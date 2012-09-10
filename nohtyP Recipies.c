@@ -1,5 +1,5 @@
 /*
- * nohtyP.h - A Python-like API for C, in one .c and one .h
+ * nohtyP Recipies.c - A Python-like API for C, in one .c and one .h
  *      Public domain?  PSF?  dunno
  *      http://nohtyp.wordpress.com/
  *      TODO Python's license
@@ -42,7 +42,7 @@ RECIPIE( BuildingLists )
         yp_decref( list );
     }
 
-    /* Build list( "ABCDE" ), continuing on error */
+    /* Build list( "ABCDE" ), TODO dealing with errors appropriately */
     {
         ypObject *list = yp_listN( 0 );
         ypObject *item;
