@@ -82,8 +82,10 @@ void yp_initialize( void );
 
 
 /*
- * Reference counting
+ * Object fundamentals
  */
+
+typedef struct _ypObject ypObject;
 
 // Increments the reference count of x, returning it as a convenience.  Always succeeds; if x is
 // immortal this is a no-op.
@@ -103,6 +105,8 @@ void yp_decrefN( yp_ssize_t n, ... );
 /*
  * Freezing, "unfreezing", and invalidating
  */
+// TODO For all of these, esp the deep variants, consider how to handle types that don't have
+// frozen/unfrozen variants!
 
 // Steals x, transmutes it to its associated immutable type, and returns a new reference to it.
 // If x is already immutable or has been invalidated this is a no-op; if x can't be frozen
@@ -386,10 +390,6 @@ yp_ord
 
 
 
-
-
-
-
 // A function to create a list of yp_Nones, which can be replaced in turn
 // by the real values; avoids resizing the list constantly when the length
 // is known beforehand.
@@ -398,5 +398,20 @@ yp_ord
 
 
 // A macro to get exception info as a string, include file/line info.
+
+
+
+/*
+ * XXX Internals; do not use directly!
+ */
+
+struct _ypObject {
+    yp_uint32_t ob_type_refcnt;     // first byte type code, remainder ref count
+    yp_uint32_t ob_alloclen_hash;   // allocated length for mutables, hash for immutables
+    yp_uint32_t ob_len;             // length of object, if applicable
+    void *      ob_allocptr;        // pointer to allocated data, if applicable
+};
+
+
 
 
