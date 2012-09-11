@@ -26,10 +26,14 @@
     ( ((type) & 0xFFu) | (((refcnt) & 0xFFFFFFu) << 8) )
 #define ypObject_TYPE_CODE( ob ) \
     ( ((yp_uint8_t *)(ob))[0] )
-#define ypObject_TYPE( ob ) \
-    ( ypTypeTable[ypObject_TYPE_CODE( ob )] )
+#define ypObject_SET_TYPE_CODE( ob, type ) \
+    ( ((yp_uint8_t *)(ob))[0] = (type) )
 #define ypObject_TYPE_CODE_IS_MUTABLE( type ) \
     ( (type) & 0x1u )
+#define ypObject_TYPE_CODE_AS_FROZEN( type ) \
+    ( (type) | 0x1u )
+#define ypObject_TYPE( ob ) \
+    ( ypTypeTable[ypObject_TYPE_CODE( ob )] )
 #define ypObject_IS_MUTABLE( ob ) \
     ( ypObject_TYPE_CODE_IS_MUTABLE( ypObject_TYPE_CODE( ob ) ) )
 #define ypObject_REFCNT( ob ) \
@@ -204,8 +208,103 @@ typedef struct _typeobject {
 
 
 /*************************************************************************************************
+ * Helpful functions and macros for the type methods/functions
+ *************************************************************************************************/
+
+// Functions that modify their inputs take a "ypObject **x"; use this as 
+// "return_yp_INPLACE_ERR( *x, yp_TypeError );" to return the error properly
+#define return_yp_INPLACE_ERR( ob, err ) \
+    do { yp_decref( ob ); (ob) = (err); return; } while( 0 )
+
+
+
+/*************************************************************************************************
+ * Freezing, "unfreezing", and invalidating
+ *************************************************************************************************/
+
+
+ypObject *_yp_freeze( ypObject *x )
+{
+    int oldCode = ypObject_TYPE_CODE( *x );
+    int newCode = ypObject_TYPE_CODE_AS_FROZEN( oldCode );
+    ypTypeObject *newType;
+    ypObject *result;
+
+    // Check if it's already frozen (no-op) or if it can't be frozen (error)
+    if( oldCode == newCode ) return NULL;
+    newType = ypTypeTable[newCode];
+    if( newType == NULL ) return yp_TypeError;
+
+    // Freeze the object, discarding alloclen and possibly reducing memory usage, etc
+    ypObject_SET_TYPE_CODE( *x, newCode );
+    (*x)->ob_alloclen_hash = ypObject_HASH_NOT_CACHED;
+    return newType->tp_after_freeze( *x );
+}
+
+void yp_freeze( ypObject **x )
+{
+    ypObject *result = _yp_freeze( *x );
+    if( result != NULL ) return_yp_INPLACE_ERR( *x, result );
+}
+
+ypObject *_yp_deepfreeze( ypObject *x, ypObject *memo )
+{
+    ypObject *id;
+    ypObject *result;
+    
+    // Avoid recursion
+    // TODO yp_add_unique returns key error if object already in set
+    id = yp_intC( (yp_int64_t) x );
+    result = yp_add_unique( memo, id );
+    yp_decref( id );
+    if( result == yp_KeyError ) return NULL; // success
+    if( yp_isexceptionC( result ) ) return result;
+
+    // Freeze current object before going deep
+    result = _yp_freeze( x );
+    if( result != NULL ) return result;
+    // TODO tp_traverse should return if its visitor returns non-NULL...?  Or should we track
+    // additional data in what is currently memo?
+    return ypObject_TYPE( x )->tp_traverse( x, _yp_deepfreeze, memo );
+}
+
+void yp_deepfreeze( ypObject **x )
+{
+    ypObject *memo = yp_setN( 0 );
+    ypObject *result = _yp_deepfreeze( *x, memo );
+    yp_decref( memo );
+    if( result != NULL ) return_yp_INPLACE_ERR( *x, result );
+}
+
+// Returns a new reference to a mutable shallow copy of x, or yp_MemoryError.
+ypObject *yp_unfrozen_copy( ypObject *x );
+
+// Returns a new reference to a mutable deep copy of x, or yp_MemoryError.
+ypObject *yp_unfrozen_deepcopy( ypObject *x );
+
+ypObject *yp_frozen_copy( ypObject *x );
+
+ypObject *yp_frozen_deepcopy( ypObject *x );
+
+// Steals x, discards all referenced objects, deallocates _some_ memory, transmutes it to
+// the ypInvalidated type (rendering the object useless), and returns a new reference to x.
+// If x is immortal or already invalidated this is a no-op.
+void yp_invalidate( ypObject **x );
+
+// Steals and invalidates x and, recursively, all referenced objects, returning a new reference.
+void yp_deepinvalidate( ypObject **x );
+
+
+
+
+
+
+/*************************************************************************************************
  * Public object interface
  *************************************************************************************************/
+
+// TODO should I be filling the type tables completely with function pointers that just return
+// ypMethodError, to avoid having to write NULL checks?
 
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
 #define _yp_REDIRECT1( ob, tp_meth, args ) \
@@ -226,7 +325,7 @@ typedef struct _typeobject {
     ypObject *result; \
     if( type->tp_meth == NULL ) result = ypMethodError; \
     else result = type->tp_meth args; \
-    if( result != NULL ) { yp_decref( *pOb ); *pOb = result; } \
+    if( result != NULL ) return_yp_INPLACE_ERR( *pOb, result ); \
     return;
 
 #define _yp_INPLACE2( pOb, tp_suite, suite_meth, args ) \
@@ -234,7 +333,7 @@ typedef struct _typeobject {
     ypObject *result; \
     if( type->tp_suite == NULL || type->tp_suite->suite_meth == NULL ) result = ypMethodError; \
     else result = type->tp_suite->suite_meth args; \
-    if( result != NULL ) { yp_decref( *pOb ); *pOb = result; } \
+    if( result != NULL ) return_yp_INPLACE_ERR( *pOb, result ); \
     return;
 
 void yp_append( ypObject **s, ypObject *x ) {
