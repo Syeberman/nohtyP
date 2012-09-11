@@ -106,14 +106,15 @@ void yp_decrefN( yp_ssize_t n, ... );
  * Freezing, "unfreezing", and invalidating
  */
 // TODO For all of these, esp the deep variants, consider how to handle types that don't have
-// frozen/unfrozen variants!
+// frozen/unfrozen variants!  For now, let's return TypeError.
 
 // Steals x, transmutes it to its associated immutable type, and returns a new reference to it.
 // If x is already immutable or has been invalidated this is a no-op; if x can't be frozen
-ypObject *yp_freeze( ypObject *x );
+// yp_TypeError is returned.
+void yp_freeze( ypObject **x );
 
 // Steals and freezes x and, recursively, all referenced objects, returning a new reference.
-ypObject *yp_deepfreeze( ypObject *x );
+void yp_deepfreeze( ypObject **x );
 
 // TODO a bit in the ypObject header to track recursion
 
@@ -130,10 +131,10 @@ ypObject *yp_frozen_deepcopy( ypObject *x );
 // Steals x, discards all referenced objects, deallocates _some_ memory, transmutes it to
 // the ypInvalidated type (rendering the object useless), and returns a new reference to x.
 // If x is immortal or already invalidated this is a no-op.
-ypObject *yp_invalidate( ypObject *x );
+void yp_invalidate( ypObject **x );
 
 // Steals and invalidates x and, recursively, all referenced objects, returning a new reference.
-ypObject *yp_deepinvalidate( ypObject *x );
+void yp_deepinvalidate( ypObject **x );
 
 
 /*
@@ -227,7 +228,7 @@ ypObject *yp_not( ypObject *x );
 
 
 /*
- * Constructors
+ * Constructors TODO reorder
  */
 
 // Returns a new mutable bytearray, copying the first len bytes from source.  If source is NULL it
@@ -258,7 +259,7 @@ ypObject *yp_set
 ypObject *yp_frozenset
 
 // TODO unfrozen int?
-ypObject *yp_intC( long long value );
+ypObject *yp_intC( yp_int64_t value );
 
 
 ypObject *yp_listN( yp_ssize_t n, ... );
