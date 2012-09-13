@@ -63,6 +63,14 @@
  * object, even immutable ones, before exchanging between threads.  Sharing immutable, immortal
  * objects is always safe.
  *
+ * The naming convention for functions, types, and so forth is first-and-foremost geared towards
+ * reducing keystrokes for the common cases.  "Runtime entities" like functions are prefixed with
+ * yp_, "compiler entities" like types with yp (no underscore).  The boundary between C an nohtyP
+ * is an important one.  Functions that accept C types and return objects end in "C"; those that
+ * accept objects and return C types end in "_asC", unless it is unambiguous that the return is a C
+ * type as in yp_isexceptionC or yp_lenC; finally, if the specific C type is important, as it is
+ * with numbers, the type is contained in the function name ("yp_int_asuint8C").
+ *
  * Postfixes:
  *  C - to/from C types
  *  D - discard after use (ie yp_IFd)
