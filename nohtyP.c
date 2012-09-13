@@ -37,14 +37,23 @@
 #define ypObject_IS_MUTABLE( ob ) \
     ( ypObject_TYPE_CODE_IS_MUTABLE( ypObject_TYPE_CODE( ob ) ) )
 #define ypObject_REFCNT( ob ) \
-    ( ((ypObject *)(ob))->ob_type_refnt >> 8 )
+    ( ((ypObject *)(ob))->ob_type_refcnt >> 8 )
+
+// Type pairs are identified by the immutable type code, as all its methods are supported by the
+// immutable version
+#define yp_TYPE_PAIR_CODE( ob ) \
+    ypObject_TYPE_CODE_AS_FROZEN( ypObject_TYPE_CODE( ob ) )
+
 
 // A refcnt of this value means the object is immortal
 #define ypObject_REFCNT_IMMORTAL (0xFFFFFFu)
 
-// When a hash of this value is stored in ob_alloclen_hash, call tp_hash (which may then update
-// cache)
+// When a hash of this value is stored in ob_hash, call tp_hash (which may then update cache)
 #define ypObject_HASH_NOT_CACHED (0xFFFFFFFFu)
+
+// Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
+#define ypObject_LEN_INVALID        (0xFFFFu)
+#define ypObject_ALLOCLEN_INVALID   (0xFFFFu)
 
 // "CONSTants" are immutable immortals
 #define ypObject_HEAD_INIT_CONST( type, len ) \
@@ -121,7 +130,7 @@ typedef struct {
     objobjproc sq_contains;
 
 
-typedef struct _typeobject {
+typedef struct {
     ypObject_HEAD
     ypObject *tp_name; /* For printing, in format "<module>.<name>" */
     yp_ssize_t tp_basicsize, tp_itemsize; /* For allocation */ // TODO remove?
@@ -161,61 +170,149 @@ typedef struct _typeobject {
     getiterfunc tp_iter;
     iternextfunc tp_iternext;
 
-#ifdef COUNT_ALLOCS
-    /* these must be last and never explicitly initialized */
-    yp_ssize_t tp_allocs;
-    yp_ssize_t tp_frees;
-    yp_ssize_t tp_maxalloc;
-    struct _typeobject *tp_prev;
-    struct _typeobject *tp_next;
-#endif
 } ypTypeObject;
-#endif
 
 // Codes for the standard types (for lookup in the type table)
-#define ypInvalidated_TYPE          (  0u)
+#define ypInvalidated_CODE          (  0u)
 // no mutable ypInvalidated type    (  1u)
-#define ypException_TYPE            (  2u)
+#define ypException_CODE            (  2u)
 // no mutable ypException type      (  3u)
-#define ypType_TYPE                 (  4u)
+#define ypType_CODE                 (  4u)
 // no mutable ypType type           (  5u)
 
-#define ypNone_TYPE                 (  6u)
+#define ypNone_CODE                 (  6u)
 // no mutable ypNone type           (  7u)
-#define ypBool_TYPE                 (  8u)
-// no mutable ypBool type           (  9u)
+#define ypBool_CODE                 (  8u)
+// TODO what to call a mutalbe bool (  9u)
 
-#define ypInt_TYPE                  ( 10u)
+#define ypInt_CODE                  ( 10u)
 // TODO what to call a mutable int  ( 11u)
-#define ypFloat_TYPE                ( 12u)
+#define ypFloat_CODE                ( 12u)
 // TODO what to call a mutable float( 13u)
 
 // no immutable ypIter type         ( 14u)
-#define ypIter_TYPE                 ( 15u)
+#define ypIter_CODE                 ( 15u)
 
-#define ypBytes_TYPE                ( 16u)
-#define ypByteArray_TYPE            ( 17u)
-#define ypStr_TYPE                  ( 18u)
-#define ypCharacterArray_TYPE       ( 19u)
-#define ypTuple_TYPE                ( 20u)
-#define ypList_TYPE                 ( 21u)
+#define ypBytes_CODE                ( 16u)
+#define ypByteArray_CODE            ( 17u)
+#define ypStr_CODE                  ( 18u)
+#define ypCharacterArray_CODE       ( 19u)
+#define ypTuple_CODE                ( 20u)
+#define ypList_CODE                 ( 21u)
 
-#define ypFrozenSet_TYPE            ( 22u)
-#define ypSet_TYPE                  ( 23u)
+#define ypFrozenSet_CODE            ( 22u)
+#define ypSet_CODE                  ( 23u)
 
-#define ypFrozenDict_TYPE           ( 24u)
-#define ypDict_TYPE                 ( 25u)
+#define ypFrozenDict_CODE           ( 24u)
+#define ypDict_CODE                 ( 25u)
 
 
 /*************************************************************************************************
- * Helpful functions and macros for the type methods/functions
+ * Helpful functions and macros for the type code
  *************************************************************************************************/
+
+// Declares the ob_inline_data array for container object structures
+#define yp_INLINE_DATA( elemType ) \
+    elemType ob_inline_data[1]
+
+// Return sizeof for a structure member
+#define _yp_sizeof_member( structType, member ) \
+    sizeof( ((structType *)0)->member )
+
+// Sets ptr to a malloc'd buffer for fixed, non-container objects, or NULL on failure
+#define ypMem_MALLOC_FIXED( ptr, obStruct, type ) \
+    do { \
+        (ptr) = (ypObject *) malloc( sizeof( obStruct ) ); \
+        if( ptr == NULL ) break; \
+        (ptr)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
+        (ptr)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ptr)->ob_len = ypObject_LEN_INVALID; \
+        (ptr)->ob_alloclen = ypObject_ALLOCLEN_INVALID; \
+        (ptr)->ob_data = NULL; \
+    } while( 0 )
+
+// Sets ptr to a malloc'd buffer for an immutable container object holding alloclen elements, or
+// NULL on failure; ob_inline_data in obStruct is used to determine the element size and ob_data;
+// ob_len is set to zero
+#define ypMem_MALLOC_CONTAINER_INLINE( ptr, obStruct, type, alloclen ) \
+    do { \
+        (ptr) = (ypObject *) malloc( sizeof( obStruct )/*includes one element*/ + \
+                ((alloclen-1) * _yp_sizeof_member( obStruct, ob_inline_data[0] )) ); \
+        if( ptr == NULL ) break; \
+        (ptr)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
+        (ptr)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ptr)->ob_len = 0; \
+        (ptr)->ob_alloclen = alloclen; \
+        (ptr)->ob_data = ((obStruct *)(ptr))->ob_inline_data; \
+    } while( 0 )
+
+// Sets ptr to a malloc'd buffer for a mutable container currently holding alloclen elements, or
+// NULL on failure; ob_inline_data in obStruct is used to determine the element size; ob_len is set
+// to zero
+#define ypMem_MALLOC_CONTAINER_VARIABLE( ptr, obStruct, type, alloclen ) \
+    do { \
+        (ptr) = (ypObject *) malloc( sizeof( obStruct )/*includes one element*/ - \
+                _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
+        if( ptr == NULL ) break; \
+        (ptr)->ob_data = malloc( (alloclen) * _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
+        if( (ptr)->ob_data == NULL ) { free( ptr ); break; } \
+        (ptr)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
+        (ptr)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ptr)->ob_len = 0; \
+        (ptr)->ob_alloclen = alloclen; \
+    } while( 0 )
+
+#undef _yp_sizeof_member
 
 // Functions that modify their inputs take a "ypObject **x"; use this as 
 // "return_yp_INPLACE_ERR( *x, yp_TypeError );" to return the error properly
 #define return_yp_INPLACE_ERR( ob, err ) \
     do { yp_decref( ob ); (ob) = (err); return; } while( 0 )
 
+
+
+
+/*************************************************************************************************
+ * Object fundamentals
+ *************************************************************************************************/
+
+ypObject *yp_incref( ypObject *x )
+{
+    yp_uint32_t refcnt = ypObject_REFCNT( x );
+    if( refcnt == ypObject_REFCNT_IMMORTAL ) return x; // no-op
+    x->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( ypObject_TYPE( x ), refcnt+1 );
+    return x;
+}
+
+void yp_increfN( yp_ssize_t n, ... )
+{
+    va_list args;
+    int i;
+    va_start( args, n );
+    for( i = 0; i < n; i++ ) yp_incref( va_arg( args, ypObject * ) );
+    va_end( args );
+}
+
+void yp_decref( ypObject *x )
+{
+    yp_uint32_t refcnt = ypObject_REFCNT( x );
+    if( refcnt == ypObject_REFCNT_IMMORTAL ) return x; // no-op
+
+    if( refcnt <= 1 ) {
+        yp_TYPE( x )->tp_dealloc( x );
+    } else {
+        x->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( ypObject_TYPE( x ), refcnt-1 );
+    }
+}
+
+void yp_decrefN( yp_ssize_t n, ... )
+{
+    va_list args;
+    int i;
+    va_start( args, n );
+    for( i = 0; i < n; i++ ) yp_decref( va_arg( args, ypObject * ) );
+    va_end( args );
+}
 
 
 /*************************************************************************************************
@@ -235,9 +332,9 @@ ypObject *_yp_freeze( ypObject *x )
     newType = ypTypeTable[newCode];
     if( newType == NULL ) return yp_TypeError;
 
-    // Freeze the object, discarding alloclen and possibly reducing memory usage, etc
+    // Freeze the object, ensure hash will be recalculated, and possibly reduce memory usage, etc
     ypObject_SET_TYPE_CODE( *x, newCode );
-    (*x)->ob_alloclen_hash = ypObject_HASH_NOT_CACHED;
+    (*x)->ob_hash = ypObject_HASH_NOT_CACHED;
     return newType->tp_after_freeze( *x );
 }
 
@@ -295,8 +392,11 @@ void yp_invalidate( ypObject **x );
 void yp_deepinvalidate( ypObject **x );
 
 
+/*************************************************************************************************
+ * Boolean operations
+ *************************************************************************************************/
 
-
+// TODO
 
 
 /*************************************************************************************************
@@ -344,6 +444,173 @@ void yp_append( ypObject **s, ypObject *x ) {
 
 
 // TODO undef necessary stuff
+
+
+/*************************************************************************************************
+ * Bools
+ *************************************************************************************************/
+
+// Returns 1 if the bool object is true, else 0; only valid on bool objects!  The return can also
+// be interpreted as the value of the boolean.
+// XXX This assumes that yp_True and yp_False are the only two bools
+#define ypBool_IS_TRUE_C( b ) ( ((ypBoolObject *)b) == yp_True )
+
+
+/*************************************************************************************************
+ * Integers
+ *************************************************************************************************/
+
+static ypObject *yp_int_iadd( ypObject *x, ypObject *y ) 
+{
+    x->value += y->value; // TODO overflow check, etc
+}
+
+static ypObject *yp_int_add( ypObject *x, ypObject *y ) 
+{
+    // TODO check type first; no sense making the same copy
+    ypObject *new = yp_unfrozen_copy( x );
+    return _yp_int_add( new, y );
+}
+
+
+/*************************************************************************************************
+ * Floats
+ *************************************************************************************************/
+
+
+/*************************************************************************************************
+ * Iterators
+ *************************************************************************************************/
+
+
+/*************************************************************************************************
+ * Sequence of bytes
+ *************************************************************************************************/
+
+typedef struct {
+    ypObject_HEAD
+    yp_INLINE_DATA( yp_uint8_t );
+} ypBytesObject;
+
+#define ypBytes_DATA( b ) ( (yp_uint8_t *) ((ypBytesObject *)b)->ob_data )
+// TODO what if ob_len is the "invalid" value?
+#define ypBytes_LEN( b )  ( ((ypObject *)b)->ob_len )
+
+// Return a new bytes object with uninitialized data of the given length, or an exception
+static ypObject *_yp_bytes_new( yp_ssize_t len )
+{
+    ypObject *b;
+    ypMem_MALLOC_CONTAINER_INLINE( b, ypBytesObject, ypBytes_CODE, len );
+    if( b == NULL ) return yp_MemoryError;
+    b->ob_len = len;
+    return b;
+}
+
+// Return a new bytes object with uninitialized data of the given length, or an exception
+// TODO Over-allocate to avoid future resizings
+static ypObject *_yp_bytearray_new( yp_ssize_t len )
+{
+    ypObject *b;
+    ypMem_MALLOC_CONTAINER_VARIABLE( b, ypBytesObject, ypByteArray_CODE, len );
+    if( b == NULL ) return yp_MemoryError;
+    b->ob_len = len;
+    return b;
+}
+
+
+
+// TODO resize bytearray
+
+
+
+// If x is an exception, return immediately.  If x is a bool/int in range(256), store value in
+// storage and set *x_data=storage, x_len=1.  If x is a fellow bytes, set *x_data and x_len.
+// Returns NULL on success, exception on error.
+static ypObject *_bytes_coerce( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len, 
+        yp_uint8_t *storage )
+{
+    ypObject *result;
+    int x_type = yp_TYPE_PAIR_CODE( x );
+    if( x_type == ypException_CODE ) return x;
+
+    if( x_type == yp_Bool_CODE || x_type == ypInt_CODE ) {
+        result = yp_as_uint8C( x, storage );
+        if( yp_isexceptionC( result ) ) return result;
+        *x_data = storage;
+        *x_len = 1;
+    } else if( x_type == ypBytes_CODE ) {
+        *x_data = ypBytes_DATA( x );
+        *x_len = ypBytes_LEN( x );
+    }
+    return NULL; // success
+}
+
+static ypObject *bytes_contains( ypObject *b, ypObject *x )
+{
+    ypObject *result;
+    yp_uint8_t *x_data;
+    yp_ssize_t x_len;        
+    yp_uint8_t storage;
+    yp_uint8_t *b_rdata;   // remaining data
+    yp_ssize_t b_rlen;     // remaining length
+    
+    result = _bytes_coerce( x, &x_data, &x_len, &storage );
+    if( result != NULL ) return result;
+
+    b_rdata = ypBytes_DATA( b );
+    b_rlen = ypBytes_LEN( b );
+    while( b_rlen >= x_len ) {
+        if( memcmp( b_rdata, x_data, x_len ) == 0 ) return yp_True;
+        b_rdata++; b_rlen--;
+    }
+    return yp_False;   
+}
+
+static ypObject *bytearray_iconcat( ypObject *b, ypObject *x )
+{
+    ypObject *result;
+    yp_uint8_t *x_data;
+    yp_ssize_t x_len;        
+    yp_uint8_t storage;
+    yp_uint8_t *b_rdata;   // remaining data
+    yp_ssize_t b_rlen;     // remaining length
+    
+    result = _bytes_coerce( x, &x_data, &x_len, &storage );
+    if( result != NULL ) return result;
+
+    // TODO
+    b_rdata = ypBytes_DATA( b );
+    b_rlen = ypBytes_LEN( b );
+    while( b_rlen >= x_len ) {
+        if( memcmp( b_rdata, x_data, x_len ) == 0 ) return yp_True;
+        b_rdata++; b_rlen--;
+    }
+    return yp_False;   
+}
+
+static ypObject *bytes_concat( ypObject *b, ypObject *x )
+{
+    // TODO freeze if b is frozen
+}
+
+
+
+
+
+// TODO undef macros
+
+
+/*************************************************************************************************
+ * Sequence of unicode characters
+ *************************************************************************************************/
+
+
+/*************************************************************************************************
+ * Sequence of generic items
+ *************************************************************************************************/
+
+
+
 
 
 /*************************************************************************************************
