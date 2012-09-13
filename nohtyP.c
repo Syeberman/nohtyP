@@ -219,47 +219,66 @@ typedef struct {
 #define _yp_sizeof_member( structType, member ) \
     sizeof( ((structType *)0)->member )
 
-// Sets ptr to a malloc'd buffer for fixed, non-container objects, or NULL on failure
-#define ypMem_MALLOC_FIXED( ptr, obStruct, type ) \
+// XXX Currently expected that malloc(0) and realloc(p,0) are suported
+
+// Sets ob to a malloc'd buffer for fixed, non-container objects, or yp_MemoryError on failure
+#define ypMem_MALLOC_FIXED( ob, obStruct, type ) \
     do { \
-        (ptr) = (ypObject *) malloc( sizeof( obStruct ) ); \
-        if( ptr == NULL ) break; \
-        (ptr)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
-        (ptr)->ob_hash = ypObject_HASH_NOT_CACHED; \
-        (ptr)->ob_len = ypObject_LEN_INVALID; \
-        (ptr)->ob_alloclen = ypObject_ALLOCLEN_INVALID; \
-        (ptr)->ob_data = NULL; \
+        (ob) = (ypObject *) malloc( sizeof( obStruct ) ); \
+        if( (ob) == NULL ) { (ob) = yp_MemoryError; break; }; \
+        (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
+        (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ob)->ob_len = ypObject_LEN_INVALID; \
+        (ob)->ob_alloclen = ypObject_ALLOCLEN_INVALID; \
+        (ob)->ob_data = NULL; \
     } while( 0 )
 
-// Sets ptr to a malloc'd buffer for an immutable container object holding alloclen elements, or
-// NULL on failure; ob_inline_data in obStruct is used to determine the element size and ob_data;
-// ob_len is set to zero
-#define ypMem_MALLOC_CONTAINER_INLINE( ptr, obStruct, type, alloclen ) \
+// TODO check that alloclen isn't >= ALOCLEN_INVALID (or negative?)
+
+// Sets ob to a malloc'd buffer for an immutable container object holding alloclen elements, or
+// yp_MemoryError on failure.  ob_inline_data in obStruct is used to determine the element size 
+// and ob_data; ob_len is set to zero.  alloclen cannot be negative.
+#define ypMem_MALLOC_CONTAINER_INLINE( ob, obStruct, type, alloclen ) \
     do { \
-        (ptr) = (ypObject *) malloc( sizeof( obStruct )/*includes one element*/ + \
+        (ob) = (ypObject *) malloc( sizeof( obStruct )/*includes one element*/ + \
                 ((alloclen-1) * _yp_sizeof_member( obStruct, ob_inline_data[0] )) ); \
-        if( ptr == NULL ) break; \
-        (ptr)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
-        (ptr)->ob_hash = ypObject_HASH_NOT_CACHED; \
-        (ptr)->ob_len = 0; \
-        (ptr)->ob_alloclen = alloclen; \
-        (ptr)->ob_data = ((obStruct *)(ptr))->ob_inline_data; \
+        if( (ob) == NULL ) { (ob) = yp_MemoryError; break; }; \
+        (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
+        (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ob)->ob_len = 0; \
+        (ob)->ob_alloclen = alloclen; \
+        (ob)->ob_data = ((obStruct *)(ob))->ob_inline_data; \
     } while( 0 )
 
-// Sets ptr to a malloc'd buffer for a mutable container currently holding alloclen elements, or
-// NULL on failure; ob_inline_data in obStruct is used to determine the element size; ob_len is set
-// to zero
-#define ypMem_MALLOC_CONTAINER_VARIABLE( ptr, obStruct, type, alloclen ) \
+// Sets ob to a malloc'd buffer for a mutable container currently holding alloclen elements, or
+// yp_MemoryError on failure.  ob_inline_data in obStruct is used to determine the element size; 
+// ob_len is set to zero.  alloclen cannot be negative.
+#define ypMem_MALLOC_CONTAINER_VARIABLE( ob, obStruct, type, alloclen ) \
     do { \
-        (ptr) = (ypObject *) malloc( sizeof( obStruct )/*includes one element*/ - \
+        (ob) = (ypObject *) malloc( sizeof( obStruct )/*includes one element*/ - \
                 _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
-        if( ptr == NULL ) break; \
-        (ptr)->ob_data = malloc( (alloclen) * _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
-        if( (ptr)->ob_data == NULL ) { free( ptr ); break; } \
-        (ptr)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
-        (ptr)->ob_hash = ypObject_HASH_NOT_CACHED; \
-        (ptr)->ob_len = 0; \
-        (ptr)->ob_alloclen = alloclen; \
+        if( (ob) == NULL ) { (ob) = yp_MemoryError; break; }; \
+        (ob)->ob_data = malloc( (alloclen) * _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
+        if( (ob)->ob_data == NULL ) { free( ob ); (ob) = yp_MemoryError; break; } \
+        (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
+        (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ob)->ob_len = 0; \
+        (ob)->ob_alloclen = alloclen; \
+    } while( 0 )
+
+// Resizes ob_data, the variable-portion of ob, to the given alloclen, and sets result to NULL.
+// If realloc fails, result is set to yp_MemoryError and ob is not modified.  ob_inline_data in
+// obStruct is used to determine the element size; ob_alloclen is set to newAlloclen.
+// Any objects in the  truncated section must have already been discarded.  newAlloclen cannot be
+// negative.
+#define ypMem_REALLOC_CONTAINER_VARIABLE( result, ob, obStruct, newAlloclen ) \
+    do { \
+        void *newData = realloc( \
+                (newAlloclen) * _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
+        if( newData == NULL ) { (result) = yp_MemoryError; break; }; \
+        (result) = NULL; /* success */ \
+        (ob)->ob_data = newData; \
+        (ob)->ob_alloclen = newAlloclen; \
     } while( 0 )
 
 #undef _yp_sizeof_member
@@ -405,6 +424,7 @@ void yp_deepinvalidate( ypObject **x );
 
 // TODO should I be filling the type tables completely with function pointers that just return
 // ypMethodError, to avoid having to write NULL checks?
+// TODO do/while(0)
 
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
 #define _yp_REDIRECT1( ob, tp_meth, args ) \
@@ -500,8 +520,9 @@ typedef struct {
 static ypObject *_yp_bytes_new( yp_ssize_t len )
 {
     ypObject *b;
+    if( len < 0 ) len = 0;
     ypMem_MALLOC_CONTAINER_INLINE( b, ypBytesObject, ypBytes_CODE, len );
-    if( b == NULL ) return yp_MemoryError;
+    if( isexceptionC( b ) ) return b;
     b->ob_len = len;
     return b;
 }
@@ -511,17 +532,39 @@ static ypObject *_yp_bytes_new( yp_ssize_t len )
 static ypObject *_yp_bytearray_new( yp_ssize_t len )
 {
     ypObject *b;
+    if( len < 0 ) len = 0;
     ypMem_MALLOC_CONTAINER_VARIABLE( b, ypBytesObject, ypByteArray_CODE, len );
-    if( b == NULL ) return yp_MemoryError;
+    if( isexceptionC( b ) ) return b;
     b->ob_len = len;
     return b;
 }
 
+// Returns a copy of the bytes object; the new object will have the given length. If 
+// len is less than b->ob_len, data is truncated; if equal, returns an exact copy; if greater, 
+// extra bytes are uninitialized.
+static ypObject *_yp_bytes_copy( ypObject *b, yp_ssize_t len )
+{
+    ypObject *newB;
+    if( ypObject_IS_MUTABLE( b ) ) {
+        newB = _yp_bytearray_new( len );
+    } else {
+        newB = _yp_bytes_new( len );
+    }
+    if( isexceptionC( newB ) ) return newB;
+    memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), MIN( len, ypBytes_LEN( b ) ) );
+    return newB;
+}
 
-
-// TODO resize bytearray
-
-
+// Shrinks or grows the bytearray; any new bytes are uninitialized.  Returns NULL on success,
+// exception on error.
+static ypObject *_yp_bytearray_resize( ypObject *b, yp_ssize_t newLen )
+{
+    ypObject *result;
+    ypMem_REALLOC_CONTAINER_VARIABLE( result, *b, ypBytesObject, newLen );
+    if( result != NULL ) return result;
+    b->ob_len = len;
+    return NULL;
+}
 
 // If x is an exception, return immediately.  If x is a bool/int in range(256), store value in
 // storage and set *x_data=storage, x_len=1.  If x is a fellow bytes, set *x_data and x_len.
@@ -545,6 +588,7 @@ static ypObject *_bytes_coerce( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_
     return NULL; // success
 }
 
+// Returns True, False, or an exception
 static ypObject *bytes_contains( ypObject *b, ypObject *x )
 {
     ypObject *result;
@@ -566,31 +610,41 @@ static ypObject *bytes_contains( ypObject *b, ypObject *x )
     return yp_False;   
 }
 
+// Returns new reference or an exception
+static ypObject *bytes_concat( ypObject *b, ypObject *x )
+{
+    ypObject *result;
+    yp_uint8_t *x_data;
+    yp_ssize_t x_len;        
+    yp_uint8_t storage;
+    ypObject *newB;
+    
+    result = _bytes_coerce( x, &x_data, &x_len, &storage );
+    if( result != NULL ) return result;
+
+    newB = _yp_bytes_copy( b, ypBytes_LEN( b ) + x_len );
+    if( isexceptionC( newB ) ) return newB;
+
+    memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), x_data, x_len );
+    return newB;
+}
+
+// Returns NULL or an exception
 static ypObject *bytearray_iconcat( ypObject *b, ypObject *x )
 {
     ypObject *result;
     yp_uint8_t *x_data;
     yp_ssize_t x_len;        
     yp_uint8_t storage;
-    yp_uint8_t *b_rdata;   // remaining data
-    yp_ssize_t b_rlen;     // remaining length
     
     result = _bytes_coerce( x, &x_data, &x_len, &storage );
     if( result != NULL ) return result;
 
-    // TODO
-    b_rdata = ypBytes_DATA( b );
-    b_rlen = ypBytes_LEN( b );
-    while( b_rlen >= x_len ) {
-        if( memcmp( b_rdata, x_data, x_len ) == 0 ) return yp_True;
-        b_rdata++; b_rlen--;
-    }
-    return yp_False;   
-}
+    result = _yp_bytearray_resize( b, ypBytes_LEN( b ) + x_len );
+    if( result != NULL ) return result;
 
-static ypObject *bytes_concat( ypObject *b, ypObject *x )
-{
-    // TODO freeze if b is frozen
+    memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), x_data, x_len );
+    return NULL;
 }
 
 
