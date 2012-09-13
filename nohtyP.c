@@ -584,12 +584,15 @@ static ypObject *_bytes_coerce( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_
     } else if( x_type == ypBytes_CODE ) {
         *x_data = ypBytes_DATA( x );
         *x_len = ypBytes_LEN( x );
+    } else {
+        return yp_TypeError;
     }
     return NULL; // success
 }
 
-// Returns True, False, or an exception
-static ypObject *bytes_contains( ypObject *b, ypObject *x )
+// Returns NULL or an exception
+// XXX Ensure that yp_ValueError from this function unambiguously means "not found"
+static ypObject *bytes_index_asC( ypObject *b, ypObject *x, yp_ssize_t *i )
 {
     ypObject *result;
     yp_uint8_t *x_data;
@@ -604,10 +607,24 @@ static ypObject *bytes_contains( ypObject *b, ypObject *x )
     b_rdata = ypBytes_DATA( b );
     b_rlen = ypBytes_LEN( b );
     while( b_rlen >= x_len ) {
-        if( memcmp( b_rdata, x_data, x_len ) == 0 ) return yp_True;
+        if( memcmp( b_rdata, x_data, x_len ) == 0 ) {
+            *i = b_rdata - ypBytes_DATA( b );
+            return NULL; // success
+        }
         b_rdata++; b_rlen--;
     }
-    return yp_False;   
+    return yp_ValueError;
+}
+
+// Returns True, False, or an exception
+static ypObject *bytes_contains( ypObject *b, ypObject *x )
+{
+    ypObject *result;
+    yp_ssize_t i = -1;
+    result = bytes_index_asC( b, x, &i );
+    if( result == NULL ) return yp_True; // item found
+    if( result == yp_valueError ) return yp_False; // item not found
+    return result; // error
 }
 
 // Returns new reference or an exception
@@ -647,8 +664,37 @@ static ypObject *bytearray_iconcat( ypObject *b, ypObject *x )
     return NULL;
 }
 
+// TODO bytes_repeat
 
+// Returns new reference or an exception
+static ypObject *bytes_getitem_seqC( ypObject *b, yp_ssize_t i )
+{
+    if( i < 0 ) i += ypBytes_LEN( b );
+    if( i < 0 || i >= ypBytes_LEN( b ) ) return yp_IndexError;
+    return yp_intC( ypBytes_DATA( b )[i] );
+}
 
+// Returns new reference or an exception
+static ypObject *bytes_getsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
+{
+    // TODO a function like PySlice_GetIndicesEx to adjust values and do calculations
+}
+
+// Returns new reference or an exception
+// TODO bytes_getitem...need a generic function to redirect to getitem_seqC or getsliceC
+
+// Returns NULL or an exception
+static ypObject *bytes_lenC( ypObject *b, yp_ssize_t *len )
+{
+    *len = ypBytes_LEN( b );
+    return NULL;
+}
+
+// bytes_index_asC is above
+
+static ypObject *bytes_count_asC( ypObject *b, ypObject *x, yp_ssize_t *i )
+{
+}
 
 
 // TODO undef macros
