@@ -391,26 +391,22 @@ yp_ord
 
 
 
-// A function to create a list of yp_Nones, which can be replaced in turn
-// by the real values; avoids resizing the list constantly when the length
-// is known beforehand.
 
-
-
-
-// A macro to get exception info as a string, include file/line info.
+// A macro to get exception info as a string, include file/line info of the place the macro is
+// checked
 
 
 
 /*
- * XXX Internals; do not use directly!
+ * Internals  XXX Do not use directly!
  */
 
 struct _ypObject {
-    yp_uint32_t ob_type_refcnt;     // first byte type code, remainder ref count
-    yp_uint32_t ob_alloclen_hash;   // allocated length for mutables, hash for immutables
-    yp_uint32_t ob_len;             // length of object, if applicable
-    void *      ob_allocptr;        // pointer to allocated data, if applicable
+    yp_uint32_t ob_type_refcnt; // first byte type code, remainder ref count
+    yp_uint32_t ob_hash;        // cached hash for immutables
+    yp_uint16_t ob_len;         // length of object
+    yp_uint16_t ob_alloclen;    // allocated length
+    void *      ob_data;        // pointer to object data
 };
 
 
