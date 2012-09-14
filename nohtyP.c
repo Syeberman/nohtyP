@@ -210,6 +210,7 @@ typedef struct {
 /*************************************************************************************************
  * Helpful functions and macros for the type code
  *************************************************************************************************/
+// TODO make a separate ypMem section
 
 // Declares the ob_inline_data array for container object structures
 #define yp_INLINE_DATA( elemType ) \
@@ -709,6 +710,44 @@ static ypObject *bytes_count_asC( ypObject *b, ypObject *x, yp_ssize_t *i )
  * Sequence of generic items
  *************************************************************************************************/
 
+/*************************************************************************************************
+ * Sets
+ *************************************************************************************************/
+
+// sets and mappings share the same struct def and much of the same code, except a dict has 2x the
+// allocation as the second half of the allocation is the values
+
+// factor is 1 for sets, 2 for dicts
+#define ypSetObject_BODY( factor ) \
+    ypObject_HEAD \
+    ypObject *ob_inline_data[1][factor]; // TODO improve this definition and interaction with ypMem_MALLOC_CONTAINER_*
+
+typedef struct {
+    ypSetObject_BODY( 1 )
+} yFrozenSetObject;
+
+// set_lookkey mostly the same, except it returns an index so it can be indexed into key and, for
+// dicts, values
+
+// can rely and trust yp_eq because it's fast and we know all the implementations; also no need to
+// check for a modded dict
+
+
+
+/*************************************************************************************************
+ * Mappings
+ *************************************************************************************************/
+
+// ob_inline_data contains space for 2x alloclen objects; first half of array are keys, second is
+// values
+typedef struct {
+    ypSetObject_BODY( 2 )
+} yFrozenDictObject;
+
+// TODO blog entry: in python key/val are side-by-side, but so many keys are considered during
+// lookup and they jump all over the table that it's better to keep the keys densely packed, so
+// that they have a better chance of getting picked up in the same cache; conversely, you only look
+// up the value once, so putting them in the same cache area as keys doesn't really help
 
 
 
