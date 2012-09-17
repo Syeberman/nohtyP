@@ -10,8 +10,6 @@
  * possible, it is written in one .c and one .h file and attempts to rely strictly on standard C
  * functions.
  *
- * TODO document that bytes support format and other Python3 str-only funcs
- *
  * All objects maintain a reference count; when that count reaches zero, the object is deallocated.
  * An invalidated object can still have references to it, although any attempt to use that object
  * would result in an exception.  Objects can be declared immortal and, thus, never deallocated;
@@ -37,9 +35,6 @@
  * yp_InvalidatedError is returned.  Freezing and invalidating are two examples of object 
  * transmutation, where the type of the object is converted to a different type.
  *
- * freeze: http://www.python.org/dev/peps/pep-0351/
- * frozendict: http://www.python.org/dev/peps/pep-0416/ *
- *
  * When an error occurs in a function, it returns an exception object (after ensuring all objects
  * are left in a consistent state), even if no exceptions are mentioned in the documentation.  If
  * the function has stolen a reference, that reference is discarded.  If an exception object is
@@ -64,12 +59,13 @@
  * objects is always safe.
  *
  * The naming convention for functions, types, and so forth is first-and-foremost geared towards
- * reducing keystrokes for the common cases.  "Runtime entities" like functions are prefixed with
- * yp_, "compiler entities" like types with yp (no underscore).  The boundary between C an nohtyP
- * is an important one.  Functions that accept C types and return objects end in "C"; those that
- * accept objects and return C types end in "_asC", unless it is unambiguous that the return is a C
- * type as in yp_isexceptionC or yp_lenC; finally, if the specific C type is important, as it is
- * with numbers, the type is contained in the function name ("yp_int_asuint8C").
+ * reducing keystrokes for the common cases.  "Runtime entities" like functions and macros are
+ * prefixed with * yp_, "compiler entities" like types with yp (no underscore).  The boundary
+ * between C an nohtyP is an important one.  Functions that accept C types and return objects end
+ * in "C"; those that accept objects and return C types end in "_asC", unless it is unambiguous
+ * that the return is a C type ("yp_isexceptionC", "yp_lenC"); finally, if the specific C type
+ * is important, as it is with numbers, the type is contained in the function name 
+ * ("yp_int_asuint8C").
  *
  * Postfixes:
  *  C - to/from C types
@@ -113,27 +109,31 @@ void yp_decrefN( yp_ssize_t n, ... );
 /*
  * Freezing, "Unfreezing", and Invalidating
  */
-// TODO For all of these, esp the deep variants, consider how to handle types that don't have
-// frozen/unfrozen variants!  For now, let's return TypeError.
 
 // Steals x, transmutes it to its associated immutable type, and returns a new reference to it.
 // If x is already immutable or has been invalidated this is a no-op; if x can't be frozen
-// yp_TypeError is returned.
+// a new, invalidated object is returned (the original object is not invalidated, but the reference
+// _is_ discarded). 
 void yp_freeze( ypObject **x );
 
 // Steals and freezes x and, recursively, all referenced objects, returning a new reference.
 void yp_deepfreeze( ypObject **x );
 
-// TODO a bit in the ypObject header to track recursion
-
-// Returns a new reference to a mutable shallow copy of x, or yp_MemoryError.
+// Returns a new reference to a mutable shallow copy of x.  If x has no associated mutable type an
+// immutable copy is returned.  May also return yp_MemoryError.
 ypObject *yp_unfrozen_copy( ypObject *x );
 
-// Returns a new reference to a mutable deep copy of x, or yp_MemoryError.
+// Creates a mutable copy of x and, recursively, all referenced objects, returning a new reference
+// (or yp_MemoryError).
 ypObject *yp_unfrozen_deepcopy( ypObject *x );
 
+// Returns a new reference to an immutable shallow copy of x.  If x has no associated immutable 
+// type a new, invalidated object is returned (x is neither invalidated nor discarded).  May also
+// return yp_MemoryError.
 ypObject *yp_frozen_copy( ypObject *x );
 
+// Creates an immutable copy of x and, recursively, all referenced objects, returning a new 
+// reference (or yp_MemoryError).
 ypObject *yp_frozen_deepcopy( ypObject *x );
 
 // Steals x, discards all referenced objects, deallocates _some_ memory, transmutes it to
@@ -253,6 +253,10 @@ yp_oct
 yp_pow
 yp_round
 
+// TODO versions of the above that steal their arguments, so that operations can be chained
+// together. (yp_addD)
+// TODO inplace versions of above, for the mutable int type
+// TODO bitwise and/or need new names, so as not to conflict with yp_and/yp_or...yp_amp/yp_bar?
 
 /*
  * Iterator Operations
@@ -311,77 +315,98 @@ yp_ord
 /*
  * Optional Macros
  *
- * These macros _may_ make working with nohtyP easier, but are not required
+ * These macros may make working with nohtyP easier, but are not required.  They are best described
+ * by the nohtyP examples, but are documented below.  The implementations of these macros are
+ * considered internal; you'll find them near the end of this header.
  */
 
-// A series of optional macros to emulate an if/elif/else with exception handling.  This simplifies
-// the use of functions that return true, false, or an exception.  To be used strictly as follows:
-//  yp_IF( cond1 ) {
-//      // ...
-//  } yp_ELIF( cond2 ) {        // optional; multiple yp_ELIFs allowed
-//      // ...
-//  } yp_ELSE {                 // optional
-//      // ...
-//  } yp_ELSE_EXCEPT_AS( e ) {  // optional; can also use yp_ELSE_EXCEPT
-//      // ...
-//  } yp_ENDIF
+// yp_IF: A series of macros to emulate an if/elif/else with exception handling.  To be used 
+// strictly as follows (including braces):
+//      yp_IF( condition1 ) {
+//        // branch1
+//      } yp_ELIF( condition2 ) {   // optional; multiple yp_ELIFs allowed
+//          // branch2
+//      } yp_ELSE {                 // optional
+//          // else-branch
+//      } yp_ELSE_EXCEPT_AS( e ) {  // optional; can also use yp_ELSE_EXCEPT
+//          // exception-branch
+//      } yp_ENDIF
 // As in Python, a condition is only evaluated if previous conditions evaluated false and did not
-// raise an exception, the yp_ELSE_EXCEPT_AS branch is executed if any evaluated condition raises
-// an exception, and the exception variable is only set if an exception occurs.  Unlike Python, 
-// exceptions in the chosen branch do not trigger the yp_ELSE_EXCEPT_AS branch, and the exception
-// variable is not cleared at the end of the branch.
-// TODO what to do about references generated by the expressions?
-// XXX Implementation is considered internal; you'll find it near the end of this header
+// raise an exception, the exception-branch is executed if any evaluated condition raises an
+// exception, and the exception variable is only set if an exception occurs.  Unlike Python, 
+// exceptions in the chosen branch do not trigger the exception-branch, and the exception variable
+// is not cleared at the end of the exception-branch.
+// If a condition creates a new reference that must be discarded, use yp_IFd and/or yp_ELIFd ("d"
+// stands for "discard" or "decref"):
+//      yp_IFd( yp_getitem( a, key ) )
 
-// A series of optional macros to emulate a while/else with exception handling.
-//  yp_WHILE( expression ) {
-//      // ...
-//  } yp_WHILE_ELSE {
-//      // ...
-//  } yp_WHILE_EXCEPT_AS( e ) {
-//      // ...
-//  }
-// Expression is evaluated multiple times until it evaluates to false (or an exception)
-// TODO what to do about references generated by the expression?
-// XXX Implementation is considered internal; you'll find it near the end of this header
+// yp_WHILE: A series of macros to emulate a while/else with exception handling.  To be used
+// strictly as follows (including braces):
+//      yp_WHILE( condition ) {
+//          // suite
+//      } yp_WHILE_ELSE {           // optional
+//          // else-suite
+//      } yp_WHILE_EXCEPT_AS( e ) { // optional; can also use yp_WHILE_EXCEPT
+//          // exception-suite
+//      } yp_ENDWHILE
+// C's break and continue statements work as you'd expect.  As in Python, the condition is
+// evaluated multiple times until:
+//  - it evaluates to false, in which case the else-suite is executed
+//  - a break statement, in which case neither the else- nor exception-suites are executed
+//  - an exception occurs in condition, in which case e is set to the exception and the 
+//  exception-suite is executed
+// Unlike Python, exceptions in the suites do not trigger the exception-suite, and the exception
+// variable is not cleared at the end of the exception-suite.
+// If condition creates a new reference that must be discarded, use yp_WHILEd ("d" stands for
+// "discard" or "decref"):
+//      yp_WHILEd( yp_getindexC( a, -1 ) )
 
-// A series of optional macros to emulate a for/else with exception handling.  This simplifies the
-// use of iterators that may return exceptions.  To be used strictly as follows:
-//  yp_FOR( x, expression ) {
-//      // ...
-//  } yp_FOR_ELSE {             // optional
-//      // ...
-//  } yp_FOR_EXCEPT_AS( e ) {   // optional; can also use yp_FOR_EXCEPT
-//      // ...
-//  } yp_ENDFOR
-// As in Python, an iterator is created from the expression, the for suite is executed once for each
-// yielded value, 
-// the target is not assigned if the expression or iterator fails 
-// break and continue work as expected
-// Unlike Python, multiple targets are not allowed (no automatic tuple unpacking)
-// The iterator reference and previous items are automatically discarded, but not for the
-// expression or the final item (so that it can be used afterwards)
-// the 
-// itself.
-// TODO what to do about references generated by the expression?
-// XXX Implementation is considered internal; you'll find it near the end of this header
+// yp_FOR: A series of macros to emulate a for/else with exception handling.  To be used strictly
+// as follows (including braces):
+//      yp_FOR( x, expression ) {
+//          // suite
+//      } yp_FOR_ELSE {             // optional
+//          // else-suite
+//      } yp_FOR_EXCEPT_AS( e ) {   // optional; can also use yp_FOR_EXCEPT
+//          // exception-suite
+//      } yp_ENDFOR
+// C's break and continue statements work as you'd expect.  As in Python, the expression is
+// evaluated once to create an iterator, then the suite is executed once with each successfully-
+// yielded value assigned to x (which can be reassigned within the suite).  This occurs until:
+//  - the iterator returns yp_StopIteration, in which case else-suite is executed (but *not* the
+//  exception-suite)
+//  - a break statement, in which case neither the else- nor exception-suites are executed
+//  - an exception occurs in expression or the iterator, in which case e is set to the exception
+//  and the exception-suite is executed
+// Unlike Python, there is no automatic tuple unpacking, exceptions in the suites do not trigger
+// the exception-suite, and the exception variable is not cleared at the end of the 
+// exception-suite.
+// Be careful with references.  While the internal iterator object is automatically discarded, if
+// the expression itself creates a new reference, use yp_FORd ("d" stands for "discard" or 
+// "decref"):
+//      yp_FORd( yp_tupleN( a, b, c ) )
+// Also, the yielded values assigned to x are borrowed: they are automatically discarded at the end
+// of every suite.  If you want to retain a reference to them, you'll need to call yp_incref
+// yourself:
+//      yp_FORd( x, values ) {
+//          if( yp_ge( x, minValue ) ) {
+//              yp_incref( x );
+//              break;
+//          }
+//      } yp_ENDFOR
 
-
-// TODO: this:
-#define yp0( self, method )         yp_ ## method( )
-#define yp1( self, method, arg1 )   yp_ ## method( arg1 )
-#if HAS_VARIADICMACRO // FIXME
-#define yp( self, method, ... )     yp_ ## method( _VAR_ARGS_ )
-#else
-#define yp yp1
-#endif
-#define yp2( self, method, arg1, arg2 ) yp_ ## method( arg1, arg2 )
-// etc etc
-// Also document that this makes the math stuff a little nicer:
-//  yp( a, add, b )
-// and the method calls look more like Python:
-//  yp( a, append, b ) // a.append( b )
-
+// yp: A set of macros to make nohtyP function calls look more like Python operators and method
+// calls.  Best explained with examples:
+//  a.append( b )           --> yp( a,append, b )               --> yp_append( a, b )
+//  a + b                   --> yp( a, add, b )                 --> yp_add( a, b )
+// For methods that take no arguments, use yp0:
+//  a.isspace( )            --> yp0( a,isspace )                --> yp_isspace( a )
+// If variadic macros are supported by your compiler, yp can take multiple arguments:
+//  a.setdefault( b, c )    --> yp( a,setdefault, b, c )        --> yp_setdefault( a, b, c )
+//  a.startswith( b, 2, 7 ) --> yp( a,startswith3, b, 2, 7 )    --> yp_startswith3( a, b, 2, 7 )
+// If variadic macros are not supported, use yp2, yp3, etc:
+//  a.setdefault( b, c )    --> yp2( a,setdefault, b, c )       --> yp_setdefault( a, b, c )
+//  a.startswith( b, 2, 7 ) --> yp3( a,startswith3, b, 2, 7 )   --> yp_startswith3( a, b, 2, 7 )
 
 // A macro to get exception info as a string, include file/line info of the place the macro is
 // checked
@@ -403,24 +428,55 @@ struct _ypObject {
 
 // The implementation of yp_IF is considered "internal"; see above for documentation
 #define yp_IF( expression ) { \
+    ypObject *_yp_IF_expr; \
     ypObject *_yp_IF_cond; \
-    if( (_yp_IF_cond = yp_bool( expression )) == yp_True )
+    { \
+        _yp_IF_expr = (expression); \
+        _yp_IF_cond = yp_bool( _yp_IF_expr ); \
+        if( _yp_IF_cond == yp_True )
+#define yp_IFd( expression ) { \
+    ypObject *_yp_IF_expr; \
+    ypObject *_yp_IF_cond; \
+    { \
+        _yp_IF_expr = (expression); \
+        _yp_IF_cond = yp_bool( _yp_IF_expr ); \
+        yp_decref( _yp_IF_expr ); \
+        if( _yp_IF_cond == yp_True )
 #define yp_ELIF( expression ) \
-    if( _yp_IF_cond == yp_False ) \
-      if( (_yp_IF_cond = yp_bool( expression )) == yp_True )
+    } if( _yp_IF_cond == yp_False ) { \
+        _yp_IF_expr = (expression); \
+        _yp_IF_cond = yp_bool( _yp_IF_expr ); \
+        if( _yp_IF_cond == yp_True )
+#define yp_ELIFd( expression ) \
+    } if( _yp_IF_cond == yp_False ) { \
+        _yp_IF_expr = (expression); \
+        _yp_IF_cond = yp_bool( _yp_IF_expr ); \
+        yp_decref( _yp_IF_expr ); \
+        if( _yp_IF_cond == yp_True )
 #define yp_ELSE \
-    if( _yp_IF_cond == yp_False )
+    } if( _yp_IF_cond == yp_False ) {
 #define yp_ELSE_EXCEPT \
-    if( yp_isexceptionC( _yp_IF_cond ) )
+    } if( yp_isexceptionC( _yp_IF_cond ) ) {
 #define yp_ELSE_EXCEPT_AS( target ) \
-    if( yp_isexceptionC( _yp_IF_cond ) && (target = _yp_IF_cond) )
+    } if( yp_isexceptionC( _yp_IF_cond ) ) { \
+        target = _yp_IF_cond;
 #define yp_ENDIF \
-    }
+    } }
 
 // The implementation of yp_WHILE is considered "internal"; see above for documentation
 #define yp_WHILE( expression ) { \
+    ypObject *_yp_WHILE_expr; \
     ypObject *_yp_WHILE_cond; \
-    while( (_yp_WHILE_cond = yp_bool( expression )) == yp_True )
+    while( _yp_WHILE_expr = (expression), \
+           _yp_WHILE_cond = yp_bool( _yp_WHILE_expr ), \
+           _yp_WHILE_cond == yp_True )
+#define yp_WHILEd( expression ) { \
+    ypObject *_yp_WHILE_expr; \
+    ypObject *_yp_WHILE_cond; \
+    while( _yp_WHILE_expr = (expression), \
+           _yp_WHILE_cond = yp_bool( _yp_WHILE_expr ), \
+           yp_decref( _yp_WHILE_expr ), \
+           _yp_WHILE_cond == yp_True )
 #define yp_WHILE_ELSE \
     if( _yp_WHILE_cond == yp_False )
 #define yp_WHILE_EXCEPT \
@@ -432,11 +488,20 @@ struct _ypObject {
 
 // The implementation of yp_FOR is considered "internal"; see above for documentation
 #define yp_FOR( target, expression ) { \
-    ypObject *_yp_FOR_iter = yp_iter( expression ); \
+    ypObject *_yp_FOR_expr = (expression); \
+    ypObject *_yp_FOR_iter = yp_iter( _yp_FOR_expr ); \
     ypObject *_yp_FOR_item; \
     for( _yp_FOR_item = yp_next( _yp_FOR_iter ); \
-         !yp_isexceptionC( _yp_FOR_item ) && (yp_decref( target ), target = _yp_FOR_item); \
-         _yp_FOR_item = yp_next( _yp_FOR_iter ) )
+         !yp_isexceptionC( _yp_FOR_item ) && (target = _yp_FOR_item); \
+         yp_decref( _yp_FOR_item ), _yp_FOR_item = yp_next( _yp_FOR_iter ) )
+#define yp_FORd( target, expression ) { \
+    ypObject *_yp_FOR_expr = (expression); \
+    ypObject *_yp_FOR_iter = yp_iter( _yp_FOR_expr ); \
+    ypObject *_yp_FOR_item; \
+    yp_decref( _yp_FOR_expr ); \
+    for( _yp_FOR_item = yp_next( _yp_FOR_iter ); \
+         !yp_isexceptionC( _yp_FOR_item ) && (target = _yp_FOR_item); \
+         yp_decref( _yp_FOR_item ), _yp_FOR_item = yp_next( _yp_FOR_iter ) )
 #define yp_FOR_ELSE \
     if( _yp_FOR_item == yp_StopIteration )
 #define yp_FOR_EXCEPT \
@@ -447,6 +512,20 @@ struct _ypObject {
         _yp_FOR_item != yp_StopIteration && \
         (target = _yp_FOR_item) )
 #define yp_ENDFOR \
+    yp_decref( _yp_FOR_item ); \
     yp_decref( _yp_FOR_iter ); \
     }
+
+// The implementation of "yp" is considered "internal"; see above for documentation
+#define yp0( self, method )         yp_ ## method( self )
+#define yp1( self, method, a1 )     yp_ ## method( self, a1 )
+#ifdef yp_NO_VARIADIC_MACROS // FIXME rename or something
+#define yp yp1
+#else
+#define yp( self, method, ... )     yp_ ## method( self, _VAR_ARGS_ )
+#endif
+#define yp2( self, method, a1, a2 ) yp_ ## method( self, a1, a2 )
+#define yp3( self, method, a1, a2, a3 ) yp_ ## method( self, a1, a2, a3 )
+#define yp4( self, method, a1, a2, a3, a4 ) yp_ ## method( self, a1, a2, a3, a4 )
+
 
