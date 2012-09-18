@@ -285,6 +285,11 @@ yp_zip
  * Sequence Operations
  */
 
+// When given to a slice-like start/stop argument, signals that the slice should start/stop at the
+// end of the sequence.  Use zero to identify the start of the sequence.
+//  Ex: a complete slice in Python is "[:]"; in nohtyP, it's "0, ypSlice_END, 1"
+#define ypSlice_END  yp_SSIZE_T_MAX
+
 // TODO bad idea?
 // For sequences that store their items as an array of pointers to ypObjects (list and tuple),
 // returns a pointer to the beginning of that array, and sets len to the length of the sequence.
