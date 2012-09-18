@@ -49,7 +49,7 @@
 #define ypObject_REFCNT_IMMORTAL (0xFFFFFFu)
 
 // When a hash of this value is stored in ob_hash, call tp_hash (which may then update cache)
-#define ypObject_HASH_NOT_CACHED (0xFFFFFFFFu)
+#define ypObject_HASH_NOT_CACHED ((yp_hash_t) -1)
 
 // Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
 #define ypObject_LEN_INVALID        (0xFFFFu)
@@ -201,24 +201,76 @@ typedef struct {
 
 
 /*************************************************************************************************
- * Helpful functions and macros for the type code
+ * Helpful functions and macros
  *************************************************************************************************/
-// TODO make a separate ypMem section
+
+// Functions that modify their inputs take a "ypObject **x"; use this as
+// "return_yp_INPLACE_ERR( *x, yp_ValueError );" to return the error properly
+// TODO Necessary?  This logic is put in the public object interface only...
+#define return_yp_INPLACE_ERR( ob, err ) \
+    do { yp_decref( ob ); (ob) = (err); return; } while( 0 )
+
+// When an object encounters an unknown type, there are three possible cases:
+//  - it's an invalidated object, so return yp_InvalidatedError
+//  - it's an exception, so return it
+//  - it's some other type, so return yp_TypeError
+#define return_yp_BAD_TYPE( ob ) \
+    do { switch( yp_TYPE_PAIR_CODE( ob ) ) { \
+            case ypInvalidated_CODE: return yp_InvalidatedError; \
+            case ypException_CODE: return (ob); \
+            default: return yp_TypeError; } } while( 0 )
+
+// Return sizeof for a structure member
+#define yp_sizeof_member( structType, member ) \
+    sizeof( ((structType *)0)->member )
+
+// Prime multiplier used in string and various other hashes
+#define _ypHASH_MULTIPLIER 1000003  // 0xf4243
+
+// Return the hash of the given number of bytes; always succeeds
+static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
+{
+    yp_uhash_t x;
+    yp_ssize_t i;
+
+    if( len == 0 ) return 0;
+    x ^= (yp_uhash_t) *p << 7;
+    for (i = 0; i < len; i++) {
+        x = (_ypHASH_MULTIPLIER * x) ^ (yp_uhash_t) *p++;
+    }
+    x ^= (yp_uhash_t) len;
+    if (x == ypObject_HASH_NOT_CACHED) x = ypObject_HASH_NOT_CACHED-1;
+    return x;
+}
+
+
+/*************************************************************************************************
+ * nohtyP memory allocations
+ *************************************************************************************************/
+
+// Dummy memory allocators to ensure that yp_init is called before anything else
+static void *_yp_dummy_malloc( yp_ssize_t size ) { return NULL; }
+static void *_yp_dummy_realloc( void *p, yp_ssize_t size ) { return NULL; }
+static void _yp_dummy_free( void *p ) { }
+
+// Default versions of the allocators, using C's malloc/realloc/free
+static void *_yp_malloc( yp_ssize_t size ) { return malloc( MAX( size, 1 ) ); }
+static void *_yp_realloc( void *p, yp_ssize_t size ) { return realloc( p, MAX( size, 1 ) ); }
+#define _yp_free  free
+
+// Allows the allocation functions to be overridden by yp_init
+static void *(*yp_malloc)( yp_ssize_t ) = _yp_dummy_malloc;
+static void *(*yp_realloc)( void *, yp_ssize_t ) = _yp_dummy_relloc;
+static void (*yp_free)( void * ) = _yp_dummy_free;
 
 // Declares the ob_inline_data array for container object structures
 #define yp_INLINE_DATA( elemType ) \
     elemType ob_inline_data[1]
 
-// Return sizeof for a structure member
-#define _yp_sizeof_member( structType, member ) \
-    sizeof( ((structType *)0)->member )
-
-// XXX Currently expected that malloc(0) and realloc(p,0) are suported
-
 // Sets ob to a malloc'd buffer for fixed, non-container objects, or yp_MemoryError on failure
 #define ypMem_MALLOC_FIXED( ob, obStruct, type ) \
     do { \
-        (ob) = (ypObject *) malloc( sizeof( obStruct ) ); \
+        (ob) = (ypObject *) yp_malloc( sizeof( obStruct ) ); \
         if( (ob) == NULL ) { (ob) = yp_MemoryError; break; }; \
         (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
         (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
@@ -230,12 +282,12 @@ typedef struct {
 // TODO check that alloclen isn't >= ALOCLEN_INVALID (or negative?)
 
 // Sets ob to a malloc'd buffer for an immutable container object holding alloclen elements, or
-// yp_MemoryError on failure.  ob_inline_data in obStruct is used to determine the element size 
+// yp_MemoryError on failure.  ob_inline_data in obStruct is used to determine the element size
 // and ob_data; ob_len is set to zero.  alloclen cannot be negative.
 #define ypMem_MALLOC_CONTAINER_INLINE( ob, obStruct, type, alloclen ) \
     do { \
-        (ob) = (ypObject *) malloc( sizeof( obStruct )/*includes one element*/ + \
-                ((alloclen-1) * _yp_sizeof_member( obStruct, ob_inline_data[0] )) ); \
+        (ob) = (ypObject *) yp_malloc( sizeof( obStruct )/*includes one element*/ + \
+                ((alloclen-1) * yp_sizeof_member( obStruct, ob_inline_data[0] )) ); \
         if( (ob) == NULL ) { (ob) = yp_MemoryError; break; }; \
         (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
         (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
@@ -245,14 +297,15 @@ typedef struct {
     } while( 0 )
 
 // Sets ob to a malloc'd buffer for a mutable container currently holding alloclen elements, or
-// yp_MemoryError on failure.  ob_inline_data in obStruct is used to determine the element size; 
+// yp_MemoryError on failure.  ob_inline_data in obStruct is used to determine the element size;
 // ob_len is set to zero.  alloclen cannot be negative.
 #define ypMem_MALLOC_CONTAINER_VARIABLE( ob, obStruct, type, alloclen ) \
     do { \
-        (ob) = (ypObject *) malloc( sizeof( obStruct )/*includes one element*/ - \
-                _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
+        (ob) = (ypObject *) yp_malloc( sizeof( obStruct )/*includes one element*/ - \
+                yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
         if( (ob) == NULL ) { (ob) = yp_MemoryError; break; }; \
-        (ob)->ob_data = malloc( (alloclen) * _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
+        (ob)->ob_data = yp_malloc( \
+                (alloclen) * yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
         if( (ob)->ob_data == NULL ) { free( ob ); (ob) = yp_MemoryError; break; } \
         (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
         (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
@@ -267,22 +320,13 @@ typedef struct {
 // negative.
 #define ypMem_REALLOC_CONTAINER_VARIABLE( result, ob, obStruct, newAlloclen ) \
     do { \
-        void *newData = realloc( \
-                (newAlloclen) * _yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
+        void *newData = yp_realloc( \
+                (newAlloclen) * yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
         if( newData == NULL ) { (result) = yp_MemoryError; break; }; \
         (result) = yp_None; \
         (ob)->ob_data = newData; \
         (ob)->ob_alloclen = newAlloclen; \
     } while( 0 )
-
-#undef _yp_sizeof_member
-
-// Functions that modify their inputs take a "ypObject **x"; use this as 
-// "return_yp_INPLACE_ERR( *x, yp_TypeError );" to return the error properly
-#define return_yp_INPLACE_ERR( ob, err ) \
-    do { yp_decref( ob ); (ob) = (err); return; } while( 0 )
-
-
 
 
 /*************************************************************************************************
@@ -361,7 +405,7 @@ ypObject *_yp_deepfreeze( ypObject *x, ypObject *memo )
 {
     ypObject *id;
     ypObject *result;
-    
+
     // Avoid recursion
     // TODO yp_addunique returns key error if object already in set
     id = yp_intC( (yp_int64_t) x );
@@ -448,6 +492,7 @@ void yp_append( ypObject **s, ypObject *x ) {
 
 
 
+
 // TODO undef necessary stuff
 
 /*************************************************************************************************
@@ -459,6 +504,8 @@ void yp_append( ypObject **s, ypObject *x ) {
 /*************************************************************************************************
  * Exceptions
  *************************************************************************************************/
+
+
 
 
 /*************************************************************************************************
@@ -481,12 +528,12 @@ void yp_append( ypObject **s, ypObject *x ) {
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
-static ypObject *yp_int_iadd( ypObject *x, ypObject *y ) 
+static ypObject *yp_int_iadd( ypObject *x, ypObject *y )
 {
     x->value += y->value; // TODO overflow check, etc
 }
 
-static ypObject *yp_int_add( ypObject *x, ypObject *y ) 
+static ypObject *yp_int_add( ypObject *x, ypObject *y )
 {
     // TODO check type first; no sense making the same copy
     ypObject *new = yp_unfrozen_copy( x );
@@ -549,7 +596,7 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
     } else {
         *slicelength = (*stop - *start - 1) / (*step) + 1;
     }
-    
+
     return yp_None;
 }
 
@@ -574,11 +621,11 @@ static ypObject *_yp_bytes_new( yp_ssize_t len )
     if( len < 0 ) len = 0; // TODO return a new ref to an immortal b'' object
     ypMem_MALLOC_CONTAINER_INLINE( b, ypBytesObject, ypBytes_CODE, len );
     if( isexceptionC( b ) ) return b;
-    b->ob_len = len;
+    ypBytes_LEN( b ) = len;
     return b;
 }
 
-// Return a new bytes object with uninitialized data of the given length, or an exception
+// Return a new bytearray object with uninitialized data of the given length, or an exception
 // TODO Over-allocate to avoid future resizings
 static ypObject *_yp_bytearray_new( yp_ssize_t len )
 {
@@ -586,21 +633,27 @@ static ypObject *_yp_bytearray_new( yp_ssize_t len )
     if( len < 0 ) len = 0;
     ypMem_MALLOC_CONTAINER_VARIABLE( b, ypBytesObject, ypByteArray_CODE, len );
     if( isexceptionC( b ) ) return b;
-    b->ob_len = len;
+    ypBytes_LEN( b ) = len;
     return b;
 }
 
-// Returns a copy of the bytes object; the new object will have the given length. If 
-// len is less than b->ob_len, data is truncated; if equal, returns an exact copy; if greater, 
-// extra bytes are uninitialized.
+// Return a new bytes or bytearray object (depending on b) with uninitialzed data of the given
+// length, or an exception
+static ypObject *_yp_bytes_new_sametype( ypObject *b, yp_ssize_t len )
+{
+    if( ypObject_IS_MUTABLE( b ) ) {
+        return _yp_bytearray_new( len );
+    } else {
+        return _yp_bytes_new( len );
+    }
+}
+
+// Returns a copy of the bytes or bytearray object; the new object will have the given length. If
+// len is less than ypBytes_LEN( b ), data is truncated; if equal, returns an exact copy; if
+// greater, extra bytes are uninitialized.
 static ypObject *_yp_bytes_copy( ypObject *b, yp_ssize_t len )
 {
-    ypObject *newB;
-    if( ypObject_IS_MUTABLE( b ) ) {
-        newB = _yp_bytearray_new( len );
-    } else {
-        newB = _yp_bytes_new( len );
-    }
+    ypObject *newB = _yp_bytes_new_sametype( b, len );
     if( isexceptionC( newB ) ) return newB;
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), MIN( len, ypBytes_LEN( b ) ) );
     return newB;
@@ -613,7 +666,7 @@ static ypObject *_yp_bytearray_resize( ypObject *b, yp_ssize_t newLen )
     ypObject *result;
     ypMem_REALLOC_CONTAINER_VARIABLE( result, *b, ypBytesObject, newLen );
     if( yp_isexceptionC( result ) ) return result;
-    b->ob_len = len;
+    ypBytes_LEN( b ) = len;
     return yp_None;
 }
 
@@ -628,22 +681,23 @@ static void _bytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x
         *x_len = ypBytes_LEN( x );
         return;
     }
-    
+
     *x_data = NULL;
     *x_len = 0;
     return;
 }
 
-// If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If 
+// If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
 // x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
-static void _bytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len, 
+// TODO: to be correct, ValueError should be raised when int out of range(256)
+static void _bytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
         yp_uint8_t *storage )
 {
     ypObject *result;
     int x_type = yp_TYPE_PAIR_CODE( x );
 
     if( x_type == ypBool_CODE || x_type == ypInt_CODE ) {
-        result = yp_as_uint8C( x, storage );
+        *storage = yp_as_uint8C( x, &result );
         if( !yp_isexceptionC( result ) ) {
             *x_data = storage;
             *x_len = 1;
@@ -663,19 +717,18 @@ static void _bytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize
 // TODO Returns yp_None or an exception
 
 // Returns yp_None or an exception
-static ypObject *bytes_find3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop, 
+static ypObject *bytes_find3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t *i )
 {
     yp_uint8_t *x_data;
-    yp_ssize_t x_len;        
+    yp_ssize_t x_len;
     yp_uint8_t storage;
     ypObject *result;
     yp_ssize_t b_rlen;     // remaining length
     yp_uint8_t *b_rdata;   // remaining data
-    
-    if( isexceptionC( x ) ) return x;
+
     _bytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
-    if( x_data == NULL ) return yp_TypeError;
+    if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, 1, &b_rlen );
     if( yp_isexceptionC( result ) ) return result;
@@ -692,7 +745,7 @@ static ypObject *bytes_find3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_ss
     return yp_None;
 }
 
-// Returns True, False, or an exception
+// Returns yp_True, yp_False, or an exception
 static ypObject *bytes_contains( ypObject *b, ypObject *x )
 {
     ypObject *result;
@@ -707,13 +760,11 @@ static ypObject *bytes_contains( ypObject *b, ypObject *x )
 static ypObject *bytes_concat( ypObject *b, ypObject *x )
 {
     yp_uint8_t *x_data;
-    yp_ssize_t x_len;        
-    yp_uint8_t storage;
+    yp_ssize_t x_len;
     ypObject *newB;
-    
-    if( yp_isexceptionC( x ) ) return x;
-    _bytes_coerce_bytes( x, &x_data, &x_len, &storage );
-    if( x_data == NULL ) return yp_TypeError;
+
+    _bytes_coerce_bytes( x, &x_data, &x_len );
+    if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     newB = _yp_bytes_copy( b, ypBytes_LEN( b ) + x_len );
     if( isexceptionC( newB ) ) return newB;
@@ -726,13 +777,12 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
 static ypObject *bytearray_extend( ypObject *b, ypObject *x )
 {
     yp_uint8_t *x_data;
-    yp_ssize_t x_len;        
+    yp_ssize_t x_len;
     yp_uint8_t storage;
     ypObject *result;
-    
-    if( yp_isexceptionC( x ) ) return x;
+
     _bytes_coerce( x, &x_data, &x_len, &storage );
-    if( x_data == NULL ) return yp_TypeError;
+    if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     result = _yp_bytearray_resize( b, ypBytes_LEN( b ) + x_len );
     if( yp_isexceptionC( result ) ) return result;
@@ -742,24 +792,144 @@ static ypObject *bytearray_extend( ypObject *b, ypObject *x )
 }
 
 // TODO bytes_repeat
+// TODO bytes_irepeat
 
 // Returns new reference or an exception
 static ypObject *bytes_getindexC( ypObject *b, yp_ssize_t i )
 {
-    ypObject *result;
-    result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
+    ypObject *result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
     if( yp_isexceptionC( result ) ) return result;
     return yp_intC( ypBytes_DATA( b )[i] );
+}
+
+// Returns yp_None or an exception
+static ypObject *bytearray_setindexC( ypObject *b, yp_ssize_t i, ypObject *x )
+{
+    ypObject *result = yp_None;
+    yp_uint8_t x_value;
+
+    x_value = yp_as_uint8C( x, &result );
+    if( yp_isexceptionC( result ) ) return result;
+
+    result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
+    if( yp_isexceptionC( result ) ) return result;
+
+    ypBytes_DATA( b )[i] = x_value;
+    return yp_None;
+}
+
+// Returns yp_None or an exception
+static ypObject *bytearray_delindexC( ypObject *b, yp_ssize_t i )
+{
+    ypObject *result;
+
+    result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // memmove allows overlap; don't bother reallocating
+    memmove( ypBytes_DATA( b )+i, ypBytes_DATA( b )+i+1, ypBytes_LEN( b )-i-1 );
+    ypBytes_LEN( b ) -= 1;
+    return yp_None;
 }
 
 // Returns new reference or an exception
 static ypObject *bytes_getsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    // TODO a function like PySlice_GetIndicesEx to adjust values and do calculations
+    ypObject *result;
+    yp_ssize_t newLen;
+    ypObject *newB;
+
+    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &newLen );
+    if( yp_isexceptionC( result ) ) return result;
+
+    newB = _yp_bytes_new_sametype( b, newLen );
+    if( isexceptionC( newB ) ) return newB;
+
+    if( step == 1 ) {
+        memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b )+start, newLen );
+    } else {
+        yp_ssize_t i;
+        for( i = 0; i < newLen; i++ ) {
+            ypBytes_DATA( newB )[i] = ypBytes_DATA( b )[start + i*step];
+        }
+    }
+    return newB;
 }
 
-// Returns new reference or an exception
-// TODO bytes_getitem...need a generic function to redirect to getindexC or getsliceC
+// Returns yp_None or an exception
+// TODO handle b == x! (and elsewhere?)
+static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t step, ypObject *x )
+{
+    ypObject *result;
+    yp_ssize_t sliceLen;
+    yp_uint8_t *x_data;
+    yp_ssize_t x_len;
+
+    _bytes_coerce_bytes( x, &x_data, &x_len );
+    if( x_data == NULL ) return_yp_BAD_TYPE( x );
+    if( x_len == 0 ) return bytearray_delsliceC( b, start, stop, step );
+
+    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &sliceLen );
+    if( yp_isexceptionC( result ) ) return result;
+
+    if( step == 1 ) {
+        if( x_len > sliceLen ) {
+            // bytearray is growing
+            yp_ssize_t growBy = x_len - sliceLen;
+            yp_ssize_t oldLen = ypBytes_LEN( b );
+            result = _yp_bytearray_resize( b, oldLen + growBy );
+            if( yp_isexceptionC( result ) ) return result;
+            // memmove allows overlap
+            memmove( ypBytes_DATA( b )+stop+growBy, ypBytes_DATA( b )+stop, oldLen-stop );
+        } else if( x_len < sliceLen ) {
+            // bytearray is shrinking
+            yp_ssize_t shrinkBy = sliceLen - x_len;
+            // memmove allows overlap
+            memmove( ypBytes_DATA( b )+stop-shrinkBy, ypBytes_DATA( b )+stop,
+                    ypBytes_LEN( b )-stop );
+            ypBytes_LEN( b ) -= shrinkBy;
+        }
+        // There are now x_len bytes starting at b[start] waiting for x_data
+        memcpy( ypBytes_DATA( b )+start, x_data, x_len );
+    } else {
+        yp_ssize_t i;
+        if( x_len != sliceLen ) return yp_ValueError;
+        for( i = 0; i < sliceLen; i++ ) {
+            ypBytes_DATA( b )[start + i*step] = x_data[i];
+        }
+    }
+    return yp_None;
+}
+
+// Returns yp_None or an exception
+static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t step )
+{
+    ypObject *result;
+    yp_ssize_t sliceLen;
+
+    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &sliceLen );
+    if( yp_isexceptionC( result ) ) return result;
+    if( sliceLen < 1 ) return yp_None; // no-op
+    if( step < 0 ) {
+        stop = start + 1;
+        start = stop + step*(sliceLen - 1) - 1;
+        step = -step;
+    }
+
+    if( step == 1 ) {
+        // One contiguous section
+        memmove( ypBytes_DATA( b )+stop-sliceLen, ypBytes_DATA( b )+stop, ypBytes_LEN( b )-stop );
+        ypBytes_LEN( b ) -= sliceLen;
+    } else {
+        return yp_NotImplementedError; // TODO implement
+    }
+    return yp_None;
+}
+
+
+// TODO bytes_getitem, setitem, delitem...need generic functions to redirect to getindexC et al
 
 // Returns yp_None or an exception
 static ypObject *bytes_lenC( ypObject *b, yp_ssize_t *len )
@@ -768,12 +938,73 @@ static ypObject *bytes_lenC( ypObject *b, yp_ssize_t *len )
     return yp_None;
 }
 
-// bytes_index_asC is above
+// TODO allow custom min/max methods?
 
-static ypObject *bytes_count_asC( ypObject *b, ypObject *x, yp_ssize_t *i )
+static ypObject *bytes_count3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t *n )
 {
+    yp_uint8_t *x_data;
+    yp_ssize_t x_len;
+    yp_uint8_t storage;
+    ypObject *result;
+    yp_ssize_t b_rlen;     // remaining length
+    yp_uint8_t *b_rdata;   // remaining data
+
+    _bytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
+    if( x_data == NULL ) return_yp_BAD_TYPE( x );
+
+    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, 1, &b_rlen );
+    if( yp_isexceptionC( result ) ) return result;
+    b_rdata = ypBytes_DATA( b ) + start;
+
+    *n = 0;
+    while( b_rlen >= x_len ) {
+        if( memcmp( b_rdata, x_data, x_len ) == 0 ) {
+            *n += 1;
+            b_rdata += x_len; b_rlen -= x_len;
+        } else {
+            b_rdata += 1; b_rlen -= 1;
+        }
+    }
+    return yp_None;
 }
 
+
+// Comparison methods return yp_True, yp_False, or an exception, and are not called if b==x.  When
+// checking for (in)equality, more efficient to check size first
+#define _ypBytes_RELATIVE_CMP_BODY( name, operator ) \
+static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
+    int cmp; \
+    yp_ssize_t b_len, x_len; \
+    if( yp_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return_yp_BAD_TYPE( x ); \
+    b_len = ypBytes_LEN( b ); x_len = ypBytes_LEN( x ); \
+    cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) ); \
+    if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0); \
+    return ypBool_FROM_C( cmp operator 0 ); \
+}
+_ypBytes_RELATIVE_CMP_BODY( lt, < );
+_ypBytes_RELATIVE_CMP_BODY( le, <= );
+_ypBytes_RELATIVE_CMP_BODY( ge, >= );
+_ypBytes_RELATIVE_CMP_BODY( gt, > );
+#undef _ypBytes_RELATIVE_CMP_BODY
+#define _ypBytes_EQUALITY_CMP_BODY( name, operator ) \
+static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
+    int cmp; \
+    yp_ssize_t b_len, x_len; \
+    if( yp_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return_yp_BAD_TYPE( x ); \
+    b_len = ypBytes_LEN( b ); x_len = ypBytes_LEN( x ); \
+    if( b_len != x_len ) return ypBool_FROM_C( 1 operator 0 ); \
+    cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) ); \
+    return ypBool_FROM_C( cmp operator 0 ); \
+}
+_ypBytes_EQUALITY_CMP_BODY( eq, == );
+_ypBytes_EQUALITY_CMP_BODY( ne, != );
+#undef _ypBytes_EQUALITY_CMP_BODY
+
+// Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
+static yp_hash_t bytes_current_hash( ypObject *b ) {
+    return yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
+}
 
 // TODO undef macros
 
