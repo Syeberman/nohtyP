@@ -53,6 +53,8 @@
  *
  * TODO comparison/boolean operations and error handling and yp_IF
  *
+ * TODO Error handling on functions that return C values
+ *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
  * threads, including changing reference counts.  One strategy to ensure this is to deep copy any
  * object, even immutable ones, before exchanging between threads.  Sharing immutable, immortal
@@ -96,14 +98,14 @@ typedef struct _ypObject ypObject;
 ypObject *yp_incref( ypObject *x );
 
 // A convenience function to increment the references of n objects.
-void yp_increfN( yp_ssize_t n, ... );
+void yp_increfN( int n, ... );
 
 // Decrements the reference count of x, deallocating it if the count reaches zero.  Always 
 // succeeds; if x is immortal this is a no-op.
 void yp_decref( ypObject *x );
 
 // A convenience function to decrement the references of n objects.
-void yp_decrefN( yp_ssize_t n, ... );
+void yp_decrefN( int n, ... );
 
 
 /*
@@ -159,7 +161,7 @@ ypObject *yp_or( ypObject *x, ypObject *y );
 
 // A convenience function to "or" n objects.  Similar to yp_any, returns yp_False if n is zero, 
 // and the first object if n is one.
-ypObject *yp_orN( yp_ssize_t n, ... );
+ypObject *yp_orN( int n, ... );
 
 // Returns a borrowed reference to x if x is false, otherwise to y.  Unlike Python, both arguments
 // are always evaluated.
@@ -167,7 +169,7 @@ ypObject *yp_and( ypObject *x, ypObject *y );
 
 // A convenience function to "and" n objects.  Similar to yp_all, returns yp_True if n is zero,
 // and the first object if n is one.
-ypObject *yp_andN( yp_ssize_t n, ... );
+ypObject *yp_andN( int n, ... );
 
 // Returns yp_True if x is considered false, otherwise yp_False.
 ypObject *yp_not( ypObject *x );
@@ -196,7 +198,7 @@ ypObject *yp_bytesC( unsigned char *source, yp_ssize_t len );
 
 // Returns a new mutable dict of n items.  There must be n pairs of objects, with the first 
 // object in each pair being the key and the second the value (for a total of n*2 objects).
-ypObject *yp_dictN( yp_ssize_t n, ... );
+ypObject *yp_dictN( int n, ... );
 // TODO should there be a prefix to indicate this "automatically unpacked" structure idea?
 // like with divmod returning two objects via output pointer parameters?
 
@@ -217,11 +219,11 @@ ypObject *yp_frozenset
 ypObject *yp_intC( yp_int64_t value );
 
 
-ypObject *yp_listN( yp_ssize_t n, ... );
+ypObject *yp_listN( int n, ... );
 
 // Returns a new list made of factor shallow copies of yp_listN( n, ... ) concatenated.  Equivalent
 // to "factor * [obj1, obj2, ...]" in Python.
-ypObject *yp_list_repeatCN( yp_ssize_t factor, yp_ssize_t n, ... );
+ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... );
 ypObject *yp_list
 ypObject *yp_tuple
 
@@ -424,7 +426,7 @@ yp_ord
 
 struct _ypObject {
     yp_uint32_t ob_type_refcnt; // first byte type code, remainder ref count
-    yp_uint32_t ob_hash;        // cached hash for immutables
+    yp_hash_t ob_hash;          // cached hash for immutables
     yp_uint16_t ob_len;         // length of object
     yp_uint16_t ob_alloclen;    // allocated length
     void *      ob_data;        // pointer to object data
