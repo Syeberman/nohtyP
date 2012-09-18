@@ -12,6 +12,13 @@
 // TODO yp_int32_t, yp_uint32_t
 
 /*************************************************************************************************
+ * Static assertions for nohtyP.h
+ *************************************************************************************************/
+
+#define yp_STATIC_ASSERT( cond, tag ) typedef char assert_ ## tag[ (cond) ? 1 : -1 ]
+
+
+/*************************************************************************************************
  * Internal structures and types, and related macros
  *************************************************************************************************/
 
@@ -1021,24 +1028,154 @@ static yp_hash_t bytes_current_hash( ypObject *b ) {
 /*************************************************************************************************
  * Sets
  *************************************************************************************************/
+// XXX Much of this set/dict implementation is pulled right from Python, so best to read the
+// original source for documentation on this implementation
+// TODO make sure I'm using FrozenSet in the right places
 
-// sets and mappings share the same struct def and much of the same code, except a dict has 2x the
-// allocation as the second half of the allocation is the values
-
-// factor is 1 for sets, 2 for dicts
-#define ypSetObject_BODY( factor ) \
+// Sets and dicts share much of the same data structures and code, with one difference being a
+// set has two entries for each item (interleaved hash and key), while a dict has three
+// (interleaved hash and key, followed by sequential values)
+#define ypFrozenSetObject_BODY( isdict ) \
     ypObject_HEAD \
-    ypObject *ob_inline_data[1][factor]; // TODO improve this definition and interaction with ypMem_MALLOC_CONTAINER_*
-
+    yp_ssize_t so_fill;  /* # Active + # Dummy */ \
+    Py_ssize_t so_mask; \
+    ypObject *ob_inline_data[1][isdict ? 3 : 2];
 typedef struct {
-    ypSetObject_BODY( 1 )
+    ypFrozenSetObject_BODY( FALSE )
 } yFrozenSetObject;
 
-// set_lookkey mostly the same, except it returns an index so it can be indexed into key and, for
-// dicts, values
+// Sets are arrays of ypObject*s, two for each item; the first ypObject* is actually the hash, so
+// make sure it can be stored as a ypObject *
+typedef struct {
+    yp_hash_t se_hash;
+    ypObject *se_key;
+} ypFrozenSet_KeyEntry;
+yp_STATIC_ASSERT( offsetof( ypFrozenSet_KeyEntry, se_key ) == sizeof( ypObject * ), set_key_entry_overlay );
 
-// can rely and trust yp_eq because it's fast and we know all the implementations; also no need to
-// check for a modded dict
+#define ypFrozenSet_TABLE( so ) ( (ypFrozenSet_KeyEntry *) ((ypObject *)so)->ob_data )
+// TODO what if ob_len is the "invalid" value?
+#define ypFrozenSet_LEN( so )  ( ((ypObject *)so)->ob_len )
+#define ypFrozenSet_FILL( so )  ( ((yFrozenSetObject *)so)->so_fill )
+#define ypFrozenSet_ALLOCLEN( so )  ( ((ypObject *)so)->ob_alloclen )
+#define ypFrozenSet_MASK( so ) ( ((yFrozenSetObject *)so)->so_mask )
+
+#define ypFrozenSet_PERTURB_SHIFT (5)
+static ypObject *ypFrozenSet_dummy = ypObject_HEAD_INIT_CONST( ypInvalidated_CODE, 0 );
+
+// Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
+// yp_None, or an exception on error.
+// TODO The dict implementation has a bunch of these for various scenarios; let's keep it simple
+// for now, but investigate...
+static ypObject *_ypFrozenSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t hash, 
+        ypFrozenSet_KeyEntry **loc )
+{
+    register size_t i;
+    register size_t perturb;
+    register ypFrozenSet_KeyEntry *freeslot;
+    register size_t mask = (size_t) ypFrozenSet_MASK( so );
+    ypFrozenSet_KeyEntry *table = ypFrozenSet_TABLE( so );
+    ypFrozenSet_KeyEntry *ep0 = ypFrozenSet_TABLE( so );
+    register ypFrozenSet_KeyEntry *ep;
+    register ypObject *cmp;
+
+    i = (size_t)hash & mask;
+    ep = &ep0[i];
+    if (ep->se_key == NULL || ep->se_key == key) goto success;
+
+    if (ep->se_key == ypFrozenSet_dummy) {
+        freeslot = ep;
+    } else {
+        if (ep->se_hash == hash) {
+            // Python has protection here against __eq__ changing this set object; hopefully not a
+            // problem in nohtyP
+            cmp = yp_eq( ep->se_key, key );
+            if( yp_isexceptionC( cmp ) ) return cmp;
+            if( cmp == yp_True ) goto success;
+        }
+        freeslot = NULL;
+    }
+
+    // In the loop, se_key == ypFrozenSet_dummy is by far (factor of 100s) the least likely 
+    // outcome, so test for that last
+    for (perturb = hash; ; perturb >>= PERTURB_SHIFT) {
+        i = (i << 2) + i + perturb + 1;
+        ep = &ep0[i & mask];
+        if (ep->se_key == NULL) {
+            if( freeslot != NULL ) ep = freeslot;
+            goto success;
+        }
+        if (ep->se_key == key) goto success;
+        if (ep->se_hash == hash && ep->se_key != ypFrozenSet_dummy) {
+            // Same __eq__ protection is here as well in Python
+            cmp = yp_eq( ep->se_key, key );
+            if( yp_isexceptionC( cmp ) ) return cmp;
+            if( cmp == yp_True ) goto success;
+        } else if (ep->se_key == ypFrozenSet_dummy && freeslot == NULL) {
+            freeslot = ep;
+        }
+    }
+    return yp_SystemError; /* NOT REACHED */
+
+// When the code jumps here, it means ep points to the proper entry
+success:
+    *loc = ep;
+    return yp_None;
+}
+
+
+// Inserts a new item into the table, setting *loc to the location.  Returns yp_False if the key
+// was already in the table (and, as such, didn't need to be inserted), else yp_True or an 
+// exception.
+static ypObject *_ypFrozenSet_insertkey( ypObject *so, ypObject *key, yp_hash_t hash, 
+        ypFrozenSet_KeyEntry **loc )
+{
+    ypObject *result = _ypFrozenSet_lookkey( so, key, hash, loc );
+    // TODO yp_isexceptionC use internally should be a macro
+    if( yp_isexceptionC( result ) ) return result;
+
+    if( (*loc)->se_key == NULL ) {
+        // Entry has never been used
+        ypFrozenSet_FILL( so ) += 1;
+        (*loc)->se_key = yp_incref( key );
+        (*loc)->se_hash = hash;
+        ypFrozenSet_LEN( so ) += 1;
+        return yp_True;
+    } else if( (*loc)->se_key == ypFrozenSet_dummy ) {
+        // Entry was used, but has since been deleted
+        (*loc)->se_key = yp_incref( key );
+        (*loc)->se_hash = hash;
+        ypFrozenSet_LEN( so ) += 1;
+        return yp_True;
+    } else {
+        // Key already at entry; nothing to do
+        return yp_False;
+    }
+}
+
+// Internal routine used while cleaning/resizing/copying a table: the key is known to be absent
+// from the table, and the table contains no deleted entries.  XXX Steals a reference to key!
+static void _ypFrozenSet_insertclean_stealkey( ypObject *so, ypObject *key, yp_hash_t hash,
+        ypFrozenSet_KeyEntry **ep )
+{
+    size_t i;
+    size_t perturb;
+    size_t mask = (size_t) ypFrozenSet_MASK( so );
+    PyDictEntry *ep0 = ypFrozenSet_TABLE( so );
+
+    i = hash & mask;
+    (*ep) = &ep0[i];
+    for (perturb = hash; (*ep)->se_key != NULL; perturb >>= PERTURB_SHIFT) {
+        i = (i << 2) + i + perturb + 1;
+        (*ep) = &ep0[i & mask];
+    }
+    ypFrozenSet_FILL( so ) += 1;
+    (*ep)->se_key = key;
+    (*ep)->se_hash = hash;
+    ypFrozenSet_LEN( so ) += 1;
+}
+
+
+
 
 
 
@@ -1046,16 +1183,15 @@ typedef struct {
  * Mappings
  *************************************************************************************************/
 
-// ob_inline_data contains space for 2x alloclen objects; first half of array are keys, second is
-// values
-typedef struct {
-    ypSetObject_BODY( 2 )
-} yFrozenDictObject;
-
 // TODO blog entry: in python key/val are side-by-side, but so many keys are considered during
 // lookup and they jump all over the table that it's better to keep the keys densely packed, so
 // that they have a better chance of getting picked up in the same cache; conversely, you only look
 // up the value once, so putting them in the same cache area as keys doesn't really help
+
+// Sets and dicts share much of the same data structures
+typedef struct {
+    ypFrozenSetObject_BODY( TRUE )
+} yFrozenDictObject;
 
 
 
