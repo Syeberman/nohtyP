@@ -472,6 +472,8 @@ void yp_append( ypObject **s, ypObject *x ) {
 // XXX This assumes that yp_True and yp_False are the only two bools
 #define ypBool_IS_TRUE_C( b ) ( ((ypBoolObject *)b) == yp_True )
 
+#define ypBool_FROM_C( cond ) ( (cond) ? yp_True : yp_False )
+
 
 /*************************************************************************************************
  * Integers
@@ -506,6 +508,53 @@ static ypObject *yp_int_add( ypObject *x, ypObject *y )
 
 
 /*************************************************************************************************
+ * Indices and slices
+ *************************************************************************************************/
+
+// Using the given length, adjusts negative indicies to positive.  Returns yp_IndexError if the
+// adjusted index is out-of-bounds, else yp_None.
+static ypObject *ypSequence_AdjustIndexC( yp_ssize_t length, yp_ssize_t *i )
+{
+    if( *i < 0 ) *i += length;
+    if( *i < 0 || *i >= length ) return yp_IndexError;
+    return yp_None;
+}
+
+// Using the given length, in-place converts the given start/stop/step values to valid indices, and
+// also calculates the length of the slice.  Returns yp_ValueError if *step is zero, else yp_None;
+// there are no out-of-bounds errors with slices.
+static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
+        yp_ssize_t *step, yp_ssize_t *slicelength )
+{
+    // Adjust step
+    if( *step == 0 ) return yp_ValueError;
+    if( *step < -yp_SSIZE_T_MAX ) *step = -yp_SSIZE_T_MAX; // ensure *step can be negated
+
+    // Adjust start
+    if( *start < 0 ) *start += length;
+    if( *start < 0 ) *start = (*step < 0) ? -1 : 0;
+    if( *start >= length ) *start = (*step < 0) > length-1 : length;
+
+    // Adjust stop
+    if( *stop < 0 ) *stop += length;
+    if( *stop < 0 ) *stop = (*step < 0) ? -1 : 0;
+    if( *stop >= length ) *stop = (*step < 0) ? length-1 : length;
+
+    // Calculate slicelength
+    if( (*step < 0 && *stop >= *start) ||
+        (*step > 0 && *start >= *stop)    ) {
+        *slicelength = 0;
+    } else if( *step < 0 ) {
+        *slicelength = (*stop - *start + 1) / (*step) + 1;
+    } else {
+        *slicelength = (*stop - *start - 1) / (*step) + 1;
+    }
+    
+    return yp_None;
+}
+
+
+/*************************************************************************************************
  * Sequence of bytes
  *************************************************************************************************/
 
@@ -522,7 +571,7 @@ typedef struct {
 static ypObject *_yp_bytes_new( yp_ssize_t len )
 {
     ypObject *b;
-    if( len < 0 ) len = 0;
+    if( len < 0 ) len = 0; // TODO return a new ref to an immortal b'' object
     ypMem_MALLOC_CONTAINER_INLINE( b, ypBytesObject, ypBytes_CODE, len );
     if( isexceptionC( b ) ) return b;
     b->ob_len = len;
@@ -568,7 +617,7 @@ static ypObject *_yp_bytearray_resize( ypObject *b, yp_ssize_t newLen )
     return yp_None;
 }
 
-// If x is a fellow bytes, set *x_data and x_len.  Otherwise, set *x_data=NULL and *x_len=0.
+// If x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
 static void _bytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len )
 {
     ypObject *result;
@@ -585,8 +634,8 @@ static void _bytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x
     return;
 }
 
-// If x is a bool/int in range(256), store value in storage and set *x_data=storage, x_len=1.  If 
-// x is a fellow bytes, set *x_data and x_len.  Otherwise, set *x_data=NULL and *x_len=0.
+// If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If 
+// x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
 static void _bytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len, 
         yp_uint8_t *storage )
 {
@@ -612,27 +661,26 @@ static void _bytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize
 }
 
 // TODO Returns yp_None or an exception
-// static ypObject *bytes_index3_asC( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t end, yp_ssize_t *i );
-// TODO for naming convention, how to convey that x is nohtyP, but start/end is C?
-
-// TODO similarly, a yp_find that returns -1
 
 // Returns yp_None or an exception
-// XXX Careful, yp_ValueError also returned if x is yp_ValueError
-static ypObject *bytes_index_asC( ypObject *b, ypObject *x, yp_ssize_t *i )
+static ypObject *bytes_find3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop, 
+        yp_ssize_t *i )
 {
     yp_uint8_t *x_data;
     yp_ssize_t x_len;        
     yp_uint8_t storage;
-    yp_uint8_t *b_rdata;   // remaining data
+    ypObject *result;
     yp_ssize_t b_rlen;     // remaining length
+    yp_uint8_t *b_rdata;   // remaining data
     
     if( isexceptionC( x ) ) return x;
     _bytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
-    if( x_data == NULL ) return yp_ValueError;
+    if( x_data == NULL ) return yp_TypeError;
 
-    b_rdata = ypBytes_DATA( b );
-    b_rlen = ypBytes_LEN( b );
+    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, 1, &b_rlen );
+    if( yp_isexceptionC( result ) ) return result;
+    b_rdata = ypBytes_DATA( b ) + start;
+
     while( b_rlen >= x_len ) {
         if( memcmp( b_rdata, x_data, x_len ) == 0 ) {
             *i = b_rdata - ypBytes_DATA( b );
@@ -640,7 +688,8 @@ static ypObject *bytes_index_asC( ypObject *b, ypObject *x, yp_ssize_t *i )
         }
         b_rdata++; b_rlen--;
     }
-    return yp_ValueError;
+    *i = -1;
+    return yp_None;
 }
 
 // Returns True, False, or an exception
@@ -649,11 +698,9 @@ static ypObject *bytes_contains( ypObject *b, ypObject *x )
     ypObject *result;
     yp_ssize_t i = -1;
 
-    if( isexceptionC( x ) ) return x;
-    result = bytes_index_asC( b, x, &i );
-    if( result == yp_None ) return yp_True; // item found
-    if( result == yp_valueError ) return yp_False; // item not found
-    return result; // error
+    result = bytes_find3C( b, x, 0, ypSlice_END, &i );
+    if( yp_isexceptionC( result ) ) return result;
+    return ypBool_FROM_C( i >= 0 );
 }
 
 // Returns new reference or an exception
@@ -699,8 +746,9 @@ static ypObject *bytearray_extend( ypObject *b, ypObject *x )
 // Returns new reference or an exception
 static ypObject *bytes_getindexC( ypObject *b, yp_ssize_t i )
 {
-    if( i < 0 ) i += ypBytes_LEN( b );
-    if( i < 0 || i >= ypBytes_LEN( b ) ) return yp_IndexError;
+    ypObject *result;
+    result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
+    if( yp_isexceptionC( result ) ) return result;
     return yp_intC( ypBytes_DATA( b )[i] );
 }
 
