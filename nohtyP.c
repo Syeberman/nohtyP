@@ -306,6 +306,12 @@ static void (*yp_free)( void * ) = _yp_dummy_free;
 // Sets ob to a malloc'd buffer for a mutable container currently holding alloclen elements, or
 // yp_MemoryError on failure.  ob_inline_data in obStruct is used to determine the element size;
 // ob_len is set to zero.  alloclen cannot be negative.
+// TODO Allocate a set number of elements in-line, regardless of alloclen; similar to Python's
+// smalltable stuff in sets, etc, it avoids an extra malloc for small sets of data; this should be
+// a parameter to this macro
+// TODO But it's up to the types to decide if/when to over-allocate, and if over-allocating need to
+// make sure to use the in-line buffer when possible
+// TODO Does Python over-allocate like this?
 #define ypMem_MALLOC_CONTAINER_VARIABLE( ob, obStruct, type, alloclen ) \
     do { \
         (ob) = (ypObject *) yp_malloc( sizeof( obStruct )/*includes one element*/ - \
@@ -325,6 +331,11 @@ static void (*yp_free)( void * ) = _yp_dummy_free;
 // obStruct is used to determine the element size; ob_alloclen is set to newAlloclen.
 // Any objects in the  truncated section must have already been discarded.  newAlloclen cannot be
 // negative.
+// TODO If newAlloclen is <= the amount pre-allocated in-line by ypMem_MALLOC_CONTAINER_VARIABLE,
+// then use it instead of holding on to the separately-allocated buffer; the amount needs to be a
+// parameter to this macro, and it must be the same value as used for MALLOC
+// TODO The types need to be responsible for not using this macro if not required (ie checking the
+// current alloclen)
 #define ypMem_REALLOC_CONTAINER_VARIABLE( result, ob, obStruct, newAlloclen ) \
     do { \
         void *newData = yp_realloc( \
@@ -869,7 +880,7 @@ static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
         yp_ssize_t step, ypObject *x )
 {
     ypObject *result;
-    yp_ssize_t sliceLen;
+    yp_ssize_t slicelength;
     yp_uint8_t *x_data;
     yp_ssize_t x_len;
 
@@ -877,21 +888,21 @@ static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
     if( x_len == 0 ) return bytearray_delsliceC( b, start, stop, step );
 
-    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &sliceLen );
+    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
 
     if( step == 1 ) {
-        if( x_len > sliceLen ) {
+        if( x_len > slicelength ) {
             // bytearray is growing
-            yp_ssize_t growBy = x_len - sliceLen;
+            yp_ssize_t growBy = x_len - slicelength;
             yp_ssize_t oldLen = ypBytes_LEN( b );
             result = _yp_bytearray_resize( b, oldLen + growBy );
             if( yp_isexceptionC( result ) ) return result;
             // memmove allows overlap
             memmove( ypBytes_DATA( b )+stop+growBy, ypBytes_DATA( b )+stop, oldLen-stop );
-        } else if( x_len < sliceLen ) {
+        } else if( x_len < slicelength ) {
             // bytearray is shrinking
-            yp_ssize_t shrinkBy = sliceLen - x_len;
+            yp_ssize_t shrinkBy = slicelength - x_len;
             // memmove allows overlap
             memmove( ypBytes_DATA( b )+stop-shrinkBy, ypBytes_DATA( b )+stop,
                     ypBytes_LEN( b )-stop );
@@ -901,8 +912,8 @@ static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
         memcpy( ypBytes_DATA( b )+start, x_data, x_len );
     } else {
         yp_ssize_t i;
-        if( x_len != sliceLen ) return yp_ValueError;
-        for( i = 0; i < sliceLen; i++ ) {
+        if( x_len != slicelength ) return yp_ValueError;
+        for( i = 0; i < slicelength; i++ ) {
             ypBytes_DATA( b )[start + i*step] = x_data[i];
         }
     }
@@ -914,21 +925,22 @@ static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
         yp_ssize_t step )
 {
     ypObject *result;
-    yp_ssize_t sliceLen;
+    yp_ssize_t slicelength;
 
-    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &sliceLen );
+    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
-    if( sliceLen < 1 ) return yp_None; // no-op
+    if( slicelength < 1 ) return yp_None; // no-op
     if( step < 0 ) {
         stop = start + 1;
-        start = stop + step*(sliceLen - 1) - 1;
+        start = stop + step*(slicelength - 1) - 1;
         step = -step;
     }
 
     if( step == 1 ) {
         // One contiguous section
-        memmove( ypBytes_DATA( b )+stop-sliceLen, ypBytes_DATA( b )+stop, ypBytes_LEN( b )-stop );
-        ypBytes_LEN( b ) -= sliceLen;
+        memmove( ypBytes_DATA( b )+stop-slicelength, ypBytes_DATA( b )+stop, 
+                ypBytes_LEN( b )-stop );
+        ypBytes_LEN( b ) -= slicelength;
     } else {
         return yp_NotImplementedError; // TODO implement
     }

@@ -5,42 +5,25 @@
  *      TODO Python's license
  *
  * The goal of nohtyP is to enable Python-like code to be written in C.  It is patterned after
- * Python's built-in API, then adjusted for C's lack of exceptions, manual reference counting, and
- * expected usage patterns.  It also borrows ideas from Python's own C API.  To be as portable as
- * possible, it is written in one .c and one .h file and attempts to rely strictly on standard C
- * functions.
+ * Python's built-in API, then adjusted for expected usage patterns.  It also borrows ideas from 
+ * Python's own C API.  To be as portable as possible, it is written in one .c and one .h file and
+ * attempts to rely strictly on standard C.
  *
- * All objects maintain a reference count; when that count reaches zero, the object is deallocated.
- * An invalidated object can still have references to it, although any attempt to use that object
- * would result in an exception.  Objects can be declared immortal and, thus, never deallocated;
- * attempting to invalidate an immortal is a no-op.  Examples of immortals include yp_None,
- * yp_True, yp_False, exceptions, yp_CONST_BYTES, and so forth.
- *
- * Most functions borrow inputs, create their own references, and output new references.
- * One exception: those that modify objects steal a reference to the modified object and return a
+ * Most functions borrow inputs, create their own references, and output new references.  One 
+ * exception: those that modify objects steal a reference to the modified object and return a
  * new reference; this may not be the same object, particularly if an exception occurs.  (You can
- * always call yp_incref or yp_copy to compensate for a stolen reference.)  Another exception:
+ * always call yp_incref first to ensure the object is not deallocated.)  Another exception:
  * yp_or and yp_and return borrowed references, as this simplifies the most-common use case.
- *
- * TODO instead of steal/return, take in a PyObject**, modifying it in-place on error, and that
- * way the syntax/compiler helps us remember that this is special.  Can still return
- * None/exception, which could be handy.
  *
  * TODO in the docs, be explicit about which functions return immortal objects
  *
- * Most objects support a one-way freeze function that makes them immutable, an unfrozen_copy
- * function that returns mutable copy, and a one-way invalidate function that discards all 
- * references and renders the object useless (even immutable objects); there are also deep
- * variants to these functions.  If an invalidated object is supplied to a function, 
- * yp_InvalidatedError is returned.  Freezing and invalidating are two examples of object 
- * transmutation, where the type of the object is converted to a different type.
- *
  * When an error occurs in a function, it returns an exception object (after ensuring all objects
- * are left in a consistent state), even if no exceptions are mentioned in the documentation.  If
- * the function has stolen a reference, that reference is discarded.  If an exception object is
- * used for any input into a function, it is returned before any modifications occur; note that
- * containers cannot store exception objects.  As a result of these rules, it is possible to
- * string together multiple function calls and only check if an exeption occured at the end: 
+ * are left in a consistent state), even if no exceptions are mentioned in the documentation.  
+ * If the  function has stolen a reference, that reference is discarded.  If an exception object
+ * is used for any input into a function, it is returned before any modifications occur.  
+ * Exception objects are immortal, so it isn't necessary to call yp_decref on them.  As a result
+ * of these rules, it is possible to string together multiple function calls and only check if an
+ * exeption occured at the end: 
  *      yp_CONST_BYTES( sep, ", " ); 
  *      yp_CONST_BYTES( fmt, "(%s)\n" ); 
  *      ypObject *sepList = yp_join( sep, list );
@@ -48,32 +31,21 @@
  *      ypObject *result = yp_format( fmt, sepList ); 
  *      yp_decref( sepList ); 
  *      if( yp_isexception( result ) ) exit( -1 ); 
- * Additionally, exception objects are immortal, so it is safe to ignore them for functions that
- * only return immortal objects (such as yp_None).
- *
- * TODO comparison/boolean operations and error handling and yp_IF
- *
- * TODO Error handling on functions that return C values
  *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
- * threads, including changing reference counts.  One strategy to ensure this is to deep copy any
- * object, even immutable ones, before exchanging between threads.  Sharing immutable, immortal
- * objects is always safe.
+ * threads; this includes updating reference counts, so immutables are not inherently threadsafe!
+ * One strategy to ensure safety is to deep copy objects before exchanging between threads.  
+ * Sharing immutable, immortal objects is always safe.
  *
- * The naming convention for functions, types, and so forth is first-and-foremost geared towards
- * reducing keystrokes for the common cases.  "Runtime entities" like functions and macros are
- * prefixed with * yp_, "compiler entities" like types with yp (no underscore).  The boundary
- * between C an nohtyP is an important one.  Functions that accept C types and return objects end
- * in "C"; those that accept objects and return C types end in "_asC", unless it is unambiguous
- * that the return is a C type ("yp_isexceptionC", "yp_lenC"); finally, if the specific C type
- * is important, as it is with numbers, the type is contained in the function name 
- * ("yp_int_asuint8C").
+ * The boundary between C types and ypObjects is an important one.  Functions that accept C types
+ * and return objects end in "C".  Functions that accept objects and return C types end in "_asC",
+ * unless "C" would be unambiguous; for example, yp_isexceptionC and yp_lenC must accept only 
+ * objects for input.  TODO what about when in and out is C?
  *
- * Postfixes:
- *  C - to/from C types
- *  D - discard after use (ie yp_IFd)
+ * Other important postfixes:
+ *  D - discard after use (ie yp_IFd) TODO others?
  *  N - n variable positional arguments follow
- *  K - n keyword arguments follow
+ *  K - n keyword arguments follow (for a total of n*2 arguments)
  *  X - direct access to internal memory: tread carefully!
  */
 
@@ -91,6 +63,11 @@ void yp_initialize( void );
  * Object Fundamentals
  */
 
+// All objects maintain a reference count; when that count reaches zero, the object is deallocated.
+// Certain objects are immortal and, thus, never deallocated; examples include yp_None, yp_True, 
+// yp_False, exceptions, yp_CONST_BYTES, and so forth.
+
+// nohtyP objects are only accessed through pointers to ypObject.
 typedef struct _ypObject ypObject;
 
 // Increments the reference count of x, returning it as a convenience.  Always succeeds; if x is
@@ -112,76 +89,88 @@ void yp_decrefN( int n, ... );
  * Freezing, "Unfreezing", and Invalidating
  */
 
+// Most objects support a one-way freeze function that makes them immutable, an unfrozen_copy
+// function that returns a mutable copy, and a one-way invalidate function that renders the object
+// useless; there are also deep variants to these functions.  Supplying an invalidated object to a
+// function results in yp_InvalidatedError.  Freezing and invalidating are two examples of object
+// transmutation, where the type of the object is converted to a different type.  Unlike Python,
+// most objects are copied in memory, even immutables, as copying is one method for maintaining
+// threadsafety.
+
 // Steals x, transmutes it to its associated immutable type, and returns a new reference to it.
-// If x is already immutable or has been invalidated this is a no-op; if x can't be frozen
-// a new, invalidated object is returned (the original object is not invalidated, but the reference
-// _is_ discarded). 
+// If x is already immutable or has been invalidated this is a no-op.  If x can't be frozen
+// a new, invalidated object is returned (rarely occurs: most types _can_ be frozen). 
 void yp_freeze( ypObject **x );
 
-// Steals and freezes x and, recursively, all referenced objects, returning a new reference.
+// Steals and freezes x and, recursively, all contained objects, returning a new reference.
 void yp_deepfreeze( ypObject **x );
 
 // Returns a new reference to a mutable shallow copy of x.  If x has no associated mutable type an
 // immutable copy is returned.  May also return yp_MemoryError.
 ypObject *yp_unfrozen_copy( ypObject *x );
 
-// Creates a mutable copy of x and, recursively, all referenced objects, returning a new reference
-// (or yp_MemoryError).
+// Creates a mutable copy of x and, recursively, all contained objects, returning a new reference.
 ypObject *yp_unfrozen_deepcopy( ypObject *x );
 
 // Returns a new reference to an immutable shallow copy of x.  If x has no associated immutable 
-// type a new, invalidated object is returned (x is neither invalidated nor discarded).  May also
-// return yp_MemoryError.
+// type a new, invalidated object is returned.  May also return yp_MemoryError.
 ypObject *yp_frozen_copy( ypObject *x );
 
-// Creates an immutable copy of x and, recursively, all referenced objects, returning a new 
-// reference (or yp_MemoryError).
+// Creates an immutable copy of x and, recursively, all contained objects, returning a new 
+// reference.
 ypObject *yp_frozen_deepcopy( ypObject *x );
 
-// Steals x, discards all referenced objects, deallocates _some_ memory, transmutes it to
+// TODO _copy, _deepcopy
+
+// Steals x, discards all contained objects, deallocates _some_ memory, transmutes it to
 // the ypInvalidated type (rendering the object useless), and returns a new reference to x.
-// If x is immortal or already invalidated this is a no-op.
+// If x is immortal or already invalidated this is a no-op; immutable objects _can_ be invalidated.
 void yp_invalidate( ypObject **x );
 
-// Steals and invalidates x and, recursively, all referenced objects, returning a new reference.
+// Steals and invalidates x and, recursively, all contained objects, returning a new reference.
 void yp_deepinvalidate( ypObject **x );
 
 
 /*
- * Boolean Operations
+ * Boolean Operations and Comparisons
  */
 
-// Returns yp_False if the object should be considered false (yp_None, a number equal to zero, or
-// a container of zero length), otherwise yp_True.
+// TODO comparison/boolean operations and error handling and yp_IF
+
+// Returns the immortal yp_False if the object should be considered false (yp_None, a number equal
+// to zero, or a container of zero length), otherwise yp_True or an exception.
 ypObject *yp_bool( ypObject *x );
 
-// Returns a borrowed reference to y if x is false, otherwise to x.  Unlike  Python, both
+// Returns a *borrowed* reference to y if x is false, otherwise to x.  Unlike  Python, both
 // arguments are always evaluated.
 ypObject *yp_or( ypObject *x, ypObject *y );
 
 // A convenience function to "or" n objects.  Similar to yp_any, returns yp_False if n is zero, 
-// and the first object if n is one.
+// and the first object if n is one.  Returns a *borrowed* reference.
 ypObject *yp_orN( int n, ... );
 
-// Returns a borrowed reference to x if x is false, otherwise to y.  Unlike Python, both arguments
-// are always evaluated.
+// Returns a *borrowed* reference to x if x is false, otherwise to y.  Unlike Python, both 
+// arguments are always evaluated.
 ypObject *yp_and( ypObject *x, ypObject *y );
 
 // A convenience function to "and" n objects.  Similar to yp_all, returns yp_True if n is zero,
-// and the first object if n is one.
+// and the first object if n is one.  Returns a *borrowed* reference.
 ypObject *yp_andN( int n, ... );
 
-// Returns yp_True if x is considered false, otherwise yp_False.
+// Returns the immortal yp_True if x is considered false, otherwise yp_False or an exception.
 ypObject *yp_not( ypObject *x );
 
-// You may also be interested in yp_IF and yp_WHILE for working with boolean operations; see below
+// Implements the "less than" (x<y), "less than or equal" (x<=y), "equal" (x==y), "not equal"
+// (x!=y), "greater than or equal" (x>=y), and "greater than" (x>y) comparisons.  Returns the
+// immortal yp_True if the condition is true, otherwise yp_False or an exception.
+ypObject *yp_lt( ypObject *x, ypObject *y );
+ypObject *yp_le( ypObject *x, ypObject *y );
+ypObject *yp_eq( ypObject *x, ypObject *y );
+ypObject *yp_ne( ypObject *x, ypObject *y );
+ypObject *yp_ge( ypObject *x, ypObject *y );
+ypObject *yp_gt( ypObject *x, ypObject *y );
 
-
-/*
- * Comparisons
- */
-
-
+// You may also be interested in yp_IF and yp_WHILE for working with boolean operations; see below.
 
 
 /*
@@ -193,14 +182,12 @@ ypObject *yp_not( ypObject *x );
 // (and, therefore, will not contain the null byte).
 ypObject *yp_bytearrayC( unsigned char *source, yp_ssize_t len );
 
-// Equivalent to yp_freeze( yp_bytearrayC( source, len ) );.
+// Equivalent to yp_freeze( yp_bytearrayC( source, len ) ).
 ypObject *yp_bytesC( unsigned char *source, yp_ssize_t len );
 
 // Returns a new mutable dict of n items.  There must be n pairs of objects, with the first 
 // object in each pair being the key and the second the value (for a total of n*2 objects).
-ypObject *yp_dictN( int n, ... );
-// TODO should there be a prefix to indicate this "automatically unpacked" structure idea?
-// like with divmod returning two objects via output pointer parameters?
+ypObject *yp_dictK( int n, ... );
 
 // Returns a new mutable, empty dict, likely to be populated with yp_setitem.  lenhint is the
 // expected number of items in the final dict, or negative if this is not known.
@@ -232,6 +219,9 @@ ypObject *yp_tuple
 // TODO unfrozen str?  chararray?
 ypObject *yp_str
 
+// TODO should there be a prefix to indicate this "automatically unpacked" structure idea?
+// like with divmod returning two objects via output pointer parameters?
+
 
 
 
@@ -259,6 +249,9 @@ yp_round
 // together. (yp_addD)
 // TODO inplace versions of above, for the mutable int type
 // TODO bitwise and/or need new names, so as not to conflict with yp_and/yp_or...yp_amp/yp_bar?
+
+// TODO document uint yp_addC( uint, uint, ypObject *error ) (how to name?!)
+
 
 /*
  * Iterator Operations
@@ -295,7 +288,7 @@ yp_zip
 // TODO bad idea?
 // For sequences that store their items as an array of pointers to ypObjects (list and tuple),
 // returns a pointer to the beginning of that array, and sets len to the length of the sequence.
-// The returned value points into internal object memory, so they are borrowed references and
+// The returned value points into internal object memory, so they are *borrowed* references and
 // MUST NOT be modified; furthermore, the sequence itself must not be modified while using the
 // array.  Returns NULL and sets len to -1 on error.
 // 'X' means the function is dealing with internal data
