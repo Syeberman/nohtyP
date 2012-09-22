@@ -45,7 +45,7 @@
  * Other important postfixes:
  *  D - discard after use (ie yp_IFd) TODO others?
  *  N - n variable positional arguments follow
- *  K - n keyword arguments follow (for a total of n*2 arguments)
+ *  K - n key/value arguments follow (for a total of n*2 arguments)
  *  X - direct access to internal memory: tread carefully!
  */
 
@@ -141,24 +141,30 @@ void yp_deepinvalidate( ypObject **x );
 // to zero, or a container of zero length), otherwise yp_True or an exception.
 ypObject *yp_bool( ypObject *x );
 
+// Returns the immortal yp_True if x is considered false, otherwise yp_False or an exception.
+ypObject *yp_not( ypObject *x );
+
 // Returns a *borrowed* reference to y if x is false, otherwise to x.  Unlike  Python, both
 // arguments are always evaluated.
 ypObject *yp_or( ypObject *x, ypObject *y );
 
-// A convenience function to "or" n objects.  Similar to yp_any, returns yp_False if n is zero, 
-// and the first object if n is one.  Returns a *borrowed* reference.
+// A convenience function to "or" n objects.  Returns yp_False if n is zero, and the first object 
+// if n is one.  Returns a *borrowed* reference.
 ypObject *yp_orN( int n, ... );
+
+// Equivalent to yp_bool( yp_orN( n, ... ) ).
+ypObject *yp_anyN( int n, ... );
 
 // Returns a *borrowed* reference to x if x is false, otherwise to y.  Unlike Python, both 
 // arguments are always evaluated.
 ypObject *yp_and( ypObject *x, ypObject *y );
 
-// A convenience function to "and" n objects.  Similar to yp_all, returns yp_True if n is zero,
-// and the first object if n is one.  Returns a *borrowed* reference.
+// A convenience function to "and" n objects.  Returns yp_True if n is zero, and the first object
+// if n is one.  Returns a *borrowed* reference.
 ypObject *yp_andN( int n, ... );
 
-// Returns the immortal yp_True if x is considered false, otherwise yp_False or an exception.
-ypObject *yp_not( ypObject *x );
+// Equivalent to yp_bool( yp_andN( n, ... ) ).
+ypObject *yp_allN( int n, ... );
 
 // Implements the "less than" (x<y), "less than or equal" (x<=y), "equal" (x==y), "not equal"
 // (x!=y), "greater than or equal" (x>=y), and "greater than" (x>y) comparisons.  Returns the
@@ -174,16 +180,76 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
 
 
 /*
- * Constructors TODO reorder
+ * nohtyP's C types
  */
 
-// Returns a new mutable bytearray, copying the first len bytes from source.  If source is NULL it
+// TODO yp_int32_t, yp_uint32_t; yp_int_t is the type used to represent ints, yp_float_t the same
+// (so is actually double).
+
+// The signature of a function that can be wrapped up in a generator-iter, called by yp_send and
+// similar functions.  State is an array of len *borrowed* ypObject*s that hold the current state;
+// the function cannot change the number of objects, but it can discard them and replace with new
+// references.  value is an object that is "sent" into the function by yp_send; it may also be 
+// yp_GeneratorExit if yp_close is called, or another exception.  The return value must be a new 
+// reference, or an exception.
+typedef ypObject *(*yp_generator_func_t)( ypObject **state, yp_ssize_t len, ypObject *value );
+
+
+/*
+ * Constructors
+ */
+
+// Unlike Python, most nohtyP types have both mutable and immutable versions.  An "intstore" is a
+// mutable int (it "stores" an int); similar for floatstore.  The mutable str is called a
+// "characterarray", while a "frozendict" is an immutable dict.  There is no immutable iter type.
+
+// Returns a new int/intstore with the given value.
+ypObject *yp_intC( yp_int_t value );
+ypObject *yp_intstoreC( yp_int_t value );
+
+// Returns a new int/intstore interpreting the string as an integer literal with the given base.
+// Base zero means to infer the base according to Python's syntax.
+ypObject *yp_int_strC( char *string, int base );
+ypObject *yp_intstore_strC( char *string, int base );
+
+// Returns a new float/floatstore with the given value.
+ypObject *yp_floatC( yp_float_t value );
+ypObject *yp_floatstoreC( yp_float_t value );
+
+// Returns a new float/floatstore interpreting the string as a Python floating-point literal.
+ypObject *yp_float_strC( char *string );
+ypObject *yp_floatstore_strC( char *string );
+
+// Returns a new iter for object x.
+ypObject *yp_iter( ypObject *x );
+
+// Returns a new generator-iter object using the given func.  The function will be passed the given
+// n objects as state on each call.
+// TODO put a lenhint here?  auto-decrement lenhint on every yielded value!
+ypObject *yp_generatorCN( yp_generator_func_t func, int n, ... );
+
+// Returns a new bytes/bytearray, copying the first len bytes from source.  If source is NULL it
 // is considered as having all null bytes; if len is negative source is considered null terminated
 // (and, therefore, will not contain the null byte).
-ypObject *yp_bytearrayC( unsigned char *source, yp_ssize_t len );
+ypObject *yp_bytesC( yp_uint8_t *source, yp_ssize_t len );
+ypObject *yp_bytearrayC( yp_uint8_t *source, yp_ssize_t len );
 
-// Equivalent to yp_freeze( yp_bytearrayC( source, len ) ).
-ypObject *yp_bytesC( unsigned char *source, yp_ssize_t len );
+
+ypObject *yp_str
+// TODO unfrozen str: CharacterArray
+
+ypObject *yp_tuple
+ypObject *yp_listN( int n, ... );
+// Returns a new list made of factor shallow copies of yp_listN( n, ... ) concatenated.  Equivalent
+// to "factor * [obj1, obj2, ...]" in Python.
+ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... );
+ypObject *yp_list
+
+
+ypObject *yp_frozenset
+ypObject *yp_set
+
+// TODO frozendict?
 
 // Returns a new mutable dict of n items.  There must be n pairs of objects, with the first 
 // object in each pair being the key and the second the value (for a total of n*2 objects).
@@ -193,34 +259,10 @@ ypObject *yp_dictK( int n, ... );
 // expected number of items in the final dict, or negative if this is not known.
 ypObject *yp_dict_emptyC( yp_ssize_t lenhint );
 
-// TODO frozendict?
 
-// TODO unfrozen float?
-ypObject *yp_float
-
-
-ypObject *yp_set
-ypObject *yp_frozenset
-
-// TODO unfrozen int?
-ypObject *yp_intC( yp_int64_t value );
-
-
-ypObject *yp_listN( int n, ... );
-
-// Returns a new list made of factor shallow copies of yp_listN( n, ... ) concatenated.  Equivalent
-// to "factor * [obj1, obj2, ...]" in Python.
-ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... );
-ypObject *yp_list
-ypObject *yp_tuple
 
 // TODO files (ie open)?
 
-// TODO unfrozen str?  chararray?
-ypObject *yp_str
-
-// TODO should there be a prefix to indicate this "automatically unpacked" structure idea?
-// like with divmod returning two objects via output pointer parameters?
 
 
 

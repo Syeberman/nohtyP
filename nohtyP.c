@@ -9,7 +9,6 @@
 
 #include "nohtyP.h"
 
-// TODO yp_int32_t, yp_uint32_t
 
 /*************************************************************************************************
  * Static assertions for nohtyP.h
@@ -183,12 +182,12 @@ typedef struct {
 #define ypNone_CODE                 (  6u)
 // no mutable ypNone type           (  7u)
 #define ypBool_CODE                 (  8u)
-// TODO what to call a mutable bool (  9u)
+// no mutable ypBool type           (  9u)
 
 #define ypInt_CODE                  ( 10u)
-// TODO what to call a mutable int  ( 11u)
+#define ypIntStore_CODE             ( 11u)
 #define ypFloat_CODE                ( 12u)
-// TODO what to call a mutable float( 13u)
+#define ypFloatStore_CODE           ( 13u)
 
 // no immutable ypIter type         ( 14u)
 #define ypIter_CODE                 ( 15u)
@@ -571,6 +570,9 @@ static ypObject *yp_int_add( ypObject *x, ypObject *y )
  * Iterators
  *************************************************************************************************/
 
+// TODO Iterators should have a lenhint "attribute" so that consumers of the iterator can
+// pre-allocate
+
 
 /*************************************************************************************************
  * Indices and slices
@@ -617,6 +619,8 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
 
     return yp_None;
 }
+
+// TODO ypSlice_InvertIndicesC to take start/stop/step and adjust for -step
 
 
 /*************************************************************************************************
@@ -1036,6 +1040,9 @@ static yp_hash_t bytes_current_hash( ypObject *b ) {
 /*************************************************************************************************
  * Sequence of generic items
  *************************************************************************************************/
+
+// TODO Eventually, use timsort, but for now C's qsort should be fine
+
 
 /*************************************************************************************************
  * Sets
