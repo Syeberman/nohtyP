@@ -139,6 +139,8 @@ RECIPIE( ConditionalStatements )
         yp_decref( bytes );
     }
 
+// TODO In ypExamples, show why there is no dict constructor version that directly accepts strings
+// (...because it's so easy to create immortals for bytes/str)
     
 
 }
