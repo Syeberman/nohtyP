@@ -15,8 +15,6 @@
  * always call yp_incref first to ensure the object is not deallocated.)  Another exception:
  * yp_or and yp_and return borrowed references, as this simplifies the most-common use case.
  *
- * TODO in the docs, be explicit about which functions return immortal objects
- *
  * When an error occurs in a function, it returns an exception object (after ensuring all objects
  * are left in a consistent state), even if no exceptions are mentioned in the documentation.  
  * If the  function has stolen a reference, that reference is discarded.  If an exception object
@@ -24,8 +22,8 @@
  * Exception objects are immortal, so it isn't necessary to call yp_decref on them.  As a result
  * of these rules, it is possible to string together multiple function calls and only check if an
  * exeption occured at the end: 
- *      yp_CONST_BYTES( sep, ", " ); 
- *      yp_CONST_BYTES( fmt, "(%s)\n" ); 
+ *      yp_IMMORTAL_BYTES( sep, ", " ); 
+ *      yp_IMMORTAL_BYTES( fmt, "(%s)\n" ); 
  *      ypObject *sepList = yp_join( sep, list );
  *      // if yp_join failed, sepList could be an exception 
  *      ypObject *result = yp_format( fmt, sepList ); 
@@ -40,13 +38,14 @@
  * The boundary between C types and ypObjects is an important one.  Functions that accept C types
  * and return objects end in "C".  Functions that accept objects and return C types end in "_asC",
  * unless "C" would be unambiguous; for example, yp_isexceptionC and yp_lenC must accept only 
- * objects for input.  TODO what about when in and out is C?
+ * objects for input.  Finally, functions where the inputs and outputs are, except for the error
+ * indicator, all C types, are nohtyP library routines and thus end in "L".
  *
  * Other important postfixes:
- *  D - discard after use (ie yp_IFd) TODO others?
+ *  D - discard after use (ie yp_IFd)
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
- *  X - direct access to internal memory: tread carefully!
+ *  X - direct access to internal memory; tread carefully!
  */
 
 
@@ -65,7 +64,7 @@ void yp_initialize( void );
 
 // All objects maintain a reference count; when that count reaches zero, the object is deallocated.
 // Certain objects are immortal and, thus, never deallocated; examples include yp_None, yp_True, 
-// yp_False, exceptions, yp_CONST_BYTES, and so forth.
+// yp_False, exceptions, and so forth.
 
 // nohtyP objects are only accessed through pointers to ypObject.
 typedef struct _ypObject ypObject;
@@ -120,7 +119,11 @@ ypObject *yp_frozen_copy( ypObject *x );
 // reference.
 ypObject *yp_frozen_deepcopy( ypObject *x );
 
-// TODO _copy, _deepcopy
+// Returns a new reference to an exact, shallow copy of x.  May also return yp_MemoryError.
+ypObject *yp_copy( ypObject *x );
+
+// Creates an exact copy of x and, recursively, all contained objects, returning a new reference.
+ypObject *yp_deepcopy( ypObject *x );
 
 // Steals x, discards all contained objects, deallocates _some_ memory, transmutes it to
 // the ypInvalidated type (rendering the object useless), and returns a new reference to x.
@@ -186,12 +189,12 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
 // TODO yp_int32_t, yp_uint32_t; yp_int_t is the type used to represent ints, yp_float_t the same
 // (so is actually double).
 
-// The signature of a function that can be wrapped up in a generator-iter, called by yp_send and
+// The signature of a function that can be wrapped up in a generator, called by yp_send and
 // similar functions.  State is an array of len *borrowed* ypObject*s that hold the current state;
 // the function cannot change the number of objects, but it can discard them and replace with new
 // references.  value is an object that is "sent" into the function by yp_send; it may also be 
 // yp_GeneratorExit if yp_close is called, or another exception.  The return value must be a new 
-// reference, or an exception.
+// reference, yp_StopIteration if the generator is exhausted, or another exception.
 typedef ypObject *(*yp_generator_func_t)( ypObject **state, yp_ssize_t len, ypObject *value );
 
 
@@ -201,70 +204,90 @@ typedef ypObject *(*yp_generator_func_t)( ypObject **state, yp_ssize_t len, ypOb
 
 // Unlike Python, most nohtyP types have both mutable and immutable versions.  An "intstore" is a
 // mutable int (it "stores" an int); similar for floatstore.  The mutable str is called a
-// "characterarray", while a "frozendict" is an immutable dict.  There is no immutable iter type.
+// "characterarray", while a "frozendict" is an immutable dict.  There is no immutable iter or file
+// type.
 
-// Returns a new int/intstore with the given value.
+// Returns a new reference to an int/intstore with the given value.
 ypObject *yp_intC( yp_int_t value );
 ypObject *yp_intstoreC( yp_int_t value );
 
-// Returns a new int/intstore interpreting the string as an integer literal with the given base.
-// Base zero means to infer the base according to Python's syntax.
+// Returns a new reference to an int/intstore interpreting the C string as an integer literal with
+// the given base.  Base zero means to infer the base according to Python's syntax.
 ypObject *yp_int_strC( char *string, int base );
 ypObject *yp_intstore_strC( char *string, int base );
 
-// Returns a new float/floatstore with the given value.
+// Returns a new reference to a float/floatstore with the given value.
 ypObject *yp_floatC( yp_float_t value );
 ypObject *yp_floatstoreC( yp_float_t value );
 
-// Returns a new float/floatstore interpreting the string as a Python floating-point literal.
+// Returns a new reference to a float/floatstore interpreting the string as a Python 
+// floating-point literal.
 ypObject *yp_float_strC( char *string );
 ypObject *yp_floatstore_strC( char *string );
 
-// Returns a new iter for object x.
+// Returns a new reference to an iterator for object x.
 ypObject *yp_iter( ypObject *x );
 
-// Returns a new generator-iter object using the given func.  The function will be passed the given
-// n objects as state on each call.
-// TODO put a lenhint here?  auto-decrement lenhint on every yielded value!
-ypObject *yp_generatorCN( yp_generator_func_t func, int n, ... );
+// Returns a new reference to a generator-iterator object using the given func.  The function will
+// be passed the given n objects as state on each call.  lenhint is a clue to consumers of the 
+// generator how many items will be yielded; use zero if this is not known.
+ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
 
-// Returns a new bytes/bytearray, copying the first len bytes from source.  If source is NULL it
-// is considered as having all null bytes; if len is negative source is considered null terminated
-// (and, therefore, will not contain the null byte).
+// Returns a new reference to a bytes/bytearray, copying the first len bytes from source.  If 
+// source is NULL it is considered as having all null bytes; if len is negative source is 
+// considered null terminated (and, therefore, will not contain the null byte).
+//  Ex: pre-allocate a bytearray of length 50: yp_bytearrayC( NULL, 50 )
 ypObject *yp_bytesC( yp_uint8_t *source, yp_ssize_t len );
 ypObject *yp_bytearrayC( yp_uint8_t *source, yp_ssize_t len );
 
+// Creates an immortal bytes constant at compile-time, which can be accessed by the variable name,
+// which is of type "static ypObject * const".  value is a C string literal that can contain null
+// bytes.  The length is calculated while compiling; the hash will be calculated the first time it
+// is accessed.  To be used as:
+//      yp_IMMORTAL_BYTES( name, value ); 
 
-ypObject *yp_str
-// TODO unfrozen str: CharacterArray
+// XXX The str/characterarray types will be added in a future version
 
-ypObject *yp_tuple
+// Returns a new reference to a tuple/list of length n containing the given objects.
+ypObject *yp_tupleN( int n, ... );
 ypObject *yp_listN( int n, ... );
-// Returns a new list made of factor shallow copies of yp_listN( n, ... ) concatenated.  Equivalent
-// to "factor * [obj1, obj2, ...]" in Python.
+
+// Returns a new reference to a tuple/list made from factor shallow copies of yp_tupleN( n, ... )
+// concatenated.  Equivalent to "factor * (obj0, obj1, ...)" in Python.
+//  Ex: pre-allocate a list of length 99: yp_list_repeatCN( 99, 1, yp_None )
+//  Ex: an 8-tuple containing alternating bools: yp_tuple_repeatCN( 4, 2, yp_False, yp_True )
+ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... );
 ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... );
-ypObject *yp_list
 
+// Returns a new reference to a tuple/list whose elements come from iterable.
+ypObject *yp_tuple( ypObject *iterable );
+ypObject *yp_list( ypObject *iterable );
 
-ypObject *yp_frozenset
-ypObject *yp_set
+// Returns a new reference to a frozenset/set containing the given n objects; the length will be n,
+// unless there are duplicate objects.
+ypObject *yp_frozensetN( int n, ... );
+ypObject *yp_setN( int n, ... );
 
-// TODO frozendict?
+// Returns a new reference to a frozenset/set whose elements come from iterable.
+ypObject *yp_frozenset( ypObject *iterable );
+ypObject *yp_set( ypObject *iterable );
 
-// Returns a new mutable dict of n items.  There must be n pairs of objects, with the first 
-// object in each pair being the key and the second the value (for a total of n*2 objects).
+// Returns a new reference to a frozendict/dict containing the given n key/value pairs (for a total
+// of 2*n objects); the length will be n, unless there are duplicate keys.
+//  Ex: yp_dictK( 3, key0, value0, key1, value1, key2, value2 )
+ypObject *yp_frozendictK( int n, ... );
 ypObject *yp_dictK( int n, ... );
 
-// Returns a new mutable, empty dict, likely to be populated with yp_setitem.  lenhint is the
-// expected number of items in the final dict, or negative if this is not known.
-ypObject *yp_dict_emptyC( yp_ssize_t lenhint );
+// Returns a new reference to a frozendict/dict containing the given n keys all set to value; the
+// length will be n, unless there are duplicate keys.
+//  Ex: pre-allocate a dict with 3 keys: yp_dict_fromkeysN( yp_None, 3, key0, key1, key2 )
+ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... );
+ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
+
+// XXX The file type will be added in a future version
 
 
-
-// TODO files (ie open)?
-
-
-
+// TODO be explicit about which functions return immortal objects
 
 
 /*
@@ -298,8 +321,6 @@ yp_round
 /*
  * Iterator Operations
  */
-ypObject *yp_iter
-// XXX no frozen iter
 
 yp_all
 yp_any
@@ -328,7 +349,7 @@ yp_zip
 #define ypSlice_END  yp_SSIZE_T_MAX
 
 // TODO bad idea?
-// For sequences that store their items as an array of pointers to ypObjects (list and tuple),
+// For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
 // returns a pointer to the beginning of that array, and sets len to the length of the sequence.
 // The returned value points into internal object memory, so they are *borrowed* references and
 // MUST NOT be modified; furthermore, the sequence itself must not be modified while using the
@@ -459,14 +480,23 @@ yp_ord
  * Internals  XXX Do not use directly!
  */
 
+// This structure is likely to change in future versions; it should only exist in-memory
 struct _ypObject {
     yp_uint32_t ob_type_refcnt; // first byte type code, remainder ref count
-    yp_hash_t ob_hash;          // cached hash for immutables
+    yp_hash_t   ob_hash;        // cached hash for immutables
     yp_uint16_t ob_len;         // length of object
     yp_uint16_t ob_alloclen;    // allocated length
     void *      ob_data;        // pointer to object data
 };
 
+
+// "Constructors" for immortal objects; implementation considered "internal", documentation above
+#define yp_IMMORTAL_BYTES( name, value ) \
+    static const char _ ## name ## _data[] = value; \
+    static ypObject _ ## name ## _struct = yp_IMMORTAL_HEAD_INIT( \
+            ypBytes_CODE, _ ## name ## _data, sizeof( _ ## name ## _data )-1 ); \
+    static ypObject * const name = &_ ## name ## _struct /* force use of semi-colon */
+// TODO yp_IMMORTAL_TUPLE, if useful
 
 // The implementation of yp_IF is considered "internal"; see above for documentation
 #define yp_IF( expression ) { \

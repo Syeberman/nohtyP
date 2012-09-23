@@ -16,6 +16,9 @@
 
 #define yp_STATIC_ASSERT( cond, tag ) typedef char assert_ ## tag[ (cond) ? 1 : -1 ]
 
+// TODO assert all the yp_int*_ts, etc are of the right size
+// TODO assert that sizeof( "abcd" ) == 5 (ie it includes the null-terminator)
+
 
 /*************************************************************************************************
  * Internal structures and types, and related macros
@@ -61,10 +64,11 @@
 #define ypObject_LEN_INVALID        (0xFFFFu)
 #define ypObject_ALLOCLEN_INVALID   (0xFFFFu)
 
-// "CONSTants" are immutable immortals
-#define ypObject_HEAD_INIT_CONST( type, len ) \
+// Creates (likely immutable) immortals 
+// TODO What to set alloclen to?  Does it matter?
+#define yp_IMMORTAL_HEAD_INIT( type, data, len ) \
     { ypObject_MAKE_TYPE_REFCNT( type, ypObject_REFCNT_IMMORTAL ), \
-      ypObject_HASH_NOT_CACHED, len, NULL },
+      ypObject_HASH_NOT_CACHED, len, 0, data },
 
 
 
@@ -393,7 +397,10 @@ void yp_decrefN( yp_ssize_t n, ... )
  * Freezing, "unfreezing", and invalidating
  *************************************************************************************************/
 
-
+// TODO If len==0, replace it with the immortal "zero-version" of the type
+//  WAIT! I can't do that, because that won't freeze the original and others might be referencing
+//  the original so won't see it as frozen now.
+//  SO! Still freeze the original, but then also replace it with the zero-version
 ypObject *_yp_freeze( ypObject *x )
 {
     int oldCode = ypObject_TYPE_CODE( *x );
@@ -571,7 +578,7 @@ static ypObject *yp_int_add( ypObject *x, ypObject *y )
  *************************************************************************************************/
 
 // TODO Iterators should have a lenhint "attribute" so that consumers of the iterator can
-// pre-allocate
+// pre-allocate; this should be automatically decremented with every yielded value
 
 
 /*************************************************************************************************
@@ -626,6 +633,8 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
 /*************************************************************************************************
  * Sequence of bytes
  *************************************************************************************************/
+
+// TODO ensure it is always null-terminated
 
 typedef struct {
     ypObject_HEAD
@@ -1079,7 +1088,8 @@ yp_STATIC_ASSERT( offsetof( ypFrozenSet_KeyEntry, se_key ) == sizeof( ypObject *
 #define ypFrozenSet_MASK( so ) ( ((yFrozenSetObject *)so)->so_mask )
 
 #define ypFrozenSet_PERTURB_SHIFT (5)
-static ypObject *ypFrozenSet_dummy = ypObject_HEAD_INIT_CONST( ypInvalidated_CODE, 0 );
+static ypObject _ypFrozenSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 0 );
+static ypObject *ypFrozenSet_dummy = &_ypFrozenSet_dummy;
 
 // Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
 // yp_None, or an exception on error.
