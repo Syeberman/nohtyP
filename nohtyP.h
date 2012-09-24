@@ -38,8 +38,8 @@
  * The boundary between C types and ypObjects is an important one.  Functions that accept C types
  * and return objects end in "C".  Functions that accept objects and return C types end in "_asC",
  * unless "C" would be unambiguous; for example, yp_isexceptionC and yp_lenC must accept only 
- * objects for input.  Finally, functions where the inputs and outputs are, except for the error
- * indicator, all C types, are nohtyP library routines and thus end in "L".
+ * objects for input.  Finally, functions that do not operate on _any_ objects are nohtyP library
+ * routines and thus end in "L" (such functions are exposed to avoid object creation overhead).
  *
  * Other important postfixes:
  *  D - discard after use (ie yp_IFd)
@@ -96,12 +96,12 @@ void yp_decrefN( int n, ... );
 // most objects are copied in memory, even immutables, as copying is one method for maintaining
 // threadsafety.
 
-// Steals x, transmutes it to its associated immutable type, and returns a new reference to it.
-// If x is already immutable or has been invalidated this is a no-op.  If x can't be frozen
+// Steals *x, transmutes it to its associated immutable type, and returns a new reference to it.
+// If *x is already immutable or has been invalidated this is a no-op.  If *x can't be frozen
 // a new, invalidated object is returned (rarely occurs: most types _can_ be frozen). 
 void yp_freeze( ypObject **x );
 
-// Steals and freezes x and, recursively, all contained objects, returning a new reference.
+// Steals and freezes *x and, recursively, all contained objects, returning a new reference.
 void yp_deepfreeze( ypObject **x );
 
 // Returns a new reference to a mutable shallow copy of x.  If x has no associated mutable type an
@@ -125,12 +125,13 @@ ypObject *yp_copy( ypObject *x );
 // Creates an exact copy of x and, recursively, all contained objects, returning a new reference.
 ypObject *yp_deepcopy( ypObject *x );
 
-// Steals x, discards all contained objects, deallocates _some_ memory, transmutes it to
-// the ypInvalidated type (rendering the object useless), and returns a new reference to x.
-// If x is immortal or already invalidated this is a no-op; immutable objects _can_ be invalidated.
+// Steals *x, discards all contained objects, deallocates _some_ memory, transmutes it to
+// the ypInvalidated type (rendering the object useless), and returns a new reference to *x.
+// If *x is immortal or already invalidated this is a no-op; immutable objects _can_ be 
+// invalidated.
 void yp_invalidate( ypObject **x );
 
-// Steals and invalidates x and, recursively, all contained objects, returning a new reference.
+// Steals and invalidates *x and, recursively, all contained objects, returning a new reference.
 void yp_deepinvalidate( ypObject **x );
 
 
@@ -293,29 +294,97 @@ ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
 /*
  * Generic Object Operations
  */
-yp_hash
-yp_isinstanceC
-yp_len
-yp_type
 
+// Returns the hash value of x; x must be immutable.  Returns -1 and sets *exc on error.
+yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
+
+// Returns the _current_ hash value of x; if x is mutable, this value may change between calls.
+// Returns -1 and sets *exc on error.  (Unlike Python, you can calculate the hash value of mutable
+// types.)
+yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
+
+// Returns the length of x.  Returns zero and sets *exc on error.
+yp_ssize_t yp_lenC( ypObject *x, ypObject **exc );
 
 
 /*
  * Numeric Operations
  */
-yp_abs
-yp_divmod
+
+// TODO this is a big ugly section, and possibly not often used; move near the bottom?
+
+// Each of these functions return new reference(s) to the result of the given numeric operation;
+// for example, yp_add returns the result of adding x and y together.  If the given operands do not
+// support the operation, yp_TypeError is returned.  Additional notes:
+//  - yp_divmod returns two objects via *div and *mod; on error, they are both set to an exception
+//  - If z is yp_None, yp_pow returns x to the power y, otherwise x to the power y modulo z
+//  - To avoid confusion with the logical operators of the same name, yp_amp implements bitwise
+//  and, while yp_bar implements bitwise or
+//  - Unlike Python, non-numeric types do not (currently) overload these operators
+ypObject *yp_add( ypObject *x, ypObject *y );
+ypObject *yp_sub( ypObject *x, ypObject *y );
+ypObject *yp_mul( ypObject *x, ypObject *y );
+ypObject *yp_truediv( ypObject *x, ypObject *y );
+ypObject *yp_floordiv( ypObject *x, ypObject *y );
+ypObject *yp_mod( ypObject *x, ypObject *y );
+void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod );
+ypObject *yp_pow( ypObject *x, ypObject *y, ypObject *z );
+ypObject *yp_lshift( ypObject *x, ypObject *y );
+ypObject *yp_rshift( ypObject *x, ypObject *y );
+ypObject *yp_amp( ypObject *x, ypObject *y );
+ypObject *yp_xor( ypObject *x, ypObject *y );
+ypObject *yp_bar( ypObject *x, ypObject *y );
+ypObject *yp_neg( ypObject *x );
+ypObject *yp_pos( ypObject *x );
+ypObject *yp_abs( ypObject *x );
+ypObject *yp_invert( ypObject *x );
+
+// In-place versions of the above that steal *x and return a new reference.  If the object *x can
+// be modified to hold the result, it is, otherwise *x is discarded and replaced with the result.
+// If *x is immutable on input, an immutable object is returned, otherwise a mutable object is
+// returned.  On error, *x is discarded and set to an exception.
+void yp_iadd( ypObject **x, ypObject *y );
+void yp_isub( ypObject **x, ypObject *y );
+void yp_imul( ypObject **x, ypObject *y );
+void yp_itruediv( ypObject **x, ypObject *y );
+void yp_ifloordiv( ypObject **x, ypObject *y );
+void yp_imod( ypObject **x, ypObject *y );
+void yp_ipow( ypObject **x, ypObject *y, ypObject *z );
+void yp_ilshift( ypObject **x, ypObject *y );
+void yp_irshift( ypObject **x, ypObject *y );
+void yp_iamp( ypObject **x, ypObject *y );
+void yp_ixor( ypObject **x, ypObject *y );
+void yp_ibar( ypObject **x, ypObject *y );
+void yp_ineg( ypObject **x );
+void yp_ipos( ypObject **x );
+void yp_iabs( ypObject **x );
+void yp_iinvert( ypObject **x );
+
+// TODO: et al
+void yp_iaddC( ypObject **x, yp_int_t y );
+
+// TODO: et al
+void yp_iadd_floatC( ypObject **x, yp_float_t y );
+
+// TODO: et al
+yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
+
+// TODO: et al
+yp_float_t yp_add_floatL( yp_float_t x, yp_float_t y, ypObject **exc );
+
+
+
+// Return a new reference to x rounded to ndigits after the decimal point.
+ypObject *yp_roundC( ypObject *x, int ndigits );
+
+
+
+
 yp_hex
 yp_oct
-yp_pow
-yp_round
 
 // TODO versions of the above that steal their arguments, so that operations can be chained
 // together. (yp_addD)
-// TODO inplace versions of above, for the mutable int type
-// TODO bitwise and/or need new names, so as not to conflict with yp_and/yp_or...yp_amp/yp_bar?
-
-// TODO document uint yp_addC( uint, uint, ypObject *error ) (how to name?!)
 
 
 /*

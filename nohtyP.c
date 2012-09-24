@@ -58,7 +58,7 @@
 #define ypObject_REFCNT_IMMORTAL (0xFFFFFFu)
 
 // When a hash of this value is stored in ob_hash, call tp_hash (which may then update cache)
-#define ypObject_HASH_NOT_CACHED ((yp_hash_t) -1)
+#define ypObject_HASH_INVALID ((yp_hash_t) -1)
 
 // Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
 #define ypObject_LEN_INVALID        (0xFFFFu)
@@ -68,7 +68,7 @@
 // TODO What to set alloclen to?  Does it matter?
 #define yp_IMMORTAL_HEAD_INIT( type, data, len ) \
     { ypObject_MAKE_TYPE_REFCNT( type, ypObject_REFCNT_IMMORTAL ), \
-      ypObject_HASH_NOT_CACHED, len, 0, data },
+      ypObject_HASH_INVALID, len, 0, data },
 
 
 
@@ -249,7 +249,7 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
         x = (_ypHASH_MULTIPLIER * x) ^ (yp_uhash_t) *p++;
     }
     x ^= (yp_uhash_t) len;
-    if (x == ypObject_HASH_NOT_CACHED) x = ypObject_HASH_NOT_CACHED-1;
+    if (x == ypObject_HASH_INVALID) x = ypObject_HASH_INVALID-1;
     return x;
 }
 
@@ -283,7 +283,7 @@ static void (*yp_free)( void * ) = _yp_dummy_free;
         (ob) = (ypObject *) yp_malloc( sizeof( obStruct ) ); \
         if( (ob) == NULL ) { (ob) = yp_MemoryError; break; }; \
         (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
-        (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ob)->ob_hash = ypObject_HASH_INVALID; \
         (ob)->ob_len = ypObject_LEN_INVALID; \
         (ob)->ob_alloclen = ypObject_ALLOCLEN_INVALID; \
         (ob)->ob_data = NULL; \
@@ -300,7 +300,7 @@ static void (*yp_free)( void * ) = _yp_dummy_free;
                 ((alloclen-1) * yp_sizeof_member( obStruct, ob_inline_data[0] )) ); \
         if( (ob) == NULL ) { (ob) = yp_MemoryError; break; }; \
         (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
-        (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ob)->ob_hash = ypObject_HASH_INVALID; \
         (ob)->ob_len = 0; \
         (ob)->ob_alloclen = alloclen; \
         (ob)->ob_data = ((obStruct *)(ob))->ob_inline_data; \
@@ -324,7 +324,7 @@ static void (*yp_free)( void * ) = _yp_dummy_free;
                 (alloclen) * yp_sizeof_member( obStruct, ob_inline_data[0] ) ); \
         if( (ob)->ob_data == NULL ) { free( ob ); (ob) = yp_MemoryError; break; } \
         (ob)->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 ); \
-        (ob)->ob_hash = ypObject_HASH_NOT_CACHED; \
+        (ob)->ob_hash = ypObject_HASH_INVALID; \
         (ob)->ob_len = 0; \
         (ob)->ob_alloclen = alloclen; \
     } while( 0 )
