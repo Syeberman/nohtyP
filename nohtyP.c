@@ -216,7 +216,6 @@ typedef struct {
 
 // Functions that modify their inputs take a "ypObject **x"; use this as
 // "return_yp_INPLACE_ERR( *x, yp_ValueError );" to return the error properly
-// TODO Necessary?  This logic is put in the public object interface only...
 #define return_yp_INPLACE_ERR( ob, err ) \
     do { yp_decref( ob ); (ob) = (err); return; } while( 0 )
 
@@ -224,11 +223,17 @@ typedef struct {
 //  - it's an invalidated object, so return yp_InvalidatedError
 //  - it's an exception, so return it
 //  - it's some other type, so return yp_TypeError
-#define return_yp_BAD_TYPE( ob ) \
-    do { switch( yp_TYPE_PAIR_CODE( ob ) ) { \
+#define return_yp_BAD_TYPE( bad_ob ) \
+    do { switch( yp_TYPE_PAIR_CODE( bad_ob ) ) { \
             case ypInvalidated_CODE: return yp_InvalidatedError; \
-            case ypException_CODE: return (ob); \
+            case ypException_CODE: return (bad_ob); \
             default: return yp_TypeError; } } while( 0 )
+#define return_yp_INPLACE_BAD_TYPE( ob, bad_ob ) \
+    do { switch( yp_TYPE_PAIR_CODE( bad_ob ) ) { \
+            case ypInvalidated_CODE: return_yp_INPLACE_ERR( (ob), yp_InvalidatedError ); \
+            case ypException_CODE: return_yp_INPLACE_ERR( (ob), bad_ob ); \
+            default: return_yp_INPLACE_ERR( (ob), yp_TypeError ); } } while( 0 )
+
 
 // Return sizeof for a structure member
 #define yp_sizeof_member( structType, member ) \
@@ -552,17 +557,65 @@ void yp_append( ypObject **s, ypObject *x ) {
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
-static ypObject *yp_int_iadd( ypObject *x, ypObject *y )
+
+yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    x->value += y->value; // TODO overflow check, etc
+    return x + y; // TODO overflow check
 }
 
-static ypObject *yp_int_add( ypObject *x, ypObject *y )
+// XXX Overloading of add/etc currently not supported
+void yp_iaddC( ypObject **x, yp_int_t y )
 {
-    // TODO check type first; no sense making the same copy
-    ypObject *new = yp_unfrozen_copy( x );
-    return _yp_int_add( new, y );
+    int x_type = yp_TYPE_PAIR_CODE( *x );
+    ypObject *exc = yp_None;
+
+    if( x_type == ypInt_CODE ) {
+        yp_int_t result;
+        result = yp_addL( ypInt_VALUE( *x ), y, &exc );
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( exc );
+        if( ypObject_IS_MUTABLE( x ) ) {
+            ypInt_VALUE( x ) = result;
+        } else {
+            yp_decref( *x );
+            *x = yp_intC( result );
+        }
+        return;
+
+    } else if( x_type == ypFloat_CODE ) {
+        yp_float_t y_asfloat = yp_int_asfloatL( y, &exc ); // TODO
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( exc );
+        yp_iaddFC( x, y_asfloat );
+        return;
+    }
+
+    return_yp_INPLACE_BAD_TYPE( *x, x );
 }
+
+void yp_iadd( ypObject **x, ypObject *y )
+{
+    int y_type = yp_TYPE_PAIR_CODE( *y );
+    ypObject *exc = yp_None;
+
+    if( y_type == ypInt_CODE ) {
+        yp_iaddC( x, ypInt_VALUE( y ) );
+        return;
+
+    } else if( y_type == ypFloat_CODE ) {
+        yp_iaddFC( x, ypFloat_VALUE( y ) );
+        return;
+    }
+
+    return_yp_INPLACE_BAD_TYPE( *x, y );
+}
+
+ypObject *yp_add( ypObject *x, ypObject *y )
+{
+    ypObject *result = yp_unfrozen_copy( x );
+    yp_iadd( &result, y );
+    if( !ypObject_IS_MUTABLE( x ) ) yp_freeze( &result );
+    return result;
+}
+
 
 
 /*************************************************************************************************
@@ -570,6 +623,41 @@ static ypObject *yp_int_add( ypObject *x, ypObject *y )
  *************************************************************************************************/
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
+
+yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return x + y; // TODO overflow check
+}
+
+
+void yp_iaddFC( ypObject **x, yp_float_t y )
+{
+    int x_type = yp_TYPE_PAIR_CODE( *x );
+    ypObject *exc = yp_None;
+
+    if( x_type == ypFloat_CODE ) {
+        yp_float_t result;
+        result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( exc );
+        if( ypObject_IS_MUTABLE( x ) ) {
+            ypFloat_VALUE( x ) = result;
+        } else {
+            yp_decref( *x );
+            *x = yp_floatC( result );
+        }
+        return;
+
+    } else if( x_type == ypInt_CODE ) {
+        // TODO Shouldn't we coerce x to a float here?
+        yp_int_t y_asint = yp_float_asintL( y, &exc ); // TODO
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( exc );
+        yp_iaddC( x, y_asint );
+        return;
+    }
+
+    return_yp_INPLACE_BAD_TYPE( *x, x );
+}
+
 
 
 
