@@ -43,6 +43,7 @@
  *
  * Other important postfixes:
  *  D - discard after use (ie yp_IFd)
+ *  F - C float-based version (as opposed to int-based)
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
  *  X - direct access to internal memory; tread carefully!
@@ -364,13 +365,13 @@ void yp_iinvert( ypObject **x );
 void yp_iaddC( ypObject **x, yp_int_t y );
 
 // TODO: et al
-void yp_iadd_floatC( ypObject **x, yp_float_t y );
+void yp_iaddFC( ypObject **x, yp_float_t y );
 
 // TODO: et al
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
 
 // TODO: et al
-yp_float_t yp_add_floatL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
 
 
 
