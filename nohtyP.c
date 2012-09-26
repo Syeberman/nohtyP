@@ -215,9 +215,9 @@ typedef struct {
  *************************************************************************************************/
 
 // Functions that modify their inputs take a "ypObject **x"; use this as
-// "return_yp_INPLACE_ERR( *x, yp_ValueError );" to return the error properly
+// "return_yp_INPLACE_ERR( x, yp_ValueError );" to return the error properly
 #define return_yp_INPLACE_ERR( ob, err ) \
-    do { yp_decref( ob ); (ob) = (err); return; } while( 0 )
+    do { yp_decref( *(ob) ); *(ob) = (err); return; } while( 0 )
 
 // When an object encounters an unknown type, there are three possible cases:
 //  - it's an invalidated object, so return yp_InvalidatedError
@@ -427,7 +427,7 @@ ypObject *_yp_freeze( ypObject *x )
 void yp_freeze( ypObject **x )
 {
     ypObject *result = _yp_freeze( *x );
-    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( *x, result );
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( x, result );
 }
 
 ypObject *_yp_deepfreeze( ypObject *x, ypObject *memo )
@@ -456,7 +456,7 @@ void yp_deepfreeze( ypObject **x )
     ypObject *memo = yp_setN( 0 );
     ypObject *result = _yp_deepfreeze( *x, memo );
     yp_decref( memo );
-    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( *x, result );
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( x, result );
 }
 
 ypObject *yp_unfrozen_copy( ypObject *x );
@@ -503,7 +503,7 @@ void yp_deepinvalidate( ypObject **x );
     ypObject *result; \
     if( type->tp_meth == NULL ) result = ypMethodError; \
     else result = type->tp_meth args; \
-    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( *pOb, result ); \
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
     return;
 
 #define _yp_INPLACE2( pOb, tp_suite, suite_meth, args ) \
@@ -511,7 +511,7 @@ void yp_deepinvalidate( ypObject **x );
     ypObject *result; \
     if( type->tp_suite == NULL || type->tp_suite->suite_meth == NULL ) result = ypMethodError; \
     else result = type->tp_suite->suite_meth args; \
-    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( *pOb, result ); \
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
     return;
 
 void yp_append( ypObject **s, ypObject *x ) {
@@ -572,7 +572,7 @@ void yp_iaddC( ypObject **x, yp_int_t y )
     if( x_type == ypInt_CODE ) {
         yp_int_t result;
         result = yp_addL( ypInt_VALUE( *x ), y, &exc );
-        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( exc );
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         if( ypObject_IS_MUTABLE( x ) ) {
             ypInt_VALUE( x ) = result;
         } else {
@@ -582,8 +582,8 @@ void yp_iaddC( ypObject **x, yp_int_t y )
         return;
 
     } else if( x_type == ypFloat_CODE ) {
-        yp_float_t y_asfloat = yp_int_asfloatL( y, &exc ); // TODO
-        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( exc );
+        yp_float_t y_asfloat = yp_asfloatL( y, &exc ); // TODO
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         yp_iaddFC( x, y_asfloat );
         return;
     }
@@ -593,7 +593,7 @@ void yp_iaddC( ypObject **x, yp_int_t y )
 
 void yp_iadd( ypObject **x, ypObject *y )
 {
-    int y_type = yp_TYPE_PAIR_CODE( *y );
+    int y_type = yp_TYPE_PAIR_CODE( y );
     ypObject *exc = yp_None;
 
     if( y_type == ypInt_CODE ) {
@@ -610,7 +610,15 @@ void yp_iadd( ypObject **x, ypObject *y )
 
 ypObject *yp_add( ypObject *x, ypObject *y )
 {
-    ypObject *result = yp_unfrozen_copy( x );
+    int x_type = yp_TYPE_PAIR_CODE( x );
+    int y_type = yp_TYPE_PAIR_CODE( y );
+    ypObject *result;
+
+    if( x_type != ypInt_CODE && x_type != ypFloat_CODE ) return_yp_BAD_TYPE( x );
+    if( y_type != ypInt_CODE && y_type != ypFloat_CODE ) return_yp_BAD_TYPE( y );
+
+    // All numbers hold their data in-line, so freezing a mutable is not heap-inefficient
+    result = yp_unfrozen_copy( x );
     yp_iadd( &result, y );
     if( !ypObject_IS_MUTABLE( x ) ) yp_freeze( &result );
     return result;
@@ -634,11 +642,11 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
 {
     int x_type = yp_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
+    yp_float_t result;
 
     if( x_type == ypFloat_CODE ) {
-        yp_float_t result;
         result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
-        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( exc );
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         if( ypObject_IS_MUTABLE( x ) ) {
             ypFloat_VALUE( x ) = result;
         } else {
@@ -648,17 +656,17 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
         return;
 
     } else if( x_type == ypInt_CODE ) {
-        // TODO Shouldn't we coerce x to a float here?
-        yp_int_t y_asint = yp_float_asintL( y, &exc ); // TODO
-        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( exc );
-        yp_iaddC( x, y_asint );
+        yp_float_t x_asfloat = yp_asfloatC( *x, &exc );
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
+        if( isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        yp_decref( *x );
+        *x = yp_floatC( result );
         return;
     }
 
     return_yp_INPLACE_BAD_TYPE( *x, x );
 }
-
-
 
 
 /*************************************************************************************************
@@ -728,6 +736,7 @@ typedef struct {
     ypObject_HEAD
     yp_INLINE_DATA( yp_uint8_t );
 } ypBytesObject;
+yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % 8 == 0, bytes_inline_data_alignment );
 
 #define ypBytes_DATA( b ) ( (yp_uint8_t *) ((ypBytesObject *)b)->ob_data )
 // TODO what if ob_len is the "invalid" value?
@@ -816,7 +825,7 @@ static void _bytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize
     int x_type = yp_TYPE_PAIR_CODE( x );
 
     if( x_type == ypBool_CODE || x_type == ypInt_CODE ) {
-        *storage = yp_as_uint8C( x, &result );
+        *storage = yp_asuint8C( x, &result );
         if( !yp_isexceptionC( result ) ) {
             *x_data = storage;
             *x_len = 1;
@@ -927,7 +936,7 @@ static ypObject *bytearray_setindexC( ypObject *b, yp_ssize_t i, ypObject *x )
     ypObject *result = yp_None;
     yp_uint8_t x_value;
 
-    x_value = yp_as_uint8C( x, &result );
+    x_value = yp_asuint8C( x, &result );
     if( yp_isexceptionC( result ) ) return result;
 
     result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
