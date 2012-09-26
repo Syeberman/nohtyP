@@ -308,11 +308,65 @@ yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 yp_ssize_t yp_lenC( ypObject *x, ypObject **exc );
 
 
+
+/*
+ * Iterator Operations
+ */
+
+yp_all
+yp_any
+yp_enumerate
+yp_filter
+yp_map // ?! do I need to wrap C functions?
+yp_max
+yp_min
+yp_next
+yp_range
+yp_reversed
+yp_sorted // or is this a seqence operation?
+yp_zip
+
+// You may also be interested in yp_FOR for working with iterables; see below
+
+
+/*
+ * Sequence Operations
+ */
+
+// When given to a slice-like start/stop argument, signals that the slice should start/stop at the
+// end of the sequence.  Use zero to identify the start of the sequence.
+//  Ex: a complete slice in Python is "[:]"; in nohtyP, it's "0, ypSlice_END, 1"
+#define ypSlice_END  yp_SSIZE_T_MAX
+
+// TODO bad idea?
+// For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
+// returns a pointer to the beginning of that array, and sets len to the length of the sequence.
+// The returned value points into internal object memory, so they are *borrowed* references and
+// MUST NOT be modified; furthermore, the sequence itself must not be modified while using the
+// array.  Returns NULL and sets len to -1 on error.
+// 'X' means the function is dealing with internal data
+ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
+// TODO similar magic for bytes/etc, although writing to bytearray is OK
+
+/*
+ * Set Operations
+ */
+
+/*
+ * Mapping Operations
+ */
+
+/*
+ * Bytes & String Operations
+ */
+yp_chr // also yp_chrC could be useful
+yp_ord
+
+
+
 /*
  * Numeric Operations
  */
-
-// TODO this is a big ugly section, and possibly not often used; move near the bottom?
 
 // Each of these functions return new reference(s) to the result of the given numeric operation;
 // for example, yp_add returns the result of adding x and y together.  If the given operands do not
@@ -361,88 +415,46 @@ void yp_ipos( ypObject **x );
 void yp_iabs( ypObject **x );
 void yp_iinvert( ypObject **x );
 
-// TODO: et al
+// Versions of yp_iadd et al that accept a C integer as the second argument.  Remember that *x is
+// stolen and a new reference returned in its place.
 void yp_iaddC( ypObject **x, yp_int_t y );
-
 // TODO: et al
+
+// Versions of yp_iadd et al that accept a C floating-point as the second argument.  Remember that
+// *x is stolen and a new reference returned in its place.
 void yp_iaddFC( ypObject **x, yp_float_t y );
-
 // TODO: et al
+
+// Library routines for nohtyP integer operations on C types.  Returns a reasonable value and sets 
+// *exc on error; "reasonable" usually means "truncated".
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
-
 // TODO: et al
+
+// Library routines for nohtyP floating-point operations on C types.  Returns a reasonable value 
+// and sets *exc on error; "reasonable" usually means "truncated".
 yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
+// TODO: et al
 
-
+// Conversion routines from C types or objects to C types.  Returns a reasonable value and sets 
+// *exc on error; "reasonable" usually means "truncated".  Converting a float to an int truncates
+// toward zero but is not an error.
+yp_int_t yp_asintC( ypObject *x, ypObject **exc );
+yp_int8_t yp_asint8C( ypObject *x, ypObject **exc );
+// TODO et al
+yp_float_t yp_asfloatC( ypObject *x, ypObject **exc );
+yp_float32_t yp_asfloat32C( ypObject *x, ypObject **exc );
+yp_float64_t yp_asfloat64C( ypObject *x, ypObject **exc );
+yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc );
+yp_int_t yp_asintFL( yp_float_t x, ypObject **exc );
 
 // Return a new reference to x rounded to ndigits after the decimal point.
 ypObject *yp_roundC( ypObject *x, int ndigits );
 
-
-
-
-yp_hex
-yp_oct
+// TODO
+yp_sum
 
 // TODO versions of the above that steal their arguments, so that operations can be chained
 // together. (yp_addD)
-
-
-/*
- * Iterator Operations
- */
-
-yp_all
-yp_any
-yp_enumerate
-yp_filter
-yp_map // ?! do I need to wrap C functions?
-yp_max // or numeric?
-yp_min
-yp_next
-yp_range
-yp_reversed
-yp_sorted // or is this a seqence operation?
-yp_sum // or numeric?
-yp_zip
-
-// You may also be interested in yp_FOR for working with iterables; see below
-
-
-/*
- * Sequence Operations
- */
-
-// When given to a slice-like start/stop argument, signals that the slice should start/stop at the
-// end of the sequence.  Use zero to identify the start of the sequence.
-//  Ex: a complete slice in Python is "[:]"; in nohtyP, it's "0, ypSlice_END, 1"
-#define ypSlice_END  yp_SSIZE_T_MAX
-
-// TODO bad idea?
-// For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
-// returns a pointer to the beginning of that array, and sets len to the length of the sequence.
-// The returned value points into internal object memory, so they are *borrowed* references and
-// MUST NOT be modified; furthermore, the sequence itself must not be modified while using the
-// array.  Returns NULL and sets len to -1 on error.
-// 'X' means the function is dealing with internal data
-ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
-// TODO similar magic for bytes/etc, although writing to bytearray is OK
-
-/*
- * Set Operations
- */
-
-/*
- * Mapping Operations
- */
-
-/*
- * Bytes & String Operations
- */
-yp_chr // also yp_chrC could be useful
-yp_ord
-
-
 
 
 /*
@@ -557,6 +569,7 @@ struct _ypObject {
     yp_uint16_t ob_len;         // length of object
     yp_uint16_t ob_alloclen;    // allocated length
     void *      ob_data;        // pointer to object data
+    // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
 
 
