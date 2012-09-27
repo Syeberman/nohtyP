@@ -55,6 +55,10 @@
 
 
 // A refcnt of this value means the object is immortal
+// TODO Need two types of immortals: statically-allocated immortals (so should never be
+// freed/invalidated) and overly-incref'd immortals (should be allowed to be invalidated and thus
+// free any extra data, although the object itself will never be free'd as we've lost track of the
+// refcounts)
 #define ypObject_REFCNT_IMMORTAL (0xFFFFFFu)
 
 // When a hash of this value is stored in ob_hash, call tp_hash (which may then update cache)
@@ -266,6 +270,9 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
 // Dummy memory allocators to ensure that yp_init is called before anything else
 static void *_yp_dummy_malloc( yp_ssize_t size ) { return NULL; }
 static void *_yp_dummy_realloc( void *p, yp_ssize_t size ) { return NULL; }
+// TODO Windows has an _expand function; can use this to shrink invalidated objects in-place; the
+// dummy version can just return the pointer unchanged; this will only be useful in the in-place
+// data is large...which it might not be
 static void _yp_dummy_free( void *p ) { }
 
 // Default versions of the allocators, using C's malloc/realloc/free
@@ -354,6 +361,25 @@ static void (*yp_free)( void * ) = _yp_dummy_free;
         (ob)->ob_alloclen = newAlloclen; \
     } while( 0 )
 
+
+/* XXX Here's a crazy idea that is likely unfounded, premature optimization, but it's an idea that
+ * might come in handy later if we're stuck with a restrictive version of malloc.
+ *
+ * When ints/floats become proper small objects, they'll be 16 bytes in size, which some malloc's
+ * might over-allocate up to 64 bytes or more.  Just wasted space
+ *
+ * So, make a "small object container" object, that will never be seen externally, but that these
+ * small objects can allocate memory from.  They would maintain a reference to the container
+ * (bumping the size to 24 bytes...this might be the deal breaker).  On dealloc for the int/etc, it
+ * decrefs its reference to the container.  The container would itself be a small object; it only
+ * stores the refcount and frees itself when it hits zero.
+ *
+ * Internal to the container, memory is allocated stackwise, and only freed when all small objects
+ * are dead.  Kinda like regions; kinda also like obstacks, except nothing is popped off the stack
+ * until the whole stack is discarded.
+ *
+ * ...OR!  Don't do this as objects, but wrap around the busted malloc so that it does this itself.
+ */
 
 /*************************************************************************************************
  * Object fundamentals
@@ -1337,5 +1363,17 @@ typedef struct {
 // Currently a no-op
 void yp_initialize( void )
 {
+    // TODO Config param idea: "minimum" or "average" or "usual" or "preferred" allocation
+    // size...something that indicates that malloc handles these sizes particularly well.  The
+    // number should be small, like 64 bytes or something.  This number can be used to decide how
+    // much data to put in-line.  The call to malloc would use exactly this size when creating an
+    // object, and at least this size when allocating extra data.  This makes all objects the same
+    // size, which will help malloc avoid fragmentation.  It also recognizes the fact that each
+    // malloc has a certain overhead in memory, so might as well allocate a certain amount to
+    // compensate.  When invalidating an object, the extra data is freed, but the invalidated
+    // object that remains would sit in memory with this size until fully freed, so the extra data
+    // is wasted until then, which is why the value should be small.  (Actually, not all objects
+    // will be this size, as int/float, when they become small objects, will only allocate a
+    // fraction of this.)
 }
 
