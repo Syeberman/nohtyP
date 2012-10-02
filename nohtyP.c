@@ -727,11 +727,13 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
     if( *step < -yp_SSIZE_T_MAX ) *step = -yp_SSIZE_T_MAX; // ensure *step can be negated
 
     // Adjust start
+    // TODO ypSlice_DEFAULT
     if( *start < 0 ) *start += length;
     if( *start < 0 ) *start = (*step < 0) ? -1 : 0;
-    if( *start >= length ) *start = (*step < 0) > length-1 : length;
+    if( *start >= length ) *start = (*step < 0) ? length-1 : length;
 
     // Adjust stop
+    // TODO ypSlice_DEFAULT
     if( *stop < 0 ) *stop += length;
     if( *stop < 0 ) *stop = (*step < 0) ? -1 : 0;
     if( *stop >= length ) *stop = (*step < 0) ? length-1 : length;

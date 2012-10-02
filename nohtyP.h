@@ -97,12 +97,12 @@ void yp_decrefN( int n, ... );
 // most objects are copied in memory, even immutables, as copying is one method for maintaining
 // threadsafety.
 
-// Steals *x, transmutes it to its associated immutable type, and returns a new reference to it.
-// If *x is already immutable or has been invalidated this is a no-op.  If *x can't be frozen
-// a new, invalidated object is returned (rarely occurs: most types _can_ be frozen). 
+// Transmutes *x to its associated immutable type.  If *x is already immutable this is a no-op.  
+// If *x can't be frozen it is discarded and a new, invalidated object is returned in its place
+// (rarely occurs: most types _can_ be frozen). 
 void yp_freeze( ypObject **x );
 
-// Steals and freezes *x and, recursively, all contained objects, returning a new reference.
+// Freezes *x and, recursively, all contained objects, replacing it with an exception on error.
 void yp_deepfreeze( ypObject **x );
 
 // Returns a new reference to a mutable shallow copy of x.  If x has no associated mutable type an
@@ -126,13 +126,12 @@ ypObject *yp_copy( ypObject *x );
 // Creates an exact copy of x and, recursively, all contained objects, returning a new reference.
 ypObject *yp_deepcopy( ypObject *x );
 
-// Steals *x, discards all contained objects, deallocates _some_ memory, transmutes it to
-// the ypInvalidated type (rendering the object useless), and returns a new reference to *x.
-// If *x is immortal or already invalidated this is a no-op; immutable objects _can_ be 
-// invalidated.
+// Discards all contained objects in *x, deallocates _some_ memory, and transmutes it to the 
+// ypInvalidated type (rendering the object useless).  If *x is immortal or already invalidated
+// this is a no-op; immutable objects _can_ be invalidated.
 void yp_invalidate( ypObject **x );
 
-// Steals and invalidates *x and, recursively, all contained objects, returning a new reference.
+// Invalidates *x and, recursively, all contained objects.
 void yp_deepinvalidate( ypObject **x );
 
 
@@ -160,6 +159,10 @@ ypObject *yp_orN( int n, ... );
 // Equivalent to yp_bool( yp_orN( n, ... ) ).
 ypObject *yp_anyN( int n, ... );
 
+// Returns the immortal yp_True if any element of iterable is true; if the iterable is empty,
+// returns yp_False.  Stops iterating at the first true element.
+ypObject *yp_any( ypObject *iterable );
+
 // Returns a *borrowed* reference to x if x is false, otherwise to y.  Unlike Python, both 
 // arguments are always evaluated.
 ypObject *yp_and( ypObject *x, ypObject *y );
@@ -170,6 +173,10 @@ ypObject *yp_andN( int n, ... );
 
 // Equivalent to yp_bool( yp_andN( n, ... ) ).
 ypObject *yp_allN( int n, ... );
+
+// Returns the immortal yp_True if all elements of iterable are true or the iterable is empty.
+// Stops iterating at the first false element.
+ypObject *yp_all( ypObject *iterable );
 
 // Implements the "less than" (x<y), "less than or equal" (x<=y), "equal" (x==y), "not equal"
 // (x!=y), "greater than or equal" (x>=y), and "greater than" (x>y) comparisons.  Returns the
@@ -235,6 +242,10 @@ ypObject *yp_iter( ypObject *x );
 // generator how many items will be yielded; use zero if this is not known.
 ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
 
+// Returns a new reference to a range object. yp_rangeC is equivalent to yp_rangeC3( 0, stop, 1 ).
+ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
+ypObject *yp_rangeC( yp_int_t stop );
+
 // Returns a new reference to a bytes/bytearray, copying the first len bytes from source.  If 
 // source is NULL it is considered as having all null bytes; if len is negative source is 
 // considered null terminated (and, therefore, will not contain the null byte).
@@ -264,6 +275,16 @@ ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... );
 // Returns a new reference to a tuple/list whose elements come from iterable.
 ypObject *yp_tuple( ypObject *iterable );
 ypObject *yp_list( ypObject *iterable );
+
+// Returns a new reference to a sorted list from the items in iterable.  key is a function that
+// returns new or immortal references that are used as comparison keys; to compare the elements
+// directly, use yp_incref.  If reverse is true, the list elements are sorted as if each 
+// comparison were reversed.
+typedef ypObject *(*yp_sort_key_func_t)( ypObject *x );
+ypObject *yp_sorted3( ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse );
+
+// Equivalent to yp_sorted3( iterable, yp_incref, yp_False ).
+ypObject *yp_sorted( ypObject *iterable );
 
 // Returns a new reference to a frozenset/set containing the given n objects; the length will be n,
 // unless there are duplicate objects.
@@ -300,7 +321,7 @@ ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
 yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
 
 // Returns the _current_ hash value of x; if x is mutable, this value may change between calls.
-// Returns -1 and sets *exc on error.  (Unlike Python, you can calculate the hash value of mutable
+// Returns -1 and sets *exc on error.  (Unlike Python, this can calculate the hash value of mutable
 // types.)
 yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
@@ -313,30 +334,79 @@ yp_ssize_t yp_lenC( ypObject *x, ypObject **exc );
  * Iterator Operations
  */
 
-yp_all
-yp_any
-yp_enumerate
-yp_filter
-yp_map // ?! do I need to wrap C functions?
-yp_max
-yp_min
-yp_next
-yp_range
-yp_reversed
-yp_sorted // or is this a seqence operation?
-yp_zip
+// "Sends" a value into an iterator *x and returns a new reference to the next yielded value, or 
+// yp_StopIteration if the iterator is exhausted.  The value may be ignored by the iterator.  If 
+// value is an exception this behaves like yp_throw.
+ypObject *yp_send( ypObject **x, ypObject *value );
 
-// You may also be interested in yp_FOR for working with iterables; see below
+// Equivalent to yp_send( x, yp_None ).
+ypObject *yp_next( ypObject **x );
+
+// Similar to yp_next, but returns a new reference to defval in place of yp_StopIteration.
+ypObject *yp_next2( ypObject **x, ypObject *defval );
+
+// "Throws" an exception into the iterator *x and returns a new reference to the next yielded 
+// value, yp_StopIteration if the iterator is exhausted, or another exception.  type _must_ be an 
+// exception.
+ypObject *yp_throw( ypObject **x, ypObject *type );
+
+// "Closes" the iterator by calling yp_throw( x, yp_GeneratorExit ).  If yp_StopIteration or
+// yp_GeneratorExit is returned by yp_throw, *x is not discarded, otherwise *x is replaced with
+// an exception.  The behaviour of this function for other types, in particular files, is 
+// documented elsewhere.
+void yp_close( ypObject **x );
+
+// Returns a new reference to an iterator that yields values from iterable for which function
+// returns true.  The given function must return new or immortal references, as each returned
+// value will be discarded; to inspect the elements directly, use yp_incref.
+typedef ypObject *(*yp_filter_function_t)( ypObject *x );
+ypObject *yp_filter( yp_filter_function_t function, ypObject *iterable );
+
+// Similar to yp_filter, but yields values for which function returns false.
+ypObject *yp_filterfalse( yp_filter_function_t function, ypObject *iterable );
+
+// Returns a new reference to the largest/smallest of the given n objects.  key is a function that
+// returns new or immortal references that are used as comparison keys; to compare the elements
+// directly, use yp_incref.
+ypObject *yp_max_keyN( yp_sort_key_func_t key, int n, ... );
+ypObject *yp_min_keyN( yp_sort_key_func_t key, int n, ... );
+
+// Equivalent to yp_max_keyN( yp_incref, n, ... ) and yp_min_keyN( yp_incref, n, ... ).
+ypObject *yp_maxN( int n, ... );
+ypObject *yp_minN( int n, ... );
+
+// Returns a new reference to the largest/smallest element in iterable.  key is as in yp_max_keyN.
+ypObject *yp_max_key( ypObject *iterable, yp_sort_key_func_t key );
+ypObject *yp_min_key( ypObject *iterable, yp_sort_key_func_t key );
+
+// Equivalent to yp_max_key( iterable, yp_incref ) and yp_min_key( iterable, yp_incref ).
+ypObject *yp_max( ypObject *iterable );
+ypObject *yp_min( ypObject *iterable );
+
+// Returns a new reference to an iterator that yields the elements of seq in reverse order.
+ypObject *yp_reversed( ypObject *seq );
+
+// Returns a new reference to an iterator that aggregates elements from each of the n iterables.
+ypObject *yp_zipN( int n, ... );
+
+// You may also be interested in yp_FOR for working with iterables; see below.
 
 
 /*
  * Sequence Operations
  */
 
-// When given to a slice-like start/stop argument, signals that the slice should start/stop at the
-// end of the sequence.  Use zero to identify the start of the sequence.
-//  Ex: a complete slice in Python is "[:]"; in nohtyP, it's "0, ypSlice_END, 1"
-#define ypSlice_END  yp_SSIZE_T_MAX
+// When given to a slice-like start/stop C argument, signals that the default "end" value be used
+// for the argument; which end depends on the sign of step.  If you know the sign of step, you may
+// prefer 0 and ypSlice_USELEN instead.
+//  Ex: The nohtyP equivalent of "[::a]" is "ypSlice_DEFAULT, ypSlice_DEFAULT, a"
+#define ypSlice_DEFAULT (-yp_SSIZE_T_MAX-1)
+
+// When given to a slice-like start/stop C argument, signals that yp_len should be used; in other
+// words, it signals that the slice should start/stop at the end of the sequence.
+//  Ex: The nohtyP equivalent of "[:]" is "0, ypSlice_END, 1"
+#define ypSlice_USELEN  yp_SSIZE_T_MAX
+
 
 // TODO bad idea?
 // For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
@@ -394,10 +464,10 @@ ypObject *yp_pos( ypObject *x );
 ypObject *yp_abs( ypObject *x );
 ypObject *yp_invert( ypObject *x );
 
-// In-place versions of the above that steal *x and return a new reference.  If the object *x can
-// be modified to hold the result, it is, otherwise *x is discarded and replaced with the result.
-// If *x is immutable on input, an immutable object is returned, otherwise a mutable object is
-// returned.  On error, *x is discarded and set to an exception.
+// In-place versions of the above; if the object *x can be modified to hold the result, it is, 
+// otherwise *x is discarded and replaced with the result.  If *x is immutable on input, an
+// immutable object is returned, otherwise a mutable object is returned.  On error, *x is 
+// discarded and set to an exception.
 void yp_iadd( ypObject **x, ypObject *y );
 void yp_isub( ypObject **x, ypObject *y );
 void yp_imul( ypObject **x, ypObject *y );
@@ -415,13 +485,13 @@ void yp_ipos( ypObject **x );
 void yp_iabs( ypObject **x );
 void yp_iinvert( ypObject **x );
 
-// Versions of yp_iadd et al that accept a C integer as the second argument.  Remember that *x is
-// stolen and a new reference returned in its place.
+// Versions of yp_iadd et al that accept a C integer as the second argument.  Remember that *x may
+// be discarded and replaced with the result.
 void yp_iaddC( ypObject **x, yp_int_t y );
 // TODO: et al
 
 // Versions of yp_iadd et al that accept a C floating-point as the second argument.  Remember that
-// *x is stolen and a new reference returned in its place.
+// *x may be discarded and replaced with the result.
 void yp_iaddFC( ypObject **x, yp_float_t y );
 // TODO: et al
 
@@ -450,8 +520,11 @@ yp_int_t yp_asintFL( yp_float_t x, ypObject **exc );
 // Return a new reference to x rounded to ndigits after the decimal point.
 ypObject *yp_roundC( ypObject *x, int ndigits );
 
-// TODO
-yp_sum
+// Sums the n given objects and returns the total.
+ypObject *yp_sumN( int n, ... );
+
+// Sums the items of iterable and returns the total.
+ypObject *yp_sum( ypObject *iterable );
 
 // TODO versions of the above that steal their arguments, so that operations can be chained
 // together. (yp_addD)
