@@ -719,6 +719,10 @@ static ypObject *ypSequence_AdjustIndexC( yp_ssize_t length, yp_ssize_t *i )
 // Using the given length, in-place converts the given start/stop/step values to valid indices, and
 // also calculates the length of the slice.  Returns yp_ValueError if *step is zero, else yp_None;
 // there are no out-of-bounds errors with slices.
+// XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
+// yp_SLICE_USELEN is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
+// as any value that's greater than length.
+// XXX Adapted from PySlice_GetIndicesEx
 static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
         yp_ssize_t *step, yp_ssize_t *slicelength )
 {
@@ -727,20 +731,26 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
     if( *step < -yp_SSIZE_T_MAX ) *step = -yp_SSIZE_T_MAX; // ensure *step can be negated
 
     // Adjust start
-    // TODO ypSlice_DEFAULT
-    if( *start < 0 ) *start += length;
-    if( *start < 0 ) *start = (*step < 0) ? -1 : 0;
-    if( *start >= length ) *start = (*step < 0) ? length-1 : length;
+    if( *start == yp_SLICE_DEFAULT ) {
+        *start = (*step < 0) ? length-1 : 0;
+    } else {
+        if( *start < 0 ) *start += length;
+        if( *start < 0 ) *start = (*step < 0) ? -1 : 0;
+        if( *start >= length ) *start = (*step < 0) ? length-1 : length;
+    }
 
     // Adjust stop
-    // TODO ypSlice_DEFAULT
-    if( *stop < 0 ) *stop += length;
-    if( *stop < 0 ) *stop = (*step < 0) ? -1 : 0;
-    if( *stop >= length ) *stop = (*step < 0) ? length-1 : length;
+    if( *stop == yp_SLICE_DEFAULT ) {
+        *stop = (*step < 0) ? -1 : length;
+    } else {
+        if( *stop < 0 ) *stop += length;
+        if( *stop < 0 ) *stop = (*step < 0) ? -1 : 0;
+        if( *stop >= length ) *stop = (*step < 0) ? length-1 : length;
+    }
 
     // Calculate slicelength
-    if( (*step < 0 && *stop >= *start) ||
-        (*step > 0 && *start >= *stop)    ) {
+    if( (*step < 0 && *stop  >= *start) ||
+        (*step > 0 && *start >= *stop )    ) {
         *slicelength = 0;
     } else if( *step < 0 ) {
         *slicelength = (*stop - *start + 1) / (*step) + 1;
@@ -751,7 +761,31 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
     return yp_None;
 }
 
-// TODO ypSlice_InvertIndicesC to take start/stop/step and adjust for -step
+// Using the given _adjusted_ values, in-place converts the given start/stop/step values to the
+// inverse slice, where *step=-(*step).  Returns an exception on error.
+// Adapted from Python's list_ass_subscript
+static ypObject *ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step, 
+        yp_ssize_t slicelength )
+{
+    if( slicelength < 1 ) return yp_None; // no-op
+
+    if( *step < 0 ) {
+        // This comes direct from list_ass_subscript
+        *stop = *start + 1;
+        *start = *stop + (*step) * (slicelength - 1) - 1;
+    } else {
+        // This part I've inferred; TODO verify!
+        *stop = *start - 1;
+        *start = *stop + (*step) * (slicelength - 1) + 1;
+    }
+    *step = -(*step);
+
+    return yp_None;
+}
+
+// Returns the index of the i'th item in the slice with the given adjusted start/step values.  i
+// must be in range(slicelength).
+#define ypSlice_INDEX( start, step, i )  ((start) + (i)*(step))
 
 
 /*************************************************************************************************
@@ -1006,7 +1040,7 @@ static ypObject *bytes_getsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop
     } else {
         yp_ssize_t i;
         for( i = 0; i < newLen; i++ ) {
-            ypBytes_DATA( newB )[i] = ypBytes_DATA( b )[start + i*step];
+            ypBytes_DATA( newB )[i] = ypBytes_DATA( b )[ypSlice_INDEX( start, step, i )];
         }
     }
     return newB;
@@ -1052,7 +1086,7 @@ static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
         yp_ssize_t i;
         if( x_len != slicelength ) return yp_ValueError;
         for( i = 0; i < slicelength; i++ ) {
-            ypBytes_DATA( b )[start + i*step] = x_data[i];
+            ypBytes_DATA( b )[ypSlice_INDEX( start, step, i )] = x_data[i];
         }
     }
     return yp_None;
@@ -1068,11 +1102,7 @@ static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
     if( slicelength < 1 ) return yp_None; // no-op
-    if( step < 0 ) {
-        stop = start + 1;
-        start = stop + step*(slicelength - 1) - 1;
-        step = -step;
-    }
+    if( step < 0 ) ypSlice_InvertIndicesC( &start, &stop, &step, slicelength );
 
     if( step == 1 ) {
         // One contiguous section
@@ -1220,6 +1250,7 @@ static ypObject *ypFrozenSet_dummy = &_ypFrozenSet_dummy;
 // yp_None, or an exception on error.
 // TODO The dict implementation has a bunch of these for various scenarios; let's keep it simple
 // for now, but investigate...
+// XXX Adapted from Python's lookdict in dictobject.c
 static ypObject *_ypFrozenSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t hash, 
         ypFrozenSet_KeyEntry **loc )
 {
@@ -1280,6 +1311,7 @@ success:
 // Inserts a new item into the table, setting *loc to the location.  Returns yp_False if the key
 // was already in the table (and, as such, didn't need to be inserted), else yp_True or an 
 // exception.
+// XXX Adapted from Python's insertdict in dictobject.c
 static ypObject *_ypFrozenSet_insertkey( ypObject *so, ypObject *key, yp_hash_t hash, 
         ypFrozenSet_KeyEntry **loc )
 {
@@ -1308,6 +1340,7 @@ static ypObject *_ypFrozenSet_insertkey( ypObject *so, ypObject *key, yp_hash_t 
 
 // Internal routine used while cleaning/resizing/copying a table: the key is known to be absent
 // from the table, and the table contains no deleted entries.  XXX Steals a reference to key!
+// XXX Adapted from Python's insertdict_clean in dictobject.c
 static void _ypFrozenSet_insertclean_stealkey( ypObject *so, ypObject *key, yp_hash_t hash,
         ypFrozenSet_KeyEntry **ep )
 {

@@ -399,13 +399,13 @@ ypObject *yp_zipN( int n, ... );
 // When given to a slice-like start/stop C argument, signals that the default "end" value be used
 // for the argument; which end depends on the sign of step.  If you know the sign of step, you may
 // prefer 0 and ypSlice_USELEN instead.
-//  Ex: The nohtyP equivalent of "[::a]" is "ypSlice_DEFAULT, ypSlice_DEFAULT, a"
-#define ypSlice_DEFAULT (-yp_SSIZE_T_MAX-1)
+//  Ex: The nohtyP equivalent of "[::a]" is "yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, a"
+#define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
 
 // When given to a slice-like start/stop C argument, signals that yp_len should be used; in other
 // words, it signals that the slice should start/stop at the end of the sequence.
-//  Ex: The nohtyP equivalent of "[:]" is "0, ypSlice_END, 1"
-#define ypSlice_USELEN  yp_SSIZE_T_MAX
+//  Ex: The nohtyP equivalent of "[:]" is "0, yp_SLICE_USELEN, 1"
+#define yp_SLICE_USELEN  yp_SSIZE_T_MAX
 
 
 // TODO bad idea?
