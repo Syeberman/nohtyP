@@ -907,7 +907,7 @@ static void _bytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize
 // TODO Returns yp_None or an exception
 
 // Returns yp_None or an exception
-static ypObject *bytes_find3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+static ypObject *bytes_findC4( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t *i )
 {
     yp_uint8_t *x_data;
@@ -941,7 +941,7 @@ static ypObject *bytes_contains( ypObject *b, ypObject *x )
     ypObject *result;
     yp_ssize_t i = -1;
 
-    result = bytes_find3C( b, x, 0, ypSlice_END, &i );
+    result = bytes_findC4( b, x, 0, yp_SLICE_USELEN, &i );
     if( yp_isexceptionC( result ) ) return result;
     return ypBool_FROM_C( i >= 0 );
 }
