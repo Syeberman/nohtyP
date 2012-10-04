@@ -16,12 +16,11 @@
  * yp_or and yp_and return borrowed references, as this simplifies the most-common use case.
  *
  * When an error occurs in a function, it returns an exception object (after ensuring all objects
- * are left in a consistent state), even if no exceptions are mentioned in the documentation.  
- * If the  function has stolen a reference, that reference is discarded.  If an exception object
- * is used for any input into a function, it is returned before any modifications occur.  
- * Exception objects are immortal, so it isn't necessary to call yp_decref on them.  As a result
- * of these rules, it is possible to string together multiple function calls and only check if an
- * exeption occured at the end: 
+ * are left in a consistent state).  If the function is modifying an object, that object is 
+ * discarded and replaced with the exception.  If an exception object is used for any input into a
+ * function, it is returned before any modifications occur.  Exception objects are immortal, so it
+ * isn't necessary to call yp_decref on them.  As a result of these rules, it is possible to 
+ * string together multiple function calls and only check if an exeption occured at the end: 
  *      yp_IMMORTAL_BYTES( sep, ", " ); 
  *      yp_IMMORTAL_BYTES( fmt, "(%s)\n" ); 
  *      ypObject *sepList = yp_join( sep, list );
@@ -29,6 +28,7 @@
  *      ypObject *result = yp_format( fmt, sepList ); 
  *      yp_decref( sepList ); 
  *      if( yp_isexception( result ) ) exit( -1 ); 
+ * Unless explicitly documented as "always succeeds", _any_ function can return an exception. 
  *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
  * threads; this includes updating reference counts, so immutables are not inherently threadsafe!
@@ -47,6 +47,7 @@
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
  *  X - direct access to internal memory; tread carefully!
+ *  # (number) - a function with # inputs that otherwise shares the same name as another function
  */
 
 
@@ -102,7 +103,7 @@ void yp_decrefN( int n, ... );
 // (rarely occurs: most types _can_ be frozen). 
 void yp_freeze( ypObject **x );
 
-// Freezes *x and, recursively, all contained objects, replacing it with an exception on error.
+// Freezes *x and, recursively, all contained objects.
 void yp_deepfreeze( ypObject **x );
 
 // Returns a new reference to a mutable shallow copy of x.  If x has no associated mutable type an
@@ -142,10 +143,10 @@ void yp_deepinvalidate( ypObject **x );
 // TODO comparison/boolean operations and error handling and yp_IF
 
 // Returns the immortal yp_False if the object should be considered false (yp_None, a number equal
-// to zero, or a container of zero length), otherwise yp_True or an exception.
+// to zero, or a container of zero length), otherwise yp_True.
 ypObject *yp_bool( ypObject *x );
 
-// Returns the immortal yp_True if x is considered false, otherwise yp_False or an exception.
+// Returns the immortal yp_True if x is considered false, otherwise yp_False.
 ypObject *yp_not( ypObject *x );
 
 // Returns a *borrowed* reference to y if x is false, otherwise to x.  Unlike  Python, both
@@ -180,7 +181,7 @@ ypObject *yp_all( ypObject *iterable );
 
 // Implements the "less than" (x<y), "less than or equal" (x<=y), "equal" (x==y), "not equal"
 // (x!=y), "greater than or equal" (x>=y), and "greater than" (x>y) comparisons.  Returns the
-// immortal yp_True if the condition is true, otherwise yp_False or an exception.
+// immortal yp_True if the condition is true, otherwise yp_False.
 ypObject *yp_lt( ypObject *x, ypObject *y );
 ypObject *yp_le( ypObject *x, ypObject *y );
 ypObject *yp_eq( ypObject *x, ypObject *y );
@@ -325,36 +326,35 @@ yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
 // types.)
 yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
-// Returns the length of x.  Returns zero and sets *exc on error.
-yp_ssize_t yp_lenC( ypObject *x, ypObject **exc );
-
-
 
 /*
  * Iterator Operations
  */
 
-// "Sends" a value into an iterator *x and returns a new reference to the next yielded value, or 
+// As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an 
+// object that implements yp_iter.
+
+// "Sends" a value into *iterator and returns a new reference to the next yielded value, or 
 // yp_StopIteration if the iterator is exhausted.  The value may be ignored by the iterator.  If 
 // value is an exception this behaves like yp_throw.
-ypObject *yp_send( ypObject **x, ypObject *value );
+ypObject *yp_send( ypObject **iterator, ypObject *value );
 
-// Equivalent to yp_send( x, yp_None ).
-ypObject *yp_next( ypObject **x );
+// Equivalent to yp_send( iterator, yp_None ).
+ypObject *yp_next( ypObject **iterator );
 
 // Similar to yp_next, but returns a new reference to defval in place of yp_StopIteration.
-ypObject *yp_next2( ypObject **x, ypObject *defval );
+ypObject *yp_next2( ypObject **iterator, ypObject *defval );
 
-// "Throws" an exception into the iterator *x and returns a new reference to the next yielded 
+// "Throws" an exception into *iterator and returns a new reference to the next yielded 
 // value, yp_StopIteration if the iterator is exhausted, or another exception.  type _must_ be an 
 // exception.
-ypObject *yp_throw( ypObject **x, ypObject *type );
+ypObject *yp_throw( ypObject **iterator, ypObject *type );
 
-// "Closes" the iterator by calling yp_throw( x, yp_GeneratorExit ).  If yp_StopIteration or
-// yp_GeneratorExit is returned by yp_throw, *x is not discarded, otherwise *x is replaced with
-// an exception.  The behaviour of this function for other types, in particular files, is 
-// documented elsewhere.
-void yp_close( ypObject **x );
+// "Closes" the iterator by calling yp_throw( iterator, yp_GeneratorExit ).  If yp_StopIteration or
+// yp_GeneratorExit is returned by yp_throw, *iterator is not discarded, otherwise *iterator is
+// replaced with an exception.  The behaviour of this function for other types, in particular 
+// files, is documented elsewhere.
+void yp_close( ypObject **iterator );
 
 // Returns a new reference to an iterator that yields values from iterable for which function
 // returns true.  The given function must return new or immortal references, as each returned
@@ -393,8 +393,55 @@ ypObject *yp_zipN( int n, ... );
 
 
 /*
+ * Container Operations
+ */
+
+// Returns the immortal yp_True if an item of container is equal to x, else yp_False.
+ypObject *yp_contains( ypObject *container, ypObject *x );
+ypObject *yp_in( ypObject *x, ypObject *container );
+
+// Returns the immortal yp_False if an item of container is equal to x, else yp_True.
+ypObject *yp_not_in( ypObject *x, ypObject *container );
+
+// Returns the length of container.  Returns zero and sets *exc on error.
+yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
+
+
+/*
  * Sequence Operations
  */
+
+// Returns a new reference to the concatenation of container and x.
+ypObject *yp_concat( ypObject *container, ypObject *x );
+
+// Returns a new reference to factor shallow copies of container, concatenated.
+ypObject *yp_repeatC( ypObject *container, yp_ssize_t factor );
+
+// Returns a new reference to the i-th item of container, origin zero.  Negative indicies are
+// handled as in Python.
+ypObject *yp_getindexC( ypObject *container, yp_ssize_t i );
+
+// Returns a new reference to the slice of container from i to j with step k.  The
+// Python-equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.
+ypObject *yp_getsliceC( ypObject *container, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+
+// Returns the lowest index in container where x is found, such that x is contained in the slice
+// container[i:j], or -1 if x is not found.  Returns -1 and sets *exc on error; *exc is _not_ set
+// if x is simply not found.  As in Python, types such as tuples inspect only one item at a time,
+// while types such as strs look for a particular sub-sequence of items.
+yp_ssize_t yp_findC4( ypObject *container, ypObject *x, yp_ssize_t i, yp_ssize_t j, 
+        ypObject **exc );
+
+// Equivalent to yp_findC4( container, x, 0, yp_SLICE_USELEN, exc ).
+yp_ssize_t yp_findC( ypObject *container, ypObject *x, ypObject **exc );
+
+// Returns the total number of non-overlapping occurences of x in container.  Returns 0 and sets 
+// *exc on error.
+yp_ssize_t yp_countC( ypObject *container, ypObject *x, ypObject **exc );
+
+
+// TODO now onto the mutables
+
 
 // When given to a slice-like start/stop C argument, signals that the default "end" value be used
 // for the argument; which end depends on the sign of step.  If you know the sign of step, you may
@@ -402,7 +449,7 @@ ypObject *yp_zipN( int n, ... );
 //  Ex: The nohtyP equivalent of "[::a]" is "yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, a"
 #define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
 
-// When given to a slice-like start/stop C argument, signals that yp_len should be used; in other
+// When given to a slice-like start/stop C argument, signals that yp_lenC should be used; in other
 // words, it signals that the slice should start/stop at the end of the sequence.
 //  Ex: The nohtyP equivalent of "[:]" is "0, yp_SLICE_USELEN, 1"
 #define yp_SLICE_USELEN  yp_SSIZE_T_MAX
@@ -417,6 +464,7 @@ ypObject *yp_zipN( int n, ... );
 // 'X' means the function is dealing with internal data
 ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 // TODO similar magic for bytes/etc, although writing to bytearray is OK
+
 
 /*
  * Set Operations
@@ -617,14 +665,16 @@ ypObject *yp_sum( ypObject *iterable );
 // calls.  Best explained with examples:
 //  a.append( b )           --> yp( a,append, b )               --> yp_append( a, b )
 //  a + b                   --> yp( a, add, b )                 --> yp_add( a, b )
-// For methods that take no arguments, use yp0:
+// For methods that take no arguments, use yp0 (unlike elsewhere, the postfix counts the number of
+// arguments to the equivalent Python method):
 //  a.isspace( )            --> yp0( a,isspace )                --> yp_isspace( a )
 // If variadic macros are supported by your compiler, yp can take multiple arguments:
 //  a.setdefault( b, c )    --> yp( a,setdefault, b, c )        --> yp_setdefault( a, b, c )
-//  a.startswith( b, 2, 7 ) --> yp( a,startswith3, b, 2, 7 )    --> yp_startswith3( a, b, 2, 7 )
-// If variadic macros are not supported, use yp2, yp3, etc:
+//  a.startswith( b, 2, 7 ) --> yp( a,startswith4, b, 2, 7 )    --> yp_startswith4( a, b, 2, 7 )
+// If variadic macros are not supported, use yp2, yp3, etc (note how the 4 in startswith4 is 1 plus
+// the 3 in yp3):
 //  a.setdefault( b, c )    --> yp2( a,setdefault, b, c )       --> yp_setdefault( a, b, c )
-//  a.startswith( b, 2, 7 ) --> yp3( a,startswith3, b, 2, 7 )   --> yp_startswith3( a, b, 2, 7 )
+//  a.startswith( b, 2, 7 ) --> yp3( a,startswith4, b, 2, 7 )   --> yp_startswith4( a, b, 2, 7 )
 
 // A macro to get exception info as a string, include file/line info of the place the macro is
 // checked
