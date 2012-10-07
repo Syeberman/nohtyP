@@ -861,6 +861,7 @@ static ypObject *_yp_bytearray_resize( ypObject *b, yp_ssize_t newLen )
 }
 
 // If x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
+// TODO note http://bugs.python.org/issue12170 and ensure we stay consistent
 static void _bytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len )
 {
     ypObject *result;
@@ -1200,6 +1201,8 @@ static yp_hash_t bytes_current_hash( ypObject *b ) {
  * Sequence of unicode characters
  *************************************************************************************************/
 
+// TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
+
 
 /*************************************************************************************************
  * Sequence of generic items
@@ -1211,40 +1214,53 @@ static yp_hash_t bytes_current_hash( ypObject *b ) {
 /*************************************************************************************************
  * Sets
  *************************************************************************************************/
+// TODO Instead, and following http://www.python.org/dev/peps/pep-0412/, dict should treat set as a
+// separate object, with "friendly" (but yp-internal) methods to handle resizes, etc.  This allows
+// the set to be returned for yp_keys; it allows multiple dicts to share the same key dict, thus
+// reducing memory; because Python essentially does this, we'll have tests written to ensure 
+// correctness; it further-simplifies the implementation of dict.
+// http://nohtyp.wordpress.com/2012/09/19/dicts-as-sets/
+
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
 // TODO make sure I'm using FrozenSet in the right places
 
-// Sets and dicts share much of the same data structures and code, with one difference being a
-// set has two entries for each item (interleaved hash and key), while a dict has three
-// (interleaved hash and key, followed by sequential values)
-#define ypFrozenSetObject_BODY( isdict ) \
-    ypObject_HEAD \
-    yp_ssize_t so_fill;  /* # Active + # Dummy */ \
-    Py_ssize_t so_mask; \
-    ypObject *ob_inline_data[1][isdict ? 3 : 2];
-typedef struct {
-    ypFrozenSetObject_BODY( FALSE )
-} yFrozenSetObject;
-
-// Sets are arrays of ypObject*s, two for each item; the first ypObject* is actually the hash, so
-// make sure it can be stored as a ypObject *
 typedef struct {
     yp_hash_t se_hash;
     ypObject *se_key;
 } ypFrozenSet_KeyEntry;
-yp_STATIC_ASSERT( offsetof( ypFrozenSet_KeyEntry, se_key ) == sizeof( ypObject * ), set_key_entry_overlay );
+typedef struct {
+    ypObject_HEAD
+    yp_ssize_t so_fill; // # Active + # Dummy
+    yp_INLINE_DATA( ypFrozenSet_KeyEntry );
+} yFrozenSetObject;
 
 #define ypFrozenSet_TABLE( so ) ( (ypFrozenSet_KeyEntry *) ((ypObject *)so)->ob_data )
 // TODO what if ob_len is the "invalid" value?
 #define ypFrozenSet_LEN( so )  ( ((ypObject *)so)->ob_len )
 #define ypFrozenSet_FILL( so )  ( ((yFrozenSetObject *)so)->so_fill )
 #define ypFrozenSet_ALLOCLEN( so )  ( ((ypObject *)so)->ob_alloclen )
-#define ypFrozenSet_MASK( so ) ( ((yFrozenSetObject *)so)->so_mask )
+#define ypFrozenSet_MASK( so ) ( ypFrozenSet_ALLOCLEN( so ) - 1 )
 
 #define ypFrozenSet_PERTURB_SHIFT (5)
 static ypObject _ypFrozenSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 0 );
 static ypObject *ypFrozenSet_dummy = &_ypFrozenSet_dummy;
+
+// Returns true if the given ypFrozenSet_KeyEntry contains a valid key
+#define ypFrozenSet_ENTRY_USED( loc ) \
+    ( (loc)->se_key != NULL && (loc)->se_key != ypFrozenSet_dummy )
+// Returns the index of the given ypFrozenSet_KeyEntry in the hash table
+#define ypFrozenSet_ENTRY_INDEX( so, loc ) \
+    ( (yp_ssize_t) ( (loc) - ypFrozenSet_TABLE( so ) ) )
+
+
+
+static ypObject *_ypFrozenSet_new( yp_ssize_t minused )
+{
+    // TODO
+}
+
+
 
 // Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
 // yp_None, or an exception on error.
@@ -1299,7 +1315,7 @@ static ypObject *_ypFrozenSet_lookkey( ypObject *so, ypObject *key, register yp_
             freeslot = ep;
         }
     }
-    return yp_SystemError; /* NOT REACHED */
+    return yp_SystemError; // NOT REACHED
 
 // When the code jumps here, it means ep points to the proper entry
 success:
@@ -1307,62 +1323,75 @@ success:
     return yp_None;
 }
 
-
-// Inserts a new item into the table, setting *loc to the location.  Returns yp_False if the key
-// was already in the table (and, as such, didn't need to be inserted), else yp_True or an 
-// exception.
+// Adds a new key to the hash table at the given location; updates the fill and len counts.  loc 
+// must not currently be in use!
 // XXX Adapted from Python's insertdict in dictobject.c
-static ypObject *_ypFrozenSet_insertkey( ypObject *so, ypObject *key, yp_hash_t hash, 
-        ypFrozenSet_KeyEntry **loc )
+static ypObject *_ypSet_addkey( ypObject *so, ypFrozenSet_KeyEntry *loc, ypObject *key,
+        yp_hash_t hash )
 {
-    ypObject *result = _ypFrozenSet_lookkey( so, key, hash, loc );
-    // TODO yp_isexceptionC use internally should be a macro
-    if( yp_isexceptionC( result ) ) return result;
-
-    if( (*loc)->se_key == NULL ) {
-        // Entry has never been used
-        ypFrozenSet_FILL( so ) += 1;
-        (*loc)->se_key = yp_incref( key );
-        (*loc)->se_hash = hash;
-        ypFrozenSet_LEN( so ) += 1;
-        return yp_True;
-    } else if( (*loc)->se_key == ypFrozenSet_dummy ) {
-        // Entry was used, but has since been deleted
-        (*loc)->se_key = yp_incref( key );
-        (*loc)->se_hash = hash;
-        ypFrozenSet_LEN( so ) += 1;
-        return yp_True;
-    } else {
-        // Key already at entry; nothing to do
-        return yp_False;
-    }
+    if( loc->se_key == NULL ) ypFrozenSet_FILL( so ) += 1;
+    loc->se_key = yp_incref( key );
+    loc->se_hash = hash;
+    ypFrozenSet_LEN( so ) += 1;
 }
 
 // Internal routine used while cleaning/resizing/copying a table: the key is known to be absent
-// from the table, and the table contains no deleted entries.  XXX Steals a reference to key!
+// from the table, the table contains no deleted entries, and there's no need to incref the key.
+// Sets *loc to the location at which the key was inserted.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
-static void _ypFrozenSet_insertclean_stealkey( ypObject *so, ypObject *key, yp_hash_t hash,
-        ypFrozenSet_KeyEntry **ep )
+static void _ypSet_resize_insertkey( ypObject *so, ypObject *key, yp_hash_t hash,
+        ypFrozenSet_KeyEntry **loc )
 {
     size_t i;
     size_t perturb;
     size_t mask = (size_t) ypFrozenSet_MASK( so );
-    PyDictEntry *ep0 = ypFrozenSet_TABLE( so );
+    ypFrozenSet_KeyEntry *ep0 = ypFrozenSet_TABLE( so );
 
     i = hash & mask;
-    (*ep) = &ep0[i];
-    for (perturb = hash; (*ep)->se_key != NULL; perturb >>= PERTURB_SHIFT) {
+    (*loc) = &ep0[i];
+    for (perturb = hash; (*loc)->se_key != NULL; perturb >>= PERTURB_SHIFT) {
         i = (i << 2) + i + perturb + 1;
-        (*ep) = &ep0[i & mask];
+        (*loc) = &ep0[i & mask];
     }
     ypFrozenSet_FILL( so ) += 1;
-    (*ep)->se_key = key;
-    (*ep)->se_hash = hash;
+    (*loc)->se_key = key;
+    (*loc)->se_hash = hash;
     ypFrozenSet_LEN( so ) += 1;
 }
 
+// Before adding numnew keys to the set, call this function to determine if a resize is necessary.
+// Returns -1 if the set doesn't require a resize, else the new minused value to pass to
+// _ypFrozenSet_resize.  If adding one key, it's recommended to first check if the key already
+// exists in the set before checking if it should be resized; if adding multiple, just assume that
+// none of the keys exist in the set currently.
+// TODO ensure we aren't unnecessarily resizing: if the old and new alloclens will be the same,
+// and we don't have dummy entries, then resizing is a waste of effort.
+// XXX Adapted from PyDict_SetItem
+static yp_ssize_t _ypSet_shouldresize( ypObject *so, yp_ssize_t numnew )
+{
+    yp_ssize_t newfill = ypFrozenSet_FILL( so ) + numnew;
 
-
+    /* If fill >= 2/3 size, adjust size.  Normally, this doubles or
+     * quaduples the size, but it's also possible for the dict to shrink
+     * (if ma_fill is much larger than se_used, meaning a lot of dict
+     * keys have been deleted).
+     *
+     * Quadrupling the size improves average dictionary sparseness
+     * (reducing collisions) at the cost of some memory and iteration
+     * speed (which loops over every possible entry).  It also halves
+     * the number of expensive resize operations in a growing dictionary.
+     *
+     * Very large dictionaries (over 50K items) use doubling instead.
+     * This may help applications with severe memory constraints.
+     */
+    // TODO make this limit configurable
+    if( newfill*3 >= ypFrozenSet_ALLOCLEN( so )*2 ) {
+        yp_ssize_t newlen = ypFrozenSet_LEN( so ) + numnew;
+        return (newlen > 50000 ? 2 : 4) * newlen;
+    } else {
+        return -1;
+    }
+}
 
 
 
@@ -1370,16 +1399,124 @@ static void _ypFrozenSet_insertclean_stealkey( ypObject *so, ypObject *key, yp_h
  * Mappings
  *************************************************************************************************/
 
-// TODO blog entry: in python key/val are side-by-side, but so many keys are considered during
-// lookup and they jump all over the table that it's better to keep the keys densely packed, so
-// that they have a better chance of getting picked up in the same cache; conversely, you only look
-// up the value once, so putting them in the same cache area as keys doesn't really help
-
-// Sets and dicts share much of the same data structures
+// XXX keyset requires care!  It is potentially shared among multiple dicts, so we cannot remove
+// keys or resize it.  It identifies itself as a frozendict, yet we add keys to it, so it is not
+// truly immutable.  As such, it cannot be exposed outside of the set/dict implementations.
+// TODO alloclen will always be the same as keyset.alloclen; repurpose?
 typedef struct {
-    ypFrozenSetObject_BODY( TRUE )
-} yFrozenDictObject;
+    ypObject_HEAD
+    ypObject *keyset;
+    yp_INLINE_DATA( ypObject * );
+} ypFrozenDictObject;
 
+#define ypFrozenDict_VALUES( mp ) ( (ypObject *) ((ypObject *)mp)->ob_data )
+#define ypFrozenDict_KEYSET( mp ) ( ((ypFrozenDict *)mp)->keyset )
+
+// Returns the index of the given ypFrozenSet_KeyEntry in the hash table
+#define ypFrozenDict_ENTRY_INDEX( mp, loc ) \
+    ( ypFrozenSet_ENTRY_INDEX( ypFrozenDict_KEYSET( mp ), loc ) )
+
+// The tricky bit about resizing dicts is that we need both the old and new keysets and value 
+// arrays to properly transfer the data, so ypMem_REALLOC_CONTAINER_VARIABLE is no help.
+static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
+{
+    ypObject *newkeyset;
+    yp_ssize_t newalloclen;
+    ypObject **newvalues;
+    ypFrozenSet_KeyEntry *oldkeys;
+    ypObject *oldvalues;
+    yp_ssize_t valuesleft;
+    yp_ssize_t i;
+    ypObject *value;
+    ypFrozenSet_KeyEntry **loc;
+
+    // TODO allocate the value array in-line, then handle the case where both old and new value
+    // arrays could fit in-line (idea: if currently in-line, then just force that the new array be
+    // malloc'd...will need to malloc something anyway)
+    newkeyset = _ypFrozenSet_new( minused );
+    if( isexceptionC( newkeyset ) ) return newkeyset;
+    newalloclen = ypFrozenSet_ALLOCLEN( newkeyset );
+    newvalues = yp_malloc( newalloclen * sizeof( ypObject * ) );
+    if( newvalues == NULL ) {
+        yp_decref( newkeyset );
+        return yp_MemoryError;
+    }
+    memset( newvalues, 0, newalloclen * sizeof( ypObject * ) );
+
+    oldkeys = ypFrozenSet_TABLE( ypFrozenDict_KEYSET( mp ) );
+    oldvalues = ypFrozenDict_VALUES( mp );
+    valuesleft = ypFrozenDict_LEN( mp );
+    for( i = 0; valuesleft > 0; i++ ) {
+        value = ypFrozenDict_VALUES( mp )[i];
+        if( value == NULL ) continue;
+        _ypSet_resize_insertkey( newkeyset, yp_incref( oldkeytable[i].se_key ), 
+                oldkeytable[i].se_hash, &loc );
+        newvalues[ypFrozenSet_ENTRY_INDEX( newkeyset, loc )] = oldvalues[i];
+        valuesleft -= 1;
+    }
+
+    yp_decref( ypFrozenDict_KEYSET( mp ) );
+    ypFrozenDict_KEYSET( mp ) = newkeyset;
+    yp_free( oldvalues );
+    ypFrozenDict_VALUES( mp ) = newvalues;
+    return yp_None;
+}
+
+// Adds a new value to the value array corresponding to the given hash table location; updates the
+// len count.  Replaces any existing value.
+static void _ypDict_setvalue( ypObject *mp, ypFrozenSet_KeyEntry *loc, ypObject *value )
+{
+    yp_ssize_t i = ypFrozenDict_ENTRY_INDEX( mp, loc );
+    ypObject *oldvalue = ypFrozenDict_VALUES( mp )[i];
+    if( oldvalue == NULL ) {
+        ypFrozenDict_LEN( mp ) += 1;
+    } else {
+        yp_decref( oldvalue );
+    }
+    ypFrozenDict_VALUES( mp )[i] = yp_incref( value );
+}
+
+
+// yp_None or an exception
+// TODO The decision to resize currently depends only on _ypSet_shouldresize, but what if the
+// shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
+// table.  Really, we should have a _ypDict_shouldresize.
+static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
+{
+    yp_hash_t hash;
+    ypObject *keyset = ypFrozenDict_KEYSET( mp );
+    ypFrozenSet_KeyEntry *loc;
+    ypObject *result = yp_None;
+
+    // Look for the appropriate entry in the hash table
+    // TODO yp_isexceptionC used internally should be a macro
+    hash = yp_hashC( key, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    result = _ypFrozenSet_lookkey( keyset, key, hash, &loc );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // If the key is already in the hash table, then we simply need to update the value
+    if( ypFrozenSet_ENTRY_USED( loc ) ) {
+        _ypDict_setvalue( mp, loc, value );
+        return yp_None;
+    }
+
+    // Otherwise, we need to add the key, which possibly doesn't involve resizing
+    newminused = _ypSet_shouldresize( keyset, 1 );
+    if( newminused < 0 ) {
+        _ypSet_addkey( keyset, loc, key, hash );
+        _ypDict_setvalue( mp, loc, value );
+        return yp_None;
+    }
+
+    // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
+    // fast _ypSet_resize_insertkey.
+    result = _ypDict_resize( mp, newminused );   // invalidates keyset and loc
+    if( yp_isexceptionC( result ) ) return result;
+    keyset = ypFrozenDict_KEYSET( mp );
+    _ypSet_resize_insertkey( keyset, yp_incref( key ), hash, &loc );
+    _ypDict_setvalue( mp, loc, value );
+}
 
 
 
