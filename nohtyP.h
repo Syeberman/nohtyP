@@ -1,8 +1,8 @@
 /*
  * nohtyP.h - A Python-like API for C, in one .c and one .h
- *      Public domain?  PSF?  dunno
- *      http://nohtyp.wordpress.com/
- *      TODO Python's license
+ *      http://nohtyp.wordpress.com
+ *      Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
+ *      License: http://docs.python.org/py3k/license.html
  *
  * The goal of nohtyP is to enable Python-like code to be written in C.  It is patterned after
  * Python's built-in API, then adjusted for expected usage patterns.  It also borrows ideas from 
@@ -42,12 +42,13 @@
  * routines and thus end in "L" (such functions are exposed to avoid object creation overhead).
  *
  * Other important postfixes:
- *  D - discard after use (ie yp_IFd)
  *  F - C float-based version (as opposed to int-based)
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
- *  X - direct access to internal memory; tread carefully!
+ *  V - A version of "N" or "K" that accepts a va_list in place of ...
+ *  D - discard after use (ie yp_IFd)
  *  # (number) - a function with # inputs that otherwise shares the same name as another function
+ *  X - direct access to internal memory; tread carefully!
  */
 
 
@@ -77,6 +78,7 @@ ypObject *yp_incref( ypObject *x );
 
 // A convenience function to increment the references of n objects.
 void yp_increfN( int n, ... );
+void yp_increfV( int n, va_list args );
 
 // Decrements the reference count of x, deallocating it if the count reaches zero.  Always 
 // succeeds; if x is immortal this is a no-op.
@@ -84,6 +86,7 @@ void yp_decref( ypObject *x );
 
 // A convenience function to decrement the references of n objects.
 void yp_decrefN( int n, ... );
+void yp_decrefV( int n, va_list args );
 
 
 /*
@@ -156,9 +159,11 @@ ypObject *yp_or( ypObject *x, ypObject *y );
 // A convenience function to "or" n objects.  Returns yp_False if n is zero, and the first object 
 // if n is one.  Returns a *borrowed* reference.
 ypObject *yp_orN( int n, ... );
+ypObject *yp_orV( int n, va_list args );
 
 // Equivalent to yp_bool( yp_orN( n, ... ) ).
 ypObject *yp_anyN( int n, ... );
+ypObject *yp_anyV( int n, va_list args );
 
 // Returns the immortal yp_True if any element of iterable is true; if the iterable is empty,
 // returns yp_False.  Stops iterating at the first true element.
@@ -171,9 +176,11 @@ ypObject *yp_and( ypObject *x, ypObject *y );
 // A convenience function to "and" n objects.  Returns yp_True if n is zero, and the first object
 // if n is one.  Returns a *borrowed* reference.
 ypObject *yp_andN( int n, ... );
+ypObject *yp_andV( int n, va_list args );
 
 // Equivalent to yp_bool( yp_andN( n, ... ) ).
 ypObject *yp_allN( int n, ... );
+ypObject *yp_allV( int n, va_list args );
 
 // Returns the immortal yp_True if all elements of iterable are true or the iterable is empty.
 // Stops iterating at the first false element.
@@ -200,12 +207,14 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
 // (so is actually double).
 
 // The signature of a function that can be wrapped up in a generator, called by yp_send and
-// similar functions.  State is an array of len *borrowed* ypObject*s that hold the current state;
-// the function cannot change the number of objects, but it can discard them and replace with new
-// references.  value is an object that is "sent" into the function by yp_send; it may also be 
-// yp_GeneratorExit if yp_close is called, or another exception.  The return value must be a new 
-// reference, yp_StopIteration if the generator is exhausted, or another exception.
-typedef ypObject *(*yp_generator_func_t)( ypObject **state, yp_ssize_t len, ypObject *value );
+// similar functions.  state is a buffer of size bytes that holds the current state.  Its structure
+// and initial values are determined by the call to the generator constructor; the function cannot
+// change the size after creation, and any ypObject*s in state should be considered *borrowed* (it
+// is safe to replace them with new references).  value is a *borrowed* object that is "sent" into
+// the  function by yp_send; it may also be yp_GeneratorExit if yp_close is called, or another 
+// exception.  The return value must be a new  reference, yp_StopIteration if the generator is 
+// exhausted, or another exception.
+typedef ypObject *(*yp_generator_func_t)( void *state, yp_ssize_t size, ypObject *value );
 
 
 /*
@@ -239,9 +248,11 @@ ypObject *yp_floatstore_strC( char *string );
 ypObject *yp_iter( ypObject *x );
 
 // Returns a new reference to a generator-iterator object using the given func.  The function will
-// be passed the given n objects as state on each call.  lenhint is a clue to consumers of the 
-// generator how many items will be yielded; use zero if this is not known.
+// be passed the given n objects as state on each call (the objects will form an array).  lenhint 
+// is a clue to consumers of the generator how many items will be yielded; use zero if this is not
+// known.
 ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
+ypObject *yp_generatorCV( yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args );
 
 // Returns a new reference to a range object. yp_rangeC is equivalent to yp_rangeC3( 0, stop, 1 ).
 ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
@@ -254,24 +265,22 @@ ypObject *yp_rangeC( yp_int_t stop );
 ypObject *yp_bytesC( yp_uint8_t *source, yp_ssize_t len );
 ypObject *yp_bytearrayC( yp_uint8_t *source, yp_ssize_t len );
 
-// Creates an immortal bytes constant at compile-time, which can be accessed by the variable name,
-// which is of type "static ypObject * const".  value is a C string literal that can contain null
-// bytes.  The length is calculated while compiling; the hash will be calculated the first time it
-// is accessed.  To be used as:
-//      yp_IMMORTAL_BYTES( name, value ); 
-
 // XXX The str/characterarray types will be added in a future version
 
 // Returns a new reference to a tuple/list of length n containing the given objects.
 ypObject *yp_tupleN( int n, ... );
+ypObject *yp_tupleV( int n, va_list args );
 ypObject *yp_listN( int n, ... );
+ypObject *yp_listV( int n, va_list args );
 
 // Returns a new reference to a tuple/list made from factor shallow copies of yp_tupleN( n, ... )
 // concatenated.  Equivalent to "factor * (obj0, obj1, ...)" in Python.
 //  Ex: pre-allocate a list of length 99: yp_list_repeatCN( 99, 1, yp_None )
 //  Ex: an 8-tuple containing alternating bools: yp_tuple_repeatCN( 4, 2, yp_False, yp_True )
 ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... );
+ypObject *yp_tuple_repeatCV( yp_ssize_t factor, int n, va_list args );
 ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... );
+ypObject *yp_list_repeatCV( yp_ssize_t factor, int n, va_list args );
 
 // Returns a new reference to a tuple/list whose elements come from iterable.
 ypObject *yp_tuple( ypObject *iterable );
@@ -290,7 +299,9 @@ ypObject *yp_sorted( ypObject *iterable );
 // Returns a new reference to a frozenset/set containing the given n objects; the length will be n,
 // unless there are duplicate objects.
 ypObject *yp_frozensetN( int n, ... );
+ypObject *yp_frozensetV( int n, va_list args );
 ypObject *yp_setN( int n, ... );
+ypObject *yp_setV( int n, va_list args );
 
 // Returns a new reference to a frozenset/set whose elements come from iterable.
 ypObject *yp_frozenset( ypObject *iterable );
@@ -300,13 +311,17 @@ ypObject *yp_set( ypObject *iterable );
 // of 2*n objects); the length will be n, unless there are duplicate keys.
 //  Ex: yp_dictK( 3, key0, value0, key1, value1, key2, value2 )
 ypObject *yp_frozendictK( int n, ... );
+ypObject *yp_frozendictKV( int n, va_list args );
 ypObject *yp_dictK( int n, ... );
+ypObject *yp_dictKV( int n, va_list args );
 
 // Returns a new reference to a frozendict/dict containing the given n keys all set to value; the
 // length will be n, unless there are duplicate keys.
 //  Ex: pre-allocate a dict with 3 keys: yp_dict_fromkeysN( yp_None, 3, key0, key1, key2 )
 ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... );
+ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args );
 ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
+ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
 
 // XXX The file type will be added in a future version
 
@@ -369,11 +384,15 @@ ypObject *yp_filterfalse( yp_filter_function_t function, ypObject *iterable );
 // returns new or immortal references that are used as comparison keys; to compare the elements
 // directly, use yp_incref.
 ypObject *yp_max_keyN( yp_sort_key_func_t key, int n, ... );
+ypObject *yp_max_keyV( yp_sort_key_func_t key, int n, va_list args );
 ypObject *yp_min_keyN( yp_sort_key_func_t key, int n, ... );
+ypObject *yp_min_keyV( yp_sort_key_func_t key, int n, va_list args );
 
 // Equivalent to yp_max_keyN( yp_incref, n, ... ) and yp_min_keyN( yp_incref, n, ... ).
 ypObject *yp_maxN( int n, ... );
+ypObject *yp_maxV( int n, va_list args );
 ypObject *yp_minN( int n, ... );
+ypObject *yp_minV( int n, va_list args );
 
 // Returns a new reference to the largest/smallest element in iterable.  key is as in yp_max_keyN.
 ypObject *yp_max_key( ypObject *iterable, yp_sort_key_func_t key );
@@ -388,6 +407,7 @@ ypObject *yp_reversed( ypObject *seq );
 
 // Returns a new reference to an iterator that aggregates elements from each of the n iterables.
 ypObject *yp_zipN( int n, ... );
+ypObject *yp_zipV( int n, va_list args );
 
 // You may also be interested in yp_FOR for working with iterables; see below.
 
@@ -439,9 +459,7 @@ yp_ssize_t yp_findC( ypObject *container, ypObject *x, ypObject **exc );
 // *exc on error.
 yp_ssize_t yp_countC( ypObject *container, ypObject *x, ypObject **exc );
 
-
-// TODO now onto the mutables
-
+// TODO Complete mutable containers
 
 // When given to a slice-like start/stop C argument, signals that the default "end" value be used
 // for the argument; which end depends on the sign of step.  If you know the sign of step, you may
@@ -455,31 +473,25 @@ yp_ssize_t yp_countC( ypObject *container, ypObject *x, ypObject **exc );
 #define yp_SLICE_USELEN  yp_SSIZE_T_MAX
 
 
-// TODO bad idea?
-// For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
-// returns a pointer to the beginning of that array, and sets len to the length of the sequence.
-// The returned value points into internal object memory, so they are *borrowed* references and
-// MUST NOT be modified; furthermore, the sequence itself must not be modified while using the
-// array.  Returns NULL and sets len to -1 on error.
-// 'X' means the function is dealing with internal data
-ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
-// TODO similar magic for bytes/etc, although writing to bytearray is OK
-
-
 /*
  * Set Operations
  */
+
+// TODO Complete
+
 
 /*
  * Mapping Operations
  */
 
+// TODO Complete
+
+
 /*
  * Bytes & String Operations
  */
-yp_chr // also yp_chrC could be useful
-yp_ord
 
+// TODO Complete (yp_chr, yp_chrC, yp_ord, etc)
 
 
 /*
@@ -570,12 +582,40 @@ ypObject *yp_roundC( ypObject *x, int ndigits );
 
 // Sums the n given objects and returns the total.
 ypObject *yp_sumN( int n, ... );
+ypObject *yp_sumV( int n, va_list args );
 
 // Sums the items of iterable and returns the total.
 ypObject *yp_sum( ypObject *iterable );
 
-// TODO versions of the above that steal their arguments, so that operations can be chained
-// together. (yp_addD)
+
+/*
+ * Immortal "Constructors"
+ */
+
+// Defines an immortal bytes constant at compile-time, which can be accessed by the variable name,
+// which is of type "static ypObject * const".  value is a C string literal that can contain null
+// bytes.  The length is calculated while compiling; the hash will be calculated the first time it
+// is accessed.  To be used as:
+//      yp_IMMORTAL_BYTES( name, value ); 
+
+// TODO Complete
+
+
+/*
+ * Direct Object Memory Access
+ */
+
+// XXX The "X" in these names is a reminder that the function is returning internal memory, and
+// as such should be used with caution.
+
+// For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
+// returns a pointer to the beginning of that array, and sets len to the length of the sequence.
+// The returned value points into internal object memory, so they are *borrowed* references and
+// MUST NOT be modified; furthermore, the sequence itself must not be modified while using the
+// array.  Returns NULL and sets len to -1 on error.
+ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
+
+// TODO Similar X functions for the other types; some of these could allow modifications
 
 
 /*
@@ -680,7 +720,6 @@ ypObject *yp_sum( ypObject *iterable );
 // checked
 
 
-
 /*
  * Internals  XXX Do not use directly!
  */
@@ -694,7 +733,6 @@ struct _ypObject {
     void *      ob_data;        // pointer to object data
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
-
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
 #define yp_IMMORTAL_BYTES( name, value ) \
@@ -797,7 +835,7 @@ struct _ypObject {
 // The implementation of "yp" is considered "internal"; see above for documentation
 #define yp0( self, method )         yp_ ## method( self )
 #define yp1( self, method, a1 )     yp_ ## method( self, a1 )
-#ifdef yp_NO_VARIADIC_MACROS // FIXME rename or something
+#ifdef yp_NO_VARIADIC_MACROS // FIXME Rename?
 #define yp yp1
 #else
 #define yp( self, method, ... )     yp_ ## method( self, _VAR_ARGS_ )
