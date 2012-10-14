@@ -5,39 +5,38 @@
  *      License: http://docs.python.org/py3k/license.html
  *
  * The goal of nohtyP is to enable Python-like code to be written in C.  It is patterned after
- * Python's built-in API, then adjusted for expected usage patterns.  It also borrows ideas from 
+ * Python's built-in API, then adjusted for expected usage patterns.  It also borrows ideas from
  * Python's own C API.  To be as portable as possible, it is written in one .c and one .h file and
  * attempts to rely strictly on standard C.
  *
- * Most functions borrow inputs, create their own references, and output new references.  One 
+ * Most functions borrow inputs, create their own references, and output new references.  One
  * exception: those that modify objects steal a reference to the modified object and return a
  * new reference; this may not be the same object, particularly if an exception occurs.  (You can
- * always call yp_incref first to ensure the object is not deallocated.)  Another exception:
- * yp_or and yp_and return borrowed references, as this simplifies the most-common use case.
+ * always call yp_incref first to ensure the object is not deallocated.)
  *
  * When an error occurs in a function, it returns an exception object (after ensuring all objects
- * are left in a consistent state).  If the function is modifying an object, that object is 
+ * are left in a consistent state).  If the function is modifying an object, that object is
  * discarded and replaced with the exception.  If an exception object is used for any input into a
  * function, it is returned before any modifications occur.  Exception objects are immortal, so it
- * isn't necessary to call yp_decref on them.  As a result of these rules, it is possible to 
- * string together multiple function calls and only check if an exeption occured at the end: 
- *      yp_IMMORTAL_BYTES( sep, ", " ); 
- *      yp_IMMORTAL_BYTES( fmt, "(%s)\n" ); 
+ * isn't necessary to call yp_decref on them.  As a result of these rules, it is possible to
+ * string together multiple function calls and only check if an exeption occured at the end:
+ *      yp_IMMORTAL_BYTES( sep, ", " );
+ *      yp_IMMORTAL_BYTES( fmt, "(%s)\n" );
  *      ypObject *sepList = yp_join( sep, list );
- *      // if yp_join failed, sepList could be an exception 
- *      ypObject *result = yp_format( fmt, sepList ); 
- *      yp_decref( sepList ); 
- *      if( yp_isexception( result ) ) exit( -1 ); 
- * Unless explicitly documented as "always succeeds", _any_ function can return an exception. 
+ *      // if yp_join failed, sepList could be an exception
+ *      ypObject *result = yp_format( fmt, sepList );
+ *      yp_decref( sepList );
+ *      if( yp_isexception( result ) ) exit( -1 );
+ * Unless explicitly documented as "always succeeds", _any_ function can return an exception.
  *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
  * threads; this includes updating reference counts, so immutables are not inherently threadsafe!
- * One strategy to ensure safety is to deep copy objects before exchanging between threads.  
+ * One strategy to ensure safety is to deep copy objects before exchanging between threads.
  * Sharing immutable, immortal objects is always safe.
  *
  * The boundary between C types and ypObjects is an important one.  Functions that accept C types
  * and return objects end in "C".  Functions that accept objects and return C types end in "_asC",
- * unless "C" would be unambiguous; for example, yp_isexceptionC and yp_lenC must accept only 
+ * unless "C" would be unambiguous; for example, yp_isexceptionC and yp_lenC must accept only
  * objects for input.  Finally, functions that do not operate on _any_ objects are nohtyP library
  * routines and thus end in "L" (such functions are exposed to avoid object creation overhead).
  *
@@ -66,7 +65,7 @@ void yp_initialize( void );
  */
 
 // All objects maintain a reference count; when that count reaches zero, the object is deallocated.
-// Certain objects are immortal and, thus, never deallocated; examples include yp_None, yp_True, 
+// Certain objects are immortal and, thus, never deallocated; examples include yp_None, yp_True,
 // yp_False, exceptions, and so forth.
 
 // nohtyP objects are only accessed through pointers to ypObject.
@@ -80,7 +79,7 @@ ypObject *yp_incref( ypObject *x );
 void yp_increfN( int n, ... );
 void yp_increfV( int n, va_list args );
 
-// Decrements the reference count of x, deallocating it if the count reaches zero.  Always 
+// Decrements the reference count of x, deallocating it if the count reaches zero.  Always
 // succeeds; if x is immortal this is a no-op.
 void yp_decref( ypObject *x );
 
@@ -93,7 +92,7 @@ void yp_decrefV( int n, va_list args );
  * Freezing, "Unfreezing", and Invalidating
  */
 
-// Most objects support a one-way freeze function that makes them immutable, an unfrozen_copy
+// All objects support a one-way freeze function that makes them immutable, an unfrozen_copy
 // function that returns a mutable copy, and a one-way invalidate function that renders the object
 // useless; there are also deep variants to these functions.  Supplying an invalidated object to a
 // function results in yp_InvalidatedError.  Freezing and invalidating are two examples of object
@@ -101,9 +100,7 @@ void yp_decrefV( int n, va_list args );
 // most objects are copied in memory, even immutables, as copying is one method for maintaining
 // threadsafety.
 
-// Transmutes *x to its associated immutable type.  If *x is already immutable this is a no-op.  
-// If *x can't be frozen it is discarded and a new, invalidated object is returned in its place
-// (rarely occurs: most types _can_ be frozen). 
+// Transmutes *x to its associated immutable type.  If *x is already immutable this is a no-op.
 void yp_freeze( ypObject **x );
 
 // Freezes *x and, recursively, all contained objects.
@@ -116,11 +113,11 @@ ypObject *yp_unfrozen_copy( ypObject *x );
 // Creates a mutable copy of x and, recursively, all contained objects, returning a new reference.
 ypObject *yp_unfrozen_deepcopy( ypObject *x );
 
-// Returns a new reference to an immutable shallow copy of x.  If x has no associated immutable 
+// Returns a new reference to an immutable shallow copy of x.  If x has no associated immutable
 // type a new, invalidated object is returned.  May also return yp_MemoryError.
 ypObject *yp_frozen_copy( ypObject *x );
 
-// Creates an immutable copy of x and, recursively, all contained objects, returning a new 
+// Creates an immutable copy of x and, recursively, all contained objects, returning a new
 // reference.
 ypObject *yp_frozen_deepcopy( ypObject *x );
 
@@ -130,7 +127,7 @@ ypObject *yp_copy( ypObject *x );
 // Creates an exact copy of x and, recursively, all contained objects, returning a new reference.
 ypObject *yp_deepcopy( ypObject *x );
 
-// Discards all contained objects in *x, deallocates _some_ memory, and transmutes it to the 
+// Discards all contained objects in *x, deallocates _some_ memory, and transmutes it to the
 // ypInvalidated type (rendering the object useless).  If *x is immortal or already invalidated
 // this is a no-op; immutable objects _can_ be invalidated.
 void yp_invalidate( ypObject **x );
@@ -152,16 +149,17 @@ ypObject *yp_bool( ypObject *x );
 // Returns the immortal yp_True if x is considered false, otherwise yp_False.
 ypObject *yp_not( ypObject *x );
 
-// Returns a *borrowed* reference to y if x is false, otherwise to x.  Unlike  Python, both
-// arguments are always evaluated.
+// Returns a *new* reference to y if x is false, otherwise to x.  Unlike Python, both arguments
+// are always evaluated.  You may find yp_anyN more convenient, as it returns an immortal.
 ypObject *yp_or( ypObject *x, ypObject *y );
 
-// A convenience function to "or" n objects.  Returns yp_False if n is zero, and the first object 
-// if n is one.  Returns a *borrowed* reference.
+// A convenience function to "or" n objects.  Returns yp_False if n is zero, and the first object
+// if n is one.  Returns a *new* reference; you may find yp_anyN more convenient, as it returns an
+// immortal.
 ypObject *yp_orN( int n, ... );
 ypObject *yp_orV( int n, va_list args );
 
-// Equivalent to yp_bool( yp_orN( n, ... ) ).
+// Equivalent to yp_bool( yp_orN( n, ... ) ).  (Returns an immortal.)
 ypObject *yp_anyN( int n, ... );
 ypObject *yp_anyV( int n, va_list args );
 
@@ -169,16 +167,18 @@ ypObject *yp_anyV( int n, va_list args );
 // returns yp_False.  Stops iterating at the first true element.
 ypObject *yp_any( ypObject *iterable );
 
-// Returns a *borrowed* reference to x if x is false, otherwise to y.  Unlike Python, both 
-// arguments are always evaluated.
+// Returns a *new* reference to x if x is false, otherwise to y.  Unlike Python, both
+// arguments are always evaluated.  You may find yp_allN more convenient, as it returns an 
+// immortal.
 ypObject *yp_and( ypObject *x, ypObject *y );
 
 // A convenience function to "and" n objects.  Returns yp_True if n is zero, and the first object
-// if n is one.  Returns a *borrowed* reference.
+// if n is one.  Returns a *new* reference; you may find yp_allN more convenient, as it returns an
+// immortal.
 ypObject *yp_andN( int n, ... );
 ypObject *yp_andV( int n, va_list args );
 
-// Equivalent to yp_bool( yp_andN( n, ... ) ).
+// Equivalent to yp_bool( yp_andN( n, ... ) ).  (Returns an immortal.)
 ypObject *yp_allN( int n, ... );
 ypObject *yp_allV( int n, va_list args );
 
@@ -211,8 +211,8 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
 // and initial values are determined by the call to the generator constructor; the function cannot
 // change the size after creation, and any ypObject*s in state should be considered *borrowed* (it
 // is safe to replace them with new references).  value is a *borrowed* object that is "sent" into
-// the  function by yp_send; it may also be yp_GeneratorExit if yp_close is called, or another 
-// exception.  The return value must be a new  reference, yp_StopIteration if the generator is 
+// the  function by yp_send; it may also be yp_GeneratorExit if yp_close is called, or another
+// exception.  The return value must be a new  reference, yp_StopIteration if the generator is
 // exhausted, or another exception.
 typedef ypObject *(*yp_generator_func_t)( void *state, yp_ssize_t size, ypObject *value );
 
@@ -223,8 +223,8 @@ typedef ypObject *(*yp_generator_func_t)( void *state, yp_ssize_t size, ypObject
 
 // Unlike Python, most nohtyP types have both mutable and immutable versions.  An "intstore" is a
 // mutable int (it "stores" an int); similar for floatstore.  The mutable str is called a
-// "characterarray", while a "frozendict" is an immutable dict.  There is no immutable iter or file
-// type.
+// "characterarray", while a "frozendict" is an immutable dict.  There are no useful immutable 
+// types for iters or files; attempting to freeze such types will close them.
 
 // Returns a new reference to an int/intstore with the given value.
 ypObject *yp_intC( yp_int_t value );
@@ -239,7 +239,7 @@ ypObject *yp_intstore_strC( char *string, int base );
 ypObject *yp_floatC( yp_float_t value );
 ypObject *yp_floatstoreC( yp_float_t value );
 
-// Returns a new reference to a float/floatstore interpreting the string as a Python 
+// Returns a new reference to a float/floatstore interpreting the string as a Python
 // floating-point literal.
 ypObject *yp_float_strC( char *string );
 ypObject *yp_floatstore_strC( char *string );
@@ -248,7 +248,7 @@ ypObject *yp_floatstore_strC( char *string );
 ypObject *yp_iter( ypObject *x );
 
 // Returns a new reference to a generator-iterator object using the given func.  The function will
-// be passed the given n objects as state on each call (the objects will form an array).  lenhint 
+// be passed the given n objects as state on each call (the objects will form an array).  lenhint
 // is a clue to consumers of the generator how many items will be yielded; use zero if this is not
 // known.
 ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
@@ -258,8 +258,8 @@ ypObject *yp_generatorCV( yp_generator_func_t func, yp_ssize_t lenhint, int n, v
 ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
 ypObject *yp_rangeC( yp_int_t stop );
 
-// Returns a new reference to a bytes/bytearray, copying the first len bytes from source.  If 
-// source is NULL it is considered as having all null bytes; if len is negative source is 
+// Returns a new reference to a bytes/bytearray, copying the first len bytes from source.  If
+// source is NULL it is considered as having all null bytes; if len is negative source is
 // considered null terminated (and, therefore, will not contain the null byte).
 //  Ex: pre-allocate a bytearray of length 50: yp_bytearrayC( NULL, 50 )
 ypObject *yp_bytesC( yp_uint8_t *source, yp_ssize_t len );
@@ -288,12 +288,12 @@ ypObject *yp_list( ypObject *iterable );
 
 // Returns a new reference to a sorted list from the items in iterable.  key is a function that
 // returns new or immortal references that are used as comparison keys; to compare the elements
-// directly, use yp_incref.  If reverse is true, the list elements are sorted as if each 
-// comparison were reversed.
+// directly, use NULL.  If reverse is true, the list elements are sorted as if each comparison were
+// reversed.
 typedef ypObject *(*yp_sort_key_func_t)( ypObject *x );
 ypObject *yp_sorted3( ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse );
 
-// Equivalent to yp_sorted3( iterable, yp_incref, yp_False ).
+// Equivalent to yp_sorted3( iterable, NULL, yp_False ).
 ypObject *yp_sorted( ypObject *iterable );
 
 // Returns a new reference to a frozenset/set containing the given n objects; the length will be n,
@@ -326,9 +326,6 @@ ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
 // XXX The file type will be added in a future version
 
 
-// TODO be explicit about which functions return immortal objects
-
-
 /*
  * Generic Object Operations
  */
@@ -346,11 +343,11 @@ yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
  * Iterator Operations
  */
 
-// As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an 
+// As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an
 // object that implements yp_iter.
 
-// "Sends" a value into *iterator and returns a new reference to the next yielded value, or 
-// yp_StopIteration if the iterator is exhausted.  The value may be ignored by the iterator.  If 
+// "Sends" a value into *iterator and returns a new reference to the next yielded value, or
+// yp_StopIteration if the iterator is exhausted.  The value may be ignored by the iterator.  If
 // value is an exception this behaves like yp_throw.
 ypObject *yp_send( ypObject **iterator, ypObject *value );
 
@@ -360,20 +357,20 @@ ypObject *yp_next( ypObject **iterator );
 // Similar to yp_next, but returns a new reference to defval in place of yp_StopIteration.
 ypObject *yp_next2( ypObject **iterator, ypObject *defval );
 
-// "Throws" an exception into *iterator and returns a new reference to the next yielded 
-// value, yp_StopIteration if the iterator is exhausted, or another exception.  type _must_ be an 
+// "Throws" an exception into *iterator and returns a new reference to the next yielded
+// value, yp_StopIteration if the iterator is exhausted, or another exception.  type _must_ be an
 // exception.
 ypObject *yp_throw( ypObject **iterator, ypObject *type );
 
 // "Closes" the iterator by calling yp_throw( iterator, yp_GeneratorExit ).  If yp_StopIteration or
 // yp_GeneratorExit is returned by yp_throw, *iterator is not discarded, otherwise *iterator is
-// replaced with an exception.  The behaviour of this function for other types, in particular 
+// replaced with an exception.  The behaviour of this function for other types, in particular
 // files, is documented elsewhere.
 void yp_close( ypObject **iterator );
 
 // Returns a new reference to an iterator that yields values from iterable for which function
 // returns true.  The given function must return new or immortal references, as each returned
-// value will be discarded; to inspect the elements directly, use yp_incref.
+// value will be discarded; to inspect the elements directly, use NULL.
 typedef ypObject *(*yp_filter_function_t)( ypObject *x );
 ypObject *yp_filter( yp_filter_function_t function, ypObject *iterable );
 
@@ -382,13 +379,13 @@ ypObject *yp_filterfalse( yp_filter_function_t function, ypObject *iterable );
 
 // Returns a new reference to the largest/smallest of the given n objects.  key is a function that
 // returns new or immortal references that are used as comparison keys; to compare the elements
-// directly, use yp_incref.
+// directly, use NULL.
 ypObject *yp_max_keyN( yp_sort_key_func_t key, int n, ... );
 ypObject *yp_max_keyV( yp_sort_key_func_t key, int n, va_list args );
 ypObject *yp_min_keyN( yp_sort_key_func_t key, int n, ... );
 ypObject *yp_min_keyV( yp_sort_key_func_t key, int n, va_list args );
 
-// Equivalent to yp_max_keyN( yp_incref, n, ... ) and yp_min_keyN( yp_incref, n, ... ).
+// Equivalent to yp_max_keyN( NULL, n, ... ) and yp_min_keyN( NULL, n, ... ).
 ypObject *yp_maxN( int n, ... );
 ypObject *yp_maxV( int n, va_list args );
 ypObject *yp_minN( int n, ... );
@@ -398,7 +395,7 @@ ypObject *yp_minV( int n, va_list args );
 ypObject *yp_max_key( ypObject *iterable, yp_sort_key_func_t key );
 ypObject *yp_min_key( ypObject *iterable, yp_sort_key_func_t key );
 
-// Equivalent to yp_max_key( iterable, yp_incref ) and yp_min_key( iterable, yp_incref ).
+// Equivalent to yp_max_key( iterable, NULL ) and yp_min_key( iterable, NULL ).
 ypObject *yp_max( ypObject *iterable );
 ypObject *yp_min( ypObject *iterable );
 
@@ -426,40 +423,106 @@ ypObject *yp_not_in( ypObject *x, ypObject *container );
 // Returns the length of container.  Returns zero and sets *exc on error.
 yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
 
+// Removes all items from *container.  On error, *container is discarded and set to an exception.
+void yp_clear( ypObject **container, ypObject *x );
+
+// Removes an item from *container and returns it.  On error, *container is discarded and set to an 
+// exception _and_ an exception is returned.  (Not supported on dicts; use yp_pop2 or yp_popitem
+// instead.)
+ypObject *yp_pop( ypObject **container );
+
 
 /*
  * Sequence Operations
  */
 
-// Returns a new reference to the concatenation of container and x.
-ypObject *yp_concat( ypObject *container, ypObject *x );
+// Returns a new reference to the concatenation of sequence and x.
+ypObject *yp_concat( ypObject *sequence, ypObject *x );
 
-// Returns a new reference to factor shallow copies of container, concatenated.
-ypObject *yp_repeatC( ypObject *container, yp_ssize_t factor );
+// Returns a new reference to factor shallow copies of sequence, concatenated.
+ypObject *yp_repeatC( ypObject *sequence, yp_ssize_t factor );
 
-// Returns a new reference to the i-th item of container, origin zero.  Negative indicies are
+// Returns a new reference to the i-th item of sequence, origin zero.  Negative indicies are
 // handled as in Python.
-ypObject *yp_getindexC( ypObject *container, yp_ssize_t i );
+ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i );
 
-// Returns a new reference to the slice of container from i to j with step k.  The
+// Returns a new reference to the slice of sequence from i to j with step k.  The
 // Python-equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.
-ypObject *yp_getsliceC( ypObject *container, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+ypObject *yp_getsliceC( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
 
-// Returns the lowest index in container where x is found, such that x is contained in the slice
-// container[i:j], or -1 if x is not found.  Returns -1 and sets *exc on error; *exc is _not_ set
+// Sequences also support yp_getitem, documented below.
+
+// Returns the lowest index in sequence where x is found, such that x is contained in the slice
+// sequence[i:j], or -1 if x is not found.  Returns -1 and sets *exc on error; *exc is _not_ set
 // if x is simply not found.  As in Python, types such as tuples inspect only one item at a time,
 // while types such as strs look for a particular sub-sequence of items.
-yp_ssize_t yp_findC4( ypObject *container, ypObject *x, yp_ssize_t i, yp_ssize_t j, 
+yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
         ypObject **exc );
 
-// Equivalent to yp_findC4( container, x, 0, yp_SLICE_USELEN, exc ).
-yp_ssize_t yp_findC( ypObject *container, ypObject *x, ypObject **exc );
+// Equivalent to yp_findC4( sequence, x, 0, yp_SLICE_USELEN, exc ).
+yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc );
 
-// Returns the total number of non-overlapping occurences of x in container.  Returns 0 and sets 
+// Similar to yp_findC4 and yp_findC, except sets *exc to yp_ValueError if x is not found.
+yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+        ypObject **exc );
+yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
+
+// Returns the total number of non-overlapping occurences of x in sequence.  Returns 0 and sets
 // *exc on error.
-yp_ssize_t yp_countC( ypObject *container, ypObject *x, ypObject **exc );
+yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc );
 
-// TODO Complete mutable containers
+// Sets the i-th item of *sequence, origin zero, to x.  Negative indicies are handled as in 
+// Python.  On error, *sequence is discarded and set to an exception.
+void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
+
+// Sets the slice of *sequence, from i to j with step k, to x.  The Python-equivalent "defaults"
+// for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, *sequence is discarded and 
+// set to an exception.
+void yp_setsliceC( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x );
+
+// Sequences also support yp_setitem, documented below.
+
+// Removes the i-th item from *sequence, origin zero.  Negative indicies are handled as in Python.
+// On error, *sequence is discarded and set to an exception.
+void yp_delindexC( ypObject **sequence, yp_ssize_t i );
+
+// Removes the elements of the slice from *sequence, from i to j with step k.  The Python-
+// equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, 
+// *sequence is discarded and set to an exception.
+void yp_delsliceC( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+
+// Sequences also support yp_delitem, documented below.
+
+// Appends x to the end of *sequence.  On error, *sequence is discarded and set to an exception.
+void yp_append( ypObject **sequence, ypObject *x );
+
+// Appends the contents of t to the end of *sequence.  On error, *sequence is discarded and set to
+// an exception.
+void yp_extend( ypObject **sequence, ypObject *t );
+
+// Inserts x into *sequence at the index given by i; existing elements are shifted to make room.
+// On error, *sequence is discarded and set to an exception.
+void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
+
+// Removes the i-th item from *sequence and returns it.  The Python-equivalent "default" for i is
+// -1.  On error, *sequence is discarded and set to an exception _and_ an exception is returned.
+ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
+
+// Removes the first item from *sequence that equals x.  On error, *sequence is discarded and set 
+// to an exception.
+void yp_remove( ypObject **sequence, ypObject *x );
+
+// Reverses the items of *sequence in-place.  On error, *sequence is discarded and set to an 
+// exception.
+void yp_reverse( ypObject **sequence );
+
+// Sorts the items of *sequence in-place.  key is a function that returns new or immortal 
+// references that are used as comparison keys; to compare the elements directly, use NULL.  If 
+// reverse is true, the list elements are sorted as if each comparison were reversed.
+void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse );
+
+// Equivalent to yp_sort3( sequence, NULL, yp_False ).
+void yp_sort( ypObject **sequence );
 
 // When given to a slice-like start/stop C argument, signals that the default "end" value be used
 // for the argument; which end depends on the sign of step.  If you know the sign of step, you may
@@ -486,6 +549,9 @@ yp_ssize_t yp_countC( ypObject *container, ypObject *x, ypObject **exc );
 
 // TODO Complete
 
+// TODO "Also works with sequences"
+yp_getitem
+yp_setitem
 
 /*
  * Bytes & String Operations
@@ -524,9 +590,9 @@ ypObject *yp_pos( ypObject *x );
 ypObject *yp_abs( ypObject *x );
 ypObject *yp_invert( ypObject *x );
 
-// In-place versions of the above; if the object *x can be modified to hold the result, it is, 
+// In-place versions of the above; if the object *x can be modified to hold the result, it is,
 // otherwise *x is discarded and replaced with the result.  If *x is immutable on input, an
-// immutable object is returned, otherwise a mutable object is returned.  On error, *x is 
+// immutable object is returned, otherwise a mutable object is returned.  On error, *x is
 // discarded and set to an exception.
 void yp_iadd( ypObject **x, ypObject *y );
 void yp_isub( ypObject **x, ypObject *y );
@@ -555,17 +621,17 @@ void yp_iaddC( ypObject **x, yp_int_t y );
 void yp_iaddFC( ypObject **x, yp_float_t y );
 // TODO: et al
 
-// Library routines for nohtyP integer operations on C types.  Returns a reasonable value and sets 
+// Library routines for nohtyP integer operations on C types.  Returns a reasonable value and sets
 // *exc on error; "reasonable" usually means "truncated".
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
 // TODO: et al
 
-// Library routines for nohtyP floating-point operations on C types.  Returns a reasonable value 
+// Library routines for nohtyP floating-point operations on C types.  Returns a reasonable value
 // and sets *exc on error; "reasonable" usually means "truncated".
 yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
 // TODO: et al
 
-// Conversion routines from C types or objects to C types.  Returns a reasonable value and sets 
+// Conversion routines from C types or objects to C types.  Returns a reasonable value and sets
 // *exc on error; "reasonable" usually means "truncated".  Converting a float to an int truncates
 // toward zero but is not an error.
 yp_int_t yp_asintC( ypObject *x, ypObject **exc );
@@ -596,7 +662,7 @@ ypObject *yp_sum( ypObject *iterable );
 // which is of type "static ypObject * const".  value is a C string literal that can contain null
 // bytes.  The length is calculated while compiling; the hash will be calculated the first time it
 // is accessed.  To be used as:
-//      yp_IMMORTAL_BYTES( name, value ); 
+//      yp_IMMORTAL_BYTES( name, value );
 
 // TODO Complete
 
@@ -626,7 +692,7 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
  * considered internal; you'll find them near the end of this header.
  */
 
-// yp_IF: A series of macros to emulate an if/elif/else with exception handling.  To be used 
+// yp_IF: A series of macros to emulate an if/elif/else with exception handling.  To be used
 // strictly as follows (including braces):
 //      yp_IF( condition1 ) {
 //        // branch1
@@ -639,7 +705,7 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 //      } yp_ENDIF
 // As in Python, a condition is only evaluated if previous conditions evaluated false and did not
 // raise an exception, the exception-branch is executed if any evaluated condition raises an
-// exception, and the exception variable is only set if an exception occurs.  Unlike Python, 
+// exception, and the exception variable is only set if an exception occurs.  Unlike Python,
 // exceptions in the chosen branch do not trigger the exception-branch, and the exception variable
 // is not cleared at the end of the exception-branch.
 // If a condition creates a new reference that must be discarded, use yp_IFd and/or yp_ELIFd ("d"
@@ -659,7 +725,7 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 // evaluated multiple times until:
 //  - it evaluates to false, in which case the else-suite is executed
 //  - a break statement, in which case neither the else- nor exception-suites are executed
-//  - an exception occurs in condition, in which case e is set to the exception and the 
+//  - an exception occurs in condition, in which case e is set to the exception and the
 //  exception-suite is executed
 // Unlike Python, exceptions in the suites do not trigger the exception-suite, and the exception
 // variable is not cleared at the end of the exception-suite.
@@ -685,16 +751,16 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 //  - an exception occurs in expression or the iterator, in which case e is set to the exception
 //  and the exception-suite is executed
 // Unlike Python, there is no automatic tuple unpacking, exceptions in the suites do not trigger
-// the exception-suite, and the exception variable is not cleared at the end of the 
+// the exception-suite, and the exception variable is not cleared at the end of the
 // exception-suite.
 // Be careful with references.  While the internal iterator object is automatically discarded, if
-// the expression itself creates a new reference, use yp_FORd ("d" stands for "discard" or 
+// the expression itself creates a new reference, use yp_FORd ("d" stands for "discard" or
 // "decref"):
-//      yp_FORd( yp_tupleN( a, b, c ) )
+//      yp_FORd( x, yp_tupleN( a, b, c ) )
 // Also, the yielded values assigned to x are borrowed: they are automatically discarded at the end
 // of every suite.  If you want to retain a reference to them, you'll need to call yp_incref
 // yourself:
-//      yp_FORd( x, values ) {
+//      yp_FOR( x, values ) {
 //          if( yp_ge( x, minValue ) ) {
 //              yp_incref( x );
 //              break;
