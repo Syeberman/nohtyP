@@ -211,8 +211,8 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
 // and initial values are determined by the call to the generator constructor; the function cannot
 // change the size after creation, and any ypObject*s in state should be considered *borrowed* (it
 // is safe to replace them with new references).  value is a *borrowed* object that is "sent" into
-// the  function by yp_send; it may also be yp_GeneratorExit if yp_close is called, or another
-// exception.  The return value must be a new  reference, yp_StopIteration if the generator is
+// the function by yp_send; it may also be yp_GeneratorExit if yp_close is called, or another
+// exception.  The return value must be a new reference, yp_StopIteration if the generator is
 // exhausted, or another exception.
 typedef ypObject *(*yp_generator_func_t)( void *state, yp_ssize_t size, ypObject *value );
 
@@ -423,12 +423,17 @@ ypObject *yp_not_in( ypObject *x, ypObject *container );
 // Returns the length of container.  Returns zero and sets *exc on error.
 yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
 
-// Removes all items from *container.  On error, *container is discarded and set to an exception.
-void yp_clear( ypObject **container, ypObject *x );
+// Adds an item to *container.  On error, *container is discarded and set to an exception.  The 
+// relation between yp_push and yp_pop depends on the type: x may be the first or last item popped,
+// or items may be popped in arbitrary order.
+void yp_push( ypObject **container, ypObject *x );
 
-// Removes an item from *container and returns it.  On error, *container is discarded and set to an 
-// exception _and_ an exception is returned.  (Not supported on dicts; use yp_pop2 or yp_popitem
-// instead.)
+// Removes all items from *container.  On error, *container is discarded and set to an exception.
+void yp_clear( ypObject **container );
+
+// Removes an item from *container and returns a new reference to it.  On error, *container is 
+// discarded and set to an exception _and_ an exception is returned.  (Not supported on dicts; use 
+// yp_pop2 or yp_popitem instead.)
 ypObject *yp_pop( ypObject **container );
 
 
@@ -495,6 +500,7 @@ void yp_delsliceC( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k
 
 // Appends x to the end of *sequence.  On error, *sequence is discarded and set to an exception.
 void yp_append( ypObject **sequence, ypObject *x );
+void yp_push( ypObject **sequence, ypObject *x );
 
 // Appends the contents of t to the end of *sequence.  On error, *sequence is discarded and set to
 // an exception.
@@ -508,6 +514,10 @@ void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 // -1.  On error, *sequence is discarded and set to an exception _and_ an exception is returned.
 ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
 
+// Equivalent to yp_popindexC( sequence, -1 ).  Note that for sequences, yp_push and yp_pop
+// together implement a stack (last in, first out).
+ypObject *yp_pop( ypObject **sequence );
+
 // Removes the first item from *sequence that equals x.  On error, *sequence is discarded and set 
 // to an exception.
 void yp_remove( ypObject **sequence, ypObject *x );
@@ -518,7 +528,8 @@ void yp_reverse( ypObject **sequence );
 
 // Sorts the items of *sequence in-place.  key is a function that returns new or immortal 
 // references that are used as comparison keys; to compare the elements directly, use NULL.  If 
-// reverse is true, the list elements are sorted as if each comparison were reversed.
+// reverse is true, the list elements are sorted as if each comparison were reversed.  On error, 
+// *sequence is discarded and set to an exception.
 void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse );
 
 // Equivalent to yp_sort3( sequence, NULL, yp_False ).
@@ -540,7 +551,79 @@ void yp_sort( ypObject **sequence );
  * Set Operations
  */
 
-// TODO Complete
+// Returns the immortal yp_True if set has no elements in common with x, else yp_False.
+ypObject *yp_isdisjoint( ypObject *set, ypObject *x );
+
+// Returns the immortal yp_True if every element in set is in x, else yp_False.
+ypObject *yp_issubset( ypObject *set, ypObject *x );
+
+// Returns the immortal yp_True if every element in set is in x and x has additional elements, else
+// yp_False.
+ypObject *yp_lt( ypObject *set, ypObject *x );
+
+// Returns the immortal yp_True if every element in x is in set, else yp_False.
+ypObject *yp_issuperset( ypObject *set, ypObject *x );
+
+// Returns the immortal yp_True if every element in x is in set and set has additional elements, 
+// else yp_False.
+ypObject *yp_gt( ypObject *set, ypObject *x );
+
+// Returns a new reference to a set (or frozenset if set is immutable) containing all the elements
+// from set and all n objects.
+ypObject *yp_unionN( ypObject *set, int n, ... );
+ypObject *yp_unionV( ypObject *set, int n, va_list args );
+
+// Returns a new reference to a set (or frozenset if set is immutable) containing all the elements
+// common to the set and all n objects.
+ypObject *yp_intersectionN( ypObject *set, int n, ... );
+ypObject *yp_intersectionV( ypObject *set, int n, va_list args );
+
+// Returns a new reference to a set (or frozenset if set is immutable) containing all the elements
+// from set that are not in the n objects.
+ypObject *yp_differenceN( ypObject *set, int n, ... );
+ypObject *yp_differenceV( ypObject *set, int n, va_list args );
+
+// Returns a new reference to a set (or frozenset if set is immutable) containing all the elements
+// in either set or x but not both.
+ypObject *yp_symmetric_difference( ypObject *set, ypObject *x );
+
+// Add the elements from the n objects to *set.  On error, *set is discarded and set to an 
+// exception.
+void yp_updateN( ypObject **set, int n, ... );
+void yp_updateV( ypObject **set, int n, va_list args );
+
+// Removes elements from *set that are not contained in all n objects.  On error, *set is discarded
+// and set to an exception.
+void yp_intersection_updateN( ypObject **set, int n, ... );
+void yp_intersection_updateV( ypObject **set, int n, va_list args );
+
+// Removes elements from *set that are contained in any of the n objects.  On error, *set is 
+// discarded and set to an exception.
+void yp_difference_updateN( ypObject **set, int n, ... );
+void yp_difference_updateV( ypObject **set, int n, va_list args );
+
+// Removes elements from *set that are contained in x, and adds elements from x not contained in
+// *set.  On error, *set is discarded and set to an exception.
+void yp_symmetric_difference_update( ypObject **set, ypObject *x );
+
+// Add element x to *set.  On error, *set is discarded and set to an exception.
+// While Python calls this method add, yp_add is already used for "a+b", so these two equivalent 
+// aliases are provided instead.
+void yp_push( ypObject **set, ypObject *x );
+void yp_set_add( ypObject **set, ypObject *x );
+
+// Removes element x from *set.  Raises yp_KeyError if x is not contained in *set.  On error, 
+// *set is discarded and set to an exception.
+void yp_remove( ypObject **set, ypObject *x );
+
+// Removes element x from *set if it is present.  On error, *set is discarded and set to an 
+// exception.
+void yp_discard( ypObject **set, ypObject *x );
+
+// Removes an arbitrary item from *set and returns a new reference to it.  On error, *set is 
+// discarded and set to an exception _and_ an exception is returned.  You cannot use the order
+// of yp_push calls on sets to determine the order of yp_pop'ped elements.
+ypObject *yp_pop( ypObject **set );
 
 
 /*
@@ -553,11 +636,12 @@ void yp_sort( ypObject **sequence );
 yp_getitem
 yp_setitem
 
+
 /*
  * Bytes & String Operations
  */
 
-// TODO Complete (yp_chr, yp_chrC, yp_ord, etc)
+// XXX bytes- and str-specific methods will be added in a future version
 
 
 /*
