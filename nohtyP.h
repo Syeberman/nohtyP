@@ -214,6 +214,7 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
 // the function by yp_send; it may also be yp_GeneratorExit if yp_close is called, or another
 // exception.  The return value must be a new reference, yp_StopIteration if the generator is
 // exhausted, or another exception.
+// TODO What if the generator needs to inspect the iterator object to, say, modify the length hint?
 typedef ypObject *(*yp_generator_func_t)( void *state, yp_ssize_t size, ypObject *value );
 
 
@@ -323,6 +324,11 @@ ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args );
 ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
 ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
 
+// Returns a new reference to a frozendict/dict whose key-value pairs come from x.  x can be a
+// mapping object, or an iterable that yields exactly two items at a time (ie (key, value)).
+ypObject *yp_frozendict( ypObject *x );
+ypObject *yp_dict( ypObject *x );
+
 // XXX The file type will be added in a future version
 
 
@@ -354,13 +360,20 @@ ypObject *yp_send( ypObject **iterator, ypObject *value );
 // Equivalent to yp_send( iterator, yp_None ).
 ypObject *yp_next( ypObject **iterator );
 
-// Similar to yp_next, but returns a new reference to defval in place of yp_StopIteration.
+// Similar to yp_next, but returns a new reference to defval when the iterator is exhausted.  The
+// Python-equivalent "default" of defval is yp_StopIteration.
 ypObject *yp_next2( ypObject **iterator, ypObject *defval );
 
 // "Throws" an exception into *iterator and returns a new reference to the next yielded
 // value, yp_StopIteration if the iterator is exhausted, or another exception.  type _must_ be an
 // exception.
 ypObject *yp_throw( ypObject **iterator, ypObject *type );
+
+// Returns a hint as to how many items are left to be yielded.  The accuracy of this hint depends 
+// on the underlying type: most containers know their lengths exactly, but some generators may not.
+// A hint of zero could mean that the iterator is exhausted, that the length is unknown, or that
+// the iterator will yield infinite values.  Returns zero and sets *exc on error.
+yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 
 // "Closes" the iterator by calling yp_throw( iterator, yp_GeneratorExit ).  If yp_StopIteration or
 // yp_GeneratorExit is returned by yp_throw, *iterator is not discarded, otherwise *iterator is
@@ -433,7 +446,7 @@ void yp_clear( ypObject **container );
 
 // Removes an item from *container and returns a new reference to it.  On error, *container is 
 // discarded and set to an exception _and_ an exception is returned.  (Not supported on dicts; use 
-// yp_pop2 or yp_popitem instead.)
+// yp_popvalue or yp_popitem instead.)
 ypObject *yp_pop( ypObject **container );
 
 
@@ -451,11 +464,12 @@ ypObject *yp_repeatC( ypObject *sequence, yp_ssize_t factor );
 // handled as in Python.
 ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i );
 
-// Returns a new reference to the slice of sequence from i to j with step k.  The
-// Python-equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.
-ypObject *yp_getsliceC( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+// Returns a new reference to the slice of sequence from i to j with step k.  The Python-equivalent
+// "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.
+ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
 
-// Sequences also support yp_getitem, documented below.
+// Equivalent to yp_getindexC( sequence, yp_asssizeC( key, &exc ) ).
+ypObject *yp_getitem( ypObject *sequence, ypObject *key );
 
 // Returns the lowest index in sequence where x is found, such that x is contained in the slice
 // sequence[i:j], or -1 if x is not found.  Returns -1 and sets *exc on error; *exc is _not_ set
@@ -483,9 +497,10 @@ void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 // Sets the slice of *sequence, from i to j with step k, to x.  The Python-equivalent "defaults"
 // for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, *sequence is discarded and 
 // set to an exception.
-void yp_setsliceC( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x );
+void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x );
 
-// Sequences also support yp_setitem, documented below.
+// Equivalent to yp_setindexC( sequence, yp_asssizeC( key, &exc ), x ).
+void yp_setitem( ypObject **sequence, ypObject *key, ypObject *x );
 
 // Removes the i-th item from *sequence, origin zero.  Negative indicies are handled as in Python.
 // On error, *sequence is discarded and set to an exception.
@@ -494,9 +509,10 @@ void yp_delindexC( ypObject **sequence, yp_ssize_t i );
 // Removes the elements of the slice from *sequence, from i to j with step k.  The Python-
 // equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, 
 // *sequence is discarded and set to an exception.
-void yp_delsliceC( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+void yp_delsliceC4( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
 
-// Sequences also support yp_delitem, documented below.
+// Equivalent to yp_delindexC( sequence, yp_asssizeC( key, &exc ) ).
+void yp_delitem( ypObject **sequence, ypObject *key );
 
 // Appends x to the end of *sequence.  On error, *sequence is discarded and set to an exception.
 void yp_append( ypObject **sequence, ypObject *x );
@@ -512,7 +528,7 @@ void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 
 // Removes the i-th item from *sequence and returns it.  The Python-equivalent "default" for i is
 // -1.  On error, *sequence is discarded and set to an exception _and_ an exception is returned.
-ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
+ypObject *yp_popindexC2( ypObject **sequence, yp_ssize_t i );
 
 // Equivalent to yp_popindexC( sequence, -1 ).  Note that for sequences, yp_push and yp_pop
 // together implement a stack (last in, first out).
@@ -606,9 +622,9 @@ void yp_difference_updateV( ypObject **set, int n, va_list args );
 // *set.  On error, *set is discarded and set to an exception.
 void yp_symmetric_difference_update( ypObject **set, ypObject *x );
 
-// Add element x to *set.  On error, *set is discarded and set to an exception.
-// While Python calls this method add, yp_add is already used for "a+b", so these two equivalent 
-// aliases are provided instead.
+// Add element x to *set.  On error, *set is discarded and set to an exception.  While Python calls
+// this method add, yp_add is already used for "a+b", so these two equivalent aliases are provided 
+// instead.
 void yp_push( ypObject **set, ypObject *x );
 void yp_set_add( ypObject **set, ypObject *x );
 
@@ -630,11 +646,53 @@ ypObject *yp_pop( ypObject **set );
  * Mapping Operations
  */
 
-// TODO Complete
+// Returns a new reference to the value of mapping with the given key.  Returns yp_KeyError if key 
+// is not in the map.
+ypObject *yp_getitem( ypObject *mapping, ypObject *key );
 
-// TODO "Also works with sequences"
-yp_getitem
-yp_setitem
+// Adds or replaces the value of *mapping with the given key, setting it to x.  On error, *mapping 
+// is discarded and set to an exception.
+void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x );
+
+// Removes the item with the given key from *mapping.  Raises yp_KeyError if key is not in 
+// *mapping.  On error, *mapping is discarded and set to an exception.
+void yp_delitem( ypObject **mapping, ypObject *key );
+
+// As in Python, yp_contains, yp_in, yp_not_in, and yp_iter operate solely on a mapping's keys.
+
+// Similar to yp_getitem, but returns a new reference to defval if key is not in the map.  The
+// Python-equivalent "default" for defval is yp_None.
+ypObject *yp_getdefault3( ypObject *mapping, ypObject *key, ypObject *defval );
+
+// Returns a new reference to an iterator that yields mapping's (key, value) pairs as 2-tuples.
+ypObject *yp_iter_items( ypObject *mapping );
+
+// Returns a new reference to an iterator that yields mapping's keys.
+ypObject *yp_iter_keys( ypObject *mapping );
+
+// If key is in mapping, remove it and return a new reference to its value, else return a new
+// reference to defval.  The Python-equivalent "default" of defval is yp_KeyError.  On error, 
+// *mapping is discarded and set to an exception _and_ an exception is returned.  Note that yp_push
+// and yp_pop are not applicable for mapping objects.
+ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
+
+// Removes an arbitrary item from *mapping and returns new references to its *key and *value.  If
+// mapping is empty yp_KeyError is raised.  On error, *mapping is discarded and set to an exception
+// _and_ both *key and *value are set to exceptions.
+void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
+
+// Similar to yp_getitem, but returns a new reference to defval _and_ adds it to *mapping if key is
+// not in the map.  The Python-equivalent "default" for defval is yp_None; defval _must_ _not_ be
+// an exception.
+ypObject *yp_setdefault3( ypObject *mapping, ypObject *key, ypObject *defval );
+
+// TODO Complete
+// XXX yp_updateN is _not_ applicable for dicts, unless the objects are allowed to be those that
+// yp_dict accepts
+// Also: yp_updateK (kw args), yp_update (accepting those that yp_dict accepts, but just one)
+
+// Returns a new reference to an iterator that yields mapping's values.
+ypObject *yp_iter_values( ypObject *mapping );
 
 
 /*
@@ -868,6 +926,10 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 
 // A macro to get exception info as a string, include file/line info of the place the macro is
 // checked
+
+// TODO In places where functions have "defaults" and their names include their arg counts (ie
+// yp_getdefault3), eventually pick which possible version of the function is the "primary" and
+// drop the number for that version (ie make it yp_getdefault).
 
 
 /*
