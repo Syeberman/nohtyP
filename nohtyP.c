@@ -16,7 +16,18 @@
 
 #define yp_STATIC_ASSERT( cond, tag ) typedef char assert_ ## tag[ (cond) ? 1 : -1 ]
 
-// TODO assert all the yp_int*_ts, etc are of the right size
+yp_STATIC_ASSERT( sizeof( yp_int8_t ) == 1, sizeof_int8 );
+yp_STATIC_ASSERT( sizeof( yp_uint8_t ) == 1, sizeof_uint8 );
+yp_STATIC_ASSERT( sizeof( yp_int16_t ) == 2, sizeof_int16 );
+yp_STATIC_ASSERT( sizeof( yp_uint16_t ) == 2, sizeof_uint16 );
+yp_STATIC_ASSERT( sizeof( yp_int32_t ) == 4, sizeof_int32 );
+yp_STATIC_ASSERT( sizeof( yp_uint32_t ) == 4, sizeof_uint32 );
+yp_STATIC_ASSERT( sizeof( yp_int64_t ) == 8, sizeof_int64 );
+yp_STATIC_ASSERT( sizeof( yp_uint64_t ) == 8, sizeof_uint64 );
+yp_STATIC_ASSERT( sizeof( yp_float32_t ) == 4, sizeof_float32 );
+yp_STATIC_ASSERT( sizeof( yp_float64_t ) == 8, sizeof_float64 );
+yp_STATIC_ASSERT( sizeof( yp_ssize_t ) == sizeof( size_t ), sizeof_ssize );
+
 // TODO assert that sizeof( "abcd" ) == 5 (ie it includes the null-terminator)
 
 
@@ -76,48 +87,6 @@
 
 
 
-typedef struct {
-    binaryfunc nb_add;
-    binaryfunc nb_subtract;
-    binaryfunc nb_multiply;
-    binaryfunc nb_remainder;
-    binaryfunc nb_divmod;
-    ternaryfunc nb_power;
-    unaryfunc nb_negative;
-    unaryfunc nb_positive;
-    unaryfunc nb_absolute;
-    unaryfunc nb_invert;
-    binaryfunc nb_lshift;
-    binaryfunc nb_rshift;
-    binaryfunc nb_and;
-    binaryfunc nb_xor;
-    binaryfunc nb_or;
-    binaryfunc nb_floor_divide;
-    binaryfunc nb_true_divide;
-
-    unaryfunc nb_int;
-    unaryfunc nb_float;
-    unaryfunc nb_index;
-
-    binaryfunc nb_iadd;
-    binaryfunc nb_isubtract;
-    binaryfunc nb_imultiply;
-    binaryfunc nb_iremainder;
-    // TODO? binaryfunc nb_idivmod;
-    ternaryfunc nb_ipower;
-    unaryfunc nb_inegative;
-    unaryfunc nb_ipositive;
-    unaryfunc nb_iabsolute;
-    unaryfunc nb_iinvert;
-    binaryfunc nb_ilshift;
-    binaryfunc nb_irshift;
-    binaryfunc nb_iand;
-    binaryfunc nb_ixor;
-    binaryfunc nb_ior;
-    binaryfunc nb_ifloor_divide;
-    binaryfunc nb_itrue_divide;
-} ypNumberMethods;
-
 
 typedef struct {
     binaryfunc sq_concat;
@@ -134,7 +103,6 @@ typedef struct {
 
 
 // TODO all of them
-    inquiry nb_bool;
     ssizeargfunc sq_item;
     ssizeargfunc sq_set_item;
     objobjproc sq_contains;
@@ -143,40 +111,90 @@ typedef struct {
 typedef struct {
     ypObject_HEAD
     ypObject *tp_name; /* For printing, in format "<module>.<name>" */
-    yp_ssize_t tp_basicsize, tp_itemsize; /* For allocation */ // TODO remove?
-
     // TODO store type code here?
 
+    // Object fundamentals
     destructor tp_dealloc;
-    hashfunc tp_hash;
-    lenfunc tp_length;
-
-    inquiry tp_clear; /* delete references to contained objects */
-    inquiry tp_invalidate; /* clear, then transmute self to ypInvalidated */
     traverseproc tp_traverse; /* call function for all accessible objects */
-
-
-
-
-    printfunc tp_print;
-
     reprfunc tp_str;
     reprfunc tp_repr;
 
-    /* Method suites for standard classes */
+    // Freezing, copying, and invalidating
+    inquiry tp_freeze;
+    inquiry tp_unfrozen_copy;
+    inquiry tp_frozen_copy;
+    inquiry tp_invalidate; /* clear, then transmute self to ypInvalidated */
+
+    // Boolean operations and comparisons
+    inquiry tp_bool;
+    objobjproc tp_lt;
+    objobjproc tp_le;
+    objobjproc tp_eq;
+    objobjproc tp_ne;
+    objobjproc tp_ge;
+    objobjproc tp_gt;
+
+    // Generic object operations
+    hashfunc tp_currenthash;
+    inquiry tp_close;
+
+    // Number operations
+    // TODO just leave ypNumberMethods as a dummy for now
     ypNumberMethods *tp_as_number;
-    ypSequenceMethods *tp_as_sequence;
-    ypMappingMethods *tp_as_mapping;
 
-    ypObject *tp_doc; /* Documentation string */
+    // Iterator operations
+    inquiry tp_iter;
+    inquiry tp_iter_reversed;
+    objobjproc tp_send;
 
-    /* rich comparisons */
-    ypCompareMethods *tp_comparisons;
+    // Container operations 
+    objobjproc tp_contains;
+    lenfunc tp_length;
+    objobjproc tp_push;
+    inquiry tp_clear; /* delete references to contained objects */
+    inquiry tp_pop;
+    objobjobjproc tp_getdefault; /* if defval is NULL, raise exception if missing */
+    objobjobjproc tp_setitem;
+    objobjproc tp_delitem;
 
-    /* Iterators */
-    getiterfunc tp_iter;
-    iternextfunc tp_iternext;
+    // Sequence operations
+    // TODO in a method suite: ypSequenceMethods *tp_as_sequence;
+    objintproc tp_repeat;
+    objintproc tp_getindex;
+    objsliceproc tp_getslice;
+    findfunc tp_find;
+    countfunc tp_count;
+    objintobjproc tp_setindex;
+    objsliceobjproc tp_setslice;
+    objintproc yp_delindex;
+    objsliceproc yp_delslice;
+    objobjproc tp_extend;
+    objintobjproc tp_insert;
+    objintproc tp_popindex;
+    objobjproc tp_remove;
+    inquiry tp_reverse;
+    sortfunc tp_sort;
 
+    // Set operations
+    // TODO in a method suite
+    objobjproc yp_isdisjoint;
+    objobjproc yp_issubset;
+    // yp_lt is elsewhere
+    objobjproc yp_issuperset;
+    // yp_gt is elsewhere
+    updatefunc yp_update;
+    intersectionfunc yp_intersection_update;
+    differencefunc yp_difference_update;
+    symmdifferencefunc yp_symmetric_difference_update;
+
+    // Mapping operations
+    // TODO in a method suite: ypMappingMethods *tp_as_mapping;
+    inquiry tp_iter_items;
+    inquiry tp_iter_keys;
+    objobjobjproc tp_popvalue;
+    popitemfunc tp_popitem;
+    objobjobjproc tp_setdefault;
+    inquiry tp_iter_values;
 } ypTypeObject;
 
 // Codes for the standard types (for lookup in the type table)

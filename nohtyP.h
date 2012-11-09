@@ -52,6 +52,16 @@
 
 
 /*
+ * Header Prerequisites
+ */
+#include <vadefs.h>
+#include <limits.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+/*
  * Initialization
  */
 
@@ -203,8 +213,32 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
  * nohtyP's C types
  */
 
-// TODO yp_int32_t, yp_uint32_t; yp_int_t is the type used to represent ints, yp_float_t the same
-// (so is actually double).
+// Fixed-size numeric C types
+typedef signed char	        yp_int8_t;
+typedef unsigned char       yp_uint8_t;
+typedef short               yp_int16_t;
+typedef unsigned short      yp_uint16_t;
+#if UINT_MAX == 0xFFFFFFFFu
+typedef int                 yp_int32_t;
+typedef unsigned int        yp_uint32_t;
+#else
+typedef long                yp_int32_t;
+typedef unsigned long       yp_uint32_t;
+#endif
+typedef long long           yp_int64_t;
+typedef unsigned long long  yp_uint64_t;
+typedef float               yp_float32_t;
+typedef double              yp_float64_t;
+#if SIZE_MAX == 0xFFFFFFFFu
+typedef yp_int32_t          yp_ssize_t;
+#else
+typedef yp_int64_t          yp_ssize_t;
+#endif
+typedef yp_ssize_t          yp_hash_t;
+
+// C types used to represent the numeric objects within nohtyP
+typedef yp_int64_t      yp_int_t;
+typedef yp_float64_t    yp_float_t;
 
 // The signature of a function that can be wrapped up in a generator, called by yp_send and
 // similar functions.  state is a buffer of size bytes that holds the current state.  Its structure
@@ -215,6 +249,8 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
 // exception.  The return value must be a new reference, yp_StopIteration if the generator is
 // exhausted, or another exception.
 // TODO What if the generator needs to inspect the iterator object to, say, modify the length hint?
+// If we pass in self (ie the iterator) instead, then have a separate function to retrieve the
+// state, then that function could automatically check for buffer overflow.
 typedef ypObject *(*yp_generator_func_t)( void *state, yp_ssize_t size, ypObject *value );
 
 
@@ -736,6 +772,7 @@ ypObject *yp_invert( ypObject *x );
 // otherwise *x is discarded and replaced with the result.  If *x is immutable on input, an
 // immutable object is returned, otherwise a mutable object is returned.  On error, *x is
 // discarded and set to an exception.
+// TODO Throw error if x is immutable?
 void yp_iadd( ypObject **x, ypObject *y );
 void yp_isub( ypObject **x, ypObject *y );
 void yp_imul( ypObject **x, ypObject *y );
@@ -1057,3 +1094,6 @@ struct _ypObject {
 #define yp4( self, method, a1, a2, a3, a4 ) yp_ ## method( self, a1, a2, a3, a4 )
 
 
+#ifdef __cplusplus
+}
+#endif
