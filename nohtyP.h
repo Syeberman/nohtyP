@@ -54,11 +54,15 @@
 /*
  * Header Prerequisites
  */
-#include <vadefs.h>
-#include <limits.h>
+#ifndef yp_NOHTYP_H
+#define yp_NOHTYP_H
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <stdarg.h>
+#include <limits.h>
+
+#define ypAPI __declspec( dllexport )
 
 
 /*
@@ -67,7 +71,7 @@ extern "C" {
 
 // Must be called once before any other function; subsequent calls are a no-op.  If a fatal error
 // occurs abort() is called.
-void yp_initialize( void );
+ypAPI void yp_initialize( void );
 
 
 /*
@@ -81,9 +85,12 @@ void yp_initialize( void );
 // nohtyP objects are only accessed through pointers to ypObject.
 typedef struct _ypObject ypObject;
 
+// The null-reference object.
+ypAPI ypObject *yp_None;
+
 // Increments the reference count of x, returning it as a convenience.  Always succeeds; if x is
 // immortal this is a no-op.
-ypObject *yp_incref( ypObject *x );
+ypAPI ypObject *yp_incref( ypObject *x );
 
 // A convenience function to increment the references of n objects.
 void yp_increfN( int n, ... );
@@ -96,6 +103,9 @@ void yp_decref( ypObject *x );
 // A convenience function to decrement the references of n objects.
 void yp_decrefN( int n, ... );
 void yp_decrefV( int n, va_list args );
+
+// Returns true (non-zero) if x is an exception, else false.  Always succeeds.
+int yp_isexceptionC( ypObject *x );
 
 
 /*
@@ -151,6 +161,10 @@ void yp_deepinvalidate( ypObject **x );
  */
 
 // TODO comparison/boolean operations and error handling and yp_IF
+
+// There are exactly two boolean values: yp_True and yp_False.
+ypObject *yp_True;
+ypObject *yp_False;
 
 // Returns the immortal yp_False if the object should be considered false (yp_None, a number equal
 // to zero, or a container of zero length), otherwise yp_True.
@@ -558,6 +572,11 @@ void yp_push( ypObject **sequence, ypObject *x );
 // an exception.
 void yp_extend( ypObject **sequence, ypObject *t );
 
+// Appends the contents of *sequence to itself factor-1 times; if factor is zero *sequence is
+// cleared.  Equivalent to seq*=factor for lists in Python.  On error, *sequence is discarded and
+// set to an exception.
+void yp_irepeatC( ypObject **sequence, yp_ssize_t factor );
+
 // Inserts x into *sequence at the index given by i; existing elements are shifted to make room.
 // On error, *sequence is discarded and set to an exception.
 void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
@@ -658,11 +677,16 @@ void yp_difference_updateV( ypObject **set, int n, va_list args );
 // *set.  On error, *set is discarded and set to an exception.
 void yp_symmetric_difference_update( ypObject **set, ypObject *x );
 
-// Add element x to *set.  On error, *set is discarded and set to an exception.  While Python calls
+// Adds element x to *set.  On error, *set is discarded and set to an exception.  While Python calls
 // this method add, yp_add is already used for "a+b", so these two equivalent aliases are provided 
 // instead.
 void yp_push( ypObject **set, ypObject *x );
 void yp_set_add( ypObject **set, ypObject *x );
+
+// If x is already contained in *set, returns yp_False; otherwise, adds x to *set and returns
+// yp_True.  On error, *set is discarded and set to an exception.
+// TODO rethink this method
+ypObject *yp_pushunique( ypObject **set, ypObject *x );
 
 // Removes element x from *set.  Raises yp_KeyError if x is not contained in *set.  On error, 
 // *set is discarded and set to an exception.
@@ -844,6 +868,52 @@ ypObject *yp_sum( ypObject *iterable );
 //      yp_IMMORTAL_BYTES( name, value );
 
 // TODO Complete
+
+/*
+ * Exceptions
+ */
+ypAPI ypObject * yp_BaseException;
+ypAPI ypObject * yp_Exception;
+ypAPI ypObject * yp_StopIteration;
+ypAPI ypObject * yp_GeneratorExit;
+ypAPI ypObject * yp_ArithmeticError;
+ypAPI ypObject * yp_LookupError;
+
+ypAPI ypObject * yp_AssertionError;
+ypAPI ypObject * yp_AttributeError;
+ypAPI ypObject * yp_MethodError; // method lookup failure; "subclass" of yp_AttributeError
+ypAPI ypObject * yp_EOFError;
+ypAPI ypObject * yp_FloatingPointError;
+ypAPI ypObject * yp_EnvironmentError;
+ypAPI ypObject * yp_IOError;
+ypAPI ypObject * yp_OSError;
+ypAPI ypObject * yp_ImportError;
+ypAPI ypObject * yp_IndexError;
+ypAPI ypObject * yp_KeyError;
+ypAPI ypObject * yp_KeyboardInterrupt;
+ypAPI ypObject * yp_MemoryError;
+ypAPI ypObject * yp_NameError;
+ypAPI ypObject * yp_OverflowError;
+ypAPI ypObject * yp_RuntimeError;
+ypAPI ypObject * yp_NotImplementedError;
+ypAPI ypObject * yp_SyntaxError;
+ypAPI ypObject * yp_IndentationError;
+ypAPI ypObject * yp_TabError;
+ypAPI ypObject * yp_ReferenceError;
+ypAPI ypObject * yp_SystemError;
+ypAPI ypObject * yp_SystemExit;
+ypAPI ypObject * yp_TypeError;
+ypAPI ypObject * yp_UnboundLocalError;
+ypAPI ypObject * yp_UnicodeError;
+ypAPI ypObject * yp_UnicodeEncodeError;
+ypAPI ypObject * yp_UnicodeDecodeError;
+ypAPI ypObject * yp_UnicodeTranslateError;
+ypAPI ypObject * yp_ValueError;
+ypAPI ypObject * yp_ZeroDivisionError;
+ypAPI ypObject * yp_BufferError;
+
+ypAPI ypObject * yp_RecursionErrorInst;
+
 
 
 /*
@@ -1097,3 +1167,4 @@ struct _ypObject {
 #ifdef __cplusplus
 }
 #endif
+#endif // yp_NOHTYP_H
