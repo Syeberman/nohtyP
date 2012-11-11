@@ -249,6 +249,8 @@ typedef yp_int32_t          yp_ssize_t;
 typedef yp_int64_t          yp_ssize_t;
 #endif
 typedef yp_ssize_t          yp_hash_t;
+#define yp_SSIZE_T_MAX ((yp_ssize_t) (SIZE_MAX / 2))
+#define yp_SSIZE_T_MIN (-yp_SSIZE_T_MAX - 1)
 
 // C types used to represent the numeric objects within nohtyP
 typedef yp_int64_t      yp_int_t;
@@ -283,8 +285,8 @@ ypObject *yp_intstoreC( yp_int_t value );
 
 // Returns a new reference to an int/intstore interpreting the C string as an integer literal with
 // the given base.  Base zero means to infer the base according to Python's syntax.
-ypObject *yp_int_strC( char *string, int base );
-ypObject *yp_intstore_strC( char *string, int base );
+ypObject *yp_int_strC( const char *string, int base );
+ypObject *yp_intstore_strC( const char *string, int base );
 
 // Returns a new reference to a float/floatstore with the given value.
 ypObject *yp_floatC( yp_float_t value );
@@ -292,8 +294,8 @@ ypObject *yp_floatstoreC( yp_float_t value );
 
 // Returns a new reference to a float/floatstore interpreting the string as a Python
 // floating-point literal.
-ypObject *yp_float_strC( char *string );
-ypObject *yp_floatstore_strC( char *string );
+ypObject *yp_float_strC( const char *string );
+ypObject *yp_floatstore_strC( const char *string );
 
 // Returns a new reference to an iterator for object x.
 ypObject *yp_iter( ypObject *x );
@@ -313,10 +315,14 @@ ypObject *yp_rangeC( yp_int_t stop );
 // source is NULL it is considered as having all null bytes; if len is negative source is
 // considered null terminated (and, therefore, will not contain the null byte).
 //  Ex: pre-allocate a bytearray of length 50: yp_bytearrayC( NULL, 50 )
-ypObject *yp_bytesC( yp_uint8_t *source, yp_ssize_t len );
-ypObject *yp_bytearrayC( yp_uint8_t *source, yp_ssize_t len );
+ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len );
+ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len );
 
 // XXX The str/characterarray types will be added in a future version
+
+// Returns a new reference to the str representing a character whose Unicode codepoint is the
+// integer i.
+ypObject *yp_chrC( yp_int_t i );
 
 // Returns a new reference to a tuple/list of length n containing the given objects.
 ypObject *yp_tupleN( int n, ... );
@@ -839,7 +845,13 @@ yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
 // toward zero but is not an error.
 yp_int_t yp_asintC( ypObject *x, ypObject **exc );
 yp_int8_t yp_asint8C( ypObject *x, ypObject **exc );
-// TODO et al
+yp_uint8_t yp_asuint8C( ypObject *x, ypObject **exc );
+yp_int16_t yp_asint16C( ypObject *x, ypObject **exc );
+yp_uint16_t yp_asuint16C( ypObject *x, ypObject **exc );
+yp_int32_t yp_asint32C( ypObject *x, ypObject **exc );
+yp_uint32_t yp_asuint32C( ypObject *x, ypObject **exc );
+yp_int64_t yp_asint64C( ypObject *x, ypObject **exc );
+yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc );
 yp_float_t yp_asfloatC( ypObject *x, ypObject **exc );
 yp_float32_t yp_asfloat32C( ypObject *x, ypObject **exc );
 yp_float64_t yp_asfloat64C( ypObject *x, ypObject **exc );
@@ -903,6 +915,7 @@ ypAPI ypObject * yp_ReferenceError;
 ypAPI ypObject * yp_SystemError;
 ypAPI ypObject * yp_SystemExit;
 ypAPI ypObject * yp_TypeError;
+ypAPI ypObject * yp_InvalidatedError; // operation on invalidated object; "subclass" of yp_TypeError
 ypAPI ypObject * yp_UnboundLocalError;
 ypAPI ypObject * yp_UnicodeError;
 ypAPI ypObject * yp_UnicodeEncodeError;
@@ -1054,10 +1067,14 @@ struct _ypObject {
 };
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
+// TODO What to set alloclen to?  Does it matter?
+#define yp_IMMORTAL_HEAD_INIT( type, data, len ) \
+    { ypObject_MAKE_TYPE_REFCNT( type, ypObject_REFCNT_IMMORTAL ), \
+      ypObject_HASH_INVALID, len, 0, data }
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
-    static ypObject _ ## name ## _struct = yp_IMMORTAL_HEAD_INIT( \
-            ypBytes_CODE, _ ## name ## _data, sizeof( _ ## name ## _data )-1 ); \
+    static ypObject _ ## name ## _struct = { yp_IMMORTAL_HEAD_INIT( \
+        ypBytes_CODE, _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     static ypObject * const name = &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE, if useful
 

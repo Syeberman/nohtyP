@@ -8,6 +8,10 @@
  */
 
 #include "nohtyP.h"
+#include <stdio.h>
+
+#define RECIPIE( name ) void name( void )
+#define PrintException( exc ) printf( "exception occured\n" ) // TODO
 
 /*
  * Building lists
@@ -22,7 +26,7 @@ RECIPIE( BuildingLists )
         ypObject *item;
         int i;
 
-        for( i == 0; i < 5; i++ ) {
+        for( i = 0; i < 5; i++ ) {
             // If intC fails, item set to exception
             item = yp_intC( i );
             
@@ -49,7 +53,7 @@ RECIPIE( BuildingLists )
         ypObject *working;
         int i;
 
-        for( i == 0; i < 5; i++ ) {
+        for( i = 0; i < 5; i++ ) {
             // If chrC fails, item set to exception
             item = yp_chrC( 'A'+i );
             
@@ -88,8 +92,8 @@ RECIPIE( ConditionalStatements )
         yp_IF( cond1 ) {
             // Will not be executed, b"" is false
         } yp_ELIF( cond2 ) {
-            // Will be executed, int( 5 ) is true; getitem will return yp_TypeError
-            yp_getitem( cond2, 10 );
+            // Will be executed, int( 5 ) is true; yp_getindexC will return yp_MethodError
+            yp_getindexC( cond2, 20 );
         } yp_ELSE {
             // Will not be executed, as cond2 was true
         } yp_ELSE_EXCEPT_AS( e ) {
@@ -107,10 +111,10 @@ RECIPIE( ConditionalStatements )
     {
         ypObject *bytes = yp_bytesC( "ABCDE", -1 ); // -1 means "null-terminated"
 
-        // getitem returns a new reference that must be discarded, hence the 'd' in yp_IFd
-        yp_IFd( yp_getitem( bytes, 0 ) ) {
+        // yp_getindexC returns a new reference that must be discarded, hence the 'd' in yp_IFd
+        yp_IFd( yp_getindexC( bytes, 0 ) ) {
             // Will be executed, as "A" is true
-        } yp_ELIFd( yp_getitem( bytes, 20 ) ) {
+        } yp_ELIFd( yp_getindexC( bytes, 20 ) ) {
             // Not executed since the first branch was taken
         } yp_ELSE_EXCEPT {
             // Although the second getitem would cause an exception, since it is not executed this
@@ -126,8 +130,8 @@ RECIPIE( ConditionalStatements )
         ypObject *bytes = yp_bytesC( "ABCDE", -1 ); // -1 means "null-terminated"
         ypObject *e = yp_None; // good to initialize this if you plan to use it after yp_ENDIF
 
-        // getitem will return yp_IndexError as 20 is not valid
-        yp_IFd( yp_getitem( bytes, 20 ) ) {
+        // yp_getindexC will return yp_IndexError as 20 is not valid
+        yp_IFd( yp_getindexC( bytes, 20 ) ) {
             // Not executed since getitem failed
         } yp_ELSE_EXCEPT_AS( e ) {
             // This branch is executed instead
