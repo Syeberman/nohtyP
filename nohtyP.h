@@ -47,7 +47,7 @@
  *  V - A version of "N" or "K" that accepts a va_list in place of ...
  *  D - discard after use (ie yp_IFd)
  *  # (number) - a function with # inputs that otherwise shares the same name as another function
- *  X - direct access to internal memory; tread carefully!
+ *  X - direct access to internal memory or borrowed objects; tread carefully!
  */
 
 
@@ -257,17 +257,11 @@ typedef yp_int64_t      yp_int_t;
 typedef yp_float64_t    yp_float_t;
 
 // The signature of a function that can be wrapped up in a generator, called by yp_send and
-// similar functions.  state is a buffer of size bytes that holds the current state.  Its structure
-// and initial values are determined by the call to the generator constructor; the function cannot
-// change the size after creation, and any ypObject*s in state should be considered *borrowed* (it
-// is safe to replace them with new references).  value is a *borrowed* object that is "sent" into
-// the function by yp_send; it may also be yp_GeneratorExit if yp_close is called, or another
-// exception.  The return value must be a new reference, yp_StopIteration if the generator is
-// exhausted, or another exception.
-// TODO What if the generator needs to inspect the iterator object to, say, modify the length hint?
-// If we pass in self (ie the iterator) instead, then have a separate function to retrieve the
-// state, then that function could automatically check for buffer overflow.
-typedef ypObject *(*yp_generator_func_t)( void *state, yp_ssize_t size, ypObject *value );
+// similar functions.  self is the iterator object; use yp_iter_stateX to retrieve any state
+// variables.  value is the object that is sent into the function by yp_send; it may also be
+// yp_GeneratorExit if yp_close is called, or another exception.  The return value must be a new
+// reference, yp_StopIteration if the generator is exhausted, or another exception.
+typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 
 
 /*
@@ -430,6 +424,13 @@ ypObject *yp_throw( ypObject **iterator, ypObject *type );
 // A hint of zero could mean that the iterator is exhausted, that the length is unknown, or that
 // the iterator will yield infinite values.  Returns zero and sets *exc on error.
 yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
+
+// Typically only called from within yp_generator_func_t functions.  Returns the generator state
+// and its size in bytes.  The structure and initial values of *state are determined by the call
+// to the generator constructor; the function cannot change the size after creation, and any
+// ypObject*s in *state should be considered *borrowed* (it is safe to replace them with new 
+// references).  Sets *state to NULL, *size to zero, and *exc to an exception on error.
+void yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size, ypObject **exc );
 
 // "Closes" the iterator by calling yp_throw( iterator, yp_GeneratorExit ).  If yp_StopIteration or
 // yp_GeneratorExit is returned by yp_throw, *iterator is not discarded, otherwise *iterator is
@@ -691,7 +692,7 @@ void yp_set_add( ypObject **set, ypObject *x );
 
 // If x is already contained in *set, returns yp_False; otherwise, adds x to *set and returns
 // yp_True.  On error, *set is discarded and set to an exception.
-// TODO rethink this method
+// TODO rethink this method...maybe the yp_KEEPALIVE stuff could help
 ypObject *yp_pushunique( ypObject **set, ypObject *x );
 
 // Removes element x from *set.  Raises yp_KeyError if x is not contained in *set.  On error, 
@@ -924,9 +925,7 @@ ypAPI ypObject * yp_UnicodeTranslateError;
 ypAPI ypObject * yp_ValueError;
 ypAPI ypObject * yp_ZeroDivisionError;
 ypAPI ypObject * yp_BufferError;
-
 ypAPI ypObject * yp_RecursionErrorInst;
-
 
 
 /*
@@ -994,6 +993,8 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 // If condition creates a new reference that must be discarded, use yp_WHILEd ("d" stands for
 // "discard" or "decref"):
 //      yp_WHILEd( yp_getindexC( a, -1 ) )
+// TODO if yp_WHILE_EXCEPT_AS declared the exception variable internally, then it would disappear once
+// outside of the block and thus behave more like Python (here and elsewhere)
 
 // yp_FOR: A series of macros to emulate a for/else with exception handling.  To be used strictly
 // as follows (including braces):
@@ -1167,6 +1168,34 @@ struct _ypObject {
     yp_decref( _yp_FOR_item ); \
     yp_decref( _yp_FOR_iter ); \
     }
+
+// TODO if this is a good idea, then document above
+// TODO able to supply multiples?
+// TODO should x be reset within yp_KEEPALIVE_EXCEPT_AS?  If not, how to get original value?
+// yp_KEEPALIVE( x ) {
+//   --> _ypObject *_saved_x = yp_incref( x );
+//   --> _ypObject **_p_x = &x;
+// } yp_KEEPALIVE_EXCEPT_AS( target ) {
+//  --> if( yp_isexceptionC( *_p_x ) && (target = *_p_x) )
+// } yp_ENDKEEPALIVE
+//   --> if( yp_isexceptionC( *_p_x ) ) {
+//          *_p_x = _saved_x;
+//       } else {
+//          yp_decref( _saved_x );
+//       }
+
+// yp_KEEPALIVE( x ) {
+//     yp_setindex( &x, 1, yp_None );
+// } yp_KEEPALIVE_EXCEPT_AS( exc ) {
+//     handle_exception( exc );
+// } yp_ENDKEEPALIVE
+
+// Or a one-line version...
+// yp_KEEPALIVE( x, yp_setindex( &x, 1, yp_None ), &exc );
+// if( yp_isexceptionC( exc ) ) handle_exception( exc );
+
+// yp_DONTDISC, yp_DONTDISCARD, yp_NODISCARD, yp_NOT_A_CRITICAL_MODIFICAITON
+
 
 // The implementation of "yp" is considered "internal"; see above for documentation
 #define yp0( self, method )         yp_ ## method( self )

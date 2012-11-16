@@ -268,21 +268,28 @@ static ypTypeObject **ypTypeTable;
 #define return_yp_INPLACE_ERR( ob, err ) \
     do { yp_decref( *(ob) ); *(ob) = (err); return; } while( 0 )
 
+// Functions that return C values take a "ypObject **exc" that are only modified on error and are
+// not discarded beforehand; they also need to return a valid C value
+#define return_yp_CEXC_ERR( retval, exc, err ) \
+    do { *(exc) = (err); return retval; } while( 0 )
+
 // When an object encounters an unknown type, there are three possible cases:
 //  - it's an invalidated object, so return yp_InvalidatedError
 //  - it's an exception, so return it
 //  - it's some other type, so return yp_TypeError
+#define yp_BAD_TYPE( bad_ob ) ( \
+    yp_TYPE_PAIR_CODE( bad_ob ) == ypInvalidated_CODE ? \
+        yp_InvalidatedError : \
+    yp_TYPE_PAIR_CODE( bad_ob ) == ypException_CODE ? \
+        (bad_ob) : \
+    /* else */ \
+        yp_TypeError )
 #define return_yp_BAD_TYPE( bad_ob ) \
-    do { switch( yp_TYPE_PAIR_CODE( bad_ob ) ) { \
-            case ypInvalidated_CODE: return yp_InvalidatedError; \
-            case ypException_CODE: return (bad_ob); \
-            default: return yp_TypeError; } } while( 0 )
+    do { return yp_BAD_TYPE( bad_ob ); } while( 0 )
 #define return_yp_INPLACE_BAD_TYPE( ob, bad_ob ) \
-    do { switch( yp_TYPE_PAIR_CODE( bad_ob ) ) { \
-            case ypInvalidated_CODE: return_yp_INPLACE_ERR( (ob), yp_InvalidatedError ); \
-            case ypException_CODE: return_yp_INPLACE_ERR( (ob), (bad_ob) ); \
-            default: return_yp_INPLACE_ERR( (ob), yp_TypeError ); } } while( 0 )
-
+    do { return_yp_INPLACE_ERR( (ob), yp_BAD_TYPE( bad_ob ) ); } while( 0 )
+#define return_yp_CEXC_BAD_TYPE( retval, exc, bad_ob ) \
+    do { return_yp_CEXC_ERR( (retval), (exc), yp_BAD_TYPE( bad_ob ) ); } while( 0 )
 
 // Return sizeof for a structure member
 #define yp_sizeof_member( structType, member ) \
@@ -604,7 +611,10 @@ void yp_extend( ypObject **s, ypObject *x ) {
  * Exceptions
  *************************************************************************************************/
 
-
+int yp_isexceptionC( ypObject *x )
+{
+    return yp_TYPE_PAIR_CODE( x ) == ypException_CODE;
+}
 
 
 /*************************************************************************************************
@@ -632,7 +642,7 @@ typedef struct {
 } ypIntObject;
 #define ypInt_VALUE( i ) ( ((ypIntObject *)i)->ob_value )
 
-// Arithmetic code depends on both int and float particularls being defined first
+// Arithmetic code depends on both int and float particulars being defined first
 typedef struct {
     ypObject_HEAD
     yp_float_t ob_value;
@@ -705,6 +715,20 @@ ypObject *yp_add( ypObject *x, ypObject *y )
     return result;
 }
 
+ypObject *yp_intC( yp_int_t value )
+{
+    ypObject *i;
+    ypMem_MALLOC_FIXED( i, ypIntObject, ypInt_CODE );
+    if( yp_isexceptionC( i ) ) return i;
+    ypInt_VALUE( i ) = value;
+    return i;
+}
+
+yp_int_t yp_asintC( ypObject *x, ypObject **exc )
+{
+    if( yp_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x );
+    return ypInt_VALUE( x );
+}
 
 
 /*************************************************************************************************
