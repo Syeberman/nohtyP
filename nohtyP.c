@@ -39,6 +39,7 @@ yp_STATIC_ASSERT( yp_SSIZE_T_MIN-1 > yp_SSIZE_T_MIN, ssize_min );
 #pragma warning( pop ) 
 
 // TODO assert that sizeof( "abcd" ) == 5 (ie it includes the null-terminator)
+// TODO assert that we're little-endian (that type code is first byte)
 
 
 /*************************************************************************************************
@@ -48,14 +49,12 @@ yp_STATIC_ASSERT( yp_SSIZE_T_MIN-1 > yp_SSIZE_T_MIN, ssize_min );
 typedef size_t yp_uhash_t;
 
 // ypObject_HEAD defines the initial segment of every ypObject
-#define ypObject_HEAD \
-    ypObject ob_base;
+#define ypObject_HEAD _ypObject_HEAD
 
 // First byte of object structure is the type code; next 3 bytes is reference count.  The
 // least-significant bit of the type code specifies if the type is immutable (0) or not.
 // XXX Assuming little-endian for now
-#define ypObject_MAKE_TYPE_REFCNT( type, refcnt ) \
-    ( ((type) & 0xFFu) | (((refcnt) & 0xFFFFFFu) << 8) )
+#define ypObject_MAKE_TYPE_REFCNT _ypObject_MAKE_TYPE_REFCNT
 #define ypObject_TYPE_CODE( ob ) \
     ( ((yp_uint8_t *)(ob))[0] )
 #define ypObject_SET_TYPE_CODE( ob, type ) \
@@ -76,19 +75,22 @@ typedef size_t yp_uhash_t;
 #define yp_TYPE_PAIR_CODE( ob ) \
     ypObject_TYPE_CODE_AS_FROZEN( ypObject_TYPE_CODE( ob ) )
 
-// A refcnt of this value means the object is immortal
 // TODO Need two types of immortals: statically-allocated immortals (so should never be
 // freed/invalidated) and overly-incref'd immortals (should be allowed to be invalidated and thus
 // free any extra data, although the object itself will never be free'd as we've lost track of the
 // refcounts)
-#define ypObject_REFCNT_IMMORTAL (0xFFFFFFu)
+#define ypObject_REFCNT_IMMORTAL _ypObject_REFCNT_IMMORTAL
 
 // When a hash of this value is stored in ob_hash, call tp_hash (which may then update cache)
-#define ypObject_HASH_INVALID ((yp_hash_t) -1)
+#define ypObject_HASH_INVALID _ypObject_HASH_INVALID
 
 // Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
-#define ypObject_LEN_INVALID        (0xFFFFu)
-#define ypObject_ALLOCLEN_INVALID   (0xFFFFu)
+#define ypObject_LEN_INVALID        _ypObject_LEN_INVALID
+#define ypObject_ALLOCLEN_INVALID   _ypObject_ALLOCLEN_INVALID
+
+// Base "constructor" for immortal objects
+// TODO What to set alloclen to?  Does it matter?
+#define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)( ypObject * );
@@ -123,27 +125,27 @@ typedef struct {
     countfunc tp_count;
     objssizeobjproc tp_setindex;
     objsliceobjproc tp_setslice;
-    objssizeproc yp_delindex;
-    objsliceproc yp_delslice;
+    objssizeproc tp_delindex;
+    objsliceproc tp_delslice;
     objobjproc tp_extend;
     objssizeproc tp_irepeat;
     objssizeobjproc tp_insert;
     objssizeproc tp_popindex;
-    objobjproc tp_remove;
     objproc tp_reverse;
     sortfunc tp_sort;
 } ypSequenceMethods;
 
 typedef struct {
-    objobjproc yp_isdisjoint;
-    objobjproc yp_issubset;
-    // yp_lt is elsewhere
-    objobjproc yp_issuperset;
-    // yp_gt is elsewhere
-    objvalistproc yp_update;
-    objvalistproc yp_intersection_update;
-    objvalistproc yp_difference_update;
-    objobjproc yp_symmetric_difference_update;
+    objobjproc tp_isdisjoint;
+    objobjproc tp_issubset;
+    // tp_lt is elsewhere
+    objobjproc tp_issuperset;
+    // tp_gt is elsewhere
+    objvalistproc tp_update;
+    objvalistproc tp_intersection_update;
+    objvalistproc tp_difference_update;
+    objobjproc tp_symmetric_difference_update;
+    objobjproc tp_pushunique;
 } ypSetMethods;
 
 typedef struct {
@@ -171,6 +173,7 @@ typedef struct {
     objproc tp_freeze;
     objproc tp_unfrozen_copy;
     objproc tp_frozen_copy;
+    objproc tp_copy; /* TODO */
     objproc tp_invalidate; /* clear, then transmute self to ypInvalidated */
 
     // Boolean operations and comparisons
@@ -200,6 +203,7 @@ typedef struct {
     objobjproc tp_push;
     objproc tp_clear; /* delete references to contained objects */
     objproc tp_pop;
+    objobjproc tp_remove; /* TODO some indication that error is due to missing item, to supress on discard */
     objobjobjproc tp_getdefault; /* if defval is NULL, raise exception if missing */
     objobjobjproc tp_setitem;
     objobjproc tp_delitem;
@@ -251,7 +255,7 @@ static ypTypeObject **ypTypeTable;
 #define ypFrozenDict_CODE           ( 24u)
 #define ypDict_CODE                 ( 25u)
 
-
+yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE );
 
 
 /*************************************************************************************************
@@ -338,8 +342,7 @@ static void *(*yp_realloc)( void *, yp_ssize_t ) = _yp_dummy_realloc;
 static void (*yp_free)( void * ) = _yp_dummy_free;
 
 // Declares the ob_inline_data array for container object structures
-#define yp_INLINE_DATA( elemType ) \
-    elemType ob_inline_data[1]
+#define yp_INLINE_DATA _yp_INLINE_DATA
 
 // Sets ob to a malloc'd buffer for fixed, non-container objects, or yp_MemoryError on failure
 #define ypMem_MALLOC_FIXED( ob, obStruct, type ) \
@@ -414,25 +417,6 @@ static void (*yp_free)( void * ) = _yp_dummy_free;
     } while( 0 )
 
 
-/* XXX Here's a crazy idea that is likely unfounded, premature optimization, but it's an idea that
- * might come in handy later if we're stuck with a restrictive version of malloc.
- *
- * When ints/floats become proper small objects, they'll be 16 bytes in size, which some malloc's
- * might over-allocate up to 64 bytes or more.  Just wasted space
- *
- * So, make a "small object container" object, that will never be seen externally, but that these
- * small objects can allocate memory from.  They would maintain a reference to the container
- * (bumping the size to 24 bytes...this might be the deal breaker).  On dealloc for the int/etc, it
- * decrefs its reference to the container.  The container would itself be a small object; it only
- * stores the refcount and frees itself when it hits zero.
- *
- * Internal to the container, memory is allocated stackwise, and only freed when all small objects
- * are dead.  Kinda like regions; kinda also like obstacks, except nothing is popped off the stack
- * until the whole stack is discarded.
- *
- * ...OR!  Don't do this as objects, but wrap around the busted malloc so that it does this itself.
- */
-
 /*************************************************************************************************
  * Object fundamentals
  *************************************************************************************************/
@@ -486,7 +470,7 @@ void yp_decrefN( yp_ssize_t n, ... )
 //  SO! Still freeze the original, but then also replace it with the zero-version
 // FIXME rethink what we do generically in this function, and what we delegate to tp_freeze, and
 // also when we call tp_freeze
-ypObject *_yp_freeze( ypObject *x )
+static ypObject *_yp_freeze( ypObject *x )
 {
     int oldCode = ypObject_TYPE_CODE( x );
     int newCode = ypObject_TYPE_CODE_AS_FROZEN( oldCode );
@@ -495,7 +479,7 @@ ypObject *_yp_freeze( ypObject *x )
     // Check if it's already frozen (no-op) or if it can't be frozen (error)
     if( oldCode == newCode ) return yp_None;
     newType = ypTypeTable[newCode];
-    if( newType == NULL ) return yp_TypeError;  // TODO return a new, invalidated object
+    if( newType == NULL ) return yp_TypeError;  // TODO make this never happen: such objects should be closed (or invalidated?) instead
 
     // Freeze the object, cache the final hash, and possibly reduce memory usage, etc
     ypObject_SET_TYPE_CODE( x, newCode );
@@ -509,7 +493,7 @@ void yp_freeze( ypObject **x )
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( x, result );
 }
 
-ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
+static ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
 {
     ypObject *memo = (ypObject *) _memo;
     ypObject *id;
@@ -517,10 +501,12 @@ ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
 
     // Avoid recursion
     id = yp_intC( (yp_int64_t) x );
-    result = yp_pushunique( &memo, id );
+    result = yp_pushuniqueE( &memo, id );
     yp_decref( id );
-    if( result == yp_False ) return yp_None;
-    if( yp_isexceptionC( result ) ) return result;
+    if( yp_isexceptionC( result ) ) {
+        if( result == yp_KeyError ) return yp_None; // already in set
+        return result;
+    }
 
     // Freeze current object before going deep
     result = _yp_freeze( x );
@@ -546,6 +532,16 @@ ypObject *yp_frozen_copy( ypObject *x );
 
 ypObject *yp_frozen_deepcopy( ypObject *x );
 
+ypObject *yp_copy( ypObject *x ) {
+    return ypObject_IS_MUTABLE( x ) ? yp_unfrozen_copy( x ) : yp_frozen_copy( x );
+}
+
+ypObject *yp_deepcopy( ypObject *x ) {
+    // FIXME No! this won't work; each traversed object's type needs to be retained.
+    // Ah hell, just make this a method too.
+    return ypObject_IS_MUTABLE( x ) ? yp_unfrozen_deepcopy( x ) : yp_frozen_deepcopy( x );
+}
+
 void yp_invalidate( ypObject **x );
 
 void yp_deepinvalidate( ypObject **x );
@@ -569,7 +565,7 @@ void yp_deepinvalidate( ypObject **x );
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
 #define _yp_REDIRECT1( ob, tp_meth, args ) \
     ypTypeObject *type = ypObject_TYPE( ob ); \
-    if( type->tp_meth == NULL ) return ypMethodError; \
+    if( type->tp_meth == NULL ) return yp_MethodError; \
     return type->tp_meth args;
 
 #define _yp_REDIRECT2( ob, tp_suite, suite_meth, args ) \
@@ -593,13 +589,33 @@ void yp_deepinvalidate( ypObject **x );
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
     return;
 
-void yp_extend( ypObject **s, ypObject *x ) {
-    _yp_INPLACE2( s, tp_as_sequence, tp_extend, (*s, x) )
+ypObject *yp_bool( ypObject *x ) {
+    _yp_REDIRECT1( x, tp_bool, (x) );
+    // TODO Ensure the result is yp_True, yp_False, or an exception
 }
 
+void yp_push( ypObject **sequence, ypObject *x ) {
+    _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
+}
 
+ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i ) {
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_getindex, (sequence, i) );
+}
+
+void yp_append( ypObject **sequence, ypObject *x ) {
+    _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
+}
+
+void yp_extend( ypObject **sequence, ypObject *x ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_extend, (*sequence, x) )
+}
+
+ypObject *yp_pushuniqueE( ypObject **set, ypObject *x ) {
+    _yp_REDIRECT2( *set, tp_as_set, tp_pushunique, (*set, x) );
+}
 
 // TODO undef necessary stuff
+
 
 /*************************************************************************************************
  * Invalidated Objects
@@ -626,9 +642,21 @@ int yp_isexceptionC( ypObject *x )
 // Returns 1 if the bool object is true, else 0; only valid on bool objects!  The return can also
 // be interpreted as the value of the boolean.
 // XXX This assumes that yp_True and yp_False are the only two bools
-#define ypBool_IS_TRUE_C( b ) ( ((ypBoolObject *)b) == yp_True )
+#define ypBool_IS_TRUE_C( b ) ( (b) == yp_True )
 
 #define ypBool_FROM_C( cond ) ( (cond) ? yp_True : yp_False )
+
+// TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
+typedef struct {
+    ypObject_HEAD
+    char ob_value;
+} ypBoolObject;
+#define _ypBool_VALUE( b ) ( ((ypBoolObject *)b)->ob_value )
+
+ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 1};
+ypObject *yp_True = (ypObject *) &_yp_True_struct;
+ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 0};
+ypObject *yp_False = (ypObject *) &_yp_False_struct;
 
 
 /*************************************************************************************************
@@ -726,8 +754,32 @@ ypObject *yp_intC( yp_int_t value )
 
 yp_int_t yp_asintC( ypObject *x, ypObject **exc )
 {
-    if( yp_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x );
-    return ypInt_VALUE( x );
+    int x_type = yp_TYPE_PAIR_CODE( x );
+
+    if( x_type == ypInt_CODE ) {
+        return ypInt_VALUE( x );
+    } else if( x_type == ypFloat_CODE ) {
+        return yp_asintFL( ypFloat_VALUE( x ), exc );
+    }
+    return_yp_CEXC_BAD_TYPE( 0, exc, x );
+}
+
+yp_float_t yp_asfloatC( ypObject *x, ypObject **exc )
+{
+    int x_type = yp_TYPE_PAIR_CODE( x );
+
+    if( x_type == ypInt_CODE ) {
+        return yp_asfloatL( ypInt_VALUE( x ), exc );
+    } else if( x_type == ypFloat_CODE ) {
+        return ypFloat_VALUE( x );
+    }
+    return_yp_CEXC_BAD_TYPE( 0.0, exc, x );
+}
+
+yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc )
+{
+    // TODO Implement this as Python does
+    return (yp_float_t) x;
 }
 
 
@@ -770,6 +822,21 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
     }
 
     return_yp_INPLACE_BAD_TYPE( x, *x );
+}
+
+ypObject *yp_floatC( yp_float_t value )
+{
+    ypObject *f;
+    ypMem_MALLOC_FIXED( f, ypFloatObject, ypFloat_CODE );
+    if( yp_isexceptionC( f ) ) return f;
+    ypFloat_VALUE( f ) = value;
+    return f;
+}
+
+yp_int_t yp_asintFL( yp_float_t x, ypObject **exc )
+{
+    // TODO Implement this as Python does
+    return (yp_int_t) x;
 }
 
 
@@ -872,15 +939,15 @@ static ypObject *ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp
 
 // TODO ensure it is always null-terminated
 
-typedef struct {
-    ypObject_HEAD
-    yp_INLINE_DATA( yp_uint8_t );
-} ypBytesObject;
+// struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
+typedef struct _ypBytesObject ypBytesObject;
 yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % 8 == 0, bytes_inline_data_alignment );
 
 #define ypBytes_DATA( b ) ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
 // TODO what if ob_len is the "invalid" value?
 #define ypBytes_LEN( b )  ( ((ypObject *)b)->ob_len )
+
+// TODO end all bytes with a (hidden) null byte
 
 // Return a new bytes object with uninitialized data of the given length, or an exception
 static ypObject *_yp_bytes_new( yp_ssize_t len )
@@ -1271,6 +1338,34 @@ _ypBytes_EQUALITY_CMP_BODY( ne, != );
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 static yp_hash_t bytes_current_hash( ypObject *b ) {
     return yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
+}
+
+static ypObject *_yp_bytesC( ypObject *(*allocator)( yp_ssize_t ), 
+    const yp_uint8_t *source, yp_ssize_t len )
+{
+    ypObject *b;
+    
+    // Allocate an object of the appropriate size
+    if( source == NULL ) {
+        if( len < 0 ) len = 0;
+    } else {
+        if( len < 0 ) len = strlen( (const char *) source );
+    }
+    b = allocator( len );
+
+    // Initialize the data
+    if( source == NULL ) {
+        memset( ypBytes_DATA( b ), 0, len );
+    } else {
+        memcpy( ypBytes_DATA( b ), source, len );
+    }
+    return b;
+}
+ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len ) {
+    return _yp_bytesC( _yp_bytes_new, source, len );
+}
+ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
+    return _yp_bytesC( _yp_bytearray_new, source, len );
 }
 
 // TODO undef macros

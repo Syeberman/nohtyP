@@ -34,20 +34,17 @@
  * One strategy to ensure safety is to deep copy objects before exchanging between threads.
  * Sharing immutable, immortal objects is always safe.
  *
- * The boundary between C types and ypObjects is an important one.  Functions that accept C types
- * and return objects end in "C".  Functions that accept objects and return C types end in "_asC",
- * unless "C" would be unambiguous; for example, yp_isexceptionC and yp_lenC must accept only
- * objects for input.  Finally, functions that do not operate on _any_ objects are nohtyP library
- * routines and thus end in "L" (such functions are exposed to avoid object creation overhead).
- *
  * Other important postfixes:
- *  F - C float-based version (as opposed to int-based)
+ *  C - C native types are accepted and returned where appropriate
+ *  F - A version of "C" that accepts floats in place of ints
+ *  L - Library routines that operate strictly on C types
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
  *  V - A version of "N" or "K" that accepts a va_list in place of ...
- *  D - discard after use (ie yp_IFd)
- *  # (number) - a function with # inputs that otherwise shares the same name as another function
- *  X - direct access to internal memory or borrowed objects; tread carefully!
+ *  E - Errors modifying an object do not discard the object (exceptions are returned instead)
+ *  D - Discard after use (ie yp_IFd)
+ *  X - Direct access to internal memory or borrowed objects; tread carefully!
+ *  # (number) - A function with # inputs that otherwise shares the same name as another function
  */
 
 
@@ -160,8 +157,6 @@ void yp_deepinvalidate( ypObject **x );
  * Boolean Operations and Comparisons
  */
 
-// TODO comparison/boolean operations and error handling and yp_IF
-
 // There are exactly two boolean values: yp_True and yp_False.
 ypObject *yp_True;
 ypObject *yp_False;
@@ -271,7 +266,7 @@ typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 // Unlike Python, most nohtyP types have both mutable and immutable versions.  An "intstore" is a
 // mutable int (it "stores" an int); similar for floatstore.  The mutable str is called a
 // "characterarray", while a "frozendict" is an immutable dict.  There are no useful immutable 
-// types for iters or files; attempting to freeze such types will close them.
+// types for iters or files: attempting to freeze such types will close them.
 
 // Returns a new reference to an int/intstore with the given value.
 ypObject *yp_intC( yp_int_t value );
@@ -690,10 +685,9 @@ void yp_symmetric_difference_update( ypObject **set, ypObject *x );
 void yp_push( ypObject **set, ypObject *x );
 void yp_set_add( ypObject **set, ypObject *x );
 
-// If x is already contained in *set, returns yp_False; otherwise, adds x to *set and returns
-// yp_True.  On error, *set is discarded and set to an exception.
-// TODO rethink this method...maybe the yp_KEEPALIVE stuff could help
-ypObject *yp_pushunique( ypObject **set, ypObject *x );
+// If x is already contained in *set, returns yp_KeyError; otherwise, adds x to *set and returns
+// the immortal yp_None.  Returns an exception on error; *set is never discarded.
+ypObject *yp_pushuniqueE( ypObject **set, ypObject *x );
 
 // Removes element x from *set.  Raises yp_KeyError if x is not contained in *set.  On error, 
 // *set is discarded and set to an exception.
@@ -940,6 +934,7 @@ ypAPI ypObject * yp_RecursionErrorInst;
 // The returned value points into internal object memory, so they are *borrowed* references and
 // MUST NOT be modified; furthermore, the sequence itself must not be modified while using the
 // array.  Returns NULL and sets len to -1 on error.
+// TODO return an exception object...be consistent among X functions
 ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 
 // TODO Similar X functions for the other types; some of these could allow modifications
@@ -1067,16 +1062,43 @@ struct _ypObject {
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
 
+// ypObject_HEAD defines the initial segment of every ypObject
+#define _ypObject_HEAD \
+    ypObject ob_base;
+// Declares the ob_inline_data array for container object structures
+#define _yp_INLINE_DATA( elemType ) \
+    elemType ob_inline_data[1]
+
+// This structure is likely to change in future versions; it should only exist in-memory
+struct _ypBytesObject {
+    _ypObject_HEAD
+    _yp_INLINE_DATA( yp_uint8_t );
+};
+
+// A refcnt of this value means the object is immortal
+#define _ypObject_REFCNT_IMMORTAL (0xFFFFFFu)
+// When a hash of this value is stored in ob_hash, call tp_hash (which may then update cache)
+#define _ypObject_HASH_INVALID ((yp_hash_t) -1)
+// Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
+#define _ypObject_LEN_INVALID        (0xFFFFu)
+#define _ypObject_ALLOCLEN_INVALID   (0xFFFFu)
+
+// First byte of object structure is the type code; next 3 bytes is reference count
+#define _ypObject_MAKE_TYPE_REFCNT( type, refcnt ) \
+    ( ((type) & 0xFFu) | (((refcnt) & 0xFFFFFFu) << 8) )
+
+// These type codes must match those in nohtyP.c
+#define _ypBytes_CODE                ( 16u)
+
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-// TODO What to set alloclen to?  Does it matter?
-#define yp_IMMORTAL_HEAD_INIT( type, data, len ) \
-    { ypObject_MAKE_TYPE_REFCNT( type, ypObject_REFCNT_IMMORTAL ), \
-      ypObject_HASH_INVALID, len, 0, data }
+#define _yp_IMMORTAL_HEAD_INIT( type, data, len ) \
+    { _ypObject_MAKE_TYPE_REFCNT( type, _ypObject_REFCNT_IMMORTAL ), \
+      _ypObject_HASH_INVALID, len, 0, data }
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
-    static ypObject _ ## name ## _struct = { yp_IMMORTAL_HEAD_INIT( \
-        ypBytes_CODE, _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
-    static ypObject * const name = &_ ## name ## _struct /* force use of semi-colon */
+    static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
+        _ypBytes_CODE, _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
+    static ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE, if useful
 
 // The implementation of yp_IF is considered "internal"; see above for documentation
@@ -1169,38 +1191,10 @@ struct _ypObject {
     yp_decref( _yp_FOR_iter ); \
     }
 
-// TODO if this is a good idea, then document above
-// TODO able to supply multiples?
-// TODO should x be reset within yp_KEEPALIVE_EXCEPT_AS?  If not, how to get original value?
-// yp_KEEPALIVE( x ) {
-//   --> _ypObject *_saved_x = yp_incref( x );
-//   --> _ypObject **_p_x = &x;
-// } yp_KEEPALIVE_EXCEPT_AS( target ) {
-//  --> if( yp_isexceptionC( *_p_x ) && (target = *_p_x) )
-// } yp_ENDKEEPALIVE
-//   --> if( yp_isexceptionC( *_p_x ) ) {
-//          *_p_x = _saved_x;
-//       } else {
-//          yp_decref( _saved_x );
-//       }
-
-// yp_KEEPALIVE( x ) {
-//     yp_setindex( &x, 1, yp_None );
-// } yp_KEEPALIVE_EXCEPT_AS( exc ) {
-//     handle_exception( exc );
-// } yp_ENDKEEPALIVE
-
-// Or a one-line version...
-// yp_KEEPALIVE( x, yp_setindex( &x, 1, yp_None ), &exc );
-// if( yp_isexceptionC( exc ) ) handle_exception( exc );
-
-// yp_DONTDISC, yp_DONTDISCARD, yp_NODISCARD, yp_NOT_A_CRITICAL_MODIFICAITON
-
-
 // The implementation of "yp" is considered "internal"; see above for documentation
 #define yp0( self, method )         yp_ ## method( self )
 #define yp1( self, method, a1 )     yp_ ## method( self, a1 )
-#ifdef yp_NO_VARIADIC_MACROS // FIXME Rename?
+#ifdef yp_NO_VARIADIC_MACROS // TODO Rename?
 #define yp yp1
 #else
 #define yp( self, method, ... )     yp_ ## method( self, _VAR_ARGS_ )
