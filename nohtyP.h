@@ -1097,8 +1097,8 @@ struct _ypBytesObject {
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypBytes_CODE, _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
-    static ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+        _ypBytes_CODE, (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
+    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE, if useful
 
 // The implementation of yp_IF is considered "internal"; see above for documentation

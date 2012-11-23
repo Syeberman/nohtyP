@@ -92,6 +92,9 @@ typedef size_t yp_uhash_t;
 // TODO What to set alloclen to?  Does it matter?
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
+// Base "constructor" for immortal type objects
+#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT( ypType_CODE, NULL, 0 )
+
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)( ypObject * );
 typedef ypObject *(*objobjproc)( ypObject *, ypObject * );
@@ -103,12 +106,12 @@ typedef ypObject *(*objsliceobjproc)( ypObject *, yp_ssize_t, yp_ssize_t, yp_ssi
 typedef ypObject *(*objvalistproc)( ypObject *, int, va_list );
 
 // Some functions have rather unique signatures
-typedef ypObject * (*visitfunc)( ypObject *, void * );
-typedef ypObject * (*traversefunc)( ypObject *, visitfunc, void * );
-typedef yp_hash_t (*hashfunc)( ypObject * );
-typedef yp_ssize_t (*lenfunc)( ypObject * );
-typedef yp_ssize_t (*countfunc)( ypObject *, ypObject * );
-typedef yp_ssize_t (*findfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t );
+typedef ypObject *(*visitfunc)( ypObject *, void * );
+typedef ypObject *(*traversefunc)( ypObject *, visitfunc, void * );
+typedef ypObject *(*hashfunc)( ypObject *, yp_hash_t * );
+typedef ypObject *(*lenfunc)( ypObject *, yp_ssize_t * );
+typedef ypObject *(*countfunc)( ypObject *, ypObject *, yp_ssize_t * );
+typedef ypObject *(*findfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
 typedef ypObject *(*sortfunc)( ypObject *, yp_sort_key_func_t, ypObject * );
 typedef ypObject *(*popitemfunc)( ypObject *, ypObject **, ypObject ** );
 
@@ -171,9 +174,8 @@ typedef struct {
 
     // Freezing, copying, and invalidating
     objproc tp_freeze;
-    objproc tp_unfrozen_copy;
-    objproc tp_frozen_copy;
-    objproc tp_copy; /* TODO */
+    traversefunc tp_unfrozen_copy;
+    traversefunc tp_frozen_copy;
     objproc tp_invalidate; /* clear, then transmute self to ypInvalidated */
 
     // Boolean operations and comparisons
@@ -256,6 +258,72 @@ static ypTypeObject **ypTypeTable;
 #define ypDict_CODE                 ( 25u)
 
 yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE );
+
+
+// Generic versions of the methods above to return errors, usually; every method function pointer
+// needs to point to a valid function (as opposed to constantly checking for NULL)
+#define DEFINE_GENERIC_METHODS( name, retval ) \
+    static ypObject *name ## _objproc( ypObject *x ) { return retval; } \
+    static ypObject *name ## _objobjproc( ypObject *x, ypObject *y ) { return retval; } \
+    static ypObject *name ## _objobjobjproc( ypObject *x, ypObject *y, ypObject *z ) { return retval; } \
+    static ypObject *name ## _objssizeproc( ypObject *x, yp_ssize_t i ) { return retval; } \
+    static ypObject *name ## _objssizeobjproc( ypObject *x, yp_ssize_t i, ypObject *y ) { return retval; } \
+    static ypObject *name ## _objsliceproc( ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k ) { return retval; } \
+    static ypObject *name ## _objsliceobjproc( ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y ) { return retval; } \
+    static ypObject *name ## _objvalistproc( ypObject *x, int n, va_list args ) { return retval; } \
+    \
+    static ypObject *name ## _visitfunc( ypObject *x, void *memo ) { return retval; } \
+    static ypObject *name ## _traversefunc( ypObject *x, visitfunc visitor, void *memo ) { return retval; } \
+    static ypObject *name ## _hashfunc( ypObject *x, yp_hash_t *hash ) { return retval; } \
+    static ypObject *name ## _lenfunc( ypObject *x, yp_ssize_t *len ) { return retval; } \
+    static ypObject *name ## _countfunc( ypObject *x, ypObject *y, yp_ssize_t *count ) { return retval; } \
+    static ypObject *name ## _findfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *index ) { return retval; } \
+    static ypObject *name ## _sortfunc( ypObject *x, yp_sort_key_func_t key, ypObject *reverse ) { return retval; } \
+    static ypObject *name ## _popitemfunc( ypObject *x, ypObject **key, ypObject **value ) { return retval; } \
+    \
+    static ypNumberMethods name ## _NumberMethods[1] = { { \
+        *name ## _objproc \
+    } }; \
+    static ypSequenceMethods name ## _SequenceMethods[1] = { { \
+        *name ## _objssizeproc, \
+        *name ## _objsliceproc, \
+        *name ## _findfunc, \
+        *name ## _countfunc, \
+        *name ## _objssizeobjproc, \
+        *name ## _objsliceobjproc, \
+        *name ## _objssizeproc, \
+        *name ## _objsliceproc, \
+        *name ## _objobjproc, \
+        *name ## _objssizeproc, \
+        *name ## _objssizeobjproc, \
+        *name ## _objssizeproc, \
+        *name ## _objproc, \
+        *name ## _sortfunc \
+    } }; \
+    static ypSetMethods name ## _SetMethods[1] = { { \
+        *name ## _objobjproc, \
+        *name ## _objobjproc, \
+        *name ## _objobjproc, \
+        *name ## _objvalistproc, \
+        *name ## _objvalistproc, \
+        *name ## _objvalistproc, \
+        *name ## _objobjproc, \
+        *name ## _objobjproc \
+    } }; \
+    static ypMappingMethods name ## _MappingMethods[1] = { { \
+        *name ## _objproc, \
+        *name ## _objproc, \
+        *name ## _objobjobjproc, \
+        *name ## _popitemfunc, \
+        *name ## _objobjobjproc, \
+        *name ## _objproc \
+    } };
+DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for use in methods the type doesn't support
+DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for use by Invalidated objects
+DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for use by exception objects; returns "self"
+
+// For use when an object contains no references to other objects
+static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo ) { return yp_None; } \
 
 
 /*************************************************************************************************
@@ -475,6 +543,7 @@ static ypObject *_yp_freeze( ypObject *x )
     int oldCode = ypObject_TYPE_CODE( x );
     int newCode = ypObject_TYPE_CODE_AS_FROZEN( oldCode );
     ypTypeObject *newType;
+    ypObject *result;
 
     // Check if it's already frozen (no-op) or if it can't be frozen (error)
     if( oldCode == newCode ) return yp_None;
@@ -483,7 +552,8 @@ static ypObject *_yp_freeze( ypObject *x )
 
     // Freeze the object, cache the final hash, and possibly reduce memory usage, etc
     ypObject_SET_TYPE_CODE( x, newCode );
-    x->ob_hash = newType->tp_currenthash( x ); // TODO rename?
+    x->ob_hash = _ypObject_HASH_INVALID;
+    result = newType->tp_currenthash( x, &x->ob_hash );
     return newType->tp_freeze( x );
 }
 
@@ -524,22 +594,55 @@ void yp_deepfreeze( ypObject **x )
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( x, result );
 }
 
-ypObject *yp_unfrozen_copy( ypObject *x );
+// Use this, and a memo of NULL, as the visitor for shallow copies
+static ypObject *_yp_shallowcopy_visitor( ypObject *x, void *memo ) {
+    return yp_incref( x );
+}
 
-ypObject *yp_unfrozen_deepcopy( ypObject *x );
+ypObject *yp_unfrozen_copy( ypObject *x ) {
+    return ypObject_TYPE( x )->tp_unfrozen_copy( x, _yp_shallowcopy_visitor, NULL );
+}
 
-ypObject *yp_frozen_copy( ypObject *x );
+static ypObject *_yp_unfrozen_deepcopy( ypObject *x, void *memo ) {
+    // TODO
+    // TODO don't forget to discard the new objects on error
+}
 
-ypObject *yp_frozen_deepcopy( ypObject *x );
+ypObject *yp_unfrozen_deepcopy( ypObject *x ) {
+    ypObject *memo = yp_dictK( 0 );
+    ypObject *result = _yp_unfrozen_deepcopy( x, memo );
+    yp_decref( memo );
+    return result;
+}
+
+ypObject *yp_frozen_copy( ypObject *x ) {
+    return ypObject_TYPE( x )->tp_frozen_copy( x, _yp_shallowcopy_visitor, NULL );
+}
+
+static ypObject *_yp_frozen_deepcopy( ypObject *x, void *memo ) {
+    // TODO
+}
+
+ypObject *yp_frozen_deepcopy( ypObject *x ) {
+    ypObject *memo = yp_dictK( 0 );
+    ypObject *result = _yp_frozen_deepcopy( x, memo );
+    yp_decref( memo );
+    return result;
+}
 
 ypObject *yp_copy( ypObject *x ) {
     return ypObject_IS_MUTABLE( x ) ? yp_unfrozen_copy( x ) : yp_frozen_copy( x );
 }
 
+static ypObject *_yp_deepcopy( ypObject *x, void *memo ) {
+    // TODO
+}
+
 ypObject *yp_deepcopy( ypObject *x ) {
-    // FIXME No! this won't work; each traversed object's type needs to be retained.
-    // Ah hell, just make this a method too.
-    return ypObject_IS_MUTABLE( x ) ? yp_unfrozen_deepcopy( x ) : yp_frozen_deepcopy( x );
+    ypObject *memo = yp_dictK( 0 );
+    ypObject *result = _yp_deepcopy( x, memo );
+    yp_decref( memo );
+    return result;
 }
 
 void yp_invalidate( ypObject **x );
@@ -558,34 +661,26 @@ void yp_deepinvalidate( ypObject **x );
  * Public object interface
  *************************************************************************************************/
 
-// TODO should I be filling the type tables completely with function pointers that just return
-// ypMethodError, to avoid having to write NULL checks?
 // TODO do/while(0)
 
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
 #define _yp_REDIRECT1( ob, tp_meth, args ) \
     ypTypeObject *type = ypObject_TYPE( ob ); \
-    if( type->tp_meth == NULL ) return yp_MethodError; \
     return type->tp_meth args;
 
 #define _yp_REDIRECT2( ob, tp_suite, suite_meth, args ) \
     ypTypeObject *type = ypObject_TYPE( ob ); \
-    if( type->tp_suite == NULL || type->tp_suite->suite_meth == NULL ) return yp_MethodError; \
     return type->tp_suite->suite_meth args;
 
 #define _yp_INPLACE1( pOb, tp_meth, args ) \
     ypTypeObject *type = ypObject_TYPE( *pOb ); \
-    ypObject *result; \
-    if( type->tp_meth == NULL ) result = yp_MethodError; \
-    else result = type->tp_meth args; \
+    ypObject *result = type->tp_meth args; \
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
     return;
 
 #define _yp_INPLACE2( pOb, tp_suite, suite_meth, args ) \
     ypTypeObject *type = ypObject_TYPE( *pOb ); \
-    ypObject *result; \
-    if( type->tp_suite == NULL || type->tp_suite->suite_meth == NULL ) result = yp_MethodError; \
-    else result = type->tp_suite->suite_meth args; \
+    ypObject *result = type->tp_suite->suite_meth args; \
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
     return;
 
@@ -594,6 +689,7 @@ ypObject *yp_bool( ypObject *x ) {
     // TODO Ensure the result is yp_True, yp_False, or an exception
 }
 
+// TODO for this and other methods that mutate, check first if it's immutable
 void yp_push( ypObject **sequence, ypObject *x ) {
     _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
 }
@@ -627,6 +723,126 @@ ypObject *yp_pushuniqueE( ypObject **set, ypObject *x ) {
  * Exceptions
  *************************************************************************************************/
 
+// TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
+typedef struct {
+    ypObject_HEAD
+    ypObject *ob_name;
+} ypExceptionObject;
+#define _ypException_NAME( e ) ( ((ypExceptionObject *)e)->ob_name )
+
+static ypTypeObject ypException_Type = {
+    yp_TYPE_HEAD_INIT, 
+    NULL,                               // tp_name
+
+    // Object fundamentals
+    NULL,                               // tp_dealloc
+    NoRefs_traversefunc,                // tp_traverse
+    NULL,                               // tp_str
+    NULL,                               // tp_repr
+
+    // Freezing, copying, and invalidating
+    ExceptionMethod_objproc,            // tp_freeze
+    ExceptionMethod_traversefunc,       // tp_unfrozen_copy
+    ExceptionMethod_traversefunc,       // tp_frozen_copy
+    ExceptionMethod_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    ExceptionMethod_objproc,            // tp_bool
+    ExceptionMethod_objobjproc,         // tp_lt
+    ExceptionMethod_objobjproc,         // tp_le
+    ExceptionMethod_objobjproc,         // tp_eq
+    ExceptionMethod_objobjproc,         // tp_ne
+    ExceptionMethod_objobjproc,         // tp_ge
+    ExceptionMethod_objobjproc,         // tp_gt
+
+    // Generic object operations
+    ExceptionMethod_hashfunc,           // tp_currenthash
+    ExceptionMethod_objproc,            // tp_close
+
+    // Number operations
+    ExceptionMethod_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    ExceptionMethod_objproc,            // tp_iter
+    ExceptionMethod_objproc,            // tp_iter_reversed
+    ExceptionMethod_objobjproc,         // tp_send
+
+    // Container operations 
+    ExceptionMethod_objobjproc,         // tp_contains
+    ExceptionMethod_lenfunc,            // tp_length
+    ExceptionMethod_objobjproc,         // tp_push
+    ExceptionMethod_objproc,            // tp_clear
+    ExceptionMethod_objproc,            // tp_pop
+    ExceptionMethod_objobjproc,         // tp_remove
+    ExceptionMethod_objobjobjproc,      // tp_getdefault
+    ExceptionMethod_objobjobjproc,      // tp_setitem
+    ExceptionMethod_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    ExceptionMethod_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    ExceptionMethod_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    ExceptionMethod_MappingMethods      // tp_as_mapping
+};
+
+// No constructors for exceptions; all such objects are immortal
+
+// The immortal exception objects
+// TODO implement an exception heirarchy one day
+// TODO replace use of yp_IMMORTAL_BYTES with proper string object
+#define _yp_IMMORTAL_EXCEPTION( name ) \
+    yp_IMMORTAL_BYTES( name ## _name, #name ); \
+    static ypExceptionObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
+        ypException_CODE, NULL, 0 ), (ypObject *) &_ ## name ## _name_struct }; \
+    ypObject *name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+
+_yp_IMMORTAL_EXCEPTION( yp_BaseException );
+_yp_IMMORTAL_EXCEPTION( yp_Exception );
+_yp_IMMORTAL_EXCEPTION( yp_StopIteration );
+_yp_IMMORTAL_EXCEPTION( yp_GeneratorExit );
+_yp_IMMORTAL_EXCEPTION( yp_ArithmeticError );
+_yp_IMMORTAL_EXCEPTION( yp_LookupError );
+
+_yp_IMMORTAL_EXCEPTION( yp_AssertionError );
+_yp_IMMORTAL_EXCEPTION( yp_AttributeError );
+_yp_IMMORTAL_EXCEPTION( yp_MethodError ); // "subclass" of yp_AttributeError
+_yp_IMMORTAL_EXCEPTION( yp_EOFError );
+_yp_IMMORTAL_EXCEPTION( yp_FloatingPointError );
+_yp_IMMORTAL_EXCEPTION( yp_EnvironmentError );
+_yp_IMMORTAL_EXCEPTION( yp_IOError );
+_yp_IMMORTAL_EXCEPTION( yp_OSError );
+_yp_IMMORTAL_EXCEPTION( yp_ImportError );
+_yp_IMMORTAL_EXCEPTION( yp_IndexError );
+_yp_IMMORTAL_EXCEPTION( yp_KeyError );
+_yp_IMMORTAL_EXCEPTION( yp_KeyboardInterrupt );
+_yp_IMMORTAL_EXCEPTION( yp_MemoryError );
+_yp_IMMORTAL_EXCEPTION( yp_NameError );
+_yp_IMMORTAL_EXCEPTION( yp_OverflowError );
+_yp_IMMORTAL_EXCEPTION( yp_RuntimeError );
+_yp_IMMORTAL_EXCEPTION( yp_NotImplementedError );
+_yp_IMMORTAL_EXCEPTION( yp_SyntaxError );
+_yp_IMMORTAL_EXCEPTION( yp_IndentationError );
+_yp_IMMORTAL_EXCEPTION( yp_TabError );
+_yp_IMMORTAL_EXCEPTION( yp_ReferenceError );
+_yp_IMMORTAL_EXCEPTION( yp_SystemError );
+_yp_IMMORTAL_EXCEPTION( yp_SystemExit );
+_yp_IMMORTAL_EXCEPTION( yp_TypeError );
+_yp_IMMORTAL_EXCEPTION( yp_InvalidatedError ); // "subclass" of yp_TypeError
+_yp_IMMORTAL_EXCEPTION( yp_UnboundLocalError );
+_yp_IMMORTAL_EXCEPTION( yp_UnicodeError );
+_yp_IMMORTAL_EXCEPTION( yp_UnicodeEncodeError );
+_yp_IMMORTAL_EXCEPTION( yp_UnicodeDecodeError );
+_yp_IMMORTAL_EXCEPTION( yp_UnicodeTranslateError );
+_yp_IMMORTAL_EXCEPTION( yp_ValueError );
+_yp_IMMORTAL_EXCEPTION( yp_ZeroDivisionError );
+_yp_IMMORTAL_EXCEPTION( yp_BufferError );
+_yp_IMMORTAL_EXCEPTION( yp_RecursionErrorInst );
+// TODO #undef _yp_IMMORTAL_EXCEPTION
+
+// TODO make this a macro, also, for use internally
 int yp_isexceptionC( ypObject *x )
 {
     return yp_TYPE_PAIR_CODE( x ) == ypException_CODE;
@@ -653,6 +869,11 @@ typedef struct {
 } ypBoolObject;
 #define _ypBool_VALUE( b ) ( ((ypBoolObject *)b)->ob_value )
 
+// TODO methods here
+
+// No constructors for bools; there are exactly two objects, and they are immortal
+
+// There are exactly two bool objects
 ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 1};
 ypObject *yp_True = (ypObject *) &_yp_True_struct;
 ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 0};
