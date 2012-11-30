@@ -368,15 +368,15 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
     sizeof( ((structType *)0)->member )
 
 // For N functions (that take variable arguments); to be used as follows:
-//      yp_N_FUNC_BODY( ypObject *, yp_foobarV, (x, n, args) )
-// Assumes n is the last fixed argument; args is the va_list.
-#define yp_N_FUNC_BODY( retval_type, v_func, v_func_args ) \
-    retval_type retval; \
-    va_list args; \
-    va_start( args, n ); \
-    retval = v_func v_func_args; \
-    va_end( args ); \
-    return retval; \
+//      return_yp_V_FUNC( ypObject *, yp_foobarV, (x, n, args), n )
+// v_func_args must end in the identifier "args", which is declared internal to the macro.
+#define return_yp_V_FUNC( v_func_rettype, v_func, v_func_args, last_fixed ) \
+    do {v_func_rettype retval; \
+        va_list args; \
+        va_start( args, last_fixed ); \
+        retval = v_func v_func_args; \
+        va_end( args ); \
+        return retval; } while( 0 )
 
 // Prime multiplier used in string and various other hashes
 #define _ypHASH_MULTIPLIER 1000003  // 0xf4243
@@ -1116,7 +1116,7 @@ static ypObject *_ypIterValist_func( ypObject *_i, ypObject *value )
 {
     _ypIterValistObject *i = (_ypIterValistObject *) _i;
     if( i->ob_lenhint < 1 ) return yp_StopIteration;
-    return va_arg( i->ob_args, ypObject * );
+    return yp_incref( va_arg( i->ob_args, ypObject * ) );
 }
 
 // TODO #undef _ypIterObject_HEAD
@@ -1700,6 +1700,39 @@ static ypObject *ypSet_dummy = &_ypSet_dummy;
 #define ypSet_ENTRY_INDEX( so, loc ) \
     ( (yp_ssize_t) ( (loc) - ypSet_TABLE( so ) ) )
 
+
+
+// Before adding keys to the set, call this function to determine if a resize is necessary.
+// Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
+// added before the next resize.
+// TODO ensure we aren't unnecessarily resizing: if the old and new alloclens will be the same,
+// and we don't have dummy entries, then resizing is a waste of effort.
+// XXX Adapted from PyDict_SetItem, although our thresholds are slightly different
+static yp_ssize_t _ypSet_space_remaining( ypObject *so )
+{
+    /* If fill >= 2/3 size, adjust size.  Normally, this doubles or
+     * quaduples the size, but it's also possible for the dict to shrink
+     * (if ma_fill is much larger than se_used, meaning a lot of dict
+     * keys have been deleted).
+     */
+    yp_ssize_t retval = (ypSet_ALLOCLEN( so )*2) / 3;
+    retval -= ypSet_FILL( so );
+    if( retval <= 0 ) return 0; // should resize before adding keys
+    return retval;
+}
+
+// Returns the alloclen that will fit minused, or <1 on error
+// XXX Adapted from Python's dictresize
+static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
+{
+    yp_ssize_t alloclen;
+    for( alloclen = PySet_MIN_ALLOCLEN;
+         alloclen <= minused && newsize > 0;
+         alloclen <<= 1 );
+    return alloclen;    
+}
+
+
 static ypObject *_yp_frozenset_new( yp_ssize_t minused )
 {
     // TODO
@@ -1709,7 +1742,6 @@ static ypObject *_yp_set_new( yp_ssize_t minused )
 {
     // TODO
 }
-
 
 // Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
 // yp_None, or an exception on error.
@@ -1772,8 +1804,8 @@ success:
     return yp_None;
 }
 
-// Adds a new key to the hash table at the given location; updates the fill and len counts.  loc 
-// must not currently be in use!
+// Adds a new key to the hash table at the given location.  loc must not currently be in use!
+// Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict in dictobject.c
 static ypObject *_ypSet_addkey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
         yp_hash_t hash )
@@ -1786,9 +1818,10 @@ static ypObject *_ypSet_addkey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key
 
 // Internal routine used while cleaning/resizing/copying a table: the key is known to be absent
 // from the table, the table contains no deleted entries, and there's no need to incref the key.
-// Sets *loc to the location at which the key was inserted.
+// Sets *loc to the location at which the key was inserted.  Ensure the set is large enough 
+// (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
-static void _ypSet_resize_insertkey( ypObject *so, ypObject *key, yp_hash_t hash,
+static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
         ypSet_KeyEntry **loc )
 {
     size_t i;
@@ -1808,6 +1841,57 @@ static void _ypSet_resize_insertkey( ypObject *so, ypObject *key, yp_hash_t hash
     ypSet_LEN( so ) += 1;
 }
 
+// The tricky bit about resizing sets is that we need both the old and new hash tables to properly
+// transfer the data, so ypMem_REALLOC_CONTAINER_VARIABLE is no help.
+// TODO call this with the growth factor already factored in
+static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
+{
+    yp_ssize_t newalloclen;
+    ypSet_KeyEntry *newkeys;
+    ypSet_KeyEntry *oldkeys;
+    yp_ssize_t keysleft;
+    yp_ssize_t i;
+    ypSet_KeyEntry *loc;
+
+    // TODO allocate the table in-line, then handle the case where both old and new tables
+    // could fit in-line (idea: if currently in-line, then just force that the new array be
+    // malloc'd...will need to malloc something anyway)
+    newalloclen = _ypSet_calc_alloclen( minused );
+    if( newalloclen < 1 ) return yp_MemoryError;
+    newkeys = (ypSet_KeyEntry *) yp_malloc( newalloclen * sizeof( ypSet_KeyEntry * ) );
+    if( newkeys == NULL ) return yp_MemoryError;
+    memset( newkeys, 0, newalloclen * sizeof( ypSet_KeyEntry * ) );
+
+    // Failures are impossible from here on, so swap-in the new table
+    oldkeys = ypSet_TABLE( so );
+    keysleft = ypSet_LEN( so );
+    ypSet_TABLE( so ) = newkeys;
+    ypSet_LEN( so ) = 0;
+    ypSet_FILL( so ) = 0;
+    ypSet_ALLOCLEN( so ) = newalloclen;
+
+    // Move the keys from the old table before free'ing it
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( oldkeys[i] ) ) continue;
+        _ypSet_movekey_clean( so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc );
+        keysleft -= 1;
+    }
+    yp_free( oldkeys );
+    return yp_None;
+}
+
+
+
+
+// Adds the keys yielded from iterable to the set.
+// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+static ypObject *_ypSet_update( ypObject *so, ypObject *iterable ) {
+    // TODO
+    // TODO if so is empty and iterable is a set or mapping, then we can use _ypSet_movekey_clean
+    // TODO if we can, avoid calculating _ypSet_space_remaining on every item
+    // TODO determine when/where/how the set should be resized
+}
+
 // Before adding numnew keys to the set, call this function to determine if a resize is necessary.
 // Returns -1 if the set doesn't require a resize, else the new minused value to pass to
 // _ypSet_resize.  If adding one key, it's recommended to first check if the key already
@@ -1816,6 +1900,7 @@ static void _ypSet_resize_insertkey( ypObject *so, ypObject *key, yp_hash_t hash
 // TODO ensure we aren't unnecessarily resizing: if the old and new alloclens will be the same,
 // and we don't have dummy entries, then resizing is a waste of effort.
 // XXX Adapted from PyDict_SetItem
+// TODO delete?
 static yp_ssize_t _ypSet_shouldresize( ypObject *so, yp_ssize_t numnew )
 {
     yp_ssize_t newfill = ypSet_FILL( so ) + numnew;
@@ -1842,46 +1927,50 @@ static yp_ssize_t _ypSet_shouldresize( ypObject *so, yp_ssize_t numnew )
     }
 }
 
+
+
 // Constructors
-static ypObject *_ypSet( ypObject *(*allocator)( ypObject * ), ypObject *iterable ) {
-    ypObject *set;
+// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable ) {
+    ypObject *newSo;
     ypObject *exc = yp_None;
     yp_ssize_t lenhint = yp_iter_lenhintC( iterable, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     
-    set = _yp_frozenset_new( lenhint );
-    if( yp_isexceptionC( set ) ) return set;
+    newSo = allocator( lenhint );
+    if( yp_isexceptionC( newSo ) ) return newSo;
     // TODO make sure _yp_set_update is efficient for pre-sized objects
-    exc = _ypSet_update( set, iterable );
+    exc = _ypSet_update( newSo, iterable );
     if( yp_isexceptionC( exc ) ) {
-        yp_decref( set );
+        yp_decref( newSo );
         return exc;
     }
-    return set;
+    return newSo;
 }
 
-// TODO special-case the n=0
 ypObject *yp_frozensetN( int n, ... ) {
-    yp_N_FUNC_BODY( ypObject *, yp_frozensetV, (n, args) )
+    if( n == 0 ) return _yp_frozenset_new( 0 );
+    return_yp_V_FUNC( ypObject *, yp_frozensetV, (n, args), n );
 }
 ypObject *yp_frozensetV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return yp_frozenset( iter_args );
+    return _ypSet( _yp_frozenset_new, iter_args );
+}
+ypObject *yp_frozenset( ypObject *iterable ) {
+    return _ypSet( _yp_frozenset_new, iterable );
 }
 
 ypObject *yp_setN( int n, ... ) {
-    yp_N_FUNC_BODY( ypObject *, yp_setV, (n, args) )
+    if( n == 0 ) return _yp_set_new( 0 );
+    return_yp_V_FUNC( ypObject *, yp_setV, (n, args), n );
 }
 ypObject *yp_setV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return yp_set( iter_args );
+    return _ypSet( _yp_set_new, iter_args );
 }
-
-// Returns a new reference to a frozenset/set whose elements come from iterable.
-// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-ypObject *yp_frozenset( ypObject *iterable );
-ypObject *yp_set( ypObject *iterable );
-
+ypObject *yp_set( ypObject *iterable ) {
+    return _ypSet( _yp_set_new, iterable );
+}
 
 
 /*************************************************************************************************
@@ -1940,7 +2029,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     for( i = 0; valuesleft > 0; i++ ) {
         value = ypDict_VALUES( mp )[i];
         if( value == NULL ) continue;
-        _ypSet_resize_insertkey( newkeyset, yp_incref( oldkeys[i].se_key ), 
+        _ypSet_movekey_clean( newkeyset, yp_incref( oldkeys[i].se_key ), 
                 oldkeys[i].se_hash, &loc );
         newvalues[ypSet_ENTRY_INDEX( newkeyset, loc )] = oldvalues[i];
         valuesleft -= 1;
@@ -1969,13 +2058,12 @@ static void _ypDict_setvalue( ypObject *mp, ypSet_KeyEntry *loc, ypObject *value
 
 
 // yp_None or an exception
-// TODO The decision to resize currently depends only on _ypSet_shouldresize, but what if the
+// TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
 // shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
-// table.  Really, we should have a _ypDict_shouldresize.
+// table.  Really, we should have a _ypDict_space_remaining.
 static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
 {
     yp_hash_t hash;
-    yp_ssize_t newminused;
     ypObject *keyset = ypDict_KEYSET( mp );
     ypSet_KeyEntry *loc;
     ypObject *result = yp_None;
@@ -1994,19 +2082,18 @@ static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
     }
 
     // Otherwise, we need to add the key, which possibly doesn't involve resizing
-    newminused = _ypSet_shouldresize( keyset, 1 );
-    if( newminused < 0 ) {
+    if( _ypSet_space_remaining( keyset ) >= 1 ) {
         _ypSet_addkey( keyset, loc, key, hash );
         _ypDict_setvalue( mp, loc, value );
         return yp_None;
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
-    // fast _ypSet_resize_insertkey.
-    result = _ypDict_resize( mp, newminused );   // invalidates keyset and loc
+    // fast _ypSet_movekey_clean.
+    result = _ypDict_resize( mp, ypDict_LEN( mp )+1 );   // invalidates keyset and loc
     if( yp_isexceptionC( result ) ) return result;
     keyset = ypDict_KEYSET( mp );
-    _ypSet_resize_insertkey( keyset, yp_incref( key ), hash, &loc );
+    _ypSet_movekey_clean( keyset, yp_incref( key ), hash, &loc );
     _ypDict_setvalue( mp, loc, value );
 }
 
