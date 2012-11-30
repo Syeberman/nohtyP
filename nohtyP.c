@@ -367,6 +367,17 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
 #define yp_sizeof_member( structType, member ) \
     sizeof( ((structType *)0)->member )
 
+// For N functions (that take variable arguments); to be used as follows:
+//      yp_N_FUNC_BODY( ypObject *, yp_foobarV, (x, n, args) )
+// Assumes n is the last fixed argument; args is the va_list.
+#define yp_N_FUNC_BODY( retval_type, v_func, v_func_args ) \
+    retval_type retval; \
+    va_list args; \
+    va_start( args, n ); \
+    retval = v_func v_func_args; \
+    va_end( args ); \
+    return retval; \
+
 // Prime multiplier used in string and various other hashes
 #define _ypHASH_MULTIPLIER 1000003  // 0xf4243
 
@@ -1068,6 +1079,47 @@ yp_int_t yp_asintFL( yp_float_t x, ypObject **exc )
 // TODO Iterators should have a lenhint "attribute" so that consumers of the iterator can
 // pre-allocate; this should be automatically decremented with every yielded value
 
+// _ypIterObject_HEAD shared with ypIterValistObject below
+#define _ypIterObject_HEAD \
+    ypObject_HEAD \
+    yp_generator_func_t ob_func; \
+    yp_ssize_t ob_lenhint;
+typedef struct {
+    _ypIterObject_HEAD
+    yp_INLINE_DATA( yp_uint8_t );
+} ypIterObject;
+#define ypIter_LENHINT( i ) ( ((ypIterObject *)i)->ob_lenhint )
+
+
+/*************************************************************************************************
+ * Special (and dangerous) iterator for working with variable arguments of ypObject*s
+ *************************************************************************************************/
+
+// XXX Be very careful working with this: only pass it to functions that will call yp_iter_lenhintC
+// and yp_next.  It is not your typical object: it's allocated on the stack.  While this could be
+// dangerous, it also reduces duplicating code between versions that handle va_args and those that
+// handle iterables.
+
+typedef struct {
+    _ypIterObject_HEAD
+    va_list ob_args;
+} _ypIterValistObject;
+
+// The number of arguments is stored in ob_lenhint, which is automatically decremented by yp_next 
+// on each yielded value.
+#define yp_ONSTACK_ITER_VALIST( name, n, args ) \
+    _ypIterValistObject _ ## name ## _struct = { \
+        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, 0 ), _ypIterValist_func, n, args}; \
+    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+
+static ypObject *_ypIterValist_func( ypObject *_i, ypObject *value )
+{
+    _ypIterValistObject *i = (_ypIterValistObject *) _i;
+    if( i->ob_lenhint < 1 ) return yp_StopIteration;
+    return va_arg( i->ob_args, ypObject * );
+}
+
+// TODO #undef _ypIterObject_HEAD
 
 /*************************************************************************************************
  * Indices and slices
@@ -1195,7 +1247,7 @@ static ypObject *_yp_bytearray_new( yp_ssize_t len )
 
 // Return a new bytes or bytearray object (depending on b) with uninitialzed data of the given
 // length, or an exception
-static ypObject *_yp_bytes_new_sametype( ypObject *b, yp_ssize_t len )
+static ypObject *_ypBytes_new_sametype( ypObject *b, yp_ssize_t len )
 {
     if( ypObject_IS_MUTABLE( b ) ) {
         return _yp_bytearray_new( len );
@@ -1207,9 +1259,9 @@ static ypObject *_yp_bytes_new_sametype( ypObject *b, yp_ssize_t len )
 // Returns a copy of the bytes or bytearray object; the new object will have the given length. If
 // len is less than ypBytes_LEN( b ), data is truncated; if equal, returns an exact copy; if
 // greater, extra bytes are uninitialized.
-static ypObject *_yp_bytes_copy( ypObject *b, yp_ssize_t len )
+static ypObject *_ypBytes_copy( ypObject *b, yp_ssize_t len )
 {
-    ypObject *newB = _yp_bytes_new_sametype( b, len );
+    ypObject *newB = _ypBytes_new_sametype( b, len );
     if( yp_isexceptionC( newB ) ) return newB;
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), MIN( len, ypBytes_LEN( b ) ) );
     return newB;
@@ -1217,7 +1269,7 @@ static ypObject *_yp_bytes_copy( ypObject *b, yp_ssize_t len )
 
 // Shrinks or grows the bytearray; any new bytes are uninitialized.  Returns yp_None on success,
 // exception on error.
-static ypObject *_yp_bytearray_resize( ypObject *b, yp_ssize_t newLen )
+static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t newLen )
 {
     ypObject *result;
     ypMem_REALLOC_CONTAINER_VARIABLE( result, b, ypBytesObject, newLen );
@@ -1228,7 +1280,7 @@ static ypObject *_yp_bytearray_resize( ypObject *b, yp_ssize_t newLen )
 
 // If x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
 // TODO note http://bugs.python.org/issue12170 and ensure we stay consistent
-static void _bytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len )
+static void _ypBytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len )
 {
     int x_type = yp_TYPE_PAIR_CODE( x );
 
@@ -1246,7 +1298,7 @@ static void _bytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x
 // If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
 // x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
 // TODO: to be correct, ValueError should be raised when int out of range(256)
-static void _bytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
+static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
         yp_uint8_t *storage )
 {
     ypObject *result;
@@ -1284,7 +1336,7 @@ static ypObject *bytes_findC4( ypObject *b, ypObject *x, yp_ssize_t start, yp_ss
     yp_ssize_t b_rlen;     // remaining length
     yp_uint8_t *b_rdata;   // remaining data
 
-    _bytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
+    _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
@@ -1320,10 +1372,10 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     yp_ssize_t x_len;
     ypObject *newB;
 
-    _bytes_coerce_bytes( x, &x_data, &x_len );
+    _ypBytes_coerce_bytes( x, &x_data, &x_len );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
-    newB = _yp_bytes_copy( b, ypBytes_LEN( b ) + x_len );
+    newB = _ypBytes_copy( b, ypBytes_LEN( b ) + x_len );
     if( yp_isexceptionC( newB ) ) return newB;
 
     memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), x_data, x_len );
@@ -1337,10 +1389,10 @@ static ypObject *bytearray_extend( ypObject *b, ypObject *x )
     yp_ssize_t x_len;
     ypObject *result;
 
-    _bytes_coerce_bytes( x, &x_data, &x_len );
+    _ypBytes_coerce_bytes( x, &x_data, &x_len );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
-    result = _yp_bytearray_resize( b, ypBytes_LEN( b ) + x_len );
+    result = _ypBytes_resize( b, ypBytes_LEN( b ) + x_len );
     if( yp_isexceptionC( result ) ) return result;
 
     memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), x_data, x_len );
@@ -1398,7 +1450,7 @@ static ypObject *bytes_getsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &newLen );
     if( yp_isexceptionC( result ) ) return result;
 
-    newB = _yp_bytes_new_sametype( b, newLen );
+    newB = _ypBytes_new_sametype( b, newLen );
     if( yp_isexceptionC( newB ) ) return newB;
 
     if( step == 1 ) {
@@ -1414,7 +1466,8 @@ static ypObject *bytes_getsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop
 
 // Returns yp_None or an exception
 // TODO handle b == x! (and elsewhere?)
-static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step );
+static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop, 
+        yp_ssize_t step );
 static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step, ypObject *x )
 {
@@ -1423,7 +1476,7 @@ static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
     yp_uint8_t *x_data;
     yp_ssize_t x_len;
 
-    _bytes_coerce_bytes( x, &x_data, &x_len );
+    _ypBytes_coerce_bytes( x, &x_data, &x_len );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
     if( x_len == 0 ) return bytearray_delsliceC( b, start, stop, step );
 
@@ -1435,7 +1488,7 @@ static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
             // bytearray is growing
             yp_ssize_t growBy = x_len - slicelength;
             yp_ssize_t oldLen = ypBytes_LEN( b );
-            result = _yp_bytearray_resize( b, oldLen + growBy );
+            result = _ypBytes_resize( b, oldLen + growBy );
             if( yp_isexceptionC( result ) ) return result;
             // memmove allows overlap
             memmove( ypBytes_DATA( b )+stop+growBy, ypBytes_DATA( b )+stop, oldLen-stop );
@@ -1505,7 +1558,7 @@ static ypObject *bytes_count3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_s
     yp_ssize_t b_rlen;     // remaining length
     yp_uint8_t *b_rdata;   // remaining data
 
-    _bytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
+    _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
@@ -1561,7 +1614,7 @@ static yp_hash_t bytes_current_hash( ypObject *b ) {
     return yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
 }
 
-static ypObject *_yp_bytesC( ypObject *(*allocator)( yp_ssize_t ), 
+static ypObject *_ypBytesC( ypObject *(*allocator)( yp_ssize_t ), 
     const yp_uint8_t *source, yp_ssize_t len )
 {
     ypObject *b;
@@ -1583,10 +1636,10 @@ static ypObject *_yp_bytesC( ypObject *(*allocator)( yp_ssize_t ),
     return b;
 }
 ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len ) {
-    return _yp_bytesC( _yp_bytes_new, source, len );
+    return _ypBytesC( _yp_bytes_new, source, len );
 }
 ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
-    return _yp_bytesC( _yp_bytearray_new, source, len );
+    return _ypBytesC( _yp_bytearray_new, source, len );
 }
 
 // TODO undef macros
@@ -1618,43 +1671,44 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
 
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
-// TODO make sure I'm using FrozenSet in the right places
 
 typedef struct {
     yp_hash_t se_hash;
     ypObject *se_key;
-} ypFrozenSet_KeyEntry;
+} ypSet_KeyEntry;
 typedef struct {
     ypObject_HEAD
     yp_ssize_t so_fill; // # Active + # Dummy
-    yp_INLINE_DATA( ypFrozenSet_KeyEntry );
-} yFrozenSetObject;
+    yp_INLINE_DATA( ypSet_KeyEntry );
+} ypSetObject;
 
-#define ypFrozenSet_TABLE( so ) ( (ypFrozenSet_KeyEntry *) ((ypObject *)so)->ob_data )
+#define ypSet_TABLE( so ) ( (ypSet_KeyEntry *) ((ypObject *)so)->ob_data )
 // TODO what if ob_len is the "invalid" value?
-#define ypFrozenSet_LEN( so )  ( ((ypObject *)so)->ob_len )
-#define ypFrozenSet_FILL( so )  ( ((yFrozenSetObject *)so)->so_fill )
-#define ypFrozenSet_ALLOCLEN( so )  ( ((ypObject *)so)->ob_alloclen )
-#define ypFrozenSet_MASK( so ) ( ypFrozenSet_ALLOCLEN( so ) - 1 )
+#define ypSet_LEN( so )  ( ((ypObject *)so)->ob_len )
+#define ypSet_FILL( so )  ( ((ySetObject *)so)->so_fill )
+#define ypSet_ALLOCLEN( so )  ( ((ypObject *)so)->ob_alloclen )
+#define ypSet_MASK( so ) ( ypSet_ALLOCLEN( so ) - 1 )
 
-#define ypFrozenSet_PERTURB_SHIFT (5)
-static ypObject _ypFrozenSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 0 );
-static ypObject *ypFrozenSet_dummy = &_ypFrozenSet_dummy;
+#define ypSet_PERTURB_SHIFT (5)
+static ypObject _ypSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 0 );
+static ypObject *ypSet_dummy = &_ypSet_dummy;
 
-// Returns true if the given ypFrozenSet_KeyEntry contains a valid key
-#define ypFrozenSet_ENTRY_USED( loc ) \
-    ( (loc)->se_key != NULL && (loc)->se_key != ypFrozenSet_dummy )
-// Returns the index of the given ypFrozenSet_KeyEntry in the hash table
-#define ypFrozenSet_ENTRY_INDEX( so, loc ) \
-    ( (yp_ssize_t) ( (loc) - ypFrozenSet_TABLE( so ) ) )
+// Returns true if the given ypSet_KeyEntry contains a valid key
+#define ypSet_ENTRY_USED( loc ) \
+    ( (loc)->se_key != NULL && (loc)->se_key != ypSet_dummy )
+// Returns the index of the given ypSet_KeyEntry in the hash table
+#define ypSet_ENTRY_INDEX( so, loc ) \
+    ( (yp_ssize_t) ( (loc) - ypSet_TABLE( so ) ) )
 
-
-
-static ypObject *_ypFrozenSet_new( yp_ssize_t minused )
+static ypObject *_yp_frozenset_new( yp_ssize_t minused )
 {
     // TODO
 }
 
+static ypObject *_yp_set_new( yp_ssize_t minused )
+{
+    // TODO
+}
 
 
 // Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
@@ -1662,23 +1716,23 @@ static ypObject *_ypFrozenSet_new( yp_ssize_t minused )
 // TODO The dict implementation has a bunch of these for various scenarios; let's keep it simple
 // for now, but investigate...
 // XXX Adapted from Python's lookdict in dictobject.c
-static ypObject *_ypFrozenSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t hash, 
-        ypFrozenSet_KeyEntry **loc )
+static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t hash, 
+        ypSet_KeyEntry **loc )
 {
     register size_t i;
     register size_t perturb;
-    register ypFrozenSet_KeyEntry *freeslot;
-    register size_t mask = (size_t) ypFrozenSet_MASK( so );
-    ypFrozenSet_KeyEntry *table = ypFrozenSet_TABLE( so );
-    ypFrozenSet_KeyEntry *ep0 = ypFrozenSet_TABLE( so );
-    register ypFrozenSet_KeyEntry *ep;
+    register ypSet_KeyEntry *freeslot;
+    register size_t mask = (size_t) ypSet_MASK( so );
+    ypSet_KeyEntry *table = ypSet_TABLE( so );
+    ypSet_KeyEntry *ep0 = ypSet_TABLE( so );
+    register ypSet_KeyEntry *ep;
     register ypObject *cmp;
 
     i = (size_t)hash & mask;
     ep = &ep0[i];
     if (ep->se_key == NULL || ep->se_key == key) goto success;
 
-    if (ep->se_key == ypFrozenSet_dummy) {
+    if (ep->se_key == ypSet_dummy) {
         freeslot = ep;
     } else {
         if (ep->se_hash == hash) {
@@ -1691,9 +1745,9 @@ static ypObject *_ypFrozenSet_lookkey( ypObject *so, ypObject *key, register yp_
         freeslot = NULL;
     }
 
-    // In the loop, se_key == ypFrozenSet_dummy is by far (factor of 100s) the least likely 
+    // In the loop, se_key == ypSet_dummy is by far (factor of 100s) the least likely 
     // outcome, so test for that last
-    for (perturb = hash; ; perturb >>= ypFrozenSet_PERTURB_SHIFT) {
+    for (perturb = hash; ; perturb >>= ypSet_PERTURB_SHIFT) {
         i = (i << 2) + i + perturb + 1;
         ep = &ep0[i & mask];
         if (ep->se_key == NULL) {
@@ -1701,12 +1755,12 @@ static ypObject *_ypFrozenSet_lookkey( ypObject *so, ypObject *key, register yp_
             goto success;
         }
         if (ep->se_key == key) goto success;
-        if (ep->se_hash == hash && ep->se_key != ypFrozenSet_dummy) {
+        if (ep->se_hash == hash && ep->se_key != ypSet_dummy) {
             // Same __eq__ protection is here as well in Python
             cmp = yp_eq( ep->se_key, key );
             if( yp_isexceptionC( cmp ) ) return cmp;
             if( cmp == yp_True ) goto success;
-        } else if (ep->se_key == ypFrozenSet_dummy && freeslot == NULL) {
+        } else if (ep->se_key == ypSet_dummy && freeslot == NULL) {
             freeslot = ep;
         }
     }
@@ -1721,13 +1775,13 @@ success:
 // Adds a new key to the hash table at the given location; updates the fill and len counts.  loc 
 // must not currently be in use!
 // XXX Adapted from Python's insertdict in dictobject.c
-static ypObject *_ypSet_addkey( ypObject *so, ypFrozenSet_KeyEntry *loc, ypObject *key,
+static ypObject *_ypSet_addkey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
         yp_hash_t hash )
 {
-    if( loc->se_key == NULL ) ypFrozenSet_FILL( so ) += 1;
+    if( loc->se_key == NULL ) ypSet_FILL( so ) += 1;
     loc->se_key = yp_incref( key );
     loc->se_hash = hash;
-    ypFrozenSet_LEN( so ) += 1;
+    ypSet_LEN( so ) += 1;
 }
 
 // Internal routine used while cleaning/resizing/copying a table: the key is known to be absent
@@ -1735,28 +1789,28 @@ static ypObject *_ypSet_addkey( ypObject *so, ypFrozenSet_KeyEntry *loc, ypObjec
 // Sets *loc to the location at which the key was inserted.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
 static void _ypSet_resize_insertkey( ypObject *so, ypObject *key, yp_hash_t hash,
-        ypFrozenSet_KeyEntry **loc )
+        ypSet_KeyEntry **loc )
 {
     size_t i;
     size_t perturb;
-    size_t mask = (size_t) ypFrozenSet_MASK( so );
-    ypFrozenSet_KeyEntry *ep0 = ypFrozenSet_TABLE( so );
+    size_t mask = (size_t) ypSet_MASK( so );
+    ypSet_KeyEntry *ep0 = ypSet_TABLE( so );
 
     i = hash & mask;
     (*loc) = &ep0[i];
-    for (perturb = hash; (*loc)->se_key != NULL; perturb >>= ypFrozenSet_PERTURB_SHIFT) {
+    for (perturb = hash; (*loc)->se_key != NULL; perturb >>= ypSet_PERTURB_SHIFT) {
         i = (i << 2) + i + perturb + 1;
         (*loc) = &ep0[i & mask];
     }
-    ypFrozenSet_FILL( so ) += 1;
+    ypSet_FILL( so ) += 1;
     (*loc)->se_key = key;
     (*loc)->se_hash = hash;
-    ypFrozenSet_LEN( so ) += 1;
+    ypSet_LEN( so ) += 1;
 }
 
 // Before adding numnew keys to the set, call this function to determine if a resize is necessary.
 // Returns -1 if the set doesn't require a resize, else the new minused value to pass to
-// _ypFrozenSet_resize.  If adding one key, it's recommended to first check if the key already
+// _ypSet_resize.  If adding one key, it's recommended to first check if the key already
 // exists in the set before checking if it should be resized; if adding multiple, just assume that
 // none of the keys exist in the set currently.
 // TODO ensure we aren't unnecessarily resizing: if the old and new alloclens will be the same,
@@ -1764,7 +1818,7 @@ static void _ypSet_resize_insertkey( ypObject *so, ypObject *key, yp_hash_t hash
 // XXX Adapted from PyDict_SetItem
 static yp_ssize_t _ypSet_shouldresize( ypObject *so, yp_ssize_t numnew )
 {
-    yp_ssize_t newfill = ypFrozenSet_FILL( so ) + numnew;
+    yp_ssize_t newfill = ypSet_FILL( so ) + numnew;
 
     /* If fill >= 2/3 size, adjust size.  Normally, this doubles or
      * quaduples the size, but it's also possible for the dict to shrink
@@ -1780,13 +1834,53 @@ static yp_ssize_t _ypSet_shouldresize( ypObject *so, yp_ssize_t numnew )
      * This may help applications with severe memory constraints.
      */
     // TODO make this limit configurable
-    if( newfill*3 >= ypFrozenSet_ALLOCLEN( so )*2 ) {
-        yp_ssize_t newlen = ypFrozenSet_LEN( so ) + numnew;
+    if( newfill*3 >= ypSet_ALLOCLEN( so )*2 ) {
+        yp_ssize_t newlen = ypSet_LEN( so ) + numnew;
         return (newlen > 50000 ? 2 : 4) * newlen;
     } else {
         return -1;
     }
 }
+
+// Constructors
+static ypObject *_ypSet( ypObject *(*allocator)( ypObject * ), ypObject *iterable ) {
+    ypObject *set;
+    ypObject *exc = yp_None;
+    yp_ssize_t lenhint = yp_iter_lenhintC( iterable, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    
+    set = _yp_frozenset_new( lenhint );
+    if( yp_isexceptionC( set ) ) return set;
+    // TODO make sure _yp_set_update is efficient for pre-sized objects
+    exc = _ypSet_update( set, iterable );
+    if( yp_isexceptionC( exc ) ) {
+        yp_decref( set );
+        return exc;
+    }
+    return set;
+}
+
+// TODO special-case the n=0
+ypObject *yp_frozensetN( int n, ... ) {
+    yp_N_FUNC_BODY( ypObject *, yp_frozensetV, (n, args) )
+}
+ypObject *yp_frozensetV( int n, va_list args ) {
+    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
+    return yp_frozenset( iter_args );
+}
+
+ypObject *yp_setN( int n, ... ) {
+    yp_N_FUNC_BODY( ypObject *, yp_setV, (n, args) )
+}
+ypObject *yp_setV( int n, va_list args ) {
+    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
+    return yp_set( iter_args );
+}
+
+// Returns a new reference to a frozenset/set whose elements come from iterable.
+// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+ypObject *yp_frozenset( ypObject *iterable );
+ypObject *yp_set( ypObject *iterable );
 
 
 
@@ -1802,16 +1896,16 @@ typedef struct {
     ypObject_HEAD
     ypObject *keyset;
     yp_INLINE_DATA( ypObject * );
-} ypFrozenDictObject;
+} ypDictObject;
 
-#define ypFrozenDict_LEN( mp )              ( ((ypObject *)mp)->ob_len )
-#define ypFrozenDict_VALUES( mp )           ( (ypObject **) ((ypObject *)mp)->ob_data )
-#define ypFrozenDict_SET_VALUES( mp, x )    ( ((ypObject *)mp)->ob_data = x )
-#define ypFrozenDict_KEYSET( mp )           ( ((ypFrozenDictObject *)mp)->keyset )
+#define ypDict_LEN( mp )              ( ((ypObject *)mp)->ob_len )
+#define ypDict_VALUES( mp )           ( (ypObject **) ((ypObject *)mp)->ob_data )
+#define ypDict_SET_VALUES( mp, x )    ( ((ypObject *)mp)->ob_data = x )
+#define ypDict_KEYSET( mp )           ( ((ypDictObject *)mp)->keyset )
 
-// Returns the index of the given ypFrozenSet_KeyEntry in the hash table
-#define ypFrozenDict_ENTRY_INDEX( mp, loc ) \
-    ( ypFrozenSet_ENTRY_INDEX( ypFrozenDict_KEYSET( mp ), loc ) )
+// Returns the index of the given ypSet_KeyEntry in the hash table
+#define ypDict_ENTRY_INDEX( mp, loc ) \
+    ( ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), loc ) )
 
 // The tricky bit about resizing dicts is that we need both the old and new keysets and value 
 // arrays to properly transfer the data, so ypMem_REALLOC_CONTAINER_VARIABLE is no help.
@@ -1820,19 +1914,19 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     ypObject *newkeyset;
     yp_ssize_t newalloclen;
     ypObject **newvalues;
-    ypFrozenSet_KeyEntry *oldkeys;
+    ypSet_KeyEntry *oldkeys;
     ypObject **oldvalues;
     yp_ssize_t valuesleft;
     yp_ssize_t i;
     ypObject *value;
-    ypFrozenSet_KeyEntry *loc;
+    ypSet_KeyEntry *loc;
 
     // TODO allocate the value array in-line, then handle the case where both old and new value
     // arrays could fit in-line (idea: if currently in-line, then just force that the new array be
     // malloc'd...will need to malloc something anyway)
-    newkeyset = _ypFrozenSet_new( minused );
+    newkeyset = _ypfrozenset_new( minused );
     if( yp_isexceptionC( newkeyset ) ) return newkeyset;
-    newalloclen = ypFrozenSet_ALLOCLEN( newkeyset );
+    newalloclen = ypSet_ALLOCLEN( newkeyset );
     newvalues = (ypObject **) yp_malloc( newalloclen * sizeof( ypObject * ) );
     if( newvalues == NULL ) {
         yp_decref( newkeyset );
@@ -1840,37 +1934,37 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     }
     memset( newvalues, 0, newalloclen * sizeof( ypObject * ) );
 
-    oldkeys = ypFrozenSet_TABLE( ypFrozenDict_KEYSET( mp ) );
-    oldvalues = ypFrozenDict_VALUES( mp );
-    valuesleft = ypFrozenDict_LEN( mp );
+    oldkeys = ypSet_TABLE( ypDict_KEYSET( mp ) );
+    oldvalues = ypDict_VALUES( mp );
+    valuesleft = ypDict_LEN( mp );
     for( i = 0; valuesleft > 0; i++ ) {
-        value = ypFrozenDict_VALUES( mp )[i];
+        value = ypDict_VALUES( mp )[i];
         if( value == NULL ) continue;
         _ypSet_resize_insertkey( newkeyset, yp_incref( oldkeys[i].se_key ), 
                 oldkeys[i].se_hash, &loc );
-        newvalues[ypFrozenSet_ENTRY_INDEX( newkeyset, loc )] = oldvalues[i];
+        newvalues[ypSet_ENTRY_INDEX( newkeyset, loc )] = oldvalues[i];
         valuesleft -= 1;
     }
 
-    yp_decref( ypFrozenDict_KEYSET( mp ) );
-    ypFrozenDict_KEYSET( mp ) = newkeyset;
+    yp_decref( ypDict_KEYSET( mp ) );
+    ypDict_KEYSET( mp ) = newkeyset;
     yp_free( oldvalues );
-    ypFrozenDict_SET_VALUES( mp, newvalues );
+    ypDict_SET_VALUES( mp, newvalues );
     return yp_None;
 }
 
 // Adds a new value to the value array corresponding to the given hash table location; updates the
 // len count.  Replaces any existing value.
-static void _ypDict_setvalue( ypObject *mp, ypFrozenSet_KeyEntry *loc, ypObject *value )
+static void _ypDict_setvalue( ypObject *mp, ypSet_KeyEntry *loc, ypObject *value )
 {
-    yp_ssize_t i = ypFrozenDict_ENTRY_INDEX( mp, loc );
-    ypObject *oldvalue = ypFrozenDict_VALUES( mp )[i];
+    yp_ssize_t i = ypDict_ENTRY_INDEX( mp, loc );
+    ypObject *oldvalue = ypDict_VALUES( mp )[i];
     if( oldvalue == NULL ) {
-        ypFrozenDict_LEN( mp ) += 1;
+        ypDict_LEN( mp ) += 1;
     } else {
         yp_decref( oldvalue );
     }
-    ypFrozenDict_VALUES( mp )[i] = yp_incref( value );
+    ypDict_VALUES( mp )[i] = yp_incref( value );
 }
 
 
@@ -1882,19 +1976,19 @@ static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
 {
     yp_hash_t hash;
     yp_ssize_t newminused;
-    ypObject *keyset = ypFrozenDict_KEYSET( mp );
-    ypFrozenSet_KeyEntry *loc;
+    ypObject *keyset = ypDict_KEYSET( mp );
+    ypSet_KeyEntry *loc;
     ypObject *result = yp_None;
 
     // Look for the appropriate entry in the hash table
     // TODO yp_isexceptionC used internally should be a macro
     hash = yp_hashC( key, &result );
     if( yp_isexceptionC( result ) ) return result;
-    result = _ypFrozenSet_lookkey( keyset, key, hash, &loc );
+    result = _ypSet_lookkey( keyset, key, hash, &loc );
     if( yp_isexceptionC( result ) ) return result;
 
     // If the key is already in the hash table, then we simply need to update the value
-    if( ypFrozenSet_ENTRY_USED( loc ) ) {
+    if( ypSet_ENTRY_USED( loc ) ) {
         _ypDict_setvalue( mp, loc, value );
         return yp_None;
     }
@@ -1911,7 +2005,7 @@ static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
     // fast _ypSet_resize_insertkey.
     result = _ypDict_resize( mp, newminused );   // invalidates keyset and loc
     if( yp_isexceptionC( result ) ) return result;
-    keyset = ypFrozenDict_KEYSET( mp );
+    keyset = ypDict_KEYSET( mp );
     _ypSet_resize_insertkey( keyset, yp_incref( key ), hash, &loc );
     _ypDict_setvalue( mp, loc, value );
 }
