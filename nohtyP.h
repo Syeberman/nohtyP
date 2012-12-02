@@ -397,9 +397,9 @@ yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 // As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an
 // object that implements yp_iter.
 
-// "Sends" a value into *iterator and returns a new reference to the next yielded value, or
-// yp_StopIteration if the iterator is exhausted.  The value may be ignored by the iterator.  If
-// value is an exception this behaves like yp_throw.
+// "Sends" a value into *iterator and returns a new reference to the next yielded value,
+// yp_StopIteration if the iterator is exhausted, or another exception.  The value may be ignored
+// by the iterator.  If value is an exception this behaves like yp_throw.
 ypObject *yp_send( ypObject **iterator, ypObject *value );
 
 // Equivalent to yp_send( iterator, yp_None ).
