@@ -36,7 +36,7 @@ yp_STATIC_ASSERT( sizeof( yp_ssize_t ) == sizeof( size_t ), sizeof_ssize );
 #pragma warning( disable : 4307 )
 yp_STATIC_ASSERT( yp_SSIZE_T_MAX+1 < yp_SSIZE_T_MAX, ssize_max );
 yp_STATIC_ASSERT( yp_SSIZE_T_MIN-1 > yp_SSIZE_T_MIN, ssize_min );
-#pragma warning( pop ) 
+#pragma warning( pop )
 
 // TODO assert that sizeof( "abcd" ) == 5 (ie it includes the null-terminator)
 // TODO assert that we're little-endian (that type code is first byte)
@@ -199,7 +199,7 @@ typedef struct {
     objproc tp_iter_reversed;
     objobjproc tp_send;
 
-    // Container operations 
+    // Container operations
     objobjproc tp_contains;
     lenfunc tp_length;
     objobjproc tp_push;
@@ -617,6 +617,7 @@ ypObject *yp_unfrozen_copy( ypObject *x ) {
 static ypObject *_yp_unfrozen_deepcopy( ypObject *x, void *memo ) {
     // TODO
     // TODO don't forget to discard the new objects on error
+    return yp_NotImplementedError;
 }
 
 ypObject *yp_unfrozen_deepcopy( ypObject *x ) {
@@ -632,6 +633,7 @@ ypObject *yp_frozen_copy( ypObject *x ) {
 
 static ypObject *_yp_frozen_deepcopy( ypObject *x, void *memo ) {
     // TODO
+    return yp_NotImplementedError;
 }
 
 ypObject *yp_frozen_deepcopy( ypObject *x ) {
@@ -647,6 +649,7 @@ ypObject *yp_copy( ypObject *x ) {
 
 static ypObject *_yp_deepcopy( ypObject *x, void *memo ) {
     // TODO
+    return yp_NotImplementedError;
 }
 
 ypObject *yp_deepcopy( ypObject *x ) {
@@ -742,7 +745,7 @@ typedef struct {
 #define _ypException_NAME( e ) ( ((ypExceptionObject *)e)->ob_name )
 
 static ypTypeObject ypException_Type = {
-    yp_TYPE_HEAD_INIT, 
+    yp_TYPE_HEAD_INIT,
     NULL,                               // tp_name
 
     // Object fundamentals
@@ -778,7 +781,7 @@ static ypTypeObject ypException_Type = {
     ExceptionMethod_objproc,            // tp_iter_reversed
     ExceptionMethod_objobjproc,         // tp_send
 
-    // Container operations 
+    // Container operations
     ExceptionMethod_objobjproc,         // tp_contains
     ExceptionMethod_lenfunc,            // tp_length
     ExceptionMethod_objobjproc,         // tp_push
@@ -1019,7 +1022,7 @@ yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc )
  * Floats
  *************************************************************************************************/
 
-// Float object, etc defined above
+// ypFloatObject and ypFloat_VALUE are defined above for use by the int code
 
 yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
@@ -1105,7 +1108,7 @@ typedef struct {
     va_list ob_args;
 } _ypIterValistObject;
 
-// The number of arguments is stored in ob_lenhint, which is automatically decremented by yp_next 
+// The number of arguments is stored in ob_lenhint, which is automatically decremented by yp_next
 // on each yielded value.
 #define yp_ONSTACK_ITER_VALIST( name, n, args ) \
     _ypIterValistObject _ ## name ## _struct = { \
@@ -1182,7 +1185,7 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
 // Using the given _adjusted_ values, in-place converts the given start/stop/step values to the
 // inverse slice, where *step=-(*step).  Returns an exception on error.
 // Adapted from Python's list_ass_subscript
-static ypObject *ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step, 
+static ypObject *ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step,
         yp_ssize_t slicelength )
 {
     if( slicelength < 1 ) return yp_None; // no-op
@@ -1466,7 +1469,7 @@ static ypObject *bytes_getsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop
 
 // Returns yp_None or an exception
 // TODO handle b == x! (and elsewhere?)
-static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop, 
+static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step );
 static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step, ypObject *x )
@@ -1526,7 +1529,7 @@ static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
 
     if( step == 1 ) {
         // One contiguous section
-        memmove( ypBytes_DATA( b )+stop-slicelength, ypBytes_DATA( b )+stop, 
+        memmove( ypBytes_DATA( b )+stop-slicelength, ypBytes_DATA( b )+stop,
                 ypBytes_LEN( b )-stop );
         ypBytes_LEN( b ) -= slicelength;
     } else {
@@ -1614,11 +1617,11 @@ static yp_hash_t bytes_current_hash( ypObject *b ) {
     return yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
 }
 
-static ypObject *_ypBytesC( ypObject *(*allocator)( yp_ssize_t ), 
+static ypObject *_ypBytesC( ypObject *(*allocator)( yp_ssize_t ),
     const yp_uint8_t *source, yp_ssize_t len )
 {
     ypObject *b;
-    
+
     // Allocate an object of the appropriate size
     if( source == NULL ) {
         if( len < 0 ) len = 0;
@@ -1662,12 +1665,6 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
 /*************************************************************************************************
  * Sets
  *************************************************************************************************/
-// TODO Instead, and following http://www.python.org/dev/peps/pep-0412/, dict should treat set as a
-// separate object, with "friendly" (but yp-internal) methods to handle resizes, etc.  This allows
-// the set to be returned for yp_keys; it allows multiple dicts to share the same key dict, thus
-// reducing memory; because Python essentially does this, we'll have tests written to ensure 
-// correctness; it further-simplifies the implementation of dict.
-// http://nohtyp.wordpress.com/2012/09/19/dicts-as-sets/
 
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
@@ -1683,13 +1680,15 @@ typedef struct {
 } ypSetObject;
 
 #define ypSet_TABLE( so ) ( (ypSet_KeyEntry *) ((ypObject *)so)->ob_data )
+#define ypSet_SET_TABLE( so, value ) ( ((ypObject *)so)->ob_data = (void *) (value) )
 // TODO what if ob_len is the "invalid" value?
 #define ypSet_LEN( so )  ( ((ypObject *)so)->ob_len )
-#define ypSet_FILL( so )  ( ((ySetObject *)so)->so_fill )
+#define ypSet_FILL( so )  ( ((ypSetObject *)so)->so_fill )
 #define ypSet_ALLOCLEN( so )  ( ((ypObject *)so)->ob_alloclen )
 #define ypSet_MASK( so ) ( ypSet_ALLOCLEN( so ) - 1 )
 
 #define ypSet_PERTURB_SHIFT (5)
+#define ypSet_MINSIZE (8)
 static ypObject _ypSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 0 );
 static ypObject *ypSet_dummy = &_ypSet_dummy;
 
@@ -1700,7 +1699,13 @@ static ypObject *ypSet_dummy = &_ypSet_dummy;
 #define ypSet_ENTRY_INDEX( so, loc ) \
     ( (yp_ssize_t) ( (loc) - ypSet_TABLE( so ) ) )
 
-
+// set code relies on some of the internals from the dict implementation
+typedef struct {
+    ypObject_HEAD
+    ypObject *keyset;
+    yp_INLINE_DATA( ypObject * );
+} ypDictObject;
+#define ypDict_KEYSET( mp )  ( ((ypDictObject *)mp)->keyset )
 
 // Before adding keys to the set, call this function to determine if a resize is necessary.
 // Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
@@ -1721,26 +1726,50 @@ static yp_ssize_t _ypSet_space_remaining( ypObject *so )
     return retval;
 }
 
+// If a resize is necessary and you suspect future growth may occur, call this function to 
+// determine the minused value to pass to _ypSet_resize.
+// TODO make this limit configurable
+// XXX Adapted from PyDict_SetItem
+static yp_ssize_t _ypSet_calc_resize_minused( ypObject *so, yp_ssize_t newlen )
+{
+    if( ypObject_IS_MUTABLE( so ) ) {
+        /* Quadrupling the size improves average dictionary sparseness
+         * (reducing collisions) at the cost of some memory and iteration
+         * speed (which loops over every possible entry).  It also halves
+         * the number of expensive resize operations in a growing dictionary.
+         *
+         * Very large dictionaries (over 50K items) use doubling instead.
+         * This may help applications with severe memory constraints.
+         */
+        return (newlen > 50000 ? 2 : 4) * newlen;
+    } else {
+        // frozensets don't need extra room to grow; additional keys will never be added
+        return newlen;
+    }
+
+}
+
 // Returns the alloclen that will fit minused, or <1 on error
 // XXX Adapted from Python's dictresize
 static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
 {
     yp_ssize_t alloclen;
-    for( alloclen = PySet_MIN_ALLOCLEN;
-         alloclen <= minused && newsize > 0;
+    for( alloclen = ypSet_MINSIZE;
+         alloclen <= minused && alloclen > 0;
          alloclen <<= 1 );
-    return alloclen;    
+    return alloclen;
 }
-
 
 static ypObject *_yp_frozenset_new( yp_ssize_t minused )
 {
     // TODO
+    return yp_NotImplementedError;
 }
 
 static ypObject *_yp_set_new( yp_ssize_t minused )
 {
     // TODO
+    return yp_NotImplementedError;
 }
 
 // Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
@@ -1748,7 +1777,7 @@ static ypObject *_yp_set_new( yp_ssize_t minused )
 // TODO The dict implementation has a bunch of these for various scenarios; let's keep it simple
 // for now, but investigate...
 // XXX Adapted from Python's lookdict in dictobject.c
-static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t hash, 
+static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t hash,
         ypSet_KeyEntry **loc )
 {
     register size_t i;
@@ -1777,7 +1806,7 @@ static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t
         freeslot = NULL;
     }
 
-    // In the loop, se_key == ypSet_dummy is by far (factor of 100s) the least likely 
+    // In the loop, se_key == ypSet_dummy is by far (factor of 100s) the least likely
     // outcome, so test for that last
     for (perturb = hash; ; perturb >>= ypSet_PERTURB_SHIFT) {
         i = (i << 2) + i + perturb + 1;
@@ -1804,22 +1833,22 @@ success:
     return yp_None;
 }
 
-// Adds a new key to the hash table at the given location.  loc must not currently be in use!
-// Ensure the set is large enough (_ypSet_space_remaining) before adding items.
+// Steals key and adds it to the hash table at the given location.  loc must not currently be in 
+// use! Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict in dictobject.c
-static ypObject *_ypSet_addkey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
+static void _ypSet_movekey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
         yp_hash_t hash )
 {
     if( loc->se_key == NULL ) ypSet_FILL( so ) += 1;
-    loc->se_key = yp_incref( key );
+    loc->se_key = key;
     loc->se_hash = hash;
     ypSet_LEN( so ) += 1;
 }
 
-// Internal routine used while cleaning/resizing/copying a table: the key is known to be absent
-// from the table, the table contains no deleted entries, and there's no need to incref the key.
-// Sets *loc to the location at which the key was inserted.  Ensure the set is large enough 
-// (_ypSet_space_remaining) before adding items.
+// Steals key and adds it to the *clean* hash table.  Only use if the key is known to be absent
+// from the table, and the table contains no deleted entries; this is usually known when 
+// cleaning/resizing/copying a table.  Sets *loc to the location at which the key was inserted.  
+// Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
 static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
         ypSet_KeyEntry **loc )
@@ -1841,9 +1870,11 @@ static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
     ypSet_LEN( so ) += 1;
 }
 
-// The tricky bit about resizing sets is that we need both the old and new hash tables to properly
-// transfer the data, so ypMem_REALLOC_CONTAINER_VARIABLE is no help.
-// TODO call this with the growth factor already factored in
+// Resizes the set to the smallest size that will hold minused values.  If you want to reduce the
+// need for future resizes, call with a larger minused; _ypSet_calc_resize_minused is suggested for
+// this purpose.  Returns yp_None, or an exception on error.
+// TODO ensure we aren't unnecessarily resizing: if the old and new alloclens will be the same,
+// and we don't have dummy entries, then resizing is a waste of effort.
 static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
 {
     yp_ssize_t newalloclen;
@@ -1865,85 +1896,178 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     // Failures are impossible from here on, so swap-in the new table
     oldkeys = ypSet_TABLE( so );
     keysleft = ypSet_LEN( so );
-    ypSet_TABLE( so ) = newkeys;
+    ypSet_SET_TABLE( so, newkeys );
     ypSet_LEN( so ) = 0;
     ypSet_FILL( so ) = 0;
     ypSet_ALLOCLEN( so ) = newalloclen;
 
     // Move the keys from the old table before free'ing it
     for( i = 0; keysleft > 0; i++ ) {
-        if( !ypSet_ENTRY_USED( oldkeys[i] ) ) continue;
-        _ypSet_movekey_clean( so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc );
+        if( !ypSet_ENTRY_USED( &oldkeys[i] ) ) continue;
         keysleft -= 1;
+        _ypSet_movekey_clean( so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc );
     }
     yp_free( oldkeys );
     return yp_None;
 }
 
+// Adds the key to the hash table.  *spaceleft should be initialized from  _ypSet_space_remaining; 
+// this function then decrements it with each key added, and resets it on every resize.  Returns 
+// yp_None or an exception.
+// XXX Adapted from PyDict_SetItem
+static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft )
+{
+    yp_hash_t hash;
+    ypObject *result = yp_None;
+    ypSet_KeyEntry *loc;
 
+    // Look for the appropriate entry in the hash table
+    hash = yp_hashC( key, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    result = _ypSet_lookkey( so, key, hash, &loc );
+    if( yp_isexceptionC( result ) ) return result;
 
+    // If the key is already in the hash table, then there's nothing to do
+    if( ypSet_ENTRY_USED( loc ) ) return yp_None;
 
-// Adds the keys yielded from iterable to the set.
-// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-static ypObject *_ypSet_update( ypObject *so, ypObject *iterable ) {
-    // TODO
-    // TODO if so is empty and iterable is a set or mapping, then we can use _ypSet_movekey_clean
-    // TODO if we can, avoid calculating _ypSet_space_remaining on every item
-    // TODO determine when/where/how the set should be resized
+    // Otherwise, we need to add the key, which possibly doesn't involve resizing
+    if( *spaceleft >= 1 ) {
+        _ypSet_movekey( so, loc, key, hash );
+        *spaceleft -= 1;
+        return yp_None;
+    }
+
+    // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
+    // fast _ypSet_movekey_clean.  Remember that _ypSet_resize invalidates loc.
+    result = _ypSet_resize( so, _ypSet_calc_resize_minused( so, ypSet_LEN( so )+1 ) );
+    if( yp_isexceptionC( result ) ) return result;
+    _ypSet_movekey_clean( so, key, hash, &loc );
+    *spaceleft = _ypSet_space_remaining( so );
+    return yp_None;
 }
 
-// Before adding numnew keys to the set, call this function to determine if a resize is necessary.
-// Returns -1 if the set doesn't require a resize, else the new minused value to pass to
-// _ypSet_resize.  If adding one key, it's recommended to first check if the key already
-// exists in the set before checking if it should be resized; if adding multiple, just assume that
-// none of the keys exist in the set currently.
-// TODO ensure we aren't unnecessarily resizing: if the old and new alloclens will be the same,
-// and we don't have dummy entries, then resizing is a waste of effort.
-// XXX Adapted from PyDict_SetItem
-// TODO delete?
-static yp_ssize_t _ypSet_shouldresize( ypObject *so, yp_ssize_t numnew )
+static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other ) 
 {
-    yp_ssize_t newfill = ypSet_FILL( so ) + numnew;
+    // TODO resize if necessary; if starting from clean, use _ypSet_movekey_clean, otherwise
+    // _ypSet_movekey
+    yp_ssize_t keysleft = ypSet_LEN( other );
+    ypSet_KeyEntry *otherkeys = ypSet_TABLE( other );
+    ypObject *result;
+    yp_ssize_t i;
+    ypSet_KeyEntry *loc;
 
-    /* If fill >= 2/3 size, adjust size.  Normally, this doubles or
-     * quaduples the size, but it's also possible for the dict to shrink
-     * (if ma_fill is much larger than se_used, meaning a lot of dict
-     * keys have been deleted).
-     *
-     * Quadrupling the size improves average dictionary sparseness
-     * (reducing collisions) at the cost of some memory and iteration
-     * speed (which loops over every possible entry).  It also halves
-     * the number of expensive resize operations in a growing dictionary.
-     *
-     * Very large dictionaries (over 50K items) use doubling instead.
-     * This may help applications with severe memory constraints.
-     */
-    // TODO make this limit configurable
-    if( newfill*3 >= ypSet_ALLOCLEN( so )*2 ) {
-        yp_ssize_t newlen = ypSet_LEN( so ) + numnew;
-        return (newlen > 50000 ? 2 : 4) * newlen;
+    // Resize the set if necessary
+    if( _ypSet_space_remaining( so ) < keysleft ) {
+        result = _ypSet_resize( so, ypSet_LEN( so )+keysleft );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+
+    // If the set is empty and contains no deleted entries, then we also know that none of the keys
+    // in other will be in the set, so we can use _ypSet_movekey_clean
+    if( ypSet_LEN( so ) == 0 && ypSet_FILL( so ) == 0 ) {
+        for( i = 0; keysleft > 0; i++ ) {
+            if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
+            keysleft -= 1;
+            _ypSet_movekey_clean( so, yp_incref( otherkeys[i].se_key ), 
+                    otherkeys[i].se_hash, &loc );
+        }
+        return yp_None;
+    }
+
+    // Otherwise, we need to skip over duplicate keys and use _ypSet_movekey
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
+        keysleft -= 1;
+        result = _ypSet_lookkey( so, otherkeys[i].se_key, otherkeys[i].se_hash, &loc );
+        if( yp_isexceptionC( result ) ) return result;
+        if( ypSet_ENTRY_USED( loc ) ) continue; // if the entry is used then key is already in set
+        _ypSet_movekey( so, loc, yp_incref( otherkeys[i].se_key ), otherkeys[i].se_hash );
+    }
+    return yp_None;
+}
+
+// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter ) 
+{
+    yp_ssize_t spaceleft = _ypSet_space_remaining( so );
+    ypObject *result = yp_None;
+    yp_ssize_t lenhint;
+    ypObject *key;
+
+    // Use lenhint in the hopes of requiring only one resize
+    lenhint = yp_iter_lenhintC( *keyiter, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    if( spaceleft < lenhint ) {
+        result = _ypSet_resize( so, ypSet_LEN( so )+lenhint );
+        if( yp_isexceptionC( result ) ) return result;
+        spaceleft = _ypSet_space_remaining( so );
+    }
+
+    // Add all the yielded keys to the set.  Keep in mind that _ypSet_push may resize the
+    // set despite our attempts at pre-allocating, since lenhint _is_ just a hint.
+    while( 1 ) {
+        key = yp_next( keyiter ); // new ref
+        if( yp_isexceptionC( key ) ) {
+            if( key == yp_StopIteration ) break;
+            return key;
+        }
+        result = _ypSet_push( so, key, &spaceleft );
+        yp_decref( key );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
+// Adds the keys yielded from iterable to the set.  If the set has enough space to hold all the 
+// keys, the set is not resized (important, as yp_setN et al pre-allocate the necessary space).
+static ypObject *_ypSet_update( ypObject *so, ypObject *iterable ) 
+{
+    // TODO determine when/where/how the set should be resized
+    int iterable_type = yp_TYPE_PAIR_CODE( iterable );
+    ypObject *keyiter;
+    ypObject *result;
+
+    // sets and dicts both iterate over a fellow set, so there are efficiencies we can exploit;
+    // otherwise, treat it as a generic iterator.  Recall that type pairs are identified by the 
+    // immutable type code.
+    if( iterable_type == ypFrozenSet_CODE ) {
+        return _ypSet_update_from_set( so, iterable );
+    } else if( iterable_type == ypFrozenDict_CODE ) {
+        return _ypSet_update_from_set( so, ypDict_KEYSET( iterable ) );
     } else {
-        return -1;
+        keyiter = yp_iter( iterable ); // new ref
+        if( yp_isexceptionC( keyiter ) ) return keyiter;
+        result = _ypSet_update_from_iter( so, &keyiter );
+        yp_decref( keyiter );
+        return result;
     }
 }
 
 
+// Public methods
+
+static ypObject *set_push( ypObject *so, ypObject *x ) {
+    yp_ssize_t spaceleft = _ypSet_space_remaining( so );
+    return _ypSet_push( so, x, &spaceleft );
+}
+
 
 // Constructors
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable ) {
+static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable ) 
+{
     ypObject *newSo;
-    ypObject *exc = yp_None;
-    yp_ssize_t lenhint = yp_iter_lenhintC( iterable, &exc );
-    if( yp_isexceptionC( exc ) ) return exc;
-    
+    ypObject *result = yp_None;
+    yp_ssize_t lenhint = yp_iter_lenhintC( iterable, &result );
+    if( yp_isexceptionC( result ) ) return result;
+
     newSo = allocator( lenhint );
     if( yp_isexceptionC( newSo ) ) return newSo;
     // TODO make sure _yp_set_update is efficient for pre-sized objects
-    exc = _ypSet_update( newSo, iterable );
-    if( yp_isexceptionC( exc ) ) {
+    result = _ypSet_update( newSo, iterable );
+    if( yp_isexceptionC( result ) ) {
         yp_decref( newSo );
-        return exc;
+        return result;
     }
     return newSo;
 }
@@ -1981,22 +2105,16 @@ ypObject *yp_set( ypObject *iterable ) {
 // keys or resize it.  It identifies itself as a frozendict, yet we add keys to it, so it is not
 // truly immutable.  As such, it cannot be exposed outside of the set/dict implementations.
 // TODO alloclen will always be the same as keyset.alloclen; repurpose?
-typedef struct {
-    ypObject_HEAD
-    ypObject *keyset;
-    yp_INLINE_DATA( ypObject * );
-} ypDictObject;
-
+// ypDictObject and ypDict_KEYSET are defined above, for use by the set code
 #define ypDict_LEN( mp )              ( ((ypObject *)mp)->ob_len )
 #define ypDict_VALUES( mp )           ( (ypObject **) ((ypObject *)mp)->ob_data )
 #define ypDict_SET_VALUES( mp, x )    ( ((ypObject *)mp)->ob_data = x )
-#define ypDict_KEYSET( mp )           ( ((ypDictObject *)mp)->keyset )
 
 // Returns the index of the given ypSet_KeyEntry in the hash table
 #define ypDict_ENTRY_INDEX( mp, loc ) \
     ( ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), loc ) )
 
-// The tricky bit about resizing dicts is that we need both the old and new keysets and value 
+// The tricky bit about resizing dicts is that we need both the old and new keysets and value
 // arrays to properly transfer the data, so ypMem_REALLOC_CONTAINER_VARIABLE is no help.
 static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
 {
@@ -2013,7 +2131,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     // TODO allocate the value array in-line, then handle the case where both old and new value
     // arrays could fit in-line (idea: if currently in-line, then just force that the new array be
     // malloc'd...will need to malloc something anyway)
-    newkeyset = _ypfrozenset_new( minused );
+    newkeyset = _yp_frozenset_new( minused );
     if( yp_isexceptionC( newkeyset ) ) return newkeyset;
     newalloclen = ypSet_ALLOCLEN( newkeyset );
     newvalues = (ypObject **) yp_malloc( newalloclen * sizeof( ypObject * ) );
@@ -2029,8 +2147,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     for( i = 0; valuesleft > 0; i++ ) {
         value = ypDict_VALUES( mp )[i];
         if( value == NULL ) continue;
-        _ypSet_movekey_clean( newkeyset, yp_incref( oldkeys[i].se_key ), 
-                oldkeys[i].se_hash, &loc );
+        _ypSet_movekey_clean( newkeyset, oldkeys[i].se_key, oldkeys[i].se_hash, &loc );
         newvalues[ypSet_ENTRY_INDEX( newkeyset, loc )] = oldvalues[i];
         valuesleft -= 1;
     }
@@ -2083,7 +2200,7 @@ static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
 
     // Otherwise, we need to add the key, which possibly doesn't involve resizing
     if( _ypSet_space_remaining( keyset ) >= 1 ) {
-        _ypSet_addkey( keyset, loc, key, hash );
+        _ypSet_movekey( keyset, loc, yp_incref( key ), hash );
         _ypDict_setvalue( mp, loc, value );
         return yp_None;
     }
