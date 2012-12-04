@@ -397,6 +397,8 @@ yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 // As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an
 // object that implements yp_iter.
 
+// TODO Because these functions don't (currently) discard *iterator, should they have prefix E?
+
 // "Sends" a value into *iterator and returns a new reference to the next yielded value,
 // yp_StopIteration if the iterator is exhausted, or another exception.  The value may be ignored
 // by the iterator.  If value is an exception this behaves like yp_throw.
@@ -410,9 +412,9 @@ ypObject *yp_next( ypObject **iterator );
 ypObject *yp_next2( ypObject **iterator, ypObject *defval );
 
 // "Throws" an exception into *iterator and returns a new reference to the next yielded
-// value, yp_StopIteration if the iterator is exhausted, or another exception.  type _must_ be an
+// value, yp_StopIteration if the iterator is exhausted, or another exception.  exc _must_ be an
 // exception.
-ypObject *yp_throw( ypObject **iterator, ypObject *type );
+ypObject *yp_throw( ypObject **iterator, ypObject *exc );
 
 // Returns a hint as to how many items are left to be yielded.  The accuracy of this hint depends 
 // on the underlying type: most containers know their lengths exactly, but some generators may not.
