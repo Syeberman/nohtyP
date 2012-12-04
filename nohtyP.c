@@ -70,6 +70,8 @@ typedef size_t yp_uhash_t;
 #define ypObject_REFCNT( ob ) \
     ( ((ypObject *)(ob))->ob_type_refcnt >> 8 )
 
+#define ypObject_CACHED_HASH( ob ) ( ((ypObject *)(ob))->ob_hash )
+
 // Type pairs are identified by the immutable type code, as all its methods are supported by the
 // immutable version
 #define yp_TYPE_PAIR_CODE( ob ) \
@@ -81,7 +83,7 @@ typedef size_t yp_uhash_t;
 // refcounts)
 #define ypObject_REFCNT_IMMORTAL _ypObject_REFCNT_IMMORTAL
 
-// When a hash of this value is stored in ob_hash, call tp_hash (which may then update cache)
+// When a hash of this value is stored in ob_hash, call tp_hash
 #define ypObject_HASH_INVALID _ypObject_HASH_INVALID
 
 // Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
@@ -241,7 +243,7 @@ static ypTypeObject **ypTypeTable;
 #define ypFloat_CODE                ( 12u)
 #define ypFloatStore_CODE           ( 13u)
 
-// no immutable ypIter type         ( 14u)
+#define ypFrozenIter_CODE           ( 14u) // behaves like a closed iter
 #define ypIter_CODE                 ( 15u)
 
 #define ypBytes_CODE                ( 16u)
@@ -665,15 +667,57 @@ void yp_deepinvalidate( ypObject **x );
 
 
 /*************************************************************************************************
- * Boolean operations
+ * Boolean operations, comparisons, and generic object operations
  *************************************************************************************************/
 
-// TODO
+
+// XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
+ypObject *yp_ComparisonNotImplemented;
+#define _ypBool_PUBLIC_CMP_FUNCTION( name, reflection ) \
+ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
+    ypTypeObject *type = ypObject_TYPE( x ); \
+    ypObject *result = type->tp_ ## name( x, y ); \
+    if( result != yp_ComparisonNotImplemented ) return result; \
+    type = ypObject_TYPE( y ); \
+    result = type->tp_ ## reflection( y, x ); \
+    if( result != yp_ComparisonNotImplemented ) return result; \
+    return yp_TypeError; \
+}
+_ypBool_PUBLIC_CMP_FUNCTION( lt, gt );
+_ypBool_PUBLIC_CMP_FUNCTION( le, ge );
+_ypBool_PUBLIC_CMP_FUNCTION( eq, eq );
+_ypBool_PUBLIC_CMP_FUNCTION( ne, ne );
+_ypBool_PUBLIC_CMP_FUNCTION( ge, le );
+_ypBool_PUBLIC_CMP_FUNCTION( gt, lt );
+// TODO #undef _ypBool_PUBLIC_CMP_FUNCTION
+
+yp_STATIC_ASSERT( ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one );
+yp_hash_t yp_hashC( ypObject *x, ypObject **exc )
+{
+    if( ypObject_IS_MUTABLE( x ) ) return_yp_CEXC_BAD_TYPE( ypObject_HASH_INVALID, exc, x );
+    return yp_currenthashC( x, exc );
+}
+yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc )
+{
+    yp_hash_t hash = ypObject_CACHED_HASH( x );
+    ypObject *result;
+
+    if( !ypObject_IS_MUTABLE( x ) && hash != ypObject_HASH_INVALID ) {
+        return hash;
+    }
+    result = ypObject_TYPE( x )->tp_currenthash( x, &hash );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
+    if( !ypObject_IS_MUTABLE( x ) ) ypObject_CACHED_HASH( x ) = hash;
+    return hash;
+}
 
 
 /*************************************************************************************************
- * Public object interface
+ * Common object methods
  *************************************************************************************************/
+
+// These are the functions that simply redirect to object methods; more complex public functions
+// are found elsewhere.
 
 // TODO do/while(0)
 
@@ -701,6 +745,27 @@ void yp_deepinvalidate( ypObject **x );
 ypObject *yp_bool( ypObject *x ) {
     _yp_REDIRECT1( x, tp_bool, (x) );
     // TODO Ensure the result is yp_True, yp_False, or an exception
+}
+
+ypObject *yp_iter( ypObject *x ) {
+    _yp_REDIRECT1( x, tp_iter, (x) );
+    // TODO Ensure the result is an iterator or an exception
+}
+
+ypObject *yp_send( ypObject **iterator, ypObject *value ) {
+    _yp_REDIRECT1( *iterator, tp_send, (*iterator, value) );
+    // TODO should we be discarding *iterator?
+}
+
+ypObject *yp_next( ypObject **iterator ) {
+    _yp_REDIRECT1( *iterator, tp_send, (*iterator, yp_None) );
+    // TODO should we be discarding *iterator?
+}
+
+ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
+    if( !yp_isexceptionC( exc ) ) return yp_TypeError;
+    {_yp_REDIRECT1( *iterator, tp_send, (*iterator, exc) );}
+    // TODO should we be discarding *iterator?
 }
 
 // TODO for this and other methods that mutate, check first if it's immutable
@@ -837,6 +902,7 @@ _yp_IMMORTAL_EXCEPTION( yp_NameError );
 _yp_IMMORTAL_EXCEPTION( yp_OverflowError );
 _yp_IMMORTAL_EXCEPTION( yp_RuntimeError );
 _yp_IMMORTAL_EXCEPTION( yp_NotImplementedError );
+_yp_IMMORTAL_EXCEPTION( yp_ComparisonNotImplemented ); // "subclass" of yp_NotImplementedError
 _yp_IMMORTAL_EXCEPTION( yp_SyntaxError );
 _yp_IMMORTAL_EXCEPTION( yp_IndentationError );
 _yp_IMMORTAL_EXCEPTION( yp_TabError );
@@ -1092,6 +1158,16 @@ typedef struct {
     yp_INLINE_DATA( yp_uint8_t );
 } ypIterObject;
 #define ypIter_LENHINT( i ) ( ((ypIterObject *)i)->ob_lenhint )
+
+
+yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc ) 
+{
+    if( yp_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
+        return_yp_CEXC_BAD_TYPE( 0, exc, iterator );
+    }
+    // TODO ensure we never return <0
+    return ypIter_LENHINT( iterator );
+}
 
 
 /*************************************************************************************************
@@ -1583,34 +1659,34 @@ static ypObject *bytes_count3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_s
 
 // Comparison methods return yp_True, yp_False, or an exception, and are not called if b==x.  When
 // checking for (in)equality, more efficient to check size first
-#define _ypBytes_RELATIVE_CMP_BODY( name, operator ) \
+#define _ypBytes_RELATIVE_CMP_FUNCTION( name, operator ) \
 static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
     int cmp; \
     yp_ssize_t b_len, x_len; \
-    if( yp_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return_yp_BAD_TYPE( x ); \
+    if( yp_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented; \
     b_len = ypBytes_LEN( b ); x_len = ypBytes_LEN( x ); \
     cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) ); \
     if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0); \
     return ypBool_FROM_C( cmp operator 0 ); \
 }
-_ypBytes_RELATIVE_CMP_BODY( lt, < );
-_ypBytes_RELATIVE_CMP_BODY( le, <= );
-_ypBytes_RELATIVE_CMP_BODY( ge, >= );
-_ypBytes_RELATIVE_CMP_BODY( gt, > );
-#undef _ypBytes_RELATIVE_CMP_BODY
-#define _ypBytes_EQUALITY_CMP_BODY( name, operator ) \
+_ypBytes_RELATIVE_CMP_FUNCTION( lt, < );
+_ypBytes_RELATIVE_CMP_FUNCTION( le, <= );
+_ypBytes_RELATIVE_CMP_FUNCTION( ge, >= );
+_ypBytes_RELATIVE_CMP_FUNCTION( gt, > );
+// TODO #undef _ypBytes_RELATIVE_CMP_FUNCTION
+#define _ypBytes_EQUALITY_CMP_FUNCTION( name, operator ) \
 static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
     int cmp; \
     yp_ssize_t b_len, x_len; \
-    if( yp_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return_yp_BAD_TYPE( x ); \
+    if( yp_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented; \
     b_len = ypBytes_LEN( b ); x_len = ypBytes_LEN( x ); \
     if( b_len != x_len ) return ypBool_FROM_C( 1 operator 0 ); \
     cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) ); \
     return ypBool_FROM_C( cmp operator 0 ); \
 }
-_ypBytes_EQUALITY_CMP_BODY( eq, == );
-_ypBytes_EQUALITY_CMP_BODY( ne, != );
-#undef _ypBytes_EQUALITY_CMP_BODY
+_ypBytes_EQUALITY_CMP_FUNCTION( eq, == );
+_ypBytes_EQUALITY_CMP_FUNCTION( ne, != );
+// TODO #undef _ypBytes_EQUALITY_CMP_FUNCTION
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 static yp_hash_t bytes_current_hash( ypObject *b ) {
@@ -1654,12 +1730,61 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
 
 // TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
 
+ypObject *yp_chrC( yp_int_t i ) {
+    return yp_NotImplementedError; // TODO
+}
+
 
 /*************************************************************************************************
  * Sequence of generic items
  *************************************************************************************************/
 
 // TODO Eventually, use timsort, but for now C's qsort should be fine
+
+static ypObject *_yp_tuple_new( yp_ssize_t len )
+{
+    return yp_NotImplementedError;
+}
+
+static ypObject *_yp_list_new( yp_ssize_t len )
+{
+    return yp_NotImplementedError;
+}
+
+
+// Constructors
+
+// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable ) 
+{
+    return yp_NotImplementedError;
+}
+
+ypObject *yp_tupleN( int n, ... ) {
+    if( n == 0 ) return _yp_tuple_new( 0 );
+    return_yp_V_FUNC( ypObject *, yp_tupleV, (n, args), n );
+}
+ypObject *yp_tupleV( int n, va_list args ) {
+    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
+    return _ypTuple( _yp_tuple_new, iter_args );
+}
+ypObject *yp_tuple( ypObject *iterable ) {
+    return _ypTuple( _yp_tuple_new, iterable );
+    
+}
+
+ypObject *yp_listN( int n, ... ) {
+    if( n == 0 ) return _yp_list_new( 0 );
+    return_yp_V_FUNC( ypObject *, yp_listV, (n, args), n );
+}
+ypObject *yp_listV( int n, va_list args ) {
+    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
+    return _ypTuple( _yp_list_new, iter_args );
+}
+ypObject *yp_list( ypObject *iterable ) {
+    return _ypTuple( _yp_list_new, iterable );
+    
+}
 
 
 /*************************************************************************************************
@@ -2114,6 +2239,18 @@ ypObject *yp_set( ypObject *iterable ) {
 #define ypDict_ENTRY_INDEX( mp, loc ) \
     ( ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), loc ) )
 
+static ypObject *_yp_frozendict_new( yp_ssize_t minused )
+{
+    // TODO
+    return yp_NotImplementedError;
+}
+
+static ypObject *_yp_dict_new( yp_ssize_t minused )
+{
+    // TODO
+    return yp_NotImplementedError;
+}
+
 // The tricky bit about resizing dicts is that we need both the old and new keysets and value
 // arrays to properly transfer the data, so ypMem_REALLOC_CONTAINER_VARIABLE is no help.
 static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
@@ -2214,6 +2351,46 @@ static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
     _ypDict_setvalue( mp, loc, value );
 }
 
+
+// Constructors
+ypObject *yp_frozendictK( int n, ... ) {
+    if( n == 0 ) return _yp_frozendict_new( 0 );
+    return_yp_V_FUNC( ypObject *, yp_frozendictKV, (n, args), n );
+}
+ypObject *yp_frozendictKV( int n, va_list args ) {
+    return yp_NotImplementedError;
+}
+
+ypObject *yp_dictK( int n, ... ) {
+    if( n == 0 ) return _yp_dict_new( 0 );
+    return_yp_V_FUNC( ypObject *, yp_dictKV, (n, args), n );
+}
+ypObject *yp_dictKV( int n, va_list args ) {
+    return yp_NotImplementedError;
+}
+
+ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
+    if( n == 0 ) return _yp_frozendict_new( 0 );
+    return_yp_V_FUNC( ypObject *, yp_frozendict_fromkeysV, (value, n, args), n );
+}
+ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
+    return yp_NotImplementedError;
+}
+
+ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
+    if( n == 0 ) return _yp_dict_new( 0 );
+    return_yp_V_FUNC( ypObject *, yp_dict_fromkeysV, (value, n, args), n );
+}
+ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
+    return yp_NotImplementedError;
+}
+
+ypObject *yp_frozendict( ypObject *x ) {
+    return yp_NotImplementedError;
+}
+ypObject *yp_dict( ypObject *x ) {
+    return yp_NotImplementedError;
+}
 
 
 /*************************************************************************************************
