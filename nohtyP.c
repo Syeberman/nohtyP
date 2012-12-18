@@ -1,10 +1,8 @@
 /*
  * nohtyP.c - A Python-like API for C, in one .c and one .h
- *      Public domain?  PSF?  dunno
- *      http://nohtyp.wordpress.com/
- *      TODO Python's license
- *
- * TODO
+ *      http://nohtyp.wordpress.com
+ *      Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
+ *      License: http://docs.python.org/py3k/license.html
  */
 
 #include "nohtyP.h"
@@ -70,8 +68,6 @@ typedef size_t yp_uhash_t;
 #define ypObject_REFCNT( ob ) \
     ( ((ypObject *)(ob))->ob_type_refcnt >> 8 )
 
-#define ypObject_CACHED_HASH( ob ) ( ((ypObject *)(ob))->ob_hash )
-
 // Type pairs are identified by the immutable type code, as all its methods are supported by the
 // immutable version
 #define yp_TYPE_PAIR_CODE( ob ) \
@@ -89,6 +85,11 @@ typedef size_t yp_uhash_t;
 // Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
 #define ypObject_LEN_INVALID        _ypObject_LEN_INVALID
 #define ypObject_ALLOCLEN_INVALID   _ypObject_ALLOCLEN_INVALID
+
+// Lengths and hashes can be cached in the object for easy retrieval
+#define ypObject_CACHED_LEN( ob ) \
+    ((yp_ssize_t) (((ypObject *)(ob))->ob_len == ypObject_LEN_INVALID ? -1 : ((ypObject *)(ob))->ob_len ))
+#define ypObject_CACHED_HASH( ob ) ( ((ypObject *)(ob))->ob_hash )
 
 // Base "constructor" for immortal objects
 // TODO What to set alloclen to?  Does it matter?
@@ -223,7 +224,7 @@ typedef struct {
 } ypTypeObject;
 
 // The type table is defined at the bottom of this file
-static ypTypeObject **ypTypeTable;
+static ypTypeObject *ypTypeTable[255];
 
 // Codes for the standard types (for lookup in the type table)
 #define ypInvalidated_CODE          (  0u)
@@ -497,6 +498,14 @@ static void (*yp_free)( void * ) = _yp_dummy_free;
         (ob)->ob_alloclen = newAlloclen; \
     } while( 0 )
 
+#define ypMem_FREE_FIXED yp_free
+
+#define ypMem_FREE_CONTAINER( ob, obStruct ) \
+    do { \
+        if( (ob)->ob_data != ((obStruct *)(ob))->ob_inline_data ) yp_free( (ob)->ob_data ); \
+        yp_free( ob ); \
+    } while( 0 )
+
 
 /*************************************************************************************************
  * Object fundamentals
@@ -709,6 +718,18 @@ yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc )
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
     if( !ypObject_IS_MUTABLE( x ) ) ypObject_CACHED_HASH( x ) = hash;
     return hash;
+}
+
+yp_ssize_t yp_lenC( ypObject *x, ypObject **exc )
+{
+    yp_ssize_t len = ypObject_CACHED_LEN( x );
+    ypObject *result;
+
+    if( len >= 0 ) return len;
+    result = ypObject_TYPE( x )->tp_length( x, &len );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
+    if( len < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError ); // tp_length should not return <0
+    return len;
 }
 
 
@@ -977,6 +998,130 @@ typedef struct {
     yp_float_t ob_value;
 } ypFloatObject;
 #define ypFloat_VALUE( f ) ( ((ypFloatObject *)f)->ob_value )
+
+
+static ypObject *int_dealloc( ypObject *x ) {
+    ypMem_FREE_FIXED( x );
+    return yp_None;
+}
+
+static ypTypeObject ypInt_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    int_dealloc,                    // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    MethodError_objproc,            // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+static ypTypeObject ypIntStore_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    int_dealloc,                    // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    MethodError_objproc,            // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+
 
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
@@ -1693,6 +1838,132 @@ static yp_hash_t bytes_current_hash( ypObject *b ) {
     return yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
 }
 
+
+static ypObject *bytes_dealloc( ypObject *x ) {
+    ypMem_FREE_CONTAINER( x, ypBytesObject );
+    return yp_None;
+}
+
+static ypTypeObject ypBytes_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    bytes_dealloc,                  // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    MethodError_objproc,            // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+static ypTypeObject ypByteArray_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    bytes_dealloc,                  // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    MethodError_objproc,            // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+
+
+// Public constructors
+
 static ypObject *_ypBytesC( ypObject *(*allocator)( yp_ssize_t ),
     const yp_uint8_t *source, yp_ssize_t len )
 {
@@ -2398,16 +2669,54 @@ ypObject *yp_dict( ypObject *x ) {
  *************************************************************************************************/
 // XXX Make sure this corresponds with ypInvalidated_TYPE et al!
 
+// Recall that C helpfully sets missing array elements to NULL
+static ypTypeObject *ypTypeTable[255] = {
+    NULL,               /* ypInvalidated_CODE          (  0u) */
+    NULL,               /*                             (  1u) */
+    &ypException_Type,  /* ypException_CODE            (  2u) */
+    NULL,               /*                             (  3u) */
+    NULL,               /* ypType_CODE                 (  4u) */
+    NULL,               /*                             (  5u) */
 
+    NULL,               /* ypNone_CODE                 (  6u) */
+    NULL,               /*                             (  7u) */
+    NULL,               /* ypBool_CODE                 (  8u) */
+    NULL,               /*                             (  9u) */
+
+    &ypInt_Type,        /* ypInt_CODE                  ( 10u) */
+    &ypIntStore_Type,   /* ypIntStore_CODE             ( 11u) */
+    NULL,               /* ypFloat_CODE                ( 12u) */
+    NULL,               /* ypFloatStore_CODE           ( 13u) */
+
+    NULL,               /* ypFrozenIter_CODE           ( 14u) */
+    NULL,               /* ypIter_CODE                 ( 15u) */
+
+    &ypBytes_Type,      /* ypBytes_CODE                ( 16u) */
+    &ypByteArray_Type,  /* ypByteArray_CODE            ( 17u) */
+    NULL,               /* ypStr_CODE                  ( 18u) */
+    NULL,               /* ypCharacterArray_CODE       ( 19u) */
+    NULL,               /* ypTuple_CODE                ( 20u) */
+    NULL,               /* ypList_CODE                 ( 21u) */
+
+    NULL,               /* ypFrozenSet_CODE            ( 22u) */
+    NULL,               /* ypSet_CODE                  ( 23u) */
+
+    NULL,               /* ypFrozenDict_CODE           ( 24u) */
+    NULL,               /* ypDict_CODE                 ( 25u) */
+};
 
 
 /*************************************************************************************************
  * Initialization
  *************************************************************************************************/
 
-// Currently a no-op
+// TODO Make this accept configuration values from the user in a structure
 void yp_initialize( void )
 {
+    yp_malloc = _yp_malloc;
+    yp_realloc = _yp_realloc;
+    yp_free = _yp_free;
+    
     // TODO Config param idea: "minimum" or "average" or "usual" or "preferred" allocation
     // size...something that indicates that malloc handles these sizes particularly well.  The
     // number should be small, like 64 bytes or something.  This number can be used to decide how

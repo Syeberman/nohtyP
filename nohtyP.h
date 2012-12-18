@@ -1199,7 +1199,7 @@ struct _ypBytesObject {
 #ifdef yp_NO_VARIADIC_MACROS // TODO Rename?
 #define yp yp1
 #else
-#define yp( self, method, ... )     yp_ ## method( self, _VAR_ARGS_ )
+#define yp( self, method, ... )     yp_ ## method( self, _VA_ARGS_ )
 #endif
 #define yp2( self, method, a1, a2 ) yp_ ## method( self, a1, a2 )
 #define yp3( self, method, a1, a2, a3 ) yp_ ## method( self, a1, a2, a3 )
