@@ -234,8 +234,8 @@ static ypTypeObject *ypTypeTable[255];
 #define ypType_CODE                 (  4u)
 // no mutable ypType type           (  5u)
 
-#define ypNone_CODE                 (  6u)
-// no mutable ypNone type           (  7u)
+#define ypNoneType_CODE             (  6u)
+// no mutable ypNoneType type       (  7u)
 #define ypBool_CODE                 (  8u)
 // no mutable ypBool type           (  9u)
 
@@ -954,7 +954,75 @@ int yp_isexceptionC( ypObject *x )
  * None
  *************************************************************************************************/
 
+// TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
+
 // FIXME this needs to happen
+
+ypObject *nonetype_bool( ypObject *n ) {
+    return yp_False;
+}
+
+static ypTypeObject ypNoneType_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    MethodError_objproc,            // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    nonetype_bool,                  // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+// No constructors for nonetypes; there is exactly one, immortal object
+static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT( ypNoneType_CODE, NULL, 0 );
+ypObject *yp_None = &_yp_None_struct;
 
 
 /*************************************************************************************************
@@ -977,14 +1045,75 @@ typedef struct {
 } ypBoolObject;
 #define _ypBool_VALUE( b ) ( ((ypBoolObject *)b)->ob_value )
 
-// TODO methods here
+ypObject *bool_bool( ypObject *b ) {
+    return b;
+}
+
+static ypTypeObject ypBool_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    MethodError_objproc,            // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    bool_bool,                      // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
 
 // No constructors for bools; there are exactly two objects, and they are immortal
 
 // There are exactly two bool objects
-ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 1};
+static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 1};
 ypObject *yp_True = (ypObject *) &_yp_True_struct;
-ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 0};
+static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 0};
 ypObject *yp_False = (ypObject *) &_yp_False_struct;
 
 
@@ -2754,10 +2883,10 @@ static ypTypeObject *ypTypeTable[255] = {
     NULL,               /* ypType_CODE                 (  4u) */
     NULL,               /*                             (  5u) */
 
-    NULL,               /* ypNone_CODE                 (  6u) */
-    NULL,               /*                             (  7u) */
-    NULL,               /* ypBool_CODE                 (  8u) */
-    NULL,               /*                             (  9u) */
+    &ypNoneType_Type,   /* ypNoneType_CODE             (  6u) */
+    &ypNoneType_Type,   /*                             (  7u) */
+    &ypBool_Type,       /* ypBool_CODE                 (  8u) */
+    &ypBool_Type,       /*                             (  9u) */
 
     &ypInt_Type,        /* ypInt_CODE                  ( 10u) */
     &ypIntStore_Type,   /* ypIntStore_CODE             ( 11u) */
