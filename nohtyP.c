@@ -60,7 +60,7 @@ typedef size_t yp_uhash_t;
 #define ypObject_TYPE_CODE_IS_MUTABLE( type ) \
     ( (type) & 0x1u )
 #define ypObject_TYPE_CODE_AS_FROZEN( type ) \
-    ( (type) | 0x1u )
+    ( (type) & 0xFEu )
 #define ypObject_TYPE( ob ) \
     ( ypTypeTable[ypObject_TYPE_CODE( ob )] )
 #define ypObject_IS_MUTABLE( ob ) \
@@ -113,7 +113,7 @@ typedef ypObject *(*visitfunc)( ypObject *, void * );
 typedef ypObject *(*traversefunc)( ypObject *, visitfunc, void * );
 typedef ypObject *(*hashfunc)( ypObject *, yp_hash_t * );
 typedef ypObject *(*lenfunc)( ypObject *, yp_ssize_t * );
-typedef ypObject *(*countfunc)( ypObject *, ypObject *, yp_ssize_t * );
+typedef ypObject *(*countfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
 typedef ypObject *(*findfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
 typedef ypObject *(*sortfunc)( ypObject *, yp_sort_key_func_t, ypObject * );
 typedef ypObject *(*popitemfunc)( ypObject *, ypObject **, ypObject ** );
@@ -279,7 +279,7 @@ yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE );
     static ypObject *name ## _traversefunc( ypObject *x, visitfunc visitor, void *memo ) { return retval; } \
     static ypObject *name ## _hashfunc( ypObject *x, yp_hash_t *hash ) { return retval; } \
     static ypObject *name ## _lenfunc( ypObject *x, yp_ssize_t *len ) { return retval; } \
-    static ypObject *name ## _countfunc( ypObject *x, ypObject *y, yp_ssize_t *count ) { return retval; } \
+    static ypObject *name ## _countfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count ) { return retval; } \
     static ypObject *name ## _findfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *index ) { return retval; } \
     static ypObject *name ## _sortfunc( ypObject *x, yp_sort_key_func_t key, ypObject *reverse ) { return retval; } \
     static ypObject *name ## _popitemfunc( ypObject *x, ypObject **key, ypObject **value ) { return retval; } \
@@ -951,6 +951,13 @@ int yp_isexceptionC( ypObject *x )
 
 
 /*************************************************************************************************
+ * None
+ *************************************************************************************************/
+
+// FIXME this needs to happen
+
+
+/*************************************************************************************************
  * Bools
  *************************************************************************************************/
 
@@ -1000,9 +1007,13 @@ typedef struct {
 #define ypFloat_VALUE( f ) ( ((ypFloatObject *)f)->ob_value )
 
 
-static ypObject *int_dealloc( ypObject *x ) {
-    ypMem_FREE_FIXED( x );
+static ypObject *int_dealloc( ypObject *i ) {
+    ypMem_FREE_FIXED( i );
     return yp_None;
+}
+
+static ypObject *int_bool( ypObject *i ) {
+    return ypBool_FROM_C( ypInt_VALUE( i ) );
 }
 
 static ypTypeObject ypInt_Type = {
@@ -1022,7 +1033,7 @@ static ypTypeObject ypInt_Type = {
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
-    MethodError_objproc,            // tp_bool
+    int_bool,                       // tp_bool
     MethodError_objobjproc,         // tp_lt
     MethodError_objobjproc,         // tp_le
     MethodError_objobjproc,         // tp_eq
@@ -1080,7 +1091,7 @@ static ypTypeObject ypIntStore_Type = {
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
-    MethodError_objproc,            // tp_bool
+    int_bool,                       // tp_bool
     MethodError_objobjproc,         // tp_lt
     MethodError_objobjproc,         // tp_le
     MethodError_objobjproc,         // tp_eq
@@ -1120,8 +1131,6 @@ static ypTypeObject ypIntStore_Type = {
     // Mapping operations
     MethodError_MappingMethods      // tp_as_mapping
 };
-
-
 
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
@@ -1210,22 +1219,34 @@ yp_int_t yp_asintC( ypObject *x, ypObject **exc )
     return_yp_CEXC_BAD_TYPE( 0, exc, x );
 }
 
-yp_float_t yp_asfloatC( ypObject *x, ypObject **exc )
-{
-    int x_type = yp_TYPE_PAIR_CODE( x );
-
-    if( x_type == ypInt_CODE ) {
-        return yp_asfloatL( ypInt_VALUE( x ), exc );
-    } else if( x_type == ypFloat_CODE ) {
-        return ypFloat_VALUE( x );
-    }
-    return_yp_CEXC_BAD_TYPE( 0.0, exc, x );
+// Defines the conversion functions.  Overflow checking is done by first truncating the value then
+// seeing if it equals the stored value.  Note that when yp_asintC raises an exception, it returns
+// zero, which can be represented in every integer type, so we won't override any yp_TypeError 
+// errors.
+#define _ypInt_PUBLIC_AS_C_FUNCTION( name ) \
+yp_ ## name ## _t yp_as ## name ## C( ypObject *x, ypObject **exc ) { \
+    yp_int_t asint = yp_asintC( x, exc ); \
+    yp_ ## name ## _t retval = (yp_ ## name ## _t) asint; \
+    if( retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_OverflowError ); \
+    return retval; \
 }
+_ypInt_PUBLIC_AS_C_FUNCTION( int8 );
+_ypInt_PUBLIC_AS_C_FUNCTION( uint8 );
+_ypInt_PUBLIC_AS_C_FUNCTION( int16 );
+_ypInt_PUBLIC_AS_C_FUNCTION( uint16 );
+_ypInt_PUBLIC_AS_C_FUNCTION( int32 );
+_ypInt_PUBLIC_AS_C_FUNCTION( uint32 );
+// TODO #undef _ypInt_PUBLIC_AS_C_FUNCTION
 
-yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc )
-{
-    // TODO Implement this as Python does
-    return (yp_float_t) x;
+// The functions below assume/assert that yp_int_t is 64 bits
+yp_STATIC_ASSERT( sizeof( yp_int_t ) == 8, sizeof_yp_int );
+yp_int64_t yp_asint64C( ypObject *x, ypObject **exc ) {
+    return yp_asintC( x, exc );
+}
+yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc ) {
+    yp_int_t asint = yp_asintC( x, exc );
+    if( asint < 0 ) return_yp_CEXC_ERR( (yp_uint64_t) asint, exc, yp_OverflowError );
+    return (yp_uint64_t) asint;
 }
 
 
@@ -1277,6 +1298,24 @@ ypObject *yp_floatC( yp_float_t value )
     if( yp_isexceptionC( f ) ) return f;
     ypFloat_VALUE( f ) = value;
     return f;
+}
+
+yp_float_t yp_asfloatC( ypObject *x, ypObject **exc )
+{
+    int x_type = yp_TYPE_PAIR_CODE( x );
+
+    if( x_type == ypInt_CODE ) {
+        return yp_asfloatL( ypInt_VALUE( x ), exc );
+    } else if( x_type == ypFloat_CODE ) {
+        return ypFloat_VALUE( x );
+    }
+    return_yp_CEXC_BAD_TYPE( 0.0, exc, x );
+}
+
+yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc )
+{
+    // TODO Implement this as Python does
+    return (yp_float_t) x;
 }
 
 yp_int_t yp_asintFL( yp_float_t x, ypObject **exc )
@@ -1548,8 +1587,12 @@ static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssi
 
 // TODO Returns yp_None or an exception
 
+static ypObject *bytes_bool( ypObject *b ) {
+    return ypBool_FROM_C( ypBytes_LEN( b ) );
+}
+
 // Returns yp_None or an exception
-static ypObject *bytes_findC4( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t *i )
 {
     yp_uint8_t *x_data;
@@ -1584,7 +1627,7 @@ static ypObject *bytes_contains( ypObject *b, ypObject *x )
     ypObject *result;
     yp_ssize_t i = -1;
 
-    result = bytes_findC4( b, x, 0, yp_SLICE_USELEN, &i );
+    result = bytes_find( b, x, 0, yp_SLICE_USELEN, &i );
     if( yp_isexceptionC( result ) ) return result;
     return ypBool_FROM_C( i >= 0 );
 }
@@ -1627,7 +1670,7 @@ static ypObject *bytearray_extend( ypObject *b, ypObject *x )
 // TODO bytes_irepeat
 
 // Returns new reference or an exception
-static ypObject *bytes_getindexC( ypObject *b, yp_ssize_t i )
+static ypObject *bytes_getindex( ypObject *b, yp_ssize_t i )
 {
     ypObject *result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
     if( yp_isexceptionC( result ) ) return result;
@@ -1635,7 +1678,7 @@ static ypObject *bytes_getindexC( ypObject *b, yp_ssize_t i )
 }
 
 // Returns yp_None or an exception
-static ypObject *bytearray_setindexC( ypObject *b, yp_ssize_t i, ypObject *x )
+static ypObject *bytearray_setindex( ypObject *b, yp_ssize_t i, ypObject *x )
 {
     ypObject *result = yp_None;
     yp_uint8_t x_value;
@@ -1651,7 +1694,7 @@ static ypObject *bytearray_setindexC( ypObject *b, yp_ssize_t i, ypObject *x )
 }
 
 // Returns yp_None or an exception
-static ypObject *bytearray_delindexC( ypObject *b, yp_ssize_t i )
+static ypObject *bytearray_delindex( ypObject *b, yp_ssize_t i )
 {
     ypObject *result;
 
@@ -1665,7 +1708,7 @@ static ypObject *bytearray_delindexC( ypObject *b, yp_ssize_t i )
 }
 
 // Returns new reference or an exception
-static ypObject *bytes_getsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
+static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
     ypObject *result;
     yp_ssize_t newLen;
@@ -1690,9 +1733,9 @@ static ypObject *bytes_getsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop
 
 // Returns yp_None or an exception
 // TODO handle b == x! (and elsewhere?)
-static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
+static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step );
-static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
+static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step, ypObject *x )
 {
     ypObject *result;
@@ -1702,7 +1745,7 @@ static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
 
     _ypBytes_coerce_bytes( x, &x_data, &x_len );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
-    if( x_len == 0 ) return bytearray_delsliceC( b, start, stop, step );
+    if( x_len == 0 ) return bytearray_delslice( b, start, stop, step );
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
@@ -1737,7 +1780,7 @@ static ypObject *bytearray_setsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
 }
 
 // Returns yp_None or an exception
-static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
+static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step )
 {
     ypObject *result;
@@ -1763,7 +1806,7 @@ static ypObject *bytearray_delsliceC( ypObject *b, yp_ssize_t start, yp_ssize_t 
 // TODO bytes_getitem, setitem, delitem...need generic functions to redirect to getindexC et al
 
 // Returns yp_None or an exception
-static ypObject *bytes_lenC( ypObject *b, yp_ssize_t *len )
+static ypObject *bytes_len( ypObject *b, yp_ssize_t *len )
 {
     *len = ypBytes_LEN( b );
     return yp_None;
@@ -1771,7 +1814,7 @@ static ypObject *bytes_lenC( ypObject *b, yp_ssize_t *len )
 
 // TODO allow custom min/max methods?
 
-static ypObject *bytes_count3C( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t *n )
 {
     yp_uint8_t *x_data;
@@ -1834,15 +1877,31 @@ _ypBytes_EQUALITY_CMP_FUNCTION( ne, != );
 // TODO #undef _ypBytes_EQUALITY_CMP_FUNCTION
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
-static yp_hash_t bytes_current_hash( ypObject *b ) {
+static yp_hash_t bytes_currenthash( ypObject *b ) {
     return yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
 }
-
 
 static ypObject *bytes_dealloc( ypObject *x ) {
     ypMem_FREE_CONTAINER( x, ypBytesObject );
     return yp_None;
 }
+
+static ypSequenceMethods ypBytes_as_sequence = {
+    bytes_getindex,                 // tp_getindex
+    bytes_getslice,                 // tp_getslice
+    bytes_find,                     // tp_find
+    bytes_count,                    // tp_count
+    MethodError_objssizeobjproc,    // tp_setindex
+    MethodError_objsliceobjproc,    // tp_setslice
+    MethodError_objssizeproc,       // tp_delindex
+    MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_extend
+    MethodError_objssizeproc,       // tp_irepeat
+    MethodError_objssizeobjproc,    // tp_insert
+    MethodError_objssizeproc,       // tp_popindex
+    MethodError_objproc,            // tp_reverse
+    MethodError_sortfunc            // tp_sort
+};
 
 static ypTypeObject ypBytes_Type = {
     yp_TYPE_HEAD_INIT,
@@ -1861,7 +1920,7 @@ static ypTypeObject ypBytes_Type = {
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
-    MethodError_objproc,            // tp_bool
+    bytes_bool,                     // tp_bool
     MethodError_objobjproc,         // tp_lt
     MethodError_objobjproc,         // tp_le
     MethodError_objobjproc,         // tp_eq
@@ -1893,13 +1952,30 @@ static ypTypeObject ypBytes_Type = {
     MethodError_objobjproc,         // tp_delitem
 
     // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+    &ypBytes_as_sequence,           // tp_as_sequence
 
     // Set operations
     MethodError_SetMethods,         // tp_as_set
 
     // Mapping operations
     MethodError_MappingMethods      // tp_as_mapping
+};
+
+static ypSequenceMethods ypByteArray_as_sequence = {
+    bytes_getindex,                 // tp_getindex
+    bytes_getslice,                 // tp_getslice
+    bytes_find,                     // tp_find
+    bytes_count,                    // tp_count
+    bytearray_setindex,             // tp_setindex
+    bytearray_setslice,             // tp_setslice
+    bytearray_delindex,             // tp_delindex
+    bytearray_delslice,             // tp_delslice
+    MethodError_objobjproc,         // tp_extend
+    MethodError_objssizeproc,       // tp_irepeat
+    MethodError_objssizeobjproc,    // tp_insert
+    MethodError_objssizeproc,       // tp_popindex
+    MethodError_objproc,            // tp_reverse
+    MethodError_sortfunc            // tp_sort
 };
 
 static ypTypeObject ypByteArray_Type = {
@@ -1919,7 +1995,7 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
-    MethodError_objproc,            // tp_bool
+    bytes_bool,                     // tp_bool
     MethodError_objobjproc,         // tp_lt
     MethodError_objobjproc,         // tp_le
     MethodError_objobjproc,         // tp_eq
@@ -1951,7 +2027,7 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_objobjproc,         // tp_delitem
 
     // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+    &ypByteArray_as_sequence,       // tp_as_sequence
 
     // Set operations
     MethodError_SetMethods,         // tp_as_set

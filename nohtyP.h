@@ -1134,6 +1134,7 @@ struct _ypBytesObject {
     } if( _yp_IF_cond == yp_False ) {
 #define yp_ELSE_EXCEPT \
     } if( yp_isexceptionC( _yp_IF_cond ) ) {
+// TODO define the target internally?
 #define yp_ELSE_EXCEPT_AS( target ) \
     } if( yp_isexceptionC( _yp_IF_cond ) ) { \
         target = _yp_IF_cond;
