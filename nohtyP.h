@@ -961,13 +961,13 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 //      } yp_ELSE_EXCEPT_AS( e ) {  // optional; can also use yp_ELSE_EXCEPT
 //          // exception-branch
 //      } yp_ENDIF
-// As in Python, a condition is only evaluated if previous conditions evaluated false and did not
-// raise an exception, the exception-branch is executed if any evaluated condition raises an
-// exception, and the exception variable is only set if an exception occurs.  Unlike Python,
+// C's return statement works as you'd expect.
+// As in Python, a condition is only evaluated if previous conditions evaluated false and did not 
+// raise an exception, the exception-branch is executed if any evaluated condition raises an 
+// exception, and the exception variable is only set if an exception occurs.  Unlike Python, 
 // exceptions in the chosen branch do not trigger the exception-branch, and the exception variable
-// is not cleared at the end of the exception-branch.
-// If a condition creates a new reference that must be discarded, use yp_IFd and/or yp_ELIFd ("d"
-// stands for "discard" or "decref"):
+// is not cleared at the end of the exception-branch.  If a condition creates a new reference that
+// must be discarded, use yp_IFd and/or yp_ELIFd ("d" stands for "discard" or "decref"):
 //      yp_IFd( yp_getitem( a, key ) )
 
 // yp_WHILE: A series of macros to emulate a while/else with exception handling.  To be used
@@ -979,8 +979,8 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 //      } yp_WHILE_EXCEPT_AS( e ) { // optional; can also use yp_WHILE_EXCEPT
 //          // exception-suite
 //      } yp_ENDWHILE
-// C's break and continue statements work as you'd expect.  As in Python, the condition is
-// evaluated multiple times until:
+// C's break, continue, and return statements work as you'd expect.
+// As in Python, the condition is evaluated multiple times until:
 //  - it evaluates to false, in which case the else-suite is executed
 //  - a break statement, in which case neither the else- nor exception-suites are executed
 //  - an exception occurs in condition, in which case e is set to the exception and the
@@ -990,8 +990,8 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 // If condition creates a new reference that must be discarded, use yp_WHILEd ("d" stands for
 // "discard" or "decref"):
 //      yp_WHILEd( yp_getindexC( a, -1 ) )
-// TODO if yp_WHILE_EXCEPT_AS declared the exception variable internally, then it would disappear once
-// outside of the block and thus behave more like Python (here and elsewhere)
+// TODO if yp_WHILE_EXCEPT_AS declared the exception variable internally, then it would disappear
+// once outside of the block and thus behave more like Python (here and elsewhere)
 
 // yp_FOR: A series of macros to emulate a for/else with exception handling.  To be used strictly
 // as follows (including braces):
@@ -1002,9 +1002,13 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 //      } yp_FOR_EXCEPT_AS( e ) {   // optional; can also use yp_FOR_EXCEPT
 //          // exception-suite
 //      } yp_ENDFOR
-// C's break and continue statements work as you'd expect.  As in Python, the expression is
-// evaluated once to create an iterator, then the suite is executed once with each successfully-
-// yielded value assigned to x (which can be reassigned within the suite).  This occurs until:
+// C's break and continue statements work as you'd expect.  XXX However, using C's return statement
+// directly in a yp_FOR will cause reference leaks, so do not use it.
+// TODO Come up with a viable alternative for the return statement (the trouble is if you want to
+// return a new reference to x...it'll be decref'd before you return it)
+// As in Python, the expression is evaluated once to create an iterator, then the suite is executed
+// once with each successfully-yielded value assigned to x (which can be reassigned within the 
+// suite).  This occurs until:
 //  - the iterator returns yp_StopIteration, in which case else-suite is executed (but *not* the
 //  exception-suite)
 //  - a break statement, in which case neither the else- nor exception-suites are executed
@@ -1026,6 +1030,9 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 //              break;
 //          }
 //      } yp_ENDFOR
+// FIXME re-think the auto-decref of yielded values by yp_ENDFOR...quite common to loop to try to
+// find a value, having to incref it all the time can be cumbersome.  Might also be a good time to
+// rethink other borrowed values in this api.
 
 // yp: A set of macros to make nohtyP function calls look more like Python operators and method
 // calls.  Best explained with examples:
@@ -1192,7 +1199,7 @@ struct _ypBytesObject {
 #define yp_ENDFOR \
     yp_decref( _yp_FOR_item ); \
     yp_decref( _yp_FOR_iter ); \
-    }
+}
 
 // The implementation of "yp" is considered "internal"; see above for documentation
 #define yp0( self, method )         yp_ ## method( self )

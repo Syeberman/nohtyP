@@ -381,6 +381,14 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
         va_end( args ); \
         return retval; } while( 0 )
 
+// As above, but for functions without a return value
+#define return_yp_V_FUNC_void( v_func, v_func_args, last_fixed ) \
+    do {va_list args; \
+        va_start( args, last_fixed ); \
+        v_func v_func_args; \
+        va_end( args ); \
+        return; } while( 0 )
+
 // Prime multiplier used in string and various other hashes
 #define _ypHASH_MULTIPLIER 1000003  // 0xf4243
 
@@ -551,6 +559,65 @@ void yp_decrefN( yp_ssize_t n, ... )
 
 
 /*************************************************************************************************
+ * Iterators
+ *************************************************************************************************/
+
+// TODO Iterators should have a lenhint "attribute" so that consumers of the iterator can
+// pre-allocate; this should be automatically decremented with every yielded value
+
+// _ypIterObject_HEAD shared with ypIterValistObject below
+#define _ypIterObject_HEAD \
+    ypObject_HEAD \
+    yp_generator_func_t ob_func; \
+    yp_ssize_t ob_lenhint;
+typedef struct {
+    _ypIterObject_HEAD
+    yp_INLINE_DATA( yp_uint8_t );
+} ypIterObject;
+#define ypIter_LENHINT( i ) ( ((ypIterObject *)i)->ob_lenhint )
+
+yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc ) 
+{
+    if( yp_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
+        return_yp_CEXC_BAD_TYPE( 0, exc, iterator );
+    }
+    // TODO ensure we never return <0
+    return ypIter_LENHINT( iterator );
+}
+
+
+/*************************************************************************************************
+ * Special (and dangerous) iterator for working with variable arguments of ypObject*s
+ *************************************************************************************************/
+
+// XXX Be very careful working with this: only pass it to functions that will call yp_iter_lenhintC
+// and yp_next.  It is not your typical object: it's allocated on the stack.  While this could be
+// dangerous, it also reduces duplicating code between versions that handle va_args and those that
+// handle iterables.
+
+typedef struct {
+    _ypIterObject_HEAD
+    va_list ob_args;
+} _ypIterValistObject;
+
+// The number of arguments is stored in ob_lenhint, which is automatically decremented by yp_next
+// on each yielded value.
+#define yp_ONSTACK_ITER_VALIST( name, n, args ) \
+    _ypIterValistObject _ ## name ## _struct = { \
+        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, 0 ), _ypIterValist_func, n, args}; \
+    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+
+static ypObject *_ypIterValist_func( ypObject *_i, ypObject *value )
+{
+    _ypIterValistObject *i = (_ypIterValistObject *) _i;
+    if( i->ob_lenhint < 1 ) return yp_StopIteration;
+    return yp_incref( va_arg( i->ob_args, ypObject * ) );
+}
+
+// TODO #undef _ypIterObject_HEAD
+
+
+/*************************************************************************************************
  * Freezing, "unfreezing", and invalidating
  *************************************************************************************************/
 
@@ -679,6 +746,118 @@ void yp_deepinvalidate( ypObject **x );
  * Boolean operations, comparisons, and generic object operations
  *************************************************************************************************/
 
+// If you know that b is either yp_True, yp_False, or an exception, use this
+// XXX b should be a variable, _not_ an expression, as it's evaluated up to three times
+#define ypBool_NOT( b ) ( b == yp_True ? yp_False : \
+                         (b == yp_False ? yp_True : b))
+ypObject *yp_not( ypObject *x ) {
+    ypObject *result = yp_bool( x );
+    return ypBool_NOT( result );
+}
+
+ypObject *yp_or( ypObject *x, ypObject *y ) 
+{
+    ypObject *b = yp_bool( x );
+    if( yp_isexceptionC( b ) ) return b;
+    if( b == yp_False ) return yp_incref( y );
+    return yp_incref( x );
+}
+
+ypObject *yp_orN( int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_orV, (n, args), n );
+}
+ypObject *yp_orV( int n, va_list args ) 
+{
+    ypObject *x;
+    ypObject *b;
+    if( n == 0 ) return yp_False;
+    for( /*n already set*/; n > 1; n-- ) {
+        x = va_arg( args, ypObject * );
+        b = yp_bool( x );
+        if( yp_isexceptionC( b ) ) return b;
+        if( b == yp_True ) return yp_incref( x );
+    }
+    // If everything else was false, we always return the last object
+    return yp_incref( va_arg( args, ypObject * ) );
+}
+
+ypObject *yp_anyN( int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_anyV, (n, args), n );
+}
+ypObject *yp_anyV( int n, va_list args ) {
+    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
+    return yp_any( iter_args );
+}
+// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+ypObject *yp_any( ypObject *iterable ) 
+{
+    ypObject *iter;
+    ypObject *x;
+    ypObject *result = yp_False;
+
+    iter = yp_iter( iterable ); // new ref
+    while( 1 ) {
+        x = yp_next( &iter ); // new ref
+        if( x == yp_StopIteration ) break;
+        result = yp_bool( x );
+        yp_decref( x );
+        if( result != yp_False ) break; // exit on yp_True or exception
+    }
+    yp_decref( iter );
+    return result;
+}
+
+ypObject *yp_and( ypObject *x, ypObject *y )
+{
+    ypObject *b = yp_bool( x );
+    if( yp_isexceptionC( b ) ) return b;
+    if( b == yp_False ) return yp_incref( x );
+    return yp_incref( y );
+}
+
+ypObject *yp_andN( int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_andV, (n, args), n );
+}    
+ypObject *yp_andV( int n, va_list args )
+{
+    ypObject *x;
+    ypObject *b;
+    if( n == 0 ) return yp_True;
+    for( /*n already set*/; n > 1; n-- ) {
+        x = va_arg( args, ypObject * );
+        b = yp_bool( x );
+        if( yp_isexceptionC( b ) ) return b;
+        if( b == yp_False ) return yp_incref( x );
+    }
+    // If everything else was true, we always return the last object
+    return yp_incref( va_arg( args, ypObject * ) );
+}
+
+ypObject *yp_allN( int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_allV, (n, args), n );
+}
+ypObject *yp_allV( int n, va_list args ) {
+    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
+    return yp_all( iter_args );
+}
+// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+ypObject *yp_all( ypObject *iterable )
+{
+    ypObject *iter;
+    ypObject *x;
+    ypObject *result = yp_True;
+
+    iter = yp_iter( iterable ); // new ref
+    while( 1 ) {
+        x = yp_next( &iter ); // new ref
+        if( x == yp_StopIteration ) break;
+        result = yp_bool( x );
+        yp_decref( x );
+        if( result != yp_True ) break; // exit on yp_False or exception
+    }
+    yp_decref( iter );
+    return result;
+}
 
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 ypObject *yp_ComparisonNotImplemented;
@@ -743,6 +922,7 @@ yp_ssize_t yp_lenC( ypObject *x, ypObject **exc )
 // TODO do/while(0)
 
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
+// TODO _return_yp_REDIRECT, etc
 #define _yp_REDIRECT1( ob, tp_meth, args ) \
     ypTypeObject *type = ypObject_TYPE( ob ); \
     return type->tp_meth args;
@@ -789,7 +969,19 @@ ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
     // TODO should we be discarding *iterator?
 }
 
-// TODO for this and other methods that mutate, check first if it's immutable
+ypObject *yp_contains( ypObject *container, ypObject *x ) {
+    _yp_REDIRECT1( container, tp_contains, (container, x) );
+}
+ypObject *yp_in( ypObject *x, ypObject *container ) {
+    _yp_REDIRECT1( container, tp_contains, (container, x) );
+}
+
+ypObject *yp_not_in( ypObject *x, ypObject *container ) {
+    ypObject *result = yp_in( x, container );
+    return ypBool_NOT( result );
+}
+
+// TODO for this and other methods that mutate, check first if it's immutable?
 void yp_push( ypObject **sequence, ypObject *x ) {
     _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
 }
@@ -804,6 +996,83 @@ void yp_append( ypObject **sequence, ypObject *x ) {
 
 void yp_extend( ypObject **sequence, ypObject *x ) {
     _yp_INPLACE2( sequence, tp_as_sequence, tp_extend, (*sequence, x) )
+}
+
+ypObject *yp_isdisjoint( ypObject *set, ypObject *x ) {
+    _yp_REDIRECT2( set, tp_as_set, tp_isdisjoint, (set, x) );
+}
+
+ypObject *yp_issubset( ypObject *set, ypObject *x ) {
+    _yp_REDIRECT2( set, tp_as_set, tp_issubset, (set, x) );
+}
+
+ypObject *yp_issuperset( ypObject *set, ypObject *x ) {
+    _yp_REDIRECT2( set, tp_as_set, tp_issuperset, (set, x) );
+}
+
+// XXX Freezing a mutable set is a quick operation, so we redirect the new-object set methods to
+// the in-place versions.  Among other things, this helps to avoid duplicating code.
+// TODO Verify this assumption
+ypObject *yp_unionN( ypObject *set, int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_unionV, (set, n, args), n );
+}
+ypObject *yp_unionV( ypObject *set, int n, va_list args ) {
+    ypObject *result = yp_unfrozen_copy( set );
+    yp_updateV( &result, n, args );
+    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
+    return result;
+}
+
+ypObject *yp_intersectionN( ypObject *set, int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_intersectionV, (set, n, args), n );
+}    
+ypObject *yp_intersectionV( ypObject *set, int n, va_list args ) {
+    ypObject *result = yp_unfrozen_copy( set );
+    yp_intersection_updateV( &result, n, args );
+    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
+    return result;
+}
+    
+ypObject *yp_differenceN( ypObject *set, int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_differenceV, (set, n, args), n );
+}
+ypObject *yp_differenceV( ypObject *set, int n, va_list args ) {
+    ypObject *result = yp_unfrozen_copy( set );
+    yp_difference_updateV( &result, n, args );
+    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
+    return result;
+}
+    
+ypObject *yp_symmetric_difference( ypObject *set, ypObject *x ) {
+    ypObject *result = yp_unfrozen_copy( set );
+    yp_symmetric_difference_update( &result, x );
+    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
+    return result;
+}
+
+void yp_updateN( ypObject **set, int n, ... ) {
+    return_yp_V_FUNC_void( yp_updateV, (set, n, args), n );
+}    
+void yp_updateV( ypObject **set, int n, va_list args ) {
+    _yp_INPLACE2( set, tp_as_set, tp_update, (*set, n, args) );
+}
+
+void yp_intersection_updateN( ypObject **set, int n, ... ) {
+    return_yp_V_FUNC_void( yp_intersection_updateV, (set, n, args), n );
+}    
+void yp_intersection_updateV( ypObject **set, int n, va_list args ) {
+    _yp_INPLACE2( set, tp_as_set, tp_intersection_update, (*set, n, args) );
+}
+
+void yp_difference_updateN( ypObject **set, int n, ... ) {
+    return_yp_V_FUNC_void( yp_difference_updateV, (set, n, args), n );
+}    
+void yp_difference_updateV( ypObject **set, int n, va_list args ) {
+    _yp_INPLACE2( set, tp_as_set, tp_difference_update, (*set, n, args) );
+}
+
+void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
+    _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, (*set, x) );
 }
 
 ypObject *yp_pushuniqueE( ypObject **set, ypObject *x ) {
@@ -1453,65 +1722,6 @@ yp_int_t yp_asintFL( yp_float_t x, ypObject **exc )
     return (yp_int_t) x;
 }
 
-
-/*************************************************************************************************
- * Iterators
- *************************************************************************************************/
-
-// TODO Iterators should have a lenhint "attribute" so that consumers of the iterator can
-// pre-allocate; this should be automatically decremented with every yielded value
-
-// _ypIterObject_HEAD shared with ypIterValistObject below
-#define _ypIterObject_HEAD \
-    ypObject_HEAD \
-    yp_generator_func_t ob_func; \
-    yp_ssize_t ob_lenhint;
-typedef struct {
-    _ypIterObject_HEAD
-    yp_INLINE_DATA( yp_uint8_t );
-} ypIterObject;
-#define ypIter_LENHINT( i ) ( ((ypIterObject *)i)->ob_lenhint )
-
-
-yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc ) 
-{
-    if( yp_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
-        return_yp_CEXC_BAD_TYPE( 0, exc, iterator );
-    }
-    // TODO ensure we never return <0
-    return ypIter_LENHINT( iterator );
-}
-
-
-/*************************************************************************************************
- * Special (and dangerous) iterator for working with variable arguments of ypObject*s
- *************************************************************************************************/
-
-// XXX Be very careful working with this: only pass it to functions that will call yp_iter_lenhintC
-// and yp_next.  It is not your typical object: it's allocated on the stack.  While this could be
-// dangerous, it also reduces duplicating code between versions that handle va_args and those that
-// handle iterables.
-
-typedef struct {
-    _ypIterObject_HEAD
-    va_list ob_args;
-} _ypIterValistObject;
-
-// The number of arguments is stored in ob_lenhint, which is automatically decremented by yp_next
-// on each yielded value.
-#define yp_ONSTACK_ITER_VALIST( name, n, args ) \
-    _ypIterValistObject _ ## name ## _struct = { \
-        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, 0 ), _ypIterValist_func, n, args}; \
-    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-
-static ypObject *_ypIterValist_func( ypObject *_i, ypObject *value )
-{
-    _ypIterValistObject *i = (_ypIterValistObject *) _i;
-    if( i->ob_lenhint < 1 ) return yp_StopIteration;
-    return yp_incref( va_arg( i->ob_args, ypObject * ) );
-}
-
-// TODO #undef _ypIterObject_HEAD
 
 /*************************************************************************************************
  * Indices and slices
@@ -2879,7 +3089,7 @@ static ypTypeObject *ypTypeTable[255] = {
     NULL,               /* ypInvalidated_CODE          (  0u) */
     NULL,               /*                             (  1u) */
     &ypException_Type,  /* ypException_CODE            (  2u) */
-    NULL,               /*                             (  3u) */
+    &ypException_Type,  /*                             (  3u) */
     NULL,               /* ypType_CODE                 (  4u) */
     NULL,               /*                             (  5u) */
 
