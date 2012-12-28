@@ -87,6 +87,7 @@ typedef size_t yp_uhash_t;
 #define ypObject_ALLOCLEN_INVALID   _ypObject_ALLOCLEN_INVALID
 
 // Lengths and hashes can be cached in the object for easy retrieval
+// FIXME trap when setting ob_len et al overflows available space
 #define ypObject_CACHED_LEN( ob ) \
     ((yp_ssize_t) (((ypObject *)(ob))->ob_len == ypObject_LEN_INVALID ? -1 : ((ypObject *)(ob))->ob_len ))
 #define ypObject_CACHED_HASH( ob ) ( ((ypObject *)(ob))->ob_hash )
@@ -562,9 +563,6 @@ void yp_decrefN( yp_ssize_t n, ... )
  * Iterators
  *************************************************************************************************/
 
-// TODO Iterators should have a lenhint "attribute" so that consumers of the iterator can
-// pre-allocate; this should be automatically decremented with every yielded value
-
 // _ypIterObject_HEAD shared with ypIterValistObject below
 #define _ypIterObject_HEAD \
     ypObject_HEAD \
@@ -574,15 +572,159 @@ typedef struct {
     _ypIterObject_HEAD
     yp_INLINE_DATA( yp_uint8_t );
 } ypIterObject;
-#define ypIter_LENHINT( i ) ( ((ypIterObject *)i)->ob_lenhint )
+#define ypIter_STATE( i )       ( ((ypObject *)i)->ob_data )
+#define ypIter_STATE_SIZE( so ) ( ((ypObject *)i)->ob_alloclen )
+#define ypIter_FUNC( i )        ( ((ypIterObject *)i)->ob_func )
+#define ypIter_LENHINT( i )     ( ((ypIterObject *)i)->ob_lenhint )
+
+// Iterator methods
+
+static ypobject *iter_closed_generator( ypObject *i, ypObject *value ) {
+    return yp_StopIteration;
+}
+static ypObject *iter_close( ypObject *i ) 
+{
+    // Let the generator know we're closing
+    ypObject *result = ypIter_FUNC( i )( i, yp_GeneratorExit );
+
+    // Close off this iterator
+    ypIter_FUNC( i ) = iter_closed_generator;
+    ypIter_LENHINT( i ) = 0;
+    // TODO free the inline data/objects?
+
+    // Handle the returned value from the generator.  yp_StopIteration and yp_GeneratorExit are not
+    // errors.  Any other exception or yielded value _is_ an error, as per Python.
+    if( result == yp_StopIteration || result == yp_GeneratorExit ) return yp_None;
+    if( yp_isexceptionC( result ) ) return result;
+    yp_decref( result ); // discard unexpectedly-yielded value
+    return yp_RuntimeError;
+}
+
+static ypobject *iter_iter( ypObject *i ) {
+    return yp_incref( i );
+}
+
+static ypObject *iter_send( ypObject *i, ypObject *value ) 
+{
+    // As per Python, when a generator raises an exception, it can't continue to yield values.  If
+    // iter_close fails just ignore it: result is already set to an exception.
+    ypObject *result = ypIter_FUNC( i )( i, value );
+    if( yp_isexceptionC( result ) ) iter_close( i );
+    ypIter_LENHINT( i ) -= 1;
+    return result;
+}
+
+static ypObject *iter_dealloc( ypObject *i ) {
+    iter_close( i ); // ignore errors
+    // FIXME review state
+    ypMem_FREE_CONTAINER( i, ypIterObject );
+    return yp_None;
+}
+
+static ypTypeObject ypIter_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    iter_dealloc,                   // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse // FIXME not true depending on state
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    MethodError_objproc,            // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+// Public functions
 
 yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc ) 
 {
+    yp_ssize_t lenhint;
     if( yp_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
         return_yp_CEXC_BAD_TYPE( 0, exc, iterator );
     }
-    // TODO ensure we never return <0
-    return ypIter_LENHINT( iterator );
+    lenhint = ypIter_LENHINT( iterator );
+    return lenhint < 0 ? 0 : lenhint;
+}
+
+void yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size, ypObject **exc )
+{
+    if( yp_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
+        *state = NULL;
+        *size = 0;
+        *exc = yp_BAD_TYPE( iterator );
+        return;
+    }
+    *state = ypIter_STATE( iterator );
+    *size = ypIter_STATE_SIZE( iterator );
+    return;
+}
+
+// Constructors
+
+ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint, 
+        void *state, yp_ssize_t size, int n, ... )
+{
+    return_yp_V_FUNC( ypObject *, yp_generator_fromstructCV, 
+            (func, lenhint, state, size, n, args), n );
+}
+ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint, 
+        void *state, yp_ssize_t size, int n, va_list args )
+{
+    ypObject *iterator;
+    if( n > 0 ) return yp_NotImplementedError; // TODO implement objects in state
+
+    ypMem_MALLOC_CONTAINER_INLINE( iterator, ypIterObject, ypIter_CODE, size );
+    if( yp_isexceptionC( iterator ) ) return iterator;
+    
+    iterator->ob_len = ypObject_LEN_INVALID;
+    ypIter_FUNC( iterator ) = func;
+    ypIter_LENHINT( iterator ) = lenhint;
+    memcpy( ypIter_STATE( iterator ), state, size );
 }
 
 
@@ -910,176 +1052,6 @@ yp_ssize_t yp_lenC( ypObject *x, ypObject **exc )
     if( len < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError ); // tp_length should not return <0
     return len;
 }
-
-
-/*************************************************************************************************
- * Common object methods
- *************************************************************************************************/
-
-// These are the functions that simply redirect to object methods; more complex public functions
-// are found elsewhere.
-
-// TODO do/while(0)
-
-// args must be surrounded in brackets, to form the function call; as such, must also include ob
-// TODO _return_yp_REDIRECT, etc
-#define _yp_REDIRECT1( ob, tp_meth, args ) \
-    ypTypeObject *type = ypObject_TYPE( ob ); \
-    return type->tp_meth args;
-
-#define _yp_REDIRECT2( ob, tp_suite, suite_meth, args ) \
-    ypTypeObject *type = ypObject_TYPE( ob ); \
-    return type->tp_suite->suite_meth args;
-
-#define _yp_INPLACE1( pOb, tp_meth, args ) \
-    ypTypeObject *type = ypObject_TYPE( *pOb ); \
-    ypObject *result = type->tp_meth args; \
-    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
-    return;
-
-#define _yp_INPLACE2( pOb, tp_suite, suite_meth, args ) \
-    ypTypeObject *type = ypObject_TYPE( *pOb ); \
-    ypObject *result = type->tp_suite->suite_meth args; \
-    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
-    return;
-
-ypObject *yp_bool( ypObject *x ) {
-    _yp_REDIRECT1( x, tp_bool, (x) );
-    // TODO Ensure the result is yp_True, yp_False, or an exception
-}
-
-ypObject *yp_iter( ypObject *x ) {
-    _yp_REDIRECT1( x, tp_iter, (x) );
-    // TODO Ensure the result is an iterator or an exception
-}
-
-ypObject *yp_send( ypObject **iterator, ypObject *value ) {
-    _yp_REDIRECT1( *iterator, tp_send, (*iterator, value) );
-    // TODO should we be discarding *iterator?
-}
-
-ypObject *yp_next( ypObject **iterator ) {
-    _yp_REDIRECT1( *iterator, tp_send, (*iterator, yp_None) );
-    // TODO should we be discarding *iterator?
-}
-
-ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
-    if( !yp_isexceptionC( exc ) ) return yp_TypeError;
-    {_yp_REDIRECT1( *iterator, tp_send, (*iterator, exc) );}
-    // TODO should we be discarding *iterator?
-}
-
-ypObject *yp_contains( ypObject *container, ypObject *x ) {
-    _yp_REDIRECT1( container, tp_contains, (container, x) );
-}
-ypObject *yp_in( ypObject *x, ypObject *container ) {
-    _yp_REDIRECT1( container, tp_contains, (container, x) );
-}
-
-ypObject *yp_not_in( ypObject *x, ypObject *container ) {
-    ypObject *result = yp_in( x, container );
-    return ypBool_NOT( result );
-}
-
-// TODO for this and other methods that mutate, check first if it's immutable?
-void yp_push( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
-}
-
-ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i ) {
-    _yp_REDIRECT2( sequence, tp_as_sequence, tp_getindex, (sequence, i) );
-}
-
-void yp_append( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
-}
-
-void yp_extend( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_extend, (*sequence, x) )
-}
-
-ypObject *yp_isdisjoint( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_isdisjoint, (set, x) );
-}
-
-ypObject *yp_issubset( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_issubset, (set, x) );
-}
-
-ypObject *yp_issuperset( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_issuperset, (set, x) );
-}
-
-// XXX Freezing a mutable set is a quick operation, so we redirect the new-object set methods to
-// the in-place versions.  Among other things, this helps to avoid duplicating code.
-// TODO Verify this assumption
-ypObject *yp_unionN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_unionV, (set, n, args), n );
-}
-ypObject *yp_unionV( ypObject *set, int n, va_list args ) {
-    ypObject *result = yp_unfrozen_copy( set );
-    yp_updateV( &result, n, args );
-    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
-    return result;
-}
-
-ypObject *yp_intersectionN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_intersectionV, (set, n, args), n );
-}    
-ypObject *yp_intersectionV( ypObject *set, int n, va_list args ) {
-    ypObject *result = yp_unfrozen_copy( set );
-    yp_intersection_updateV( &result, n, args );
-    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
-    return result;
-}
-    
-ypObject *yp_differenceN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_differenceV, (set, n, args), n );
-}
-ypObject *yp_differenceV( ypObject *set, int n, va_list args ) {
-    ypObject *result = yp_unfrozen_copy( set );
-    yp_difference_updateV( &result, n, args );
-    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
-    return result;
-}
-    
-ypObject *yp_symmetric_difference( ypObject *set, ypObject *x ) {
-    ypObject *result = yp_unfrozen_copy( set );
-    yp_symmetric_difference_update( &result, x );
-    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
-    return result;
-}
-
-void yp_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_updateV, (set, n, args), n );
-}    
-void yp_updateV( ypObject **set, int n, va_list args ) {
-    _yp_INPLACE2( set, tp_as_set, tp_update, (*set, n, args) );
-}
-
-void yp_intersection_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_intersection_updateV, (set, n, args), n );
-}    
-void yp_intersection_updateV( ypObject **set, int n, va_list args ) {
-    _yp_INPLACE2( set, tp_as_set, tp_intersection_update, (*set, n, args) );
-}
-
-void yp_difference_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_difference_updateV, (set, n, args), n );
-}    
-void yp_difference_updateV( ypObject **set, int n, va_list args ) {
-    _yp_INPLACE2( set, tp_as_set, tp_difference_update, (*set, n, args) );
-}
-
-void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
-    _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, (*set, x) );
-}
-
-ypObject *yp_pushuniqueE( ypObject **set, ypObject *x ) {
-    _yp_REDIRECT2( *set, tp_as_set, tp_pushunique, (*set, x) );
-}
-
-// TODO undef necessary stuff
 
 
 /*************************************************************************************************
@@ -3077,6 +3049,176 @@ ypObject *yp_frozendict( ypObject *x ) {
 ypObject *yp_dict( ypObject *x ) {
     return yp_NotImplementedError;
 }
+
+
+/*************************************************************************************************
+ * Common object methods
+ *************************************************************************************************/
+
+// These are the functions that simply redirect to object methods; more complex public functions
+// are found elsewhere.
+
+// TODO do/while(0)
+
+// args must be surrounded in brackets, to form the function call; as such, must also include ob
+// TODO _return_yp_REDIRECT, etc
+#define _yp_REDIRECT1( ob, tp_meth, args ) \
+    ypTypeObject *type = ypObject_TYPE( ob ); \
+    return type->tp_meth args;
+
+#define _yp_REDIRECT2( ob, tp_suite, suite_meth, args ) \
+    ypTypeObject *type = ypObject_TYPE( ob ); \
+    return type->tp_suite->suite_meth args;
+
+#define _yp_INPLACE1( pOb, tp_meth, args ) \
+    ypTypeObject *type = ypObject_TYPE( *pOb ); \
+    ypObject *result = type->tp_meth args; \
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
+    return;
+
+#define _yp_INPLACE2( pOb, tp_suite, suite_meth, args ) \
+    ypTypeObject *type = ypObject_TYPE( *pOb ); \
+    ypObject *result = type->tp_suite->suite_meth args; \
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
+    return;
+
+ypObject *yp_bool( ypObject *x ) {
+    _yp_REDIRECT1( x, tp_bool, (x) );
+    // TODO Ensure the result is yp_True, yp_False, or an exception
+}
+
+ypObject *yp_iter( ypObject *x ) {
+    _yp_REDIRECT1( x, tp_iter, (x) );
+    // TODO Ensure the result is an iterator or an exception
+}
+
+ypObject *yp_send( ypObject **iterator, ypObject *value ) {
+    _yp_REDIRECT1( *iterator, tp_send, (*iterator, value) );
+    // TODO should we be discarding *iterator?
+}
+
+ypObject *yp_next( ypObject **iterator ) {
+    _yp_REDIRECT1( *iterator, tp_send, (*iterator, yp_None) );
+    // TODO should we be discarding *iterator?
+}
+
+ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
+    if( !yp_isexceptionC( exc ) ) return yp_TypeError;
+    {_yp_REDIRECT1( *iterator, tp_send, (*iterator, exc) );}
+    // TODO should we be discarding *iterator?
+}
+
+ypObject *yp_contains( ypObject *container, ypObject *x ) {
+    _yp_REDIRECT1( container, tp_contains, (container, x) );
+}
+ypObject *yp_in( ypObject *x, ypObject *container ) {
+    _yp_REDIRECT1( container, tp_contains, (container, x) );
+}
+
+ypObject *yp_not_in( ypObject *x, ypObject *container ) {
+    ypObject *result = yp_in( x, container );
+    return ypBool_NOT( result );
+}
+
+// TODO for this and other methods that mutate, check first if it's immutable?
+void yp_push( ypObject **sequence, ypObject *x ) {
+    _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
+}
+
+ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i ) {
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_getindex, (sequence, i) );
+}
+
+void yp_append( ypObject **sequence, ypObject *x ) {
+    _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
+}
+
+void yp_extend( ypObject **sequence, ypObject *x ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_extend, (*sequence, x) )
+}
+
+ypObject *yp_isdisjoint( ypObject *set, ypObject *x ) {
+    _yp_REDIRECT2( set, tp_as_set, tp_isdisjoint, (set, x) );
+}
+
+ypObject *yp_issubset( ypObject *set, ypObject *x ) {
+    _yp_REDIRECT2( set, tp_as_set, tp_issubset, (set, x) );
+}
+
+ypObject *yp_issuperset( ypObject *set, ypObject *x ) {
+    _yp_REDIRECT2( set, tp_as_set, tp_issuperset, (set, x) );
+}
+
+// XXX Freezing a mutable set is a quick operation, so we redirect the new-object set methods to
+// the in-place versions.  Among other things, this helps to avoid duplicating code.
+// TODO Verify this assumption
+ypObject *yp_unionN( ypObject *set, int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_unionV, (set, n, args), n );
+}
+ypObject *yp_unionV( ypObject *set, int n, va_list args ) {
+    ypObject *result = yp_unfrozen_copy( set );
+    yp_updateV( &result, n, args );
+    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
+    return result;
+}
+
+ypObject *yp_intersectionN( ypObject *set, int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_intersectionV, (set, n, args), n );
+}    
+ypObject *yp_intersectionV( ypObject *set, int n, va_list args ) {
+    ypObject *result = yp_unfrozen_copy( set );
+    yp_intersection_updateV( &result, n, args );
+    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
+    return result;
+}
+    
+ypObject *yp_differenceN( ypObject *set, int n, ... ) {
+    return_yp_V_FUNC( ypObject *, yp_differenceV, (set, n, args), n );
+}
+ypObject *yp_differenceV( ypObject *set, int n, va_list args ) {
+    ypObject *result = yp_unfrozen_copy( set );
+    yp_difference_updateV( &result, n, args );
+    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
+    return result;
+}
+    
+ypObject *yp_symmetric_difference( ypObject *set, ypObject *x ) {
+    ypObject *result = yp_unfrozen_copy( set );
+    yp_symmetric_difference_update( &result, x );
+    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
+    return result;
+}
+
+void yp_updateN( ypObject **set, int n, ... ) {
+    return_yp_V_FUNC_void( yp_updateV, (set, n, args), n );
+}    
+void yp_updateV( ypObject **set, int n, va_list args ) {
+    _yp_INPLACE2( set, tp_as_set, tp_update, (*set, n, args) );
+}
+
+void yp_intersection_updateN( ypObject **set, int n, ... ) {
+    return_yp_V_FUNC_void( yp_intersection_updateV, (set, n, args), n );
+}    
+void yp_intersection_updateV( ypObject **set, int n, va_list args ) {
+    _yp_INPLACE2( set, tp_as_set, tp_intersection_update, (*set, n, args) );
+}
+
+void yp_difference_updateN( ypObject **set, int n, ... ) {
+    return_yp_V_FUNC_void( yp_difference_updateV, (set, n, args), n );
+}    
+void yp_difference_updateV( ypObject **set, int n, va_list args ) {
+    _yp_INPLACE2( set, tp_as_set, tp_difference_update, (*set, n, args) );
+}
+
+void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
+    _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, (*set, x) );
+}
+
+ypObject *yp_pushuniqueE( ypObject **set, ypObject *x ) {
+    _yp_REDIRECT2( *set, tp_as_set, tp_pushunique, (*set, x) );
+}
+
+// TODO undef necessary stuff
 
 
 /*************************************************************************************************
