@@ -296,6 +296,15 @@ ypObject *yp_iter( ypObject *x );
 ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
 ypObject *yp_generatorCV( yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args );
 
+// Similar to yp_generatorCN, but accepts an arbitrary structure (or array) of the given
+// size which will be copied into the iterator and maintained as state.  If state contains any
+// objects, their offsets must be given as the variable arguments; new references to these objects
+// will be created.  (Note that these objects cannot be contained in a union.)
+ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint, 
+        void *state, yp_ssize_t size, int n, ... );
+ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint, 
+        void *state, yp_ssize_t size, int n, va_list args );
+
 // Returns a new reference to a range object. yp_rangeC is equivalent to yp_rangeC3( 0, stop, 1 ).
 ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
 ypObject *yp_rangeC( yp_int_t stop );
@@ -1064,9 +1073,9 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 // This structure is likely to change in future versions; it should only exist in-memory
 struct _ypObject {
     yp_uint32_t ob_type_refcnt; // first byte type code, remainder ref count
-    yp_hash_t   ob_hash;        // cached hash for immutables
     yp_uint16_t ob_len;         // length of object
-    yp_uint16_t ob_alloclen;    // allocated length
+    yp_uint16_t ob_alloclen;    // allocated length // FIXME necessary for all objects?
+    yp_hash_t   ob_hash;        // cached hash for immutables
     void *      ob_data;        // pointer to object data
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
