@@ -28,6 +28,7 @@ yp_STATIC_ASSERT( sizeof( yp_uint64_t ) == 8, sizeof_uint64 );
 yp_STATIC_ASSERT( sizeof( yp_float32_t ) == 4, sizeof_float32 );
 yp_STATIC_ASSERT( sizeof( yp_float64_t ) == 8, sizeof_float64 );
 yp_STATIC_ASSERT( sizeof( yp_ssize_t ) == sizeof( size_t ), sizeof_ssize );
+#define yp_MAX_ALIGNMENT (8)  // The maximum possible required alignment of any entity
 
 // Temporarily disable "integral constant overflow" warnings for this test
 #pragma warning( push )
@@ -566,31 +567,63 @@ void yp_decrefN( yp_ssize_t n, ... )
 // _ypIterObject_HEAD shared with ypIterValistObject below
 #define _ypIterObject_HEAD \
     ypObject_HEAD \
-    yp_generator_func_t ob_func; \
-    yp_ssize_t ob_lenhint;
+    yp_int32_t ob_lenhint; \
+    yp_uint32_t ob_objlocs; \
+    yp_generator_func_t ob_func;
 typedef struct {
     _ypIterObject_HEAD
     yp_INLINE_DATA( yp_uint8_t );
 } ypIterObject;
+// FIXME yp_STATIC_ASSERT( offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_iter_inline_data );
+
 #define ypIter_STATE( i )       ( ((ypObject *)i)->ob_data )
-#define ypIter_STATE_SIZE( so ) ( ((ypObject *)i)->ob_alloclen )
-#define ypIter_FUNC( i )        ( ((ypIterObject *)i)->ob_func )
+#define ypIter_STATE_SIZE( i )  ( ((ypObject *)i)->ob_alloclen )
+// TODO decide where we check for underflow for lenhint
 #define ypIter_LENHINT( i )     ( ((ypIterObject *)i)->ob_lenhint )
+// ob_objlocs: bit n is 1 if (n*sizeof(ypObject *)) is the offset of an object in state
+#define ypIter_OBJLOCS( i )     ( ((ypIterObject *)i)->ob_objlocs )
+#define ypIter_FUNC( i )        ( ((ypIterObject *)i)->ob_func )
 
 // Iterator methods
 
-static ypobject *iter_closed_generator( ypObject *i, ypObject *value ) {
+static ypObject *iter_traverse( ypObject *i, visitfunc visitor, void *memo )
+{
+    yp_uint8_t *p = ypIter_STATE( i );
+    yp_uint8_t *p_end = p + ypIter_STATE_SIZE( i );
+    yp_uint32_t locs = ypIter_OBJLOCS( i );
+    ypObject *result;
+
+    while( locs ) { // while there are still more objects to be found...
+        if( locs & 0x1u ) {
+            // p is pointing at an object; call visitor
+            result = visitor( (ypObject *)p, memo );
+            if( yp_isexceptionC( result ) ) return result;
+        }
+        p += sizeof( ypObject * );
+        locs >>= 1;
+    }
+    return yp_None;
+}
+
+// Decrements the reference count of the visited object
+static ypObject *_iter_closing_visitor( ypObject *x, void *memo ) {
+    yp_decref( x );
+    return yp_None;
+}
+
+static ypObject *_iter_closed_generator( ypObject *i, ypObject *value ) {
     return yp_StopIteration;
 }
-static ypObject *iter_close( ypObject *i ) 
+static ypObject *iter_close( ypObject *i )
 {
     // Let the generator know we're closing
     ypObject *result = ypIter_FUNC( i )( i, yp_GeneratorExit );
 
     // Close off this iterator
-    ypIter_FUNC( i ) = iter_closed_generator;
+    iter_traverse( i, _iter_closing_visitor, NULL ); // never fails
+    ypIter_OBJLOCS( i ) = 0x0u; // they are all discarded now...
     ypIter_LENHINT( i ) = 0;
-    // TODO free the inline data/objects?
+    ypIter_FUNC( i ) = _iter_closed_generator;
 
     // Handle the returned value from the generator.  yp_StopIteration and yp_GeneratorExit are not
     // errors.  Any other exception or yielded value _is_ an error, as per Python.
@@ -600,11 +633,11 @@ static ypObject *iter_close( ypObject *i )
     return yp_RuntimeError;
 }
 
-static ypobject *iter_iter( ypObject *i ) {
+static ypObject *iter_iter( ypObject *i ) {
     return yp_incref( i );
 }
 
-static ypObject *iter_send( ypObject *i, ypObject *value ) 
+static ypObject *iter_send( ypObject *i, ypObject *value )
 {
     // As per Python, when a generator raises an exception, it can't continue to yield values.  If
     // iter_close fails just ignore it: result is already set to an exception.
@@ -615,8 +648,7 @@ static ypObject *iter_send( ypObject *i, ypObject *value )
 }
 
 static ypObject *iter_dealloc( ypObject *i ) {
-    iter_close( i ); // ignore errors
-    // FIXME review state
+    iter_close( i ); // ignore errors; discards all references
     ypMem_FREE_CONTAINER( i, ypIterObject );
     return yp_None;
 }
@@ -627,7 +659,7 @@ static ypTypeObject ypIter_Type = {
 
     // Object fundamentals
     iter_dealloc,                   // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse // FIXME not true depending on state
+    iter_traverse,                  // tp_traverse
     NULL,                           // tp_str
     NULL,                           // tp_repr
 
@@ -648,15 +680,15 @@ static ypTypeObject ypIter_Type = {
 
     // Generic object operations
     MethodError_hashfunc,           // tp_currenthash
-    MethodError_objproc,            // tp_close
+    iter_close,                     // tp_close
 
     // Number operations
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_objproc,            // tp_iter
+    iter_iter,                      // tp_iter
     MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    iter_send,                      // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -681,7 +713,7 @@ static ypTypeObject ypIter_Type = {
 
 // Public functions
 
-yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc ) 
+yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc )
 {
     yp_ssize_t lenhint;
     if( yp_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
@@ -691,40 +723,142 @@ yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc )
     return lenhint < 0 ? 0 : lenhint;
 }
 
+// Hidden (for now) feature: size can be NULL
+// TODO what if the requested size was an input that we checked against the size of state
+// TODO what if we violated the normal rules and inspected *exc on input: if an exception, return
+// as if that error occured
+// TODO alternatively/additionally, document that this always succeeds if iterator _is_ one
 void yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size, ypObject **exc )
 {
     if( yp_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
         *state = NULL;
-        *size = 0;
+        if( size ) *size = 0;
         *exc = yp_BAD_TYPE( iterator );
         return;
     }
     *state = ypIter_STATE( iterator );
-    *size = ypIter_STATE_SIZE( iterator );
+    if( size ) *size = ypIter_STATE_SIZE( iterator );
     return;
 }
 
-// Constructors
+// Generator Constructors
 
-ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint, 
+// Increments the reference count of the visited object
+static ypObject *_iter_constructing_visitor( ypObject *x, void *memo ) {
+    yp_incref( x );
+    return yp_None;
+}
+
+ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint,
         void *state, yp_ssize_t size, int n, ... )
 {
-    return_yp_V_FUNC( ypObject *, yp_generator_fromstructCV, 
+    return_yp_V_FUNC( ypObject *, yp_generator_fromstructCV,
             (func, lenhint, state, size, n, args), n );
 }
-ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint, 
+ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint,
         void *state, yp_ssize_t size, int n, va_list args )
 {
     ypObject *iterator;
-    if( n > 0 ) return yp_NotImplementedError; // TODO implement objects in state
+    yp_uint32_t objlocs = 0x0u;
+    yp_ssize_t objoffset;
+    yp_ssize_t objloc_index;
 
+    // TODO if size < 0 return error
+
+    // Determine the location of the objects.  There are a few errors the user could make:
+    //  - an offset for a ypObject* that is at least partially outside of state; ignore these
+    //  - an unaligned ypObject*, which isn't currently allowed and should never happen
+    //  - a larger offset than we can represent with objlocs: a current limitation of nohtyP
+    // TODO use yp_divmodL here?
+    for( /*n already set*/; n > 0; n-- ) {
+        objoffset = va_arg( args, yp_ssize_t );
+        if( objoffset < 0 ) continue;
+        if( objoffset+sizeof( ypObject * ) > (size_t) size ) continue;
+        if( objoffset%sizeof( ypObject * ) != 0 ) return yp_SystemLimitationError;
+        objloc_index = objoffset / sizeof( ypObject * );
+        if( objloc_index > 31 ) return yp_SystemLimitationError;
+        objlocs |= (0x1u << objloc_index);
+    }
+
+    // Allocate the iterator
     ypMem_MALLOC_CONTAINER_INLINE( iterator, ypIterObject, ypIter_CODE, size );
     if( yp_isexceptionC( iterator ) ) return iterator;
-    
+
+    // Set attributes, increment reference counts, and return
     iterator->ob_len = ypObject_LEN_INVALID;
-    ypIter_FUNC( iterator ) = func;
     ypIter_LENHINT( iterator ) = lenhint;
+    ypIter_FUNC( iterator ) = func;
     memcpy( ypIter_STATE( iterator ), state, size );
+    ypIter_OBJLOCS( iterator ) = objlocs;
+    iter_traverse( iterator, _iter_constructing_visitor, NULL ); // never fails
+    return iterator;
+}
+
+// Sequence Iterator Constructors
+
+typedef struct {
+    _ypIterObject_HEAD
+    ypObject *ob_seq;
+    yp_ssize_t ob_index;
+} ypSeqIterObject;
+#define ypSeqIter_SEQ( i )      ( ((ypSeqIterObject *)i)->ob_seq )
+#define ypSeqIter_INDEX( i )    ( ((ypSeqIterObject *)i)->ob_index )
+
+static ypObject *_iter_sequence_generator( ypObject *i, ypObject *value )
+{
+    ypObject *result;
+    if( yp_isexceptionC( value ) ) return value; // yp_GeneratorExit, in particular
+    result = yp_getindexC( ypSeqIter_SEQ( i ), ypSeqIter_INDEX( i )++ );
+    return result == yp_IndexError ? yp_StopIteration : result;
+}
+
+static ypObject *_iter_reversed_generator( ypObject *i, ypObject *value )
+{
+    ypObject *result;
+    if( yp_isexceptionC( value ) ) return value; // yp_GeneratorExit, in particular
+    result = yp_getindexC( ypSeqIter_SEQ( i ), ypSeqIter_INDEX( i )-- );
+    return result == yp_IndexError ? yp_StopIteration : result;
+}
+
+static ypObject *_Sequence_iter( ypObject *sequence, yp_int_t reversed )
+{
+    yp_ssize_t length;
+    ypObject *exc = yp_None;
+    ypObject *iterator;
+
+    // Determine the length
+    // TODO shortcut to the closed iterator when length is zero?
+    length = yp_lenC( sequence, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+
+    // Allocate the iterator
+    ypMem_MALLOC_FIXED( iterator, ypSeqIterObject, ypIter_CODE );
+    if( yp_isexceptionC( iterator ) ) return iterator;
+
+    // Set attributes, increment reference counts, and return
+    iterator->ob_len = ypObject_LEN_INVALID;
+    ypIter_LENHINT( iterator ) = length;
+    ypIter_STATE( iterator ) = &(ypSeqIter_SEQ( iterator )); // TODO also size?
+    ypIter_OBJLOCS( iterator ) = 0x1u;  // indicates ob_seq at state offset zero
+    if( reversed ) {
+        ypIter_FUNC( iterator ) = _iter_reversed_generator;
+        ypSeqIter_INDEX( iterator ) = length-1;
+    } else {
+        ypIter_FUNC( iterator ) = _iter_sequence_generator;
+        ypSeqIter_INDEX( iterator ) = 0;
+    }
+    ypSeqIter_SEQ( iterator ) = yp_incref( sequence );
+    return iterator;
+}
+
+// Assign this to tp_iter for sequences
+static ypObject *Sequence_iter( ypObject *sequence ) {
+    return _Sequence_iter( sequence, 0 );
+}
+
+// Assign this to tp_iter_reversed for sequences
+static ypObject *Sequence_iter_reversed( ypObject *sequence ) {
+    return _Sequence_iter( sequence, 1 );
 }
 
 
@@ -741,22 +875,23 @@ typedef struct {
     _ypIterObject_HEAD
     va_list ob_args;
 } _ypIterValistObject;
+#define ypIterValist_ARGS( i ) (((_ypIterValistObject *)i)->ob_args)
 
 // The number of arguments is stored in ob_lenhint, which is automatically decremented by yp_next
-// on each yielded value.
+// after each yielded value.
 #define yp_ONSTACK_ITER_VALIST( name, n, args ) \
     _ypIterValistObject _ ## name ## _struct = { \
-        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, 0 ), _ypIterValist_func, n, args}; \
+        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, 0 ), n, 0x0u, _iter_valist_generator, args}; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 
-static ypObject *_ypIterValist_func( ypObject *_i, ypObject *value )
+static ypObject *_iter_valist_generator( ypObject *i, ypObject *value )
 {
-    _ypIterValistObject *i = (_ypIterValistObject *) _i;
-    if( i->ob_lenhint < 1 ) return yp_StopIteration;
-    return yp_incref( va_arg( i->ob_args, ypObject * ) );
+    if( yp_isexceptionC( value ) ) return value;
+    if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
+    return yp_incref( va_arg( ypIterValist_ARGS( i ), ypObject * ) );
 }
 
-// TODO #undef _ypIterObject_HEAD
+// TODO #undef _ypIterObject_HEAD, etc
 
 
 /*************************************************************************************************
@@ -897,7 +1032,7 @@ ypObject *yp_not( ypObject *x ) {
     return ypBool_NOT( result );
 }
 
-ypObject *yp_or( ypObject *x, ypObject *y ) 
+ypObject *yp_or( ypObject *x, ypObject *y )
 {
     ypObject *b = yp_bool( x );
     if( yp_isexceptionC( b ) ) return b;
@@ -908,7 +1043,7 @@ ypObject *yp_or( ypObject *x, ypObject *y )
 ypObject *yp_orN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_orV, (n, args), n );
 }
-ypObject *yp_orV( int n, va_list args ) 
+ypObject *yp_orV( int n, va_list args )
 {
     ypObject *x;
     ypObject *b;
@@ -931,7 +1066,7 @@ ypObject *yp_anyV( int n, va_list args ) {
     return yp_any( iter_args );
 }
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-ypObject *yp_any( ypObject *iterable ) 
+ypObject *yp_any( ypObject *iterable )
 {
     ypObject *iter;
     ypObject *x;
@@ -959,7 +1094,7 @@ ypObject *yp_and( ypObject *x, ypObject *y )
 
 ypObject *yp_andN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_andV, (n, args), n );
-}    
+}
 ypObject *yp_andV( int n, va_list args )
 {
     ypObject *x;
@@ -1001,6 +1136,7 @@ ypObject *yp_all( ypObject *iterable )
     return result;
 }
 
+// Defined here are yp_lt, yp_le, yp_eq, yp_ne, yp_ge, and yp_gt
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 ypObject *yp_ComparisonNotImplemented;
 #define _ypBool_PUBLIC_CMP_FUNCTION( name, reflection ) \
@@ -1170,6 +1306,7 @@ _yp_IMMORTAL_EXCEPTION( yp_IndentationError );
 _yp_IMMORTAL_EXCEPTION( yp_TabError );
 _yp_IMMORTAL_EXCEPTION( yp_ReferenceError );
 _yp_IMMORTAL_EXCEPTION( yp_SystemError );
+_yp_IMMORTAL_EXCEPTION( yp_SystemLimitationError ); // "subclass" of yp_SystemError
 _yp_IMMORTAL_EXCEPTION( yp_SystemExit );
 _yp_IMMORTAL_EXCEPTION( yp_TypeError );
 _yp_IMMORTAL_EXCEPTION( yp_InvalidatedError ); // "subclass" of yp_TypeError
@@ -1591,7 +1728,7 @@ yp_int_t yp_asintC( ypObject *x, ypObject **exc )
 
 // Defines the conversion functions.  Overflow checking is done by first truncating the value then
 // seeing if it equals the stored value.  Note that when yp_asintC raises an exception, it returns
-// zero, which can be represented in every integer type, so we won't override any yp_TypeError 
+// zero, which can be represented in every integer type, so we won't override any yp_TypeError
 // errors.
 #define _ypInt_PUBLIC_AS_C_FUNCTION( name ) \
 yp_ ## name ## _t yp_as ## name ## C( ypObject *x, ypObject **exc ) { \
@@ -1788,7 +1925,7 @@ static ypObject *ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp
 
 // struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
 typedef struct _ypBytesObject ypBytesObject;
-yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % 8 == 0, bytes_inline_data_alignment );
+yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
 #define ypBytes_DATA( b ) ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
 // TODO what if ob_len is the "invalid" value?
@@ -2247,8 +2384,8 @@ static ypTypeObject ypBytes_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_objproc,            // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
+    Sequence_iter,                  // tp_iter
+    Sequence_iter_reversed,         // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
     // Container operations
@@ -2322,8 +2459,8 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_objproc,            // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
+    Sequence_iter,                  // tp_iter
+    Sequence_iter_reversed,         // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
     // Container operations
@@ -2413,7 +2550,7 @@ static ypObject *_yp_list_new( yp_ssize_t len )
 // Constructors
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable ) 
+static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable )
 {
     return yp_NotImplementedError;
 }
@@ -2428,7 +2565,7 @@ ypObject *yp_tupleV( int n, va_list args ) {
 }
 ypObject *yp_tuple( ypObject *iterable ) {
     return _ypTuple( _yp_tuple_new, iterable );
-    
+
 }
 
 ypObject *yp_listN( int n, ... ) {
@@ -2441,7 +2578,7 @@ ypObject *yp_listV( int n, va_list args ) {
 }
 ypObject *yp_list( ypObject *iterable ) {
     return _ypTuple( _yp_list_new, iterable );
-    
+
 }
 
 
@@ -2509,7 +2646,7 @@ static yp_ssize_t _ypSet_space_remaining( ypObject *so )
     return retval;
 }
 
-// If a resize is necessary and you suspect future growth may occur, call this function to 
+// If a resize is necessary and you suspect future growth may occur, call this function to
 // determine the minused value to pass to _ypSet_resize.
 // TODO make this limit configurable
 // XXX Adapted from PyDict_SetItem
@@ -2616,7 +2753,7 @@ success:
     return yp_None;
 }
 
-// Steals key and adds it to the hash table at the given location.  loc must not currently be in 
+// Steals key and adds it to the hash table at the given location.  loc must not currently be in
 // use! Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict in dictobject.c
 static void _ypSet_movekey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
@@ -2629,8 +2766,8 @@ static void _ypSet_movekey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
 }
 
 // Steals key and adds it to the *clean* hash table.  Only use if the key is known to be absent
-// from the table, and the table contains no deleted entries; this is usually known when 
-// cleaning/resizing/copying a table.  Sets *loc to the location at which the key was inserted.  
+// from the table, and the table contains no deleted entries; this is usually known when
+// cleaning/resizing/copying a table.  Sets *loc to the location at which the key was inserted.
 // Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
 static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
@@ -2694,8 +2831,8 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     return yp_None;
 }
 
-// Adds the key to the hash table.  *spaceleft should be initialized from  _ypSet_space_remaining; 
-// this function then decrements it with each key added, and resets it on every resize.  Returns 
+// Adds the key to the hash table.  *spaceleft should be initialized from  _ypSet_space_remaining;
+// this function then decrements it with each key added, and resets it on every resize.  Returns
 // yp_None or an exception.
 // XXX Adapted from PyDict_SetItem
 static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft )
@@ -2729,7 +2866,7 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     return yp_None;
 }
 
-static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other ) 
+static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
 {
     // TODO resize if necessary; if starting from clean, use _ypSet_movekey_clean, otherwise
     // _ypSet_movekey
@@ -2751,7 +2888,7 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
         for( i = 0; keysleft > 0; i++ ) {
             if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
             keysleft -= 1;
-            _ypSet_movekey_clean( so, yp_incref( otherkeys[i].se_key ), 
+            _ypSet_movekey_clean( so, yp_incref( otherkeys[i].se_key ),
                     otherkeys[i].se_hash, &loc );
         }
         return yp_None;
@@ -2770,7 +2907,7 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
 }
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter ) 
+static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     ypObject *result = yp_None;
@@ -2801,9 +2938,9 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter )
     return yp_None;
 }
 
-// Adds the keys yielded from iterable to the set.  If the set has enough space to hold all the 
+// Adds the keys yielded from iterable to the set.  If the set has enough space to hold all the
 // keys, the set is not resized (important, as yp_setN et al pre-allocate the necessary space).
-static ypObject *_ypSet_update( ypObject *so, ypObject *iterable ) 
+static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 {
     // TODO determine when/where/how the set should be resized
     int iterable_type = yp_TYPE_PAIR_CODE( iterable );
@@ -2811,7 +2948,7 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
     ypObject *result;
 
     // sets and dicts both iterate over a fellow set, so there are efficiencies we can exploit;
-    // otherwise, treat it as a generic iterator.  Recall that type pairs are identified by the 
+    // otherwise, treat it as a generic iterator.  Recall that type pairs are identified by the
     // immutable type code.
     if( iterable_type == ypFrozenSet_CODE ) {
         return _ypSet_update_from_set( so, iterable );
@@ -2837,7 +2974,7 @@ static ypObject *set_push( ypObject *so, ypObject *x ) {
 
 // Constructors
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable ) 
+static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable )
 {
     ypObject *newSo;
     ypObject *result = yp_None;
@@ -3164,14 +3301,14 @@ ypObject *yp_unionV( ypObject *set, int n, va_list args ) {
 
 ypObject *yp_intersectionN( ypObject *set, int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_intersectionV, (set, n, args), n );
-}    
+}
 ypObject *yp_intersectionV( ypObject *set, int n, va_list args ) {
     ypObject *result = yp_unfrozen_copy( set );
     yp_intersection_updateV( &result, n, args );
     if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
     return result;
 }
-    
+
 ypObject *yp_differenceN( ypObject *set, int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_differenceV, (set, n, args), n );
 }
@@ -3181,7 +3318,7 @@ ypObject *yp_differenceV( ypObject *set, int n, va_list args ) {
     if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
     return result;
 }
-    
+
 ypObject *yp_symmetric_difference( ypObject *set, ypObject *x ) {
     ypObject *result = yp_unfrozen_copy( set );
     yp_symmetric_difference_update( &result, x );
@@ -3191,21 +3328,21 @@ ypObject *yp_symmetric_difference( ypObject *set, ypObject *x ) {
 
 void yp_updateN( ypObject **set, int n, ... ) {
     return_yp_V_FUNC_void( yp_updateV, (set, n, args), n );
-}    
+}
 void yp_updateV( ypObject **set, int n, va_list args ) {
     _yp_INPLACE2( set, tp_as_set, tp_update, (*set, n, args) );
 }
 
 void yp_intersection_updateN( ypObject **set, int n, ... ) {
     return_yp_V_FUNC_void( yp_intersection_updateV, (set, n, args), n );
-}    
+}
 void yp_intersection_updateV( ypObject **set, int n, va_list args ) {
     _yp_INPLACE2( set, tp_as_set, tp_intersection_update, (*set, n, args) );
 }
 
 void yp_difference_updateN( ypObject **set, int n, ... ) {
     return_yp_V_FUNC_void( yp_difference_updateV, (set, n, args), n );
-}    
+}
 void yp_difference_updateV( ypObject **set, int n, va_list args ) {
     _yp_INPLACE2( set, tp_as_set, tp_difference_update, (*set, n, args) );
 }
@@ -3273,7 +3410,7 @@ void yp_initialize( void )
     yp_malloc = _yp_malloc;
     yp_realloc = _yp_realloc;
     yp_free = _yp_free;
-    
+
     // TODO Config param idea: "minimum" or "average" or "usual" or "preferred" allocation
     // size...something that indicates that malloc handles these sizes particularly well.  The
     // number should be small, like 64 bytes or something.  This number can be used to decide how
