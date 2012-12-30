@@ -919,6 +919,7 @@ ypAPI ypObject * yp_IndentationError;
 ypAPI ypObject * yp_TabError;
 ypAPI ypObject * yp_ReferenceError;
 ypAPI ypObject * yp_SystemError;
+ypAPI ypObject * yp_SystemLimitationError; // limitation in the implementation of nohtyP; "subclass" of yp_SystemError
 ypAPI ypObject * yp_SystemExit;
 ypAPI ypObject * yp_TypeError;
 ypAPI ypObject * yp_InvalidatedError; // operation on invalidated object; "subclass" of yp_TypeError

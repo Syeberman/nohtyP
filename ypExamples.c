@@ -20,7 +20,7 @@ typedef int bool;
 #define false 0
 #define true 1
 
-#define EXAMPLE( group, name ) do { ypExamples_example_name = #group #name; printf( "\nExample %s\n", ypExamples_example_name ); _flushall( );} while(0);
+#define EXAMPLE( group, name ) do { ypExamples_example_name = #group "_" #name; printf( "\nExample %s\n", ypExamples_example_name ); _flushall( );} while(0);
 #define PrintError( fmt, ... ) fprintf( stderr, "  line %d: " fmt "\n", __LINE__, __VA_ARGS__ )
 #define Expect( cond, fmt, ... ) do { if( cond ) break; ypExamples_result++; PrintError( fmt, __VA_ARGS__ ); } while(0)
 // TODO include exception name
@@ -123,7 +123,7 @@ EXAMPLE( Sets, BriefDemonstration )
     yp_IMMORTAL_BYTES( b_crabgrass, "crabgrass" );
     yp_IMMORTAL_BYTES( b_abracadabra, "abracadabra" );
     yp_IMMORTAL_BYTES( b_alacazam, "alacazam" );
-    yp_IMMORTAL_BYTES( b_a, "a" );
+    yp_IMMORTAL_BYTES( b_a, "a" ); // FIXME make immortal ints
     yp_IMMORTAL_BYTES( b_b, "b" );
     yp_IMMORTAL_BYTES( b_z, "z" );
     yp_IMMORTAL_BYTES( b_q, "q" );
