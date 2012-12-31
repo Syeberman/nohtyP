@@ -1112,7 +1112,7 @@ struct _ypBytesObject {
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
 #define _yp_IMMORTAL_HEAD_INIT( type, data, len ) \
     { _ypObject_MAKE_TYPE_REFCNT( type, _ypObject_REFCNT_IMMORTAL ), \
-      _ypObject_HASH_INVALID, len, 0, data }
+      len, 0, _ypObject_HASH_INVALID, data }
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
