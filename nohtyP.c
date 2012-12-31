@@ -262,8 +262,8 @@ static ypTypeObject *ypTypeTable[255];
 #define ypFrozenDict_CODE           ( 24u)
 #define ypDict_CODE                 ( 25u)
 
+yp_STATIC_ASSERT( _ypInt_CODE == ypInt_CODE, ypInt_CODE );
 yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE );
-
 
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
@@ -965,12 +965,12 @@ void yp_deepfreeze( ypObject **x )
 }
 
 // Use this, and a memo of NULL, as the visitor for shallow copies
-static ypObject *_yp_shallowcopy_visitor( ypObject *x, void *memo ) {
+static ypObject *yp_shallowcopy_visitor( ypObject *x, void *memo ) {
     return yp_incref( x );
 }
 
 ypObject *yp_unfrozen_copy( ypObject *x ) {
-    return ypObject_TYPE( x )->tp_unfrozen_copy( x, _yp_shallowcopy_visitor, NULL );
+    return ypObject_TYPE( x )->tp_unfrozen_copy( x, yp_shallowcopy_visitor, NULL );
 }
 
 static ypObject *_yp_unfrozen_deepcopy( ypObject *x, void *memo ) {
@@ -987,7 +987,7 @@ ypObject *yp_unfrozen_deepcopy( ypObject *x ) {
 }
 
 ypObject *yp_frozen_copy( ypObject *x ) {
-    return ypObject_TYPE( x )->tp_frozen_copy( x, _yp_shallowcopy_visitor, NULL );
+    return ypObject_TYPE( x )->tp_frozen_copy( x, yp_shallowcopy_visitor, NULL );
 }
 
 static ypObject *_yp_frozen_deepcopy( ypObject *x, void *memo ) {
@@ -1503,11 +1503,9 @@ ypObject *yp_False = (ypObject *) &_yp_False_struct;
  * Integers
  *************************************************************************************************/
 
+// struct _ypIntObject is declared in nohtyP.h for use by yp_IMMORTAL_INT
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
-typedef struct {
-    ypObject_HEAD
-    yp_int_t ob_value;
-} ypIntObject;
+typedef struct _ypIntObject ypIntObject;
 #define ypInt_VALUE( i ) ( ((ypIntObject *)i)->ob_value )
 
 // Arithmetic code depends on both int and float particulars being defined first
@@ -1527,9 +1525,23 @@ static ypObject *int_bool( ypObject *i ) {
     return ypBool_FROM_C( ypInt_VALUE( i ) );
 }
 
+// Comparison methods return yp_True, yp_False, or an exception
+#define _ypInt_RELATIVE_CMP_FUNCTION( name, operator ) \
+static ypObject *int_ ## name( ypObject *i, ypObject *x ) { \
+    if( yp_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return yp_ComparisonNotImplemented; \
+    return ypBool_FROM_C( ypInt_VALUE( i ) operator ypInt_VALUE( x ) ); \
+}
+_ypInt_RELATIVE_CMP_FUNCTION( lt, < );
+_ypInt_RELATIVE_CMP_FUNCTION( le, <= );
+_ypInt_RELATIVE_CMP_FUNCTION( eq, == );
+_ypInt_RELATIVE_CMP_FUNCTION( ne, != );
+_ypInt_RELATIVE_CMP_FUNCTION( ge, >= );
+_ypInt_RELATIVE_CMP_FUNCTION( gt, > );
+// TODO #undef _ypInt_RELATIVE_CMP_FUNCTION
+
 // XXX Adapted from Python's int_hash (now obsolete)
 // TODO adapt from long_hash instead, which seems to handle this differently
-static ypObject *int_currenthash( ypObject *i, yp_hash_t *hash ) 
+static ypObject *int_currenthash( ypObject *i, yp_hash_t *hash )
 {
     // This must remain consistent with the other numeric types
     // FIXME int is larger than hash on 32-bit systems, so this truncates data, which we don't
@@ -1557,12 +1569,12 @@ static ypTypeObject ypInt_Type = {
 
     // Boolean operations and comparisons
     int_bool,                       // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    int_lt,                         // tp_lt
+    int_le,                         // tp_le
+    int_eq,                         // tp_eq
+    int_ne,                         // tp_ne
+    int_ge,                         // tp_ge
+    int_gt,                         // tp_gt
 
     // Generic object operations
     int_currenthash,                // tp_currenthash
@@ -1615,12 +1627,12 @@ static ypTypeObject ypIntStore_Type = {
 
     // Boolean operations and comparisons
     int_bool,                       // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    int_lt,                         // tp_lt
+    int_le,                         // tp_le
+    int_eq,                         // tp_eq
+    int_ne,                         // tp_ne
+    int_ge,                         // tp_ge
+    int_gt,                         // tp_gt
 
     // Generic object operations
     int_currenthash,                // tp_currenthash
@@ -1663,10 +1675,10 @@ yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 // XXX Overloading of add/etc currently not supported
 void yp_iaddC( ypObject **x, yp_int_t y )
 {
-    int x_type = yp_TYPE_PAIR_CODE( *x );
+    int x_pair = yp_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
 
-    if( x_type == ypInt_CODE ) {
+    if( x_pair == ypInt_CODE ) {
         yp_int_t result;
         result = yp_addL( ypInt_VALUE( *x ), y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
@@ -1678,7 +1690,7 @@ void yp_iaddC( ypObject **x, yp_int_t y )
         }
         return;
 
-    } else if( x_type == ypFloat_CODE ) {
+    } else if( x_pair == ypFloat_CODE ) {
         yp_float_t y_asfloat = yp_asfloatL( y, &exc ); // TODO
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         yp_iaddFC( x, y_asfloat );
@@ -1690,14 +1702,14 @@ void yp_iaddC( ypObject **x, yp_int_t y )
 
 void yp_iadd( ypObject **x, ypObject *y )
 {
-    int y_type = yp_TYPE_PAIR_CODE( y );
+    int y_pair = yp_TYPE_PAIR_CODE( y );
     ypObject *exc = yp_None;
 
-    if( y_type == ypInt_CODE ) {
+    if( y_pair == ypInt_CODE ) {
         yp_iaddC( x, ypInt_VALUE( y ) );
         return;
 
-    } else if( y_type == ypFloat_CODE ) {
+    } else if( y_pair == ypFloat_CODE ) {
         yp_iaddFC( x, ypFloat_VALUE( y ) );
         return;
     }
@@ -1707,12 +1719,12 @@ void yp_iadd( ypObject **x, ypObject *y )
 
 ypObject *yp_add( ypObject *x, ypObject *y )
 {
-    int x_type = yp_TYPE_PAIR_CODE( x );
-    int y_type = yp_TYPE_PAIR_CODE( y );
+    int x_pair = yp_TYPE_PAIR_CODE( x );
+    int y_pair = yp_TYPE_PAIR_CODE( y );
     ypObject *result;
 
-    if( x_type != ypInt_CODE && x_type != ypFloat_CODE ) return_yp_BAD_TYPE( x );
-    if( y_type != ypInt_CODE && y_type != ypFloat_CODE ) return_yp_BAD_TYPE( y );
+    if( x_pair != ypInt_CODE && x_pair != ypFloat_CODE ) return_yp_BAD_TYPE( x );
+    if( y_pair != ypInt_CODE && y_pair != ypFloat_CODE ) return_yp_BAD_TYPE( y );
 
     // All numbers hold their data in-line, so freezing a mutable is not heap-inefficient
     result = yp_unfrozen_copy( x );
@@ -1732,11 +1744,11 @@ ypObject *yp_intC( yp_int_t value )
 
 yp_int_t yp_asintC( ypObject *x, ypObject **exc )
 {
-    int x_type = yp_TYPE_PAIR_CODE( x );
+    int x_pair = yp_TYPE_PAIR_CODE( x );
 
-    if( x_type == ypInt_CODE ) {
+    if( x_pair == ypInt_CODE ) {
         return ypInt_VALUE( x );
-    } else if( x_type == ypFloat_CODE ) {
+    } else if( x_pair == ypFloat_CODE ) {
         return yp_asintFL( ypFloat_VALUE( x ), exc );
     }
     return_yp_CEXC_BAD_TYPE( 0, exc, x );
@@ -1786,11 +1798,11 @@ yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc )
 
 void yp_iaddFC( ypObject **x, yp_float_t y )
 {
-    int x_type = yp_TYPE_PAIR_CODE( *x );
+    int x_pair = yp_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
     yp_float_t result;
 
-    if( x_type == ypFloat_CODE ) {
+    if( x_pair == ypFloat_CODE ) {
         result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         if( ypObject_IS_MUTABLE( x ) ) {
@@ -1801,7 +1813,7 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
         }
         return;
 
-    } else if( x_type == ypInt_CODE ) {
+    } else if( x_pair == ypInt_CODE ) {
         yp_float_t x_asfloat = yp_asfloatC( *x, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
@@ -1825,11 +1837,11 @@ ypObject *yp_floatC( yp_float_t value )
 
 yp_float_t yp_asfloatC( ypObject *x, ypObject **exc )
 {
-    int x_type = yp_TYPE_PAIR_CODE( x );
+    int x_pair = yp_TYPE_PAIR_CODE( x );
 
-    if( x_type == ypInt_CODE ) {
+    if( x_pair == ypInt_CODE ) {
         return yp_asfloatL( ypInt_VALUE( x ), exc );
-    } else if( x_type == ypFloat_CODE ) {
+    } else if( x_pair == ypFloat_CODE ) {
         return ypFloat_VALUE( x );
     }
     return_yp_CEXC_BAD_TYPE( 0.0, exc, x );
@@ -2009,9 +2021,9 @@ static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t newLen )
 // TODO note http://bugs.python.org/issue12170 and ensure we stay consistent
 static void _ypBytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len )
 {
-    int x_type = yp_TYPE_PAIR_CODE( x );
+    int x_pair = yp_TYPE_PAIR_CODE( x );
 
-    if( x_type == ypBytes_CODE ) {
+    if( x_pair == ypBytes_CODE ) {
         *x_data = ypBytes_DATA( x );
         *x_len = ypBytes_LEN( x );
         return;
@@ -2029,16 +2041,16 @@ static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssi
         yp_uint8_t *storage )
 {
     ypObject *result;
-    int x_type = yp_TYPE_PAIR_CODE( x );
+    int x_pair = yp_TYPE_PAIR_CODE( x );
 
-    if( x_type == ypBool_CODE || x_type == ypInt_CODE ) {
+    if( x_pair == ypBool_CODE || x_pair == ypInt_CODE ) {
         *storage = yp_asuint8C( x, &result );
         if( !yp_isexceptionC( result ) ) {
             *x_data = storage;
             *x_len = 1;
             return;
         }
-    } else if( x_type == ypBytes_CODE ) {
+    } else if( x_pair == ypBytes_CODE ) {
         *x_data = ypBytes_DATA( x );
         *x_len = ypBytes_LEN( x );
         return;
@@ -2311,6 +2323,7 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
 
 // Comparison methods return yp_True, yp_False, or an exception, and are not called if b==x.  When
 // checking for (in)equality, more efficient to check size first
+// TODO is that bit about not being called if b==x true?!
 #define _ypBytes_RELATIVE_CMP_FUNCTION( name, operator ) \
 static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
     int cmp; \
@@ -2886,7 +2899,7 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
 
     // Otherwise, we need to add the key, which possibly doesn't involve resizing
     if( *spaceleft >= 1 ) {
-        _ypSet_movekey( so, loc, key, hash );
+        _ypSet_movekey( so, loc, yp_incref( key ), hash );
         *spaceleft -= 1;
         return yp_None;
     }
@@ -2895,12 +2908,15 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     // fast _ypSet_movekey_clean.  Remember that _ypSet_resize invalidates loc.
     result = _ypSet_resize( so, _ypSet_calc_resize_minused( so, ypSet_LEN( so )+1 ) );
     if( yp_isexceptionC( result ) ) return result;
-    _ypSet_movekey_clean( so, key, hash, &loc );
+    _ypSet_movekey_clean( so, yp_incref( key ), hash, &loc );
     *spaceleft = _ypSet_space_remaining( so );
     return yp_None;
 }
 
-static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
+// XXX We're trusting that copy_visitor will behave properly and return an object that has the same
+// hash as the original and that is unequal to anything else in the other set
+static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other,
+        visitfunc copy_visitor, void *copy_memo )
 {
     // TODO resize if necessary; if starting from clean, use _ypSet_movekey_clean, otherwise
     // _ypSet_movekey
@@ -2908,6 +2924,7 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
     ypSet_KeyEntry *otherkeys = ypSet_TABLE( other );
     ypObject *result;
     yp_ssize_t i;
+    ypObject *key;
     ypSet_KeyEntry *loc;
 
     // Resize the set if necessary
@@ -2922,8 +2939,9 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
         for( i = 0; keysleft > 0; i++ ) {
             if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
             keysleft -= 1;
-            _ypSet_movekey_clean( so, yp_incref( otherkeys[i].se_key ),
-                    otherkeys[i].se_hash, &loc );
+            key = copy_visitor( otherkeys[i].se_key, copy_memo );
+            if( yp_isexceptionC( key ) ) return key;
+            _ypSet_movekey_clean( so, key, otherkeys[i].se_hash, &loc );
         }
         return yp_None;
     }
@@ -2935,7 +2953,9 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
         result = _ypSet_lookkey( so, otherkeys[i].se_key, otherkeys[i].se_hash, &loc );
         if( yp_isexceptionC( result ) ) return result;
         if( ypSet_ENTRY_USED( loc ) ) continue; // if the entry is used then key is already in set
-        _ypSet_movekey( so, loc, yp_incref( otherkeys[i].se_key ), otherkeys[i].se_hash );
+        key = copy_visitor( otherkeys[i].se_key, copy_memo );
+        if( yp_isexceptionC( key ) ) return key;
+        _ypSet_movekey( so, loc, key, otherkeys[i].se_hash );
     }
     return yp_None;
 }
@@ -2979,17 +2999,17 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter )
 static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 {
     // TODO determine when/where/how the set should be resized
-    int iterable_type = yp_TYPE_PAIR_CODE( iterable );
+    int iterable_pair = yp_TYPE_PAIR_CODE( iterable );
     ypObject *keyiter;
     ypObject *result;
 
     // sets and dicts both iterate over a fellow set, so there are efficiencies we can exploit;
     // otherwise, treat it as a generic iterator.  Recall that type pairs are identified by the
     // immutable type code.
-    if( iterable_type == ypFrozenSet_CODE ) {
-        return _ypSet_update_from_set( so, iterable );
-    } else if( iterable_type == ypFrozenDict_CODE ) {
-        return _ypSet_update_from_set( so, ypDict_KEYSET( iterable ) );
+    if( iterable_pair == ypFrozenSet_CODE ) {
+        return _ypSet_update_from_set( so, iterable, yp_shallowcopy_visitor, NULL );
+    } else if( iterable_pair == ypFrozenDict_CODE ) {
+        return _ypSet_update_from_set( so, ypDict_KEYSET( iterable ), yp_shallowcopy_visitor, NULL );
     } else {
         keyiter = yp_iter( iterable ); // new ref
         if( yp_isexceptionC( keyiter ) ) return keyiter;
@@ -3008,7 +3028,7 @@ static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo
     yp_ssize_t keysleft = ypSet_LEN( so );
     yp_ssize_t i;
     ypObject *result;
-    
+
     for( i = 0; keysleft > 0; i++ ) {
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
         keysleft -= 1;
@@ -3018,21 +3038,37 @@ static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo
     return yp_None;
 }
 
-// FIXME copy operations are actually traverse functions that need to take a visitor for nested
-// objects
-static ypObject *frozenset_unfrozen_copy( ypObject *so ) {
-    return yp_set( so );
+static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo )
+{
+    ypObject *result;
+    ypObject *so_copy = _yp_set_new( ypSet_LEN( so ) ); // new ref
+    if( yp_isexceptionC( so_copy ) ) return so_copy;
+    result = _ypSet_update_from_set( so_copy, so, copy_visitor, copy_memo );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( so_copy );
+        return result;
+    }
+    return so_copy;
 }
 
-static ypObject *frozenset_frozen_copy( ypObject *so ) {
-    return yp_frozenset( so );
+static ypObject *frozenset_frozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo )
+{
+    ypObject *result;
+    ypObject *so_copy = _yp_frozenset_new( ypSet_LEN( so ) ); // new ref
+    if( yp_isexceptionC( so_copy ) ) return so_copy;
+    result = _ypSet_update_from_set( so_copy, so, copy_visitor, copy_memo );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( so_copy );
+        return result;
+    }
+    return so_copy;
 }
 
 static ypObject *frozenset_bool( ypObject *so ) {
     return ypBool_FROM_C( ypSet_LEN( so ) );
 }
 
-static ypObject *frozenset_contains( ypObject *so, ypObject *x ) 
+static ypObject *frozenset_contains( ypObject *so, ypObject *x )
 {
     yp_hash_t hash;
     ypObject *result = yp_None;
@@ -3168,8 +3204,8 @@ static ypTypeObject ypSet_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    frozenset_unfrozen_copy,        // tp_unfrozen_copy
+    frozenset_frozen_copy,          // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
