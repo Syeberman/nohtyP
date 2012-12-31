@@ -406,7 +406,7 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
         x = (_ypHASH_MULTIPLIER * x) ^ (yp_uhash_t) *p++;
     }
     x ^= (yp_uhash_t) len;
-    if (x == ypObject_HASH_INVALID) x = ypObject_HASH_INVALID-1;
+    if (x == ypObject_HASH_INVALID) x -= 1;
     return x;
 }
 
@@ -544,6 +544,7 @@ void yp_decref( ypObject *x )
     if( refcnt >= ypObject_REFCNT_IMMORTAL ) return; // no-op
 
     if( refcnt <= 1 ) {
+        // TODO Errors currently ignored...should we log them instead?
         ypObject_TYPE( x )->tp_dealloc( x );
     } else {
         x->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( ypObject_TYPE_CODE( x ), refcnt-1 );
@@ -642,8 +643,8 @@ static ypObject *iter_send( ypObject *i, ypObject *value )
     // As per Python, when a generator raises an exception, it can't continue to yield values.  If
     // iter_close fails just ignore it: result is already set to an exception.
     ypObject *result = ypIter_FUNC( i )( i, value );
-    if( yp_isexceptionC( result ) ) iter_close( i );
     ypIter_LENHINT( i ) -= 1;
+    if( yp_isexceptionC( result ) ) iter_close( i );
     return result;
 }
 
@@ -653,6 +654,7 @@ static ypObject *iter_dealloc( ypObject *i ) {
     return yp_None;
 }
 
+// A frozen iter behaves like a closed iter; as such, they share the same method table
 static ypTypeObject ypIter_Type = {
     yp_TYPE_HEAD_INIT,
     NULL,                           // tp_name
@@ -795,6 +797,7 @@ ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhin
 }
 
 // Sequence Iterator Constructors
+// TODO Review the efficiency of this over having each sequence implement their own custom functions
 
 typedef struct {
     _ypIterObject_HEAD
@@ -816,8 +819,9 @@ static ypObject *_iter_reversed_generator( ypObject *i, ypObject *value )
 {
     ypObject *result;
     if( yp_isexceptionC( value ) ) return value; // yp_GeneratorExit, in particular
+    if( ypSeqIter_INDEX( i ) < 0 ) return yp_StopIteration;
     result = yp_getindexC( ypSeqIter_SEQ( i ), ypSeqIter_INDEX( i )-- );
-    return result == yp_IndexError ? yp_StopIteration : result;
+    return result;
 }
 
 static ypObject *_Sequence_iter( ypObject *sequence, yp_int_t reversed )
@@ -1212,7 +1216,7 @@ static ypTypeObject ypException_Type = {
     NULL,                               // tp_name
 
     // Object fundamentals
-    NULL,                               // tp_dealloc
+    MethodError_objproc,                // tp_dealloc
     NoRefs_traversefunc,                // tp_traverse
     NULL,                               // tp_str
     NULL,                               // tp_repr
@@ -1523,6 +1527,18 @@ static ypObject *int_bool( ypObject *i ) {
     return ypBool_FROM_C( ypInt_VALUE( i ) );
 }
 
+// XXX Adapted from Python's int_hash (now obsolete)
+// TODO adapt from long_hash instead, which seems to handle this differently
+static ypObject *int_currenthash( ypObject *i, yp_hash_t *hash ) 
+{
+    // This must remain consistent with the other numeric types
+    // FIXME int is larger than hash on 32-bit systems, so this truncates data, which we don't
+    // want; better is to adapt the long_hash algorithm to this datatype
+    *hash = (yp_hash_t) ypInt_VALUE( i );
+    if( *hash == ypObject_HASH_INVALID ) *hash -= 1;
+    return yp_None;
+}
+
 static ypTypeObject ypInt_Type = {
     yp_TYPE_HEAD_INIT,
     NULL,                           // tp_name
@@ -1549,7 +1565,7 @@ static ypTypeObject ypInt_Type = {
     MethodError_objobjproc,         // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    int_currenthash,                // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -1607,7 +1623,7 @@ static ypTypeObject ypIntStore_Type = {
     MethodError_objobjproc,         // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    int_currenthash,                // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -2325,8 +2341,9 @@ _ypBytes_EQUALITY_CMP_FUNCTION( ne, != );
 // TODO #undef _ypBytes_EQUALITY_CMP_FUNCTION
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
-static yp_hash_t bytes_currenthash( ypObject *b ) {
-    return yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
+static ypObject *bytes_currenthash( ypObject *b, yp_hash_t *hash ) {
+    *hash = yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
+    return yp_None;
 }
 
 static ypObject *bytes_dealloc( ypObject *x ) {
@@ -2377,7 +2394,7 @@ static ypTypeObject ypBytes_Type = {
     MethodError_objobjproc,         // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    bytes_currenthash,              // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -2452,7 +2469,7 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_objobjproc,         // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    bytes_currenthash,              // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -2646,6 +2663,20 @@ static yp_ssize_t _ypSet_space_remaining( ypObject *so )
     return retval;
 }
 
+// Returns the alloclen that will fit minused entries, or <1 on error
+// XXX Adapted from Python's dictresize
+// TODO Need to carefully review how expected len becomes minused becomes alloclen; need to also
+// review that pre-allocating 6, say, will mean no resizes if 6 are added
+static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
+{
+    yp_ssize_t minentries = ((minused * 3) / 2) + 1; // recall we fill to 2/3 size
+    yp_ssize_t alloclen;
+    for( alloclen = ypSet_MINSIZE;
+         alloclen <= minentries && alloclen > 0;
+         alloclen <<= 1 );
+    return alloclen;
+}
+
 // If a resize is necessary and you suspect future growth may occur, call this function to
 // determine the minused value to pass to _ypSet_resize.
 // TODO make this limit configurable
@@ -2669,27 +2700,30 @@ static yp_ssize_t _ypSet_calc_resize_minused( ypObject *so, yp_ssize_t newlen )
 
 }
 
-// Returns the alloclen that will fit minused, or <1 on error
-// XXX Adapted from Python's dictresize
-static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
-{
-    yp_ssize_t alloclen;
-    for( alloclen = ypSet_MINSIZE;
-         alloclen <= minused && alloclen > 0;
-         alloclen <<= 1 );
-    return alloclen;
-}
-
+// Returns a new, empty frozenset object to hold minused entries
 static ypObject *_yp_frozenset_new( yp_ssize_t minused )
 {
-    // TODO
-    return yp_NotImplementedError;
+    yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
+    ypObject *so;
+    if( alloclen < 1 ) return yp_MemoryError;
+    ypMem_MALLOC_CONTAINER_INLINE( so, ypSetObject, ypFrozenSet_CODE, alloclen );
+    if( yp_isexceptionC( so ) ) return so;
+    ypSet_FILL( so ) = 0;
+    memset( ypSet_TABLE( so ), 0, alloclen * sizeof( ypSet_KeyEntry ) );
+    return so;
 }
 
+// Returns a new, empty set object to hold minused entries
 static ypObject *_yp_set_new( yp_ssize_t minused )
 {
-    // TODO
-    return yp_NotImplementedError;
+    yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
+    ypObject *so;
+    if( alloclen < 1 ) return yp_MemoryError;
+    ypMem_MALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_CODE, alloclen );
+    if( yp_isexceptionC( so ) ) return so;
+    ypSet_FILL( so ) = 0;
+    memset( ypSet_TABLE( so ), 0, alloclen * sizeof( ypSet_KeyEntry ) );
+    return so;
 }
 
 // Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
@@ -2915,6 +2949,8 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter )
     ypObject *key;
 
     // Use lenhint in the hopes of requiring only one resize
+    // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
+    // the given lenhint
     lenhint = yp_iter_lenhintC( *keyiter, &result );
     if( yp_isexceptionC( result ) ) return result;
     if( spaceleft < lenhint ) {
@@ -2966,20 +3002,229 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 
 // Public methods
 
+static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo )
+{
+    ypSet_KeyEntry *keys = ypSet_TABLE( so );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t i;
+    ypObject *result;
+    
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
+        keysleft -= 1;
+        result = visitor( keys[i].se_key, memo );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
+// FIXME copy operations are actually traverse functions that need to take a visitor for nested
+// objects
+static ypObject *frozenset_unfrozen_copy( ypObject *so ) {
+    return yp_set( so );
+}
+
+static ypObject *frozenset_frozen_copy( ypObject *so ) {
+    return yp_frozenset( so );
+}
+
+static ypObject *frozenset_bool( ypObject *so ) {
+    return ypBool_FROM_C( ypSet_LEN( so ) );
+}
+
+static ypObject *frozenset_contains( ypObject *so, ypObject *x ) 
+{
+    yp_hash_t hash;
+    ypObject *result = yp_None;
+    ypSet_KeyEntry *loc;
+
+    hash = yp_hashC( x, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    result = _ypSet_lookkey( so, x, hash, &loc );
+    if( yp_isexceptionC( result ) ) return result;
+    return ypBool_FROM_C( ypSet_ENTRY_USED( loc ) );
+}
+
+static ypObject *set_update( ypObject *so, int n, va_list args )
+{
+    ypObject *result;
+    for( /*n already set*/; n > 0; n-- ) {
+        result = _ypSet_update( so, va_arg( args, ypObject * ) );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
 static ypObject *set_push( ypObject *so, ypObject *x ) {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     return _ypSet_push( so, x, &spaceleft );
 }
+
+static ypObject *_frozenset_dealloc_visitor( ypObject *x, void *memo ) {
+    yp_decref( x );
+    return yp_None;
+}
+
+static ypObject *frozenset_dealloc( ypObject *so )
+{
+    frozenset_traverse( so, _frozenset_dealloc_visitor, NULL ); // cannot fail
+    ypMem_FREE_CONTAINER( so, ypSetObject );
+    return yp_None;
+}
+
+static ypSetMethods ypFrozenSet_as_set = {
+    MethodError_objobjproc,         // tp_isdisjoint
+    MethodError_objobjproc,         // tp_issubset
+    // tp_lt is elsewhere
+    MethodError_objobjproc,         // tp_issuperset
+    // tp_gt is elsewhere
+    MethodError_objvalistproc,      // tp_update
+    MethodError_objvalistproc,      // tp_intersection_update
+    MethodError_objvalistproc,      // tp_difference_update
+    MethodError_objobjproc,         // tp_symmetric_difference_update
+    MethodError_objobjproc          // tp_pushunique
+};
+
+static ypTypeObject ypFrozenSet_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    frozenset_dealloc,              // tp_dealloc
+    frozenset_traverse,             // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    frozenset_unfrozen_copy,        // tp_unfrozen_copy
+    frozenset_frozen_copy,          // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    frozenset_bool,                 // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    frozenset_contains,             // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    &ypFrozenSet_as_set,            // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+static ypSetMethods ypSet_as_set = {
+    MethodError_objobjproc,         // tp_isdisjoint
+    MethodError_objobjproc,         // tp_issubset
+    // tp_lt is elsewhere
+    MethodError_objobjproc,         // tp_issuperset
+    // tp_gt is elsewhere
+    set_update,                     // tp_update
+    MethodError_objvalistproc,      // tp_intersection_update
+    MethodError_objvalistproc,      // tp_difference_update
+    MethodError_objobjproc,         // tp_symmetric_difference_update
+    MethodError_objobjproc          // tp_pushunique
+};
+
+static ypTypeObject ypSet_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    frozenset_dealloc,              // tp_dealloc
+    frozenset_traverse,             // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    frozenset_bool,                 // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    frozenset_contains,             // tp_contains
+    MethodError_lenfunc,            // tp_length
+    set_push,                       // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    &ypSet_as_set,                  // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
 
 
 // Constructors
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
 static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable )
 {
+    ypObject *exc = yp_None;
     ypObject *newSo;
-    ypObject *result = yp_None;
-    yp_ssize_t lenhint = yp_iter_lenhintC( iterable, &result );
-    if( yp_isexceptionC( result ) ) return result;
+    ypObject *result;
+    yp_ssize_t lenhint = yp_lenC( iterable, &exc );
+    if( yp_isexceptionC( exc ) ) lenhint = yp_iter_lenhintC( iterable, &exc );
+    // Ignore errors determining lenhint; it just means we can't pre-allocate
 
     newSo = allocator( lenhint );
     if( yp_isexceptionC( newSo ) ) return newSo;
@@ -3382,8 +3627,8 @@ static ypTypeObject *ypTypeTable[255] = {
     NULL,               /* ypFloat_CODE                ( 12u) */
     NULL,               /* ypFloatStore_CODE           ( 13u) */
 
-    NULL,               /* ypFrozenIter_CODE           ( 14u) */
-    NULL,               /* ypIter_CODE                 ( 15u) */
+    &ypIter_Type,       /* ypFrozenIter_CODE           ( 14u) */
+    &ypIter_Type,       /* ypIter_CODE                 ( 15u) */
 
     &ypBytes_Type,      /* ypBytes_CODE                ( 16u) */
     &ypByteArray_Type,  /* ypByteArray_CODE            ( 17u) */
@@ -3392,8 +3637,8 @@ static ypTypeObject *ypTypeTable[255] = {
     NULL,               /* ypTuple_CODE                ( 20u) */
     NULL,               /* ypList_CODE                 ( 21u) */
 
-    NULL,               /* ypFrozenSet_CODE            ( 22u) */
-    NULL,               /* ypSet_CODE                  ( 23u) */
+    &ypFrozenSet_Type,  /* ypFrozenSet_CODE            ( 22u) */
+    &ypSet_Type,        /* ypSet_CODE                  ( 23u) */
 
     NULL,               /* ypFrozenDict_CODE           ( 24u) */
     NULL,               /* ypDict_CODE                 ( 25u) */

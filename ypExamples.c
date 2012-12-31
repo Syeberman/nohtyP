@@ -156,36 +156,36 @@ EXAMPLE( Sets, BriefDemonstration )
 
         /* Unique letters in a: {'a', 'r', 'b', 'c', 'd'} */
         ExpectEqual( 5, yp_lenC( a, &exc ) );
-        ExpectEqual( yp_True, yp_contains( b_a, a ) );
-        ExpectEqual( yp_False, yp_contains( b_z, a ) );
+        ExpectEqual( yp_True, yp_in( b_a, a ) );
+        ExpectEqual( yp_False, yp_in( b_z, a ) );
 
         /* Letters in a but not in b: {'r', 'd', 'b'}
          * If you forget that yp_differenceN returns a new reference, you'll leak some memory */
         result = yp_differenceN( a, 1, b );
         ExpectEqual( 3, yp_lenC( result, &exc ) );
-        ExpectEqual( yp_True, yp_contains( b_b, result ) );
-        ExpectEqual( yp_False, yp_contains( b_a, result ) );
+        ExpectEqual( yp_True, yp_in( b_b, result ) );
+        ExpectEqual( yp_False, yp_in( b_a, result ) );
         yp_decref( result );
 
         /* Letters in either a or b: {'a', 'c', 'r', 'd', 'b', 'm', 'z', 'l'} */
         result = yp_unionN( a, 1, b );
         ExpectEqual( 8, yp_lenC( result, &exc ) );
-        ExpectEqual( yp_True, yp_contains( b_z, result ) );
-        ExpectEqual( yp_False, yp_contains( b_q, result ) );
+        ExpectEqual( yp_True, yp_in( b_z, result ) );
+        ExpectEqual( yp_False, yp_in( b_q, result ) );
         yp_decref( result );
 
         /* Letters in both a and b: {'a', 'c'} */
         result = yp_intersectionN( a, 1, b );
         ExpectEqual( 2, yp_lenC( result, &exc ) );
-        ExpectEqual( yp_True, yp_contains( b_a, result ) );
-        ExpectEqual( yp_False, yp_contains( b_b, result ) );
+        ExpectEqual( yp_True, yp_in( b_a, result ) );
+        ExpectEqual( yp_False, yp_in( b_b, result ) );
         yp_decref( result );
 
         /* Letters in a or b but not both: {'r', 'd', 'b', 'm', 'z', 'l'} */
         result = yp_symmetric_difference( a, b );
         ExpectEqual( 6, yp_lenC( result, &exc ) );
-        ExpectEqual( yp_True, yp_contains( b_z, result ) );
-        ExpectEqual( yp_False, yp_contains( b_a, result ) );
+        ExpectEqual( yp_True, yp_in( b_z, result ) );
+        ExpectEqual( yp_False, yp_in( b_a, result ) );
         yp_decref( result );
 
         /* You can clean-up multiple references with a single command */
