@@ -187,7 +187,7 @@ ypObject *yp_anyV( int n, va_list args );
 ypObject *yp_any( ypObject *iterable );
 
 // Returns a *new* reference to x if x is false, otherwise to y.  Unlike Python, both
-// arguments are always evaluated.  You may find yp_allN more convenient, as it returns an 
+// arguments are always evaluated.  You may find yp_allN more convenient, as it returns an
 // immortal.
 ypObject *yp_and( ypObject *x, ypObject *y );
 
@@ -223,7 +223,7 @@ ypObject *yp_gt( ypObject *x, ypObject *y );
  */
 
 // Fixed-size numeric C types
-typedef signed char	        yp_int8_t;
+typedef signed char         yp_int8_t;
 typedef unsigned char       yp_uint8_t;
 typedef short               yp_int16_t;
 typedef unsigned short      yp_uint16_t;
@@ -265,7 +265,7 @@ typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 
 // Unlike Python, most nohtyP types have both mutable and immutable versions.  An "intstore" is a
 // mutable int (it "stores" an int); similar for floatstore.  The mutable str is called a
-// "characterarray", while a "frozendict" is an immutable dict.  There are no useful immutable 
+// "characterarray", while a "frozendict" is an immutable dict.  There are no useful immutable
 // types for iters or files: attempting to freeze such types will close them.
 
 // Returns a new reference to an int/intstore with the given value.
@@ -300,9 +300,9 @@ ypObject *yp_generatorCV( yp_generator_func_t func, yp_ssize_t lenhint, int n, v
 // size which will be copied into the iterator and maintained as state.  If state contains any
 // objects, their offsets must be given as the variable arguments; new references to these objects
 // will be created.  (Note that these objects cannot be contained in a union.)
-ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint, 
+ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint,
         void *state, yp_ssize_t size, int n, ... );
-ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint, 
+ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint,
         void *state, yp_ssize_t size, int n, va_list args );
 
 // Returns a new reference to a range object. yp_rangeC is equivalent to yp_rangeC3( 0, stop, 1 ).
@@ -425,7 +425,7 @@ ypObject *yp_next2( ypObject **iterator, ypObject *defval );
 // exception.
 ypObject *yp_throw( ypObject **iterator, ypObject *exc );
 
-// Returns a hint as to how many items are left to be yielded.  The accuracy of this hint depends 
+// Returns a hint as to how many items are left to be yielded.  The accuracy of this hint depends
 // on the underlying type: most containers know their lengths exactly, but some generators may not.
 // A hint of zero could mean that the iterator is exhausted, that the length is unknown, or that
 // the iterator will yield infinite values.  Returns zero and sets *exc on error.
@@ -434,7 +434,7 @@ yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 // Typically only called from within yp_generator_func_t functions.  Returns the generator state
 // and its size in bytes.  The structure and initial values of *state are determined by the call
 // to the generator constructor; the function cannot change the size after creation, and any
-// ypObject*s in *state should be considered *borrowed* (it is safe to replace them with new 
+// ypObject*s in *state should be considered *borrowed* (it is safe to replace them with new
 // references).  Sets *state to NULL, *size to zero, and *exc to an exception on error.
 void yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size, ypObject **exc );
 
@@ -499,7 +499,7 @@ ypObject *yp_not_in( ypObject *x, ypObject *container );
 // Returns the length of container.  Returns zero and sets *exc on error.
 yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
 
-// Adds an item to *container.  On error, *container is discarded and set to an exception.  The 
+// Adds an item to *container.  On error, *container is discarded and set to an exception.  The
 // relation between yp_push and yp_pop depends on the type: x may be the first or last item popped,
 // or items may be popped in arbitrary order.
 void yp_push( ypObject **container, ypObject *x );
@@ -507,8 +507,8 @@ void yp_push( ypObject **container, ypObject *x );
 // Removes all items from *container.  On error, *container is discarded and set to an exception.
 void yp_clear( ypObject **container );
 
-// Removes an item from *container and returns a new reference to it.  On error, *container is 
-// discarded and set to an exception _and_ an exception is returned.  (Not supported on dicts; use 
+// Removes an item from *container and returns a new reference to it.  On error, *container is
+// discarded and set to an exception _and_ an exception is returned.  (Not supported on dicts; use
 // yp_popvalue or yp_popitem instead.)
 ypObject *yp_pop( ypObject **container );
 
@@ -553,12 +553,12 @@ yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
 // *exc on error.
 yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc );
 
-// Sets the i-th item of *sequence, origin zero, to x.  Negative indicies are handled as in 
+// Sets the i-th item of *sequence, origin zero, to x.  Negative indicies are handled as in
 // Python.  On error, *sequence is discarded and set to an exception.
 void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 
 // Sets the slice of *sequence, from i to j with step k, to x.  The Python-equivalent "defaults"
-// for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, *sequence is discarded and 
+// for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, *sequence is discarded and
 // set to an exception.
 void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x );
 
@@ -570,7 +570,7 @@ void yp_setitem( ypObject **sequence, ypObject *key, ypObject *x );
 void yp_delindexC( ypObject **sequence, yp_ssize_t i );
 
 // Removes the elements of the slice from *sequence, from i to j with step k.  The Python-
-// equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, 
+// equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error,
 // *sequence is discarded and set to an exception.
 void yp_delsliceC4( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
 
@@ -602,17 +602,17 @@ ypObject *yp_popindexC2( ypObject **sequence, yp_ssize_t i );
 // together implement a stack (last in, first out).
 ypObject *yp_pop( ypObject **sequence );
 
-// Removes the first item from *sequence that equals x.  On error, *sequence is discarded and set 
+// Removes the first item from *sequence that equals x.  On error, *sequence is discarded and set
 // to an exception.
 void yp_remove( ypObject **sequence, ypObject *x );
 
-// Reverses the items of *sequence in-place.  On error, *sequence is discarded and set to an 
+// Reverses the items of *sequence in-place.  On error, *sequence is discarded and set to an
 // exception.
 void yp_reverse( ypObject **sequence );
 
-// Sorts the items of *sequence in-place.  key is a function that returns new or immortal 
-// references that are used as comparison keys; to compare the elements directly, use NULL.  If 
-// reverse is true, the list elements are sorted as if each comparison were reversed.  On error, 
+// Sorts the items of *sequence in-place.  key is a function that returns new or immortal
+// references that are used as comparison keys; to compare the elements directly, use NULL.  If
+// reverse is true, the list elements are sorted as if each comparison were reversed.  On error,
 // *sequence is discarded and set to an exception.
 void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse );
 
@@ -648,7 +648,7 @@ ypObject *yp_lt( ypObject *set, ypObject *x );
 // Returns the immortal yp_True if every element in x is in set, else yp_False.
 ypObject *yp_issuperset( ypObject *set, ypObject *x );
 
-// Returns the immortal yp_True if every element in x is in set and set has additional elements, 
+// Returns the immortal yp_True if every element in x is in set and set has additional elements,
 // else yp_False.
 ypObject *yp_gt( ypObject *set, ypObject *x );
 
@@ -671,7 +671,7 @@ ypObject *yp_differenceV( ypObject *set, int n, va_list args );
 // in either set or x but not both.
 ypObject *yp_symmetric_difference( ypObject *set, ypObject *x );
 
-// Add the elements from the n objects to *set.  On error, *set is discarded and set to an 
+// Add the elements from the n objects to *set.  On error, *set is discarded and set to an
 // exception.
 void yp_updateN( ypObject **set, int n, ... );
 void yp_updateV( ypObject **set, int n, va_list args );
@@ -681,7 +681,7 @@ void yp_updateV( ypObject **set, int n, va_list args );
 void yp_intersection_updateN( ypObject **set, int n, ... );
 void yp_intersection_updateV( ypObject **set, int n, va_list args );
 
-// Removes elements from *set that are contained in any of the n objects.  On error, *set is 
+// Removes elements from *set that are contained in any of the n objects.  On error, *set is
 // discarded and set to an exception.
 void yp_difference_updateN( ypObject **set, int n, ... );
 void yp_difference_updateV( ypObject **set, int n, va_list args );
@@ -691,7 +691,7 @@ void yp_difference_updateV( ypObject **set, int n, va_list args );
 void yp_symmetric_difference_update( ypObject **set, ypObject *x );
 
 // Adds element x to *set.  On error, *set is discarded and set to an exception.  While Python calls
-// this method add, yp_add is already used for "a+b", so these two equivalent aliases are provided 
+// this method add, yp_add is already used for "a+b", so these two equivalent aliases are provided
 // instead.
 void yp_push( ypObject **set, ypObject *x );
 void yp_set_add( ypObject **set, ypObject *x );
@@ -700,15 +700,15 @@ void yp_set_add( ypObject **set, ypObject *x );
 // the immortal yp_None.  Returns an exception on error; *set is never discarded.
 ypObject *yp_pushuniqueE( ypObject **set, ypObject *x );
 
-// Removes element x from *set.  Raises yp_KeyError if x is not contained in *set.  On error, 
+// Removes element x from *set.  Raises yp_KeyError if x is not contained in *set.  On error,
 // *set is discarded and set to an exception.
 void yp_remove( ypObject **set, ypObject *x );
 
-// Removes element x from *set if it is present.  On error, *set is discarded and set to an 
+// Removes element x from *set if it is present.  On error, *set is discarded and set to an
 // exception.
 void yp_discard( ypObject **set, ypObject *x );
 
-// Removes an arbitrary item from *set and returns a new reference to it.  On error, *set is 
+// Removes an arbitrary item from *set and returns a new reference to it.  On error, *set is
 // discarded and set to an exception _and_ an exception is returned.  You cannot use the order
 // of yp_push calls on sets to determine the order of yp_pop'ped elements.
 ypObject *yp_pop( ypObject **set );
@@ -718,15 +718,15 @@ ypObject *yp_pop( ypObject **set );
  * Mapping Operations
  */
 
-// Returns a new reference to the value of mapping with the given key.  Returns yp_KeyError if key 
+// Returns a new reference to the value of mapping with the given key.  Returns yp_KeyError if key
 // is not in the map.
 ypObject *yp_getitem( ypObject *mapping, ypObject *key );
 
-// Adds or replaces the value of *mapping with the given key, setting it to x.  On error, *mapping 
+// Adds or replaces the value of *mapping with the given key, setting it to x.  On error, *mapping
 // is discarded and set to an exception.
 void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x );
 
-// Removes the item with the given key from *mapping.  Raises yp_KeyError if key is not in 
+// Removes the item with the given key from *mapping.  Raises yp_KeyError if key is not in
 // *mapping.  On error, *mapping is discarded and set to an exception.
 void yp_delitem( ypObject **mapping, ypObject *key );
 
@@ -743,7 +743,7 @@ ypObject *yp_iter_items( ypObject *mapping );
 ypObject *yp_iter_keys( ypObject *mapping );
 
 // If key is in mapping, remove it and return a new reference to its value, else return a new
-// reference to defval.  The Python-equivalent "default" of defval is yp_KeyError.  On error, 
+// reference to defval.  The Python-equivalent "default" of defval is yp_KeyError.  On error,
 // *mapping is discarded and set to an exception _and_ an exception is returned.  Note that yp_push
 // and yp_pop are not applicable for mapping objects.
 ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
@@ -879,6 +879,10 @@ ypObject *yp_sum( ypObject *iterable );
  * Immortal "Constructors"
  */
 
+// Defines an immortal int constant at compile-time, which can be accessed by the variable name,
+// which is of type "static ypObject * const".  value is a C integer literal.  To be used as:
+//      yp_IMMORTAL_INT( name, value );
+
 // Defines an immortal bytes constant at compile-time, which can be accessed by the variable name,
 // which is of type "static ypObject * const".  value is a C string literal that can contain null
 // bytes.  The length is calculated while compiling; the hash will be calculated the first time it
@@ -972,9 +976,9 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 //          // exception-branch
 //      } yp_ENDIF
 // C's return statement works as you'd expect.
-// As in Python, a condition is only evaluated if previous conditions evaluated false and did not 
-// raise an exception, the exception-branch is executed if any evaluated condition raises an 
-// exception, and the exception variable is only set if an exception occurs.  Unlike Python, 
+// As in Python, a condition is only evaluated if previous conditions evaluated false and did not
+// raise an exception, the exception-branch is executed if any evaluated condition raises an
+// exception, and the exception variable is only set if an exception occurs.  Unlike Python,
 // exceptions in the chosen branch do not trigger the exception-branch, and the exception variable
 // is not cleared at the end of the exception-branch.  If a condition creates a new reference that
 // must be discarded, use yp_IFd and/or yp_ELIFd ("d" stands for "discard" or "decref"):
@@ -1017,7 +1021,7 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 // TODO Come up with a viable alternative for the return statement (the trouble is if you want to
 // return a new reference to x...it'll be decref'd before you return it)
 // As in Python, the expression is evaluated once to create an iterator, then the suite is executed
-// once with each successfully-yielded value assigned to x (which can be reassigned within the 
+// once with each successfully-yielded value assigned to x (which can be reassigned within the
 // suite).  This occurs until:
 //  - the iterator returns yp_StopIteration, in which case else-suite is executed (but *not* the
 //  exception-suite)
@@ -1088,7 +1092,11 @@ struct _ypObject {
 #define _yp_INLINE_DATA( elemType ) \
     elemType ob_inline_data[1]
 
-// This structure is likely to change in future versions; it should only exist in-memory
+// These structures are likely to change in future versions; they should only exist in-memory
+struct _ypIntObject {
+    _ypObject_HEAD
+    yp_int_t ob_value;
+};
 struct _ypBytesObject {
     _ypObject_HEAD
     _yp_INLINE_DATA( yp_uint8_t );
@@ -1107,12 +1115,18 @@ struct _ypBytesObject {
     ( ((type) & 0xFFu) | (((refcnt) & 0xFFFFFFu) << 8) )
 
 // These type codes must match those in nohtyP.c
+#define _ypInt_CODE                  ( 10u)
 #define _ypBytes_CODE                ( 16u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
 #define _yp_IMMORTAL_HEAD_INIT( type, data, len ) \
     { _ypObject_MAKE_TYPE_REFCNT( type, _ypObject_REFCNT_IMMORTAL ), \
       len, 0, _ypObject_HASH_INVALID, data }
+// TODO It's possible to calculate the hash of ints at compile time
+#define yp_IMMORTAL_INT( name, value ) \
+    static struct _ypIntObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
+        _ypInt_CODE, NULL, 0 ), value }; \
+    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \

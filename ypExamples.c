@@ -51,16 +51,16 @@ EXAMPLE( BuildingLists, DiscardOnException )
     for( i = 0; i < 5; i++ ) {
         // If yp_intC fails, item set to an exception
         item = yp_intC( i );
-        
+
         // If item or list is an exception, or yp_append fails, list discarded and replaced with
         // an exception
         yp_append( &list, item );
-        
+
         // yp_append creates its own reference to item, so we need to discard ours; this is
         // safe even if item is an exception, as exceptions are immortal
         yp_decref( item );
     }
-    
+
     // If any of the yp_listN, yp_intC, or yp_append calls failed, list would now be that
     // exception
     ExpectNoException( list );
@@ -84,14 +84,14 @@ EXAMPLE( BuildingLists, KeepOnException )
         // When yp_chrC fails (on values greater than 0xFF), item will be set to exception
         item = yp_chrC( 0xFE+i );  // FIXME but it won't fail, as it supports unicode...
         if( i > 1 ) ExpectEqual( yp_ValueError, item );
-        
-        // As yp_append will discard list if item is an exception, we need to pass it a separate 
+
+        // As yp_append will discard list if item is an exception, we need to pass it a separate
         // reference in a separate variable
         working = yp_incref( list );
         yp_append( &working, item );
         if( i > 1 ) ExpectEqual( yp_ValueError, working );
         yp_decref( working );
-        
+
         // append creates its own reference to item, so we need to discard ours
         yp_decref( item );
     }
@@ -114,8 +114,8 @@ EXAMPLE( BuildingLists, KeepOnException )
 /* Taken from Python's tutorial */
 EXAMPLE( Sets, BriefDemonstration )
 {
-    // Rather than allocating at runtime, immutable objects such as bytes can be statically
-    // allocated either locally or globally
+    // Rather than allocating at runtime, immutable objects such as bytes and ints can be
+    // statically allocated either locally or globally
     yp_IMMORTAL_BYTES( b_apple, "apple" );
     yp_IMMORTAL_BYTES( b_orange, "orange" );
     yp_IMMORTAL_BYTES( b_pear, "pear" );
@@ -123,10 +123,10 @@ EXAMPLE( Sets, BriefDemonstration )
     yp_IMMORTAL_BYTES( b_crabgrass, "crabgrass" );
     yp_IMMORTAL_BYTES( b_abracadabra, "abracadabra" );
     yp_IMMORTAL_BYTES( b_alacazam, "alacazam" );
-    yp_IMMORTAL_BYTES( b_a, "a" ); // FIXME make immortal ints
-    yp_IMMORTAL_BYTES( b_b, "b" );
-    yp_IMMORTAL_BYTES( b_z, "z" );
-    yp_IMMORTAL_BYTES( b_q, "q" );
+    yp_IMMORTAL_INT( i_a, 'a' );
+    yp_IMMORTAL_INT( i_b, 'b' );
+    yp_IMMORTAL_INT( i_z, 'z' );
+    yp_IMMORTAL_INT( i_q, 'q' );
 
     /* yp_lenC and similar functions only modify exc on error; since they do not discard existing
      * values, exc should be initialized to yp_None or another immortal. */
@@ -149,43 +149,44 @@ EXAMPLE( Sets, BriefDemonstration )
         yp_decref( basket );
     }
     {
-        /* Sets can also be initialized from other iterable objects */
+        /* Sets can also be initialized from other iterable objects; recall that the elements of a
+         * bytes object are ints. */
         ypObject *a = yp_set( b_abracadabra );
         ypObject *b = yp_set( b_alacazam );
         ypObject *result;
 
         /* Unique letters in a: {'a', 'r', 'b', 'c', 'd'} */
         ExpectEqual( 5, yp_lenC( a, &exc ) );
-        ExpectEqual( yp_True, yp_in( b_a, a ) );
-        ExpectEqual( yp_False, yp_in( b_z, a ) );
+        ExpectEqual( yp_True, yp_in( i_a, a ) );
+        ExpectEqual( yp_False, yp_in( i_z, a ) );
 
         /* Letters in a but not in b: {'r', 'd', 'b'}
          * If you forget that yp_differenceN returns a new reference, you'll leak some memory */
         result = yp_differenceN( a, 1, b );
         ExpectEqual( 3, yp_lenC( result, &exc ) );
-        ExpectEqual( yp_True, yp_in( b_b, result ) );
-        ExpectEqual( yp_False, yp_in( b_a, result ) );
+        ExpectEqual( yp_True, yp_in( i_b, result ) );
+        ExpectEqual( yp_False, yp_in( i_a, result ) );
         yp_decref( result );
 
         /* Letters in either a or b: {'a', 'c', 'r', 'd', 'b', 'm', 'z', 'l'} */
         result = yp_unionN( a, 1, b );
         ExpectEqual( 8, yp_lenC( result, &exc ) );
-        ExpectEqual( yp_True, yp_in( b_z, result ) );
-        ExpectEqual( yp_False, yp_in( b_q, result ) );
+        ExpectEqual( yp_True, yp_in( i_z, result ) );
+        ExpectEqual( yp_False, yp_in( i_q, result ) );
         yp_decref( result );
 
         /* Letters in both a and b: {'a', 'c'} */
         result = yp_intersectionN( a, 1, b );
         ExpectEqual( 2, yp_lenC( result, &exc ) );
-        ExpectEqual( yp_True, yp_in( b_a, result ) );
-        ExpectEqual( yp_False, yp_in( b_b, result ) );
+        ExpectEqual( yp_True, yp_in( i_a, result ) );
+        ExpectEqual( yp_False, yp_in( i_b, result ) );
         yp_decref( result );
 
         /* Letters in a or b but not both: {'r', 'd', 'b', 'm', 'z', 'l'} */
         result = yp_symmetric_difference( a, b );
         ExpectEqual( 6, yp_lenC( result, &exc ) );
-        ExpectEqual( yp_True, yp_in( b_z, result ) );
-        ExpectEqual( yp_False, yp_in( b_a, result ) );
+        ExpectEqual( yp_True, yp_in( i_z, result ) );
+        ExpectEqual( yp_False, yp_in( i_a, result ) );
         yp_decref( result );
 
         /* You can clean-up multiple references with a single command */
@@ -227,7 +228,7 @@ EXAMPLE( ConditionalStatements, ELIF )
         ExpectUnreachable( );
     } yp_ENDIF
     // If you forget ENDIF, you'll get a "missing '}'" compile error
-    
+
     // Ensure branch 2 was taken above, then clean up
     ExpectTrue( branch2_taken );
     yp_decrefN( 2, cond1, cond2 );
@@ -251,7 +252,7 @@ EXAMPLE( ConditionalStatements, IFd )
         // this branch won't be executed either
         ExpectUnreachable( );
     } yp_ENDIF
-    
+
     // Ensure branch 1 was taken above, then clean-up
     ExpectTrue( branch1_taken );
     yp_decref( bytes );
@@ -272,7 +273,7 @@ EXAMPLE( ConditionalStatements, EXCEPT_AS )
         except_taken = true;
     } yp_ENDIF
     // e is still available for use, if you so desire, but you can ignore it as it's immortal
-    
+
     // Ensure the right branch was taken, then clean-up
     ExpectTrue( except_taken );
     yp_decref( bytes );
@@ -285,7 +286,7 @@ EXAMPLE( ConditionalStatements, EXCEPT_AS )
     // End of ypExamples
     system("pause"); // FIXME why isn't VC++ pausing?
     return ypExamples_result;
-} 
+}
 
 int main(int argc, char *argv[], char *envp[])
 {
