@@ -1427,7 +1427,7 @@ typedef struct {
 } ypBoolObject;
 #define _ypBool_VALUE( b ) ( ((ypBoolObject *)b)->ob_value )
 
-ypObject *bool_bool( ypObject *b ) {
+static ypObject *bool_bool( ypObject *b ) {
     return b;
 }
 
@@ -2837,6 +2837,16 @@ static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
     ypSet_LEN( so ) += 1;
 }
 
+// Removes the key at the given location from the hash table and returns the reference to it (the
+// key's reference count is not modified).
+static ypObject *_ypSet_removekey( ypObject *so, ypSet_KeyEntry *loc )
+{
+    ypObject *oldkey = loc->se_key;
+    loc->se_key = ypSet_dummy;
+    ypSet_LEN( so ) -= 1;
+    return oldkey;
+}
+
 // Resizes the set to the smallest size that will hold minused values.  If you want to reduce the
 // need for future resizes, call with a larger minused; _ypSet_calc_resize_minused is suggested for
 // this purpose.  Returns yp_None, or an exception on error.
@@ -3019,6 +3029,43 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
     }
 }
 
+// Removes the keys not yielded from iterable to the set
+static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
+{
+    int iterable_pair = yp_TYPE_PAIR_CODE( iterable );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    ypSet_KeyEntry *keys = ypSet_TABLE( so );
+    ypObject *other;
+    yp_ssize_t i;
+    ypSet_KeyEntry *other_loc;
+    ypObject *result = yp_None;
+
+    // The most-likely case is that iterable is a fellow set; if not, then we have two choices:
+    //  - for each item in so, see if it is in iterable (requires constructing a set from iterable)
+    //  - for each item in iterable, "mark" equal items in so, discard remainders (requires
+    //  allocating some method to "mark" the items)
+    // The former method is easier and works best with the most-likely case, so going with that.
+    if( iterable_pair == ypFrozenSet_CODE ) {
+        other = yp_incref( iterable );
+    } else if( iterable_pair == ypFrozenDict_CODE ) {
+        other = yp_incref( ypDict_KEYSET( iterable ) );
+    } else {
+        other = yp_frozenset( iterable ); // new ref
+        if( yp_isexceptionC( other ) ) return other;
+    }
+
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
+        keysleft -= 1;
+        result = _ypSet_lookkey( other, keys[i].se_key, keys[i].se_hash, &other_loc );
+        if( yp_isexceptionC( result ) ) break;
+        if( !ypSet_ENTRY_USED( other_loc ) ) yp_decref( _ypSet_removekey( so, &keys[i] ) );
+    }
+
+    // Clean-up and exit; result might be an exception
+    yp_decref( other );
+    return result;
+}
 
 // Public methods
 
@@ -3086,6 +3133,16 @@ static ypObject *set_update( ypObject *so, int n, va_list args )
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
         result = _ypSet_update( so, va_arg( args, ypObject * ) );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
+static ypObject *set_intersection_update( ypObject *so, int n, va_list args )
+{
+    ypObject *result;
+    for( /*n already set*/; n > 0; n-- ) {
+        result = _ypSet_intersection_update( so, va_arg( args, ypObject * ) );
         if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
@@ -3186,7 +3243,7 @@ static ypSetMethods ypSet_as_set = {
     MethodError_objobjproc,         // tp_issuperset
     // tp_gt is elsewhere
     set_update,                     // tp_update
-    MethodError_objvalistproc,      // tp_intersection_update
+    set_intersection_update,        // tp_intersection_update
     MethodError_objvalistproc,      // tp_difference_update
     MethodError_objobjproc,         // tp_symmetric_difference_update
     MethodError_objobjproc          // tp_pushunique
