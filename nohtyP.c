@@ -2890,7 +2890,8 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
 
 // Adds the key to the hash table.  *spaceleft should be initialized from  _ypSet_space_remaining;
 // this function then decrements it with each key added, and resets it on every resize.  Returns
-// yp_None or an exception.
+// yp_True if so was modified, yp_False if it wasn't due to the key already being in the set, or an
+// exception on error.
 // XXX Adapted from PyDict_SetItem
 static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft )
 {
@@ -2905,13 +2906,13 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     if( yp_isexceptionC( result ) ) return result;
 
     // If the key is already in the hash table, then there's nothing to do
-    if( ypSet_ENTRY_USED( loc ) ) return yp_None;
+    if( ypSet_ENTRY_USED( loc ) ) return yp_False;
 
     // Otherwise, we need to add the key, which possibly doesn't involve resizing
     if( *spaceleft >= 1 ) {
         _ypSet_movekey( so, loc, yp_incref( key ), hash );
         *spaceleft -= 1;
-        return yp_None;
+        return yp_True;
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
@@ -2920,7 +2921,30 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     if( yp_isexceptionC( result ) ) return result;
     _ypSet_movekey_clean( so, yp_incref( key ), hash, &loc );
     *spaceleft = _ypSet_space_remaining( so );
-    return yp_None;
+    return yp_True;
+}
+
+// Removes the key from the hash table.  The set is not resized.  Returns yp_True if so was
+// modified, yp_False if it wasn't due to the key not being in the set, or an exception on error.
+static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
+{
+    yp_hash_t hash;
+    ypObject *result = yp_None;
+    ypSet_KeyEntry *loc;
+
+    // Look for the appropriate entry in the hash table; note that key can be a mutable object,
+    // because we are not adding it to the set
+    hash = yp_currenthashC( key, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    result = _ypSet_lookkey( so, key, hash, &loc );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // If the key is not in the hash table, then there's nothing to do
+    if( !ypSet_ENTRY_USED( loc ) ) return yp_False;
+
+    // Otherwise, we need to remove the key
+    yp_decref( _ypSet_removekey( so, loc ) );
+    return yp_True;
 }
 
 // XXX We're trusting that copy_visitor will behave properly and return an object that has the same
@@ -2938,6 +2962,8 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other,
     ypSet_KeyEntry *loc;
 
     // Resize the set if necessary
+    // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
+    // the given lenhint
     if( _ypSet_space_remaining( so ) < keysleft ) {
         result = _ypSet_resize( so, ypSet_LEN( so )+keysleft );
         if( yp_isexceptionC( result ) ) return result;
@@ -3029,42 +3055,127 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
     }
 }
 
-// Removes the keys not yielded from iterable to the set
-static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
+static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *other )
 {
-    int iterable_pair = yp_TYPE_PAIR_CODE( iterable );
     yp_ssize_t keysleft = ypSet_LEN( so );
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    ypObject *other;
     yp_ssize_t i;
     ypSet_KeyEntry *other_loc;
-    ypObject *result = yp_None;
+    ypObject *result;
 
-    // The most-likely case is that iterable is a fellow set; if not, then we have two choices:
-    //  - for each item in so, see if it is in iterable (requires constructing a set from iterable)
-    //  - for each item in iterable, "mark" equal items in so, discard remainders (requires
-    //  allocating some method to "mark" the items)
-    // The former method is easier and works best with the most-likely case, so going with that.
-    if( iterable_pair == ypFrozenSet_CODE ) {
-        other = yp_incref( iterable );
-    } else if( iterable_pair == ypFrozenDict_CODE ) {
-        other = yp_incref( ypDict_KEYSET( iterable ) );
-    } else {
-        other = yp_frozenset( iterable ); // new ref
-        if( yp_isexceptionC( other ) ) return other;
-    }
-
+    // Since we're only removing keys from so, it won't be resized, so we can loop over it
     for( i = 0; keysleft > 0; i++ ) {
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
         keysleft -= 1;
         result = _ypSet_lookkey( other, keys[i].se_key, keys[i].se_hash, &other_loc );
-        if( yp_isexceptionC( result ) ) break;
-        if( !ypSet_ENTRY_USED( other_loc ) ) yp_decref( _ypSet_removekey( so, &keys[i] ) );
+        if( yp_isexceptionC( result ) ) return result;
+        if( ypSet_ENTRY_USED( other_loc ) ) continue; // if entry used, key is in other
+        yp_decref( _ypSet_removekey( so, &keys[i] ) );
     }
+    return yp_None;
+}
 
-    // Clean-up and exit; result might be an exception
-    yp_decref( other );
+static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo );
+static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject **keyiter );
+static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other );
+static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject **keyiter )
+{
+    ypObject *so_toremove;
+    ypObject *result;
+        
+    // Unfortunately, we need to create a short-lived copy of so.  It's either that, or convert
+    // keyiter to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
+    so_toremove = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL ); // new ref
+    if( yp_isexceptionC( so_toremove ) ) return so_toremove;
+
+    // Remove items from so_toremove that are yielded by keyiter.  so_toremove is then a set
+    // containing the keys to remove from so.
+    result = _ypSet_difference_update_from_iter( so_toremove, keyiter );
+    if( !yp_isexceptionC( result ) ) {
+        result = _ypSet_difference_update_from_set( so, so_toremove );
+    }
+    yp_decref( so_toremove );
     return result;
+}
+
+// Removes the keys not yielded from iterable from the set
+static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
+{
+    int iterable_pair = yp_TYPE_PAIR_CODE( iterable );
+    ypObject *keyiter;
+    ypObject *result;
+
+    if( iterable_pair == ypFrozenSet_CODE ) {
+        return _ypSet_intersection_update_from_set( so, iterable );
+    } else if( iterable_pair == ypFrozenDict_CODE ) {
+        return _ypSet_intersection_update_from_set( so, ypDict_KEYSET( iterable ) );
+    } else {
+        keyiter = yp_iter( iterable ); // new ref
+        if( yp_isexceptionC( keyiter ) ) return keyiter;
+        result = _ypSet_intersection_update_from_iter( so, &keyiter );
+        yp_decref( keyiter );
+        return result;
+    }
+}
+
+static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other )
+{
+    yp_ssize_t keysleft = ypSet_LEN( other );
+    ypSet_KeyEntry *otherkeys = ypSet_TABLE( other );
+    ypObject *result;
+    yp_ssize_t i;
+    ypSet_KeyEntry *loc;
+
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
+        keysleft -= 1;
+        result = _ypSet_lookkey( so, otherkeys[i].se_key, otherkeys[i].se_hash, &loc );
+        if( yp_isexceptionC( result ) ) return result;
+        if( !ypSet_ENTRY_USED( loc ) ) continue; // if entry not used, key is not in set
+        yp_decref( _ypSet_removekey( so, loc ) );
+    }
+    return yp_None;
+}
+
+static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject **keyiter )
+{
+    ypObject *result = yp_None;
+    ypObject *key;
+
+    while( 1 ) {
+        key = yp_next( keyiter ); // new ref
+        if( yp_isexceptionC( key ) ) {
+            if( key == yp_StopIteration ) break;
+            return key;
+        }
+        result = _ypSet_pop( so, key );
+        yp_decref( key );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
+// Removes the keys yielded from iterable from the set
+static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
+{
+    int iterable_pair = yp_TYPE_PAIR_CODE( iterable );
+    ypObject *keyiter;
+    ypObject *result;
+
+    // sets and dicts both iterate over a fellow set, so there are efficiencies we can exploit;
+    // otherwise, treat it as a generic iterator.  Recall that type pairs are identified by the
+    // immutable type code.
+    if( iterable_pair == ypFrozenSet_CODE ) {
+        return _ypSet_difference_update_from_set( so, iterable );
+    } else if( iterable_pair == ypFrozenDict_CODE ) {
+        return _ypSet_difference_update_from_set( so, ypDict_KEYSET( iterable ) );
+    } else {
+        keyiter = yp_iter( iterable ); // new ref
+        if( yp_isexceptionC( keyiter ) ) return keyiter;
+        result = _ypSet_difference_update_from_iter( so, &keyiter );
+        yp_decref( keyiter );
+        return result;
+    }
 }
 
 // Public methods
@@ -3121,7 +3232,7 @@ static ypObject *frozenset_contains( ypObject *so, ypObject *x )
     ypObject *result = yp_None;
     ypSet_KeyEntry *loc;
 
-    hash = yp_hashC( x, &result );
+    hash = yp_currenthashC( x, &result );
     if( yp_isexceptionC( result ) ) return result;
     result = _ypSet_lookkey( so, x, hash, &loc );
     if( yp_isexceptionC( result ) ) return result;
@@ -3148,9 +3259,33 @@ static ypObject *set_intersection_update( ypObject *so, int n, va_list args )
     return yp_None;
 }
 
+static ypObject *set_difference_update( ypObject *so, int n, va_list args )
+{
+    ypObject *result;
+    for( /*n already set*/; n > 0; n-- ) {
+        result = _ypSet_difference_update( so, va_arg( args, ypObject * ) );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
+static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
+    yp_ssize_t spaceleft = _ypSet_space_remaining( so );
+    ypObject *result = _ypSet_push( so, x, &spaceleft );
+    if( yp_isexceptionC( result ) ) return result;
+    return result == yp_True ? yp_None : yp_KeyError;
+}
+
 static ypObject *set_push( ypObject *so, ypObject *x ) {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
-    return _ypSet_push( so, x, &spaceleft );
+    ypObject *result = _ypSet_push( so, x, &spaceleft );
+    if( yp_isexceptionC( result ) ) return result;
+    return yp_None; 
+}
+
+static ypObject *frozenset_len( ypObject *so, yp_ssize_t *len ) {
+    *len = ypSet_LEN( so );
+    return yp_None;
 }
 
 static ypObject *_frozenset_dealloc_visitor( ypObject *x, void *memo ) {
@@ -3217,7 +3352,7 @@ static ypTypeObject ypFrozenSet_Type = {
 
     // Container operations
     frozenset_contains,             // tp_contains
-    MethodError_lenfunc,            // tp_length
+    frozenset_len,                  // tp_length
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -3244,9 +3379,9 @@ static ypSetMethods ypSet_as_set = {
     // tp_gt is elsewhere
     set_update,                     // tp_update
     set_intersection_update,        // tp_intersection_update
-    MethodError_objvalistproc,      // tp_difference_update
+    set_difference_update,          // tp_difference_update
     MethodError_objobjproc,         // tp_symmetric_difference_update
-    MethodError_objobjproc          // tp_pushunique
+    set_pushunique,                 // tp_pushunique
 };
 
 static ypTypeObject ypSet_Type = {
@@ -3288,7 +3423,7 @@ static ypTypeObject ypSet_Type = {
 
     // Container operations
     frozenset_contains,             // tp_contains
-    MethodError_lenfunc,            // tp_length
+    frozenset_len,                  // tp_length
     set_push,                       // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -3692,6 +3827,19 @@ void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
 ypObject *yp_pushuniqueE( ypObject **set, ypObject *x ) {
     _yp_REDIRECT2( *set, tp_as_set, tp_pushunique, (*set, x) );
 }
+
+ypObject *yp_getitem( ypObject *mapping, ypObject *key ) {
+    _yp_REDIRECT1( mapping, tp_getdefault, (mapping, key, NULL) );
+}
+
+void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x ) {
+    _yp_INPLACE1( mapping, tp_setitem, (*mapping, key, x) );
+}
+
+void yp_delitem( ypObject **mapping, ypObject *key ) {
+    _yp_INPLACE1( mapping, tp_delitem, (*mapping, key) );
+}
+
 
 // TODO undef necessary stuff
 
