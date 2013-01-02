@@ -148,6 +148,7 @@ EXAMPLE( Sets, BriefDemonstration )
         /* Don't forget to clean-up the new reference returned by yp_setN! */
         yp_decref( basket );
     }
+
     {
         /* Sets can also be initialized from other iterable objects; recall that the elements of a
          * bytes object are ints. */
@@ -197,6 +198,66 @@ EXAMPLE( Sets, BriefDemonstration )
     ExpectEqual( yp_None, exc );
 }
 
+
+/*
+ * Dictionaries
+ */
+
+/* Taken from Python's tutorial */
+EXAMPLE( Dictionaries, SmallExample )
+{
+    // Rather than allocating at runtime, immutable objects such as bytes and ints can be
+    // statically allocated either locally or globally (of course, you'd be wise to give your ints
+    // better names than "i_4098")
+    yp_IMMORTAL_BYTES( b_jack, "jack" );
+    yp_IMMORTAL_BYTES( b_sape, "sape" );
+    yp_IMMORTAL_BYTES( b_guido, "guido" );
+    yp_IMMORTAL_BYTES( b_irv, "irv" );
+    yp_IMMORTAL_INT( i_4098, 4098 );
+    yp_IMMORTAL_INT( i_4139, 4139 );
+    yp_IMMORTAL_INT( i_4127, 4127 );
+
+    /* yp_lenC and similar functions only modify exc on error; since they do not discard existing
+     * values, exc should be initialized to yp_None or another immortal. */
+    ypObject *exc = yp_None;
+    ypObject *result;
+
+    /* The 'K' in "yp_dictK" is a reminder that the variable arguments are n key/value pairs,
+     * for a total of 2n arguments; as in Python, a key comes immediately before its value */
+    ypObject *tel = yp_dictK( 2, b_jack, i_4098, b_sape, i_4139 );
+    ExpectEqual( 2, yp_lenC( tel, &exc ) );
+
+    /* Adding a key to the dict: {'sape': 4139, 'guido': 4127, 'jack': 4098} */
+    yp_setitem( &tel, b_guido, i_4127 );
+    ExpectEqual( 3, yp_lenC( tel, &exc ) );
+
+    /* Retrieving a key from the dict returns a new reference that you must remember to 
+     * discard; commenting the calls that yield new references can help in this. */
+    result = yp_getitem( tel, b_jack ); // new ref
+    ExpectEqual( 4098, yp_asintC( result, &exc ) );
+    yp_decref( result );
+
+    /* Discarding a key from the dict: {'guido': 4127, 'jack': 4098} */
+    yp_delitem( &tel, b_sape );
+    ExpectEqual( 2, yp_lenC( tel, &exc ) );
+
+    /* Adding another key: {'guido': 4127, 'irv': 4127, 'jack': 4098} */
+    yp_setitem( &tel, b_irv, i_4127 );
+    ExpectEqual( 3, yp_lenC( tel, &exc ) );
+
+    /* The default iterator for dictionaries yields its keys, so yp_list results in:
+     *  ['irv', 'guido', 'jack'] */
+    result = yp_list( tel ); // new ref
+    ExpectEqual( 3, yp_lenC( result, &exc ) );
+    ExpectEqual( yp_True, yp_in( b_irv, result ) );
+    ExpectEqual( yp_False, yp_in( i_4127, result ) );
+    yp_decref( result );
+
+    /* yp_in looks to see if the key is in the dictionary */
+    ExpectEqual( yp_True, yp_in( b_guido, tel ) );
+    ExpectEqual( yp_False, yp_not_in( b_jack, tel ) );
+    ExpectEqual( yp_False, yp_in( i_4127, tel ) );
+}
 
 
 /*
