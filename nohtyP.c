@@ -867,13 +867,13 @@ static ypObject *Sequence_iter_reversed( ypObject *sequence ) {
 
 
 /*************************************************************************************************
- * Special (and dangerous) iterator for working with variable arguments of ypObject*s
+ * Special (and dangerous) iterators for working with variable arguments of ypObject*s
  *************************************************************************************************/
 
-// XXX Be very careful working with this: only pass it to functions that will call yp_iter_lenhintC
-// and yp_next.  It is not your typical object: it's allocated on the stack.  While this could be
-// dangerous, it also reduces duplicating code between versions that handle va_args and those that
-// handle iterables.
+// XXX Be very careful working with these: only pass them to trusted functions that will not 
+// attempt to retain a reference to these objects after returning.  These aren't your typical  
+// objects: they're allocated on the stack.  While this could be dangerous, it also  reduces 
+// duplicating code between versions that handle va_args and those that handle iterables.
 
 typedef struct {
     _ypIterObject_HEAD
@@ -893,6 +893,45 @@ static ypObject *_iter_valist_generator( ypObject *i, ypObject *value )
     if( yp_isexceptionC( value ) ) return value;
     if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
     return yp_incref( va_arg( ypIterValist_ARGS( i ), ypObject * ) );
+}
+
+// XXX Be _especially_ careful working with this: it always yields the same yp_ONSTACK_ITER_VALIST 
+// object, which it "revives" for a new pair of arguments every time it's yielded.  Not only are
+// you denied retaining references to these objects, you are denied retaining a reference to 
+// previously-yielded yp_ONSTACK_ITER_VALISTs.
+typedef struct {
+    _ypIterObject_HEAD
+    ypObject *ob_subiter;
+} _ypIterKValistObject;
+#define ypIterKValist_SUBITER( i ) (((_ypIterKValistObject *)i)->ob_subiter)
+
+// Don't include ob_subiter in ob_objlocs
+#define yp_ONSTACK_ITER_KVALIST( name, n, args ) \
+    _ypIterValistObject _ ## name ## _subiter_struct = { \
+        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, 0 ), 0, 0x0u, _iter_closed_generator, args}; \
+    _ypIterKValistObject _ ## name ## _struct = { \
+        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, 0 ), \
+        n, 0x0u, _iter_kvalist_generator, (ypObject *) &_ ## name ## _subiter_struct }; \
+    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+
+static ypObject *_iter_kvalist_generator( ypObject *i, ypObject *value )
+{
+    yp_ssize_t left;
+    ypObject *subiter;
+    
+    if( yp_isexceptionC( value ) ) return value;
+    if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
+
+    // Ensure the sub-iterator consumed all the items from va_list it should have
+    subiter = ypIterKValist_SUBITER( i );
+    for( left = ypIter_LENHINT( subiter ); left > 0; left-- ) {
+        va_arg( ypIterValist_ARGS( subiter ), ypObject * );
+    }
+    
+    // Reset the sub-iterator, and yield it again
+    ypIter_LENHINT( subiter ) = 2;
+    ypIter_FUNC( subiter ) = _iter_valist_generator;
+    return subiter;
 }
 
 // TODO #undef _ypIterObject_HEAD, etc
@@ -1198,6 +1237,63 @@ yp_ssize_t yp_lenC( ypObject *x, ypObject **exc )
  * Invalidated Objects
  *************************************************************************************************/
 
+static ypTypeObject ypInvalidated_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                               // tp_name
+
+    // Object fundamentals
+    MethodError_objproc,                // tp_dealloc
+    NoRefs_traversefunc,                // tp_traverse
+    NULL,                               // tp_str
+    NULL,                               // tp_repr
+
+    // Freezing, copying, and invalidating
+    InvalidatedError_objproc,           // tp_freeze
+    InvalidatedError_traversefunc,      // tp_unfrozen_copy
+    InvalidatedError_traversefunc,      // tp_frozen_copy
+    InvalidatedError_objproc,           // tp_invalidate
+
+    // Boolean operations and comparisons
+    InvalidatedError_objproc,           // tp_bool
+    InvalidatedError_objobjproc,        // tp_lt
+    InvalidatedError_objobjproc,        // tp_le
+    InvalidatedError_objobjproc,        // tp_eq
+    InvalidatedError_objobjproc,        // tp_ne
+    InvalidatedError_objobjproc,        // tp_ge
+    InvalidatedError_objobjproc,        // tp_gt
+
+    // Generic object operations
+    InvalidatedError_hashfunc,          // tp_currenthash
+    InvalidatedError_objproc,           // tp_close
+
+    // Number operations
+    InvalidatedError_NumberMethods,     // tp_as_number
+
+    // Iterator operations
+    InvalidatedError_objproc,           // tp_iter
+    InvalidatedError_objproc,           // tp_iter_reversed
+    InvalidatedError_objobjproc,        // tp_send
+
+    // Container operations
+    InvalidatedError_objobjproc,        // tp_contains
+    InvalidatedError_lenfunc,           // tp_length
+    InvalidatedError_objobjproc,        // tp_push
+    InvalidatedError_objproc,           // tp_clear
+    InvalidatedError_objproc,           // tp_pop
+    InvalidatedError_objobjproc,        // tp_remove
+    InvalidatedError_objobjobjproc,     // tp_getdefault
+    InvalidatedError_objobjobjproc,     // tp_setitem
+    InvalidatedError_objobjproc,        // tp_delitem
+
+    // Sequence operations
+    InvalidatedError_SequenceMethods,   // tp_as_sequence
+
+    // Set operations
+    InvalidatedError_SetMethods,        // tp_as_set
+
+    // Mapping operations
+    InvalidatedError_MappingMethods     // tp_as_mapping
+};
 
 
 /*************************************************************************************************
@@ -1330,6 +1426,9 @@ int yp_isexceptionC( ypObject *x )
 {
     return yp_TYPE_PAIR_CODE( x ) == ypException_CODE;
 }
+
+// FIXME to allow future versions to support a heirarchy of exceptions, a yp_exceptionmathcesC or
+// some other form of naming; then update the code to stop doing ==
 
 
 /*************************************************************************************************
@@ -2677,7 +2776,7 @@ static yp_ssize_t _ypSet_space_remaining( ypObject *so )
 }
 
 // Returns the alloclen that will fit minused entries, or <1 on error
-// XXX Adapted from Python's dictresize
+// XXX Adapted from Python's dictresize; keep in-sync with _ypSet_space_remaining
 // TODO Need to carefully review how expected len becomes minused becomes alloclen; need to also
 // review that pre-allocating 6, say, will mean no resizes if 6 are added
 static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
@@ -2692,25 +2791,19 @@ static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
 
 // If a resize is necessary and you suspect future growth may occur, call this function to
 // determine the minused value to pass to _ypSet_resize.
-// TODO make this limit configurable
+// TODO make this limit configurable via yp_init
 // XXX Adapted from PyDict_SetItem
-static yp_ssize_t _ypSet_calc_resize_minused( ypObject *so, yp_ssize_t newlen )
+static yp_ssize_t _ypSet_calc_resize_minused( yp_ssize_t newlen )
 {
-    if( ypObject_IS_MUTABLE( so ) ) {
-        /* Quadrupling the size improves average dictionary sparseness
-         * (reducing collisions) at the cost of some memory and iteration
-         * speed (which loops over every possible entry).  It also halves
-         * the number of expensive resize operations in a growing dictionary.
-         *
-         * Very large dictionaries (over 50K items) use doubling instead.
-         * This may help applications with severe memory constraints.
-         */
-        return (newlen > 50000 ? 2 : 4) * newlen;
-    } else {
-        // frozensets don't need extra room to grow; additional keys will never be added
-        return newlen;
-    }
-
+    /* Quadrupling the size improves average dictionary sparseness
+     * (reducing collisions) at the cost of some memory and iteration
+     * speed (which loops over every possible entry).  It also halves
+     * the number of expensive resize operations in a growing dictionary.
+     *
+     * Very large dictionaries (over 50K items) use doubling instead.
+     * This may help applications with severe memory constraints.
+     */
+    return (newlen > 50000 ? 2 : 4) * newlen;
 }
 
 // Returns a new, empty frozenset object to hold minused entries
@@ -2916,16 +3009,20 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
-    // fast _ypSet_movekey_clean.  Remember that _ypSet_resize invalidates loc.
-    result = _ypSet_resize( so, _ypSet_calc_resize_minused( so, ypSet_LEN( so )+1 ) );
+    // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.  Remember that
+    // _ypSet_resize invalidates loc.
+    newlen = ypSet_LEN( so )+1;
+    if( ypObject_IS_MUTABLE( so ) ) newlen = _ypSet_calc_resize_minused( newlen );
+    result = _ypSet_resize( so, newlen );
     if( yp_isexceptionC( result ) ) return result;
     _ypSet_movekey_clean( so, yp_incref( key ), hash, &loc );
     *spaceleft = _ypSet_space_remaining( so );
     return yp_True;
 }
 
-// Removes the key from the hash table.  The set is not resized.  Returns yp_True if so was
-// modified, yp_False if it wasn't due to the key not being in the set, or an exception on error.
+// Removes the key from the hash table.  The set is not resized.  Returns the reference to the 
+// removed key if so was modified, ypSet_dummy if it wasn't due to the key not being in the 
+// set, or an exception on error.
 static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
 {
     yp_hash_t hash;
@@ -2940,11 +3037,10 @@ static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
     if( yp_isexceptionC( result ) ) return result;
 
     // If the key is not in the hash table, then there's nothing to do
-    if( !ypSet_ENTRY_USED( loc ) ) return yp_False;
+    if( !ypSet_ENTRY_USED( loc ) ) return ypSet_dummy;
 
     // Otherwise, we need to remove the key
-    yp_decref( _ypSet_removekey( so, loc ) );
-    return yp_True;
+    return _ypSet_removekey( so, loc ); // new ref
 }
 
 // XXX We're trusting that copy_visitor will behave properly and return an object that has the same
@@ -3145,12 +3241,13 @@ static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject **ke
     while( 1 ) {
         key = yp_next( keyiter ); // new ref
         if( yp_isexceptionC( key ) ) {
-            if( key == yp_StopIteration ) break;
+            if( key == yp_StopIteration ) break; // FIXME replace such checks with a function call
             return key;
         }
-        result = _ypSet_pop( so, key );
+        result = _ypSet_pop( so, key ); // new ref
         yp_decref( key );
         if( yp_isexceptionC( result ) ) return result;
+        yp_decref( result );
     }
     return yp_None;
 }
@@ -3494,10 +3591,15 @@ ypObject *yp_set( ypObject *iterable ) {
  * Mappings
  *************************************************************************************************/
 
+// XXX Much of this set/dict implementation is pulled right from Python, so best to read the
+// original source for documentation on this implementation
+
 // XXX keyset requires care!  It is potentially shared among multiple dicts, so we cannot remove
 // keys or resize it.  It identifies itself as a frozendict, yet we add keys to it, so it is not
 // truly immutable.  As such, it cannot be exposed outside of the set/dict implementations.
+// TODO investigate how/when the keyset will be shared between dicts
 // TODO alloclen will always be the same as keyset.alloclen; repurpose?
+
 // ypDictObject and ypDict_KEYSET are defined above, for use by the set code
 #define ypDict_LEN( mp )              ( ((ypObject *)mp)->ob_len )
 #define ypDict_VALUES( mp )           ( (ypObject **) ((ypObject *)mp)->ob_data )
@@ -3509,14 +3611,68 @@ ypObject *yp_set( ypObject *iterable ) {
 
 static ypObject *_yp_frozendict_new( yp_ssize_t minused )
 {
-    // TODO
-    return yp_NotImplementedError;
+    ypObject *keyset;
+    yp_ssize_t alloclen;
+    ypObject *mp;
+
+    keyset = _yp_frozenset_new( minused );
+    if( yp_isexceptionC( keyset ) ) return keyset;
+    alloclen = ypSet_ALLOCLEN( keyset );
+    ypMem_MALLOC_CONTAINER_INLINE( mp, ypDictObject, ypFrozenDict_CODE, alloclen );
+    if( yp_isexceptionC( mp ) ) {
+        yp_decref( keyset );
+        return mp;
+    }
+    memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
+    return so;
 }
 
 static ypObject *_yp_dict_new( yp_ssize_t minused )
 {
-    // TODO
-    return yp_NotImplementedError;
+    ypObject *keyset;
+    yp_ssize_t alloclen;
+    ypObject *mp;
+
+    keyset = _yp_frozenset_new( minused );
+    if( yp_isexceptionC( keyset ) ) return keyset;
+    alloclen = ypSet_ALLOCLEN( keyset );
+    ypMem_MALLOC_CONTAINER_INLINE( mp, ypDictObject, ypDict_CODE, alloclen );
+    if( yp_isexceptionC( mp ) ) {
+        yp_decref( keyset );
+        return mp;
+    }
+    memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
+    return so;
+}
+
+// Steals value and adds it to the value array corresponding to the given hash table location.  
+// Returns the reference to the previous value, or ypSet_dummy if no previous value.
+static ypObject *_ypDict_movevalue( ypObject *mp, ypSet_KeyEntry *loc, ypObject *value )
+{
+    yp_ssize_t i = ypDict_ENTRY_INDEX( mp, loc );
+    ypObject *oldvalue = ypDict_VALUES( mp )[i];
+    ypDict_VALUES( mp )[i] = value;
+    if( oldvalue == NULL ) {
+        ypDict_LEN( mp ) += 1;
+        return ypSet_dummy;
+    } else {
+        return oldvalue;
+    }
+}
+
+// Removes the value from the value array corresponding to the given hash table location.  Returns
+// the reference to the previous value, or ypSet_dummy if no previous value.
+static ypObject *_ypDict_removevalue( ypObject *mp, ypSet_KeyEntry *loc )
+{
+    yp_ssize_t i = ypDict_ENTRY_INDEX( mp, loc );
+    ypObject *oldvalue = ypDict_VALUES( mp )[i];
+    if( oldvalue == NULL ) {
+        return ypSet_dummy;
+    } else {
+        ypDict_VALUES( mp )[i] = NULL;
+        ypDict_LEN( mp ) -= 1;
+        return oldvalue;
+    }
 }
 
 // The tricky bit about resizing dicts is that we need both the old and new keysets and value
@@ -3564,20 +3720,19 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     return yp_None;
 }
 
-// Adds a new value to the value array corresponding to the given hash table location; updates the
-// len count.  Replaces any existing value.
-static void _ypDict_setvalue( ypObject *mp, ypSet_KeyEntry *loc, ypObject *value )
-{
-    yp_ssize_t i = ypDict_ENTRY_INDEX( mp, loc );
-    ypObject *oldvalue = ypDict_VALUES( mp )[i];
-    if( oldvalue == NULL ) {
-        ypDict_LEN( mp ) += 1;
-    } else {
-        yp_decref( oldvalue );
-    }
-    ypDict_VALUES( mp )[i] = yp_incref( value );
-}
 
+// TODO ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, yp_ssize_t *spaceleft );
+//   ... true, false, or exception
+// TODO ypObject *_ypDict_pop( ypObject *mp, ypObject *key );
+//   ... old value, dummy, or exception
+
+// TODO _ypDict_update_from_dict
+// TODO ...what if the dict we're updating against shares the same keyset?
+
+// TODO _ypDict_update_from_iter
+// TODO _ypDict_update
+
+// Public methods
 
 // yp_None or an exception
 // TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
@@ -3621,12 +3776,35 @@ static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
 
 
 // Constructors
+// XXX x may be an yp_ONSTACK_ITER_KVALIST: use carefully
+// TODO if x is a fellow dict, consider sharing its keyset
+static ypObject *_ypDict( ypObject *(*allocator)( yp_ssize_t ), ypObject *x )
+{
+    ypObject *exc = yp_None;
+    ypObject *newMp;
+    ypObject *result;
+    yp_ssize_t lenhint = yp_lenC( x, &exc );
+    if( yp_isexceptionC( exc ) ) lenhint = yp_iter_lenhintC( x, &exc );
+    // Ignore errors determining lenhint; it just means we can't pre-allocate
+
+    newMp = allocator( lenhint );
+    if( yp_isexceptionC( newMp ) ) return newMp;
+    // TODO make sure _ypDict_update is efficient for pre-sized objects
+    result = _ypDict_update( newSo, x );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( newMp );
+        return result;
+    }
+    return newMp;
+}
+
 ypObject *yp_frozendictK( int n, ... ) {
     if( n == 0 ) return _yp_frozendict_new( 0 );
     return_yp_V_FUNC( ypObject *, yp_frozendictKV, (n, args), n );
 }
 ypObject *yp_frozendictKV( int n, va_list args ) {
-    return yp_NotImplementedError;
+    yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
+    return _ypDict( _yp_frozendict_new, iter_args );
 }
 
 ypObject *yp_dictK( int n, ... ) {
@@ -3634,9 +3812,11 @@ ypObject *yp_dictK( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_dictKV, (n, args), n );
 }
 ypObject *yp_dictKV( int n, va_list args ) {
-    return yp_NotImplementedError;
+    yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
+    return _ypDict( _yp_dict_new, iter_args );
 }
 
+// TODO something akin to yp_ONSTACK_ITER_KVALIST that yields the same value with each key
 ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
     if( n == 0 ) return _yp_frozendict_new( 0 );
     return_yp_V_FUNC( ypObject *, yp_frozendict_fromkeysV, (value, n, args), n );
@@ -3654,10 +3834,10 @@ ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
 }
 
 ypObject *yp_frozendict( ypObject *x ) {
-    return yp_NotImplementedError;
+    return _ypDict( _yp_frozendict_new, x );
 }
 ypObject *yp_dict( ypObject *x ) {
-    return yp_NotImplementedError;
+    return _ypDict( _yp_dict_new, x );
 }
 
 
@@ -3847,12 +4027,12 @@ void yp_delitem( ypObject **mapping, ypObject *key ) {
 /*************************************************************************************************
  * The type table
  *************************************************************************************************/
-// XXX Make sure this corresponds with ypInvalidated_TYPE et al!
+// XXX Make sure this corresponds with ypInvalidated_CODE et al!
 
 // Recall that C helpfully sets missing array elements to NULL
 static ypTypeObject *ypTypeTable[255] = {
-    NULL,               /* ypInvalidated_CODE          (  0u) */
-    NULL,               /*                             (  1u) */
+    &ypInvalidated_Type,/* ypInvalidated_CODE          (  0u) */
+    &ypInvalidated_Type,/*                             (  1u) */
     &ypException_Type,  /* ypException_CODE            (  2u) */
     &ypException_Type,  /*                             (  3u) */
     NULL,               /* ypType_CODE                 (  4u) */

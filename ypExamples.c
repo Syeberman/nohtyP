@@ -36,6 +36,32 @@ int ypExamples( void )
 
 
 /*
+ * Immortals
+ */
+
+/* An immortal object is one that does not maintain a reference count and, thus, is never
+ * deallocated; while safe to do so, it is not necessary to call yp_incref or yp_decref on these
+ * objects.  yp_None, yp_True, and yp_False are all built-in immortals, as are all exception
+ * objects.  When a function is documented like "Returns an immortal...", you know you can safely
+ * discard the result without first yp_decref'ing it. */
+
+/* It is also possible to define your own, usually immutable, immortal objects.  The following code
+ * defines a series of immortal bytes objects, for use in the examples below.  These macros can be
+ * used to define global and function-local "ypObject * const" variables. */
+yp_IMMORTAL_BYTES( b_apple, "apple" );              // ypObject * const b_apple = <...>;
+yp_IMMORTAL_BYTES( b_orange, "orange" );
+yp_IMMORTAL_BYTES( b_pear, "pear" );
+yp_IMMORTAL_BYTES( b_banana, "banana" );
+yp_IMMORTAL_BYTES( b_crabgrass, "crabgrass" );
+yp_IMMORTAL_BYTES( b_abracadabra, "abracadabra" );
+yp_IMMORTAL_BYTES( b_alacazam, "alacazam" );
+yp_IMMORTAL_BYTES( b_jack, "jack" );
+yp_IMMORTAL_BYTES( b_sape, "sape" );
+yp_IMMORTAL_BYTES( b_guido, "guido" );
+yp_IMMORTAL_BYTES( b_irv, "irv" );
+
+
+/*
  * Building lists
  */
 
@@ -114,15 +140,10 @@ EXAMPLE( BuildingLists, KeepOnException )
 /* Taken from Python's tutorial */
 EXAMPLE( Sets, BriefDemonstration )
 {
-    // Rather than allocating at runtime, immutable objects such as bytes and ints can be
-    // statically allocated either locally or globally
-    yp_IMMORTAL_BYTES( b_apple, "apple" );
-    yp_IMMORTAL_BYTES( b_orange, "orange" );
-    yp_IMMORTAL_BYTES( b_pear, "pear" );
-    yp_IMMORTAL_BYTES( b_banana, "banana" );
-    yp_IMMORTAL_BYTES( b_crabgrass, "crabgrass" );
-    yp_IMMORTAL_BYTES( b_abracadabra, "abracadabra" );
-    yp_IMMORTAL_BYTES( b_alacazam, "alacazam" );
+    /* Defining immortal int objects is usually not necessary, as the nohtyP functions that often
+     * deal with integers (ie yp_getitem) have versions that accept C integers directly (ie
+     * yp_getindexC).  int objects are needed for this example because we use them to check for
+     * their presence inside a set. */
     yp_IMMORTAL_INT( i_a, 'a' );
     yp_IMMORTAL_INT( i_b, 'b' );
     yp_IMMORTAL_INT( i_z, 'z' );
@@ -206,13 +227,10 @@ EXAMPLE( Sets, BriefDemonstration )
 /* Taken from Python's tutorial */
 EXAMPLE( Dictionaries, SmallExample )
 {
-    // Rather than allocating at runtime, immutable objects such as bytes and ints can be
-    // statically allocated either locally or globally (of course, you'd be wise to give your ints
-    // better names than "i_4098")
-    yp_IMMORTAL_BYTES( b_jack, "jack" );
-    yp_IMMORTAL_BYTES( b_sape, "sape" );
-    yp_IMMORTAL_BYTES( b_guido, "guido" );
-    yp_IMMORTAL_BYTES( b_irv, "irv" );
+    /* Defining immortal int objects is usually not necessary; they are used in this example 
+     * as the values of a dict, although they could just as easily be mortal ints.  (Of course, 
+     * if you _do_ use immortal ints in your code, you'd be wise to give them better names than 
+     * "i_4098".) */
     yp_IMMORTAL_INT( i_4098, 4098 );
     yp_IMMORTAL_INT( i_4139, 4139 );
     yp_IMMORTAL_INT( i_4127, 4127 );

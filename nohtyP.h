@@ -379,7 +379,8 @@ ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
 ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
 
 // Returns a new reference to a frozendict/dict whose key-value pairs come from x.  x can be a
-// mapping object, or an iterable that yields exactly two items at a time (ie (key, value)).
+// mapping object (that supports yp_iter_items), or an iterable that yields exactly two items at a
+// time (ie (key, value)).
 ypObject *yp_frozendict( ypObject *x );
 ypObject *yp_dict( ypObject *x );
 
