@@ -597,7 +597,7 @@ void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 
 // Removes the i-th item from *sequence and returns it.  The Python-equivalent "default" for i is
 // -1.  On error, *sequence is discarded and set to an exception _and_ an exception is returned.
-ypObject *yp_popindexC2( ypObject **sequence, yp_ssize_t i );
+ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
 
 // Equivalent to yp_popindexC( sequence, -1 ).  Note that for sequences, yp_push and yp_pop
 // together implement a stack (last in, first out).
@@ -735,7 +735,7 @@ void yp_delitem( ypObject **mapping, ypObject *key );
 
 // Similar to yp_getitem, but returns a new reference to defval if key is not in the map.  The
 // Python-equivalent "default" for defval is yp_None.
-ypObject *yp_getdefault3( ypObject *mapping, ypObject *key, ypObject *defval );
+ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval );
 
 // Returns a new reference to an iterator that yields mapping's (key, value) pairs as 2-tuples.
 ypObject *yp_iter_items( ypObject *mapping );
@@ -757,7 +757,7 @@ void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 // Similar to yp_getitem, but returns a new reference to defval _and_ adds it to *mapping if key is
 // not in the map.  The Python-equivalent "default" for defval is yp_None; defval _must_ _not_ be
 // an exception.
-ypObject *yp_setdefault3( ypObject *mapping, ypObject *key, ypObject *defval );
+ypObject *yp_setdefault( ypObject *mapping, ypObject *key, ypObject *defval );
 
 // TODO Complete
 // XXX yp_updateN is _not_ applicable for dicts, unless the objects are allowed to be those that
@@ -1066,10 +1066,6 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 
 // A macro to get exception info as a string, include file/line info of the place the macro is
 // checked
-
-// TODO In places where functions have "defaults" and their names include their arg counts (ie
-// yp_getdefault3), eventually pick which possible version of the function is the "primary" and
-// drop the number for that version (ie make it yp_getdefault).
 
 
 /*
