@@ -2991,6 +2991,7 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     yp_hash_t hash;
     ypObject *result = yp_None;
     ypSet_KeyEntry *loc;
+    yp_ssize_t newlen;
 
     // Look for the appropriate entry in the hash table
     hash = yp_hashC( key, &result );
@@ -3009,11 +3010,10 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
-    // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.  Remember that
-    // _ypSet_resize invalidates loc.
+    // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.
     newlen = ypSet_LEN( so )+1;
     if( ypObject_IS_MUTABLE( so ) ) newlen = _ypSet_calc_resize_minused( newlen );
-    result = _ypSet_resize( so, newlen );
+    result = _ypSet_resize( so, newlen );   // invalidates loc
     if( yp_isexceptionC( result ) ) return result;
     _ypSet_movekey_clean( so, yp_incref( key ), hash, &loc );
     *spaceleft = _ypSet_space_remaining( so );
@@ -3606,8 +3606,13 @@ ypObject *yp_set( ypObject *iterable ) {
 #define ypDict_SET_VALUES( mp, x )    ( ((ypObject *)mp)->ob_data = x )
 
 // Returns the index of the given ypSet_KeyEntry in the hash table
+// TODO needed?
 #define ypDict_ENTRY_INDEX( mp, loc ) \
     ( ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), loc ) )
+
+// Returns a pointer to the value element corresponding to the given key location
+#define ypDict_VALUE_ENTRY( mp, key_loc ) \
+    ( &(ypDict_VALUES( mp )[ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), key_loc )]) )
 
 static ypObject *_yp_frozendict_new( yp_ssize_t minused )
 {
@@ -3624,7 +3629,7 @@ static ypObject *_yp_frozendict_new( yp_ssize_t minused )
         return mp;
     }
     memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
-    return so;
+    return mp;
 }
 
 static ypObject *_yp_dict_new( yp_ssize_t minused )
@@ -3642,37 +3647,7 @@ static ypObject *_yp_dict_new( yp_ssize_t minused )
         return mp;
     }
     memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
-    return so;
-}
-
-// Steals value and adds it to the value array corresponding to the given hash table location.  
-// Returns the reference to the previous value, or ypSet_dummy if no previous value.
-static ypObject *_ypDict_movevalue( ypObject *mp, ypSet_KeyEntry *loc, ypObject *value )
-{
-    yp_ssize_t i = ypDict_ENTRY_INDEX( mp, loc );
-    ypObject *oldvalue = ypDict_VALUES( mp )[i];
-    ypDict_VALUES( mp )[i] = value;
-    if( oldvalue == NULL ) {
-        ypDict_LEN( mp ) += 1;
-        return ypSet_dummy;
-    } else {
-        return oldvalue;
-    }
-}
-
-// Removes the value from the value array corresponding to the given hash table location.  Returns
-// the reference to the previous value, or ypSet_dummy if no previous value.
-static ypObject *_ypDict_removevalue( ypObject *mp, ypSet_KeyEntry *loc )
-{
-    yp_ssize_t i = ypDict_ENTRY_INDEX( mp, loc );
-    ypObject *oldvalue = ypDict_VALUES( mp )[i];
-    if( oldvalue == NULL ) {
-        return ypSet_dummy;
-    } else {
-        ypDict_VALUES( mp )[i] = NULL;
-        ypDict_LEN( mp ) -= 1;
-        return oldvalue;
-    }
+    return mp;
 }
 
 // The tricky bit about resizing dicts is that we need both the old and new keysets and value
@@ -3687,7 +3662,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     yp_ssize_t valuesleft;
     yp_ssize_t i;
     ypObject *value;
-    ypSet_KeyEntry *loc;
+    ypSet_KeyEntry *newkey_loc;
 
     // TODO allocate the value array in-line, then handle the case where both old and new value
     // arrays could fit in-line (idea: if currently in-line, then just force that the new array be
@@ -3708,8 +3683,8 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     for( i = 0; valuesleft > 0; i++ ) {
         value = ypDict_VALUES( mp )[i];
         if( value == NULL ) continue;
-        _ypSet_movekey_clean( newkeyset, oldkeys[i].se_key, oldkeys[i].se_hash, &loc );
-        newvalues[ypSet_ENTRY_INDEX( newkeyset, loc )] = oldvalues[i];
+        _ypSet_movekey_clean( newkeyset, oldkeys[i].se_key, oldkeys[i].se_hash, &newkey_loc );
+        newvalues[ypSet_ENTRY_INDEX( newkeyset, newkey_loc )] = oldvalues[i];
         valuesleft -= 1;
     }
 
@@ -3720,59 +3695,262 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     return yp_None;
 }
 
+// Adds the key/value to the dict.  If override is false, returns yp_False and does not modify the
+// dict if there is an existing value.  *spaceleft should be initialized from  
+// _ypSet_space_remaining; this function then decrements it with each key added, and resets it on 
+// every resize.  Returns yp_True if mp was modified, yp_False if it wasn't due to existing values
+// being preserved (ie override is false), or an exception on error.
+// XXX Adapted from PyDict_SetItem
+// TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
+// shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
+// table.  Really, we should have a _ypDict_space_remaining.
+static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int override, 
+        yp_ssize_t *spaceleft )
+{
+    yp_hash_t hash;
+    ypObject *keyset = ypDict_KEYSET( mp );
+    ypSet_KeyEntry *key_loc;
+    ypObject *result = yp_None;
+    ypObject **value_loc;
+    yp_ssize_t newlen;
 
-// TODO ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, yp_ssize_t *spaceleft );
-//   ... true, false, or exception
-// TODO ypObject *_ypDict_pop( ypObject *mp, ypObject *key );
-//   ... old value, dummy, or exception
+    // Look for the appropriate entry in the hash table
+    // TODO yp_isexceptionC used internally should be a macro
+    hash = yp_hashC( key, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    result = _ypSet_lookkey( keyset, key, hash, &key_loc );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // If the key is already in the hash table, then we simply need to update the value
+    if( ypSet_ENTRY_USED( key_loc ) ) {
+        value_loc = ypDict_VALUE_ENTRY( mp, key_loc );
+        if( *value_loc == NULL ) {
+            *value_loc = yp_incref( value );
+            ypDict_LEN( mp ) += 1;
+        } else {
+            if( !override ) return yp_False;
+            yp_decref( *value_loc );
+            *value_loc = yp_incref( value );
+        }
+        return yp_True;
+    }
+
+    // Otherwise, we need to add the key, which possibly doesn't involve resizing
+    // TODO spaceleft
+    if( *spaceleft >= 1 ) {
+        _ypSet_movekey( keyset, key_loc, yp_incref( key ), hash );
+        *ypDict_VALUE_ENTRY( mp, key_loc ) = yp_incref( value );
+        ypDict_LEN( mp ) += 1;
+        *spaceleft -= 1;
+        return yp_True;
+    }
+
+    // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
+    // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.
+    newlen = ypDict_LEN( mp )+1;
+    if( ypObject_IS_MUTABLE( mp ) ) newlen = _ypSet_calc_resize_minused( newlen );
+    result = _ypDict_resize( mp, newlen );  // invalidates keyset and key_loc
+    if( yp_isexceptionC( result ) ) return result;
+    
+    keyset = ypDict_KEYSET( mp );
+    _ypSet_movekey_clean( keyset, yp_incref( key ), hash, &key_loc );
+    *ypDict_VALUE_ENTRY( mp, key_loc ) = yp_incref( value );
+    ypDict_LEN( mp ) += 1;
+    *spaceleft = _ypSet_space_remaining( keyset );
+    return yp_True;
+}
+
+// Removes the value from the dict; the key stays in the keyset, but that's of no concern.  The
+// dict is not resized.  Returns the reference to the removed value if mp was modified, ypSet_dummy
+// if it wasn't due to the value not being set, or an exception on error.
+static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
+{
+    yp_hash_t hash;
+    ypObject *keyset = ypDict_KEYSET( mp );
+    ypSet_KeyEntry *key_loc;
+    ypObject *result = yp_None;
+    ypObject **value_loc;
+    ypObject *oldvalue;
+
+    // Look for the appropriate entry in the hash table; note that key can be a mutable object,
+    // because we are not adding it to the set
+    hash = yp_currenthashC( key, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    result = _ypSet_lookkey( keyset, key, hash, &key_loc );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // If the there's no existing value, then there's nothing to do (if the key is not in the set,
+    // then *value_loc will be NULL)
+    value_loc = ypDict_VALUE_ENTRY( mp, key_loc );
+    if( *value_loc == NULL ) return ypSet_dummy;
+
+    // Otherwise, we need to remove the value
+    oldvalue = *value_loc;
+    *value_loc = NULL;
+    ypDict_LEN( mp ) -= 1;
+    return oldvalue; // new ref
+
+}
 
 // TODO _ypDict_update_from_dict
 // TODO ...what if the dict we're updating against shares the same keyset?
 
 // TODO _ypDict_update_from_iter
 // TODO _ypDict_update
+static ypObject *_ypDict_update( ypObject *mp, ypObject *x ) 
+{
+    return yp_NotImplementedError;
+}
 
 // Public methods
 
+static ypObject *frozendict_bool( ypObject *mp ) {
+    return ypBool_FROM_C( ypDict_LEN( mp ) );
+}
+
 // yp_None or an exception
-// TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
-// shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
-// table.  Really, we should have a _ypDict_space_remaining.
 static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
 {
-    yp_hash_t hash;
-    ypObject *keyset = ypDict_KEYSET( mp );
-    ypSet_KeyEntry *loc;
-    ypObject *result = yp_None;
-
-    // Look for the appropriate entry in the hash table
-    // TODO yp_isexceptionC used internally should be a macro
-    hash = yp_hashC( key, &result );
+    yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
+    ypObject *result = _ypDict_push( mp, key, value, 1, &spaceleft );
     if( yp_isexceptionC( result ) ) return result;
-    result = _ypSet_lookkey( keyset, key, hash, &loc );
-    if( yp_isexceptionC( result ) ) return result;
-
-    // If the key is already in the hash table, then we simply need to update the value
-    if( ypSet_ENTRY_USED( loc ) ) {
-        _ypDict_setvalue( mp, loc, value );
-        return yp_None;
-    }
-
-    // Otherwise, we need to add the key, which possibly doesn't involve resizing
-    if( _ypSet_space_remaining( keyset ) >= 1 ) {
-        _ypSet_movekey( keyset, loc, yp_incref( key ), hash );
-        _ypDict_setvalue( mp, loc, value );
-        return yp_None;
-    }
-
-    // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
-    // fast _ypSet_movekey_clean.
-    result = _ypDict_resize( mp, ypDict_LEN( mp )+1 );   // invalidates keyset and loc
-    if( yp_isexceptionC( result ) ) return result;
-    keyset = ypDict_KEYSET( mp );
-    _ypSet_movekey_clean( keyset, yp_incref( key ), hash, &loc );
-    _ypDict_setvalue( mp, loc, value );
+    return yp_None;
 }
+
+static ypMappingMethods ypFrozenDict_as_mapping = {
+    MethodError_objproc,            // tp_iter_items
+    MethodError_objproc,            // tp_iter_keys
+    MethodError_objobjobjproc,      // tp_popvalue
+    MethodError_popitemfunc,        // tp_popitem
+    MethodError_objobjobjproc,      // tp_setdefault
+    MethodError_objproc             // tp_iter_values
+};
+
+static ypTypeObject ypFrozenDict_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    MethodError_objproc,            // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse // FIXME
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    frozendict_bool,                // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+static ypMappingMethods ypDict_as_mapping = {
+    MethodError_objproc,            // tp_iter_items
+    MethodError_objproc,            // tp_iter_keys
+    MethodError_objobjobjproc,      // tp_popvalue
+    MethodError_popitemfunc,        // tp_popitem
+    MethodError_objobjobjproc,      // tp_setdefault
+    MethodError_objproc             // tp_iter_values
+};
+
+static ypTypeObject ypDict_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    MethodError_objproc,            // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse // FIXME
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    frozendict_bool,                // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    MethodError_objproc,            // tp_iter
+    MethodError_objproc,            // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
 
 
 // Constructors
@@ -3790,7 +3968,7 @@ static ypObject *_ypDict( ypObject *(*allocator)( yp_ssize_t ), ypObject *x )
     newMp = allocator( lenhint );
     if( yp_isexceptionC( newMp ) ) return newMp;
     // TODO make sure _ypDict_update is efficient for pre-sized objects
-    result = _ypDict_update( newSo, x );
+    result = _ypDict_update( newMp, x );
     if( yp_isexceptionC( result ) ) {
         yp_decref( newMp );
         return result;
@@ -4061,8 +4239,8 @@ static ypTypeObject *ypTypeTable[255] = {
     &ypFrozenSet_Type,  /* ypFrozenSet_CODE            ( 22u) */
     &ypSet_Type,        /* ypSet_CODE                  ( 23u) */
 
-    NULL,               /* ypFrozenDict_CODE           ( 24u) */
-    NULL,               /* ypDict_CODE                 ( 25u) */
+    &ypFrozenDict_Type, /* ypFrozenDict_CODE           ( 24u) */
+    &ypDict_Type,       /* ypDict_CODE                 ( 25u) */
 };
 
 
