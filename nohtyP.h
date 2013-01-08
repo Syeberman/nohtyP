@@ -26,7 +26,7 @@
  *      // if yp_join failed, sepList could be an exception
  *      ypObject *result = yp_format( fmt, sepList );
  *      yp_decref( sepList );
- *      if( yp_isexception( result ) ) exit( -1 );
+ *      if( yp_isexceptionC( result ) ) exit( -1 );
  * Unless explicitly documented as "always succeeds", _any_ function can return an exception.
  *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
@@ -407,8 +407,6 @@ yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 // As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an
 // object that implements yp_iter.
 
-// TODO Because these functions don't (currently) discard *iterator, should they have prefix E?
-
 // "Sends" a value into *iterator and returns a new reference to the next yielded value,
 // yp_StopIteration if the iterator is exhausted, or another exception.  The value may be ignored
 // by the iterator.  If value is an exception this behaves like yp_throw.
@@ -437,6 +435,7 @@ yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 // to the generator constructor; the function cannot change the size after creation, and any
 // ypObject*s in *state should be considered *borrowed* (it is safe to replace them with new
 // references).  Sets *state to NULL, *size to zero, and *exc to an exception on error.
+// TODO drop exc, return exception/None instead?
 void yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size, ypObject **exc );
 
 // "Closes" the iterator by calling yp_throw( iterator, yp_GeneratorExit ).  If yp_StopIteration or
@@ -809,7 +808,6 @@ ypObject *yp_invert( ypObject *x );
 // otherwise *x is discarded and replaced with the result.  If *x is immutable on input, an
 // immutable object is returned, otherwise a mutable object is returned.  On error, *x is
 // discarded and set to an exception.
-// TODO Throw error if x is immutable?
 void yp_iadd( ypObject **x, ypObject *y );
 void yp_isub( ypObject **x, ypObject *y );
 void yp_imul( ypObject **x, ypObject *y );
@@ -907,8 +905,6 @@ ypAPI ypObject * yp_AttributeError;
 ypAPI ypObject * yp_MethodError; // method lookup failure; "subclass" of yp_AttributeError
 ypAPI ypObject * yp_EOFError;
 ypAPI ypObject * yp_FloatingPointError;
-ypAPI ypObject * yp_EnvironmentError;
-ypAPI ypObject * yp_IOError;
 ypAPI ypObject * yp_OSError;
 ypAPI ypObject * yp_ImportError;
 ypAPI ypObject * yp_IndexError;
@@ -919,9 +915,6 @@ ypAPI ypObject * yp_NameError;
 ypAPI ypObject * yp_OverflowError;
 ypAPI ypObject * yp_RuntimeError;
 ypAPI ypObject * yp_NotImplementedError;
-ypAPI ypObject * yp_SyntaxError;
-ypAPI ypObject * yp_IndentationError;
-ypAPI ypObject * yp_TabError;
 ypAPI ypObject * yp_ReferenceError;
 ypAPI ypObject * yp_SystemError;
 ypAPI ypObject * yp_SystemLimitationError; // limitation in the implementation of nohtyP; "subclass" of yp_SystemError
@@ -936,7 +929,14 @@ ypAPI ypObject * yp_UnicodeTranslateError;
 ypAPI ypObject * yp_ValueError;
 ypAPI ypObject * yp_ZeroDivisionError;
 ypAPI ypObject * yp_BufferError;
-ypAPI ypObject * yp_RecursionErrorInst;
+
+// Returns true (non-zero) if x is an exception that matches exc, else false.  This takes into
+// account the exception heirarchy, so is the preferred method of testing for specific exceptions.
+// Always succeeds.
+int yp_isexceptionC2( ypObject *x, ypObject *exc );
+
+// A convenience function to compare x against n possible exceptions.  Returns false if n is zero.
+int yp_isexceptionCN( ypObject *x, int n, ... );
 
 
 /*
@@ -1005,8 +1005,6 @@ ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
 // If condition creates a new reference that must be discarded, use yp_WHILEd ("d" stands for
 // "discard" or "decref"):
 //      yp_WHILEd( yp_getindexC( a, -1 ) )
-// TODO if yp_WHILE_EXCEPT_AS declared the exception variable internally, then it would disappear
-// once outside of the block and thus behave more like Python (here and elsewhere)
 
 // yp_FOR: A series of macros to emulate a for/else with exception handling.  To be used strictly
 // as follows (including braces):
@@ -1162,7 +1160,6 @@ struct _ypBytesObject {
     } if( _yp_IF_cond == yp_False ) {
 #define yp_ELSE_EXCEPT \
     } if( yp_isexceptionC( _yp_IF_cond ) ) {
-// TODO define the target internally?
 #define yp_ELSE_EXCEPT_AS( target ) \
     } if( yp_isexceptionC( _yp_IF_cond ) ) { \
         target = _yp_IF_cond;
@@ -1209,13 +1206,13 @@ struct _ypBytesObject {
          !yp_isexceptionC( _yp_FOR_item ) && (target = _yp_FOR_item); \
          yp_decref( _yp_FOR_item ), _yp_FOR_item = yp_next( _yp_FOR_iter ) )
 #define yp_FOR_ELSE \
-    if( _yp_FOR_item == yp_StopIteration )
+    if( yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) )
 #define yp_FOR_EXCEPT \
     if( yp_isexceptionC( _yp_FOR_item ) && \
-        _yp_FOR_item != yp_StopIteration )
+        !yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) )
 #define yp_FOR_EXCEPT_AS( target ) \
     if( yp_isexceptionC( _yp_FOR_item ) && \
-        _yp_FOR_item != yp_StopIteration && \
+        !yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) && \
         (target = _yp_FOR_item) )
 #define yp_ENDFOR \
     yp_decref( _yp_FOR_item ); \
@@ -1225,7 +1222,7 @@ struct _ypBytesObject {
 // The implementation of "yp" is considered "internal"; see above for documentation
 #define yp0( self, method )         yp_ ## method( self )
 #define yp1( self, method, a1 )     yp_ ## method( self, a1 )
-#ifdef yp_NO_VARIADIC_MACROS // TODO Rename?
+#ifdef yp_NO_VARIADIC_MACROS
 #define yp yp1
 #else
 #define yp( self, method, ... )     yp_ ## method( self, _VA_ARGS_ )
