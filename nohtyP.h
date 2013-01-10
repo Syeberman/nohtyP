@@ -363,7 +363,8 @@ ypObject *yp_frozenset( ypObject *iterable );
 ypObject *yp_set( ypObject *iterable );
 
 // Returns a new reference to a frozendict/dict containing the given n key/value pairs (for a total
-// of 2*n objects); the length will be n, unless there are duplicate keys.
+// of 2*n objects); the length will be n, unless there are duplicate keys, in which case the last
+// value will be retained.
 //  Ex: yp_dictK( 3, key0, value0, key1, value1, key2, value2 )
 ypObject *yp_frozendictK( int n, ... );
 ypObject *yp_frozendictKV( int n, va_list args );
@@ -380,7 +381,8 @@ ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
 
 // Returns a new reference to a frozendict/dict whose key-value pairs come from x.  x can be a
 // mapping object (that supports yp_iter_items), or an iterable that yields exactly two items at a
-// time (ie (key, value)).
+// time (ie (key, value)).  If a given key is seen more than once, the last value yielded is
+// retained.
 ypObject *yp_frozendict( ypObject *x );
 ypObject *yp_dict( ypObject *x );
 
@@ -430,13 +432,13 @@ ypObject *yp_throw( ypObject **iterator, ypObject *exc );
 // the iterator will yield infinite values.  Returns zero and sets *exc on error.
 yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 
-// Typically only called from within yp_generator_func_t functions.  Returns the generator state
-// and its size in bytes.  The structure and initial values of *state are determined by the call
-// to the generator constructor; the function cannot change the size after creation, and any
-// ypObject*s in *state should be considered *borrowed* (it is safe to replace them with new
-// references).  Sets *state to NULL, *size to zero, and *exc to an exception on error.
-// TODO drop exc, return exception/None instead?
-void yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size, ypObject **exc );
+// Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
+// internal generator state buffer and its size in bytes, and returns the immortal yp_None.  The 
+// structure and initial values of *state are determined by the call to the generator constructor; 
+// the function cannot change the size after creation, and any ypObject*s in *state should be 
+// considered *borrowed* (it is safe to replace them with new references).  Sets *state to NULL, 
+// *size to zero, and returns an exception on error.
+ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size );
 
 // "Closes" the iterator by calling yp_throw( iterator, yp_GeneratorExit ).  If yp_StopIteration or
 // yp_GeneratorExit is returned by yp_throw, *iterator is not discarded, otherwise *iterator is
@@ -758,10 +760,16 @@ void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 // an exception.
 ypObject *yp_setdefault( ypObject *mapping, ypObject *key, ypObject *defval );
 
-// TODO Complete
-// XXX yp_updateN is _not_ applicable for dicts, unless the objects are allowed to be those that
-// yp_dict accepts
-// Also: yp_updateK (kw args), yp_update (accepting those that yp_dict accepts, but just one)
+// Add the given n key/value pairs (for a total of 2*n objects) to *mapping, overwriting existing 
+// keys.  If a given key is seen more than once, the last value is retained.  On error, *mapping is
+// discarded and set to an exception.
+void yp_updateK( ypObject **mapping, int n, ... );
+void yp_updateKV( ypObject **mapping, int n, va_list args );
+
+// Add the elements from the n objects to *mapping.  Each object is handled as per yp_dict.  On 
+// error, *mapping is discarded and set to an exception.
+void yp_updateN( ypObject **mapping, int n, ... );
+void yp_updateV( ypObject **mapping, int n, va_list args );
 
 // Returns a new reference to an iterator that yields mapping's values.
 ypObject *yp_iter_values( ypObject *mapping );
@@ -782,7 +790,7 @@ ypObject *yp_iter_values( ypObject *mapping );
 // for example, yp_add returns the result of adding x and y together.  If the given operands do not
 // support the operation, yp_TypeError is returned.  Additional notes:
 //  - yp_divmod returns two objects via *div and *mod; on error, they are both set to an exception
-//  - If z is yp_None, yp_pow returns x to the power y, otherwise x to the power y modulo z
+//  - If z is yp_None, yp_pow3 returns x to the power y, otherwise x to the power y modulo z
 //  - To avoid confusion with the logical operators of the same name, yp_amp implements bitwise
 //  and, while yp_bar implements bitwise or
 //  - Unlike Python, non-numeric types do not (currently) overload these operators
@@ -793,7 +801,8 @@ ypObject *yp_truediv( ypObject *x, ypObject *y );
 ypObject *yp_floordiv( ypObject *x, ypObject *y );
 ypObject *yp_mod( ypObject *x, ypObject *y );
 void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod );
-ypObject *yp_pow( ypObject *x, ypObject *y, ypObject *z );
+ypObject *yp_pow( ypObject *x, ypObject *y );
+ypObject *yp_pow3( ypObject *x, ypObject *y, ypObject *z );
 ypObject *yp_lshift( ypObject *x, ypObject *y );
 ypObject *yp_rshift( ypObject *x, ypObject *y );
 ypObject *yp_amp( ypObject *x, ypObject *y );
@@ -814,7 +823,8 @@ void yp_imul( ypObject **x, ypObject *y );
 void yp_itruediv( ypObject **x, ypObject *y );
 void yp_ifloordiv( ypObject **x, ypObject *y );
 void yp_imod( ypObject **x, ypObject *y );
-void yp_ipow( ypObject **x, ypObject *y, ypObject *z );
+void yp_ipow( ypObject **x, ypObject *y );
+void yp_ipow3( ypObject **x, ypObject *y, ypObject *z );
 void yp_ilshift( ypObject **x, ypObject *y );
 void yp_irshift( ypObject **x, ypObject *y );
 void yp_iamp( ypObject **x, ypObject *y );
@@ -828,22 +838,76 @@ void yp_iinvert( ypObject **x );
 // Versions of yp_iadd et al that accept a C integer as the second argument.  Remember that *x may
 // be discarded and replaced with the result.
 void yp_iaddC( ypObject **x, yp_int_t y );
-// TODO: et al
+void yp_isubC( ypObject **x, yp_int_t y );
+void yp_imulC( ypObject **x, yp_int_t y );
+void yp_itruedivC( ypObject **x, yp_int_t y );
+void yp_ifloordivC( ypObject **x, yp_int_t y );
+void yp_imodC( ypObject **x, yp_int_t y );
+void yp_ipowC( ypObject **x, yp_int_t y );
+void yp_ipowC3( ypObject **x, yp_int_t y, yp_int_t z );
+void yp_ilshiftC( ypObject **x, yp_int_t y );
+void yp_irshiftC( ypObject **x, yp_int_t y );
+void yp_iampC( ypObject **x, yp_int_t y );
+void yp_ixorC( ypObject **x, yp_int_t y );
+void yp_ibarC( ypObject **x, yp_int_t y );
 
 // Versions of yp_iadd et al that accept a C floating-point as the second argument.  Remember that
 // *x may be discarded and replaced with the result.
 void yp_iaddFC( ypObject **x, yp_float_t y );
-// TODO: et al
+void yp_isubFC( ypObject **x, yp_float_t y );
+void yp_imulFC( ypObject **x, yp_float_t y );
+void yp_itruedivFC( ypObject **x, yp_float_t y );
+void yp_ifloordivFC( ypObject **x, yp_float_t y );
+void yp_imodFC( ypObject **x, yp_float_t y );
+void yp_ipowFC( ypObject **x, yp_float_t y );
+void yp_ipowFC3( ypObject **x, yp_float_t y, yp_float_t z );
+void yp_ilshiftFC( ypObject **x, yp_float_t y );
+void yp_irshiftFC( ypObject **x, yp_float_t y );
+void yp_iampFC( ypObject **x, yp_float_t y );
+void yp_ixorFC( ypObject **x, yp_float_t y );
+void yp_ibarFC( ypObject **x, yp_float_t y );
 
 // Library routines for nohtyP integer operations on C types.  Returns a reasonable value and sets
 // *exc on error; "reasonable" usually means "truncated".
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
-// TODO: et al
+yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_floordivL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject **exc );
+void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc );
+yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc );
+yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_rshiftL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_ampL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_xorL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject **exc );
+yp_int_t yp_negL( yp_int_t x, ypObject **exc );
+yp_int_t yp_posL( yp_int_t x, ypObject **exc );
+yp_int_t yp_absL( yp_int_t x, ypObject **exc );
+yp_int_t yp_invertL( yp_int_t x, ypObject **exc );
 
 // Library routines for nohtyP floating-point operations on C types.  Returns a reasonable value
 // and sets *exc on error; "reasonable" usually means "truncated".
 yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
-// TODO: et al
+yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc );
+void yp_divmodFL( yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc );
+yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_powFL3( yp_float_t x, yp_float_t y, yp_float_t z, ypObject **exc );
+yp_float_t yp_lshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_rshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_ampFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_xorFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_barFL( yp_float_t x, yp_float_t y, ypObject **exc );
+yp_float_t yp_negFL( yp_float_t x, ypObject **exc );
+yp_float_t yp_posFL( yp_float_t x, ypObject **exc );
+yp_float_t yp_absFL( yp_float_t x, ypObject **exc );
+yp_float_t yp_invertFL( yp_float_t x, ypObject **exc );
 
 // Conversion routines from C types or objects to C types.  Returns a reasonable value and sets
 // *exc on error; "reasonable" usually means "truncated".  Converting a float to an int truncates
@@ -888,47 +952,53 @@ ypObject *yp_sum( ypObject *iterable );
 // is accessed.  To be used as:
 //      yp_IMMORTAL_BYTES( name, value );
 
-// TODO Complete
 
 /*
  * Exceptions
  */
-ypAPI ypObject * yp_BaseException;
-ypAPI ypObject * yp_Exception;
-ypAPI ypObject * yp_StopIteration;
-ypAPI ypObject * yp_GeneratorExit;
-ypAPI ypObject * yp_ArithmeticError;
-ypAPI ypObject * yp_LookupError;
 
-ypAPI ypObject * yp_AssertionError;
-ypAPI ypObject * yp_AttributeError;
-ypAPI ypObject * yp_MethodError; // method lookup failure; "subclass" of yp_AttributeError
-ypAPI ypObject * yp_EOFError;
-ypAPI ypObject * yp_FloatingPointError;
-ypAPI ypObject * yp_OSError;
-ypAPI ypObject * yp_ImportError;
-ypAPI ypObject * yp_IndexError;
-ypAPI ypObject * yp_KeyError;
-ypAPI ypObject * yp_KeyboardInterrupt;
-ypAPI ypObject * yp_MemoryError;
-ypAPI ypObject * yp_NameError;
-ypAPI ypObject * yp_OverflowError;
-ypAPI ypObject * yp_RuntimeError;
-ypAPI ypObject * yp_NotImplementedError;
-ypAPI ypObject * yp_ReferenceError;
-ypAPI ypObject * yp_SystemError;
-ypAPI ypObject * yp_SystemLimitationError; // limitation in the implementation of nohtyP; "subclass" of yp_SystemError
-ypAPI ypObject * yp_SystemExit;
-ypAPI ypObject * yp_TypeError;
-ypAPI ypObject * yp_InvalidatedError; // operation on invalidated object; "subclass" of yp_TypeError
-ypAPI ypObject * yp_UnboundLocalError;
-ypAPI ypObject * yp_UnicodeError;
-ypAPI ypObject * yp_UnicodeEncodeError;
-ypAPI ypObject * yp_UnicodeDecodeError;
-ypAPI ypObject * yp_UnicodeTranslateError;
-ypAPI ypObject * yp_ValueError;
-ypAPI ypObject * yp_ZeroDivisionError;
-ypAPI ypObject * yp_BufferError;
+// All exception objects are immortal and, as such, do not need to be yp_decref'ed if returned.
+
+// The exception objects that have direct Python counterparts.
+ypAPI ypObject *yp_BaseException;
+ypAPI ypObject *yp_Exception;
+ypAPI ypObject *yp_StopIteration;
+ypAPI ypObject *yp_GeneratorExit;
+ypAPI ypObject *yp_ArithmeticError;
+ypAPI ypObject *yp_LookupError;
+ypAPI ypObject *yp_AssertionError;
+ypAPI ypObject *yp_AttributeError;
+ypAPI ypObject *yp_EOFError;
+ypAPI ypObject *yp_FloatingPointError;
+ypAPI ypObject *yp_OSError;
+ypAPI ypObject *yp_ImportError;
+ypAPI ypObject *yp_IndexError;
+ypAPI ypObject *yp_KeyError;
+ypAPI ypObject *yp_KeyboardInterrupt;
+ypAPI ypObject *yp_MemoryError;
+ypAPI ypObject *yp_NameError;
+ypAPI ypObject *yp_OverflowError;
+ypAPI ypObject *yp_RuntimeError;
+ypAPI ypObject *yp_NotImplementedError;
+ypAPI ypObject *yp_ReferenceError;
+ypAPI ypObject *yp_SystemError;
+ypAPI ypObject *yp_SystemExit;
+ypAPI ypObject *yp_TypeError;
+ypAPI ypObject *yp_UnboundLocalError;
+ypAPI ypObject *yp_UnicodeError;
+ypAPI ypObject *yp_UnicodeEncodeError;
+ypAPI ypObject *yp_UnicodeDecodeError;
+ypAPI ypObject *yp_UnicodeTranslateError;
+ypAPI ypObject *yp_ValueError;
+ypAPI ypObject *yp_ZeroDivisionError;
+ypAPI ypObject *yp_BufferError;
+
+// Raised when the object does not support the given method; subexception of yp_AttributeError
+ypAPI ypObject *yp_MethodError;
+// Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError
+ypAPI ypObject *yp_SystemLimitationError;
+// Raised when an invalidated object is passed to a function; subexception of yp_TypeError
+ypAPI ypObject *yp_InvalidatedError;
 
 // Returns true (non-zero) if x is an exception that matches exc, else false.  This takes into
 // account the exception heirarchy, so is the preferred method of testing for specific exceptions.
@@ -947,14 +1017,11 @@ int yp_isexceptionCN( ypObject *x, int n, ... );
 // as such should be used with caution.
 
 // For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
-// returns a pointer to the beginning of that array, and sets len to the length of the sequence.
-// The returned value points into internal object memory, so they are *borrowed* references and
-// MUST NOT be modified; furthermore, the sequence itself must not be modified while using the
-// array.  Returns NULL and sets len to -1 on error.
-// TODO return an exception object...be consistent among X functions
-ypObject const * *yp_itemarrayX( ypObject *seq, yp_ssize_t *len );
-
-// TODO Similar X functions for the other types; some of these could allow modifications
+// sets *array to the beginning of that array, *len to the length of the sequence, and returns the
+// immortal yp_None.  *array will point into internal object memory, so they are *borrowed* 
+// references and MUST NOT be replaced; furthermore, the sequence itself must not be modified while
+// using the array.  Sets *array to NULL, *len to zero, and returns an exception on error.
+ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );
 
 
 /*
@@ -1127,7 +1194,7 @@ struct _ypBytesObject {
     static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
         _ypBytes_CODE, (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-// TODO yp_IMMORTAL_TUPLE, if useful
+// TODO yp_IMMORTAL_TUPLE
 
 // The implementation of yp_IF is considered "internal"; see above for documentation
 #define yp_IF( expression ) { \
