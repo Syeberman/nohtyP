@@ -1138,6 +1138,8 @@ ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssize_t *l
  */
 
 // This structure is likely to change in future versions; it should only exist in-memory
+// TODO what do we gain by caching the hash?  We already jump through hoops to use the hash
+// stored in the hash table where possible.
 struct _ypObject {
     yp_uint32_t ob_type_refcnt; // first byte type code, remainder ref count
     yp_uint16_t ob_len;         // length of object
@@ -1157,7 +1159,7 @@ struct _ypObject {
 // These structures are likely to change in future versions; they should only exist in-memory
 struct _ypIntObject {
     _ypObject_HEAD
-    yp_int_t ob_value;
+    yp_int_t value;
 };
 struct _ypBytesObject {
     _ypObject_HEAD
