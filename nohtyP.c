@@ -2795,23 +2795,296 @@ ypObject *yp_chrC( yp_int_t i ) {
 
 // TODO Eventually, use timsort, but for now C's qsort should be fine
 
-static ypObject *_yp_tuple_new( yp_ssize_t len )
+typedef struct {
+    ypObject_HEAD
+    yp_INLINE_DATA( ypObject * );
+} ypTupleObject;
+#define ypTuple_ARRAY( sq ) ( (ypObject **) ((ypObject *)sq)->ob_data )
+// TODO what if ob_len is the "invalid" value?
+#define ypTuple_LEN( sq ) ( ((ypObject *)sq)->ob_len )
+#define ypTuple_ALLOCLEN( sq ) ( ((ypObject *)sq)->ob_alloclen )
+
+// FIXME in general, we need a way to determine when we can use the _INLINE variant
+// Returns a new tuple of len zero, but allocated for alloclen elements
+static ypObject *_yp_tuple_new( yp_ssize_t alloclen ) {
+    return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, ypTuple_CODE, alloclen, alloclen );
+}
+
+// Returns a new list of len zero, but allocated for alloclen elements
+static ypObject *_yp_list_new( yp_ssize_t alloclen ) {
+    return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, ypList_CODE, alloclen, alloclen );
+}
+
+// Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded.  Returns 
+// yp_None on success, exception on error.
+// TODO over-allocate as appropriate
+static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t alloclen )
+{
+    return ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, alloclen, alloclen );
+}
+
+// If a resize is needed, the lenhint of iter is used; iter can also be yp_None (yp_iter_lenhintC
+// will just return zero).
+static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, ypObject *iter )
+{
+    ypObject *result;
+    if( ypTuple_ALLOCLEN( sq ) - ypTuple_LEN( sq ) < 1 ) {
+        yp_ssize_t growhint = yp_iter_lenhintC( iter, &result )+1; // ignore errors (will be 0+1)
+        // TODO over-allocate?
+        result = _ypTuple_resize( sq, ypTuple_LEN( sq ) + growhint );
+        if( yp_IS_EXCEPTION_C( result ) ) return result;
+    }
+    ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] = yp_incref( x );
+    ypTuple_LEN( sq ) += 1;
+    return yp_None;
+}
+
+static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject **iter )
+{
+    ypObject *x;
+    ypObject *result;
+
+    while( 1 ) {    
+        x = yp_next( iter ); // new ref
+        if( yp_IS_EXCEPTION_C( x ) ) {
+            if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
+            return x;
+        }
+        result = _ypTuple_push( sq, x, *iter );
+        yp_decref( x );
+        if( yp_IS_EXCEPTION_C( result ) ) return result;
+    }
+    return yp_None;
+}
+
+static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
+{
+    ypObject *iter;
+    ypObject *result;
+
+    // TODO Will special cases for other lists/tuples save anything?
+    iter = yp_iter( iterable ); // new ref
+    if( yp_IS_EXCEPTION_C( iter ) ) return iter;
+    result = _ypTuple_extend_from_iter( sq, &iter );
+    yp_decref( iter );
+    return result;
+}
+
+// Public Methods
+
+static ypObject *tuple_getindex( ypObject *sq, yp_ssize_t i )
+{
+    ypObject *result = ypSequence_AdjustIndexC( ypTuple_LEN( sq ), &i );
+    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    return yp_incref( ypTuple_ARRAY( sq )[i] );
+}
+
+static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
     return yp_NotImplementedError;
 }
 
-static ypObject *_yp_list_new( yp_ssize_t len )
+static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t *i )
 {
     return yp_NotImplementedError;
 }
 
+static ypObject *tuple_count( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t *n )
+{
+    return yp_NotImplementedError;
+}
+
+static ypObject *tuple_bool( ypObject *sq ) {
+    return ypBool_FROM_C( ypTuple_LEN( sq ) );
+}
+
+static ypObject *list_push( ypObject *sq, ypObject *x ) {
+    return _ypTuple_push( sq, x, yp_None );
+}
+
+static ypObject *tuple_dealloc( ypObject *sq )
+{
+    int i;
+    for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
+        yp_decref( ypTuple_ARRAY( sq )[i] );
+    }
+    ypMem_FREE_CONTAINER( sq, ypTupleObject );
+    return yp_None;
+}
+
+#define list_extend _ypTuple_extend
+
+static ypSequenceMethods ypTuple_as_sequence = {
+    tuple_getindex,                 // tp_getindex
+    tuple_getslice,                 // tp_getslice
+    tuple_find,                     // tp_find
+    tuple_count,                    // tp_count
+    MethodError_objssizeobjproc,    // tp_setindex
+    MethodError_objsliceobjproc,    // tp_setslice
+    MethodError_objssizeproc,       // tp_delindex
+    MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_extend
+    MethodError_objssizeproc,       // tp_irepeat
+    MethodError_objssizeobjproc,    // tp_insert
+    MethodError_objssizeproc,       // tp_popindex
+    MethodError_objproc,            // tp_reverse
+    MethodError_sortfunc            // tp_sort
+};
+
+static ypTypeObject ypTuple_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    tuple_dealloc,                  // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse  FIXME
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    tuple_bool,                     // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    Sequence_iter,                  // tp_iter
+    Sequence_iter_reversed,         // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    &ypTuple_as_sequence,           // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+static ypSequenceMethods ypList_as_sequence = {
+    tuple_getindex,                 // tp_getindex
+    tuple_getslice,                 // tp_getslice
+    tuple_find,                     // tp_find
+    tuple_count,                    // tp_count
+    MethodError_objssizeobjproc,    // tp_setindex
+    MethodError_objsliceobjproc,    // tp_setslice
+    MethodError_objssizeproc,       // tp_delindex
+    MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_extend
+    MethodError_objssizeproc,       // tp_irepeat
+    MethodError_objssizeobjproc,    // tp_insert
+    MethodError_objssizeproc,       // tp_popindex
+    MethodError_objproc,            // tp_reverse
+    MethodError_sortfunc            // tp_sort
+};
+
+static ypTypeObject ypList_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    tuple_dealloc,                  // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse  FIXME
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    tuple_bool,                     // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    Sequence_iter,                  // tp_iter
+    Sequence_iter_reversed,         // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_length
+    list_push,                      // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    &ypList_as_sequence,            // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
 
 // Constructors
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
 static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable )
 {
-    return yp_NotImplementedError;
+    ypObject *result = yp_None;
+    ypObject *newSq;
+    yp_ssize_t lenhint = yp_lenC( iterable, &result );
+    if( yp_IS_EXCEPTION_C( result ) ) lenhint = yp_iter_lenhintC( iterable, &result );
+    // Ignore errors determining lenhint; it just means we can't pre-allocate
+
+    newSq = allocator( lenhint );
+    if( yp_IS_EXCEPTION_C( newSq ) ) return newSq;
+    result = _ypTuple_extend( newSq, iterable );
+    if( yp_IS_EXCEPTION_C( result ) ) {
+        yp_decref( newSq );
+        return result;
+    }
+    return newSq;
 }
 
 ypObject *yp_tupleN( int n, ... ) {
@@ -4524,8 +4797,8 @@ static ypTypeObject *ypTypeTable[255] = {
     &ypByteArray_Type,  /* ypByteArray_CODE            ( 17u) */
     NULL,               /* ypStr_CODE                  ( 18u) */
     NULL,               /* ypCharacterArray_CODE       ( 19u) */
-    NULL,               /* ypTuple_CODE                ( 20u) */
-    NULL,               /* ypList_CODE                 ( 21u) */
+    &ypTuple_Type,      /* ypTuple_CODE                ( 20u) */
+    &ypList_Type,       /* ypList_CODE                 ( 21u) */
 
     &ypFrozenSet_Type,  /* ypFrozenSet_CODE            ( 22u) */
     &ypSet_Type,        /* ypSet_CODE                  ( 23u) */
