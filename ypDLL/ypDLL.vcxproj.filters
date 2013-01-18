@@ -11,19 +11,16 @@
     </Filter>
     <Filter Include="Resource Files">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="nohtyP.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ypExamples.c">
+    <ClCompile Include="..\nohtyP.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="nohtyP.h">
+    <ClInclude Include="..\nohtyP.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

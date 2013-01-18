@@ -1,7 +1,18 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual C++ Express 2010
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nohtyP", "nohtyP.vcxproj", "{62B7CFA2-BE9A-8026-F3CE-4835CD4297E9}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ypDLL", "ypDLL\ypDLL.vcxproj", "{02BD86E1-2E1A-4A6F-9022-7AD31580E4C6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ypExamples", "ypExamples\ypExamples.vcxproj", "{70541D32-6C76-4A75-9473-B1A898BCF6CD}"
+	ProjectSection(ProjectDependencies) = postProject
+		{02BD86E1-2E1A-4A6F-9022-7AD31580E4C6} = {02BD86E1-2E1A-4A6F-9022-7AD31580E4C6}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PynohtyP", "PynohtyP\PynohtyP.vcxproj", "{39625834-99D1-4A6D-9D81-ED4BB5816E24}"
+	ProjectSection(ProjectDependencies) = postProject
+		{70541D32-6C76-4A75-9473-B1A898BCF6CD} = {70541D32-6C76-4A75-9473-B1A898BCF6CD}
+		{02BD86E1-2E1A-4A6F-9022-7AD31580E4C6} = {02BD86E1-2E1A-4A6F-9022-7AD31580E4C6}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -9,10 +20,18 @@ Global
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{62B7CFA2-BE9A-8026-F3CE-4835CD4297E9}.Debug|Win32.ActiveCfg = Debug|Win32
-		{62B7CFA2-BE9A-8026-F3CE-4835CD4297E9}.Debug|Win32.Build.0 = Debug|Win32
-		{62B7CFA2-BE9A-8026-F3CE-4835CD4297E9}.Release|Win32.ActiveCfg = Release|Win32
-		{62B7CFA2-BE9A-8026-F3CE-4835CD4297E9}.Release|Win32.Build.0 = Release|Win32
+		{02BD86E1-2E1A-4A6F-9022-7AD31580E4C6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{02BD86E1-2E1A-4A6F-9022-7AD31580E4C6}.Debug|Win32.Build.0 = Debug|Win32
+		{02BD86E1-2E1A-4A6F-9022-7AD31580E4C6}.Release|Win32.ActiveCfg = Release|Win32
+		{02BD86E1-2E1A-4A6F-9022-7AD31580E4C6}.Release|Win32.Build.0 = Release|Win32
+		{70541D32-6C76-4A75-9473-B1A898BCF6CD}.Debug|Win32.ActiveCfg = Debug|Win32
+		{70541D32-6C76-4A75-9473-B1A898BCF6CD}.Debug|Win32.Build.0 = Debug|Win32
+		{70541D32-6C76-4A75-9473-B1A898BCF6CD}.Release|Win32.ActiveCfg = Release|Win32
+		{70541D32-6C76-4A75-9473-B1A898BCF6CD}.Release|Win32.Build.0 = Release|Win32
+		{39625834-99D1-4A6D-9D81-ED4BB5816E24}.Debug|Win32.ActiveCfg = Debug|Win32
+		{39625834-99D1-4A6D-9D81-ED4BB5816E24}.Debug|Win32.Build.0 = Debug|Win32
+		{39625834-99D1-4A6D-9D81-ED4BB5816E24}.Release|Win32.ActiveCfg = Release|Win32
+		{39625834-99D1-4A6D-9D81-ED4BB5816E24}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
