@@ -5,6 +5,10 @@ yp.py - Python wrapper for nohtyP
     License: http://docs.python.org/py3k/license.html
 """
 
+# FIXME temporary
+import os
+os.environ["path"] += r";D:\Perforce\p4_reality\main\nohtyP\Debug"
+
 from ctypes import *
 
 ypdll = cdll.nohtyP
@@ -39,6 +43,7 @@ def yp_func_errcheck( result, func, args ):
 def yp_func( retval, name, args ):
     """Defines a function in globals() that wraps the given C yp_* function."""
     proto = CFUNCTYPE( retval.type, *(x.type for x in args) )
+    # TODO does x.default make every arg optional?
     pflags = tuple( (x.direction, x.name, x.default) for x in args )
     func = proto( (name, ypdll), pflags )
     func.errcheck = yp_func_errcheck
@@ -70,13 +75,15 @@ yp_func( ypObject_p, "yp_incref", (ypObject_p( "x" ), ) )
 # void yp_increfV( int n, va_list args );
 
 # void yp_decref( ypObject *x );
-yp_func( None, "yp_decref", (ypObject_p( "x" ), ) )
+yp_func( void, "yp_decref", (ypObject_p( "x" ), ) )
 
 # void yp_decrefN( int n, ... );
 # void yp_decrefV( int n, va_list args );
 
+# Disable errcheck for this to avoid an infinite recursion, as it's used by ypObject_p's errcheck
 # int yp_isexceptionC( ypObject *x );
 yp_func( int, "yp_isexceptionC", (ypObject_p( "x" ), ) )
+delattr( yp_isexceptionC, "errcheck" )
 
 
 # void yp_freeze( ypObject **x );
@@ -139,9 +146,11 @@ ypObject_p_value( "yp_False" )
 #typedef float               yp_float32_t;
 class yp_float32_t( yp_param_ret ):
     type = c_float
+    default = 0.0
 #typedef double              yp_float64_t;
 class yp_float64_t( yp_param_ret ):
     type = c_double
+    default = 0.0
 #if SIZE_MAX == 0xFFFFFFFFu
 #typedef yp_int32_t          yp_ssize_t;
 #else
@@ -149,16 +158,20 @@ class yp_float64_t( yp_param_ret ):
 #endif
 class yp_ssize_t( yp_param_ret ):
     type = c_ssize_t
+    default = 0
 #typedef yp_ssize_t          yp_hash_t;
 class yp_hash_t( yp_param_ret ):
     type = yp_ssize_t.type
+    default = -1
 
 # typedef yp_int64_t      yp_int_t;
 class yp_int_t( yp_param_ret ):
     type = c_int64
+    default = 0
 # typedef yp_float64_t    yp_float_t;
 class yp_float_t( yp_param_ret ):
     type = yp_float64_t.type
+    default = 0.0
 
 # typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 
@@ -218,6 +231,7 @@ yp_func( ypObject_p, "yp_intC", (yp_int_t( "value" ), ) )
 # ypObject *yp_frozensetV( int n, va_list args );
 # ypObject *yp_setN( int n, ... );
 # ypObject *yp_setV( int n, va_list args );
+yp_func( ypObject_p, "yp_setN", (int( "n" ), ) ) # FIXME
 
 # ypObject *yp_frozenset( ypObject *iterable );
 # ypObject *yp_set( ypObject *iterable );
@@ -551,52 +565,67 @@ yp_func( ypObject_p, "yp_intC", (yp_int_t( "value" ), ) )
 # ypObject *yp_sum( ypObject *iterable );
 
 
-# ypAPI ypObject *yp_BaseException;
-# ypAPI ypObject *yp_Exception;
-# ypAPI ypObject *yp_StopIteration;
-# ypAPI ypObject *yp_GeneratorExit;
-# ypAPI ypObject *yp_ArithmeticError;
-# ypAPI ypObject *yp_LookupError;
-# ypAPI ypObject *yp_AssertionError;
-# ypAPI ypObject *yp_AttributeError;
-# ypAPI ypObject *yp_EOFError;
-# ypAPI ypObject *yp_FloatingPointError;
-# ypAPI ypObject *yp_OSError;
-# ypAPI ypObject *yp_ImportError;
-# ypAPI ypObject *yp_IndexError;
-# ypAPI ypObject *yp_KeyError;
-# ypAPI ypObject *yp_KeyboardInterrupt;
-# ypAPI ypObject *yp_MemoryError;
-# ypAPI ypObject *yp_NameError;
-# ypAPI ypObject *yp_OverflowError;
-# ypAPI ypObject *yp_RuntimeError;
-# ypAPI ypObject *yp_NotImplementedError;
-# ypAPI ypObject *yp_ReferenceError;
-# ypAPI ypObject *yp_SystemError;
-# ypAPI ypObject *yp_SystemExit;
-# ypAPI ypObject *yp_TypeError;
-# ypAPI ypObject *yp_UnboundLocalError;
-# ypAPI ypObject *yp_UnicodeError;
-# ypAPI ypObject *yp_UnicodeEncodeError;
-# ypAPI ypObject *yp_UnicodeDecodeError;
-# ypAPI ypObject *yp_UnicodeTranslateError;
-# ypAPI ypObject *yp_ValueError;
-# ypAPI ypObject *yp_ZeroDivisionError;
-# ypAPI ypObject *yp_BufferError;
-def ypObject_p_errcheck( x ):
-    """Raises the appropriate Python exception if x is a nohtyP exception"""
-    if yp_isexceptionC( x ): raise Exception( ) # TODO raise appropriate exceptions
+ypExc2py = {}
+def ypObject_p_exception( name, pyExc ):
+    ypExc = ypObject_p.type.in_dll( ypdll, name )
+    ypExc2py[ypExc.value] = (name, pyExc)
+    globals( )[name] = ypExc
 
+ypObject_p_exception( "yp_BaseException", BaseException )
+ypObject_p_exception( "yp_Exception", Exception )
+ypObject_p_exception( "yp_StopIteration", StopIteration )
+ypObject_p_exception( "yp_GeneratorExit", GeneratorExit )
+ypObject_p_exception( "yp_ArithmeticError", ArithmeticError )
+ypObject_p_exception( "yp_LookupError", LookupError )
+ypObject_p_exception( "yp_AssertionError", AssertionError )
+ypObject_p_exception( "yp_AttributeError", AttributeError )
+ypObject_p_exception( "yp_EOFError", EOFError )
+ypObject_p_exception( "yp_FloatingPointError", FloatingPointError )
+ypObject_p_exception( "yp_OSError", OSError )
+ypObject_p_exception( "yp_ImportError", ImportError )
+ypObject_p_exception( "yp_IndexError", IndexError )
+ypObject_p_exception( "yp_KeyError", KeyError )
+ypObject_p_exception( "yp_KeyboardInterrupt", KeyboardInterrupt )
+ypObject_p_exception( "yp_MemoryError", MemoryError )
+ypObject_p_exception( "yp_NameError", NameError )
+ypObject_p_exception( "yp_OverflowError", OverflowError )
+ypObject_p_exception( "yp_RuntimeError", RuntimeError )
+ypObject_p_exception( "yp_NotImplementedError", NotImplementedError )
+ypObject_p_exception( "yp_ReferenceError", ReferenceError )
+ypObject_p_exception( "yp_SystemError", SystemError )
+ypObject_p_exception( "yp_SystemExit", SystemExit )
+ypObject_p_exception( "yp_TypeError", TypeError )
+ypObject_p_exception( "yp_UnboundLocalError", UnboundLocalError )
+ypObject_p_exception( "yp_UnicodeError", UnicodeError )
+ypObject_p_exception( "yp_UnicodeEncodeError", UnicodeEncodeError )
+ypObject_p_exception( "yp_UnicodeDecodeError", UnicodeDecodeError )
+ypObject_p_exception( "yp_UnicodeTranslateError", UnicodeTranslateError )
+ypObject_p_exception( "yp_ValueError", ValueError )
+ypObject_p_exception( "yp_ZeroDivisionError", ZeroDivisionError )
+ypObject_p_exception( "yp_BufferError", BufferError )
 
 # Raised when the object does not support the given method; subexception of yp_AttributeError
-# ypAPI ypObject *yp_MethodError;
+ypObject_p_exception( "yp_MethodError", AttributeError )
 # Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError
-# ypAPI ypObject *yp_SystemLimitationError;
+ypObject_p_exception( "yp_SystemLimitationError", SystemError )
 # Raised when an invalidated object is passed to a function; subexception of yp_TypeError
-# ypAPI ypObject *yp_InvalidatedError;
+ypObject_p_exception( "yp_InvalidatedError", TypeError )
+
+def ypObject_p_errcheck( x ):
+    """Raises the appropriate Python exception if x is a nohtyP exception"""
+    if yp_isexceptionC( x ):
+    	name, pyExc = ypExc2py[x.value]
+    	raise pyExc( name )
 
 # int yp_isexceptionC2( ypObject *x, ypObject *exc );
 
 # int yp_isexceptionCN( ypObject *x, int n, ... );
+
+
+
+# FIXME quick test
+yp_initialize( )
+yp_setN( 0 )
+yp_intC( 5 )
 
 
