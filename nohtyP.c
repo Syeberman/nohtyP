@@ -2,7 +2,7 @@
  * nohtyP.c - A Python-like API for C, in one .c and one .h
  *      http://nohtyp.wordpress.com
  *      Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
- *      License: http://docs.python.org/py3k/license.html
+ *      License: http://docs.python.org/3/license.html
  */
 
 #include "nohtyP.h"
@@ -1069,7 +1069,7 @@ static ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
 
     // Avoid recursion
     id = yp_intC( (yp_int64_t) x );
-    result = yp_pushuniqueE( &memo, id );
+    result = yp_pushuniqueE( memo, id );
     yp_decref( id );
     if( yp_IS_EXCEPTION_C( result ) ) {
         if( yp_isexceptionC2( result, yp_KeyError ) ) return yp_None; // already in set
@@ -4735,8 +4735,8 @@ void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
     _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, (*set, x) );
 }
 
-ypObject *yp_pushuniqueE( ypObject **set, ypObject *x ) {
-    _yp_REDIRECT2( *set, tp_as_set, tp_pushunique, (*set, x) );
+ypObject *yp_pushuniqueE( ypObject *set, ypObject *x ) {
+    _yp_REDIRECT2( set, tp_as_set, tp_pushunique, (set, x) );
 }
 
 ypObject *yp_getitem( ypObject *mapping, ypObject *key ) {

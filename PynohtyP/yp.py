@@ -2,7 +2,7 @@
 yp.py - Python wrapper for nohtyP
     http://nohtyp.wordpress.com
     Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
-    License: http://docs.python.org/py3k/license.html
+    License: http://docs.python.org/3/license.html
 """
 
 # FIXME temporary
@@ -25,6 +25,7 @@ class yp_param_ret:
     def __init__( self, name ):
         self.name = name
     def errcheck( self ): pass # no error checking by default
+# FIXME c_types have their own __init__ that we can't hijack...and actually that's silly anyway
 
 # Some standard C param/return types.  We subclass from ctypes' types but give the subclass the
 # same name, overriding the ctype type in this module only (ensuring the original is not modified).
@@ -48,7 +49,7 @@ def yp_func( retval, name, args ):
 
 
 # ypAPI void yp_initialize( void );
-yp_func( void, "yp_initialize", () )
+yp_func( c_void, "yp_initialize", () )
 
 # typedef struct _ypObject ypObject;
 class c_ypObject_p( c_void_p, yp_param_ret ):
@@ -70,7 +71,7 @@ yp_func( c_ypObject_p, "yp_incref", (c_ypObject_p( "x" ), ) )
 # void yp_increfV( int n, va_list args );
 
 # void yp_decref( ypObject *x );
-yp_func( void, "yp_decref", (c_ypObject_p( "x" ), ) )
+yp_func( c_void, "yp_decref", (c_ypObject_p( "x" ), ) )
 
 # void yp_decrefN( int n, ... );
 # void yp_decrefV( int n, va_list args );
@@ -646,4 +647,5 @@ yp_initialize( )
 yp_setN( 0 )
 yp_intC( 5 )
 
+input( "Press Enter to continue..." )
 

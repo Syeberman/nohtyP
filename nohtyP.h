@@ -2,46 +2,60 @@
  * nohtyP.h - A Python-like API for C, in one .c and one .h
  *      http://nohtyp.wordpress.com
  *      Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
- *      License: http://docs.python.org/py3k/license.html
+ *      License: http://docs.python.org/3/license.html
  *
  * The goal of nohtyP is to enable Python-like code to be written in C.  It is patterned after
  * Python's built-in API, then adjusted for expected usage patterns.  It also borrows ideas from
  * Python's own C API.  To be as portable as possible, it is written in one .c and one .h file and
- * attempts to rely strictly on standard C.
+ * attempts to rely strictly on standard C.  The documentation below is complete, but brief; more
+ * detailed documentation can be found at http://docs.python.org/3/.
  *
- * Most functions borrow inputs, create their own references, and output new references.  One
- * exception: those that modify objects steal a reference to the modified object and return a
- * new reference; this may not be the same object, particularly if an exception occurs.  (You can
- * always call yp_incref first to ensure the object is not deallocated.)
+ * Most functions borrow inputs, create their own references, and output new references.  Errors
+ * are handled in one of four ways.  Functions that return objects simply return an appropriate
+ * exception object on error:
+ *      value = yp_getitem( dict, key );
+ *      if( yp_isexceptionC( value ) ) printf( "unknown key" );
+ * Functions that modify objects accept a ypObject* by reference and replace that object with an
+ * exception on error, discarding the original reference:
+ *      yp_setitem( &dict, key, value );
+ *      if( yp_isexceptionC( dict ) ) printf( "unhashable key, dict discarded" );
+ * If you don't want the modified object discarded on error, use the 'E' version, which returns an
+ * exception on error, otherwise yp_None:
+ *      result = yp_setitemE( dict, key, value );
+ *      if( yp_isexceptionC( result ) ) printf( "unhashable key, dict not modified" );
+ * Finally, functions that return C values accept a ypObject** that is set to the exception; it is
+ * set _only_ on error, and existing values are not discarded, so the variable should first be 
+ * initialized to an immortal:
+ *      ypObject *result = yp_None;
+ *      len = yp_lenC( x, &result );
+ *      if( yp_isexceptionC( result ) ) printf( "x isn't a container" );
+ * Exception objects are immortal, allowing you to return immediately, without having to call
+ * yp_decref, if an error occurs.  Unless explicitly documented as "always succeeds", _any_ 
+ * function can return an exception.
  *
- * When an error occurs in a function, it returns an exception object (after ensuring all objects
- * are left in a consistent state).  If the function is modifying an object, that object is
- * discarded and replaced with the exception.  If an exception object is used for any input into a
- * function, it is returned before any modifications occur.  Exception objects are immortal, so it
- * isn't necessary to call yp_decref on them.  As a result of these rules, it is possible to
- * string together multiple function calls and only check if an exeption occured at the end:
- *      yp_IMMORTAL_BYTES( sep, ", " );
- *      yp_IMMORTAL_BYTES( fmt, "(%s)\n" );
- *      ypObject *sepList = yp_join( sep, list );
- *      // if yp_join failed, sepList could be an exception
- *      ypObject *result = yp_format( fmt, sepList );
- *      yp_decref( sepList );
- *      if( yp_isexceptionC( result ) ) exit( -1 );
- * Unless explicitly documented as "always succeeds", _any_ function can return an exception.
+ * It is possible to string together function calls without checking for errors in-between.  When
+ * an exception object is used as input to a function, it is immediately returned.  This allows you
+ * to check for errors only at the end of a block of code:
+ *      newdict = yp_dictK( 0 );            // newdict might be yp_MemoryError
+ *      value = yp_getitem( olddict, key ); // value could be yp_KeyError
+ *      yp_iaddC( &value, 5 );              // possibly replaces value with yp_TypeError
+ *      yp_setitem( &newdict, key, value ); // if value is an exception, newdict will be too
+ *      yp_decref( value );                 // a no-op if value is an exception
+ *      if( yp_isexceptionC( newdict ) ) abort( );
  *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
  * threads; this includes updating reference counts, so immutables are not inherently threadsafe!
  * One strategy to ensure safety is to deep copy objects before exchanging between threads.
  * Sharing immutable, immortal objects is always safe.
  *
- * Other important postfixes:
+ * Certain functions are given postfixes to highlight their unique behaviour:
  *  C - C native types are accepted and returned where appropriate
  *  F - A version of "C" that accepts floats in place of ints
  *  L - Library routines that operate strictly on C types
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
  *  V - A version of "N" or "K" that accepts a va_list in place of ...
- *  E - Errors modifying an object do not discard the object (exceptions are returned instead)
+ *  E - Errors modifying an object do not discard the object (yp_None/exception returned instead)
  *  D - Discard after use (ie yp_IFd)
  *  X - Direct access to internal memory or borrowed objects; tread carefully!
  *  # (number) - A function with # inputs that otherwise shares the same name as another function
@@ -567,7 +581,8 @@ ypAPI void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 // Sets the slice of *sequence, from i to j with step k, to x.  The Python-equivalent "defaults"
 // for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, *sequence is discarded and
 // set to an exception.
-ypAPI void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x );
+ypAPI void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, 
+        ypObject *x );
 
 // Equivalent to yp_setindexC( sequence, yp_asssizeC( key, &exc ), x ).
 ypAPI void yp_setitem( ypObject **sequence, ypObject *key, ypObject *x );
@@ -697,15 +712,15 @@ ypAPI void yp_difference_updateV( ypObject **set, int n, va_list args );
 // *set.  On error, *set is discarded and set to an exception.
 ypAPI void yp_symmetric_difference_update( ypObject **set, ypObject *x );
 
-// Adds element x to *set.  On error, *set is discarded and set to an exception.  While Python calls
-// this method add, yp_add is already used for "a+b", so these two equivalent aliases are provided
-// instead.
+// Adds element x to *set.  On error, *set is discarded and set to an exception.  While Python 
+// calls this method add, yp_add is already used for "a+b", so these two equivalent aliases are 
+// provided instead.
 ypAPI void yp_push( ypObject **set, ypObject *x );
 ypAPI void yp_set_add( ypObject **set, ypObject *x );
 
-// If x is already contained in *set, returns yp_KeyError; otherwise, adds x to *set and returns
-// the immortal yp_None.  Returns an exception on error; *set is never discarded.
-ypAPI ypObject *yp_pushuniqueE( ypObject **set, ypObject *x );
+// If x is already contained in set, returns yp_KeyError; otherwise, adds x to set and returns
+// the immortal yp_None.  Returns an exception on error; set is never discarded.
+ypAPI ypObject *yp_pushuniqueE( ypObject *set, ypObject *x );
 
 // Removes element x from *set.  Raises yp_KeyError if x is not contained in *set.  On error,
 // *set is discarded and set to an exception.
@@ -901,7 +916,8 @@ ypAPI yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI void yp_divmodFL( yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc );
+ypAPI void yp_divmodFL( yp_float_t x, yp_float_t y, 
+        yp_float_t *div, yp_float_t *mod, ypObject **exc );
 ypAPI yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_powFL3( yp_float_t x, yp_float_t y, yp_float_t z, ypObject **exc );
 ypAPI yp_float_t yp_lshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
@@ -1191,7 +1207,6 @@ struct _ypBytesObject {
 #define _yp_IMMORTAL_HEAD_INIT( type, data, len ) \
     { _ypObject_MAKE_TYPE_REFCNT( type, _ypObject_REFCNT_IMMORTAL ), \
       len, 0, _ypObject_HASH_INVALID, data }
-// TODO It's possible to calculate the hash of ints at compile time
 #define yp_IMMORTAL_INT( name, value ) \
     static struct _ypIntObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
         _ypInt_CODE, NULL, 0 ), value }; \
