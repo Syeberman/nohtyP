@@ -2,7 +2,7 @@
  * ypExamples.c - Contains a number of nohtyP examples
  *      http://nohtyp.wordpress.com
  *      Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
- *      License: http://docs.python.org/py3k/license.html
+ *      License: http://docs.python.org/3/license.html
  */
 
 #include "nohtyP.h"
