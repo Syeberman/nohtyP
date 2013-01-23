@@ -10,6 +10,9 @@ yp.py - Python wrapper for nohtyP
 import os
 os.environ["path"] += r";D:\Perforce\p4_reality\main\nohtyP\Debug"
 
+import atexit
+atexit.register( input, "Press Enter to continue..." )
+
 from ctypes import *
 
 ypdll = cdll.nohtyP
@@ -647,6 +650,3 @@ yp_func( c_int, "yp_isexceptionC2", (c_ypObject_p( "x" ), c_ypObject_p( "exc" ))
 yp_initialize( )
 yp_setN( 0 )
 yp_intC( 5 )
-
-input( "Press Enter to continue..." )
-
