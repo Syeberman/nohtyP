@@ -1,7 +1,7 @@
 /*
  * nohtyP.h - A Python-like API for C, in one .c and one .h
- *      http://nohtyp.wordpress.com
- *      Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
+ *      http://nohtyp.wordpress.com    [v0.1.0 $Change$]
+ *      Copyright © 2001-2013 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  *
  * The goal of nohtyP is to enable Python-like code to be written in C.  It is patterned after
@@ -24,13 +24,13 @@
  *      result = yp_setitemE( dict, key, value );
  *      if( yp_isexceptionC( result ) ) printf( "unhashable key, dict not modified" );
  * Finally, functions that return C values accept a ypObject** that is set to the exception; it is
- * set _only_ on error, and existing values are not discarded, so the variable should first be 
+ * set _only_ on error, and existing values are not discarded, so the variable should first be
  * initialized to an immortal:
  *      ypObject *result = yp_None;
  *      len = yp_lenC( x, &result );
  *      if( yp_isexceptionC( result ) ) printf( "x isn't a container" );
  * Exception objects are immortal, allowing you to return immediately, without having to call
- * yp_decref, if an error occurs.  Unless explicitly documented as "always succeeds", _any_ 
+ * yp_decref, if an error occurs.  Unless explicitly documented as "always succeeds", _any_
  * function can return an exception.
  *
  * It is possible to string together function calls without checking for errors in-between.  When
@@ -452,10 +452,10 @@ ypAPI ypObject *yp_throw( ypObject **iterator, ypObject *exc );
 ypAPI yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 
 // Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
-// internal generator state buffer and its size in bytes, and returns the immortal yp_None.  The 
-// structure and initial values of *state are determined by the call to the generator constructor; 
-// the function cannot change the size after creation, and any ypObject*s in *state should be 
-// considered *borrowed* (it is safe to replace them with new references).  Sets *state to NULL, 
+// internal generator state buffer and its size in bytes, and returns the immortal yp_None.  The
+// structure and initial values of *state are determined by the call to the generator constructor;
+// the function cannot change the size after creation, and any ypObject*s in *state should be
+// considered *borrowed* (it is safe to replace them with new references).  Sets *state to NULL,
 // *size to zero, and returns an exception on error.
 ypAPI ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size );
 
@@ -581,7 +581,7 @@ ypAPI void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 // Sets the slice of *sequence, from i to j with step k, to x.  The Python-equivalent "defaults"
 // for i and j are yp_SLICE_DEFAULT, while for k it is 1.  On error, *sequence is discarded and
 // set to an exception.
-ypAPI void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, 
+ypAPI void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k,
         ypObject *x );
 
 // Equivalent to yp_setindexC( sequence, yp_asssizeC( key, &exc ), x ).
@@ -712,8 +712,8 @@ ypAPI void yp_difference_updateV( ypObject **set, int n, va_list args );
 // *set.  On error, *set is discarded and set to an exception.
 ypAPI void yp_symmetric_difference_update( ypObject **set, ypObject *x );
 
-// Adds element x to *set.  On error, *set is discarded and set to an exception.  While Python 
-// calls this method add, yp_add is already used for "a+b", so these two equivalent aliases are 
+// Adds element x to *set.  On error, *set is discarded and set to an exception.  While Python
+// calls this method add, yp_add is already used for "a+b", so these two equivalent aliases are
 // provided instead.
 ypAPI void yp_push( ypObject **set, ypObject *x );
 ypAPI void yp_set_add( ypObject **set, ypObject *x );
@@ -780,13 +780,13 @@ ypAPI void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 // an exception.
 ypAPI ypObject *yp_setdefault( ypObject *mapping, ypObject *key, ypObject *defval );
 
-// Add the given n key/value pairs (for a total of 2*n objects) to *mapping, overwriting existing 
+// Add the given n key/value pairs (for a total of 2*n objects) to *mapping, overwriting existing
 // keys.  If a given key is seen more than once, the last value is retained.  On error, *mapping is
 // discarded and set to an exception.
 ypAPI void yp_updateK( ypObject **mapping, int n, ... );
 ypAPI void yp_updateKV( ypObject **mapping, int n, va_list args );
 
-// Add the elements from the n objects to *mapping.  Each object is handled as per yp_dict.  On 
+// Add the elements from the n objects to *mapping.  Each object is handled as per yp_dict.  On
 // error, *mapping is discarded and set to an exception.
 ypAPI void yp_updateN( ypObject **mapping, int n, ... );
 ypAPI void yp_updateV( ypObject **mapping, int n, va_list args );
@@ -916,7 +916,7 @@ ypAPI yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI void yp_divmodFL( yp_float_t x, yp_float_t y, 
+ypAPI void yp_divmodFL( yp_float_t x, yp_float_t y,
         yp_float_t *div, yp_float_t *mod, ypObject **exc );
 ypAPI yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_powFL3( yp_float_t x, yp_float_t y, yp_float_t z, ypObject **exc );
@@ -1039,7 +1039,7 @@ ypAPI int yp_isexceptionCN( ypObject *x, int n, ... );
 
 // For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
 // sets *array to the beginning of that array, *len to the length of the sequence, and returns the
-// immortal yp_None.  *array will point into internal object memory, so they are *borrowed* 
+// immortal yp_None.  *array will point into internal object memory, so they are *borrowed*
 // references and MUST NOT be replaced; furthermore, the sequence itself must not be modified while
 // using the array.  Sets *array to NULL, *len to zero, and returns an exception on error.
 ypAPI ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );

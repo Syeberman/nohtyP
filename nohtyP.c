@@ -1,7 +1,7 @@
 /*
  * nohtyP.c - A Python-like API for C, in one .c and one .h
- *      http://nohtyp.wordpress.com
- *      Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
+ *      http://nohtyp.wordpress.com    [v0.1.0 $Change$]
+ *      Copyright © 2001-2013 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  */
 
@@ -462,16 +462,16 @@ static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
 #define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( sizeof( obStruct ), (type) )
 
 // Returns a malloc'd buffer for a container object holding alloclen elements in-line, or
-// exception on failure.  The container can neither grow nor shrink after allocation.  
-// ob_inline_data in obStruct is used to determine the element size and ob_data; ob_len is set to 
+// exception on failure.  The container can neither grow nor shrink after allocation.
+// ob_inline_data in obStruct is used to determine the element size and ob_data; ob_len is set to
 // zero.  alloclen cannot be negative; ob_alloclen may be larger than requested.
-static ypObject *_ypMem_malloc_container_inline( 
+static ypObject *_ypMem_malloc_container_inline(
         yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems, int type, yp_ssize_t alloclen )
 {
     ypObject *ob;
     if( alloclen >= ypObject_ALLOCLEN_INVALID ) return yp_SystemLimitationError;
     // TODO debug-only assert to ensure alloclen positive
-    
+
     ob = (ypObject *) yp_malloc( offsetof_inline + (alloclen * sizeof_elems) );
     if( ob == NULL ) return yp_MemoryError;
     ob->ob_alloclen = alloclen;
@@ -500,17 +500,17 @@ static yp_ssize_t _ypMem_ideal_size = _ypMem_ideal_size_DEFAULT;
 
 // Returns a malloc'd buffer for a container that may grow or shrink in the future, or exception on
 // failure.  A fixed amount of memory is allocated in-line, as per _ypMem_ideal_size.  If this fits
-// required elements, it is used, otherwise a separate buffer of ideal elements is allocated.  
-// required cannot be negative and ideal must be no less than required; ob_alloclen may be larger 
+// required elements, it is used, otherwise a separate buffer of ideal elements is allocated.
+// required cannot be negative and ideal must be no less than required; ob_alloclen may be larger
 // than either of these.
-static ypObject *_ypMem_malloc_container_variable( 
-        yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems, int type, 
+static ypObject *_ypMem_malloc_container_variable(
+        yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems, int type,
         yp_ssize_t required, yp_ssize_t ideal )
 {
     ypObject *ob;
     if( ideal >= ypObject_ALLOCLEN_INVALID ) return yp_SystemLimitationError;
     // TODO debug-only asserts to ensure other assumptions
-    
+
     if( offsetof_inline < _ypMem_ideal_size ) {
         ob = (ypObject *) yp_malloc( _ypMem_ideal_size );
         if( ob == NULL ) return yp_MemoryError;
@@ -540,14 +540,14 @@ static ypObject *_ypMem_malloc_container_variable(
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (required), (ideal) )
 
 // Resizes ob_data, the variable-portion of ob, and returns yp_None.  On error, ob is not modified,
-// and an exception is returned.  required is the minimum ob_alloclen required, and the minimum 
-// number of elements that will be preserved; if required can fit inline, the inline buffer is 
-// used.  ideal is the ob_alloclen to use if the data does not fit inline and a separate buffer 
-// must be allocated.  This function will always resize the data, so first check to see if a 
-// resize is necessary.  Any objects in the truncated section must have already been discarded.  
-// required cannot be negative and ideal must be no less than required; ob_alloclen may be larger 
+// and an exception is returned.  required is the minimum ob_alloclen required, and the minimum
+// number of elements that will be preserved; if required can fit inline, the inline buffer is
+// used.  ideal is the ob_alloclen to use if the data does not fit inline and a separate buffer
+// must be allocated.  This function will always resize the data, so first check to see if a
+// resize is necessary.  Any objects in the truncated section must have already been discarded.
+// required cannot be negative and ideal must be no less than required; ob_alloclen may be larger
 // than either of these.
-static ypObject *_ypMem_realloc_container_variable( 
+static ypObject *_ypMem_realloc_container_variable(
         ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems,
         yp_ssize_t required, yp_ssize_t ideal )
 {
@@ -564,7 +564,7 @@ static ypObject *_ypMem_realloc_container_variable(
         if( ob->ob_data != inlineptr ) {
             memcpy( inlineptr, ob->ob_data, required * sizeof_elems );
             yp_free( ob->ob_data );
-            ob->ob_data = inlineptr;            
+            ob->ob_data = inlineptr;
         }
         ob->ob_alloclen = inlinelen;
         return yp_None;
@@ -1478,33 +1478,33 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
 
   _yp_IMMORTAL_EXCEPTION( yp_Exception, yp_BaseException );
     _yp_IMMORTAL_EXCEPTION( yp_StopIteration, yp_Exception );
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_ArithmeticError, yp_Exception );
       _yp_IMMORTAL_EXCEPTION( yp_FloatingPointError, yp_ArithmeticError );
       _yp_IMMORTAL_EXCEPTION( yp_OverflowError, yp_ArithmeticError );
       _yp_IMMORTAL_EXCEPTION( yp_ZeroDivisionError, yp_ArithmeticError );
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_AssertionError, yp_Exception );
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_AttributeError, yp_Exception );
       _yp_IMMORTAL_EXCEPTION( yp_MethodError, yp_AttributeError );
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_BufferError, yp_Exception );
     _yp_IMMORTAL_EXCEPTION( yp_EOFError, yp_Exception );
     _yp_IMMORTAL_EXCEPTION( yp_ImportError, yp_Exception );
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_LookupError, yp_Exception );
       _yp_IMMORTAL_EXCEPTION( yp_IndexError, yp_LookupError );
       _yp_IMMORTAL_EXCEPTION( yp_KeyError, yp_LookupError );
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_MemoryError, yp_Exception );
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_NameError, yp_Exception );
       _yp_IMMORTAL_EXCEPTION( yp_UnboundLocalError, yp_NameError );
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_OSError, yp_Exception );
       // TODO Many subexceptions missing here
-    
+
     _yp_IMMORTAL_EXCEPTION( yp_ReferenceError, yp_Exception );
 
     _yp_IMMORTAL_EXCEPTION( yp_RuntimeError, yp_Exception );
@@ -1544,7 +1544,7 @@ int yp_isexceptionC2( ypObject *x, ypObject *exc )
     return _yp_isexceptionC2( x, exc );
 }
 
-int yp_isexceptionCN( ypObject *x, int n, ... ) 
+int yp_isexceptionCN( ypObject *x, int n, ... )
 {
     va_list args;
 
@@ -2815,7 +2815,7 @@ static ypObject *_yp_list_new( yp_ssize_t alloclen ) {
     return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, ypList_CODE, alloclen, alloclen );
 }
 
-// Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded.  Returns 
+// Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded.  Returns
 // yp_None on success, exception on error.
 // TODO over-allocate as appropriate
 static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t alloclen )
@@ -2844,7 +2844,7 @@ static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject **iter )
     ypObject *x;
     ypObject *result;
 
-    while( 1 ) {    
+    while( 1 ) {
         x = yp_next( iter ); // new ref
         if( yp_IS_EXCEPTION_C( x ) ) {
             if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
@@ -4206,7 +4206,7 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
 }
 
 // Item iterators yield iterators that yield exactly 2 values: key first, then value.  This
-// returns new references to that pair in *key and *value.  Both are set to an exception on error; 
+// returns new references to that pair in *key and *value.  Both are set to an exception on error;
 // in particular, yp_ValueError is returned if exactly 2 values are not returned.
 // XXX *itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
 static void _ypDict_iter_items_next( ypObject **itemiter, ypObject **key, ypObject **value )
@@ -4215,9 +4215,9 @@ static void _ypDict_iter_items_next( ypObject **itemiter, ypObject **key, ypObje
     ypObject *keyvaliter = yp_next( itemiter ); // new ref
     if( yp_IS_EXCEPTION_C( keyvaliter ) ) { // including yp_StopIteration
         *key = *value = keyvaliter;
-        return; 
+        return;
     }
-    
+
     *key = yp_next( &keyvaliter ); // new ref
     if( yp_IS_EXCEPTION_C( *key ) ) {
         if( yp_isexceptionC2( *key, yp_StopIteration ) ) *key = yp_ValueError;
@@ -4250,7 +4250,7 @@ Return:
 }
 
 // TODO ...what if the dict we're updating against shares the same keyset?
-static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other, 
+static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other,
         visitfunc copy_visitor, void *copy_memo )
 {
     return yp_NotImplementedError; // TODO
@@ -4301,7 +4301,7 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
     ypObject *result;
 
     // If x is a fellow dict there are efficiencies we can exploit; otherwise, prefer yp_iter_items
-    // over yp_iter if supported.  Recall that type pairs are identified by the immutable type 
+    // over yp_iter if supported.  Recall that type pairs are identified by the immutable type
     // code.
     if( x_pair == ypFrozenDict_CODE ) {
         return _ypDict_update_from_dict( mp, x, yp_shallowcopy_visitor, NULL );
@@ -4361,7 +4361,7 @@ static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
     return yp_None;
 }
 
-static ypObject *dict_delitem( ypObject *mp, ypObject *key ) 
+static ypObject *dict_delitem( ypObject *mp, ypObject *key )
 {
     ypObject *result = _ypDict_pop( mp, key );
     if( yp_IS_EXCEPTION_C( result ) ) return result;
