@@ -1,7 +1,8 @@
 """
 yp.py - Python wrapper for nohtyP
-    http://nohtyp.wordpress.com
-    Copyright © 2001-2012 Python Software Foundation; All Rights Reserved
+    http://nohtyp.wordpress.com    [v0.1.0 $Change$]
+    Copyright © 2001-2013 Python Software Foundation; All Rights Reserved
+
     License: http://docs.python.org/3/license.html
 """
 
@@ -55,7 +56,7 @@ yp_func( c_void, "yp_initialize", () )
 class c_ypObject_p( c_void_p, yp_param_ret ):
     # TODO @classmethod def from_param( cls, val ): ...
     # default set below
-    def errcheck( self ): ypObject_p_errcheck( self ) 
+    def errcheck( self ): ypObject_p_errcheck( self )
 
 def c_ypObject_p_value( name ):
     globals( )[name] = c_ypObject_p.in_dll( ypdll, name )
@@ -306,7 +307,7 @@ def pyIter2yp( iterable ):
     except: lenhint = 0 # TODO try Python's lenhint?
     pyiter = iter( iterable )
     state = _pyIter2yp_struct( pyiter )
-    ypiter = yp_generator_fromstructCN( _pyIter2yp_generator, lenhint, 
+    ypiter = yp_generator_fromstructCN( _pyIter2yp_generator, lenhint,
             byref( state ), sizeof( state ), 0 )
     ypiter._pyiter = pyiter # ensure ypiter maintains a reference to pyiter for it's lifetime
     return ypiter
@@ -633,8 +634,8 @@ ypObject_p_exception( "yp_InvalidatedError", TypeError )
 def ypObject_p_errcheck( x ):
     """Raises the appropriate Python exception if x is a nohtyP exception"""
     if yp_isexceptionC( x ):
-    	name, pyExc = ypExc2py[x.value]
-    	raise pyExc( name )
+        name, pyExc = ypExc2py[x.value]
+        raise pyExc( name )
 
 # int yp_isexceptionC2( ypObject *x, ypObject *exc );
 yp_func( c_int, "yp_isexceptionC2", (c_ypObject_p( "x" ), c_ypObject_p( "exc" )) )
