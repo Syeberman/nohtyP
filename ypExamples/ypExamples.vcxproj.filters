@@ -20,7 +20,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\ypExamples.c">
+    <ClCompile Include="..\Extras\ypExamples.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
