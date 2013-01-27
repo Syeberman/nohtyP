@@ -206,7 +206,7 @@ typedef struct {
 
     // Container operations
     objobjproc tp_contains;
-    lenfunc tp_length;
+    lenfunc tp_len;
     objobjproc tp_push;
     objproc tp_clear; /* delete references to contained objects */
     objproc tp_pop;
@@ -264,9 +264,6 @@ static ypTypeObject *ypTypeTable[255];
 
 yp_STATIC_ASSERT( _ypInt_CODE == ypInt_CODE, ypInt_CODE );
 yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE );
-
-// Macro-version of yp_isexceptionC
-#define yp_IS_EXCEPTION_C( x ) (ypObject_TYPE_PAIR_CODE( x ) == ypException_CODE)
 
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
@@ -343,8 +340,11 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
 #define MAX(a,b)   ((a) > (b) ? (a) : (b))
 #endif
 
-// Functions that modify their inputs take a "ypObject **x"; use this as
-// "return_yp_INPLACE_ERR( x, yp_ValueError );" to return the error properly
+// Functions that modify their inputs take a "ypObject **x".
+// Use this as "yp_INPLACE_ERR( x, yp_ValueError );" to discard x and set it to an exception.
+#define yp_INPLACE_ERR( ob, err ) \
+    do { yp_decref( *(ob) ); *(ob) = (err); } while( 0 )
+// Use this as "return_yp_INPLACE_ERR( x, yp_ValueError );" to return the error properly
 #define return_yp_INPLACE_ERR( ob, err ) \
     do { yp_decref( *(ob) ); *(ob) = (err); return; } while( 0 )
 
@@ -686,7 +686,7 @@ static ypObject *iter_traverse( ypObject *i, visitfunc visitor, void *memo )
         if( locs & 0x1u ) {
             // p is pointing at an object; call visitor
             result = visitor( (ypObject *)p, memo );
-            if( yp_IS_EXCEPTION_C( result ) ) return result;
+            if( yp_isexceptionC( result ) ) return result;
         }
         p += sizeof( ypObject * );
         locs >>= 1;
@@ -717,7 +717,7 @@ static ypObject *iter_close( ypObject *i )
     // Handle the returned value from the generator.  yp_StopIteration and yp_GeneratorExit are not
     // errors.  Any other exception or yielded value _is_ an error, as per Python.
     if( yp_isexceptionCN( result, 2, yp_StopIteration, yp_GeneratorExit ) ) return yp_None;
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     yp_decref( result ); // discard unexpectedly-yielded value
     return yp_RuntimeError;
 }
@@ -732,7 +732,7 @@ static ypObject *iter_send( ypObject *i, ypObject *value )
     // iter_close fails just ignore it: result is already set to an exception.
     ypObject *result = ypIter_FUNC( i )( i, value );
     ypIter_LENHINT( i ) -= 1;
-    if( yp_IS_EXCEPTION_C( result ) ) iter_close( i );
+    if( yp_isexceptionC( result ) ) iter_close( i );
     return result;
 }
 
@@ -782,7 +782,7 @@ static ypTypeObject ypIter_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    MethodError_lenfunc,            // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -871,7 +871,7 @@ ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhin
 
     // Allocate the iterator
     iterator = ypMem_MALLOC_CONTAINER_INLINE( ypIterObject, ypIter_CODE, size );
-    if( yp_IS_EXCEPTION_C( iterator ) ) return iterator;
+    if( yp_isexceptionC( iterator ) ) return iterator;
 
     // Set attributes, increment reference counts, and return
     iterator->ob_len = ypObject_LEN_INVALID;
@@ -897,7 +897,7 @@ typedef struct {
 static ypObject *_iter_sequence_generator( ypObject *i, ypObject *value )
 {
     ypObject *result;
-    if( yp_IS_EXCEPTION_C( value ) ) return value; // yp_GeneratorExit, in particular
+    if( yp_isexceptionC( value ) ) return value; // yp_GeneratorExit, in particular
     result = yp_getindexC( ypSeqIter_SEQ( i ), ypSeqIter_INDEX( i )++ );
     return yp_isexceptionC2( result, yp_IndexError ) ? yp_StopIteration : result;
 }
@@ -905,7 +905,7 @@ static ypObject *_iter_sequence_generator( ypObject *i, ypObject *value )
 static ypObject *_iter_reversed_generator( ypObject *i, ypObject *value )
 {
     ypObject *result;
-    if( yp_IS_EXCEPTION_C( value ) ) return value; // yp_GeneratorExit, in particular
+    if( yp_isexceptionC( value ) ) return value; // yp_GeneratorExit, in particular
     if( ypSeqIter_INDEX( i ) < 0 ) return yp_StopIteration;
     result = yp_getindexC( ypSeqIter_SEQ( i ), ypSeqIter_INDEX( i )-- );
     return result;
@@ -920,11 +920,11 @@ static ypObject *_Sequence_iter( ypObject *sequence, yp_int_t reversed )
     // Determine the length
     // TODO shortcut to the closed iterator when length is zero?
     length = yp_lenC( sequence, &exc );
-    if( yp_IS_EXCEPTION_C( exc ) ) return exc;
+    if( yp_isexceptionC( exc ) ) return exc;
 
     // Allocate the iterator
     iterator = ypMem_MALLOC_FIXED( ypSeqIterObject, ypIter_CODE );
-    if( yp_IS_EXCEPTION_C( iterator ) ) return iterator;
+    if( yp_isexceptionC( iterator ) ) return iterator;
 
     // Set attributes, increment reference counts, and return
     iterator->ob_len = ypObject_LEN_INVALID;
@@ -978,7 +978,7 @@ typedef struct {
 
 static ypObject *_iter_valist_generator( ypObject *i, ypObject *value )
 {
-    if( yp_IS_EXCEPTION_C( value ) ) return value;
+    if( yp_isexceptionC( value ) ) return value;
     if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
     return yp_incref( va_arg( ypIterValist_ARGS( i ), ypObject * ) );
 }
@@ -1008,7 +1008,7 @@ static ypObject *_iter_kvalist_generator( ypObject *i, ypObject *value )
     yp_ssize_t left;
     ypObject *subiter;
 
-    if( yp_IS_EXCEPTION_C( value ) ) return value;
+    if( yp_isexceptionC( value ) ) return value;
     if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
 
     // Ensure the sub-iterator consumed all the items from va_list it should have
@@ -1058,7 +1058,7 @@ static ypObject *_yp_freeze( ypObject *x )
 void yp_freeze( ypObject **x )
 {
     ypObject *result = _yp_freeze( *x );
-    if( yp_IS_EXCEPTION_C( result ) ) return_yp_INPLACE_ERR( x, result );
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( x, result );
 }
 
 static ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
@@ -1071,14 +1071,14 @@ static ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
     id = yp_intC( (yp_int64_t) x );
     result = yp_pushuniqueE( memo, id );
     yp_decref( id );
-    if( yp_IS_EXCEPTION_C( result ) ) {
+    if( yp_isexceptionC( result ) ) {
         if( yp_isexceptionC2( result, yp_KeyError ) ) return yp_None; // already in set
         return result;
     }
 
     // Freeze current object before going deep
     result = _yp_freeze( x );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     // TODO tp_traverse should return if its visitor returns exception...?  Or should we track
     // additional data in what is currently memo?
     return ypObject_TYPE( x )->tp_traverse( x, _yp_deepfreeze, memo );
@@ -1089,7 +1089,7 @@ void yp_deepfreeze( ypObject **x )
     ypObject *memo = yp_setN( 0 );
     ypObject *result = _yp_deepfreeze( *x, memo );
     yp_decref( memo );
-    if( yp_IS_EXCEPTION_C( result ) ) return_yp_INPLACE_ERR( x, result );
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( x, result );
 }
 
 // Use this, and a memo of NULL, as the visitor for shallow copies
@@ -1167,7 +1167,7 @@ ypObject *yp_not( ypObject *x ) {
 ypObject *yp_or( ypObject *x, ypObject *y )
 {
     ypObject *b = yp_bool( x );
-    if( yp_IS_EXCEPTION_C( b ) ) return b;
+    if( yp_isexceptionC( b ) ) return b;
     if( b == yp_False ) return yp_incref( y );
     return yp_incref( x );
 }
@@ -1183,7 +1183,7 @@ ypObject *yp_orV( int n, va_list args )
     for( /*n already set*/; n > 1; n-- ) {
         x = va_arg( args, ypObject * );
         b = yp_bool( x );
-        if( yp_IS_EXCEPTION_C( b ) ) return b;
+        if( yp_isexceptionC( b ) ) return b;
         if( b == yp_True ) return yp_incref( x );
     }
     // If everything else was false, we always return the last object
@@ -1206,7 +1206,7 @@ ypObject *yp_any( ypObject *iterable )
 
     iter = yp_iter( iterable ); // new ref
     while( 1 ) {
-        x = yp_next( &iter ); // new ref
+        x = yp_next( iter ); // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
         result = yp_bool( x );
         yp_decref( x );
@@ -1219,7 +1219,7 @@ ypObject *yp_any( ypObject *iterable )
 ypObject *yp_and( ypObject *x, ypObject *y )
 {
     ypObject *b = yp_bool( x );
-    if( yp_IS_EXCEPTION_C( b ) ) return b;
+    if( yp_isexceptionC( b ) ) return b;
     if( b == yp_False ) return yp_incref( x );
     return yp_incref( y );
 }
@@ -1235,7 +1235,7 @@ ypObject *yp_andV( int n, va_list args )
     for( /*n already set*/; n > 1; n-- ) {
         x = va_arg( args, ypObject * );
         b = yp_bool( x );
-        if( yp_IS_EXCEPTION_C( b ) ) return b;
+        if( yp_isexceptionC( b ) ) return b;
         if( b == yp_False ) return yp_incref( x );
     }
     // If everything else was true, we always return the last object
@@ -1258,7 +1258,7 @@ ypObject *yp_all( ypObject *iterable )
 
     iter = yp_iter( iterable ); // new ref
     while( 1 ) {
-        x = yp_next( &iter ); // new ref
+        x = yp_next( iter ); // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
         result = yp_bool( x );
         yp_decref( x );
@@ -1304,7 +1304,7 @@ yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc )
         return hash;
     }
     result = ypObject_TYPE( x )->tp_currenthash( x, &hash );
-    if( yp_IS_EXCEPTION_C( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
     if( !ypObject_IS_MUTABLE( x ) ) ypObject_CACHED_HASH( x ) = hash;
     return hash;
 }
@@ -1315,9 +1315,9 @@ yp_ssize_t yp_lenC( ypObject *x, ypObject **exc )
     ypObject *result;
 
     if( len >= 0 ) return len;
-    result = ypObject_TYPE( x )->tp_length( x, &len );
-    if( yp_IS_EXCEPTION_C( result ) ) return_yp_CEXC_ERR( 0, exc, result );
-    if( len < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError ); // tp_length should not return <0
+    result = ypObject_TYPE( x )->tp_len( x, &len );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
+    if( len < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError ); // tp_len should not return <0
     return len;
 }
 
@@ -1365,7 +1365,7 @@ static ypTypeObject ypInvalidated_Type = {
 
     // Container operations
     InvalidatedError_objobjproc,        // tp_contains
-    InvalidatedError_lenfunc,           // tp_length
+    InvalidatedError_lenfunc,           // tp_len
     InvalidatedError_objobjproc,        // tp_push
     InvalidatedError_objproc,           // tp_clear
     InvalidatedError_objproc,           // tp_pop
@@ -1437,7 +1437,7 @@ static ypTypeObject ypException_Type = {
 
     // Container operations
     ExceptionMethod_objobjproc,         // tp_contains
-    ExceptionMethod_lenfunc,            // tp_length
+    ExceptionMethod_lenfunc,            // tp_len
     ExceptionMethod_objobjproc,         // tp_push
     ExceptionMethod_objproc,            // tp_clear
     ExceptionMethod_objproc,            // tp_pop
@@ -1525,9 +1525,11 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
 
 // TODO #undef _yp_IMMORTAL_EXCEPTION
 
+#define yp_IS_EXCEPTION_C( x ) (ypObject_TYPE_PAIR_CODE( x ) == ypException_CODE)
 int yp_isexceptionC( ypObject *x ) {
     return yp_IS_EXCEPTION_C( x );
 }
+#define yp_isexceptionC yp_IS_EXCEPTION_C // force-inline yp_isexceptionC below
 
 static int _yp_isexceptionC2( ypObject *x, ypObject *exc )
 {
@@ -1613,7 +1615,7 @@ static ypTypeObject ypNoneType_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    MethodError_lenfunc,            // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -1700,7 +1702,7 @@ static ypTypeObject ypBool_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    MethodError_lenfunc,            // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -1820,7 +1822,7 @@ static ypTypeObject ypInt_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    MethodError_lenfunc,            // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -1878,7 +1880,7 @@ static ypTypeObject ypIntStore_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    MethodError_lenfunc,            // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -1911,7 +1913,7 @@ void yp_iaddC( ypObject **x, yp_int_t y )
     if( x_pair == ypInt_CODE ) {
         yp_int_t result;
         result = yp_addL( ypInt_VALUE( *x ), y, &exc );
-        if( yp_IS_EXCEPTION_C( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         if( ypObject_IS_MUTABLE( x ) ) {
             ypInt_VALUE( x ) = result;
         } else {
@@ -1922,7 +1924,7 @@ void yp_iaddC( ypObject **x, yp_int_t y )
 
     } else if( x_pair == ypFloat_CODE ) {
         yp_float_t y_asfloat = yp_asfloatL( y, &exc ); // TODO
-        if( yp_IS_EXCEPTION_C( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         yp_iaddFC( x, y_asfloat );
         return;
     }
@@ -1966,7 +1968,15 @@ ypObject *yp_add( ypObject *x, ypObject *y )
 ypObject *yp_intC( yp_int_t value )
 {
     ypObject *i = ypMem_MALLOC_FIXED( ypIntObject, ypInt_CODE );
-    if( yp_IS_EXCEPTION_C( i ) ) return i;
+    if( yp_isexceptionC( i ) ) return i;
+    ypInt_VALUE( i ) = value;
+    return i;
+}
+
+ypObject *yp_intstoreC( yp_int_t value )
+{
+    ypObject *i = ypMem_MALLOC_FIXED( ypIntObject, ypIntStore_CODE );
+    if( yp_isexceptionC( i ) ) return i;
     ypInt_VALUE( i ) = value;
     return i;
 }
@@ -2001,6 +2011,11 @@ _ypInt_PUBLIC_AS_C_FUNCTION( int16 );
 _ypInt_PUBLIC_AS_C_FUNCTION( uint16 );
 _ypInt_PUBLIC_AS_C_FUNCTION( int32 );
 _ypInt_PUBLIC_AS_C_FUNCTION( uint32 );
+#if SIZE_MAX <= 0xFFFFFFFFu // 32-bit (or less) platform
+yp_STATIC_ASSERT( sizeof( yp_ssize_t ) < sizeof( yp_int_t ), sizeof_yp_ssize_lt_yp_int );
+_ypInt_PUBLIC_AS_C_FUNCTION( ssize );
+_ypInt_PUBLIC_AS_C_FUNCTION( hash );
+#endif
 // TODO #undef _ypInt_PUBLIC_AS_C_FUNCTION
 
 // The functions below assume/assert that yp_int_t is 64 bits
@@ -2013,6 +2028,16 @@ yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc ) {
     if( asint < 0 ) return_yp_CEXC_ERR( (yp_uint64_t) asint, exc, yp_OverflowError );
     return (yp_uint64_t) asint;
 }
+
+#if SIZE_MAX > 0xFFFFFFFFu // 64-bit (or more) platform
+yp_STATIC_ASSERT( sizeof( yp_ssize_t ) == sizeof( yp_int_t ), sizeof_yp_ssize_eq_yp_int );
+yp_ssize_t yp_asssizeC( ypObject *x, ypObject **exc ) {
+    return yp_asintC( x, exc );
+}
+yp_hash_t yp_ashashC( ypObject *x, ypObject **exc ) {
+    return yp_asintC( x, exc );
+}
+#endif
 
 
 /*************************************************************************************************
@@ -2034,7 +2059,7 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
 
     if( x_pair == ypFloat_CODE ) {
         result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
-        if( yp_IS_EXCEPTION_C( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         if( ypObject_IS_MUTABLE( x ) ) {
             ypFloat_VALUE( x ) = result;
         } else {
@@ -2045,9 +2070,9 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
 
     } else if( x_pair == ypInt_CODE ) {
         yp_float_t x_asfloat = yp_asfloatC( *x, &exc );
-        if( yp_IS_EXCEPTION_C( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
-        if( yp_IS_EXCEPTION_C( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         yp_decref( *x );
         *x = yp_floatC( result );
         return;
@@ -2059,7 +2084,15 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
 ypObject *yp_floatC( yp_float_t value )
 {
     ypObject *f = ypMem_MALLOC_FIXED( ypFloatObject, ypFloat_CODE );
-    if( yp_IS_EXCEPTION_C( f ) ) return f;
+    if( yp_isexceptionC( f ) ) return f;
+    ypFloat_VALUE( f ) = value;
+    return f;
+}
+
+ypObject *yp_floatstoreC( yp_float_t value )
+{
+    ypObject *f = ypMem_MALLOC_FIXED( ypFloatObject, ypFloatStore_CODE );
+    if( yp_isexceptionC( f ) ) return f;
     ypFloat_VALUE( f ) = value;
     return f;
 }
@@ -2196,7 +2229,7 @@ static ypObject *_yp_bytes_new( yp_ssize_t len )
     ypObject *b;
     if( len < 0 ) len = 0; // TODO return a new ref to an immortal b'' object
     b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, ypBytes_CODE, len );
-    if( yp_IS_EXCEPTION_C( b ) ) return b;
+    if( yp_isexceptionC( b ) ) return b;
     ypBytes_LEN( b ) = len;
     return b;
 }
@@ -2208,7 +2241,7 @@ static ypObject *_yp_bytearray_new( yp_ssize_t len )
     ypObject *b;
     if( len < 0 ) len = 0;
     b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, ypByteArray_CODE, len, len );
-    if( yp_IS_EXCEPTION_C( b ) ) return b;
+    if( yp_isexceptionC( b ) ) return b;
     ypBytes_LEN( b ) = len;
     return b;
 }
@@ -2230,7 +2263,7 @@ static ypObject *_ypBytes_new_sametype( ypObject *b, yp_ssize_t len )
 static ypObject *_ypBytes_copy( ypObject *b, yp_ssize_t len )
 {
     ypObject *newB = _ypBytes_new_sametype( b, len );
-    if( yp_IS_EXCEPTION_C( newB ) ) return newB;
+    if( yp_isexceptionC( newB ) ) return newB;
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), MIN( len, ypBytes_LEN( b ) ) );
     return newB;
 }
@@ -2241,7 +2274,7 @@ static ypObject *_ypBytes_copy( ypObject *b, yp_ssize_t len )
 static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t newLen )
 {
     ypObject *result = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen, newLen );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     ypBytes_LEN( b ) = newLen;
     return yp_None;
 }
@@ -2274,7 +2307,7 @@ static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssi
 
     if( x_pair == ypBool_CODE || x_pair == ypInt_CODE ) {
         *storage = yp_asuint8C( x, &result );
-        if( !yp_IS_EXCEPTION_C( result ) ) {
+        if( !yp_isexceptionC( result ) ) {
             *x_data = storage;
             *x_len = 1;
             return;
@@ -2312,7 +2345,7 @@ static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssiz
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     b_rdata = ypBytes_DATA( b ) + start;
 
     while( b_rlen >= x_len ) {
@@ -2333,7 +2366,7 @@ static ypObject *bytes_contains( ypObject *b, ypObject *x )
     yp_ssize_t i = -1;
 
     result = bytes_find( b, x, 0, yp_SLICE_USELEN, &i );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     return ypBool_FROM_C( i >= 0 );
 }
 
@@ -2348,7 +2381,7 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     newB = _ypBytes_copy( b, ypBytes_LEN( b ) + x_len );
-    if( yp_IS_EXCEPTION_C( newB ) ) return newB;
+    if( yp_isexceptionC( newB ) ) return newB;
 
     memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), x_data, x_len );
     return newB;
@@ -2365,7 +2398,7 @@ static ypObject *bytearray_extend( ypObject *b, ypObject *x )
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     result = _ypBytes_resize( b, ypBytes_LEN( b ) + x_len );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), x_data, x_len );
     return yp_None;
@@ -2378,7 +2411,7 @@ static ypObject *bytearray_extend( ypObject *b, ypObject *x )
 static ypObject *bytes_getindex( ypObject *b, yp_ssize_t i )
 {
     ypObject *result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     return yp_intC( ypBytes_DATA( b )[i] );
 }
 
@@ -2389,10 +2422,10 @@ static ypObject *bytearray_setindex( ypObject *b, yp_ssize_t i, ypObject *x )
     yp_uint8_t x_value;
 
     x_value = yp_asuint8C( x, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     ypBytes_DATA( b )[i] = x_value;
     return yp_None;
@@ -2404,7 +2437,7 @@ static ypObject *bytearray_delindex( ypObject *b, yp_ssize_t i )
     ypObject *result;
 
     result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     // memmove allows overlap; don't bother reallocating
     memmove( ypBytes_DATA( b )+i, ypBytes_DATA( b )+i+1, ypBytes_LEN( b )-i-1 );
@@ -2420,10 +2453,10 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     ypObject *newB;
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &newLen );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     newB = _ypBytes_new_sametype( b, newLen );
-    if( yp_IS_EXCEPTION_C( newB ) ) return newB;
+    if( yp_isexceptionC( newB ) ) return newB;
 
     if( step == 1 ) {
         memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b )+start, newLen );
@@ -2453,7 +2486,7 @@ static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     if( x_len == 0 ) return bytearray_delslice( b, start, stop, step );
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     if( step == 1 ) {
         if( x_len > slicelength ) {
@@ -2461,7 +2494,7 @@ static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
             yp_ssize_t growBy = x_len - slicelength;
             yp_ssize_t oldLen = ypBytes_LEN( b );
             result = _ypBytes_resize( b, oldLen + growBy );
-            if( yp_IS_EXCEPTION_C( result ) ) return result;
+            if( yp_isexceptionC( result ) ) return result;
             // memmove allows overlap
             memmove( ypBytes_DATA( b )+stop+growBy, ypBytes_DATA( b )+stop, oldLen-stop );
         } else if( x_len < slicelength ) {
@@ -2492,7 +2525,7 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     yp_ssize_t slicelength;
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     if( slicelength < 1 ) return yp_None; // no-op
     if( step < 0 ) ypSlice_InvertIndicesC( &start, &stop, &step, slicelength );
 
@@ -2534,7 +2567,7 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     b_rdata = ypBytes_DATA( b ) + start;
 
     *n = 0;
@@ -2649,7 +2682,7 @@ static ypTypeObject ypBytes_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    MethodError_lenfunc,            // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2724,7 +2757,7 @@ static ypTypeObject ypByteArray_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    MethodError_lenfunc,            // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2804,6 +2837,13 @@ typedef struct {
 #define ypTuple_LEN( sq ) ( ((ypObject *)sq)->ob_len )
 #define ypTuple_ALLOCLEN( sq ) ( ((ypObject *)sq)->ob_alloclen )
 
+// Moves the elements from [src:] to the index dest; this can be used when deleting items (they 
+// must be discarded first), or inserting (the new space is uninitialized).  Assumes enough space
+// is allocated for the move.  Recall that memmove handles overlap.
+#define ypTuple_ELEMMOVE( sq, dest, src ) \
+    memmove( ypTuple_ARRAY( sq )+(dest), ypTuple_ARRAY( sq )+(src), \
+            (ypTuple_LEN( sq )-(src)) * sizeof( ypObject * ) );
+
 // FIXME in general, we need a way to determine when we can use the _INLINE variant
 // Returns a new tuple of len zero, but allocated for alloclen elements
 static ypObject *_yp_tuple_new( yp_ssize_t alloclen ) {
@@ -2832,27 +2872,27 @@ static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, ypObject *iter )
         yp_ssize_t growhint = yp_iter_lenhintC( iter, &result )+1; // ignore errors (will be 0+1)
         // TODO over-allocate?
         result = _ypTuple_resize( sq, ypTuple_LEN( sq ) + growhint );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
     ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] = yp_incref( x );
     ypTuple_LEN( sq ) += 1;
     return yp_None;
 }
 
-static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject **iter )
+static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject *iter )
 {
     ypObject *x;
     ypObject *result;
 
     while( 1 ) {
         x = yp_next( iter ); // new ref
-        if( yp_IS_EXCEPTION_C( x ) ) {
+        if( yp_isexceptionC( x ) ) {
             if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
             return x;
         }
-        result = _ypTuple_push( sq, x, *iter );
+        result = _ypTuple_push( sq, x, iter );
         yp_decref( x );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
 }
@@ -2864,8 +2904,8 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
 
     // TODO Will special cases for other lists/tuples save anything?
     iter = yp_iter( iterable ); // new ref
-    if( yp_IS_EXCEPTION_C( iter ) ) return iter;
-    result = _ypTuple_extend_from_iter( sq, &iter );
+    if( yp_isexceptionC( iter ) ) return iter;
+    result = _ypTuple_extend_from_iter( sq, iter );
     yp_decref( iter );
     return result;
 }
@@ -2875,7 +2915,7 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
 static ypObject *tuple_getindex( ypObject *sq, yp_ssize_t i )
 {
     ypObject *result = ypSequence_AdjustIndexC( ypTuple_LEN( sq ), &i );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     return yp_incref( ypTuple_ARRAY( sq )[i] );
 }
 
@@ -2896,12 +2936,132 @@ static ypObject *tuple_count( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ss
     return yp_NotImplementedError;
 }
 
+static ypObject *list_setindex( ypObject *sq, yp_ssize_t i, ypObject *x )
+{
+    ypObject *result;
+    if( yp_isexceptionC( x ) ) return x;
+    result = ypSequence_AdjustIndexC( ypTuple_LEN( sq ), &i );
+    if( yp_isexceptionC( result ) ) return result;
+    yp_decref( ypTuple_ARRAY( sq )[i] );
+    ypTuple_ARRAY( sq )[i] = yp_incref( x );
+    return yp_None;
+}
+
+static ypObject *list_setslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, 
+        ypObject *x )
+{
+    if( yp_isexceptionC( x ) ) return x;
+    return yp_NotImplementedError;
+}
+
+static ypObject *list_popindex( ypObject *sq, yp_ssize_t i )
+{
+    ypObject *result = ypSequence_AdjustIndexC( ypTuple_LEN( sq ), &i );
+    if( yp_isexceptionC( result ) ) return result;
+
+    result = ypTuple_ARRAY( sq )[i];
+    ypTuple_ELEMMOVE( sq, i, i+1 );
+    ypTuple_LEN( sq ) -= 1;
+    return result;
+}
+
+static ypObject *list_delindex( ypObject *sq, yp_ssize_t i )
+{
+    ypObject *result = list_popindex( sq, i );
+    if( yp_isexceptionC( result ) ) return result;
+    yp_decref( result );
+    return yp_None;
+}
+
+static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
+{
+    return yp_NotImplementedError;
+}
+
+// TODO getitem et al
+
+#define list_extend _ypTuple_extend
+
+static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
+{
+    return yp_NotImplementedError;
+}
+
+static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
+{
+    ypObject *result;
+    if( yp_isexceptionC( x ) ) return x;
+    result = ypSequence_AdjustIndexC( ypTuple_LEN( sq ), &i );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // Resize if necessary
+    // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE, copying
+    // large amounts of data twice; optimize (and...are there other areas of the code where this
+    // happens?)
+    if( ypTuple_ALLOCLEN( sq ) - ypTuple_LEN( sq ) < 1 ) {
+        // TODO over-allocate?
+        result = _ypTuple_resize( sq, ypTuple_LEN( sq ) + 1 );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+
+    // Make room at i and add x
+    ypTuple_ELEMMOVE( sq, i+1, i );
+    ypTuple_ARRAY( sq )[i] = yp_incref( x );
+    ypTuple_LEN( sq ) += 1;
+    return yp_None;
+}
+
+// list_popindex is above
+
+static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
+{
+    yp_ssize_t i;
+    ypObject *result;
+    for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
+        result = visitor( ypTuple_ARRAY( sq )[i], memo );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
 static ypObject *tuple_bool( ypObject *sq ) {
     return ypBool_FROM_C( ypTuple_LEN( sq ) );
 }
 
+static ypObject *tuple_contains( ypObject *sq, ypObject *x ) 
+{
+    yp_ssize_t i;
+    ypObject *result;
+    for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
+        result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
+        if( result != yp_False ) return result; // yp_True, or an exception
+    }
+    return yp_False;
+}
+
+static ypObject *tuple_len( ypObject *sq, yp_ssize_t *len ) {
+    *len = ypTuple_LEN( sq );
+    return yp_None;
+}
+
 static ypObject *list_push( ypObject *sq, ypObject *x ) {
     return _ypTuple_push( sq, x, yp_None );
+}
+
+static ypObject *list_clear( ypObject *sq ) 
+{
+    while( ypTuple_LEN( sq ) > 0 ) {
+        yp_decref( ypTuple_ARRAY( sq )[ypTuple_LEN( sq )-1] );
+        ypTuple_LEN( sq ) -= 1;
+    }
+    return yp_None;
+}
+
+static ypObject *list_pop( ypObject *sq )
+{
+    if( ypTuple_LEN( sq ) < 1 ) return yp_IndexError;
+    ypTuple_LEN( sq ) -= 1;
+    return ypTuple_ARRAY( sq )[ypTuple_LEN( sq )];
 }
 
 static ypObject *tuple_dealloc( ypObject *sq )
@@ -2939,7 +3099,7 @@ static ypTypeObject ypTuple_Type = {
 
     // Object fundamentals
     tuple_dealloc,                  // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse  FIXME
+    tuple_traverse,                 // tp_traverse
     NULL,                           // tp_str
     NULL,                           // tp_repr
 
@@ -2971,8 +3131,8 @@ static ypTypeObject ypTuple_Type = {
     MethodError_objobjproc,         // tp_send
 
     // Container operations
-    MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    tuple_contains,                 // tp_contains
+    tuple_len,                      // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2996,14 +3156,14 @@ static ypSequenceMethods ypList_as_sequence = {
     tuple_getslice,                 // tp_getslice
     tuple_find,                     // tp_find
     tuple_count,                    // tp_count
-    MethodError_objssizeobjproc,    // tp_setindex
-    MethodError_objsliceobjproc,    // tp_setslice
-    MethodError_objssizeproc,       // tp_delindex
-    MethodError_objsliceproc,       // tp_delslice
-    MethodError_objobjproc,         // tp_extend
-    MethodError_objssizeproc,       // tp_irepeat
-    MethodError_objssizeobjproc,    // tp_insert
-    MethodError_objssizeproc,       // tp_popindex
+    list_setindex,                  // tp_setindex
+    list_setslice,                  // tp_setslice
+    list_delindex,                  // tp_delindex
+    list_delslice,                  // tp_delslice
+    list_extend,                    // tp_extend
+    list_irepeat,                   // tp_irepeat
+    list_insert,                    // tp_insert
+    list_popindex,                  // tp_popindex
     MethodError_objproc,            // tp_reverse
     MethodError_sortfunc            // tp_sort
 };
@@ -3014,7 +3174,7 @@ static ypTypeObject ypList_Type = {
 
     // Object fundamentals
     tuple_dealloc,                  // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse  FIXME
+    tuple_traverse,                 // tp_traverse
     NULL,                           // tp_str
     NULL,                           // tp_repr
 
@@ -3046,11 +3206,11 @@ static ypTypeObject ypList_Type = {
     MethodError_objobjproc,         // tp_send
 
     // Container operations
-    MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_length
+    tuple_contains,                 // tp_contains
+    tuple_len,                      // tp_len
     list_push,                      // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
+    list_clear,                     // tp_clear
+    list_pop,                       // tp_pop
     MethodError_objobjproc,         // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
@@ -3074,13 +3234,13 @@ static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *itera
     ypObject *result = yp_None;
     ypObject *newSq;
     yp_ssize_t lenhint = yp_lenC( iterable, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) lenhint = yp_iter_lenhintC( iterable, &result );
+    if( yp_isexceptionC( result ) ) lenhint = yp_iter_lenhintC( iterable, &result );
     // Ignore errors determining lenhint; it just means we can't pre-allocate
 
     newSq = allocator( lenhint );
-    if( yp_IS_EXCEPTION_C( newSq ) ) return newSq;
+    if( yp_isexceptionC( newSq ) ) return newSq;
     result = _ypTuple_extend( newSq, iterable );
-    if( yp_IS_EXCEPTION_C( result ) ) {
+    if( yp_isexceptionC( result ) ) {
         yp_decref( newSq );
         return result;
     }
@@ -3221,7 +3381,7 @@ static ypObject *_yp_frozenset_new( yp_ssize_t minused )
     ypObject *so;
     if( alloclen < 1 ) return yp_MemoryError;
     so = ypMem_MALLOC_CONTAINER_VARIABLE( ypSetObject, ypFrozenSet_CODE, alloclen, alloclen );
-    if( yp_IS_EXCEPTION_C( so ) ) return so;
+    if( yp_isexceptionC( so ) ) return so;
     ypSet_ALLOCLEN( so ) = alloclen; // we can't make use of the excess anyway
     ypSet_FILL( so ) = 0;
     memset( ypSet_TABLE( so ), 0, alloclen * sizeof( ypSet_KeyEntry ) );
@@ -3235,7 +3395,7 @@ static ypObject *_yp_set_new( yp_ssize_t minused )
     ypObject *so;
     if( alloclen < 1 ) return yp_MemoryError;
     so = ypMem_MALLOC_CONTAINER_VARIABLE( ypSetObject, ypSet_CODE, alloclen, alloclen );
-    if( yp_IS_EXCEPTION_C( so ) ) return so;
+    if( yp_isexceptionC( so ) ) return so;
     ypSet_ALLOCLEN( so ) = alloclen; // we can't make use of the excess anyway
     ypSet_FILL( so ) = 0;
     memset( ypSet_TABLE( so ), 0, alloclen * sizeof( ypSet_KeyEntry ) );
@@ -3270,7 +3430,7 @@ static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t
             // Python has protection here against __eq__ changing this set object; hopefully not a
             // problem in nohtyP
             cmp = yp_eq( ep->se_key, key );
-            if( yp_IS_EXCEPTION_C( cmp ) ) return cmp;
+            if( yp_isexceptionC( cmp ) ) return cmp;
             if( cmp == yp_True ) goto success;
         }
         freeslot = NULL;
@@ -3289,7 +3449,7 @@ static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t
         if (ep->se_hash == hash && ep->se_key != ypSet_dummy) {
             // Same __eq__ protection is here as well in Python
             cmp = yp_eq( ep->se_key, key );
-            if( yp_IS_EXCEPTION_C( cmp ) ) return cmp;
+            if( yp_isexceptionC( cmp ) ) return cmp;
             if( cmp == yp_True ) goto success;
         } else if (ep->se_key == ypSet_dummy && freeslot == NULL) {
             freeslot = ep;
@@ -3405,9 +3565,9 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
 
     // Look for the appropriate entry in the hash table
     hash = yp_hashC( key, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     result = _ypSet_lookkey( so, key, hash, &loc );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     // If the key is already in the hash table, then there's nothing to do
     if( ypSet_ENTRY_USED( loc ) ) return yp_False;
@@ -3424,7 +3584,7 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     newlen = ypSet_LEN( so )+1;
     if( ypObject_IS_MUTABLE( so ) ) newlen = _ypSet_calc_resize_minused( newlen );
     result = _ypSet_resize( so, newlen );   // invalidates loc
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     _ypSet_movekey_clean( so, yp_incref( key ), hash, &loc );
     *spaceleft = _ypSet_space_remaining( so );
     return yp_True;
@@ -3442,9 +3602,9 @@ static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
     hash = yp_currenthashC( key, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     result = _ypSet_lookkey( so, key, hash, &loc );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     // If the key is not in the hash table, then there's nothing to do
     if( !ypSet_ENTRY_USED( loc ) ) return ypSet_dummy;
@@ -3472,7 +3632,7 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other,
     // the given lenhint
     if( _ypSet_space_remaining( so ) < keysleft ) {
         result = _ypSet_resize( so, ypSet_LEN( so )+keysleft );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
 
     // If the set is empty and contains no deleted entries, then we also know that none of the keys
@@ -3482,7 +3642,7 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other,
             if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
             keysleft -= 1;
             key = copy_visitor( otherkeys[i].se_key, copy_memo );
-            if( yp_IS_EXCEPTION_C( key ) ) return key;
+            if( yp_isexceptionC( key ) ) return key;
             _ypSet_movekey_clean( so, key, otherkeys[i].se_hash, &loc );
         }
         return yp_None;
@@ -3493,17 +3653,17 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other,
         if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
         keysleft -= 1;
         result = _ypSet_lookkey( so, otherkeys[i].se_key, otherkeys[i].se_hash, &loc );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
         if( ypSet_ENTRY_USED( loc ) ) continue; // if the entry is used then key is already in set
         key = copy_visitor( otherkeys[i].se_key, copy_memo );
-        if( yp_IS_EXCEPTION_C( key ) ) return key;
+        if( yp_isexceptionC( key ) ) return key;
         _ypSet_movekey( so, loc, key, otherkeys[i].se_hash );
     }
     return yp_None;
 }
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter )
+static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *keyiter )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     ypObject *result = yp_None;
@@ -3513,11 +3673,11 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter )
     // Use lenhint in the hopes of requiring only one resize
     // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
     // the given lenhint
-    lenhint = yp_iter_lenhintC( *keyiter, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    lenhint = yp_iter_lenhintC( keyiter, &result );
+    if( yp_isexceptionC( result ) ) return result;
     if( spaceleft < lenhint ) {
         result = _ypSet_resize( so, ypSet_LEN( so )+lenhint );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
         spaceleft = _ypSet_space_remaining( so );
     }
 
@@ -3525,13 +3685,13 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **keyiter )
     // set despite our attempts at pre-allocating, since lenhint _is_ just a hint.
     while( 1 ) {
         key = yp_next( keyiter ); // new ref
-        if( yp_IS_EXCEPTION_C( key ) ) {
+        if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break;
             return key;
         }
         result = _ypSet_push( so, key, &spaceleft );
         yp_decref( key );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
 }
@@ -3554,8 +3714,8 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
         return _ypSet_update_from_set( so, ypDict_KEYSET( iterable ), yp_shallowcopy_visitor, NULL );
     } else {
         keyiter = yp_iter( iterable ); // new ref
-        if( yp_IS_EXCEPTION_C( keyiter ) ) return keyiter;
-        result = _ypSet_update_from_iter( so, &keyiter );
+        if( yp_isexceptionC( keyiter ) ) return keyiter;
+        result = _ypSet_update_from_iter( so, keyiter );
         yp_decref( keyiter );
         return result;
     }
@@ -3574,7 +3734,7 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
         keysleft -= 1;
         result = _ypSet_lookkey( other, keys[i].se_key, keys[i].se_hash, &other_loc );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
         if( ypSet_ENTRY_USED( other_loc ) ) continue; // if entry used, key is in other
         yp_decref( _ypSet_removekey( so, &keys[i] ) );
     }
@@ -3582,9 +3742,9 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
 }
 
 static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo );
-static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject **keyiter );
+static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *keyiter );
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other );
-static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject **keyiter )
+static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject *keyiter )
 {
     ypObject *so_toremove;
     ypObject *result;
@@ -3592,12 +3752,12 @@ static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject **
     // Unfortunately, we need to create a short-lived copy of so.  It's either that, or convert
     // keyiter to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
     so_toremove = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL ); // new ref
-    if( yp_IS_EXCEPTION_C( so_toremove ) ) return so_toremove;
+    if( yp_isexceptionC( so_toremove ) ) return so_toremove;
 
     // Remove items from so_toremove that are yielded by keyiter.  so_toremove is then a set
     // containing the keys to remove from so.
     result = _ypSet_difference_update_from_iter( so_toremove, keyiter );
-    if( !yp_IS_EXCEPTION_C( result ) ) {
+    if( !yp_isexceptionC( result ) ) {
         result = _ypSet_difference_update_from_set( so, so_toremove );
     }
     yp_decref( so_toremove );
@@ -3617,8 +3777,8 @@ static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
         return _ypSet_intersection_update_from_set( so, ypDict_KEYSET( iterable ) );
     } else {
         keyiter = yp_iter( iterable ); // new ref
-        if( yp_IS_EXCEPTION_C( keyiter ) ) return keyiter;
-        result = _ypSet_intersection_update_from_iter( so, &keyiter );
+        if( yp_isexceptionC( keyiter ) ) return keyiter;
+        result = _ypSet_intersection_update_from_iter( so, keyiter );
         yp_decref( keyiter );
         return result;
     }
@@ -3636,27 +3796,27 @@ static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *othe
         if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
         keysleft -= 1;
         result = _ypSet_lookkey( so, otherkeys[i].se_key, otherkeys[i].se_hash, &loc );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
         if( !ypSet_ENTRY_USED( loc ) ) continue; // if entry not used, key is not in set
         yp_decref( _ypSet_removekey( so, loc ) );
     }
     return yp_None;
 }
 
-static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject **keyiter )
+static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *keyiter )
 {
     ypObject *result = yp_None;
     ypObject *key;
 
     while( 1 ) {
         key = yp_next( keyiter ); // new ref
-        if( yp_IS_EXCEPTION_C( key ) ) {
+        if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break;
             return key;
         }
         result = _ypSet_pop( so, key ); // new ref
         yp_decref( key );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
         yp_decref( result );
     }
     return yp_None;
@@ -3678,8 +3838,8 @@ static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
         return _ypSet_difference_update_from_set( so, ypDict_KEYSET( iterable ) );
     } else {
         keyiter = yp_iter( iterable ); // new ref
-        if( yp_IS_EXCEPTION_C( keyiter ) ) return keyiter;
-        result = _ypSet_difference_update_from_iter( so, &keyiter );
+        if( yp_isexceptionC( keyiter ) ) return keyiter;
+        result = _ypSet_difference_update_from_iter( so, keyiter );
         yp_decref( keyiter );
         return result;
     }
@@ -3698,7 +3858,7 @@ static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
         keysleft -= 1;
         result = visitor( keys[i].se_key, memo );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
 }
@@ -3707,9 +3867,9 @@ static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, 
 {
     ypObject *result;
     ypObject *so_copy = _yp_set_new( ypSet_LEN( so ) ); // new ref
-    if( yp_IS_EXCEPTION_C( so_copy ) ) return so_copy;
+    if( yp_isexceptionC( so_copy ) ) return so_copy;
     result = _ypSet_update_from_set( so_copy, so, copy_visitor, copy_memo );
-    if( yp_IS_EXCEPTION_C( result ) ) {
+    if( yp_isexceptionC( result ) ) {
         yp_decref( so_copy );
         return result;
     }
@@ -3720,9 +3880,9 @@ static ypObject *frozenset_frozen_copy( ypObject *so, visitfunc copy_visitor, vo
 {
     ypObject *result;
     ypObject *so_copy = _yp_frozenset_new( ypSet_LEN( so ) ); // new ref
-    if( yp_IS_EXCEPTION_C( so_copy ) ) return so_copy;
+    if( yp_isexceptionC( so_copy ) ) return so_copy;
     result = _ypSet_update_from_set( so_copy, so, copy_visitor, copy_memo );
-    if( yp_IS_EXCEPTION_C( result ) ) {
+    if( yp_isexceptionC( result ) ) {
         yp_decref( so_copy );
         return result;
     }
@@ -3740,9 +3900,9 @@ static ypObject *frozenset_contains( ypObject *so, ypObject *x )
     ypSet_KeyEntry *loc;
 
     hash = yp_currenthashC( x, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     result = _ypSet_lookkey( so, x, hash, &loc );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     return ypBool_FROM_C( ypSet_ENTRY_USED( loc ) );
 }
 
@@ -3751,7 +3911,7 @@ static ypObject *set_update( ypObject *so, int n, va_list args )
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
         result = _ypSet_update( so, va_arg( args, ypObject * ) );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
 }
@@ -3761,7 +3921,7 @@ static ypObject *set_intersection_update( ypObject *so, int n, va_list args )
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
         result = _ypSet_intersection_update( so, va_arg( args, ypObject * ) );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
 }
@@ -3771,7 +3931,7 @@ static ypObject *set_difference_update( ypObject *so, int n, va_list args )
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
         result = _ypSet_difference_update( so, va_arg( args, ypObject * ) );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
 }
@@ -3779,14 +3939,14 @@ static ypObject *set_difference_update( ypObject *so, int n, va_list args )
 static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     ypObject *result = _ypSet_push( so, x, &spaceleft );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     return result == yp_True ? yp_None : yp_KeyError;
 }
 
 static ypObject *set_push( ypObject *so, ypObject *x ) {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     ypObject *result = _ypSet_push( so, x, &spaceleft );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     return yp_None;
 }
 
@@ -3859,7 +4019,7 @@ static ypTypeObject ypFrozenSet_Type = {
 
     // Container operations
     frozenset_contains,             // tp_contains
-    frozenset_len,                  // tp_length
+    frozenset_len,                  // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -3930,7 +4090,7 @@ static ypTypeObject ypSet_Type = {
 
     // Container operations
     frozenset_contains,             // tp_contains
-    frozenset_len,                  // tp_length
+    frozenset_len,                  // tp_len
     set_push,                       // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -3958,14 +4118,14 @@ static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterabl
     ypObject *newSo;
     ypObject *result;
     yp_ssize_t lenhint = yp_lenC( iterable, &exc );
-    if( yp_IS_EXCEPTION_C( exc ) ) lenhint = yp_iter_lenhintC( iterable, &exc );
+    if( yp_isexceptionC( exc ) ) lenhint = yp_iter_lenhintC( iterable, &exc );
     // Ignore errors determining lenhint; it just means we can't pre-allocate
 
     newSo = allocator( lenhint );
-    if( yp_IS_EXCEPTION_C( newSo ) ) return newSo;
+    if( yp_isexceptionC( newSo ) ) return newSo;
     // TODO make sure _yp_set_update is efficient for pre-sized objects
     result = _ypSet_update( newSo, iterable );
-    if( yp_IS_EXCEPTION_C( result ) ) {
+    if( yp_isexceptionC( result ) ) {
         yp_decref( newSo );
         return result;
     }
@@ -4033,10 +4193,10 @@ static ypObject *_yp_frozendict_new( yp_ssize_t minused )
     ypObject *mp;
 
     keyset = _yp_frozenset_new( minused );
-    if( yp_IS_EXCEPTION_C( keyset ) ) return keyset;
+    if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
     mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, ypFrozenDict_CODE, alloclen, alloclen );
-    if( yp_IS_EXCEPTION_C( mp ) ) {
+    if( yp_isexceptionC( mp ) ) {
         yp_decref( keyset );
         return mp;
     }
@@ -4052,10 +4212,10 @@ static ypObject *_yp_dict_new( yp_ssize_t minused )
     ypObject *mp;
 
     keyset = _yp_frozenset_new( minused );
-    if( yp_IS_EXCEPTION_C( keyset ) ) return keyset;
+    if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
     mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, ypDict_CODE, alloclen, alloclen );
-    if( yp_IS_EXCEPTION_C( mp ) ) {
+    if( yp_isexceptionC( mp ) ) {
         yp_decref( keyset );
         return mp;
     }
@@ -4082,7 +4242,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     // arrays could fit in-line (idea: if currently in-line, then just force that the new array be
     // malloc'd...will need to malloc something anyway)
     newkeyset = _yp_frozenset_new( minused );
-    if( yp_IS_EXCEPTION_C( newkeyset ) ) return newkeyset;
+    if( yp_isexceptionC( newkeyset ) ) return newkeyset;
     newalloclen = ypSet_ALLOCLEN( newkeyset );
     newvalues = (ypObject **) yp_malloc( newalloclen * sizeof( ypObject * ) );
     if( newvalues == NULL ) {
@@ -4129,11 +4289,11 @@ static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int
     yp_ssize_t newlen;
 
     // Look for the appropriate entry in the hash table
-    // TODO yp_IS_EXCEPTION_C used internally should be a macro
+    // TODO yp_isexceptionC used internally should be a macro
     hash = yp_hashC( key, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     result = _ypSet_lookkey( keyset, key, hash, &key_loc );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     // If the key is already in the hash table, then we simply need to update the value
     if( ypSet_ENTRY_USED( key_loc ) ) {
@@ -4164,7 +4324,7 @@ static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int
     newlen = ypDict_LEN( mp )+1;
     if( ypObject_IS_MUTABLE( mp ) ) newlen = _ypSet_calc_resize_minused( newlen );
     result = _ypDict_resize( mp, newlen );  // invalidates keyset and key_loc
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     keyset = ypDict_KEYSET( mp );
     _ypSet_movekey_clean( keyset, yp_incref( key ), hash, &key_loc );
@@ -4189,9 +4349,9 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
     hash = yp_currenthashC( key, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     result = _ypSet_lookkey( keyset, key, hash, &key_loc );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     // If the there's no existing value, then there's nothing to do (if the key is not in the set,
     // then *value_loc will be NULL)
@@ -4209,33 +4369,33 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
 // returns new references to that pair in *key and *value.  Both are set to an exception on error;
 // in particular, yp_ValueError is returned if exactly 2 values are not returned.
 // XXX *itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
-static void _ypDict_iter_items_next( ypObject **itemiter, ypObject **key, ypObject **value )
+static void _ypDict_iter_items_next( ypObject *itemiter, ypObject **key, ypObject **value )
 {
     ypObject *excess;
     ypObject *keyvaliter = yp_next( itemiter ); // new ref
-    if( yp_IS_EXCEPTION_C( keyvaliter ) ) { // including yp_StopIteration
+    if( yp_isexceptionC( keyvaliter ) ) { // including yp_StopIteration
         *key = *value = keyvaliter;
         return;
     }
 
-    *key = yp_next( &keyvaliter ); // new ref
-    if( yp_IS_EXCEPTION_C( *key ) ) {
+    *key = yp_next( keyvaliter ); // new ref
+    if( yp_isexceptionC( *key ) ) {
         if( yp_isexceptionC2( *key, yp_StopIteration ) ) *key = yp_ValueError;
         *value = *key;
         goto Return;
     }
 
-    *value = yp_next( &keyvaliter ); // new ref
-    if( yp_IS_EXCEPTION_C( *value ) ) {
+    *value = yp_next( keyvaliter ); // new ref
+    if( yp_isexceptionC( *value ) ) {
         if( yp_isexceptionC2( *value, yp_StopIteration ) ) *value = yp_ValueError;
         yp_decref( *key );
         *key = *value;
         goto Return;
     }
 
-    excess = yp_next( &keyvaliter ); // new ref, but should be yp_StopIteration
+    excess = yp_next( keyvaliter ); // new ref, but should be yp_StopIteration
     if( excess != yp_StopIteration ) {
-        if( !yp_IS_EXCEPTION_C( excess ) ) {
+        if( !yp_isexceptionC( excess ) ) {
             yp_decref( excess );
             excess = yp_ValueError;
         }
@@ -4257,7 +4417,7 @@ static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other,
 }
 
 // XXX *itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
-static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject **itemiter )
+static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject *itemiter )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
     ypObject *result = yp_None;
@@ -4268,11 +4428,11 @@ static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject **itemiter )
     // Use lenhint in the hopes of requiring only one resize
     // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
     // the given lenhint
-    lenhint = yp_iter_lenhintC( *itemiter, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    lenhint = yp_iter_lenhintC( itemiter, &result );
+    if( yp_isexceptionC( result ) ) return result;
     if( spaceleft < lenhint ) {
         result = _ypDict_resize( mp, ypDict_LEN( mp )+lenhint );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
         spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
     }
 
@@ -4280,13 +4440,13 @@ static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject **itemiter )
     // dict despite our attempts at pre-allocating, since lenhint _is_ just a hint.
     while( 1 ) {
         _ypDict_iter_items_next( itemiter, &key, &value ); // new refs: key, value
-        if( yp_IS_EXCEPTION_C( key ) ) {
+        if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break;
             return key;
         }
         result = _ypDict_push( mp, key, value, 1, &spaceleft );
         yp_decrefN( 2, key, value );
-        if( yp_IS_EXCEPTION_C( result ) ) return result;
+        if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
 }
@@ -4308,8 +4468,8 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
     } else {
         itemiter = yp_iter_items( x ); // new ref
         if( yp_isexceptionC2( itemiter, yp_MethodError ) ) itemiter = yp_iter( x ); // new ref
-        if( yp_IS_EXCEPTION_C( itemiter ) ) return itemiter;
-        result = _ypDict_update_from_iter( mp, &itemiter );
+        if( yp_isexceptionC( itemiter ) ) return itemiter;
+        result = _ypDict_update_from_iter( mp, itemiter );
         yp_decref( itemiter );
         return result;
     }
@@ -4338,9 +4498,9 @@ static ypObject *frozendict_getdefault( ypObject *mp, ypObject *key, ypObject *d
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
     hash = yp_currenthashC( key, &result );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     result = _ypSet_lookkey( keyset, key, hash, &key_loc );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
 
     // If the there's no existing value, return defval, otherwise return the value
     value = *ypDict_VALUE_ENTRY( mp, key_loc );
@@ -4357,14 +4517,14 @@ static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
     ypObject *result = _ypDict_push( mp, key, value, 1, &spaceleft );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     return yp_None;
 }
 
 static ypObject *dict_delitem( ypObject *mp, ypObject *key )
 {
     ypObject *result = _ypDict_pop( mp, key );
-    if( yp_IS_EXCEPTION_C( result ) ) return result;
+    if( yp_isexceptionC( result ) ) return result;
     if( result == ypSet_dummy ) return yp_KeyError;
     yp_decref( result );
     return yp_None;
@@ -4418,7 +4578,7 @@ static ypTypeObject ypFrozenDict_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    frozendict_len,                 // tp_length
+    frozendict_len,                 // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -4485,7 +4645,7 @@ static ypTypeObject ypDict_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    frozendict_len,                 // tp_length
+    frozendict_len,                 // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -4513,14 +4673,14 @@ static ypObject *_ypDict( ypObject *(*allocator)( yp_ssize_t ), ypObject *x )
     ypObject *newMp;
     ypObject *result;
     yp_ssize_t lenhint = yp_lenC( x, &exc );
-    if( yp_IS_EXCEPTION_C( exc ) ) lenhint = yp_iter_lenhintC( x, &exc );
+    if( yp_isexceptionC( exc ) ) lenhint = yp_iter_lenhintC( x, &exc );
     // Ignore errors determining lenhint; it just means we can't pre-allocate
 
     newMp = allocator( lenhint );
-    if( yp_IS_EXCEPTION_C( newMp ) ) return newMp;
+    if( yp_isexceptionC( newMp ) ) return newMp;
     // TODO make sure _ypDict_update is efficient for pre-sized objects
     result = _ypDict_update( newMp, x );
-    if( yp_IS_EXCEPTION_C( result ) ) {
+    if( yp_isexceptionC( result ) ) {
         yp_decref( newMp );
         return result;
     }
@@ -4582,24 +4742,36 @@ ypObject *yp_dict( ypObject *x ) {
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
 // TODO _return_yp_REDIRECT, etc
 #define _yp_REDIRECT1( ob, tp_meth, args ) \
-    ypTypeObject *type = ypObject_TYPE( ob ); \
-    return type->tp_meth args;
+    do {ypTypeObject *type = ypObject_TYPE( ob ); \
+        return type->tp_meth args; } while( 0 )
 
 #define _yp_REDIRECT2( ob, tp_suite, suite_meth, args ) \
-    ypTypeObject *type = ypObject_TYPE( ob ); \
-    return type->tp_suite->suite_meth args;
+    do {ypTypeObject *type = ypObject_TYPE( ob ); \
+        return type->tp_suite->suite_meth args; } while( 0 )
 
 #define _yp_INPLACE1( pOb, tp_meth, args ) \
-    ypTypeObject *type = ypObject_TYPE( *pOb ); \
-    ypObject *result = type->tp_meth args; \
-    if( yp_IS_EXCEPTION_C( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
-    return;
+    do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
+        ypObject *result = type->tp_meth args; \
+        if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
+        return; } while( 0 )
 
 #define _yp_INPLACE2( pOb, tp_suite, suite_meth, args ) \
-    ypTypeObject *type = ypObject_TYPE( *pOb ); \
-    ypObject *result = type->tp_suite->suite_meth args; \
-    if( yp_IS_EXCEPTION_C( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
-    return;
+    do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
+        ypObject *result = type->tp_suite->suite_meth args; \
+        if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
+        return; } while( 0 )
+
+#define _yp_INPLACE_RETURN1( pOb, tp_meth, args ) \
+    do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
+        ypObject *result = type->tp_meth args; \
+        if( yp_isexceptionC( result ) ) yp_INPLACE_ERR( pOb, result ); \
+        return result; } while( 0 )
+
+#define _yp_INPLACE_RETURN2( pOb, tp_suite, suite_meth, args ) \
+    do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
+        ypObject *result = type->tp_suite->suite_meth args; \
+        if( yp_isexceptionC( result ) ) yp_INPLACE_ERR( pOb, result ); \
+        return result; } while( 0 )
 
 ypObject *yp_bool( ypObject *x ) {
     _yp_REDIRECT1( x, tp_bool, (x) );
@@ -4611,21 +4783,19 @@ ypObject *yp_iter( ypObject *x ) {
     // TODO Ensure the result is an iterator or an exception
 }
 
-// TODO Because these functions don't (currently) discard *iterator, should they have prefix E?
-
-ypObject *yp_send( ypObject **iterator, ypObject *value ) {
-    _yp_REDIRECT1( *iterator, tp_send, (*iterator, value) );
+ypObject *yp_send( ypObject *iterator, ypObject *value ) {
+    _yp_REDIRECT1( iterator, tp_send, (iterator, value) );
     // TODO should we be discarding *iterator?
 }
 
-ypObject *yp_next( ypObject **iterator ) {
-    _yp_REDIRECT1( *iterator, tp_send, (*iterator, yp_None) );
+ypObject *yp_next( ypObject *iterator ) {
+    _yp_REDIRECT1( iterator, tp_send, (iterator, yp_None) );
     // TODO should we be discarding *iterator?
 }
 
-ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
-    if( !yp_IS_EXCEPTION_C( exc ) ) return yp_TypeError;
-    {_yp_REDIRECT1( *iterator, tp_send, (*iterator, exc) );}
+ypObject *yp_throw( ypObject *iterator, ypObject *exc ) {
+    if( !yp_isexceptionC( exc ) ) return yp_TypeError;
+    _yp_REDIRECT1( iterator, tp_send, (iterator, exc) );
     // TODO should we be discarding *iterator?
 }
 
@@ -4641,21 +4811,105 @@ ypObject *yp_not_in( ypObject *x, ypObject *container ) {
     return ypBool_NOT( result );
 }
 
-// TODO for this and other methods that mutate, check first if it's immutable?
-void yp_push( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
+void yp_push( ypObject **container, ypObject *x ) {
+    _yp_INPLACE1( container, tp_push, (*container, x) );
+}
+
+void yp_clear( ypObject **container ) {
+    _yp_INPLACE1( container, tp_clear, (*container) );
+}
+
+ypObject *yp_pop( ypObject **container ) {
+    _yp_INPLACE_RETURN1( container, tp_pop, (*container) );
+}
+
+ypObject *yp_concat( ypObject *sequence, ypObject *x ) {
+    return yp_NotImplementedError;
+}
+
+ypObject *yp_repeatC( ypObject *sequence, yp_ssize_t factor ) {
+    return yp_NotImplementedError;
 }
 
 ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i ) {
     _yp_REDIRECT2( sequence, tp_as_sequence, tp_getindex, (sequence, i) );
 }
 
+ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k ) {
+    return yp_NotImplementedError;
+}
+
+yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) {
+    return_yp_CEXC_ERR( -1, exc, yp_NotImplementedError );
+}
+
+yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+    return yp_findC4( sequence, x, 0, yp_SLICE_USELEN, exc );
+}
+
+yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) {
+    ypObject *subexc = yp_None;
+    yp_ssize_t result = yp_findC4( sequence, x, i, j, &subexc );
+    if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( -1, exc, subexc );
+    if( result == -1 ) return_yp_CEXC_ERR( -1, exc, yp_ValueError );
+    return result;
+}
+
+yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+    return yp_indexC4( sequence, x, 0, yp_SLICE_USELEN, exc );
+}
+
+void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_setindex, (*sequence, i, x) );
+}
+
+void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k,
+        ypObject *x ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_setslice, (*sequence, i, j, k, x) );
+}
+
+void yp_delindexC( ypObject **sequence, yp_ssize_t i ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_delindex, (*sequence, i) );
+}
+
+void yp_delsliceC4( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_delslice, (*sequence, i, j, k) );
+}
+
 void yp_append( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE1( sequence, tp_push, (*sequence, x) )
+    _yp_INPLACE1( sequence, tp_push, (*sequence, x) );
 }
 
 void yp_extend( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_extend, (*sequence, x) )
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_extend, (*sequence, x) );
+}
+
+void yp_irepeatC( ypObject **sequence, yp_ssize_t factor ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_irepeat, (*sequence, factor) );
+}
+
+void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_insert, (*sequence, i, x) );
+}
+
+ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i ) {
+    _yp_INPLACE_RETURN2( sequence, tp_as_sequence, tp_popindex, (*sequence, i) );
+}
+
+void yp_remove( ypObject **sequence, ypObject *x ) {
+    _yp_INPLACE1( sequence, tp_remove, (*sequence, x) );
+}
+
+void yp_reverse( ypObject **sequence ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_reverse, (*sequence) );
+}
+
+void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_sort, (*sequence, key, reverse) );
+}
+
+void yp_sort( ypObject **sequence ) {
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_sort, (*sequence, NULL, yp_False) );
 }
 
 ypObject *yp_isdisjoint( ypObject *set, ypObject *x ) {

@@ -74,10 +74,14 @@ extern "C" {
 #include <stdarg.h>
 #include <limits.h>
 
+#ifdef yp_ENABLE_SHARED
 #ifdef yp_BUILD_CORE
 #define ypAPI extern __declspec( dllexport )
 #else
 #define ypAPI extern __declspec( dllimport )
+#endif
+#else
+#define ypAPI extern
 #endif
 
 
@@ -274,7 +278,8 @@ typedef yp_float64_t    yp_float_t;
 // similar functions.  self is the iterator object; use yp_iter_stateX to retrieve any state
 // variables.  value is the object that is sent into the function by yp_send; it may also be
 // yp_GeneratorExit if yp_close is called, or another exception.  The return value must be a new
-// reference, yp_StopIteration if the generator is exhausted, or another exception.
+// reference, yp_StopIteration if the generator is exhausted, or another exception.  The generator
+// will be closed if it returns an exception.
 typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 
 
@@ -428,22 +433,25 @@ ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 // As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an
 // object that implements yp_iter.
 
-// "Sends" a value into *iterator and returns a new reference to the next yielded value,
+// Unlike other functions that modify their inputs, yp_send et al do not discard iterator on error.
+// Instead, if an error occurs in one yp_send, subsequent calls will raise yp_StopIteration.
+
+// "Sends" a value into iterator and returns a new reference to the next yielded value, 
 // yp_StopIteration if the iterator is exhausted, or another exception.  The value may be ignored
 // by the iterator.  If value is an exception this behaves like yp_throw.
-ypAPI ypObject *yp_send( ypObject **iterator, ypObject *value );
+ypAPI ypObject *yp_send( ypObject *iterator, ypObject *value );
 
 // Equivalent to yp_send( iterator, yp_None ).
-ypAPI ypObject *yp_next( ypObject **iterator );
+ypAPI ypObject *yp_next( ypObject *iterator );
 
-// Similar to yp_next, but returns a new reference to defval when the iterator is exhausted.  The
-// Python-equivalent "default" of defval is yp_StopIteration.
-ypAPI ypObject *yp_next2( ypObject **iterator, ypObject *defval );
+// Similar to yp_next, but returns a new reference to defval when the iterator is exhausted.  
+// defval _can_ be an exception; the Python-equivalent "default" of defval is yp_StopIteration.
+ypAPI ypObject *yp_next2( ypObject *iterator, ypObject *defval );
 
-// "Throws" an exception into *iterator and returns a new reference to the next yielded
-// value, yp_StopIteration if the iterator is exhausted, or another exception.  exc _must_ be an
+// "Throws" an exception into iterator and returns a new reference to the next yielded value, 
+// yp_StopIteration if the iterator is exhausted, or another exception.  exc _must_ be an 
 // exception.
-ypAPI ypObject *yp_throw( ypObject **iterator, ypObject *exc );
+ypAPI ypObject *yp_throw( ypObject *iterator, ypObject *exc );
 
 // Returns a hint as to how many items are left to be yielded.  The accuracy of this hint depends
 // on the underlying type: most containers know their lengths exactly, but some generators may not.
@@ -754,8 +762,8 @@ ypAPI void yp_delitem( ypObject **mapping, ypObject *key );
 
 // As in Python, yp_contains, yp_in, yp_not_in, and yp_iter operate solely on a mapping's keys.
 
-// Similar to yp_getitem, but returns a new reference to defval if key is not in the map.  The
-// Python-equivalent "default" for defval is yp_None.
+// Similar to yp_getitem, but returns a new reference to defval if key is not in the map.  defval
+// _can_ be an exception; the Python-equivalent "default" for defval is yp_None.
 ypAPI ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval );
 
 // Returns a new reference to an iterator that yields mapping's (key, value) pairs as 2-tuples.
@@ -765,9 +773,9 @@ ypAPI ypObject *yp_iter_items( ypObject *mapping );
 ypAPI ypObject *yp_iter_keys( ypObject *mapping );
 
 // If key is in mapping, remove it and return a new reference to its value, else return a new
-// reference to defval.  The Python-equivalent "default" of defval is yp_KeyError.  On error,
-// *mapping is discarded and set to an exception _and_ an exception is returned.  Note that yp_push
-// and yp_pop are not applicable for mapping objects.
+// reference to defval.  defval _can_ be an exception; the Python-equivalent "default" of defval is
+// yp_KeyError.  On error, *mapping is discarded and set to an exception _and_ an exception is 
+// returned.  Note that yp_push and yp_pop are not applicable for mapping objects.
 ypAPI ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
 
 // Removes an arbitrary item from *mapping and returns new references to its *key and *value.  If
@@ -776,8 +784,8 @@ ypAPI ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defva
 ypAPI void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 
 // Similar to yp_getitem, but returns a new reference to defval _and_ adds it to *mapping if key is
-// not in the map.  The Python-equivalent "default" for defval is yp_None; defval _must_ _not_ be
-// an exception.
+// not in the map.  The Python-equivalent "default" for defval is yp_None; as defval may be added
+// to the map, it cannot be an exception.
 ypAPI ypObject *yp_setdefault( ypObject *mapping, ypObject *key, ypObject *defval );
 
 // Add the given n key/value pairs (for a total of 2*n objects) to *mapping, overwriting existing
