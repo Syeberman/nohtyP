@@ -6,10 +6,6 @@ yp.py - Python wrapper for nohtyP
     License: http://docs.python.org/3/license.html
 """
 
-# FIXME temporary
-import os
-os.environ["path"] += r";D:\Perforce\p4_reality\main\nohtyP\Debug"
-
 import atexit
 atexit.register( input, "Press Enter to continue..." )
 
@@ -22,31 +18,31 @@ c_IN = 1
 c_OUT = 2
 c_INOUT = 3
 
-class yp_param_ret:
-    """Describes one parameter or return value from a function."""
-    direction = c_IN # ignored on return values
-    # default = default value to use
-    def __init__( self, name ):
-        self.name = name
-    def errcheck( self ): pass # no error checking by default
-# FIXME c_types have their own __init__ that we can't hijack...and actually that's silly anyway
-
 # Some standard C param/return types.  We subclass from ctypes' types but give the subclass the
 # same name, overriding the ctype type in this module only (ensuring the original is not modified).
 c_void = None # only valid for return values
-class c_int( c_int, yp_param_ret ):
+class c_int( c_int ):
     default = 0
 
+_yp_no_default = object( )
+class yp_param:
+    def __init__( self, type, name, direction=c_IN, default=_yp_no_default ):
+        self.type = type
+        if default is _yp_no_default:
+            self.pflag = (direction, name)
+        else:
+            self.pflag = (direction, name, default)
+
 def yp_func_errcheck( result, func, args ):
-    result.errcheck( )
-    for arg in args: arg.errcheck( )
+    getattr( result, "errcheck", int )( )
+    for arg in args: getattr( arg, "errcheck", int )( )
     return args
 
-def yp_func( retval, name, args ):
+def yp_func( retval, name, paramtuple ):
     """Defines a function in globals() that wraps the given C yp_* function."""
-    proto = CFUNCTYPE( retval, *args )
-    # TODO does x.default make every arg optional?
-    pflags = tuple( (x.direction, x.name, x.default) for x in args )
+    params = tuple( yp_param( *x ) for x in paramtuple )
+    proto = CFUNCTYPE( retval, *(x.type for x in params) )
+    pflags = tuple( x.pflag for x in params )
     func = proto( (name, ypdll), pflags )
     func.errcheck = yp_func_errcheck
     globals( )[name] = func
@@ -56,7 +52,7 @@ def yp_func( retval, name, args ):
 yp_func( c_void, "yp_initialize", () )
 
 # typedef struct _ypObject ypObject;
-class c_ypObject_p( c_void_p, yp_param_ret ):
+class c_ypObject_p( c_void_p ):
     # TODO @classmethod def from_param( cls, val ): ...
     # default set below
     def errcheck( self ): ypObject_p_errcheck( self )
@@ -69,20 +65,20 @@ c_ypObject_p_value( "yp_None" )
 c_ypObject_p.default = yp_None
 
 # ypAPI ypObject *yp_incref( ypObject *x );
-yp_func( c_ypObject_p, "yp_incref", (c_ypObject_p( "x" ), ) )
+yp_func( c_ypObject_p, "yp_incref", ((c_ypObject_p, "x"), ) )
 
 # void yp_increfN( int n, ... );
 # void yp_increfV( int n, va_list args );
 
 # void yp_decref( ypObject *x );
-yp_func( c_void, "yp_decref", (c_ypObject_p( "x" ), ) )
+yp_func( c_void, "yp_decref", ((c_ypObject_p, "x"), ) )
 
 # void yp_decrefN( int n, ... );
 # void yp_decrefV( int n, va_list args );
 
 # Disable errcheck for this to avoid an infinite recursion, as it's used by c_ypObject_p's errcheck
 # int yp_isexceptionC( ypObject *x );
-yp_func( c_int, "yp_isexceptionC", (c_ypObject_p( "x" ), ) )
+yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ) )
 del yp_isexceptionC.errcheck
 
 
@@ -113,8 +109,10 @@ c_ypObject_p_value( "yp_True" )
 c_ypObject_p_value( "yp_False" )
 
 # ypObject *yp_bool( ypObject *x );
+yp_func( c_ypObject_p, "yp_bool", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_not( ypObject *x );
+yp_func( c_ypObject_p, "yp_not", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_or( ypObject *x, ypObject *y );
 
@@ -135,6 +133,7 @@ c_ypObject_p_value( "yp_False" )
 # ypObject *yp_allV( int n, va_list args );
 
 # ypObject *yp_all( ypObject *iterable );
+yp_func( c_ypObject_p, "yp_all", ((c_ypObject_p, "iterable"), ) )
 
 # ypObject *yp_lt( ypObject *x, ypObject *y );
 # ypObject *yp_le( ypObject *x, ypObject *y );
@@ -142,48 +141,59 @@ c_ypObject_p_value( "yp_False" )
 # ypObject *yp_ne( ypObject *x, ypObject *y );
 # ypObject *yp_ge( ypObject *x, ypObject *y );
 # ypObject *yp_gt( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_lt", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
+yp_func( c_ypObject_p, "yp_le", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
+yp_func( c_ypObject_p, "yp_eq", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
+yp_func( c_ypObject_p, "yp_ne", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
+yp_func( c_ypObject_p, "yp_ge", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
+yp_func( c_ypObject_p, "yp_gt", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
+
 
 #typedef float               yp_float32_t;
-class c_yp_float32_t( c_float, yp_param_ret ):
+class c_yp_float32_t( c_float ):
     default = 0.0
 #typedef double              yp_float64_t;
-class c_yp_float64_t( c_double, yp_param_ret ):
+class c_yp_float64_t( c_double ):
     default = 0.0
 #if SIZE_MAX == 0xFFFFFFFFu
 #typedef yp_int32_t          yp_ssize_t;
 #else
 #typedef yp_int64_t          yp_ssize_t;
 #endif
-class c_yp_ssize_t( c_ssize_t, yp_param_ret ):
+class c_yp_ssize_t( c_ssize_t ):
     default = 0
 #typedef yp_ssize_t          yp_hash_t;
-class c_yp_hash_t( c_yp_ssize_t, yp_param_ret ):
+class c_yp_hash_t( c_yp_ssize_t ):
     default = -1
 
 # typedef yp_int64_t      yp_int_t;
-class c_yp_int_t( c_int64, yp_param_ret ):
+class c_yp_int_t( c_int64 ):
     default = 0
 # typedef yp_float64_t    yp_float_t;
-class c_yp_float_t( c_yp_float64_t, yp_param_ret ):
+class c_yp_float_t( c_yp_float64_t ):
     default = 0.0
 
 # typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 c_yp_generator_func_t = CFUNCTYPE( c_ypObject_p, c_ypObject_p, c_ypObject_p )
 
 # ypObject *yp_intC( yp_int_t value );
-yp_func( c_ypObject_p, "yp_intC", (yp_int_t( "value" ), ) )
+yp_func( c_ypObject_p, "yp_intC", ((c_yp_int_t, "value"), ) )
 # ypObject *yp_intstoreC( yp_int_t value );
+yp_func( c_ypObject_p, "yp_intstoreC", ((c_yp_int_t, "value"), ) )
 
 # ypObject *yp_int_strC( const char *string, int base );
 # ypObject *yp_intstore_strC( const char *string, int base );
 
 # ypObject *yp_floatC( yp_float_t value );
+yp_func( c_ypObject_p, "yp_floatC", ((c_yp_float_t, "value"), ) )
 # ypObject *yp_floatstoreC( yp_float_t value );
+yp_func( c_ypObject_p, "yp_floatstoreC", ((c_yp_float_t, "value"), ) )
 
 # ypObject *yp_float_strC( const char *string );
 # ypObject *yp_floatstore_strC( const char *string );
 
 # ypObject *yp_iter( ypObject *x );
+yp_func( c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
 # ypObject *yp_generatorCV( yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args );
@@ -223,12 +233,15 @@ yp_func( c_ypObject_p, "yp_intC", (yp_int_t( "value" ), ) )
 
 # ypObject *yp_frozensetN( int n, ... );
 # ypObject *yp_frozensetV( int n, va_list args );
+yp_func( c_ypObject_p, "yp_frozensetN", ((c_int, "n"), ) ) # FIXME
 # ypObject *yp_setN( int n, ... );
 # ypObject *yp_setV( int n, va_list args );
-yp_func( c_ypObject_p, "yp_setN", (int( "n" ), ) ) # FIXME
+yp_func( c_ypObject_p, "yp_setN", ((c_int, "n"), ) ) # FIXME
 
 # ypObject *yp_frozenset( ypObject *iterable );
+yp_func( c_ypObject_p, "yp_frozenset", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_set( ypObject *iterable );
+yp_func( c_ypObject_p, "yp_set", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_frozendictK( int n, ... );
 # ypObject *yp_frozendictKV( int n, va_list args );
@@ -241,13 +254,17 @@ yp_func( c_ypObject_p, "yp_setN", (int( "n" ), ) ) # FIXME
 # ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
 
 # ypObject *yp_frozendict( ypObject *x );
+yp_func( c_ypObject_p, "yp_frozendict", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_dict( ypObject *x );
+yp_func( c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ) )
 
 # XXX The file type will be added in a future version
+
 
 # yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
 
 # yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
+
 
 # ypObject *yp_send( ypObject **iterator, ypObject *value );
 
@@ -317,9 +334,12 @@ def pyIter2yp( iterable ):
 
 
 # ypObject *yp_contains( ypObject *container, ypObject *x );
+yp_func( c_ypObject_p, "yp_contains", ((c_ypObject_p, "container"), (c_ypObject_p, "x")) )
 # ypObject *yp_in( ypObject *x, ypObject *container );
+yp_func( c_ypObject_p, "yp_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")) )
 
 # ypObject *yp_not_in( ypObject *x, ypObject *container );
+yp_func( c_ypObject_p, "yp_not_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")) )
 
 # yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
 
@@ -331,12 +351,17 @@ def pyIter2yp( iterable ):
 
 
 # ypObject *yp_concat( ypObject *sequence, ypObject *x );
+yp_func( c_ypObject_p, "yp_concat", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_repeatC( ypObject *sequence, yp_ssize_t factor );
+yp_func( c_ypObject_p, "yp_repeatC", ((c_ypObject_p, "sequence"), (c_yp_ssize_t, "factor")) )
 
 # ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i );
+yp_func( c_ypObject_p, "yp_getindexC", ((c_ypObject_p, "sequence"), (c_yp_ssize_t, "i")) )
 
 # ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"), 
+    (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k")) )
 
 # ypObject *yp_getitem( ypObject *sequence, ypObject *key );
 
@@ -641,7 +666,7 @@ def ypObject_p_errcheck( x ):
         raise pyExc( name )
 
 # int yp_isexceptionC2( ypObject *x, ypObject *exc );
-yp_func( c_int, "yp_isexceptionC2", (c_ypObject_p( "x" ), c_ypObject_p( "exc" )) )
+yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc")) )
 
 # int yp_isexceptionCN( ypObject *x, int n, ... );
 
