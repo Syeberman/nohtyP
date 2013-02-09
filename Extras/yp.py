@@ -673,5 +673,10 @@ yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc"))
 
 # FIXME quick test
 yp_initialize( )
-yp_setN( 0 )
-yp_intC( 5 )
+yp_decref( yp_setN( 0 ) )
+yp_decref( yp_intC( 5 ) )
+
+
+# FIXME integrate this somehow with unittest
+import os
+os.system( "ypExamples.exe" )

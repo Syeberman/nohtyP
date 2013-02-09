@@ -953,6 +953,8 @@ ypAPI yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc );
 ypAPI yp_float_t yp_asfloatC( ypObject *x, ypObject **exc );
 ypAPI yp_float32_t yp_asfloat32C( ypObject *x, ypObject **exc );
 ypAPI yp_float64_t yp_asfloat64C( ypObject *x, ypObject **exc );
+ypAPI yp_ssize_t yp_asssizeC( ypObject *x, ypObject **exc );
+ypAPI yp_hash_t yp_ashashC( ypObject *x, ypObject **exc );
 ypAPI yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc );
 ypAPI yp_int_t yp_asintFL( yp_float_t x, ypObject **exc );
 
