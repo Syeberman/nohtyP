@@ -275,6 +275,9 @@ EXAMPLE( Dictionaries, SmallExample )
     ExpectEqual( yp_True, yp_in( b_guido, tel ) );
     ExpectEqual( yp_False, yp_not_in( b_jack, tel ) );
     ExpectEqual( yp_False, yp_in( i_4127, tel ) );
+
+    /* Clean-up */
+    yp_decref( tel );
 }
 
 
