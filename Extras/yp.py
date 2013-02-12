@@ -53,34 +53,47 @@ yp_func( c_void, "yp_initialize", () )
 
 # typedef struct _ypObject ypObject;
 class c_ypObject_p( c_void_p ):
-    # TODO @classmethod def from_param( cls, val ): ...
+    @classmethod
+    def from_param( cls, val ): return ypObject.frompython( val )
     # default set below
     def errcheck( self ): ypObject_p_errcheck( self )
 
 def c_ypObject_p_value( name ):
     globals( )[name] = c_ypObject_p.in_dll( ypdll, name )
 
+class c_ypObject_pp( POINTER( c_ypObject_p ) ):
+    @classmethod 
+    def from_param( cls, val ):
+        obj = c_ypObject_p.from_param( val )
+        yp_incref( obj.value )
+        return byref( obj )
+    # default set below
+    def errcheck( self ): 
+        ypObject_p_errcheck( self.value )
+        yp_decref( obj.value )
+        obj.value = yp_None.value
+
+
 # ypAPI ypObject *yp_None;
 c_ypObject_p_value( "yp_None" )
 c_ypObject_p.default = yp_None
 
 # ypAPI ypObject *yp_incref( ypObject *x );
-yp_func( c_ypObject_p, "yp_incref", ((c_ypObject_p, "x"), ) )
+yp_func( c_void_p, "yp_incref", ((c_void_p, "x"), ) )
 
 # void yp_increfN( int n, ... );
 # void yp_increfV( int n, va_list args );
 
 # void yp_decref( ypObject *x );
-yp_func( c_void, "yp_decref", ((c_ypObject_p, "x"), ) )
+yp_func( c_void, "yp_decref", ((c_void_p, "x"), ) )
 
 # void yp_decrefN( int n, ... );
 # void yp_decrefV( int n, va_list args );
 
 # Disable errcheck for this to avoid an infinite recursion, as it's used by c_ypObject_p's errcheck
 # int yp_isexceptionC( ypObject *x );
-yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ) )
+yp_func( c_int, "yp_isexceptionC", ((c_void_p, "x"), ) )
 del yp_isexceptionC.errcheck
-
 
 # void yp_freeze( ypObject **x );
 
@@ -446,6 +459,7 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 
 # void yp_push( ypObject **set, ypObject *x );
 # void yp_set_add( ypObject **set, ypObject *x );
+yp_func( c_void, "yp_set_add", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_pushuniqueE( ypObject **set, ypObject *x );
 
@@ -671,11 +685,54 @@ yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc"))
 # int yp_isexceptionCN( ypObject *x, int n, ... );
 
 
+
+class ypObject( c_ypObject_p ):
+    _yp_decref = yp_decref
+    _yp_None_value = yp_None.value
+    def __init__( self ):
+        self.value = yp_None.value
+    def __del__( self ):
+        self._yp_decref( self.value )
+        self.value = self._yp_None_value
+    _pytype2yp = {}
+    @classmethod
+    def frompython( cls, pyobj ):
+        if isinstance( pyobj, ypObject ): return pyobj
+        return cls._pytype2yp[type( pyobj )].frompython( pyobj )
+   
+    def __contains__( self, x ):
+        return yp_contains( self.value, x )
+    def add( self, x ):
+        yp_set_add( self.value, x )
+
+def pytype( pytype ):
+    def _pytype( cls ): ypObject._pytype2yp[pytype] = cls
+    return _pytype
+
+@pytype( int )
+class ypInt( ypObject ):
+    @classmethod
+    def frompython( cls, pyobj ):
+        self = cls( )
+        self.value = yp_intC( pyobj ).value
+        return self
+
+@pytype( set )
+class ypSet( ypObject ):
+    @classmethod
+    def frompython( cls, pyobj ):
+        self = cls( )
+        self.value = yp_setN( 0 ).value
+        for x in pyobj: self.add( x )
+        return self
+
+
+
 # FIXME quick test
 yp_initialize( )
-yp_decref( yp_setN( 0 ) )
-yp_decref( yp_intC( 5 ) )
-
+so = ypObject.frompython( set( ) )
+so.add( 5 )
+assert 5 in so
 
 # FIXME integrate this somehow with unittest
 import os
