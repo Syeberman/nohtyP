@@ -5112,6 +5112,10 @@ void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
     _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, (*set, x) );
 }
 
+ypAPI void yp_set_add( ypObject **set, ypObject *x ) {
+    _yp_INPLACE1( set, tp_push, (*set, x) );
+}
+
 ypObject *yp_pushuniqueE( ypObject *set, ypObject *x ) {
     _yp_REDIRECT2( set, tp_as_set, tp_pushunique, (set, x) );
 }
