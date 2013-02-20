@@ -34,8 +34,8 @@ class yp_param:
             self.pflag = (direction, name, default)
 
 def yp_func_errcheck( result, func, args ):
-    getattr( result, "errcheck", int )( )
-    for arg in args: getattr( arg, "errcheck", int )( )
+    getattr( result, "_yp_errcheck", int )( )
+    for arg in args: getattr( arg, "_yp_errcheck", int )( )
     return args
 
 def yp_func( retval, name, paramtuple ):
@@ -45,7 +45,7 @@ def yp_func( retval, name, paramtuple ):
     pflags = tuple( x.pflag for x in params )
     func = proto( (name, ypdll), pflags )
     func.errcheck = yp_func_errcheck
-    globals( )[name] = func
+    globals( )["_"+name] = func
 
 
 # ypAPI void yp_initialize( void );
@@ -56,7 +56,7 @@ class c_ypObject_p( c_void_p ):
     @classmethod
     def from_param( cls, val ): return ypObject.frompython( val )
     # default set below
-    def errcheck( self ): ypObject_p_errcheck( self )
+    def _yp_errcheck( self ): ypObject_p_errcheck( self )
 
 def c_ypObject_p_value( name ):
     globals( )[name] = c_ypObject_p.in_dll( ypdll, name )
@@ -65,12 +65,12 @@ class c_ypObject_pp( POINTER( c_ypObject_p ) ):
     @classmethod 
     def from_param( cls, val ):
         obj = c_ypObject_p.from_param( val )
-        yp_incref( obj.value )
+        _yp_incref( obj.value )
         return byref( obj )
     # default set below
-    def errcheck( self ): 
+    def _yp_errcheck( self ): 
         ypObject_p_errcheck( self.value )
-        yp_decref( obj.value )
+        _yp_decref( obj.value )
         obj.value = yp_None.value
 
 
@@ -93,7 +93,7 @@ yp_func( c_void, "yp_decref", ((c_void_p, "x"), ) )
 # Disable errcheck for this to avoid an infinite recursion, as it's used by c_ypObject_p's errcheck
 # int yp_isexceptionC( ypObject *x );
 yp_func( c_int, "yp_isexceptionC", ((c_void_p, "x"), ) )
-del yp_isexceptionC.errcheck
+del _yp_isexceptionC.errcheck
 
 # void yp_freeze( ypObject **x );
 
@@ -187,6 +187,7 @@ class c_yp_float_t( c_yp_float64_t ):
     default = 0.0
 
 # typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
+# TODO Make this a decorator
 c_yp_generator_func_t = CFUNCTYPE( c_ypObject_p, c_ypObject_p, c_ypObject_p )
 
 # ypObject *yp_intC( yp_int_t value );
@@ -215,6 +216,9 @@ yp_func( c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ) )
 #         void *state, yp_ssize_t size, int n, ... );
 # ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint,
 #         void *state, yp_ssize_t size, int n, va_list args );
+yp_func( c_ypObject_p, "yp_generator_fromstructCN", 
+        ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"), 
+            (c_void_p, "state"), (c_yp_ssize_t, "size"), (c_int, "n", 0)) )
 
 # ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
 # ypObject *yp_rangeC( yp_int_t stop );
@@ -318,32 +322,6 @@ yp_func( c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_zipN( int n, ... );
 # ypObject *yp_zipV( int n, va_list args );
-
-
-# Converts Python iterators to nohtyP iterators
-# TODO rename/move in the file?
-
-class _pyIter2yp_struct( Structure ):
-    _fields_ = (("pyiter", py_object), )
-_pyIter2yp_struct_p = POINTER( _pyIter2yp_struct )
-def _pyIter2yp_generator_func( self, value ):
-    try:
-        if yp_isexceptionC( value ): return value # yp_GeneratorExit, in particular
-        state, size = yp_iter_stateX( self )
-        state = cast( state, _pyIter2yp_struct_p )
-        return state.pyiter.next( )
-    except BaseException as e:
-        return pyExc2yp[type( e )]
-_pyIter2yp_generator = c_yp_generator_func_t( _pyIter2yp_generator_func )
-def pyIter2yp( iterable ):
-    try: lenhint = len( iterable )
-    except: lenhint = 0 # TODO try Python's lenhint?
-    pyiter = iter( iterable )
-    state = _pyIter2yp_struct( pyiter )
-    ypiter = yp_generator_fromstructCN( _pyIter2yp_generator, lenhint,
-            byref( state ), sizeof( state ), 0 )
-    ypiter._pyiter = pyiter # ensure ypiter maintains a reference to pyiter for it's lifetime
-    return ypiter
 
 
 # ypObject *yp_contains( ypObject *container, ypObject *x );
@@ -625,13 +603,13 @@ yp_func( c_void, "yp_set_add", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 # ypObject *yp_sum( ypObject *iterable );
 
 
-ypExc2py = {}
-pyExc2yp = {}
+_ypExc2py = {}
+_pyExc2yp = {}
 def ypObject_p_exception( name, pyExc ):
     ypExc = c_ypObject_p.in_dll( ypdll, name )
-    ypExc2py[ypExc.value] = (name, pyExc)
-    pyExc2yp[pyExc] = ypExc
-    globals( )[name] = ypExc
+    _ypExc2py[ypExc.value] = (name, pyExc)
+    _pyExc2yp[pyExc] = ypExc
+    globals( )["_"+name] = ypExc
 
 ypObject_p_exception( "yp_BaseException", BaseException )
 ypObject_p_exception( "yp_Exception", Exception )
@@ -675,8 +653,8 @@ ypObject_p_exception( "yp_InvalidatedError", TypeError )
 
 def ypObject_p_errcheck( x ):
     """Raises the appropriate Python exception if x is a nohtyP exception"""
-    if yp_isexceptionC( x ):
-        name, pyExc = ypExc2py[x.value]
+    if _yp_isexceptionC( x ):
+        name, pyExc = _ypExc2py[x.value]
         raise pyExc( name )
 
 # int yp_isexceptionC2( ypObject *x, ypObject *exc );
@@ -685,20 +663,28 @@ yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc"))
 # int yp_isexceptionCN( ypObject *x, int n, ... );
 
 
-
 class ypObject( c_ypObject_p ):
-    _yp_decref = yp_decref
+    _yp_decref = _yp_decref
     _yp_None_value = yp_None.value
     def __init__( self ):
-        self.value = yp_None.value
+        raise NotImplementedError( "can't instantiate ypObject directly" )
     def __del__( self ):
         self._yp_decref( self.value )
         self.value = self._yp_None_value
     _pytype2yp = {}
     @classmethod
     def frompython( cls, pyobj ):
+        """ypObject.frompython is a factory that returns the correct yp_* object based on the type
+        of pyobj.  All other .frompython class methods always return that exact type.
+        """
         if isinstance( pyobj, ypObject ): return pyobj
-        return cls._pytype2yp[type( pyobj )].frompython( pyobj )
+        if cls is ypObject: cls = cls._pytype2yp[type( pyobj )]
+        return cls._frompython( pyobj )
+    @classmethod
+    def _frompython( cls, pyobj ):
+        """Default implementation for cls.frompython, which simply calls the constructor."""
+        # TODO if every class uses the default _frompython, then remove it, it's not needed
+        return cls( pyobj )
    
     def __contains__( self, x ):
         return yp_contains( self.value, x )
@@ -706,34 +692,63 @@ class ypObject( c_ypObject_p ):
         yp_set_add( self.value, x )
 
 def pytype( pytype ):
-    def _pytype( cls ): ypObject._pytype2yp[pytype] = cls
+    def _pytype( cls ):
+        ypObject._pytype2yp[pytype] = cls
+        return cls
     return _pytype
 
+class yp_iter( ypObject ):
+    def _pygenerator_func( self, yp_self, yp_value ):
+        try:
+            if _yp_isexceptionC( yp_value ): return yp_value # yp_GeneratorExit, in particular
+            return ypObject.frompython( self.pyiter.next( ) )
+        except BaseException as e:
+            return _pyExc2yp[type( e )]
+
+    _no_sentinel = object( )
+    def __init__( self, object, sentinel=_no_sentinel ):
+        if sentinel is not yp_iter._no_sentinel: object = iter( object, sentinel )
+        if isinstance( object, ypObject ):
+        	self.value = _yp_iter( object.value ).value
+        	return
+
+        try: lenhint = len( object )
+        except: lenhint = 0 # TODO try Python's lenhint?
+        self.pyiter = iter( object )
+        self.value = _yp_generator_fromstructCN( 
+                c_yp_generator_func_t( self._pygenerator_func ), lenhint, 0, 0, 0 ).value
+
+def yp_iterable( iterable ):
+    """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a 
+    yp_iter based on iterable."""
+    if isinstance( iterable, ypObject ): return iterable
+    return yp_iter( iterable )
+
 @pytype( int )
-class ypInt( ypObject ):
-    @classmethod
-    def frompython( cls, pyobj ):
-        self = cls( )
-        self.value = yp_intC( pyobj ).value
-        return self
+class yp_int( ypObject ):
+    def __init__( self, x=0, base=None ):
+        if base is None:
+            try: self.value = _yp_intC( x ).value # TODO can I get rid of .value?
+            except TypeError: pass
+            else: return
+            base = 10
+        self.value = _yp_int_strC( x, base ).value
 
 @pytype( set )
-class ypSet( ypObject ):
-    @classmethod
-    def frompython( cls, pyobj ):
-        self = cls( )
-        self.value = yp_setN( 0 ).value
-        for x in pyobj: self.add( x )
-        return self
+class yp_set( ypObject ):
+    def __init__( cls, iterable=iter( () ) ):
+        iterable = yp_iterable( iterable )
+        self.value = _yp_set( iterable.value ).value
 
 
 
 # FIXME quick test
-yp_initialize( )
-so = ypObject.frompython( set( ) )
+_yp_initialize( )
+so = yp_set( )
 so.add( 5 )
 assert 5 in so
 
 # FIXME integrate this somehow with unittest
 import os
 os.system( "ypExamples.exe" )
+
