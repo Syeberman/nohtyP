@@ -298,6 +298,7 @@ ypAPI ypObject *yp_intstoreC( yp_int_t value );
 
 // Returns a new reference to an int/intstore interpreting the C string as an integer literal with
 // the given base.  Base zero means to infer the base according to Python's syntax.
+// FIXME this is called "str" but how are we interpreting string?  as bytes, or unicode?
 ypAPI ypObject *yp_int_strC( const char *string, int base );
 ypAPI ypObject *yp_intstore_strC( const char *string, int base );
 
