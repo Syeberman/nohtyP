@@ -10,6 +10,7 @@ import atexit
 atexit.register( input, "Press Enter to continue..." )
 
 from ctypes import *
+import sys
 
 ypdll = cdll.nohtyP
 
@@ -54,29 +55,33 @@ yp_func( c_void, "yp_initialize", () )
 # typedef struct _ypObject ypObject;
 class c_ypObject_p( c_void_p ):
     @classmethod
-    def from_param( cls, val ): return ypObject.frompython( val )
+    def from_param( cls, val ):
+        if isinstance( val, c_ypObject_p ): return val
+        return ypObject.frompython( val )
     # default set below
     def _yp_errcheck( self ): ypObject_p_errcheck( self )
 
 def c_ypObject_p_value( name ):
-    globals( )[name] = c_ypObject_p.in_dll( ypdll, name )
+    globals( )["_"+name] = c_ypObject_p.in_dll( ypdll, name )
 
 class c_ypObject_pp( POINTER( c_ypObject_p ) ):
     @classmethod 
     def from_param( cls, val ):
         obj = c_ypObject_p.from_param( val )
-        _yp_incref( obj.value )
+        _yp_incref( obj )
         return byref( obj )
     # default set below
     def _yp_errcheck( self ): 
-        ypObject_p_errcheck( self.value )
-        _yp_decref( obj.value )
-        obj.value = yp_None.value
+        ypObject_p_errcheck( self )
+    def __del__( self ):
+        _yp_decref( self )
+        self.value = _yp_None.value
+        super( ).__del__( self )
 
 
 # ypAPI ypObject *yp_None;
 c_ypObject_p_value( "yp_None" )
-c_ypObject_p.default = yp_None
+c_ypObject_p.default = _yp_None
 
 # ypAPI ypObject *yp_incref( ypObject *x );
 yp_func( c_void_p, "yp_incref", ((c_void_p, "x"), ) )
@@ -187,8 +192,9 @@ class c_yp_float_t( c_yp_float64_t ):
     default = 0.0
 
 # typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
-# TODO Make this a decorator
-c_yp_generator_func_t = CFUNCTYPE( c_ypObject_p, c_ypObject_p, c_ypObject_p )
+# XXX The return value needs to be a c_void_p to prevent addresses-as-ints from being converted to
+# a yp_int
+c_yp_generator_func_t = CFUNCTYPE( c_void_p, c_ypObject_p, c_ypObject_p )
 
 # ypObject *yp_intC( yp_int_t value );
 yp_func( c_ypObject_p, "yp_intC", ((c_yp_int_t, "value"), ) )
@@ -664,13 +670,14 @@ yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc"))
 
 
 class ypObject( c_ypObject_p ):
-    _yp_decref = _yp_decref
-    _yp_None_value = yp_None.value
     def __init__( self ):
         raise NotImplementedError( "can't instantiate ypObject directly" )
     def __del__( self ):
-        self._yp_decref( self.value )
-        self.value = self._yp_None_value
+        # FIXME It seems that _yp_decref and _yp_None gets set to None when Python is closing
+        try: _yp_decref( self )
+        except: pass
+        try: self.value = _yp_None.value
+        except: self.value = 0
     _pytype2yp = {}
     @classmethod
     def frompython( cls, pyobj ):
@@ -686,10 +693,9 @@ class ypObject( c_ypObject_p ):
         # TODO if every class uses the default _frompython, then remove it, it's not needed
         return cls( pyobj )
    
-    def __contains__( self, x ):
-        return yp_contains( self.value, x )
-    def add( self, x ):
-        yp_set_add( self.value, x )
+    def __contains__( self, x ): return yp_bool( _yp_contains( self, x ) )
+# TODO will this work if _yp_bool returns an exception?
+    def __bool__( self ): return bool( yp_bool( self ) )
 
 def pytype( pytype ):
     def _pytype( cls ):
@@ -697,26 +703,52 @@ def pytype( pytype ):
         return cls
     return _pytype
 
+@pytype( bool )
+class yp_bool( ypObject ):
+    def __new__( cls, x=_yp_False, *, _value=None ):
+        """_value is for internal use only."""
+        if _value is not None:
+            self = super( ).__new__( cls )
+            self.value = _value
+            return self
+        elif isinstance( x, c_ypObject_p ):
+            x = _yp_bool( x )
+            if x.value == _yp_True.value: return yp_True
+            if x.value == _yp_False.value: return yp_False
+            raise TypeError( "unexpected return from _yp_bool %r" % x )
+        else:
+        	return yp_True if x else yp_False
+    def __init__( self, *args, **kwargs ):
+        """For internal use only."""
+        pass
+    def __bool__( self ): return self.value == _yp_True.value
+yp_True = yp_bool( _value=_yp_True.value )
+yp_False = yp_bool( _value=_yp_False.value )
+
 class yp_iter( ypObject ):
     def _pygenerator_func( self, yp_self, yp_value ):
         try:
-            if _yp_isexceptionC( yp_value ): return yp_value # yp_GeneratorExit, in particular
-            return ypObject.frompython( self.pyiter.next( ) )
+            if _yp_isexceptionC( yp_value ):
+            	result = yp_value # yp_GeneratorExit, in particular
+            else:
+                result = ypObject.frompython( next( self.pyiter ) )
         except BaseException as e:
-            return _pyExc2yp[type( e )]
+            result = _pyExc2yp[type( e )]
+        # If we just try to return result here, ctypes gets confused (TODO bug?)
+        return result.value
 
     _no_sentinel = object( )
     def __init__( self, object, sentinel=_no_sentinel ):
         if sentinel is not yp_iter._no_sentinel: object = iter( object, sentinel )
         if isinstance( object, ypObject ):
-        	self.value = _yp_iter( object.value ).value
+        	self.value = _yp_iter( object ).value
         	return
 
         try: lenhint = len( object )
         except: lenhint = 0 # TODO try Python's lenhint?
         self.pyiter = iter( object )
-        self.value = _yp_generator_fromstructCN( 
-                c_yp_generator_func_t( self._pygenerator_func ), lenhint, 0, 0, 0 ).value
+        self.pycallback = c_yp_generator_func_t( self._pygenerator_func )
+        self.value = _yp_generator_fromstructCN( self.pycallback, lenhint, 0, 0, 0 ).value
 
 def yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a 
@@ -736,9 +768,11 @@ class yp_int( ypObject ):
 
 @pytype( set )
 class yp_set( ypObject ):
-    def __init__( cls, iterable=iter( () ) ):
+    def __init__( self, iterable=iter( () ) ):
         iterable = yp_iterable( iterable )
-        self.value = _yp_set( iterable.value ).value
+        self.value = _yp_set( iterable ).value
+
+    def add( self, x ): _yp_set_add( self, x )
 
 
 
@@ -747,6 +781,9 @@ _yp_initialize( )
 so = yp_set( )
 so.add( 5 )
 assert 5 in so
+assert 50 not in so
+
+#_yp_set_add( yp_int( 5 ), 5 )
 
 # FIXME integrate this somehow with unittest
 import os
