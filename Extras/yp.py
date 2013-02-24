@@ -19,11 +19,8 @@ c_IN = 1
 c_OUT = 2
 c_INOUT = 3
 
-# Some standard C param/return types.  We subclass from ctypes' types but give the subclass the
-# same name, overriding the ctype type in this module only (ensuring the original is not modified).
+# Some standard C param/return types
 c_void = None # only valid for return values
-class c_int( c_int ):
-    default = 0
 
 _yp_no_default = object( )
 class yp_param:
@@ -35,22 +32,28 @@ class yp_param:
             self.pflag = (direction, name, default)
 
 def yp_func_errcheck( result, func, args ):
+    print( "errcheck for %r" % func.__name__ )
+    print( "    %r %r" % (result, args) )
     getattr( result, "_yp_errcheck", int )( )
     for arg in args: getattr( arg, "_yp_errcheck", int )( )
     return args
 
-def yp_func( retval, name, paramtuple ):
+def yp_func( retval, name, paramtuple, errcheck=True ):
     """Defines a function in globals() that wraps the given C yp_* function."""
     params = tuple( yp_param( *x ) for x in paramtuple )
     proto = CFUNCTYPE( retval, *(x.type for x in params) )
     pflags = tuple( x.pflag for x in params )
     func = proto( (name, ypdll), pflags )
-    func.errcheck = yp_func_errcheck
+    func.__name__ = "_"+name
+    # FIXME the resulting args argument in errcheck is made up of the _original_ arguments passed
+    # to the function; it does not store the converted c_ypObject_pp, for example, which kills our
+    # ability to trap _yp_set_add exceptions.
+    if errcheck: func.errcheck = yp_func_errcheck
     globals( )["_"+name] = func
 
 
 # ypAPI void yp_initialize( void );
-yp_func( c_void, "yp_initialize", () )
+yp_func( c_void, "yp_initialize", (), errcheck=False )
 
 # typedef struct _ypObject ypObject;
 class c_ypObject_p( c_void_p ):
@@ -58,47 +61,50 @@ class c_ypObject_p( c_void_p ):
     def from_param( cls, val ):
         if isinstance( val, c_ypObject_p ): return val
         return ypObject.frompython( val )
-    # default set below
-    def _yp_errcheck( self ): ypObject_p_errcheck( self )
+    def _yp_errcheck( self ): 
+        print( "    Checking %r 0x%08X" % (self, self.value) )
+        ypObject_p_errcheck( self )
 
 def c_ypObject_p_value( name ):
     globals( )["_"+name] = c_ypObject_p.in_dll( ypdll, name )
 
-class c_ypObject_pp( POINTER( c_ypObject_p ) ):
+class c_ypObject_pp( c_ypObject_p*1 ):
+    def __init__( self, *args, **kwargs ):
+        super( ).__init__( *args, **kwargs )
+        _yp_incref( self[0] )
     @classmethod 
     def from_param( cls, val ):
-        obj = c_ypObject_p.from_param( val )
-        _yp_incref( obj )
-        return byref( obj )
-    # default set below
+        if isinstance( val, c_ypObject_pp ): return val
+        obj = cls( c_ypObject_p.from_param( val ) )
+        print( "Converted %r to %r" % (val, obj) )
+        return obj
     def _yp_errcheck( self ): 
-        ypObject_p_errcheck( self )
+        print( "    Checking %r 0x%08X" % (self, self[0].value) )
+        ypObject_p_errcheck( self[0] )
     def __del__( self ):
-        _yp_decref( self )
-        self.value = _yp_None.value
-        super( ).__del__( self )
+        _yp_decref( self[0] )
+        self[0] = _yp_None
+        #super( ).__del__( self ) # no __del__ method?!
 
 
 # ypAPI ypObject *yp_None;
 c_ypObject_p_value( "yp_None" )
-c_ypObject_p.default = _yp_None
 
 # ypAPI ypObject *yp_incref( ypObject *x );
-yp_func( c_void_p, "yp_incref", ((c_void_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_increfN( int n, ... );
 # void yp_increfV( int n, va_list args );
 
 # void yp_decref( ypObject *x );
-yp_func( c_void, "yp_decref", ((c_void_p, "x"), ) )
+yp_func( c_void, "yp_decref", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_decrefN( int n, ... );
 # void yp_decrefV( int n, va_list args );
 
 # Disable errcheck for this to avoid an infinite recursion, as it's used by c_ypObject_p's errcheck
 # int yp_isexceptionC( ypObject *x );
-yp_func( c_int, "yp_isexceptionC", ((c_void_p, "x"), ) )
-del _yp_isexceptionC.errcheck
+yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_freeze( ypObject **x );
 
@@ -168,28 +174,22 @@ yp_func( c_ypObject_p, "yp_gt", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 
 
 #typedef float               yp_float32_t;
-class c_yp_float32_t( c_float ):
-    default = 0.0
+class c_yp_float32_t( c_float ): pass
 #typedef double              yp_float64_t;
-class c_yp_float64_t( c_double ):
-    default = 0.0
+class c_yp_float64_t( c_double ): pass
 #if SIZE_MAX == 0xFFFFFFFFu
 #typedef yp_int32_t          yp_ssize_t;
 #else
 #typedef yp_int64_t          yp_ssize_t;
 #endif
-class c_yp_ssize_t( c_ssize_t ):
-    default = 0
+class c_yp_ssize_t( c_ssize_t ): pass
 #typedef yp_ssize_t          yp_hash_t;
-class c_yp_hash_t( c_yp_ssize_t ):
-    default = -1
+class c_yp_hash_t( c_yp_ssize_t ): pass
 
 # typedef yp_int64_t      yp_int_t;
-class c_yp_int_t( c_int64 ):
-    default = 0
+class c_yp_int_t( c_int64 ): pass
 # typedef yp_float64_t    yp_float_t;
-class c_yp_float_t( c_yp_float64_t ):
-    default = 0.0
+class c_yp_float_t( c_yp_float64_t ): pass
 
 # typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 # XXX The return value needs to be a c_void_p to prevent addresses-as-ints from being converted to
@@ -768,7 +768,7 @@ class yp_int( ypObject ):
 
 @pytype( set )
 class yp_set( ypObject ):
-    def __init__( self, iterable=iter( () ) ):
+    def __init__( self, iterable=iter( () ) ): # TODO default to a yp_iter
         iterable = yp_iterable( iterable )
         self.value = _yp_set( iterable ).value
 
@@ -776,16 +776,25 @@ class yp_set( ypObject ):
 
 
 
-# FIXME quick test
 _yp_initialize( )
+
+# FIXME quick test
+"""
 so = yp_set( )
 so.add( 5 )
 assert 5 in so
 assert 50 not in so
+"""
 
-#_yp_set_add( yp_int( 5 ), 5 )
+#import pdb; pdb.set_trace()
+try: _yp_set_add( yp_int( 5 ), 5 )
+except AttributeError: pass
+except: raise AssertionError( "should have raised AttributeError" )
+else: raise AssertionError( "should have failed" )
+
+del so # FIXME how can we ensure so gets cleaned up at the end, before ctypes?
 
 # FIXME integrate this somehow with unittest
-import os
-os.system( "ypExamples.exe" )
+#import os
+#os.system( "ypExamples.exe" )
 
