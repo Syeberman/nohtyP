@@ -5198,7 +5198,7 @@ void yp_initialize( void )
 {
 #ifdef _MSC_VER
     // TODO memory leak detection that should only be enabled for debug builds
-    _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
+    _CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 
     yp_malloc = _default_yp_malloc;
@@ -5218,4 +5218,3 @@ void yp_initialize( void )
     // will be this size, as int/float, when they become small objects, will only allocate a
     // fraction of this.)
 }
-
