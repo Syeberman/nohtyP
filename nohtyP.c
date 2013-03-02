@@ -4205,7 +4205,7 @@ void yp_set_add( ypObject **set, ypObject *x )
 {
     ypObject *result;
     if( ypObject_TYPE_CODE( *set ) != ypSet_CODE ) return_yp_INPLACE_BAD_TYPE( set, *set );
-    result = set_add( *set, x );
+    result = set_push( *set, x );
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( set, result );
 }
 
