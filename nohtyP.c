@@ -4199,7 +4199,19 @@ static ypTypeObject ypSet_Type = {
 };
 
 
+// Public functions
+
+void yp_set_add( ypObject **set, ypObject *x )
+{
+    ypObject *result;
+    if( ypObject_TYPE_CODE( *set ) != ypSet_CODE ) return_yp_INPLACE_BAD_TYPE( set, *set );
+    result = set_add( *set, x );
+    if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( set, result );
+}
+
+
 // Constructors
+
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
 static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable )
 {
@@ -5110,10 +5122,6 @@ void yp_difference_updateV( ypObject **set, int n, va_list args ) {
 
 void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
     _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, (*set, x) );
-}
-
-ypAPI void yp_set_add( ypObject **set, ypObject *x ) {
-    _yp_INPLACE1( set, tp_push, (*set, x) );
 }
 
 ypObject *yp_pushuniqueE( ypObject *set, ypObject *x ) {
