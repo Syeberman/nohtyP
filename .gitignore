@@ -5,7 +5,9 @@
 *.exe
 *.o
 *.so
-
+*.pyc
+*.pyo
+__pycache__/
 
 # Local Visual Studio files
 *.vcxproj.user
