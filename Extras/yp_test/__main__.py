@@ -1,4 +1,4 @@
-from test import regrtest, support
+from yp_test import regrtest, support
 
 
 TEMPDIR, TESTCWD = regrtest._make_temp_dir_for_build(regrtest.TEMPDIR)
