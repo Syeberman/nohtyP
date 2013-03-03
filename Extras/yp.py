@@ -24,32 +24,39 @@ c_void = None # only valid for return values
 
 _yp_no_default = object( )
 class yp_param:
-    def __init__( self, type, name, direction=c_IN, default=_yp_no_default ):
+    def __init__( self, type, name, default=_yp_no_default, direction=c_IN ):
         self.type = type
         if default is _yp_no_default:
             self.pflag = (direction, name)
         else:
             self.pflag = (direction, name, default)
+    def preconvert( self, x ):
+        if issubclass( self.type, (c_ypObject_p, c_ypObject_pp) ):
+            return self.type.from_param( x )
+        else:
+            return x
 
 def yp_func_errcheck( result, func, args ):
-    print( "errcheck for %r" % func.__name__ )
-    print( "    %r %r" % (result, args) )
     getattr( result, "_yp_errcheck", int )( )
     for arg in args: getattr( arg, "_yp_errcheck", int )( )
     return args
 
 def yp_func( retval, name, paramtuple, errcheck=True ):
     """Defines a function in globals() that wraps the given C yp_* function."""
+    # Gather all the information that ctypes needs
     params = tuple( yp_param( *x ) for x in paramtuple )
     proto = CFUNCTYPE( retval, *(x.type for x in params) )
-    pflags = tuple( x.pflag for x in params )
-    func = proto( (name, ypdll), pflags )
-    func.__name__ = "_"+name
-    # FIXME the resulting args argument in errcheck is made up of the _original_ arguments passed
-    # to the function; it does not store the converted c_ypObject_pp, for example, which kills our
-    # ability to trap _yp_set_add exceptions.
-    if errcheck: func.errcheck = yp_func_errcheck
-    globals( )["_"+name] = func
+    c_func = proto( (name, ypdll), tuple( x.pflag for x in params ) )
+    c_func._yp_name = "_"+name
+    if errcheck: c_func.errcheck = yp_func_errcheck
+
+    # Create a wrapper function to convert arguments and check for errors (because the way ctypes
+    # does it doesn't work well for us...yp_func_errcheck needs the objects _after_ from_param)
+    def c_func_wrapper( *args ):
+        args = tuple( params[i].preconvert( x ) for (i, x) in enumerate( args ) )
+        return c_func( *args ) # let c_func.errcheck check for errors
+    c_func_wrapper.__name__ = c_func._yp_name
+    globals( )[c_func._yp_name] = c_func_wrapper
 
 
 # ypAPI void yp_initialize( void );
@@ -61,8 +68,7 @@ class c_ypObject_p( c_void_p ):
     def from_param( cls, val ):
         if isinstance( val, c_ypObject_p ): return val
         return ypObject.frompython( val )
-    def _yp_errcheck( self ): 
-        print( "    Checking %r 0x%08X" % (self, self.value) )
+    def _yp_errcheck( self ):
         ypObject_p_errcheck( self )
 
 def c_ypObject_p_value( name ):
@@ -72,14 +78,12 @@ class c_ypObject_pp( c_ypObject_p*1 ):
     def __init__( self, *args, **kwargs ):
         super( ).__init__( *args, **kwargs )
         _yp_incref( self[0] )
-    @classmethod 
+    @classmethod
     def from_param( cls, val ):
         if isinstance( val, c_ypObject_pp ): return val
         obj = cls( c_ypObject_p.from_param( val ) )
-        print( "Converted %r to %r" % (val, obj) )
         return obj
-    def _yp_errcheck( self ): 
-        print( "    Checking %r 0x%08X" % (self, self[0].value) )
+    def _yp_errcheck( self ):
         ypObject_p_errcheck( self[0] )
     def __del__( self ):
         _yp_decref( self[0] )
@@ -222,8 +226,8 @@ yp_func( c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ) )
 #         void *state, yp_ssize_t size, int n, ... );
 # ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint,
 #         void *state, yp_ssize_t size, int n, va_list args );
-yp_func( c_ypObject_p, "yp_generator_fromstructCN", 
-        ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"), 
+yp_func( c_ypObject_p, "yp_generator_fromstructCN",
+        ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"),
             (c_void_p, "state"), (c_yp_ssize_t, "size"), (c_int, "n", 0)) )
 
 # ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
@@ -357,7 +361,7 @@ yp_func( c_ypObject_p, "yp_repeatC", ((c_ypObject_p, "sequence"), (c_yp_ssize_t,
 yp_func( c_ypObject_p, "yp_getindexC", ((c_ypObject_p, "sequence"), (c_yp_ssize_t, "i")) )
 
 # ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
-yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"), 
+yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k")) )
 
 # ypObject *yp_getitem( ypObject *sequence, ypObject *key );
@@ -692,7 +696,7 @@ class ypObject( c_ypObject_p ):
         """Default implementation for cls.frompython, which simply calls the constructor."""
         # TODO if every class uses the default _frompython, then remove it, it's not needed
         return cls( pyobj )
-   
+
     def __contains__( self, x ): return yp_bool( _yp_contains( self, x ) )
 # TODO will this work if _yp_bool returns an exception?
     def __bool__( self ): return bool( yp_bool( self ) )
@@ -717,7 +721,7 @@ class yp_bool( ypObject ):
             if x.value == _yp_False.value: return yp_False
             raise TypeError( "unexpected return from _yp_bool %r" % x )
         else:
-        	return yp_True if x else yp_False
+            return yp_True if x else yp_False
     def __init__( self, *args, **kwargs ):
         """For internal use only."""
         pass
@@ -729,7 +733,7 @@ class yp_iter( ypObject ):
     def _pygenerator_func( self, yp_self, yp_value ):
         try:
             if _yp_isexceptionC( yp_value ):
-            	result = yp_value # yp_GeneratorExit, in particular
+                result = yp_value # yp_GeneratorExit, in particular
             else:
                 result = ypObject.frompython( next( self.pyiter ) )
         except BaseException as e:
@@ -741,8 +745,8 @@ class yp_iter( ypObject ):
     def __init__( self, object, sentinel=_no_sentinel ):
         if sentinel is not yp_iter._no_sentinel: object = iter( object, sentinel )
         if isinstance( object, ypObject ):
-        	self.value = _yp_iter( object ).value
-        	return
+            self.value = _yp_iter( object ).value
+            return
 
         try: lenhint = len( object )
         except: lenhint = 0 # TODO try Python's lenhint?
@@ -751,7 +755,7 @@ class yp_iter( ypObject ):
         self.value = _yp_generator_fromstructCN( self.pycallback, lenhint, 0, 0, 0 ).value
 
 def yp_iterable( iterable ):
-    """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a 
+    """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
     if isinstance( iterable, ypObject ): return iterable
     return yp_iter( iterable )
@@ -778,18 +782,15 @@ class yp_set( ypObject ):
 
 _yp_initialize( )
 
-# FIXME quick test
-"""
 so = yp_set( )
 so.add( 5 )
 assert 5 in so
 assert 50 not in so
-"""
 
 #import pdb; pdb.set_trace()
 try: _yp_set_add( yp_int( 5 ), 5 )
-except AttributeError: pass
-except: raise AssertionError( "should have raised AttributeError" )
+except TypeError: pass
+except: raise AssertionError( "should have raised TypeError" )
 else: raise AssertionError( "should have failed" )
 
 del so # FIXME how can we ensure so gets cleaned up at the end, before ctypes?
