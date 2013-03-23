@@ -2,11 +2,12 @@
 Tests common to list and UserList.UserList
 """
 
+from yp import *
 import sys
 import os
 from functools import cmp_to_key
 
-from test import support, seq_tests
+from yp_test import support, seq_tests
 
 
 class CommonTest(seq_tests.CommonTest):

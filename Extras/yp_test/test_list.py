@@ -1,5 +1,6 @@
+from yp import *
 import sys
-from test import support, list_tests
+from yp_test import support, list_tests
 import pickle
 
 class ListTest(list_tests.CommonTest):

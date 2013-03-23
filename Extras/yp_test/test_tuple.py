@@ -1,4 +1,5 @@
-from test import support, seq_tests
+from yp import *
+from yp_test import support, seq_tests
 
 import gc
 import pickle

@@ -41,8 +41,9 @@ enumerate(iter('abc')).
 
 """
 
+from yp import *
 import unittest
-from test import support
+from yp_test import support
 from itertools import repeat
 from collections import deque
 from builtins import len as _len
