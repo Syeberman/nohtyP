@@ -5,6 +5,7 @@ See tabulate() for output format.
 
 """
 
+from yp import *
 import sys
 import time
 import random

@@ -1,7 +1,8 @@
-from test.support import verbose, TestFailed
+from yp import *
+from yp_test.support import verbose, TestFailed
 import locale
 import sys
-import test.support as support
+import yp_test.support as support
 import unittest
 
 maxsize = support.MAX_Py_ssize_t
