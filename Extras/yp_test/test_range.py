@@ -613,7 +613,7 @@ class RangeTest(unittest.TestCase):
             del rangeobj.step
 
 def test_main():
-    test.support.run_unittest(RangeTest)
+    yp_test.support.run_unittest(RangeTest)
 
 if __name__ == "__main__":
     test_main()
