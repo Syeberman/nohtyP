@@ -1,6 +1,7 @@
 # Tests that work for both bytes and buffer objects.
 # See PEP 3137.
 
+from yp import *
 import struct
 import sys
 

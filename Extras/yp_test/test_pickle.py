@@ -1,15 +1,16 @@
+from yp import *
 import pickle
 import io
 import collections
 
-from test import support
+from yp_test import support
 
-from test.pickletester import AbstractPickleTests
-from test.pickletester import AbstractPickleModuleTests
-from test.pickletester import AbstractPersistentPicklerTests
-from test.pickletester import AbstractPicklerUnpicklerObjectTests
-from test.pickletester import AbstractDispatchTableTests
-from test.pickletester import BigmemPickleTests
+from yp_test.pickletester import AbstractPickleTests
+from yp_test.pickletester import AbstractPickleModuleTests
+from yp_test.pickletester import AbstractPersistentPicklerTests
+from yp_test.pickletester import AbstractPicklerUnpicklerObjectTests
+from yp_test.pickletester import AbstractDispatchTableTests
+from yp_test.pickletester import BigmemPickleTests
 
 try:
     import _pickle

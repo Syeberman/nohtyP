@@ -5,6 +5,7 @@ which itself ought to be unified with string_tests.py (and the latter
 should be modernized).
 """
 
+from yp import *
 import os
 import re
 import sys
@@ -13,9 +14,9 @@ import functools
 import pickle
 import tempfile
 import unittest
-import test.support
-import test.string_tests
-import test.buffer_tests
+import yp_test.support
+import yp_test.string_tests
+import yp_test.buffer_tests
 
 
 if sys.flags.bytes_warning:

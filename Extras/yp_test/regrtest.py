@@ -241,7 +241,7 @@ RESOURCE_DENIED = -3
 INTERRUPTED = -4
 CHILD_ERROR = -5   # error in a child process
 
-from test import support
+from yp_test import support
 
 RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network',
                   'decimal', 'cpu', 'subprocess', 'urlfetch', 'gui')
@@ -619,7 +619,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         output = Queue()
         pending = MultiprocessTests(tests)
         opt_args = support.args_from_interpreter_flags()
-        base_cmd = [sys.executable] + opt_args + ['-m', 'test.regrtest']
+        base_cmd = [sys.executable] + opt_args + ['-m', 'yp_test.regrtest']
         def work():
             # A worker thread.
             try:
@@ -731,7 +731,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                     del gc.garbage[:]
             # Unload the newly imported modules (best effort finalization)
             for module in sys.modules.keys():
-                if module not in save_modules and module.startswith("test."):
+                if module not in save_modules and module.startswith("yp_test."):
                     support.unload(module)
 
     if interrupted:
@@ -812,16 +812,16 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
 # small set of tests to determine if we have a basically functioning interpreter
 # (i.e. if any of these fail, then anything else is likely to follow)
 STDTESTS = [
-    'test_grammar',
-    'test_opcodes',
-    'test_dict',
-    'test_builtin',
-    'test_exceptions',
-    'test_types',
-    'test_unittest',
-    'test_doctest',
-    'test_doctest2',
-    'test_support'
+#    'test_grammar',
+#    'test_opcodes',
+#    'test_dict',
+#    'test_builtin',
+#    'test_exceptions',
+#    'test_types',
+#    'test_unittest',
+#    'test_doctest',
+#    'test_doctest2',
+#    'test_support'
 ]
 
 # set of tests that we don't want to be executed when using regrtest
@@ -1203,11 +1203,11 @@ def runtest_inner(test, verbose, quiet,
     test_time = 0.0
     refleak = False  # True if the test leaked references.
     try:
-        if test.startswith('test.'):
+        if test.startswith('yp_test.'):
             abstest = test
         else:
             # Always import it from the test package
-            abstest = 'test.' + test
+            abstest = 'yp_test.' + test
         with saved_test_environment(test, verbose, quiet) as environment:
             start_time = time.time()
             the_package = __import__(abstest, globals(), locals(), [])
@@ -1705,7 +1705,7 @@ _expectations = (
 class _ExpectedSkips:
     def __init__(self):
         import os.path
-        from test import test_timeout
+        from yp_test import test_timeout
 
         self.valid = False
         expected = None

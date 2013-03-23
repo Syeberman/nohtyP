@@ -2,8 +2,9 @@
 Common tests shared by test_str, test_unicode, test_userstring and test_string.
 """
 
+from yp import *
 import unittest, string, sys, struct
-from test import support
+from yp_test import support
 from collections import UserList
 
 class Sequence:
