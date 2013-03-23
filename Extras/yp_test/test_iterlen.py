@@ -61,6 +61,7 @@ def len(obj):
         except AttributeError:
             raise TypeError
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestInvariantWithoutMutations(unittest.TestCase):
 
     def test_invariant(self):
@@ -214,6 +215,7 @@ class NoneLengthHint(object):
     def __length_hint__(self):
         return None
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestLengthHintExceptions(unittest.TestCase):
 
     def test_issue1242657(self):

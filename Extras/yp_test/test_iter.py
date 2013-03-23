@@ -51,6 +51,7 @@ class SequenceClass:
 
 # Main test suite
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestCase(unittest.TestCase):
 
     # Helper to check that an iterator returns a given sequence

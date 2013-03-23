@@ -39,6 +39,7 @@ class Indexable:
         return self.value
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BaseBytesTest(unittest.TestCase):
 
     def test_basics(self):
@@ -1090,6 +1091,7 @@ class ByteArrayTest(BaseBytesTest):
         self.assertEqual(b, orig)
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class AssortedBytesTest(unittest.TestCase):
     #
     # Test various combinations of bytes and bytearray
@@ -1228,6 +1230,7 @@ class AssortedBytesTest(unittest.TestCase):
     # the rest that make sense (the code can be cleaned up to use modern
     # unittest methods at the same time).
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BytearrayPEP3137Test(unittest.TestCase,
                        yp_test.buffer_tests.MixinBytesBufferCommonTests):
     def marshal(self, x):
@@ -1270,15 +1273,18 @@ class FixedStringTest(yp_test.string_tests.BaseTest):
     def test_lower(self):
         pass
 
+@unittest.skip( "TODO: convert to yp.py" )
 class ByteArrayAsStringTest(FixedStringTest):
     type2test = bytearray
     contains_bytes = True
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BytesAsStringTest(FixedStringTest):
     type2test = bytes
     contains_bytes = True
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class SubclassTest(unittest.TestCase):
 
     def test_basic(self):

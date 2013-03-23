@@ -138,7 +138,8 @@ def test_main():
                       CDispatchTableTests, CChainDispatchTableTests,
                       InMemoryPickleTests])
     support.run_unittest(*tests)
-    support.run_doctest(pickle)
+    # TODO SyeV: support these doctests?  (likely not)
+    #support.run_doctest(pickle)
 
 if __name__ == "__main__":
     test_main()

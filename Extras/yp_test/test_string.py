@@ -3,6 +3,7 @@ import unittest, string
 from yp_test import support
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class ModuleTest(unittest.TestCase):
 
     def test_attrs(self):

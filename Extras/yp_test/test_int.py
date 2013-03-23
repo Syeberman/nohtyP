@@ -25,6 +25,7 @@ L = [
         ("\u0200", ValueError)
 ]
 
+@unittest.skip( "TODO: convert to yp.py" )
 class IntTestCases(unittest.TestCase):
 
     def test_basic(self):
