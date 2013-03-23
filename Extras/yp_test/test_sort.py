@@ -1,4 +1,5 @@
-from test import support
+from yp import *
+from yp_test import support
 import random
 import sys
 import unittest

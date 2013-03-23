@@ -1,5 +1,6 @@
+from yp import *
 import unittest
-from test import support
+from yp_test import support
 
 import collections, random, string
 import collections.abc
@@ -895,7 +896,7 @@ class DictTest(unittest.TestCase):
         f.a = 'a'
         self.assertEqual(f.__dict__, {1:1, 'a':'a'})
 
-from test import mapping_tests
+from yp_test import mapping_tests
 
 class GeneralMappingTests(mapping_tests.BasicTestMappingProtocol):
     type2test = dict

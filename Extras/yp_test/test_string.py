@@ -1,5 +1,6 @@
+from yp import *
 import unittest, string
-from test import support
+from yp_test import support
 
 
 class ModuleTest(unittest.TestCase):

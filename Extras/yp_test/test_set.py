@@ -1,5 +1,6 @@
+from yp import *
 import unittest
-from test import support
+from yp_test import support
 import gc
 import weakref
 import operator

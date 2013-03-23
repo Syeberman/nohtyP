@@ -3,12 +3,13 @@
 #
 # Also test that hash implementations are inherited as expected
 
+from yp import *
 import datetime
 import os
 import sys
 import unittest
-from test import support
-from test.script_helper import assert_python_ok
+from yp_test import support
+from yp_test.script_helper import assert_python_ok
 from collections import Hashable
 
 IS_64BIT = sys.maxsize > 2**32
