@@ -1,7 +1,8 @@
 # Test iterators.
 
+from yp import *
 import unittest
-from test.support import run_unittest, TESTFN, unlink, cpython_only
+from yp_test.support import run_unittest, TESTFN, unlink, cpython_only
 import pickle
 import collections.abc
 
