@@ -15,6 +15,7 @@ from collections import Hashable
 IS_64BIT = sys.maxsize > 2**32
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class HashEqualityTestCase(unittest.TestCase):
 
     def same_hash(self, *objlist):
@@ -69,6 +70,7 @@ class InheritedHashWithInequality(FixedHash, OnlyInequality): pass
 class NoHash(object):
     __hash__ = None
 
+@unittest.skip( "TODO: convert to yp.py" )
 class HashInheritanceTestCase(unittest.TestCase):
     default_expected = [object(),
                         DefaultHash(),
@@ -113,6 +115,7 @@ class DefaultIterSeq(object):
     def __getitem__(self, index):
         return self.seq[index]
 
+@unittest.skip( "TODO: convert to yp.py" )
 class HashBuiltinsTestCase(unittest.TestCase):
     hashes_to_check = [enumerate(range(10)),
                        iter(DefaultIterSeq()),
@@ -124,6 +127,7 @@ class HashBuiltinsTestCase(unittest.TestCase):
         for obj in self.hashes_to_check:
             self.assertEqual(hash(obj), _default_hash(obj))
 
+@unittest.skip( "TODO: convert to yp.py" )
 class HashRandomizationTests(unittest.TestCase):
 
     # Each subclass should define a field "repr_", containing the repr() of

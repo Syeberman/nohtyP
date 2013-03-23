@@ -8,6 +8,7 @@ import gc, weakref
 import pickle
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class DictTest(unittest.TestCase):
 
     def test_invalid_keyword_arguments(self):
@@ -898,12 +899,14 @@ class DictTest(unittest.TestCase):
 
 from yp_test import mapping_tests
 
+@unittest.skip( "TODO: convert to yp.py" )
 class GeneralMappingTests(mapping_tests.BasicTestMappingProtocol):
     type2test = dict
 
 class Dict(dict):
     pass
 
+@unittest.skip( "TODO: convert to yp.py" )
 class SubclassMappingTests(mapping_tests.BasicTestMappingProtocol):
     type2test = Dict
 

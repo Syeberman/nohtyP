@@ -7,6 +7,7 @@ from yp import *
 import unittest
 from yp_test import support
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestHexOctBin(unittest.TestCase):
 
     def test_hex_baseline(self):

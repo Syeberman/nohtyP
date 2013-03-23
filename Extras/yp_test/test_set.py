@@ -38,6 +38,7 @@ class HashCountingInt(int):
         self.hash_count += 1
         return int.__hash__(self)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestJointOps(unittest.TestCase):
     # Tests common to both set and frozenset
 
@@ -362,6 +363,7 @@ class TestJointOps(unittest.TestCase):
         gc.collect()
         self.assertTrue(ref() is None, "Cycle was not collected")
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestSet(TestJointOps):
     thetype = set
     basetype = set
@@ -634,6 +636,7 @@ class TestSet(TestJointOps):
 class SetSubclass(set):
     pass
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestSetSubclass(TestSet):
     thetype = SetSubclass
     basetype = set
@@ -642,10 +645,12 @@ class SetSubclassWithKeywordArgs(set):
     def __init__(self, iterable=[], newarg=None):
         set.__init__(self, iterable)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestSetSubclassWithKeywordArgs(TestSet):
 
     def test_keywords_in_subclass(self):
         'SF bug #1486663 -- this used to erroneously raise a TypeError'
+        self.skipTest( "TODO: convert to yp.py" )
         SetSubclassWithKeywordArgs(newarg=1)
 
 class TestFrozenSet(TestJointOps):
@@ -749,6 +754,7 @@ empty_set = set()
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestBasicOps(unittest.TestCase):
 
     def test_repr(self):
@@ -969,6 +975,7 @@ def baditer():
 def gooditer():
     yield True
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestExceptionPropagation(unittest.TestCase):
     """SF 628246:  Set constructor should not trap iterator TypeErrors"""
 
@@ -996,6 +1003,7 @@ class TestExceptionPropagation(unittest.TestCase):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestSetOfSets(unittest.TestCase):
     def test_constructor(self):
         inner = frozenset([1])
@@ -1009,6 +1017,7 @@ class TestSetOfSets(unittest.TestCase):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestBinaryOps(unittest.TestCase):
     def setUp(self):
         self.set = set((2, 4, 6))
@@ -1082,6 +1091,7 @@ class TestBinaryOps(unittest.TestCase):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestUpdateOps(unittest.TestCase):
     def setUp(self):
         self.set = set((2, 4, 6))
@@ -1168,6 +1178,7 @@ class TestUpdateOps(unittest.TestCase):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestMutate(unittest.TestCase):
     def setUp(self):
         self.values = ["a", "b", "c"]
@@ -1242,6 +1253,7 @@ class TestMutate(unittest.TestCase):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestSubsets(unittest.TestCase):
 
     case2method = {"<=": "issubset",
@@ -1320,6 +1332,7 @@ class TestSubsetNonOverlap(TestSubsets):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestOnlySetsInBinaryOps(unittest.TestCase):
 
     def test_eq_ne(self):
@@ -1487,6 +1500,7 @@ class TestOnlySetsGenerator(TestOnlySetsInBinaryOps):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestCopying(unittest.TestCase):
 
     def test_copy(self):
@@ -1538,6 +1552,7 @@ class TestCopyingNested(TestCopying):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestIdentities(unittest.TestCase):
     def setUp(self):
         self.a = set('abracadabra')
@@ -1658,6 +1673,7 @@ def L(seqn):
     'Test multiple tiers of iterators'
     return chain(map(lambda x:x, R(Ig(G(seqn)))))
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestVariousIteratorArgs(unittest.TestCase):
 
     def test_constructor(self):
@@ -1716,6 +1732,7 @@ class bad_dict_clear:
     def __hash__(self):
         return 0
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestWeirdBugs(unittest.TestCase):
     def test_8420_set_merge(self):
         # This used to segfault
@@ -1789,6 +1806,7 @@ def faces(G):
     return f
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestGraphs(unittest.TestCase):
 
     def test_cube(self):

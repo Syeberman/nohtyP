@@ -21,6 +21,7 @@ def pyrange_reversed(start, stop, step):
     return pyrange(stop - step, start - step, -step)
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class RangeTest(unittest.TestCase):
     def assert_iterators_equal(self, xs, ys, test_id, limit=None):
         # check that an iterator xs matches the expected results ys,

@@ -6,6 +6,7 @@ from yp_test import support
 
 import os
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BoolTest(unittest.TestCase):
 
     def test_subclass(self):
