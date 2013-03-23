@@ -6,8 +6,8 @@ yp.py - Python wrapper for nohtyP
     License: http://docs.python.org/3/license.html
 """
 
-import atexit
-atexit.register( input, "Press Enter to continue..." )
+#import atexit
+#atexit.register( input, "Press Enter to continue..." )
 
 from ctypes import *
 import sys
@@ -782,18 +782,18 @@ class yp_set( ypObject ):
 
 _yp_initialize( )
 
-so = yp_set( )
-so.add( 5 )
-assert 5 in so
-assert 50 not in so
+#so = yp_set( )
+#so.add( 5 )
+#assert 5 in so
+#assert 50 not in so
 
 #import pdb; pdb.set_trace()
-try: _yp_set_add( yp_int( 5 ), 5 )
-except TypeError: pass
-except: raise AssertionError( "should have raised TypeError" )
-else: raise AssertionError( "should have failed" )
+#try: _yp_set_add( yp_int( 5 ), 5 )
+#except TypeError: pass
+#except: raise AssertionError( "should have raised TypeError" )
+#else: raise AssertionError( "should have failed" )
 
-del so # FIXME how can we ensure so gets cleaned up at the end, before ctypes?
+#del so # FIXME how can we ensure so gets cleaned up at the end, before ctypes?
 
 # FIXME integrate this somehow with unittest
 #import os

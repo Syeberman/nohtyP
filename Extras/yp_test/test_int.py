@@ -1,7 +1,8 @@
+from yp import *
 import sys
 
 import unittest
-from test.support import run_unittest
+from yp_test.support import run_unittest
 
 L = [
         ('0', 0),

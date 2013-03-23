@@ -1,4 +1,5 @@
 # tests common to dict and UserDict
+from yp import *
 import unittest
 import collections
 

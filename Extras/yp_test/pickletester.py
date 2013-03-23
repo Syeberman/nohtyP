@@ -1,3 +1,4 @@
+from yp import *
 import io
 import unittest
 import pickle
@@ -7,7 +8,7 @@ import copyreg
 import weakref
 from http.cookies import SimpleCookie
 
-from test.support import (
+from yp_test.support import (
     TestFailed, TESTFN, run_with_locale, no_tracing,
     _2G, _4G, bigmemtest,
     )

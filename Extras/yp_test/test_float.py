@@ -1,8 +1,9 @@
 
+from yp import *
 import unittest, struct
 import os
 import sys
-from test import support
+from yp_test import support
 import math
 from math import isinf, isnan, copysign, ldexp
 import operator
