@@ -739,7 +739,7 @@ class yp_iter( ypObject ):
         except BaseException as e:
             result = _pyExc2yp[type( e )]
         # If we just try to return result here, ctypes gets confused (TODO bug?)
-        return result.value
+        return _yp_incref( result ).value
 
     _no_sentinel = object( )
     def __init__( self, object, sentinel=_no_sentinel ):
@@ -769,6 +769,12 @@ class yp_int( ypObject ):
             else: return
             base = 10
         self.value = _yp_int_strC( x, base ).value
+
+@pytype( frozenset )
+class yp_frozenset( ypObject ):
+    def __init__( self, iterable=iter( () ) ): # TODO default to a yp_iter
+        iterable = yp_iterable( iterable )
+        self.value = _yp_frozenset( iterable ).value
 
 @pytype( set )
 class yp_set( ypObject ):
