@@ -10,6 +10,10 @@
 #include <stddef.h>
 #include <string.h>
 
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
+
 
 /*************************************************************************************************
  * Static assertions for nohtyP.h
@@ -340,18 +344,36 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
 #define MAX(a,b)   ((a) > (b) ? (a) : (b))
 #endif
 
+// Issues a breakpoint if the debugger is attached, on supported platforms
+// TODO Debug only
+// FIXME Use this only at the point the error is "raised"
+#if 0 && defined( _MSC_VER )
+static void yp_breakonerr( ypObject *err ) {
+    if( !IsDebuggerPresent( ) ) return;
+    if( err != yp_TypeError ) return; // FIXME temporary, but shows how to trap a certain type of error
+    DebugBreak( );
+}
+#else
+#define yp_breakonerr( err )
+#endif
+
+// Functions that return nohtyP objects simply need to return the error object to "raise" it
+// Use this as "return_yp_ERR( x, yp_ValueError );" to return the error properly
+#define return_yp_ERR( _err ) \
+    do { ypObject *_yp_ERR_err = (_err); yp_breakonerr( _yp_ERR_err ); return _yp_ERR_err; } while( 0 )
+
 // Functions that modify their inputs take a "ypObject **x".
-// Use this as "yp_INPLACE_ERR( x, yp_ValueError );" to discard x and set it to an exception.
-#define yp_INPLACE_ERR( ob, err ) \
-    do { yp_decref( *(ob) ); *(ob) = (err); } while( 0 )
+// Use this as "yp_INPLACE_ERR( x, yp_ValueError );" to discard x and set it to an exception
+#define yp_INPLACE_ERR( ob, _err ) \
+    do { ypObject *_yp_ERR_err = (_err); yp_breakonerr( _yp_ERR_err ); yp_decref( *(ob) ); *(ob) = (_yp_ERR_err); } while( 0 )
 // Use this as "return_yp_INPLACE_ERR( x, yp_ValueError );" to return the error properly
-#define return_yp_INPLACE_ERR( ob, err ) \
-    do { yp_decref( *(ob) ); *(ob) = (err); return; } while( 0 )
+#define return_yp_INPLACE_ERR( ob, _err ) \
+    do { yp_INPLACE_ERR( (ob), (_err) ); return; } while( 0 )
 
 // Functions that return C values take a "ypObject **exc" that are only modified on error and are
 // not discarded beforehand; they also need to return a valid C value
-#define return_yp_CEXC_ERR( retval, exc, err ) \
-    do { *(exc) = (err); return retval; } while( 0 )
+#define return_yp_CEXC_ERR( retval, exc, _err ) \
+    do { ypObject *_yp_ERR_err = (_err); yp_breakonerr( _yp_ERR_err ); *(exc) = (_yp_ERR_err); return retval; } while( 0 )
 
 // When an object encounters an unknown type, there are three possible cases:
 //  - it's an invalidated object, so return yp_InvalidatedError
@@ -365,11 +387,11 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
     /* else */ \
         yp_TypeError )
 #define return_yp_BAD_TYPE( bad_ob ) \
-    do { return yp_BAD_TYPE( bad_ob ); } while( 0 )
+    return_yp_ERR( yp_BAD_TYPE( bad_ob ) )
 #define return_yp_INPLACE_BAD_TYPE( ob, bad_ob ) \
-    do { return_yp_INPLACE_ERR( (ob), yp_BAD_TYPE( bad_ob ) ); } while( 0 )
+    return_yp_INPLACE_ERR( (ob), yp_BAD_TYPE( bad_ob ) )
 #define return_yp_CEXC_BAD_TYPE( retval, exc, bad_ob ) \
-    do { return_yp_CEXC_ERR( (retval), (exc), yp_BAD_TYPE( bad_ob ) ); } while( 0 )
+    return_yp_CEXC_ERR( (retval), (exc), yp_BAD_TYPE( bad_ob ) )
 
 // Return sizeof for a structure member
 #define yp_sizeof_member( structType, member ) \
@@ -412,6 +434,15 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
     if (x == ypObject_HASH_INVALID) x -= 1;
     return x;
 }
+
+#if 0
+#include <stdio.h>
+#define DEBUG0( fmt ) printf( fmt "\n" )
+#define DEBUG( fmt, ... ) printf( fmt "\n", __VA_ARGS__ )
+#else
+#define DEBUG0( fmt )
+#define DEBUG( fmt, ... )
+#endif
 
 
 /*************************************************************************************************
@@ -465,6 +496,7 @@ static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
     if( p == NULL ) return NULL;
     *actual = (yp_ssize_t) _msize( p );
     // TODO should we check that *actual is > 0?
+    DEBUG( "malloc: 0x%08X %d bytes", p, *actual );
     return p;
 }
 static void *_default_yp_malloc_resize( yp_ssize_t *actual, 
@@ -481,9 +513,13 @@ static void *_default_yp_malloc_resize( yp_ssize_t *actual,
     }
     *actual = (yp_ssize_t) _msize( newp );
     // TODO should we check that *actual is > 0?
+    DEBUG( "malloc_resize: 0x%08X %d bytes  (was 0x%08X)", newp, *actual, p );
     return newp;
 }
-static void (*_default_yp_free)( void *p ) = free;
+static void _default_yp_free( void *p ) {
+    free( p );
+    DEBUG( "free: 0x%08X", p );
+}
 
 // If all else fails, rely on the standard C malloc/free functions
 #else
@@ -537,6 +573,7 @@ static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
     ob->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 );
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = ypObject_LEN_INVALID;
+    DEBUG( "MALLOC_FIXED: type %d 0x%08X", type, ob );
     return ob;
 }
 #define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( sizeof( obStruct ), (type) )
@@ -561,6 +598,7 @@ static ypObject *_ypMem_malloc_container_inline(
     ob->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 );
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
+    DEBUG( "MALLOC_CONTAINER_INLINE: type %d 0x%08X alloclen %d", type, ob, ob->ob_alloclen );
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_INLINE( obStruct, type, alloclen ) \
@@ -613,6 +651,7 @@ static ypObject *_ypMem_malloc_container_variable(
     ob->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 );
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
+    DEBUG( "MALLOC_CONTAINER_VARIABLE: type %d 0x%08X alloclen %d", type, ob, ob->ob_alloclen );
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_VARIABLE( obStruct, type, required, extra ) \
@@ -652,6 +691,7 @@ static ypObject *_ypMem_realloc_container_variable(
             ob->ob_data = inlineptr;
         }
         ob->ob_alloclen = inlinelen;
+        DEBUG( "REALLOC_CONTAINER_VARIABLE (to inline): 0x%08X alloclen %d", ob, ob->ob_alloclen );
         return yp_None;
     }
 
@@ -663,6 +703,7 @@ static ypObject *_ypMem_realloc_container_variable(
         ob->ob_data = newptr;
         // FIXME check for alloclen overflow!
         ob->ob_alloclen = size / sizeof_elems; // rounds down
+        DEBUG( "REALLOC_CONTAINER_VARIABLE (from inline): 0x%08X alloclen %d", ob, ob->ob_alloclen );
         return yp_None;
     }
 
@@ -674,6 +715,7 @@ static ypObject *_ypMem_realloc_container_variable(
     ob->ob_data = newptr;
     // FIXME check for alloclen overflow!
     ob->ob_alloclen = size / sizeof_elems; // rounds down
+    DEBUG( "REALLOC_CONTAINER_VARIABLE (malloc_resize): 0x%08X alloclen %d", ob, ob->ob_alloclen );
     return yp_None;
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, required, ideal ) \
@@ -681,6 +723,7 @@ static ypObject *_ypMem_realloc_container_variable(
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (required), (ideal) )
 
 // Frees an object allocated with ypMem_MALLOC_FIXED
+// TODO Make this a function so it can have a specific DEBUG statement?
 #define ypMem_FREE_FIXED yp_free
 
 // Frees an object allocated with either ypMem_REALLOC_CONTAINER_* macro
@@ -689,6 +732,7 @@ static void _ypMem_free_container( ypObject *ob, yp_ssize_t offsetof_inline )
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     if( ob->ob_data != inlineptr ) yp_free( ob->ob_data );
     yp_free( ob );
+    DEBUG( "FREE_CONTAINER: 0x%08X", ob );
 }
 #define ypMem_FREE_CONTAINER( ob, obStruct ) \
     _ypMem_free_container( ob, offsetof( obStruct, ob_inline_data ) )
@@ -703,6 +747,7 @@ ypObject *yp_incref( ypObject *x )
     yp_uint32_t refcnt = ypObject_REFCNT( x );
     if( refcnt >= ypObject_REFCNT_IMMORTAL ) return x; // no-op
     x->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( ypObject_TYPE_CODE( x ), refcnt+1 );
+    DEBUG( "incref: 0x%08X refcnt %d", x, ypObject_REFCNT( x ) );
     return x;
 }
 
@@ -723,8 +768,10 @@ void yp_decref( ypObject *x )
     if( refcnt <= 1 ) {
         // TODO Errors currently ignored...should we log them instead?
         ypObject_TYPE( x )->tp_dealloc( x );
+        DEBUG( "decref (dealloc): 0x%08X", x );
     } else {
         x->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( ypObject_TYPE_CODE( x ), refcnt-1 );
+        DEBUG( "decref: 0x%08X refcnt %d", x, ypObject_REFCNT( x ) );
     }
 }
 
@@ -2059,6 +2106,7 @@ ypObject *yp_intC( yp_int_t value )
     ypObject *i = ypMem_MALLOC_FIXED( ypIntObject, ypInt_CODE );
     if( yp_isexceptionC( i ) ) return i;
     ypInt_VALUE( i ) = value;
+    DEBUG( "yp_intC: 0x%08X value %d", i, value );
     return i;
 }
 
@@ -2067,6 +2115,7 @@ ypObject *yp_intstoreC( yp_int_t value )
     ypObject *i = ypMem_MALLOC_FIXED( ypIntObject, ypIntStore_CODE );
     if( yp_isexceptionC( i ) ) return i;
     ypInt_VALUE( i ) = value;
+    DEBUG( "yp_intstoreC: 0x%08X value %d", i, value );
     return i;
 }
 
