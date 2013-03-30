@@ -22,11 +22,13 @@ c_INOUT = 3
 # Some standard C param/return types
 c_void = None # only valid for return values
 
-_yp_no_default = object( )
+# Used to signal that a particular arg has not been supplied; set to default value of such params
+_yp_arg_missing = object( )
+
 class yp_param:
-    def __init__( self, type, name, default=_yp_no_default, direction=c_IN ):
+    def __init__( self, type, name, default=_yp_arg_missing, direction=c_IN ):
         self.type = type
-        if default is _yp_no_default:
+        if default is _yp_arg_missing:
             self.pflag = (direction, name)
         else:
             self.pflag = (direction, name, default)
@@ -39,6 +41,8 @@ class yp_param:
 def yp_func_errcheck( result, func, args ):
     getattr( result, "_yp_errcheck", int )( )
     for arg in args: getattr( arg, "_yp_errcheck", int )( )
+    if isinstance( result, c_ypObject_p ):
+        result.__class__ = ypObject._ypcode2yp[result._yp_typecode]
     return args
 
 def yp_func( retval, name, paramtuple, errcheck=True ):
@@ -70,6 +74,9 @@ class c_ypObject_p( c_void_p ):
         return ypObject.frompython( val )
     def _yp_errcheck( self ):
         ypObject_p_errcheck( self )
+    @property
+    def _yp_typecode( self ):
+        return string_at( self.value, 1 )[0]
 
 def c_ypObject_p_value( name ):
     globals( )["_"+name] = c_ypObject_p.in_dll( ypdll, name )
@@ -87,7 +94,7 @@ class c_ypObject_pp( c_ypObject_p*1 ):
         ypObject_p_errcheck( self[0] )
     def __del__( self ):
         _yp_decref( self[0] )
-        self[0] = _yp_None
+        self[0] = yp_None
         #super( ).__del__( self ) # no __del__ method?!
 
 
@@ -115,16 +122,22 @@ yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False )
 # void yp_deepfreeze( ypObject **x );
 
 # ypObject *yp_unfrozen_copy( ypObject *x );
+yp_func( c_ypObject_p, "yp_unfrozen_copy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_unfrozen_deepcopy( ypObject *x );
+yp_func( c_ypObject_p, "yp_unfrozen_deepcopy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_frozen_copy( ypObject *x );
+yp_func( c_ypObject_p, "yp_frozen_copy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_frozen_deepcopy( ypObject *x );
+yp_func( c_ypObject_p, "yp_frozen_deepcopy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_copy( ypObject *x );
+yp_func( c_ypObject_p, "yp_copy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_deepcopy( ypObject *x );
+yp_func( c_ypObject_p, "yp_deepcopy", ((c_ypObject_p, "x"), ) )
 
 # void yp_invalidate( ypObject **x );
 
@@ -234,7 +247,9 @@ yp_func( c_ypObject_p, "yp_generator_fromstructCN",
 # ypObject *yp_rangeC( yp_int_t stop );
 
 # ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len );
+yp_func( c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
 # ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len );
+yp_func( c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
 
 # XXX The str/characterarray types will be added in a future version
 
@@ -674,8 +689,9 @@ yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc"))
 
 
 class ypObject( c_ypObject_p ):
-    def __init__( self ):
-        raise NotImplementedError( "can't instantiate ypObject directly" )
+    def __new__( cls ):
+        if cls is ypObject: raise NotImplementedError( "can't instantiate ypObject directly" )
+        return super( ).__new__( cls )
     def __del__( self ):
         # FIXME It seems that _yp_decref and _yp_None gets set to None when Python is closing
         try: _yp_decref( self )
@@ -683,6 +699,7 @@ class ypObject( c_ypObject_p ):
         try: self.value = _yp_None.value
         except: self.value = 0
     _pytype2yp = {}
+    _ypcode2yp = {}
     @classmethod
     def frompython( cls, pyobj ):
         """ypObject.frompython is a factory that returns the correct yp_* object based on the type
@@ -697,17 +714,38 @@ class ypObject( c_ypObject_p ):
         # TODO if every class uses the default _frompython, then remove it, it's not needed
         return cls( pyobj )
 
-    def __contains__( self, x ): return yp_bool( _yp_contains( self, x ) )
-# TODO will this work if _yp_bool returns an exception?
+    def copy( self ): return _yp_copy( self )
+
+    # TODO will this work if yp_bool returns an exception?
     def __bool__( self ): return bool( yp_bool( self ) )
 
-def pytype( pytype ):
+    def __contains__( self, x ): return _yp_contains( self, x )
+
+def pytype( pytype, ypcode ):
     def _pytype( cls ):
         ypObject._pytype2yp[pytype] = cls
+        ypObject._ypcode2yp[ypcode] = cls
         return cls
     return _pytype
 
-@pytype( bool )
+# FIXME yp_NoneType isn't, itself, a singleton, as multiples could be made (with the same .value)
+@pytype( type( None ), 6 )
+class yp_NoneType( ypObject ):
+    def __new__( cls, *, _value=None ):
+        """_value is for internal use only."""
+        if _value is not None:
+            self = super( ).__new__( cls )
+            self.value = _value
+            return self
+        return yp_None
+    @classmethod
+    def _frompython( cls, pyobj ):
+        assert pyobj is None
+        return yp_None
+yp_None = yp_NoneType( _value=_yp_None.value )
+
+# FIXME yp_True/yp_False aren't, themselves, singletons, as multiples could be made (same .value)
+@pytype( bool, 8 )
 class yp_bool( ypObject ):
     def __new__( cls, x=_yp_False, *, _value=None ):
         """_value is for internal use only."""
@@ -722,37 +760,40 @@ class yp_bool( ypObject ):
             raise TypeError( "unexpected return from _yp_bool %r" % x )
         else:
             return yp_True if x else yp_False
-    def __init__( self, *args, **kwargs ):
-        """For internal use only."""
         pass
     def __bool__( self ): return self.value == _yp_True.value
 yp_True = yp_bool( _value=_yp_True.value )
 yp_False = yp_bool( _value=_yp_False.value )
 
+@pytype( iter, 15 )
 class yp_iter( ypObject ):
     def _pygenerator_func( self, yp_self, yp_value ):
         try:
             if _yp_isexceptionC( yp_value ):
                 result = yp_value # yp_GeneratorExit, in particular
             else:
-                result = ypObject.frompython( next( self.pyiter ) )
+                result = ypObject.frompython( next( self._pyiter ) )
         except BaseException as e:
             result = _pyExc2yp[type( e )]
         # If we just try to return result here, ctypes gets confused (TODO bug?)
         return _yp_incref( result ).value
 
-    _no_sentinel = object( )
-    def __init__( self, object, sentinel=_no_sentinel ):
-        if sentinel is not yp_iter._no_sentinel: object = iter( object, sentinel )
-        if isinstance( object, ypObject ):
-            self.value = _yp_iter( object ).value
-            return
+    def __new__( cls, object, sentinel=_yp_arg_missing ):
+        if sentinel is not _yp_arg_missing: object = iter( object, sentinel )
+        if isinstance( object, ypObject ): return _yp_iter( object )
 
         try: lenhint = len( object )
         except: lenhint = 0 # TODO try Python's lenhint?
-        self.pyiter = iter( object )
-        self.pycallback = c_yp_generator_func_t( self._pygenerator_func )
-        self.value = _yp_generator_fromstructCN( self.pycallback, lenhint, 0, 0, 0 ).value
+        self = super( ).__new__( cls )
+        self._pyiter = iter( object )
+        self._pycallback = c_yp_generator_func_t( self._pygenerator_func )
+        self.value = _yp_generator_fromstructCN( self._pycallback, lenhint, 0, 0, 0 ).value
+        return self
+
+_yp_closed_iter = yp_iter( () )
+try: _yp_next( _yp_closed_iter )
+except StopIteration: pass
+else: raise AssertionError( "should be an empty iterator" )
 
 def yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
@@ -760,27 +801,47 @@ def yp_iterable( iterable ):
     if isinstance( iterable, ypObject ): return iterable
     return yp_iter( iterable )
 
-@pytype( int )
+@pytype( int, 10 )
 class yp_int( ypObject ):
-    def __init__( self, x=0, base=None ):
+    def __new__( cls, x=0, base=None ):
         if base is None:
-            try: self.value = _yp_intC( x ).value # TODO can I get rid of .value?
+            try: return _yp_intC( x )
             except TypeError: pass
-            else: return
             base = 10
-        self.value = _yp_int_strC( x, base ).value
+        return _yp_int_strC( x, base )
 
-@pytype( frozenset )
+# FIXME When nohtyP supports a proper Unicode string type, use it
+# FIXME When nohtyP has types that have string representations, update this
+# FIXME Just generally move more of this logic into nohtyP, when available
+@pytype( str, 18 )
+class yp_str( ypObject ):
+    def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
+        if encoding is _yp_arg_missing and errors is _yp_arg_missing:
+        	encoded = str( object ).encode( "ascii" )
+        	return _yp_bytesC( encoded, len( encoded ) )
+        else:
+        	raise NotImplementedError
+
+# FIXME The str hack is temporary
+@pytype( frozenset, 22 )
 class yp_frozenset( ypObject ):
-    def __init__( self, iterable=iter( () ) ): # TODO default to a yp_iter
-        iterable = yp_iterable( iterable )
-        self.value = _yp_frozenset( iterable ).value
+    def __new__( cls, iterable=_yp_closed_iter ):
+        if isinstance( iterable, str ):
+        	iterable = yp_str( iterable )
+        else:
+            iterable = yp_iterable( iterable )
+        return _yp_frozenset( iterable )
 
-@pytype( set )
+# FIXME The str hack is temporary
+@pytype( set, 23 )
 class yp_set( ypObject ):
-    def __init__( self, iterable=iter( () ) ): # TODO default to a yp_iter
-        iterable = yp_iterable( iterable )
-        self.value = _yp_set( iterable ).value
+    def __new__( cls, iterable=_yp_closed_iter ):
+        if isinstance( iterable, str ):
+        	iterable = yp_str( iterable )
+        else:
+            import pdb; pdb.set_trace()
+            iterable = yp_iterable( iterable )
+        return _yp_set( iterable )
 
     def add( self, x ): _yp_set_add( self, x )
 
