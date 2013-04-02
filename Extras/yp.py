@@ -63,8 +63,10 @@ def yp_func( retval, name, paramtuple, errcheck=True ):
     globals( )[c_func._yp_name] = c_func_wrapper
 
 
+# XXX Initialize nohtyP
 # ypAPI void yp_initialize( void );
 yp_func( c_void, "yp_initialize", (), errcheck=False )
+_yp_initialize( )
 
 # typedef struct _ypObject ypObject;
 class c_ypObject_p( c_void_p ):
@@ -102,7 +104,7 @@ class c_ypObject_pp( c_ypObject_p*1 ):
 c_ypObject_p_value( "yp_None" )
 
 # ypAPI ypObject *yp_incref( ypObject *x );
-yp_func( c_ypObject_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
+yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_increfN( int n, ... );
 # void yp_increfV( int n, va_list args );
@@ -308,13 +310,14 @@ yp_func( c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ) )
 # yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
 
-# ypObject *yp_send( ypObject **iterator, ypObject *value );
+# ypObject *yp_send( ypObject *iterator, ypObject *value );
 
-# ypObject *yp_next( ypObject **iterator );
+# ypObject *yp_next( ypObject *iterator );
+yp_func( c_ypObject_p, "yp_next", ((c_ypObject_p, "iterator"), ) )
 
-# ypObject *yp_next2( ypObject **iterator, ypObject *defval );
+# ypObject *yp_next2( ypObject *iterator, ypObject *defval );
 
-# ypObject *yp_throw( ypObject **iterator, ypObject *exc );
+# ypObject *yp_throw( ypObject *iterator, ypObject *exc );
 
 # yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 
@@ -692,6 +695,7 @@ class ypObject( c_ypObject_p ):
     def __new__( cls ):
         if cls is ypObject: raise NotImplementedError( "can't instantiate ypObject directly" )
         return super( ).__new__( cls )
+    def __init__( self, *args, **kwargs ): pass
     def __del__( self ):
         # FIXME It seems that _yp_decref and _yp_None gets set to None when Python is closing
         try: _yp_decref( self )
@@ -718,6 +722,16 @@ class ypObject( c_ypObject_p ):
 
     # TODO will this work if yp_bool returns an exception?
     def __bool__( self ): return bool( yp_bool( self ) )
+    def __lt__( self, other ): return _yp_lt( self, other )
+    def __le__( self, other ): return _yp_le( self, other )
+    def __eq__( self, other ): return _yp_eq( self, other )
+    def __ne__( self, other ): return _yp_ne( self, other )
+    def __ge__( self, other ): return _yp_ge( self, other )
+    def __gt__( self, other ): return _yp_gt( self, other )
+
+    def __iter__( self ): return _yp_iter( self )
+
+    def __next__( self ): return _yp_next( self )
 
     def __contains__( self, x ): return _yp_contains( self, x )
 
@@ -776,7 +790,7 @@ class yp_iter( ypObject ):
         except BaseException as e:
             result = _pyExc2yp[type( e )]
         # If we just try to return result here, ctypes gets confused (TODO bug?)
-        return _yp_incref( result ).value
+        return _yp_incref( result )
 
     def __new__( cls, object, sentinel=_yp_arg_missing ):
         if sentinel is not _yp_arg_missing: object = iter( object, sentinel )
@@ -787,10 +801,12 @@ class yp_iter( ypObject ):
         self = super( ).__new__( cls )
         self._pyiter = iter( object )
         self._pycallback = c_yp_generator_func_t( self._pygenerator_func )
-        self.value = _yp_generator_fromstructCN( self._pycallback, lenhint, 0, 0, 0 ).value
+        self.value = _yp_incref( _yp_generator_fromstructCN( self._pycallback, lenhint, 0, 0, 0 ) )
         return self
 
-_yp_closed_iter = yp_iter( () )
+    def __iter__( self ): return self
+
+_yp_closed_iter = yp_iter( lambda: None, None )
 try: _yp_next( _yp_closed_iter )
 except StopIteration: pass
 else: raise AssertionError( "should be an empty iterator" )
@@ -798,7 +814,7 @@ else: raise AssertionError( "should be an empty iterator" )
 def yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
-    if isinstance( iterable, ypObject ): return iterable
+    if isinstance( iterable, c_ypObject_p ): return iterable
     return yp_iter( iterable )
 
 @pytype( int, 10 )
@@ -809,6 +825,20 @@ class yp_int( ypObject ):
             except TypeError: pass
             base = 10
         return _yp_int_strC( x, base )
+
+# FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
+# FIXME Just generally move more of this logic into nohtyP, when available
+@pytype( bytes, 16 )
+class yp_bytes( ypObject ):
+    def __new__( cls, source=0, encoding=None, errors=None ):
+        if isinstance( source, str ):
+        	raise NotImplementedError
+        elif isinstance( source, (int, yp_int) ):
+            return _yp_bytesC( None, source )
+        # else if it has the buffer interface
+        # else if it is an iterable
+        else:
+        	raise TypeError( type( source ) )
 
 # FIXME When nohtyP supports a proper Unicode string type, use it
 # FIXME When nohtyP has types that have string representations, update this
@@ -839,7 +869,6 @@ class yp_set( ypObject ):
         if isinstance( iterable, str ):
         	iterable = yp_str( iterable )
         else:
-            import pdb; pdb.set_trace()
             iterable = yp_iterable( iterable )
         return _yp_set( iterable )
 
@@ -847,7 +876,6 @@ class yp_set( ypObject ):
 
 
 
-_yp_initialize( )
 
 #so = yp_set( )
 #so.add( 5 )
