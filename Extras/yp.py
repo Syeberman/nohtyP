@@ -102,6 +102,7 @@ class c_ypObject_pp( c_ypObject_p*1 ):
 
 # ypAPI ypObject *yp_None;
 c_ypObject_p_value( "yp_None" )
+c_ypObject_pp_exc = (c_ypObject_pp, "exc", _yp_None)
 
 # ypAPI ypObject *yp_incref( ypObject *x );
 yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
@@ -268,7 +269,9 @@ yp_func( c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "l
 # ypObject *yp_list_repeatCV( yp_ssize_t factor, int n, va_list args );
 
 # ypObject *yp_tuple( ypObject *iterable );
+yp_func( c_ypObject_p, "yp_tuple", ((c_ypObject_p, "iterable"), ) )
 # ypObject *yp_list( ypObject *iterable );
+yp_func( c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ) )
 
 # typedef ypObject *(*yp_sort_key_func_t)( ypObject *x );
 # ypObject *yp_sorted3( ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse );
@@ -283,9 +286,9 @@ yp_func( c_ypObject_p, "yp_frozensetN", ((c_int, "n"), ) ) # FIXME
 yp_func( c_ypObject_p, "yp_setN", ((c_int, "n"), ) ) # FIXME
 
 # ypObject *yp_frozenset( ypObject *iterable );
-yp_func( c_ypObject_p, "yp_frozenset", ((c_ypObject_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_frozenset", ((c_ypObject_p, "iterable"), ) )
 # ypObject *yp_set( ypObject *iterable );
-yp_func( c_ypObject_p, "yp_set", ((c_ypObject_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_set", ((c_ypObject_p, "iterable"), ) )
 
 # ypObject *yp_frozendictK( int n, ... );
 # ypObject *yp_frozendictKV( int n, va_list args );
@@ -361,12 +364,16 @@ yp_func( c_ypObject_p, "yp_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container"
 yp_func( c_ypObject_p, "yp_not_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")) )
 
 # yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc) )
 
 # void yp_push( ypObject **container, ypObject *x );
+yp_func( c_void, "yp_push", ((c_ypObject_pp, "container"), (c_ypObject_p, "x")) )
 
 # void yp_clear( ypObject **container );
+yp_func( c_void, "yp_clear", ((c_ypObject_pp, "container"), ) )
 
 # ypObject *yp_pop( ypObject **container );
+yp_func( c_ypObject_p, "yp_pop", ((c_ypObject_pp, "container"), ) )
 
 
 # ypObject *yp_concat( ypObject *sequence, ypObject *x );
@@ -409,6 +416,7 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 
 # void yp_append( ypObject **sequence, ypObject *x );
 # void yp_push( ypObject **sequence, ypObject *x );
+yp_func( c_void, "yp_append", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")) )
 
 # void yp_extend( ypObject **sequence, ypObject *t );
 
@@ -421,6 +429,7 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 # ypObject *yp_pop( ypObject **sequence );
 
 # void yp_remove( ypObject **sequence, ypObject *x );
+yp_func( c_void, "yp_remove", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")) )
 
 # void yp_reverse( ypObject **sequence );
 
@@ -432,12 +441,15 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 #define yp_SLICE_USELEN  yp_SSIZE_T_MAX
 
 # ypObject *yp_isdisjoint( ypObject *set, ypObject *x );
+yp_func( c_ypObject_p, "yp_isdisjoint", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_issubset( ypObject *set, ypObject *x );
+yp_func( c_ypObject_p, "yp_issubset", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_lt( ypObject *set, ypObject *x );
 
 # ypObject *yp_issuperset( ypObject *set, ypObject *x );
+yp_func( c_ypObject_p, "yp_issuperset", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_gt( ypObject *set, ypObject *x );
 
@@ -451,6 +463,7 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 # ypObject *yp_differenceV( ypObject *set, int n, va_list args );
 
 # ypObject *yp_symmetric_difference( ypObject *set, ypObject *x );
+yp_func( c_ypObject_p, "yp_symmetric_difference", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # void yp_updateN( ypObject **set, int n, ... );
 # void yp_updateV( ypObject **set, int n, va_list args );
@@ -462,16 +475,19 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 # void yp_difference_updateV( ypObject **set, int n, va_list args );
 
 # void yp_symmetric_difference_update( ypObject **set, ypObject *x );
+yp_func( c_void, "yp_symmetric_difference_update", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # void yp_push( ypObject **set, ypObject *x );
 # void yp_set_add( ypObject **set, ypObject *x );
 yp_func( c_void, "yp_set_add", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_pushuniqueE( ypObject **set, ypObject *x );
+yp_func( c_void, "yp_pushuniqueE", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # void yp_remove( ypObject **set, ypObject *x );
 
 # void yp_discard( ypObject **set, ypObject *x );
+#yp_func( c_void, "yp_discard", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_pop( ypObject **set );
 
@@ -734,6 +750,24 @@ class ypObject( c_ypObject_p ):
     def __next__( self ): return _yp_next( self )
 
     def __contains__( self, x ): return _yp_contains( self, x )
+    def __len__( self ): return _yp_lenC( self )
+    def push( self, x ): _yp_push( self, x )
+    def clear( self ): _yp_clear( self )
+    def pop( self ): return _yp_pop( self )
+
+    def isdisjoint( self, other ): return _yp_isdisjoint( self, other )
+    def issuperset( self, other ): return _yp_issuperset( self, other )
+    # def union( self, *others ):
+    # def intersection( self, *others ):
+    # def difference( self, *others ):
+    def symmetric_difference( self, other ): return _yp_symmetric_difference( self, other )
+    # def update( self, *others ):
+    # def intersection_update( self, *others ):
+    # def difference_update( self, *others ):
+    def symmetric_difference_update( self, other ): return _yp_symmetric_difference_update( self, other )
+    def add( self, elem ): _yp_set_add( self, elem )
+    def remove( self, elem ): _yp_set_remove( self, elem )
+    def discard( self, elem ): _yp_set_discard( self, elem )
 
 def pytype( pytype, ypcode ):
     def _pytype( cls ):
@@ -852,6 +886,16 @@ class yp_str( ypObject ):
         else:
         	raise NotImplementedError
 
+@pytype( tuple, 20 )
+class yp_tuple( ypObject ):
+    def __new__( cls, iterable=_yp_closed_iter ):
+        return _yp_tuple( yp_iterable( iterable ) )
+
+@pytype( list, 21 )
+class yp_list( ypObject ):
+    def __new__( cls, iterable=_yp_closed_iter ):
+        return _yp_list( yp_iterable( iterable ) )
+
 # FIXME The str hack is temporary
 @pytype( frozenset, 22 )
 class yp_frozenset( ypObject ):
@@ -871,9 +915,6 @@ class yp_set( ypObject ):
         else:
             iterable = yp_iterable( iterable )
         return _yp_set( iterable )
-
-    def add( self, x ): _yp_set_add( self, x )
-
 
 
 

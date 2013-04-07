@@ -1432,6 +1432,8 @@ _ypBool_PUBLIC_CMP_FUNCTION( ge, le, yp_TypeError );
 _ypBool_PUBLIC_CMP_FUNCTION( gt, lt, yp_TypeError );
 // TODO #undef _ypBool_PUBLIC_CMP_FUNCTION
 
+// TODO Need to decide whether to keep pre-computed hash in ypObject and, if so, if we can remove
+// the hash from ypSet's element table
 yp_STATIC_ASSERT( ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one );
 yp_hash_t yp_hashC( ypObject *x, ypObject **exc )
 {
@@ -2721,9 +2723,11 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
 }
 
 
-// Comparison methods return yp_True, yp_False, or an exception, and are not called if b==x.  When
-// checking for (in)equality, more efficient to check size first
-// TODO is that bit about not being called if b==x true?!
+// Comparison methods return yp_True, yp_False, or an exception.  When checking for (in)equality, 
+// more efficient to check size first.
+// TODO Check for b==x!
+// TODO Consider the pre-computed hash, if available
+// TODO Generally compare efficiency against Python
 #define _ypBytes_RELATIVE_CMP_FUNCTION( name, operator ) \
 static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
     int cmp; \
@@ -3428,13 +3432,14 @@ typedef struct {
     yp_INLINE_DATA( ypSet_KeyEntry );
 } ypSetObject;
 
-#define ypSet_TABLE( so ) ( (ypSet_KeyEntry *) ((ypObject *)so)->ob_data )
-#define ypSet_SET_TABLE( so, value ) ( ((ypObject *)so)->ob_data = (void *) (value) )
+#define ypSet_TABLE( so )               ( (ypSet_KeyEntry *) ((ypObject *)so)->ob_data )
+#define ypSet_SET_TABLE( so, value )    ( ((ypObject *)so)->ob_data = (void *) (value) )
 // TODO what if ob_len is the "invalid" value?
-#define ypSet_LEN( so )  ( ((ypObject *)so)->ob_len )
-#define ypSet_FILL( so )  ( ((ypSetObject *)so)->fill )
-#define ypSet_ALLOCLEN( so )  ( ((ypObject *)so)->ob_alloclen )
-#define ypSet_MASK( so ) ( ypSet_ALLOCLEN( so ) - 1 )
+#define ypSet_LEN( so )                 ( ((ypObject *)so)->ob_len )
+#define ypSet_FILL( so )                ( ((ypSetObject *)so)->fill )
+#define ypSet_ALLOCLEN( so )            ( ((ypObject *)so)->ob_alloclen )
+#define ypSet_MASK( so )                ( ypSet_ALLOCLEN( so ) - 1 )
+#define ypSet_INLINE_DATA( so )         ( ((ypSetObject *)so)->ob_inline_data )
 
 #define ypSet_PERTURB_SHIFT (5)
 
@@ -3458,6 +3463,7 @@ typedef struct {
     ypObject *keyset;
     yp_INLINE_DATA( ypObject * );
 } ypDictObject;
+#define ypDict_LEN( mp )     ( ((ypObject *)mp)->ob_len )
 #define ypDict_KEYSET( mp )  ( ((ypDictObject *)mp)->keyset )
 
 // Before adding keys to the set, call this function to determine if a resize is necessary.
@@ -3685,7 +3691,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
         keysleft -= 1;
         _ypSet_movekey_clean( so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc );
     }
-    yp_free( oldkeys );
+    if( oldkeys != ypSet_INLINE_DATA( so ) ) yp_free( oldkeys );
     return yp_None;
 }
 
@@ -4044,6 +4050,110 @@ static ypObject *frozenset_contains( ypObject *so, ypObject *x )
     return ypBool_FROM_C( ypSet_ENTRY_USED( loc ) );
 }
 
+static ypObject *frozenset_isdisjoint( ypObject *so, ypObject *x )
+{
+    return yp_NotImplementedError;
+}
+
+static ypObject *_frozenset_issubset( ypObject *so, ypObject *x )
+{
+    ypSet_KeyEntry *keys = ypSet_TABLE( so );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t i;
+    ypObject *result;
+    ypSet_KeyEntry *loc;
+
+    if( ypSet_LEN( so ) > ypSet_LEN( x ) ) return yp_False;
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
+        keysleft -= 1;
+        result = _ypSet_lookkey( x, keys[i].se_key, keys[i].se_hash, &loc );
+        if( yp_isexceptionC( result ) ) return result;
+        if( !ypSet_ENTRY_USED( loc ) ) return yp_False;
+    }
+    return yp_True;
+}
+static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    ypObject *x_asset;
+    ypObject *result;
+
+    // We can take some shortcuts if x is a set or a dict
+    if( x_pair == ypFrozenSet_CODE ) {
+        return _frozenset_issubset( so, x );
+    } else if( x_pair == ypFrozenDict_CODE ) {
+        if( ypSet_LEN( so ) > ypDict_LEN( x ) ) return yp_False;
+    }
+    
+    // Otherwise, we need to convert x to a set to quickly test if it contains all items
+    x_asset = yp_frozenset( x );
+    result = _frozenset_issubset( so, x_asset );
+    yp_decref( x_asset );
+    return result;
+}
+
+// Remember that if x.issubset(so), then so.issuperset(x)
+static ypObject *frozenset_issuperset( ypObject *so, ypObject *x )
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    ypObject *x_asset;
+    ypObject *result;
+
+    // We can take some shortcuts if x is a set or a dict
+    if( x_pair == ypFrozenSet_CODE ) {
+        return _frozenset_issubset( x, so );
+    } else if( x_pair == ypFrozenDict_CODE ) {
+        if( ypDict_LEN( x ) > ypSet_LEN( so ) ) return yp_False;
+    }
+    
+    // Otherwise, we need to convert x to a set to quickly test if it contains all items
+    x_asset = yp_frozenset( x );
+    result = _frozenset_issubset( x_asset, so );
+    yp_decref( x_asset );
+    return result;
+}
+
+static ypObject *frozenset_lt( ypObject *so, ypObject *x )
+{
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
+    if( ypSet_LEN( so ) >= ypSet_LEN( x ) ) return yp_False;
+    return _frozenset_issubset( so, x );
+}
+
+static ypObject *frozenset_le( ypObject *so, ypObject *x )
+{
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
+    return _frozenset_issubset( so, x );
+}
+
+static ypObject *frozenset_eq( ypObject *so, ypObject *x )
+{
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
+    if( ypSet_LEN( so ) != ypSet_LEN( x ) ) return yp_False;
+    // FIXME Compare stored hashes (they should be equal if so and x are equal)
+    return _frozenset_issubset( so, x );
+}
+
+static ypObject *frozenset_ne( ypObject *so, ypObject *x )
+{
+    ypObject *result = frozenset_eq( so, x );
+    return ypBool_NOT( result );
+}
+
+static ypObject *frozenset_ge( ypObject *so, ypObject *x )
+{
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
+    return _frozenset_issubset( x, so );
+}
+
+static ypObject *frozenset_gt( ypObject *so, ypObject *x )
+{
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
+    if( ypSet_LEN( so ) <= ypSet_LEN( x ) ) return yp_False;
+    return _frozenset_issubset( x, so );
+}
+
 static ypObject *set_update( ypObject *so, int n, va_list args )
 {
     ypObject *result;
@@ -4106,10 +4216,10 @@ static ypObject *frozenset_dealloc( ypObject *so )
 }
 
 static ypSetMethods ypFrozenSet_as_set = {
-    MethodError_objobjproc,         // tp_isdisjoint
-    MethodError_objobjproc,         // tp_issubset
+    frozenset_isdisjoint,           // tp_isdisjoint
+    frozenset_issubset,             // tp_issubset
     // tp_lt is elsewhere
-    MethodError_objobjproc,         // tp_issuperset
+    frozenset_issuperset,           // tp_issuperset
     // tp_gt is elsewhere
     MethodError_objvalistproc,      // tp_update
     MethodError_objvalistproc,      // tp_intersection_update
@@ -4136,12 +4246,12 @@ static ypTypeObject ypFrozenSet_Type = {
 
     // Boolean operations and comparisons
     frozenset_bool,                 // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    frozenset_lt,                   // tp_lt
+    frozenset_le,                   // tp_le
+    frozenset_eq,                   // tp_eq
+    frozenset_ne,                   // tp_ne
+    frozenset_ge,                   // tp_ge
+    frozenset_gt,                   // tp_gt
 
     // Generic object operations
     MethodError_hashfunc,           // tp_currenthash
@@ -4177,10 +4287,10 @@ static ypTypeObject ypFrozenSet_Type = {
 };
 
 static ypSetMethods ypSet_as_set = {
-    MethodError_objobjproc,         // tp_isdisjoint
-    MethodError_objobjproc,         // tp_issubset
+    frozenset_isdisjoint,           // tp_isdisjoint
+    frozenset_issubset,             // tp_issubset
     // tp_lt is elsewhere
-    MethodError_objobjproc,         // tp_issuperset
+    frozenset_issuperset,           // tp_issuperset
     // tp_gt is elsewhere
     set_update,                     // tp_update
     set_intersection_update,        // tp_intersection_update
@@ -4207,12 +4317,12 @@ static ypTypeObject ypSet_Type = {
 
     // Boolean operations and comparisons
     frozenset_bool,                 // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    frozenset_lt,                   // tp_lt
+    frozenset_le,                   // tp_le
+    frozenset_eq,                   // tp_eq
+    frozenset_ne,                   // tp_ne
+    frozenset_ge,                   // tp_ge
+    frozenset_gt,                   // tp_gt
 
     // Generic object operations
     MethodError_hashfunc,           // tp_currenthash
@@ -4320,10 +4430,10 @@ ypObject *yp_set( ypObject *iterable ) {
 // TODO investigate how/when the keyset will be shared between dicts
 // TODO alloclen will always be the same as keyset.alloclen; repurpose?
 
-// ypDictObject and ypDict_KEYSET are defined above, for use by the set code
-#define ypDict_LEN( mp )              ( ((ypObject *)mp)->ob_len )
-#define ypDict_VALUES( mp )           ( (ypObject **) ((ypObject *)mp)->ob_data )
-#define ypDict_SET_VALUES( mp, x )    ( ((ypObject *)mp)->ob_data = x )
+// ypDictObject, ypDict_LEN, and ypDict_KEYSET are defined above, for use by the set code
+#define ypDict_VALUES( mp )         ( (ypObject **) ((ypObject *)mp)->ob_data )
+#define ypDict_SET_VALUES( mp, x )  ( ((ypObject *)mp)->ob_data = x )
+#define ypDict_INLINE_DATA( mp )    ( ((ypDictObject *)mp)->ob_inline_data )
 
 // Returns the index of the given ypSet_KeyEntry in the hash table
 // TODO needed?
@@ -4416,7 +4526,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
 
     yp_decref( ypDict_KEYSET( mp ) );
     ypDict_KEYSET( mp ) = newkeyset;
-    yp_free( oldvalues );
+    if( oldvalues != ypDict_INLINE_DATA( mp ) ) yp_free( oldvalues );
     ypDict_SET_VALUES( mp, newvalues );
     return yp_None;
 }
