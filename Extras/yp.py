@@ -206,22 +206,22 @@ yp_func( c_ypObject_p, "yp_gt", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 
 
 #typedef float               yp_float32_t;
-class c_yp_float32_t( c_float ): pass
+c_yp_float32_t = c_float
 #typedef double              yp_float64_t;
-class c_yp_float64_t( c_double ): pass
+c_yp_float64_t = c_double
 #if SIZE_MAX == 0xFFFFFFFFu
 #typedef yp_int32_t          yp_ssize_t;
 #else
 #typedef yp_int64_t          yp_ssize_t;
 #endif
-class c_yp_ssize_t( c_ssize_t ): pass
+c_yp_ssize_t = c_ssize_t
 #typedef yp_ssize_t          yp_hash_t;
-class c_yp_hash_t( c_yp_ssize_t ): pass
+c_yp_hash_t = c_yp_ssize_t
 
 # typedef yp_int64_t      yp_int_t;
-class c_yp_int_t( c_int64 ): pass
+c_yp_int_t = c_int64
 # typedef yp_float64_t    yp_float_t;
-class c_yp_float_t( c_yp_float64_t ): pass
+c_yp_float_t = c_yp_float64_t
 
 # typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 # XXX The return value needs to be a c_void_p to prevent addresses-as-ints from being converted to
@@ -763,7 +763,7 @@ class ypObject( c_ypObject_p ):
     def __next__( self ): return _yp_next( self )
 
     def __contains__( self, x ): return _yp_contains( self, x )
-    def __len__( self ): return _yp_lenC( self )
+    def __len__( self ): return _yp_lenC( self, yp_None )
     def push( self, x ): _yp_push( self, x )
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )

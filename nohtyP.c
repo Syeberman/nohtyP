@@ -658,7 +658,6 @@ static ypObject *_ypMem_malloc_container_variable(
     _ypMem_malloc_container_variable( offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (required), (extra) )
 
-// FIXME this
 // Resizes ob_data, the variable-portion of ob, and returns yp_None.  On error, ob is not modified,
 // and an exception is returned.  required is the minimum ob_alloclen required, and the minimum
 // number of elements that will be preserved; if required can fit inline, the inline buffer is
@@ -3991,6 +3990,11 @@ static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
 
 // Public methods
 
+static ypObject *_frozenset_decref_visitor( ypObject *x, void *memo ) {
+    yp_decref( x );
+    return yp_None;
+}
+
 static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
@@ -4198,19 +4202,26 @@ static ypObject *set_push( ypObject *so, ypObject *x ) {
     return yp_None;
 }
 
+static ypObject *set_clear( ypObject *so ) {
+    if( ypSet_FILL( so ) == 0 ) return yp_None;
+    frozenset_traverse( so, _frozenset_decref_visitor, NULL ); // cannot fail
+    // FIXME there's a memcpy in this that we can and should avoid
+    ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, ypSet_MINSIZE );
+    ypSet_ALLOCLEN( so ) = ypSet_MINSIZE; // we can't make use of the excess anyway
+    ypSet_LEN( so ) = 0;
+    ypSet_FILL( so ) = 0;
+    memset( ypSet_TABLE( so ), 0, ypSet_MINSIZE * sizeof( ypSet_KeyEntry ) );
+    return yp_None;
+}
+
 static ypObject *frozenset_len( ypObject *so, yp_ssize_t *len ) {
     *len = ypSet_LEN( so );
     return yp_None;
 }
 
-static ypObject *_frozenset_dealloc_visitor( ypObject *x, void *memo ) {
-    yp_decref( x );
-    return yp_None;
-}
-
 static ypObject *frozenset_dealloc( ypObject *so )
 {
-    frozenset_traverse( so, _frozenset_dealloc_visitor, NULL ); // cannot fail
+    frozenset_traverse( so, _frozenset_decref_visitor, NULL ); // cannot fail
     ypMem_FREE_CONTAINER( so, ypSetObject );
     return yp_None;
 }
@@ -4340,7 +4351,7 @@ static ypTypeObject ypSet_Type = {
     frozenset_contains,             // tp_contains
     frozenset_len,                  // tp_len
     set_push,                       // tp_push
-    MethodError_objproc,            // tp_clear
+    set_clear,                      // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjproc,         // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
@@ -4763,6 +4774,20 @@ static ypObject *frozendict_bool( ypObject *mp ) {
     return ypBool_FROM_C( ypDict_LEN( mp ) );
 }
 
+static ypObject *frozendict_contains( ypObject *mp, ypObject *key )
+{
+    yp_hash_t hash;
+    ypObject *keyset = ypDict_KEYSET( mp );
+    ypSet_KeyEntry *key_loc;
+    ypObject *result = yp_None;
+
+    hash = yp_currenthashC( key, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    result = _ypSet_lookkey( keyset, key, hash, &key_loc );
+    if( yp_isexceptionC( result ) ) return result;
+    return ypBool_FROM_C( (*ypDict_VALUE_ENTRY( mp, key_loc )) != NULL );
+}
+
 static ypObject *frozendict_len( ypObject *mp, yp_ssize_t *len ) {
     *len = ypDict_LEN( mp );
     return yp_None;
@@ -4871,7 +4896,7 @@ static ypTypeObject ypFrozenDict_Type = {
     MethodError_objobjproc,         // tp_send
 
     // Container operations
-    MethodError_objobjproc,         // tp_contains
+    frozendict_contains,            // tp_contains
     frozendict_len,                 // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
@@ -4938,7 +4963,7 @@ static ypTypeObject ypDict_Type = {
     MethodError_objobjproc,         // tp_send
 
     // Container operations
-    MethodError_objobjproc,         // tp_contains
+    frozendict_contains,            // tp_contains
     frozendict_len,                 // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear

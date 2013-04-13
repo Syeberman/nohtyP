@@ -355,6 +355,7 @@ class TestJointOps(unittest.TestCase):
         self.assertEqual(sum(elem.hash_count for elem in d), n)
         self.assertEqual(d3, dict.fromkeys(d, 123))
 
+    @unittest.skip("REWORK: nohtyP sets don't store user-defined types")
     def test_container_iterator(self):
         # Bug #3680: tp_traverse was not implemented for set iterator object
         class C(object):
