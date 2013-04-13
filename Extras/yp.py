@@ -50,15 +50,24 @@ def yp_func( retval, name, paramtuple, errcheck=True ):
     # Gather all the information that ctypes needs
     params = tuple( yp_param( *x ) for x in paramtuple )
     proto = CFUNCTYPE( retval, *(x.type for x in params) )
-    c_func = proto( (name, ypdll), tuple( x.pflag for x in params ) )
+    # XXX ctypes won't allow variable-length arguments if we pass in pflags
+    c_func = proto( (name, ypdll) )
     c_func._yp_name = "_"+name
     if errcheck: c_func.errcheck = yp_func_errcheck
 
     # Create a wrapper function to convert arguments and check for errors (because the way ctypes
     # does it doesn't work well for us...yp_func_errcheck needs the objects _after_ from_param)
-    def c_func_wrapper( *args ):
-        args = tuple( params[i].preconvert( x ) for (i, x) in enumerate( args ) )
-        return c_func( *args ) # let c_func.errcheck check for errors
+    if len( paramtuple ) > 0 and paramtuple[-1] is c_multiN_ypObject_p:
+        def c_func_wrapper( *args ):
+            fixed, extra = args[:len( params )-1], args[len( params )-1:]
+            converted = list( params[i].preconvert( x ) for (i, x) in enumerate( fixed ) )
+            converted.append( len( extra ) )
+            converted.extend( c_ypObject_p.from_param( x ) for x in extra )
+            return c_func( *converted ) # let c_func.errcheck check for errors
+    else:
+        def c_func_wrapper( *args ):
+            converted = tuple( params[i].preconvert( x ) for (i, x) in enumerate( args ) )
+            return c_func( *converted ) # let c_func.errcheck check for errors
     c_func_wrapper.__name__ = c_func._yp_name
     globals( )[c_func._yp_name] = c_func_wrapper
 
@@ -102,7 +111,10 @@ class c_ypObject_pp( c_ypObject_p*1 ):
 
 # ypAPI ypObject *yp_None;
 c_ypObject_p_value( "yp_None" )
+
+# Special-case arguments
 c_ypObject_pp_exc = (c_ypObject_pp, "exc", _yp_None)
+c_multiN_ypObject_p = (c_int, "n", 0)
 
 # ypAPI ypObject *yp_incref( ypObject *x );
 yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
@@ -244,7 +256,7 @@ yp_func( c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ) )
 #         void *state, yp_ssize_t size, int n, va_list args );
 yp_func( c_ypObject_p, "yp_generator_fromstructCN",
         ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"),
-            (c_void_p, "state"), (c_yp_ssize_t, "size"), (c_int, "n", 0)) )
+            (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p) )
 
 # ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
 # ypObject *yp_rangeC( yp_int_t stop );
@@ -280,10 +292,10 @@ yp_func( c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ) )
 
 # ypObject *yp_frozensetN( int n, ... );
 # ypObject *yp_frozensetV( int n, va_list args );
-yp_func( c_ypObject_p, "yp_frozensetN", ((c_int, "n"), ) ) # FIXME
+yp_func( c_ypObject_p, "yp_frozensetN", (c_multiN_ypObject_p, ) )
 # ypObject *yp_setN( int n, ... );
 # ypObject *yp_setV( int n, va_list args );
-yp_func( c_ypObject_p, "yp_setN", ((c_int, "n"), ) ) # FIXME
+yp_func( c_ypObject_p, "yp_setN", (c_multiN_ypObject_p, ) )
 
 # ypObject *yp_frozenset( ypObject *iterable );
 yp_func( c_ypObject_p, "yp_frozenset", ((c_ypObject_p, "iterable"), ) )
@@ -458,6 +470,7 @@ yp_func( c_ypObject_p, "yp_issuperset", ((c_ypObject_p, "set"), (c_ypObject_p, "
 
 # ypObject *yp_intersectionN( ypObject *set, int n, ... );
 # ypObject *yp_intersectionV( ypObject *set, int n, va_list args );
+yp_func( c_ypObject_p, "yp_intersectionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_differenceN( ypObject *set, int n, ... );
 # ypObject *yp_differenceV( ypObject *set, int n, va_list args );
@@ -758,16 +771,15 @@ class ypObject( c_ypObject_p ):
     def isdisjoint( self, other ): return _yp_isdisjoint( self, other )
     def issuperset( self, other ): return _yp_issuperset( self, other )
     # def union( self, *others ):
-    # def intersection( self, *others ):
+    def intersection( self, *others ): return _yp_intersectionN( self, *others )
     # def difference( self, *others ):
     def symmetric_difference( self, other ): return _yp_symmetric_difference( self, other )
     # def update( self, *others ):
     # def intersection_update( self, *others ):
     # def difference_update( self, *others ):
     def symmetric_difference_update( self, other ): return _yp_symmetric_difference_update( self, other )
-    def add( self, elem ): _yp_set_add( self, elem )
-    def remove( self, elem ): _yp_set_remove( self, elem )
-    def discard( self, elem ): _yp_set_discard( self, elem )
+    def remove( self, elem ): _yp_remove( self, elem )
+    def discard( self, elem ): _yp_discard( self, elem )
 
 def pytype( pytype, ypcode ):
     def _pytype( cls ):
@@ -835,7 +847,7 @@ class yp_iter( ypObject ):
         self = super( ).__new__( cls )
         self._pyiter = iter( object )
         self._pycallback = c_yp_generator_func_t( self._pygenerator_func )
-        self.value = _yp_incref( _yp_generator_fromstructCN( self._pycallback, lenhint, 0, 0, 0 ) )
+        self.value = _yp_incref( _yp_generator_fromstructCN( self._pycallback, lenhint, 0, 0 ) )
         return self
 
     def __iter__( self ): return self
@@ -896,26 +908,36 @@ class yp_list( ypObject ):
     def __new__( cls, iterable=_yp_closed_iter ):
         return _yp_list( yp_iterable( iterable ) )
 
-# FIXME The str hack is temporary
-@pytype( frozenset, 22 )
-class yp_frozenset( ypObject ):
+class _ypSet( ypObject ):
     def __new__( cls, iterable=_yp_closed_iter ):
+        # FIXME This str hack is temporary
         if isinstance( iterable, str ):
         	iterable = yp_str( iterable )
         else:
             iterable = yp_iterable( iterable )
-        return _yp_frozenset( iterable )
+        return cls._ypSet_constructor( iterable )
+    def __or__( self, other ): 
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        return _yp_unionN( self, other )
+    def __and__( self, other ): 
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        return _yp_intersectionN( self, other )
+    def __sub__( self, other ): 
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        return _yp_differenceN( self, other )
+    def __xor__( self, other ): 
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        return _yp_symmetric_difference( self, other )
+    def add( self, elem ): _yp_set_add( self, elem )
+
+@pytype( frozenset, 22 )
+class yp_frozenset( _ypSet ):
+    _ypSet_constructor = _yp_frozenset
 
 # FIXME The str hack is temporary
 @pytype( set, 23 )
-class yp_set( ypObject ):
-    def __new__( cls, iterable=_yp_closed_iter ):
-        if isinstance( iterable, str ):
-        	iterable = yp_str( iterable )
-        else:
-            iterable = yp_iterable( iterable )
-        return _yp_set( iterable )
-
+class yp_set( _ypSet ):
+    _ypSet_constructor = _yp_set
 
 
 #so = yp_set( )

@@ -300,6 +300,7 @@ class TestJointOps(unittest.TestCase):
         f.add(s)
         f.discard(s)
 
+    @unittest.skip("nohtyP sets don't store user-defined types")
     def test_badcmp(self):
         s = self.thetype([BadCmp()])
         # Detect comparison errors during insertion and lookup
