@@ -781,9 +781,11 @@ class ypObject( c_ypObject_p ):
     def remove( self, elem ): _yp_remove( self, elem )
     def discard( self, elem ): _yp_discard( self, elem )
 
-def pytype( pytype, ypcode ):
+def pytype( pytypes, ypcode ):
+    if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
     def _pytype( cls ):
-        ypObject._pytype2yp[pytype] = cls
+        for pytype in pytypes: 
+            ypObject._pytype2yp[pytype] = cls
         ypObject._ypcode2yp[ypcode] = cls
         return cls
     return _pytype
@@ -825,7 +827,7 @@ class yp_bool( ypObject ):
 yp_True = yp_bool( _value=_yp_True.value )
 yp_False = yp_bool( _value=_yp_False.value )
 
-@pytype( iter, 15 )
+@pytype( (iter, type(x for x in ())), 15 )
 class yp_iter( ypObject ):
     def _pygenerator_func( self, yp_self, yp_value ):
         try:
@@ -835,7 +837,6 @@ class yp_iter( ypObject ):
                 result = ypObject.frompython( next( self._pyiter ) )
         except BaseException as e:
             result = _pyExc2yp[type( e )]
-        # If we just try to return result here, ctypes gets confused (TODO bug?)
         return _yp_incref( result )
 
     def __new__( cls, object, sentinel=_yp_arg_missing ):
@@ -878,13 +879,13 @@ class yp_int( ypObject ):
 class yp_bytes( ypObject ):
     def __new__( cls, source=0, encoding=None, errors=None ):
         if isinstance( source, str ):
-        	raise NotImplementedError
+            raise NotImplementedError
         elif isinstance( source, (int, yp_int) ):
             return _yp_bytesC( None, source )
         # else if it has the buffer interface
         # else if it is an iterable
         else:
-        	raise TypeError( type( source ) )
+            raise TypeError( type( source ) )
 
 # FIXME When nohtyP supports a proper Unicode string type, use it
 # FIXME When nohtyP has types that have string representations, update this
@@ -893,10 +894,10 @@ class yp_bytes( ypObject ):
 class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
-        	encoded = str( object ).encode( "ascii" )
-        	return _yp_bytesC( encoded, len( encoded ) )
+            encoded = str( object ).encode( "ascii" )
+            return _yp_bytesC( encoded, len( encoded ) )
         else:
-        	raise NotImplementedError
+            raise NotImplementedError
 
 @pytype( tuple, 20 )
 class yp_tuple( ypObject ):
@@ -912,7 +913,7 @@ class _ypSet( ypObject ):
     def __new__( cls, iterable=_yp_closed_iter ):
         # FIXME This str hack is temporary
         if isinstance( iterable, str ):
-        	iterable = yp_str( iterable )
+            iterable = yp_iter( iterable )
         else:
             iterable = yp_iterable( iterable )
         return cls._ypSet_constructor( iterable )
