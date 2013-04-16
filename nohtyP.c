@@ -437,8 +437,8 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
 
 #if 0
 #include <stdio.h>
-#define DEBUG0( fmt ) printf( fmt "\n" )
-#define DEBUG( fmt, ... ) printf( fmt "\n", __VA_ARGS__ )
+#define DEBUG0( fmt ) do { _flushall( ); printf( fmt "\n" ); _flushall( ); } while( 0 )
+#define DEBUG( fmt, ... ) do { _flushall( ); printf( fmt "\n", __VA_ARGS__ ); _flushall( ); } while( 0 )
 #else
 #define DEBUG0( fmt )
 #define DEBUG( fmt, ... )
@@ -3691,6 +3691,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
         _ypSet_movekey_clean( so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc );
     }
     if( oldkeys != ypSet_INLINE_DATA( so ) ) yp_free( oldkeys );
+    DEBUG( "_ypSet_resize: 0x%08X table 0x%08X  (was 0x%08X)", so, newkeys, oldkeys );
     return yp_None;
 }
 
