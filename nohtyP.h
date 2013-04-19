@@ -831,6 +831,9 @@ ypAPI ypObject *yp_iter_values( ypObject *mapping );
  * Bytes & String Operations
  */
 
+// TODO Document how the object returned/accepted for [1] is different than that for [1:2] for
+// these types of objects
+
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC et al.
 ypAPI ypObject *yp_s_ascii;     // "ascii"
 ypAPI ypObject *yp_s_latin_1;   // "latin_1"
@@ -1025,17 +1028,10 @@ ypAPI ypObject *yp_sum( ypObject *iterable );
 //      yp_IMMORTAL_BYTES( name, value );
 
 // Defines an immortal str constant at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const".  value is an initializer for an array of yp_int32_t values,
-// each representing one character in the string.  The length is calculated while compiling; the
-// hash will be calculated the first time it is accessed.
-// TODO NULL-termination (struct { yp_int32_t usrdata[] = <value>; yp_int32_t nullterm = 0; };)?
-// TODO Notes on inefficiency of space?
-//      yp_IMMORTAL_STR_UCS4_ARRAY( name, value );
-
-// TODO both an array and a string literal version? or wchar?
-//      yp_IMMORTAL_STR_UCS2_ARRAY( name, value );
-
-// TODO as above
+// which is of type "ypObject * const".  value is a C string literal.  The length is calculated 
+// while compiling; the hash will be calculated the first time it is accessed.
+// TODO Some warning that the compiler used may not actually be using latin-1
+// TODO Review this documentation
 //      yp_IMMORTAL_STR_LATIN1( name, value );
 
 
