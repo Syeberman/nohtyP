@@ -256,7 +256,7 @@ static ypTypeObject *ypTypeTable[255];
 #define ypBytes_CODE                ( 16u)
 #define ypByteArray_CODE            ( 17u)
 #define ypStr_CODE                  ( 18u)
-#define ypCharacterArray_CODE       ( 19u)
+#define ypChrArray_CODE             ( 19u)
 #define ypTuple_CODE                ( 20u)
 #define ypList_CODE                 ( 21u)
 
@@ -1872,6 +1872,8 @@ ypObject *yp_False = (ypObject *) &_yp_False_struct;
  * Integers
  *************************************************************************************************/
 
+// TODO: pre-allocate a set of immortal ints for range(-5, 255), or whatever seems appropriate
+
 // struct _ypIntObject is declared in nohtyP.h for use by yp_IMMORTAL_INT
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 typedef struct _ypIntObject ypIntObject;
@@ -2679,7 +2681,6 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     return yp_None;
 }
 
-
 // TODO bytes_getitem, setitem, delitem...need generic functions to redirect to getindexC et al
 
 // Returns yp_None or an exception
@@ -2727,6 +2728,7 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
 // TODO Check for b==x!
 // TODO Consider the pre-computed hash, if available
 // TODO Generally compare efficiency against Python
+// TODO Convert to function (here and elsewhere)
 #define _ypBytes_RELATIVE_CMP_FUNCTION( name, operator ) \
 static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
     int cmp; \
@@ -2762,8 +2764,8 @@ static ypObject *bytes_currenthash( ypObject *b, yp_hash_t *hash ) {
     return yp_None;
 }
 
-static ypObject *bytes_dealloc( ypObject *x ) {
-    ypMem_FREE_CONTAINER( x, ypBytesObject );
+static ypObject *bytes_dealloc( ypObject *b ) {
+    ypMem_FREE_CONTAINER( b, ypBytesObject );
     return yp_None;
 }
 
@@ -2956,10 +2958,273 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
  *************************************************************************************************/
 
 // TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
+typedef struct {
+    ypObject_HEAD
+    yp_INLINE_DATA( yp_uint8_t );
+} ypStrObject;
+yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
+
+// TODO getindex for bytearray (and byte) returns an immutable integer, so getindex for chrarray
+// should return an immutable str-of-len-one, which is also consistent with Python's str
+
+// TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
+
+// TODO add checks to ensure invalid Unicode codepoints don't get added
+
+#define ypStr_DATA( s ) ( (yp_uint8_t *) ((ypObject *)s)->ob_data )
+// TODO what if ob_len is the "invalid" value?
+#define ypStr_LEN( s )  ( ((ypObject *)s)->ob_len )
+
+// Return a new str object with uninitialized data of the given length, or an exception
+static ypObject *_yp_str_new( yp_ssize_t len )
+{
+    ypObject *s;
+    if( len < 0 ) len = 0; // TODO return a new ref to an immortal "" object
+    s = ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, len );
+    if( yp_isexceptionC( s ) ) return s;
+    ypStr_LEN( s ) = len;
+    return s;
+}
+
+// Return a new chrarray object with uninitialized data of the given length, or an exception
+// TODO Over-allocate to avoid future resizings
+static ypObject *_yp_chrarray_new( yp_ssize_t len )
+{
+    ypObject *s;
+    if( len < 0 ) len = 0;
+    s = ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, ypChrArray_CODE, len, 0 );
+    if( yp_isexceptionC( s ) ) return s;
+    ypStr_LEN( s ) = len;
+    return s;
+}
+
+
+static ypObject *str_bool( ypObject *s ) {
+    return ypBool_FROM_C( ypStr_LEN( s ) );
+}
+
+// Returns new reference or an exception
+static ypObject *str_getindex( ypObject *s, yp_ssize_t i )
+{
+    ypObject *result = ypSequence_AdjustIndexC( ypStr_LEN( s ), &i );
+    if( yp_isexceptionC( result ) ) return result;
+    return yp_chrC( ypStr_DATA( s )[i] );
+}
+
+// Returns yp_None or an exception
+static ypObject *str_len( ypObject *s, yp_ssize_t *len )
+{
+    *len = ypStr_LEN( s );
+    return yp_None;
+}
+
+// Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
+// FIXME bring this in-line with Python's string hashing; it's currently using bytes hashing
+static ypObject *str_currenthash( ypObject *s, yp_hash_t *hash ) {
+    *hash = yp_HashBytes( ypStr_DATA( s ), ypStr_LEN( s ) );
+    return yp_None;
+}
+
+static ypObject *str_dealloc( ypObject *s ) {
+    ypMem_FREE_CONTAINER( s, ypStrObject );
+    return yp_None;
+}
+
+
+
+static ypSequenceMethods ypStr_as_sequence = {
+    str_getindex,                   // tp_getindex
+    MethodError_objsliceproc,       // tp_getslice
+    MethodError_findfunc,           // tp_find
+    MethodError_countfunc,          // tp_count
+    MethodError_objssizeobjproc,    // tp_setindex
+    MethodError_objsliceobjproc,    // tp_setslice
+    MethodError_objssizeproc,       // tp_delindex
+    MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_extend
+    MethodError_objssizeproc,       // tp_irepeat
+    MethodError_objssizeobjproc,    // tp_insert
+    MethodError_objssizeproc,       // tp_popindex
+    MethodError_objproc,            // tp_reverse
+    MethodError_sortfunc            // tp_sort
+};
+
+static ypTypeObject ypStr_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    str_dealloc,                    // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    str_bool,                       // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    Sequence_iter,                  // tp_iter
+    Sequence_iter_reversed,         // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_len
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    &ypStr_as_sequence,             // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+static ypSequenceMethods ypChrArray_as_sequence = {
+    str_getindex,                   // tp_getindex
+    MethodError_objsliceproc,       // tp_getslice
+    MethodError_findfunc,           // tp_find
+    MethodError_countfunc,          // tp_count
+    MethodError_objssizeobjproc,    // tp_setindex
+    MethodError_objsliceobjproc,    // tp_setslice
+    MethodError_objssizeproc,       // tp_delindex
+    MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_extend
+    MethodError_objssizeproc,       // tp_irepeat
+    MethodError_objssizeobjproc,    // tp_insert
+    MethodError_objssizeproc,       // tp_popindex
+    MethodError_objproc,            // tp_reverse
+    MethodError_sortfunc            // tp_sort
+};
+
+static ypTypeObject ypChrArray_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    str_dealloc,                    // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    str_bool,                       // tp_bool
+    MethodError_objobjproc,         // tp_lt
+    MethodError_objobjproc,         // tp_le
+    MethodError_objobjproc,         // tp_eq
+    MethodError_objobjproc,         // tp_ne
+    MethodError_objobjproc,         // tp_ge
+    MethodError_objobjproc,         // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    Sequence_iter,                  // tp_iter
+    Sequence_iter_reversed,         // tp_iter_reversed
+    MethodError_objobjproc,         // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_len
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    &ypChrArray_as_sequence,        // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+
+// Public constructors
+
+// FIXME completely ignoring encoding/errors, and assuming source in latin-1
+static ypObject *_ypStrC( ypObject *(*allocator)( yp_ssize_t ),
+    const yp_uint8_t *source, yp_ssize_t len )
+{
+    ypObject *s;
+
+    // Allocate an object of the appropriate size
+    if( source == NULL ) {
+        if( len < 0 ) len = 0;
+    } else {
+        if( len < 0 ) len = strlen( (const char *) source );
+    }
+    s = allocator( len );
+
+    // Initialize the data
+    if( source == NULL ) {
+        memset( ypStr_DATA( s ), 0, len );
+    } else {
+        memcpy( ypStr_DATA( s ), source, len );
+    }
+    return s;
+}
+ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len, 
+        ypObject *encoding, ypObject *errors ) {
+    return _ypStrC( _yp_str_new, source, len );
+}
+ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+        ypObject *encoding, ypObject *errors ) {
+    return _ypStrC( _yp_chrarray_new, source, len );
+}
 
 ypObject *yp_chrC( yp_int_t i ) {
-    return yp_NotImplementedError; // TODO
+    yp_uint8_t source[1];
+
+    if( i < 0x00 || i > 0xFF ) return yp_SystemLimitationError;
+    source[0] = (yp_uint8_t) i;
+    return _ypStrC( _yp_str_new, source, 1 );
 }
+
+// TODO undef macros
 
 
 /*************************************************************************************************
@@ -5370,7 +5635,7 @@ static ypTypeObject *ypTypeTable[255] = {
     &ypBytes_Type,      /* ypBytes_CODE                ( 16u) */
     &ypByteArray_Type,  /* ypByteArray_CODE            ( 17u) */
     NULL,               /* ypStr_CODE                  ( 18u) */
-    NULL,               /* ypCharacterArray_CODE       ( 19u) */
+    NULL,               /* ypChrArray_CODE             ( 19u) */
     &ypTuple_Type,      /* ypTuple_CODE                ( 20u) */
     &ypList_Type,       /* ypList_CODE                 ( 21u) */
 
