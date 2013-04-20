@@ -266,7 +266,23 @@ yp_func( c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")
 # ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len );
 yp_func( c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
 
-# XXX The str/characterarray types will be added in a future version
+# ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+#         ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_str_frombytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
+# ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+#         ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_chrarray_frombytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
+
+# ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors );
+# ypObject *yp_chrarray3( ypObject *object, ypObject *encoding, ypObject *errors );
+
+# ypObject *yp_str( ypObject *object );
+# ypObject *yp_chrarray( ypObject *object );
+
+# ypObject *yp_str0( void );
+# ypObject *yp_chrarray0( void );
 
 # ypObject *yp_chrC( yp_int_t i );
 
@@ -532,7 +548,25 @@ yp_func( c_void, "yp_pushuniqueE", ((c_ypObject_pp, "set"), (c_ypObject_p, "x"))
 # ypObject *yp_iter_values( ypObject *mapping );
 
 
-# XXX bytes- and str-specific methods will be added in a future version
+# ypObject *yp_s_ascii;     // "ascii"
+c_ypObject_p_value( "yp_s_ascii" )
+# ypObject *yp_s_latin_1;   // "latin_1"
+c_ypObject_p_value( "yp_s_latin_1" )
+# ypObject *yp_s_utf_32;    // "utf_32"
+# ypObject *yp_s_utf_32_be; // "utf_32_be"
+# ypObject *yp_s_utf_32_le; // "utf_32_le"
+# ypObject *yp_s_utf_16;    // "utf_16"
+# ypObject *yp_s_utf_16_be; // "utf_16_be"
+# ypObject *yp_s_utf_16_le; // "utf_16_le"
+# ypObject *yp_s_utf_8;     // "utf_8"
+
+# ypObject *yp_s_strict;    // "strict"
+c_ypObject_p_value( "yp_s_strict" )
+# ypObject *yp_s_ignore;    // "ignore"
+# ypObject *yp_s_replace;   // "replace"
+
+# XXX Additional bytes- and str-specific methods will be added in a future version
+
 
 # ypObject *yp_add( ypObject *x, ypObject *y );
 # ypObject *yp_sub( ypObject *x, ypObject *y );
@@ -858,10 +892,11 @@ try: _yp_next( _yp_closed_iter )
 except StopIteration: pass
 else: raise AssertionError( "should be an empty iterator" )
 
-def yp_iterable( iterable ):
+def _yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
     if isinstance( iterable, c_ypObject_p ): return iterable
+    if isinstance( iterable, str ): return yp_str( iterable )
     return yp_iter( iterable )
 
 @pytype( int, 10 )
@@ -871,7 +906,7 @@ class yp_int( ypObject ):
             try: return _yp_intC( x )
             except TypeError: pass
             base = 10
-        return _yp_int_strC( x, base )
+        raise NotImplementedError
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
@@ -887,36 +922,31 @@ class yp_bytes( ypObject ):
         else:
             raise TypeError( type( source ) )
 
-# FIXME When nohtyP supports a proper Unicode string type, use it
 # FIXME When nohtyP has types that have string representations, update this
+# FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
 # FIXME Just generally move more of this logic into nohtyP, when available
 @pytype( str, 18 )
 class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
-            encoded = str( object ).encode( "ascii" )
-            return _yp_bytesC( encoded, len( encoded ) )
+            encoded = str( object ).encode( "latin-1" )
+            return _yp_str_frombytesC( encoded, len( encoded ), _yp_s_latin_1, _yp_s_strict )
         else:
             raise NotImplementedError
 
 @pytype( tuple, 20 )
 class yp_tuple( ypObject ):
     def __new__( cls, iterable=_yp_closed_iter ):
-        return _yp_tuple( yp_iterable( iterable ) )
+        return _yp_tuple( _yp_iterable( iterable ) )
 
 @pytype( list, 21 )
 class yp_list( ypObject ):
     def __new__( cls, iterable=_yp_closed_iter ):
-        return _yp_list( yp_iterable( iterable ) )
+        return _yp_list( _yp_iterable( iterable ) )
 
 class _ypSet( ypObject ):
     def __new__( cls, iterable=_yp_closed_iter ):
-        # FIXME This str hack is temporary
-        if isinstance( iterable, str ):
-            iterable = yp_iter( iterable )
-        else:
-            iterable = yp_iterable( iterable )
-        return cls._ypSet_constructor( iterable )
+        return cls._ypSet_constructor( _yp_iterable( iterable ) )
     def __or__( self, other ): 
         if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
         return _yp_unionN( self, other )
@@ -935,7 +965,6 @@ class _ypSet( ypObject ):
 class yp_frozenset( _ypSet ):
     _ypSet_constructor = _yp_frozenset
 
-# FIXME The str hack is temporary
 @pytype( set, 23 )
 class yp_set( _ypSet ):
     _ypSet_constructor = _yp_set
