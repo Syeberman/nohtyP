@@ -268,6 +268,7 @@ static ypTypeObject *ypTypeTable[255];
 
 yp_STATIC_ASSERT( _ypInt_CODE == ypInt_CODE, ypInt_CODE );
 yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE );
+yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
 
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
@@ -454,14 +455,14 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
 //  partially or completely replaced after the realloc
 //  - malloc/realloc may allocate more memory than requested, memory that _could_ be used if we
 //  only knew how much there was
-// yp_malloc, yp_malloc_resize, and yp_free are the top level functions of nohtyP's memory 
+// yp_malloc, yp_malloc_resize, and yp_free are the top level functions of nohtyP's memory
 // allocation scheme, designed to overcome these inefficiencies.  There are several implementations
-// of these APIs depending on the target platform; you can also provide your own versions via 
+// of these APIs depending on the target platform; you can also provide your own versions via
 // yp_initialize.
 
 // Dummy memory allocation functions that always fail, to ensure yp_initialize is called first
 static void *_dummy_yp_malloc( yp_ssize_t *actual, yp_ssize_t size ) { return NULL; }
-static void *_dummy_yp_malloc_resize( yp_ssize_t *actual, 
+static void *_dummy_yp_malloc_resize( yp_ssize_t *actual,
         void *p, yp_ssize_t size, yp_ssize_t extra ) { return NULL; }
 static void _dummy_yp_free( void *p ) { }
 
@@ -473,11 +474,11 @@ static void *(*yp_malloc)( yp_ssize_t *actual, yp_ssize_t size ) = _dummy_yp_mal
 // Resizes the given buffer in-place if possible, returning p; otherwise, allocates a new buffer
 // and returns a pointer to it.  This function *never* copies data to the new buffer and *never*
 // frees the old buffer: it is up to the caller to do this if a new buffer is returned.  In either
-// case, *actual is set to the actual amount of memory allocated by the returned pointer.  The 
+// case, *actual is set to the actual amount of memory allocated by the returned pointer.  The
 // resized/new buffer will be at least size bytes; extra is a hint as to how much the buffer should
-// be over-allocated.  On error, returns NULL, p is not modified, and *actual is undefined.  This 
+// be over-allocated.  On error, returns NULL, p is not modified, and *actual is undefined.  This
 // will allocate memory even when size==0.
-static void *(*yp_malloc_resize)( yp_ssize_t *actual, 
+static void *(*yp_malloc_resize)( yp_ssize_t *actual,
         void *p, yp_ssize_t size, yp_ssize_t extra ) = _dummy_yp_malloc_resize;
 
 // Frees memory returned by yp_malloc and yp_malloc_resize.
@@ -488,10 +489,10 @@ static void (*yp_free)( void *p );
 #ifdef _MSC_VER
 #include <malloc.h>
 #include <crtdbg.h> // For debugging only
-static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size ) 
+static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
 {
     void *p;
-    if( size < 1 ) size = 1;    
+    if( size < 1 ) size = 1;
     p = malloc( (size_t) size );
     if( p == NULL ) return NULL;
     *actual = (yp_ssize_t) _msize( p );
@@ -499,8 +500,8 @@ static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
     DEBUG( "malloc: 0x%08X %d bytes", p, *actual );
     return p;
 }
-static void *_default_yp_malloc_resize( yp_ssize_t *actual, 
-        void *p, yp_ssize_t size, yp_ssize_t extra ) 
+static void *_default_yp_malloc_resize( yp_ssize_t *actual,
+        void *p, yp_ssize_t size, yp_ssize_t extra )
 {
     void *newp;
     if( size < 1 ) size = 1;
@@ -534,14 +535,14 @@ static yp_ssize_t _default_yp_malloc_good_size( yp_ssize_t size )
     if( diff > 0 ) size += _yp_DEFAULT_MALLOC_ROUNDTO - diff;
     return size;
 }
-static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size ) 
+static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
 {
     *actual = _default_yp_malloc_good_size( size );
     if( *actual < 1 ) return NULL;
     return malloc( *actual );
 }
-static void *_default_yp_malloc_resize( yp_ssize_t *actual, 
-        void *p, yp_ssize_t size, yp_ssize_t extra ) 
+static void *_default_yp_malloc_resize( yp_ssize_t *actual,
+        void *p, yp_ssize_t size, yp_ssize_t extra )
 {
     if( size < 1 ) size = 1;
     if( extra < 0 ) extra = 0;
@@ -579,8 +580,8 @@ static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
 #define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( sizeof( obStruct ), (type) )
 
 // Returns a malloc'd buffer for a container object holding alloclen elements in-line, or exception
-// on failure.  The container can neither grow nor shrink after allocation.  ob_inline_data in 
-// obStruct is used to determine the element size and ob_data; ob_len is set to zero.  alloclen 
+// on failure.  The container can neither grow nor shrink after allocation.  ob_inline_data in
+// obStruct is used to determine the element size and ob_data; ob_len is set to zero.  alloclen
 // cannot be negative; ob_alloclen may be larger than requested.
 static ypObject *_ypMem_malloc_container_inline(
         yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems, int type, yp_ssize_t alloclen )
@@ -620,7 +621,7 @@ static yp_ssize_t _ypMem_ideal_size = _ypMem_ideal_size_DEFAULT;
 
 // Returns a malloc'd buffer for a container that may grow or shrink in the future, or exception on
 // failure.  A fixed amount of memory is allocated in-line, as per _ypMem_ideal_size.  If this fits
-// required elements, it is used, otherwise a separate buffer of required+extra elements is 
+// required elements, it is used, otherwise a separate buffer of required+extra elements is
 // allocated.  required and extra cannot be negative; ob_alloclen may be larger than requested.
 // FIXME ideal is now extra...fix!
 static ypObject *_ypMem_malloc_container_variable(
@@ -1412,7 +1413,7 @@ ypObject *yp_all( ypObject *iterable )
 
 // Defined here are yp_lt, yp_le, yp_eq, yp_ne, yp_ge, and yp_gt
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
-ypObject *yp_ComparisonNotImplemented;
+ypObject * const yp_ComparisonNotImplemented;
 #define _ypBool_PUBLIC_CMP_FUNCTION( name, reflection, defval ) \
 ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
     ypTypeObject *type = ypObject_TYPE( x ); \
@@ -1611,7 +1612,7 @@ static ypTypeObject ypException_Type = {
     static ypExceptionObject _ ## name ## _struct = { \
         _yp_IMMORTAL_HEAD_INIT( ypException_CODE, NULL, 0 ), \
         (ypObject *) &_ ## name ## _name_struct, superptr }; \
-    ypObject *name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define _yp_IMMORTAL_EXCEPTION( name, super ) \
     _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, (ypObject *) &_ ## super ## _struct )
 
@@ -1780,7 +1781,7 @@ static ypTypeObject ypNoneType_Type = {
 
 // No constructors for nonetypes; there is exactly one, immortal object
 static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT( ypNoneType_CODE, NULL, 0 );
-ypObject *yp_None = &_yp_None_struct;
+ypObject * const yp_None = &_yp_None_struct;
 
 
 /*************************************************************************************************
@@ -1863,9 +1864,9 @@ static ypTypeObject ypBool_Type = {
 
 // There are exactly two bool objects
 static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 1};
-ypObject *yp_True = (ypObject *) &_yp_True_struct;
+ypObject * const yp_True = (ypObject *) &_yp_True_struct;
 static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 0};
-ypObject *yp_False = (ypObject *) &_yp_False_struct;
+ypObject * const yp_False = (ypObject *) &_yp_False_struct;
 
 
 /*************************************************************************************************
@@ -2723,7 +2724,7 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
 }
 
 
-// Comparison methods return yp_True, yp_False, or an exception.  When checking for (in)equality, 
+// Comparison methods return yp_True, yp_False, or an exception.  When checking for (in)equality,
 // more efficient to check size first.
 // TODO Check for b==x!
 // TODO Consider the pre-computed hash, if available
@@ -2958,11 +2959,9 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
  *************************************************************************************************/
 
 // TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
-typedef struct {
-    ypObject_HEAD
-    yp_INLINE_DATA( yp_uint8_t );
-} ypStrObject;
-yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
+// struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
+typedef struct _ypStrObject ypStrObject;
+yp_STATIC_ASSERT( offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_str_inline_data );
 
 // TODO getindex for bytearray (and byte) returns an immutable integer, so getindex for chrarray
 // should return an immutable str-of-len-one, which is also consistent with Python's str
@@ -3018,6 +3017,26 @@ static ypObject *str_len( ypObject *s, yp_ssize_t *len )
     return yp_None;
 }
 
+// Comparison methods return yp_True, yp_False, or an exception.  When checking for (in)equality,
+// more efficient to check size first.
+// TODO Check for s==x!
+// TODO Consider the pre-computed hash, if available
+// TODO Generally compare efficiency against Python
+// TODO Convert to function (here and elsewhere)
+#define _ypStr_EQUALITY_CMP_FUNCTION( name, operator ) \
+static ypObject *str_ ## name( ypObject *s, ypObject *x ) { \
+    int cmp; \
+    yp_ssize_t s_len, x_len; \
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented; \
+    s_len = ypStr_LEN( s ); x_len = ypStr_LEN( x ); \
+    if( s_len != x_len ) return ypBool_FROM_C( 1 operator 0 ); \
+    cmp = memcmp( ypStr_DATA( s ), ypStr_DATA( x ), MIN( s_len, x_len ) ); \
+    return ypBool_FROM_C( cmp operator 0 ); \
+}
+_ypStr_EQUALITY_CMP_FUNCTION( eq, == );
+_ypStr_EQUALITY_CMP_FUNCTION( ne, != );
+// TODO #undef _ypStr_EQUALITY_CMP_FUNCTION
+
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 // FIXME bring this in-line with Python's string hashing; it's currently using bytes hashing
 static ypObject *str_currenthash( ypObject *s, yp_hash_t *hash ) {
@@ -3029,8 +3048,6 @@ static ypObject *str_dealloc( ypObject *s ) {
     ypMem_FREE_CONTAINER( s, ypStrObject );
     return yp_None;
 }
-
-
 
 static ypSequenceMethods ypStr_as_sequence = {
     str_getindex,                   // tp_getindex
@@ -3069,13 +3086,13 @@ static ypTypeObject ypStr_Type = {
     str_bool,                       // tp_bool
     MethodError_objobjproc,         // tp_lt
     MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
+    str_eq,                         // tp_eq
+    str_ne,                         // tp_ne
     MethodError_objobjproc,         // tp_ge
     MethodError_objobjproc,         // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    str_currenthash,                // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -3144,13 +3161,13 @@ static ypTypeObject ypChrArray_Type = {
     str_bool,                       // tp_bool
     MethodError_objobjproc,         // tp_lt
     MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
+    str_eq,                         // tp_eq
+    str_ne,                         // tp_ne
     MethodError_objobjproc,         // tp_ge
     MethodError_objobjproc,         // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    str_currenthash,                // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -3207,7 +3224,7 @@ static ypObject *_ypStrC( ypObject *(*allocator)( yp_ssize_t ),
     }
     return s;
 }
-ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len, 
+ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors ) {
     return _ypStrC( _yp_str_new, source, len );
 }
@@ -3223,6 +3240,22 @@ ypObject *yp_chrC( yp_int_t i ) {
     source[0] = (yp_uint8_t) i;
     return _ypStrC( _yp_str_new, source, 1 );
 }
+
+// Immortal constants
+
+yp_IMMORTAL_STR_LATIN1( yp_s_ascii,     "ascii" );
+yp_IMMORTAL_STR_LATIN1( yp_s_latin_1,   "latin_1" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_32,    "utf_32" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_32_be, "utf_32_be" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_32_le, "utf_32_le" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_16,    "utf_16" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_16_be, "utf_16_be" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_16_le, "utf_16_le" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_8,     "utf_8" );
+
+yp_IMMORTAL_STR_LATIN1( yp_s_strict,    "strict" );
+yp_IMMORTAL_STR_LATIN1( yp_s_ignore,    "ignore" );
+yp_IMMORTAL_STR_LATIN1( yp_s_replace,   "replace" );
 
 // TODO undef macros
 
@@ -3242,7 +3275,7 @@ typedef struct {
 #define ypTuple_LEN( sq ) ( ((ypObject *)sq)->ob_len )
 #define ypTuple_ALLOCLEN( sq ) ( ((ypObject *)sq)->ob_alloclen )
 
-// Moves the elements from [src:] to the index dest; this can be used when deleting items (they 
+// Moves the elements from [src:] to the index dest; this can be used when deleting items (they
 // must be discarded first), or inserting (the new space is uninitialized).  Assumes enough space
 // is allocated for the move.  Recall that memmove handles overlap.
 #define ypTuple_ELEMMOVE( sq, dest, src ) \
@@ -3352,7 +3385,7 @@ static ypObject *list_setindex( ypObject *sq, yp_ssize_t i, ypObject *x )
     return yp_None;
 }
 
-static ypObject *list_setslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, 
+static ypObject *list_setslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step,
         ypObject *x )
 {
     if( yp_isexceptionC( x ) ) return x;
@@ -3433,7 +3466,7 @@ static ypObject *tuple_bool( ypObject *sq ) {
     return ypBool_FROM_C( ypTuple_LEN( sq ) );
 }
 
-static ypObject *tuple_contains( ypObject *sq, ypObject *x ) 
+static ypObject *tuple_contains( ypObject *sq, ypObject *x )
 {
     yp_ssize_t i;
     ypObject *result;
@@ -3453,7 +3486,7 @@ static ypObject *list_push( ypObject *sq, ypObject *x ) {
     return _ypTuple_push( sq, x, yp_None );
 }
 
-static ypObject *list_clear( ypObject *sq ) 
+static ypObject *list_clear( ypObject *sq )
 {
     while( ypTuple_LEN( sq ) > 0 ) {
         yp_decref( ypTuple_ARRAY( sq )[ypTuple_LEN( sq )-1] );
@@ -4355,7 +4388,7 @@ static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
     } else if( x_pair == ypFrozenDict_CODE ) {
         if( ypSet_LEN( so ) > ypDict_LEN( x ) ) return yp_False;
     }
-    
+
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
     x_asset = yp_frozenset( x );
     result = _frozenset_issubset( so, x_asset );
@@ -4376,7 +4409,7 @@ static ypObject *frozenset_issuperset( ypObject *so, ypObject *x )
     } else if( x_pair == ypFrozenDict_CODE ) {
         if( ypDict_LEN( x ) > ypSet_LEN( so ) ) return yp_False;
     }
-    
+
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
     x_asset = yp_frozenset( x );
     result = _frozenset_issubset( x_asset, so );
@@ -4795,7 +4828,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     for( i = 0; valuesleft > 0; i++ ) {
         value = ypDict_VALUES( mp )[i];
         if( value == NULL ) continue;
-        _ypSet_movekey_clean( newkeyset, yp_incref( oldkeys[i].se_key ), oldkeys[i].se_hash, 
+        _ypSet_movekey_clean( newkeyset, yp_incref( oldkeys[i].se_key ), oldkeys[i].se_hash,
                 &newkey_loc );
         newvalues[ypSet_ENTRY_INDEX( newkeyset, newkey_loc )] = oldvalues[i];
         valuesleft -= 1;
@@ -5634,8 +5667,8 @@ static ypTypeObject *ypTypeTable[255] = {
 
     &ypBytes_Type,      /* ypBytes_CODE                ( 16u) */
     &ypByteArray_Type,  /* ypByteArray_CODE            ( 17u) */
-    NULL,               /* ypStr_CODE                  ( 18u) */
-    NULL,               /* ypChrArray_CODE             ( 19u) */
+    &ypStr_Type,        /* ypStr_CODE                  ( 18u) */
+    &ypChrArray_Type,   /* ypChrArray_CODE             ( 19u) */
     &ypTuple_Type,      /* ypTuple_CODE                ( 20u) */
     &ypList_Type,       /* ypList_CODE                 ( 21u) */
 

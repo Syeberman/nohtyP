@@ -106,7 +106,7 @@ ypAPI void yp_initialize( void );
 typedef struct _ypObject ypObject;
 
 // The null-reference object.
-ypAPI ypObject *yp_None;
+ypAPI ypObject * const yp_None;
 
 // Increments the reference count of x, returning it as a convenience.  Always succeeds; if x is
 // immortal this is a no-op.
@@ -181,8 +181,8 @@ ypAPI void yp_deepinvalidate( ypObject **x );
  */
 
 // There are exactly two boolean values: yp_True and yp_False.
-ypAPI ypObject *yp_True;
-ypAPI ypObject *yp_False;
+ypAPI ypObject * const yp_True;
+ypAPI ypObject * const yp_False;
 
 // Returns the immortal yp_False if the object should be considered false (yp_None, a number equal
 // to zero, or a container of zero length), otherwise yp_True.
@@ -835,21 +835,21 @@ ypAPI ypObject *yp_iter_values( ypObject *mapping );
 // these types of objects
 
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC et al.
-ypAPI ypObject *yp_s_ascii;     // "ascii"
-ypAPI ypObject *yp_s_latin_1;   // "latin_1"
-ypAPI ypObject *yp_s_utf_32;    // "utf_32"
-ypAPI ypObject *yp_s_utf_32_be; // "utf_32_be"
-ypAPI ypObject *yp_s_utf_32_le; // "utf_32_le"
-ypAPI ypObject *yp_s_utf_16;    // "utf_16"
-ypAPI ypObject *yp_s_utf_16_be; // "utf_16_be"
-ypAPI ypObject *yp_s_utf_16_le; // "utf_16_le"
-ypAPI ypObject *yp_s_utf_8;     // "utf_8"
+ypAPI ypObject * const yp_s_ascii;     // "ascii"
+ypAPI ypObject * const yp_s_latin_1;   // "latin_1"
+ypAPI ypObject * const yp_s_utf_32;    // "utf_32"
+ypAPI ypObject * const yp_s_utf_32_be; // "utf_32_be"
+ypAPI ypObject * const yp_s_utf_32_le; // "utf_32_le"
+ypAPI ypObject * const yp_s_utf_16;    // "utf_16"
+ypAPI ypObject * const yp_s_utf_16_be; // "utf_16_be"
+ypAPI ypObject * const yp_s_utf_16_le; // "utf_16_le"
+ypAPI ypObject * const yp_s_utf_8;     // "utf_8"
 
 // Immortal strs representing common string decode error handling schemes, for convience with 
 // yp_str_frombytesC et al.
-ypAPI ypObject *yp_s_strict;    // "strict"
-ypAPI ypObject *yp_s_ignore;    // "ignore"
-ypAPI ypObject *yp_s_replace;   // "replace"
+ypAPI ypObject * const yp_s_strict;    // "strict"
+ypAPI ypObject * const yp_s_ignore;    // "ignore"
+ypAPI ypObject * const yp_s_replace;   // "replace"
 
 // XXX Additional bytes- and str-specific methods will be added in a future version
 
@@ -1031,7 +1031,7 @@ ypAPI ypObject *yp_sum( ypObject *iterable );
 // which is of type "ypObject * const".  value is a C string literal.  The length is calculated 
 // while compiling; the hash will be calculated the first time it is accessed.
 // TODO Some warning that the compiler used may not actually be using latin-1
-// TODO Review this documentation
+// TODO Review this documentation, and macro name (does Python have similar?)
 //      yp_IMMORTAL_STR_LATIN1( name, value );
 
 
@@ -1042,45 +1042,45 @@ ypAPI ypObject *yp_sum( ypObject *iterable );
 // All exception objects are immortal and, as such, do not need to be yp_decref'ed if returned.
 
 // The exception objects that have direct Python counterparts.
-ypAPI ypObject *yp_BaseException;
-ypAPI ypObject *yp_Exception;
-ypAPI ypObject *yp_StopIteration;
-ypAPI ypObject *yp_GeneratorExit;
-ypAPI ypObject *yp_ArithmeticError;
-ypAPI ypObject *yp_LookupError;
-ypAPI ypObject *yp_AssertionError;
-ypAPI ypObject *yp_AttributeError;
-ypAPI ypObject *yp_EOFError;
-ypAPI ypObject *yp_FloatingPointError;
-ypAPI ypObject *yp_OSError;
-ypAPI ypObject *yp_ImportError;
-ypAPI ypObject *yp_IndexError;
-ypAPI ypObject *yp_KeyError;
-ypAPI ypObject *yp_KeyboardInterrupt;
-ypAPI ypObject *yp_MemoryError;
-ypAPI ypObject *yp_NameError;
-ypAPI ypObject *yp_OverflowError;
-ypAPI ypObject *yp_RuntimeError;
-ypAPI ypObject *yp_NotImplementedError;
-ypAPI ypObject *yp_ReferenceError;
-ypAPI ypObject *yp_SystemError;
-ypAPI ypObject *yp_SystemExit;
-ypAPI ypObject *yp_TypeError;
-ypAPI ypObject *yp_UnboundLocalError;
-ypAPI ypObject *yp_UnicodeError;
-ypAPI ypObject *yp_UnicodeEncodeError;
-ypAPI ypObject *yp_UnicodeDecodeError;
-ypAPI ypObject *yp_UnicodeTranslateError;
-ypAPI ypObject *yp_ValueError;
-ypAPI ypObject *yp_ZeroDivisionError;
-ypAPI ypObject *yp_BufferError;
+ypAPI ypObject * const yp_BaseException;
+ypAPI ypObject * const yp_Exception;
+ypAPI ypObject * const yp_StopIteration;
+ypAPI ypObject * const yp_GeneratorExit;
+ypAPI ypObject * const yp_ArithmeticError;
+ypAPI ypObject * const yp_LookupError;
+ypAPI ypObject * const yp_AssertionError;
+ypAPI ypObject * const yp_AttributeError;
+ypAPI ypObject * const yp_EOFError;
+ypAPI ypObject * const yp_FloatingPointError;
+ypAPI ypObject * const yp_OSError;
+ypAPI ypObject * const yp_ImportError;
+ypAPI ypObject * const yp_IndexError;
+ypAPI ypObject * const yp_KeyError;
+ypAPI ypObject * const yp_KeyboardInterrupt;
+ypAPI ypObject * const yp_MemoryError;
+ypAPI ypObject * const yp_NameError;
+ypAPI ypObject * const yp_OverflowError;
+ypAPI ypObject * const yp_RuntimeError;
+ypAPI ypObject * const yp_NotImplementedError;
+ypAPI ypObject * const yp_ReferenceError;
+ypAPI ypObject * const yp_SystemError;
+ypAPI ypObject * const yp_SystemExit;
+ypAPI ypObject * const yp_TypeError;
+ypAPI ypObject * const yp_UnboundLocalError;
+ypAPI ypObject * const yp_UnicodeError;
+ypAPI ypObject * const yp_UnicodeEncodeError;
+ypAPI ypObject * const yp_UnicodeDecodeError;
+ypAPI ypObject * const yp_UnicodeTranslateError;
+ypAPI ypObject * const yp_ValueError;
+ypAPI ypObject * const yp_ZeroDivisionError;
+ypAPI ypObject * const yp_BufferError;
 
 // Raised when the object does not support the given method; subexception of yp_AttributeError
-ypAPI ypObject *yp_MethodError;
+ypAPI ypObject * const yp_MethodError;
 // Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError
-ypAPI ypObject *yp_SystemLimitationError;
+ypAPI ypObject * const yp_SystemLimitationError;
 // Raised when an invalidated object is passed to a function; subexception of yp_TypeError
-ypAPI ypObject *yp_InvalidatedError;
+ypAPI ypObject * const yp_InvalidatedError;
 
 // Returns true (non-zero) if x is an exception that matches exc, else false.  This takes into
 // account the exception heirarchy, so is the preferred method of testing for specific exceptions.
@@ -1255,6 +1255,10 @@ struct _ypBytesObject {
     _ypObject_HEAD
     _yp_INLINE_DATA( yp_uint8_t );
 };
+struct _ypStrObject {
+    _ypObject_HEAD
+    _yp_INLINE_DATA( yp_uint8_t );
+};
 
 // A refcnt of this value means the object is immortal
 #define _ypObject_REFCNT_IMMORTAL (0xFFFFFFu)
@@ -1271,6 +1275,7 @@ struct _ypBytesObject {
 // These type codes must match those in nohtyP.c
 #define _ypInt_CODE                  ( 10u)
 #define _ypBytes_CODE                ( 16u)
+#define _ypStr_CODE                  ( 18u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
 #define _yp_IMMORTAL_HEAD_INIT( type, data, len ) \
@@ -1285,7 +1290,13 @@ struct _ypBytesObject {
     static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
         _ypBytes_CODE, (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+#define yp_IMMORTAL_STR_LATIN1( name, value ) \
+    static const char _ ## name ## _data[] = value; \
+    static struct _ypStrObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
+        _ypStr_CODE, (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
+    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE
+
 
 #ifdef yp_FUTURE
 // The implementation of yp_IF is considered "internal"; see above for documentation
