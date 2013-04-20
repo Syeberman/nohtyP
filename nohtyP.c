@@ -117,7 +117,8 @@ typedef ypObject *(*objvalistproc)( ypObject *, int, va_list );
 // Some functions have rather unique signatures
 typedef ypObject *(*visitfunc)( ypObject *, void * );
 typedef ypObject *(*traversefunc)( ypObject *, visitfunc, void * );
-typedef ypObject *(*hashfunc)( ypObject *, yp_hash_t * );
+typedef yp_hash_t (*hashvisitfunc)( ypObject *, ypObject ** );
+typedef ypObject *(*hashfunc)( ypObject *, hashvisitfunc, yp_hash_t * );
 typedef ypObject *(*lenfunc)( ypObject *, yp_ssize_t * );
 typedef ypObject *(*countfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
 typedef ypObject *(*findfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
@@ -284,7 +285,7 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
     \
     static ypObject *name ## _visitfunc( ypObject *x, void *memo ) { return retval; } \
     static ypObject *name ## _traversefunc( ypObject *x, visitfunc visitor, void *memo ) { return retval; } \
-    static ypObject *name ## _hashfunc( ypObject *x, yp_hash_t *hash ) { return retval; } \
+    static ypObject *name ## _hashfunc( ypObject *x, hashvisitfunc visitor, yp_hash_t *hash ) { return retval; } \
     static ypObject *name ## _lenfunc( ypObject *x, yp_ssize_t *len ) { return retval; } \
     static ypObject *name ## _countfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count ) { return retval; } \
     static ypObject *name ## _findfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *index ) { return retval; } \
@@ -1187,7 +1188,7 @@ static ypObject *_yp_freeze( ypObject *x )
     // Freeze the object, cache the final hash, and possibly reduce memory usage, etc
     ypObject_SET_TYPE_CODE( x, newCode );
     x->ob_hash = _ypObject_HASH_INVALID;
-    result = newType->tp_currenthash( x, &x->ob_hash );
+    result = newType->tp_currenthash( x, yp_hashC, &x->ob_hash );
     return newType->tp_freeze( x );
 }
 
@@ -1432,25 +1433,30 @@ _ypBool_PUBLIC_CMP_FUNCTION( ge, le, yp_TypeError );
 _ypBool_PUBLIC_CMP_FUNCTION( gt, lt, yp_TypeError );
 // TODO #undef _ypBool_PUBLIC_CMP_FUNCTION
 
+// XXX Remember, an immutable container may hold mutable objects; yp_hashC must fail in that case
 // TODO Need to decide whether to keep pre-computed hash in ypObject and, if so, if we can remove
 // the hash from ypSet's element table
 yp_STATIC_ASSERT( ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one );
 yp_hash_t yp_hashC( ypObject *x, ypObject **exc )
 {
+    yp_hash_t hash = ypObject_CACHED_HASH( x );
+    ypObject *result;
+
     if( ypObject_IS_MUTABLE( x ) ) return_yp_CEXC_BAD_TYPE( ypObject_HASH_INVALID, exc, x );
-    return yp_currenthashC( x, exc );
+    if( hash != ypObject_HASH_INVALID ) return hash;
+    result = ypObject_TYPE( x )->tp_currenthash( x, yp_hashC, &hash );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
+    ypObject_CACHED_HASH( x ) = hash;
+    return hash;
 }
 yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc )
 {
     yp_hash_t hash = ypObject_CACHED_HASH( x );
     ypObject *result;
 
-    if( !ypObject_IS_MUTABLE( x ) && hash != ypObject_HASH_INVALID ) {
-        return hash;
-    }
-    result = ypObject_TYPE( x )->tp_currenthash( x, &hash );
+    if( !ypObject_IS_MUTABLE( x ) && hash != ypObject_HASH_INVALID ) return hash;
+    result = ypObject_TYPE( x )->tp_currenthash( x, yp_currenthashC, &hash );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
-    if( !ypObject_IS_MUTABLE( x ) ) ypObject_CACHED_HASH( x ) = hash;
     return hash;
 }
 
@@ -1913,7 +1919,7 @@ _ypInt_RELATIVE_CMP_FUNCTION( gt, > );
 
 // XXX Adapted from Python's int_hash (now obsolete)
 // TODO adapt from long_hash instead, which seems to handle this differently
-static ypObject *int_currenthash( ypObject *i, yp_hash_t *hash )
+static ypObject *int_currenthash( ypObject *i, hashvisitfunc visitor, yp_hash_t *hash )
 {
     // This must remain consistent with the other numeric types
     // FIXME int is larger than hash on 32-bit systems, so this truncates data, which we don't
@@ -2760,7 +2766,7 @@ _ypBytes_EQUALITY_CMP_FUNCTION( ne, != );
 // TODO #undef _ypBytes_EQUALITY_CMP_FUNCTION
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
-static ypObject *bytes_currenthash( ypObject *b, yp_hash_t *hash ) {
+static ypObject *bytes_currenthash( ypObject *b, hashvisitfunc visitor, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
     return yp_None;
 }
@@ -3039,7 +3045,7 @@ _ypStr_EQUALITY_CMP_FUNCTION( ne, != );
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 // FIXME bring this in-line with Python's string hashing; it's currently using bytes hashing
-static ypObject *str_currenthash( ypObject *s, yp_hash_t *hash ) {
+static ypObject *str_currenthash( ypObject *s, hashvisitfunc visitor, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypStr_DATA( s ), ypStr_LEN( s ) );
     return yp_None;
 }
