@@ -117,8 +117,8 @@ typedef ypObject *(*objvalistproc)( ypObject *, int, va_list );
 // Some functions have rather unique signatures
 typedef ypObject *(*visitfunc)( ypObject *, void * );
 typedef ypObject *(*traversefunc)( ypObject *, visitfunc, void * );
-typedef yp_hash_t (*hashvisitfunc)( ypObject *, ypObject ** );
-typedef ypObject *(*hashfunc)( ypObject *, hashvisitfunc, yp_hash_t * );
+typedef ypObject *(*hashvisitfunc)( ypObject *, void *, yp_hash_t * );
+typedef ypObject *(*hashfunc)( ypObject *, hashvisitfunc, void *, yp_hash_t * );
 typedef ypObject *(*lenfunc)( ypObject *, yp_ssize_t * );
 typedef ypObject *(*countfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
 typedef ypObject *(*findfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
@@ -179,6 +179,7 @@ typedef struct {
     // Object fundamentals
     objproc tp_dealloc;
     traversefunc tp_traverse; /* call function for all accessible objects */
+    // TODO str, repr have the possibility of recursion; trap & test
     objproc tp_str;
     objproc tp_repr;
 
@@ -285,7 +286,7 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
     \
     static ypObject *name ## _visitfunc( ypObject *x, void *memo ) { return retval; } \
     static ypObject *name ## _traversefunc( ypObject *x, visitfunc visitor, void *memo ) { return retval; } \
-    static ypObject *name ## _hashfunc( ypObject *x, hashvisitfunc visitor, yp_hash_t *hash ) { return retval; } \
+    static ypObject *name ## _hashfunc( ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) { return retval; } \
     static ypObject *name ## _lenfunc( ypObject *x, yp_ssize_t *len ) { return retval; } \
     static ypObject *name ## _countfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count ) { return retval; } \
     static ypObject *name ## _findfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *index ) { return retval; } \
@@ -419,9 +420,11 @@ static void yp_breakonerr( ypObject *err ) {
         return; } while( 0 )
 
 // Prime multiplier used in string and various other hashes
+// XXX Adapted from Python's _PyHASH_MULTIPLIER
 #define _ypHASH_MULTIPLIER 1000003  // 0xf4243
 
 // Return the hash of the given number of bytes; always succeeds
+// XXX Adapted from Python's _Py_HashBytes
 static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
 {
     yp_uhash_t x;
@@ -436,6 +439,9 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
     if (x == ypObject_HASH_INVALID) x -= 1;
     return x;
 }
+
+// TODO Make this configurable via yp_initialize
+static int _yp_recursion_limit = 1000;
 
 #if 0
 #include <stdio.h>
@@ -607,7 +613,7 @@ static ypObject *_ypMem_malloc_container_inline(
     _ypMem_malloc_container_inline( offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (alloclen) )
 
-// TODO Make this configurable via yp_init
+// TODO Make this configurable via yp_initialize
 // XXX 64-bit PyDictObject is 128 bytes...we are larger!
 // XXX Cannot change once objects are allocated
 // TODO Make static asserts to ensure that certain-sized objects fit with one allocation
@@ -1178,17 +1184,17 @@ static ypObject *_yp_freeze( ypObject *x )
     int oldCode = ypObject_TYPE_CODE( x );
     int newCode = ypObject_TYPE_CODE_AS_FROZEN( oldCode );
     ypTypeObject *newType;
-    ypObject *result;
+    ypObject *exc = yp_None;
 
     // Check if it's already frozen (no-op) or if it can't be frozen (error)
     if( oldCode == newCode ) return yp_None;
     newType = ypTypeTable[newCode];
     if( newType == NULL ) return yp_TypeError;  // TODO make this never happen: such objects should be closed (or invalidated?) instead
 
-    // Freeze the object, cache the final hash, and possibly reduce memory usage, etc
+    // Freeze the object, cache the final hash (via yp_hashC), possibly reduce memory usage, etc
     ypObject_SET_TYPE_CODE( x, newCode );
-    x->ob_hash = _ypObject_HASH_INVALID;
-    result = newType->tp_currenthash( x, yp_hashC, &x->ob_hash );
+    x->ob_hash = _ypObject_HASH_INVALID; // just in case
+    yp_hashC( x, &exc );
     return newType->tp_freeze( x );
 }
 
@@ -1204,7 +1210,7 @@ static ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
     ypObject *id;
     ypObject *result;
 
-    // Avoid recursion
+    // Avoid recursion: we only have to visit each object once
     id = yp_intC( (yp_int64_t) x );
     result = yp_pushuniqueE( memo, id );
     yp_decref( id );
@@ -1239,8 +1245,8 @@ ypObject *yp_unfrozen_copy( ypObject *x ) {
 }
 
 static ypObject *_yp_unfrozen_deepcopy( ypObject *x, void *memo ) {
-    // TODO
     // TODO don't forget to discard the new objects on error
+    // TODO trap recursion & test
     return yp_NotImplementedError;
 }
 
@@ -1256,7 +1262,7 @@ ypObject *yp_frozen_copy( ypObject *x ) {
 }
 
 static ypObject *_yp_frozen_deepcopy( ypObject *x, void *memo ) {
-    // TODO
+    // TODO trap recursion & test
     return yp_NotImplementedError;
 }
 
@@ -1272,7 +1278,7 @@ ypObject *yp_copy( ypObject *x ) {
 }
 
 static ypObject *_yp_deepcopy( ypObject *x, void *memo ) {
-    // TODO
+    // TODO trap recursion & test
     return yp_NotImplementedError;
 }
 
@@ -1414,6 +1420,7 @@ ypObject *yp_all( ypObject *iterable )
 
 // Defined here are yp_lt, yp_le, yp_eq, yp_ne, yp_ge, and yp_gt
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
+// TODO Comparison functions have the possibility of recursion; trap (also, add tests)
 ypObject * const yp_ComparisonNotImplemented;
 #define _ypBool_PUBLIC_CMP_FUNCTION( name, reflection, defval ) \
 ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
@@ -1436,26 +1443,61 @@ _ypBool_PUBLIC_CMP_FUNCTION( gt, lt, yp_TypeError );
 // XXX Remember, an immutable container may hold mutable objects; yp_hashC must fail in that case
 // TODO Need to decide whether to keep pre-computed hash in ypObject and, if so, if we can remove
 // the hash from ypSet's element table
+// TODO Hash functions (currenthash, mainly) have the possibility of recursion; trap (also: test)
 yp_STATIC_ASSERT( ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one );
-yp_hash_t yp_hashC( ypObject *x, ypObject **exc )
+
+ypObject * const yp_RecursionLimitError;
+static ypObject *_yp_hash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
 {
-    yp_hash_t hash = ypObject_CACHED_HASH( x );
+    int *recursion_depth = (int *) _memo;
     ypObject *result;
 
-    if( ypObject_IS_MUTABLE( x ) ) return_yp_CEXC_BAD_TYPE( ypObject_HASH_INVALID, exc, x );
-    if( hash != ypObject_HASH_INVALID ) return hash;
-    result = ypObject_TYPE( x )->tp_currenthash( x, yp_hashC, &hash );
+    // Check type, cached hash, and recursion depth first
+    if( ypObject_IS_MUTABLE( x ) ) return_yp_BAD_TYPE( x );
+    if( ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID ) {
+        *hash = ypObject_CACHED_HASH( x );
+        return yp_None;
+    }
+    if( *recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
+    
+    *recursion_depth += 1;
+    result = ypObject_TYPE( x )->tp_currenthash( x, _yp_hash_visitor, _memo, hash );
+    *recursion_depth -= 1;
+    if( yp_isexceptionC( result ) ) return result;
+    ypObject_CACHED_HASH( x ) = *hash;
+    return yp_None;
+}
+yp_hash_t yp_hashC( ypObject *x, ypObject **exc )
+{
+    int recursion_depth = 0;
+    yp_hash_t hash;
+    ypObject *result = _yp_hash_visitor( x, &recursion_depth, &hash );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
-    ypObject_CACHED_HASH( x ) = hash;
     return hash;
+}
+
+static ypObject *_yp_cachedhash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
+{
+    int *recursion_depth = (int *) _memo;
+    ypObject *result;
+
+    // Check cached hash, and recursion depth first
+    if( !ypObject_IS_MUTABLE( x ) && ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID ) {
+        *hash = ypObject_CACHED_HASH( x );
+        return yp_None;
+    }
+    if( *recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
+    
+    *recursion_depth += 1;
+    result = ypObject_TYPE( x )->tp_currenthash( x, _yp_cachedhash_visitor, _memo, hash );
+    *recursion_depth -= 1;
+    return result;
 }
 yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc )
 {
-    yp_hash_t hash = ypObject_CACHED_HASH( x );
-    ypObject *result;
-
-    if( !ypObject_IS_MUTABLE( x ) && hash != ypObject_HASH_INVALID ) return hash;
-    result = ypObject_TYPE( x )->tp_currenthash( x, yp_currenthashC, &hash );
+    int recursion_depth = 0;
+    yp_hash_t hash;
+    ypObject *result = _yp_cachedhash_visitor( x, &recursion_depth, &hash );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
     return hash;
 }
@@ -1661,6 +1703,11 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
     _yp_IMMORTAL_EXCEPTION( yp_RuntimeError, yp_Exception );
       _yp_IMMORTAL_EXCEPTION( yp_NotImplementedError, yp_RuntimeError );
         _yp_IMMORTAL_EXCEPTION( yp_ComparisonNotImplemented, yp_NotImplementedError );
+      // TODO Document yp_CircularReferenceError and use
+      // (Python raises RuntimeError on "maximum recursion depth exceeded", so this fits)
+      _yp_IMMORTAL_EXCEPTION( yp_CircularReferenceError, yp_RuntimeError );
+      // TODO Same with yp_RecursionLimitError
+      _yp_IMMORTAL_EXCEPTION( yp_RecursionLimitError, yp_RuntimeError );
 
     _yp_IMMORTAL_EXCEPTION( yp_SystemError, yp_Exception );
       _yp_IMMORTAL_EXCEPTION( yp_SystemLimitationError, yp_SystemError );
@@ -1919,7 +1966,8 @@ _ypInt_RELATIVE_CMP_FUNCTION( gt, > );
 
 // XXX Adapted from Python's int_hash (now obsolete)
 // TODO adapt from long_hash instead, which seems to handle this differently
-static ypObject *int_currenthash( ypObject *i, hashvisitfunc visitor, yp_hash_t *hash )
+static ypObject *int_currenthash( ypObject *i, 
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
     // This must remain consistent with the other numeric types
     // FIXME int is larger than hash on 32-bit systems, so this truncates data, which we don't
@@ -2766,7 +2814,8 @@ _ypBytes_EQUALITY_CMP_FUNCTION( ne, != );
 // TODO #undef _ypBytes_EQUALITY_CMP_FUNCTION
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
-static ypObject *bytes_currenthash( ypObject *b, hashvisitfunc visitor, yp_hash_t *hash ) {
+static ypObject *bytes_currenthash( ypObject *b, 
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
     return yp_None;
 }
@@ -3045,7 +3094,8 @@ _ypStr_EQUALITY_CMP_FUNCTION( ne, != );
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 // FIXME bring this in-line with Python's string hashing; it's currently using bytes hashing
-static ypObject *str_currenthash( ypObject *s, hashvisitfunc visitor, yp_hash_t *hash ) {
+static ypObject *str_currenthash( ypObject *s, 
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypStr_DATA( s ), ypStr_LEN( s ) );
     return yp_None;
 }
@@ -3472,6 +3522,34 @@ static ypObject *tuple_bool( ypObject *sq ) {
     return ypBool_FROM_C( ypTuple_LEN( sq ) );
 }
 
+// XXX Adapted from Python's tuplehash
+// TODO Do we want to allow currenthash to work on circular references and, if so, how?
+static ypObject *tuple_currenthash( ypObject *sq,
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) 
+{
+    ypObject *result;
+    yp_uhash_t x;
+    yp_hash_t y;
+    yp_ssize_t len = ypTuple_LEN(sq);
+    ypObject **p;
+    yp_uhash_t mult = _ypHASH_MULTIPLIER;
+    x = 0x345678;
+    p = ypTuple_ARRAY(sq);
+    while (--len >= 0) {
+        result = hash_visitor(*p++, hash_memo, &y);
+        if (yp_isexceptionC(result)) return result;
+        x = (x ^ y) * mult;
+        /* the cast might truncate len; that doesn't change hash stability */
+        mult += (yp_hash_t)(82520L + len + len);
+    }
+    x += 97531L;
+    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
+        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
+    }
+    *hash = (yp_hash_t)x;
+    return yp_None;
+}
+
 static ypObject *tuple_contains( ypObject *sq, ypObject *x )
 {
     yp_ssize_t i;
@@ -3563,7 +3641,7 @@ static ypTypeObject ypTuple_Type = {
     MethodError_objobjproc,         // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    tuple_currenthash,              // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -3638,7 +3716,7 @@ static ypTypeObject ypList_Type = {
     MethodError_objobjproc,         // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    tuple_currenthash,              // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -3804,7 +3882,7 @@ static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
 
 // If a resize is necessary and you suspect future growth may occur, call this function to
 // determine the minused value to pass to _ypSet_resize.
-// TODO make this limit configurable via yp_init
+// TODO Make this configurable via yp_initialize
 // XXX Adapted from PyDict_SetItem
 static yp_ssize_t _ypSet_calc_resize_minused( yp_ssize_t newlen )
 {

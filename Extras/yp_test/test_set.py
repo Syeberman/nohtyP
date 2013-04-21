@@ -69,7 +69,7 @@ class TestJointOps(unittest.TestCase):
     def test_contains(self):
         for c in self.letters:
             self.assertEqual(c in self.s, c in self.d)
-        self.assertRaises(TypeError, self.s.__contains__, [[]])
+        self.assertNotIn(yp_list(), self.s) # nohtyP sets accept mutable types for "in"
         s = self.thetype([yp_frozenset(self.letters)])
         self.assertIn(self.thetype(self.letters), s)
 
