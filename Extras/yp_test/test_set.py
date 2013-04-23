@@ -16,8 +16,8 @@ import collections.abc
 def frozenset( *args, **kwargs ): raise NotImplementedError( "convert script to yp_frozenset here" )
 def set( *args, **kwargs ): raise NotImplementedError( "convert script to yp_set here" )
 
-class PassThru(Exception):
-    pass
+# Choose an error unlikely to be confused with anything else in Python or nohtyP
+PassThru = OverflowError
 
 def check_pass_thru():
     raise PassThru
@@ -155,7 +155,7 @@ class TestJointOps(unittest.TestCase):
         self.assertEqual(self.s, self.thetype(self.word))
         self.assertEqual(type(i), self.basetype)
         self.assertRaises(PassThru, self.s.difference, check_pass_thru())
-        self.assertRaises(TypeError, self.s.difference, [[]])
+        self.assertEqual(self.s, self.s.difference([[]])) # nohtyP sets accept mutable types here
         for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
             self.assertEqual(self.thetype('abcba').difference(C('cdc')), yp_set('ab'))
             self.assertEqual(self.thetype('abcba').difference(C('efgfe')), yp_set('abc'))
@@ -260,6 +260,7 @@ class TestJointOps(unittest.TestCase):
         it = pickle.loads(d)
         self.assertEqual(self.thetype(it), data - self.thetype((drop,)))
 
+    @unittest.skip("REWORK: nohtyP sets don't store user-defined types")
     def test_deepcopy(self):
         class Tracer:
             def __init__(self, value):
@@ -312,6 +313,7 @@ class TestJointOps(unittest.TestCase):
             self.assertRaises(RuntimeError, s.discard, BadCmp())
             self.assertRaises(RuntimeError, s.remove, BadCmp())
 
+    @unittest.skip("REWORK: nohtyP sets don't store user-defined types")
     def test_cyclical_repr(self):
         w = ReprWrapper()
         s = self.thetype([w])
@@ -322,6 +324,7 @@ class TestJointOps(unittest.TestCase):
             name = repr(s).partition('(')[0]    # strip class name
             self.assertEqual(repr(s), '%s({%s(...)})' % (name, name))
 
+    @unittest.skip("REWORK: nohtyP sets don't store user-defined types")
     def test_cyclical_print(self):
         w = ReprWrapper()
         s = self.thetype([w])
@@ -525,7 +528,11 @@ class TestSet(TestJointOps):
             else:
                 self.assertNotIn(c, self.s)
         self.assertRaises(PassThru, self.s.difference_update, check_pass_thru())
-        self.assertRaises(TypeError, self.s.difference_update, [[]])
+        
+        s = self.s.copy()
+        s.difference_update([[]]) # nohtyP sets accept mutable types here
+        self.assertEqual(self.s, s)
+        
         self.assertRaises(TypeError, self.s.symmetric_difference_update, [[]])
         for p, q in (('cdc', 'ab'), ('efgfe', 'abc'), ('ccb', 'a'), ('ef', 'abc')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
