@@ -64,6 +64,16 @@ def yp_func( retval, name, paramtuple, errcheck=True ):
             converted.append( len( extra ) )
             converted.extend( c_ypObject_p.from_param( x ) for x in extra )
             return c_func( *converted ) # let c_func.errcheck check for errors
+
+    elif len( paramtuple ) > 0 and paramtuple[-1] is c_multiK_ypObject_p:
+        def c_func_wrapper( *args ):
+            fixed, extra = args[:len( params )-1], args[len( params )-1:]
+            assert len( extra ) % 2 == 0
+            converted = list( params[i].preconvert( x ) for (i, x) in enumerate( fixed ) )
+            converted.append( len( extra ) // 2 )
+            converted.extend( c_ypObject_p.from_param( x ) for x in extra )
+            return c_func( *converted ) # let c_func.errcheck check for errors
+
     else:
         def c_func_wrapper( *args ):
             converted = tuple( params[i].preconvert( x ) for (i, x) in enumerate( args ) )
@@ -115,6 +125,8 @@ c_ypObject_p_value( "yp_None" )
 # Special-case arguments
 c_ypObject_pp_exc = (c_ypObject_pp, "exc", _yp_None)
 c_multiN_ypObject_p = (c_int, "n", 0)
+c_multiK_ypObject_p = (c_int, "n", 0)
+assert c_multiN_ypObject_p is not c_multiK_ypObject_p
 
 # ypAPI ypObject *yp_incref( ypObject *x );
 yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
@@ -322,6 +334,7 @@ yp_func( c_ypObject_p, "yp_set", ((c_ypObject_p, "iterable"), ) )
 # ypObject *yp_frozendictKV( int n, va_list args );
 # ypObject *yp_dictK( int n, ... );
 # ypObject *yp_dictKV( int n, va_list args );
+yp_func( c_ypObject_p, "yp_dictK", (c_multiK_ypObject_p, ) )
 
 # ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... );
 # ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args );
@@ -483,6 +496,7 @@ yp_func( c_ypObject_p, "yp_issuperset", ((c_ypObject_p, "set"), (c_ypObject_p, "
 
 # ypObject *yp_unionN( ypObject *set, int n, ... );
 # ypObject *yp_unionV( ypObject *set, int n, va_list args );
+yp_func( c_ypObject_p, "yp_unionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_intersectionN( ypObject *set, int n, ... );
 # ypObject *yp_intersectionV( ypObject *set, int n, va_list args );
@@ -490,18 +504,22 @@ yp_func( c_ypObject_p, "yp_intersectionN", ((c_ypObject_p, "set"), c_multiN_ypOb
 
 # ypObject *yp_differenceN( ypObject *set, int n, ... );
 # ypObject *yp_differenceV( ypObject *set, int n, va_list args );
+yp_func( c_ypObject_p, "yp_differenceN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_symmetric_difference( ypObject *set, ypObject *x );
 yp_func( c_ypObject_p, "yp_symmetric_difference", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # void yp_updateN( ypObject **set, int n, ... );
 # void yp_updateV( ypObject **set, int n, va_list args );
+yp_func( c_void, "yp_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_intersection_updateN( ypObject **set, int n, ... );
 # void yp_intersection_updateV( ypObject **set, int n, va_list args );
+yp_func( c_void, "yp_intersection_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_difference_updateN( ypObject **set, int n, ... );
 # void yp_difference_updateV( ypObject **set, int n, va_list args );
+yp_func( c_void, "yp_difference_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_symmetric_difference_update( ypObject **set, ypObject *x );
 yp_func( c_void, "yp_symmetric_difference_update", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
@@ -541,6 +559,7 @@ yp_func( c_void, "yp_pushuniqueE", ((c_ypObject_pp, "set"), (c_ypObject_p, "x"))
 
 # void yp_updateK( ypObject **mapping, int n, ... );
 # void yp_updateKV( ypObject **mapping, int n, va_list args );
+yp_func( c_void, "yp_updateK", ((c_ypObject_pp, "mapping"), c_multiK_ypObject_p) )
 
 # void yp_updateN( ypObject **mapping, int n, ... );
 # void yp_updateV( ypObject **mapping, int n, va_list args );
@@ -804,21 +823,21 @@ class ypObject( c_ypObject_p ):
 
     def isdisjoint( self, other ): return _yp_isdisjoint( self, other )
     def issuperset( self, other ): return _yp_issuperset( self, other )
-    # def union( self, *others ):
+    def union( self, *others ): return _yp_unionN( self, *others )
     def intersection( self, *others ): return _yp_intersectionN( self, *others )
-    # def difference( self, *others ):
+    def difference( self, *others ):  return _yp_differenceN( self, *others )
     def symmetric_difference( self, other ): return _yp_symmetric_difference( self, other )
-    # def update( self, *others ):
-    # def intersection_update( self, *others ):
-    # def difference_update( self, *others ):
-    def symmetric_difference_update( self, other ): return _yp_symmetric_difference_update( self, other )
+    def update( self, *others ): _yp_updateN( self, *others )
+    def intersection_update( self, *others ): _yp_intersection_updateN( self, *others )
+    def difference_update( self, *others ): _yp_difference_updateN( self, *others )
+    def symmetric_difference_update( self, other ): _yp_symmetric_difference_update( self, other )
     def remove( self, elem ): _yp_remove( self, elem )
     def discard( self, elem ): _yp_discard( self, elem )
 
 def pytype( pytypes, ypcode ):
     if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
     def _pytype( cls ):
-        for pytype in pytypes: 
+        for pytype in pytypes:
             ypObject._pytype2yp[pytype] = cls
         ypObject._ypcode2yp[ypcode] = cls
         return cls
@@ -947,16 +966,16 @@ class yp_list( ypObject ):
 class _ypSet( ypObject ):
     def __new__( cls, iterable=_yp_closed_iter ):
         return cls._ypSet_constructor( _yp_iterable( iterable ) )
-    def __or__( self, other ): 
+    def __or__( self, other ):
         if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
         return _yp_unionN( self, other )
-    def __and__( self, other ): 
+    def __and__( self, other ):
         if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
         return _yp_intersectionN( self, other )
-    def __sub__( self, other ): 
+    def __sub__( self, other ):
         if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
         return _yp_differenceN( self, other )
-    def __xor__( self, other ): 
+    def __xor__( self, other ):
         if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
         return _yp_symmetric_difference( self, other )
     def add( self, elem ): _yp_set_add( self, elem )
@@ -968,6 +987,30 @@ class yp_frozenset( _ypSet ):
 @pytype( set, 23 )
 class yp_set( _ypSet ):
     _ypSet_constructor = _yp_set
+
+# Python dict objects need to be passed through this then sent to the "K" version of the function;
+# all other objects can be converted to nohtyP and passed in thusly
+def _yp_flatten_dict( args ):
+    items = args.items( )
+    retval = []
+    for item in items:
+        assert len( item ) == 2
+        retval.extend( item )
+    return retval
+
+@pytype( dict, 25 )
+class yp_dict( ypObject ):
+    def __new__( cls, *args, **kwargs ):
+        if len( args ) == 0:
+            return _yp_dictK( *_yp_flatten_dict( kwargs ) )
+        if len( args ) > 1:
+            raise TypeError( "yp_dict expected at most 1 arguments, got %d" % len( args ) )
+        if isinstance( args[0], dict ):
+            self = _yp_dictK( *_yp_flatten_dict( args[0] ) )
+        else:
+            self = _yp_dict( args[0] )
+        if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
+        return self
 
 
 #so = yp_set( )

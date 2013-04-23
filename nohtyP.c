@@ -419,6 +419,10 @@ static void yp_breakonerr( ypObject *err ) {
         va_end( args ); \
         return; } while( 0 )
 
+// As above, but for "K"-functions
+#define return_yp_K_FUNC        return_yp_V_FUNC
+#define return_yp_K_FUNC_void   return_yp_V_FUNC_void
+
 // Prime multiplier used in string and various other hashes
 // XXX Adapted from Python's _PyHASH_MULTIPLIER
 #define _ypHASH_MULTIPLIER 1000003  // 0xf4243
@@ -5742,6 +5746,13 @@ ypObject *yp_iter_items( ypObject *mapping ) {
 
 ypObject *yp_iter_keys( ypObject *mapping ) {
     _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_keys, (mapping) );
+}
+
+void yp_updateK( ypObject **mapping, int n, ... ) {
+    return_yp_K_FUNC_void( yp_updateKV, (mapping, n, args), n );
+}
+void yp_updateKV( ypObject **mapping, int n, va_list args ) {
+    _yp_INPLACE2( mapping, tp_as_mapping, tp_updateK, (*mapping, n, args) );
 }
 
 ypObject *yp_iter_values( ypObject *mapping ) {
