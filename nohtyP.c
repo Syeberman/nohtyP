@@ -4424,6 +4424,35 @@ static ypObject *frozenset_bool( ypObject *so ) {
     return ypBool_FROM_C( ypSet_LEN( so ) );
 }
 
+// XXX Adapted from Python's frozenset_hash
+static ypObject *frozenset_currenthash( ypObject *so,
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *_hash ) 
+{
+    ypSet_KeyEntry *keys = ypSet_TABLE( so );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t i;
+    yp_uhash_t h, hash = 1927868237U;
+
+    hash *= (yp_uhash_t)ypSet_LEN(so) + 1;
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
+        keysleft -= 1;
+        /* Work to increase the bit dispersion for closely spaced hash
+           values.  The is important because some use cases have many
+           combinations of a small number of elements with nearby
+           hashes so that many distinct combinations collapse to only
+           a handful of distinct hash values. */
+        h = keys[i].se_hash;
+        hash ^= (h ^ (h << 16) ^ 89869747U)  * 3644798167U;
+    }
+    hash = hash * 69069U + 907133923U;
+    if (hash == (yp_uhash_t)ypObject_HASH_INVALID) {
+        hash = 590923713U;
+    }
+    *_hash = (yp_hash_t)hash;
+    return yp_None;
+}
+
 static ypObject *frozenset_contains( ypObject *so, ypObject *x )
 {
     yp_hash_t hash;
@@ -4648,7 +4677,7 @@ static ypTypeObject ypFrozenSet_Type = {
     frozenset_gt,                   // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    frozenset_currenthash,          // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -4719,7 +4748,7 @@ static ypTypeObject ypSet_Type = {
     frozenset_gt,                   // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    frozenset_currenthash,          // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
