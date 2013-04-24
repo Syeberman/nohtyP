@@ -656,9 +656,13 @@ ypAPI ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
 // together implement a stack (last in, first out).
 ypAPI ypObject *yp_pop( ypObject **sequence );
 
-// Removes the first item from *sequence that equals x.  On error, *sequence is discarded and set
-// to an exception.
+// Removes the first item from *sequence that equals x.  Raises yp_ValueError if x is not
+// contained in *sequence.  On error, *sequence is discarded and set to an exception.
 ypAPI void yp_remove( ypObject **sequence, ypObject *x );
+
+// Removes the first item from *sequence that equals x, if one is present.  On error, *sequence
+// is discarded and set to an exception.
+ypAPI void yp_discard( ypObject **sequence, ypObject *x );
 
 // Reverses the items of *sequence in-place.  On error, *sequence is discarded and set to an
 // exception.
