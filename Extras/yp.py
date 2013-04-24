@@ -532,9 +532,10 @@ yp_func( c_void, "yp_set_add", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 yp_func( c_void, "yp_pushuniqueE", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # void yp_remove( ypObject **set, ypObject *x );
+# (declared above)
 
 # void yp_discard( ypObject **set, ypObject *x );
-#yp_func( c_void, "yp_discard", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
+yp_func( c_void, "yp_discard", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_pop( ypObject **set );
 

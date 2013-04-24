@@ -216,7 +216,7 @@ typedef struct {
     objobjproc tp_push;
     objproc tp_clear; /* delete references to contained objects */
     objproc tp_pop;
-    objobjproc tp_remove; /* TODO some indication that error is due to missing item, to supress on discard */
+    objobjobjproc tp_remove; /* if onmissing is NULL, raise exception if missing */
     objobjobjproc tp_getdefault; /* if defval is NULL, raise exception if missing */
     objobjobjproc tp_setitem;
     objobjproc tp_delitem;
@@ -933,7 +933,7 @@ static ypTypeObject ypIter_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -1566,7 +1566,7 @@ static ypTypeObject ypInvalidated_Type = {
     InvalidatedError_objobjproc,        // tp_push
     InvalidatedError_objproc,           // tp_clear
     InvalidatedError_objproc,           // tp_pop
-    InvalidatedError_objobjproc,        // tp_remove
+    InvalidatedError_objobjobjproc,     // tp_remove
     InvalidatedError_objobjobjproc,     // tp_getdefault
     InvalidatedError_objobjobjproc,     // tp_setitem
     InvalidatedError_objobjproc,        // tp_delitem
@@ -1638,7 +1638,7 @@ static ypTypeObject ypException_Type = {
     ExceptionMethod_objobjproc,         // tp_push
     ExceptionMethod_objproc,            // tp_clear
     ExceptionMethod_objproc,            // tp_pop
-    ExceptionMethod_objobjproc,         // tp_remove
+    ExceptionMethod_objobjobjproc,      // tp_remove
     ExceptionMethod_objobjobjproc,      // tp_getdefault
     ExceptionMethod_objobjobjproc,      // tp_setitem
     ExceptionMethod_objobjproc,         // tp_delitem
@@ -1821,7 +1821,7 @@ static ypTypeObject ypNoneType_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -1901,7 +1901,7 @@ static ypTypeObject ypBool_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -2024,7 +2024,7 @@ static ypTypeObject ypInt_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -2082,7 +2082,7 @@ static ypTypeObject ypIntStore_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -2889,7 +2889,7 @@ static ypTypeObject ypBytes_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -2964,7 +2964,7 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -3169,7 +3169,7 @@ static ypTypeObject ypStr_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -3244,7 +3244,7 @@ static ypTypeObject ypChrArray_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -3662,7 +3662,7 @@ static ypTypeObject ypTuple_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -3737,7 +3737,7 @@ static ypTypeObject ypList_Type = {
     list_push,                      // tp_push
     list_clear,                     // tp_clear
     list_pop,                       // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -4635,6 +4635,19 @@ static ypObject *frozenset_len( ypObject *so, yp_ssize_t *len ) {
     return yp_None;
 }
 
+// onmissing must be an immortal, or NULL
+static ypObject *set_remove( ypObject *so, ypObject *x, ypObject *onmissing ) 
+{
+    ypObject *result = _ypSet_pop( so, x );
+    if( yp_isexceptionC( result ) ) return result;
+    if( result == ypSet_dummy ) {
+        if( onmissing == NULL ) return yp_KeyError;
+        return onmissing;
+    }
+    yp_decref( result );
+    return yp_None;
+}
+
 static ypObject *frozenset_dealloc( ypObject *so )
 {
     frozenset_traverse( so, _frozenset_decref_visitor, NULL ); // cannot fail
@@ -4698,7 +4711,7 @@ static ypTypeObject ypFrozenSet_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -4769,7 +4782,7 @@ static ypTypeObject ypSet_Type = {
     set_push,                       // tp_push
     set_clear,                      // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    set_remove,                     // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -5317,7 +5330,7 @@ static ypTypeObject ypFrozenDict_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     frozendict_getdefault,          // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
@@ -5384,7 +5397,7 @@ static ypTypeObject ypDict_Type = {
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
-    MethodError_objobjproc,         // tp_remove
+    MethodError_objobjobjproc,      // tp_remove
     frozendict_getdefault,          // tp_getdefault
     dict_setitem,                   // tp_setitem
     dict_delitem,                   // tp_delitem
@@ -5632,7 +5645,7 @@ ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i ) {
 }
 
 void yp_remove( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE1( sequence, tp_remove, (*sequence, x) );
+    _yp_INPLACE1( sequence, tp_remove, (*sequence, x, NULL) );
 }
 
 void yp_reverse( ypObject **sequence ) {
@@ -5728,6 +5741,10 @@ ypObject *yp_pushuniqueE( ypObject *set, ypObject *x ) {
     _yp_REDIRECT2( set, tp_as_set, tp_pushunique, (set, x) );
 }
 
+void yp_discard( ypObject **set, ypObject *x ) {
+    _yp_INPLACE1( set, tp_remove, (*set, x, yp_None) );
+}
+
 ypObject *yp_getitem( ypObject *mapping, ypObject *key ) {
     _yp_REDIRECT1( mapping, tp_getdefault, (mapping, key, NULL) );
 }
@@ -5752,7 +5769,9 @@ void yp_updateK( ypObject **mapping, int n, ... ) {
     return_yp_K_FUNC_void( yp_updateKV, (mapping, n, args), n );
 }
 void yp_updateKV( ypObject **mapping, int n, va_list args ) {
-    _yp_INPLACE2( mapping, tp_as_mapping, tp_updateK, (*mapping, n, args) );
+    yp_decref( *mapping );
+    *mapping = yp_NotImplementedError;
+    //_yp_INPLACE2( mapping, tp_as_mapping, tp_updateK, (*mapping, n, args) );
 }
 
 ypObject *yp_iter_values( ypObject *mapping ) {

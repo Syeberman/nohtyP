@@ -278,6 +278,7 @@ class TestJointOps(unittest.TestCase):
         self.assertNotEqual(id(t), id(newt))
         self.assertEqual(t.value + 1, newt.value)
 
+    @unittest.skip("REWORK: nohtyP sets don't store user-defined types")
     def test_gc(self):
         # Create a nest of cycles to exercise overall ref count check
         class A:
@@ -288,6 +289,7 @@ class TestJointOps(unittest.TestCase):
             elem.sub = elem
             elem.set = yp_set([elem])
 
+    @unittest.skip("REWORK: nohtyP sets don't store user-defined types")
     def test_subclass_with_custom_hash(self):
         # Bug #1257731
         class H(self.thetype):
@@ -339,6 +341,7 @@ class TestJointOps(unittest.TestCase):
             fo.close()
             support.unlink(support.TESTFN)
 
+    @unittest.skip("REWORK: nohtyP sets don't store user-defined types")
     def test_do_not_rehash_dict_keys(self):
         n = 10
         d = dict.fromkeys(map(HashCountingInt, range(n)))
@@ -453,7 +456,11 @@ class TestSet(TestJointOps):
         self.s.discard('a')
         self.assertNotIn('a', self.s)
         self.s.discard('Q')
-        self.assertRaises(TypeError, self.s.discard, [])
+        
+        length = len(self.s)
+        self.s.discard([]) # nohtyP sets accept mutable types here
+        self.assertEqual(len(self.s), length)
+        
         s = self.thetype([yp_frozenset(self.word)])
         self.assertIn(self.thetype(self.word), s)
         s.discard(self.thetype(self.word))
@@ -533,7 +540,6 @@ class TestSet(TestJointOps):
         s.difference_update([[]]) # nohtyP sets accept mutable types here
         self.assertEqual(self.s, s)
         
-        self.assertRaises(TypeError, self.s.symmetric_difference_update, [[]])
         for p, q in (('cdc', 'ab'), ('efgfe', 'abc'), ('ccb', 'a'), ('ef', 'abc')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
                 s = self.thetype('abcba')
