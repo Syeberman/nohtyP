@@ -378,6 +378,7 @@ class TestSet(TestJointOps):
     thetype = yp_set
     basetype = yp_set
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_init(self):
         s = self.thetype()
         s.__init__(self.word)
