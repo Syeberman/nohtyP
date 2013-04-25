@@ -1858,6 +1858,20 @@ static ypObject *bool_bool( ypObject *b ) {
     return b;
 }
 
+// Here be bool_lt, bool_le, bool_eq, bool_ne, bool_ge, bool_gt
+#define _ypBool_RELATIVE_CMP_FUNCTION( name, operator ) \
+static ypObject *bool_ ## name( ypObject *b, ypObject *x ) { \
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBool_CODE ) return yp_ComparisonNotImplemented; \
+    return ypBool_FROM_C( _ypBool_VALUE( b ) operator _ypBool_VALUE( x ) ); \
+}
+_ypBool_RELATIVE_CMP_FUNCTION( lt, < );
+_ypBool_RELATIVE_CMP_FUNCTION( le, <= );
+_ypBool_RELATIVE_CMP_FUNCTION( eq, == );
+_ypBool_RELATIVE_CMP_FUNCTION( ne, != );
+_ypBool_RELATIVE_CMP_FUNCTION( ge, >= );
+_ypBool_RELATIVE_CMP_FUNCTION( gt, > );
+// TODO #undef _ypBool_RELATIVE_CMP_FUNCTION
+
 static ypTypeObject ypBool_Type = {
     yp_TYPE_HEAD_INIT,
     NULL,                           // tp_name
@@ -1876,12 +1890,12 @@ static ypTypeObject ypBool_Type = {
 
     // Boolean operations and comparisons
     bool_bool,                      // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    bool_lt,                        // tp_lt
+    bool_le,                        // tp_le
+    bool_eq,                        // tp_eq
+    bool_ne,                        // tp_ne
+    bool_ge,                        // tp_ge
+    bool_gt,                        // tp_gt
 
     // Generic object operations
     MethodError_hashfunc,           // tp_currenthash
@@ -1954,7 +1968,7 @@ static ypObject *int_bool( ypObject *i ) {
     return ypBool_FROM_C( ypInt_VALUE( i ) );
 }
 
-// Comparison methods return yp_True, yp_False, or an exception
+// Here be int_lt, int_le, int_eq, int_ne, int_ge, int_gt
 #define _ypInt_RELATIVE_CMP_FUNCTION( name, operator ) \
 static ypObject *int_ ## name( ypObject *i, ypObject *x ) { \
     if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return yp_ComparisonNotImplemented; \
@@ -2781,41 +2795,53 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
     return yp_None;
 }
 
+// Returns -1, 0, or 1 as per memcmp
+static int _ypBytes_relative_cmp( ypObject *b, ypObject *x ) {
+    yp_ssize_t b_len = ypBytes_LEN( b );
+    yp_ssize_t x_len = ypBytes_LEN( x );
+    int cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) );
+    if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0);
+    return cmp;
+}
+static ypObject *bytes_lt( ypObject *b, ypObject *x ) {
+    if( b == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) < 0 );
+}    
+static ypObject *bytes_le( ypObject *b, ypObject *x ) {
+    if( b == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) <= 0 );
+}    
+static ypObject *bytes_ge( ypObject *b, ypObject *x ) {
+    if( b == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) >= 0 );
+}    
+static ypObject *bytes_gt( ypObject *b, ypObject *x ) {
+    if( b == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) > 0 );
+}    
 
-// Comparison methods return yp_True, yp_False, or an exception.  When checking for (in)equality,
-// more efficient to check size first.
-// TODO Check for b==x!
-// TODO Consider the pre-computed hash, if available
-// TODO Generally compare efficiency against Python
-// TODO Convert to function (here and elsewhere)
-#define _ypBytes_RELATIVE_CMP_FUNCTION( name, operator ) \
-static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
-    int cmp; \
-    yp_ssize_t b_len, x_len; \
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented; \
-    b_len = ypBytes_LEN( b ); x_len = ypBytes_LEN( x ); \
-    cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) ); \
-    if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0); \
-    return ypBool_FROM_C( cmp operator 0 ); \
+// Returns true (1) if the two bytes/bytearrays are equal.  Size is a quick way to check equality.
+// TODO The pre-computed hash, if any, would also be a quick check
+static int _ypBytes_are_equal( ypObject *b, ypObject *x ) {
+    yp_ssize_t b_len = ypBytes_LEN( b );
+    yp_ssize_t x_len = ypBytes_LEN( x );
+    if( b_len != x_len ) return 0;
+    return memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), b_len ) == 0;
 }
-_ypBytes_RELATIVE_CMP_FUNCTION( lt, < );
-_ypBytes_RELATIVE_CMP_FUNCTION( le, <= );
-_ypBytes_RELATIVE_CMP_FUNCTION( ge, >= );
-_ypBytes_RELATIVE_CMP_FUNCTION( gt, > );
-// TODO #undef _ypBytes_RELATIVE_CMP_FUNCTION
-#define _ypBytes_EQUALITY_CMP_FUNCTION( name, operator ) \
-static ypObject *bytes_ ## name( ypObject *b, ypObject *x ) { \
-    int cmp; \
-    yp_ssize_t b_len, x_len; \
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented; \
-    b_len = ypBytes_LEN( b ); x_len = ypBytes_LEN( x ); \
-    if( b_len != x_len ) return ypBool_FROM_C( 1 operator 0 ); \
-    cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) ); \
-    return ypBool_FROM_C( cmp operator 0 ); \
-}
-_ypBytes_EQUALITY_CMP_FUNCTION( eq, == );
-_ypBytes_EQUALITY_CMP_FUNCTION( ne, != );
-// TODO #undef _ypBytes_EQUALITY_CMP_FUNCTION
+static ypObject *bytes_eq( ypObject *b, ypObject *x ) {
+    if( b == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypBytes_are_equal( b, x ) );
+}    
+static ypObject *bytes_ne( ypObject *b, ypObject *x ) {
+    if( b == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( !_ypBytes_are_equal( b, x ) );
+}    
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 static ypObject *bytes_currenthash( ypObject *b, 
@@ -3076,25 +3102,24 @@ static ypObject *str_len( ypObject *s, yp_ssize_t *len )
     return yp_None;
 }
 
-// Comparison methods return yp_True, yp_False, or an exception.  When checking for (in)equality,
-// more efficient to check size first.
-// TODO Check for s==x!
-// TODO Consider the pre-computed hash, if available
-// TODO Generally compare efficiency against Python
-// TODO Convert to function (here and elsewhere)
-#define _ypStr_EQUALITY_CMP_FUNCTION( name, operator ) \
-static ypObject *str_ ## name( ypObject *s, ypObject *x ) { \
-    int cmp; \
-    yp_ssize_t s_len, x_len; \
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented; \
-    s_len = ypStr_LEN( s ); x_len = ypStr_LEN( x ); \
-    if( s_len != x_len ) return ypBool_FROM_C( 1 operator 0 ); \
-    cmp = memcmp( ypStr_DATA( s ), ypStr_DATA( x ), MIN( s_len, x_len ) ); \
-    return ypBool_FROM_C( cmp operator 0 ); \
+// Returns true (1) if the two str/chrarrays are equal.  Size is a quick way to check equality.
+// TODO The pre-computed hash, if any, would also be a quick check
+static int _ypStr_are_equal( ypObject *s, ypObject *x ) {
+    yp_ssize_t b_len = ypStr_LEN( s );
+    yp_ssize_t x_len = ypStr_LEN( x );
+    if( b_len != x_len ) return 0;
+    return memcmp( ypStr_DATA( s ), ypStr_DATA( x ), b_len ) == 0;
 }
-_ypStr_EQUALITY_CMP_FUNCTION( eq, == );
-_ypStr_EQUALITY_CMP_FUNCTION( ne, != );
-// TODO #undef _ypStr_EQUALITY_CMP_FUNCTION
+static ypObject *str_eq( ypObject *s, ypObject *x ) {
+    if( s == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypStr_are_equal( s, x ) );
+}    
+static ypObject *str_ne( ypObject *s, ypObject *x ) {
+    if( s == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( !_ypStr_are_equal( s, x ) );
+}    
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 // FIXME bring this in-line with Python's string hashing; it's currently using bytes hashing
@@ -3526,6 +3551,31 @@ static ypObject *tuple_bool( ypObject *sq ) {
     return ypBool_FROM_C( ypTuple_LEN( sq ) );
 }
 
+
+// Returns yp_True if the two tuples/lists are equal.  Size is a quick way to check equality.
+// TODO The pre-computed hash, if any, would also be a quick check
+// FIXME comparison functions can recurse, just like currenthash...fix!
+static ypObject *tuple_eq( ypObject *sq, ypObject *x )
+{
+    yp_ssize_t sq_len = ypBytes_LEN( sq );
+    yp_ssize_t x_len  = ypBytes_LEN( x );
+    yp_ssize_t i;
+    ypObject *result;
+    
+    if( sq == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypTuple_CODE ) return yp_ComparisonNotImplemented;
+    if( sq_len != x_len ) return yp_False;
+    for( i = 0; i < sq_len; i++ ) {
+        result = yp_eq( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] );
+        if( result != yp_True ) return result; // returns on yp_False or an exception
+    }
+    return yp_True;
+}
+static ypObject *tuple_ne( ypObject *sq, ypObject *x ) {
+    ypObject *result = tuple_eq( sq, x );
+    return ypBool_NOT( result );
+}    
+
 // XXX Adapted from Python's tuplehash
 // TODO Do we want to allow currenthash to work on circular references and, if so, how?
 static ypObject *tuple_currenthash( ypObject *sq,
@@ -3639,8 +3689,8 @@ static ypTypeObject ypTuple_Type = {
     tuple_bool,                     // tp_bool
     MethodError_objobjproc,         // tp_lt
     MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
+    tuple_eq,                       // tp_eq
+    tuple_ne,                       // tp_ne
     MethodError_objobjproc,         // tp_ge
     MethodError_objobjproc,         // tp_gt
 
@@ -3714,8 +3764,8 @@ static ypTypeObject ypList_Type = {
     tuple_bool,                     // tp_bool
     MethodError_objobjproc,         // tp_lt
     MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
+    tuple_eq,                       // tp_eq
+    tuple_ne,                       // tp_ne
     MethodError_objobjproc,         // tp_ge
     MethodError_objobjproc,         // tp_gt
 
@@ -4536,6 +4586,7 @@ static ypObject *frozenset_issuperset( ypObject *so, ypObject *x )
 
 static ypObject *frozenset_lt( ypObject *so, ypObject *x )
 {
+    if( so == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     if( ypSet_LEN( so ) >= ypSet_LEN( x ) ) return yp_False;
     return _frozenset_issubset( so, x );
@@ -4543,12 +4594,14 @@ static ypObject *frozenset_lt( ypObject *so, ypObject *x )
 
 static ypObject *frozenset_le( ypObject *so, ypObject *x )
 {
+    if( so == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     return _frozenset_issubset( so, x );
 }
 
 static ypObject *frozenset_eq( ypObject *so, ypObject *x )
 {
+    if( so == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     if( ypSet_LEN( so ) != ypSet_LEN( x ) ) return yp_False;
     // FIXME Compare stored hashes (they should be equal if so and x are equal)
@@ -4563,12 +4616,14 @@ static ypObject *frozenset_ne( ypObject *so, ypObject *x )
 
 static ypObject *frozenset_ge( ypObject *so, ypObject *x )
 {
+    if( so == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     return _frozenset_issubset( x, so );
 }
 
 static ypObject *frozenset_gt( ypObject *so, ypObject *x )
 {
+    if( so == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     if( ypSet_LEN( so ) <= ypSet_LEN( x ) ) return yp_False;
     return _frozenset_issubset( x, so );
