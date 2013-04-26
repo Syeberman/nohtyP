@@ -979,6 +979,22 @@ class _ypSet( ypObject ):
     def __xor__( self, other ):
         if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
         return _yp_symmetric_difference( self, other )
+    def __ior__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        _yp_updateN( self, other )
+        return self
+    def __iand__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        _yp_intersection_updateN( self, other )
+        return self
+    def __isub__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        _yp_difference_updateN( self, other )
+        return self
+    def __ixor__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        _yp_symmetric_difference_update( self, other )
+        return self
     def add( self, elem ): _yp_set_add( self, elem )
 
 @pytype( frozenset, 22 )
