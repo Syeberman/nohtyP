@@ -118,7 +118,7 @@ class TestJointOps(unittest.TestCase):
             self.assertEqual(self.thetype('abcba').intersection(C('cbcf'), C('bag')), yp_set('b'))
         s = self.thetype('abcba')
         z = s.intersection()
-        if self.thetype == yp_frozenset():
+        if self.thetype == yp_frozenset:
             self.assertEqual(id(s), id(z))
         else:
             self.assertNotEqual(id(s), id(z))
@@ -458,9 +458,9 @@ class TestSet(TestJointOps):
         self.assertNotIn('a', self.s)
         self.s.discard('Q')
         
-        length = len(self.s)
-        self.s.discard([]) # nohtyP sets accept mutable types here
-        self.assertEqual(len(self.s), length)
+        s = self.s.copy()
+        s.discard([]) # nohtyP sets accept mutable types here
+        self.assertEqual(s, self.s)
         
         s = self.thetype([yp_frozenset(self.word)])
         self.assertIn(self.thetype(self.word), s)
@@ -507,7 +507,11 @@ class TestSet(TestJointOps):
             else:
                 self.assertNotIn(c, self.s)
         self.assertRaises(PassThru, self.s.intersection_update, check_pass_thru())
-        self.assertRaises(TypeError, self.s.intersection_update, [[]])
+
+        s = self.s.copy()
+        s.intersection_update([[]]) # nohtyP sets accept mutable types here
+        self.assertEqual(s, self.thetype())
+
         for p, q in (('cdc', 'c'), ('efgfe', ''), ('ccb', 'bc'), ('ef', '')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
                 s = self.thetype('abcba')
@@ -539,7 +543,7 @@ class TestSet(TestJointOps):
         
         s = self.s.copy()
         s.difference_update([[]]) # nohtyP sets accept mutable types here
-        self.assertEqual(self.s, s)
+        self.assertEqual(s, self.s)
         
         for p, q in (('cdc', 'ab'), ('efgfe', 'abc'), ('ccb', 'a'), ('ef', 'abc')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:

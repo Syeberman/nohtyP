@@ -4193,6 +4193,28 @@ static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
     return _ypSet_removekey( so, loc ); // new ref
 }
 
+// XXX Check for the so==x case _before_ calling this function
+// TODO This requires that the elements of x are immutable...do we want to support mutables too?
+static ypObject *_ypSet_issubset( ypObject *so, ypObject *x )
+{
+    ypSet_KeyEntry *keys = ypSet_TABLE( so );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t i;
+    ypObject *result;
+    ypSet_KeyEntry *loc;
+
+    if( ypSet_LEN( so ) > ypSet_LEN( x ) ) return yp_False;
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
+        keysleft -= 1;
+        result = _ypSet_lookkey( x, keys[i].se_key, keys[i].se_hash, &loc );
+        if( yp_isexceptionC( result ) ) return result;
+        if( !ypSet_ENTRY_USED( loc ) ) return yp_False;
+    }
+    return yp_True;
+}
+
+// XXX Check for the so==other case _before_ calling this function
 // XXX We're trusting that copy_visitor will behave properly and return an object that has the same
 // hash as the original and that is unequal to anything else in the other set
 static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other,
@@ -4278,6 +4300,8 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *keyiter )
 
 // Adds the keys yielded from iterable to the set.  If the set has enough space to hold all the
 // keys, the set is not resized (important, as yp_setN et al pre-allocate the necessary space).
+// Requires that iterables's items are immutable; unavoidable as they are to be added to the set.
+// XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 {
     // TODO determine when/where/how the set should be resized
@@ -4291,6 +4315,8 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_update_from_set( so, iterable, yp_shallowcopy_visitor, NULL );
     } else if( iterable_pair == ypFrozenDict_CODE ) {
+        // FIXME Ahhh!  Faulty!  Just because a key is in keyset, doesn't mean the key is in the
+        // dictionary!!
         return _ypSet_update_from_set( so, ypDict_KEYSET( iterable ), yp_shallowcopy_visitor, NULL );
     } else {
         keyiter = yp_iter( iterable ); // new ref
@@ -4321,6 +4347,7 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
     return yp_None;
 }
 
+// FIXME This _allows_ keyiter to yield mutable values, unlike issubset; standardize
 static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo );
 static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *keyiter );
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other );
@@ -4345,6 +4372,7 @@ static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject *k
 }
 
 // Removes the keys not yielded from iterable from the set
+// XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
 {
     int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
@@ -4354,6 +4382,8 @@ static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_intersection_update_from_set( so, iterable );
     } else if( iterable_pair == ypFrozenDict_CODE ) {
+        // FIXME Ahhh!  Faulty!  Just because a key is in keyset, doesn't mean the key is in the
+        // dictionary!!
         return _ypSet_intersection_update_from_set( so, ypDict_KEYSET( iterable ) );
     } else {
         keyiter = yp_iter( iterable ); // new ref
@@ -4383,6 +4413,7 @@ static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *othe
     return yp_None;
 }
 
+// FIXME This _allows_ keyiter to yield mutable values, unlike issubset; standardize
 static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *keyiter )
 {
     ypObject *result = yp_None;
@@ -4403,6 +4434,7 @@ static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *key
 }
 
 // Removes the keys yielded from iterable from the set
+// XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
 {
     int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
@@ -4415,6 +4447,8 @@ static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_difference_update_from_set( so, iterable );
     } else if( iterable_pair == ypFrozenDict_CODE ) {
+        // FIXME Ahhh!  Faulty!  Just because a key is in keyset, doesn't mean the key is in the
+        // dictionary!!
         return _ypSet_difference_update_from_set( so, ypDict_KEYSET( iterable ) );
     } else {
         keyiter = yp_iter( iterable ); // new ref
@@ -4525,24 +4559,6 @@ static ypObject *frozenset_isdisjoint( ypObject *so, ypObject *x )
     return yp_NotImplementedError;
 }
 
-static ypObject *_frozenset_issubset( ypObject *so, ypObject *x )
-{
-    ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    yp_ssize_t keysleft = ypSet_LEN( so );
-    yp_ssize_t i;
-    ypObject *result;
-    ypSet_KeyEntry *loc;
-
-    if( ypSet_LEN( so ) > ypSet_LEN( x ) ) return yp_False;
-    for( i = 0; keysleft > 0; i++ ) {
-        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
-        keysleft -= 1;
-        result = _ypSet_lookkey( x, keys[i].se_key, keys[i].se_hash, &loc );
-        if( yp_isexceptionC( result ) ) return result;
-        if( !ypSet_ENTRY_USED( loc ) ) return yp_False;
-    }
-    return yp_True;
-}
 static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
@@ -4550,15 +4566,16 @@ static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
     ypObject *result;
 
     // We can take some shortcuts if x is a set or a dict
+    if( so == x ) return yp_True;
     if( x_pair == ypFrozenSet_CODE ) {
-        return _frozenset_issubset( so, x );
+        return _ypSet_issubset( so, x );
     } else if( x_pair == ypFrozenDict_CODE ) {
         if( ypSet_LEN( so ) > ypDict_LEN( x ) ) return yp_False;
     }
 
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
     x_asset = yp_frozenset( x );
-    result = _frozenset_issubset( so, x_asset );
+    result = _ypSet_issubset( so, x_asset );
     yp_decref( x_asset );
     return result;
 }
@@ -4571,15 +4588,16 @@ static ypObject *frozenset_issuperset( ypObject *so, ypObject *x )
     ypObject *result;
 
     // We can take some shortcuts if x is a set or a dict
+    if( so == x ) return yp_True;
     if( x_pair == ypFrozenSet_CODE ) {
-        return _frozenset_issubset( x, so );
+        return _ypSet_issubset( x, so );
     } else if( x_pair == ypFrozenDict_CODE ) {
         if( ypDict_LEN( x ) > ypSet_LEN( so ) ) return yp_False;
     }
 
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
     x_asset = yp_frozenset( x );
-    result = _frozenset_issubset( x_asset, so );
+    result = _ypSet_issubset( x_asset, so );
     yp_decref( x_asset );
     return result;
 }
@@ -4589,14 +4607,14 @@ static ypObject *frozenset_lt( ypObject *so, ypObject *x )
     if( so == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     if( ypSet_LEN( so ) >= ypSet_LEN( x ) ) return yp_False;
-    return _frozenset_issubset( so, x );
+    return _ypSet_issubset( so, x );
 }
 
 static ypObject *frozenset_le( ypObject *so, ypObject *x )
 {
     if( so == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
-    return _frozenset_issubset( so, x );
+    return _ypSet_issubset( so, x );
 }
 
 static ypObject *frozenset_eq( ypObject *so, ypObject *x )
@@ -4605,7 +4623,7 @@ static ypObject *frozenset_eq( ypObject *so, ypObject *x )
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     if( ypSet_LEN( so ) != ypSet_LEN( x ) ) return yp_False;
     // FIXME Compare stored hashes (they should be equal if so and x are equal)
-    return _frozenset_issubset( so, x );
+    return _ypSet_issubset( so, x );
 }
 
 static ypObject *frozenset_ne( ypObject *so, ypObject *x )
@@ -4618,7 +4636,7 @@ static ypObject *frozenset_ge( ypObject *so, ypObject *x )
 {
     if( so == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
-    return _frozenset_issubset( x, so );
+    return _ypSet_issubset( x, so );
 }
 
 static ypObject *frozenset_gt( ypObject *so, ypObject *x )
@@ -4626,14 +4644,16 @@ static ypObject *frozenset_gt( ypObject *so, ypObject *x )
     if( so == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     if( ypSet_LEN( so ) <= ypSet_LEN( x ) ) return yp_False;
-    return _frozenset_issubset( x, so );
+    return _ypSet_issubset( x, so );
 }
 
 static ypObject *set_update( ypObject *so, int n, va_list args )
 {
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
-        result = _ypSet_update( so, va_arg( args, ypObject * ) );
+        ypObject *x = va_arg( args, ypObject * );
+        if( so == x ) continue;
+        result = _ypSet_update( so, x );
         if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
@@ -4643,20 +4663,32 @@ static ypObject *set_intersection_update( ypObject *so, int n, va_list args )
 {
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
-        result = _ypSet_intersection_update( so, va_arg( args, ypObject * ) );
+        ypObject *x = va_arg( args, ypObject * );
+        if( so == x ) continue;
+        result = _ypSet_intersection_update( so, x );
         if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
 }
 
+static ypObject *set_clear( ypObject *so );
 static ypObject *set_difference_update( ypObject *so, int n, va_list args )
 {
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
-        result = _ypSet_difference_update( so, va_arg( args, ypObject * ) );
+        ypObject *x = va_arg( args, ypObject * );
+        if( so == x ) return set_clear( so );
+        result = _ypSet_difference_update( so, x );
         if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
+}
+
+static ypObject *set_symmetric_difference_update( ypObject *so, ypObject *x )
+{
+    if( so == x ) return set_clear( so );
+
+    return yp_NotImplementedError;
 }
 
 static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
@@ -4790,7 +4822,7 @@ static ypSetMethods ypSet_as_set = {
     set_update,                     // tp_update
     set_intersection_update,        // tp_intersection_update
     set_difference_update,          // tp_difference_update
-    MethodError_objobjproc,         // tp_symmetric_difference_update
+    set_symmetric_difference_update,// tp_symmetric_difference_update
     set_pushunique,                 // tp_pushunique
 };
 
