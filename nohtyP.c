@@ -4194,6 +4194,26 @@ static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
 
 // XXX Check for the so==x case _before_ calling this function
 // TODO This requires that the elements of x are immutable...do we want to support mutables too?
+static ypObject *_ypSet_isdisjoint( ypObject *so, ypObject *x )
+{
+    ypSet_KeyEntry *keys = ypSet_TABLE( so );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t i;
+    ypObject *result;
+    ypSet_KeyEntry *loc;
+
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
+        keysleft -= 1;
+        result = _ypSet_lookkey( x, keys[i].se_key, keys[i].se_hash, &loc );
+        if( yp_isexceptionC( result ) ) return result;
+        if( ypSet_ENTRY_USED( loc ) ) return yp_False;
+    }
+    return yp_True;
+}
+
+// XXX Check for the so==x case _before_ calling this function
+// TODO This requires that the elements of x are immutable...do we want to support mutables too?
 static ypObject *_ypSet_issubset( ypObject *so, ypObject *x )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
@@ -4352,6 +4372,8 @@ static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject *k
     ypObject *so_toremove;
     ypObject *result;
 
+    // FIXME can we do this without creating a copy or, alternatively, would it be better to
+    // implement this as ypSet_intersection?
     // Unfortunately, we need to create a short-lived copy of so.  It's either that, or convert
     // keyiter to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
     so_toremove = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL ); // new ref
@@ -4547,7 +4569,20 @@ static ypObject *frozenset_contains( ypObject *so, ypObject *x )
 
 static ypObject *frozenset_isdisjoint( ypObject *so, ypObject *x )
 {
-    return yp_NotImplementedError;
+    ypObject *x_asset;
+    ypObject *result;
+
+    if( so == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenSet_CODE ) {
+        return _ypSet_isdisjoint( so, x );
+    } else {
+        // Otherwise, we need to convert x to a set to quickly test if it contains all items
+        // FIXME Can we make a version of _ypSet_isdisjoint that doesn't reqire a new set created?
+        x_asset = yp_frozenset( x );
+        result = _ypSet_isdisjoint( so, x_asset );
+        yp_decref( x_asset );
+        return result;
+    }
 }
 
 static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
@@ -4565,6 +4600,7 @@ static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
     }
 
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
+    // FIXME Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
     x_asset = yp_frozenset( x );
     result = _ypSet_issubset( so, x_asset );
     yp_decref( x_asset );
@@ -4587,6 +4623,7 @@ static ypObject *frozenset_issuperset( ypObject *so, ypObject *x )
     }
 
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
+    // FIXME Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
     x_asset = yp_frozenset( x );
     result = _ypSet_issubset( x_asset, so );
     yp_decref( x_asset );

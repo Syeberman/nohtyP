@@ -135,7 +135,7 @@ class TestJointOps(unittest.TestCase):
                     actual = s1.isdisjoint(s2)
                     expected = f(s1, s2)
                     self.assertEqual(actual, expected)
-                    self.assertTrue(actual is True or actual is False)
+                    #self.assertTrue(actual is True or actual is False) # N/A for nohtyP
 
     def test_and(self):
         i = self.s.intersection(self.otherword)
@@ -229,6 +229,7 @@ class TestJointOps(unittest.TestCase):
         self.assertFalse(yp_set('a').issubset('cbs'))
         self.assertFalse(yp_set('cbs').issuperset('a'))
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickling(self):
         for i in range(pickle.HIGHEST_PROTOCOL + 1):
             p = pickle.dumps(self.s, i)
@@ -240,6 +241,7 @@ class TestJointOps(unittest.TestCase):
                 dup = pickle.loads(p)
                 self.assertEqual(self.s.x, dup.x)
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_iterator_pickling(self):
         itorg = iter(self.s)
         data = self.thetype(self.s)
@@ -614,6 +616,7 @@ class TestSet(TestJointOps):
         s = None
         self.assertRaises(ReferenceError, str, p)
 
+    @unittest.skip("REWORK: nohtyP doesn't have user-defined types")
     def test_rich_compare(self):
         class TestRichSetCompare:
             def __gt__(self, some_set):
@@ -877,6 +880,7 @@ class TestBasicOps(unittest.TestCase):
         # don't rely on it in your own programs
         self.assertEqual(setiter.__length_hint__(), len(self.set))
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickling(self):
         p = pickle.dumps(self.set)
         copy = pickle.loads(p)
