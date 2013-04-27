@@ -5286,8 +5286,6 @@ static ypObject *frozendict_bool( ypObject *mp ) {
     return ypBool_FROM_C( ypDict_LEN( mp ) );
 }
 
-// TODO frozendict_iter
-
 static ypObject *frozendict_contains( ypObject *mp, ypObject *key )
 {
     yp_hash_t hash;
@@ -5351,6 +5349,52 @@ static ypObject *dict_delitem( ypObject *mp, ypObject *key )
     return yp_None;
 }
 
+typedef struct {
+    _ypIterObject_HEAD
+    ypObject *mp;
+    yp_ssize_t index;
+} ypDictIterObject;
+#define ypDictIter_DICT( i )    ( ((ypDictIterObject *)i)->mp )
+#define ypDictIter_INDEX( i )   ( ((ypDictIterObject *)i)->index )
+
+static ypObject *_frozendict_iter_new( ypObject *mp, yp_generator_func_t generator )
+{
+    // Allocate the iterator
+    ypObject *iterator = ypMem_MALLOC_FIXED( ypDictIterObject, ypIter_CODE );
+    if( yp_isexceptionC( iterator ) ) return iterator;
+
+    // Set attributes, increment reference counts, and return
+    iterator->ob_len = ypObject_LEN_INVALID;
+    ypIter_LENHINT( iterator ) = ypDict_LEN( mp );
+    ypIter_STATE( iterator ) = &(ypDictIter_DICT( iterator )); // TODO also size?
+    ypIter_OBJLOCS( iterator ) = 0x1u;  // indicates mp at state offset zero
+    ypIter_FUNC( iterator ) = generator;
+    ypDictIter_INDEX( iterator ) = 0;
+    ypDictIter_DICT( iterator ) = yp_incref( mp );
+    return iterator;
+}
+
+static ypObject *_frozendict_iter_keys_generator( ypObject *i, ypObject *value )
+{
+    ypObject *mp = ypDictIter_DICT( i );
+    ypObject *keyset = ypDict_KEYSET( mp );
+    yp_ssize_t *index = &ypDictIter_INDEX( i );
+    if( yp_isexceptionC( value ) ) return value; // yp_GeneratorExit, in particular
+    if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
+
+    for( /*index already set*/; /*lenhint tracks valuesleft*/; (*index)++ ) {
+        if( ypDict_VALUES( mp )[*index] != NULL ) {
+            ypObject *key = ypSet_TABLE( keyset )[*index].se_key;
+            (*index)++;
+            return key;
+        }
+    }
+    return yp_SystemError; // NOT REACHED
+}
+static ypObject *frozendict_iter_keys( ypObject *mp ) {
+    return _frozendict_iter_new( mp, _frozendict_iter_keys_generator );
+}
+
 static ypObject *_frozendict_dealloc_visitor( ypObject *x, void *memo ) {
     yp_decref( x );
     return yp_None;
@@ -5365,7 +5409,7 @@ static ypObject *frozendict_dealloc( ypObject *mp )
 
 static ypMappingMethods ypFrozenDict_as_mapping = {
     MethodError_objproc,            // tp_iter_items
-    MethodError_objproc,            // tp_iter_keys
+    frozendict_iter_keys,           // tp_iter_keys
     MethodError_objobjobjproc,      // tp_popvalue
     MethodError_popitemfunc,        // tp_popitem
     MethodError_objobjobjproc,      // tp_setdefault
@@ -5405,7 +5449,7 @@ static ypTypeObject ypFrozenDict_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_objproc,            // tp_iter
+    frozendict_iter_keys,           // tp_iter
     MethodError_objproc,            // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
@@ -5432,7 +5476,7 @@ static ypTypeObject ypFrozenDict_Type = {
 
 static ypMappingMethods ypDict_as_mapping = {
     MethodError_objproc,            // tp_iter_items
-    MethodError_objproc,            // tp_iter_keys
+    frozendict_iter_keys,           // tp_iter_keys
     MethodError_objobjobjproc,      // tp_popvalue
     MethodError_popitemfunc,        // tp_popitem
     MethodError_objobjobjproc,      // tp_setdefault
@@ -5472,7 +5516,7 @@ static ypTypeObject ypDict_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_objproc,            // tp_iter
+    frozendict_iter_keys,           // tp_iter
     MethodError_objproc,            // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
@@ -5917,7 +5961,7 @@ void yp_initialize( void )
 {
 #ifdef _MSC_VER
     // TODO memory leak detection that should only be enabled for debug builds
-    _CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
+    // _CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 
     yp_malloc = _default_yp_malloc;
