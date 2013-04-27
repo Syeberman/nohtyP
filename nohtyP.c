@@ -3899,7 +3899,6 @@ typedef struct {
     yp_INLINE_DATA( ypObject * );
 } ypDictObject;
 #define ypDict_LEN( mp )     ( ((ypObject *)mp)->ob_len )
-#define ypDict_KEYSET( mp )  ( ((ypDictObject *)mp)->keyset )
 
 // Before adding keys to the set, call this function to determine if a resize is necessary.
 // Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
@@ -4309,15 +4308,9 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
     ypObject *keyiter;
     ypObject *result;
 
-    // sets and dicts both iterate over a fellow set, so there are efficiencies we can exploit;
-    // otherwise, treat it as a generic iterator.  Recall that type pairs are identified by the
-    // immutable type code.
+    // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_update_from_set( so, iterable, yp_shallowcopy_visitor, NULL );
-    } else if( iterable_pair == ypFrozenDict_CODE ) {
-        // FIXME Ahhh!  Faulty!  Just because a key is in keyset, doesn't mean the key is in the
-        // dictionary!!
-        return _ypSet_update_from_set( so, ypDict_KEYSET( iterable ), yp_shallowcopy_visitor, NULL );
     } else {
         keyiter = yp_iter( iterable ); // new ref
         if( yp_isexceptionC( keyiter ) ) return keyiter;
@@ -4327,6 +4320,7 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
     }
 }
 
+// XXX Check the so==other case _before_ calling this function
 static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *other )
 {
     yp_ssize_t keysleft = ypSet_LEN( so );
@@ -4335,8 +4329,10 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
     ypSet_KeyEntry *other_loc;
     ypObject *result;
 
-    // Since we're only removing keys from so, it won't be resized, so we can loop over it
+    // Since we're only removing keys from so, it won't be resized, so we can loop over it.  We
+    // break once so is empty because we aren't expecting any errors from _ypSet_lookkey.
     for( i = 0; keysleft > 0; i++ ) {
+        if( ypSet_LEN( so ) < 1 ) break;
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
         keysleft -= 1;
         result = _ypSet_lookkey( other, keys[i].se_key, keys[i].se_hash, &other_loc );
@@ -4379,12 +4375,9 @@ static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
     ypObject *keyiter;
     ypObject *result;
 
+    // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_intersection_update_from_set( so, iterable );
-    } else if( iterable_pair == ypFrozenDict_CODE ) {
-        // FIXME Ahhh!  Faulty!  Just because a key is in keyset, doesn't mean the key is in the
-        // dictionary!!
-        return _ypSet_intersection_update_from_set( so, ypDict_KEYSET( iterable ) );
     } else {
         keyiter = yp_iter( iterable ); // new ref
         if( yp_isexceptionC( keyiter ) ) return keyiter;
@@ -4394,6 +4387,7 @@ static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
     }
 }
 
+// XXX Check for the so==other case _before_ calling this function
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other )
 {
     yp_ssize_t keysleft = ypSet_LEN( other );
@@ -4402,7 +4396,9 @@ static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *othe
     yp_ssize_t i;
     ypSet_KeyEntry *loc;
 
+    // We break once so is empty because we aren't expecting any errors from _ypSet_lookkey
     for( i = 0; keysleft > 0; i++ ) {
+        if( ypSet_LEN( so ) < 1 ) break;
         if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
         keysleft -= 1;
         result = _ypSet_lookkey( so, otherkeys[i].se_key, otherkeys[i].se_hash, &loc );
@@ -4419,6 +4415,7 @@ static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *key
     ypObject *result = yp_None;
     ypObject *key;
 
+    // It's tempting to stop once so is empty, but doing so would mask errors in yielded keys
     while( 1 ) {
         key = yp_next( keyiter ); // new ref
         if( yp_isexceptionC( key ) ) {
@@ -4441,15 +4438,9 @@ static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
     ypObject *keyiter;
     ypObject *result;
 
-    // sets and dicts both iterate over a fellow set, so there are efficiencies we can exploit;
-    // otherwise, treat it as a generic iterator.  Recall that type pairs are identified by the
-    // immutable type code.
+    // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_difference_update_from_set( so, iterable );
-    } else if( iterable_pair == ypFrozenDict_CODE ) {
-        // FIXME Ahhh!  Faulty!  Just because a key is in keyset, doesn't mean the key is in the
-        // dictionary!!
-        return _ypSet_difference_update_from_set( so, ypDict_KEYSET( iterable ) );
     } else {
         keyiter = yp_iter( iterable ); // new ref
         if( yp_isexceptionC( keyiter ) ) return keyiter;
@@ -4662,6 +4653,7 @@ static ypObject *set_update( ypObject *so, int n, va_list args )
 static ypObject *set_intersection_update( ypObject *so, int n, va_list args )
 {
     ypObject *result;
+    // It's tempting to stop once so is empty, but doing so would mask errors in args
     for( /*n already set*/; n > 0; n-- ) {
         ypObject *x = va_arg( args, ypObject * );
         if( so == x ) continue;
@@ -4675,10 +4667,14 @@ static ypObject *set_clear( ypObject *so );
 static ypObject *set_difference_update( ypObject *so, int n, va_list args )
 {
     ypObject *result;
+    // It's tempting to stop once so is empty, but doing so would mask errors in args
     for( /*n already set*/; n > 0; n-- ) {
         ypObject *x = va_arg( args, ypObject * );
-        if( so == x ) return set_clear( so );
-        result = _ypSet_difference_update( so, x );
+        if( so == x ) {
+            result = set_clear( so );
+        } else {
+            result = _ypSet_difference_update( so, x );
+        }
         if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
@@ -4687,7 +4683,6 @@ static ypObject *set_difference_update( ypObject *so, int n, va_list args )
 static ypObject *set_symmetric_difference_update( ypObject *so, ypObject *x )
 {
     if( so == x ) return set_clear( so );
-
     return yp_NotImplementedError;
 }
 
@@ -4706,7 +4701,7 @@ static ypObject *set_push( ypObject *so, ypObject *x ) {
 }
 
 static ypObject *set_clear( ypObject *so ) {
-    if( ypSet_FILL( so ) == 0 ) return yp_None;
+    if( ypSet_FILL( so ) < 1 ) return yp_None;
     frozenset_traverse( so, _frozenset_decref_visitor, NULL ); // cannot fail
     // FIXME there's a memcpy in this that we can and should avoid
     ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, ypSet_MINSIZE );
@@ -4957,7 +4952,8 @@ ypObject *yp_set( ypObject *iterable ) {
 // TODO investigate how/when the keyset will be shared between dicts
 // TODO alloclen will always be the same as keyset.alloclen; repurpose?
 
-// ypDictObject, ypDict_LEN, and ypDict_KEYSET are defined above, for use by the set code
+// ypDictObject and ypDict_LEN are defined above, for use by the set code
+#define ypDict_KEYSET( mp )         ( ((ypDictObject *)mp)->keyset )
 #define ypDict_VALUES( mp )         ( (ypObject **) ((ypObject *)mp)->ob_data )
 #define ypDict_SET_VALUES( mp, x )  ( ((ypObject *)mp)->ob_data = x )
 #define ypDict_INLINE_DATA( mp )    ( ((ypDictObject *)mp)->ob_inline_data )
@@ -5289,6 +5285,8 @@ static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *mem
 static ypObject *frozendict_bool( ypObject *mp ) {
     return ypBool_FROM_C( ypDict_LEN( mp ) );
 }
+
+// TODO frozendict_iter
 
 static ypObject *frozendict_contains( ypObject *mp, ypObject *key )
 {
