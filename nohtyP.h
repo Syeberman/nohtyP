@@ -314,7 +314,8 @@ ypAPI ypObject *yp_float_strC( const char *string );
 ypAPI ypObject *yp_floatstore_strC( const char *string );
 #endif
 
-// Returns a new reference to an iterator for object x.
+// Returns a new reference to an iterator for object x.  It is usually unsafe to modify an object
+// being iterated over.
 ypAPI ypObject *yp_iter( ypObject *x );
 
 // Returns a new reference to a generator-iterator object using the given func.  The function will
@@ -1018,6 +1019,40 @@ ypAPI ypObject *yp_sum( ypObject *iterable );
 
 
 /*
+ * Mini Iterators
+ */
+
+// yp_iter usually returns a newly-allocated object.  Many types can function as "mini iterators" 
+// which can be used to avoid having to allocate/deallocate a separate iterator object.  The 
+// objects returned by yp_miniiter must be used in a very specific manner: you should only call 
+// yp_miniiter_next and yp_decref on them (yp_incref is also safe, but is usually unnecessary).  
+// The behaviour of any other functions is undefined and may or may not raise exceptions.  
+// yp_miniiter is always supported if yp_iter is, and vice-versa; as a consequence, yp_miniiter 
+// _may_ actually allocate a new object, although this is rare.  Example use:
+//      yp_uint64_t mi_state;
+//      ypObject *mi = yp_miniiter( list, &mi_state );
+//      while( 1 ) {
+//          ypObject *item = yp_miniiter_next( mi, &mi_state );
+//          if( yp_isexceptionC2( item, yp_StopIteration ) ) break;
+//          // ... operate on item ...
+//          yp_decref( item );
+//      }
+//      yp_decref( mi );
+
+// TODO mini iterators for yp_iter_values, yp_iter_items, etc
+
+// Returns a new reference to a mini iterator for object x and initializes *state to the iterator's
+// starting state.  *state is opaque: you must *not* modify it directly.  It is usually unsafe to
+// modify an object being iterated over.
+ypAPI ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state );
+
+// Returns a new reference to the next yielded value from the mini iterator, yp_StopIteration if
+// the iterator is exhausted, or another exception.  state must point to the same integer used in
+// the yp_miniiter call that returned mi; *state will be modified.
+ypAPI ypObject *yp_miniiter_next( ypObject *mi, yp_uint64_t *state );
+
+
+/*
  * Immortal "Constructors"
  */
 
@@ -1368,6 +1403,7 @@ struct _ypStrObject {
 
 #ifdef yp_FUTURE
 // The implementation of yp_FOR is considered "internal"; see above for documentation
+// TODO Can we update this for yp_miniiter?
 #define yp_FOR( target, expression ) { \
     ypObject *_yp_FOR_expr = (expression); \
     ypObject *_yp_FOR_iter = yp_iter( _yp_FOR_expr ); \
