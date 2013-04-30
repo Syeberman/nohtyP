@@ -1025,10 +1025,10 @@ ypAPI ypObject *yp_sum( ypObject *iterable );
 // yp_iter usually returns a newly-allocated object.  Many types can function as "mini iterators" 
 // which can be used to avoid having to allocate/deallocate a separate iterator object.  The 
 // objects returned by yp_miniiter must be used in a very specific manner: you should only call 
-// yp_miniiter_next and yp_decref on them (yp_incref is also safe, but is usually unnecessary).  
+// yp_miniiter_* and yp_decref on them (yp_incref is also safe, but is usually unnecessary).  
 // The behaviour of any other functions is undefined and may or may not raise exceptions.  
-// yp_miniiter is always supported if yp_iter is, and vice-versa; as a consequence, yp_miniiter 
-// _may_ actually allocate a new object, although this is rare.  Example use:
+// For convenience, yp_miniiter is always supported if yp_iter is, and vice-versa; as a 
+// consequence, yp_miniiter _may_ actually allocate a new object, although this is rare.  Example:
 //      yp_uint64_t mi_state;
 //      ypObject *mi = yp_miniiter( list, &mi_state );
 //      while( 1 ) {
@@ -1047,9 +1047,13 @@ ypAPI ypObject *yp_sum( ypObject *iterable );
 ypAPI ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state );
 
 // Returns a new reference to the next yielded value from the mini iterator, yp_StopIteration if
-// the iterator is exhausted, or another exception.  state must point to the same integer used in
+// the iterator is exhausted, or another exception.  state must point to the same location used in
 // the yp_miniiter call that returned mi; *state will be modified.
 ypAPI ypObject *yp_miniiter_next( ypObject *mi, yp_uint64_t *state );
+
+// Returns a hint as to how many items are left to be yielded.  See yp_iter_lenhintC for additional
+// information.  Returns zero and sets *exc on error.
+ypAPI yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **exc );
 
 
 /*
