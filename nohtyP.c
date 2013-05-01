@@ -880,12 +880,12 @@ static ypObject *iter_close( ypObject *i )
 // iter objects can be returned from yp_miniiter...they simply ignore *state
 static ypObject *iter_miniiter( ypObject *i, yp_uint64_t *state ) {
     *state = 0; // just in case...
-    return yp_incref( i ); 
+    return yp_incref( i );
 }
 
 static ypObject *iter_send( ypObject *i, ypObject *value );
 static ypObject *iter_miniiter_next( ypObject *i, yp_uint64_t *state ) {
-    return iter_send( i, yp_None ); 
+    return iter_send( i, yp_None );
 }
 
 static ypObject *iter_miniiter_lenhint( ypObject *i, yp_uint64_t *state, yp_ssize_t *lenhint ) {
@@ -1149,7 +1149,7 @@ static ypObject *_ypSequence_miniiter_next( ypObject *x, yp_uint64_t *_state ) {
     return yp_isexceptionC2( result, yp_IndexError ) ? yp_StopIteration : result;
 }
 
-// TODO ensure yp_miniiter_lenhintC itself catches hint<0 
+// TODO ensure yp_miniiter_lenhintC itself catches hint<0
 // TODO needs testing!  This is an otherwise-hidden optimization to pre-allocate objects
 static ypObject *_ypSequence_miniiter_lenh( ypObject *x, yp_uint64_t *_state, yp_ssize_t *lenhint )
 {
@@ -1235,8 +1235,6 @@ static ypObject *_iter_kvalist_generator( ypObject *i, ypObject *value )
     ypIter_FUNC( subiter ) = _iter_valist_generator;
     return subiter;
 }
-
-// TODO #undef _ypIterObject_HEAD, etc
 
 
 /*************************************************************************************************
@@ -1420,20 +1418,20 @@ ypObject *yp_anyV( int n, va_list args ) {
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
 ypObject *yp_any( ypObject *iterable )
 {
-    ypObject *iter;
+    ypObject *mi;
+    yp_uint64_t mi_state;
     ypObject *x;
     ypObject *result = yp_False;
 
-    // FIXME replace with yp_miniiter
-    iter = yp_iter( iterable ); // new ref
+    mi = yp_miniiter( iterable, &mi_state ); // new ref
     while( 1 ) {
-        x = yp_next( iter ); // new ref
+        x = yp_miniiter_next( mi, &mi_state ); // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
         result = yp_bool( x );
         yp_decref( x );
         if( result != yp_False ) break; // exit on yp_True or exception
     }
-    yp_decref( iter );
+    yp_decref( mi );
     return result;
 }
 
@@ -1473,20 +1471,20 @@ ypObject *yp_allV( int n, va_list args ) {
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
 ypObject *yp_all( ypObject *iterable )
 {
-    ypObject *iter;
+    ypObject *mi;
+    yp_uint64_t mi_state;
     ypObject *x;
     ypObject *result = yp_True;
 
-    // FIXME replace with yp_miniiter
-    iter = yp_iter( iterable ); // new ref
+    mi = yp_miniiter( iterable, &mi_state ); // new ref
     while( 1 ) {
-        x = yp_next( iter ); // new ref
+        x = yp_miniiter_next( mi, &mi_state ); // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
         result = yp_bool( x );
         yp_decref( x );
         if( result != yp_True ) break; // exit on yp_False or exception
     }
-    yp_decref( iter );
+    yp_decref( mi );
     return result;
 }
 
@@ -1510,7 +1508,6 @@ _ypBool_PUBLIC_CMP_FUNCTION( eq, eq, ypBool_FROM_C( x == y ) );
 _ypBool_PUBLIC_CMP_FUNCTION( ne, ne, ypBool_FROM_C( x != y ) );
 _ypBool_PUBLIC_CMP_FUNCTION( ge, le, yp_TypeError );
 _ypBool_PUBLIC_CMP_FUNCTION( gt, lt, yp_TypeError );
-// TODO #undef _ypBool_PUBLIC_CMP_FUNCTION
 
 // XXX Remember, an immutable container may hold mutable objects; yp_hashC must fail in that case
 // TODO Need to decide whether to keep pre-computed hash in ypObject and, if so, if we can remove
@@ -1531,7 +1528,7 @@ static ypObject *_yp_hash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
         return yp_None;
     }
     if( *recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
-    
+
     *recursion_depth += 1;
     result = ypObject_TYPE( x )->tp_currenthash( x, _yp_hash_visitor, _memo, hash );
     *recursion_depth -= 1;
@@ -1559,7 +1556,7 @@ static ypObject *_yp_cachedhash_visitor( ypObject *x, void *_memo, yp_hash_t *ha
         return yp_None;
     }
     if( *recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
-    
+
     *recursion_depth += 1;
     result = ypObject_TYPE( x )->tp_currenthash( x, _yp_cachedhash_visitor, _memo, hash );
     *recursion_depth -= 1;
@@ -1801,8 +1798,6 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
         _yp_IMMORTAL_EXCEPTION( yp_UnicodeDecodeError, yp_UnicodeError );
         _yp_IMMORTAL_EXCEPTION( yp_UnicodeTranslateError, yp_UnicodeError );
 
-// TODO #undef _yp_IMMORTAL_EXCEPTION
-
 #define yp_IS_EXCEPTION_C( x ) (ypObject_TYPE_PAIR_CODE( x ) == ypException_CODE)
 int yp_isexceptionC( ypObject *x ) {
     return yp_IS_EXCEPTION_C( x );
@@ -1950,7 +1945,6 @@ _ypBool_RELATIVE_CMP_FUNCTION( eq, == );
 _ypBool_RELATIVE_CMP_FUNCTION( ne, != );
 _ypBool_RELATIVE_CMP_FUNCTION( ge, >= );
 _ypBool_RELATIVE_CMP_FUNCTION( gt, > );
-// TODO #undef _ypBool_RELATIVE_CMP_FUNCTION
 
 static ypTypeObject ypBool_Type = {
     yp_TYPE_HEAD_INIT,
@@ -2064,11 +2058,10 @@ _ypInt_RELATIVE_CMP_FUNCTION( eq, == );
 _ypInt_RELATIVE_CMP_FUNCTION( ne, != );
 _ypInt_RELATIVE_CMP_FUNCTION( ge, >= );
 _ypInt_RELATIVE_CMP_FUNCTION( gt, > );
-// TODO #undef _ypInt_RELATIVE_CMP_FUNCTION
 
 // XXX Adapted from Python's int_hash (now obsolete)
 // TODO adapt from long_hash instead, which seems to handle this differently
-static ypObject *int_currenthash( ypObject *i, 
+static ypObject *int_currenthash( ypObject *i,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
     // This must remain consistent with the other numeric types
@@ -2322,7 +2315,6 @@ yp_STATIC_ASSERT( sizeof( yp_ssize_t ) < sizeof( yp_int_t ), sizeof_yp_ssize_lt_
 _ypInt_PUBLIC_AS_C_FUNCTION( ssize );
 _ypInt_PUBLIC_AS_C_FUNCTION( hash );
 #endif
-// TODO #undef _ypInt_PUBLIC_AS_C_FUNCTION
 
 // The functions below assume/assert that yp_int_t is 64 bits
 yp_STATIC_ASSERT( sizeof( yp_int_t ) == 8, sizeof_yp_int );
@@ -2899,22 +2891,22 @@ static ypObject *bytes_lt( ypObject *b, ypObject *x ) {
     if( b == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) < 0 );
-}    
+}
 static ypObject *bytes_le( ypObject *b, ypObject *x ) {
     if( b == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) <= 0 );
-}    
+}
 static ypObject *bytes_ge( ypObject *b, ypObject *x ) {
     if( b == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) >= 0 );
-}    
+}
 static ypObject *bytes_gt( ypObject *b, ypObject *x ) {
     if( b == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) > 0 );
-}    
+}
 
 // Returns true (1) if the two bytes/bytearrays are equal.  Size is a quick way to check equality.
 // TODO The pre-computed hash, if any, would also be a quick check
@@ -2928,15 +2920,15 @@ static ypObject *bytes_eq( ypObject *b, ypObject *x ) {
     if( b == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_are_equal( b, x ) );
-}    
+}
 static ypObject *bytes_ne( ypObject *b, ypObject *x ) {
     if( b == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( !_ypBytes_are_equal( b, x ) );
-}    
+}
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
-static ypObject *bytes_currenthash( ypObject *b, 
+static ypObject *bytes_currenthash( ypObject *b,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
     return yp_None;
@@ -3136,8 +3128,6 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
     return _ypBytesC( _yp_bytearray_new, source, len );
 }
 
-// TODO undef macros
-
 
 /*************************************************************************************************
  * Sequence of unicode characters
@@ -3214,16 +3204,16 @@ static ypObject *str_eq( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypStr_are_equal( s, x ) );
-}    
+}
 static ypObject *str_ne( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( !_ypStr_are_equal( s, x ) );
-}    
+}
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 // FIXME bring this in-line with Python's string hashing; it's currently using bytes hashing
-static ypObject *str_currenthash( ypObject *s, 
+static ypObject *str_currenthash( ypObject *s,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypStr_DATA( s ), ypStr_LEN( s ) );
     return yp_None;
@@ -3450,8 +3440,6 @@ yp_IMMORTAL_STR_LATIN1( yp_s_strict,    "strict" );
 yp_IMMORTAL_STR_LATIN1( yp_s_ignore,    "ignore" );
 yp_IMMORTAL_STR_LATIN1( yp_s_replace,   "replace" );
 
-// TODO undef macros
-
 
 /*************************************************************************************************
  * Sequence of generic items
@@ -3494,15 +3482,14 @@ static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t alloclen )
     return ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, alloclen, 0 );
 }
 
-// If a resize is needed, the lenhint of iter is used; iter can also be yp_None (yp_iter_lenhintC
-// will just return zero).
-static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, ypObject *iter )
+// growhint is the number of additional items, not including x, that are expected to be added to
+// the tuple
+static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
 {
     ypObject *result;
     if( ypTuple_ALLOCLEN( sq ) - ypTuple_LEN( sq ) < 1 ) {
-        yp_ssize_t growhint = yp_iter_lenhintC( iter, &result )+1; // ignore errors (will be 0+1)
-        // TODO over-allocate?
-        result = _ypTuple_resize( sq, ypTuple_LEN( sq ) + growhint );
+        if( growhint < 0 ) growhint = 0;
+        result = _ypTuple_resize( sq, ypTuple_LEN( sq ) + growhint+1 );
         if( yp_isexceptionC( result ) ) return result;
     }
     ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] = yp_incref( x );
@@ -3510,18 +3497,21 @@ static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, ypObject *iter )
     return yp_None;
 }
 
-static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject *iter )
+static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject *mi, yp_uint64_t *mi_state )
 {
+    ypObject *exc = yp_None;
     ypObject *x;
     ypObject *result;
+    yp_ssize_t lenhint = yp_miniiter_lenhintC( mi, mi_state, &exc ); // zero on error
 
     while( 1 ) {
-        x = yp_next( iter ); // new ref
+        x = yp_miniiter_next( mi, mi_state ); // new ref
         if( yp_isexceptionC( x ) ) {
             if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
             return x;
         }
-        result = _ypTuple_push( sq, x, iter );
+        lenhint -= 1; // check for <0 only when we need it in _ypTuple_push
+        result = _ypTuple_push( sq, x, lenhint );
         yp_decref( x );
         if( yp_isexceptionC( result ) ) return result;
     }
@@ -3530,15 +3520,15 @@ static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject *iter )
 
 static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
 {
-    ypObject *iter;
+    ypObject *mi;
+    yp_uint64_t mi_state;
     ypObject *result;
 
     // TODO Will special cases for other lists/tuples save anything?
-    // FIXME replace with yp_miniiter
-    iter = yp_iter( iterable ); // new ref
-    if( yp_isexceptionC( iter ) ) return iter;
-    result = _ypTuple_extend_from_iter( sq, iter );
-    yp_decref( iter );
+    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    if( yp_isexceptionC( mi ) ) return mi;
+    result = _ypTuple_extend_from_iter( sq, mi, &mi_state );
+    yp_decref( mi );
     return result;
 }
 
@@ -3670,7 +3660,7 @@ static ypObject *tuple_eq( ypObject *sq, ypObject *x )
     yp_ssize_t x_len  = ypBytes_LEN( x );
     yp_ssize_t i;
     ypObject *result;
-    
+
     if( sq == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypTuple_CODE ) return yp_ComparisonNotImplemented;
     if( sq_len != x_len ) return yp_False;
@@ -3683,12 +3673,12 @@ static ypObject *tuple_eq( ypObject *sq, ypObject *x )
 static ypObject *tuple_ne( ypObject *sq, ypObject *x ) {
     ypObject *result = tuple_eq( sq, x );
     return ypBool_NOT( result );
-}    
+}
 
 // XXX Adapted from Python's tuplehash
 // TODO Do we want to allow currenthash to work on circular references and, if so, how?
 static ypObject *tuple_currenthash( ypObject *sq,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) 
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
     ypObject *result;
     yp_uhash_t x;
@@ -3730,7 +3720,7 @@ static ypObject *tuple_len( ypObject *sq, yp_ssize_t *len ) {
 }
 
 static ypObject *list_push( ypObject *sq, ypObject *x ) {
-    return _ypTuple_push( sq, x, yp_None );
+    return _ypTuple_push( sq, x, 0 );
 }
 
 static ypObject *list_clear( ypObject *sq )
@@ -4401,7 +4391,7 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other,
 }
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *keyiter )
+static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     ypObject *result = yp_None;
@@ -4411,7 +4401,7 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *keyiter )
     // Use lenhint in the hopes of requiring only one resize
     // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
     // the given lenhint
-    lenhint = yp_iter_lenhintC( keyiter, &result );
+    lenhint = yp_miniiter_lenhintC( mi, mi_state, &result );
     if( yp_isexceptionC( result ) ) return result;
     if( spaceleft < lenhint ) {
         result = _ypSet_resize( so, ypSet_LEN( so )+lenhint );
@@ -4422,7 +4412,7 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *keyiter )
     // Add all the yielded keys to the set.  Keep in mind that _ypSet_push may resize the
     // set despite our attempts at pre-allocating, since lenhint _is_ just a hint.
     while( 1 ) {
-        key = yp_next( keyiter ); // new ref
+        key = yp_miniiter_next( mi, mi_state ); // new ref
         if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break;
             return key;
@@ -4442,18 +4432,18 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 {
     // TODO determine when/where/how the set should be resized
     int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
-    ypObject *keyiter;
+    ypObject *mi;
+    yp_uint64_t mi_state;
     ypObject *result;
 
     // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_update_from_set( so, iterable, yp_shallowcopy_visitor, NULL );
     } else {
-        // FIXME replace with yp_miniiter
-        keyiter = yp_iter( iterable ); // new ref
-        if( yp_isexceptionC( keyiter ) ) return keyiter;
-        result = _ypSet_update_from_iter( so, keyiter );
-        yp_decref( keyiter );
+        mi = yp_miniiter( iterable, &mi_state ); // new ref
+        if( yp_isexceptionC( mi ) ) return mi;
+        result = _ypSet_update_from_iter( so, mi, &mi_state );
+        yp_decref( mi );
         return result;
     }
 }
@@ -4481,11 +4471,12 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
     return yp_None;
 }
 
-// FIXME This _allows_ keyiter to yield mutable values, unlike issubset; standardize
+// FIXME This _allows_ mi to yield mutable values, unlike issubset; standardize
 static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo );
-static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *keyiter );
+static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_t *mi_state );
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other );
-static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject *keyiter )
+static ypObject *_ypSet_intersection_update_from_iter( 
+        ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
 {
     ypObject *so_toremove;
     ypObject *result;
@@ -4493,13 +4484,13 @@ static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject *k
     // FIXME can we do this without creating a copy or, alternatively, would it be better to
     // implement this as ypSet_intersection?
     // Unfortunately, we need to create a short-lived copy of so.  It's either that, or convert
-    // keyiter to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
+    // mi to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
     so_toremove = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL ); // new ref
     if( yp_isexceptionC( so_toremove ) ) return so_toremove;
 
-    // Remove items from so_toremove that are yielded by keyiter.  so_toremove is then a set
+    // Remove items from so_toremove that are yielded by mi.  so_toremove is then a set
     // containing the keys to remove from so.
-    result = _ypSet_difference_update_from_iter( so_toremove, keyiter );
+    result = _ypSet_difference_update_from_iter( so_toremove, mi, mi_state );
     if( !yp_isexceptionC( result ) ) {
         result = _ypSet_difference_update_from_set( so, so_toremove );
     }
@@ -4512,18 +4503,18 @@ static ypObject *_ypSet_intersection_update_from_iter( ypObject *so, ypObject *k
 static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
 {
     int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
-    ypObject *keyiter;
+    ypObject *mi;
+    yp_uint64_t mi_state;
     ypObject *result;
 
     // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_intersection_update_from_set( so, iterable );
     } else {
-        // FIXME replace with yp_miniiter
-        keyiter = yp_iter( iterable ); // new ref
-        if( yp_isexceptionC( keyiter ) ) return keyiter;
-        result = _ypSet_intersection_update_from_iter( so, keyiter );
-        yp_decref( keyiter );
+        mi = yp_miniiter( iterable, &mi_state ); // new ref
+        if( yp_isexceptionC( mi ) ) return mi;
+        result = _ypSet_intersection_update_from_iter( so, mi, &mi_state );
+        yp_decref( mi );
         return result;
     }
 }
@@ -4550,15 +4541,16 @@ static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *othe
     return yp_None;
 }
 
-// FIXME This _allows_ keyiter to yield mutable values, unlike issubset; standardize
-static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *keyiter )
+// FIXME This _allows_ mi to yield mutable values, unlike issubset; standardize
+static ypObject *_ypSet_difference_update_from_iter( 
+        ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
 {
     ypObject *result = yp_None;
     ypObject *key;
 
     // It's tempting to stop once so is empty, but doing so would mask errors in yielded keys
     while( 1 ) {
-        key = yp_next( keyiter ); // new ref
+        key = yp_miniiter_next( mi, mi_state ); // new ref
         if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break;
             return key;
@@ -4576,18 +4568,18 @@ static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *key
 static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
 {
     int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
-    ypObject *keyiter;
+    ypObject *mi;
+    yp_uint64_t mi_state;
     ypObject *result;
 
     // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_difference_update_from_set( so, iterable );
     } else {
-        // FIXME replace with yp_miniiter
-        keyiter = yp_iter( iterable ); // new ref
-        if( yp_isexceptionC( keyiter ) ) return keyiter;
-        result = _ypSet_difference_update_from_iter( so, keyiter );
-        yp_decref( keyiter );
+        mi = yp_miniiter( iterable, &mi_state ); // new ref
+        if( yp_isexceptionC( mi ) ) return mi;
+        result = _ypSet_difference_update_from_iter( so, mi, &mi_state );
+        yp_decref( mi );
         return result;
     }
 }
@@ -4647,7 +4639,7 @@ static ypObject *frozenset_bool( ypObject *so ) {
 
 // XXX Adapted from Python's frozenset_hash
 static ypObject *frozenset_currenthash( ypObject *so,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *_hash ) 
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *_hash )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
     yp_ssize_t keysleft = ypSet_LEN( so );
@@ -4875,7 +4867,7 @@ static ypObject *frozenset_len( ypObject *so, yp_ssize_t *len ) {
 }
 
 // onmissing must be an immortal, or NULL
-static ypObject *set_remove( ypObject *so, ypObject *x, ypObject *onmissing ) 
+static ypObject *set_remove( ypObject *so, ypObject *x, ypObject *onmissing )
 {
     ypObject *result = _ypSet_pop( so, x );
     if( yp_isexceptionC( result ) ) return result;
@@ -5119,6 +5111,7 @@ ypObject *yp_set( ypObject *iterable ) {
 
 // ypDictObject and ypDict_LEN are defined above, for use by the set code
 #define ypDict_KEYSET( mp )         ( ((ypDictObject *)mp)->keyset )
+#define ypDict_ALLOCLEN( mp )       ypSet_ALLOCLEN( ypDict_KEYSET( mp ) )
 #define ypDict_VALUES( mp )         ( (ypObject **) ((ypObject *)mp)->ob_data )
 #define ypDict_SET_VALUES( mp, x )  ( ((ypObject *)mp)->ob_data = x )
 #define ypDict_INLINE_DATA( mp )    ( ((ypDictObject *)mp)->ob_inline_data )
@@ -5416,8 +5409,8 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
     if( x_pair == ypFrozenDict_CODE ) {
         return _ypDict_update_from_dict( mp, x, yp_shallowcopy_visitor, NULL );
     } else {
+        // FIXME replace with yp_miniiter_items once supported
         itemiter = yp_iter_items( x ); // new ref
-        // FIXME replace with yp_miniiter
         if( yp_isexceptionC2( itemiter, yp_MethodError ) ) itemiter = yp_iter( x ); // new ref
         if( yp_isexceptionC( itemiter ) ) return itemiter;
         result = _ypDict_update_from_iter( mp, itemiter );
@@ -5516,49 +5509,65 @@ static ypObject *dict_delitem( ypObject *mp, ypObject *key )
 }
 
 typedef struct {
-    _ypIterObject_HEAD
-    ypObject *mp;
-    yp_ssize_t index;
-} ypDictIterObject;
-#define ypDictIter_DICT( i )    ( ((ypDictIterObject *)i)->mp )
-#define ypDictIter_INDEX( i )   ( ((ypDictIterObject *)i)->index )
+    yp_uint32_t keys : 1;
+    yp_uint32_t itemsleft : 31;
+    // aligned
+    yp_uint32_t values : 1;
+    yp_uint32_t index : 31;
+} ypDictMiState;
+yp_STATIC_ASSERT( ypObject_ALLOCLEN_INVALID <= 0x7FFFFFFFu, alloclen_fits_31_bits );
+yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
 
-static ypObject *_frozendict_iter_new( ypObject *mp, yp_generator_func_t generator )
+static ypObject *frozendict_miniiter_keys( ypObject *mp, yp_uint64_t *_state )
 {
-    // Allocate the iterator
-    ypObject *iterator = ypMem_MALLOC_FIXED( ypDictIterObject, ypIter_CODE );
-    if( yp_isexceptionC( iterator ) ) return iterator;
-
-    // Set attributes, increment reference counts, and return
-    iterator->ob_len = ypObject_LEN_INVALID;
-    ypIter_LENHINT( iterator ) = ypDict_LEN( mp );
-    ypIter_STATE( iterator ) = &(ypDictIter_DICT( iterator )); // TODO also size?
-    ypIter_OBJLOCS( iterator ) = 0x1u;  // indicates mp at state offset zero
-    ypIter_FUNC( iterator ) = generator;
-    ypDictIter_INDEX( iterator ) = 0;
-    ypDictIter_DICT( iterator ) = yp_incref( mp );
-    return iterator;
+    ypDictMiState *state = (ypDictMiState *) _state;
+    state->keys = 1;
+    state->values = 0;
+    state->itemsleft = ypDict_LEN( mp );
+    state->index = 0;
+    return yp_incref( mp );
 }
 
-static ypObject *_frozendict_iter_keys_generator( ypObject *i, ypObject *value )
+static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
 {
-    ypObject *mp = ypDictIter_DICT( i );
-    ypObject *keyset = ypDict_KEYSET( mp );
-    yp_ssize_t *index = &ypDictIter_INDEX( i );
-    if( yp_isexceptionC( value ) ) return value; // yp_GeneratorExit, in particular
-    if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
+    ypObject *result;
+    ypDictMiState *state = (ypDictMiState *) _state;
+    yp_ssize_t index = state->index; // don't forget to write it back
+    if( state->itemsleft < 1 ) return yp_StopIteration;
 
-    for( /*index already set*/; /*lenhint tracks valuesleft*/; (*index)++ ) {
-        if( ypDict_VALUES( mp )[*index] != NULL ) {
-            ypObject *key = ypSet_TABLE( keyset )[*index].se_key;
-            (*index)++;
-            return key;
+    // Find the next entry
+    for( /*index already set*/; index < ypDict_ALLOCLEN( mp ); index++ ) {
+        if( ypDict_VALUES( mp )[index] != NULL ) break;
+    }
+
+    // Find the requested data
+    if( state->keys ) {
+        if( state->values ) {
+            result = yp_tupleN( 2, ypSet_TABLE( ypDict_KEYSET( mp ) )[index].se_key,
+                                   ypDict_VALUES( mp )[index] );
+        } else {
+            result = yp_incref( ypSet_TABLE( ypDict_KEYSET( mp ) )[index].se_key );
+        }
+    } else {
+        if( state->values ) {
+            result = yp_incref( ypDict_VALUES( mp )[index] );
+        } else {
+            result = yp_SystemError; // should never occur
         }
     }
-    return yp_SystemError; // NOT REACHED
+    if( yp_isexceptionC( result ) ) return result;
+
+    // Update state and return
+    state->index = index + 1;
+    state->itemsleft -= 1;
+    return result;
 }
-static ypObject *frozendict_iter_keys( ypObject *mp ) {
-    return _frozendict_iter_new( mp, _frozendict_iter_keys_generator );
+
+static ypObject *frozendict_miniiter_lenhint( 
+        ypObject *mp, yp_uint64_t *state, yp_ssize_t *lenhint )
+{
+    *lenhint = ((ypDictMiState *) state)->itemsleft;
+    return yp_None;
 }
 
 static ypObject *_frozendict_dealloc_visitor( ypObject *x, void *memo ) {
@@ -5575,7 +5584,7 @@ static ypObject *frozendict_dealloc( ypObject *mp )
 
 static ypMappingMethods ypFrozenDict_as_mapping = {
     MethodError_objproc,            // tp_iter_items
-    frozendict_iter_keys,           // tp_iter_keys
+    MethodError_objproc,            // tp_iter_keys
     MethodError_objobjobjproc,      // tp_popvalue
     MethodError_popitemfunc,        // tp_popitem
     MethodError_objobjobjproc,      // tp_setdefault
@@ -5615,11 +5624,11 @@ static ypTypeObject ypFrozenDict_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_miniiterfunc,       // tp_miniiter
+    frozendict_miniiter_keys,       // tp_miniiter
     MethodError_miniiterfunc,       // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    frozendict_iter_keys,           // tp_iter
+    frozendict_miniiter_next,       // tp_miniiter_next
+    frozendict_miniiter_lenhint,    // tp_miniiter_lenhint
+    _ypIter_from_miniiter,          // tp_iter
     MethodError_objproc,            // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
@@ -5646,7 +5655,7 @@ static ypTypeObject ypFrozenDict_Type = {
 
 static ypMappingMethods ypDict_as_mapping = {
     MethodError_objproc,            // tp_iter_items
-    frozendict_iter_keys,           // tp_iter_keys
+    MethodError_objproc,            // tp_iter_keys
     MethodError_objobjobjproc,      // tp_popvalue
     MethodError_popitemfunc,        // tp_popitem
     MethodError_objobjobjproc,      // tp_setdefault
@@ -5686,11 +5695,11 @@ static ypTypeObject ypDict_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_miniiterfunc,       // tp_miniiter
+    frozendict_miniiter_keys,       // tp_miniiter
     MethodError_miniiterfunc,       // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    frozendict_iter_keys,           // tp_iter
+    frozendict_miniiter_next,       // tp_miniiter_next
+    frozendict_miniiter_lenhint,    // tp_miniiter_lenhint
+    _ypIter_from_miniiter,          // tp_iter
     MethodError_objproc,            // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
@@ -6081,7 +6090,20 @@ ypObject *yp_iter_values( ypObject *mapping ) {
     _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_values, (mapping) );
 }
 
-// TODO undef necessary stuff
+ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state ) {
+    _yp_REDIRECT1( x, tp_miniiter, (x, state) );
+}
+
+ypObject *yp_miniiter_next( ypObject *mi, yp_uint64_t *state ) {
+    _yp_REDIRECT1( mi, tp_miniiter_next, (mi, state) );
+}
+
+yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **exc ) {
+    yp_ssize_t lenhint = 0;
+    ypObject *result = ypObject_TYPE( mi )->tp_miniiter_lenhint( mi, state, &lenhint );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
+    return lenhint < 0 ? 0 : lenhint;
+}
 
 
 /*************************************************************************************************
