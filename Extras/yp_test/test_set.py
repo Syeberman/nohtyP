@@ -52,6 +52,7 @@ class TestJointOps(unittest.TestCase):
         self.s = self.thetype(word)
         self.d = dict.fromkeys(word)
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_new_or_init(self):
         self.assertRaises(TypeError, self.thetype, [], 2)
         self.assertRaises(TypeError, yp_set().__init__, a=1)
@@ -679,6 +680,7 @@ class TestFrozenSet(TestJointOps):
     thetype = yp_frozenset
     basetype = yp_frozenset
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_init(self):
         s = self.thetype(self.word)
         s.__init__(self.otherword)

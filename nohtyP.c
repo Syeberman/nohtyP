@@ -3964,6 +3964,8 @@ ypObject *yp_list( ypObject *iterable ) {
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
 
+// TODO Many set operations allocate temporary objects on the heap; is there a way to avoid this?
+
 typedef struct {
     yp_hash_t se_hash;
     ypObject *se_key;
@@ -4584,6 +4586,35 @@ static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
     }
 }
 
+// XXX Check for the so==other case _before_ calling this function
+static ypObject *_ypSet_symmetric_difference_update_from_set( ypObject *so, ypObject *other )
+{
+    yp_ssize_t spaceleft = _ypSet_space_remaining( so );
+    yp_ssize_t keysleft = ypSet_LEN( other );
+    ypSet_KeyEntry *otherkeys = ypSet_TABLE( other );
+    ypObject *result;
+    yp_ssize_t i;
+
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
+        keysleft -= 1;
+
+        // First, attempt to remove; if nothing was removed, then add it instead
+        // TODO _ypSet_pop and _ypSet_push both call yp_currenthashC; consolidate?
+        result = _ypSet_pop( so, otherkeys[i].se_key );
+        if( yp_isexceptionC( result ) ) return result;
+        if( result == ypSet_dummy ) {
+            result = _ypSet_push( so, otherkeys[i].se_key, &spaceleft ); // may resize so
+            if( yp_isexceptionC( result ) ) return result;
+        } else {
+            // XXX spaceleft based on alloclen and fill, so doesn't change on deletions
+            yp_decref( result );
+        }
+    }
+    return yp_None;
+}
+
+
 // Public methods
 
 static ypObject *_frozenset_decref_visitor( ypObject *x, void *memo ) {
@@ -4689,7 +4720,7 @@ static ypObject *frozenset_isdisjoint( ypObject *so, ypObject *x )
         return _ypSet_isdisjoint( so, x );
     } else {
         // Otherwise, we need to convert x to a set to quickly test if it contains all items
-        // FIXME Can we make a version of _ypSet_isdisjoint that doesn't reqire a new set created?
+        // TODO Can we make a version of _ypSet_isdisjoint that doesn't reqire a new set created?
         x_asset = yp_frozenset( x );
         result = _ypSet_isdisjoint( so, x_asset );
         yp_decref( x_asset );
@@ -4712,7 +4743,7 @@ static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
     }
 
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
-    // FIXME Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
+    // TODO Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
     x_asset = yp_frozenset( x );
     result = _ypSet_issubset( so, x_asset );
     yp_decref( x_asset );
@@ -4735,7 +4766,7 @@ static ypObject *frozenset_issuperset( ypObject *so, ypObject *x )
     }
 
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
-    // FIXME Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
+    // TODO Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
     x_asset = yp_frozenset( x );
     result = _ypSet_issubset( x_asset, so );
     yp_decref( x_asset );
@@ -4831,8 +4862,23 @@ static ypObject *set_difference_update( ypObject *so, int n, va_list args )
 
 static ypObject *set_symmetric_difference_update( ypObject *so, ypObject *x )
 {
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    ypObject *result;
+
     if( so == x ) return set_clear( so );
-    return yp_NotImplementedError;
+
+    // Recall that type pairs are identified by the immutable type code
+    if( x_pair == ypFrozenSet_CODE ) {
+        return _ypSet_symmetric_difference_update_from_set( so, x );
+    } else {
+        // TODO Can we make a version of _ypSet_symmetric_difference_update_from_set that doesn't
+        // reqire a new set created?
+        ypObject *x_asset = yp_frozenset( x );
+        if( yp_isexceptionC( x_asset ) ) return x_asset;
+        result = _ypSet_symmetric_difference_update_from_set( so, x_asset );
+        yp_decref( x_asset );
+        return result;
+    }
 }
 
 static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
@@ -5528,6 +5574,7 @@ static ypObject *frozendict_miniiter_keys( ypObject *mp, yp_uint64_t *_state )
     return yp_incref( mp );
 }
 
+// XXX We need to be a little suspicious of _state...just in case the caller has changed it
 static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
 {
     ypObject *result;
@@ -5536,8 +5583,14 @@ static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
     if( state->itemsleft < 1 ) return yp_StopIteration;
 
     // Find the next entry
-    for( /*index already set*/; index < ypDict_ALLOCLEN( mp ); index++ ) {
+    while( 1 ) {
+        if( index >= ypDict_ALLOCLEN( mp ) ) {
+            state->index = index;
+            state->itemsleft = 0;
+            return yp_StopIteration;
+        }
         if( ypDict_VALUES( mp )[index] != NULL ) break;
+        index++;
     }
 
     // Find the requested data
