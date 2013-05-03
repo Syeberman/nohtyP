@@ -1260,10 +1260,12 @@ static ypObject *_yp_freeze( ypObject *x )
     if( newType == NULL ) return yp_TypeError;  // TODO make this never happen: such objects should be closed (or invalidated?) instead
 
     // Freeze the object, cache the final hash (via yp_hashC), possibly reduce memory usage, etc
+    exc = newType->tp_freeze( x );
+    if( yp_isexceptionC( exc ) ) return exc;
     ypObject_SET_TYPE_CODE( x, newCode );
     x->ob_hash = _ypObject_HASH_INVALID; // just in case
     yp_hashC( x, &exc );
-    return newType->tp_freeze( x );
+    return exc;
 }
 
 void yp_freeze( ypObject **x )
@@ -4638,6 +4640,10 @@ static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo
     return yp_None;
 }
 
+static ypObject *frozenset_freeze( ypObject *so ) {
+    return yp_None; // no-op, currently
+}
+
 static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo )
 {
     ypObject *result;
@@ -4956,7 +4962,7 @@ static ypTypeObject ypFrozenSet_Type = {
     NULL,                           // tp_repr
 
     // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
+    frozenset_freeze,               // tp_freeze
     frozenset_unfrozen_copy,        // tp_unfrozen_copy
     frozenset_frozen_copy,          // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
@@ -5031,7 +5037,7 @@ static ypTypeObject ypSet_Type = {
     NULL,                           // tp_repr
 
     // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
+    frozenset_freeze,               // tp_freeze
     frozenset_unfrozen_copy,        // tp_unfrozen_copy
     frozenset_frozen_copy,          // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
