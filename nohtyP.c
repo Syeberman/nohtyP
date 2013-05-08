@@ -437,6 +437,7 @@ static void yp_breakonerr( ypObject *err ) {
 
 // Return the hash of the given number of bytes; always succeeds
 // XXX Adapted from Python's _Py_HashBytes
+// FIXME On the Release build, this seems to return inconsistent results
 static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
 {
     yp_uhash_t x;
@@ -2528,8 +2529,9 @@ static ypObject *_yp_bytes_new( yp_ssize_t len )
 {
     ypObject *b;
     if( len < 0 ) len = 0; // TODO return a new ref to an immortal b'' object
-    b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, ypBytes_CODE, len );
+    b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, ypBytes_CODE, len+1 );
     if( yp_isexceptionC( b ) ) return b;
+    ypBytes_DATA( b )[len] = '\0';
     ypBytes_LEN( b ) = len;
     return b;
 }
@@ -2540,8 +2542,9 @@ static ypObject *_yp_bytearray_new( yp_ssize_t len )
 {
     ypObject *b;
     if( len < 0 ) len = 0;
-    b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, ypByteArray_CODE, len, 0 );
+    b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, ypByteArray_CODE, len+1, 0 );
     if( yp_isexceptionC( b ) ) return b;
+    ypBytes_DATA( b )[len] = '\0';
     ypBytes_LEN( b ) = len;
     return b;
 }
@@ -2573,8 +2576,9 @@ static ypObject *_ypBytes_copy( ypObject *b, yp_ssize_t len )
 // TODO over-allocate as appropriate
 static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t newLen )
 {
-    ypObject *result = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen, 0 );
+    ypObject *result = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, 0 );
     if( yp_isexceptionC( result ) ) return result;
+    ypBytes_DATA( b )[newLen] = '\0';
     ypBytes_LEN( b ) = newLen;
     return yp_None;
 }
@@ -3156,8 +3160,9 @@ static ypObject *_yp_str_new( yp_ssize_t len )
 {
     ypObject *s;
     if( len < 0 ) len = 0; // TODO return a new ref to an immortal "" object
-    s = ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, len );
+    s = ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, len+1 );
     if( yp_isexceptionC( s ) ) return s;
+    ypStr_DATA( s )[len] = '\0';
     ypStr_LEN( s ) = len;
     return s;
 }
@@ -3168,8 +3173,9 @@ static ypObject *_yp_chrarray_new( yp_ssize_t len )
 {
     ypObject *s;
     if( len < 0 ) len = 0;
-    s = ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, ypChrArray_CODE, len, 0 );
+    s = ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, ypChrArray_CODE, len+1, 0 );
     if( yp_isexceptionC( s ) ) return s;
+    ypStr_DATA( s )[len] = '\0';
     ypStr_LEN( s ) = len;
     return s;
 }
@@ -4169,7 +4175,7 @@ static void _ypSet_movekey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
 // Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
 static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
-        ypSet_KeyEntry **loc )
+        ypSet_KeyEntry **ep )
 {
     size_t i;
     size_t perturb;
@@ -4177,14 +4183,14 @@ static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
     ypSet_KeyEntry *ep0 = ypSet_TABLE( so );
 
     i = hash & mask;
-    (*loc) = &ep0[i];
-    for (perturb = hash; (*loc)->se_key != NULL; perturb >>= ypSet_PERTURB_SHIFT) {
+    (*ep) = &ep0[i];
+    for (perturb = hash; (*ep)->se_key != NULL; perturb >>= ypSet_PERTURB_SHIFT) {
         i = (i << 2) + i + perturb + 1;
-        (*loc) = &ep0[i & mask];
+        (*ep) = &ep0[i & mask];
     }
     ypSet_FILL( so ) += 1;
-    (*loc)->se_key = key;
-    (*loc)->se_hash = hash;
+    (*ep)->se_key = key;
+    (*ep)->se_hash = hash;
     ypSet_LEN( so ) += 1;
 }
 
@@ -4218,9 +4224,9 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     // malloc'd...will need to malloc something anyway)
     newalloclen = _ypSet_calc_alloclen( minused );
     if( newalloclen < 1 ) return yp_MemoryError;
-    newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * sizeof( ypSet_KeyEntry * ) );
+    newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * sizeof( ypSet_KeyEntry ) );
     if( newkeys == NULL ) return yp_MemoryError;
-    memset( newkeys, 0, newalloclen * sizeof( ypSet_KeyEntry * ) );
+    memset( newkeys, 0, newalloclen * sizeof( ypSet_KeyEntry ) );
 
     // Failures are impossible from here on, so swap-in the new table
     oldkeys = ypSet_TABLE( so );
