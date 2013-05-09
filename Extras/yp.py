@@ -823,6 +823,7 @@ class ypObject( c_ypObject_p ):
     def pop( self ): return _yp_pop( self )
 
     def isdisjoint( self, other ): return _yp_isdisjoint( self, other )
+    def issubset( self, other ): return _yp_issubset( self, other )
     def issuperset( self, other ): return _yp_issuperset( self, other )
     def union( self, *others ): return _yp_unionN( self, *others )
     def intersection( self, *others ): return _yp_intersectionN( self, *others )

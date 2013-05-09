@@ -4919,6 +4919,39 @@ static ypObject *set_clear( ypObject *so ) {
     return yp_None;
 }
 
+// Note the difference between this, which removes an arbitrary key, and
+// _ypSet_pop, which removes a specific key
+// XXX Adapted from Python's set_pop
+static ypObject *set_pop( ypObject *so ) {
+    register yp_ssize_t i = 0;
+    register ypSet_KeyEntry *table = ypSet_TABLE( so );
+    ypObject *key;
+
+    if( ypSet_LEN( so ) < 1 ) return yp_KeyError; // "pop from an empty set"
+
+    /* We abuse the hash field of slot 0 to hold a search finger:
+     * If slot 0 has a value, use slot 0.
+     * Else slot 0 is being used to hold a search finger,
+     * and we use its hash value as the first index to look.
+     */
+    if( !ypSet_ENTRY_USED( table ) ) {
+        i = table->se_hash;
+        /* The hash field may be a real hash value, or it may be a
+         * legit search finger, or it may be a once-legit search
+         * finger that's out of bounds now because it wrapped around
+         * or the table shrunk -- simply make sure it's in bounds now.
+         */
+        if( i > ypSet_MASK( so ) || i < 1 ) i = 1; /* skip slot 0 */
+        while( !ypSet_ENTRY_USED( table+i ) ) {
+            i++;
+            if( i > ypSet_MASK( so ) ) i = 1;
+        }
+    }
+    key = _ypSet_removekey( so, table+i );
+    table->se_hash = i + 1;  /* next place to start */
+    return key;
+}
+
 static ypObject *frozenset_len( ypObject *so, yp_ssize_t *len ) {
     *len = ypSet_LEN( so );
     return yp_None;
@@ -5078,7 +5111,7 @@ static ypTypeObject ypSet_Type = {
     frozenset_len,                  // tp_len
     set_push,                       // tp_push
     set_clear,                      // tp_clear
-    MethodError_objproc,            // tp_pop
+    set_pop,                        // tp_pop
     set_remove,                     // tp_remove
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
