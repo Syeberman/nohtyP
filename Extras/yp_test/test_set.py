@@ -427,13 +427,14 @@ class TestSet(TestJointOps):
         self.s.remove('a')
         self.assertNotIn('a', self.s)
         self.assertRaises(KeyError, self.s.remove, 'Q')
-        self.assertRaises(TypeError, self.s.remove, [])
+        self.assertRaises(KeyError, self.s.remove, []) # nohtyP sets accept mutable types here
         s = self.thetype([yp_frozenset(self.word)])
         self.assertIn(self.thetype(self.word), s)
         s.remove(self.thetype(self.word))
         self.assertNotIn(self.thetype(self.word), s)
         self.assertRaises(KeyError, self.s.remove, self.thetype(self.word))
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_remove_keyerror_unpacking(self):
         # bug:  www.python.org/sf/1576657
         for v1 in ['Q', (1,)]:
@@ -445,6 +446,7 @@ class TestSet(TestJointOps):
             else:
                 self.fail()
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_remove_keyerror_set(self):
         key = self.thetype([3, 4])
         try:
