@@ -350,6 +350,7 @@ yp_func( c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ) )
 
 
 # yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
+yp_func( c_yp_hash_t, "yp_hashC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 
 # yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
@@ -814,6 +815,8 @@ class ypObject( c_ypObject_p ):
 
     def __iter__( self ): return _yp_iter( self )
 
+    def __hash__( self ): return _yp_hashC( self, yp_None )
+
     def __next__( self ): return _yp_next( self )
 
     def __contains__( self, x ): return _yp_contains( self, x )
@@ -879,6 +882,12 @@ class yp_bool( ypObject ):
             return yp_True if x else yp_False
         pass
     def __bool__( self ): return self.value == _yp_True.value
+    def __lt__( self, other ): return bool( self ) <  other
+    def __le__( self, other ): return bool( self ) <= other
+    def __eq__( self, other ): return bool( self ) == other
+    def __ne__( self, other ): return bool( self ) != other
+    def __ge__( self, other ): return bool( self ) >= other
+    def __gt__( self, other ): return bool( self ) >  other
 yp_True = yp_bool( _value=_yp_True.value )
 yp_False = yp_bool( _value=_yp_False.value )
 
