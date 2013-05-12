@@ -3200,6 +3200,35 @@ static ypObject *str_len( ypObject *s, yp_ssize_t *len )
     return yp_None;
 }
 
+// Returns -1, 0, or 1 as per memcmp
+static int _ypStr_relative_cmp( ypObject *s, ypObject *x ) {
+    yp_ssize_t b_len = ypStr_LEN( s );
+    yp_ssize_t x_len = ypStr_LEN( x );
+    int cmp = memcmp( ypStr_DATA( s ), ypStr_DATA( x ), MIN( b_len, x_len ) );
+    if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0);
+    return cmp;
+}
+static ypObject *str_lt( ypObject *s, ypObject *x ) {
+    if( s == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) < 0 );
+}
+static ypObject *str_le( ypObject *s, ypObject *x ) {
+    if( s == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) <= 0 );
+}
+static ypObject *str_ge( ypObject *s, ypObject *x ) {
+    if( s == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) >= 0 );
+}
+static ypObject *str_gt( ypObject *s, ypObject *x ) {
+    if( s == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) > 0 );
+}
+
 // Returns true (1) if the two str/chrarrays are equal.  Size is a quick way to check equality.
 // TODO The pre-computed hash, if any, would also be a quick check
 static int _ypStr_are_equal( ypObject *s, ypObject *x ) {
@@ -3267,12 +3296,12 @@ static ypTypeObject ypStr_Type = {
 
     // Boolean operations and comparisons
     str_bool,                       // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
+    str_lt,                         // tp_lt
+    str_le,                         // tp_le
     str_eq,                         // tp_eq
     str_ne,                         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    str_ge,                         // tp_ge
+    str_gt,                         // tp_gt
 
     // Generic object operations
     str_currenthash,                // tp_currenthash
@@ -3346,12 +3375,12 @@ static ypTypeObject ypChrArray_Type = {
 
     // Boolean operations and comparisons
     str_bool,                       // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
+    str_lt,                         // tp_lt
+    str_le,                         // tp_le
     str_eq,                         // tp_eq
     str_ne,                         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    str_ge,                         // tp_ge
+    str_gt,                         // tp_gt
 
     // Generic object operations
     str_currenthash,                // tp_currenthash
@@ -4709,6 +4738,51 @@ static ypObject *frozenset_currenthash( ypObject *so,
     return yp_None;
 }
 
+typedef struct {
+    yp_uint32_t keysleft;
+    yp_uint32_t index;
+} ypSetMiState;
+yp_STATIC_ASSERT( ypObject_ALLOCLEN_INVALID <= 0xFFFFFFFFu, alloclen_fits_32_bits );
+yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypSetMiState ), ypSetMiState_fits_uint64 );
+
+static ypObject *frozenset_miniiter( ypObject *so, yp_uint64_t *_state )
+{
+    ypSetMiState *state = (ypSetMiState *) _state;
+    state->keysleft = ypSet_LEN( so );
+    state->index = 0;
+    return yp_incref( so );
+}
+
+// XXX We need to be a little suspicious of _state...just in case the caller has changed it
+static ypObject *frozenset_miniiter_next( ypObject *so, yp_uint64_t *_state )
+{
+    ypSetMiState *state = (ypSetMiState *) _state;
+    ypSet_KeyEntry *loc;
+
+    // Find the next entry
+    if( state->keysleft < 1 ) return yp_StopIteration;
+    while( 1 ) {
+        if( state->index >= ypSet_ALLOCLEN( so ) ) {
+            state->keysleft = 0;
+            return yp_StopIteration;
+        }
+        loc = &ypSet_TABLE( so )[state->index];
+        state->index += 1;
+        if( ypSet_ENTRY_USED( loc ) ) break;
+    }
+
+    // Update state and return the key
+    state->keysleft -= 1;
+    return yp_incref( loc->se_key );
+}
+
+static ypObject *frozenset_miniiter_lenhint( 
+        ypObject *so, yp_uint64_t *state, yp_ssize_t *lenhint )
+{
+    *lenhint = ((ypSetMiState *) state)->keysleft;
+    return yp_None;
+}
+
 static ypObject *frozenset_contains( ypObject *so, ypObject *x )
 {
     yp_hash_t hash;
@@ -5023,11 +5097,11 @@ static ypTypeObject ypFrozenSet_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_miniiterfunc,       // tp_miniiter
+    frozenset_miniiter,             // tp_miniiter
     MethodError_miniiterfunc,       // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    MethodError_objproc,            // tp_iter
+    frozenset_miniiter_next,        // tp_miniiter_next
+    frozenset_miniiter_lenhint,     // tp_miniiter_lenhint
+    _ypIter_from_miniiter,          // tp_iter
     MethodError_objproc,            // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
@@ -5098,11 +5172,11 @@ static ypTypeObject ypSet_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_miniiterfunc,       // tp_miniiter
+    frozenset_miniiter,             // tp_miniiter
     MethodError_miniiterfunc,       // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    MethodError_objproc,            // tp_iter
+    frozenset_miniiter_next,        // tp_miniiter_next
+    frozenset_miniiter_lenhint,     // tp_miniiter_lenhint
+    _ypIter_from_miniiter,          // tp_iter
     MethodError_objproc,            // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 

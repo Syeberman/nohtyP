@@ -674,6 +674,7 @@ class SetSubclassWithKeywordArgs(yp_set):
 
 class TestSetSubclassWithKeywordArgs(TestSet):
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_keywords_in_subclass(self):
         'SF bug #1486663 -- this used to erroneously raise a TypeError'
         SetSubclassWithKeywordArgs(newarg=1)
@@ -1016,6 +1017,7 @@ class TestExceptionPropagation(unittest.TestCase):
         yp_set('abc')
         yp_set(gooditer())
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_changingSizeWhileIterating(self):
         s = yp_set([1,2,3])
         try:
@@ -1749,6 +1751,7 @@ class bad_dict_clear:
         return 0
 
 class TestWeirdBugs(unittest.TestCase):
+    @unittest.skip("REWORK: nohtyP sets don't store user-defined types")
     def test_8420_set_merge(self):
         # This used to segfault
         global be_bad, set2, dict2
