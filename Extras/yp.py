@@ -542,22 +542,32 @@ yp_func( c_void, "yp_discard", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 
 # ypObject *yp_getitem( ypObject *mapping, ypObject *key );
+yp_func( c_ypObject_p, "yp_getitem", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key")) )
 
 # void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x );
+yp_func( c_void, "yp_setitem", 
+        ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "x")) )
 
 # void yp_delitem( ypObject **mapping, ypObject *key );
+yp_func( c_void, "yp_delitem", ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key")) )
 
 # ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval );
+yp_func( c_ypObject_p, "yp_getdefault", 
+        ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")) )
 
 # ypObject *yp_iter_items( ypObject *mapping );
+yp_func( c_ypObject_p, "yp_iter_items", ((c_ypObject_p, "mapping"), ) )
 
 # ypObject *yp_iter_keys( ypObject *mapping );
+yp_func( c_ypObject_p, "yp_iter_keys", ((c_ypObject_p, "mapping"), ) )
 
 # ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
 
 # void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 
-# ypObject *yp_setdefault( ypObject *mapping, ypObject *key, ypObject *defval );
+# ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval );
+yp_func( c_ypObject_p, "yp_setdefault", 
+        ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")) )
 
 # void yp_updateK( ypObject **mapping, int n, ... );
 # void yp_updateKV( ypObject **mapping, int n, va_list args );
@@ -567,6 +577,7 @@ yp_func( c_void, "yp_updateK", ((c_ypObject_pp, "mapping"), c_multiK_ypObject_p)
 # void yp_updateV( ypObject **mapping, int n, va_list args );
 
 # ypObject *yp_iter_values( ypObject *mapping );
+yp_func( c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ) )
 
 
 # ypObject *yp_s_ascii;     // "ascii"
@@ -839,6 +850,12 @@ class ypObject( c_ypObject_p ):
     def remove( self, elem ): _yp_remove( self, elem )
     def discard( self, elem ): _yp_discard( self, elem )
 
+    def __getitem__( self, key ): return _yp_getitem( self, key )
+    def __setitem__( self, key, value ): _yp_setitem( self, key, value )
+    def __delitem__( self, key ): _yp_delitem( self, key )
+    def get( self, key, defval=_yp_None ): return _yp_getdefault( self, key, defval )
+    def setdefault( self, key, defval=_yp_None ): return _yp_setdefault( self, key, defval )
+
 def pytype( pytypes, ypcode ):
     if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
     def _pytype( cls ):
@@ -1025,6 +1042,17 @@ def _yp_flatten_dict( args ):
         retval.extend( item )
     return retval
 
+# TODO If nohtyP ever supports "dict view" objects, replace these faked-out versions
+class yp_dict_keys:
+    def __init__( self, mp ): self.mp = mp
+    def __iter__( self ): return _yp_iter_keys( self.mp )
+class yp_dict_values:
+    def __init__( self, mp ): self.mp = mp
+    def __iter__( self ): return _yp_iter_values( self.mp )
+class yp_dict_items:
+    def __init__( self, mp ): self.mp = mp
+    def __iter__( self ): return _yp_iter_items( self.mp )
+
 @pytype( dict, 25 )
 class yp_dict( ypObject ):
     def __new__( cls, *args, **kwargs ):
@@ -1038,6 +1066,9 @@ class yp_dict( ypObject ):
             self = _yp_dict( args[0] )
         if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
         return self
+    def keys( self ): return yp_dict_keys( self )
+    def values( self ): return yp_dict_values( self )
+    def items( self ): return yp_dict_items( self )
 
 
 #so = yp_set( )
