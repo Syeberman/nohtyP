@@ -814,8 +814,9 @@ ypAPI void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 
 // Similar to yp_getitem, but returns a new reference to defval _and_ adds it to *mapping if key is
 // not in the map.  The Python-equivalent "default" for defval is yp_None; as defval may be added
-// to the map, it cannot be an exception.
-ypAPI ypObject *yp_setdefault( ypObject *mapping, ypObject *key, ypObject *defval );
+// to the map, it cannot be an exception.  On error, *mapping is discarded and set to an exception
+// _and_ an exception is returned.
+ypAPI ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval );
 
 // Add the given n key/value pairs (for a total of 2*n objects) to *mapping, overwriting existing
 // keys.  If a given key is seen more than once, the last value is retained.  On error, *mapping is
@@ -1254,11 +1255,11 @@ ypAPI ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssiz
 // arguments to the equivalent Python method):
 //  a.isspace( )            --> yp0( a,isspace )                --> yp_isspace( a )
 // If variadic macros are supported by your compiler, yp can take multiple arguments:
-//  a.setdefault( b, c )    --> yp( a,setdefault, b, c )        --> yp_setdefault( a, b, c )
+//  a.setdefault( b, c )    --> yp( &a,setdefault, b, c )       --> yp_setdefault( &a, b, c )
 //  a.startswith( b, 2, 7 ) --> yp( a,startswith4, b, 2, 7 )    --> yp_startswith4( a, b, 2, 7 )
 // If variadic macros are not supported, use yp2, yp3, etc (note how the 4 in startswith4 is 1 plus
 // the 3 in yp3):
-//  a.setdefault( b, c )    --> yp2( a,setdefault, b, c )       --> yp_setdefault( a, b, c )
+//  a.setdefault( b, c )    --> yp2( &a,setdefault, b, c )      --> yp_setdefault( &a, b, c )
 //  a.startswith( b, 2, 7 ) --> yp3( a,startswith4, b, 2, 7 )   --> yp_startswith4( a, b, 2, 7 )
 #endif
 

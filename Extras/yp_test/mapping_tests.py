@@ -3,6 +3,8 @@ from yp import *
 import unittest
 import collections
 
+# nohtyP: Calls to dict are OK here: it's for comparing yp_dict with dict
+
 
 class BasicTestMappingProtocol(unittest.TestCase):
     # This base class can be used to check that an object conforms to the

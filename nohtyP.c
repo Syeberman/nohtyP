@@ -164,11 +164,14 @@ typedef struct {
 } ypSetMethods;
 
 typedef struct {
+    miniiterfunc tp_miniiter_items;
     objproc tp_iter_items;
+    miniiterfunc tp_miniiter_keys;
     objproc tp_iter_keys;
     objobjobjproc tp_popvalue;
     popitemfunc tp_popitem;
     objobjobjproc tp_setdefault;
+    miniiterfunc tp_miniiter_values;
     objproc tp_iter_values;
 } ypMappingMethods;
 
@@ -331,11 +334,14 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
         *name ## _objobjproc \
     } }; \
     static ypMappingMethods name ## _MappingMethods[1] = { { \
+        *name ## _miniiterfunc, \
         *name ## _objproc, \
+        *name ## _miniiterfunc, \
         *name ## _objproc, \
         *name ## _objobjobjproc, \
         *name ## _popitemfunc, \
         *name ## _objobjobjproc, \
+        *name ## _miniiterfunc, \
         *name ## _objproc \
     } };
 DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for use in methods the type doesn't support
@@ -5683,6 +5689,19 @@ typedef struct {
 yp_STATIC_ASSERT( ypObject_ALLOCLEN_INVALID <= 0x7FFFFFFFu, alloclen_fits_31_bits );
 yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
 
+static ypObject *frozendict_miniiter_items( ypObject *mp, yp_uint64_t *_state )
+{
+    ypDictMiState *state = (ypDictMiState *) _state;
+    state->keys = 1;
+    state->values = 1;
+    state->itemsleft = ypDict_LEN( mp );
+    state->index = 0;
+    return yp_incref( mp );
+}
+static ypObject *frozendict_iter_items( ypObject *x ) {
+    return _ypMiIter_from_miniiter( x, frozendict_miniiter_items );
+}
+
 static ypObject *frozendict_miniiter_keys( ypObject *mp, yp_uint64_t *_state )
 {
     ypDictMiState *state = (ypDictMiState *) _state;
@@ -5691,6 +5710,22 @@ static ypObject *frozendict_miniiter_keys( ypObject *mp, yp_uint64_t *_state )
     state->itemsleft = ypDict_LEN( mp );
     state->index = 0;
     return yp_incref( mp );
+}
+static ypObject *frozendict_iter_keys( ypObject *x ) {
+    return _ypMiIter_from_miniiter( x, frozendict_miniiter_keys );
+}
+
+static ypObject *frozendict_miniiter_values( ypObject *mp, yp_uint64_t *_state )
+{
+    ypDictMiState *state = (ypDictMiState *) _state;
+    state->keys = 0;
+    state->values = 1;
+    state->itemsleft = ypDict_LEN( mp );
+    state->index = 0;
+    return yp_incref( mp );
+}
+static ypObject *frozendict_iter_values( ypObject *x ) {
+    return _ypMiIter_from_miniiter( x, frozendict_miniiter_values );
 }
 
 // XXX We need to be a little suspicious of _state...just in case the caller has changed it
@@ -5755,12 +5790,15 @@ static ypObject *frozendict_dealloc( ypObject *mp )
 }
 
 static ypMappingMethods ypFrozenDict_as_mapping = {
-    MethodError_objproc,            // tp_iter_items
-    MethodError_objproc,            // tp_iter_keys
+    frozendict_miniiter_items,      // tp_miniiter_items
+    frozendict_iter_items,          // tp_iter_items
+    frozendict_miniiter_keys,       // tp_miniiter_keys
+    frozendict_iter_keys,           // tp_iter_keys
     MethodError_objobjobjproc,      // tp_popvalue
     MethodError_popitemfunc,        // tp_popitem
     MethodError_objobjobjproc,      // tp_setdefault
-    MethodError_objproc             // tp_iter_values
+    frozendict_miniiter_values,     // tp_miniiter_values
+    frozendict_iter_values          // tp_iter_values
 };
 
 static ypTypeObject ypFrozenDict_Type = {
@@ -5800,7 +5838,7 @@ static ypTypeObject ypFrozenDict_Type = {
     MethodError_miniiterfunc,       // tp_miniiter_reversed
     frozendict_miniiter_next,       // tp_miniiter_next
     frozendict_miniiter_lenhint,    // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
+    frozendict_iter_keys,           // tp_iter
     MethodError_objproc,            // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
@@ -5822,16 +5860,19 @@ static ypTypeObject ypFrozenDict_Type = {
     MethodError_SetMethods,         // tp_as_set
 
     // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+    &ypFrozenDict_as_mapping        // tp_as_mapping
 };
 
 static ypMappingMethods ypDict_as_mapping = {
-    MethodError_objproc,            // tp_iter_items
-    MethodError_objproc,            // tp_iter_keys
+    frozendict_miniiter_items,      // tp_miniiter_items
+    frozendict_iter_items,          // tp_iter_items
+    frozendict_miniiter_keys,       // tp_miniiter_keys
+    frozendict_iter_keys,           // tp_iter_keys
     MethodError_objobjobjproc,      // tp_popvalue
     MethodError_popitemfunc,        // tp_popitem
     MethodError_objobjobjproc,      // tp_setdefault
-    MethodError_objproc             // tp_iter_values
+    frozendict_miniiter_values,     // tp_miniiter_values
+    frozendict_iter_values          // tp_iter_values
 };
 
 static ypTypeObject ypDict_Type = {
@@ -5871,7 +5912,7 @@ static ypTypeObject ypDict_Type = {
     MethodError_miniiterfunc,       // tp_miniiter_reversed
     frozendict_miniiter_next,       // tp_miniiter_next
     frozendict_miniiter_lenhint,    // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
+    frozendict_iter_keys,           // tp_iter
     MethodError_objproc,            // tp_iter_reversed
     MethodError_objobjproc,         // tp_send
 
@@ -5893,7 +5934,7 @@ static ypTypeObject ypDict_Type = {
     MethodError_SetMethods,         // tp_as_set
 
     // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+    &ypDict_as_mapping              // tp_as_mapping
 };
 
 // Constructors
@@ -6241,12 +6282,28 @@ void yp_delitem( ypObject **mapping, ypObject *key ) {
     _yp_INPLACE1( mapping, tp_delitem, (*mapping, key) );
 }
 
+ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval ) {
+    _yp_REDIRECT1( mapping, tp_getdefault, (mapping, key, defval) );
+}
+
 ypObject *yp_iter_items( ypObject *mapping ) {
     _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_items, (mapping) );
 }
 
 ypObject *yp_iter_keys( ypObject *mapping ) {
     _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_keys, (mapping) );
+}
+
+void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value ) {
+    // XXX tp_popitem should set *key and *value to exceptions on error
+    _yp_INPLACE2( mapping, tp_as_mapping, tp_popitem, (*mapping, key, value) );
+}
+
+ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval ) {
+    ypTypeObject *type = ypObject_TYPE( *mapping );
+    ypObject *result = type->tp_as_mapping->tp_setdefault( *mapping, key, defval );
+    if( yp_isexceptionC( result ) ) yp_INPLACE_ERR( mapping, result );
+    return result; 
 }
 
 void yp_updateK( ypObject **mapping, int n, ... ) {
