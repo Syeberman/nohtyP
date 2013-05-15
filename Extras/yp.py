@@ -10,7 +10,7 @@ yp.py - Python wrapper for nohtyP
 #atexit.register( input, "Press Enter to continue..." )
 
 from ctypes import *
-import sys
+import sys, weakref
 
 ypdll = cdll.nohtyP
 
@@ -24,6 +24,10 @@ c_void = None # only valid for return values
 
 # Used to signal that a particular arg has not been supplied; set to default value of such params
 _yp_arg_missing = object( )
+
+# Ensures that at most one Python object exists per nohtyP object
+_yp_pyobj_cache = weakref.WeakValueDictionary( )
+
 
 class yp_param:
     def __init__( self, type, name, default=_yp_arg_missing, direction=c_IN ):
@@ -42,8 +46,11 @@ def yp_func_errcheck( result, func, args ):
     getattr( result, "_yp_errcheck", int )( )
     for arg in args: getattr( arg, "_yp_errcheck", int )( )
     if isinstance( result, c_ypObject_p ):
-        result.__class__ = ypObject._ypcode2yp[result._yp_typecode]
-    return args
+        try: result = _yp_pyobj_cache[result.value] # try to use an existing object
+        except KeyError:
+            result.__class__ = ypObject._ypcode2yp[result._yp_typecode]
+            _yp_pyobj_cache[result.value] = result
+    return result
 
 def yp_func( retval, name, paramtuple, errcheck=True ):
     """Defines a function in globals() that wraps the given C yp_* function."""
@@ -100,7 +107,10 @@ class c_ypObject_p( c_void_p ):
         return string_at( self.value, 1 )[0]
 
 def c_ypObject_p_value( name ):
-    globals( )["_"+name] = c_ypObject_p.in_dll( ypdll, name )
+    value = c_ypObject_p.in_dll( ypdll, name )
+    value.__class__ = ypObject._ypcode2yp[value._yp_typecode]
+    _yp_pyobj_cache[value.value] = value
+    globals( )[name] = value
 
 class c_ypObject_pp( c_ypObject_p*1 ):
     def __init__( self, *args, **kwargs ):
@@ -120,10 +130,9 @@ class c_ypObject_pp( c_ypObject_p*1 ):
 
 
 # ypAPI ypObject *yp_None;
-c_ypObject_p_value( "yp_None" )
 
 # Special-case arguments
-c_ypObject_pp_exc = (c_ypObject_pp, "exc", _yp_None)
+c_ypObject_pp_exc = (c_ypObject_pp, "exc", None)
 c_multiN_ypObject_p = (c_int, "n", 0)
 c_multiK_ypObject_p = (c_int, "n", 0)
 assert c_multiN_ypObject_p is not c_multiK_ypObject_p
@@ -172,9 +181,7 @@ yp_func( c_ypObject_p, "yp_deepcopy", ((c_ypObject_p, "x"), ) )
 
 
 # ypObject *yp_True;
-c_ypObject_p_value( "yp_True" )
 # ypObject *yp_False;
-c_ypObject_p_value( "yp_False" )
 
 # ypObject *yp_bool( ypObject *x );
 yp_func( c_ypObject_p, "yp_bool", ((c_ypObject_p, "x"), ) )
@@ -581,9 +588,7 @@ yp_func( c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ) )
 
 
 # ypObject *yp_s_ascii;     // "ascii"
-c_ypObject_p_value( "yp_s_ascii" )
 # ypObject *yp_s_latin_1;   // "latin_1"
-c_ypObject_p_value( "yp_s_latin_1" )
 # ypObject *yp_s_utf_32;    // "utf_32"
 # ypObject *yp_s_utf_32_be; // "utf_32_be"
 # ypObject *yp_s_utf_32_le; // "utf_32_le"
@@ -593,7 +598,6 @@ c_ypObject_p_value( "yp_s_latin_1" )
 # ypObject *yp_s_utf_8;     // "utf_8"
 
 # ypObject *yp_s_strict;    // "strict"
-c_ypObject_p_value( "yp_s_strict" )
 # ypObject *yp_s_ignore;    // "ignore"
 # ypObject *yp_s_replace;   // "replace"
 
@@ -601,6 +605,7 @@ c_ypObject_p_value( "yp_s_strict" )
 
 
 # ypObject *yp_add( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_add", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_sub( ypObject *x, ypObject *y );
 # ypObject *yp_mul( ypObject *x, ypObject *y );
 # ypObject *yp_truediv( ypObject *x, ypObject *y );
@@ -792,11 +797,11 @@ class ypObject( c_ypObject_p ):
         return super( ).__new__( cls )
     def __init__( self, *args, **kwargs ): pass
     def __del__( self ):
-        # FIXME It seems that _yp_decref and _yp_None gets set to None when Python is closing
+        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing
         try: _yp_decref( self )
         except: pass
-        try: self.value = _yp_None.value
-        except: self.value = 0
+        try: self.value = yp_None.value
+        except: pass
     _pytype2yp = {}
     _ypcode2yp = {}
     @classmethod
@@ -853,8 +858,10 @@ class ypObject( c_ypObject_p ):
     def __getitem__( self, key ): return _yp_getitem( self, key )
     def __setitem__( self, key, value ): _yp_setitem( self, key, value )
     def __delitem__( self, key ): _yp_delitem( self, key )
-    def get( self, key, defval=_yp_None ): return _yp_getdefault( self, key, defval )
-    def setdefault( self, key, defval=_yp_None ): return _yp_setdefault( self, key, defval )
+    def get( self, key, defval=None ): return _yp_getdefault( self, key, defval )
+    def setdefault( self, key, defval=None ): return _yp_setdefault( self, key, defval )
+
+    def __add__( self, other ): return _yp_add( self, other )
 
 def pytype( pytypes, ypcode ):
     if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
@@ -865,48 +872,32 @@ def pytype( pytypes, ypcode ):
         return cls
     return _pytype
 
-# FIXME yp_NoneType isn't, itself, a singleton, as multiples could be made (with the same .value)
 @pytype( type( None ), 6 )
 class yp_NoneType( ypObject ):
-    def __new__( cls, *, _value=None ):
-        """_value is for internal use only."""
-        if _value is not None:
-            self = super( ).__new__( cls )
-            self.value = _value
-            return self
-        return yp_None
+    def __new__( cls ): raise NotImplementedError( "can't instantiate yp_NoneType directly" )
     @classmethod
     def _frompython( cls, pyobj ):
         assert pyobj is None
         return yp_None
-yp_None = yp_NoneType( _value=_yp_None.value )
+c_ypObject_p_value( "yp_None" )
 
-# FIXME yp_True/yp_False aren't, themselves, singletons, as multiples could be made (same .value)
 @pytype( bool, 8 )
 class yp_bool( ypObject ):
-    def __new__( cls, x=_yp_False, *, _value=None ):
-        """_value is for internal use only."""
-        if _value is not None:
-            self = super( ).__new__( cls )
-            self.value = _value
-            return self
-        elif isinstance( x, c_ypObject_p ):
-            x = _yp_bool( x )
-            if x.value == _yp_True.value: return yp_True
-            if x.value == _yp_False.value: return yp_False
-            raise TypeError( "unexpected return from _yp_bool %r" % x )
+    def __new__( cls, x=False ):
+        if isinstance( x, c_ypObject_p ):
+            return _yp_bool( x )
         else:
             return yp_True if x else yp_False
         pass
-    def __bool__( self ): return self.value == _yp_True.value
+    def __bool__( self ): return self.value == yp_True.value
     def __lt__( self, other ): return bool( self ) <  other
     def __le__( self, other ): return bool( self ) <= other
     def __eq__( self, other ): return bool( self ) == other
     def __ne__( self, other ): return bool( self ) != other
     def __ge__( self, other ): return bool( self ) >= other
     def __gt__( self, other ): return bool( self ) >  other
-yp_True = yp_bool( _value=_yp_True.value )
-yp_False = yp_bool( _value=_yp_False.value )
+c_ypObject_p_value( "yp_True" )
+c_ypObject_p_value( "yp_False" )
 
 @pytype( (iter, type(x for x in ())), 15 )
 class yp_iter( ypObject ):
@@ -977,9 +968,12 @@ class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
             encoded = str( object ).encode( "latin-1" )
-            return _yp_str_frombytesC( encoded, len( encoded ), _yp_s_latin_1, _yp_s_strict )
+            return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
         else:
             raise NotImplementedError
+c_ypObject_p_value( "yp_s_ascii" )
+c_ypObject_p_value( "yp_s_latin_1" )
+c_ypObject_p_value( "yp_s_strict" )
 
 @pytype( tuple, 20 )
 class yp_tuple( ypObject ):
