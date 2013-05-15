@@ -40,11 +40,12 @@ class DictTest(unittest.TestCase):
             self.assertEqual(yp_dict(eval(dictliteral)), yp_dict(items))
 
     def test_bool(self):
-        self.assertIs(not yp_dict(), True)
+        self.assertFalse(yp_dict())
         self.assertTrue(yp_dict({1: 2}))
-        self.assertIs(bool(yp_dict()), yp_False)
-        self.assertIs(bool(yp_dict({1: 2})), yp_True)
+        self.assertIs(yp_bool(yp_dict()), yp_False)
+        self.assertIs(yp_bool(yp_dict({1: 2})), yp_True)
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_keys(self):
         d = yp_dict()
         self.assertEqual(set(d.keys()), set())
@@ -55,6 +56,7 @@ class DictTest(unittest.TestCase):
         self.assertRaises(TypeError, d.keys, None)
         self.assertEqual(repr(yp_dict(a=1).keys()), "dict_keys(['a'])")
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_values(self):
         d = yp_dict()
         self.assertEqual(set(d.values()), set())
@@ -63,6 +65,7 @@ class DictTest(unittest.TestCase):
         self.assertRaises(TypeError, d.values, None)
         self.assertEqual(repr(yp_dict(a=1).values()), "dict_values([1])")
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_items(self):
         d = yp_dict()
         self.assertEqual(set(d.items()), set())
@@ -269,10 +272,10 @@ class DictTest(unittest.TestCase):
 
     def test_get(self):
         d = yp_dict()
-        self.assertIs(d.get('c'), None)
+        self.assertIs(d.get('c'), yp_None)
         self.assertEqual(d.get('c', 3), 3)
         d = yp_dict({'a': 1, 'b': 2})
-        self.assertIs(d.get('c'), None)
+        self.assertIs(d.get('c'), yp_None)
         self.assertEqual(d.get('c', 3), 3)
         self.assertEqual(d.get('a'), 1)
         self.assertEqual(d.get('a', 3), 1)
@@ -282,9 +285,9 @@ class DictTest(unittest.TestCase):
     def test_setdefault(self):
         # yp_dict.setdefault()
         d = yp_dict()
-        self.assertIs(d.setdefault('key0'), None)
+        self.assertIs(d.setdefault('key0'), yp_None)
         d.setdefault('key0', [])
-        self.assertIs(d.setdefault('key0'), None)
+        self.assertIs(d.setdefault('key0'), yp_None)
         d.setdefault('key', []).append(3)
         self.assertEqual(d['key'][0], 3)
         d.setdefault('key', []).append(4)
@@ -441,6 +444,7 @@ class DictTest(unittest.TestCase):
         d[key2] = 2
         self.assertEqual(d, yp_dict({key2: 2}))
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_repr(self):
         d = yp_dict()
         self.assertEqual(repr(d), '{}')

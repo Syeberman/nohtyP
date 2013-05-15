@@ -612,6 +612,7 @@ class TestSet(TestJointOps):
         t ^= t
         self.assertEqual(t, self.thetype())
 
+    @unittest.skip( "TODO: Implement yp_weakref_proxy" )
     def test_weakref(self):
         s = self.thetype('gallahad')
         p = weakref.proxy(s)
@@ -783,10 +784,12 @@ empty_set = yp_set()
 
 class TestBasicOps(unittest.TestCase):
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_repr(self):
         if self.repr is not None:
             self.assertEqual(repr(self.set), self.repr)
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def check_repr_against_values(self):
         text = repr(self.set)
         self.assertTrue(text.startswith('{'))
@@ -798,6 +801,7 @@ class TestBasicOps(unittest.TestCase):
         sorted_repr_values.sort()
         self.assertEqual(result, sorted_repr_values)
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_print(self):
         try:
             fo = open(support.TESTFN, "w")
@@ -958,6 +962,7 @@ class TestBasicOpsString(TestBasicOps):
         self.dup    = yp_set(self.values)
         self.length = 3
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_repr(self):
         self.check_repr_against_values()
 
@@ -971,6 +976,7 @@ class TestBasicOpsBytes(TestBasicOps):
         self.dup    = yp_set(self.values)
         self.length = 3
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_repr(self):
         self.check_repr_against_values()
 
@@ -990,6 +996,7 @@ class TestBasicOpsMixedStringBytes(TestBasicOps):
     def tearDown(self):
         self._warning_filters.__exit__(None, None, None)
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_repr(self):
         self.check_repr_against_values()
 
