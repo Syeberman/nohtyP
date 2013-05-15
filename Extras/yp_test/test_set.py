@@ -136,7 +136,7 @@ class TestJointOps(unittest.TestCase):
                     actual = s1.isdisjoint(s2)
                     expected = f(s1, s2)
                     self.assertEqual(actual, expected)
-                    #self.assertTrue(actual is True or actual is False) # N/A for nohtyP
+                    self.assertTrue(actual is yp_True or actual is yp_False)
 
     def test_and(self):
         i = self.s.intersection(self.otherword)

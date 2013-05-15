@@ -1321,6 +1321,8 @@ ypObject *yp_unfrozen_copy( ypObject *x ) {
     return ypObject_TYPE( x )->tp_unfrozen_copy( x, yp_shallowcopy_visitor, NULL );
 }
 
+// XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
+// maybe even those should be copied as well...or just those that contain other objects
 static ypObject *_yp_unfrozen_deepcopy( ypObject *x, void *memo ) {
     // TODO don't forget to discard the new objects on error
     // TODO trap recursion & test
@@ -1335,9 +1337,12 @@ ypObject *yp_unfrozen_deepcopy( ypObject *x ) {
 }
 
 ypObject *yp_frozen_copy( ypObject *x ) {
+    if( !ypObject_IS_MUTABLE( x ) ) return yp_incref( x );
     return ypObject_TYPE( x )->tp_frozen_copy( x, yp_shallowcopy_visitor, NULL );
 }
 
+// XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
+// maybe even those should be copied as well...or just those that contain other objects
 static ypObject *_yp_frozen_deepcopy( ypObject *x, void *memo ) {
     // TODO trap recursion & test
     return yp_NotImplementedError;
@@ -1354,6 +1359,8 @@ ypObject *yp_copy( ypObject *x ) {
     return ypObject_IS_MUTABLE( x ) ? yp_unfrozen_copy( x ) : yp_frozen_copy( x );
 }
 
+// XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
+// maybe even those should be copied as well...or just those that contain other objects
 static ypObject *_yp_deepcopy( ypObject *x, void *memo ) {
     // TODO trap recursion & test
     return yp_NotImplementedError;
@@ -3982,8 +3989,8 @@ ypObject *yp_tupleV( int n, va_list args ) {
     return _ypTuple( _yp_tuple_new, iter_args );
 }
 ypObject *yp_tuple( ypObject *iterable ) {
+    if( ypObject_TYPE_CODE( iterable ) == ypTuple_CODE ) return yp_incref( iterable );
     return _ypTuple( _yp_tuple_new, iterable );
-
 }
 
 ypObject *yp_listN( int n, ... ) {
@@ -4036,6 +4043,14 @@ yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-offsetof( ypSetObject, ob_inline_da
 
 static ypObject _ypSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 0 );
 static ypObject *ypSet_dummy = &_ypSet_dummy;
+
+// Empty frozensets can be represented by this, immortal object
+// TODO Can we use this in more places...anywhere we'd return a possibly-empty frozenset?
+static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_MINSIZE] = {0};
+static ypSetObject _yp_frozenset_empty_struct = {
+    { ypObject_MAKE_TYPE_REFCNT( ypFrozenSet_CODE, ypObject_REFCNT_IMMORTAL ),
+    0, ypSet_MINSIZE, ypObject_HASH_INVALID, _yp_frozenset_empty_data }, 0 };
+static ypObject * const _yp_frozenset_empty = (ypObject *) &_yp_frozenset_empty_struct;
 
 // Returns true if the given ypSet_KeyEntry contains a valid key
 #define ypSet_ENTRY_USED( loc ) \
@@ -4104,6 +4119,8 @@ static yp_ssize_t _ypSet_calc_resize_minused( yp_ssize_t newlen )
 
 // Returns a new, empty frozenset object to hold minused entries
 // TODO can use CONTAINER_INLINE if minused is a firm max length for the frozenset
+// XXX A minused of zero may mean lenhint is unreliable; we may still grow the frozenset, so don't
+// return _yp_frozenset_empty!
 static ypObject *_yp_frozenset_new( yp_ssize_t minused )
 {
     yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
@@ -4520,7 +4537,7 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
 static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo );
 static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_t *mi_state );
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other );
-static ypObject *_ypSet_intersection_update_from_iter( 
+static ypObject *_ypSet_intersection_update_from_iter(
         ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
 {
     ypObject *so_toremove;
@@ -4587,7 +4604,7 @@ static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *othe
 }
 
 // FIXME This _allows_ mi to yield mutable values, unlike issubset; standardize
-static ypObject *_ypSet_difference_update_from_iter( 
+static ypObject *_ypSet_difference_update_from_iter(
         ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
 {
     ypObject *result = yp_None;
@@ -4782,7 +4799,7 @@ static ypObject *frozenset_miniiter_next( ypObject *so, yp_uint64_t *_state )
     return yp_incref( loc->se_key );
 }
 
-static ypObject *frozenset_miniiter_lenhint( 
+static ypObject *frozenset_miniiter_lenhint(
         ypObject *so, yp_uint64_t *state, yp_ssize_t *lenhint )
 {
     *lenhint = ((ypSetMiState *) state)->keysleft;
@@ -5228,8 +5245,13 @@ static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterabl
     ypObject *newSo;
     ypObject *result;
     yp_ssize_t lenhint = yp_lenC( iterable, &exc );
-    if( yp_isexceptionC( exc ) ) lenhint = yp_iter_lenhintC( iterable, &exc );
-    // Ignore errors determining lenhint; it just means we can't pre-allocate
+    if( yp_isexceptionC( exc ) ) {
+        // Ignore errors determining lenhint; it just means we can't pre-allocate
+        lenhint = yp_iter_lenhintC( iterable, &exc );
+    } else if( lenhint == 0 && allocator == _yp_frozenset_new ) {
+        // yp_lenC reports an empty iterable, so we can shortcut frozenset creation
+        return _yp_frozenset_empty;
+    }
 
     newSo = allocator( lenhint );
     if( yp_isexceptionC( newSo ) ) return newSo;
@@ -5243,14 +5265,16 @@ static ypObject *_ypSet( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterabl
 }
 
 ypObject *yp_frozensetN( int n, ... ) {
-    if( n == 0 ) return _yp_frozenset_new( 0 );
+    if( n < 1 ) return _yp_frozenset_empty;
     return_yp_V_FUNC( ypObject *, yp_frozensetV, (n, args), n );
 }
 ypObject *yp_frozensetV( int n, va_list args ) {
+    // TODO Return _yp_frozenset_empty on n<1??
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypSet( _yp_frozenset_new, iter_args );
 }
 ypObject *yp_frozenset( ypObject *iterable ) {
+    if( ypObject_TYPE_CODE( iterable ) == ypFrozenSet_CODE ) return yp_incref( iterable );
     return _ypSet( _yp_frozenset_new, iterable );
 }
 
@@ -5296,8 +5320,19 @@ ypObject *yp_set( ypObject *iterable ) {
 #define ypDict_VALUE_ENTRY( mp, key_loc ) \
     ( &(ypDict_VALUES( mp )[ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), key_loc )]) )
 
+// Empty frozendicts can be represented by this, immortal object
+// TODO Can we use this in more places...anywhere we'd return a possibly-empty frozendict?
+static ypObject _yp_frozendict_empty_data[ypSet_MINSIZE] = {0};
+static ypDictObject _yp_frozendict_empty_struct = {
+    { ypObject_MAKE_TYPE_REFCNT( ypFrozenDict_CODE, ypObject_REFCNT_IMMORTAL ),
+    0, ypSet_MINSIZE, ypObject_HASH_INVALID, _yp_frozendict_empty_data }, 
+    (ypObject *) &_yp_frozenset_empty_struct };
+static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empty_struct;
+
 // TODO can use CONTAINER_INLINE if we're sure the frozendict won't grow past minused while being
 // created
+// XXX A minused of zero may mean lenhint is unreliable; we may still grow the frozendict, so don't
+// return _yp_frozendict_empty!
 static ypObject *_yp_frozendict_new( yp_ssize_t minused )
 {
     ypObject *keyset;
@@ -5770,7 +5805,7 @@ static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
     return result;
 }
 
-static ypObject *frozendict_miniiter_lenhint( 
+static ypObject *frozendict_miniiter_lenhint(
         ypObject *mp, yp_uint64_t *state, yp_ssize_t *lenhint )
 {
     *lenhint = ((ypDictMiState *) state)->itemsleft;
@@ -5946,8 +5981,13 @@ static ypObject *_ypDict( ypObject *(*allocator)( yp_ssize_t ), ypObject *x )
     ypObject *newMp;
     ypObject *result;
     yp_ssize_t lenhint = yp_lenC( x, &exc );
-    if( yp_isexceptionC( exc ) ) lenhint = yp_iter_lenhintC( x, &exc );
-    // Ignore errors determining lenhint; it just means we can't pre-allocate
+    if( yp_isexceptionC( exc ) ) {
+        // Ignore errors determining lenhint; it just means we can't pre-allocate
+        lenhint = yp_iter_lenhintC( x, &exc );
+    } else if( lenhint == 0 && allocator == _yp_frozendict_new ) {
+        // yp_lenC reports an empty iterable, so we can shortcut frozendict creation
+        return _yp_frozendict_empty;
+    }
 
     newMp = allocator( lenhint );
     if( yp_isexceptionC( newMp ) ) return newMp;
@@ -5961,10 +6001,11 @@ static ypObject *_ypDict( ypObject *(*allocator)( yp_ssize_t ), ypObject *x )
 }
 
 ypObject *yp_frozendictK( int n, ... ) {
-    if( n == 0 ) return _yp_frozendict_new( 0 );
+    if( n < 1 ) return _yp_frozendict_empty;
     return_yp_V_FUNC( ypObject *, yp_frozendictKV, (n, args), n );
 }
 ypObject *yp_frozendictKV( int n, va_list args ) {
+    // TODO Return _yp_frozendict_empty on n<1??
     yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
     return _ypDict( _yp_frozendict_new, iter_args );
 }
@@ -5980,10 +6021,11 @@ ypObject *yp_dictKV( int n, va_list args ) {
 
 // TODO something akin to yp_ONSTACK_ITER_KVALIST that yields the same value with each key
 ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
-    if( n == 0 ) return _yp_frozendict_new( 0 );
+    if( n < 1 ) return _yp_frozendict_empty;
     return_yp_V_FUNC( ypObject *, yp_frozendict_fromkeysV, (value, n, args), n );
 }
 ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
+    // TODO Return _yp_frozendict_empty on n<1??
     return yp_NotImplementedError;
 }
 
@@ -5996,6 +6038,7 @@ ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
 }
 
 ypObject *yp_frozendict( ypObject *x ) {
+    if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
     return _ypDict( _yp_frozendict_new, x );
 }
 ypObject *yp_dict( ypObject *x ) {
@@ -6201,6 +6244,7 @@ ypObject *yp_issuperset( ypObject *set, ypObject *x ) {
 // the in-place versions.  Among other things, this helps to avoid duplicating code.
 // TODO Verify this assumption
 ypObject *yp_unionN( ypObject *set, int n, ... ) {
+    if( !ypObject_IS_MUTABLE( set ) && n < 1 ) return yp_incref( set );
     return_yp_V_FUNC( ypObject *, yp_unionV, (set, n, args), n );
 }
 ypObject *yp_unionV( ypObject *set, int n, va_list args ) {
@@ -6211,6 +6255,7 @@ ypObject *yp_unionV( ypObject *set, int n, va_list args ) {
 }
 
 ypObject *yp_intersectionN( ypObject *set, int n, ... ) {
+    if( !ypObject_IS_MUTABLE( set ) && n < 1 ) return yp_incref( set );
     return_yp_V_FUNC( ypObject *, yp_intersectionV, (set, n, args), n );
 }
 ypObject *yp_intersectionV( ypObject *set, int n, va_list args ) {
@@ -6221,6 +6266,7 @@ ypObject *yp_intersectionV( ypObject *set, int n, va_list args ) {
 }
 
 ypObject *yp_differenceN( ypObject *set, int n, ... ) {
+    if( !ypObject_IS_MUTABLE( set ) && n < 1 ) return yp_incref( set );
     return_yp_V_FUNC( ypObject *, yp_differenceV, (set, n, args), n );
 }
 ypObject *yp_differenceV( ypObject *set, int n, va_list args ) {
@@ -6303,7 +6349,7 @@ ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval ) {
     ypTypeObject *type = ypObject_TYPE( *mapping );
     ypObject *result = type->tp_as_mapping->tp_setdefault( *mapping, key, defval );
     if( yp_isexceptionC( result ) ) yp_INPLACE_ERR( mapping, result );
-    return result; 
+    return result;
 }
 
 void yp_updateK( ypObject **mapping, int n, ... ) {
