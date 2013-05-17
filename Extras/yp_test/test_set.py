@@ -665,6 +665,7 @@ class TestSet(TestJointOps):
 class SetSubclass(yp_set):
     pass
 
+@unittest.skip("Not applicable to nohtyP")
 class TestSetSubclass(TestSet):
     thetype = SetSubclass
     basetype = yp_set
@@ -673,6 +674,7 @@ class SetSubclassWithKeywordArgs(yp_set):
     def __init__(self, iterable=[], newarg=None):
         yp_set.__init__(self, iterable)
 
+@unittest.skip("Not applicable to nohtyP")
 class TestSetSubclassWithKeywordArgs(TestSet):
 
     @unittest.skip("Not applicable to nohtyP")
@@ -692,9 +694,9 @@ class TestFrozenSet(TestJointOps):
 
     def test_singleton_empty_frozenset(self):
         f = yp_frozenset()
-        efs = [yp_frozenset(), yp_frozenset([]), yp_frozenset(()), yp_frozenset(''),
-               yp_frozenset(), yp_frozenset([]), yp_frozenset(()), yp_frozenset(''),
-               yp_frozenset(range(0)), yp_frozenset(yp_frozenset()),
+        efs = [yp_frozenset(), yp_frozenset(yp_list()), yp_frozenset(yp_tuple()), yp_frozenset(yp_str()),
+               yp_frozenset(), yp_frozenset(yp_list()), yp_frozenset(yp_tuple()), yp_frozenset(yp_str()),
+               yp_frozenset(yp_dict()), yp_frozenset(yp_frozenset()),
                yp_frozenset(f), f]
         # All of the empty yp_frozensets should have just one id()
         self.assertEqual(len(yp_set(map(id, efs))), 1)
@@ -747,6 +749,7 @@ class TestFrozenSet(TestJointOps):
 class FrozenSetSubclass(yp_frozenset):
     pass
 
+@unittest.skip("Not applicable to nohtyP")
 class TestFrozenSetSubclass(TestFrozenSet):
     thetype = FrozenSetSubclass
     basetype = yp_frozenset
@@ -943,6 +946,7 @@ class TestBasicOpsTuple(TestBasicOps):
 
 #------------------------------------------------------------------------------
 
+@unittest.skip("nohtyP sets don't store function objects")
 class TestBasicOpsTriple(TestBasicOps):
     def setUp(self):
         self.case   = "triple set"
