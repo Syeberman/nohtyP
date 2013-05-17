@@ -84,7 +84,7 @@ typedef size_t yp_uhash_t;
 // refcounts)
 #define ypObject_REFCNT_IMMORTAL _ypObject_REFCNT_IMMORTAL
 
-// When a hash of this value is stored in ob_hash, call tp_hash
+// When a hash of this value is stored in ob_hash, call tp_currenthash
 #define ypObject_HASH_INVALID _ypObject_HASH_INVALID
 
 // Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
@@ -1962,6 +1962,15 @@ _ypBool_RELATIVE_CMP_FUNCTION( ne, != );
 _ypBool_RELATIVE_CMP_FUNCTION( ge, >= );
 _ypBool_RELATIVE_CMP_FUNCTION( gt, > );
 
+// XXX Adapted from Python's int_hash (now obsolete)
+static ypObject *bool_currenthash( ypObject *b,
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+{
+    // This must remain consistent with the other numeric types
+    *hash = (yp_hash_t) _ypBool_VALUE( b ); // either 0 or 1
+    return yp_None;
+}
+
 static ypTypeObject ypBool_Type = {
     yp_TYPE_HEAD_INIT,
     NULL,                           // tp_name
@@ -1988,7 +1997,7 @@ static ypTypeObject ypBool_Type = {
     bool_gt,                        // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    bool_currenthash,               // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations
@@ -2535,7 +2544,7 @@ yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT =
 // TODO what if ob_len is the "invalid" value?
 #define ypBytes_LEN( b )  ( ((ypObject *)b)->ob_len )
 
-// TODO end all bytes with a (hidden) null byte
+// TODO _yp_bytes_empty (remember NULL terminator)
 
 // Return a new bytes object with uninitialized data of the given length, or an exception
 static ypObject *_yp_bytes_new( yp_ssize_t len )
@@ -3168,6 +3177,8 @@ yp_STATIC_ASSERT( offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 
 // TODO what if ob_len is the "invalid" value?
 #define ypStr_LEN( s )  ( ((ypObject *)s)->ob_len )
 
+// TODO _yp_str_empty (remember NULL terminator)
+
 // Return a new str object with uninitialized data of the given length, or an exception
 static ypObject *_yp_str_new( yp_ssize_t len )
 {
@@ -3506,6 +3517,14 @@ typedef struct {
 #define ypTuple_LEN( sq ) ( ((ypObject *)sq)->ob_len )
 #define ypTuple_ALLOCLEN( sq ) ( ((ypObject *)sq)->ob_alloclen )
 
+// Empty tuples can be represented by this, immortal object
+// TODO Can we use this in more places...anywhere we'd return a possibly-empty tuple?
+static ypObject *_yp_tuple_empty_data[1] = {NULL};
+static ypTupleObject _yp_tuple_empty_struct = {
+    { ypObject_MAKE_TYPE_REFCNT( ypTuple_CODE, ypObject_REFCNT_IMMORTAL ),
+    0, 0, ypObject_HASH_INVALID, _yp_tuple_empty_data } };
+static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
+
 // Moves the elements from [src:] to the index dest; this can be used when deleting items (they
 // must be discarded first), or inserting (the new space is uninitialized).  Assumes enough space
 // is allocated for the move.  Recall that memmove handles overlap.
@@ -3515,6 +3534,8 @@ typedef struct {
 
 // FIXME in general, we need a way to determine when we can use the _INLINE variant
 // Returns a new tuple of len zero, but allocated for alloclen elements
+// XXX An alloclen of zero may mean lenhint is unreliable; we may still grow the tuple, so don't
+// return _yp_tuple_empty!
 static ypObject *_yp_tuple_new( yp_ssize_t alloclen ) {
     return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, ypTuple_CODE, alloclen, 0 );
 }
@@ -3964,11 +3985,17 @@ static ypTypeObject ypList_Type = {
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
 static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable )
 {
-    ypObject *result = yp_None;
+    ypObject *exc = yp_None;
     ypObject *newSq;
-    yp_ssize_t lenhint = yp_lenC( iterable, &result );
-    if( yp_isexceptionC( result ) ) lenhint = yp_iter_lenhintC( iterable, &result );
-    // Ignore errors determining lenhint; it just means we can't pre-allocate
+    ypObject *result;
+    yp_ssize_t lenhint = yp_lenC( iterable, &exc );
+    if( yp_isexceptionC( exc ) ) {
+        // Ignore errors determining lenhint; it just means we can't pre-allocate
+        lenhint = yp_iter_lenhintC( iterable, &exc );
+    } else if( lenhint == 0 && allocator == _yp_tuple_new ) {
+        // yp_lenC reports an empty iterable, so we can shortcut frozenset creation
+        return _yp_tuple_empty;
+    }
 
     newSq = allocator( lenhint );
     if( yp_isexceptionC( newSq ) ) return newSq;
@@ -3981,10 +4008,11 @@ static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *itera
 }
 
 ypObject *yp_tupleN( int n, ... ) {
-    if( n == 0 ) return _yp_tuple_new( 0 );
+    if( n < 1 ) return _yp_tuple_empty;
     return_yp_V_FUNC( ypObject *, yp_tupleV, (n, args), n );
 }
 ypObject *yp_tupleV( int n, va_list args ) {
+    // TODO Return _yp_tuple_empty on n<1??
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypTuple( _yp_tuple_new, iter_args );
 }
@@ -4824,7 +4852,7 @@ static ypObject *frozenset_isdisjoint( ypObject *so, ypObject *x )
     ypObject *x_asset;
     ypObject *result;
 
-    if( so == x ) return yp_False;
+    if( so == x && ypSet_LEN( so ) > 0 ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenSet_CODE ) {
         return _ypSet_isdisjoint( so, x );
     } else {

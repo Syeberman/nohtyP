@@ -306,6 +306,8 @@ yp_func( c_ypObject_p, "yp_chrarray_frombytesC", ((c_char_p, "source"), (c_yp_ss
 # ypObject *yp_chrC( yp_int_t i );
 
 # ypObject *yp_tupleN( int n, ... );
+yp_func( c_ypObject_p, "yp_tupleN", (c_multiN_ypObject_p, ) )
+
 # ypObject *yp_tupleV( int n, va_list args );
 # ypObject *yp_listN( int n, ... );
 # ypObject *yp_listV( int n, va_list args );
@@ -372,6 +374,7 @@ yp_func( c_ypObject_p, "yp_next", ((c_ypObject_p, "iterator"), ) )
 # ypObject *yp_throw( ypObject *iterator, ypObject *exc );
 
 # yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc) )
 
 # ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size );
 
@@ -800,6 +803,7 @@ class ypObject( c_ypObject_p ):
         # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing
         try: _yp_decref( self )
         except: pass
+        return # FIXME Causing a Segmentation Fault sometimes?!?!
         try: self.value = yp_None.value
         except: pass
     _pytype2yp = {}
@@ -924,11 +928,7 @@ class yp_iter( ypObject ):
         return self
 
     def __iter__( self ): return self
-
-_yp_closed_iter = yp_iter( lambda: None, None )
-try: _yp_next( _yp_closed_iter )
-except StopIteration: pass
-else: raise AssertionError( "should be an empty iterator" )
+    def __length_hint__( self ): return _yp_iter_lenhintC( self, yp_None )
 
 def _yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
@@ -967,6 +967,8 @@ class yp_bytes( ypObject ):
 class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
+            if object is _yp_arg_missing: 
+                return _yp_str_frombytesC( None, 0, yp_s_latin_1, yp_s_strict )
             encoded = str( object ).encode( "latin-1" )
             return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
         else:
@@ -977,16 +979,18 @@ c_ypObject_p_value( "yp_s_strict" )
 
 @pytype( tuple, 20 )
 class yp_tuple( ypObject ):
-    def __new__( cls, iterable=_yp_closed_iter ):
+    def __new__( cls, iterable=_yp_arg_missing ):
+        if iterable is _yp_arg_missing: return _yp_tupleN( )
         return _yp_tuple( _yp_iterable( iterable ) )
+_yp_tuple_empty = yp_tuple( )
 
 @pytype( list, 21 )
 class yp_list( ypObject ):
-    def __new__( cls, iterable=_yp_closed_iter ):
+    def __new__( cls, iterable=_yp_tuple_empty ):
         return _yp_list( _yp_iterable( iterable ) )
 
 class _ypSet( ypObject ):
-    def __new__( cls, iterable=_yp_closed_iter ):
+    def __new__( cls, iterable=_yp_tuple_empty ):
         return cls._ypSet_constructor( _yp_iterable( iterable ) )
     def __or__( self, other ):
         if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
