@@ -4852,7 +4852,7 @@ static ypObject *frozenset_isdisjoint( ypObject *so, ypObject *x )
     ypObject *x_asset;
     ypObject *result;
 
-    if( so == x && ypSet_LEN( so ) > 0 ) return yp_False;
+    if( so == x ) return ypBool_FROM_C( ypSet_LEN( so ) < 1 );
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenSet_CODE ) {
         return _ypSet_isdisjoint( so, x );
     } else {
