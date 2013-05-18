@@ -1215,7 +1215,7 @@ class TestUpdateOps(unittest.TestCase):
 
 class TestMutate(unittest.TestCase):
     def setUp(self):
-        self.values = ["a", "b", "c"]
+        self.values = yp_list( ["a", "b", "c"] )
         self.set = yp_set(self.values)
 
     def test_add_present(self):
