@@ -736,10 +736,11 @@ yp_func( c_ypObject_p, "yp_add", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 
 _ypExc2py = {}
 _pyExc2yp = {}
-def ypObject_p_exception( name, pyExc ):
+def ypObject_p_exception( name, pyExc, *, one_to_one=True ):
+    """Use one_to_one=False when pyExc should not be mapped back to the nohtyP exception."""
     ypExc = c_ypObject_p.in_dll( ypdll, name )
     _ypExc2py[ypExc.value] = (name, pyExc)
-    _pyExc2yp[pyExc] = ypExc
+    if one_to_one: _pyExc2yp[pyExc] = ypExc
     globals( )["_"+name] = ypExc
 
 ypObject_p_exception( "yp_BaseException", BaseException )
@@ -776,11 +777,11 @@ ypObject_p_exception( "yp_ZeroDivisionError", ZeroDivisionError )
 ypObject_p_exception( "yp_BufferError", BufferError )
 
 # Raised when the object does not support the given method; subexception of yp_AttributeError
-ypObject_p_exception( "yp_MethodError", AttributeError )
+ypObject_p_exception( "yp_MethodError", AttributeError, one_to_one=False )
 # Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError
-ypObject_p_exception( "yp_SystemLimitationError", SystemError )
+ypObject_p_exception( "yp_SystemLimitationError", SystemError, one_to_one=False )
 # Raised when an invalidated object is passed to a function; subexception of yp_TypeError
-ypObject_p_exception( "yp_InvalidatedError", TypeError )
+ypObject_p_exception( "yp_InvalidatedError", TypeError, one_to_one=False )
 
 def ypObject_p_errcheck( x ):
     """Raises the appropriate Python exception if x is a nohtyP exception"""
@@ -910,7 +911,8 @@ class yp_iter( ypObject ):
             if _yp_isexceptionC( yp_value ):
                 result = yp_value # yp_GeneratorExit, in particular
             else:
-                result = ypObject.frompython( next( self._pyiter ) )
+                py_result = next( self._pyiter )
+                result = ypObject.frompython( py_result )
         except BaseException as e:
             result = _pyExc2yp[type( e )]
         return _yp_incref( result )
@@ -951,7 +953,9 @@ class yp_int( ypObject ):
 @pytype( bytes, 16 )
 class yp_bytes( ypObject ):
     def __new__( cls, source=0, encoding=None, errors=None ):
-        if isinstance( source, str ):
+        if isinstance( source, (bytes, bytearray) ):
+            return _yp_bytesC( source, len( source ) )
+        elif isinstance( source, str ):
             raise NotImplementedError
         elif isinstance( source, (int, yp_int) ):
             return _yp_bytesC( None, source )
@@ -977,15 +981,19 @@ c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
 
+class _ypTuple( ypObject ):
+    # nohtyP currently doesn't overload yp_add et al, but Python expects this
+    def __add__( self, other ): return _yp_concat( self, other )
+
 @pytype( tuple, 20 )
-class yp_tuple( ypObject ):
+class yp_tuple( _ypTuple ):
     def __new__( cls, iterable=_yp_arg_missing ):
         if iterable is _yp_arg_missing: return _yp_tupleN( )
         return _yp_tuple( _yp_iterable( iterable ) )
 _yp_tuple_empty = yp_tuple( )
 
 @pytype( list, 21 )
-class yp_list( ypObject ):
+class yp_list( _ypTuple ):
     def __new__( cls, iterable=_yp_tuple_empty ):
         return _yp_list( _yp_iterable( iterable ) )
 
