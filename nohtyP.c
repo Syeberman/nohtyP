@@ -5037,6 +5037,7 @@ static ypObject *set_clear( ypObject *so ) {
     frozenset_traverse( so, _frozenset_decref_visitor, NULL ); // cannot fail
     // FIXME there's a memcpy in this that we can and should avoid
     ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, ypSet_MINSIZE );
+    // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     ypSet_ALLOCLEN( so ) = ypSet_MINSIZE; // we can't make use of the excess anyway
     ypSet_LEN( so ) = 0;
     ypSet_FILL( so ) = 0;
@@ -5655,6 +5656,11 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
 
 // Public methods
 
+static ypObject *_frozendict_decref_visitor( ypObject *x, void *memo ) {
+    yp_decref( x );
+    return yp_None;
+}
+
 static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *memo )
 {
     yp_ssize_t valuesleft = ypDict_LEN( mp );
@@ -5695,6 +5701,25 @@ static ypObject *frozendict_contains( ypObject *mp, ypObject *key )
 
 static ypObject *frozendict_len( ypObject *mp, yp_ssize_t *len ) {
     *len = ypDict_LEN( mp );
+    return yp_None;
+}
+
+static ypObject *dict_clear( ypObject *mp ) {
+    ypObject *keyset;
+    yp_ssize_t alloclen;
+    if( ypDict_LEN( mp ) < 1 ) return yp_None;
+    
+    keyset = _yp_frozenset_new( 0 );
+    if( yp_isexceptionC( keyset ) ) return keyset;
+    alloclen = ypSet_ALLOCLEN( keyset );
+
+    frozendict_traverse( mp, _frozendict_decref_visitor, NULL ); // cannot fail
+    // FIXME there's a memcpy in this that we can and should avoid
+    ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, alloclen );
+    // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
+    ypDict_LEN( mp ) = 0;
+    ypDict_KEYSET( mp ) = keyset;
+    memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
     return yp_None;
 }
 
@@ -5983,7 +6008,7 @@ static ypTypeObject ypDict_Type = {
     frozendict_contains,            // tp_contains
     frozendict_len,                 // tp_len
     MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
+    dict_clear,                     // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjobjproc,      // tp_remove
     frozendict_getdefault,          // tp_getdefault
