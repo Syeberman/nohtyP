@@ -643,6 +643,7 @@ class DictTest(unittest.TestCase):
             d[(1,)]
         self.assertEqual(c.exception.args, ((1,),))
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_bad_key(self):
         # Dictionary lookups should fail if __eq__() raises an exception.
         class CustomException(Exception):
