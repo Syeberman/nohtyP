@@ -134,6 +134,8 @@ typedef struct {
 } ypNumberMethods;
 
 typedef struct {
+    objobjproc tp_concat;
+    objssizeproc tp_repeat;
     objssizeproc tp_getindex;
     objsliceproc tp_getslice;
     findfunc tp_find;
@@ -142,6 +144,7 @@ typedef struct {
     objsliceobjproc tp_setslice;
     objssizeproc tp_delindex;
     objsliceproc tp_delslice;
+    // tp_push (aka tp_append) is elsewhere
     objobjproc tp_extend;
     objssizeproc tp_irepeat;
     objssizeobjproc tp_insert;
@@ -156,10 +159,15 @@ typedef struct {
     // tp_lt is elsewhere
     objobjproc tp_issuperset;
     // tp_gt is elsewhere
-    objvalistproc tp_update;
+    objvalistproc tp_union;
+    objvalistproc tp_intersection;
+    objvalistproc tp_difference;
+    objobjproc tp_symmetric_difference;
+    objvalistproc tp_update; // TODO combine with tp_extend, and/or move into ypTypeObject?
     objvalistproc tp_intersection_update;
     objvalistproc tp_difference_update;
     objobjproc tp_symmetric_difference_update;
+    // tp_push (aka tp_set_ad) is elsewhere
     objobjproc tp_pushunique;
 } ypSetMethods;
 
@@ -308,6 +316,8 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
         *name ## _objproc \
     } }; \
     static ypSequenceMethods name ## _SequenceMethods[1] = { { \
+        *name ## _objobjproc, \
+        *name ## _objssizeproc, \
         *name ## _objssizeproc, \
         *name ## _objsliceproc, \
         *name ## _findfunc, \
@@ -326,6 +336,10 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
     static ypSetMethods name ## _SetMethods[1] = { { \
         *name ## _objobjproc, \
         *name ## _objobjproc, \
+        *name ## _objobjproc, \
+        *name ## _objvalistproc, \
+        *name ## _objvalistproc, \
+        *name ## _objvalistproc, \
         *name ## _objobjproc, \
         *name ## _objvalistproc, \
         *name ## _objvalistproc, \
@@ -2968,6 +2982,8 @@ static ypObject *bytes_dealloc( ypObject *b ) {
 }
 
 static ypSequenceMethods ypBytes_as_sequence = {
+    bytes_concat,                   // tp_concat
+    MethodError_objssizeproc,       // tp_repeat
     bytes_getindex,                 // tp_getindex
     bytes_getslice,                 // tp_getslice
     bytes_find,                     // tp_find
@@ -3047,6 +3063,8 @@ static ypTypeObject ypBytes_Type = {
 };
 
 static ypSequenceMethods ypByteArray_as_sequence = {
+    MethodError_objobjproc,         // tp_concat
+    MethodError_objssizeproc,       // tp_repeat
     bytes_getindex,                 // tp_getindex
     bytes_getslice,                 // tp_getslice
     bytes_find,                     // tp_find
@@ -3286,6 +3304,8 @@ static ypObject *str_dealloc( ypObject *s ) {
 }
 
 static ypSequenceMethods ypStr_as_sequence = {
+    MethodError_objobjproc,         // tp_concat
+    MethodError_objssizeproc,       // tp_repeat
     str_getindex,                   // tp_getindex
     MethodError_objsliceproc,       // tp_getslice
     MethodError_findfunc,           // tp_find
@@ -3365,6 +3385,8 @@ static ypTypeObject ypStr_Type = {
 };
 
 static ypSequenceMethods ypChrArray_as_sequence = {
+    MethodError_objobjproc,         // tp_concat
+    MethodError_objssizeproc,       // tp_repeat
     str_getindex,                   // tp_getindex
     MethodError_objsliceproc,       // tp_getslice
     MethodError_findfunc,           // tp_find
@@ -3823,6 +3845,8 @@ static ypObject *tuple_dealloc( ypObject *sq )
 #define list_extend _ypTuple_extend
 
 static ypSequenceMethods ypTuple_as_sequence = {
+    MethodError_objobjproc,         // tp_concat
+    MethodError_objssizeproc,       // tp_repeat
     tuple_getindex,                 // tp_getindex
     tuple_getslice,                 // tp_getslice
     tuple_find,                     // tp_find
@@ -3902,6 +3926,8 @@ static ypTypeObject ypTuple_Type = {
 };
 
 static ypSequenceMethods ypList_as_sequence = {
+    MethodError_objobjproc,         // tp_concat
+    MethodError_objssizeproc,       // tp_repeat
     tuple_getindex,                 // tp_getindex
     tuple_getslice,                 // tp_getslice
     tuple_find,                     // tp_find
@@ -5018,6 +5044,81 @@ static ypObject *set_symmetric_difference_update( ypObject *so, ypObject *x )
     }
 }
 
+// XXX We redirect the new-object set methods to the in-place versions.  Among other things, this
+// helps to avoid duplicating code.
+// FIXME ...except we are creating objects that we destroy then create new ones, which can probably
+// be optimized in certain cases, so rethink these four methods.  At the very least, can we avoid
+// the yp_freeze?
+static ypObject *frozenset_union( ypObject *so, int n, va_list args )
+{
+    ypObject *result;
+    ypObject *new_so;
+
+    if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
+    
+    new_so = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    if( yp_isexceptionC( new_so ) ) return new_so;
+    result = set_update( new_so, n, args );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( new_so );
+        return result;
+    }
+    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &new_so );
+    return new_so;
+}
+
+static ypObject *frozenset_intersection( ypObject *so, int n, va_list args )
+{
+    ypObject *result;
+    ypObject *new_so;
+
+    if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
+    
+    new_so = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    if( yp_isexceptionC( new_so ) ) return new_so;
+    result = set_intersection_update( new_so, n, args );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( new_so );
+        return result;
+    }
+    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &new_so );
+    return new_so;
+}
+
+static ypObject *frozenset_difference( ypObject *so, int n, va_list args )
+{
+    ypObject *result;
+    ypObject *new_so;
+
+    if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
+    
+    new_so = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    if( yp_isexceptionC( new_so ) ) return new_so;
+    result = set_difference_update( new_so, n, args );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( new_so );
+        return result;
+    }
+    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &new_so );
+    return new_so;
+}
+
+static ypObject *frozenset_symmetric_difference( ypObject *so, ypObject *x )
+{
+    ypObject *result;
+    ypObject *new_so;
+
+    new_so = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    if( yp_isexceptionC( new_so ) ) return new_so;
+    result = set_symmetric_difference_update( new_so, x );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( new_so );
+        return result;
+    }
+    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &new_so );
+    return new_so;
+}
+
 static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     ypObject *result = _ypSet_push( so, x, &spaceleft );
@@ -5109,10 +5210,15 @@ static ypSetMethods ypFrozenSet_as_set = {
     // tp_lt is elsewhere
     frozenset_issuperset,           // tp_issuperset
     // tp_gt is elsewhere
+    frozenset_union,                // tp_union
+    frozenset_intersection,         // tp_intersection
+    frozenset_difference,           // tp_difference
+    frozenset_symmetric_difference, // tp_symmetric_difference
     MethodError_objvalistproc,      // tp_update
     MethodError_objvalistproc,      // tp_intersection_update
     MethodError_objvalistproc,      // tp_difference_update
     MethodError_objobjproc,         // tp_symmetric_difference_update
+    // tp_push (aka tp_set_ad) is elsewhere
     MethodError_objobjproc          // tp_pushunique
 };
 
@@ -5184,10 +5290,15 @@ static ypSetMethods ypSet_as_set = {
     // tp_lt is elsewhere
     frozenset_issuperset,           // tp_issuperset
     // tp_gt is elsewhere
+    frozenset_union,                // tp_union
+    frozenset_intersection,         // tp_intersection
+    frozenset_difference,           // tp_difference
+    frozenset_symmetric_difference, // tp_symmetric_difference
     set_update,                     // tp_update
     set_intersection_update,        // tp_intersection_update
     set_difference_update,          // tp_difference_update
     set_symmetric_difference_update,// tp_symmetric_difference_update
+    // tp_push (aka tp_set_ad) is elsewhere
     set_pushunique,                 // tp_pushunique
 };
 
@@ -6193,11 +6304,11 @@ ypObject *yp_pop( ypObject **container ) {
 }
 
 ypObject *yp_concat( ypObject *sequence, ypObject *x ) {
-    return yp_NotImplementedError;
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_concat, (sequence, x) );
 }
 
 ypObject *yp_repeatC( ypObject *sequence, yp_ssize_t factor ) {
-    return yp_NotImplementedError;
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_repeat, (sequence, factor) );
 }
 
 ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i ) {
@@ -6293,47 +6404,29 @@ ypObject *yp_issuperset( ypObject *set, ypObject *x ) {
     _yp_REDIRECT2( set, tp_as_set, tp_issuperset, (set, x) );
 }
 
-// XXX Freezing a mutable set is a quick operation, so we redirect the new-object set methods to
-// the in-place versions.  Among other things, this helps to avoid duplicating code.
-// TODO Verify this assumption
 ypObject *yp_unionN( ypObject *set, int n, ... ) {
-    if( !ypObject_IS_MUTABLE( set ) && n < 1 ) return yp_incref( set );
     return_yp_V_FUNC( ypObject *, yp_unionV, (set, n, args), n );
 }
 ypObject *yp_unionV( ypObject *set, int n, va_list args ) {
-    ypObject *result = yp_unfrozen_copy( set );
-    yp_updateV( &result, n, args );
-    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
-    return result;
+    _yp_REDIRECT2( set, tp_as_set, tp_union, (set, n, args) );
 }
 
 ypObject *yp_intersectionN( ypObject *set, int n, ... ) {
-    if( !ypObject_IS_MUTABLE( set ) && n < 1 ) return yp_incref( set );
     return_yp_V_FUNC( ypObject *, yp_intersectionV, (set, n, args), n );
 }
 ypObject *yp_intersectionV( ypObject *set, int n, va_list args ) {
-    ypObject *result = yp_unfrozen_copy( set );
-    yp_intersection_updateV( &result, n, args );
-    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
-    return result;
+    _yp_REDIRECT2( set, tp_as_set, tp_intersection, (set, n, args) );
 }
 
 ypObject *yp_differenceN( ypObject *set, int n, ... ) {
-    if( !ypObject_IS_MUTABLE( set ) && n < 1 ) return yp_incref( set );
     return_yp_V_FUNC( ypObject *, yp_differenceV, (set, n, args), n );
 }
 ypObject *yp_differenceV( ypObject *set, int n, va_list args ) {
-    ypObject *result = yp_unfrozen_copy( set );
-    yp_difference_updateV( &result, n, args );
-    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
-    return result;
+    _yp_REDIRECT2( set, tp_as_set, tp_difference, (set, n, args) );
 }
 
 ypObject *yp_symmetric_difference( ypObject *set, ypObject *x ) {
-    ypObject *result = yp_unfrozen_copy( set );
-    yp_symmetric_difference_update( &result, x );
-    if( !ypObject_IS_MUTABLE( set ) ) yp_freeze( &result );
-    return result;
+    _yp_REDIRECT2( set, tp_as_set, tp_symmetric_difference, (set, x) );
 }
 
 void yp_updateN( ypObject **set, int n, ... ) {
