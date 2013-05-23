@@ -456,7 +456,7 @@ ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
  */
 
 // As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an
-// object that implements yp_iter.
+// object that implements yp_iter.  Examples of iterables include bytes, str, tuple, set, and dict.
 
 // Unlike other functions that modify their inputs, yp_send et al do not discard iterator on error.
 // Instead, if an error occurs in one yp_send, subsequent calls will raise yp_StopIteration.
@@ -543,6 +543,9 @@ ypAPI ypObject *yp_zipV( int n, va_list args );
  * Container Operations
  */
 
+// These methods are supported by bytes, str, tuple, frozenset, and frozendict (and their mutable
+// counterparts, of course).
+
 // Returns the immortal yp_True if an item of container is equal to x, else yp_False.
 ypAPI ypObject *yp_contains( ypObject *container, ypObject *x );
 ypAPI ypObject *yp_in( ypObject *x, ypObject *container );
@@ -570,6 +573,10 @@ ypAPI ypObject *yp_pop( ypObject **container );
 /*
  * Sequence Operations
  */
+
+// These methods are supported by bytes, str, and tuple (and their mutable counterparts, of 
+// course).  They are _not_ supported by frozenset and frozendict because those types do not store
+// their elements in any particular order.
 
 // Returns a new reference to the concatenation of sequence and x.
 ypAPI ypObject *yp_concat( ypObject *sequence, ypObject *x );
@@ -777,6 +784,8 @@ ypAPI ypObject *yp_pop( ypObject **set );
  * Mapping Operations
  */
 
+// frozendicts and dicts are both mapping objects.
+
 // Returns a new reference to the value of mapping with the given key.  Returns yp_KeyError if key
 // is not in the map.
 ypAPI ypObject *yp_getitem( ypObject *mapping, ypObject *key );
@@ -863,6 +872,8 @@ ypAPI ypObject * const yp_s_replace;   // "replace"
 /*
  * Numeric Operations
  */
+
+// The numeric types include ints and floats (and their mutable counterparts, of course).
 
 // Each of these functions return new reference(s) to the result of the given numeric operation;
 // for example, yp_add returns the result of adding x and y together.  If the given operands do not
