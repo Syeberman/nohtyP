@@ -359,6 +359,7 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
         *name ## _objproc \
     } };
 DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for use in methods the type doesn't support
+DEFINE_GENERIC_METHODS( TypeError, yp_TypeError );
 DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for use by Invalidated objects
 DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for use by exception objects; returns "self"
 
@@ -969,11 +970,11 @@ static ypTypeObject ypIter_Type = {
 
     // Iterator operations
     iter_miniiter,                  // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     iter_miniiter_next,             // tp_miniiter_next
     iter_miniiter_lenhint,          // tp_miniiter_lenhint
     iter_iter,                      // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
+    TypeError_objproc,              // tp_iter_reversed
     iter_send,                      // tp_send
 
     // Container operations
@@ -1912,13 +1913,13 @@ static ypTypeObject ypNoneType_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_miniiterfunc,       // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     MethodError_miniiterfunc,       // tp_miniiter_next
     MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    MethodError_objproc,            // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objproc,              // tp_iter
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -2018,13 +2019,13 @@ static ypTypeObject ypBool_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_miniiterfunc,       // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     MethodError_miniiterfunc,       // tp_miniiter_next
     MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    MethodError_objproc,            // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objproc,              // tp_iter
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -2144,13 +2145,13 @@ static ypTypeObject ypInt_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_miniiterfunc,       // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     MethodError_miniiterfunc,       // tp_miniiter_next
     MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    MethodError_objproc,            // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objproc,              // tp_iter
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -2206,13 +2207,13 @@ static ypTypeObject ypIntStore_Type = {
     MethodError_NumberMethods,      // tp_as_number
 
     // Iterator operations
-    MethodError_miniiterfunc,       // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     MethodError_miniiterfunc,       // tp_miniiter_next
     MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    MethodError_objproc,            // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objproc,              // tp_iter
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -3039,7 +3040,7 @@ static ypTypeObject ypBytes_Type = {
     _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
     _ypIter_from_miniiter,          // tp_iter
     _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -3120,7 +3121,7 @@ static ypTypeObject ypByteArray_Type = {
     _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
     _ypIter_from_miniiter,          // tp_iter
     _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -3361,7 +3362,7 @@ static ypTypeObject ypStr_Type = {
     _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
     _ypIter_from_miniiter,          // tp_iter
     _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -3442,7 +3443,7 @@ static ypTypeObject ypChrArray_Type = {
     _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
     _ypIter_from_miniiter,          // tp_iter
     _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
@@ -3555,16 +3556,11 @@ static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
             (ypTuple_LEN( sq )-(src)) * sizeof( ypObject * ) );
 
 // FIXME in general, we need a way to determine when we can use the _INLINE variant
-// Returns a new tuple of len zero, but allocated for alloclen elements
+// Returns a new tuple or list of len zero, but allocated for alloclen elements
 // XXX An alloclen of zero may mean lenhint is unreliable; we may still grow the tuple, so don't
 // return _yp_tuple_empty!
-static ypObject *_yp_tuple_new( yp_ssize_t alloclen ) {
-    return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, ypTuple_CODE, alloclen, 0 );
-}
-
-// Returns a new list of len zero, but allocated for alloclen elements
-static ypObject *_yp_list_new( yp_ssize_t alloclen ) {
-    return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, ypList_CODE, alloclen, 0 );
+static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen ) {
+    return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, type, alloclen, 0 );
 }
 
 // Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded.  Returns
@@ -3626,6 +3622,34 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
 }
 
 // Public Methods
+
+static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
+{
+    ypObject *exc = yp_None;
+    ypObject *newSq;
+    ypObject *result;
+    yp_ssize_t lenhint = yp_lenC( iterable, &exc );
+    int iterable_empty = 0; // set to 1 if iterable is known to be empty
+    if( yp_isexceptionC( exc ) ) {
+        // Ignore errors determining lenhint; it just means we can't pre-allocate
+        lenhint = yp_iter_lenhintC( iterable, &exc );
+    } else if( lenhint == 0 ) {
+        // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
+        iterable_empty = 1;
+    }
+
+    newSq = _ypTuple_new( ypObject_TYPE_CODE( sq ), ypTuple_LEN( sq )+lenhint );
+    if( yp_isexceptionC( newSq ) ) return newSq;
+    result = _ypTuple_extend( newSq, sq );
+    if( !iterable_empty && !yp_isexceptionC( result ) ) {
+        result = _ypTuple_extend( newSq, iterable );
+    }
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( newSq );
+        return result;
+    }
+    return newSq;
+}
 
 static ypObject *tuple_getindex( ypObject *sq, yp_ssize_t i )
 {
@@ -3845,7 +3869,7 @@ static ypObject *tuple_dealloc( ypObject *sq )
 #define list_extend _ypTuple_extend
 
 static ypSequenceMethods ypTuple_as_sequence = {
-    MethodError_objobjproc,         // tp_concat
+    tuple_concat,                   // tp_concat
     MethodError_objssizeproc,       // tp_repeat
     tuple_getindex,                 // tp_getindex
     tuple_getslice,                 // tp_getslice
@@ -3902,7 +3926,7 @@ static ypTypeObject ypTuple_Type = {
     _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
     _ypIter_from_miniiter,          // tp_iter
     _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     tuple_contains,                 // tp_contains
@@ -3926,7 +3950,7 @@ static ypTypeObject ypTuple_Type = {
 };
 
 static ypSequenceMethods ypList_as_sequence = {
-    MethodError_objobjproc,         // tp_concat
+    tuple_concat,                   // tp_concat
     MethodError_objssizeproc,       // tp_repeat
     tuple_getindex,                 // tp_getindex
     tuple_getslice,                 // tp_getslice
@@ -3983,7 +4007,7 @@ static ypTypeObject ypList_Type = {
     _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
     _ypIter_from_miniiter,          // tp_iter
     _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     tuple_contains,                 // tp_contains
@@ -4009,7 +4033,7 @@ static ypTypeObject ypList_Type = {
 // Constructors
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *iterable )
+static ypObject *_ypTuple( int type, ypObject *iterable )
 {
     ypObject *exc = yp_None;
     ypObject *newSq;
@@ -4018,12 +4042,13 @@ static ypObject *_ypTuple( ypObject *(*allocator)( yp_ssize_t ), ypObject *itera
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
-    } else if( lenhint == 0 && allocator == _yp_tuple_new ) {
-        // yp_lenC reports an empty iterable, so we can shortcut frozenset creation
-        return _yp_tuple_empty;
+    } else if( lenhint == 0 ) {
+        // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
+        if( type == ypTuple_CODE ) return _yp_tuple_empty;
+        return _ypTuple_new( type, 0 );
     }
 
-    newSq = allocator( lenhint );
+    newSq = _ypTuple_new( type, lenhint );
     if( yp_isexceptionC( newSq ) ) return newSq;
     result = _ypTuple_extend( newSq, iterable );
     if( yp_isexceptionC( result ) ) {
@@ -4040,23 +4065,23 @@ ypObject *yp_tupleN( int n, ... ) {
 ypObject *yp_tupleV( int n, va_list args ) {
     // TODO Return _yp_tuple_empty on n<1??
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return _ypTuple( _yp_tuple_new, iter_args );
+    return _ypTuple( ypTuple_CODE, iter_args );
 }
 ypObject *yp_tuple( ypObject *iterable ) {
     if( ypObject_TYPE_CODE( iterable ) == ypTuple_CODE ) return yp_incref( iterable );
-    return _ypTuple( _yp_tuple_new, iterable );
+    return _ypTuple( ypTuple_CODE, iterable );
 }
 
 ypObject *yp_listN( int n, ... ) {
-    if( n == 0 ) return _yp_list_new( 0 );
+    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0 );
     return_yp_V_FUNC( ypObject *, yp_listV, (n, args), n );
 }
 ypObject *yp_listV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return _ypTuple( _yp_list_new, iter_args );
+    return _ypTuple( ypList_CODE, iter_args );
 }
 ypObject *yp_list( ypObject *iterable ) {
-    return _ypTuple( _yp_list_new, iterable );
+    return _ypTuple( ypList_CODE, iterable );
 
 }
 
@@ -5052,71 +5077,71 @@ static ypObject *set_symmetric_difference_update( ypObject *so, ypObject *x )
 static ypObject *frozenset_union( ypObject *so, int n, va_list args )
 {
     ypObject *result;
-    ypObject *new_so;
+    ypObject *newSo;
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
     
-    new_so = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
-    if( yp_isexceptionC( new_so ) ) return new_so;
-    result = set_update( new_so, n, args );
+    newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    if( yp_isexceptionC( newSo ) ) return newSo;
+    result = set_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
-        yp_decref( new_so );
+        yp_decref( newSo );
         return result;
     }
-    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &new_so );
-    return new_so;
+    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &newSo );
+    return newSo;
 }
 
 static ypObject *frozenset_intersection( ypObject *so, int n, va_list args )
 {
     ypObject *result;
-    ypObject *new_so;
+    ypObject *newSo;
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
     
-    new_so = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
-    if( yp_isexceptionC( new_so ) ) return new_so;
-    result = set_intersection_update( new_so, n, args );
+    newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    if( yp_isexceptionC( newSo ) ) return newSo;
+    result = set_intersection_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
-        yp_decref( new_so );
+        yp_decref( newSo );
         return result;
     }
-    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &new_so );
-    return new_so;
+    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &newSo );
+    return newSo;
 }
 
 static ypObject *frozenset_difference( ypObject *so, int n, va_list args )
 {
     ypObject *result;
-    ypObject *new_so;
+    ypObject *newSo;
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
     
-    new_so = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
-    if( yp_isexceptionC( new_so ) ) return new_so;
-    result = set_difference_update( new_so, n, args );
+    newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    if( yp_isexceptionC( newSo ) ) return newSo;
+    result = set_difference_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
-        yp_decref( new_so );
+        yp_decref( newSo );
         return result;
     }
-    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &new_so );
-    return new_so;
+    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &newSo );
+    return newSo;
 }
 
 static ypObject *frozenset_symmetric_difference( ypObject *so, ypObject *x )
 {
     ypObject *result;
-    ypObject *new_so;
+    ypObject *newSo;
 
-    new_so = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
-    if( yp_isexceptionC( new_so ) ) return new_so;
-    result = set_symmetric_difference_update( new_so, x );
+    newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    if( yp_isexceptionC( newSo ) ) return newSo;
+    result = set_symmetric_difference_update( newSo, x );
     if( yp_isexceptionC( result ) ) {
-        yp_decref( new_so );
+        yp_decref( newSo );
         return result;
     }
-    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &new_so );
-    return new_so;
+    if( !ypObject_IS_MUTABLE( so ) ) yp_freeze( &newSo );
+    return newSo;
 }
 
 static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
@@ -5256,12 +5281,12 @@ static ypTypeObject ypFrozenSet_Type = {
 
     // Iterator operations
     frozenset_miniiter,             // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     frozenset_miniiter_next,        // tp_miniiter_next
     frozenset_miniiter_lenhint,     // tp_miniiter_lenhint
     _ypIter_from_miniiter,          // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     frozenset_contains,             // tp_contains
@@ -5336,12 +5361,12 @@ static ypTypeObject ypSet_Type = {
 
     // Iterator operations
     frozenset_miniiter,             // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     frozenset_miniiter_next,        // tp_miniiter_next
     frozenset_miniiter_lenhint,     // tp_miniiter_lenhint
     _ypIter_from_miniiter,          // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     frozenset_contains,             // tp_contains
@@ -5419,7 +5444,7 @@ ypObject *yp_frozenset( ypObject *iterable ) {
 }
 
 ypObject *yp_setN( int n, ... ) {
-    if( n == 0 ) return _yp_set_new( 0 );
+    if( n < 1 ) return _yp_set_new( 0 );
     return_yp_V_FUNC( ypObject *, yp_setV, (n, args), n );
 }
 ypObject *yp_setV( int n, va_list args ) {
@@ -6034,12 +6059,12 @@ static ypTypeObject ypFrozenDict_Type = {
 
     // Iterator operations
     frozendict_miniiter_keys,       // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     frozendict_miniiter_next,       // tp_miniiter_next
     frozendict_miniiter_lenhint,    // tp_miniiter_lenhint
     frozendict_iter_keys,           // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     frozendict_contains,            // tp_contains
@@ -6108,12 +6133,12 @@ static ypTypeObject ypDict_Type = {
 
     // Iterator operations
     frozendict_miniiter_keys,       // tp_miniiter
-    MethodError_miniiterfunc,       // tp_miniiter_reversed
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
     frozendict_miniiter_next,       // tp_miniiter_next
     frozendict_miniiter_lenhint,    // tp_miniiter_lenhint
     frozendict_iter_keys,           // tp_iter
-    MethodError_objproc,            // tp_iter_reversed
-    MethodError_objobjproc,         // tp_send
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
 
     // Container operations
     frozendict_contains,            // tp_contains
@@ -6175,7 +6200,7 @@ ypObject *yp_frozendictKV( int n, va_list args ) {
 }
 
 ypObject *yp_dictK( int n, ... ) {
-    if( n == 0 ) return _yp_dict_new( 0 );
+    if( n < 1 ) return _yp_dict_new( 0 );
     return_yp_V_FUNC( ypObject *, yp_dictKV, (n, args), n );
 }
 ypObject *yp_dictKV( int n, va_list args ) {
@@ -6194,7 +6219,7 @@ ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
 }
 
 ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
-    if( n == 0 ) return _yp_dict_new( 0 );
+    if( n < 1 ) return _yp_dict_new( 0 );
     return_yp_V_FUNC( ypObject *, yp_dict_fromkeysV, (value, n, args), n );
 }
 ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
