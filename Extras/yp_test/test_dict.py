@@ -718,6 +718,7 @@ class DictTest(unittest.TestCase):
                  'f': None, 'g': None, 'h': None})
         d = yp_dict()
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_container_iterator(self):
         # Bug #3680: tp_traverse was not implemented for dictiter and
         # dictview objects.
@@ -746,6 +747,7 @@ class DictTest(unittest.TestCase):
         gc.collect()
         self.assertTrue(gc.is_tracked(t), t)
 
+    @unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_literals(self):
         # Test GC-optimization of yp_dict literals
@@ -764,6 +766,7 @@ class DictTest(unittest.TestCase):
         self._tracked(yp_dict({1: yp_dict()}))
         self._tracked(yp_dict({1: set()}))
 
+    @unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_dynamic(self):
         # Test GC-optimization of dynamically-created dicts
@@ -828,6 +831,7 @@ class DictTest(unittest.TestCase):
         d.update([(x, y), (z, w)])
         self._tracked(d)
 
+    @unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_subtypes(self):
         # Dict subtypes are always tracked
