@@ -363,6 +363,12 @@ DEFINE_GENERIC_METHODS( TypeError, yp_TypeError );
 DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for use by Invalidated objects
 DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for use by exception objects; returns "self"
 
+// For use when an object doesn't support a particular comparison operation
+ypObject * const yp_ComparisonNotImplemented;
+static ypObject *NotImplemented_comparefunc( ypObject *x, ypObject *y ) {
+    return yp_ComparisonNotImplemented;
+}
+
 // For use when an object contains no references to other objects
 static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo ) { return yp_None; } \
 
@@ -1406,8 +1412,8 @@ void yp_deepinvalidate( ypObject **x );
 
 // If you know that b is either yp_True, yp_False, or an exception, use this
 // XXX b should be a variable, _not_ an expression, as it's evaluated up to three times
-#define ypBool_NOT( b ) ( b == yp_True ? yp_False : \
-                         (b == yp_False ? yp_True : b))
+#define ypBool_NOT( b ) ( (b) == yp_True ? yp_False : \
+                         ((b) == yp_False ? yp_True : (b)))
 ypObject *yp_not( ypObject *x ) {
     ypObject *result = yp_bool( x );
     return ypBool_NOT( result );
@@ -1522,6 +1528,7 @@ ypObject *yp_all( ypObject *iterable )
 // Defined here are yp_lt, yp_le, yp_eq, yp_ne, yp_ge, and yp_gt
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 // TODO Comparison functions have the possibility of recursion; trap (also, add tests)
+// TODO Ensure the tp_* comparison functions always return a bool
 ypObject * const yp_ComparisonNotImplemented;
 #define _ypBool_PUBLIC_CMP_FUNCTION( name, reflection, defval ) \
 ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
@@ -3781,6 +3788,7 @@ static ypObject *tuple_eq( ypObject *sq, ypObject *x )
     if( sq == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypTuple_CODE ) return yp_ComparisonNotImplemented;
     if( sq_len != x_len ) return yp_False;
+
     for( i = 0; i < sq_len; i++ ) {
         result = yp_eq( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] );
         if( result != yp_True ) return result; // returns on yp_False or an exception
@@ -4976,6 +4984,7 @@ static ypObject *frozenset_le( ypObject *so, ypObject *x )
     return _ypSet_issubset( so, x );
 }
 
+// FIXME comparison functions can recurse, just like currenthash...fix!
 static ypObject *frozenset_eq( ypObject *so, ypObject *x )
 {
     if( so == x ) return yp_True;
@@ -5080,7 +5089,7 @@ static ypObject *frozenset_union( ypObject *so, int n, va_list args )
     ypObject *newSo;
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
-    
+
     newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_update( newSo, n, args );
@@ -5098,7 +5107,7 @@ static ypObject *frozenset_intersection( ypObject *so, int n, va_list args )
     ypObject *newSo;
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
-    
+
     newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_intersection_update( newSo, n, args );
@@ -5116,7 +5125,7 @@ static ypObject *frozenset_difference( ypObject *so, int n, va_list args )
     ypObject *newSo;
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
-    
+
     newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_difference_update( newSo, n, args );
@@ -5490,7 +5499,7 @@ ypObject *yp_set( ypObject *iterable ) {
 static ypObject _yp_frozendict_empty_data[ypSet_MINSIZE] = {0};
 static ypDictObject _yp_frozendict_empty_struct = {
     { ypObject_MAKE_TYPE_REFCNT( ypFrozenDict_CODE, ypObject_REFCNT_IMMORTAL ),
-    0, ypSet_MINSIZE, ypObject_HASH_INVALID, _yp_frozendict_empty_data }, 
+    0, ypSet_MINSIZE, ypObject_HASH_INVALID, _yp_frozendict_empty_data },
     (ypObject *) &_yp_frozenset_empty_struct };
 static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empty_struct;
 
@@ -5821,6 +5830,48 @@ static ypObject *frozendict_bool( ypObject *mp ) {
     return ypBool_FROM_C( ypDict_LEN( mp ) );
 }
 
+// FIXME comparison functions can recurse, just like currenthash...fix!
+static ypObject *frozendict_eq( ypObject *mp, ypObject *x )
+{
+    yp_ssize_t valuesleft;
+    yp_ssize_t mp_i;
+    ypObject *mp_value;
+    ypSet_KeyEntry *mp_key_loc;
+    ypSet_KeyEntry *x_key_loc;
+    ypObject *x_value;
+    ypObject *result;
+
+    if( mp == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenDict_CODE ) return yp_ComparisonNotImplemented;
+    if( ypDict_LEN( mp ) != ypDict_LEN( x ) ) return yp_False;
+    // FIXME Compare stored hashes (they should be equal if mp and x are equal)
+
+    valuesleft = ypDict_LEN( mp );
+    for( mp_i = 0; valuesleft > 0; mp_i++ ) {
+        mp_value = ypDict_VALUES( mp )[mp_i];
+        if( mp_value == NULL ) continue;
+        valuesleft -= 1;
+        mp_key_loc = ypSet_TABLE( ypDict_KEYSET( mp ) ) + mp_i;
+
+        // If the key is not also in x, mp and x are not equal
+        result = _ypSet_lookkey( ypDict_KEYSET( x ),
+                mp_key_loc->se_key, mp_key_loc->se_hash, &x_key_loc );
+        if( yp_isexceptionC( result ) ) return result;
+        x_value = *ypDict_VALUE_ENTRY( x, x_key_loc );
+        if( x_value == NULL ) return yp_False;
+
+        // If the values are not equal, than neither are mp and x
+        result = yp_eq( mp_value, x_value );
+        if( result != yp_True ) return result; // yp_False or an exception
+    }
+    return yp_True;
+}
+
+static ypObject *frozendict_ne( ypObject *mp, ypObject *x ) {
+    ypObject *result = frozendict_eq( mp, x );
+    return ypBool_NOT( result );
+}
+
 static ypObject *frozendict_contains( ypObject *mp, ypObject *key )
 {
     yp_hash_t hash;
@@ -5844,7 +5895,7 @@ static ypObject *dict_clear( ypObject *mp ) {
     ypObject *keyset;
     yp_ssize_t alloclen;
     if( ypDict_LEN( mp ) < 1 ) return yp_None;
-    
+
     keyset = _yp_frozenset_new( 0 );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
@@ -6043,12 +6094,12 @@ static ypTypeObject ypFrozenDict_Type = {
 
     // Boolean operations and comparisons
     frozendict_bool,                // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    NotImplemented_comparefunc,     // tp_lt
+    NotImplemented_comparefunc,     // tp_le
+    frozendict_eq,                  // tp_eq
+    frozendict_ne,                  // tp_ne
+    NotImplemented_comparefunc,     // tp_ge
+    NotImplemented_comparefunc,     // tp_gt
 
     // Generic object operations
     MethodError_hashfunc,           // tp_currenthash
@@ -6117,12 +6168,12 @@ static ypTypeObject ypDict_Type = {
 
     // Boolean operations and comparisons
     frozendict_bool,                // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    NotImplemented_comparefunc,     // tp_lt
+    NotImplemented_comparefunc,     // tp_le
+    frozendict_eq,                  // tp_eq
+    frozendict_ne,                  // tp_ne
+    NotImplemented_comparefunc,     // tp_ge
+    NotImplemented_comparefunc,     // tp_gt
 
     // Generic object operations
     MethodError_hashfunc,           // tp_currenthash

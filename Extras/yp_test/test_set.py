@@ -1497,6 +1497,7 @@ class TestOnlySetsDict(TestOnlySetsInBinaryOps):
 
 #------------------------------------------------------------------------------
 
+@unittest.skip("Not applicable to nohtyP")
 class TestOnlySetsOperator(TestOnlySetsInBinaryOps):
     def setUp(self):
         self.set   = yp_set((1, 2, 3))
