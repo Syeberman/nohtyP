@@ -54,6 +54,7 @@
       <PreprocessorDefinitions>yp_ENABLE_SHARED;yp_BUILD_CORE;WIN32;_DEBUG;_WINDOWS;_USRDLL;YPDLL_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <SmallerTypeCheck>true</SmallerTypeCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\..</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -71,6 +72,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>yp_ENABLE_SHARED;yp_BUILD_CORE;WIN32;NDEBUG;_WINDOWS;_USRDLL;YPDLL_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\..</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -81,10 +83,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\nohtyP.c" />
+    <ClCompile Include="..\..\nohtyP.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\nohtyP.h" />
+    <ClInclude Include="..\..\nohtyP.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

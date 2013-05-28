@@ -15,6 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Extras\yp.py" />
+    <None Include="..\..\Lib\yp.py" />
   </ItemGroup>
 </Project>
