@@ -1,6 +1,9 @@
 # tests common to dict and UserDict
+from yp import *
 import unittest
 import collections
+
+# nohtyP: Calls to dict are OK here: it's for comparing yp_dict with dict
 
 
 class BasicTestMappingProtocol(unittest.TestCase):
@@ -268,10 +271,10 @@ class BasicTestMappingProtocol(unittest.TestCase):
 
     def test_get(self):
         d = self._empty_mapping()
-        self.assertTrue(d.get(list(self.other.keys())[0]) is None)
+        self.assertTrue(d.get(list(self.other.keys())[0]) is yp_None)
         self.assertEqual(d.get(list(self.other.keys())[0], 3), 3)
         d = self.reference
-        self.assertTrue(d.get(list(self.other.keys())[0]) is None)
+        self.assertTrue(d.get(list(self.other.keys())[0]) is yp_None)
         self.assertEqual(d.get(list(self.other.keys())[0], 3), 3)
         self.assertEqual(d.get(list(self.inmapping.keys())[0]),
                          list(self.inmapping.values())[0])
@@ -601,6 +604,7 @@ class TestHashMappingProtocol(TestMappingProtocol):
         else:
             self.fail("changing dict size during iteration doesn't raise Error")
 
+    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_repr(self):
         d = self._empty_mapping()
         self.assertEqual(repr(d), '{}')

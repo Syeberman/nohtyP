@@ -5,6 +5,7 @@ which itself ought to be unified with string_tests.py (and the latter
 should be modernized).
 """
 
+from yp import *
 import os
 import re
 import sys
@@ -13,16 +14,16 @@ import functools
 import pickle
 import tempfile
 import unittest
-import test.support
-import test.string_tests
-import test.buffer_tests
+import yp_test.support
+import yp_test.string_tests
+import yp_test.buffer_tests
 
 
 if sys.flags.bytes_warning:
     def check_bytes_warnings(func):
         @functools.wraps(func)
         def wrapper(*args, **kw):
-            with test.support.check_warnings(('', BytesWarning)):
+            with yp_test.support.check_warnings(('', BytesWarning)):
                 return func(*args, **kw)
         return wrapper
 else:
@@ -38,6 +39,7 @@ class Indexable:
         return self.value
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BaseBytesTest(unittest.TestCase):
 
     def test_basics(self):
@@ -704,7 +706,7 @@ class BytesTest(BaseBytesTest):
 
     # Test PyBytes_FromFormat()
     def test_from_format(self):
-        test.support.import_module('ctypes')
+        yp_test.support.import_module('ctypes')
         from ctypes import pythonapi, py_object, c_int, c_char_p
         PyBytes_FromFormat = pythonapi.PyBytes_FromFormat
         PyBytes_FromFormat.restype = py_object
@@ -1089,6 +1091,7 @@ class ByteArrayTest(BaseBytesTest):
         self.assertEqual(b, orig)
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class AssortedBytesTest(unittest.TestCase):
     #
     # Test various combinations of bytes and bytearray
@@ -1200,7 +1203,7 @@ class AssortedBytesTest(unittest.TestCase):
     def test_compare(self):
         if sys.flags.bytes_warning:
             def bytes_warning():
-                return test.support.check_warnings(('', BytesWarning))
+                return yp_test.support.check_warnings(('', BytesWarning))
             with bytes_warning():
                 b'' == ''
             with bytes_warning():
@@ -1227,8 +1230,9 @@ class AssortedBytesTest(unittest.TestCase):
     # the rest that make sense (the code can be cleaned up to use modern
     # unittest methods at the same time).
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BytearrayPEP3137Test(unittest.TestCase,
-                       test.buffer_tests.MixinBytesBufferCommonTests):
+                       yp_test.buffer_tests.MixinBytesBufferCommonTests):
     def marshal(self, x):
         return bytearray(x)
 
@@ -1250,7 +1254,7 @@ class BytearrayPEP3137Test(unittest.TestCase,
             self.assertTrue(val is not newval,
                             expr+' returned val on a mutable object')
 
-class FixedStringTest(test.string_tests.BaseTest):
+class FixedStringTest(yp_test.string_tests.BaseTest):
 
     def fixtype(self, obj):
         if isinstance(obj, str):
@@ -1269,15 +1273,18 @@ class FixedStringTest(test.string_tests.BaseTest):
     def test_lower(self):
         pass
 
+@unittest.skip( "TODO: convert to yp.py" )
 class ByteArrayAsStringTest(FixedStringTest):
     type2test = bytearray
     contains_bytes = True
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BytesAsStringTest(FixedStringTest):
     type2test = bytes
     contains_bytes = True
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class SubclassTest(unittest.TestCase):
 
     def test_basic(self):
@@ -1371,7 +1378,7 @@ class BytesSubclassTest(SubclassTest):
 
 
 def test_main():
-    test.support.run_unittest(
+    yp_test.support.run_unittest(
         BytesTest, AssortedBytesTest, BytesAsStringTest,
         ByteArrayTest, ByteArrayAsStringTest, BytesSubclassTest,
         ByteArraySubclassTest, BytearrayPEP3137Test)

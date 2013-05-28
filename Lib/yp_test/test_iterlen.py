@@ -41,8 +41,9 @@ enumerate(iter('abc')).
 
 """
 
+from yp import *
 import unittest
-from test import support
+from yp_test import support
 from itertools import repeat
 from collections import deque
 from builtins import len as _len
@@ -60,6 +61,7 @@ def len(obj):
         except AttributeError:
             raise TypeError
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestInvariantWithoutMutations(unittest.TestCase):
 
     def test_invariant(self):
@@ -213,6 +215,7 @@ class NoneLengthHint(object):
     def __length_hint__(self):
         return None
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestLengthHintExceptions(unittest.TestCase):
 
     def test_issue1242657(self):

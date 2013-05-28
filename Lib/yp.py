@@ -6,11 +6,11 @@ yp.py - Python wrapper for nohtyP
     License: http://docs.python.org/3/license.html
 """
 
-import atexit
-atexit.register( input, "Press Enter to continue..." )
+#import atexit
+#atexit.register( input, "Press Enter to continue..." )
 
 from ctypes import *
-import sys
+import sys, weakref
 
 ypdll = cdll.nohtyP
 
@@ -22,11 +22,17 @@ c_INOUT = 3
 # Some standard C param/return types
 c_void = None # only valid for return values
 
-_yp_no_default = object( )
+# Used to signal that a particular arg has not been supplied; set to default value of such params
+_yp_arg_missing = object( )
+
+# Ensures that at most one Python object exists per nohtyP object
+_yp_pyobj_cache = weakref.WeakValueDictionary( )
+
+
 class yp_param:
-    def __init__( self, type, name, default=_yp_no_default, direction=c_IN ):
+    def __init__( self, type, name, default=_yp_arg_missing, direction=c_IN ):
         self.type = type
-        if default is _yp_no_default:
+        if default is _yp_arg_missing:
             self.pflag = (direction, name)
         else:
             self.pflag = (direction, name, default)
@@ -39,28 +45,54 @@ class yp_param:
 def yp_func_errcheck( result, func, args ):
     getattr( result, "_yp_errcheck", int )( )
     for arg in args: getattr( arg, "_yp_errcheck", int )( )
-    return args
+    if isinstance( result, c_ypObject_p ):
+        try: result = _yp_pyobj_cache[result.value] # try to use an existing object
+        except KeyError:
+            result.__class__ = ypObject._ypcode2yp[result._yp_typecode]
+            _yp_pyobj_cache[result.value] = result
+    return result
 
 def yp_func( retval, name, paramtuple, errcheck=True ):
     """Defines a function in globals() that wraps the given C yp_* function."""
     # Gather all the information that ctypes needs
     params = tuple( yp_param( *x ) for x in paramtuple )
     proto = CFUNCTYPE( retval, *(x.type for x in params) )
-    c_func = proto( (name, ypdll), tuple( x.pflag for x in params ) )
+    # XXX ctypes won't allow variable-length arguments if we pass in pflags
+    c_func = proto( (name, ypdll) )
     c_func._yp_name = "_"+name
     if errcheck: c_func.errcheck = yp_func_errcheck
 
     # Create a wrapper function to convert arguments and check for errors (because the way ctypes
     # does it doesn't work well for us...yp_func_errcheck needs the objects _after_ from_param)
-    def c_func_wrapper( *args ):
-        args = tuple( params[i].preconvert( x ) for (i, x) in enumerate( args ) )
-        return c_func( *args ) # let c_func.errcheck check for errors
+    if len( paramtuple ) > 0 and paramtuple[-1] is c_multiN_ypObject_p:
+        def c_func_wrapper( *args ):
+            fixed, extra = args[:len( params )-1], args[len( params )-1:]
+            converted = list( params[i].preconvert( x ) for (i, x) in enumerate( fixed ) )
+            converted.append( len( extra ) )
+            converted.extend( c_ypObject_p.from_param( x ) for x in extra )
+            return c_func( *converted ) # let c_func.errcheck check for errors
+
+    elif len( paramtuple ) > 0 and paramtuple[-1] is c_multiK_ypObject_p:
+        def c_func_wrapper( *args ):
+            fixed, extra = args[:len( params )-1], args[len( params )-1:]
+            assert len( extra ) % 2 == 0
+            converted = list( params[i].preconvert( x ) for (i, x) in enumerate( fixed ) )
+            converted.append( len( extra ) // 2 )
+            converted.extend( c_ypObject_p.from_param( x ) for x in extra )
+            return c_func( *converted ) # let c_func.errcheck check for errors
+
+    else:
+        def c_func_wrapper( *args ):
+            converted = tuple( params[i].preconvert( x ) for (i, x) in enumerate( args ) )
+            return c_func( *converted ) # let c_func.errcheck check for errors
     c_func_wrapper.__name__ = c_func._yp_name
     globals( )[c_func._yp_name] = c_func_wrapper
 
 
+# XXX Initialize nohtyP
 # ypAPI void yp_initialize( void );
 yp_func( c_void, "yp_initialize", (), errcheck=False )
+_yp_initialize( )
 
 # typedef struct _ypObject ypObject;
 class c_ypObject_p( c_void_p ):
@@ -70,9 +102,15 @@ class c_ypObject_p( c_void_p ):
         return ypObject.frompython( val )
     def _yp_errcheck( self ):
         ypObject_p_errcheck( self )
+    @property
+    def _yp_typecode( self ):
+        return string_at( self.value, 1 )[0]
 
 def c_ypObject_p_value( name ):
-    globals( )["_"+name] = c_ypObject_p.in_dll( ypdll, name )
+    value = c_ypObject_p.in_dll( ypdll, name )
+    value.__class__ = ypObject._ypcode2yp[value._yp_typecode]
+    _yp_pyobj_cache[value.value] = value
+    globals( )[name] = value
 
 class c_ypObject_pp( c_ypObject_p*1 ):
     def __init__( self, *args, **kwargs ):
@@ -87,15 +125,20 @@ class c_ypObject_pp( c_ypObject_p*1 ):
         ypObject_p_errcheck( self[0] )
     def __del__( self ):
         _yp_decref( self[0] )
-        self[0] = _yp_None
+        self[0] = yp_None
         #super( ).__del__( self ) # no __del__ method?!
 
 
 # ypAPI ypObject *yp_None;
-c_ypObject_p_value( "yp_None" )
+
+# Special-case arguments
+c_ypObject_pp_exc = (c_ypObject_pp, "exc", None)
+c_multiN_ypObject_p = (c_int, "n", 0)
+c_multiK_ypObject_p = (c_int, "n", 0)
+assert c_multiN_ypObject_p is not c_multiK_ypObject_p
 
 # ypAPI ypObject *yp_incref( ypObject *x );
-yp_func( c_ypObject_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
+yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_increfN( int n, ... );
 # void yp_increfV( int n, va_list args );
@@ -115,16 +158,22 @@ yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False )
 # void yp_deepfreeze( ypObject **x );
 
 # ypObject *yp_unfrozen_copy( ypObject *x );
+yp_func( c_ypObject_p, "yp_unfrozen_copy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_unfrozen_deepcopy( ypObject *x );
+yp_func( c_ypObject_p, "yp_unfrozen_deepcopy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_frozen_copy( ypObject *x );
+yp_func( c_ypObject_p, "yp_frozen_copy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_frozen_deepcopy( ypObject *x );
+yp_func( c_ypObject_p, "yp_frozen_deepcopy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_copy( ypObject *x );
+yp_func( c_ypObject_p, "yp_copy", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_deepcopy( ypObject *x );
+yp_func( c_ypObject_p, "yp_deepcopy", ((c_ypObject_p, "x"), ) )
 
 # void yp_invalidate( ypObject **x );
 
@@ -132,9 +181,7 @@ yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False )
 
 
 # ypObject *yp_True;
-c_ypObject_p_value( "yp_True" )
 # ypObject *yp_False;
-c_ypObject_p_value( "yp_False" )
 
 # ypObject *yp_bool( ypObject *x );
 yp_func( c_ypObject_p, "yp_bool", ((c_ypObject_p, "x"), ) )
@@ -178,22 +225,22 @@ yp_func( c_ypObject_p, "yp_gt", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 
 
 #typedef float               yp_float32_t;
-class c_yp_float32_t( c_float ): pass
+c_yp_float32_t = c_float
 #typedef double              yp_float64_t;
-class c_yp_float64_t( c_double ): pass
+c_yp_float64_t = c_double
 #if SIZE_MAX == 0xFFFFFFFFu
 #typedef yp_int32_t          yp_ssize_t;
 #else
 #typedef yp_int64_t          yp_ssize_t;
 #endif
-class c_yp_ssize_t( c_ssize_t ): pass
+c_yp_ssize_t = c_ssize_t
 #typedef yp_ssize_t          yp_hash_t;
-class c_yp_hash_t( c_yp_ssize_t ): pass
+c_yp_hash_t = c_yp_ssize_t
 
 # typedef yp_int64_t      yp_int_t;
-class c_yp_int_t( c_int64 ): pass
+c_yp_int_t = c_int64
 # typedef yp_float64_t    yp_float_t;
-class c_yp_float_t( c_yp_float64_t ): pass
+c_yp_float_t = c_yp_float64_t
 
 # typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 # XXX The return value needs to be a c_void_p to prevent addresses-as-ints from being converted to
@@ -228,19 +275,39 @@ yp_func( c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ) )
 #         void *state, yp_ssize_t size, int n, va_list args );
 yp_func( c_ypObject_p, "yp_generator_fromstructCN",
         ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"),
-            (c_void_p, "state"), (c_yp_ssize_t, "size"), (c_int, "n", 0)) )
+            (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p) )
 
 # ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
 # ypObject *yp_rangeC( yp_int_t stop );
 
 # ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len );
+yp_func( c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
 # ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len );
+yp_func( c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
 
-# XXX The str/characterarray types will be added in a future version
+# ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+#         ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_str_frombytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
+# ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+#         ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_chrarray_frombytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
+
+# ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors );
+# ypObject *yp_chrarray3( ypObject *object, ypObject *encoding, ypObject *errors );
+
+# ypObject *yp_str( ypObject *object );
+# ypObject *yp_chrarray( ypObject *object );
+
+# ypObject *yp_str0( void );
+# ypObject *yp_chrarray0( void );
 
 # ypObject *yp_chrC( yp_int_t i );
 
 # ypObject *yp_tupleN( int n, ... );
+yp_func( c_ypObject_p, "yp_tupleN", (c_multiN_ypObject_p, ) )
+
 # ypObject *yp_tupleV( int n, va_list args );
 # ypObject *yp_listN( int n, ... );
 # ypObject *yp_listV( int n, va_list args );
@@ -251,7 +318,9 @@ yp_func( c_ypObject_p, "yp_generator_fromstructCN",
 # ypObject *yp_list_repeatCV( yp_ssize_t factor, int n, va_list args );
 
 # ypObject *yp_tuple( ypObject *iterable );
+yp_func( c_ypObject_p, "yp_tuple", ((c_ypObject_p, "iterable"), ) )
 # ypObject *yp_list( ypObject *iterable );
+yp_func( c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ) )
 
 # typedef ypObject *(*yp_sort_key_func_t)( ypObject *x );
 # ypObject *yp_sorted3( ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse );
@@ -260,20 +329,21 @@ yp_func( c_ypObject_p, "yp_generator_fromstructCN",
 
 # ypObject *yp_frozensetN( int n, ... );
 # ypObject *yp_frozensetV( int n, va_list args );
-yp_func( c_ypObject_p, "yp_frozensetN", ((c_int, "n"), ) ) # FIXME
+yp_func( c_ypObject_p, "yp_frozensetN", (c_multiN_ypObject_p, ) )
 # ypObject *yp_setN( int n, ... );
 # ypObject *yp_setV( int n, va_list args );
-yp_func( c_ypObject_p, "yp_setN", ((c_int, "n"), ) ) # FIXME
+yp_func( c_ypObject_p, "yp_setN", (c_multiN_ypObject_p, ) )
 
 # ypObject *yp_frozenset( ypObject *iterable );
-yp_func( c_ypObject_p, "yp_frozenset", ((c_ypObject_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_frozenset", ((c_ypObject_p, "iterable"), ) )
 # ypObject *yp_set( ypObject *iterable );
-yp_func( c_ypObject_p, "yp_set", ((c_ypObject_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_set", ((c_ypObject_p, "iterable"), ) )
 
 # ypObject *yp_frozendictK( int n, ... );
 # ypObject *yp_frozendictKV( int n, va_list args );
 # ypObject *yp_dictK( int n, ... );
 # ypObject *yp_dictKV( int n, va_list args );
+yp_func( c_ypObject_p, "yp_dictK", (c_multiK_ypObject_p, ) )
 
 # ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... );
 # ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args );
@@ -289,19 +359,22 @@ yp_func( c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ) )
 
 
 # yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
+yp_func( c_yp_hash_t, "yp_hashC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 
 # yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
 
-# ypObject *yp_send( ypObject **iterator, ypObject *value );
+# ypObject *yp_send( ypObject *iterator, ypObject *value );
 
-# ypObject *yp_next( ypObject **iterator );
+# ypObject *yp_next( ypObject *iterator );
+yp_func( c_ypObject_p, "yp_next", ((c_ypObject_p, "iterator"), ) )
 
-# ypObject *yp_next2( ypObject **iterator, ypObject *defval );
+# ypObject *yp_next2( ypObject *iterator, ypObject *defval );
 
-# ypObject *yp_throw( ypObject **iterator, ypObject *exc );
+# ypObject *yp_throw( ypObject *iterator, ypObject *exc );
 
 # yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc) )
 
 # ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size );
 
@@ -343,12 +416,16 @@ yp_func( c_ypObject_p, "yp_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container"
 yp_func( c_ypObject_p, "yp_not_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")) )
 
 # yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc) )
 
 # void yp_push( ypObject **container, ypObject *x );
+yp_func( c_void, "yp_push", ((c_ypObject_pp, "container"), (c_ypObject_p, "x")) )
 
 # void yp_clear( ypObject **container );
+yp_func( c_void, "yp_clear", ((c_ypObject_pp, "container"), ) )
 
 # ypObject *yp_pop( ypObject **container );
+yp_func( c_ypObject_p, "yp_pop", ((c_ypObject_pp, "container"), ) )
 
 
 # ypObject *yp_concat( ypObject *sequence, ypObject *x );
@@ -391,6 +468,7 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 
 # void yp_append( ypObject **sequence, ypObject *x );
 # void yp_push( ypObject **sequence, ypObject *x );
+yp_func( c_void, "yp_append", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")) )
 
 # void yp_extend( ypObject **sequence, ypObject *t );
 
@@ -403,6 +481,7 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 # ypObject *yp_pop( ypObject **sequence );
 
 # void yp_remove( ypObject **sequence, ypObject *x );
+yp_func( c_void, "yp_remove", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")) )
 
 # void yp_reverse( ypObject **sequence );
 
@@ -414,80 +493,122 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 #define yp_SLICE_USELEN  yp_SSIZE_T_MAX
 
 # ypObject *yp_isdisjoint( ypObject *set, ypObject *x );
+yp_func( c_ypObject_p, "yp_isdisjoint", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_issubset( ypObject *set, ypObject *x );
+yp_func( c_ypObject_p, "yp_issubset", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_lt( ypObject *set, ypObject *x );
 
 # ypObject *yp_issuperset( ypObject *set, ypObject *x );
+yp_func( c_ypObject_p, "yp_issuperset", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_gt( ypObject *set, ypObject *x );
 
 # ypObject *yp_unionN( ypObject *set, int n, ... );
 # ypObject *yp_unionV( ypObject *set, int n, va_list args );
+yp_func( c_ypObject_p, "yp_unionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_intersectionN( ypObject *set, int n, ... );
 # ypObject *yp_intersectionV( ypObject *set, int n, va_list args );
+yp_func( c_ypObject_p, "yp_intersectionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_differenceN( ypObject *set, int n, ... );
 # ypObject *yp_differenceV( ypObject *set, int n, va_list args );
+yp_func( c_ypObject_p, "yp_differenceN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_symmetric_difference( ypObject *set, ypObject *x );
+yp_func( c_ypObject_p, "yp_symmetric_difference", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # void yp_updateN( ypObject **set, int n, ... );
 # void yp_updateV( ypObject **set, int n, va_list args );
+yp_func( c_void, "yp_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_intersection_updateN( ypObject **set, int n, ... );
 # void yp_intersection_updateV( ypObject **set, int n, va_list args );
+yp_func( c_void, "yp_intersection_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_difference_updateN( ypObject **set, int n, ... );
 # void yp_difference_updateV( ypObject **set, int n, va_list args );
+yp_func( c_void, "yp_difference_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_symmetric_difference_update( ypObject **set, ypObject *x );
+yp_func( c_void, "yp_symmetric_difference_update", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # void yp_push( ypObject **set, ypObject *x );
 # void yp_set_add( ypObject **set, ypObject *x );
 yp_func( c_void, "yp_set_add", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_pushuniqueE( ypObject **set, ypObject *x );
+yp_func( c_void, "yp_pushuniqueE", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # void yp_remove( ypObject **set, ypObject *x );
+# (declared above)
 
 # void yp_discard( ypObject **set, ypObject *x );
+yp_func( c_void, "yp_discard", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_pop( ypObject **set );
 
 
 # ypObject *yp_getitem( ypObject *mapping, ypObject *key );
+yp_func( c_ypObject_p, "yp_getitem", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key")) )
 
 # void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x );
+yp_func( c_void, "yp_setitem", 
+        ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "x")) )
 
 # void yp_delitem( ypObject **mapping, ypObject *key );
+yp_func( c_void, "yp_delitem", ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key")) )
 
 # ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval );
+yp_func( c_ypObject_p, "yp_getdefault", 
+        ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")) )
 
 # ypObject *yp_iter_items( ypObject *mapping );
+yp_func( c_ypObject_p, "yp_iter_items", ((c_ypObject_p, "mapping"), ) )
 
 # ypObject *yp_iter_keys( ypObject *mapping );
+yp_func( c_ypObject_p, "yp_iter_keys", ((c_ypObject_p, "mapping"), ) )
 
 # ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
 
 # void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 
-# ypObject *yp_setdefault( ypObject *mapping, ypObject *key, ypObject *defval );
+# ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval );
+yp_func( c_ypObject_p, "yp_setdefault", 
+        ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")) )
 
 # void yp_updateK( ypObject **mapping, int n, ... );
 # void yp_updateKV( ypObject **mapping, int n, va_list args );
+yp_func( c_void, "yp_updateK", ((c_ypObject_pp, "mapping"), c_multiK_ypObject_p) )
 
 # void yp_updateN( ypObject **mapping, int n, ... );
 # void yp_updateV( ypObject **mapping, int n, va_list args );
 
 # ypObject *yp_iter_values( ypObject *mapping );
+yp_func( c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ) )
 
 
-# XXX bytes- and str-specific methods will be added in a future version
+# ypObject *yp_s_ascii;     // "ascii"
+# ypObject *yp_s_latin_1;   // "latin_1"
+# ypObject *yp_s_utf_32;    // "utf_32"
+# ypObject *yp_s_utf_32_be; // "utf_32_be"
+# ypObject *yp_s_utf_32_le; // "utf_32_le"
+# ypObject *yp_s_utf_16;    // "utf_16"
+# ypObject *yp_s_utf_16_be; // "utf_16_be"
+# ypObject *yp_s_utf_16_le; // "utf_16_le"
+# ypObject *yp_s_utf_8;     // "utf_8"
+
+# ypObject *yp_s_strict;    // "strict"
+# ypObject *yp_s_ignore;    // "ignore"
+# ypObject *yp_s_replace;   // "replace"
+
+# XXX Additional bytes- and str-specific methods will be added in a future version
+
 
 # ypObject *yp_add( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_add", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_sub( ypObject *x, ypObject *y );
 # ypObject *yp_mul( ypObject *x, ypObject *y );
 # ypObject *yp_truediv( ypObject *x, ypObject *y );
@@ -615,10 +736,11 @@ yp_func( c_void, "yp_set_add", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 
 _ypExc2py = {}
 _pyExc2yp = {}
-def ypObject_p_exception( name, pyExc ):
+def ypObject_p_exception( name, pyExc, *, one_to_one=True ):
+    """Use one_to_one=False when pyExc should not be mapped back to the nohtyP exception."""
     ypExc = c_ypObject_p.in_dll( ypdll, name )
     _ypExc2py[ypExc.value] = (name, pyExc)
-    _pyExc2yp[pyExc] = ypExc
+    if one_to_one: _pyExc2yp[pyExc] = ypExc
     globals( )["_"+name] = ypExc
 
 ypObject_p_exception( "yp_BaseException", BaseException )
@@ -655,11 +777,11 @@ ypObject_p_exception( "yp_ZeroDivisionError", ZeroDivisionError )
 ypObject_p_exception( "yp_BufferError", BufferError )
 
 # Raised when the object does not support the given method; subexception of yp_AttributeError
-ypObject_p_exception( "yp_MethodError", AttributeError )
+ypObject_p_exception( "yp_MethodError", AttributeError, one_to_one=False )
 # Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError
-ypObject_p_exception( "yp_SystemLimitationError", SystemError )
+ypObject_p_exception( "yp_SystemLimitationError", SystemError, one_to_one=False )
 # Raised when an invalidated object is passed to a function; subexception of yp_TypeError
-ypObject_p_exception( "yp_InvalidatedError", TypeError )
+ypObject_p_exception( "yp_InvalidatedError", TypeError, one_to_one=False )
 
 def ypObject_p_errcheck( x ):
     """Raises the appropriate Python exception if x is a nohtyP exception"""
@@ -674,15 +796,19 @@ yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc"))
 
 
 class ypObject( c_ypObject_p ):
-    def __init__( self ):
-        raise NotImplementedError( "can't instantiate ypObject directly" )
+    def __new__( cls ):
+        if cls is ypObject: raise NotImplementedError( "can't instantiate ypObject directly" )
+        return super( ).__new__( cls )
+    def __init__( self, *args, **kwargs ): pass
     def __del__( self ):
-        # FIXME It seems that _yp_decref and _yp_None gets set to None when Python is closing
+        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing
         try: _yp_decref( self )
         except: pass
-        try: self.value = _yp_None.value
-        except: self.value = 0
+        return # FIXME Causing a Segmentation Fault sometimes?!?!
+        try: self.value = yp_None.value
+        except: pass
     _pytype2yp = {}
+    _ypcode2yp = {}
     @classmethod
     def frompython( cls, pyobj ):
         """ypObject.frompython is a factory that returns the correct yp_* object based on the type
@@ -697,103 +823,272 @@ class ypObject( c_ypObject_p ):
         # TODO if every class uses the default _frompython, then remove it, it's not needed
         return cls( pyobj )
 
-    def __contains__( self, x ): return yp_bool( _yp_contains( self, x ) )
-# TODO will this work if _yp_bool returns an exception?
-    def __bool__( self ): return bool( yp_bool( self ) )
+    def copy( self ): return _yp_copy( self )
 
-def pytype( pytype ):
+    # TODO will this work if yp_bool returns an exception?
+    def __bool__( self ): return bool( yp_bool( self ) )
+    def __lt__( self, other ): return _yp_lt( self, other )
+    def __le__( self, other ): return _yp_le( self, other )
+    def __eq__( self, other ): return _yp_eq( self, other )
+    def __ne__( self, other ): return _yp_ne( self, other )
+    def __ge__( self, other ): return _yp_ge( self, other )
+    def __gt__( self, other ): return _yp_gt( self, other )
+
+    def __iter__( self ): return _yp_iter( self )
+
+    def __hash__( self ): return _yp_hashC( self, yp_None )
+
+    def __next__( self ): return _yp_next( self )
+
+    def __contains__( self, x ): return _yp_contains( self, x )
+    def __len__( self ): return _yp_lenC( self, yp_None )
+    def push( self, x ): _yp_push( self, x )
+    def clear( self ): _yp_clear( self )
+    def pop( self ): return _yp_pop( self )
+
+    def isdisjoint( self, other ): return _yp_isdisjoint( self, other )
+    def issubset( self, other ): return _yp_issubset( self, other )
+    def issuperset( self, other ): return _yp_issuperset( self, other )
+    def union( self, *others ): return _yp_unionN( self, *others )
+    def intersection( self, *others ): return _yp_intersectionN( self, *others )
+    def difference( self, *others ):  return _yp_differenceN( self, *others )
+    def symmetric_difference( self, other ): return _yp_symmetric_difference( self, other )
+    def update( self, *others ): _yp_updateN( self, *others )
+    def intersection_update( self, *others ): _yp_intersection_updateN( self, *others )
+    def difference_update( self, *others ): _yp_difference_updateN( self, *others )
+    def symmetric_difference_update( self, other ): _yp_symmetric_difference_update( self, other )
+    def remove( self, elem ): _yp_remove( self, elem )
+    def discard( self, elem ): _yp_discard( self, elem )
+
+    def __getitem__( self, key ): return _yp_getitem( self, key )
+    def __setitem__( self, key, value ): _yp_setitem( self, key, value )
+    def __delitem__( self, key ): _yp_delitem( self, key )
+    def get( self, key, defval=None ): return _yp_getdefault( self, key, defval )
+    def setdefault( self, key, defval=None ): return _yp_setdefault( self, key, defval )
+
+    def __add__( self, other ): return _yp_add( self, other )
+
+def pytype( pytypes, ypcode ):
+    if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
     def _pytype( cls ):
-        ypObject._pytype2yp[pytype] = cls
+        for pytype in pytypes:
+            ypObject._pytype2yp[pytype] = cls
+        ypObject._ypcode2yp[ypcode] = cls
         return cls
     return _pytype
 
-@pytype( bool )
+@pytype( type( None ), 6 )
+class yp_NoneType( ypObject ):
+    def __new__( cls ): raise NotImplementedError( "can't instantiate yp_NoneType directly" )
+    @classmethod
+    def _frompython( cls, pyobj ):
+        assert pyobj is None
+        return yp_None
+c_ypObject_p_value( "yp_None" )
+
+@pytype( bool, 8 )
 class yp_bool( ypObject ):
-    def __new__( cls, x=_yp_False, *, _value=None ):
-        """_value is for internal use only."""
-        if _value is not None:
-            self = super( ).__new__( cls )
-            self.value = _value
-            return self
-        elif isinstance( x, c_ypObject_p ):
-            x = _yp_bool( x )
-            if x.value == _yp_True.value: return yp_True
-            if x.value == _yp_False.value: return yp_False
-            raise TypeError( "unexpected return from _yp_bool %r" % x )
+    def __new__( cls, x=False ):
+        if isinstance( x, c_ypObject_p ):
+            return _yp_bool( x )
         else:
             return yp_True if x else yp_False
-    def __init__( self, *args, **kwargs ):
-        """For internal use only."""
         pass
-    def __bool__( self ): return self.value == _yp_True.value
-yp_True = yp_bool( _value=_yp_True.value )
-yp_False = yp_bool( _value=_yp_False.value )
+    def __bool__( self ): return self.value == yp_True.value
+    def __lt__( self, other ): return bool( self ) <  other
+    def __le__( self, other ): return bool( self ) <= other
+    def __eq__( self, other ): return bool( self ) == other
+    def __ne__( self, other ): return bool( self ) != other
+    def __ge__( self, other ): return bool( self ) >= other
+    def __gt__( self, other ): return bool( self ) >  other
+c_ypObject_p_value( "yp_True" )
+c_ypObject_p_value( "yp_False" )
 
+@pytype( (iter, type(x for x in ())), 15 )
 class yp_iter( ypObject ):
     def _pygenerator_func( self, yp_self, yp_value ):
         try:
             if _yp_isexceptionC( yp_value ):
                 result = yp_value # yp_GeneratorExit, in particular
             else:
-                result = ypObject.frompython( next( self.pyiter ) )
+                py_result = next( self._pyiter )
+                result = ypObject.frompython( py_result )
         except BaseException as e:
             result = _pyExc2yp[type( e )]
-        # If we just try to return result here, ctypes gets confused (TODO bug?)
-        return result.value
+        return _yp_incref( result )
 
-    _no_sentinel = object( )
-    def __init__( self, object, sentinel=_no_sentinel ):
-        if sentinel is not yp_iter._no_sentinel: object = iter( object, sentinel )
-        if isinstance( object, ypObject ):
-            self.value = _yp_iter( object ).value
-            return
+    def __new__( cls, object, sentinel=_yp_arg_missing ):
+        if sentinel is not _yp_arg_missing: object = iter( object, sentinel )
+        if isinstance( object, ypObject ): return _yp_iter( object )
 
         try: lenhint = len( object )
         except: lenhint = 0 # TODO try Python's lenhint?
-        self.pyiter = iter( object )
-        self.pycallback = c_yp_generator_func_t( self._pygenerator_func )
-        self.value = _yp_generator_fromstructCN( self.pycallback, lenhint, 0, 0, 0 ).value
+        self = super( ).__new__( cls )
+        self._pyiter = iter( object )
+        self._pycallback = c_yp_generator_func_t( self._pygenerator_func )
+        self.value = _yp_incref( _yp_generator_fromstructCN( self._pycallback, lenhint, 0, 0 ) )
+        return self
 
-def yp_iterable( iterable ):
+    def __iter__( self ): return self
+    def __length_hint__( self ): return _yp_iter_lenhintC( self, yp_None )
+
+def _yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
-    if isinstance( iterable, ypObject ): return iterable
+    if isinstance( iterable, c_ypObject_p ): return iterable
+    if isinstance( iterable, str ): return yp_str( iterable )
     return yp_iter( iterable )
 
-@pytype( int )
+@pytype( int, 10 )
 class yp_int( ypObject ):
-    def __init__( self, x=0, base=None ):
+    def __new__( cls, x=0, base=None ):
         if base is None:
-            try: self.value = _yp_intC( x ).value # TODO can I get rid of .value?
+            try: return _yp_intC( x )
             except TypeError: pass
-            else: return
             base = 10
-        self.value = _yp_int_strC( x, base ).value
+        raise NotImplementedError
 
-@pytype( set )
-class yp_set( ypObject ):
-    def __init__( self, iterable=iter( () ) ): # TODO default to a yp_iter
-        iterable = yp_iterable( iterable )
-        self.value = _yp_set( iterable ).value
+# FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
+# FIXME Just generally move more of this logic into nohtyP, when available
+@pytype( bytes, 16 )
+class yp_bytes( ypObject ):
+    def __new__( cls, source=0, encoding=None, errors=None ):
+        if isinstance( source, (bytes, bytearray) ):
+            return _yp_bytesC( source, len( source ) )
+        elif isinstance( source, str ):
+            raise NotImplementedError
+        elif isinstance( source, (int, yp_int) ):
+            return _yp_bytesC( None, source )
+        # else if it has the buffer interface
+        # else if it is an iterable
+        else:
+            raise TypeError( type( source ) )
 
-    def add( self, x ): _yp_set_add( self, x )
+# FIXME When nohtyP has types that have string representations, update this
+# FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
+# FIXME Just generally move more of this logic into nohtyP, when available
+@pytype( str, 18 )
+class yp_str( ypObject ):
+    def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
+        if encoding is _yp_arg_missing and errors is _yp_arg_missing:
+            if object is _yp_arg_missing: 
+                return _yp_str_frombytesC( None, 0, yp_s_latin_1, yp_s_strict )
+            encoded = str( object ).encode( "latin-1" )
+            return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
+        else:
+            raise NotImplementedError
+c_ypObject_p_value( "yp_s_ascii" )
+c_ypObject_p_value( "yp_s_latin_1" )
+c_ypObject_p_value( "yp_s_strict" )
+
+class _ypTuple( ypObject ):
+    # nohtyP currently doesn't overload yp_add et al, but Python expects this
+    def __add__( self, other ): return _yp_concat( self, other )
+
+@pytype( tuple, 20 )
+class yp_tuple( _ypTuple ):
+    def __new__( cls, iterable=_yp_arg_missing ):
+        if iterable is _yp_arg_missing: return _yp_tupleN( )
+        return _yp_tuple( _yp_iterable( iterable ) )
+_yp_tuple_empty = yp_tuple( )
+
+@pytype( list, 21 )
+class yp_list( _ypTuple ):
+    def __new__( cls, iterable=_yp_tuple_empty ):
+        return _yp_list( _yp_iterable( iterable ) )
+
+class _ypSet( ypObject ):
+    def __new__( cls, iterable=_yp_tuple_empty ):
+        return cls._ypSet_constructor( _yp_iterable( iterable ) )
+    def __or__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        return _yp_unionN( self, other )
+    def __and__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        return _yp_intersectionN( self, other )
+    def __sub__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        return _yp_differenceN( self, other )
+    def __xor__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        return _yp_symmetric_difference( self, other )
+    def __ior__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        _yp_updateN( self, other )
+        return self
+    def __iand__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        _yp_intersection_updateN( self, other )
+        return self
+    def __isub__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        _yp_difference_updateN( self, other )
+        return self
+    def __ixor__( self, other ):
+        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        _yp_symmetric_difference_update( self, other )
+        return self
+    def add( self, elem ): _yp_set_add( self, elem )
+
+@pytype( frozenset, 22 )
+class yp_frozenset( _ypSet ):
+    _ypSet_constructor = _yp_frozenset
+
+@pytype( set, 23 )
+class yp_set( _ypSet ):
+    _ypSet_constructor = _yp_set
+
+# Python dict objects need to be passed through this then sent to the "K" version of the function;
+# all other objects can be converted to nohtyP and passed in thusly
+def _yp_flatten_dict( args ):
+    items = args.items( )
+    retval = []
+    for item in items:
+        assert len( item ) == 2
+        retval.extend( item )
+    return retval
+
+# TODO If nohtyP ever supports "dict view" objects, replace these faked-out versions
+class yp_dict_keys:
+    def __init__( self, mp ): self.mp = mp
+    def __iter__( self ): return _yp_iter_keys( self.mp )
+class yp_dict_values:
+    def __init__( self, mp ): self.mp = mp
+    def __iter__( self ): return _yp_iter_values( self.mp )
+class yp_dict_items:
+    def __init__( self, mp ): self.mp = mp
+    def __iter__( self ): return _yp_iter_items( self.mp )
+
+@pytype( dict, 25 )
+class yp_dict( ypObject ):
+    def __new__( cls, *args, **kwargs ):
+        if len( args ) == 0:
+            return _yp_dictK( *_yp_flatten_dict( kwargs ) )
+        if len( args ) > 1:
+            raise TypeError( "yp_dict expected at most 1 arguments, got %d" % len( args ) )
+        if isinstance( args[0], dict ):
+            self = _yp_dictK( *_yp_flatten_dict( args[0] ) )
+        else:
+            self = _yp_dict( args[0] )
+        if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
+        return self
+    def keys( self ): return yp_dict_keys( self )
+    def values( self ): return yp_dict_values( self )
+    def items( self ): return yp_dict_items( self )
 
 
-
-_yp_initialize( )
-
-so = yp_set( )
-so.add( 5 )
-assert 5 in so
-assert 50 not in so
+#so = yp_set( )
+#so.add( 5 )
+#assert 5 in so
+#assert 50 not in so
 
 #import pdb; pdb.set_trace()
-try: _yp_set_add( yp_int( 5 ), 5 )
-except TypeError: pass
-except: raise AssertionError( "should have raised TypeError" )
-else: raise AssertionError( "should have failed" )
+#try: _yp_set_add( yp_int( 5 ), 5 )
+#except TypeError: pass
+#except: raise AssertionError( "should have raised TypeError" )
+#else: raise AssertionError( "should have failed" )
 
-del so # FIXME how can we ensure so gets cleaned up at the end, before ctypes?
+#del so # FIXME how can we ensure so gets cleaned up at the end, before ctypes?
 
 # FIXME integrate this somehow with unittest
 #import os

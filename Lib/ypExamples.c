@@ -5,6 +5,7 @@
  *      License: http://docs.python.org/3/license.html
  */
 
+#define yp_FUTURE // FIXME where to put this?
 #include "nohtyP.h"
 #include <stdio.h>
 #include <process.h> // FIXME for system

@@ -1,7 +1,8 @@
 # Test iterators.
 
+from yp import *
 import unittest
-from test.support import run_unittest, TESTFN, unlink, cpython_only
+from yp_test.support import run_unittest, TESTFN, unlink, cpython_only
 import pickle
 import collections.abc
 
@@ -50,6 +51,7 @@ class SequenceClass:
 
 # Main test suite
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestCase(unittest.TestCase):
 
     # Helper to check that an iterator returns a given sequence

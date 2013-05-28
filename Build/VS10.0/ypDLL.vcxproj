@@ -53,6 +53,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>yp_ENABLE_SHARED;yp_BUILD_CORE;WIN32;_DEBUG;_WINDOWS;_USRDLL;YPDLL_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <SmallerTypeCheck>true</SmallerTypeCheck>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

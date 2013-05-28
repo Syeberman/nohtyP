@@ -1,6 +1,7 @@
 # Python test set -- built-in functions
 
-import test.support, unittest
+from yp import *
+import yp_test.support, unittest
 import sys
 import pickle
 import itertools
@@ -20,6 +21,7 @@ def pyrange_reversed(start, stop, step):
     return pyrange(stop - step, start - step, -step)
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class RangeTest(unittest.TestCase):
     def assert_iterators_equal(self, xs, ys, test_id, limit=None):
         # check that an iterator xs matches the expected results ys,
@@ -612,7 +614,7 @@ class RangeTest(unittest.TestCase):
             del rangeobj.step
 
 def test_main():
-    test.support.run_unittest(RangeTest)
+    yp_test.support.run_unittest(RangeTest)
 
 if __name__ == "__main__":
     test_main()

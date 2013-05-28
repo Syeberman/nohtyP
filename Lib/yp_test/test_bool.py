@@ -1,10 +1,12 @@
 # Test properties of bool promised by PEP 285
 
+from yp import *
 import unittest
-from test import support
+from yp_test import support
 
 import os
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BoolTest(unittest.TestCase):
 
     def test_subclass(self):
