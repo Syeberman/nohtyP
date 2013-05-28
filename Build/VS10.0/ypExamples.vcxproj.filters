@@ -15,12 +15,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\nohtyP.h">
+    <ClInclude Include="..\..\nohtyP.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Extras\ypExamples.c">
+    <ClCompile Include="..\..\Lib\ypExamples.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
