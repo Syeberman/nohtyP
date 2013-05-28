@@ -1,7 +1,10 @@
+from yp import *
 import sys
-from test import support, list_tests
+from yp_test import support, list_tests
 import pickle
+import unittest
 
+@unittest.skip( "TODO: convert to yp.py" )
 class ListTest(list_tests.CommonTest):
     type2test = list
 

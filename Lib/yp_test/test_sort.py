@@ -1,4 +1,5 @@
-from test import support
+from yp import *
+from yp_test import support
 import random
 import sys
 import unittest
@@ -40,6 +41,7 @@ def check(tag, expected, raw, compare=None):
             nerrors += 1
             return
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestBase(unittest.TestCase):
     def testStressfully(self):
         # Try a variety of sizes at and around powers of 2, and at powers of 10.
@@ -131,6 +133,7 @@ class TestBase(unittest.TestCase):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestBugs(unittest.TestCase):
 
     def test_bug453523(self):
@@ -168,6 +171,7 @@ class TestBugs(unittest.TestCase):
 
 #==============================================================================
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestDecorateSortUndecorate(unittest.TestCase):
 
     def test_decorated(self):

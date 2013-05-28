@@ -1,8 +1,11 @@
-from test import support, seq_tests
+from yp import *
+from yp_test import support, seq_tests
 
 import gc
 import pickle
+import unittest
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TupleTest(seq_tests.CommonTest):
     type2test = tuple
 

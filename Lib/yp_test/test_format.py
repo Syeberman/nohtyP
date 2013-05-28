@@ -1,7 +1,8 @@
-from test.support import verbose, TestFailed
+from yp import *
+from yp_test.support import verbose, TestFailed
 import locale
 import sys
-import test.support as support
+import yp_test.support as support
 import unittest
 
 maxsize = support.MAX_Py_ssize_t
@@ -47,6 +48,7 @@ def testformat(formatstr, args, output=None, limit=None, overflowok=False):
                 print('yes')
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class FormatTest(unittest.TestCase):
     def test_format(self):
         testformat("%.1d", (1,), "1")

@@ -1,7 +1,8 @@
+from yp import *
 import sys
 
 import unittest
-from test.support import run_unittest
+from yp_test.support import run_unittest
 
 L = [
         ('0', 0),
@@ -24,6 +25,7 @@ L = [
         ("\u0200", ValueError)
 ]
 
+@unittest.skip( "TODO: convert to yp.py" )
 class IntTestCases(unittest.TestCase):
 
     def test_basic(self):
