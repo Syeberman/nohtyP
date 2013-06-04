@@ -1,6 +1,6 @@
 """
 yp.py - Python wrapper for nohtyP
-    http://nohtyp.wordpress.com    [v0.1.0 $Change$]
+    http://bitbucket.org/Syeberman/nohtyp   [v0.1.0 $Change$]
     Copyright © 2001-2013 Python Software Foundation; All Rights Reserved
 
     License: http://docs.python.org/3/license.html

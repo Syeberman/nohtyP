@@ -1,13 +1,13 @@
 /*
  * nohtyP.h - A Python-like API for C, in one .c and one .h
- *      http://nohtyp.wordpress.com    [v0.1.0 $Change$]
+ *      http://bitbucket.org/Syeberman/nohtyp   [v0.1.0 $Change$]
  *      Copyright © 2001-2013 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  *
  * The goal of nohtyP is to enable Python-like code to be written in C.  It is patterned after
  * Python's built-in API, then adjusted for expected usage patterns.  It also borrows ideas from
  * Python's own C API.  To be as portable as possible, it is written in one .c and one .h file and
- * attempts to rely strictly on standard C.  The documentation below is complete, but brief; more
+ * is tested against multiple compilers.  The documentation below is complete, but brief; more
  * detailed documentation can be found at http://docs.python.org/3/.
  *
  * Most functions borrow inputs, create their own references, and output new references.  Errors
