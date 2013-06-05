@@ -105,7 +105,7 @@ ypAPI void yp_initialize( void );
 // nohtyP objects are only accessed through pointers to ypObject.
 typedef struct _ypObject ypObject;
 
-// The null-reference object.
+// The immortal, null-reference object.
 ypAPI ypObject * const yp_None;
 
 // Increments the reference count of x, returning it as a convenience.  Always succeeds; if x is
@@ -180,7 +180,7 @@ ypAPI void yp_deepinvalidate( ypObject **x );
  * Boolean Operations and Comparisons
  */
 
-// There are exactly two boolean values: yp_True and yp_False.
+// There are exactly two boolean values, both immortal: yp_True and yp_False.
 ypAPI ypObject * const yp_True;
 ypAPI ypObject * const yp_False;
 
@@ -272,6 +272,8 @@ typedef yp_ssize_t          yp_hash_t;
 
 // C types used to represent the numeric objects within nohtyP
 typedef yp_int64_t      yp_int_t;
+#define yp_INT_T_MAX LLONG_MAX
+#define yp_INT_T_MIN LLONG_MIN
 typedef yp_float64_t    yp_float_t;
 
 // The signature of a function that can be wrapped up in a generator, called by yp_send and
@@ -1029,6 +1031,10 @@ ypAPI ypObject *yp_sumV( int n, va_list args );
 // Sums the items of iterable and returns the total.
 ypAPI ypObject *yp_sum( ypObject *iterable );
 
+// The maximum and minimum integer values, as immortal objects.
+ypAPI ypObject * const yp_sys_maxint;
+ypAPI ypObject * const yp_sys_minint;
+
 
 /*
  * Mini Iterators
@@ -1066,6 +1072,18 @@ ypAPI ypObject *yp_miniiter_next( ypObject *mi, yp_uint64_t *state );
 // Returns a hint as to how many items are left to be yielded.  See yp_iter_lenhintC for additional
 // information.  Returns zero and sets *exc on error.
 ypAPI yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **exc );
+
+
+/*
+ * Compound Operations
+ */
+
+// Certain operations tend to be chained together, for example retrieving a value from a container
+// and converting it to C.  The following functions are provided for your convenience to simplify
+// such code (particularly around reference counting).
+
+// Like: yp_asintC( yp_getitem( container, key, ), exc )
+ypAPI yp_int_t yp_asintC_getitem( ypObject *container, ypObject *key, ypObject **exc );
 
 
 /*
@@ -1152,6 +1170,14 @@ ypAPI int yp_isexceptionCN( ypObject *x, int n, ... );
 
 // XXX The "X" in these names is a reminder that the function is returning internal memory, and
 // as such should be used with caution.
+
+// For sequences that store their elements as an array of bytes (bytes and bytearray), sets *bytes 
+// to the beginning of that array, *len to the length of the sequence, and returns the immortal 
+// yp_None.  *bytes will point into internal object memory which MUST NOT be modified; furthermore,
+// the sequence itself must not be modified while using the array.  As a special case, if len is
+// NULL, the sequence must not contain null bytes and *bytes will point to a null-terminated array.
+// Sets *bytes to NULL, *len to zero (if len is not NULL), and returns an exception on error.
+ypAPI ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
 
 // For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
 // sets *array to the beginning of that array, *len to the length of the sequence, and returns the
@@ -1338,7 +1364,7 @@ struct _ypStrObject {
       len, 0, _ypObject_HASH_INVALID, data }
 #define yp_IMMORTAL_INT( name, value ) \
     static struct _ypIntObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypInt_CODE, NULL, 0 ), value }; \
+        _ypInt_CODE, NULL, 0 ), (value) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
