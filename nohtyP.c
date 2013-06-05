@@ -2093,6 +2093,16 @@ typedef struct {
 } ypFloatObject;
 #define ypFloat_VALUE( f ) ( ((ypFloatObject *)f)->value )
 
+// Signatures of some specialized arithmetic functions
+typedef yp_int_t (*arithLfunc)( yp_int_t, yp_int_t, ypObject ** );
+typedef yp_float_t (*arithFLfunc)( yp_float_t, yp_float_t, ypObject ** );
+typedef void (*iarithCfunc)( ypObject **, yp_int_t );
+typedef void (*iarithFCfunc)( ypObject **, yp_float_t );
+typedef void (*iarithfunc)( ypObject **, ypObject * );
+
+// Public, immortal objects
+yp_IMMORTAL_INT( yp_sys_maxint, yp_INT_T_MAX );
+yp_IMMORTAL_INT( yp_sys_minint, yp_INT_T_MIN );
 
 static ypObject *int_dealloc( ypObject *i ) {
     ypMem_FREE_FIXED( i );
@@ -2258,15 +2268,20 @@ yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
     return x + y; // TODO overflow check
 }
 
+yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x - y; // TODO overflow check
+}
+
 // XXX Overloading of add/etc currently not supported
-void yp_iaddC( ypObject **x, yp_int_t y )
+static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithFCfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
 
     if( x_pair == ypInt_CODE ) {
         yp_int_t result;
-        result = yp_addL( ypInt_VALUE( *x ), y, &exc );
+        result = intop( ypInt_VALUE( *x ), y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         if( ypObject_IS_MUTABLE( x ) ) {
             ypInt_VALUE( x ) = result;
@@ -2279,31 +2294,31 @@ void yp_iaddC( ypObject **x, yp_int_t y )
     } else if( x_pair == ypFloat_CODE ) {
         yp_float_t y_asfloat = yp_asfloatL( y, &exc ); // TODO
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
-        yp_iaddFC( x, y_asfloat );
+        floatop( x, y_asfloat );
         return;
     }
 
     return_yp_INPLACE_BAD_TYPE( x, *x );
 }
 
-void yp_iadd( ypObject **x, ypObject *y )
+static void iarithmetic( ypObject **x, ypObject *y, iarithCfunc intop, iarithFCfunc floatop )
 {
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
     ypObject *exc = yp_None;
 
     if( y_pair == ypInt_CODE ) {
-        yp_iaddC( x, ypInt_VALUE( y ) );
+        intop( x, ypInt_VALUE( y ) );
         return;
 
     } else if( y_pair == ypFloat_CODE ) {
-        yp_iaddFC( x, ypFloat_VALUE( y ) );
+        floatop( x, ypFloat_VALUE( y ) );
         return;
     }
 
     return_yp_INPLACE_BAD_TYPE( x, y );
 }
 
-ypObject *yp_add( ypObject *x, ypObject *y )
+static ypObject *arithmetic( ypObject *x, ypObject *y, iarithfunc numop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
@@ -2314,18 +2329,65 @@ ypObject *yp_add( ypObject *x, ypObject *y )
 
     // All numbers hold their data in-line, so freezing a mutable is not heap-inefficient
     result = yp_unfrozen_copy( x );
-    yp_iadd( &result, y );
+    numop( &result, y );
     if( !ypObject_IS_MUTABLE( x ) ) yp_freeze( &result );
     return result;
 }
 
+// Defined here are yp_iaddC (et al), yp_iadd (et al), and yp_add (et al)
+#define _ypInt_PUBLIC_ARITH_FUNCTION( name ) \
+    void yp_i ## name ## C( ypObject **x, yp_int_t y ) { \
+        iarithmeticC( x, y, yp_ ## name ## L, yp_i ## name ## FC ); \
+    } \
+    void yp_i ## name( ypObject **x, ypObject *y ) { \
+        iarithmetic( x, y, yp_i ## name ## C, yp_i ## name ## FC ); \
+    } \
+    ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
+        return arithmetic( x, y, yp_i ## name ); \
+    }
+_ypInt_PUBLIC_ARITH_FUNCTION( add );
+_ypInt_PUBLIC_ARITH_FUNCTION( sub );
+// TODO #undef _ypInt_PUBLIC_ARITH_FUNCTION
+
+// Public constructors
+
+// This pre-allocates an array of immortal ints for yp_intC to return
+#define _ypInt_PREALLOC_START (-5)
+#define _ypInt_PREALLOC_END   (257)
+static ypIntObject _ypInt_pre_allocated[] = {
+    #define _ypInt_PREALLOC( value ) \
+        { _yp_IMMORTAL_HEAD_INIT( _ypInt_CODE, NULL, 0 ), (value) }
+    _ypInt_PREALLOC( -5 ),
+    _ypInt_PREALLOC( -4 ),
+    _ypInt_PREALLOC( -3 ),
+    _ypInt_PREALLOC( -2 ),
+    _ypInt_PREALLOC( -1 ),
+
+    // Allocates a range of 2, 4, etc starting at the given multiple of 2, 4, etc
+    #define _ypInt_PREALLOC002( v ) _ypInt_PREALLOC(    v ), _ypInt_PREALLOC(    (v) | 0x01 )
+    #define _ypInt_PREALLOC004( v ) _ypInt_PREALLOC002( v ), _ypInt_PREALLOC002( (v) | 0x02 )
+    #define _ypInt_PREALLOC008( v ) _ypInt_PREALLOC004( v ), _ypInt_PREALLOC004( (v) | 0x04 )
+    #define _ypInt_PREALLOC016( v ) _ypInt_PREALLOC008( v ), _ypInt_PREALLOC008( (v) | 0x08 )
+    #define _ypInt_PREALLOC032( v ) _ypInt_PREALLOC016( v ), _ypInt_PREALLOC016( (v) | 0x10 )
+    #define _ypInt_PREALLOC064( v ) _ypInt_PREALLOC032( v ), _ypInt_PREALLOC032( (v) | 0x20 )
+    #define _ypInt_PREALLOC128( v ) _ypInt_PREALLOC064( v ), _ypInt_PREALLOC064( (v) | 0x40 )
+    #define _ypInt_PREALLOC256( v ) _ypInt_PREALLOC128( v ), _ypInt_PREALLOC128( (v) | 0x80 )
+    _ypInt_PREALLOC256( 0 ), // pre-allocates range( 256 )
+
+    _ypInt_PREALLOC( 256 ),
+};
+
 ypObject *yp_intC( yp_int_t value )
 {
-    ypObject *i = ypMem_MALLOC_FIXED( ypIntObject, ypInt_CODE );
-    if( yp_isexceptionC( i ) ) return i;
-    ypInt_VALUE( i ) = value;
+    if( _ypInt_PREALLOC_START <= value && value < _ypInt_PREALLOC_END ) {
+        return (ypObject *) &(_ypInt_pre_allocated[value - _ypInt_PREALLOC_START]);
+    } else {
+        ypObject *i = ypMem_MALLOC_FIXED( ypIntObject, ypInt_CODE );
+        if( yp_isexceptionC( i ) ) return i;
+        ypInt_VALUE( i ) = value;
     DEBUG( "yp_intC: 0x%08X value %d", i, value );
-    return i;
+        return i;
+    }
 }
 
 ypObject *yp_intstoreC( yp_int_t value )
@@ -2336,6 +2398,8 @@ ypObject *yp_intstoreC( yp_int_t value )
     DEBUG( "yp_intstoreC: 0x%08X value %d", i, value );
     return i;
 }
+
+// Public conversion functions
 
 yp_int_t yp_asintC( ypObject *x, ypObject **exc )
 {
@@ -2406,14 +2470,19 @@ yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc )
     return x + y; // TODO overflow check
 }
 
-void yp_iaddFC( ypObject **x, yp_float_t y )
+yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return x - y; // TODO overflow check
+}
+
+static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
     yp_float_t result;
 
     if( x_pair == ypFloat_CODE ) {
-        result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
+        result = floatop( ypFloat_VALUE( *x ), y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         if( ypObject_IS_MUTABLE( x ) ) {
             ypFloat_VALUE( x ) = result;
@@ -2426,7 +2495,7 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
     } else if( x_pair == ypInt_CODE ) {
         yp_float_t x_asfloat = yp_asfloatC( *x, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
-        result = yp_addFL( ypFloat_VALUE( *x ), y, &exc );
+        result = floatop( ypFloat_VALUE( *x ), y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         yp_decref( *x );
         *x = yp_floatC( result );
@@ -2435,6 +2504,17 @@ void yp_iaddFC( ypObject **x, yp_float_t y )
 
     return_yp_INPLACE_BAD_TYPE( x, *x );
 }
+
+// Defined here are yp_iaddFC (et al)
+#define _ypFloat_PUBLIC_ARITH_FUNCTION( name ) \
+    void yp_i ## name ## FC( ypObject **x, yp_float_t y ) { \
+        iarithmeticFC( x, y, yp_ ## name ## FL ); \
+    }
+_ypFloat_PUBLIC_ARITH_FUNCTION( add );
+_ypFloat_PUBLIC_ARITH_FUNCTION( sub );
+// TODO #undef _ypFloat_PUBLIC_ARITH_FUNCTION
+
+// Public constructors
 
 ypObject *yp_floatC( yp_float_t value )
 {
@@ -2451,6 +2531,8 @@ ypObject *yp_floatstoreC( yp_float_t value )
     ypFloat_VALUE( f ) = value;
     return f;
 }
+
+// Public conversion functions
 
 yp_float_t yp_asfloatC( ypObject *x, ypObject **exc )
 {
