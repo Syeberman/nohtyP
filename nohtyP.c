@@ -4657,7 +4657,7 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     ypObject *result = yp_None;
-    yp_ssize_t lenhint;
+//    yp_ssize_t lenhint;
     ypObject *key;
 
     // Use lenhint in the hopes of requiring only one resize
@@ -5624,7 +5624,7 @@ static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empt
 // created
 // XXX A minused of zero may mean lenhint is unreliable; we may still grow the frozendict, so don't
 // return _yp_frozendict_empty!
-static ypObject *_yp_frozendict_new( yp_ssize_t minused )
+static ypObject *_ypDict_new( int type, yp_ssize_t minused )
 {
     ypObject *keyset;
     yp_ssize_t alloclen;
@@ -5633,7 +5633,7 @@ static ypObject *_yp_frozendict_new( yp_ssize_t minused )
     keyset = _yp_frozenset_new( minused );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
-    mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, ypFrozenDict_CODE, alloclen, 0 );
+    mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
     if( yp_isexceptionC( mp ) ) {
         yp_decref( keyset );
         return mp;
@@ -5643,23 +5643,37 @@ static ypObject *_yp_frozendict_new( yp_ssize_t minused )
     return mp;
 }
 
-static ypObject *_yp_dict_new( yp_ssize_t minused )
+// TODO We just need _one_ incref_visitor throughout nohtyP
+static ypObject *_ypDict_incref_visitor( ypObject *x, void *memo ) {
+    yp_incref( x );
+    return yp_None;
+}
+
+// TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
+// either a) optimizing x first, or b) not sharing the keyset of this object
+// TODO Shallow copies of frozendicts to frozendicts can just return incref( x )...where to handle?
+static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *memo );
+static ypObject *_ypDict_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
 {
     ypObject *keyset;
     yp_ssize_t alloclen;
     ypObject *mp;
 
-    keyset = _yp_frozenset_new( minused );
-    if( yp_isexceptionC( keyset ) ) return keyset;
-    alloclen = ypSet_ALLOCLEN( keyset );
-    mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, ypDict_CODE, alloclen, 0 );
-    if( yp_isexceptionC( mp ) ) {
-        yp_decref( keyset );
+    // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
+    if( copy_visitor == yp_shallowcopy_visitor ) {
+        keyset = ypDict_KEYSET( x );
+        alloclen = ypSet_ALLOCLEN( keyset );
+        mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
+        if( yp_isexceptionC( mp ) ) return mp;
+        ypDict_KEYSET( mp ) = keyset; // will be incref'd by _ypDict_incref_visitor
+        ypDict_LEN( mp ) = ypDict_LEN( x );
+        memcpy( ypDict_VALUES( mp ), ypDict_VALUES( x ), alloclen * sizeof( ypObject * ) );
+        frozendict_traverse( mp, _ypDict_incref_visitor, NULL ); // cannot fail
         return mp;
     }
-    ypDict_KEYSET( mp ) = keyset;
-    memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
-    return mp;
+
+    // Otherwise, copying takes a bit more effort
+    return yp_NotImplementedError;
 }
 
 // The tricky bit about resizing dicts is that we need both the old and new keysets and value
@@ -5864,7 +5878,7 @@ static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject *itemiter )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
     ypObject *result = yp_None;
-    yp_ssize_t lenhint;
+//    yp_ssize_t lenhint;
     ypObject *key;
     ypObject *value;
 
@@ -5946,6 +5960,15 @@ static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *mem
         valuesleft -= 1;
     }
     return yp_None;
+}
+
+static ypObject *frozendict_unfrozen_copy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypDict_copy( ypDict_CODE, x, copy_visitor, copy_memo );
+}
+
+static ypObject *frozendict_frozen_copy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
+    // TODO Shallow copies of frozendicts can just return incref( x )...where to handle?
+    return _ypDict_copy( ypFrozenDict_CODE, x, copy_visitor, copy_memo );
 }
 
 static ypObject *frozendict_bool( ypObject *mp ) {
@@ -6240,8 +6263,8 @@ static ypTypeObject ypFrozenDict_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    frozendict_unfrozen_copy,       // tp_unfrozen_copy
+    frozendict_frozen_copy,         // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -6315,8 +6338,8 @@ static ypTypeObject ypDict_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    frozendict_unfrozen_copy,       // tp_unfrozen_copy
+    frozendict_frozen_copy,         // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -6367,8 +6390,8 @@ static ypTypeObject ypDict_Type = {
 
 // Constructors
 // XXX x may be an yp_ONSTACK_ITER_KVALIST: use carefully
-// TODO if x is a fellow dict, consider sharing its keyset
-static ypObject *_ypDict( ypObject *(*allocator)( yp_ssize_t ), ypObject *x )
+// XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
+static ypObject *_ypDict( int type, ypObject *x )
 {
     ypObject *exc = yp_None;
     ypObject *newMp;
@@ -6377,12 +6400,12 @@ static ypObject *_ypDict( ypObject *(*allocator)( yp_ssize_t ), ypObject *x )
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( x, &exc );
-    } else if( lenhint == 0 && allocator == _yp_frozendict_new ) {
+    } else if( lenhint == 0 && type == ypFrozenDict_CODE ) {
         // yp_lenC reports an empty iterable, so we can shortcut frozendict creation
         return _yp_frozendict_empty;
     }
 
-    newMp = allocator( lenhint );
+    newMp = _ypDict_new( type, lenhint );
     if( yp_isexceptionC( newMp ) ) return newMp;
     // TODO make sure _ypDict_update is efficient for pre-sized objects
     result = _ypDict_update( newMp, x );
@@ -6400,16 +6423,16 @@ ypObject *yp_frozendictK( int n, ... ) {
 ypObject *yp_frozendictKV( int n, va_list args ) {
     // TODO Return _yp_frozendict_empty on n<1??
     yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
-    return _ypDict( _yp_frozendict_new, iter_args );
+    return _ypDict( ypFrozenDict_CODE, iter_args );
 }
 
 ypObject *yp_dictK( int n, ... ) {
-    if( n < 1 ) return _yp_dict_new( 0 );
+    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
     return_yp_V_FUNC( ypObject *, yp_dictKV, (n, args), n );
 }
 ypObject *yp_dictKV( int n, va_list args ) {
     yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
-    return _ypDict( _yp_dict_new, iter_args );
+    return _ypDict( ypDict_CODE, iter_args );
 }
 
 // TODO something akin to yp_ONSTACK_ITER_KVALIST that yields the same value with each key
@@ -6423,7 +6446,7 @@ ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
 }
 
 ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
-    if( n < 1 ) return _yp_dict_new( 0 );
+    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
     return_yp_V_FUNC( ypObject *, yp_dict_fromkeysV, (value, n, args), n );
 }
 ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
@@ -6432,10 +6455,19 @@ ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
 
 ypObject *yp_frozendict( ypObject *x ) {
     if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
-    return _ypDict( _yp_frozendict_new, x );
+    
+    // If x is a fellow dict then perform a copy so we can share keysets
+    if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
+        return _ypDict_copy( ypFrozenDict_CODE, x, yp_shallowcopy_visitor, NULL );
+    }
+    return _ypDict( ypFrozenDict_CODE, x );
 }
 ypObject *yp_dict( ypObject *x ) {
-    return _ypDict( _yp_dict_new, x );
+    // If x is a fellow dict then perform a copy so we can share keysets
+    if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
+        return _ypDict_copy( ypDict_CODE, x, yp_shallowcopy_visitor, NULL );
+    }
+    return _ypDict( ypDict_CODE, x );
 }
 
 
@@ -6752,6 +6784,18 @@ yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **ex
     ypObject *result = ypObject_TYPE( mi )->tp_miniiter_lenhint( mi, state, &lenhint );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
     return lenhint < 0 ? 0 : lenhint;
+}
+
+
+/*************************************************************************************************
+ * Compound operations
+ *************************************************************************************************/
+
+yp_int_t yp_asintC_getitem( ypObject *container, ypObject *key, ypObject **exc ) {
+    ypObject *value = yp_getitem( container, key );
+    yp_int_t retval = yp_asintC( value, exc );
+    yp_decref( value );
+    return retval;
 }
 
 
