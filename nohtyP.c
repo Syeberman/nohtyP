@@ -2356,7 +2356,7 @@ _ypInt_PUBLIC_ARITH_FUNCTION( sub );
 #define _ypInt_PREALLOC_END   (257)
 static ypIntObject _ypInt_pre_allocated[] = {
     #define _ypInt_PREALLOC( value ) \
-        { _yp_IMMORTAL_HEAD_INIT( _ypInt_CODE, NULL, 0 ), (value) }
+        { yp_IMMORTAL_HEAD_INIT( _ypInt_CODE, NULL, ypObject_LEN_INVALID ), (value) }
     _ypInt_PREALLOC( -5 ),
     _ypInt_PREALLOC( -4 ),
     _ypInt_PREALLOC( -3 ),
@@ -3885,14 +3885,30 @@ static ypObject *tuple_bool( ypObject *sq ) {
     return ypBool_FROM_C( ypTuple_LEN( sq ) );
 }
 
+#if 0 // TODO work in progress
+// Sets *cmp to -1, 0, or 1 as per memcmp; returns exception on error
+static ypObject *_ypTuple_relative_cmp( ypObject *b, ypObject *x, int *cmp ) {
+    yp_ssize_t b_len = ypBytes_LEN( b );
+    yp_ssize_t x_len = ypBytes_LEN( x );
+    int cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) );
+    if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0);
+    return cmp;
+}
+static ypObject *bytes_lt( ypObject *b, ypObject *x ) {
+    if( b == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) < 0 );
+}
+#endif
+
 
 // Returns yp_True if the two tuples/lists are equal.  Size is a quick way to check equality.
 // TODO The pre-computed hash, if any, would also be a quick check
 // FIXME comparison functions can recurse, just like currenthash...fix!
 static ypObject *tuple_eq( ypObject *sq, ypObject *x )
 {
-    yp_ssize_t sq_len = ypBytes_LEN( sq );
-    yp_ssize_t x_len  = ypBytes_LEN( x );
+    yp_ssize_t sq_len = ypTuple_LEN( sq );
+    yp_ssize_t x_len  = ypTuple_LEN( x );
     yp_ssize_t i;
     ypObject *result;
 
