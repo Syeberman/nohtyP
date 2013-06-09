@@ -366,7 +366,7 @@ DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for use by I
 DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for use by exception objects; returns "self"
 
 // For use when an object doesn't support a particular comparison operation
-ypObject * const yp_ComparisonNotImplemented;
+extern ypObject * const yp_ComparisonNotImplemented;
 static ypObject *NotImplemented_comparefunc( ypObject *x, ypObject *y ) {
     return yp_ComparisonNotImplemented;
 }
@@ -776,12 +776,15 @@ static ypObject *_ypMem_realloc_container_variable(
         return yp_None;
     }
 
-    // Otherwise, let yp_malloc_resize handle moving the data around
+    // Otherwise, let yp_malloc_resize determine if we can expand in-place or need to memcpy
     newptr = yp_malloc_resize( &size, ob->ob_data, required * sizeof_elems, extra * sizeof_elems );
     if( newptr == NULL ) return yp_MemoryError;
-    memcpy( newptr, ob->ob_data, MIN(ob->ob_alloclen * sizeof_elems, size) );
-    yp_free( ob->ob_data );
-    ob->ob_data = newptr;
+    // TODO Push such memcpy's out to the callers of ypMem_REALLOC_CONTAINER_VARIABLE
+    if( newptr != ob->ob_data ) {
+        memcpy( newptr, ob->ob_data, MIN(ob->ob_alloclen * sizeof_elems, size) );
+        yp_free( ob->ob_data );
+        ob->ob_data = newptr;
+    }
     // FIXME check for alloclen overflow!
     ob->ob_alloclen = size / sizeof_elems; // rounds down
     DEBUG( "REALLOC_CONTAINER_VARIABLE (malloc_resize): 0x%08X alloclen %d", ob, ob->ob_alloclen );
@@ -1557,7 +1560,7 @@ ypObject *yp_all( ypObject *iterable )
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 // TODO Comparison functions have the possibility of recursion; trap (also, add tests)
 // TODO Ensure the tp_* comparison functions always return a bool
-ypObject * const yp_ComparisonNotImplemented;
+extern ypObject * const yp_ComparisonNotImplemented;
 #define _ypBool_PUBLIC_CMP_FUNCTION( name, reflection, defval ) \
     ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
         ypTypeObject *type = ypObject_TYPE( x ); \
@@ -1581,7 +1584,7 @@ _ypBool_PUBLIC_CMP_FUNCTION( gt, lt, yp_TypeError );
 // TODO Hash functions (currenthash, mainly) have the possibility of recursion; trap (also: test)
 yp_STATIC_ASSERT( ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one );
 
-ypObject * const yp_RecursionLimitError;
+extern ypObject * const yp_RecursionLimitError;
 static ypObject *_yp_hash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
 {
     int *recursion_depth = (int *) _memo;
