@@ -470,6 +470,20 @@ int yp_isexceptionC( ypObject *x ) {
 // XXX Adapted from Python's _PyHASH_MULTIPLIER
 #define _ypHASH_MULTIPLIER 1000003  // 0xf4243
 
+// Return the hash of the given pointer; always succeeds
+// XXX Adapted from Python's _Py_HashPointer
+static yp_hash_t yp_HashPointer( void *p )
+{
+    yp_hash_t x;
+    size_t y = (size_t) p;
+    /* bottom 3 or 4 bits are likely to be 0; rotate y by 4 to avoid
+       excessive hash collisions for dicts and sets */
+    y = (y >> 4) | (y << (8 * sizeof( void * ) - 4));
+    x = (yp_hash_t) y;
+    if (x == ypObject_HASH_INVALID) x -= 1;
+    return x;
+}
+
 // Return the hash of the given number of bytes; always succeeds
 // XXX Adapted from Python's _Py_HashBytes
 // FIXME On the Release build, this seems to return inconsistent results
@@ -968,12 +982,12 @@ static ypTypeObject ypIter_Type = {
 
     // Boolean operations and comparisons
     MethodError_objproc,            // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    NotImplemented_comparefunc,     // tp_lt
+    NotImplemented_comparefunc,     // tp_le
+    NotImplemented_comparefunc,     // tp_eq
+    NotImplemented_comparefunc,     // tp_ne
+    NotImplemented_comparefunc,     // tp_ge
+    NotImplemented_comparefunc,     // tp_gt
 
     // Generic object operations
     MethodError_hashfunc,           // tp_currenthash
@@ -1897,6 +1911,12 @@ ypObject *nonetype_bool( ypObject *n ) {
     return yp_False;
 }
 
+static ypObject *nonetype_currenthash( ypObject *n,
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
+    *hash = yp_HashPointer( yp_None );
+    return yp_None;
+}
+
 static ypTypeObject ypNoneType_Type = {
     yp_TYPE_HEAD_INIT,
     NULL,                           // tp_name
@@ -1915,15 +1935,15 @@ static ypTypeObject ypNoneType_Type = {
 
     // Boolean operations and comparisons
     nonetype_bool,                  // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
-    MethodError_objobjproc,         // tp_eq
-    MethodError_objobjproc,         // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    NotImplemented_comparefunc,     // tp_lt
+    NotImplemented_comparefunc,     // tp_le
+    NotImplemented_comparefunc,     // tp_eq
+    NotImplemented_comparefunc,     // tp_ne
+    NotImplemented_comparefunc,     // tp_ge
+    NotImplemented_comparefunc,     // tp_gt
 
     // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
+    nonetype_currenthash,           // tp_currenthash
     MethodError_objproc,            // tp_close
 
     // Number operations

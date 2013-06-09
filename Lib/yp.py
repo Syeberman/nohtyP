@@ -712,6 +712,7 @@ yp_func( c_ypObject_p, "yp_add", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # yp_float_t yp_invertFL( yp_float_t x, ypObject **exc );
 
 # yp_int_t yp_asintC( ypObject *x, ypObject **exc );
+yp_func( c_yp_int_t, "yp_asintC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 # yp_int8_t yp_asint8C( ypObject *x, ypObject **exc );
 # yp_uint8_t yp_asuint8C( ypObject *x, ypObject **exc );
 # yp_int16_t yp_asint16C( ypObject *x, ypObject **exc );
@@ -947,6 +948,9 @@ class yp_int( ypObject ):
             except TypeError: pass
             base = 10
         raise NotImplementedError
+    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    def __str__( self ): return str( _yp_asintC( self, yp_None ) )
+    def __repr__( self ): return repr( _yp_asintC( self, yp_None ) )
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
@@ -977,6 +981,11 @@ class yp_str( ypObject ):
             return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
         else:
             raise NotImplementedError
+    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    #def __str__( self ):
+    #    # FIXME need ypObject *yp_asencodedCX( *seq, *encoded, *len, *encoding )...or something
+    #    raise NotImplementedError
+    #__repr__ = __str__
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
