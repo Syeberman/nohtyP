@@ -1179,6 +1179,17 @@ ypAPI int yp_isexceptionCN( ypObject *x, int n, ... );
 // Sets *bytes to NULL, *len to zero (if len is not NULL), and returns an exception on error.
 ypAPI ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
 
+// str and chrarrays internally store their Unicode characters in particular encodings, usually
+// depending on the contents of the string.  This function sets *encoded to the beginning of that
+// data, *size to the number of bytes in encoded, and *encoding to the immortal str representing 
+// the encoding used (yp_s_utf_32, perhaps).  *encoding will point into internal object memory
+// which MUST NOT be modified; furthermore, the string itself must not be modified while using the
+// array.  As a special case, if size is NULL, the string must not contain null characters and
+// *encoded will point to a null-terminated string.  On error, sets *encoded to NULL, *size to 
+// zero (if size is not NULL), sets *encoding to the exception, and returns it.
+ypAPI ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
+        ypObject * *encoding );
+
 // For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
 // sets *array to the beginning of that array, *len to the length of the sequence, and returns the
 // immortal yp_None.  *array will point into internal object memory, so they are *borrowed*

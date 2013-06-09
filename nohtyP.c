@@ -3263,7 +3263,7 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_MappingMethods      // tp_as_mapping
 };
 
-ypObject *_yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len )
+static ypObject *_yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len )
 {
     if( ypObject_TYPE_PAIR_CODE( seq ) != ypBytes_CODE ) return_yp_BAD_TYPE( seq );
     *bytes = ypBytes_DATA( seq );
@@ -3604,6 +3604,30 @@ static ypTypeObject ypChrArray_Type = {
     MethodError_MappingMethods      // tp_as_mapping
 };
 
+static ypObject *_yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size, 
+        ypObject * *encoding )
+{
+    if( ypObject_TYPE_PAIR_CODE( seq ) != ypStr_CODE ) return_yp_BAD_TYPE( seq );
+    *encoded = ypStr_DATA( seq );
+    if( size == NULL ) {
+        return yp_NotImplementedError;
+    } else {
+        *size = ypStr_LEN( seq );
+    }
+    *encoding = yp_s_latin_1;
+    return yp_None;
+}
+ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size, 
+        ypObject * *encoding )
+{
+    ypObject *result = _yp_asencodedCX( seq, encoded, size, encoding );
+    if( yp_isexceptionC( result ) ) {
+        *encoded = NULL;
+        if( size != NULL ) *size = 0;
+        *encoding = result;
+    }
+    return result;
+}
 
 // Public constructors
 
@@ -6510,7 +6534,7 @@ ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
 
 ypObject *yp_frozendict( ypObject *x ) {
     if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
-    
+
     // If x is a fellow dict then perform a copy so we can share keysets
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
         return _ypDict_copy( ypFrozenDict_CODE, x, yp_shallowcopy_visitor, NULL );

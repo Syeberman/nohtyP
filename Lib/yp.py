@@ -21,6 +21,7 @@ c_INOUT = 3
 
 # Some standard C param/return types
 c_void = None # only valid for return values
+c_char_pp = POINTER( c_char_p )
 
 # Used to signal that a particular arg has not been supplied; set to default value of such params
 _yp_arg_missing = object( )
@@ -234,6 +235,7 @@ c_yp_float64_t = c_double
 #typedef yp_int64_t          yp_ssize_t;
 #endif
 c_yp_ssize_t = c_ssize_t
+c_yp_ssize_t_p = POINTER( c_yp_ssize_t )
 #typedef yp_ssize_t          yp_hash_t;
 c_yp_hash_t = c_yp_ssize_t
 
@@ -735,6 +737,16 @@ yp_func( c_yp_int_t, "yp_asintC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 # ypObject *yp_sum( ypObject *iterable );
 
 
+# ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
+
+# ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
+#        ypObject * *encoding );
+yp_func( c_ypObject_p, "yp_asencodedCX", ((c_ypObject_p, "seq"), 
+    (c_char_pp, "encoded"), (c_yp_ssize_t_p, "size"), (c_ypObject_pp, "encoding")) )
+
+# ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );
+
+
 _ypExc2py = {}
 _pyExc2yp = {}
 def ypObject_p_exception( name, pyExc, *, one_to_one=True ):
@@ -981,11 +993,14 @@ class yp_str( ypObject ):
             return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
         else:
             raise NotImplementedError
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    #def __str__( self ):
-    #    # FIXME need ypObject *yp_asencodedCX( *seq, *encoded, *len, *encoding )...or something
-    #    raise NotImplementedError
-    #__repr__ = __str__
+    def __str__( self ):
+        encoded = c_char_pp( c_char_p( ) )
+        size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
+        encoding = c_ypObject_pp( yp_None )
+        _yp_asencodedCX( self, encoded, size, encoding )
+        # FIXME assert encoding[0].value == yp_s_latin_1.value
+        return string_at( encoded.contents, size.contents ).decode( "latin-1" )
+    __repr__ = __str__
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
