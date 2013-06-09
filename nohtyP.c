@@ -102,7 +102,7 @@ typedef size_t yp_uhash_t;
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
 // Base "constructor" for immortal type objects
-#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT( ypType_CODE, NULL, 0 )
+#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT( ypType_CODE, NULL, ypObject_LEN_INVALID )
 
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)( ypObject * );
@@ -1220,7 +1220,7 @@ typedef struct {
 // after each yielded value.
 #define yp_ONSTACK_ITER_VALIST( name, n, args ) \
     _ypIterValistObject _ ## name ## _struct = { \
-        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
+        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
         n, 0x0u, _iter_valist_generator, args}; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 
@@ -1244,10 +1244,10 @@ typedef struct {
 // Don't include subiter in ob_objlocs
 #define yp_ONSTACK_ITER_KVALIST( name, n, args ) \
     _ypIterValistObject _ ## name ## _subiter_struct = { \
-        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
+        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
         0, 0x0u, _iter_closed_generator, args}; \
     _ypIterKValistObject _ ## name ## _struct = { \
-        _yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
+        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
         n, 0x0u, _iter_kvalist_generator, (ypObject *) &_ ## name ## _subiter_struct }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 
@@ -1787,7 +1787,7 @@ static ypTypeObject ypException_Type = {
 #define _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, superptr ) \
     yp_IMMORTAL_BYTES( name ## _name, #name ); \
     static ypExceptionObject _ ## name ## _struct = { \
-        _yp_IMMORTAL_HEAD_INIT( ypException_CODE, NULL, 0 ), \
+        yp_IMMORTAL_HEAD_INIT( ypException_CODE, NULL, 0 ), \
         (ypObject *) &_ ## name ## _name_struct, superptr }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define _yp_IMMORTAL_EXCEPTION( name, super ) \
@@ -1983,10 +1983,10 @@ static ypObject *bool_bool( ypObject *b ) {
 
 // Here be bool_lt, bool_le, bool_eq, bool_ne, bool_ge, bool_gt
 #define _ypBool_RELATIVE_CMP_FUNCTION( name, operator ) \
-static ypObject *bool_ ## name( ypObject *b, ypObject *x ) { \
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypBool_CODE ) return yp_ComparisonNotImplemented; \
-    return ypBool_FROM_C( _ypBool_VALUE( b ) operator _ypBool_VALUE( x ) ); \
-}
+    static ypObject *bool_ ## name( ypObject *b, ypObject *x ) { \
+        if( ypObject_TYPE_PAIR_CODE( x ) != ypBool_CODE ) return yp_ComparisonNotImplemented; \
+        return ypBool_FROM_C( _ypBool_VALUE( b ) operator _ypBool_VALUE( x ) ); \
+    }
 _ypBool_RELATIVE_CMP_FUNCTION( lt, < );
 _ypBool_RELATIVE_CMP_FUNCTION( le, <= );
 _ypBool_RELATIVE_CMP_FUNCTION( eq, == );
@@ -2115,10 +2115,10 @@ static ypObject *int_bool( ypObject *i ) {
 
 // Here be int_lt, int_le, int_eq, int_ne, int_ge, int_gt
 #define _ypInt_RELATIVE_CMP_FUNCTION( name, operator ) \
-static ypObject *int_ ## name( ypObject *i, ypObject *x ) { \
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return yp_ComparisonNotImplemented; \
-    return ypBool_FROM_C( ypInt_VALUE( i ) operator ypInt_VALUE( x ) ); \
-}
+    static ypObject *int_ ## name( ypObject *i, ypObject *x ) { \
+        if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return yp_ComparisonNotImplemented; \
+        return ypBool_FROM_C( ypInt_VALUE( i ) operator ypInt_VALUE( x ) ); \
+    }
 _ypInt_RELATIVE_CMP_FUNCTION( lt, < );
 _ypInt_RELATIVE_CMP_FUNCTION( le, <= );
 _ypInt_RELATIVE_CMP_FUNCTION( eq, == );
@@ -2356,7 +2356,7 @@ _ypInt_PUBLIC_ARITH_FUNCTION( sub );
 #define _ypInt_PREALLOC_END   (257)
 static ypIntObject _ypInt_pre_allocated[] = {
     #define _ypInt_PREALLOC( value ) \
-        { yp_IMMORTAL_HEAD_INIT( _ypInt_CODE, NULL, ypObject_LEN_INVALID ), (value) }
+        { yp_IMMORTAL_HEAD_INIT( ypInt_CODE, NULL, ypObject_LEN_INVALID ), (value) }
     _ypInt_PREALLOC( -5 ),
     _ypInt_PREALLOC( -4 ),
     _ypInt_PREALLOC( -3 ),
@@ -3885,22 +3885,42 @@ static ypObject *tuple_bool( ypObject *sq ) {
     return ypBool_FROM_C( ypTuple_LEN( sq ) );
 }
 
-#if 0 // TODO work in progress
-// Sets *cmp to -1, 0, or 1 as per memcmp; returns exception on error
-static ypObject *_ypTuple_relative_cmp( ypObject *b, ypObject *x, int *cmp ) {
-    yp_ssize_t b_len = ypBytes_LEN( b );
-    yp_ssize_t x_len = ypBytes_LEN( x );
-    int cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) );
-    if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0);
-    return cmp;
-}
-static ypObject *bytes_lt( ypObject *b, ypObject *x ) {
-    if( b == x ) return yp_False;
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
-    return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) < 0 );
-}
-#endif
+// Sets *i to the index in sq and x of the first differing element, or -1 if the elements are equal
+// up to the length of the shortest object.  Returns exception on error.
+static ypObject *_ypTuple_cmp_first_difference( ypObject *sq, ypObject *x, yp_ssize_t *i )
+{
+    yp_ssize_t min_len;
+    ypObject *result;
 
+    if( sq == x ) {
+        *i = -1;
+        return yp_True;
+    }
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypTuple_CODE ) return yp_ComparisonNotImplemented;
+
+    // XXX Python's list implementation has protection against the length being modified during the
+    // comparison; that isn't required here, at least not yet
+    min_len = MIN( ypTuple_LEN( sq ), ypTuple_LEN( x ) );
+    for( *i = 0; *i < min_len; (*i)++ ) {
+        result = yp_eq( ypTuple_ARRAY( sq )[*i], ypTuple_ARRAY( x )[*i] );
+        if( result != yp_True ) return result; // returns on yp_False or an exception
+    }
+    *i = -1;
+    return yp_True;
+}
+// Here be tuple_lt, tuple_le, tuple_ge, tuple_gt
+#define _ypTuple_RELATIVE_CMP_FUNCTION( name, len_cmp_op ) \
+    static ypObject *tuple_ ## name( ypObject *sq, ypObject *x ) { \
+        yp_ssize_t i = -1; \
+        ypObject *result = _ypTuple_cmp_first_difference( sq, x, &i ); \
+        if( yp_isexceptionC( result ) ) return result; \
+        if( i < 0 ) return ypBool_FROM_C( ypTuple_LEN( sq ) len_cmp_op ypTuple_LEN( x ) ); \
+        return yp_ ## name( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] ); \
+    }
+_ypTuple_RELATIVE_CMP_FUNCTION( lt, < );
+_ypTuple_RELATIVE_CMP_FUNCTION( le, <= );
+_ypTuple_RELATIVE_CMP_FUNCTION( ge, >= );
+_ypTuple_RELATIVE_CMP_FUNCTION( gt, > );
 
 // Returns yp_True if the two tuples/lists are equal.  Size is a quick way to check equality.
 // TODO The pre-computed hash, if any, would also be a quick check
@@ -3908,13 +3928,12 @@ static ypObject *bytes_lt( ypObject *b, ypObject *x ) {
 static ypObject *tuple_eq( ypObject *sq, ypObject *x )
 {
     yp_ssize_t sq_len = ypTuple_LEN( sq );
-    yp_ssize_t x_len  = ypTuple_LEN( x );
     yp_ssize_t i;
     ypObject *result;
 
     if( sq == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypTuple_CODE ) return yp_ComparisonNotImplemented;
-    if( sq_len != x_len ) return yp_False;
+    if( sq_len != ypTuple_LEN( x ) ) return yp_False;
 
     for( i = 0; i < sq_len; i++ ) {
         result = yp_eq( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] );
@@ -4040,12 +4059,12 @@ static ypTypeObject ypTuple_Type = {
 
     // Boolean operations and comparisons
     tuple_bool,                     // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
+    tuple_lt,                       // tp_lt
+    tuple_le,                       // tp_le
     tuple_eq,                       // tp_eq
     tuple_ne,                       // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    tuple_ge,                       // tp_ge
+    tuple_gt,                       // tp_gt
 
     // Generic object operations
     tuple_currenthash,              // tp_currenthash
@@ -4121,12 +4140,12 @@ static ypTypeObject ypList_Type = {
 
     // Boolean operations and comparisons
     tuple_bool,                     // tp_bool
-    MethodError_objobjproc,         // tp_lt
-    MethodError_objobjproc,         // tp_le
+    tuple_lt,                       // tp_lt
+    tuple_le,                       // tp_le
     tuple_eq,                       // tp_eq
     tuple_ne,                       // tp_ne
-    MethodError_objobjproc,         // tp_ge
-    MethodError_objobjproc,         // tp_gt
+    tuple_ge,                       // tp_ge
+    tuple_gt,                       // tp_gt
 
     // Generic object operations
     tuple_currenthash,              // tp_currenthash
