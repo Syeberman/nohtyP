@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#include <float.h>
+#include <math.h>
 
 #ifdef _MSC_VER
 #include <Windows.h>
@@ -466,9 +468,79 @@ int yp_isexceptionC( ypObject *x ) {
 #define return_yp_K_FUNC        return_yp_V_FUNC
 #define return_yp_K_FUNC_void   return_yp_V_FUNC_void
 
+#ifdef _MSC_VER
+#define yp_IS_NAN _isnan
+#define yp_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
+#define yp_IS_FINITE(X) _finite(X)
+#else
+#error Need to port Py_IS_NAN et al to nohtyP for this platform
+#endif
+
 // Prime multiplier used in string and various other hashes
 // XXX Adapted from Python's _PyHASH_MULTIPLIER
 #define _ypHASH_MULTIPLIER 1000003  // 0xf4243
+
+// Parameters used for the numeric hash implementation.  Numeric hashes are based on reduction
+// modulo the prime 2**_PyHASH_BITS - 1.
+// XXX Adapted from Python's pyport.h
+#if SIZE_MAX == 0xFFFFFFFFu
+#define _ypHASH_BITS 31
+#else
+#define _ypHASH_BITS 61
+#endif
+#define _ypHASH_MODULUS (((size_t)1 << _ypHASH_BITS) - 1)
+#define _ypHASH_INF 314159
+#define _ypHASH_NAN 0
+
+// Return the hash of the given double; always succeeds
+// XXX Adapted from Python's _Py_HashDouble
+yp_hash_t yp_HashDouble( double v )
+{
+    int e, sign;
+    double m;
+    yp_uhash_t x, y;
+
+    if (!yp_IS_FINITE(v)) {
+        if (yp_IS_INFINITY(v)) {
+            return v > 0 ? _ypHASH_INF : -_ypHASH_INF;
+        } else {
+            return _ypHASH_NAN;
+        }
+    }
+
+    m = frexp(v, &e);
+
+    sign = 1;
+    if (m < 0) {
+        sign = -1;
+        m = -m;
+    }
+
+    /* process 28 bits at a time;  this should work well both for binary
+       and hexadecimal floating point. */
+    x = 0;
+    while (m) {
+        x = ((x << 28) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - 28);
+        m *= 268435456.0;  /* 2**28 */
+        e -= 28;
+        y = (yp_uhash_t)m;  /* pull out integer part */
+        m -= y;
+        x += y;
+        if (x >= _ypHASH_MODULUS) {
+            x -= _ypHASH_MODULUS;
+        }
+    }
+
+    /* adjust for the exponent;  first reduce it modulo _ypHASH_BITS */
+    e = e >= 0 ? e % _ypHASH_BITS : _ypHASH_BITS-1-((-1-e) % _ypHASH_BITS);
+    x = ((x << e) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - e);
+
+    x = x * sign;
+    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
+        x = (yp_uhash_t)(ypObject_HASH_INVALID-1);
+    }
+    return (yp_hash_t)x;
+}
 
 // Return the hash of the given pointer; always succeeds
 // XXX Adapted from Python's _Py_HashPointer
@@ -498,7 +570,9 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
         x = (_ypHASH_MULTIPLIER * x) ^ (yp_uhash_t) *p++;
     }
     x ^= (yp_uhash_t) len;
-    if (x == ypObject_HASH_INVALID) x -= 1;
+    if (x == (yp_uhash_t) ypObject_HASH_INVALID) {
+        x = (yp_uhash_t) (ypObject_HASH_INVALID-1);
+    }
     return x;
 }
 
@@ -2151,6 +2225,7 @@ _ypInt_RELATIVE_CMP_FUNCTION( gt, > );
 
 // XXX Adapted from Python's int_hash (now obsolete)
 // TODO adapt from long_hash instead, which seems to handle this differently
+// TODO Move this to a _yp_HashLong function?
 static ypObject *int_currenthash( ypObject *i,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
@@ -2370,7 +2445,6 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, iarithfunc numop )
     }
 _ypInt_PUBLIC_ARITH_FUNCTION( add );
 _ypInt_PUBLIC_ARITH_FUNCTION( sub );
-// TODO #undef _ypInt_PUBLIC_ARITH_FUNCTION
 
 // Public constructors
 
@@ -2486,7 +2560,163 @@ yp_hash_t yp_ashashC( ypObject *x, ypObject **exc ) {
  * Floats
  *************************************************************************************************/
 
+// TODO Python has PyFPE_START_PROTECT; we should be doing the same
+
 // ypFloatObject and ypFloat_VALUE are defined above for use by the int code
+
+static ypObject *float_dealloc( ypObject *f ) {
+    ypMem_FREE_FIXED( f );
+    return yp_None;
+}
+
+static ypObject *float_bool( ypObject *f ) {
+    return ypBool_FROM_C( ypFloat_VALUE( f ) != 0.0 );
+}
+
+// Here be float_lt, float_le, float_eq, float_ne, float_ge, float_gt
+#define _ypFloat_RELATIVE_CMP_FUNCTION( name, operator ) \
+    static ypObject *float_ ## name( ypObject *f, ypObject *x ) { \
+        if( ypObject_TYPE_PAIR_CODE( x ) != ypFloat_CODE ) return yp_ComparisonNotImplemented; \
+        return ypBool_FROM_C( ypFloat_VALUE( f ) operator ypFloat_VALUE( x ) ); \
+    }
+_ypFloat_RELATIVE_CMP_FUNCTION( lt, < );
+_ypFloat_RELATIVE_CMP_FUNCTION( le, <= );
+_ypFloat_RELATIVE_CMP_FUNCTION( eq, == );
+_ypFloat_RELATIVE_CMP_FUNCTION( ne, != );
+_ypFloat_RELATIVE_CMP_FUNCTION( ge, >= );
+_ypFloat_RELATIVE_CMP_FUNCTION( gt, > );
+
+static ypObject *float_currenthash( ypObject *f,
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+{
+    // This must remain consistent with the other numeric types
+    *hash = yp_HashDouble( ypFloat_VALUE( f ) );
+    return yp_None;
+}
+
+static ypTypeObject ypFloat_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    float_dealloc,                  // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    float_bool,                     // tp_bool
+    float_lt,                       // tp_lt
+    float_le,                       // tp_le
+    float_eq,                       // tp_eq
+    float_ne,                       // tp_ne
+    float_ge,                       // tp_ge
+    float_gt,                       // tp_gt
+
+    // Generic object operations
+    float_currenthash,              // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    TypeError_miniiterfunc,         // tp_miniiter
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
+    MethodError_miniiterfunc,       // tp_miniiter_next
+    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+    TypeError_objproc,              // tp_iter
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_len
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjobjproc,      // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+static ypTypeObject ypFloatStore_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    float_dealloc,                  // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    float_bool,                     // tp_bool
+    float_lt,                       // tp_lt
+    float_le,                       // tp_le
+    float_eq,                       // tp_eq
+    float_ne,                       // tp_ne
+    float_ge,                       // tp_ge
+    float_gt,                       // tp_gt
+
+    // Generic object operations
+    float_currenthash,              // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    TypeError_miniiterfunc,         // tp_miniiter
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
+    MethodError_miniiterfunc,       // tp_miniiter_next
+    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+    TypeError_objproc,              // tp_iter
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_len
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjobjproc,      // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
 
 yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
@@ -2535,7 +2765,6 @@ static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
     }
 _ypFloat_PUBLIC_ARITH_FUNCTION( add );
 _ypFloat_PUBLIC_ARITH_FUNCTION( sub );
-// TODO #undef _ypFloat_PUBLIC_ARITH_FUNCTION
 
 // Public constructors
 
@@ -6902,8 +7131,8 @@ static ypTypeObject *ypTypeTable[255] = {
 
     &ypInt_Type,        /* ypInt_CODE                  ( 10u) */
     &ypIntStore_Type,   /* ypIntStore_CODE             ( 11u) */
-    NULL,               /* ypFloat_CODE                ( 12u) */
-    NULL,               /* ypFloatStore_CODE           ( 13u) */
+    &ypFloat_Type,      /* ypFloat_CODE                ( 12u) */
+    &ypFloatStore_Type, /* ypFloatStore_CODE           ( 13u) */
 
     &ypIter_Type,       /* ypFrozenIter_CODE           ( 14u) */
     &ypIter_Type,       /* ypIter_CODE                 ( 15u) */

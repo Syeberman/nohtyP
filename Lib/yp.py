@@ -724,6 +724,7 @@ yp_func( c_yp_int_t, "yp_asintC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 # yp_int64_t yp_asint64C( ypObject *x, ypObject **exc );
 # yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc );
 # yp_float_t yp_asfloatC( ypObject *x, ypObject **exc );
+yp_func( c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 # yp_float32_t yp_asfloat32C( ypObject *x, ypObject **exc );
 # yp_float64_t yp_asfloat64C( ypObject *x, ypObject **exc );
 # yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc );
@@ -859,17 +860,28 @@ class ypObject( c_ypObject_p ):
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
 
-    def isdisjoint( self, other ): return _yp_isdisjoint( self, other )
-    def issubset( self, other ): return _yp_issubset( self, other )
-    def issuperset( self, other ): return _yp_issuperset( self, other )
-    def union( self, *others ): return _yp_unionN( self, *others )
-    def intersection( self, *others ): return _yp_intersectionN( self, *others )
-    def difference( self, *others ):  return _yp_differenceN( self, *others )
-    def symmetric_difference( self, other ): return _yp_symmetric_difference( self, other )
-    def update( self, *others ): _yp_updateN( self, *others )
-    def intersection_update( self, *others ): _yp_intersection_updateN( self, *others )
-    def difference_update( self, *others ): _yp_difference_updateN( self, *others )
-    def symmetric_difference_update( self, other ): _yp_symmetric_difference_update( self, other )
+    def isdisjoint( self, other ): 
+        return _yp_isdisjoint( self, _yp_iterable( other ) )
+    def issubset( self, other ): 
+        return _yp_issubset( self, _yp_iterable( other ) )
+    def issuperset( self, other ): 
+        return _yp_issuperset( self, _yp_iterable( other ) )
+    def union( self, *others ): 
+        return _yp_unionN( self, *(_yp_iterable( x ) for x in others) )
+    def intersection( self, *others ): 
+        return _yp_intersectionN( self, *(_yp_iterable( x ) for x in others) )
+    def difference( self, *others ):  
+        return _yp_differenceN( self, *(_yp_iterable( x ) for x in others) )
+    def symmetric_difference( self, other ): 
+        return _yp_symmetric_difference( self, _yp_iterable( other ) )
+    def update( self, *others ): 
+        _yp_updateN( self, *(_yp_iterable( x ) for x in others) )
+    def intersection_update( self, *others ): 
+        _yp_intersection_updateN( self, *(_yp_iterable( x ) for x in others) )
+    def difference_update( self, *others ): 
+        _yp_difference_updateN( self, *(_yp_iterable( x ) for x in others) )
+    def symmetric_difference_update( self, other ): 
+        _yp_symmetric_difference_update( self, _yp_iterable( other ) )
     def remove( self, elem ): _yp_remove( self, elem )
     def discard( self, elem ): _yp_discard( self, elem )
 
@@ -964,6 +976,14 @@ class yp_int( ypObject ):
     def __str__( self ): return str( _yp_asintC( self, yp_None ) )
     def __repr__( self ): return repr( _yp_asintC( self, yp_None ) )
 
+@pytype( float, 12 )
+class yp_float( ypObject ):
+    def __new__( cls, x=0.0 ):
+        return _yp_floatC( x )
+    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    def __str__( self ): return str( _yp_asfloatC( self, yp_None ) )
+    def __repr__( self ): return repr( _yp_asfloatC( self, yp_None ) )
+
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
 @pytype( bytes, 16 )
@@ -993,6 +1013,7 @@ class yp_str( ypObject ):
             return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
         else:
             raise NotImplementedError
+    # Just as yp_bool.__bool__ must return a bool, so to must this return a str
     def __str__( self ):
         encoded = c_char_pp( c_char_p( ) )
         size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
@@ -1000,7 +1021,8 @@ class yp_str( ypObject ):
         _yp_asencodedCX( self, encoded, size, encoding )
         # FIXME assert encoding[0].value == yp_s_latin_1.value
         return string_at( encoded.contents, size.contents ).decode( "latin-1" )
-    __repr__ = __str__
+    # FIXME When nohtyP supports repr, replace this faked-out version
+    def __repr__( self ): return repr( str( self ) )
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
