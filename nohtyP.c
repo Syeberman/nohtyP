@@ -5346,6 +5346,7 @@ static ypObject *frozenset_isdisjoint( ypObject *so, ypObject *x )
         // Otherwise, we need to convert x to a set to quickly test if it contains all items
         // TODO Can we make a version of _ypSet_isdisjoint that doesn't reqire a new set created?
         x_asset = yp_frozenset( x );
+        if( yp_isexceptionC( x_asset ) ) return x_asset;
         result = _ypSet_isdisjoint( so, x_asset );
         yp_decref( x_asset );
         return result;
@@ -5369,6 +5370,7 @@ static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
     // TODO Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
     x_asset = yp_frozenset( x );
+    if( yp_isexceptionC( x_asset ) ) return x_asset;
     result = _ypSet_issubset( so, x_asset );
     yp_decref( x_asset );
     return result;
@@ -5392,6 +5394,7 @@ static ypObject *frozenset_issuperset( ypObject *so, ypObject *x )
     // Otherwise, we need to convert x to a set to quickly test if it contains all items
     // TODO Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
     x_asset = yp_frozenset( x );
+    if( yp_isexceptionC( x_asset ) ) return x_asset;
     result = _ypSet_issubset( x_asset, so );
     yp_decref( x_asset );
     return result;
