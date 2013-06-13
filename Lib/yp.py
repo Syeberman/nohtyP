@@ -557,14 +557,14 @@ yp_func( c_void, "yp_discard", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")) )
 yp_func( c_ypObject_p, "yp_getitem", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key")) )
 
 # void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x );
-yp_func( c_void, "yp_setitem", 
+yp_func( c_void, "yp_setitem",
         ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "x")) )
 
 # void yp_delitem( ypObject **mapping, ypObject *key );
 yp_func( c_void, "yp_delitem", ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key")) )
 
 # ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval );
-yp_func( c_ypObject_p, "yp_getdefault", 
+yp_func( c_ypObject_p, "yp_getdefault",
         ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")) )
 
 # ypObject *yp_iter_items( ypObject *mapping );
@@ -578,7 +578,7 @@ yp_func( c_ypObject_p, "yp_iter_keys", ((c_ypObject_p, "mapping"), ) )
 # void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 
 # ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval );
-yp_func( c_ypObject_p, "yp_setdefault", 
+yp_func( c_ypObject_p, "yp_setdefault",
         ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")) )
 
 # void yp_updateK( ypObject **mapping, int n, ... );
@@ -742,7 +742,7 @@ yp_func( c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 
 # ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
 #        ypObject * *encoding );
-yp_func( c_ypObject_p, "yp_asencodedCX", ((c_ypObject_p, "seq"), 
+yp_func( c_ypObject_p, "yp_asencodedCX", ((c_ypObject_p, "seq"),
     (c_char_pp, "encoded"), (c_yp_ssize_t_p, "size"), (c_ypObject_pp, "encoding")) )
 
 # ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );
@@ -860,27 +860,27 @@ class ypObject( c_ypObject_p ):
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
 
-    def isdisjoint( self, other ): 
+    def isdisjoint( self, other ):
         return _yp_isdisjoint( self, _yp_iterable( other ) )
-    def issubset( self, other ): 
+    def issubset( self, other ):
         return _yp_issubset( self, _yp_iterable( other ) )
-    def issuperset( self, other ): 
+    def issuperset( self, other ):
         return _yp_issuperset( self, _yp_iterable( other ) )
-    def union( self, *others ): 
+    def union( self, *others ):
         return _yp_unionN( self, *(_yp_iterable( x ) for x in others) )
-    def intersection( self, *others ): 
+    def intersection( self, *others ):
         return _yp_intersectionN( self, *(_yp_iterable( x ) for x in others) )
-    def difference( self, *others ):  
+    def difference( self, *others ):
         return _yp_differenceN( self, *(_yp_iterable( x ) for x in others) )
-    def symmetric_difference( self, other ): 
+    def symmetric_difference( self, other ):
         return _yp_symmetric_difference( self, _yp_iterable( other ) )
-    def update( self, *others ): 
+    def update( self, *others ):
         _yp_updateN( self, *(_yp_iterable( x ) for x in others) )
-    def intersection_update( self, *others ): 
+    def intersection_update( self, *others ):
         _yp_intersection_updateN( self, *(_yp_iterable( x ) for x in others) )
-    def difference_update( self, *others ): 
+    def difference_update( self, *others ):
         _yp_difference_updateN( self, *(_yp_iterable( x ) for x in others) )
-    def symmetric_difference_update( self, other ): 
+    def symmetric_difference_update( self, other ):
         _yp_symmetric_difference_update( self, _yp_iterable( other ) )
     def remove( self, elem ): _yp_remove( self, elem )
     def discard( self, elem ): _yp_discard( self, elem )
@@ -1007,7 +1007,7 @@ class yp_bytes( ypObject ):
 class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
-            if object is _yp_arg_missing: 
+            if object is _yp_arg_missing:
                 return _yp_str_frombytesC( None, 0, yp_s_latin_1, yp_s_strict )
             encoded = str( object ).encode( "latin-1" )
             return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
@@ -1046,34 +1046,52 @@ class yp_list( _ypTuple ):
 class _ypSet( ypObject ):
     def __new__( cls, iterable=_yp_tuple_empty ):
         return cls._ypSet_constructor( _yp_iterable( iterable ) )
+    @staticmethod
+    def _bad_other( other ): return not isinstance( other, (_ypSet, frozenset, set) )
+
     def __or__( self, other ):
-        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        if self._bad_other( other ): return NotImplemented
         return _yp_unionN( self, other )
     def __and__( self, other ):
-        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        if self._bad_other( other ): return NotImplemented
         return _yp_intersectionN( self, other )
     def __sub__( self, other ):
-        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        if self._bad_other( other ): return NotImplemented
         return _yp_differenceN( self, other )
     def __xor__( self, other ):
-        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        if self._bad_other( other ): return NotImplemented
         return _yp_symmetric_difference( self, other )
+
+    def __ror__( self, other ):
+        if self._bad_other( other ): return NotImplemented
+        return _yp_unionN( other, self )
+    def __rand__( self, other ):
+        if self._bad_other( other ): return NotImplemented
+        return _yp_intersectionN( other, self )
+    def __rsub__( self, other ):
+        if self._bad_other( other ): return NotImplemented
+        return _yp_differenceN( other, self )
+    def __rxor__( self, other ):
+        if self._bad_other( other ): return NotImplemented
+        return _yp_symmetric_difference( other, self )
+
     def __ior__( self, other ):
-        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        if self._bad_other( other ): return NotImplemented
         _yp_updateN( self, other )
         return self
     def __iand__( self, other ):
-        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        if self._bad_other( other ): return NotImplemented
         _yp_intersection_updateN( self, other )
         return self
     def __isub__( self, other ):
-        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        if self._bad_other( other ): return NotImplemented
         _yp_difference_updateN( self, other )
         return self
     def __ixor__( self, other ):
-        if not isinstance( other, (_ypSet, frozenset, set) ): raise TypeError
+        if self._bad_other( other ): return NotImplemented
         _yp_symmetric_difference_update( self, other )
         return self
+
     def add( self, elem ): _yp_set_add( self, elem )
 
 @pytype( frozenset, 22 )
@@ -1095,15 +1113,31 @@ def _yp_flatten_dict( args ):
     return retval
 
 # TODO If nohtyP ever supports "dict view" objects, replace these faked-out versions
-class yp_dict_keys:
-    def __init__( self, mp ): self.mp = mp
-    def __iter__( self ): return _yp_iter_keys( self.mp )
-class yp_dict_values:
-    def __init__( self, mp ): self.mp = mp
-    def __iter__( self ): return _yp_iter_values( self.mp )
-class yp_dict_items:
-    def __init__( self, mp ): self.mp = mp
-    def __iter__( self ): return _yp_iter_items( self.mp )
+class _setlike_dictview:
+    def __init__( self, mp ): self._mp = mp
+    def __iter__( self ): return self._iter_func( self._mp )
+    def _as_set( self ): return yp_set( self._iter_func( self._mp ) )
+    def __lt__( self, other ): return self._as_set( ) <  other
+    def __le__( self, other ): return self._as_set( ) <= other
+    def __eq__( self, other ): return self._as_set( ) == other
+    def __ne__( self, other ): return self._as_set( ) != other
+    def __ge__( self, other ): return self._as_set( ) >= other
+    def __gt__( self, other ): return self._as_set( ) >  other
+    def __or__( self, other ):  return self._as_set( ) | other
+    def __and__( self, other ): return self._as_set( ) & other
+    def __sub__( self, other ): return self._as_set( ) - other
+    def __xor__( self, other ): return self._as_set( ) ^ other
+    def __ror__( self, other ):  return other | self._as_set( )
+    def __rand__( self, other ): return other & self._as_set( )
+    def __rsub__( self, other ): return other - self._as_set( )
+    def __rxor__( self, other ): return other ^ self._as_set( )
+class _keys_dictview( _setlike_dictview ):
+    _iter_func = staticmethod( _yp_iter_keys )
+class _values_dictview:
+    def __init__( self, mp ): self._mp = mp
+    def __iter__( self ): return _yp_iter_values( self._mp )
+class _items_dictview( _setlike_dictview ):
+    _iter_func = staticmethod( _yp_iter_items )
 
 @pytype( dict, 25 )
 class yp_dict( ypObject ):
@@ -1118,9 +1152,9 @@ class yp_dict( ypObject ):
             self = _yp_dict( args[0] )
         if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
         return self
-    def keys( self ): return yp_dict_keys( self )
-    def values( self ): return yp_dict_values( self )
-    def items( self ): return yp_dict_items( self )
+    def keys( self ): return _keys_dictview( self )
+    def values( self ): return _values_dictview( self )
+    def items( self ): return _items_dictview( self )
 
 
 #so = yp_set( )
