@@ -106,6 +106,8 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(TypeError, d.__getitem__)
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    def test_getitem_badobj(self):
         class BadEq(object):
             def __eq__(self, other):
                 raise Exc()
@@ -467,6 +469,8 @@ class DictTest(unittest.TestCase):
         self.assertEqual(yp_dict(), yp_dict())
         self.assertEqual(yp_dict({1: 2}), yp_dict({1: 2}))
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    def test_eq_badobj(self):
         class Exc(Exception): pass
 
         class BadCmp(object):
@@ -529,6 +533,7 @@ class DictTest(unittest.TestCase):
         self.assertTrue(larger != larger3)
         self.assertFalse(larger == larger3)
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_errors_in_view_containment_check(self):
         class C:
             def __eq__(self, other):
