@@ -1132,6 +1132,71 @@ ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size )
     return yp_None;
 }
 
+// TODO Double-check and test the boundary conditions in this function
+// XXX iterable may be an yp_ONSTACK_ITER_*: use carefully
+// XXX Yes, Python also allows unpacking of non-sequence iterables: a,b,c={1,2,3} is valid
+void yp_unpackN( ypObject *iterable, int n, ... )
+{
+    yp_uint64_t mi_state;
+    ypObject *mi;
+    va_list args;
+    int remaining;
+    ypObject *x = yp_None; // set to None in case n==0
+    ypObject **dest;
+
+    // Set the given n arguments to the values yielded from iterable; if an exception occurs, we
+    // will need to restart and discard these values.  Remember that if yp_miniiter fails, 
+    // yp_miniiter_next will return the same exception.
+    // TODO Hmmm; let's say iterable was yp_StopIteration for some reason: this code would actually
+    // succeed when n=0 even though it should probably fail...we should check the yp_miniiter
+    // return (here and elsewhere)
+    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    va_start( args, n );
+    for( remaining = n; remaining > 0; remaining-- ) {
+        x = yp_miniiter_next( mi, &mi_state ); // new ref
+        if( yp_isexceptionC( x ) ) {
+            // If the iterable is too short, raise yp_ValueError
+            if( yp_isexceptionC2( x, yp_StopIteration ) ) x = yp_ValueError;
+            break;
+        }
+
+        dest = va_arg( args, ypObject ** );
+        *dest = x;
+    }
+    va_end( args );
+
+    // If we've been successful so far, then ensure we're at the end of iterable
+    if( !yp_isexceptionC( x ) ) {
+        x = yp_miniiter_next( mi, &mi_state ); // new ref
+        if( yp_isexceptionC2( x, yp_StopIteration ) ) {
+            x = yp_None; // success!
+        } else if( yp_isexceptionC( x ) ) {
+            // some other exception occured
+        } else {
+            // If the iterable is too long, raise yp_ValueError
+            yp_decref( x );
+            x = yp_ValueError;
+        }
+    }
+
+    // If an error occured above, then we need to discard the previously-yielded values and set
+    // all dests to the exception; otherwise, we're successful, so return
+    if( yp_isexceptionC( x ) ) {
+        va_start( args, n );
+        for( /*n already set*/; n > remaining; n-- ) {
+            dest = va_arg( args, ypObject ** );
+            yp_decref( *dest );
+            *dest = x;
+        }
+        for( /*n already set*/; n > 0; n-- ) {
+            dest = va_arg( args, ypObject ** );
+            *dest = x;
+        }
+        va_end( args );
+    }
+    yp_decref( mi );
+}
+
 // Generator Constructors
 
 // Increments the reference count of the visited object
@@ -6140,48 +6205,17 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
 // Item iterators yield iterators that yield exactly 2 values: key first, then value.  This
 // returns new references to that pair in *key and *value.  Both are set to an exception on error;
 // in particular, yp_ValueError is returned if exactly 2 values are not returned.
-// XXX *itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
-// TODO Do we have to perform so many checks for exceptions, since _ypDict_push will catch them?
-// TODO The yielded value must be a sequence...not an iterator.  We can't allow a set of 2 values
-// to be interpreted as (key, value)!
+// XXX Yes, the yielded value can be any iterable, even a set or dict (good luck guessing which
+// will be the key, and which the value)
+// XXX itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
 static void _ypDict_iter_items_next( ypObject *itemiter, ypObject **key, ypObject **value )
 {
-    ypObject *excess;
     ypObject *keyvaliter = yp_next( itemiter ); // new ref
     if( yp_isexceptionC( keyvaliter ) ) { // including yp_StopIteration
         *key = *value = keyvaliter;
         return;
     }
-
-    *key = yp_next( keyvaliter ); // new ref
-    if( yp_isexceptionC( *key ) ) {
-        if( yp_isexceptionC2( *key, yp_StopIteration ) ) *key = yp_ValueError;
-        *value = *key;
-        goto Return;
-    }
-
-    *value = yp_next( keyvaliter ); // new ref
-    if( yp_isexceptionC( *value ) ) {
-        if( yp_isexceptionC2( *value, yp_StopIteration ) ) *value = yp_ValueError;
-        yp_decref( *key );
-        *key = *value;
-        goto Return;
-    }
-
-    excess = yp_next( keyvaliter ); // new ref, but should be yp_StopIteration
-    if( excess != yp_StopIteration ) {
-        if( !yp_isexceptionC( excess ) ) {
-            yp_decref( excess );
-            excess = yp_ValueError;
-        }
-        yp_decrefN( 2, *key, *value );
-        *key = *value = excess;
-        goto Return;
-    }
-
-Return:
-    yp_decref( keyvaliter );
-    return;
+    yp_unpackN( keyvaliter, 2, key, value );
 }
 
 // TODO ...what if the dict we're updating against shares the same keyset?

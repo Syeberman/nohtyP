@@ -500,6 +500,11 @@ ypAPI ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *si
 // files, is documented elsewhere.
 ypAPI void yp_close( ypObject **iterator );
 
+// Sets the given n ypObject**s to new references for the values yielded from iterable.  Iterable 
+// must yield exactly n objects, or else a yp_ValueError is raised.  Sets all n ypObject**s to the
+// same exception on error.  There is no 'V' version of this function.
+ypAPI void yp_unpackN( ypObject *iterable, int n, ... );
+
 // Returns a new reference to an iterator that yields values from iterable for which function
 // returns true.  The given function must return new or immortal references, as each returned
 // value will be discarded; to inspect the elements directly, use NULL.
