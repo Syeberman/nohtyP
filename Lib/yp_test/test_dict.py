@@ -227,6 +227,9 @@ class DictTest(unittest.TestCase):
             yield 1
         self.assertEqual(d.fromkeys(g()), yp_dict({1:None}))
         self.assertRaises(TypeError, yp_dict().fromkeys, 3)
+
+    @unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
+    def test_fromkeys_subclass1(self):
         class dictlike(yp_dict): pass
         self.assertEqual(dictlike.fromkeys('a'), yp_dict({'a':None}))
         self.assertEqual(dictlike().fromkeys('a'), yp_dict({'a':None}))
@@ -248,6 +251,9 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(Exc, baddict1.fromkeys, [1])
 
+    def test_fromkeys_badseq(self):
+        class Exc(Exception): pass
+
         class BadSeq(object):
             def __iter__(self):
                 return self
@@ -256,12 +262,17 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(Exc, yp_dict.fromkeys, BadSeq())
 
+    @unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
+    def test_fromkeys_subclass2(self):
+        class Exc(Exception): pass
+
         class baddict2(yp_dict):
             def __setitem__(self, key, value):
                 raise Exc()
 
         self.assertRaises(Exc, baddict2.fromkeys, [1])
 
+    def test_fromkeys_fastpath(self):
         # test fast path for dictionary inputs
         d = yp_dict(zip(range(6), range(6)))
         self.assertEqual(yp_dict.fromkeys(d, 0), yp_dict(zip(range(6), [0]*6)))

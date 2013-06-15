@@ -351,6 +351,7 @@ yp_func( c_ypObject_p, "yp_dictK", (c_multiK_ypObject_p, ) )
 # ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args );
 # ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
 # ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
+yp_func( c_ypObject_p, "yp_dict_fromkeysN", ((c_ypObject_p, "value"), c_multiN_ypObject_p) )
 
 # ypObject *yp_frozendict( ypObject *x );
 yp_func( c_ypObject_p, "yp_frozendict", ((c_ypObject_p, "x"), ) )
@@ -1139,6 +1140,9 @@ class _values_dictview:
 class _items_dictview( _setlike_dictview ):
     _iter_func = staticmethod( _yp_iter_items )
 
+# FIXME Adapt the Python test suite to test for frozendict, adding in tests similar to those found
+# between list/tuple and set/frozenset (ie the singleton empty frozendict, etc)
+
 @pytype( dict, 25 )
 class yp_dict( ypObject ):
     def __new__( cls, *args, **kwargs ):
@@ -1149,26 +1153,17 @@ class yp_dict( ypObject ):
         if isinstance( args[0], dict ):
             self = _yp_dictK( *_yp_flatten_dict( args[0] ) )
         else:
-            self = _yp_dict( args[0] )
+            self = _yp_dict( _yp_iterable( args[0] ) )
         if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
         return self
+    # TODO A version of yp_dict_fromkeys that accepts a fellow mapping (use only that mapping's
+    # keys) or an iterable (each yielded item is a key)...actually I just said the same thing twice
+    @classmethod
+    def fromkeys( cls, seq, value=None ): return _yp_dict_fromkeysN( value, *seq )
     def keys( self ): return _keys_dictview( self )
     def values( self ): return _values_dictview( self )
     def items( self ): return _items_dictview( self )
 
-
-#so = yp_set( )
-#so.add( 5 )
-#assert 5 in so
-#assert 50 not in so
-
-#import pdb; pdb.set_trace()
-#try: _yp_set_add( yp_int( 5 ), 5 )
-#except TypeError: pass
-#except: raise AssertionError( "should have raised TypeError" )
-#else: raise AssertionError( "should have failed" )
-
-#del so # FIXME how can we ensure so gets cleaned up at the end, before ctypes?
 
 # FIXME integrate this somehow with unittest
 #import os

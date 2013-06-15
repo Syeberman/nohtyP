@@ -1300,6 +1300,7 @@ static ypObject *_ypSequence_miniiter_lenh( ypObject *x, yp_uint64_t *_state, yp
 // attempt to retain a reference to these objects after returning.  These aren't your typical
 // objects: they're allocated on the stack.  While this could be dangerous, it also  reduces
 // duplicating code between versions that handle va_args and those that handle iterables.
+// TODO Is there a way to improve this using miniiters and a yp_iter_valist immortal object?
 
 typedef struct {
     _ypIterObject_HEAD
@@ -1326,6 +1327,7 @@ static ypObject *_iter_valist_generator( ypObject *i, ypObject *value )
 // object, which it "revives" for a new pair of arguments every time it's yielded.  Not only are
 // you denied retaining references to these objects, you are denied retaining a reference to
 // previously-yielded yp_ONSTACK_ITER_VALISTs.
+// TODO Is there a way to improve this using miniiters and a yp_iter_kvalist immortal object?
 typedef struct {
     _ypIterObject_HEAD
     ypObject *subiter;
@@ -6140,6 +6142,8 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
 // in particular, yp_ValueError is returned if exactly 2 values are not returned.
 // XXX *itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
 // TODO Do we have to perform so many checks for exceptions, since _ypDict_push will catch them?
+// TODO The yielded value must be a sequence...not an iterator.  We can't allow a set of 2 values
+// to be interpreted as (key, value)!
 static void _ypDict_iter_items_next( ypObject *itemiter, ypObject **key, ypObject **value )
 {
     ypObject *excess;
@@ -6199,6 +6203,8 @@ static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject *itemiter )
     // Use lenhint in the hopes of requiring only one resize
     // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
     // the given lenhint
+    // TODO You know...this is all pretty simple once this resizing logic is thrown out; perhaps
+    // that's enough to remove the need for yp_ONSTACK_ITER_KVALIST
 #if 0 // ...is causing every yp_updateK to resize the dict, even though it's just replacing values
     lenhint = yp_iter_lenhintC( itemiter, &result );
     if( yp_isexceptionC( result ) ) return result;
@@ -6219,6 +6225,22 @@ static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject *itemiter )
         }
         result = _ypDict_push( mp, key, value, 1, &spaceleft );
         yp_decrefN( 2, key, value );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
+// FIXME Wait until we need a resize, then since we're resizing anyway, resize to fit the given
+// lenhint
+static ypObject *_ypDict_update_from_fromkeys( ypObject *mp, ypObject *value, int n, va_list args )
+{
+    yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
+    ypObject *result = yp_None;
+    ypObject *key;
+
+    for( /*n already set*/; n > 0; n-- ) {
+        key = va_arg( args, ypObject * ); // borrowed
+        result = _ypDict_push( mp, key, value, 1, &spaceleft );
         if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
@@ -6414,24 +6436,15 @@ static ypObject *dict_delitem( ypObject *mp, ypObject *key )
 }
 
 // TODO Investigate if this is better than using yp_ONSTACK_ITER_KVALIST and, if so, update other
-// "K" functions similarly
+// "K" functions similarly (I'm pretty sure it is)
+// FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
+// the given n
 static ypObject *dict_updateK( ypObject *mp, int n, va_list args )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
     ypObject *result = yp_None;
     ypObject *key;
     ypObject *value;
-
-    // Use n in the hopes of requiring only one resize
-    // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
-    // the given n
-#if 0 // ...is causing every yp_updateK to resize the dict, even though it's just replacing values
-    if( spaceleft < n ) {
-        result = _ypDict_resize( mp, ypDict_LEN( mp )+n );
-        if( yp_isexceptionC( result ) ) return result;
-        spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
-    }
-#endif
 
     for( /*n already set*/; n > 0; n-- ) {
         key = va_arg( args, ypObject * ); // borrowed
@@ -6705,6 +6718,7 @@ static ypTypeObject ypDict_Type = {
 // Constructors
 // XXX x may be an yp_ONSTACK_ITER_KVALIST: use carefully
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
+// TODO Perhaps this should be broken up, and a _ypDict_update_from_valist created
 static ypObject *_ypDict( int type, ypObject *x )
 {
     ypObject *exc = yp_None;
@@ -6756,7 +6770,16 @@ ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
 }
 ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
     // TODO Return _yp_frozendict_empty on n<1??
-    return yp_NotImplementedError;
+    ypObject *result;
+    ypObject *newMp = _ypDict_new( ypFrozenDict_CODE, n );
+    if( yp_isexceptionC( newMp ) ) return newMp;
+    // TODO make sure _ypDict_update_from_fromkeys is efficient for pre-sized objects
+    result = _ypDict_update_from_fromkeys( newMp, value, n, args );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( newMp );
+        return result;
+    }
+    return newMp;
 }
 
 ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
@@ -6764,7 +6787,16 @@ ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_dict_fromkeysV, (value, n, args), n );
 }
 ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
-    return yp_NotImplementedError;
+    ypObject *result;
+    ypObject *newMp = _ypDict_new( ypDict_CODE, n );
+    if( yp_isexceptionC( newMp ) ) return newMp;
+    // TODO make sure _ypDict_update_from_fromkeys is efficient for pre-sized objects
+    result = _ypDict_update_from_fromkeys( newMp, value, n, args );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( newMp );
+        return result;
+    }
+    return newMp;
 }
 
 ypObject *yp_frozendict( ypObject *x ) {
