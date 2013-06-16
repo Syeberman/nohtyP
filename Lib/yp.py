@@ -106,6 +106,8 @@ class c_ypObject_p( c_void_p ):
     @property
     def _yp_typecode( self ):
         return string_at( self.value, 1 )[0]
+class c_ypObject_p_no_errcheck( c_ypObject_p ):
+    def _yp_errcheck( self ): pass
 
 def c_ypObject_p_value( name ):
     value = c_ypObject_p.in_dll( ypdll, name )
@@ -575,6 +577,8 @@ yp_func( c_ypObject_p, "yp_iter_items", ((c_ypObject_p, "mapping"), ) )
 yp_func( c_ypObject_p, "yp_iter_keys", ((c_ypObject_p, "mapping"), ) )
 
 # ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
+yp_func( c_ypObject_p, "yp_popvalue3", ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"),
+    (c_ypObject_p, "defval")) )
 
 # void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
 
@@ -1118,20 +1122,24 @@ class _setlike_dictview:
     def __init__( self, mp ): self._mp = mp
     def __iter__( self ): return self._iter_func( self._mp )
     def _as_set( self ): return yp_set( self._iter_func( self._mp ) )
-    def __lt__( self, other ): return self._as_set( ) <  other
-    def __le__( self, other ): return self._as_set( ) <= other
-    def __eq__( self, other ): return self._as_set( ) == other
-    def __ne__( self, other ): return self._as_set( ) != other
-    def __ge__( self, other ): return self._as_set( ) >= other
-    def __gt__( self, other ): return self._as_set( ) >  other
-    def __or__( self, other ):  return self._as_set( ) | other
-    def __and__( self, other ): return self._as_set( ) & other
-    def __sub__( self, other ): return self._as_set( ) - other
-    def __xor__( self, other ): return self._as_set( ) ^ other
-    def __ror__( self, other ):  return other | self._as_set( )
-    def __rand__( self, other ): return other & self._as_set( )
-    def __rsub__( self, other ): return other - self._as_set( )
-    def __rxor__( self, other ): return other ^ self._as_set( )
+    @staticmethod
+    def _conv_other( other ):
+        if isinstance( other, _setlike_dictview ): return other._as_set( )
+        return other
+    def __lt__( self, other ): return self._as_set( ) <  self._conv_other( other )
+    def __le__( self, other ): return self._as_set( ) <= self._conv_other( other )
+    def __eq__( self, other ): return self._as_set( ) == self._conv_other( other )
+    def __ne__( self, other ): return self._as_set( ) != self._conv_other( other )
+    def __ge__( self, other ): return self._as_set( ) >= self._conv_other( other )
+    def __gt__( self, other ): return self._as_set( ) >  self._conv_other( other )
+    def __or__( self, other ):  return self._as_set( ) | self._conv_other( other )
+    def __and__( self, other ): return self._as_set( ) & self._conv_other( other )
+    def __sub__( self, other ): return self._as_set( ) - self._conv_other( other )
+    def __xor__( self, other ): return self._as_set( ) ^ self._conv_other( other )
+    def __ror__( self, other ):  return self._conv_other( other ) | self._as_set( )
+    def __rand__( self, other ): return self._conv_other( other ) & self._as_set( )
+    def __rsub__( self, other ): return self._conv_other( other ) - self._as_set( )
+    def __rxor__( self, other ): return self._conv_other( other ) ^ self._as_set( )
 class _keys_dictview( _setlike_dictview ):
     _iter_func = staticmethod( _yp_iter_keys )
 class _values_dictview:
@@ -1163,7 +1171,8 @@ class yp_dict( ypObject ):
     def keys( self ): return _keys_dictview( self )
     def values( self ): return _values_dictview( self )
     def items( self ): return _items_dictview( self )
-
+    def pop( self, key, default=c_ypObject_p_no_errcheck( _yp_KeyError.value ) ): 
+        return _yp_popvalue3( self, key, default )
 
 # FIXME integrate this somehow with unittest
 #import os
