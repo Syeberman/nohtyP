@@ -307,6 +307,8 @@ class DictTest(unittest.TestCase):
         self.assertEqual(len(d['key']), 2)
         self.assertRaises(TypeError, d.setdefault)
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    def test_setdefault_badobj(self):
         class Exc(Exception): pass
 
         class BadHash(object):
@@ -408,6 +410,8 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(TypeError, d.pop)
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    def test_pop_badobj(self):
         class Exc(Exception): pass
 
         class BadHash(object):
@@ -423,6 +427,7 @@ class DictTest(unittest.TestCase):
         x.fail = True
         self.assertRaises(Exc, d.pop, x)
 
+    @unittest.skip( "TODO: Implement mutation detection in nohtyP?" )
     def test_mutating_iteration(self):
         # changing yp_dict size during iteration
         d = yp_dict()
@@ -431,6 +436,7 @@ class DictTest(unittest.TestCase):
             for i in d:
                 d[i+1] = 1
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_mutating_lookup(self):
         # changing yp_dict during a lookup (issue #14417)
         class NastyKey:
@@ -609,6 +615,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(yp_dict({1:1}).items() | {2}, {(1,1), 2})
         self.assertEqual({2} | yp_dict({1:1}).items(), {(1,1), 2})
 
+    @unittest.skip( "TODO: Implement __missing__ (or similar) in nohtyP?" )
     def test_missing(self):
         # Make sure yp_dict doesn't have a __missing__ method
         self.assertFalse(hasattr(yp_dict, "__missing__"))
@@ -855,6 +862,7 @@ class DictTest(unittest.TestCase):
             pass
         self._tracked(MyDict())
 
+    @unittest.skip( "TODO: Implement pickling in nohtyP" )
     def test_iterator_pickling(self):
         data = yp_dict({1:"a", 2:"b", 3:"c"})
         it = iter(data)
@@ -872,6 +880,7 @@ class DictTest(unittest.TestCase):
         del data[drop]
         self.assertEqual(sorted(it), sorted(data))
 
+    @unittest.skip( "TODO: Implement pickling in nohtyP" )
     def test_itemiterator_pickling(self):
         data = yp_dict({1:"a", 2:"b", 3:"c"})
         # dictviews aren't picklable, only their iterators
@@ -893,6 +902,7 @@ class DictTest(unittest.TestCase):
         del data[drop[0]]
         self.assertEqual(yp_dict(it), data)
 
+    @unittest.skip( "TODO: Implement pickling in nohtyP" )
     def test_valuesiterator_pickling(self):
         data = yp_dict({1:"a", 2:"b", 3:"c"})
         # data.values() isn't picklable, only its iterator

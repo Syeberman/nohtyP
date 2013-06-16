@@ -6469,6 +6469,13 @@ static ypObject *dict_delitem( ypObject *mp, ypObject *key )
     return yp_None;
 }
 
+static ypObject *dict_popvalue( ypObject *mp, ypObject *key, ypObject *defval )
+{
+    ypObject *result = _ypDict_pop( mp, key );
+    if( result == ypSet_dummy ) return yp_incref( defval );
+    return result;
+}
+
 // TODO Investigate if this is better than using yp_ONSTACK_ITER_KVALIST and, if so, update other
 // "K" functions similarly (I'm pretty sure it is)
 // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
@@ -6679,7 +6686,7 @@ static ypMappingMethods ypDict_as_mapping = {
     frozendict_iter_items,          // tp_iter_items
     frozendict_miniiter_keys,       // tp_miniiter_keys
     frozendict_iter_keys,           // tp_iter_keys
-    MethodError_objobjobjproc,      // tp_popvalue
+    dict_popvalue,                  // tp_popvalue
     MethodError_popitemfunc,        // tp_popitem
     MethodError_objobjobjproc,      // tp_setdefault
     dict_updateK,                   // tp_updateK
@@ -7125,6 +7132,10 @@ ypObject *yp_iter_items( ypObject *mapping ) {
 
 ypObject *yp_iter_keys( ypObject *mapping ) {
     _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_keys, (mapping) );
+}
+
+ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval ) {
+    _yp_INPLACE_RETURN2( mapping, tp_as_mapping, tp_popvalue, (*mapping, key, defval) );
 }
 
 void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value ) {

@@ -818,9 +818,11 @@ ypAPI ypObject *yp_iter_items( ypObject *mapping );
 ypAPI ypObject *yp_iter_keys( ypObject *mapping );
 
 // If key is in mapping, remove it and return a new reference to its value, else return a new
-// reference to defval.  defval _can_ be an exception; the Python-equivalent "default" of defval is
-// yp_KeyError.  On error, *mapping is discarded and set to an exception _and_ an exception is
-// returned.  Note that yp_push and yp_pop are not applicable for mapping objects.
+// reference to defval.  defval _can_ be an exception: if key is in mapping the method succeeds,
+// otherwise the method fails with the specified exception.  The Python-equivalent "default" of
+// defval is yp_KeyError.  On error, *mapping is discarded and set to an exception (defval, 
+// perhaps) _and_ that exception is returned.  Note that yp_push and yp_pop are not applicable for
+// mapping objects.
 ypAPI ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
 
 // Removes an arbitrary item from *mapping and returns new references to its *key and *value.  If
