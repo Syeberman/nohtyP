@@ -581,6 +581,8 @@ yp_func( c_ypObject_p, "yp_popvalue3", ((c_ypObject_pp, "mapping"), (c_ypObject_
     (c_ypObject_p, "defval")) )
 
 # void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
+yp_func( c_void, "yp_popitem", ((c_ypObject_pp, "mapping"), (c_ypObject_pp, "key"), 
+    (c_ypObject_pp, "value")) )
 
 # ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval );
 yp_func( c_ypObject_p, "yp_setdefault",
@@ -1024,7 +1026,7 @@ class yp_str( ypObject ):
         size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
         encoding = c_ypObject_pp( yp_None )
         _yp_asencodedCX( self, encoded, size, encoding )
-        # FIXME assert encoding[0].value == yp_s_latin_1.value
+        assert encoding[0] == yp_s_latin_1
         return string_at( encoded.contents, size.contents ).decode( "latin-1" )
     # FIXME When nohtyP supports repr, replace this faked-out version
     def __repr__( self ): return repr( str( self ) )
@@ -1173,6 +1175,11 @@ class yp_dict( ypObject ):
     def items( self ): return _items_dictview( self )
     def pop( self, key, default=c_ypObject_p_no_errcheck( _yp_KeyError.value ) ): 
         return _yp_popvalue3( self, key, default )
+    def popitem( self ):
+        key = c_ypObject_pp( yp_None )
+        value = c_ypObject_pp( yp_None )
+        _yp_popitem( self, key, value )
+        return (key[0], value[0])
 
 # FIXME integrate this somehow with unittest
 #import os

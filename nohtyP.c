@@ -5974,7 +5974,6 @@ ypObject *yp_set( ypObject *iterable ) {
 // keys or resize it.  It identifies itself as a frozendict, yet we add keys to it, so it is not
 // truly immutable.  As such, it cannot be exposed outside of the set/dict implementations.
 // TODO investigate how/when the keyset will be shared between dicts
-// TODO alloclen will always be the same as keyset.alloclen; repurpose?
 
 // ypDictObject and ypDict_LEN are defined above, for use by the set code
 #define ypDict_KEYSET( mp )         ( ((ypDictObject *)mp)->keyset )
@@ -5982,6 +5981,12 @@ ypObject *yp_set( ypObject *iterable ) {
 #define ypDict_VALUES( mp )         ( (ypObject **) ((ypObject *)mp)->ob_data )
 #define ypDict_SET_VALUES( mp, x )  ( ((ypObject *)mp)->ob_data = x )
 #define ypDict_INLINE_DATA( mp )    ( ((ypDictObject *)mp)->ob_inline_data )
+
+// XXX The dict's alloclen is always equal to the keyset alloclen, and we don't use the standard
+// ypMem_* macros to resize the dict, so we repurpose mp->ob_alloclen to be the search finger for
+// dict_popitem; if it gets corrupted, it's no big deal, because it's just a place to start
+// searching
+#define ypDict_POPITEM_FINGER( mp ) ( ((ypObject *)mp)->ob_alloclen )
 
 // Returns the index of the given ypSet_KeyEntry in the hash table
 // TODO needed?
@@ -6059,6 +6064,8 @@ static ypObject *_ypDict_copy( int type, ypObject *x, visitfunc copy_visitor, vo
 
 // The tricky bit about resizing dicts is that we need both the old and new keysets and value
 // arrays to properly transfer the data, so ypMem_REALLOC_CONTAINER_VARIABLE is no help.
+// XXX If ever this is rewritten to use the ypMem_* macros, remember that mp->ob_alloclen is _not_
+// the allocation length: it has been repurposed (see ypDict_POPITEM_FINGER)
 static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
 {
     ypObject *newkeyset;
@@ -6101,7 +6108,6 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     ypDict_KEYSET( mp ) = newkeyset;
     if( oldvalues != ypDict_INLINE_DATA( mp ) ) yp_free( oldvalues );
     ypDict_SET_VALUES( mp, newvalues );
-    ypDict_ALLOCLEN( mp ) = newalloclen;
     return yp_None;
 }
 
@@ -6476,6 +6482,39 @@ static ypObject *dict_popvalue( ypObject *mp, ypObject *key, ypObject *defval )
     return result;
 }
 
+// Note the difference between this, which removes an arbitrary item, and
+// _ypDict_pop, which removes a specific item
+// XXX Make sure not to leave references in *key and *value on error
+// XXX Adapted from Python's set_pop
+static ypObject *dict_popitem( ypObject *mp, ypObject **key, ypObject **value )
+{
+    register yp_ssize_t i;
+    register ypObject **values = ypDict_VALUES( mp );
+
+    if( ypDict_LEN( mp ) < 1 ) return yp_KeyError; // "pop from an empty dict"
+
+    /* We abuse mp->ob_alloclen to hold a search finger; recall
+     * ypDict_ALLOCLEN uses the keyset's ob_alloclen
+     */
+    i = ypDict_POPITEM_FINGER( mp );
+    /* The ob_alloclen may be a real allocation length, or it may
+     * be a legit search finger, or it may be a once-legit search
+     * finger that's out of bounds now because it wrapped around
+     * or the table shrunk -- simply make sure it's in bounds now.
+     */
+    if( i >= ypDict_ALLOCLEN( mp ) || i < 0 ) i = 0;
+    while( values[i] == NULL ) {
+        i++;
+        if( i >= ypDict_ALLOCLEN( mp ) ) i = 0;
+    }
+    *key = yp_incref( ypSet_TABLE( ypDict_KEYSET( mp ) )[i].se_key );
+    *value = values[i];
+    values[i] = NULL;
+    ypDict_LEN( mp ) -= 1;
+    ypDict_POPITEM_FINGER( mp ) = i + 1;  /* next place to start */
+    return yp_None;
+}
+
 // TODO Investigate if this is better than using yp_ONSTACK_ITER_KVALIST and, if so, update other
 // "K" functions similarly (I'm pretty sure it is)
 // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
@@ -6687,7 +6726,7 @@ static ypMappingMethods ypDict_as_mapping = {
     frozendict_miniiter_keys,       // tp_miniiter_keys
     frozendict_iter_keys,           // tp_iter_keys
     dict_popvalue,                  // tp_popvalue
-    MethodError_popitemfunc,        // tp_popitem
+    dict_popitem,                   // tp_popitem
     MethodError_objobjobjproc,      // tp_setdefault
     dict_updateK,                   // tp_updateK
     frozendict_miniiter_values,     // tp_miniiter_values
@@ -7139,8 +7178,12 @@ ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval ) {
 }
 
 void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value ) {
-    // XXX tp_popitem should set *key and *value to exceptions on error
-    _yp_INPLACE2( mapping, tp_as_mapping, tp_popitem, (*mapping, key, value) );
+    ypTypeObject *type = ypObject_TYPE( *mapping );
+    ypObject *result = type->tp_as_mapping->tp_popitem( *mapping, key, value );
+    if( yp_isexceptionC( result ) ) {
+        *key = *value = result;
+        yp_INPLACE_ERR( mapping, result );
+    }
 }
 
 ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval ) {
