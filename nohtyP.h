@@ -90,8 +90,10 @@ extern "C" {
  */
 
 // Must be called once before any other function; subsequent calls are a no-op.  If a fatal error
-// occurs abort() is called.
-ypAPI void yp_initialize( void );
+// occurs abort() is called.  kwparams can be NULL to accept all defaults; further documentation
+// on these parameters can be found below.
+typedef struct _yp_initialize_kwparams yp_initialize_kwparams;
+ypAPI void yp_initialize( yp_initialize_kwparams *kwparams );
 
 
 /*
@@ -1169,6 +1171,17 @@ ypAPI int yp_isexceptionC2( ypObject *x, ypObject *exc );
 
 // A convenience function to compare x against n possible exceptions.  Returns false if n is zero.
 ypAPI int yp_isexceptionCN( ypObject *x, int n, ... );
+
+
+/*
+ * Initialization Parameters
+ */
+
+// yp_initialize accepts a number of parameters to customize nohtyP behaviour
+// TODO Actually provide "a number of parameters"
+typedef struct _yp_initialize_kwparams {
+    yp_ssize_t struct_size;     // set to sizeof( yp_initialize_kwparams )
+} yp_initialize_kwparams;
 
 
 /*

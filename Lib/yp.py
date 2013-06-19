@@ -93,11 +93,6 @@ def yp_func( retval, name, paramtuple, errcheck=True ):
     globals( )[c_func._yp_name] = c_func_wrapper
 
 
-# XXX Initialize nohtyP
-# ypAPI void yp_initialize( void );
-yp_func( c_void, "yp_initialize", (), errcheck=False )
-_yp_initialize( )
-
 # typedef struct _ypObject ypObject;
 class c_ypObject_p( c_void_p ):
     @classmethod
@@ -150,6 +145,11 @@ c_ypObject_pp_exc = (c_ypObject_pp, "exc", None)
 c_multiN_ypObject_p = (c_int, "n", 0)
 c_multiK_ypObject_p = (c_int, "n", 0)
 assert c_multiN_ypObject_p is not c_multiK_ypObject_p
+
+# XXX Initialize nohtyP
+# ypAPI void yp_initialize( yp_initialize_kwparams *kwparams );
+yp_func( c_void, "yp_initialize", ((c_void_p, "kwparams"), ), errcheck=False )
+_yp_initialize( None )
 
 # ypAPI ypObject *yp_incref( ypObject *x );
 yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )

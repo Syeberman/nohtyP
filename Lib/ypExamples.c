@@ -373,6 +373,6 @@ EXAMPLE( ConditionalStatements, EXCEPT_AS )
 
 int main(int argc, char *argv[], char *envp[])
 {
-    yp_initialize( );
+    yp_initialize( NULL );
     return ypExamples( ); // TODO complete
 }
