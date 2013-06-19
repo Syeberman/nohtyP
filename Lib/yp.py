@@ -6,8 +6,7 @@ yp.py - Python wrapper for nohtyP
     License: http://docs.python.org/3/license.html
 """
 
-#import atexit
-#atexit.register( input, "Press Enter to continue..." )
+# TODO __all__, or underscores
 
 from ctypes import *
 import sys, weakref
@@ -28,7 +27,12 @@ _yp_arg_missing = object( )
 
 # Ensures that at most one Python object exists per nohtyP object
 _yp_pyobj_cache = weakref.WeakValueDictionary( )
-
+def _yp_transmute_and_cache( obj ):
+    try: return _yp_pyobj_cache[obj.value] # try to use an existing object
+    except KeyError:
+        obj.__class__ = ypObject._ypcode2yp[obj._yp_typecode]
+        _yp_pyobj_cache[obj.value] = obj
+        return obj
 
 class yp_param:
     def __init__( self, type, name, default=_yp_arg_missing, direction=c_IN ):
@@ -47,10 +51,7 @@ def yp_func_errcheck( result, func, args ):
     getattr( result, "_yp_errcheck", int )( )
     for arg in args: getattr( arg, "_yp_errcheck", int )( )
     if isinstance( result, c_ypObject_p ):
-        try: result = _yp_pyobj_cache[result.value] # try to use an existing object
-        except KeyError:
-            result.__class__ = ypObject._ypcode2yp[result._yp_typecode]
-            _yp_pyobj_cache[result.value] = result
+        result = _yp_transmute_and_cache( result )
     return result
 
 def yp_func( retval, name, paramtuple, errcheck=True ):
@@ -111,8 +112,7 @@ class c_ypObject_p_no_errcheck( c_ypObject_p ):
 
 def c_ypObject_p_value( name ):
     value = c_ypObject_p.in_dll( ypdll, name )
-    value.__class__ = ypObject._ypcode2yp[value._yp_typecode]
-    _yp_pyobj_cache[value.value] = value
+    value = _yp_transmute_and_cache( value )
     globals( )[name] = value
 
 class c_ypObject_pp( c_ypObject_p*1 ):
@@ -581,7 +581,7 @@ yp_func( c_ypObject_p, "yp_popvalue3", ((c_ypObject_pp, "mapping"), (c_ypObject_
     (c_ypObject_p, "defval")) )
 
 # void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
-yp_func( c_void, "yp_popitem", ((c_ypObject_pp, "mapping"), (c_ypObject_pp, "key"), 
+yp_func( c_void, "yp_popitem", ((c_ypObject_pp, "mapping"), (c_ypObject_pp, "key"),
     (c_ypObject_pp, "value")) )
 
 # ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval );
@@ -1173,13 +1173,15 @@ class yp_dict( ypObject ):
     def keys( self ): return _keys_dictview( self )
     def values( self ): return _values_dictview( self )
     def items( self ): return _items_dictview( self )
-    def pop( self, key, default=c_ypObject_p_no_errcheck( _yp_KeyError.value ) ): 
+    def pop( self, key, default=c_ypObject_p_no_errcheck( _yp_KeyError.value ) ):
         return _yp_popvalue3( self, key, default )
     def popitem( self ):
-        key = c_ypObject_pp( yp_None )
-        value = c_ypObject_pp( yp_None )
-        _yp_popitem( self, key, value )
-        return (key[0], value[0])
+        key_p = c_ypObject_pp( yp_None )
+        value_p = c_ypObject_pp( yp_None )
+        _yp_popitem( self, key_p, value_p )
+        key = _yp_transmute_and_cache( key_p[0] )
+        value = _yp_transmute_and_cache( value_p[0] )
+        return (key, value)
 
 # FIXME integrate this somehow with unittest
 #import os
