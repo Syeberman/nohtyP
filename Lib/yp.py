@@ -25,7 +25,8 @@ c_char_pp = POINTER( c_char_p )
 # Used to signal that a particular arg has not been supplied; set to default value of such params
 _yp_arg_missing = object( )
 
-# Ensures that at most one Python object exists per nohtyP object
+# Ensures that at most one Python object exists per nohtyP object; make sure new ypObjects are
+# given their own references
 _yp_pyobj_cache = weakref.WeakValueDictionary( )
 def _yp_transmute_and_cache( obj ):
     try: return _yp_pyobj_cache[obj.value] # try to use an existing object
@@ -52,6 +53,7 @@ def yp_func_errcheck( result, func, args ):
     for arg in args: getattr( arg, "_yp_errcheck", int )( )
     if isinstance( result, c_ypObject_p ):
         result = _yp_transmute_and_cache( result )
+        # Returned references are always new; no need to incref
     return result
 
 def yp_func( retval, name, paramtuple, errcheck=True ):
@@ -113,6 +115,7 @@ class c_ypObject_p_no_errcheck( c_ypObject_p ):
 def c_ypObject_p_value( name ):
     value = c_ypObject_p.in_dll( ypdll, name )
     value = _yp_transmute_and_cache( value )
+    # These values are all immortal; no need to incref
     globals( )[name] = value
 
 class c_ypObject_pp( c_ypObject_p*1 ):
@@ -127,10 +130,18 @@ class c_ypObject_pp( c_ypObject_p*1 ):
     def _yp_errcheck( self ):
         ypObject_p_errcheck( self[0] )
     def __del__( self ):
-        _yp_decref( self[0] )
-        self[0] = yp_None
+        # FIXME Make __del__ work during shutdown
+        try: _yp_decref( self[0] )
+        except: pass
+        try: self[0] = yp_None
+        except: pass
         #super( ).__del__( self ) # no __del__ method?!
-
+    def __getitem__( self, key ):
+        item = super( ).__getitem__( key )
+        item_cached = _yp_transmute_and_cache( item )
+        # If our item was the one added to the cache, then we need to give it a new reference
+        if item is item_cached: _yp_incref( item_cached )
+        return item_cached
 
 # ypAPI ypObject *yp_None;
 
@@ -822,7 +833,9 @@ class ypObject( c_ypObject_p ):
         return super( ).__new__( cls )
     def __init__( self, *args, **kwargs ): pass
     def __del__( self ):
-        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing
+        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
+        # "Python guarantees that globals whose name begins with a single underscore are deleted 
+        # from their module before other globals are deleted"
         try: _yp_decref( self )
         except: pass
         return # FIXME Causing a Segmentation Fault sometimes?!?!
@@ -1179,9 +1192,7 @@ class yp_dict( ypObject ):
         key_p = c_ypObject_pp( yp_None )
         value_p = c_ypObject_pp( yp_None )
         _yp_popitem( self, key_p, value_p )
-        key = _yp_transmute_and_cache( key_p[0] )
-        value = _yp_transmute_and_cache( value_p[0] )
-        return (key, value)
+        return (key_p[0], value_p[0])
 
 # FIXME integrate this somehow with unittest
 #import os

@@ -711,6 +711,7 @@ class DictTest(unittest.TestCase):
         for i in range(5, 9):  # i==8 was the problem
             d[i] = i
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_resize2(self):
         # Another yp_dict resizing bug (SF bug #1456209).
         # This caused Segmentation faults or Illegal instructions.
