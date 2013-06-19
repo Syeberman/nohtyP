@@ -7281,8 +7281,8 @@ static ypTypeObject *ypTypeTable[255] = {
  * Initialization
  *************************************************************************************************/
 
-// TODO Make this accept configuration values from the user in a structure
-void yp_initialize( void )
+// TODO Make use of yp_initialize_kwparams to accept configuration values from the user
+void yp_initialize( yp_initialize_kwparams *kwparams )
 {
 #ifdef _MSC_VER
     // TODO memory leak detection that should only be enabled for debug builds
