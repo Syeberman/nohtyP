@@ -888,6 +888,8 @@ static void _ypMem_free_container( ypObject *ob, yp_ssize_t offsetof_inline )
  * Object fundamentals
  *************************************************************************************************/
 
+// TODO Instead of packing/unpacking type and refcnt in these, be smarter: inc/dec by 256, for
+// example; if using bitfields, is the compiler smart enough to do this (should be...)?
 ypObject *yp_incref( ypObject *x )
 {
     yp_uint32_t refcnt = ypObject_REFCNT( x );
