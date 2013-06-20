@@ -880,6 +880,8 @@ class ypObject( c_ypObject_p ):
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
 
+    def append( self, x ): _yp_append( self, x )
+
     def isdisjoint( self, other ):
         return _yp_isdisjoint( self, _yp_iterable( other ) )
     def issubset( self, other ):

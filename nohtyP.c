@@ -146,7 +146,7 @@ typedef struct {
     objsliceobjproc tp_setslice;
     objssizeproc tp_delindex;
     objsliceproc tp_delslice;
-    // tp_push (aka tp_append) is elsewhere
+    objobjproc tp_append;
     objobjproc tp_extend;
     objssizeproc tp_irepeat;
     objssizeobjproc tp_insert;
@@ -329,6 +329,7 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
         *name ## _objsliceobjproc, \
         *name ## _objssizeproc, \
         *name ## _objsliceproc, \
+        *name ## _objobjproc, \
         *name ## _objobjproc, \
         *name ## _objssizeproc, \
         *name ## _objssizeobjproc, \
@@ -2881,7 +2882,7 @@ yp_int_t yp_asintFL( yp_float_t x, ypObject **exc )
 
 
 /*************************************************************************************************
- * Indices and slices
+ * Common sequence functions
  *************************************************************************************************/
 
 // Using the given length, adjusts negative indicies to positive.  Returns yp_IndexError if the
@@ -2963,6 +2964,31 @@ static ypObject *ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp
 // Returns the index of the i'th item in the slice with the given adjusted start/step values.  i
 // must be in range(slicelength).
 #define ypSlice_INDEX( start, step, i )  ((start) + (i)*(step))
+
+static ypObject *_ypSequence_getdefault( ypObject *x, ypObject *key, ypObject *defval ) {
+    ypObject *exc = yp_None;
+    ypTypeObject *type = ypObject_TYPE( x );
+    yp_ssize_t index = yp_asssizeC( key, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    if( defval != NULL ) return yp_MethodError; // TODO support
+    return type->tp_as_sequence->tp_getindex( x, index );
+}
+
+static ypObject *_ypSequence_setitem( ypObject *x, ypObject *key, ypObject *value ) {
+    ypObject *exc = yp_None;
+    ypTypeObject *type = ypObject_TYPE( x );
+    yp_ssize_t index = yp_asssizeC( key, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    return type->tp_as_sequence->tp_setindex( x, index, value );
+}
+
+static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
+    ypObject *exc = yp_None;
+    ypTypeObject *type = ypObject_TYPE( x );
+    yp_ssize_t index = yp_asssizeC( key, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    return type->tp_as_sequence->tp_delindex( x, index );
+}
 
 
 /*************************************************************************************************
@@ -3413,6 +3439,7 @@ static ypSequenceMethods ypBytes_as_sequence = {
     MethodError_objsliceobjproc,    // tp_setslice
     MethodError_objssizeproc,       // tp_delindex
     MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_append
     MethodError_objobjproc,         // tp_extend
     MethodError_objssizeproc,       // tp_irepeat
     MethodError_objssizeobjproc,    // tp_insert
@@ -3469,7 +3496,7 @@ static ypTypeObject ypBytes_Type = {
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
+    _ypSequence_getdefault,         // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
 
@@ -3494,6 +3521,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
     bytearray_setslice,             // tp_setslice
     bytearray_delindex,             // tp_delindex
     bytearray_delslice,             // tp_delslice
+    MethodError_objobjproc,         // tp_append
     MethodError_objobjproc,         // tp_extend
     MethodError_objssizeproc,       // tp_irepeat
     MethodError_objssizeobjproc,    // tp_insert
@@ -3550,9 +3578,9 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
+    _ypSequence_getdefault,         // tp_getdefault
+    _ypSequence_setitem,            // tp_setitem
+    _ypSequence_delitem,            // tp_delitem
 
     // Sequence operations
     &ypByteArray_as_sequence,       // tp_as_sequence
@@ -3754,6 +3782,7 @@ static ypSequenceMethods ypStr_as_sequence = {
     MethodError_objsliceobjproc,    // tp_setslice
     MethodError_objssizeproc,       // tp_delindex
     MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_append
     MethodError_objobjproc,         // tp_extend
     MethodError_objssizeproc,       // tp_irepeat
     MethodError_objssizeobjproc,    // tp_insert
@@ -3810,7 +3839,7 @@ static ypTypeObject ypStr_Type = {
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
+    _ypSequence_getdefault,         // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
 
@@ -3835,6 +3864,7 @@ static ypSequenceMethods ypChrArray_as_sequence = {
     MethodError_objsliceobjproc,    // tp_setslice
     MethodError_objssizeproc,       // tp_delindex
     MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_append
     MethodError_objobjproc,         // tp_extend
     MethodError_objssizeproc,       // tp_irepeat
     MethodError_objssizeobjproc,    // tp_insert
@@ -3891,9 +3921,9 @@ static ypTypeObject ypChrArray_Type = {
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
+    _ypSequence_getdefault,         // tp_getdefault
+    _ypSequence_setitem,            // tp_setitem
+    _ypSequence_delitem,            // tp_delitem
 
     // Sequence operations
     &ypChrArray_as_sequence,        // tp_as_sequence
@@ -4378,6 +4408,7 @@ static ypSequenceMethods ypTuple_as_sequence = {
     MethodError_objsliceobjproc,    // tp_setslice
     MethodError_objssizeproc,       // tp_delindex
     MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_append
     MethodError_objobjproc,         // tp_extend
     MethodError_objssizeproc,       // tp_irepeat
     MethodError_objssizeobjproc,    // tp_insert
@@ -4434,7 +4465,7 @@ static ypTypeObject ypTuple_Type = {
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
+    _ypSequence_getdefault,         // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
 
@@ -4459,6 +4490,7 @@ static ypSequenceMethods ypList_as_sequence = {
     list_setslice,                  // tp_setslice
     list_delindex,                  // tp_delindex
     list_delslice,                  // tp_delslice
+    list_push,                      // tp_append
     list_extend,                    // tp_extend
     list_irepeat,                   // tp_irepeat
     list_insert,                    // tp_insert
@@ -4515,9 +4547,9 @@ static ypTypeObject ypList_Type = {
     list_clear,                     // tp_clear
     list_pop,                       // tp_pop
     MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
+    _ypSequence_getdefault,         // tp_getdefault
+    _ypSequence_setitem,            // tp_setitem
+    _ypSequence_delitem,            // tp_delitem
 
     // Sequence operations
     &ypList_as_sequence,            // tp_as_sequence
@@ -6113,15 +6145,50 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     return yp_None;
 }
 
+// Adds a new key with the given hash at the given key_loc, which may require a resize, and sets 
+// value appropriately.  *key_loc must point to a currently-unused location in the hash table; it 
+// will be updated if a resize occurs.  Otherwise behaves as _ypDict_push.
+// XXX Adapted from PyDict_SetItem
+// TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
+// shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
+// table.  Really, we should have a _ypDict_space_remaining.
+static ypObject *_ypDict_push_newkey( ypObject *mp, ypSet_KeyEntry **key_loc, ypObject *key,
+        yp_hash_t hash, ypObject *value, yp_ssize_t *spaceleft )
+{
+    ypObject *keyset = ypDict_KEYSET( mp );
+    ypObject *result;
+    yp_ssize_t newlen;
+
+    // It's possible we can add the key without resizing
+    if( *spaceleft >= 1 ) {
+        _ypSet_movekey( keyset, *key_loc, yp_incref( key ), hash );
+        *ypDict_VALUE_ENTRY( mp, *key_loc ) = yp_incref( value );
+        ypDict_LEN( mp ) += 1;
+        *spaceleft -= 1;
+        return yp_True;
+    }
+
+    // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
+    // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.
+    newlen = ypDict_LEN( mp )+1;
+    if( ypObject_IS_MUTABLE( mp ) ) newlen = _ypSet_calc_resize_minused( newlen );
+    result = _ypDict_resize( mp, newlen );  // invalidates keyset and *key_loc
+    if( yp_isexceptionC( result ) ) return result;
+
+    keyset = ypDict_KEYSET( mp );
+    _ypSet_movekey_clean( keyset, yp_incref( key ), hash, key_loc );
+    *ypDict_VALUE_ENTRY( mp, *key_loc ) = yp_incref( value );
+    ypDict_LEN( mp ) += 1;
+    *spaceleft = _ypSet_space_remaining( keyset );
+    return yp_True;
+}
+
 // Adds the key/value to the dict.  If override is false, returns yp_False and does not modify the
 // dict if there is an existing value.  *spaceleft should be initialized from
 // _ypSet_space_remaining; this function then decrements it with each key added, and resets it on
 // every resize.  Returns yp_True if mp was modified, yp_False if it wasn't due to existing values
 // being preserved (ie override is false), or an exception on error.
 // XXX Adapted from PyDict_SetItem
-// TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
-// shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
-// table.  Really, we should have a _ypDict_space_remaining.
 static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int override,
         yp_ssize_t *spaceleft )
 {
@@ -6130,7 +6197,6 @@ static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int
     ypSet_KeyEntry *key_loc;
     ypObject *result = yp_None;
     ypObject **value_loc;
-    yp_ssize_t newlen;
 
     // Look for the appropriate entry in the hash table
     // TODO yp_isexceptionC used internally should be a macro
@@ -6154,29 +6220,8 @@ static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int
         return yp_True;
     }
 
-    // Otherwise, we need to add the key, which possibly doesn't involve resizing
-    // TODO spaceleft
-    if( *spaceleft >= 1 ) {
-        _ypSet_movekey( keyset, key_loc, yp_incref( key ), hash );
-        *ypDict_VALUE_ENTRY( mp, key_loc ) = yp_incref( value );
-        ypDict_LEN( mp ) += 1;
-        *spaceleft -= 1;
-        return yp_True;
-    }
-
-    // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
-    // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.
-    newlen = ypDict_LEN( mp )+1;
-    if( ypObject_IS_MUTABLE( mp ) ) newlen = _ypSet_calc_resize_minused( newlen );
-    result = _ypDict_resize( mp, newlen );  // invalidates keyset and key_loc
-    if( yp_isexceptionC( result ) ) return result;
-
-    keyset = ypDict_KEYSET( mp );
-    _ypSet_movekey_clean( keyset, yp_incref( key ), hash, &key_loc );
-    *ypDict_VALUE_ENTRY( mp, key_loc ) = yp_incref( value );
-    ypDict_LEN( mp ) += 1;
-    *spaceleft = _ypSet_space_remaining( keyset );
-    return yp_True;
+    // Otherwise, we need to add both the key _and_ value, which may involve resizing
+    return _ypDict_push_newkey( mp, &key_loc, key, hash, value, spaceleft );
 }
 
 // Removes the value from the dict; the key stays in the keyset, but that's of no concern.  The
@@ -6517,6 +6562,40 @@ static ypObject *dict_popitem( ypObject *mp, ypObject **key, ypObject **value )
     return yp_None;
 }
 
+static ypObject *dict_setdefault( ypObject *mp, ypObject *key, ypObject *defval )
+{
+    yp_hash_t hash;
+    ypObject *keyset = ypDict_KEYSET( mp );
+    ypSet_KeyEntry *key_loc;
+    ypObject *result = yp_None;
+    ypObject **value_loc;
+
+    // Look for the appropriate entry in the hash table; note that key can be a mutable object,
+    // because we are not adding it to the set
+    hash = yp_currenthashC( key, &result );
+    if( yp_isexceptionC( result ) ) return result;  // returns if key is an exception
+    if( yp_isexceptionC( defval ) ) return defval;  // returns if defval is an exception
+    result = _ypSet_lookkey( keyset, key, hash, &key_loc );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // If the there's no existing value, add and return defval, otherwise return the value
+    value_loc = ypDict_VALUE_ENTRY( mp, key_loc );
+    if( *value_loc == NULL ) {
+        if( ypSet_ENTRY_USED( key_loc ) ) {
+            *value_loc = yp_incref( defval );
+            ypDict_LEN( mp ) += 1;
+        } else {
+            yp_ssize_t spaceleft = _ypSet_space_remaining( keyset );
+            result = _ypDict_push_newkey( mp, &key_loc, key, hash, defval, &spaceleft );
+            // value_loc is no longer valid
+            if( yp_isexceptionC( result ) ) return result;
+        }
+        return yp_incref( defval );
+    } else {
+        return yp_incref( *value_loc );
+    }
+}
+
 // TODO Investigate if this is better than using yp_ONSTACK_ITER_KVALIST and, if so, update other
 // "K" functions similarly (I'm pretty sure it is)
 // FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
@@ -6729,7 +6808,7 @@ static ypMappingMethods ypDict_as_mapping = {
     frozendict_iter_keys,           // tp_iter_keys
     dict_popvalue,                  // tp_popvalue
     dict_popitem,                   // tp_popitem
-    MethodError_objobjobjproc,      // tp_setdefault
+    dict_setdefault,                // tp_setdefault
     dict_updateK,                   // tp_updateK
     frozendict_miniiter_values,     // tp_miniiter_values
     frozendict_iter_values          // tp_iter_values
@@ -6954,18 +7033,15 @@ ypObject *yp_iter( ypObject *x ) {
 
 ypObject *yp_send( ypObject *iterator, ypObject *value ) {
     _yp_REDIRECT1( iterator, tp_send, (iterator, value) );
-    // TODO should we be discarding *iterator?
 }
 
 ypObject *yp_next( ypObject *iterator ) {
     _yp_REDIRECT1( iterator, tp_send, (iterator, yp_None) );
-    // TODO should we be discarding *iterator?
 }
 
 ypObject *yp_throw( ypObject *iterator, ypObject *exc ) {
     if( !yp_isexceptionC( exc ) ) return yp_TypeError;
     _yp_REDIRECT1( iterator, tp_send, (iterator, exc) );
-    // TODO should we be discarding *iterator?
 }
 
 ypObject *yp_contains( ypObject *container, ypObject *x ) {
@@ -7046,7 +7122,7 @@ void yp_delsliceC4( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t 
 }
 
 void yp_append( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE1( sequence, tp_push, (*sequence, x) );
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_append, (*sequence, x) );
 }
 
 void yp_extend( ypObject **sequence, ypObject *x ) {
@@ -7198,7 +7274,6 @@ ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval ) {
 void yp_updateK( ypObject **mapping, int n, ... ) {
     return_yp_K_FUNC_void( yp_updateKV, (mapping, n, args), n );
 }
-
 void yp_updateKV( ypObject **mapping, int n, va_list args ) {
     _yp_INPLACE2( mapping, tp_as_mapping, tp_updateK, (*mapping, n, args) );
 }
