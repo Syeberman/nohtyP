@@ -1110,10 +1110,9 @@ ypAPI yp_int_t yp_asintC_getitem( ypObject *container, ypObject *key, ypObject *
 //      yp_IMMORTAL_BYTES( name, value );
 
 // Defines an immortal str constant at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const".  value is a C string literal.  The length is calculated 
-// while compiling; the hash will be calculated the first time it is accessed.
-// TODO Some warning that the compiler used may not actually be using latin-1
-// TODO Review this documentation, and macro name (does Python have similar?)
+// which is of type "ypObject * const".  value is a Latin-1 encoded C string literal that can
+// contain null characters.  The length is calculated while compiling; the hash will be calculated
+// the first time it is accessed.
 //      yp_IMMORTAL_STR_LATIN1( name, value );
 
 
