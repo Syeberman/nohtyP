@@ -324,6 +324,7 @@ class DictTest(unittest.TestCase):
         x.fail = True
         self.assertRaises(Exc, d.setdefault, x, [])
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_setdefault_atomic(self):
         # Issue #13521: setdefault() calls __hash__ and __eq__ only once.
         class Hashed(object):
@@ -344,6 +345,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(hashed2.hash_count, 1)
         self.assertEqual(hashed1.eq_count + hashed2.eq_count, 1)
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_setitem_atomic_at_resize(self):
         class Hashed(object):
             def __init__(self):
@@ -664,7 +666,7 @@ class DictTest(unittest.TestCase):
         d = yp_dict()
         with self.assertRaises(KeyError) as c:
             d[(1,)]
-        self.assertEqual(c.exception.args, ((1,),))
+        #self.assertEqual(c.exception.args, ((1,),)) # not applicable to nohtyP
 
     @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_bad_key(self):
