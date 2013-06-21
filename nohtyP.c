@@ -1459,7 +1459,7 @@ static ypObject *_yp_freeze( ypObject *x )
     exc = newType->tp_freeze( x );
     if( yp_isexceptionC( exc ) ) return exc;
     ypObject_SET_TYPE_CODE( x, newCode );
-    x->ob_hash = _ypObject_HASH_INVALID; // just in case
+    x->ob_hash = ypObject_HASH_INVALID; // just in case
     yp_hashC( x, &exc );
     return exc;
 }
@@ -2044,6 +2044,73 @@ int yp_isexceptionCN( ypObject *x, int n, ... )
     va_end( args );
     return 0;
 }
+
+
+/*************************************************************************************************
+ * Types
+ *************************************************************************************************/
+
+static ypTypeObject ypType_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    MethodError_objproc,            // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    MethodError_traversefunc,       // tp_unfrozen_copy
+    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    MethodError_objproc,            // tp_bool
+    NotImplemented_comparefunc,     // tp_lt
+    NotImplemented_comparefunc,     // tp_le
+    NotImplemented_comparefunc,     // tp_eq
+    NotImplemented_comparefunc,     // tp_ne
+    NotImplemented_comparefunc,     // tp_ge
+    NotImplemented_comparefunc,     // tp_gt
+
+    // Generic object operations
+    MethodError_hashfunc,           // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    TypeError_miniiterfunc,         // tp_miniiter
+    TypeError_miniiterfunc,         // tp_miniiter_reversed
+    MethodError_miniiterfunc,       // tp_miniiter_next
+    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+    TypeError_objproc,              // tp_iter
+    TypeError_objproc,              // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    MethodError_lenfunc,            // tp_len
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjobjproc,      // tp_remove
+    MethodError_objobjobjproc,      // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+
+    // Sequence operations
+    MethodError_SequenceMethods,    // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
 
 
 /*************************************************************************************************
@@ -7388,7 +7455,7 @@ void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t 
 
 
 /*************************************************************************************************
- * The type table
+ * The type table, and related public functions and variables
  *************************************************************************************************/
 // XXX Make sure this corresponds with ypInvalidated_CODE et al!
 
@@ -7398,8 +7465,8 @@ static ypTypeObject *ypTypeTable[255] = {
     &ypInvalidated_Type,/*                             (  1u) */
     &ypException_Type,  /* ypException_CODE            (  2u) */
     &ypException_Type,  /*                             (  3u) */
-    NULL,               /* ypType_CODE                 (  4u) */
-    NULL,               /*                             (  5u) */
+    &ypType_Type,       /* ypType_CODE                 (  4u) */
+    &ypType_Type,       /*                             (  5u) */
 
     &ypNoneType_Type,   /* ypNoneType_CODE             (  6u) */
     &ypNoneType_Type,   /*                             (  7u) */
@@ -7427,6 +7494,32 @@ static ypTypeObject *ypTypeTable[255] = {
     &ypFrozenDict_Type, /* ypFrozenDict_CODE           ( 24u) */
     &ypDict_Type,       /* ypDict_CODE                 ( 25u) */
 };
+
+ypObject *yp_type( ypObject *object ) {
+    return (ypObject *) ypObject_TYPE( object );
+}
+
+// The immortal type objects
+ypObject * const yp_type_invalidated = (ypObject *) &ypInvalidated_Type;
+ypObject * const yp_type_exception = (ypObject *) &ypException_Type;
+ypObject * const yp_type_type = (ypObject *) &ypType_Type;
+ypObject * const yp_type_NoneType = (ypObject *) &ypNoneType_Type;
+ypObject * const yp_type_bool = (ypObject *) &ypBool_Type;
+ypObject * const yp_type_int = (ypObject *) &ypInt_Type;
+ypObject * const yp_type_intstore = (ypObject *) &ypIntStore_Type;
+ypObject * const yp_type_float = (ypObject *) &ypFloat_Type;
+ypObject * const yp_type_floatstore = (ypObject *) &ypFloatStore_Type;
+ypObject * const yp_type_iter = (ypObject *) &ypIter_Type;
+ypObject * const yp_type_bytes = (ypObject *) &ypBytes_Type;
+ypObject * const yp_type_bytearray = (ypObject *) &ypByteArray_Type;
+ypObject * const yp_type_str = (ypObject *) &ypStr_Type;
+ypObject * const yp_type_chrarray = (ypObject *) &ypChrArray_Type;
+ypObject * const yp_type_tuple = (ypObject *) &ypTuple_Type;
+ypObject * const yp_type_list = (ypObject *) &ypList_Type;
+ypObject * const yp_type_frozenset = (ypObject *) &ypFrozenSet_Type;
+ypObject * const yp_type_set = (ypObject *) &ypSet_Type;
+ypObject * const yp_type_frozendict = (ypObject *) &ypFrozenDict_Type;
+ypObject * const yp_type_dict = (ypObject *) &ypDict_Type;
 
 
 /*************************************************************************************************

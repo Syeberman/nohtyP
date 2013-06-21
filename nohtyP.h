@@ -1053,6 +1053,37 @@ ypAPI ypObject * const yp_sys_minint;
 
 
 /*
+ * Type Operations
+ */
+
+// Return the immortal type of object.  If object is an exception, yp_type_exception is returned;
+// if it is invalidated, yp_type_invalidated is returned.
+ypAPI ypObject *yp_type( ypObject *object );
+
+// The immortal type objects
+ypAPI ypObject * const yp_type_invalidated;
+ypAPI ypObject * const yp_type_exception;
+ypAPI ypObject * const yp_type_type;
+ypAPI ypObject * const yp_type_NoneType;
+ypAPI ypObject * const yp_type_bool;
+ypAPI ypObject * const yp_type_int;
+ypAPI ypObject * const yp_type_intstore;
+ypAPI ypObject * const yp_type_float;
+ypAPI ypObject * const yp_type_floatstore;
+ypAPI ypObject * const yp_type_iter;
+ypAPI ypObject * const yp_type_bytes;
+ypAPI ypObject * const yp_type_bytearray;
+ypAPI ypObject * const yp_type_str;
+ypAPI ypObject * const yp_type_chrarray;
+ypAPI ypObject * const yp_type_tuple;
+ypAPI ypObject * const yp_type_list;
+ypAPI ypObject * const yp_type_frozenset;
+ypAPI ypObject * const yp_type_set;
+ypAPI ypObject * const yp_type_frozendict;
+ypAPI ypObject * const yp_type_dict;
+
+
+/*
  * Mini Iterators
  */
 
