@@ -1148,7 +1148,7 @@ void yp_unpackN( ypObject *iterable, int n, ... )
     ypObject **dest;
 
     // Set the given n arguments to the values yielded from iterable; if an exception occurs, we
-    // will need to restart and discard these values.  Remember that if yp_miniiter fails, 
+    // will need to restart and discard these values.  Remember that if yp_miniiter fails,
     // yp_miniiter_next will return the same exception.
     // TODO Hmmm; let's say iterable was yp_StopIteration for some reason: this code would actually
     // succeed when n=0 even though it should probably fail...we should check the yp_miniiter
@@ -3935,20 +3935,20 @@ static ypTypeObject ypChrArray_Type = {
     MethodError_MappingMethods      // tp_as_mapping
 };
 
-static ypObject *_yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size, 
+static ypObject *_yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
         ypObject * *encoding )
 {
     if( ypObject_TYPE_PAIR_CODE( seq ) != ypStr_CODE ) return_yp_BAD_TYPE( seq );
     *encoded = ypStr_DATA( seq );
     if( size == NULL ) {
-        return yp_NotImplementedError;
+        if( strlen( *encoded ) != ypStr_LEN( seq ) ) return yp_TypeError;
     } else {
         *size = ypStr_LEN( seq );
     }
     *encoding = yp_s_latin_1;
     return yp_None;
 }
-ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size, 
+ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
         ypObject * *encoding )
 {
     ypObject *result = _yp_asencodedCX( seq, encoded, size, encoding );
@@ -3962,7 +3962,8 @@ ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t
 
 // Public constructors
 
-// FIXME completely ignoring encoding/errors, and assuming source in latin-1
+// FIXME completely ignoring encoding/errors, and assuming source is latin-1 (when we should be
+// assuming it's utf-8 by default)
 static ypObject *_ypStrC( ypObject *(*allocator)( yp_ssize_t ),
     const yp_uint8_t *source, yp_ssize_t len )
 {
@@ -3990,6 +3991,12 @@ ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
 }
 ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors ) {
+    return _ypStrC( _yp_chrarray_new, source, len );
+}
+ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
+    return _ypStrC( _yp_str_new, source, len );
+}
+ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
     return _ypStrC( _yp_chrarray_new, source, len );
 }
 
@@ -6145,8 +6152,8 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     return yp_None;
 }
 
-// Adds a new key with the given hash at the given key_loc, which may require a resize, and sets 
-// value appropriately.  *key_loc must point to a currently-unused location in the hash table; it 
+// Adds a new key with the given hash at the given key_loc, which may require a resize, and sets
+// value appropriately.  *key_loc must point to a currently-unused location in the hash table; it
 // will be updated if a resize occurs.  Otherwise behaves as _ypDict_push.
 // XXX Adapted from PyDict_SetItem
 // TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
@@ -7299,14 +7306,84 @@ yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **ex
 
 
 /*************************************************************************************************
- * Compound operations
+ * C-to-C container operations
  *************************************************************************************************/
 
-yp_int_t yp_asintC_getitem( ypObject *container, ypObject *key, ypObject **exc ) {
-    ypObject *value = yp_getitem( container, key );
-    yp_int_t retval = yp_asintC( value, exc );
-    yp_decref( value );
-    return retval;
+// XXX You could spend *weeks* adding all sorts of nifty combinations to this section: DON'T.
+// Let's restrain ourselves and limit them to functions we actually find useful (and can test) in
+// our projects that integrate nohtyP.
+
+yp_int_t yp_o2i_getitemC( ypObject *container, ypObject *key, ypObject **exc ) {
+    ypObject *x = yp_getitem( container, key );
+    yp_int_t xC = yp_asintC( x, exc );
+    yp_decref( x );
+    return xC;
+}
+
+void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t xC ) {
+    ypObject *x = yp_intC( xC );
+    yp_setitem( container, key, x );
+    yp_decref( x );
+}
+
+void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
+        yp_ssize_t *size, ypObject * *encoding, ypObject **exc )
+{
+    ypObject *x;
+    ypObject *result;
+    int container_pair = ypObject_TYPE_PAIR_CODE( container );
+
+    // XXX The pointer returned via *encoded is only valid so long as the str/chrarray object
+    // remains allocated and isn't modified.  As such, limit this function to those containers that
+    // we *know* will keep the object allocated (so long as _they_ aren't modified, of course).
+    if( container_pair != ypTuple_CODE && container_pair != ypFrozenDict_CODE ) {
+        container = yp_TypeError; // will be propagated through to *exc
+    }
+
+    x = yp_getitem( container, key );
+    result = yp_asencodedCX( x, encoded, size, encoding );
+    yp_decref( x );
+    if( yp_isexceptionC( result ) ) *exc = result;
+}
+
+void yp_o2s_setitemC4( ypObject **container, ypObject *key,
+        const yp_uint8_t *xC, yp_ssize_t x_lenC )
+{
+    ypObject *x = yp_str_frombytesC2( xC, x_lenC );
+    yp_setitem( container, key, x );
+    yp_decref( x );
+}
+
+ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC ) {
+    ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
+    ypObject *x = yp_getitem( container, key );
+    yp_decref( key );
+    return x;
+}
+
+void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
+        ypObject *x )
+{
+    ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
+    yp_setitem( container, key, x );
+    yp_decref( key );
+}
+
+yp_int_t yp_s2i_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
+        ypObject **exc )
+{
+    ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
+    yp_int_t x = yp_o2i_getitemC( container, key, exc );
+    yp_decref( key );
+    return x;
+}
+
+void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
+        yp_int_t xC )
+{
+    ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
+    yp_o2i_setitemC( container, key, xC );
+    yp_decref( key );
 }
 
 

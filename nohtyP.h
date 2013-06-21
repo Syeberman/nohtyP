@@ -350,12 +350,17 @@ ypAPI ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len );
 ypAPI ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len );
 
 // Returns a new reference to a str/chrarray decoded from the given bytes.  source and len are as
-// in yp_bytesC.  The Python-equivalent default for encoding is yp_s_utf_8, while for errors it is
-// yp_s_strict.  Equivalent to yp_str3( yp_bytesC( source, len ), encoding, errors ).
+// in yp_bytesC.  The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
+// ascii-encoded source), while for errors it is yp_s_strict.  Equivalent to:
+//  yp_str3( yp_bytesC( source, len ), encoding, errors )
 ypAPI ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors );
 ypAPI ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors );
+
+// Equivalent to yp_str3( yp_bytesC( source, len ), yp_s_utf_8, yp_s_strict ).
+ypAPI ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
+ypAPI ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
 
 // Returns a new reference to a str/chrarray decoded from the given bytes or bytearray object.  The
 // Python-equivalent default for encoding is yp_s_utf_8, while for errors it is yp_s_strict.
@@ -502,7 +507,7 @@ ypAPI ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *si
 // files, is documented elsewhere.
 ypAPI void yp_close( ypObject **iterator );
 
-// Sets the given n ypObject**s to new references for the values yielded from iterable.  Iterable 
+// Sets the given n ypObject**s to new references for the values yielded from iterable.  Iterable
 // must yield exactly n objects, or else a yp_ValueError is raised.  Sets all n ypObject**s to the
 // same exception on error.  There is no 'V' version of this function.
 ypAPI void yp_unpackN( ypObject *iterable, int n, ... );
@@ -583,7 +588,7 @@ ypAPI ypObject *yp_pop( ypObject **container );
  * Sequence Operations
  */
 
-// These methods are supported by bytes, str, and tuple (and their mutable counterparts, of 
+// These methods are supported by bytes, str, and tuple (and their mutable counterparts, of
 // course).  They are _not_ supported by frozenset and frozendict because those types do not store
 // their elements in any particular order.
 
@@ -822,7 +827,7 @@ ypAPI ypObject *yp_iter_keys( ypObject *mapping );
 // If key is in mapping, remove it and return a new reference to its value, else return a new
 // reference to defval.  defval _can_ be an exception: if key is in mapping the method succeeds,
 // otherwise the method fails with the specified exception.  The Python-equivalent "default" of
-// defval is yp_KeyError.  On error, *mapping is discarded and set to an exception (defval, 
+// defval is yp_KeyError.  On error, *mapping is discarded and set to an exception (defval,
 // perhaps) _and_ that exception is returned.  Note that yp_push and yp_pop are not applicable for
 // mapping objects.
 ypAPI ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
@@ -871,7 +876,7 @@ ypAPI ypObject * const yp_s_utf_16_be; // "utf_16_be"
 ypAPI ypObject * const yp_s_utf_16_le; // "utf_16_le"
 ypAPI ypObject * const yp_s_utf_8;     // "utf_8"
 
-// Immortal strs representing common string decode error handling schemes, for convience with 
+// Immortal strs representing common string decode error handling schemes, for convience with
 // yp_str_frombytesC et al.
 ypAPI ypObject * const yp_s_strict;    // "strict"
 ypAPI ypObject * const yp_s_ignore;    // "ignore"
@@ -1044,17 +1049,19 @@ ypAPI ypObject *yp_sum( ypObject *iterable );
 ypAPI ypObject * const yp_sys_maxint;
 ypAPI ypObject * const yp_sys_minint;
 
+// TODO yp_i_zero, yp_i_one, etc?
+
 
 /*
  * Mini Iterators
  */
 
-// yp_iter usually returns a newly-allocated object.  Many types can function as "mini iterators" 
-// which can be used to avoid having to allocate/deallocate a separate iterator object.  The 
-// objects returned by yp_miniiter must be used in a very specific manner: you should only call 
-// yp_miniiter_* and yp_decref on them (yp_incref is also safe, but is usually unnecessary).  
-// The behaviour of any other functions is undefined and may or may not raise exceptions.  
-// For convenience, yp_miniiter is always supported if yp_iter is, and vice-versa; as a 
+// yp_iter usually returns a newly-allocated object.  Many types can function as "mini iterators"
+// which can be used to avoid having to allocate/deallocate a separate iterator object.  The
+// objects returned by yp_miniiter must be used in a very specific manner: you should only call
+// yp_miniiter_* and yp_decref on them (yp_incref is also safe, but is usually unnecessary).
+// The behaviour of any other functions is undefined and may or may not raise exceptions.
+// For convenience, yp_miniiter is always supported if yp_iter is, and vice-versa; as a
 // consequence, yp_miniiter _may_ actually allocate a new object, although this is rare.  Example:
 //      yp_uint64_t mi_state;
 //      ypObject *mi = yp_miniiter( list, &mi_state );
@@ -1084,15 +1091,41 @@ ypAPI yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObjec
 
 
 /*
- * Compound Operations
+ * C-to-C Container Operations
  */
 
-// Certain operations tend to be chained together, for example retrieving a value from a container
-// and converting it to C.  The following functions are provided for your convenience to simplify
-// such code (particularly around reference counting).
+// When working with containers, it can be convenient to perform operations using C types rather
+// than dealing with reference counting and short-lived objects.  These functions provide shortcuts
+// for common operations when dealing with containers.  Keep in mind, though, that many of these
+// functions create short-lived objects, so excessive use may impact execution time.
 
-// Like: yp_asintC( yp_getitem( container, key, ), exc )
-ypAPI yp_int_t yp_asintC_getitem( ypObject *container, ypObject *key, ypObject **exc );
+// For functions that deal with strings, if encoding is missing yp_s_utf_8 (which is compatible 
+// with ascii) is assumed, while if errors is missing yp_s_strict is assumed.
+
+// Operations on containers that map objects to integers
+ypAPI yp_int_t yp_o2i_getitemC( ypObject *container, ypObject *key, ypObject **exc );
+ypAPI void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t x );
+
+// Operations on containers that map objects to strings
+// yp_o2s_getitemCX is documented below, and must be used carefully!
+ypAPI void yp_o2s_setitemC4( ypObject **container, ypObject *key,
+        const yp_uint8_t *x, yp_ssize_t x_len );
+
+// Operations on containers that map strings to objects.  Note that if the string is known at 
+// compile-time, as in:
+//      value = yp_s2o_getitemC3( o, "mykey", -1 );
+// it is more-efficient to use yp_IMMORTAL_STR_LATIN1 (also compatible with ascii), as in:
+//      yp_IMMORTAL_STR_LATIN1( s_mykey, "mykey" );
+//      value = yp_getitem( o, s_mykey );
+ypAPI ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len );
+ypAPI void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len,
+        ypObject *x );
+
+// Operations on containers that map strings to integers
+ypAPI yp_int_t yp_s2i_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
+        ypObject **exc );
+ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
+        yp_int_t xC );
 
 
 /*
@@ -1105,14 +1138,14 @@ ypAPI yp_int_t yp_asintC_getitem( ypObject *container, ypObject *key, ypObject *
 
 // Defines an immortal bytes constant at compile-time, which can be accessed by the variable name,
 // which is of type "ypObject * const".  value is a C string literal that can contain null bytes.
-// The length is calculated while compiling; the hash will be calculated the first time it is 
+// The length is calculated while compiling; the hash will be calculated the first time it is
 // accessed.  To be used as:
 //      yp_IMMORTAL_BYTES( name, value );
 
 // Defines an immortal str constant at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const".  value is a Latin-1 encoded C string literal that can
+// which is of type "ypObject * const".  value is a latin-1 encoded C string literal that can
 // contain null characters.  The length is calculated while compiling; the hash will be calculated
-// the first time it is accessed.
+// the first time it is accessed.  Note that latin-1 is compatible with an ascii-encoded value.
 //      yp_IMMORTAL_STR_LATIN1( name, value );
 
 
@@ -1190,8 +1223,8 @@ typedef struct _yp_initialize_kwparams {
 // XXX The "X" in these names is a reminder that the function is returning internal memory, and
 // as such should be used with caution.
 
-// For sequences that store their elements as an array of bytes (bytes and bytearray), sets *bytes 
-// to the beginning of that array, *len to the length of the sequence, and returns the immortal 
+// For sequences that store their elements as an array of bytes (bytes and bytearray), sets *bytes
+// to the beginning of that array, *len to the length of the sequence, and returns the immortal
 // yp_None.  *bytes will point into internal object memory which MUST NOT be modified; furthermore,
 // the sequence itself must not be modified while using the array.  As a special case, if len is
 // NULL, the sequence must not contain null bytes and *bytes will point to a null-terminated array.
@@ -1200,12 +1233,12 @@ ypAPI ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize
 
 // str and chrarrays internally store their Unicode characters in particular encodings, usually
 // depending on the contents of the string.  This function sets *encoded to the beginning of that
-// data, *size to the number of bytes in encoded, and *encoding to the immortal str representing 
-// the encoding used (yp_s_utf_32, perhaps).  *encoding will point into internal object memory
+// data, *size to the number of bytes in encoded, and *encoding to the immortal str representing
+// the encoding used (yp_s_latin_1, perhaps).  *encoding will point into internal object memory
 // which MUST NOT be modified; furthermore, the string itself must not be modified while using the
 // array.  As a special case, if size is NULL, the string must not contain null characters and
-// *encoded will point to a null-terminated string.  On error, sets *encoded to NULL, *size to 
-// zero (if size is not NULL), sets *encoding to the exception, and returns it.
+// *encoded will point to a null-terminated string.  On error, sets *encoded to NULL, *size to
+// zero (if size is not NULL), *encoding to the exception, and returns the exception.
 ypAPI ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
         ypObject * *encoding );
 
@@ -1215,6 +1248,15 @@ ypAPI ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_s
 // references and MUST NOT be replaced; furthermore, the sequence itself must not be modified while
 // using the array.  Sets *array to NULL, *len to zero, and returns an exception on error.
 ypAPI ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );
+
+// For tuples, lists, dicts, and frozendicts, this is equivalent to:
+//  yp_asencodedCX( yp_getitem( container, key ), encoded, size, encoding )
+// with *exc set on error.  For all other types, this raises yp_TypeError, and sets the outputs
+// accordingly.  *encoding will point into internal object memory which MUST NOT be modified;
+// furthermore, the string itself must neither be modified nor removed from the container while
+// using the array.
+void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
+        yp_ssize_t *size, ypObject * *encoding, ypObject **exc );
 
 
 /*
