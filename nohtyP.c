@@ -165,11 +165,11 @@ typedef struct {
     objvalistproc tp_intersection;
     objvalistproc tp_difference;
     objobjproc tp_symmetric_difference;
-    objvalistproc tp_update; // TODO rename ot tp_updateN, and/or move into ypTypeObject?
+    // tp_update is elsewhere
     objvalistproc tp_intersection_update;
     objvalistproc tp_difference_update;
     objobjproc tp_symmetric_difference_update;
-    // tp_push (aka tp_set_ad) is elsewhere
+    // tp_push (aka tp_set_add) is elsewhere
     objobjproc tp_pushunique;
 } ypSetMethods;
 
@@ -240,6 +240,7 @@ typedef struct {
     objobjobjproc tp_getdefault; /* if defval is NULL, raise exception if missing */
     objobjobjproc tp_setitem;
     objobjproc tp_delitem;
+    objvalistproc tp_update;
 
     // Sequence operations
     ypSequenceMethods *tp_as_sequence;
@@ -345,7 +346,6 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
         *name ## _objvalistproc, \
         *name ## _objvalistproc, \
         *name ## _objobjproc, \
-        *name ## _objvalistproc, \
         *name ## _objvalistproc, \
         *name ## _objvalistproc, \
         *name ## _objobjproc, \
@@ -1095,6 +1095,7 @@ static ypTypeObject ypIter_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -1852,6 +1853,7 @@ static ypTypeObject ypInvalidated_Type = {
     InvalidatedError_objobjobjproc,     // tp_getdefault
     InvalidatedError_objobjobjproc,     // tp_setitem
     InvalidatedError_objobjproc,        // tp_delitem
+    InvalidatedError_objvalistproc,     // tp_update
 
     // Sequence operations
     InvalidatedError_SequenceMethods,   // tp_as_sequence
@@ -1928,6 +1930,7 @@ static ypTypeObject ypException_Type = {
     ExceptionMethod_objobjobjproc,      // tp_getdefault
     ExceptionMethod_objobjobjproc,      // tp_setitem
     ExceptionMethod_objobjproc,         // tp_delitem
+    ExceptionMethod_objvalistproc,      // tp_update
 
     // Sequence operations
     ExceptionMethod_SequenceMethods,    // tp_as_sequence
@@ -2115,6 +2118,7 @@ static ypTypeObject ypNoneType_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -2221,6 +2225,7 @@ static ypTypeObject ypBool_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -2358,6 +2363,7 @@ static ypTypeObject ypInt_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -2420,6 +2426,7 @@ static ypTypeObject ypIntStore_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -2715,6 +2722,7 @@ static ypTypeObject ypFloat_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -2777,6 +2785,7 @@ static ypTypeObject ypFloatStore_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -3499,6 +3508,7 @@ static ypTypeObject ypBytes_Type = {
     _ypSequence_getdefault,         // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     &ypBytes_as_sequence,           // tp_as_sequence
@@ -3581,6 +3591,7 @@ static ypTypeObject ypByteArray_Type = {
     _ypSequence_getdefault,         // tp_getdefault
     _ypSequence_setitem,            // tp_setitem
     _ypSequence_delitem,            // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     &ypByteArray_as_sequence,       // tp_as_sequence
@@ -3842,6 +3853,7 @@ static ypTypeObject ypStr_Type = {
     _ypSequence_getdefault,         // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     &ypStr_as_sequence,             // tp_as_sequence
@@ -3924,6 +3936,7 @@ static ypTypeObject ypChrArray_Type = {
     _ypSequence_getdefault,         // tp_getdefault
     _ypSequence_setitem,            // tp_setitem
     _ypSequence_delitem,            // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     &ypChrArray_as_sequence,        // tp_as_sequence
@@ -4475,6 +4488,7 @@ static ypTypeObject ypTuple_Type = {
     _ypSequence_getdefault,         // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     &ypTuple_as_sequence,           // tp_as_sequence
@@ -4557,6 +4571,7 @@ static ypTypeObject ypList_Type = {
     _ypSequence_getdefault,         // tp_getdefault
     _ypSequence_setitem,            // tp_setitem
     _ypSequence_delitem,            // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     &ypList_as_sequence,            // tp_as_sequence
@@ -5787,7 +5802,6 @@ static ypSetMethods ypFrozenSet_as_set = {
     frozenset_intersection,         // tp_intersection
     frozenset_difference,           // tp_difference
     frozenset_symmetric_difference, // tp_symmetric_difference
-    MethodError_objvalistproc,      // tp_update
     MethodError_objvalistproc,      // tp_intersection_update
     MethodError_objvalistproc,      // tp_difference_update
     MethodError_objobjproc,         // tp_symmetric_difference_update
@@ -5846,6 +5860,7 @@ static ypTypeObject ypFrozenSet_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -5867,7 +5882,6 @@ static ypSetMethods ypSet_as_set = {
     frozenset_intersection,         // tp_intersection
     frozenset_difference,           // tp_difference
     frozenset_symmetric_difference, // tp_symmetric_difference
-    set_update,                     // tp_update
     set_intersection_update,        // tp_intersection_update
     set_difference_update,          // tp_difference_update
     set_symmetric_difference_update,// tp_symmetric_difference_update
@@ -5926,6 +5940,7 @@ static ypTypeObject ypSet_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    set_update,                     // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -6623,6 +6638,18 @@ static ypObject *dict_updateK( ypObject *mp, int n, va_list args )
     return yp_None;
 }
 
+static ypObject *dict_update( ypObject *mp, int n, va_list args )
+{
+    ypObject *result;
+    for( /*n already set*/; n > 0; n-- ) {
+        ypObject *x = va_arg( args, ypObject * );
+        if( mp == x ) continue;
+        result = _ypDict_update( mp, x );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
 typedef struct {
     yp_uint32_t keys : 1;
     yp_uint32_t itemsleft : 31;
@@ -6797,6 +6824,7 @@ static ypTypeObject ypFrozenDict_Type = {
     frozendict_getdefault,          // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -6872,6 +6900,7 @@ static ypTypeObject ypDict_Type = {
     frozendict_getdefault,          // tp_getdefault
     dict_setitem,                   // tp_setitem
     dict_delitem,                   // tp_delitem
+    dict_update,                    // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -7205,7 +7234,7 @@ void yp_updateN( ypObject **set, int n, ... ) {
     return_yp_V_FUNC_void( yp_updateV, (set, n, args), n );
 }
 void yp_updateV( ypObject **set, int n, va_list args ) {
-    _yp_INPLACE2( set, tp_as_set, tp_update, (*set, n, args) );
+    _yp_INPLACE1( set, tp_update, (*set, n, args) );
 }
 
 void yp_intersection_updateN( ypObject **set, int n, ... ) {

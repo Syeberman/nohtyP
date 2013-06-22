@@ -924,6 +924,10 @@ def pytype( pytypes, ypcode ):
         return cls
     return _pytype
 
+@pytype( BaseException, 2 )
+class yp_BaseException( ypObject ):
+    def __new__( cls ): raise NotImplementedError( "can't instantiate yp_BaseException directly" )
+
 @pytype( type( None ), 6 )
 class yp_NoneType( ypObject ):
     def __new__( cls ): raise NotImplementedError( "can't instantiate yp_NoneType directly" )
@@ -1195,6 +1199,16 @@ class yp_dict( ypObject ):
         value_p = c_ypObject_pp( yp_None )
         _yp_popitem( self, key_p, value_p )
         return (key_p[0], value_p[0])
+    def update( self, *args, **kwargs ):
+        if len( args ) == 0:
+            return _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
+        if len( args ) > 1:
+            raise TypeError( "update expected at most 1 arguments, got %d" % len( args ) )
+        if isinstance( args[0], dict ):
+            _yp_updateK( self, *_yp_flatten_dict( args[0] ) )
+        else:
+            _yp_updateN( self, _yp_iterable( args[0] ) )
+        if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
 
 # FIXME integrate this somehow with unittest
 #import os
