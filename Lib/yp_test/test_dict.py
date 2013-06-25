@@ -163,7 +163,8 @@ class DictTest(unittest.TestCase):
         d.update(SimpleUserDict())
         self.assertEqual(d, yp_dict({1:1, 2:2, 3:3}))
 
-        class Exc(Exception): pass
+        # Pick a Python exception that nohtyP knows, but that isn't likely to occur naturally
+        Exc = ImportError
 
         d.clear()
         class FailingUserDict:

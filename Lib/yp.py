@@ -1131,12 +1131,20 @@ class yp_set( _ypSet ):
 # Python dict objects need to be passed through this then sent to the "K" version of the function;
 # all other objects can be converted to nohtyP and passed in thusly
 def _yp_flatten_dict( args ):
-    items = args.items( )
+    keys = args.keys( )
     retval = []
-    for item in items:
-        assert len( item ) == 2
-        retval.extend( item )
+    for key in keys:
+        retval.append( key )
+        retval.append( args[key] )
     return retval
+
+def _yp_dict_iterable( iterable ):
+    """Like _yp_iterable, but returns an "item iterator" if iterable is a mapping object."""
+    if isinstance( iterable, c_ypObject_p ): return iterable
+    if isinstance( iterable, str ): return yp_str( iterable )
+    if hasattr( iterable, "keys" ):
+        return yp_iter( (k, iterable[k]) for k in iterable.keys( ) )
+    return yp_iter( iterable )
 
 # TODO If nohtyP ever supports "dict view" objects, replace these faked-out versions
 class _setlike_dictview:
@@ -1179,10 +1187,7 @@ class yp_dict( ypObject ):
             return _yp_dictK( *_yp_flatten_dict( kwargs ) )
         if len( args ) > 1:
             raise TypeError( "yp_dict expected at most 1 arguments, got %d" % len( args ) )
-        if isinstance( args[0], dict ):
-            self = _yp_dictK( *_yp_flatten_dict( args[0] ) )
-        else:
-            self = _yp_dict( _yp_iterable( args[0] ) )
+        self = _yp_dict( _yp_dict_iterable( args[0] ) )
         if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
         return self
     # TODO A version of yp_dict_fromkeys that accepts a fellow mapping (use only that mapping's
@@ -1204,10 +1209,7 @@ class yp_dict( ypObject ):
             return _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
         if len( args ) > 1:
             raise TypeError( "update expected at most 1 arguments, got %d" % len( args ) )
-        if isinstance( args[0], dict ):
-            _yp_updateK( self, *_yp_flatten_dict( args[0] ) )
-        else:
-            _yp_updateN( self, _yp_iterable( args[0] ) )
+        _yp_updateN( self, _yp_dict_iterable( args[0] ) )
         if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
 
 # FIXME integrate this somehow with unittest
