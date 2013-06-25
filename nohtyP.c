@@ -2104,6 +2104,7 @@ static ypTypeObject ypType_Type = {
     MethodError_objobjobjproc,      // tp_getdefault
     MethodError_objobjobjproc,      // tp_setitem
     MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
 
     // Sequence operations
     MethodError_SequenceMethods,    // tp_as_sequence
@@ -5405,7 +5406,8 @@ static ypObject *frozenset_freeze( ypObject *so ) {
     return yp_None; // no-op, currently
 }
 
-// TODO Make shallow copies (copy_visitor == yp_shallowcopy_visitor) efficient
+// TODO Make shallow copies (copy_visitor == yp_shallowcopy_visitor) efficient (unless there's a
+// lot of wasted space)
 static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo )
 {
     ypObject *result;
@@ -5419,7 +5421,8 @@ static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, 
     return so_copy;
 }
 
-// TODO Make shallow copies (copy_visitor == yp_shallowcopy_visitor) efficient
+// TODO Make shallow copies (copy_visitor == yp_shallowcopy_visitor) efficient (unless there's a
+// lot of wasted space)
 static ypObject *frozenset_frozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo )
 {
     ypObject *result;
@@ -6360,11 +6363,29 @@ static void _ypDict_iter_items_next( ypObject *itemiter, ypObject **key, ypObjec
     yp_unpackN( keyvaliter, 2, key, value );
 }
 
-// TODO ...what if the dict we're updating against shares the same keyset?
-static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other,
-        visitfunc copy_visitor, void *copy_memo )
+// XXX Check for the mp==other case _before_ calling this function
+// XXX We're trusting that copy_visitor will behave properly and return an object that has the same
+// hash as the original and that is unequal to anything else in the other set
+static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
 {
-    return yp_NotImplementedError; // TODO
+    yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
+    yp_ssize_t valuesleft = ypDict_LEN( other );
+    ypObject *other_keyset = ypDict_KEYSET( other );
+    yp_ssize_t i;
+    ypObject *other_value;
+    ypObject *result;
+
+    for( i = 0; valuesleft > 0; i++ ) {
+        other_value = ypDict_VALUES( other )[i];
+        if( other_value == NULL ) continue;
+
+        // TODO _ypDict_push will call yp_hashC again, even though we already know the hash
+        result = _ypDict_push( mp, ypSet_TABLE( other_keyset )[i].se_key, other_value, 1, 
+                &spaceleft );
+        if( yp_isexceptionC( result ) ) return result;
+        valuesleft -= 1;
+    }
+    return yp_None;
 }
 
 // XXX *itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
@@ -6425,6 +6446,7 @@ static ypObject *_ypDict_update_from_fromkeys( ypObject *mp, ypObject *value, in
 // Adds the key/value pairs yielded from either yp_iter_items or yp_iter to the dict.  If the dict
 // has enough space to hold all the items, the dict is not resized (important, as yp_dictK et al
 // pre-allocate the necessary space).
+// XXX Check for the mp==x case _before_ calling this function
 static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
@@ -6435,7 +6457,7 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
     // over yp_iter if supported.  Recall that type pairs are identified by the immutable type
     // code.
     if( x_pair == ypFrozenDict_CODE ) {
-        return _ypDict_update_from_dict( mp, x, yp_shallowcopy_visitor, NULL );
+        return _ypDict_update_from_dict( mp, x );
     } else {
         // FIXME replace with yp_miniiter_items once supported
         itemiter = yp_iter_items( x ); // new ref
