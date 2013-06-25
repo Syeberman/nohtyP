@@ -93,7 +93,7 @@ extern "C" {
 // occurs abort() is called.  kwparams can be NULL to accept all defaults; further documentation
 // on these parameters can be found below.
 typedef struct _yp_initialize_kwparams yp_initialize_kwparams;
-ypAPI void yp_initialize( yp_initialize_kwparams *kwparams );
+ypAPI void yp_initialize( const yp_initialize_kwparams *kwparams );
 
 
 /*
@@ -1134,6 +1134,9 @@ ypAPI yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObjec
 // with ascii) is assumed, while if errors is missing yp_s_strict is assumed.
 
 // Operations on containers that map objects to integers
+ypAPI int yp_o2i_containsC( ypObject *container, yp_int_t x, ypObject **exc );
+ypAPI void yp_o2i_pushC( ypObject **container, yp_int_t x );
+ypAPI yp_int_t yp_o2i_popC( ypObject **container, ypObject **exc );
 ypAPI yp_int_t yp_o2i_getitemC( ypObject *container, ypObject *key, ypObject **exc );
 ypAPI void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t x );
 
