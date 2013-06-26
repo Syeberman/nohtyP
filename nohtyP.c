@@ -1087,7 +1087,7 @@ static ypTypeObject ypIter_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    TypeError_lenfunc,              // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2096,7 +2096,7 @@ static ypTypeObject ypType_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    TypeError_lenfunc,              // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2178,7 +2178,7 @@ static ypTypeObject ypNoneType_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    TypeError_lenfunc,              // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2285,7 +2285,7 @@ static ypTypeObject ypBool_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    TypeError_lenfunc,              // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2423,7 +2423,7 @@ static ypTypeObject ypInt_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    TypeError_lenfunc,              // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2486,7 +2486,7 @@ static ypTypeObject ypIntStore_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    TypeError_lenfunc,              // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2782,7 +2782,7 @@ static ypTypeObject ypFloat_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    TypeError_lenfunc,              // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -2845,7 +2845,7 @@ static ypTypeObject ypFloatStore_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    TypeError_lenfunc,              // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -3568,7 +3568,7 @@ static ypTypeObject ypBytes_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    bytes_len,                      // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -3651,7 +3651,7 @@ static ypTypeObject ypByteArray_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    bytes_len,                      // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -3913,7 +3913,7 @@ static ypTypeObject ypStr_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    str_len,                        // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
@@ -3996,7 +3996,7 @@ static ypTypeObject ypChrArray_Type = {
 
     // Container operations
     MethodError_objobjproc,         // tp_contains
-    MethodError_lenfunc,            // tp_len
+    str_len,                        // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
