@@ -7431,6 +7431,27 @@ yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **ex
 // Let's restrain ourselves and limit them to functions we actually find useful (and can test) in
 // our projects that integrate nohtyP.
 
+int yp_o2i_containsC( ypObject *container, yp_int_t xC, ypObject **exc ) {
+    ypObject *x = yp_intC( xC );
+    ypObject *result = yp_contains( container, x );
+    yp_decref( x );
+    if( yp_isexceptionC( result ) ) *exc = result;
+    return result == yp_True; // returns false on yp_False or exception
+}
+
+void yp_o2i_pushC( ypObject **container, yp_int_t xC ) {
+    ypObject *x = yp_intC( xC );
+    yp_push( container, x );
+    yp_decref( x );
+}
+
+yp_int_t yp_o2i_popC( ypObject **container, ypObject **exc ) {
+    ypObject *x = yp_pop( container );
+    yp_int_t xC = yp_asintC( x, exc );
+    yp_decref( x );
+    return xC;
+}
+
 yp_int_t yp_o2i_getitemC( ypObject *container, ypObject *key, ypObject **exc ) {
     ypObject *x = yp_getitem( container, key );
     yp_int_t xC = yp_asintC( x, exc );
@@ -7443,6 +7464,7 @@ void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t xC ) {
     yp_setitem( container, key, x );
     yp_decref( x );
 }
+
 
 void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
         yp_ssize_t *size, ypObject * *encoding, ypObject **exc )
@@ -7472,6 +7494,7 @@ void yp_o2s_setitemC4( ypObject **container, ypObject *key,
     yp_decref( x );
 }
 
+
 ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC ) {
     ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
     ypObject *x = yp_getitem( container, key );
@@ -7486,6 +7509,7 @@ void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t 
     yp_setitem( container, key, x );
     yp_decref( key );
 }
+
 
 yp_int_t yp_s2i_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
         ypObject **exc )
@@ -7578,7 +7602,7 @@ ypObject * const yp_type_dict = (ypObject *) &ypDict_Type;
  *************************************************************************************************/
 
 // TODO Make use of yp_initialize_kwparams to accept configuration values from the user
-void yp_initialize( yp_initialize_kwparams *kwparams )
+void yp_initialize( const yp_initialize_kwparams *kwparams )
 {
 #ifdef _MSC_VER
     // TODO memory leak detection that should only be enabled for debug builds
