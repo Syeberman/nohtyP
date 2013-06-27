@@ -1131,7 +1131,8 @@ ypAPI yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObjec
 // functions create short-lived objects, so excessive use may impact execution time.
 
 // For functions that deal with strings, if encoding is missing yp_s_utf_8 (which is compatible 
-// with ascii) is assumed, while if errors is missing yp_s_strict is assumed.
+// with ascii) is assumed, while if errors is missing yp_s_strict is assumed.  yp_*_containsC
+// returns false and sets *exc on exception.
 
 // Operations on containers that map objects to integers
 ypAPI int yp_o2i_containsC( ypObject *container, yp_int_t x, ypObject **exc );
@@ -1417,10 +1418,14 @@ void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *e
 // This structure is likely to change in future versions; it should only exist in-memory
 // TODO what do we gain by caching the hash?  We already jump through hoops to use the hash
 // stored in the hash table where possible.
+// TODO Is there a way to reduce the size of type+refcnt+len+alloclen to 64 bits, without hitting
+// potential performance issues?
+// TODO Do like Python and have just type+refcnt for non-containers
 struct _ypObject {
-    yp_uint32_t ob_type_refcnt; // first byte type code, remainder ref count
-    yp_uint16_t ob_len;         // length of object
-    yp_uint16_t ob_alloclen;    // allocated length // FIXME necessary for all objects?
+    yp_uint32_t ob_type;        // type code
+    yp_uint32_t ob_refcnt;      // reference count
+    yp_int32_t  ob_len;         // length of object
+    yp_int32_t  ob_alloclen;    // allocated length
     yp_hash_t   ob_hash;        // cached hash for immutables
     void *      ob_data;        // pointer to object data
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
@@ -1447,17 +1452,10 @@ struct _ypStrObject {
     _yp_INLINE_DATA( yp_uint8_t );
 };
 
-// A refcnt of this value means the object is immortal
-#define _ypObject_REFCNT_IMMORTAL (0xFFFFFFu)
-// When a hash of this value is stored in ob_hash, call tp_hash (which may then update cache)
-#define _ypObject_HASH_INVALID ((yp_hash_t) -1)
-// Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
-#define _ypObject_LEN_INVALID        (0xFFFFu)
-#define _ypObject_ALLOCLEN_INVALID   (0xFFFFu)
-
-// First byte of object structure is the type code; next 3 bytes is reference count
-#define _ypObject_MAKE_TYPE_REFCNT( type, refcnt ) \
-    ( ((type) & 0xFFu) | (((refcnt) & 0xFFFFFFu) << 8) )
+// Set ob_refcnt to this value for immortal objects
+#define _ypObject_REFCNT_IMMORTAL   (0x7FFFFFFFu)
+// Set ob_hash to this value for uninitialized hashes (tp_hash will be called and ob_hash updated)
+#define _ypObject_HASH_INVALID      ((yp_hash_t) -1)
 
 // These type codes must match those in nohtyP.c
 #define _ypInt_CODE                  ( 10u)
@@ -1466,7 +1464,7 @@ struct _ypStrObject {
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
 #define _yp_IMMORTAL_HEAD_INIT( type, data, len ) \
-    { _ypObject_MAKE_TYPE_REFCNT( type, _ypObject_REFCNT_IMMORTAL ), \
+    { type, _ypObject_REFCNT_IMMORTAL, \
       len, 0, _ypObject_HASH_INVALID, data }
 #define yp_IMMORTAL_INT( name, value ) \
     static struct _ypIntObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \

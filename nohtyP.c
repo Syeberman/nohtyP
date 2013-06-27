@@ -43,8 +43,9 @@ yp_STATIC_ASSERT( yp_SSIZE_T_MAX+1 < yp_SSIZE_T_MAX, ssize_max );
 yp_STATIC_ASSERT( yp_SSIZE_T_MIN-1 > yp_SSIZE_T_MIN, ssize_min );
 #pragma warning( pop )
 
+yp_STATIC_ASSERT( sizeof( struct _ypObject ) == 16+(2*sizeof( void * )), sizeof_ypObject );
+
 // TODO assert that sizeof( "abcd" ) == 5 (ie it includes the null-terminator)
-// TODO assert that we're little-endian (that type code is first byte)
 
 
 /*************************************************************************************************
@@ -56,14 +57,11 @@ typedef size_t yp_uhash_t;
 // ypObject_HEAD defines the initial segment of every ypObject
 #define ypObject_HEAD _ypObject_HEAD
 
-// First byte of object structure is the type code; next 3 bytes is reference count.  The
-// least-significant bit of the type code specifies if the type is immutable (0) or not.
-// XXX Assuming little-endian for now
-#define ypObject_MAKE_TYPE_REFCNT _ypObject_MAKE_TYPE_REFCNT
+// The least-significant bit of the type code specifies if the type is immutable (0) or not
 #define ypObject_TYPE_CODE( ob ) \
-    ( ((yp_uint8_t *)(ob))[0] )
+    ( ((ypObject *)(ob))->ob_type )
 #define ypObject_SET_TYPE_CODE( ob, type ) \
-    ( ((yp_uint8_t *)(ob))[0] = (type) )
+    ( ypObject_TYPE_CODE( ob ) = (type) )
 #define ypObject_TYPE_CODE_IS_MUTABLE( type ) \
     ( (type) & 0x1u )
 #define ypObject_TYPE_CODE_AS_FROZEN( type ) \
@@ -73,7 +71,7 @@ typedef size_t yp_uhash_t;
 #define ypObject_IS_MUTABLE( ob ) \
     ( ypObject_TYPE_CODE_IS_MUTABLE( ypObject_TYPE_CODE( ob ) ) )
 #define ypObject_REFCNT( ob ) \
-    ( ((ypObject *)(ob))->ob_type_refcnt >> 8 )
+    ( ((ypObject *)(ob))->ob_refcnt )
 
 // Type pairs are identified by the immutable type code, as all its methods are supported by the
 // immutable version
@@ -84,20 +82,20 @@ typedef size_t yp_uhash_t;
 // freed/invalidated) and overly-incref'd immortals (should be allowed to be invalidated and thus
 // free any extra data, although the object itself will never be free'd as we've lost track of the
 // refcounts)
-#define ypObject_REFCNT_IMMORTAL _ypObject_REFCNT_IMMORTAL
+#define ypObject_REFCNT_IMMORTAL    _ypObject_REFCNT_IMMORTAL
 
 // When a hash of this value is stored in ob_hash, call tp_currenthash
-#define ypObject_HASH_INVALID _ypObject_HASH_INVALID
+#define ypObject_HASH_INVALID       _ypObject_HASH_INVALID
 
-// Signals an invalid length stored in ob_len (so call tp_len) or ob_alloclen
-#define ypObject_LEN_INVALID        _ypObject_LEN_INVALID
-#define ypObject_ALLOCLEN_INVALID   _ypObject_ALLOCLEN_INVALID
+// Set ob_len or ob_alloclen to this value to signal an invalid length
+#define ypObject_LEN_INVALID        (-1)
+
+// The largest length that can be stored in ob_len and ob_alloclen
+#define ypObject_LEN_MAX            (0x7FFFFFFF)
 
 // Lengths and hashes can be cached in the object for easy retrieval
-// FIXME trap when setting ob_len et al overflows available space
-#define ypObject_CACHED_LEN( ob ) \
-    ((yp_ssize_t) (((ypObject *)(ob))->ob_len == ypObject_LEN_INVALID ? -1 : ((ypObject *)(ob))->ob_len ))
-#define ypObject_CACHED_HASH( ob ) ( ((ypObject *)(ob))->ob_hash )
+#define ypObject_CACHED_LEN( ob )   ( ((ypObject *)(ob))->ob_len )  // negative if invalid
+#define ypObject_CACHED_HASH( ob )  ( ((ypObject *)(ob))->ob_hash ) // HASH_INVALID if invalid
 
 // Base "constructor" for immortal objects
 // TODO What to set alloclen to?  Does it matter?
@@ -713,9 +711,10 @@ static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
     yp_ssize_t size;
     ypObject *ob = (ypObject *) yp_malloc( &size, sizeof_obStruct );
     if( ob == NULL ) return yp_MemoryError;
-    ob->ob_alloclen = ypObject_ALLOCLEN_INVALID;
+    ob->ob_alloclen = ypObject_LEN_INVALID;
     ob->ob_data = NULL;
-    ob->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 );
+    ob->ob_type = type;
+    ob->ob_refcnt = 1;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = ypObject_LEN_INVALID;
     DEBUG( "MALLOC_FIXED: type %d 0x%08X", type, ob );
@@ -732,18 +731,22 @@ static ypObject *_ypMem_malloc_container_inline(
 {
     yp_ssize_t size;
     ypObject *ob;
-    if( alloclen >= ypObject_ALLOCLEN_INVALID ) return yp_SystemLimitationError;
+    if( alloclen > ypObject_LEN_MAX ) return yp_SystemLimitationError;
     // TODO debug-only assert to ensure alloclen positive
 
+    // Allocate memory, then update alloclen based on actual size of buffer allocated
     ob = (ypObject *) yp_malloc( &size, offsetof_inline + (alloclen * sizeof_elems) );
     if( ob == NULL ) return yp_MemoryError;
-    // FIXME check for alloclen overflow!
-    ob->ob_alloclen = (size - offsetof_inline) / sizeof_elems; // rounds down
+    alloclen = (size - offsetof_inline) / sizeof_elems; // rounds down
+    if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
+
+    ob->ob_alloclen = alloclen;
     ob->ob_data = ((yp_uint8_t *)ob) + offsetof_inline;
-    ob->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 );
+    ob->ob_type = type;
+    ob->ob_refcnt = 1;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
-    DEBUG( "MALLOC_CONTAINER_INLINE: type %d 0x%08X alloclen %d", type, ob, ob->ob_alloclen );
+    DEBUG( "MALLOC_CONTAINER_INLINE: type %d 0x%08X alloclen %d", type, ob, alloclen );
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_INLINE( obStruct, type, alloclen ) \
@@ -753,6 +756,7 @@ static ypObject *_ypMem_malloc_container_inline(
 // TODO Make this configurable via yp_initialize
 // XXX 64-bit PyDictObject is 128 bytes...we are larger!
 // XXX Cannot change once objects are allocated
+// XXX Of course, this is nowhere close to ypObject_LEN_MAX
 // TODO Make static asserts to ensure that certain-sized objects fit with one allocation
 // TODO Ensure this isn't larger than ALOCLEN_INVALID
 // TODO Optimize this
@@ -774,15 +778,17 @@ static ypObject *_ypMem_malloc_container_variable(
 {
     yp_ssize_t size;
     ypObject *ob;
-    if( required >= ypObject_ALLOCLEN_INVALID ) return yp_SystemLimitationError;
-    if( required+extra >= ypObject_ALLOCLEN_INVALID ) extra = ypObject_ALLOCLEN_INVALID-1 - required;
+    yp_ssize_t alloclen;
+    if( required > ypObject_LEN_MAX ) return yp_SystemLimitationError;
+    if( required+extra > ypObject_LEN_MAX ) extra = ypObject_LEN_MAX - required;
     // TODO debug-only asserts to ensure other assumptions
 
+    // Allocate object memory, update alloclen based on actual size of buffer allocated, then see
+    // if the data can fit inline or if it needs a separate buffer
     ob = (ypObject *) yp_malloc( &size, MAX( offsetof_inline, _ypMem_ideal_size ) );
     if( ob == NULL ) return yp_MemoryError;
-    // FIXME check for alloclen overflow!
-    ob->ob_alloclen = (size - offsetof_inline) / sizeof_elems; // rounds down
-    if( required <= ob->ob_alloclen ) {
+    alloclen = (size - offsetof_inline) / sizeof_elems; // rounds down
+    if( required <= alloclen ) { // a valid check even if alloclen>max, because required<=max
         ob->ob_data = ((yp_uint8_t *)ob) + offsetof_inline;
     } else {
         ob->ob_data = yp_malloc( &size, (required+extra) * sizeof_elems );
@@ -790,13 +796,16 @@ static ypObject *_ypMem_malloc_container_variable(
             yp_free( ob );
             return yp_MemoryError;
         }
-        // FIXME check for alloclen overflow!
-        ob->ob_alloclen = size / sizeof_elems; // rounds down
+        alloclen = size / sizeof_elems; // rounds down
     }
-    ob->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( type, 1 );
+    if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
+
+    ob->ob_alloclen = alloclen;
+    ob->ob_type = type;
+    ob->ob_refcnt = 1;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
-    DEBUG( "MALLOC_CONTAINER_VARIABLE: type %d 0x%08X alloclen %d", type, ob, ob->ob_alloclen );
+    DEBUG( "MALLOC_CONTAINER_VARIABLE: type %d 0x%08X alloclen %d", type, ob, alloclen );
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_VARIABLE( obStruct, type, required, extra ) \
@@ -819,11 +828,12 @@ static ypObject *_ypMem_realloc_container_variable(
 {
     void *newptr;
     yp_ssize_t size;
+    yp_ssize_t alloclen;
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     yp_ssize_t inlinelen = (_ypMem_ideal_size-offsetof_inline) / sizeof_elems;
     if( inlinelen < 0 ) inlinelen = 0;
-    if( required >= ypObject_ALLOCLEN_INVALID ) return yp_SystemLimitationError;
-    if( required+extra >= ypObject_ALLOCLEN_INVALID ) extra = ypObject_ALLOCLEN_INVALID-1 - required;
+    if( required > ypObject_LEN_MAX ) return yp_SystemLimitationError;
+    if( required+extra > ypObject_LEN_MAX ) extra = ypObject_LEN_MAX - required;
     // TODO debug-only asserts to ensure other assumptions
 
     // If the minimum required allocation can fit inline, then prefer that over a separate buffer
@@ -845,9 +855,10 @@ static ypObject *_ypMem_realloc_container_variable(
         if( newptr == NULL ) return yp_MemoryError;
         memcpy( newptr, ob->ob_data, inlinelen * sizeof_elems );
         ob->ob_data = newptr;
-        // FIXME check for alloclen overflow!
-        ob->ob_alloclen = size / sizeof_elems; // rounds down
-        DEBUG( "REALLOC_CONTAINER_VARIABLE (from inline): 0x%08X alloclen %d", ob, ob->ob_alloclen );
+        alloclen = size / sizeof_elems; // rounds down
+        if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
+        ob->ob_alloclen = alloclen;
+        DEBUG( "REALLOC_CONTAINER_VARIABLE (from inline): 0x%08X alloclen %d", ob, alloclen );
         return yp_None;
     }
 
@@ -860,9 +871,10 @@ static ypObject *_ypMem_realloc_container_variable(
         yp_free( ob->ob_data );
         ob->ob_data = newptr;
     }
-    // FIXME check for alloclen overflow!
-    ob->ob_alloclen = size / sizeof_elems; // rounds down
-    DEBUG( "REALLOC_CONTAINER_VARIABLE (malloc_resize): 0x%08X alloclen %d", ob, ob->ob_alloclen );
+    alloclen = size / sizeof_elems; // rounds down
+    if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
+    ob->ob_alloclen = alloclen;
+    DEBUG( "REALLOC_CONTAINER_VARIABLE (malloc_resize): 0x%08X alloclen %d", ob, alloclen );
     return yp_None;
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, required, ideal ) \
@@ -893,9 +905,8 @@ static void _ypMem_free_container( ypObject *ob, yp_ssize_t offsetof_inline )
 // example; if using bitfields, is the compiler smart enough to do this (should be...)?
 ypObject *yp_incref( ypObject *x )
 {
-    yp_uint32_t refcnt = ypObject_REFCNT( x );
-    if( refcnt >= ypObject_REFCNT_IMMORTAL ) return x; // no-op
-    x->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( ypObject_TYPE_CODE( x ), refcnt+1 );
+    if( ypObject_REFCNT( x ) >= ypObject_REFCNT_IMMORTAL ) return x; // no-op
+    ypObject_REFCNT( x ) += 1;
     DEBUG( "incref: 0x%08X refcnt %d", x, ypObject_REFCNT( x ) );
     return x;
 }
@@ -911,15 +922,14 @@ void yp_increfN( yp_ssize_t n, ... )
 
 void yp_decref( ypObject *x )
 {
-    yp_uint32_t refcnt = ypObject_REFCNT( x );
-    if( refcnt >= ypObject_REFCNT_IMMORTAL ) return; // no-op
+    if( ypObject_REFCNT( x ) >= ypObject_REFCNT_IMMORTAL ) return; // no-op
 
-    if( refcnt <= 1 ) {
+    if( ypObject_REFCNT( x ) <= 1 ) {
         // TODO Errors currently ignored...should we log them instead?
         ypObject_TYPE( x )->tp_dealloc( x );
         DEBUG( "decref (dealloc): 0x%08X", x );
     } else {
-        x->ob_type_refcnt = ypObject_MAKE_TYPE_REFCNT( ypObject_TYPE_CODE( x ), refcnt-1 );
+        ypObject_REFCNT( x ) += 1;
         DEBUG( "decref: 0x%08X refcnt %d", x, ypObject_REFCNT( x ) );
     }
 }
@@ -939,16 +949,26 @@ void yp_decrefN( yp_ssize_t n, ... )
  *************************************************************************************************/
 
 // _ypIterObject_HEAD shared with friendly classes below
-#define _ypIterObject_HEAD \
+#define _ypIterObject_HEAD_NO_PADDING \
     ypObject_HEAD \
     yp_int32_t ob_lenhint; \
     yp_uint32_t ob_objlocs; \
     yp_generator_func_t ob_func;
+// To ensure that ob_inline_data is aligned properly, we need to pad on some platforms
+// TODO If we use ob_len to store the lenhint, yp_lenC would have to always call tp_len, but then
+// we could trim 8 bytes off all iterators
+#if SIZE_MAX == 0xFFFFFFFFu // 32-bit (or less) platform
+#define _ypIterObject_HEAD \
+    _ypIterObject_HEAD_NO_PADDING \
+    void *_ob_padding;
+#else
+#define _ypIterObject_HEAD _ypIterObject_HEAD_NO_PADDING
+#endif
 typedef struct {
     _ypIterObject_HEAD
     yp_INLINE_DATA( yp_uint8_t );
 } ypIterObject;
-// FIXME yp_STATIC_ASSERT( offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_iter_inline_data );
+yp_STATIC_ASSERT( offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_iter_inline_data );
 
 #define ypIter_STATE( i )       ( ((ypObject *)i)->ob_data )
 #define ypIter_STATE_SIZE( i )  ( ((ypObject *)i)->ob_alloclen )
@@ -1367,22 +1387,17 @@ static ypObject *_ypSequence_miniiter_lenh( ypObject *x, yp_uint64_t *_state, yp
 
 // XXX Be very careful working with these: only pass them to trusted functions that will not
 // attempt to retain a reference to these objects after returning.  These aren't your typical
-// objects: they're allocated on the stack.  While this could be dangerous, it also  reduces
+// objects: they're allocated on the stack.  While this could be dangerous, it also reduces
 // duplicating code between versions that handle va_args and those that handle iterables.
 // TODO Is there a way to improve this using miniiters and a yp_iter_valist immortal object?
-
-typedef struct {
-    _ypIterObject_HEAD
-    va_list args;
-} _ypIterValistObject;
-#define ypIterValist_ARGS( i ) (((_ypIterValistObject *)i)->args)
+#define ypIterValist_ARGS( i ) (*((va_list *) ((ypObject *)i)->ob_data))
 
 // The number of arguments is stored in ob_lenhint, which is automatically decremented by yp_next
 // after each yielded value.
 #define yp_ONSTACK_ITER_VALIST( name, n, args ) \
-    _ypIterValistObject _ ## name ## _struct = { \
-        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
-        n, 0x0u, _iter_valist_generator, args}; \
+    ypIterObject _ ## name ## _struct = { \
+        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, &(args), ypObject_LEN_INVALID ), \
+        n, 0x0u, _iter_valist_generator}; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 
 static ypObject *_iter_valist_generator( ypObject *i, ypObject *value )
@@ -1397,20 +1412,17 @@ static ypObject *_iter_valist_generator( ypObject *i, ypObject *value )
 // you denied retaining references to these objects, you are denied retaining a reference to
 // previously-yielded yp_ONSTACK_ITER_VALISTs.
 // TODO Is there a way to improve this using miniiters and a yp_iter_kvalist immortal object?
-typedef struct {
-    _ypIterObject_HEAD
-    ypObject *subiter;
-} _ypIterKValistObject;
-#define ypIterKValist_SUBITER( i ) (((_ypIterKValistObject *)i)->subiter)
+#define ypIterKValist_SUBITER( i ) (*((ypObject **) ((ypObject *)i)->ob_data))
 
 // Don't include subiter in ob_objlocs
 #define yp_ONSTACK_ITER_KVALIST( name, n, args ) \
-    _ypIterValistObject _ ## name ## _subiter_struct = { \
-        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
+    ypIterObject _ ## name ## _subiter_struct = { \
+        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, &(args), ypObject_LEN_INVALID ), \
         0, 0x0u, _iter_closed_generator, args}; \
-    _ypIterKValistObject _ ## name ## _struct = { \
-        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, NULL, ypObject_LEN_INVALID ), \
-        n, 0x0u, _iter_kvalist_generator, (ypObject *) &_ ## name ## _subiter_struct }; \
+    ypObject * const _ ## name ## _subiter = (ypObject *) &_ ## name ## _subiter_struct; \
+    ypIterObject _ ## name ## _struct = { \
+        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, &_ ## name ## _subiter, ypObject_LEN_INVALID ), \
+        n, 0x0u, _iter_kvalist_generator}; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 
 static ypObject *_iter_kvalist_generator( ypObject *i, ypObject *value )
@@ -4116,16 +4128,16 @@ typedef struct {
     ypObject_HEAD
     yp_INLINE_DATA( ypObject * );
 } ypTupleObject;
-#define ypTuple_ARRAY( sq ) ( (ypObject **) ((ypObject *)sq)->ob_data )
+#define ypTuple_ARRAY( sq )     ( (ypObject **) ((ypObject *)sq)->ob_data )
 // TODO what if ob_len is the "invalid" value?
-#define ypTuple_LEN( sq ) ( ((ypObject *)sq)->ob_len )
-#define ypTuple_ALLOCLEN( sq ) ( ((ypObject *)sq)->ob_alloclen )
+#define ypTuple_LEN( sq )       ( ((ypObject *)sq)->ob_len )
+#define ypTuple_ALLOCLEN( sq )  ( ((ypObject *)sq)->ob_alloclen )
 
 // Empty tuples can be represented by this, immortal object
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty tuple?
 static ypObject *_yp_tuple_empty_data[1] = {NULL};
 static ypTupleObject _yp_tuple_empty_struct = {
-    { ypObject_MAKE_TYPE_REFCNT( ypTuple_CODE, ypObject_REFCNT_IMMORTAL ),
+    { ypTuple_CODE, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, _yp_tuple_empty_data } };
 static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
 
@@ -4748,7 +4760,7 @@ static ypObject *ypSet_dummy = &_ypSet_dummy;
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty frozenset?
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_MINSIZE] = {0};
 static ypSetObject _yp_frozenset_empty_struct = {
-    { ypObject_MAKE_TYPE_REFCNT( ypFrozenSet_CODE, ypObject_REFCNT_IMMORTAL ),
+    { ypFrozenSet_CODE, ypObject_REFCNT_IMMORTAL,
     0, ypSet_MINSIZE, ypObject_HASH_INVALID, _yp_frozenset_empty_data }, 0 };
 static ypObject * const _yp_frozenset_empty = (ypObject *) &_yp_frozenset_empty_struct;
 
@@ -4976,6 +4988,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     // malloc'd...will need to malloc something anyway)
     newalloclen = _ypSet_calc_alloclen( minused );
     if( newalloclen < 1 ) return yp_MemoryError;
+    if( newalloclen > ypObject_LEN_MAX ) return yp_SystemLimitationError;
     newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * sizeof( ypSet_KeyEntry ) );
     if( newkeys == NULL ) return yp_MemoryError;
     memset( newkeys, 0, newalloclen * sizeof( ypSet_KeyEntry ) );
@@ -5473,7 +5486,7 @@ typedef struct {
     yp_uint32_t keysleft;
     yp_uint32_t index;
 } ypSetMiState;
-yp_STATIC_ASSERT( ypObject_ALLOCLEN_INVALID <= 0xFFFFFFFFu, alloclen_fits_32_bits );
+yp_STATIC_ASSERT( ypObject_LEN_MAX <= 0xFFFFFFFFu, len_fits_32_bits );
 yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypSetMiState ), ypSetMiState_fits_uint64 );
 
 static ypObject *frozenset_miniiter( ypObject *so, yp_uint64_t *_state )
@@ -5493,7 +5506,7 @@ static ypObject *frozenset_miniiter_next( ypObject *so, yp_uint64_t *_state )
     // Find the next entry
     if( state->keysleft < 1 ) return yp_StopIteration;
     while( 1 ) {
-        if( state->index >= ypSet_ALLOCLEN( so ) ) {
+        if( ((yp_ssize_t) state->index) >= ypSet_ALLOCLEN( so ) ) {
             state->keysleft = 0;
             return yp_StopIteration;
         }
@@ -6127,7 +6140,7 @@ ypObject *yp_set( ypObject *iterable ) {
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty frozendict?
 static ypObject _yp_frozendict_empty_data[ypSet_MINSIZE] = {0};
 static ypDictObject _yp_frozendict_empty_struct = {
-    { ypObject_MAKE_TYPE_REFCNT( ypFrozenDict_CODE, ypObject_REFCNT_IMMORTAL ),
+    { ypFrozenDict_CODE, ypObject_REFCNT_IMMORTAL,
     0, ypSet_MINSIZE, ypObject_HASH_INVALID, _yp_frozendict_empty_data },
     (ypObject *) &_yp_frozenset_empty_struct };
 static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empty_struct;
@@ -6746,7 +6759,7 @@ typedef struct {
     yp_uint32_t values : 1;
     yp_uint32_t index : 31;
 } ypDictMiState;
-yp_STATIC_ASSERT( ypObject_ALLOCLEN_INVALID <= 0x7FFFFFFFu, alloclen_fits_31_bits );
+yp_STATIC_ASSERT( ypObject_LEN_MAX <= 0x7FFFFFFFu, len_fits_31_bits );
 yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
 
 static ypObject *frozendict_miniiter_items( ypObject *mp, yp_uint64_t *_state )

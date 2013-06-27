@@ -29,6 +29,7 @@ _yp_arg_missing = object( )
 # given their own references
 _yp_pyobj_cache = weakref.WeakValueDictionary( )
 def _yp_transmute_and_cache( obj ):
+    if obj.value is None: raise ValueError
     try: return _yp_pyobj_cache[obj.value] # try to use an existing object
     except KeyError:
         obj.__class__ = ypObject._ypcode2yp[obj._yp_typecode]
@@ -100,12 +101,14 @@ class c_ypObject_p( c_void_p ):
         if isinstance( val, c_ypObject_p ): return val
         return ypObject.frompython( val )
     def _yp_errcheck( self ):
+        if self.value is None: raise ValueError
         ypObject_p_errcheck( self )
     @property
     def _yp_typecode( self ):
-        return string_at( self.value, 1 )[0]
+        return int.from_bytes( string_at( self.value, 4 ), byteorder=sys.byteorder )
 class c_ypObject_p_no_errcheck( c_ypObject_p ):
-    def _yp_errcheck( self ): pass
+    def _yp_errcheck( self ):
+        if self.value is None: raise ValueError
 
 def c_ypObject_p_value( name ):
     value = c_ypObject_p.in_dll( ypdll, name )
@@ -836,7 +839,9 @@ class ypObject( c_ypObject_p ):
         # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
         # "Python guarantees that globals whose name begins with a single underscore are deleted 
         # from their module before other globals are deleted"
-        try: _yp_decref( self )
+        # FIXME Why is self.value sometimes None (ie a null pointer)?  Should never happen.
+        try: 
+            if self.value is not None: _yp_decref( self )
         except: pass
         return # FIXME Causing a Segmentation Fault sometimes?!?!
         try: self.value = yp_None.value
