@@ -75,7 +75,9 @@ class BasicTestMappingProtocol(unittest.TestCase):
             self.assertTrue(hasattr(iter, '__next__'))
             self.assertTrue(hasattr(iter, '__iter__'))
             x = list(iter)
-            self.assertTrue(set(x)==set(lst)==set(ref))
+            #self.assertTrue(set(x)==set(lst)==set(ref))
+            self.assertEqual(yp_set(x), yp_set(lst)             )
+            self.assertEqual(           yp_set(lst), yp_set(ref))
         check_iterandlist(iter(d.keys()), list(d.keys()),
                           self.reference.keys())
         check_iterandlist(iter(d), list(d.keys()), self.reference.keys())
@@ -103,11 +105,11 @@ class BasicTestMappingProtocol(unittest.TestCase):
         p = self._empty_mapping()
         #update
         p.update(self.reference)
-        self.assertEqual(dict(p), self.reference)
+        self.assertEqual(yp_dict(p), self.reference)
         items = list(p.items())
         p = self._empty_mapping()
         p.update(items)
-        self.assertEqual(dict(p), self.reference)
+        self.assertEqual(yp_dict(p), self.reference)
         d = self._full_mapping(self.reference)
         #setdefault
         key, value = next(iter(d.items()))
@@ -128,7 +130,7 @@ class BasicTestMappingProtocol(unittest.TestCase):
         #popitem
         key, value = d.popitem()
         self.assertNotIn(key, d)
-        self.assertEqual(value, self.reference[key])
+        self.assertEqual(value, yp_dict(self.reference)[key])
         p=self._empty_mapping()
         self.assertRaises(KeyError, p.popitem)
 
@@ -211,7 +213,8 @@ class BasicTestMappingProtocol(unittest.TestCase):
         i2 = sorted(self.reference.items())
         self.assertEqual(i1, i2)
 
-        class Exc(Exception): pass
+        # Pick a Python exception that nohtyP knows, but that isn't likely to occur naturally
+        Exc = ImportError
 
         d = self._empty_mapping()
         class FailingUserDict:
