@@ -6,9 +6,13 @@ from yp_test import support
 
 import os
 
-@unittest.skip( "TODO: convert to yp.py" )
+# Extra assurance that we're not accidentally testing Python's bool; unfortunately we can't
+# redefine True/False because they are keywords
+def bool( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bool here" )
+
 class BoolTest(unittest.TestCase):
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_subclass(self):
         try:
             class C(bool):
@@ -23,7 +27,7 @@ class BoolTest(unittest.TestCase):
     def test_print(self):
         try:
             fo = open(support.TESTFN, "w")
-            print(False, True, file=fo)
+            print(yp_False, yp_True, file=fo)
             fo.close()
             fo = open(support.TESTFN, "r")
             self.assertEqual(fo.read(), 'False True\n')
@@ -32,265 +36,267 @@ class BoolTest(unittest.TestCase):
             os.remove(support.TESTFN)
 
     def test_repr(self):
-        self.assertEqual(repr(False), 'False')
-        self.assertEqual(repr(True), 'True')
-        self.assertEqual(eval(repr(False)), False)
-        self.assertEqual(eval(repr(True)), True)
+        self.assertEqual(repr(yp_False), 'False')
+        self.assertEqual(repr(yp_True), 'True')
+        self.assertEqual(eval(repr(yp_False)), yp_False)
+        self.assertEqual(eval(repr(yp_True)), yp_True)
 
     def test_str(self):
-        self.assertEqual(str(False), 'False')
-        self.assertEqual(str(True), 'True')
+        self.assertEqual(str(yp_False), 'False')
+        self.assertEqual(str(yp_True), 'True')
 
     def test_int(self):
-        self.assertEqual(int(False), 0)
-        self.assertIsNot(int(False), False)
-        self.assertEqual(int(True), 1)
-        self.assertIsNot(int(True), True)
+        self.assertEqual(int(yp_False), 0)
+        self.assertIsNot(int(yp_False), yp_False)
+        self.assertEqual(int(yp_True), 1)
+        self.assertIsNot(int(yp_True), yp_True)
 
     def test_float(self):
-        self.assertEqual(float(False), 0.0)
-        self.assertIsNot(float(False), False)
-        self.assertEqual(float(True), 1.0)
-        self.assertIsNot(float(True), True)
+        self.assertEqual(float(yp_False), 0.0)
+        self.assertIsNot(float(yp_False), yp_False)
+        self.assertEqual(float(yp_True), 1.0)
+        self.assertIsNot(float(yp_True), yp_True)
 
     def test_math(self):
-        self.assertEqual(+False, 0)
-        self.assertIsNot(+False, False)
-        self.assertEqual(-False, 0)
-        self.assertIsNot(-False, False)
-        self.assertEqual(abs(False), 0)
-        self.assertIsNot(abs(False), False)
-        self.assertEqual(+True, 1)
-        self.assertIsNot(+True, True)
-        self.assertEqual(-True, -1)
-        self.assertEqual(abs(True), 1)
-        self.assertIsNot(abs(True), True)
-        self.assertEqual(~False, -1)
-        self.assertEqual(~True, -2)
+        self.assertEqual(+yp_False, 0)
+        self.assertIsNot(+yp_False, yp_False)
+        self.assertEqual(-yp_False, 0)
+        self.assertIsNot(-yp_False, yp_False)
+        self.assertEqual(abs(yp_False), 0)
+        self.assertIsNot(abs(yp_False), yp_False)
+        self.assertEqual(+yp_True, 1)
+        self.assertIsNot(+yp_True, yp_True)
+        self.assertEqual(-yp_True, -1)
+        self.assertEqual(abs(yp_True), 1)
+        self.assertIsNot(abs(yp_True), yp_True)
+        self.assertEqual(~yp_False, -1)
+        self.assertEqual(~yp_True, -2)
 
-        self.assertEqual(False+2, 2)
-        self.assertEqual(True+2, 3)
-        self.assertEqual(2+False, 2)
-        self.assertEqual(2+True, 3)
+        self.assertEqual(yp_False+2, 2)
+        self.assertEqual(yp_True+2, 3)
+        self.assertEqual(2+yp_False, 2)
+        self.assertEqual(2+yp_True, 3)
 
-        self.assertEqual(False+False, 0)
-        self.assertIsNot(False+False, False)
-        self.assertEqual(False+True, 1)
-        self.assertIsNot(False+True, True)
-        self.assertEqual(True+False, 1)
-        self.assertIsNot(True+False, True)
-        self.assertEqual(True+True, 2)
+        self.assertEqual(yp_False+yp_False, 0)
+        self.assertIsNot(yp_False+yp_False, yp_False)
+        self.assertEqual(yp_False+yp_True, 1)
+        self.assertIsNot(yp_False+yp_True, yp_True)
+        self.assertEqual(yp_True+yp_False, 1)
+        self.assertIsNot(yp_True+yp_False, yp_True)
+        self.assertEqual(yp_True+yp_True, 2)
 
-        self.assertEqual(True-True, 0)
-        self.assertIsNot(True-True, False)
-        self.assertEqual(False-False, 0)
-        self.assertIsNot(False-False, False)
-        self.assertEqual(True-False, 1)
-        self.assertIsNot(True-False, True)
-        self.assertEqual(False-True, -1)
+        self.assertEqual(yp_True-yp_True, 0)
+        self.assertIsNot(yp_True-yp_True, yp_False)
+        self.assertEqual(yp_False-yp_False, 0)
+        self.assertIsNot(yp_False-yp_False, yp_False)
+        self.assertEqual(yp_True-yp_False, 1)
+        self.assertIsNot(yp_True-yp_False, yp_True)
+        self.assertEqual(yp_False-yp_True, -1)
 
-        self.assertEqual(True*1, 1)
-        self.assertEqual(False*1, 0)
-        self.assertIsNot(False*1, False)
+        self.assertEqual(yp_True*1, 1)
+        self.assertEqual(yp_False*1, 0)
+        self.assertIsNot(yp_False*1, yp_False)
 
-        self.assertEqual(True/1, 1)
-        self.assertIsNot(True/1, True)
-        self.assertEqual(False/1, 0)
-        self.assertIsNot(False/1, False)
+        self.assertEqual(yp_True/1, 1)
+        self.assertIsNot(yp_True/1, yp_True)
+        self.assertEqual(yp_False/1, 0)
+        self.assertIsNot(yp_False/1, yp_False)
 
-        for b in False, True:
+        for b in yp_False, yp_True:
             for i in 0, 1, 2:
                 self.assertEqual(b**i, int(b)**i)
-                self.assertIsNot(b**i, bool(int(b)**i))
+                self.assertIsNot(b**i, yp_bool(int(b)**i))
 
-        for a in False, True:
-            for b in False, True:
-                self.assertIs(a&b, bool(int(a)&int(b)))
-                self.assertIs(a|b, bool(int(a)|int(b)))
-                self.assertIs(a^b, bool(int(a)^int(b)))
+        for a in yp_False, yp_True:
+            for b in yp_False, yp_True:
+                self.assertIs(a&b, yp_bool(int(a)&int(b)))
+                self.assertIs(a|b, yp_bool(int(a)|int(b)))
+                self.assertIs(a^b, yp_bool(int(a)^int(b)))
                 self.assertEqual(a&int(b), int(a)&int(b))
-                self.assertIsNot(a&int(b), bool(int(a)&int(b)))
+                self.assertIsNot(a&int(b), yp_bool(int(a)&int(b)))
                 self.assertEqual(a|int(b), int(a)|int(b))
-                self.assertIsNot(a|int(b), bool(int(a)|int(b)))
+                self.assertIsNot(a|int(b), yp_bool(int(a)|int(b)))
                 self.assertEqual(a^int(b), int(a)^int(b))
-                self.assertIsNot(a^int(b), bool(int(a)^int(b)))
+                self.assertIsNot(a^int(b), yp_bool(int(a)^int(b)))
                 self.assertEqual(int(a)&b, int(a)&int(b))
-                self.assertIsNot(int(a)&b, bool(int(a)&int(b)))
+                self.assertIsNot(int(a)&b, yp_bool(int(a)&int(b)))
                 self.assertEqual(int(a)|b, int(a)|int(b))
-                self.assertIsNot(int(a)|b, bool(int(a)|int(b)))
+                self.assertIsNot(int(a)|b, yp_bool(int(a)|int(b)))
                 self.assertEqual(int(a)^b, int(a)^int(b))
-                self.assertIsNot(int(a)^b, bool(int(a)^int(b)))
+                self.assertIsNot(int(a)^b, yp_bool(int(a)^int(b)))
 
-        self.assertIs(1==1, True)
-        self.assertIs(1==0, False)
-        self.assertIs(0<1, True)
-        self.assertIs(1<0, False)
-        self.assertIs(0<=0, True)
-        self.assertIs(1<=0, False)
-        self.assertIs(1>0, True)
-        self.assertIs(1>1, False)
-        self.assertIs(1>=1, True)
-        self.assertIs(0>=1, False)
-        self.assertIs(0!=1, True)
-        self.assertIs(0!=0, False)
+        self.assertIs(1==1, yp_True)
+        self.assertIs(1==0, yp_False)
+        self.assertIs(0<1, yp_True)
+        self.assertIs(1<0, yp_False)
+        self.assertIs(0<=0, yp_True)
+        self.assertIs(1<=0, yp_False)
+        self.assertIs(1>0, yp_True)
+        self.assertIs(1>1, yp_False)
+        self.assertIs(1>=1, yp_True)
+        self.assertIs(0>=1, yp_False)
+        self.assertIs(0!=1, yp_True)
+        self.assertIs(0!=0, yp_False)
 
         x = [1]
-        self.assertIs(x is x, True)
-        self.assertIs(x is not x, False)
+        self.assertIs(x is x, yp_True)
+        self.assertIs(x is not x, yp_False)
 
-        self.assertIs(1 in x, True)
-        self.assertIs(0 in x, False)
-        self.assertIs(1 not in x, False)
-        self.assertIs(0 not in x, True)
+        self.assertIs(1 in x, yp_True)
+        self.assertIs(0 in x, yp_False)
+        self.assertIs(1 not in x, yp_False)
+        self.assertIs(0 not in x, yp_True)
 
         x = {1: 2}
-        self.assertIs(x is x, True)
-        self.assertIs(x is not x, False)
+        self.assertIs(x is x, yp_True)
+        self.assertIs(x is not x, yp_False)
 
-        self.assertIs(1 in x, True)
-        self.assertIs(0 in x, False)
-        self.assertIs(1 not in x, False)
-        self.assertIs(0 not in x, True)
+        self.assertIs(1 in x, yp_True)
+        self.assertIs(0 in x, yp_False)
+        self.assertIs(1 not in x, yp_False)
+        self.assertIs(0 not in x, yp_True)
 
-        self.assertIs(not True, False)
-        self.assertIs(not False, True)
+        self.assertIs(not yp_True, yp_False)
+        self.assertIs(not yp_False, yp_True)
 
     def test_convert(self):
-        self.assertRaises(TypeError, bool, 42, 42)
-        self.assertIs(bool(10), True)
-        self.assertIs(bool(1), True)
-        self.assertIs(bool(-1), True)
-        self.assertIs(bool(0), False)
-        self.assertIs(bool("hello"), True)
-        self.assertIs(bool(""), False)
-        self.assertIs(bool(), False)
+        self.assertRaises(TypeError, yp_bool, 42, 42)
+        self.assertIs(yp_bool(10), yp_True)
+        self.assertIs(yp_bool(1), yp_True)
+        self.assertIs(yp_bool(-1), yp_True)
+        self.assertIs(yp_bool(0), yp_False)
+        self.assertIs(yp_bool("hello"), yp_True)
+        self.assertIs(yp_bool(""), yp_False)
+        self.assertIs(yp_bool(), yp_False)
 
+    # FIXME Adapt to nohtyP
     def test_format(self):
-        self.assertEqual("%d" % False, "0")
-        self.assertEqual("%d" % True, "1")
-        self.assertEqual("%x" % False, "0")
-        self.assertEqual("%x" % True, "1")
+        self.assertEqual("%d" % yp_False, "0")
+        self.assertEqual("%d" % yp_True, "1")
+        self.assertEqual("%x" % yp_False, "0")
+        self.assertEqual("%x" % yp_True, "1")
 
     def test_hasattr(self):
-        self.assertIs(hasattr([], "append"), True)
-        self.assertIs(hasattr([], "wobble"), False)
+        self.assertIs(hasattr([], "append"), yp_True)
+        self.assertIs(hasattr([], "wobble"), yp_False)
 
     def test_callable(self):
-        self.assertIs(callable(len), True)
-        self.assertIs(callable(1), False)
+        self.assertIs(callable(len), yp_True)
+        self.assertIs(callable(1), yp_False)
 
     def test_isinstance(self):
-        self.assertIs(isinstance(True, bool), True)
-        self.assertIs(isinstance(False, bool), True)
-        self.assertIs(isinstance(True, int), True)
-        self.assertIs(isinstance(False, int), True)
-        self.assertIs(isinstance(1, bool), False)
-        self.assertIs(isinstance(0, bool), False)
+        self.assertIs(isinstance(yp_True, yp_bool), yp_True)
+        self.assertIs(isinstance(yp_False, yp_bool), yp_True)
+        self.assertIs(isinstance(yp_True, int), yp_True)
+        self.assertIs(isinstance(yp_False, int), yp_True)
+        self.assertIs(isinstance(1, yp_bool), yp_False)
+        self.assertIs(isinstance(0, yp_bool), yp_False)
 
     def test_issubclass(self):
-        self.assertIs(issubclass(bool, int), True)
-        self.assertIs(issubclass(int, bool), False)
+        self.assertIs(issubclass(yp_bool, int), yp_True)
+        self.assertIs(issubclass(int, yp_bool), yp_False)
 
     def test_contains(self):
-        self.assertIs(1 in {}, False)
-        self.assertIs(1 in {1:1}, True)
+        self.assertIs(1 in {}, yp_False)
+        self.assertIs(1 in {1:1}, yp_True)
 
     def test_string(self):
-        self.assertIs("xyz".endswith("z"), True)
-        self.assertIs("xyz".endswith("x"), False)
-        self.assertIs("xyz0123".isalnum(), True)
-        self.assertIs("@#$%".isalnum(), False)
-        self.assertIs("xyz".isalpha(), True)
-        self.assertIs("@#$%".isalpha(), False)
-        self.assertIs("0123".isdigit(), True)
-        self.assertIs("xyz".isdigit(), False)
-        self.assertIs("xyz".islower(), True)
-        self.assertIs("XYZ".islower(), False)
-        self.assertIs("0123".isdecimal(), True)
-        self.assertIs("xyz".isdecimal(), False)
-        self.assertIs("0123".isnumeric(), True)
-        self.assertIs("xyz".isnumeric(), False)
-        self.assertIs(" ".isspace(), True)
-        self.assertIs("\xa0".isspace(), True)
-        self.assertIs("\u3000".isspace(), True)
-        self.assertIs("XYZ".isspace(), False)
-        self.assertIs("X".istitle(), True)
-        self.assertIs("x".istitle(), False)
-        self.assertIs("XYZ".isupper(), True)
-        self.assertIs("xyz".isupper(), False)
-        self.assertIs("xyz".startswith("x"), True)
-        self.assertIs("xyz".startswith("z"), False)
+        self.assertIs("xyz".endswith("z"), yp_True)
+        self.assertIs("xyz".endswith("x"), yp_False)
+        self.assertIs("xyz0123".isalnum(), yp_True)
+        self.assertIs("@#$%".isalnum(), yp_False)
+        self.assertIs("xyz".isalpha(), yp_True)
+        self.assertIs("@#$%".isalpha(), yp_False)
+        self.assertIs("0123".isdigit(), yp_True)
+        self.assertIs("xyz".isdigit(), yp_False)
+        self.assertIs("xyz".islower(), yp_True)
+        self.assertIs("XYZ".islower(), yp_False)
+        self.assertIs("0123".isdecimal(), yp_True)
+        self.assertIs("xyz".isdecimal(), yp_False)
+        self.assertIs("0123".isnumeric(), yp_True)
+        self.assertIs("xyz".isnumeric(), yp_False)
+        self.assertIs(" ".isspace(), yp_True)
+        self.assertIs("\xa0".isspace(), yp_True)
+        self.assertIs("\u3000".isspace(), yp_True)
+        self.assertIs("XYZ".isspace(), yp_False)
+        self.assertIs("X".istitle(), yp_True)
+        self.assertIs("x".istitle(), yp_False)
+        self.assertIs("XYZ".isupper(), yp_True)
+        self.assertIs("xyz".isupper(), yp_False)
+        self.assertIs("xyz".startswith("x"), yp_True)
+        self.assertIs("xyz".startswith("z"), yp_False)
 
     def test_boolean(self):
-        self.assertEqual(True & 1, 1)
-        self.assertNotIsInstance(True & 1, bool)
-        self.assertIs(True & True, True)
+        self.assertEqual(yp_True & 1, 1)
+        self.assertNotIsInstance(yp_True & 1, yp_bool)
+        self.assertIs(yp_True & yp_True, yp_True)
 
-        self.assertEqual(True | 1, 1)
-        self.assertNotIsInstance(True | 1, bool)
-        self.assertIs(True | True, True)
+        self.assertEqual(yp_True | 1, 1)
+        self.assertNotIsInstance(yp_True | 1, yp_bool)
+        self.assertIs(yp_True | yp_True, yp_True)
 
-        self.assertEqual(True ^ 1, 0)
-        self.assertNotIsInstance(True ^ 1, bool)
-        self.assertIs(True ^ True, False)
+        self.assertEqual(yp_True ^ 1, 0)
+        self.assertNotIsInstance(yp_True ^ 1, yp_bool)
+        self.assertIs(yp_True ^ yp_True, yp_False)
 
     def test_fileclosed(self):
         try:
             f = open(support.TESTFN, "w")
-            self.assertIs(f.closed, False)
+            self.assertIs(f.closed, yp_False)
             f.close()
-            self.assertIs(f.closed, True)
+            self.assertIs(f.closed, yp_True)
         finally:
             os.remove(support.TESTFN)
 
     def test_types(self):
         # types are always true.
-        for t in [bool, complex, dict, float, int, list, object,
-                  set, str, tuple, type]:
-            self.assertIs(bool(t), True)
+        # TODO complex? object? other nohtyP types?
+        for t in [yp_type_bool, yp_type_dict, yp_type_float, yp_type_int, yp_type_list,
+                  yp_type_set, yp_type_str, yp_type_tuple, yp_type_type]:
+            self.assertIs(yp_bool(t), yp_True)
 
     def test_operator(self):
         import operator
-        self.assertIs(operator.truth(0), False)
-        self.assertIs(operator.truth(1), True)
-        self.assertIs(operator.not_(1), False)
-        self.assertIs(operator.not_(0), True)
-        self.assertIs(operator.contains([], 1), False)
-        self.assertIs(operator.contains([1], 1), True)
-        self.assertIs(operator.lt(0, 0), False)
-        self.assertIs(operator.lt(0, 1), True)
-        self.assertIs(operator.is_(True, True), True)
-        self.assertIs(operator.is_(True, False), False)
-        self.assertIs(operator.is_not(True, True), False)
-        self.assertIs(operator.is_not(True, False), True)
+        self.assertIs(operator.truth(0), yp_False)
+        self.assertIs(operator.truth(1), yp_True)
+        self.assertIs(operator.not_(1), yp_False)
+        self.assertIs(operator.not_(0), yp_True)
+        self.assertIs(operator.contains([], 1), yp_False)
+        self.assertIs(operator.contains([1], 1), yp_True)
+        self.assertIs(operator.lt(0, 0), yp_False)
+        self.assertIs(operator.lt(0, 1), yp_True)
+        self.assertIs(operator.is_(yp_True, yp_True), yp_True)
+        self.assertIs(operator.is_(yp_True, yp_False), yp_False)
+        self.assertIs(operator.is_not(yp_True, yp_True), yp_False)
+        self.assertIs(operator.is_not(yp_True, yp_False), yp_True)
 
     def test_marshal(self):
         import marshal
-        self.assertIs(marshal.loads(marshal.dumps(True)), True)
-        self.assertIs(marshal.loads(marshal.dumps(False)), False)
+        self.assertIs(marshal.loads(marshal.dumps(yp_True)), yp_True)
+        self.assertIs(marshal.loads(marshal.dumps(yp_False)), yp_False)
 
     def test_pickle(self):
         import pickle
-        self.assertIs(pickle.loads(pickle.dumps(True)), True)
-        self.assertIs(pickle.loads(pickle.dumps(False)), False)
-        self.assertIs(pickle.loads(pickle.dumps(True, True)), True)
-        self.assertIs(pickle.loads(pickle.dumps(False, True)), False)
+        self.assertIs(pickle.loads(pickle.dumps(yp_True)), yp_True)
+        self.assertIs(pickle.loads(pickle.dumps(yp_False)), yp_False)
+        self.assertIs(pickle.loads(pickle.dumps(yp_True, yp_True)), yp_True)
+        self.assertIs(pickle.loads(pickle.dumps(yp_False, yp_True)), yp_False)
 
     def test_picklevalues(self):
         # Test for specific backwards-compatible pickle values
         import pickle
-        self.assertEqual(pickle.dumps(True, protocol=0), b"I01\n.")
-        self.assertEqual(pickle.dumps(False, protocol=0), b"I00\n.")
-        self.assertEqual(pickle.dumps(True, protocol=1), b"I01\n.")
-        self.assertEqual(pickle.dumps(False, protocol=1), b"I00\n.")
-        self.assertEqual(pickle.dumps(True, protocol=2), b'\x80\x02\x88.')
-        self.assertEqual(pickle.dumps(False, protocol=2), b'\x80\x02\x89.')
+        self.assertEqual(pickle.dumps(yp_True, protocol=0), b"I01\n.")
+        self.assertEqual(pickle.dumps(yp_False, protocol=0), b"I00\n.")
+        self.assertEqual(pickle.dumps(yp_True, protocol=1), b"I01\n.")
+        self.assertEqual(pickle.dumps(yp_False, protocol=1), b"I00\n.")
+        self.assertEqual(pickle.dumps(yp_True, protocol=2), b'\x80\x02\x88.')
+        self.assertEqual(pickle.dumps(yp_False, protocol=2), b'\x80\x02\x89.')
 
     def test_convert_to_bool(self):
         # Verify that TypeError occurs when bad things are returned
         # from __bool__().  This isn't really a bool test, but
         # it's related.
-        check = lambda o: self.assertRaises(TypeError, bool, o)
+        check = lambda o: self.assertRaises(TypeError, yp_bool, o)
         class Foo(object):
             def __bool__(self):
                 return self
@@ -315,7 +321,7 @@ class BoolTest(unittest.TestCase):
         class Eggs:
             def __len__(self):
                 return -1
-        self.assertRaises(ValueError, bool, Eggs())
+        self.assertRaises(ValueError, yp_bool, Eggs())
 
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
@@ -325,7 +331,7 @@ class BoolTest(unittest.TestCase):
                 def __len__(self):
                     return badval
             try:
-                bool(A())
+                yp_bool(A())
             except (Exception) as e_bool:
                 try:
                     len(A())
@@ -333,14 +339,14 @@ class BoolTest(unittest.TestCase):
                     self.assertEqual(str(e_bool), str(e_len))
 
     def test_real_and_imag(self):
-        self.assertEqual(True.real, 1)
-        self.assertEqual(True.imag, 0)
-        self.assertIs(type(True.real), int)
-        self.assertIs(type(True.imag), int)
-        self.assertEqual(False.real, 0)
-        self.assertEqual(False.imag, 0)
-        self.assertIs(type(False.real), int)
-        self.assertIs(type(False.imag), int)
+        self.assertEqual(yp_True.real, 1)
+        self.assertEqual(yp_True.imag, 0)
+        self.assertIs(type(yp_True.real), int)
+        self.assertIs(type(yp_True.imag), int)
+        self.assertEqual(yp_False.real, 0)
+        self.assertEqual(yp_False.imag, 0)
+        self.assertIs(type(yp_False.real), int)
+        self.assertIs(type(yp_False.imag), int)
 
 def test_main():
     support.run_unittest(BoolTest)
