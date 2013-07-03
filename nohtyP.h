@@ -1146,8 +1146,13 @@ ypAPI void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t x );
 ypAPI void yp_o2s_setitemC4( ypObject **container, ypObject *key,
         const yp_uint8_t *x, yp_ssize_t x_len );
 
-// Operations on containers that map strings to objects.  Note that if the string is known at 
-// compile-time, as in:
+// Operations on containers that map integers to objects.  Note that if the container is known
+// at compile-time to be a list, then yp_getindexC et al are better choices.
+ypAPI ypObject *yp_i2o_getitemC( ypObject *container, yp_int_t key );
+ypAPI void yp_i2o_setitemC( ypObject **container, yp_int_t key, ypObject *x );
+
+// Operations on containers that map strings to objects.  Note that if the value of the string is
+// known at compile-time, as in:
 //      value = yp_s2o_getitemC3( o, "mykey", -1 );
 // it is more-efficient to use yp_IMMORTAL_STR_LATIN1 (also compatible with ascii), as in:
 //      yp_IMMORTAL_STR_LATIN1( s_mykey, "mykey" );
