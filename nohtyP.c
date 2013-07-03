@@ -3688,7 +3688,7 @@ static ypObject *_yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssi
     if( ypObject_TYPE_PAIR_CODE( seq ) != ypBytes_CODE ) return_yp_BAD_TYPE( seq );
     *bytes = ypBytes_DATA( seq );
     if( len == NULL ) {
-        if( strlen( *bytes ) != ypBytes_LEN( seq ) ) return yp_TypeError;
+        if( (yp_ssize_t) strlen( *bytes ) != ypBytes_LEN( seq ) ) return yp_TypeError;
     } else {
         *len = ypBytes_LEN( seq );
     }
@@ -4034,7 +4034,7 @@ static ypObject *_yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp
     if( ypObject_TYPE_PAIR_CODE( seq ) != ypStr_CODE ) return_yp_BAD_TYPE( seq );
     *encoded = ypStr_DATA( seq );
     if( size == NULL ) {
-        if( strlen( *encoded ) != ypStr_LEN( seq ) ) return yp_TypeError;
+        if( (yp_ssize_t) strlen( *encoded ) != ypStr_LEN( seq ) ) return yp_TypeError;
     } else {
         *size = ypStr_LEN( seq );
     }
@@ -7479,8 +7479,8 @@ void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t xC ) {
 }
 
 
-void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
-        yp_ssize_t *size, ypObject * *encoding, ypObject **exc )
+ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
+        yp_ssize_t *size, ypObject * *encoding )
 {
     ypObject *x;
     ypObject *result;
@@ -7490,13 +7490,13 @@ void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *e
     // remains allocated and isn't modified.  As such, limit this function to those containers that
     // we *know* will keep the object allocated (so long as _they_ aren't modified, of course).
     if( container_pair != ypTuple_CODE && container_pair != ypFrozenDict_CODE ) {
-        container = yp_TypeError; // will be propagated through to *exc
+        return yp_TypeError;
     }
 
     x = yp_getitem( container, key );
     result = yp_asencodedCX( x, encoded, size, encoding );
     yp_decref( x );
-    if( yp_isexceptionC( result ) ) *exc = result;
+    return result;
 }
 
 void yp_o2s_setitemC4( ypObject **container, ypObject *key,
