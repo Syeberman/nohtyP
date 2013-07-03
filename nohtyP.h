@@ -1286,12 +1286,11 @@ ypAPI ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssiz
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
 //  yp_asencodedCX( yp_getitem( container, key ), encoded, size, encoding )
-// with *exc set on error.  For all other types, this raises yp_TypeError, and sets the outputs
-// accordingly.  *encoding will point into internal object memory which MUST NOT be modified;
-// furthermore, the string itself must neither be modified nor removed from the container while
-// using the array.
-void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
-        yp_ssize_t *size, ypObject * *encoding, ypObject **exc );
+// For all other types, this raises yp_TypeError, and sets the outputs accordingly.  *encoding 
+// will point into internal object memory which MUST NOT be modified; furthermore, the string
+// itself must neither be modified nor removed from the container while using the array.
+ypAPI ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
+        yp_ssize_t *size, ypObject * *encoding );
 
 
 /*
