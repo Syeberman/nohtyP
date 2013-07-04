@@ -3688,7 +3688,7 @@ static ypObject *_yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssi
     if( ypObject_TYPE_PAIR_CODE( seq ) != ypBytes_CODE ) return_yp_BAD_TYPE( seq );
     *bytes = ypBytes_DATA( seq );
     if( len == NULL ) {
-        if( strlen( *bytes ) != ypBytes_LEN( seq ) ) return yp_TypeError;
+        if( (yp_ssize_t) strlen( *bytes ) != ypBytes_LEN( seq ) ) return yp_TypeError;
     } else {
         *len = ypBytes_LEN( seq );
     }
@@ -4034,7 +4034,7 @@ static ypObject *_yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp
     if( ypObject_TYPE_PAIR_CODE( seq ) != ypStr_CODE ) return_yp_BAD_TYPE( seq );
     *encoded = ypStr_DATA( seq );
     if( size == NULL ) {
-        if( strlen( *encoded ) != ypStr_LEN( seq ) ) return yp_TypeError;
+        if( (yp_ssize_t) strlen( *encoded ) != ypStr_LEN( seq ) ) return yp_TypeError;
     } else {
         *size = ypStr_LEN( seq );
     }
@@ -4163,6 +4163,21 @@ static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t required, yp_ssize_t 
     return ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
 }
 
+// Used by tp_repeat et al to perform the necessary memcpy's.  sq's array must be allocated
+// to hold factor*n objects, the objects to repeat must be in the first n elements of the array, 
+// and the rest of the array must not contain any references (they will be overwritten).  Further,
+// factor and n must both be greater than zero.  Cannot fail.
+static void _ypTuple_repeat_memcpy( ypObject *sq, size_t factor, size_t n )
+{
+    ypObject **array = ypTuple_ARRAY( sq );
+    size_t copied; // the number of times [:n] has been repeated (starts at 1, of course)
+    size_t n_size = n * sizeof( ypObject * );
+    for( copied = 1; copied*2 < factor; copied *= 2 ) {
+        memcpy( array+(n*copied), array+0, n_size*copied );
+    }
+    memcpy( array+(n*copied), array+0, n_size*(factor-copied) ); // no-op if factor==copied
+}
+
 // growhint is the number of additional items, not including x, that are expected to be added to
 // the tuple
 static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
@@ -4205,7 +4220,7 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
     yp_uint64_t mi_state;
     ypObject *result;
 
-    // TODO Will special cases for other lists/tuples save anything?
+    // TODO Implement special cases for other lists/tuples (use memcpy, len=other_len, etc)
     mi = yp_miniiter( iterable, &mi_state ); // new ref
     if( yp_isexceptionC( mi ) ) return mi;
     result = _ypTuple_extend_from_iter( sq, mi, &mi_state );
@@ -4368,6 +4383,12 @@ static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
 }
 
 // list_popindex is above
+
+// TODO We just need _one_ incref_visitor throughout nohtyP
+static ypObject *_ypTuple_incref_visitor( ypObject *x, void *memo ) {
+    yp_incref( x );
+    return yp_None;
+}
 
 static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
 {
@@ -4740,8 +4761,53 @@ ypObject *yp_listV( int n, va_list args ) {
 }
 ypObject *yp_list( ypObject *iterable ) {
     return _ypTuple( ypList_CODE, iterable );
-
 }
+
+static ypObject *_ypTuple_repeatCV( int type, yp_ssize_t factor, int n, va_list args )
+{
+    ypObject *newSq;
+    yp_ssize_t i;
+    ypObject *item;
+
+    if( factor < 1 || n < 1 ) {
+        if( type == ypTuple_CODE ) return _yp_tuple_empty;
+        return _ypTuple_new( type, 0 );
+    }
+
+    newSq = _ypTuple_new( type, factor*n ); // new ref
+    if( yp_isexceptionC( newSq ) ) return newSq;
+
+    // Extract the objects from args first; we incref these later, which makes it easier to bail
+    for( i = 0; i < n; i++ ) {
+        item = va_arg( args, ypObject * );
+        if( yp_isexceptionC( item ) ) {
+            yp_decref( newSq );
+            return item;
+        }
+        ypTuple_ARRAY( newSq )[i] = item;
+    }
+    _ypTuple_repeat_memcpy( newSq, factor, n );
+
+    // Now set the other attributes, increment the reference counts, and return
+    // TODO Do we want a back-door way to increment the reference counts by n?
+    ypTuple_LEN( newSq ) = factor*n;
+    tuple_traverse( newSq, _ypTuple_incref_visitor, NULL ); // cannot fail
+    return newSq;
+}
+
+ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... ) {
+    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCV, (ypTuple_CODE, factor, n, args), n );
+}
+ypObject *yp_tuple_repeatCV( yp_ssize_t factor, int n, va_list args ) {
+    return _ypTuple_repeatCV( ypTuple_CODE, factor, n, args );
+}    
+
+ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... ) {
+    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCV, (ypList_CODE, factor, n, args), n );
+}
+ypObject *yp_list_repeatCV( yp_ssize_t factor, int n, va_list args ) {
+    return _ypTuple_repeatCV( ypList_CODE, factor, n, args );
+}    
 
 
 /*************************************************************************************************
@@ -7454,8 +7520,8 @@ void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t xC ) {
 }
 
 
-void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
-        yp_ssize_t *size, ypObject * *encoding, ypObject **exc )
+ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
+        yp_ssize_t *size, ypObject * *encoding )
 {
     ypObject *x;
     ypObject *result;
@@ -7465,13 +7531,13 @@ void yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *e
     // remains allocated and isn't modified.  As such, limit this function to those containers that
     // we *know* will keep the object allocated (so long as _they_ aren't modified, of course).
     if( container_pair != ypTuple_CODE && container_pair != ypFrozenDict_CODE ) {
-        container = yp_TypeError; // will be propagated through to *exc
+        return yp_TypeError;
     }
 
     x = yp_getitem( container, key );
     result = yp_asencodedCX( x, encoded, size, encoding );
     yp_decref( x );
-    if( yp_isexceptionC( result ) ) *exc = result;
+    return result;
 }
 
 void yp_o2s_setitemC4( ypObject **container, ypObject *key,
@@ -7482,6 +7548,18 @@ void yp_o2s_setitemC4( ypObject **container, ypObject *key,
     yp_decref( x );
 }
 
+ypObject *yp_i2o_getitemC( ypObject *container, yp_int_t keyC ) {
+    ypObject *key = yp_intC( keyC );
+    ypObject *x = yp_getitem( container, key );
+    yp_decref( key );
+    return x;
+}
+
+void yp_i2o_setitemC( ypObject **container, yp_int_t keyC, ypObject *x ) {
+    ypObject *key = yp_intC( keyC );
+    yp_setitem( container, key, x );
+    yp_decref( key );
+}
 
 ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC ) {
     ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
