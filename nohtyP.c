@@ -7576,6 +7576,18 @@ void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t 
     yp_decref( key );
 }
 
+yp_int_t yp_i2i_getitemC( ypObject *container, yp_int_t keyC, ypObject **exc ) {
+    ypObject *key = yp_intC( keyC );
+    yp_int_t x = yp_o2i_getitemC( container, key, exc );
+    yp_decref( key );
+    return x;
+}
+
+void yp_i2i_setitemC( ypObject **container, yp_int_t keyC, yp_int_t xC ) {
+    ypObject *key = yp_intC( keyC );
+    yp_o2i_setitemC( container, key, xC );
+    yp_decref( key );
+}
 
 yp_int_t yp_s2i_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
         ypObject **exc )
