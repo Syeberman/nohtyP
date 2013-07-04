@@ -492,6 +492,7 @@ yp_func( c_void, "yp_append", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x"))
 # void yp_extend( ypObject **sequence, ypObject *t );
 
 # void yp_irepeatC( ypObject **sequence, yp_ssize_t factor );
+yp_func( c_void, "yp_irepeatC", ((c_ypObject_pp, "sequence"), (c_yp_ssize_t, "factor")) )
 
 # void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 
@@ -1061,6 +1062,10 @@ c_ypObject_p_value( "yp_s_strict" )
 class _ypTuple( ypObject ):
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
+    def __mul__( self, factor ): return _yp_repeatC( self, factor )
+
+    def __iadd__( self, other ): _yp_extend( self, other )
+    def __imul__( self, factor ): _yp_irepeatC( self, factor )
 
 @pytype( tuple, 20 )
 class yp_tuple( _ypTuple ):
