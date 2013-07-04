@@ -1165,11 +1165,15 @@ ypAPI ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *key, yp
 ypAPI void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len,
         ypObject *x );
 
+// Operations on containers that map integers to integers
+ypAPI yp_int_t yp_i2i_getitemC( ypObject *container, yp_int_t key, ypObject **exc );
+ypAPI void yp_i2i_setitemC( ypObject **container, yp_int_t key, yp_int_t x );
+
 // Operations on containers that map strings to integers
-ypAPI yp_int_t yp_s2i_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
+ypAPI yp_int_t yp_s2i_getitemC3( ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len,
         ypObject **exc );
-ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
-        yp_int_t xC );
+ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len,
+        yp_int_t x );
 
 
 /*
