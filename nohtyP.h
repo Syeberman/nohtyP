@@ -862,8 +862,12 @@ ypAPI ypObject *yp_iter_values( ypObject *mapping );
  * Bytes & String Operations
  */
 
-// TODO Document how the object returned/accepted for [1] is different than that for [1:2] for
-// these types of objects
+// Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return
+// immutable ints for these types, and will only accept ints for yp_setindexC; single-byte bytes
+// and bytearray objects _are_ accepted for certain operations like yp_contains.  Contrast this to
+// strs and chrarrays, whose elements are strictly immutable, single-character strs.  Slicing an
+// object returns an object of the same type, so yp_getsliceC4 on a chrarray object returns
+// another chrarray object, and so forth.
 
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC et al.
 ypAPI ypObject * const yp_s_ascii;     // "ascii"
@@ -1130,7 +1134,7 @@ ypAPI yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObjec
 // for common operations when dealing with containers.  Keep in mind, though, that many of these
 // functions create short-lived objects, so excessive use may impact execution time.
 
-// For functions that deal with strings, if encoding is missing yp_s_utf_8 (which is compatible 
+// For functions that deal with strings, if encoding is missing yp_s_utf_8 (which is compatible
 // with ascii) is assumed, while if errors is missing yp_s_strict is assumed.  yp_*_containsC
 // returns false and sets *exc on exception.
 
@@ -1146,7 +1150,7 @@ ypAPI void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t x );
 ypAPI void yp_o2s_setitemC4( ypObject **container, ypObject *key,
         const yp_uint8_t *x, yp_ssize_t x_len );
 
-// Operations on containers that map strings to objects.  Note that if the string is known at 
+// Operations on containers that map strings to objects.  Note that if the string is known at
 // compile-time, as in:
 //      value = yp_s2o_getitemC3( o, "mykey", -1 );
 // it is more-efficient to use yp_IMMORTAL_STR_LATIN1 (also compatible with ascii), as in:

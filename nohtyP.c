@@ -4243,6 +4243,31 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
     return newSq;
 }
 
+static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
+{
+    int sq_type = ypObject_TYPE_CODE( sq );
+#if 0
+    ypObject newSq;
+    yp_ssize_t i;
+#endif
+
+    if( factor < 1 || ypTuple_LEN( sq ) < 1 ) {
+        if( sq_type == ypTuple_CODE ) return _yp_tuple_empty;
+        return _ypTuple_new( ypList_CODE, 0 );
+#if 0
+    } else if( factor == 1 ) {
+        return _ypTuple_copy( sq, yp_shallowcopy_visitor, NULL );
+#endif
+    }
+
+    return yp_NotImplementedError;
+#if 0
+    newSq = _ypTuple_new( sq_type, ypTuple_LEN( sq ) * factor );
+    for( i = 0; i < factor; i++ ) {
+    }
+#endif
+}
+
 static ypObject *tuple_getindex( ypObject *sq, yp_ssize_t i )
 {
     ypObject *result = ypSequence_AdjustIndexC( ypTuple_LEN( sq ), &i );
