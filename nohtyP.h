@@ -430,12 +430,18 @@ ypAPI ypObject *yp_dictK( int n, ... );
 ypAPI ypObject *yp_dictKV( int n, va_list args );
 
 // Returns a new reference to a frozendict/dict containing the given n keys all set to value; the
-// length will be n, unless there are duplicate keys.
+// length will be n, unless there are duplicate keys.  The Python-equivalent default of value is 
+// yp_None.  Note that, unlike Python, value is the _first_ argument.
 //  Ex: pre-allocate a dict with 3 keys: yp_dict_fromkeysN( yp_None, 3, key0, key1, key2 )
 ypAPI ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... );
 ypAPI ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args );
 ypAPI ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
 ypAPI ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
+
+// Returns a new reference to a frozendict/dict containing the keys from iterable all set to value.
+// The Python-equivalent default of value is yp_None.
+ypAPI ypObject *yp_frozendict_fromkeys( ypObject *iterable, ypObject *value );
+ypAPI ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value );
 
 // Returns a new reference to a frozendict/dict whose key-value pairs come from x.  x can be a
 // mapping object (that supports yp_iter_items), or an iterable that yields exactly two items at a
