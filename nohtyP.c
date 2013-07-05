@@ -4261,26 +4261,33 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
 static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
 {
     int sq_type = ypObject_TYPE_CODE( sq );
-#if 0
-    ypObject newSq;
+    ypObject *newSq;
     yp_ssize_t i;
-#endif
 
-    if( factor < 1 || ypTuple_LEN( sq ) < 1 ) {
-        if( sq_type == ypTuple_CODE ) return _yp_tuple_empty;
-        return _ypTuple_new( ypList_CODE, 0 );
-#if 0
-    } else if( factor == 1 ) {
-        return _ypTuple_copy( sq, yp_shallowcopy_visitor, NULL );
-#endif
+    if( sq_type == ypTuple_CODE ) {
+        // If the result will be an empty tuple, return _yp_tuple_empty
+        if( ypTuple_LEN( sq ) < 1 || factor < 1 ) return _yp_tuple_empty;
+        // If the result will be an exact copy, since we're immutable just return self
+        if( factor == 1 ) return yp_incref( sq );
+    } else {
+        // If the result will be an empty list, return a new, empty list
+        if( ypTuple_LEN( sq ) < 1 || factor < 1 ) return _ypTuple_new( ypList_CODE, 0 );
+        // If the result will be an exact copy, let the code below make that copy
     }
 
-    return yp_NotImplementedError;
-#if 0
-    newSq = _ypTuple_new( sq_type, ypTuple_LEN( sq ) * factor );
-    for( i = 0; i < factor; i++ ) {
+    // FIXME Need to detect overflow in ypTuple_LEN( sq ) * factor (in all repeat funcs) and raise
+    // yp_MemoryError if so
+    newSq = _ypTuple_new( sq_type, ypTuple_LEN( sq ) * factor ); // new ref
+    if( yp_isexceptionC( newSq ) ) return newSq;
+
+    memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ), ypTuple_LEN( sq )*sizeof( ypObject * ) );
+    _ypTuple_repeat_memcpy( newSq, factor, ypTuple_LEN( sq ) );
+    
+    ypTuple_LEN( newSq ) = factor*ypTuple_LEN( sq );
+    for( i = 0; i < ypTuple_LEN( newSq ); i++ ) {
+        yp_incref( ypTuple_ARRAY( newSq )[i] );
     }
-#endif
+    return newSq;
 }
 
 static ypObject *tuple_getindex( ypObject *sq, yp_ssize_t i )
@@ -4353,9 +4360,29 @@ static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
 
 #define list_extend _ypTuple_extend
 
+static ypObject *list_clear( ypObject *sq );
 static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
 {
-    return yp_NotImplementedError;
+    ypObject *result;
+    yp_ssize_t startLen = ypTuple_LEN( sq );
+    yp_ssize_t i;
+
+    if( startLen < 1 || factor == 1 ) return yp_None; // no-op
+    if( factor < 1 ) return list_clear( sq );
+
+    // FIXME Need to detect overflow in ypTuple_LEN( sq ) * factor (in all repeat funcs) and raise
+    // yp_MemoryError if so
+    result = _ypTuple_resize( sq, startLen * factor, 0 );
+    if( yp_isexceptionC( result ) ) return result;
+
+    _ypTuple_repeat_memcpy( sq, factor, startLen );
+    
+    // Remember that we already have references for [:startLen]
+    ypTuple_LEN( sq ) *= factor;
+    for( i = startLen; i < ypTuple_LEN( sq ); i++ ) {
+        yp_incref( ypTuple_ARRAY( sq )[i] );
+    }
+    return yp_None;
 }
 
 static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
@@ -4383,12 +4410,6 @@ static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
 }
 
 // list_popindex is above
-
-// TODO We just need _one_ incref_visitor throughout nohtyP
-static ypObject *_ypTuple_incref_visitor( ypObject *x, void *memo ) {
-    yp_incref( x );
-    return yp_None;
-}
 
 static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
 {
@@ -4545,7 +4566,7 @@ static ypObject *tuple_dealloc( ypObject *sq )
 
 static ypSequenceMethods ypTuple_as_sequence = {
     tuple_concat,                   // tp_concat
-    MethodError_objssizeproc,       // tp_repeat
+    tuple_repeat,                   // tp_repeat
     tuple_getindex,                 // tp_getindex
     tuple_getslice,                 // tp_getslice
     tuple_find,                     // tp_find
@@ -4628,7 +4649,7 @@ static ypTypeObject ypTuple_Type = {
 
 static ypSequenceMethods ypList_as_sequence = {
     tuple_concat,                   // tp_concat
-    MethodError_objssizeproc,       // tp_repeat
+    tuple_repeat,                   // tp_repeat
     tuple_getindex,                 // tp_getindex
     tuple_getslice,                 // tp_getslice
     tuple_find,                     // tp_find
@@ -4774,6 +4795,8 @@ static ypObject *_ypTuple_repeatCV( int type, yp_ssize_t factor, int n, va_list 
         return _ypTuple_new( type, 0 );
     }
 
+    // FIXME Need to detect overflow in ypTuple_LEN( sq ) * factor (in all repeat funcs) and raise
+    // yp_MemoryError if so
     newSq = _ypTuple_new( type, factor*n ); // new ref
     if( yp_isexceptionC( newSq ) ) return newSq;
 
@@ -4791,7 +4814,9 @@ static ypObject *_ypTuple_repeatCV( int type, yp_ssize_t factor, int n, va_list 
     // Now set the other attributes, increment the reference counts, and return
     // TODO Do we want a back-door way to increment the reference counts by n?
     ypTuple_LEN( newSq ) = factor*n;
-    tuple_traverse( newSq, _ypTuple_incref_visitor, NULL ); // cannot fail
+    for( i = 0; i < ypTuple_LEN( newSq ); i++ ) {
+        yp_incref( ypTuple_ARRAY( newSq )[i] );
+    }
     return newSq;
 }
 
