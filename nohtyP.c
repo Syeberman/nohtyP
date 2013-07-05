@@ -6502,23 +6502,6 @@ static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject *itemiter )
     return yp_None;
 }
 
-// FIXME Wait until we need a resize, then since we're resizing anyway, resize to fit the given
-// lenhint
-static ypObject *_ypDict_update_from_fromkeys( ypObject *mp, ypObject *value, int n, va_list args )
-{
-    yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
-    ypObject *result = yp_None;
-    ypObject *key;
-
-    while( n > 0 ) {
-        key = va_arg( args, ypObject * ); // borrowed
-        n -= 1;
-        result = _ypDict_push( mp, key, value, 1, &spaceleft, n );
-        if( yp_isexceptionC( result ) ) return result;
-    }
-    return yp_None;
-}
-
 // Adds the key/value pairs yielded from either yp_iter_items or yp_iter to the dict.  If the dict
 // has enough space to hold all the items, the dict is not resized (important, as yp_dictK et al
 // pre-allocate the necessary space).
@@ -7128,18 +7111,24 @@ ypObject *yp_dictKV( int n, va_list args ) {
     return _ypDict( ypDict_CODE, iter_args );
 }
 
-// TODO something akin to yp_ONSTACK_ITER_KVALIST that yields the same value with each key
-ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
-    if( n < 1 ) return _yp_frozendict_empty;
-    return_yp_V_FUNC( ypObject *, yp_frozendict_fromkeysV, (value, n, args), n );
-}
-ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
-    // TODO Return _yp_frozendict_empty on n<1??
-    ypObject *result;
-    ypObject *newMp = _ypDict_new( ypFrozenDict_CODE, n );
+
+static ypObject *_ypDict_fromkeysV( int type, ypObject *value, int n, va_list args )
+{
+    yp_ssize_t spaceleft;
+    ypObject *result = yp_None;
+    ypObject *key;
+    ypObject *newMp;
+    
+    newMp = _ypDict_new( type, n );
     if( yp_isexceptionC( newMp ) ) return newMp;
-    // TODO make sure _ypDict_update_from_fromkeys is efficient for pre-sized objects
-    result = _ypDict_update_from_fromkeys( newMp, value, n, args );
+    spaceleft = _ypSet_space_remaining( ypDict_KEYSET( newMp ) );
+
+    while( n > 0 ) {
+        key = va_arg( args, ypObject * ); // borrowed
+        n -= 1;
+        result = _ypDict_push( newMp, key, value, 1, &spaceleft, n );
+        if( yp_isexceptionC( result ) ) break;
+    }
     if( yp_isexceptionC( result ) ) {
         yp_decref( newMp );
         return result;
@@ -7147,22 +7136,78 @@ ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
     return newMp;
 }
 
+ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
+    if( n < 1 ) return _yp_frozendict_empty;
+    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysV, (ypFrozenDict_CODE, value, n, args), n );
+}
+ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
+    return _ypDict_fromkeysV( ypFrozenDict_CODE, value, n, args );
+}
+
 ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
     if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
-    return_yp_V_FUNC( ypObject *, yp_dict_fromkeysV, (value, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysV, (ypDict_CODE, value, n, args), n );
 }
 ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
-    ypObject *result;
-    ypObject *newMp = _ypDict_new( ypDict_CODE, n );
-    if( yp_isexceptionC( newMp ) ) return newMp;
-    // TODO make sure _ypDict_update_from_fromkeys is efficient for pre-sized objects
-    result = _ypDict_update_from_fromkeys( newMp, value, n, args );
+    return _ypDict_fromkeysV( ypDict_CODE, value, n, args );
+}
+
+
+static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value )
+{
+    ypObject *exc = yp_None;
+    ypObject *result = yp_None;
+    ypObject *mi;
+    yp_uint64_t mi_state;
+    ypObject *newMp;
+    yp_ssize_t spaceleft;
+    ypObject *key;
+    yp_ssize_t lenhint = yp_lenC( iterable, &exc );
+    if( yp_isexceptionC( exc ) ) {
+        // Ignore errors determining lenhint; it just means we can't pre-allocate
+        lenhint = yp_iter_lenhintC( iterable, &exc );
+    } else if( lenhint == 0 && type == ypFrozenDict_CODE ) {
+        // yp_lenC reports an empty iterable, so we can shortcut frozendict creation
+        return _yp_frozendict_empty;
+    }
+
+    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    if( yp_isexceptionC( mi ) ) return mi;
+
+    newMp = _ypDict_new( type, lenhint ); // new ref
+    if( yp_isexceptionC( newMp ) ) {
+        yp_decref( mi );
+        return newMp;
+    }
+    spaceleft = _ypSet_space_remaining( ypDict_KEYSET( newMp ) );
+
+    while( 1 ) {
+        key = yp_miniiter_next( mi, &mi_state ); // new ref
+        if( yp_isexceptionC( key ) ) {
+            if( yp_isexceptionC2( key, yp_StopIteration ) ) break; // end of iterator
+            result = key;
+            break;
+        }
+        lenhint -= 1;
+        result = _ypDict_push( newMp, key, value, 1, &spaceleft, lenhint );
+        yp_decref( key );
+        if( yp_isexceptionC( result ) ) break;
+    }
+    yp_decref( mi );
     if( yp_isexceptionC( result ) ) {
         yp_decref( newMp );
         return result;
     }
     return newMp;
 }
+
+ypObject *yp_frozendict_fromkeys( ypObject *iterable, ypObject *value ) {
+    return _ypDict_fromkeys( ypFrozenDict_CODE, iterable, value );
+}
+ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
+    return _ypDict_fromkeys( ypDict_CODE, iterable, value );
+}
+
 
 ypObject *yp_frozendict( ypObject *x ) {
     if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
