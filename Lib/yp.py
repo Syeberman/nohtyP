@@ -1064,8 +1064,7 @@ class _ypTuple( ypObject ):
     def __add__( self, other ): return _yp_concat( self, other )
     def __mul__( self, factor ): return _yp_repeatC( self, factor )
 
-    def __iadd__( self, other ): _yp_extend( self, other )
-    def __imul__( self, factor ): _yp_irepeatC( self, factor )
+    def __rmul__( self, factor ): return _yp_repeatC( self, factor )
 
 @pytype( tuple, 20 )
 class yp_tuple( _ypTuple ):
@@ -1078,6 +1077,8 @@ _yp_tuple_empty = yp_tuple( )
 class yp_list( _ypTuple ):
     def __new__( cls, iterable=_yp_tuple_empty ):
         return _yp_list( _yp_iterable( iterable ) )
+    def __iadd__( self, other ): _yp_extend( self, other )
+    def __imul__( self, factor ): _yp_irepeatC( self, factor )
 
 class _ypSet( ypObject ):
     def __new__( cls, iterable=_yp_tuple_empty ):

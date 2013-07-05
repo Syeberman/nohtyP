@@ -265,6 +265,8 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(u2+u2+u2, u2*3)
         self.assertEqual(u2+u2+u2, 3*u2)
 
+    @unittest.skip("Not applicable to nohtyP")
+    def test_addmul_subclass(self):
         class subclass(self.type2test):
             pass
         u3 = subclass([0, 1])
