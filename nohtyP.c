@@ -4965,6 +4965,20 @@ static ypObject *_ypSet_new( int type, yp_ssize_t minused )
     return so;
 }
 
+// Discards all references; called before clearing or deleting the set
+static void _ypSet_discard_key_refs( ypObject *so )
+{
+    ypSet_KeyEntry *keys = ypSet_TABLE( so );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t i;
+
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
+        keysleft -= 1;
+        yp_decref( keys[i].se_key );
+    }
+}
+
 // Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
 // yp_None, or an exception on error.
 // TODO The dict implementation has a bunch of these for various scenarios; let's keep it simple
@@ -5486,11 +5500,6 @@ static ypObject *_ypSet_symmetric_difference_update_from_set( ypObject *so, ypOb
 
 // Public methods
 
-static ypObject *_frozenset_decref_visitor( ypObject *x, void *memo ) {
-    yp_decref( x );
-    return yp_None;
-}
-
 static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
@@ -5882,7 +5891,7 @@ static ypObject *set_push( ypObject *so, ypObject *x ) {
 
 static ypObject *set_clear( ypObject *so ) {
     if( ypSet_FILL( so ) < 1 ) return yp_None;
-    frozenset_traverse( so, _frozenset_decref_visitor, NULL ); // cannot fail
+    _ypSet_discard_key_refs( so );
     // FIXME there's a memcpy in this that we can and should avoid
     ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, ypSet_MINSIZE );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
@@ -5946,7 +5955,7 @@ static ypObject *set_remove( ypObject *so, ypObject *x, ypObject *onmissing )
 
 static ypObject *frozenset_dealloc( ypObject *so )
 {
-    frozenset_traverse( so, _frozenset_decref_visitor, NULL ); // cannot fail
+    _ypSet_discard_key_refs( so );
     ypMem_FREE_CONTAINER( so, ypSetObject );
     return yp_None;
 }
@@ -6244,33 +6253,60 @@ static ypObject *_ypDict_new( int type, yp_ssize_t minused )
     return mp;
 }
 
-// TODO We just need _one_ incref_visitor throughout nohtyP
-static ypObject *_ypDict_incref_visitor( ypObject *x, void *memo ) {
-    yp_incref( x );
-    return yp_None;
+// Discards all value references; called before clearing or deleting the dict
+static void _ypDict_discard_value_refs( ypObject *mp )
+{
+    ypObject **values = ypDict_VALUES( mp );
+    yp_ssize_t valuesleft = ypDict_LEN( mp );
+    yp_ssize_t i;
+
+    for( i = 0; valuesleft > 0; i++ ) {
+        if( values[i] == NULL ) continue;
+        valuesleft -= 1;
+        yp_decref( values[i] );
+    }
 }
 
-// TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
-// either a) optimizing x first, or b) not sharing the keyset of this object
-// TODO Shallow copies of frozendicts to frozendicts can just return incref( x )...where to handle?
-static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *memo );
-static ypObject *_ypDict_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
+static ypObject *_ypDict_copy_shallowcopy( int type, ypObject *x )
 {
     ypObject *keyset;
     yp_ssize_t alloclen;
     ypObject *mp;
+    ypObject **values;
+    yp_ssize_t valuesleft;
+    yp_ssize_t i;
 
+    // A shallow copy of a frozendict to a frozendict doesn't require an actual copy
+    if( type == ypFrozenDict_CODE && ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
+        return yp_incref( x );
+    }
+
+    // Share the keyset object with our fellow dict
+    keyset = ypDict_KEYSET( x );
+    alloclen = ypSet_ALLOCLEN( keyset );
+    mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
+    if( yp_isexceptionC( mp ) ) return mp;
+    ypDict_KEYSET( mp ) = yp_incref( keyset );
+
+    // Now copy over the values; since we share keysets, the values all line up in the same place
+    valuesleft = ypDict_LEN( mp ) = ypDict_LEN( x );
+    values = ypDict_VALUES( mp );
+    memcpy( values, ypDict_VALUES( x ), alloclen * sizeof( ypObject * ) );
+    for( i = 0; valuesleft > 0; i++ ) {
+        if( values[i] == NULL ) continue;
+        valuesleft -= 1;
+        yp_incref( values[i] );
+    }
+    return mp;
+}
+
+// TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
+// either a) optimizing x first, or b) not sharing the keyset of this object
+static ypObject *_ypDict_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
+{
     // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
     if( copy_visitor == yp_shallowcopy_visitor ) {
-        keyset = ypDict_KEYSET( x );
-        alloclen = ypSet_ALLOCLEN( keyset );
-        mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
-        if( yp_isexceptionC( mp ) ) return mp;
-        ypDict_KEYSET( mp ) = keyset; // will be incref'd by _ypDict_incref_visitor
-        ypDict_LEN( mp ) = ypDict_LEN( x );
-        memcpy( ypDict_VALUES( mp ), ypDict_VALUES( x ), alloclen * sizeof( ypObject * ) );
-        frozendict_traverse( mp, _ypDict_incref_visitor, NULL ); // cannot fail
-        return mp;
+        return _ypDict_copy_shallowcopy( type, x );
     }
 
     // Otherwise, copying takes a bit more effort
@@ -6314,10 +6350,10 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     for( i = 0; valuesleft > 0; i++ ) {
         value = ypDict_VALUES( mp )[i];
         if( value == NULL ) continue;
+        valuesleft -= 1;
         _ypSet_movekey_clean( newkeyset, yp_incref( oldkeys[i].se_key ), oldkeys[i].se_hash,
                 &newkey_loc );
         newvalues[ypSet_ENTRY_INDEX( newkeyset, newkey_loc )] = oldvalues[i];
-        valuesleft -= 1;
     }
 
     yp_decref( ypDict_KEYSET( mp ) );
@@ -6548,9 +6584,9 @@ static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *mem
     for( i = 0; valuesleft > 0; i++ ) {
         value = ypDict_VALUES( mp )[i];
         if( value == NULL ) continue;
+        valuesleft -= 1;
         result = visitor( value, memo );
         if( yp_isexceptionC( result ) ) return result;
-        valuesleft -= 1;
     }
     return yp_None;
 }
@@ -6560,7 +6596,6 @@ static ypObject *frozendict_unfrozen_copy( ypObject *x, visitfunc copy_visitor, 
 }
 
 static ypObject *frozendict_frozen_copy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
-    // TODO Shallow copies of frozendicts can just return incref( x )...where to handle?
     return _ypDict_copy( ypFrozenDict_CODE, x, copy_visitor, copy_memo );
 }
 
@@ -6638,7 +6673,8 @@ static ypObject *dict_clear( ypObject *mp ) {
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
 
-    frozendict_traverse( mp, _frozendict_decref_visitor, NULL ); // cannot fail
+    yp_decref( ypDict_KEYSET( mp ) );
+    _ypDict_discard_value_refs( mp );
     // FIXME there's a memcpy in this that we can and should avoid
     ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, alloclen );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
@@ -6906,7 +6942,8 @@ static ypObject *_frozendict_dealloc_visitor( ypObject *x, void *memo ) {
 
 static ypObject *frozendict_dealloc( ypObject *mp )
 {
-    frozendict_traverse( mp, _frozendict_dealloc_visitor, NULL ); // cannot fail
+    yp_decref( ypDict_KEYSET( mp ) );
+    _ypDict_discard_value_refs( mp );
     ypMem_FREE_CONTAINER( mp, ypDictObject );
     return yp_None;
 }
@@ -7208,20 +7245,18 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
     return _ypDict_fromkeys( ypDict_CODE, iterable, value );
 }
 
-
 ypObject *yp_frozendict( ypObject *x ) {
-    if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
-
     // If x is a fellow dict then perform a copy so we can share keysets
+    // XXX Note _ypDict_copy_shallowcopy optimizes the "x also a frozendict" case
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
-        return _ypDict_copy( ypFrozenDict_CODE, x, yp_shallowcopy_visitor, NULL );
+        return _ypDict_copy_shallowcopy( ypFrozenDict_CODE, x );
     }
     return _ypDict( ypFrozenDict_CODE, x );
 }
 ypObject *yp_dict( ypObject *x ) {
     // If x is a fellow dict then perform a copy so we can share keysets
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
-        return _ypDict_copy( ypDict_CODE, x, yp_shallowcopy_visitor, NULL );
+        return _ypDict_copy_shallowcopy( ypDict_CODE, x );
     }
     return _ypDict( ypDict_CODE, x );
 }
