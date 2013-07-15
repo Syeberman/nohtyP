@@ -358,7 +358,9 @@ ypAPI ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
 ypAPI ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors );
 
-// Equivalent to yp_str3( yp_bytesC( source, len ), yp_s_utf_8, yp_s_strict ).
+// Equivalent to yp_str3( yp_bytesC( source, len ), yp_s_utf_8, yp_s_strict ). Note that in Python,
+// omitting encoding and errors would normally return the string representation of the bytes object
+// ("b'Zoot!'"), however this function decodes it ("Zoot!").
 ypAPI ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
 ypAPI ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
 
@@ -368,7 +370,8 @@ ypAPI ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors 
 ypAPI ypObject *yp_chrarray3( ypObject *object, ypObject *encoding, ypObject *errors );
 
 // Returns a new reference to the "informal" or nicely-printable string representation of object,
-// as a str/chrarray.
+// as a str/chrarray.  As in Python, passing a bytes object to this function returns the string
+// representation ("b'Zoot!'"); to decode the bytes, use yp_str3.
 ypAPI ypObject *yp_str( ypObject *object );
 ypAPI ypObject *yp_chrarray( ypObject *object );
 
