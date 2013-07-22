@@ -359,6 +359,41 @@ EXAMPLE( ConditionalStatements, EXCEPT_AS )
     yp_decref( bytes );
 }
 
+
+/*
+ * Loop statements
+ */
+
+/* yp_FOR has an else clause, just like Python. */
+EXAMPLE( LoopStatements, FOR_ELSE )
+{
+    ypObject *bytes = yp_bytesC( "ABCDE", -1 ); // -1 means "null-terminated"
+    ypObject *byte = yp_NameError;
+    bool else_taken = false;
+
+    yp_FOR( byte, bytes ) {
+        // A new value is assigned to byte every time through the loop; previous values in byte are
+        // automatically discarded
+        ExpectEqual( yp_type( byte ), yp_type_int );
+    } yp_FOR_ELSE {
+        // Just like in Python, if yp_FOR loops over all values successfully, then the else clause
+        // is executed
+        else_taken = true;
+    } yp_FOR_EXCEPT_AS( e ) {
+        // Just like the other yp_*_EXCEPT_AS macros, it's only executed on error in bytes
+        ExpectUnreachable( );
+    } yp_ENDFOR
+    // If you forget ENDFOR, you'll get a "missing '}'" compile error
+
+    // yp_FOR assigns new references to byte, so don't forget to discard it when completed
+    yp_decref( byte );
+
+    // Ensure the right branch was taken, then clean-up
+    ExpectTrue( else_taken );
+    yp_decref( bytes );
+}
+
+
 // TODO In ypExamples, show why there is no dict constructor version that directly accepts strings
 // (...because it's so easy to create immortals for bytes/str)
 
@@ -368,7 +403,7 @@ EXAMPLE( ConditionalStatements, EXCEPT_AS )
     return ypExamples_result;
 }
 
-int main(int argc, char *argv[], char *envp[])
+int main( int argc, char *argv[], char *envp[] )
 {
     yp_initialize( NULL );
     return ypExamples( ); // TODO complete
