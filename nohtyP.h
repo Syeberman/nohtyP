@@ -1408,7 +1408,6 @@ ypAPI ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_u
 //  also, this new value will be discarded on subsequently-yielded values
 //  - if you want to retain a reference to a yielded value before moving to the next one, create
 //  a new reference (via yp_incref, perhaps)
-// FIXME if expression results in yp_StopIteration, it will appear as an empty iterator
 #endif
 
 #ifdef yp_FUTURE
@@ -1564,27 +1563,31 @@ struct _ypStrObject {
 #define _yp_FOR( target, expression, decref_expression ) { \
     yp_uint64_t _yp_FOR_state; \
     ypObject *_yp_FOR_item; \
+    int _yp_FOR_iter_exhausted = 0; \
     ypObject *_yp_FOR_expr = (expression); \
     ypObject *_yp_FOR_iter = yp_miniiter( _yp_FOR_expr, &_yp_FOR_state ); \
     decref_expression; \
-    for( _yp_FOR_item = yp_miniiter_next( _yp_FOR_iter, &_yp_FOR_state ); \
-         !yp_isexceptionC( _yp_FOR_item ) && \
-            (yp_decref( target ), target = _yp_FOR_item); \
-         _yp_FOR_item = yp_miniiter_next( _yp_FOR_iter, &_yp_FOR_state ) ) {
+    while( 1 ) { \
+        _yp_FOR_item = yp_miniiter_next( _yp_FOR_iter, &_yp_FOR_state ); \
+        if( yp_isexceptionC( _yp_FOR_item ) ) { \
+            if( yp_isexceptionC( _yp_FOR_iter ) ) break; \
+            if( yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) ) _yp_FOR_iter_exhausted = 1; \
+            break; \
+        } \
+        yp_decref( target ); target = _yp_FOR_item; {
 #define yp_FOR( target, expression )    _yp_FOR( target, expression, ((void)0) )
 #define yp_FORd( target, expression )   _yp_FOR( target, expression, yp_decref( _yp_FOR_expr ) )
 #define yp_FOR_return( expression ) \
     return yp_decref( _yp_FOR_iter ), (expression)
 #define yp_FOR_ELSE \
-    } if( yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) ) {
+    } } if( _yp_FOR_iter_exhausted ) { {
 #define yp_FOR_EXCEPT \
-    } if( yp_isexceptionC( _yp_FOR_item ) && \
-        !yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) ) {
+    } } if( !_yp_FOR_iter_exhausted && yp_isexceptionC( _yp_FOR_item ) ) { {
 #define yp_FOR_EXCEPT_AS( target ) \
     yp_FOR_EXCEPT \
         ypObject *target = _yp_FOR_item;
 #define yp_ENDFOR \
-    } \
+    } } \
     yp_decref( _yp_FOR_iter ); \
 }
 #endif
