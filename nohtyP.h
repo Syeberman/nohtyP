@@ -433,7 +433,7 @@ ypAPI ypObject *yp_dictK( int n, ... );
 ypAPI ypObject *yp_dictKV( int n, va_list args );
 
 // Returns a new reference to a frozendict/dict containing the given n keys all set to value; the
-// length will be n, unless there are duplicate keys.  The Python-equivalent default of value is 
+// length will be n, unless there are duplicate keys.  The Python-equivalent default of value is
 // yp_None.  Note that, unlike Python, value is the _first_ argument.
 //  Ex: pre-allocate a dict with 3 keys: yp_dict_fromkeysN( yp_None, 3, key0, key1, key2 )
 ypAPI ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... );
@@ -1062,7 +1062,7 @@ ypAPI ypObject *yp_sum( ypObject *iterable );
 ypAPI ypObject * const yp_sys_maxint;
 ypAPI ypObject * const yp_sys_minint;
 
-// TODO yp_i_zero, yp_i_one, etc?
+// TODO yp_i_zero, yp_i_one, yp_i_neg_one, etc?
 
 
 /*
@@ -1308,7 +1308,7 @@ ypAPI ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssiz
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
 //  yp_asencodedCX( yp_getitem( container, key ), encoded, size, encoding )
-// For all other types, this raises yp_TypeError, and sets the outputs accordingly.  *encoding 
+// For all other types, this raises yp_TypeError, and sets the outputs accordingly.  *encoding
 // will point into internal object memory which MUST NOT be modified; furthermore, the string
 // itself must neither be modified nor removed from the container while using the array.
 ypAPI ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
@@ -1319,15 +1319,14 @@ ypAPI ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_u
  * Optional Macros
  *
  * These macros may make working with nohtyP easier, but are not required.  They are best described
- * by the nohtyP examples, but are documented below.  The implementations of these macros are
- * considered internal; you'll find them near the end of this header.
+ * by the nohtyP examples, but are documented below.
  */
 
 #ifdef yp_FUTURE
 // yp_IF: A series of macros to emulate an if/elif/else with exception handling.  To be used
 // strictly as follows (including braces):
 //      yp_IF( condition1 ) {
-//        // branch1
+//          // branch1
 //      } yp_ELIF( condition2 ) {   // optional; multiple yp_ELIFs allowed
 //          // branch2
 //      } yp_ELSE {                 // optional
@@ -1335,13 +1334,15 @@ ypAPI ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_u
 //      } yp_ELSE_EXCEPT_AS( e ) {  // optional; can also use yp_ELSE_EXCEPT
 //          // exception-branch
 //      } yp_ENDIF
-// C's return statement works as you'd expect.
+// C's return statement works as you'd expect.  yp_ELSE_EXCEPT_AS defines the exception target
+// variable. 
+//
 // As in Python, a condition is only evaluated if previous conditions evaluated false and did not
 // raise an exception, the exception-branch is executed if any evaluated condition raises an
-// exception, and the exception variable is only set if an exception occurs.  Unlike Python,
-// exceptions in the chosen branch do not trigger the exception-branch, and the exception variable
-// is not cleared at the end of the exception-branch.  If a condition creates a new reference that
-// must be discarded, use yp_IFd and/or yp_ELIFd ("d" stands for "discard" or "decref"):
+// exception, and the exception target is only available inside exception-branch.  Unlike Python,
+// exceptions in the chosen branch do not trigger the exception-branch.  If a condition creates a 
+// new reference that must be discarded, use yp_IFd and/or yp_ELIFd ("d" stands for "discard" or 
+// "decref"):
 //      yp_IFd( yp_getitem( a, key ) )
 #endif
 
@@ -1355,16 +1356,17 @@ ypAPI ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_u
 //      } yp_WHILE_EXCEPT_AS( e ) { // optional; can also use yp_WHILE_EXCEPT
 //          // exception-suite
 //      } yp_ENDWHILE
-// C's break, continue, and return statements work as you'd expect.
+// C's break, continue, and return statements work as you'd expect.  yp_WHILE_EXCEPT_AS defines the
+// exception target variable.
+//
 // As in Python, the condition is evaluated multiple times until:
 //  - it evaluates to false, in which case the else-suite is executed
 //  - a break statement, in which case neither the else- nor exception-suites are executed
-//  - an exception occurs in condition, in which case e is set to the exception and the
-//  exception-suite is executed
-// Unlike Python, exceptions in the suites do not trigger the exception-suite, and the exception
-// variable is not cleared at the end of the exception-suite.
-// If condition creates a new reference that must be discarded, use yp_WHILEd ("d" stands for
-// "discard" or "decref"):
+//  - an exception occurs in condition, in which case the exception target (which is only available
+//  inside exception-suite) is set to the exception and the exception-suite is executed
+// Unlike Python, exceptions in the suites do not trigger the exception-suite.  If condition 
+// creates a new reference that must be discarded, use yp_WHILEd ("d" stands for "discard" or 
+// "decref"):
 //      yp_WHILEd( yp_getindexC( a, -1 ) )
 #endif
 
@@ -1378,37 +1380,35 @@ ypAPI ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_u
 //      } yp_FOR_EXCEPT_AS( e ) {   // optional; can also use yp_FOR_EXCEPT
 //          // exception-suite
 //      } yp_ENDFOR
-// C's break and continue statements work as you'd expect.  XXX However, using C's return statement
-// directly in a yp_FOR will cause reference leaks, so do not use it.
-// TODO Come up with a viable alternative for the return statement (the trouble is if you want to
-// return a new reference to x...it'll be decref'd before you return it)
+// C's break and continue statements work as you'd expect; however, use yp_FOR_return instead of
+// return to avoid leaking a reference.  yp_FOR_EXCEPT_AS defines the exception target variable.
+//
 // As in Python, the expression is evaluated once to create an iterator, then the suite is executed
-// once with each successfully-yielded value assigned to x (which can be reassigned within the
-// suite).  This occurs until:
-//  - the iterator returns yp_StopIteration, in which case else-suite is executed (but *not* the
+// once for each successfully-yielded value, which is assigned to the target variable.  This 
+// occurs until:
+//  - the iterator raises yp_StopIteration, in which case else-suite is executed (but *not* the
 //  exception-suite)
 //  - a break statement, in which case neither the else- nor exception-suites are executed
-//  - an exception occurs in expression or the iterator, in which case e is set to the exception
-//  and the exception-suite is executed
-// Unlike Python, there is no automatic tuple unpacking, exceptions in the suites do not trigger
-// the exception-suite, and the exception variable is not cleared at the end of the
-// exception-suite.
-// Be careful with references.  While the internal iterator object is automatically discarded, if
-// the expression itself creates a new reference, use yp_FORd ("d" stands for "discard" or
-// "decref"):
-//      yp_FORd( x, yp_tupleN( a, b, c ) )
-// Also, the yielded values assigned to x are borrowed: they are automatically discarded at the end
-// of every suite.  If you want to retain a reference to them, you'll need to call yp_incref
-// yourself:
-//      yp_FOR( x, values ) {
-//          if( yp_ge( x, minValue ) ) {
-//              yp_incref( x );
-//              break;
-//          }
-//      } yp_ENDFOR
-// FIXME re-think the auto-decref of yielded values by yp_ENDFOR...quite common to loop to try to
-// find a value, having to incref it all the time can be cumbersome.  Might also be a good time to
-// rethink other borrowed values in this api.
+//  - an exception occurs in expression or the iterator, in which case the exception target (which
+//  is only available inside exception-suite) is set to the exception and the exception-suite is
+//  executed
+// Unlike Python, there can only be one target (no automatic tuple unpacking), and exceptions in 
+// the suites do not trigger the exception-suite.  If expression creates a new reference that must
+// be discarded, use yp_FORd ("d" stands for "discard" or "decref"):
+//      yp_FORd( x, yp_tupleN( 3, a, b, c ) )
+// 
+// Before a new reference is assigned to the target variable, the previous reference in the target
+// is automatically discarded.  As such:
+//  - if the iterator yields no values, the target's value does not change
+//  - the target will retain a reference to the last successfully-yielded value outside of the loop
+//  (and in the else- and exception-suites, for that matter)
+//  - the target *must* have a value before the loop (initializing to yp_NameError mimics Python's
+//  behaviour when the iterator yields no values)
+//  - if you assign a new value to the target, remember to discard the previous reference yourself;
+//  also, this new value will be discarded on subsequently-yielded values
+//  - if you want to retain a reference to a yielded value before moving to the next one, create
+//  a new reference (via yp_incref, perhaps)
+// FIXME if expression results in yp_StopIteration, it will appear as an empty iterator
 #endif
 
 #ifdef yp_FUTURE
@@ -1506,97 +1506,85 @@ struct _ypStrObject {
 
 #ifdef yp_FUTURE
 // The implementation of yp_IF is considered "internal"; see above for documentation
-#define yp_IF( expression ) { \
+#define _yp_IF( expression, decref_expression ) { \
     ypObject *_yp_IF_expr; \
     ypObject *_yp_IF_cond; \
     { \
         _yp_IF_expr = (expression); \
         _yp_IF_cond = yp_bool( _yp_IF_expr ); \
-        if( _yp_IF_cond == yp_True )
-#define yp_IFd( expression ) { \
-    ypObject *_yp_IF_expr; \
-    ypObject *_yp_IF_cond; \
-    { \
+        decref_expression; \
+        if( _yp_IF_cond == yp_True ) {
+#define yp_IF( expression )     _yp_IF( expression, ((void)0) )
+#define yp_IFd( expression )    _yp_IF( expression, yp_decref( _yp_IF_expr ) )
+#define _yp_ELIF( expression, decref_expression ) \
+    } } if( _yp_IF_cond == yp_False ) { \
         _yp_IF_expr = (expression); \
         _yp_IF_cond = yp_bool( _yp_IF_expr ); \
-        yp_decref( _yp_IF_expr ); \
-        if( _yp_IF_cond == yp_True )
-#define yp_ELIF( expression ) \
-    } if( _yp_IF_cond == yp_False ) { \
-        _yp_IF_expr = (expression); \
-        _yp_IF_cond = yp_bool( _yp_IF_expr ); \
-        if( _yp_IF_cond == yp_True )
-#define yp_ELIFd( expression ) \
-    } if( _yp_IF_cond == yp_False ) { \
-        _yp_IF_expr = (expression); \
-        _yp_IF_cond = yp_bool( _yp_IF_expr ); \
-        yp_decref( _yp_IF_expr ); \
-        if( _yp_IF_cond == yp_True )
+        decref_expression; \
+        if( _yp_IF_cond == yp_True ) {
+#define yp_ELIF( expression )   _yp_ELIF( expression, ((void)0) )
+#define yp_ELIFd( expression )  _yp_ELIF( expression, yp_decref( _yp_IF_expr ) )
 #define yp_ELSE \
-    } if( _yp_IF_cond == yp_False ) {
+    } } if( _yp_IF_cond == yp_False ) { {
 #define yp_ELSE_EXCEPT \
-    } if( yp_isexceptionC( _yp_IF_cond ) ) {
+    } } if( yp_isexceptionC( _yp_IF_cond ) ) { {
 #define yp_ELSE_EXCEPT_AS( target ) \
-    } if( yp_isexceptionC( _yp_IF_cond ) ) { \
-        target = _yp_IF_cond;
+    yp_ELSE_EXCEPT \
+        ypObject *target = _yp_IF_cond;
 #define yp_ENDIF \
-    } }
+    } } \
+}
 #endif
 
 #ifdef yp_FUTURE
 // The implementation of yp_WHILE is considered "internal"; see above for documentation
-#define yp_WHILE( expression ) { \
+#define _yp_WHILE( expression, decref_expression ) { \
     ypObject *_yp_WHILE_expr; \
     ypObject *_yp_WHILE_cond; \
     while( _yp_WHILE_expr = (expression), \
            _yp_WHILE_cond = yp_bool( _yp_WHILE_expr ), \
-           _yp_WHILE_cond == yp_True )
-#define yp_WHILEd( expression ) { \
-    ypObject *_yp_WHILE_expr; \
-    ypObject *_yp_WHILE_cond; \
-    while( _yp_WHILE_expr = (expression), \
-           _yp_WHILE_cond = yp_bool( _yp_WHILE_expr ), \
-           yp_decref( _yp_WHILE_expr ), \
-           _yp_WHILE_cond == yp_True )
+           decref_expression, \
+           _yp_WHILE_cond == yp_True ) {
+#define yp_WHILE( expression )  _yp_WHILE( expression, ((void)0) )
+#define yp_WHILEd( expression ) _yp_WHILE( expression, yp_decref( _yp_WHILE_expr ) )
 #define yp_WHILE_ELSE \
-    if( _yp_WHILE_cond == yp_False )
+    } if( _yp_WHILE_cond == yp_False ) {
 #define yp_WHILE_EXCEPT \
-    if( yp_isexceptionC( _yp_WHILE_cond ) )
+    } if( yp_isexceptionC( _yp_WHILE_cond ) ) {
 #define yp_WHILE_EXCEPT_AS( target ) \
-    if( yp_isexceptionC( _yp_WHILE_cond ) && (target = _yp_WHILE_cond) )
+    yp_WHILE_EXCEPT \
+        ypObject *target = _yp_WHILE_cond;
 #define yp_ENDWHILE \
-    }
+    } \
+}
 #endif
 
 #ifdef yp_FUTURE
 // The implementation of yp_FOR is considered "internal"; see above for documentation
-// TODO Can we update this for yp_miniiter?
-#define yp_FOR( target, expression ) { \
-    ypObject *_yp_FOR_expr = (expression); \
-    ypObject *_yp_FOR_iter = yp_iter( _yp_FOR_expr ); \
+#define _yp_FOR( target, expression, decref_expression ) { \
+    yp_uint64_t _yp_FOR_state; \
     ypObject *_yp_FOR_item; \
-    for( _yp_FOR_item = yp_next( _yp_FOR_iter ); \
-         !yp_isexceptionC( _yp_FOR_item ) && (target = _yp_FOR_item); \
-         yp_decref( _yp_FOR_item ), _yp_FOR_item = yp_next( _yp_FOR_iter ) )
-#define yp_FORd( target, expression ) { \
     ypObject *_yp_FOR_expr = (expression); \
-    ypObject *_yp_FOR_iter = yp_iter( _yp_FOR_expr ); \
-    ypObject *_yp_FOR_item; \
-    yp_decref( _yp_FOR_expr ); \
-    for( _yp_FOR_item = yp_next( _yp_FOR_iter ); \
-         !yp_isexceptionC( _yp_FOR_item ) && (target = _yp_FOR_item); \
-         yp_decref( _yp_FOR_item ), _yp_FOR_item = yp_next( _yp_FOR_iter ) )
+    ypObject *_yp_FOR_iter = yp_miniiter( _yp_FOR_expr, &_yp_FOR_state ); \
+    decref_expression; \
+    for( _yp_FOR_item = yp_miniiter_next( _yp_FOR_iter, &_yp_FOR_state ); \
+         !yp_isexceptionC( _yp_FOR_item ) && \
+            (yp_decref( target ), target = _yp_FOR_item); \
+         _yp_FOR_item = yp_miniiter_next( _yp_FOR_iter, &_yp_FOR_state ) ) {
+#define yp_FOR( target, expression )    _yp_FOR( target, expression, ((void)0) )
+#define yp_FORd( target, expression )   _yp_FOR( target, expression, yp_decref( _yp_FOR_expr ) )
+#define yp_FOR_return( expression ) \
+    return yp_decref( _yp_FOR_iter ), (expression)
 #define yp_FOR_ELSE \
-    if( yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) )
+    } if( yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) ) {
 #define yp_FOR_EXCEPT \
-    if( yp_isexceptionC( _yp_FOR_item ) && \
-        !yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) )
+    } if( yp_isexceptionC( _yp_FOR_item ) && \
+        !yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) ) {
 #define yp_FOR_EXCEPT_AS( target ) \
-    if( yp_isexceptionC( _yp_FOR_item ) && \
-        !yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) && \
-        (target = _yp_FOR_item) )
+    yp_FOR_EXCEPT \
+        ypObject *target = _yp_FOR_item;
 #define yp_ENDFOR \
-    yp_decref( _yp_FOR_item ); \
+    } \
     yp_decref( _yp_FOR_iter ); \
 }
 #endif

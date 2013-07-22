@@ -288,13 +288,11 @@ EXAMPLE( Dictionaries, SmallExample )
 
 /* yp_ELIF allows for chaining conditions, just as in Python.  However, yp_ELSE_EXCEPT_AS doesn't
  * work in quite the same way... */
-// FIXME looks like yp_IF isn't executing _any_ of the conditions
 EXAMPLE( ConditionalStatements, ELIF )
 {
     ypObject *cond1 = yp_bytesC( NULL, 0 );
     ypObject *cond2 = yp_intC( 5 );
     bool branch2_taken = false;
-    ypObject *e = yp_None; // only set if exception occurs FIXME do we want this??
 
     yp_IF( cond1 ) {
         ExpectUnreachable( );  // Will not be executed, yp_bytesC( NULL, 0 ) is false
@@ -306,8 +304,8 @@ EXAMPLE( ConditionalStatements, ELIF )
     } yp_ELSE {
         ExpectUnreachable( );  // Will not be executed, as cond2 was true
     } yp_ELSE_EXCEPT_AS( e ) {
-        // Executed on error in cond1 or cond2, with e set to exception object; unlike Python,
-        // this is *not* executed when yp_getindexC fails
+        // Executed on error in cond1 or cond2, with e defined and set to exception object; 
+        // unlike Python, this is *not* executed when yp_getindexC fails
         ExpectUnreachable( );
     } yp_ENDIF
     // If you forget ENDIF, you'll get a "missing '}'" compile error
@@ -345,7 +343,6 @@ EXAMPLE( ConditionalStatements, IFd )
 EXAMPLE( ConditionalStatements, EXCEPT_AS )
 {
     ypObject *bytes = yp_bytesC( "ABCDE", -1 ); // -1 means "null-terminated"
-    ypObject *e = yp_None; // good to initialize this if you plan to use it after yp_ENDIF
     bool except_taken = false;
 
     // yp_getindexC will return yp_IndexError as 20 is not valid
