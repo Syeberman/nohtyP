@@ -300,23 +300,28 @@ typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
 ypAPI ypObject *yp_intC( yp_int_t value );
 ypAPI ypObject *yp_intstoreC( yp_int_t value );
 
-#ifdef yp_FUTURE // FIXME support Unicode strings
-// Returns a new reference to an int/intstore interpreting the C string as an integer literal with
-// the given base.  Base zero means to infer the base according to Python's syntax.
-ypAPI ypObject *yp_int_strC( const char *string, int base );
-ypAPI ypObject *yp_intstore_strC( const char *string, int base );
-#endif
+// Returns a new reference to an int/intstore with the given str, chrarray, bytes, or bytearray
+// object interpreted as an integer literal in radix base.  The Python-equivalent default for base
+// is 10; a base of 0 means to interpret exactly as a Python code literal.
+ypAPI ypObject *yp_int_baseC( ypObject *x, yp_int_t base );
+ypAPI ypObject *yp_intstore_baseC( ypObject *x, yp_int_t base );
+
+// Returns a new reference to an int/intstore.  If x is a number, it is converted to an int;
+// floating-point numbers are truncated towards zero.  Otherwise, x must be a str, chrarray, bytes,
+// or bytearray object, and this is equivalent to yp_int_baseC( x, 10 ).
+ypAPI ypObject *yp_int( ypObject *x );
+ypAPI ypObject *yp_intstore( ypObject *x );
 
 // Returns a new reference to a float/floatstore with the given value.
 ypAPI ypObject *yp_floatC( yp_float_t value );
 ypAPI ypObject *yp_floatstoreC( yp_float_t value );
 
-#ifdef yp_FUTURE // FIXME support Unicode strings
-// Returns a new reference to a float/floatstore interpreting the string as a Python
-// floating-point literal.
-ypAPI ypObject *yp_float_strC( const char *string );
-ypAPI ypObject *yp_floatstore_strC( const char *string );
-#endif
+// Returns a new reference to a float/floatstore.  If x is a number, it is converted to a float.
+// Otherwise, x must be a str, chrarray, bytes, or bytearray object, which will be interpreted as a
+// Python floating-point literal.  In either case, if the resulting value is outside the range of 
+// a float then yp_OverflowError is returned.
+ypAPI ypObject *yp_float( ypObject *x );
+ypAPI ypObject *yp_floatstore( ypObject *x );
 
 // Returns a new reference to an iterator for object x.  It is usually unsafe to modify an object
 // being iterated over.
