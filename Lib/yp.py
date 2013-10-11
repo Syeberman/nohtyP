@@ -853,10 +853,10 @@ class ypObject( c_ypObject_p ):
     def __init__( self, *args, **kwargs ): pass
     def __del__( self ):
         # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
-        # "Python guarantees that globals whose name begins with a single underscore are deleted 
+        # "Python guarantees that globals whose name begins with a single underscore are deleted
         # from their module before other globals are deleted"
         # FIXME Why is self.value sometimes None (ie a null pointer)?  Should never happen.
-        try: 
+        try:
             if self.value is not None: _yp_decref( self )
         except: pass
         return # FIXME Causing a Segmentation Fault sometimes?!?!
@@ -975,6 +975,8 @@ class yp_bool( ypObject ):
         else:
             return yp_True if x else yp_False
         pass
+    def _as_int( self ): return _yp_i_one if self.value == yp_True.value else _yp_i_zero
+
     def __bool__( self ): return self.value == yp_True.value
     def __lt__( self, other ): return bool( self ) <  other
     def __le__( self, other ): return bool( self ) <= other
@@ -982,6 +984,38 @@ class yp_bool( ypObject ):
     def __ne__( self, other ): return bool( self ) != other
     def __ge__( self, other ): return bool( self ) >= other
     def __gt__( self, other ): return bool( self ) >  other
+
+    @staticmethod
+    def _arithmetic( left, op, right ):
+        if isinstance( left, yp_bool ): left = left._as_int( )
+        if isinstance( right, yp_bool ): right = right._as_int( )
+        return getattr( left, op )( right )
+    def __add__( self, other ): return yp_bool._arithmetic( self, "__add__", other )
+    def __sub__( self, other ): return yp_bool._arithmetic( self, "__sub__", other )
+    def __mul__( self, other ): return yp_bool._arithmetic( self, "__mul__", other )
+    def __mod__( self, other ): return yp_bool._arithmetic( self, "__mod__", other )
+    def __pow__( self, other ): return yp_bool._arithmetic( self, "__pow__", other )
+    def __lshift__( self, other ): return yp_bool._arithmetic( self, "__lshift__", other )
+    def __rshift__( self, other ): return yp_bool._arithmetic( self, "__rshift__", other )
+    def __radd__( self, other ): return yp_bool._arithmetic( other, "__radd__", self )
+    def __rsub__( self, other ): return yp_bool._arithmetic( other, "__rsub__", self )
+    def __rmul__( self, other ): return yp_bool._arithmetic( other, "__rmul__", self )
+    def __rmod__( self, other ): return yp_bool._arithmetic( other, "__rmod__", self )
+    def __rpow__( self, other ): return yp_bool._arithmetic( other, "__rpow__", self )
+
+    @staticmethod
+    def _boolean( left, op, right ):
+        result = yp_bool._arithmetic( left, op, right )
+        if isinstance( left, yp_bool ) and isinstance( right, yp_bool ):
+            return yp_bool( result )
+        return result
+    def __and__( self, other ): return yp_bool._boolean( self, "__and__", other )
+    def __xor__( self, other ): return yp_bool._boolean( self, "__xor__", other )
+    def __or__( self, other ): return yp_bool._boolean( self, "__or__", other )
+    def __rand__( self, other ): return yp_bool._boolean( other, "__rand__", self )
+    def __rxor__( self, other ): return yp_bool._boolean( other, "__rxor__", self )
+    def __ror__( self, other ): return yp_bool._boolean( other, "__ror__", self )
+
 c_ypObject_p_value( "yp_True" )
 c_ypObject_p_value( "yp_False" )
 
@@ -1031,6 +1065,8 @@ class yp_int( ypObject ):
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def __str__( self ): return str( _yp_asintC( self, yp_None ) )
     def __repr__( self ): return repr( _yp_asintC( self, yp_None ) )
+_yp_i_zero = yp_int( 0 )
+_yp_i_one = yp_int( 1 )
 
 @pytype( float, 12 )
 class yp_float( ypObject ):

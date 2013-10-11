@@ -182,6 +182,8 @@ ypAPI void yp_deepinvalidate( ypObject **x );
  * Boolean Operations and Comparisons
  */
 
+// Unlike Python, bools do not (currently) support arithmetic.
+
 // There are exactly two boolean values, both immortal: yp_True and yp_False.
 ypAPI ypObject * const yp_True;
 ypAPI ypObject * const yp_False;

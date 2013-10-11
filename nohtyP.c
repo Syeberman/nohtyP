@@ -2361,6 +2361,14 @@ static ypObject *int_dealloc( ypObject *i ) {
     return yp_None;
 }
 
+static ypObject *int_unfrozen_copy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
+    return yp_intstoreC( ypInt_VALUE( i ) );
+}
+
+static ypObject *int_frozen_copy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
+    return yp_intC( ypInt_VALUE( i ) );
+}
+
 static ypObject *int_bool( ypObject *i ) {
     return ypBool_FROM_C( ypInt_VALUE( i ) );
 }
@@ -2404,8 +2412,8 @@ static ypTypeObject ypInt_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    int_unfrozen_copy,              // tp_unfrozen_copy
+    int_frozen_copy,                // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2467,8 +2475,8 @@ static ypTypeObject ypIntStore_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    int_unfrozen_copy,              // tp_unfrozen_copy
+    int_frozen_copy,                // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2697,7 +2705,7 @@ ypObject *yp_intC( yp_int_t value )
         ypObject *i = ypMem_MALLOC_FIXED( ypIntObject, ypInt_CODE );
         if( yp_isexceptionC( i ) ) return i;
         ypInt_VALUE( i ) = value;
-    DEBUG( "yp_intC: 0x%08X value %d", i, value );
+        DEBUG( "yp_intC: 0x%08X value %d", i, value );
         return i;
     }
 }
