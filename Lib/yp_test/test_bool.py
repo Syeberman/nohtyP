@@ -169,7 +169,7 @@ class BoolTest(unittest.TestCase):
         self.assertIs(yp_bool(""), yp_False)
         self.assertIs(yp_bool(), yp_False)
 
-    # FIXME Adapt to nohtyP
+    @unittest.skip("TODO: Enable when formatting supported in nohtyP")
     def test_format(self):
         self.assertEqual("%d" % yp_False, "0")
         self.assertEqual("%d" % yp_True, "1")

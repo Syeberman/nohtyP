@@ -9,7 +9,7 @@ yp.py - Python wrapper for nohtyP
 # TODO __all__, or underscores
 
 from ctypes import *
-import sys, weakref
+import sys, weakref, operator
 
 ypdll = cdll.nohtyP
 
@@ -668,13 +668,13 @@ yp_func( c_ypObject_p, "yp_xor", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_bar( ypObject *x, ypObject *y );
 yp_func( c_ypObject_p, "yp_bar", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_neg( ypObject *x );
-#yp_func( c_ypObject_p, "yp_neg", ((c_ypObject_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_neg", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_pos( ypObject *x );
-#yp_func( c_ypObject_p, "yp_pos", ((c_ypObject_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_pos", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_abs( ypObject *x );
-#yp_func( c_ypObject_p, "yp_abs", ((c_ypObject_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_abs", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_invert( ypObject *x );
-#yp_func( c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ) )
+yp_func( c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ) )
 
 # void yp_iadd( ypObject **x, ypObject *y );
 # void yp_isub( ypObject **x, ypObject *y );
@@ -954,6 +954,21 @@ class ypObject( c_ypObject_p ):
     def __and__( self, other ): return _yp_amp( self, other )
     def __xor__( self, other ): return _yp_xor( self, other )
     def __or__( self, other ): return _yp_bar( self, other )
+    def __neg__( self ): return _yp_neg( self )
+    def __pos__( self ): return _yp_pos( self )
+    def __abs__( self ): return _yp_abs( self )
+    def __invert__( self ): return _yp_invert( self )
+
+    def __radd__( self, other ): return _yp_add( other, self )
+    def __rsub__( self, other ): return _yp_sub( other, self )
+    def __rmul__( self, other ): return _yp_mul( other, self )
+    def __rmod__( self, other ): return _yp_mod( other, self )
+    def __rpow__( self, other ): return _yp_pow( other, self )
+    def __rlshift__( self, other ): return _yp_lshift( other, self )
+    def __rrshift__( self, other ): return _yp_rshift( other, self )
+    def __rand__( self, other ): return _yp_amp( other, self )
+    def __rxor__( self, other ): return _yp_xor( other, self )
+    def __ror__( self, other ): return _yp_bar( other, self )
 
 def pytype( pytypes, ypcode ):
     if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
@@ -999,19 +1014,24 @@ class yp_bool( ypObject ):
     def _arithmetic( left, op, right ):
         if isinstance( left, yp_bool ): left = left._as_int( )
         if isinstance( right, yp_bool ): right = right._as_int( )
-        return getattr( left, op )( right )
-    def __add__( self, other ): return yp_bool._arithmetic( self, "__add__", other )
-    def __sub__( self, other ): return yp_bool._arithmetic( self, "__sub__", other )
-    def __mul__( self, other ): return yp_bool._arithmetic( self, "__mul__", other )
-    def __mod__( self, other ): return yp_bool._arithmetic( self, "__mod__", other )
-    def __pow__( self, other ): return yp_bool._arithmetic( self, "__pow__", other )
-    def __lshift__( self, other ): return yp_bool._arithmetic( self, "__lshift__", other )
-    def __rshift__( self, other ): return yp_bool._arithmetic( self, "__rshift__", other )
-    def __radd__( self, other ): return yp_bool._arithmetic( other, "__radd__", self )
-    def __rsub__( self, other ): return yp_bool._arithmetic( other, "__rsub__", self )
-    def __rmul__( self, other ): return yp_bool._arithmetic( other, "__rmul__", self )
-    def __rmod__( self, other ): return yp_bool._arithmetic( other, "__rmod__", self )
-    def __rpow__( self, other ): return yp_bool._arithmetic( other, "__rpow__", self )
+        return op( left, right )
+    def __add__( self, other ): return yp_bool._arithmetic( self, operator.add, other )
+    def __sub__( self, other ): return yp_bool._arithmetic( self, operator.sub, other )
+    def __mul__( self, other ): return yp_bool._arithmetic( self, operator.mul, other )
+    def __mod__( self, other ): return yp_bool._arithmetic( self, operator.mod, other )
+    def __pow__( self, other ): return yp_bool._arithmetic( self, operator.pow, other )
+    def __lshift__( self, other ): return yp_bool._arithmetic( self, operator.lshift, other )
+    def __rshift__( self, other ): return yp_bool._arithmetic( self, operator.rshift, other )
+    def __radd__( self, other ): return yp_bool._arithmetic( other, operator.add, self )
+    def __rsub__( self, other ): return yp_bool._arithmetic( other, operator.sub, self )
+    def __rmul__( self, other ): return yp_bool._arithmetic( other, operator.mul, self )
+    def __rmod__( self, other ): return yp_bool._arithmetic( other, operator.mod, self )
+    def __rpow__( self, other ): return yp_bool._arithmetic( other, operator.pow, self )
+
+    def __neg__( self ): return -self._as_int( )
+    def __pos__( self ): return +self._as_int( )
+    def __abs__( self ): return abs( self._as_int( ) )
+    def __invert__( self ): return ~self._as_int( )
 
     @staticmethod
     def _boolean( left, op, right ):
@@ -1019,12 +1039,12 @@ class yp_bool( ypObject ):
         if isinstance( left, yp_bool ) and isinstance( right, yp_bool ):
             return yp_bool( result )
         return result
-    def __and__( self, other ): return yp_bool._boolean( self, "__and__", other )
-    def __xor__( self, other ): return yp_bool._boolean( self, "__xor__", other )
-    def __or__( self, other ): return yp_bool._boolean( self, "__or__", other )
-    def __rand__( self, other ): return yp_bool._boolean( other, "__rand__", self )
-    def __rxor__( self, other ): return yp_bool._boolean( other, "__rxor__", self )
-    def __ror__( self, other ): return yp_bool._boolean( other, "__ror__", self )
+    def __and__( self, other ): return yp_bool._boolean( self, operator.and_, other )
+    def __xor__( self, other ): return yp_bool._boolean( self, operator.xor, other )
+    def __or__( self, other ): return yp_bool._boolean( self, operator.or_, other )
+    def __rand__( self, other ): return yp_bool._boolean( other, operator.and_, self )
+    def __rxor__( self, other ): return yp_bool._boolean( other, operator.xor, self )
+    def __ror__( self, other ): return yp_bool._boolean( other, operator.or_, self )
 
 c_ypObject_p_value( "yp_True" )
 c_ypObject_p_value( "yp_False" )
