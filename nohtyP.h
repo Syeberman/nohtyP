@@ -995,7 +995,7 @@ ypAPI void yp_ibarFC( ypObject **x, yp_float_t y );
 ypAPI yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc );
-ypAPI yp_int_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc );
+ypAPI yp_float_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_floordivL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc );
@@ -1017,7 +1017,7 @@ ypAPI yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc );
+ypAPI yp_int_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI void yp_divmodFL( yp_float_t x, yp_float_t y,
         yp_float_t *div, yp_float_t *mod, ypObject **exc );
