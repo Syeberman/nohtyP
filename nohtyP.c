@@ -2351,6 +2351,8 @@ typedef yp_float_t (*arithFLfunc)( yp_float_t, yp_float_t, ypObject ** );
 typedef void (*iarithCfunc)( ypObject **, yp_int_t );
 typedef void (*iarithFCfunc)( ypObject **, yp_float_t );
 typedef void (*iarithfunc)( ypObject **, ypObject * );
+typedef yp_int_t (*unaryLfunc)( yp_int_t, ypObject ** );
+typedef yp_float_t (*unaryFLfunc)( yp_float_t, ypObject ** );
 
 // Public, immortal objects
 yp_IMMORTAL_INT( yp_sys_maxint, yp_INT_T_MAX );
@@ -2586,6 +2588,27 @@ yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject **exc )
     return x | y; // TODO overflow check
 }
 
+yp_int_t yp_negL( yp_int_t x, ypObject **exc )
+{
+    return -x; // TODO overflow check
+}
+
+yp_int_t yp_posL( yp_int_t x, ypObject **exc )
+{
+    return x;
+}
+
+yp_int_t yp_absL( yp_int_t x, ypObject **exc )
+{
+    if( x < 0 ) return yp_negL( x, exc );
+    return x;
+}
+
+yp_int_t yp_invertL( yp_int_t x, ypObject **exc )
+{
+    return ~x; // TODO overflow check
+}
+
 // XXX Overloading of add/etc currently not supported
 static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithFCfunc floatop )
 {
@@ -2593,8 +2616,7 @@ static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithFCfu
     ypObject *exc = yp_None;
 
     if( x_pair == ypInt_CODE ) {
-        yp_int_t result;
-        result = intop( ypInt_VALUE( *x ), y, &exc );
+        yp_int_t result = intop( ypInt_VALUE( *x ), y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         if( ypObject_IS_MUTABLE( x ) ) {
             ypInt_VALUE( x ) = result;
@@ -2668,6 +2690,83 @@ _ypInt_PUBLIC_ARITH_FUNCTION( rshift );
 _ypInt_PUBLIC_ARITH_FUNCTION( amp );
 _ypInt_PUBLIC_ARITH_FUNCTION( xor );
 _ypInt_PUBLIC_ARITH_FUNCTION( bar );
+
+static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryFLfunc floatop )
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( *x );
+    ypObject *exc = yp_None;
+
+    if( x_pair == ypInt_CODE ) {
+        yp_int_t result = intop( ypInt_VALUE( *x ), &exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        if( ypObject_IS_MUTABLE( *x ) ) {
+            ypInt_VALUE( *x ) = result;
+        } else {
+            if( result == ypInt_VALUE( *x ) ) return;
+            yp_decref( *x );
+            *x = yp_intC( result );
+        }
+        return;
+
+    } else if( x_pair == ypFloat_CODE ) {
+        yp_float_t result = floatop( ypFloat_VALUE( *x ), &exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        if( ypObject_IS_MUTABLE( *x ) ) {
+            ypFloat_VALUE( *x ) = result;
+        } else {
+            if( result == ypFloat_VALUE( *x ) ) return;
+            yp_decref( *x );
+            *x = yp_floatC( result );
+        }
+        return;
+
+    } else {
+        return_yp_INPLACE_BAD_TYPE( x, *x );
+    }
+}
+
+static ypObject *unaryoperation( ypObject *x, unaryLfunc intop, unaryFLfunc floatop )
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    ypObject *exc = yp_None;
+
+    if( x_pair == ypInt_CODE ) {
+        yp_int_t result = intop( ypInt_VALUE( x ), &exc );
+        if( yp_isexceptionC( exc ) ) return exc;
+        if( ypObject_IS_MUTABLE( x ) ) {
+            return yp_intstoreC( result );
+        } else {
+            if( result == ypInt_VALUE( x ) ) return yp_incref( x );
+            return yp_intC( result );
+        }
+
+    } else if( x_pair == ypFloat_CODE ) {
+        yp_float_t result = floatop( ypFloat_VALUE( x ), &exc );
+        if( yp_isexceptionC( exc ) ) return exc;
+        if( ypObject_IS_MUTABLE( x ) ) {
+            return yp_floatstoreC( result );
+        } else {
+            if( result == ypFloat_VALUE( x ) ) return yp_incref( x );
+            return yp_floatC( result );
+        }
+
+    } else {
+        return_yp_BAD_TYPE( x );
+    }
+}
+
+// Defined here are yp_ineg (et al), and yp_neg (et al)
+#define _ypInt_PUBLIC_UNARY_FUNCTION( name ) \
+    void yp_i ## name( ypObject **x ) { \
+        iunaryoperation( x, yp_ ## name ## L, yp_ ## name ## FL ); \
+    } \
+    ypObject *yp_ ## name( ypObject *x ) { \
+        return unaryoperation( x, yp_ ## name ## L, yp_ ## name ## FL ); \
+    }
+_ypInt_PUBLIC_UNARY_FUNCTION( neg );
+_ypInt_PUBLIC_UNARY_FUNCTION( pos );
+_ypInt_PUBLIC_UNARY_FUNCTION( abs );
+_ypInt_PUBLIC_UNARY_FUNCTION( invert );
 
 // Public constructors
 
@@ -2987,38 +3086,59 @@ yp_int_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc )
 
 yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+    return_yp_CEXC_ERR( 0.0, exc, yp_NotImplementedError );
 }
 
 yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+    return_yp_CEXC_ERR( 0.0, exc, yp_NotImplementedError );
 }
 
 // FIXME Bit operations involving floats aren't supported; remove from public API and make static
 yp_float_t yp_lshiftFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+    return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
 yp_float_t yp_rshiftFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+    return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
 yp_float_t yp_ampFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+    return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
 yp_float_t yp_xorFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+    return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
 yp_float_t yp_barFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+    return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
+}
+
+yp_float_t yp_negFL( yp_float_t x, ypObject **exc )
+{
+    return -x; // TODO overflow check
+}
+
+yp_float_t yp_posFL( yp_float_t x, ypObject **exc )
+{
+    return x;
+}
+
+yp_float_t yp_absFL( yp_float_t x, ypObject **exc )
+{
+    if( x < 0.0 ) return yp_negFL( x, exc );
+    return x;
+}
+
+yp_float_t yp_invertFL( yp_float_t x, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
 static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
