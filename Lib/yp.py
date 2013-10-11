@@ -634,22 +634,37 @@ yp_func( c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ) )
 # ypObject *yp_add( ypObject *x, ypObject *y );
 yp_func( c_ypObject_p, "yp_add", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_sub( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_sub", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_mul( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_mul", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_truediv( ypObject *x, ypObject *y );
+#yp_func( c_ypObject_p, "yp_truediv", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_floordiv( ypObject *x, ypObject *y );
+#yp_func( c_ypObject_p, "yp_floordiv", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_mod( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_mod", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod );
 # ypObject *yp_pow( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_pow", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_pow3( ypObject *x, ypObject *y, ypObject *z );
 # ypObject *yp_lshift( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_lshift", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_rshift( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_rshift", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_amp( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_amp", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_xor( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_xor", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_bar( ypObject *x, ypObject *y );
+yp_func( c_ypObject_p, "yp_bar", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_neg( ypObject *x );
+#yp_func( c_ypObject_p, "yp_neg", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_pos( ypObject *x );
+#yp_func( c_ypObject_p, "yp_pos", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_abs( ypObject *x );
+#yp_func( c_ypObject_p, "yp_abs", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_invert( ypObject *x );
+#yp_func( c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ) )
 
 # void yp_iadd( ypObject **x, ypObject *y );
 # void yp_isub( ypObject **x, ypObject *y );
@@ -920,6 +935,15 @@ class ypObject( c_ypObject_p ):
     def setdefault( self, key, defval=None ): return _yp_setdefault( self, key, defval )
 
     def __add__( self, other ): return _yp_add( self, other )
+    def __sub__( self, other ): return _yp_sub( self, other )
+    def __mul__( self, other ): return _yp_mul( self, other )
+    def __mod__( self, other ): return _yp_mod( self, other )
+    def __pow__( self, other ): return _yp_pow( self, other )
+    def __lshift__( self, other ): return _yp_lshift( self, other )
+    def __rshift__( self, other ): return _yp_rshift( self, other )
+    def __and__( self, other ): return _yp_amp( self, other )
+    def __xor__( self, other ): return _yp_xor( self, other )
+    def __or__( self, other ): return _yp_bar( self, other )
 
 def pytype( pytypes, ypcode ):
     if not isinstance( pytypes, tuple ): pytypes = (pytypes, )

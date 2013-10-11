@@ -2528,6 +2528,56 @@ yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc )
     return x - y; // TODO overflow check
 }
 
+yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x * y; // TODO overflow check
+}
+
+yp_float_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0.0, exc, yp_NotImplementedError );
+}
+
+yp_int_t yp_floordivL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x / y; // TODO overflow check
+}
+
+yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x % y; // TODO overflow check
+}
+
+yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+}
+
+yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x << y; // TODO overflow check
+}
+
+yp_int_t yp_rshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x >> y; // TODO overflow check
+}
+
+yp_int_t yp_ampL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x & y; // TODO overflow check
+}
+
+yp_int_t yp_xorL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x ^ y; // TODO overflow check
+}
+
+yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject **exc )
+{
+    return x | y; // TODO overflow check
+}
+
 // XXX Overloading of add/etc currently not supported
 static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithFCfunc floatop )
 {
@@ -2602,6 +2652,14 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, iarithfunc numop )
     }
 _ypInt_PUBLIC_ARITH_FUNCTION( add );
 _ypInt_PUBLIC_ARITH_FUNCTION( sub );
+_ypInt_PUBLIC_ARITH_FUNCTION( mul );
+_ypInt_PUBLIC_ARITH_FUNCTION( mod );
+_ypInt_PUBLIC_ARITH_FUNCTION( pow );
+_ypInt_PUBLIC_ARITH_FUNCTION( lshift );
+_ypInt_PUBLIC_ARITH_FUNCTION( rshift );
+_ypInt_PUBLIC_ARITH_FUNCTION( amp );
+_ypInt_PUBLIC_ARITH_FUNCTION( xor );
+_ypInt_PUBLIC_ARITH_FUNCTION( bar );
 
 // Public constructors
 
@@ -2887,6 +2945,57 @@ yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc )
     return x - y; // TODO overflow check
 }
 
+yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return x * y; // TODO overflow check
+}
+
+yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return x / y; // TODO overflow check
+}
+
+yp_int_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+}
+
+yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+}
+
+yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+}
+
+// FIXME Bit operations involving floats aren't supported; remove from public API and make static
+yp_float_t yp_lshiftFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+}
+
+yp_float_t yp_rshiftFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+}
+
+yp_float_t yp_ampFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+}
+
+yp_float_t yp_xorFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+}
+
+yp_float_t yp_barFL( yp_float_t x, yp_float_t y, ypObject **exc )
+{
+    return_yp_CEXC_ERR( 0, exc, yp_TypeError );
+}
+
 static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( *x );
@@ -2924,6 +3033,14 @@ static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
     }
 _ypFloat_PUBLIC_ARITH_FUNCTION( add );
 _ypFloat_PUBLIC_ARITH_FUNCTION( sub );
+_ypFloat_PUBLIC_ARITH_FUNCTION( mul );
+_ypFloat_PUBLIC_ARITH_FUNCTION( mod );
+_ypFloat_PUBLIC_ARITH_FUNCTION( pow );
+_ypFloat_PUBLIC_ARITH_FUNCTION( lshift );
+_ypFloat_PUBLIC_ARITH_FUNCTION( rshift );
+_ypFloat_PUBLIC_ARITH_FUNCTION( amp );
+_ypFloat_PUBLIC_ARITH_FUNCTION( xor );
+_ypFloat_PUBLIC_ARITH_FUNCTION( bar );
 
 // Public constructors
 
