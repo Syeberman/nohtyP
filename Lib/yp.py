@@ -273,6 +273,11 @@ yp_func( c_ypObject_p, "yp_intstoreC", ((c_yp_int_t, "value"), ) )
 # ypObject *yp_int_strC( const char *string, int base );
 # ypObject *yp_intstore_strC( const char *string, int base );
 
+# ypObject *yp_int( ypObject *x );
+yp_func( c_ypObject_p, "yp_int", ((c_ypObject_p, "x"), ) )
+# ypObject *yp_intstore( ypObject *x );
+yp_func( c_ypObject_p, "yp_intstore", ((c_ypObject_p, "x"), ) )
+
 # ypObject *yp_floatC( yp_float_t value );
 yp_func( c_ypObject_p, "yp_floatC", ((c_yp_float_t, "value"), ) )
 # ypObject *yp_floatstoreC( yp_float_t value );
@@ -280,6 +285,11 @@ yp_func( c_ypObject_p, "yp_floatstoreC", ((c_yp_float_t, "value"), ) )
 
 # ypObject *yp_float_strC( const char *string );
 # ypObject *yp_floatstore_strC( const char *string );
+
+# ypObject *yp_float( ypObject *x );
+yp_func( c_ypObject_p, "yp_float", ((c_ypObject_p, "x"), ) )
+# ypObject *yp_floatstore( ypObject *x );
+yp_func( c_ypObject_p, "yp_floatstore", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_iter( ypObject *x );
 yp_func( c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ) )
@@ -1058,9 +1068,8 @@ def _yp_iterable( iterable ):
 class yp_int( ypObject ):
     def __new__( cls, x=0, base=None ):
         if base is None:
-            try: return _yp_intC( x )
-            except TypeError: pass
-            base = 10
+            if isinstance( x, int ): return _yp_intC( x )
+            return _yp_int( x )
         raise NotImplementedError
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def __str__( self ): return str( _yp_asintC( self, yp_None ) )
@@ -1071,7 +1080,8 @@ _yp_i_one = yp_int( 1 )
 @pytype( float, 12 )
 class yp_float( ypObject ):
     def __new__( cls, x=0.0 ):
-        return _yp_floatC( x )
+        if isinstance( x, float ): return _yp_floatC( x )
+        return _yp_float( x )
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def __str__( self ): return str( _yp_asfloatC( self, yp_None ) )
     def __repr__( self ): return repr( _yp_asfloatC( self, yp_None ) )

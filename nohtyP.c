@@ -2719,6 +2719,21 @@ ypObject *yp_intstoreC( yp_int_t value )
     return i;
 }
 
+static ypObject *_ypInt( ypObject *(*allocator)( yp_int_t ), ypObject *x )
+{
+    ypObject *exc = yp_None;
+    yp_int_t x_asint = yp_asintC( x, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    return allocator( x_asint );
+}
+ypObject *yp_int( ypObject *x ) {
+    if( ypObject_TYPE_CODE( x ) == ypInt_CODE ) return yp_incref( x );
+    return _ypInt( yp_intC, x );
+}
+ypObject *yp_intstore( ypObject *x ) {
+    return _ypInt( yp_intstoreC, x );
+}
+
 // Public conversion functions
 
 yp_int_t yp_asintC( ypObject *x, ypObject **exc )
@@ -2729,6 +2744,8 @@ yp_int_t yp_asintC( ypObject *x, ypObject **exc )
         return ypInt_VALUE( x );
     } else if( x_pair == ypFloat_CODE ) {
         return yp_asintFL( ypFloat_VALUE( x ), exc );
+    } else if( x_pair == ypBool_CODE ) {
+        return ypBool_IS_TRUE_C( x );
     }
     return_yp_CEXC_BAD_TYPE( 0, exc, x );
 }
@@ -3068,6 +3085,21 @@ ypObject *yp_floatstoreC( yp_float_t value )
     return f;
 }
 
+static ypObject *_ypFloat( ypObject *(*allocator)( yp_float_t ), ypObject *x )
+{
+    ypObject *exc = yp_None;
+    yp_float_t x_asfloat = yp_asfloatC( x, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    return allocator( x_asfloat );
+}
+ypObject *yp_float( ypObject *x ) {
+    if( ypObject_TYPE_CODE( x ) == ypFloat_CODE ) return yp_incref( x );
+    return _ypFloat( yp_floatC, x );
+}
+ypObject *yp_floatstore( ypObject *x ) {
+    return _ypFloat( yp_floatstoreC, x );
+}
+
 // Public conversion functions
 
 yp_float_t yp_asfloatC( ypObject *x, ypObject **exc )
@@ -3078,6 +3110,8 @@ yp_float_t yp_asfloatC( ypObject *x, ypObject **exc )
         return yp_asfloatL( ypInt_VALUE( x ), exc );
     } else if( x_pair == ypFloat_CODE ) {
         return ypFloat_VALUE( x );
+    } else if( x_pair == ypBool_CODE ) {
+        return yp_asfloatL( ypBool_IS_TRUE_C( x ), exc );
     }
     return_yp_CEXC_BAD_TYPE( 0.0, exc, x );
 }
