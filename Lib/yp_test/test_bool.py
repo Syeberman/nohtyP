@@ -42,20 +42,20 @@ class BoolTest(unittest.TestCase):
         self.assertEqual(eval(repr(yp_True)), yp_True)
 
     def test_str(self):
-        self.assertEqual(str(yp_False), 'False')
-        self.assertEqual(str(yp_True), 'True')
+        self.assertEqual(yp_str(yp_False), 'False')
+        self.assertEqual(yp_str(yp_True), 'True')
 
     def test_int(self):
-        self.assertEqual(int(yp_False), 0)
-        self.assertIsNot(int(yp_False), yp_False)
-        self.assertEqual(int(yp_True), 1)
-        self.assertIsNot(int(yp_True), yp_True)
+        self.assertEqual(yp_int(yp_False), 0)
+        self.assertIsNot(yp_int(yp_False), yp_False)
+        self.assertEqual(yp_int(yp_True), 1)
+        self.assertIsNot(yp_int(yp_True), yp_True)
 
     def test_float(self):
-        self.assertEqual(float(yp_False), 0.0)
-        self.assertIsNot(float(yp_False), yp_False)
-        self.assertEqual(float(yp_True), 1.0)
-        self.assertIsNot(float(yp_True), yp_True)
+        self.assertEqual(yp_float(yp_False), 0.0)
+        self.assertIsNot(yp_float(yp_False), yp_False)
+        self.assertEqual(yp_float(yp_True), 1.0)
+        self.assertIsNot(yp_float(yp_True), yp_True)
 
     def test_math(self):
         self.assertEqual(+yp_False, 0)
@@ -104,26 +104,26 @@ class BoolTest(unittest.TestCase):
 
         for b in yp_False, yp_True:
             for i in 0, 1, 2:
-                self.assertEqual(b**i, int(b)**i)
-                self.assertIsNot(b**i, yp_bool(int(b)**i))
+                self.assertEqual(b**i, yp_int(b)**i)
+                self.assertIsNot(b**i, yp_bool(yp_int(b)**i))
 
         for a in yp_False, yp_True:
             for b in yp_False, yp_True:
-                self.assertIs(a&b, yp_bool(int(a)&int(b)))
-                self.assertIs(a|b, yp_bool(int(a)|int(b)))
-                self.assertIs(a^b, yp_bool(int(a)^int(b)))
-                self.assertEqual(a&int(b), int(a)&int(b))
-                self.assertIsNot(a&int(b), yp_bool(int(a)&int(b)))
-                self.assertEqual(a|int(b), int(a)|int(b))
-                self.assertIsNot(a|int(b), yp_bool(int(a)|int(b)))
-                self.assertEqual(a^int(b), int(a)^int(b))
-                self.assertIsNot(a^int(b), yp_bool(int(a)^int(b)))
-                self.assertEqual(int(a)&b, int(a)&int(b))
-                self.assertIsNot(int(a)&b, yp_bool(int(a)&int(b)))
-                self.assertEqual(int(a)|b, int(a)|int(b))
-                self.assertIsNot(int(a)|b, yp_bool(int(a)|int(b)))
-                self.assertEqual(int(a)^b, int(a)^int(b))
-                self.assertIsNot(int(a)^b, yp_bool(int(a)^int(b)))
+                self.assertIs(a&b, yp_bool(yp_int(a)&yp_int(b)))
+                self.assertIs(a|b, yp_bool(yp_int(a)|yp_int(b)))
+                self.assertIs(a^b, yp_bool(yp_int(a)^yp_int(b)))
+                self.assertEqual(a&yp_int(b), yp_int(a)&yp_int(b))
+                self.assertIsNot(a&yp_int(b), yp_bool(yp_int(a)&yp_int(b)))
+                self.assertEqual(a|yp_int(b), yp_int(a)|yp_int(b))
+                self.assertIsNot(a|yp_int(b), yp_bool(yp_int(a)|yp_int(b)))
+                self.assertEqual(a^yp_int(b), yp_int(a)^yp_int(b))
+                self.assertIsNot(a^yp_int(b), yp_bool(yp_int(a)^yp_int(b)))
+                self.assertEqual(yp_int(a)&b, yp_int(a)&yp_int(b))
+                self.assertIsNot(yp_int(a)&b, yp_bool(yp_int(a)&yp_int(b)))
+                self.assertEqual(yp_int(a)|b, yp_int(a)|yp_int(b))
+                self.assertIsNot(yp_int(a)|b, yp_bool(yp_int(a)|yp_int(b)))
+                self.assertEqual(yp_int(a)^b, yp_int(a)^yp_int(b))
+                self.assertIsNot(yp_int(a)^b, yp_bool(yp_int(a)^yp_int(b)))
 
         self.assertIs(1==1, yp_True)
         self.assertIs(1==0, yp_False)
@@ -176,29 +176,33 @@ class BoolTest(unittest.TestCase):
         self.assertEqual("%x" % yp_False, "0")
         self.assertEqual("%x" % yp_True, "1")
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_hasattr(self):
         self.assertIs(hasattr([], "append"), yp_True)
         self.assertIs(hasattr([], "wobble"), yp_False)
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_callable(self):
         self.assertIs(callable(len), yp_True)
         self.assertIs(callable(1), yp_False)
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_isinstance(self):
         self.assertIs(isinstance(yp_True, yp_bool), yp_True)
         self.assertIs(isinstance(yp_False, yp_bool), yp_True)
-        self.assertIs(isinstance(yp_True, int), yp_True)
-        self.assertIs(isinstance(yp_False, int), yp_True)
+        self.assertIs(isinstance(yp_True, yp_int), yp_True)
+        self.assertIs(isinstance(yp_False, yp_int), yp_True)
         self.assertIs(isinstance(1, yp_bool), yp_False)
         self.assertIs(isinstance(0, yp_bool), yp_False)
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_issubclass(self):
-        self.assertIs(issubclass(yp_bool, int), yp_True)
-        self.assertIs(issubclass(int, yp_bool), yp_False)
+        self.assertIs(issubclass(yp_bool, yp_int), yp_True)
+        self.assertIs(issubclass(yp_int, yp_bool), yp_False)
 
     def test_contains(self):
-        self.assertIs(1 in {}, yp_False)
-        self.assertIs(1 in {1:1}, yp_True)
+        self.assertIs(yp_dict( {} ).__contains__( 1 ), yp_False)
+        self.assertIs(yp_dict( {1:1} ).__contains__( 1 ), yp_True)
 
     def test_string(self):
         self.assertIs("xyz".endswith("z"), yp_True)
@@ -239,6 +243,7 @@ class BoolTest(unittest.TestCase):
         self.assertNotIsInstance(yp_True ^ 1, yp_bool)
         self.assertIs(yp_True ^ yp_True, yp_False)
 
+    @unittest.skip("TODO: Implement files in nohtyP")
     def test_fileclosed(self):
         try:
             f = open(support.TESTFN, "w")
@@ -270,11 +275,13 @@ class BoolTest(unittest.TestCase):
         self.assertIs(operator.is_not(yp_True, yp_True), yp_False)
         self.assertIs(operator.is_not(yp_True, yp_False), yp_True)
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_marshal(self):
         import marshal
         self.assertIs(marshal.loads(marshal.dumps(yp_True)), yp_True)
         self.assertIs(marshal.loads(marshal.dumps(yp_False)), yp_False)
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickle(self):
         import pickle
         self.assertIs(pickle.loads(pickle.dumps(yp_True)), yp_True)
@@ -282,6 +289,7 @@ class BoolTest(unittest.TestCase):
         self.assertIs(pickle.loads(pickle.dumps(yp_True, yp_True)), yp_True)
         self.assertIs(pickle.loads(pickle.dumps(yp_False, yp_True)), yp_False)
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_picklevalues(self):
         # Test for specific backwards-compatible pickle values
         import pickle
@@ -292,6 +300,7 @@ class BoolTest(unittest.TestCase):
         self.assertEqual(pickle.dumps(yp_True, protocol=2), b'\x80\x02\x88.')
         self.assertEqual(pickle.dumps(yp_False, protocol=2), b'\x80\x02\x89.')
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_convert_to_bool(self):
         # Verify that TypeError occurs when bad things are returned
         # from __bool__().  This isn't really a bool test, but
@@ -323,6 +332,7 @@ class BoolTest(unittest.TestCase):
                 return -1
         self.assertRaises(ValueError, yp_bool, Eggs())
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
         # this will start failing if __len__ changes assertions
