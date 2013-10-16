@@ -944,35 +944,40 @@ class ypObject( c_ypObject_p ):
     def get( self, key, defval=None ): return _yp_getdefault( self, key, defval )
     def setdefault( self, key, defval=None ): return _yp_setdefault( self, key, defval )
 
-    def __add__( self, other ): return _yp_add( self, other )
-    def __sub__( self, other ): return _yp_sub( self, other )
-    def __mul__( self, other ): return _yp_mul( self, other )
-    def __truediv__( self, other ): return _yp_truediv( self, other )
-    def __floordiv__( self, other ): return _yp_floordiv( self, other )
-    def __mod__( self, other ): return _yp_mod( self, other )
-    def __pow__( self, other ): return _yp_pow( self, other )
-    def __lshift__( self, other ): return _yp_lshift( self, other )
-    def __rshift__( self, other ): return _yp_rshift( self, other )
-    def __and__( self, other ): return _yp_amp( self, other )
-    def __xor__( self, other ): return _yp_xor( self, other )
-    def __or__( self, other ): return _yp_bar( self, other )
-    def __neg__( self ): return _yp_neg( self )
-    def __pos__( self ): return _yp_pos( self )
-    def __abs__( self ): return _yp_abs( self )
-    def __invert__( self ): return _yp_invert( self )
+    # Python requires arithmetic methods to _return_ NotImplemented
+    @staticmethod
+    def _arithmetic( func, *args ):
+        try: return func( *args )
+        except TypeError: return NotImplemented
+    def __add__( self, other ): return self._arithmetic( _yp_add, self, other )
+    def __sub__( self, other ): return self._arithmetic( _yp_sub, self, other )
+    def __mul__( self, other ): return self._arithmetic( _yp_mul, self, other )
+    def __truediv__( self, other ): return self._arithmetic( _yp_truediv, self, other )
+    def __floordiv__( self, other ): return self._arithmetic( _yp_floordiv, self, other )
+    def __mod__( self, other ): return self._arithmetic( _yp_mod, self, other )
+    def __pow__( self, other ): return self._arithmetic( _yp_pow, self, other )
+    def __lshift__( self, other ): return self._arithmetic( _yp_lshift, self, other )
+    def __rshift__( self, other ): return self._arithmetic( _yp_rshift, self, other )
+    def __and__( self, other ): return self._arithmetic( _yp_amp, self, other )
+    def __xor__( self, other ): return self._arithmetic( _yp_xor, self, other )
+    def __or__( self, other ): return self._arithmetic( _yp_bar, self, other )
+    def __neg__( self ): return self._arithmetic( _yp_neg, self )
+    def __pos__( self ): return self._arithmetic( _yp_pos, self )
+    def __abs__( self ): return self._arithmetic( _yp_abs, self )
+    def __invert__( self ): return self._arithmetic( _yp_invert, self )
 
-    def __radd__( self, other ): return _yp_add( other, self )
-    def __rsub__( self, other ): return _yp_sub( other, self )
-    def __rmul__( self, other ): return _yp_mul( other, self )
-    def __rtruediv__( self, other ): return _yp_truediv( other, self )
-    def __rfloordiv__( self, other ): return _yp_floordiv( other, self )
-    def __rmod__( self, other ): return _yp_mod( other, self )
-    def __rpow__( self, other ): return _yp_pow( other, self )
-    def __rlshift__( self, other ): return _yp_lshift( other, self )
-    def __rrshift__( self, other ): return _yp_rshift( other, self )
-    def __rand__( self, other ): return _yp_amp( other, self )
-    def __rxor__( self, other ): return _yp_xor( other, self )
-    def __ror__( self, other ): return _yp_bar( other, self )
+    def __radd__( self, other ): return self._arithmetic( _yp_add, other, self )
+    def __rsub__( self, other ): return self._arithmetic( _yp_sub, other, self )
+    def __rmul__( self, other ): return self._arithmetic( _yp_mul, other, self )
+    def __rtruediv__( self, other ): return self._arithmetic( _yp_truediv, other, self )
+    def __rfloordiv__( self, other ): return self._arithmetic( _yp_floordiv, other, self )
+    def __rmod__( self, other ): return self._arithmetic( _yp_mod, other, self )
+    def __rpow__( self, other ): return self._arithmetic( _yp_pow, other, self )
+    def __rlshift__( self, other ): return self._arithmetic( _yp_lshift, other, self )
+    def __rrshift__( self, other ): return self._arithmetic( _yp_rshift, other, self )
+    def __rand__( self, other ): return self._arithmetic( _yp_amp, other, self )
+    def __rxor__( self, other ): return self._arithmetic( _yp_xor, other, self )
+    def __ror__( self, other ): return self._arithmetic( _yp_bar, other, self )
 
 def pytype( pytypes, ypcode ):
     if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
@@ -1006,6 +1011,9 @@ class yp_bool( ypObject ):
         pass
     def _as_int( self ): return _yp_i_one if self.value == yp_True.value else _yp_i_zero
 
+    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    def __repr__( self ): return "True" if self.value == yp_True.value else "False"
+
     def __bool__( self ): return self.value == yp_True.value
     def __lt__( self, other ): return bool( self ) <  other
     def __le__( self, other ): return bool( self ) <= other
@@ -1014,6 +1022,7 @@ class yp_bool( ypObject ):
     def __ge__( self, other ): return bool( self ) >= other
     def __gt__( self, other ): return bool( self ) >  other
 
+    # TODO If/when nohtyP supports arithmetic on bool, remove these _as_int hacks
     @staticmethod
     def _arithmetic( left, op, right ):
         if isinstance( left, yp_bool ): left = left._as_int( )
