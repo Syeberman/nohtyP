@@ -125,39 +125,47 @@ class BoolTest(unittest.TestCase):
                 self.assertEqual(yp_int(a)^b, yp_int(a)^yp_int(b))
                 self.assertIsNot(yp_int(a)^b, yp_bool(yp_int(a)^yp_int(b)))
 
-        self.assertIs(1==1, yp_True)
-        self.assertIs(1==0, yp_False)
-        self.assertIs(0<1, yp_True)
-        self.assertIs(1<0, yp_False)
-        self.assertIs(0<=0, yp_True)
-        self.assertIs(1<=0, yp_False)
-        self.assertIs(1>0, yp_True)
-        self.assertIs(1>1, yp_False)
-        self.assertIs(1>=1, yp_True)
-        self.assertIs(0>=1, yp_False)
-        self.assertIs(0!=1, yp_True)
-        self.assertIs(0!=0, yp_False)
+        zero = yp_int( 0 )
+        one = yp_int( 1 )
 
-        x = [1]
-        self.assertIs(x is x, yp_True)
-        self.assertIs(x is not x, yp_False)
+        self.assertIs(one==one, yp_True)
+        self.assertIs(one==zero, yp_False)
+        self.assertIs(zero<one, yp_True)
+        self.assertIs(one<zero, yp_False)
+        self.assertIs(zero<=zero, yp_True)
+        self.assertIs(one<=zero, yp_False)
+        self.assertIs(one>zero, yp_True)
+        self.assertIs(one>one, yp_False)
+        self.assertIs(one>=one, yp_True)
+        self.assertIs(zero>=one, yp_False)
+        self.assertIs(zero!=one, yp_True)
+        self.assertIs(zero!=zero, yp_False)
 
-        self.assertIs(1 in x, yp_True)
-        self.assertIs(0 in x, yp_False)
-        self.assertIs(1 not in x, yp_False)
-        self.assertIs(0 not in x, yp_True)
+        x = yp_list( [one] )
+        # Not applicable to nohtyP
+        #self.assertIs(x is x, yp_True)
+        #self.assertIs(x is not x, yp_False)
 
-        x = {1: 2}
-        self.assertIs(x is x, yp_True)
-        self.assertIs(x is not x, yp_False)
+        self.assertIs(x.__contains__( one ), yp_True)
+        self.assertIs(x.__contains__( zero ), yp_False)
+        # Not applicable to nohtyP
+        #self.assertIs(one not in x, yp_False)
+        #self.assertIs(zero not in x, yp_True)
 
-        self.assertIs(1 in x, yp_True)
-        self.assertIs(0 in x, yp_False)
-        self.assertIs(1 not in x, yp_False)
-        self.assertIs(0 not in x, yp_True)
+        x = yp_dict( {one: yp_int( 2 )} )
+        # Not applicable to nohtyP
+        #self.assertIs(x is x, yp_True)
+        #self.assertIs(x is not x, yp_False)
 
-        self.assertIs(not yp_True, yp_False)
-        self.assertIs(not yp_False, yp_True)
+        self.assertIs(x.__contains__( one ), yp_True)
+        self.assertIs(x.__contains__( zero ), yp_False)
+        # Not applicable to nohtyP
+        #self.assertIs(one not in x, yp_False)
+        #self.assertIs(zero not in x, yp_True)
+
+        # Not applicable to nohtyP
+        #self.assertIs(not yp_True, yp_False)
+        #self.assertIs(not yp_False, yp_True)
 
     def test_convert(self):
         self.assertRaises(TypeError, yp_bool, 42, 42)
@@ -204,31 +212,32 @@ class BoolTest(unittest.TestCase):
         self.assertIs(yp_dict( {} ).__contains__( 1 ), yp_False)
         self.assertIs(yp_dict( {1:1} ).__contains__( 1 ), yp_True)
 
+    @unittest.skip("TODO: Enable when nohtyP has proper str type")
     def test_string(self):
-        self.assertIs("xyz".endswith("z"), yp_True)
-        self.assertIs("xyz".endswith("x"), yp_False)
-        self.assertIs("xyz0123".isalnum(), yp_True)
-        self.assertIs("@#$%".isalnum(), yp_False)
-        self.assertIs("xyz".isalpha(), yp_True)
-        self.assertIs("@#$%".isalpha(), yp_False)
-        self.assertIs("0123".isdigit(), yp_True)
-        self.assertIs("xyz".isdigit(), yp_False)
-        self.assertIs("xyz".islower(), yp_True)
-        self.assertIs("XYZ".islower(), yp_False)
-        self.assertIs("0123".isdecimal(), yp_True)
-        self.assertIs("xyz".isdecimal(), yp_False)
-        self.assertIs("0123".isnumeric(), yp_True)
-        self.assertIs("xyz".isnumeric(), yp_False)
-        self.assertIs(" ".isspace(), yp_True)
-        self.assertIs("\xa0".isspace(), yp_True)
-        self.assertIs("\u3000".isspace(), yp_True)
-        self.assertIs("XYZ".isspace(), yp_False)
-        self.assertIs("X".istitle(), yp_True)
-        self.assertIs("x".istitle(), yp_False)
-        self.assertIs("XYZ".isupper(), yp_True)
-        self.assertIs("xyz".isupper(), yp_False)
-        self.assertIs("xyz".startswith("x"), yp_True)
-        self.assertIs("xyz".startswith("z"), yp_False)
+        self.assertIs(yp_str( "xyz" ).endswith("z"), yp_True)
+        self.assertIs(yp_str( "xyz" ).endswith("x"), yp_False)
+        self.assertIs(yp_str( "xyz0123" ).isalnum(), yp_True)
+        self.assertIs(yp_str( "@#$%" ).isalnum(), yp_False)
+        self.assertIs(yp_str( "xyz" ).isalpha(), yp_True)
+        self.assertIs(yp_str( "@#$%" ).isalpha(), yp_False)
+        self.assertIs(yp_str( "0123" ).isdigit(), yp_True)
+        self.assertIs(yp_str( "xyz" ).isdigit(), yp_False)
+        self.assertIs(yp_str( "xyz" ).islower(), yp_True)
+        self.assertIs(yp_str( "XYZ" ).islower(), yp_False)
+        self.assertIs(yp_str( "0123" ).isdecimal(), yp_True)
+        self.assertIs(yp_str( "xyz" ).isdecimal(), yp_False)
+        self.assertIs(yp_str( "0123" ).isnumeric(), yp_True)
+        self.assertIs(yp_str( "xyz" ).isnumeric(), yp_False)
+        self.assertIs(yp_str( " " ).isspace(), yp_True)
+        self.assertIs(yp_str( "\xa0" ).isspace(), yp_True)
+        self.assertIs(yp_str( "\u3000" ).isspace(), yp_True)
+        self.assertIs(yp_str( "XYZ" ).isspace(), yp_False)
+        self.assertIs(yp_str( "X" ).istitle(), yp_True)
+        self.assertIs(yp_str( "x" ).istitle(), yp_False)
+        self.assertIs(yp_str( "XYZ" ).isupper(), yp_True)
+        self.assertIs(yp_str( "xyz" ).isupper(), yp_False)
+        self.assertIs(yp_str( "xyz" ).startswith("x"), yp_True)
+        self.assertIs(yp_str( "xyz" ).startswith("z"), yp_False)
 
     def test_boolean(self):
         self.assertEqual(yp_True & 1, 1)
@@ -260,6 +269,7 @@ class BoolTest(unittest.TestCase):
                   yp_type_set, yp_type_str, yp_type_tuple, yp_type_type]:
             self.assertIs(yp_bool(t), yp_True)
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_operator(self):
         import operator
         self.assertIs(operator.truth(0), yp_False)
@@ -348,6 +358,7 @@ class BoolTest(unittest.TestCase):
                 except (Exception) as e_len:
                     self.assertEqual(str(e_bool), str(e_len))
 
+    @unittest.skip("TODO: Implement real/imag/etc in nohtyP")
     def test_real_and_imag(self):
         self.assertEqual(yp_True.real, 1)
         self.assertEqual(yp_True.imag, 0)
