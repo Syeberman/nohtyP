@@ -2065,6 +2065,10 @@ int yp_isexceptionCN( ypObject *x, int n, ... )
  * Types
  *************************************************************************************************/
 
+static ypObject *type_bool( ypObject *t ) {
+    return yp_True;
+}
+
 static ypTypeObject ypType_Type = {
     yp_TYPE_HEAD_INIT,
     NULL,                           // tp_name
@@ -2082,7 +2086,7 @@ static ypTypeObject ypType_Type = {
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
-    MethodError_objproc,            // tp_bool
+    type_bool,                      // tp_bool
     NotImplemented_comparefunc,     // tp_lt
     NotImplemented_comparefunc,     // tp_le
     NotImplemented_comparefunc,     // tp_eq
