@@ -648,9 +648,9 @@ yp_func( c_ypObject_p, "yp_sub", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_mul( ypObject *x, ypObject *y );
 yp_func( c_ypObject_p, "yp_mul", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_truediv( ypObject *x, ypObject *y );
-#yp_func( c_ypObject_p, "yp_truediv", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
+yp_func( c_ypObject_p, "yp_truediv", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_floordiv( ypObject *x, ypObject *y );
-#yp_func( c_ypObject_p, "yp_floordiv", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
+yp_func( c_ypObject_p, "yp_floordiv", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_mod( ypObject *x, ypObject *y );
 yp_func( c_ypObject_p, "yp_mod", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod );
@@ -947,6 +947,8 @@ class ypObject( c_ypObject_p ):
     def __add__( self, other ): return _yp_add( self, other )
     def __sub__( self, other ): return _yp_sub( self, other )
     def __mul__( self, other ): return _yp_mul( self, other )
+    def __truediv__( self, other ): return _yp_truediv( self, other )
+    def __floordiv__( self, other ): return _yp_floordiv( self, other )
     def __mod__( self, other ): return _yp_mod( self, other )
     def __pow__( self, other ): return _yp_pow( self, other )
     def __lshift__( self, other ): return _yp_lshift( self, other )
@@ -962,6 +964,8 @@ class ypObject( c_ypObject_p ):
     def __radd__( self, other ): return _yp_add( other, self )
     def __rsub__( self, other ): return _yp_sub( other, self )
     def __rmul__( self, other ): return _yp_mul( other, self )
+    def __rtruediv__( self, other ): return _yp_truediv( other, self )
+    def __rfloordiv__( self, other ): return _yp_floordiv( other, self )
     def __rmod__( self, other ): return _yp_mod( other, self )
     def __rpow__( self, other ): return _yp_pow( other, self )
     def __rlshift__( self, other ): return _yp_lshift( other, self )
@@ -1018,6 +1022,8 @@ class yp_bool( ypObject ):
     def __add__( self, other ): return yp_bool._arithmetic( self, operator.add, other )
     def __sub__( self, other ): return yp_bool._arithmetic( self, operator.sub, other )
     def __mul__( self, other ): return yp_bool._arithmetic( self, operator.mul, other )
+    def __truediv__( self, other ): return yp_bool._arithmetic( self, operator.truediv, other )
+    def __floordiv__( self, other ): return yp_bool._arithmetic( self, operator.floordiv, other )
     def __mod__( self, other ): return yp_bool._arithmetic( self, operator.mod, other )
     def __pow__( self, other ): return yp_bool._arithmetic( self, operator.pow, other )
     def __lshift__( self, other ): return yp_bool._arithmetic( self, operator.lshift, other )
@@ -1025,6 +1031,8 @@ class yp_bool( ypObject ):
     def __radd__( self, other ): return yp_bool._arithmetic( other, operator.add, self )
     def __rsub__( self, other ): return yp_bool._arithmetic( other, operator.sub, self )
     def __rmul__( self, other ): return yp_bool._arithmetic( other, operator.mul, self )
+    def __rtruediv__( self, other ): return yp_bool._arithmetic( other, operator.truediv, self )
+    def __rfloordiv__( self, other ): return yp_bool._arithmetic( other, operator.floordiv, self )
     def __rmod__( self, other ): return yp_bool._arithmetic( other, operator.mod, self )
     def __rpow__( self, other ): return yp_bool._arithmetic( other, operator.pow, self )
 
