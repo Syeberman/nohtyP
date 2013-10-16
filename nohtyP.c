@@ -2563,7 +2563,17 @@ yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject **exc )
 
 yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+    yp_int_t result;
+
+    // TODO A negative exponent results in a float, which we can't return, so determine a good
+    // error to raise
+    // XXX Note that we return what yp_asintC on the float result would return: zero
+    if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+
+    // TODO Is there a better implementation?
+    result = 1;
+    for( /*y already set*/; y > 0; y-- ) result = yp_mulL( result, x, exc );
+    return result;
 }
 
 yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
@@ -2689,6 +2699,7 @@ _ypInt_PUBLIC_ARITH_FUNCTION( mul );
 // truediv implemented separately, as result is always a float
 _ypInt_PUBLIC_ARITH_FUNCTION( floordiv );
 _ypInt_PUBLIC_ARITH_FUNCTION( mod );
+// FIXME if pow has a negative exponent, the result must be a float
 _ypInt_PUBLIC_ARITH_FUNCTION( pow );
 _ypInt_PUBLIC_ARITH_FUNCTION( lshift );
 _ypInt_PUBLIC_ARITH_FUNCTION( rshift );
@@ -2744,7 +2755,7 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
     if( x_pair != ypInt_CODE && x_pair != ypFloat_CODE ) return_yp_BAD_TYPE( x );
     if( y_pair != ypInt_CODE && y_pair != ypFloat_CODE ) return_yp_BAD_TYPE( y );
 
-    // All numbers hold their data in-line, so freezing a mutable is not heap-inefficient
+    // FIXME this is heap-inefficient if x is an int, as it will be discarded for a float
     result = yp_unfrozen_copy( x );
     yp_itruediv( &result, y );
     if( !ypObject_IS_MUTABLE( x ) ) yp_freeze( &result );
@@ -3164,7 +3175,7 @@ yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc )
 
 yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0.0, exc, yp_NotImplementedError );
+    return pow( x, y ); // TODO overflow check
 }
 
 // FIXME Bit operations involving floats aren't supported; remove from public API and make static
