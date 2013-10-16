@@ -141,7 +141,7 @@ class c_ypObject_pp( c_ypObject_p*1 ):
         if item is item_cached: _yp_incref( item_cached )
         return item_cached
 
-# ypAPI ypObject *yp_None;
+# ypObject *yp_None;
 
 # Special-case arguments
 c_ypObject_pp_exc = (c_ypObject_pp, "exc", None)
@@ -150,11 +150,11 @@ c_multiK_ypObject_p = (c_int, "n", 0)
 assert c_multiN_ypObject_p is not c_multiK_ypObject_p
 
 # XXX Initialize nohtyP
-# ypAPI void yp_initialize( yp_initialize_kwparams *kwparams );
+# void yp_initialize( yp_initialize_kwparams *kwparams );
 yp_func( c_void, "yp_initialize", ((c_void_p, "kwparams"), ), errcheck=False )
 _yp_initialize( None )
 
-# ypAPI ypObject *yp_incref( ypObject *x );
+# ypObject *yp_incref( ypObject *x );
 yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_increfN( int n, ... );
@@ -785,6 +785,30 @@ yp_func( c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 # ypObject *yp_sum( ypObject *iterable );
 
 
+# ypObject *yp_type( ypObject *object );
+
+# ypObject * const yp_type_invalidated;
+# ypObject * const yp_type_exception;
+# ypObject * const yp_type_type;
+# ypObject * const yp_type_NoneType;
+# ypObject * const yp_type_bool;
+# ypObject * const yp_type_int;
+# ypObject * const yp_type_intstore;
+# ypObject * const yp_type_float;
+# ypObject * const yp_type_floatstore;
+# ypObject * const yp_type_iter;
+# ypObject * const yp_type_bytes;
+# ypObject * const yp_type_bytearray;
+# ypObject * const yp_type_str;
+# ypObject * const yp_type_chrarray;
+# ypObject * const yp_type_tuple;
+# ypObject * const yp_type_list;
+# ypObject * const yp_type_frozenset;
+# ypObject * const yp_type_set;
+# ypObject * const yp_type_frozendict;
+# ypObject * const yp_type_dict;
+
+
 # ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
 
 # ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
@@ -991,6 +1015,30 @@ def pytype( pytypes, ypcode ):
 @pytype( BaseException, 2 )
 class yp_BaseException( ypObject ):
     def __new__( cls ): raise NotImplementedError( "can't instantiate yp_BaseException directly" )
+
+@pytype( type, 4 )
+class yp_type( ypObject ):
+    def __new__( cls ): raise NotImplementedError( "can't instantiate yp_type directly" )
+c_ypObject_p_value( "yp_type_invalidated" )
+c_ypObject_p_value( "yp_type_exception" )
+c_ypObject_p_value( "yp_type_type" )
+c_ypObject_p_value( "yp_type_NoneType" )
+c_ypObject_p_value( "yp_type_bool" )
+c_ypObject_p_value( "yp_type_int" )
+c_ypObject_p_value( "yp_type_intstore" )
+c_ypObject_p_value( "yp_type_float" )
+c_ypObject_p_value( "yp_type_floatstore" )
+c_ypObject_p_value( "yp_type_iter" )
+c_ypObject_p_value( "yp_type_bytes" )
+c_ypObject_p_value( "yp_type_bytearray" )
+c_ypObject_p_value( "yp_type_str" )
+c_ypObject_p_value( "yp_type_chrarray" )
+c_ypObject_p_value( "yp_type_tuple" )
+c_ypObject_p_value( "yp_type_list" )
+c_ypObject_p_value( "yp_type_frozenset" )
+c_ypObject_p_value( "yp_type_set" )
+c_ypObject_p_value( "yp_type_frozendict" )
+c_ypObject_p_value( "yp_type_dict" )
 
 @pytype( type( None ), 6 )
 class yp_NoneType( ypObject ):
