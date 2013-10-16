@@ -1019,7 +1019,7 @@ ypAPI yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI yp_int_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc );
+ypAPI yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI void yp_divmodFL( yp_float_t x, yp_float_t y,
         yp_float_t *div, yp_float_t *mod, ypObject **exc );

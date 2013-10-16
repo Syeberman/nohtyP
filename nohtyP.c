@@ -2543,9 +2543,12 @@ yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc )
     return x * y; // TODO overflow check
 }
 
+// XXX Operands are fist converted to float, then divided; result always a float
 yp_float_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return_yp_CEXC_ERR( 0.0, exc, yp_NotImplementedError );
+    yp_float_t x_asfloat = yp_asfloatL( x, exc );
+    yp_float_t y_asfloat = yp_asfloatL( y, exc );
+    return yp_truedivFL( x_asfloat, y_asfloat, exc );
 }
 
 yp_int_t yp_floordivL( yp_int_t x, yp_int_t y, ypObject **exc )
@@ -2627,7 +2630,7 @@ static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithFCfu
         return;
 
     } else if( x_pair == ypFloat_CODE ) {
-        yp_float_t y_asfloat = yp_asfloatL( y, &exc ); // TODO
+        yp_float_t y_asfloat = yp_asfloatL( y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         floatop( x, y_asfloat );
         return;
@@ -2683,6 +2686,8 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, iarithfunc numop )
 _ypInt_PUBLIC_ARITH_FUNCTION( add );
 _ypInt_PUBLIC_ARITH_FUNCTION( sub );
 _ypInt_PUBLIC_ARITH_FUNCTION( mul );
+// truediv implemented separately, as result is always a float
+_ypInt_PUBLIC_ARITH_FUNCTION( floordiv );
 _ypInt_PUBLIC_ARITH_FUNCTION( mod );
 _ypInt_PUBLIC_ARITH_FUNCTION( pow );
 _ypInt_PUBLIC_ARITH_FUNCTION( lshift );
@@ -2690,6 +2695,61 @@ _ypInt_PUBLIC_ARITH_FUNCTION( rshift );
 _ypInt_PUBLIC_ARITH_FUNCTION( amp );
 _ypInt_PUBLIC_ARITH_FUNCTION( xor );
 _ypInt_PUBLIC_ARITH_FUNCTION( bar );
+
+void yp_itruedivC( ypObject **x, yp_int_t y )
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( *x );
+    ypObject *exc = yp_None;
+
+    if( x_pair == ypInt_CODE ) {
+        yp_float_t result = yp_truedivL( ypInt_VALUE( *x ), y, &exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        yp_decref( *x );
+        *x = yp_floatC( result );
+        return;
+
+    } else if( x_pair == ypFloat_CODE ) {
+        yp_float_t y_asfloat = yp_asfloatL( y, &exc );
+        if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
+        yp_itruedivFC( x, y_asfloat );
+        return;
+    }
+
+    return_yp_INPLACE_BAD_TYPE( x, *x );
+}
+
+void yp_itruediv( ypObject **x, ypObject *y )
+{
+    int y_pair = ypObject_TYPE_PAIR_CODE( y );
+    ypObject *exc = yp_None;
+
+    if( y_pair == ypInt_CODE ) {
+        yp_itruedivC( x, ypInt_VALUE( y ) );
+        return;
+
+    } else if( y_pair == ypFloat_CODE ) {
+        yp_itruedivFC( x, ypFloat_VALUE( y ) );
+        return;
+    }
+
+    return_yp_INPLACE_BAD_TYPE( x, y );
+}
+
+ypObject *yp_truediv( ypObject *x, ypObject *y )
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int y_pair = ypObject_TYPE_PAIR_CODE( y );
+    ypObject *result;
+
+    if( x_pair != ypInt_CODE && x_pair != ypFloat_CODE ) return_yp_BAD_TYPE( x );
+    if( y_pair != ypInt_CODE && y_pair != ypFloat_CODE ) return_yp_BAD_TYPE( y );
+
+    // All numbers hold their data in-line, so freezing a mutable is not heap-inefficient
+    result = yp_unfrozen_copy( x );
+    yp_itruediv( &result, y );
+    if( !ypObject_IS_MUTABLE( x ) ) yp_freeze( &result );
+    return result;
+}
 
 static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryFLfunc floatop )
 {
@@ -3079,7 +3139,9 @@ yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc )
     return x / y; // TODO overflow check
 }
 
-yp_int_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc )
+// XXX Although the return value is a whole number, in Python if one of the operands are floats,
+// the result is a float
+yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
 }
@@ -3179,6 +3241,8 @@ static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
 _ypFloat_PUBLIC_ARITH_FUNCTION( add );
 _ypFloat_PUBLIC_ARITH_FUNCTION( sub );
 _ypFloat_PUBLIC_ARITH_FUNCTION( mul );
+_ypFloat_PUBLIC_ARITH_FUNCTION( truediv );
+_ypFloat_PUBLIC_ARITH_FUNCTION( floordiv );
 _ypFloat_PUBLIC_ARITH_FUNCTION( mod );
 _ypFloat_PUBLIC_ARITH_FUNCTION( pow );
 _ypFloat_PUBLIC_ARITH_FUNCTION( lshift );
