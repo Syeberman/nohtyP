@@ -2975,8 +2975,19 @@ static ypObject *float_bool( ypObject *f ) {
 // Here be float_lt, float_le, float_eq, float_ne, float_ge, float_gt
 #define _ypFloat_RELATIVE_CMP_FUNCTION( name, operator ) \
     static ypObject *float_ ## name( ypObject *f, ypObject *x ) { \
-        if( ypObject_TYPE_PAIR_CODE( x ) != ypFloat_CODE ) return yp_ComparisonNotImplemented; \
-        return ypBool_FROM_C( ypFloat_VALUE( f ) operator ypFloat_VALUE( x ) ); \
+        yp_float_t x_asfloat; \
+        int x_pair = ypObject_TYPE_PAIR_CODE( x ); \
+        \
+        if( x_pair == ypFloat_CODE ) { \
+            x_asfloat = ypFloat_VALUE( x ); \
+        } else if( x_pair == ypInt_CODE ) { \
+            ypObject *exc = yp_None; \
+            x_asfloat = yp_asfloatL( ypInt_VALUE( x ), &exc ); \
+            if( yp_isexceptionC( exc ) ) return exc; \
+        } else { \
+            return yp_ComparisonNotImplemented; \
+        } \
+        return ypBool_FROM_C( ypFloat_VALUE( f ) operator x_asfloat ); \
     }
 _ypFloat_RELATIVE_CMP_FUNCTION( lt, < );
 _ypFloat_RELATIVE_CMP_FUNCTION( le, <= );
