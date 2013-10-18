@@ -7,6 +7,7 @@ import unittest
 
 # Extra assurance that we're not accidentally testing Python's frozenset and set
 def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
+_list = list # ...because we actually need Python's list in a few places
 def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
 
 
@@ -58,6 +59,7 @@ class TupleTest(seq_tests.CommonTest):
                 yield i
         self.assertEqual(yp_list(yp_tuple(f())), yp_list(range(1000)))
 
+    @unittest.skip("TODO re-enable (it just takes a long time)")
     def test_hash(self):
         # See SF bug 942952:  Weakness in tuple hash
         # The hash should:
@@ -75,10 +77,10 @@ class TupleTest(seq_tests.CommonTest):
         #      is sorely suspect.
 
         N=50
-        base = yp_list(range(N))
+        base = _list(yp_int(x) for x in range(N))
         xp = [yp_tuple((i, j)) for i in base for j in base]
         inps = base + [yp_tuple((i, j)) for i in base for j in xp] + \
-                     [yp_tuple((i, j)) for i in xp for j in base] + xp + yp_list(zip(base))
+                     [yp_tuple((i, j)) for i in xp for j in base] + xp + _list(zip(base))
         collisions = len(inps) - len(set(map(hash, inps)))
         self.assertTrue(collisions <= 15)
 
