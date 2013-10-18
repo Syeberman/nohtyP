@@ -104,6 +104,7 @@ class TupleTest(seq_tests.CommonTest):
         gc.collect()
         self.assertTrue(gc.is_tracked(t), t)
 
+    @unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_literals(self):
         # Test GC-optimization of tuple literals
@@ -125,6 +126,7 @@ class TupleTest(seq_tests.CommonTest):
         self._tracked(yp_tuple(set(),))
         self._tracked(yp_tuple(x, y, z))
 
+    @unittest.skip("Not applicable to nohtyP")
     def check_track_dynamic(self, tp, always_track):
         x, y, z = 1.5, "a", []
 
@@ -145,11 +147,13 @@ class TupleTest(seq_tests.CommonTest):
         self._tracked(tp(yp_tuple([obj]) for obj in [x, y, z]))
         self._tracked(yp_tuple(tp([obj]) for obj in [x, y, z]))
 
+    @unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_dynamic(self):
         # Test GC-optimization of dynamically constructed tuples.
         self.check_track_dynamic(yp_tuple, False)
 
+    @unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_subtypes(self):
         # Tuple subtypes must always be tracked
@@ -157,6 +161,7 @@ class TupleTest(seq_tests.CommonTest):
             pass
         self.check_track_dynamic(MyTuple, True)
 
+    @unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_bug7466(self):
         # Trying to untrack an unfinished tuple could crash Python
