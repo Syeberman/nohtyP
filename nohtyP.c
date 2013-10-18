@@ -1805,6 +1805,7 @@ yp_ssize_t yp_lenC( ypObject *x, ypObject **exc )
     if( len >= 0 ) return len;
     result = ypObject_TYPE( x )->tp_len( x, &len );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
+    // TODO make this a debug-only check?
     if( len < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError ); // tp_len should not return <0
     return len;
 }
@@ -4676,10 +4677,18 @@ static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssi
     return yp_NotImplementedError;
 }
 
+// XXX n is undefined on error
 static ypObject *tuple_count( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t *n )
 {
-    return yp_NotImplementedError;
+    yp_ssize_t i;
+    *n = 0;
+    for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
+        ypObject *result = yp_eq( ypTuple_ARRAY( sq )[i], x );
+        if( yp_isexceptionC( result ) ) return result;
+        if( ypBool_IS_TRUE_C( result ) ) *n += 1;
+    }
+    return yp_None;
 }
 
 static ypObject *list_setindex( ypObject *sq, yp_ssize_t i, ypObject *x )
@@ -7752,6 +7761,16 @@ yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t
 
 yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc ) {
     return yp_indexC4( sequence, x, 0, yp_SLICE_USELEN, exc );
+}
+
+yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+    yp_ssize_t count;
+    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_count( 
+            sequence, x, 0, yp_SLICE_USELEN, &count );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
+    // TODO make this a debug-only check?
+    if( count < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError ); // tp_count should not return <0
+    return count;
 }
 
 void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x ) {

@@ -482,6 +482,8 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 # yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
 
 # yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_countC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"), 
+    c_ypObject_pp_exc) )
 
 # void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 
@@ -1220,6 +1222,8 @@ class _ypTuple( ypObject ):
     def __mul__( self, factor ): return _yp_repeatC( self, factor )
 
     def __rmul__( self, factor ): return _yp_repeatC( self, factor )
+
+    def count( self, x ): return _yp_countC( self, x, yp_None )
 
 @pytype( tuple, 20 )
 class yp_tuple( _ypTuple ):
