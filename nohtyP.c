@@ -4644,8 +4644,7 @@ static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
         // If the result will be an exact copy, let the code below make that copy
     }
 
-    // FIXME Need to detect overflow in ypTuple_LEN( sq ) * factor (in all repeat funcs) and raise
-    // yp_MemoryError if so
+    if( factor > yp_SSIZE_T_MAX / ypTuple_LEN( sq ) ) return yp_MemoryError;
     newSq = _ypTuple_new( sq_type, ypTuple_LEN( sq ) * factor ); // new ref
     if( yp_isexceptionC( newSq ) ) return newSq;
 
@@ -4739,8 +4738,7 @@ static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
     if( startLen < 1 || factor == 1 ) return yp_None; // no-op
     if( factor < 1 ) return list_clear( sq );
 
-    // FIXME Need to detect overflow in ypTuple_LEN( sq ) * factor (in all repeat funcs) and raise
-    // yp_MemoryError if so
+    if( factor > yp_SSIZE_T_MAX / startLen ) return yp_MemoryError;
     result = _ypTuple_resize( sq, startLen * factor, 0 );
     if( yp_isexceptionC( result ) ) return result;
 
@@ -5164,8 +5162,7 @@ static ypObject *_ypTuple_repeatCV( int type, yp_ssize_t factor, int n, va_list 
         return _ypTuple_new( type, 0 );
     }
 
-    // FIXME Need to detect overflow in ypTuple_LEN( sq ) * factor (in all repeat funcs) and raise
-    // yp_MemoryError if so
+    if( factor > yp_SSIZE_T_MAX / n ) return yp_MemoryError;
     newSq = _ypTuple_new( type, factor*n ); // new ref
     if( yp_isexceptionC( newSq ) ) return newSq;
 
