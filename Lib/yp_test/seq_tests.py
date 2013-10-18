@@ -206,6 +206,7 @@ class CommonTest(unittest.TestCase):
 
         self.assertRaises(TypeError, u.__contains__)
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_contains_fake(self):
         class AllEq:
             # Sequences must use rich comparison against each item
@@ -217,6 +218,7 @@ class CommonTest(unittest.TestCase):
         self.assertNotIn(AllEq(), self.type2test([]))
         self.assertIn(AllEq(), self.type2test([1]))
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_contains_order(self):
         # Sequences must test in-order.  If a rich comparison has side
         # effects, these will be visible to tests against later members.
@@ -339,6 +341,8 @@ class CommonTest(unittest.TestCase):
 
         self.assertRaises(TypeError, a.count)
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    def test_count_badobj(self):
         class BadExc(Exception):
             pass
 

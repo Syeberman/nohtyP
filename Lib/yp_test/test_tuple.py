@@ -17,35 +17,36 @@ class TupleTest(seq_tests.CommonTest):
         super().test_constructors()
         # calling built-in types without argument must return empty
         self.assertIs(yp_tuple(), yp_tuple())
-        t0_3 = yp_tuple(0, 1, 2, 3)
+        self.assertEqual(len(yp_tuple()), 0)
+        t0_3 = yp_tuple((0, 1, 2, 3))
         t0_3_bis = yp_tuple(t0_3)
         self.assertTrue(t0_3 is t0_3_bis)
         self.assertEqual(yp_tuple([]), yp_tuple())
-        self.assertEqual(yp_tuple([0, 1, 2, 3]), yp_tuple(0, 1, 2, 3))
+        self.assertEqual(yp_tuple([0, 1, 2, 3]), yp_tuple((0, 1, 2, 3)))
         self.assertEqual(yp_tuple(''), yp_tuple())
-        self.assertEqual(yp_tuple('spam'), yp_tuple('s', 'p', 'a', 'm'))
+        self.assertEqual(yp_tuple('spam'), yp_tuple(('s', 'p', 'a', 'm')))
 
     def test_truth(self):
         super().test_truth()
         self.assertTrue(not yp_tuple())
-        self.assertTrue(yp_tuple(42, ))
+        self.assertTrue(yp_tuple((42, )))
 
     def test_len(self):
         super().test_len()
         self.assertEqual(len(yp_tuple()), 0)
-        self.assertEqual(len(yp_tuple(0,)), 1)
-        self.assertEqual(len(yp_tuple(0, 1, 2)), 3)
+        self.assertEqual(len(yp_tuple((0,))), 1)
+        self.assertEqual(len(yp_tuple((0, 1, 2))), 3)
 
     def test_iadd(self):
         super().test_iadd()
-        u = yp_tuple(0, 1)
+        u = yp_tuple((0, 1))
         u2 = u
-        u += yp_tuple(2, 3)
+        u += yp_tuple((2, 3))
         self.assertTrue(u is not u2)
 
     def test_imul(self):
         super().test_imul()
-        u = yp_tuple(0, 1)
+        u = yp_tuple((0, 1))
         u2 = u
         u *= 3
         self.assertTrue(u is not u2)
@@ -75,15 +76,15 @@ class TupleTest(seq_tests.CommonTest):
 
         N=50
         base = yp_list(range(N))
-        xp = [yp_tuple(i, j) for i in base for j in base]
-        inps = base + [yp_tuple(i, j) for i in base for j in xp] + \
-                     [yp_tuple(i, j) for i in xp for j in base] + xp + yp_list(zip(base))
+        xp = [yp_tuple((i, j)) for i in base for j in base]
+        inps = base + [yp_tuple((i, j)) for i in base for j in xp] + \
+                     [yp_tuple((i, j)) for i in xp for j in base] + xp + yp_list(zip(base))
         collisions = len(inps) - len(set(map(hash, inps)))
         self.assertTrue(collisions <= 15)
 
     def test_repr(self):
         l0 = yp_tuple()
-        l2 = yp_tuple(0, 1, 2)
+        l2 = yp_tuple((0, 1, 2))
         a0 = self.type2test(l0)
         a2 = self.type2test(l2)
 
@@ -111,20 +112,20 @@ class TupleTest(seq_tests.CommonTest):
         x, y, z = 1.5, "a", []
 
         self._not_tracked(yp_tuple())
-        self._not_tracked(yp_tuple(1,))
-        self._not_tracked(yp_tuple(1, 2))
-        self._not_tracked(yp_tuple(1, 2, "a"))
-        self._not_tracked(yp_tuple(1, 2, yp_tuple(None, True, False, yp_tuple()), int))
-        self._not_tracked(yp_tuple(object(),))
-        self._not_tracked(yp_tuple(yp_tuple(1, x), y, yp_tuple(2, 3)))
+        self._not_tracked(yp_tuple((1,)))
+        self._not_tracked(yp_tuple((1, 2)))
+        self._not_tracked(yp_tuple((1, 2, "a")))
+        self._not_tracked(yp_tuple((1, 2, yp_tuple(None, True, False, yp_tuple()), int)))
+        self._not_tracked(yp_tuple((object(),)))
+        self._not_tracked(yp_tuple((yp_tuple((1, x)), y, yp_tuple((2, 3)))))
 
         # Tuples with mutable elements are always tracked, even if those
         # elements are not tracked right now.
-        self._tracked(yp_tuple([],))
-        self._tracked(yp_tuple([1],))
-        self._tracked(yp_tuple({},))
-        self._tracked(yp_tuple(set(),))
-        self._tracked(yp_tuple(x, y, z))
+        self._tracked(yp_tuple(([],)))
+        self._tracked(yp_tuple(([1],)))
+        self._tracked(yp_tuple(({},)))
+        self._tracked(yp_tuple((set(),)))
+        self._tracked(yp_tuple((x, y, z)))
 
     @unittest.skip("Not applicable to nohtyP")
     def check_track_dynamic(self, tp, always_track):
@@ -170,13 +171,14 @@ class TupleTest(seq_tests.CommonTest):
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):
-            l = yp_tuple(0,) * n
+            l = yp_tuple((0,)) * n
             s = repr(l)
             self.assertEqual(s,
                 '(' + ', '.join(['0'] * n) + ')')
         check(10)       # check our checking code
         check(1000000)
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_iterator_pickle(self):
         # Userlist iterators don't support pickling yet since
         # they are based on generators.
@@ -192,6 +194,7 @@ class TupleTest(seq_tests.CommonTest):
         d = pickle.dumps(it)
         self.assertEqual(self.type2test(it), self.type2test(data)[1:])
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_reversed_pickle(self):
         data = self.type2test([4, 5, 6, 7])
         itorg = reversed(data)
