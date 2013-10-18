@@ -4668,7 +4668,40 @@ static ypObject *tuple_getindex( ypObject *sq, yp_ssize_t i )
 
 static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    return yp_NotImplementedError;
+    int sq_type = ypObject_TYPE_CODE( sq );
+    ypObject *result;
+    yp_ssize_t newLen;
+    ypObject *newSq;
+    yp_ssize_t i;
+
+    result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &newLen );
+    if( yp_isexceptionC( result ) ) return result;
+
+    if( sq_type == ypTuple_CODE ) {
+        // If the result will be an empty tuple, return _yp_tuple_empty
+        if( newLen < 1 ) return _yp_tuple_empty;
+        // If the result will be an exact copy, since we're immutable just return self
+        if( step == 1 && newLen == ypTuple_LEN( sq ) ) return yp_incref( sq );
+    } else {
+        // If the result will be an empty list, return a new, empty list
+        if( newLen < 1 ) return _ypTuple_new( ypList_CODE, 0 );
+        // If the result will be an exact copy, let the code below make that copy
+    }
+
+    newSq = _ypTuple_new( sq_type, newLen );
+    if( yp_isexceptionC( newSq ) ) return newSq;
+
+    if( step == 1 ) {
+        memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq )+start, newLen * sizeof( ypObject * ) );
+        for( i = 0; i < newLen; i++ ) yp_incref( ypTuple_ARRAY( newSq )[i] );
+    } else {
+        for( i = 0; i < newLen; i++ ) {
+            ypTuple_ARRAY( newSq )[i] = 
+                yp_incref( ypTuple_ARRAY( sq )[ypSlice_INDEX( start, step, i )] );
+        }
+    }
+    ypTuple_LEN( newSq ) = newLen;
+    return newSq;
 }
 
 static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
@@ -7740,7 +7773,7 @@ ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i ) {
 }
 
 ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k ) {
-    return yp_NotImplementedError;
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_getslice, (sequence, i, j, k) );
 }
 
 yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) {

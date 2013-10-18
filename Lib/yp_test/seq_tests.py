@@ -192,6 +192,8 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(u[-100:100:-1], self.type2test([]))
         self.assertEqual(u[-100:100:2], self.type2test([0, 2, 4]))
 
+    @unittest.skip("Not applicable to nohtyP (yp_ssize_t doesn't go that high)")
+    def test_getslice_long_ints(self):
         # Test extreme cases with long ints
         a = self.type2test([0,1,2,3,4])
         self.assertEqual(a[ -pow(2,128): 3 ], self.type2test([0,1,2]))
