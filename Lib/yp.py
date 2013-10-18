@@ -254,6 +254,10 @@ c_yp_ssize_t = c_ssize_t
 c_yp_ssize_t_p = POINTER( c_yp_ssize_t )
 #typedef yp_ssize_t          yp_hash_t;
 c_yp_hash_t = c_yp_ssize_t
+#define yp_SSIZE_T_MAX ((yp_ssize_t) (SIZE_MAX / 2))
+_yp_SSIZE_T_MAX = sys.maxsize
+#define yp_SSIZE_T_MIN (-yp_SSIZE_T_MAX - 1)
+_yp_SSIZE_T_MIN = -_yp_SSIZE_T_MAX - 1
 
 # typedef yp_int64_t      yp_int_t;
 c_yp_int_t = c_int64
@@ -522,7 +526,9 @@ yp_func( c_void, "yp_remove", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x"))
 # void yp_sort( ypObject **sequence );
 
 #define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
+_yp_SLICE_DEFAULT = _yp_SSIZE_T_MIN
 #define yp_SLICE_USELEN  yp_SSIZE_T_MAX
+_yp_SLICE_USELEN = _yp_SSIZE_T_MAX
 
 # ypObject *yp_isdisjoint( ypObject *set, ypObject *x );
 yp_func( c_ypObject_p, "yp_isdisjoint", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
@@ -964,9 +970,21 @@ class ypObject( c_ypObject_p ):
     def remove( self, elem ): _yp_remove( self, elem )
     def discard( self, elem ): _yp_discard( self, elem )
 
-    def __getitem__( self, key ): return _yp_getitem( self, key )
-    def __setitem__( self, key, value ): _yp_setitem( self, key, value )
-    def __delitem__( self, key ): _yp_delitem( self, key )
+    def _slice( self, func, key, *args ):
+        start, stop, step = key.start, key.stop, key.step
+        if start is None: start = _yp_SLICE_DEFAULT
+        if stop is None: stop = _yp_SLICE_DEFAULT
+        if step is None: step = 1
+        return func( self, start, stop, step, *args )
+    def __getitem__( self, key ): 
+        if isinstance( key, slice ): return self._slice( _yp_getsliceC4, key )
+        else: return _yp_getitem( self, key )
+    def __setitem__( self, key, value ): 
+        if isinstance( key, slice ): self._slice( _yp_setsliceC5, key, value )
+        else: _yp_setitem( self, key, value )
+    def __delitem__( self, key ): 
+        if isinstance( key, slice ): self._slice( _yp_delsliceC4, key )
+        else: _yp_delitem( self, key )
     def get( self, key, defval=None ): return _yp_getdefault( self, key, defval )
     def setdefault( self, key, defval=None ): return _yp_setdefault( self, key, defval )
 
