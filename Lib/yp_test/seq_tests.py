@@ -366,13 +366,18 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(u.count(0), 2)
         self.assertEqual(u.index(0), 2)
         self.assertEqual(u.index(0, 2), 2)
+        self.assertEqual(u.index(0, -4), 2)
         self.assertEqual(u.index(-2, -10), 0)
         self.assertEqual(u.index(0, 3), 3)
+        self.assertEqual(u.index(0, -3), 3)
         self.assertEqual(u.index(0, 3, 4), 3)
+        self.assertEqual(u.index(0, -3, -2), 3)
         self.assertRaises(ValueError, u.index, 2, 0, -10)
 
         self.assertRaises(TypeError, u.index)
 
+    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    def test_index_badobj(self):
         class BadExc(Exception):
             pass
 
@@ -385,6 +390,8 @@ class CommonTest(unittest.TestCase):
         a = self.type2test([0, 1, 2, 3])
         self.assertRaises(BadExc, a.index, BadCmp())
 
+    @unittest.skip("Not applicable to nohtyP (yp_ssize_t doesn't go that high)")
+    def test_index_long_ints(self):
         a = self.type2test([-2, -1, 0, 0, 1, 2])
         self.assertEqual(a.index(0), 2)
         self.assertEqual(a.index(0, 2), 2)

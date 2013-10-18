@@ -4705,22 +4705,46 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
 }
 
 static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t *i )
+        yp_ssize_t *index )
 {
-    return yp_NotImplementedError;
-}
-
-// XXX n is undefined on error
-static ypObject *tuple_count( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t *n )
-{
+    ypObject *result;
+    yp_ssize_t step = 1; // ignored; assumed unchanged by ypSlice_AdjustIndicesC
+    yp_ssize_t newLen; // ignored
     yp_ssize_t i;
-    *n = 0;
-    for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
+
+    result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &newLen );
+    if( yp_isexceptionC( result ) ) return result;
+
+    for( i = start; i < stop; i++ ) {
         ypObject *result = yp_eq( ypTuple_ARRAY( sq )[i], x );
         if( yp_isexceptionC( result ) ) return result;
-        if( ypBool_IS_TRUE_C( result ) ) *n += 1;
+        if( ypBool_IS_TRUE_C( result ) ) {
+            *index = i;
+            return yp_None;
+        }
     }
+    *index = -1;
+    return yp_None;
+}
+
+static ypObject *tuple_count( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t *count )
+{
+    ypObject *result;
+    yp_ssize_t step = 1; // ignored; assumed unchanged by ypSlice_AdjustIndicesC
+    yp_ssize_t newLen; // ignored
+    yp_ssize_t i;
+    yp_ssize_t n = 0;
+
+    result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &newLen );
+    if( yp_isexceptionC( result ) ) return result;
+
+    for( i = start; i < stop; i++ ) {
+        ypObject *result = yp_eq( ypTuple_ARRAY( sq )[i], x );
+        if( yp_isexceptionC( result ) ) return result;
+        if( ypBool_IS_TRUE_C( result ) ) n += 1;
+    }
+    *count = n;
     return yp_None;
 }
 
@@ -7777,7 +7801,13 @@ ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssiz
 }
 
 yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) {
-    return_yp_CEXC_ERR( -1, exc, yp_NotImplementedError );
+    yp_ssize_t index;
+    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_find( 
+            sequence, x, i, j, &index );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( -1, exc, result );
+    // TODO make this a debug-only check?
+    if( index < -1 ) return_yp_CEXC_ERR( -1, exc, yp_SystemError );
+    return index;
 }
 
 yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc ) {
@@ -7802,7 +7832,7 @@ yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc ) {
             sequence, x, 0, yp_SLICE_USELEN, &count );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
     // TODO make this a debug-only check?
-    if( count < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError ); // tp_count should not return <0
+    if( count < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError );
     return count;
 }
 

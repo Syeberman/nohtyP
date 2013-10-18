@@ -483,6 +483,8 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 
 # yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_indexC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+    (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
 # yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
 
 # yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc );
@@ -943,6 +945,8 @@ class ypObject( c_ypObject_p ):
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
 
+    def index( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_indexC4( self, x, i, j, yp_None )
+    def count( self, x ): return _yp_countC( self, x, yp_None )
     def append( self, x ): _yp_append( self, x )
 
     def isdisjoint( self, other ):
@@ -1240,8 +1244,6 @@ class _ypTuple( ypObject ):
     def __mul__( self, factor ): return _yp_repeatC( self, factor )
 
     def __rmul__( self, factor ): return _yp_repeatC( self, factor )
-
-    def count( self, x ): return _yp_countC( self, x, yp_None )
 
 @pytype( tuple, 20 )
 class yp_tuple( _ypTuple ):
