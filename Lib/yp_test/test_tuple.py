@@ -5,7 +5,7 @@ import gc
 import pickle
 import unittest
 
-# Extra assurance that we're not accidentally testing Python's frozenset and set
+# Extra assurance that we're not accidentally testing Python's tuple and list
 def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
 _list = list # ...because we actually need Python's list in a few places
 def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
@@ -170,6 +170,7 @@ class TupleTest(seq_tests.CommonTest):
         # Trying to untrack an unfinished tuple could crash Python
         self._not_tracked(yp_tuple(gc.collect() for i in range(101)))
 
+    @unittest.skip("TODO re-enable (it just takes a long time)")
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):

@@ -634,6 +634,7 @@ static void (*yp_free)( void *p );
 static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
 {
     void *p;
+    if( size < 0 ) return NULL; // overflow, likely
     if( size < 1 ) size = 1;
     p = malloc( (size_t) size );
     if( p == NULL ) return NULL;
@@ -646,8 +647,9 @@ static void *_default_yp_malloc_resize( yp_ssize_t *actual,
         void *p, yp_ssize_t size, yp_ssize_t extra )
 {
     void *newp;
+    if( size < 0 ) return NULL; // overflow, likely
     if( size < 1 ) size = 1;
-    if( extra < 0 ) extra = 0;
+    if( extra < 0 ) return NULL; // overflow, likely
 
     newp = _expand( p, (size_t) size );
     if( newp == NULL ) {
@@ -667,7 +669,7 @@ static void _default_yp_free( void *p ) {
 // If all else fails, rely on the standard C malloc/free functions
 #else
 // Rounds allocations up to a multiple that should be easy for most heaps without wasting space for
-// the smallest objects (ie ints)
+// the smallest objects (ie ints); don't call with a negative size
 #define _yp_DEFAULT_MALLOC_ROUNDTO (16)
 static yp_ssize_t _default_yp_malloc_good_size( yp_ssize_t size )
 {
@@ -679,17 +681,16 @@ static yp_ssize_t _default_yp_malloc_good_size( yp_ssize_t size )
 }
 static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
 {
+    if( size < 0 ) return NULL; // overflow, likely
     *actual = _default_yp_malloc_good_size( size );
-    if( *actual < 1 ) return NULL;
     return malloc( *actual );
 }
 static void *_default_yp_malloc_resize( yp_ssize_t *actual,
         void *p, yp_ssize_t size, yp_ssize_t extra )
 {
-    if( size < 1 ) size = 1;
-    if( extra < 0 ) extra = 0;
+    if( size < 0 ) return NULL; // overflow, likely
+    if( extra < 0 ) return NULL; // overflow, likely
     *actual = _default_yp_malloc_good_size( size+extra );
-    if( *actual < 1 ) return NULL;
     return malloc( *actual );
 }
 static void (*_default_yp_free)( void *p ) = free;
@@ -4526,7 +4527,31 @@ static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen ) {
     return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, type, alloclen, 0 );
 }
 
-// Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded before calling.  
+// TODO Ensure shallow copies are efficient
+// TODO Shallow copies of tuples to tuples can just return incref( x )...where to handle?
+static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
+{
+    ypObject *sq;
+    yp_ssize_t i;
+    ypObject *item;
+
+    sq = _ypTuple_new( type, ypTuple_LEN( x ) );
+    if( yp_isexceptionC( sq ) ) return sq;
+
+    // Update sq's len on each item so yp_decref can clean up after mid-copy failures
+    for( i = 0; i < ypTuple_LEN( x ); i++ ) {
+        item = copy_visitor( ypTuple_ARRAY( x )[i], copy_memo );
+        if( yp_isexceptionC( item ) ) {
+            yp_decref( sq );
+            return item;
+        }
+        ypTuple_ARRAY( sq )[i] = item;
+        ypTuple_LEN( sq ) += 1;
+    }
+    return sq;
+}
+
+// Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded before calling.
 // Returns yp_None on success, exception on error.
 static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t required, yp_ssize_t extra )
 {
@@ -4534,7 +4559,7 @@ static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t required, yp_ssize_t 
 }
 
 // Used by tp_repeat et al to perform the necessary memcpy's.  sq's array must be allocated
-// to hold factor*n objects, the objects to repeat must be in the first n elements of the array, 
+// to hold factor*n objects, the objects to repeat must be in the first n elements of the array,
 // and the rest of the array must not contain any references (they will be overwritten).  Further,
 // factor and n must both be greater than zero.  Cannot fail.
 static void _ypTuple_repeat_memcpy( ypObject *sq, size_t factor, size_t n )
@@ -4651,7 +4676,7 @@ static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
 
     memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ), ypTuple_LEN( sq )*sizeof( ypObject * ) );
     _ypTuple_repeat_memcpy( newSq, factor, ypTuple_LEN( sq ) );
-    
+
     ypTuple_LEN( newSq ) = factor*ypTuple_LEN( sq );
     for( i = 0; i < ypTuple_LEN( newSq ); i++ ) {
         yp_incref( ypTuple_ARRAY( newSq )[i] );
@@ -4696,7 +4721,7 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
         for( i = 0; i < newLen; i++ ) yp_incref( ypTuple_ARRAY( newSq )[i] );
     } else {
         for( i = 0; i < newLen; i++ ) {
-            ypTuple_ARRAY( newSq )[i] = 
+            ypTuple_ARRAY( newSq )[i] =
                 yp_incref( ypTuple_ARRAY( sq )[ypSlice_INDEX( start, step, i )] );
         }
     }
@@ -4809,7 +4834,7 @@ static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
     if( yp_isexceptionC( result ) ) return result;
 
     _ypTuple_repeat_memcpy( sq, factor, startLen );
-    
+
     // Remember that we already have references for [:startLen]
     ypTuple_LEN( sq ) *= factor;
     for( i = startLen; i < ypTuple_LEN( sq ); i++ ) {
@@ -4853,6 +4878,14 @@ static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
         if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
+}
+
+static ypObject *tuple_unfrozen_copy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypTuple_copy( ypList_CODE, sq, copy_visitor, copy_memo );
+}
+
+static ypObject *tuple_frozen_copy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypTuple_copy( ypTuple_CODE, sq, copy_visitor, copy_memo );
 }
 
 static ypObject *tuple_bool( ypObject *sq ) {
@@ -5029,8 +5062,8 @@ static ypTypeObject ypTuple_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    tuple_unfrozen_copy,            // tp_unfrozen_copy
+    tuple_frozen_copy,              // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -5112,8 +5145,8 @@ static ypTypeObject ypList_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    tuple_unfrozen_copy,            // tp_unfrozen_copy
+    tuple_frozen_copy,              // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -5257,14 +5290,14 @@ ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... ) {
 }
 ypObject *yp_tuple_repeatCV( yp_ssize_t factor, int n, va_list args ) {
     return _ypTuple_repeatCV( ypTuple_CODE, factor, n, args );
-}    
+}
 
 ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... ) {
     return_yp_V_FUNC( ypObject *, _ypTuple_repeatCV, (ypList_CODE, factor, n, args), n );
 }
 ypObject *yp_list_repeatCV( yp_ssize_t factor, int n, va_list args ) {
     return _ypTuple_repeatCV( ypList_CODE, factor, n, args );
-}    
+}
 
 
 /*************************************************************************************************
@@ -5597,7 +5630,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
 // Returns yp_True if so was modified, yp_False if it wasn't due to the key already being in the
 // set, or an exception on error.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft, 
+static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft,
         yp_ssize_t growhint )
 {
     yp_hash_t hash;
@@ -6939,7 +6972,7 @@ static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
         valuesleft -= 1;
 
         // TODO _ypDict_push will call yp_hashC again, even though we already know the hash
-        result = _ypDict_push( mp, ypSet_TABLE( other_keyset )[i].se_key, other_value, 1, 
+        result = _ypDict_push( mp, ypSet_TABLE( other_keyset )[i].se_key, other_value, 1,
                 &spaceleft, valuesleft );
         if( yp_isexceptionC( result ) ) return result;
     }
@@ -7587,7 +7620,7 @@ static ypObject *_ypDict_fromkeysV( int type, ypObject *value, int n, va_list ar
     ypObject *result = yp_None;
     ypObject *key;
     ypObject *newMp;
-    
+
     newMp = _ypDict_new( type, n );
     if( yp_isexceptionC( newMp ) ) return newMp;
     spaceleft = _ypSet_space_remaining( ypDict_KEYSET( newMp ) );
@@ -7802,7 +7835,7 @@ ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssiz
 
 yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) {
     yp_ssize_t index;
-    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_find( 
+    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_find(
             sequence, x, i, j, &index );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( -1, exc, result );
     // TODO make this a debug-only check?
@@ -7828,7 +7861,7 @@ yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc ) {
 
 yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc ) {
     yp_ssize_t count;
-    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_count( 
+    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_count(
             sequence, x, 0, yp_SLICE_USELEN, &count );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
     // TODO make this a debug-only check?

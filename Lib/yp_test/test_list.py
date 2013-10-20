@@ -4,20 +4,26 @@ from yp_test import support, list_tests
 import pickle
 import unittest
 
-@unittest.skip( "TODO: convert to yp.py" )
+# Extra assurance that we're not accidentally testing Python's tuple and list
+def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
+def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
+
+
 class ListTest(list_tests.CommonTest):
-    type2test = list
+    type2test = yp_list
 
     def test_basic(self):
-        self.assertEqual(list([]), [])
-        l0_3 = [0, 1, 2, 3]
-        l0_3_bis = list(l0_3)
+        self.assertEqual(yp_list([]), yp_list())
+        self.assertEqual(len(yp_list()), 0)
+        self.assertEqual(len(yp_list([])), 0)
+        l0_3 = yp_list([0, 1, 2, 3])
+        l0_3_bis = yp_list(l0_3)
         self.assertEqual(l0_3, l0_3_bis)
         self.assertTrue(l0_3 is not l0_3_bis)
-        self.assertEqual(list(()), [])
-        self.assertEqual(list((0, 1, 2, 3)), [0, 1, 2, 3])
-        self.assertEqual(list(''), [])
-        self.assertEqual(list('spam'), ['s', 'p', 'a', 'm'])
+        self.assertEqual(yp_list(()), yp_list())
+        self.assertEqual(yp_list((0, 1, 2, 3)), yp_list([0, 1, 2, 3]))
+        self.assertEqual(yp_list(''), yp_list())
+        self.assertEqual(yp_list('spam'), yp_list(['s', 'p', 'a', 'm']))
 
         if sys.maxsize == 0x7fffffff:
             # This test can currently only work on 32-bit machines.
@@ -34,29 +40,29 @@ class ListTest(list_tests.CommonTest):
             # thread for the details:
 
             #     http://sources.redhat.com/ml/newlib/2002/msg00369.html
-            self.assertRaises(MemoryError, list, range(sys.maxsize // 2))
+            self.assertRaises(MemoryError, yp_list, range(sys.maxsize // 2))
 
         # This code used to segfault in Py2.4a3
-        x = []
+        x = yp_list()
         x.extend(-y for y in x)
-        self.assertEqual(x, [])
+        self.assertEqual(x, yp_list())
 
     def test_truth(self):
         super().test_truth()
-        self.assertTrue(not [])
-        self.assertTrue([42])
+        self.assertTrue(not yp_list())
+        self.assertTrue(yp_list([42]))
 
     def test_identity(self):
-        self.assertTrue([] is not [])
+        self.assertTrue(yp_list() is not yp_list())
 
     def test_len(self):
         super().test_len()
-        self.assertEqual(len([]), 0)
-        self.assertEqual(len([0]), 1)
-        self.assertEqual(len([0, 1, 2]), 3)
+        self.assertEqual(len(yp_list()), 0)
+        self.assertEqual(len(yp_list([0])), 1)
+        self.assertEqual(len(yp_list([0, 1, 2])), 3)
 
     def test_overflow(self):
-        lst = [4, 5, 6, 7]
+        lst = yp_list([4, 5, 6, 7])
         n = int((sys.maxsize*2+2) // len(lst))
         def mul(a, b): return a * b
         def imul(a, b): a *= b
@@ -66,7 +72,7 @@ class ListTest(list_tests.CommonTest):
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):
-            l = [0] * n
+            l = yp_list([0]) * n
             s = repr(l)
             self.assertEqual(s,
                 '[' + ', '.join(['0'] * n) + ']')
@@ -105,7 +111,7 @@ class ListTest(list_tests.CommonTest):
         # Issue 8847: In the PGO build, the MSVC linker's COMDAT folding
         # optimization causes failures in code that relies on distinct
         # function addresses.
-        class L(list): pass
+        class L(yp_list): pass
         with self.assertRaises(TypeError):
             (3,) + L([1,2])
 
