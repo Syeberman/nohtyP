@@ -9,7 +9,7 @@ yp.py - Python wrapper for nohtyP
 # TODO __all__, or underscores
 
 from ctypes import *
-import sys, weakref, operator
+import sys, weakref, operator, pickle
 
 ypdll = cdll.nohtyP
 
@@ -106,6 +106,7 @@ class c_ypObject_p( c_void_p ):
     @property
     def _yp_typecode( self ):
         return int.from_bytes( string_at( self.value, 4 ), byteorder=sys.byteorder )
+    def __reduce__( self ): raise pickle.PicklingError( "can't pickle nohtyP types (yet)" )
 class c_ypObject_p_no_errcheck( c_ypObject_p ):
     def _yp_errcheck( self ):
         if self.value is None: raise ValueError
@@ -140,6 +141,7 @@ class c_ypObject_pp( c_ypObject_p*1 ):
         # If our item was the one added to the cache, then we need to give it a new reference
         if item is item_cached: _yp_incref( item_cached )
         return item_cached
+    def __reduce__( self ): raise pickle.PicklingError( "can't pickle nohtyP types (yet)" )
 
 # ypObject *yp_None;
 
@@ -1239,6 +1241,11 @@ c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
 
 class _ypTuple( ypObject ):
+    # FIXME When nohtyP supports str/repr, replace this faked-out version
+    def __str__( self ):
+        return "(%s)" % ", ".join( repr( x ) for x in self )
+    __repr__ = __str__
+
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
     def __mul__( self, factor ): return _yp_repeatC( self, factor )
