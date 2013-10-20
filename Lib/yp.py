@@ -510,6 +510,7 @@ yp_func( c_yp_ssize_t, "yp_countC", ((c_ypObject_p, "sequence"), (c_ypObject_p, 
 yp_func( c_void, "yp_append", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")) )
 
 # void yp_extend( ypObject **sequence, ypObject *t );
+yp_func( c_void, "yp_extend", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "t")) )
 
 # void yp_irepeatC( ypObject **sequence, yp_ssize_t factor );
 yp_func( c_void, "yp_irepeatC", ((c_ypObject_pp, "sequence"), (c_yp_ssize_t, "factor")) )
@@ -925,6 +926,8 @@ class ypObject( c_ypObject_p ):
         return cls( pyobj )
 
     def copy( self ): return _yp_copy( self )
+    def __copy__( self ): return _yp_copy( self )
+    def __deepcopy__( self, memo ): return _yp_deepcopy( self )
 
     # TODO will this work if yp_bool returns an exception?
     def __bool__( self ): return bool( yp_bool( self ) )
@@ -950,6 +953,7 @@ class ypObject( c_ypObject_p ):
     def index( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_indexC4( self, x, i, j, yp_None )
     def count( self, x ): return _yp_countC( self, x, yp_None )
     def append( self, x ): _yp_append( self, x )
+    def extend( self, t ): _yp_extend( self, t )
 
     def isdisjoint( self, other ):
         return _yp_isdisjoint( self, _yp_iterable( other ) )
@@ -1263,8 +1267,12 @@ _yp_tuple_empty = yp_tuple( )
 class yp_list( _ypTuple ):
     def __new__( cls, iterable=_yp_tuple_empty ):
         return _yp_list( _yp_iterable( iterable ) )
-    def __iadd__( self, other ): _yp_extend( self, other )
-    def __imul__( self, factor ): _yp_irepeatC( self, factor )
+    def __iadd__( self, other ): 
+        _yp_extend( self, other )
+        return self
+    def __imul__( self, factor ): 
+        _yp_irepeatC( self, factor )
+        return self
 
 class _ypSet( ypObject ):
     def __new__( cls, iterable=_yp_tuple_empty ):
