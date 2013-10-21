@@ -502,6 +502,8 @@ yp_func( c_yp_ssize_t, "yp_countC", ((c_ypObject_p, "sequence"), (c_ypObject_p, 
 # void yp_delindexC( ypObject **sequence, yp_ssize_t i );
 
 # void yp_delsliceC4( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+yp_func( c_void, "yp_delsliceC4", ((c_ypObject_pp, "sequence"),
+    (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k")) )
 
 # void yp_delitem( ypObject **sequence, ypObject *key );
 
