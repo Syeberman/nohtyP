@@ -2356,7 +2356,6 @@ typedef yp_int_t (*arithLfunc)( yp_int_t, yp_int_t, ypObject ** );
 typedef yp_float_t (*arithFLfunc)( yp_float_t, yp_float_t, ypObject ** );
 typedef void (*iarithCfunc)( ypObject **, yp_int_t );
 typedef void (*iarithFCfunc)( ypObject **, yp_float_t );
-typedef void (*iarithfunc)( ypObject **, ypObject * );
 typedef yp_int_t (*unaryLfunc)( yp_int_t, ypObject ** );
 typedef yp_float_t (*unaryFLfunc)( yp_float_t, ypObject ** );
 
@@ -2672,20 +2671,53 @@ static void iarithmetic( ypObject **x, ypObject *y, iarithCfunc intop, iarithFCf
     return_yp_INPLACE_BAD_TYPE( x, y );
 }
 
-static ypObject *arithmetic( ypObject *x, ypObject *y, iarithfunc numop )
+static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop, int mutable )
+{
+    ypObject *exc = yp_None;
+    yp_int_t result = intop( x, y, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    if( mutable ) return yp_intstoreC( result );
+    return yp_intC( result );
+}
+static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithFLfunc floatop, int mutable )
+{
+    ypObject *exc = yp_None;
+    yp_float_t result = floatop( x, y, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    if( mutable ) return yp_floatstoreC( result );
+    return yp_floatC( result );
+}
+static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithFLfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    ypObject *result;
+    int mutable = ypObject_IS_MUTABLE( x );
+    ypObject *exc = yp_None;
 
-    if( x_pair != ypInt_CODE && x_pair != ypFloat_CODE ) return_yp_BAD_TYPE( x );
-    if( y_pair != ypInt_CODE && y_pair != ypFloat_CODE ) return_yp_BAD_TYPE( y );
-
-    // All numbers hold their data in-line, so freezing a mutable is not heap-inefficient
-    result = yp_unfrozen_copy( x );
-    numop( &result, y );
-    if( !ypObject_IS_MUTABLE( x ) ) yp_freeze( &result );
-    return result;
+    // Coerce the numeric operands to a common type
+    if( y_pair == ypInt_CODE ) {
+        if( x_pair == ypInt_CODE ) {
+            return arithmetic_intop( ypInt_VALUE( x ), ypInt_VALUE( y ), intop, mutable );
+        } else if( x_pair == ypFloat_CODE ) {
+            yp_float_t y_asfloat = yp_asfloatC( y, &exc );
+            if( yp_isexceptionC( exc ) ) return exc;
+            return arithmetic_floatop( ypFloat_VALUE( x ), y_asfloat, floatop, mutable );
+        } else {
+            return_yp_BAD_TYPE( x );
+        }
+    } else if( y_pair == ypFloat_CODE ) {
+        if( x_pair == ypInt_CODE ) {
+            yp_float_t x_asfloat = yp_asfloatC( x, &exc );
+            if( yp_isexceptionC( exc ) ) return exc;
+            return arithmetic_floatop( x_asfloat, ypFloat_VALUE( y ), floatop, mutable );
+        } else if( x_pair == ypFloat_CODE ) {
+            return arithmetic_floatop( ypFloat_VALUE( x ), ypFloat_VALUE( y ), floatop, mutable );
+        } else {
+            return_yp_BAD_TYPE( x );
+        }
+    } else {
+        return_yp_BAD_TYPE( y );
+    }
 }
 
 // Defined here are yp_iaddC (et al), yp_iadd (et al), and yp_add (et al)
@@ -2697,7 +2729,7 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, iarithfunc numop )
         iarithmetic( x, y, yp_i ## name ## C, yp_i ## name ## FC ); \
     } \
     ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
-        return arithmetic( x, y, yp_i ## name ); \
+        return arithmetic( x, y, yp_ ## name ## L, yp_ ## name ## FL ); \
     }
 _ypInt_PUBLIC_ARITH_FUNCTION( add );
 _ypInt_PUBLIC_ARITH_FUNCTION( sub );
@@ -2756,16 +2788,37 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    ypObject *result;
+    int mutable = ypObject_IS_MUTABLE( x );
+    ypObject *exc = yp_None;
+    yp_float_t result;
 
-    if( x_pair != ypInt_CODE && x_pair != ypFloat_CODE ) return_yp_BAD_TYPE( x );
-    if( y_pair != ypInt_CODE && y_pair != ypFloat_CODE ) return_yp_BAD_TYPE( y );
-
-    // FIXME this is heap-inefficient if x is an int, as it will be discarded for a float
-    result = yp_unfrozen_copy( x );
-    yp_itruediv( &result, y );
-    if( !ypObject_IS_MUTABLE( x ) ) yp_freeze( &result );
-    return result;
+    // Coerce the numeric operands to a common type
+    if( y_pair == ypInt_CODE ) {
+        if( x_pair == ypInt_CODE ) {
+            result = yp_truedivL( ypInt_VALUE( x ), ypInt_VALUE( y ), &exc );
+        } else if( x_pair == ypFloat_CODE ) {
+            yp_float_t y_asfloat = yp_asfloatC( y, &exc );
+            if( yp_isexceptionC( exc ) ) return exc;
+            result = yp_truedivFL( ypFloat_VALUE( x ), y_asfloat, &exc );
+        } else {
+            return_yp_BAD_TYPE( x );
+        }
+    } else if( y_pair == ypFloat_CODE ) {
+        if( x_pair == ypInt_CODE ) {
+            yp_float_t x_asfloat = yp_asfloatC( x, &exc );
+            if( yp_isexceptionC( exc ) ) return exc;
+            result = yp_truedivFL( x_asfloat, ypFloat_VALUE( y ), &exc );
+        } else if( x_pair == ypFloat_CODE ) {
+            result = yp_truedivFL( ypFloat_VALUE( x ), ypFloat_VALUE( y ), &exc );
+        } else {
+            return_yp_BAD_TYPE( x );
+        }
+    } else {
+        return_yp_BAD_TYPE( y );
+    }
+    if( yp_isexceptionC( exc ) ) return exc;
+    if( mutable ) return yp_floatstoreC( result );
+    return yp_floatC( result );
 }
 
 static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryFLfunc floatop )
