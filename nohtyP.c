@@ -4663,6 +4663,21 @@ static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
     return yp_None;
 }
 
+static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
+{
+    yp_ssize_t i;
+    yp_ssize_t newLen = ypTuple_LEN( sq ) + ypTuple_LEN( x );
+    if( ypTuple_ALLOCLEN( sq ) < newLen ) {
+        ypObject *result = _ypTuple_resize( sq, newLen, 0 );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    memcpy( ypTuple_ARRAY( sq )+ypTuple_LEN( sq ), ypTuple_ARRAY( x ), 
+            ypTuple_LEN( x )*sizeof( ypObject * ) );
+    for( i = ypTuple_LEN( sq ); i < newLen; i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
+    ypTuple_LEN( sq ) = newLen;
+    return yp_None;
+}
+
 static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject *mi, yp_uint64_t *mi_state )
 {
     ypObject *exc = yp_None;
@@ -4686,16 +4701,17 @@ static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject *mi, yp_uint6
 
 static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
 {
-    ypObject *mi;
-    yp_uint64_t mi_state;
-    ypObject *result;
-
-    // TODO Implement special cases for other lists/tuples (use memcpy, len=other_len, etc)
-    mi = yp_miniiter( iterable, &mi_state ); // new ref
-    if( yp_isexceptionC( mi ) ) return mi;
-    result = _ypTuple_extend_from_iter( sq, mi, &mi_state );
-    yp_decref( mi );
-    return result;
+    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
+        return _ypTuple_extend_from_tuple( sq, iterable );
+    } else {
+        ypObject *result;
+        yp_uint64_t mi_state;
+        ypObject *mi = yp_miniiter( iterable, &mi_state ); // new ref
+        if( yp_isexceptionC( mi ) ) return mi;
+        result = _ypTuple_extend_from_iter( sq, mi, &mi_state );
+        yp_decref( mi );
+        return result;
+    }
 }
 
 // Public Methods
