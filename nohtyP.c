@@ -3453,13 +3453,13 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
 }
 
 // Using the given _adjusted_ values, in-place converts the given start/stop/step values to the
-// inverse slice, where *step=-(*step).  Returns an exception on error.
+// inverse slice, where *step=-(*step).  slicelength must be >0 (slicelength==0 is a no-op).
 // Adapted from Python's list_ass_subscript
-static ypObject *ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step,
+static void _ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step,
         yp_ssize_t slicelength )
 {
-    if( slicelength < 1 ) return yp_None; // no-op
-
+    // TODO make this a debug-only check
+    //yp_assert( slicelength > 0 );
     if( *step < 0 ) {
         // This comes direct from list_ass_subscript
         *stop = *start + 1;
@@ -3470,13 +3470,42 @@ static ypObject *ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp
         *start = *stop + (*step) * (slicelength - 1) + 1;
     }
     *step = -(*step);
-
-    return yp_None;
 }
 
 // Returns the index of the i'th item in the slice with the given adjusted start/step values.  i
 // must be in range(slicelength).
 #define ypSlice_INDEX( start, step, i )  ((start) + (i)*(step))
+
+// Used to remove elements from an array containing length elements, each of elemsize bytes.
+// start, stop, step, and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC,
+// and slicelength must be >0 (slicelength==0 is a no-op).  Any references in the removed elements 
+// must have already been discarded.
+static void _ypSlice_delslice_memmove( void *array, yp_ssize_t length, yp_ssize_t elemsize,
+        yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength )
+{
+    yp_uint8_t *bytes = array;
+
+    if( step < 0 ) _ypSlice_InvertIndicesC( &start, &stop, &step, slicelength );
+
+    if( step == 1 ) {
+        // One contiguous section
+        memmove( bytes+(start*elemsize), bytes+(stop*elemsize), (length-stop)*elemsize );
+    } else {
+        yp_ssize_t remaining = slicelength;
+        yp_uint8_t *chunk_dst = bytes + (start * elemsize);
+        yp_uint8_t *chunk_src = chunk_dst + elemsize;
+        yp_ssize_t  chunk_len = step * elemsize;
+        while( remaining > 1 ) {
+            memmove( chunk_dst, chunk_src, chunk_len );
+            chunk_dst += chunk_len;
+            chunk_src += chunk_len + elemsize;
+            remaining -= 1;
+        }
+        // The last chunk is likely truncated, and not a full step*elemsize in size
+        chunk_len = (bytes + (length * elemsize)) - chunk_src;
+        memmove( chunk_dst, chunk_src, chunk_len );
+    }
+}
 
 static ypObject *_ypSequence_getdefault( ypObject *x, ypObject *key, ypObject *defval ) {
     ypObject *exc = yp_None;
@@ -3827,16 +3856,9 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
     if( slicelength < 1 ) return yp_None; // no-op
-    if( step < 0 ) ypSlice_InvertIndicesC( &start, &stop, &step, slicelength );
-
-    if( step == 1 ) {
-        // One contiguous section
-        memmove( ypBytes_DATA( b )+stop-slicelength, ypBytes_DATA( b )+stop,
-                ypBytes_LEN( b )-stop );
-        ypBytes_LEN( b ) -= slicelength;
-    } else {
-        return yp_NotImplementedError; // TODO implement
-    }
+    _ypSlice_delslice_memmove( ypBytes_DATA( b ), ypBytes_LEN( b ), 1, 
+            start, stop, step, slicelength );
+    ypBytes_LEN( b ) -= slicelength;
     return yp_None;
 }
 
@@ -4865,7 +4887,22 @@ static ypObject *list_delindex( ypObject *sq, yp_ssize_t i )
 
 static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    return yp_NotImplementedError;
+    ypObject *result;
+    yp_ssize_t slicelength;
+    yp_ssize_t i;
+
+    result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &slicelength );
+    if( yp_isexceptionC( result ) ) return result;
+    if( slicelength < 1 ) return yp_None; // no-op
+
+    // First discard references, then shift the remaining pointers
+    for( i = 0; i < slicelength; i++ ) {
+        yp_decref( ypTuple_ARRAY( sq )[ypSlice_INDEX( start, step, i )] );
+    }
+    _ypSlice_delslice_memmove( ypTuple_ARRAY( sq ), ypTuple_LEN( sq ), sizeof( ypObject * ), 
+            start, stop, step, slicelength );
+    ypTuple_LEN( sq ) -= slicelength;
+    return yp_None;
 }
 
 // TODO getitem et al
