@@ -5189,8 +5189,12 @@ static ypObject *list_remove( ypObject *sq, ypObject *x, ypObject *onmissing )
         ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
         if( result == yp_False ) continue;
         if( yp_isexceptionC( result ) ) return result;
-        // result must be yp_True, so we found a match
-        return list_delindex( sq, i );
+
+        // result must be yp_True, so we found a match to remove
+        yp_decref( ypTuple_ARRAY( sq )[i] );
+        ypTuple_ELEMMOVE( sq, i, i+1 );
+        ypTuple_LEN( sq ) -= 1;
+        return yp_None;
     }
     if( onmissing == NULL ) return yp_ValueError;
     return onmissing;
