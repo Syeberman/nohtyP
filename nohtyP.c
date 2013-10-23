@@ -4884,7 +4884,7 @@ static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssi
     if( yp_isexceptionC( result ) ) return result;
 
     for( i = start; i < stop; i++ ) {
-        ypObject *result = yp_eq( ypTuple_ARRAY( sq )[i], x );
+        ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
         if( yp_isexceptionC( result ) ) return result;
         if( ypBool_IS_TRUE_C( result ) ) {
             *index = i;
@@ -4908,7 +4908,7 @@ static ypObject *tuple_count( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ss
     if( yp_isexceptionC( result ) ) return result;
 
     for( i = start; i < stop; i++ ) {
-        ypObject *result = yp_eq( ypTuple_ARRAY( sq )[i], x );
+        ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
         if( yp_isexceptionC( result ) ) return result;
         if( ypBool_IS_TRUE_C( result ) ) n += 1;
     }
@@ -5039,9 +5039,8 @@ static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
 static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
 {
     yp_ssize_t i;
-    ypObject *result;
     for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
-        result = visitor( ypTuple_ARRAY( sq )[i], memo );
+        ypObject *result = visitor( ypTuple_ARRAY( sq )[i], memo );
         if( yp_isexceptionC( result ) ) return result;
     }
     return yp_None;
@@ -5064,7 +5063,6 @@ static ypObject *tuple_bool( ypObject *sq ) {
 static ypObject *_ypTuple_cmp_first_difference( ypObject *sq, ypObject *x, yp_ssize_t *i )
 {
     yp_ssize_t min_len;
-    ypObject *result;
 
     if( sq == x ) {
         *i = -1;
@@ -5076,7 +5074,7 @@ static ypObject *_ypTuple_cmp_first_difference( ypObject *sq, ypObject *x, yp_ss
     // comparison; that isn't required here, at least not yet
     min_len = MIN( ypTuple_LEN( sq ), ypTuple_LEN( x ) );
     for( *i = 0; *i < min_len; (*i)++ ) {
-        result = yp_eq( ypTuple_ARRAY( sq )[*i], ypTuple_ARRAY( x )[*i] );
+        ypObject *result = yp_eq( ypTuple_ARRAY( sq )[*i], ypTuple_ARRAY( x )[*i] );
         if( result != yp_True ) return result; // returns on yp_False or an exception
     }
     *i = -1;
@@ -5103,14 +5101,13 @@ static ypObject *tuple_eq( ypObject *sq, ypObject *x )
 {
     yp_ssize_t sq_len = ypTuple_LEN( sq );
     yp_ssize_t i;
-    ypObject *result;
 
     if( sq == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypTuple_CODE ) return yp_ComparisonNotImplemented;
     if( sq_len != ypTuple_LEN( x ) ) return yp_False;
 
     for( i = 0; i < sq_len; i++ ) {
-        result = yp_eq( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] );
+        ypObject *result = yp_eq( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] );
         if( result != yp_True ) return result; // returns on yp_False or an exception
     }
     return yp_True;
@@ -5151,9 +5148,8 @@ static ypObject *tuple_currenthash( ypObject *sq,
 static ypObject *tuple_contains( ypObject *sq, ypObject *x )
 {
     yp_ssize_t i;
-    ypObject *result;
     for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
-        result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
+        ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
         if( result != yp_False ) return result; // yp_True, or an exception
     }
     return yp_False;
@@ -5185,9 +5181,24 @@ static ypObject *list_pop( ypObject *sq )
     return ypTuple_ARRAY( sq )[ypTuple_LEN( sq )];
 }
 
+// onmissing must be an immortal, or NULL
+static ypObject *list_remove( ypObject *sq, ypObject *x, ypObject *onmissing )
+{
+    yp_ssize_t i;
+    for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
+        ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
+        if( result == yp_False ) continue;
+        if( yp_isexceptionC( result ) ) return result;
+        // result must be yp_True, so we found a match
+        return list_delindex( sq, i );
+    }
+    if( onmissing == NULL ) return yp_ValueError;
+    return onmissing;
+}
+
 static ypObject *tuple_dealloc( ypObject *sq )
 {
-    int i;
+    yp_ssize_t i;
     for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
         yp_decref( ypTuple_ARRAY( sq )[i] );
     }
@@ -5347,7 +5358,7 @@ static ypTypeObject ypList_Type = {
     list_push,                      // tp_push
     list_clear,                     // tp_clear
     list_pop,                       // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
+    list_remove,                    // tp_remove
     _ypSequence_getdefault,         // tp_getdefault
     _ypSequence_setitem,            // tp_setitem
     _ypSequence_delitem,            // tp_delitem
