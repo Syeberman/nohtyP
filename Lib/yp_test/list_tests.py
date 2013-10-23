@@ -13,6 +13,7 @@ from yp_test import support, seq_tests
 
 class CommonTest(seq_tests.CommonTest):
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_init(self):
         # Iterable arg is optional
         self.assertEqual(self.type2test([]), self.type2test())
@@ -27,7 +28,9 @@ class CommonTest(seq_tests.CommonTest):
         a.__init__([4, 5, 6])
         self.assertEqual(a, self.type2test([4, 5, 6]))
 
+    def test_init_new_obj(self):
         # Mutables always return a new object
+        a = self.type2test([1, 2, 3])
         b = self.type2test(a)
         self.assertNotEqual(id(a), id(b))
         self.assertEqual(a, b)
