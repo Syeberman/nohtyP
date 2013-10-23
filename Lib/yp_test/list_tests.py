@@ -590,6 +590,9 @@ class CommonTest(seq_tests.CommonTest):
         a = self.type2test(range(10))
         a[::2] = tuple(range(5))
         self.assertEqual(a, self.type2test([0, 1, 1, 3, 2, 5, 3, 7, 4, 9]))
+    
+    @unittest.skip("Not applicable to nohtyP (yp_ssize_t doesn't go that high)")
+    def test_extendedslicing_long_ints(self):
         # test issue7788
         a = self.type2test(range(10))
         del a[9::1<<333]

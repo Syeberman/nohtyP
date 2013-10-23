@@ -496,6 +496,8 @@ yp_func( c_yp_ssize_t, "yp_countC", ((c_ypObject_p, "sequence"), (c_ypObject_p, 
 # void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 
 # void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x );
+yp_func( c_void, "yp_setsliceC5", ((c_ypObject_pp, "sequence"),
+    (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k"), (c_ypObject_p, "x")) )
 
 # void yp_setitem( ypObject **sequence, ypObject *key, ypObject *x );
 

@@ -3598,6 +3598,7 @@ static ypObject *_ypBytes_copy( ypObject *b, yp_ssize_t len )
 
 // Shrinks or grows the bytearray; any new bytes are uninitialized.  Returns yp_None on success,
 // exception on error.
+// XXX Unlike other "resize" functions, this one updates ypBytes_LEN (TODO standardize?)
 // TODO over-allocate as appropriate
 static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t newLen )
 {
@@ -3812,7 +3813,7 @@ static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
 
     _ypBytes_coerce_bytes( x, &x_data, &x_len );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
-    if( x_len == 0 ) return bytearray_delslice( b, start, stop, step );
+    if( step == 1 && x_len == 0 ) return bytearray_delslice( b, start, stop, step );
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
@@ -4664,6 +4665,7 @@ static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
     return yp_None;
 }
 
+// XXX sq and x _may_ be the same object
 static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
 {
     yp_ssize_t i;
@@ -4713,6 +4715,55 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
         yp_decref( mi );
         return result;
     }
+}
+
+// XXX sq and x must _not_ be the same object (pass a copy of x if so)
+static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step );
+static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq, 
+        yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x )
+{
+    ypObject *result;
+    yp_ssize_t slicelength;
+    yp_ssize_t i;
+
+    // TODO enable debug assert
+    // yp_assert( sq != x );
+
+    if( step == 1 && ypTuple_LEN( x ) == 0 ) return list_delslice( sq, start, stop, step );
+
+    result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &slicelength );
+    if( yp_isexceptionC( result ) ) return result;
+
+    if( step == 1 ) {
+        yp_ssize_t growBy = ypTuple_LEN( x ) - slicelength; // negative means list shrinking
+        yp_ssize_t newLen = ypTuple_LEN( sq ) + growBy;
+
+        // Ensure there's enough space allocated; after this, failure is impossible
+        if( growBy > 0 ) {
+            if( ypTuple_ALLOCLEN( sq ) < newLen ) {
+                ypObject *result = _ypTuple_resize( sq, newLen, 0 );
+                if( yp_isexceptionC( result ) ) return result;
+            }
+        }
+
+        // Discard items in target area, then adjust remaining items
+        for( i = start; i < stop; i++ ) yp_decref( ypTuple_ARRAY( sq )[i] );
+        ypTuple_ELEMMOVE( sq, stop+growBy, stop );
+
+        // There are now ypTuple_LEN( x ) elements starting at sq[start] waiting for x's items
+        memcpy( ypTuple_ARRAY( sq )+start, ypTuple_ARRAY( x ), 
+            ypTuple_LEN( x )*sizeof( ypObject * ) );
+        for( i = start; i < start+ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
+        ypTuple_LEN( sq ) = newLen;
+    } else {
+        if( ypTuple_LEN( x ) != slicelength ) return yp_ValueError;
+        for( i = 0; i < slicelength; i++ ) {
+            ypObject **dest = ypTuple_ARRAY( sq ) + ypSlice_INDEX( start, step, i );
+            yp_decref( *dest );
+            *dest = yp_incref( ypTuple_ARRAY( x )[i] );
+        }
+    }
+    return yp_None;
 }
 
 // Public Methods
@@ -4879,8 +4930,17 @@ static ypObject *list_setindex( ypObject *sq, yp_ssize_t i, ypObject *x )
 static ypObject *list_setslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step,
         ypObject *x )
 {
-    if( yp_isexceptionC( x ) ) return x;
-    return yp_NotImplementedError;
+    // If x is not a tuple/list, or if it is the same object as sq, then a copy must first be made
+    if( ypObject_TYPE_PAIR_CODE( x ) == ypTuple_CODE && sq != x ) {
+        return _ypTuple_setslice_from_tuple( sq, start, stop, step, x );
+    } else {
+        ypObject *result;
+        ypObject *x_astuple = yp_tuple( x );
+        if( yp_isexceptionC( x_astuple ) ) return x_astuple;
+        result = _ypTuple_setslice_from_tuple( sq, start, stop, step, x_astuple );
+        yp_decref( x_astuple );
+        return result;
+    }
 }
 
 static ypObject *list_popindex( ypObject *sq, yp_ssize_t i )
