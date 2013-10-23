@@ -480,6 +480,7 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, u.copy, None)
 
+    @unittest.skip("TODO Support sort in nohtyP")
     def test_sort(self):
         u = self.type2test([1, 0])
         u.sort()

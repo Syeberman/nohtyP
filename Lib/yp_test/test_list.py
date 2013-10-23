@@ -69,6 +69,7 @@ class ListTest(list_tests.CommonTest):
         self.assertRaises((MemoryError, OverflowError), mul, lst, n)
         self.assertRaises((MemoryError, OverflowError), imul, lst, n)
 
+    @unittest.skip("TODO re-enable (it just takes a long time)")
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):
@@ -79,6 +80,7 @@ class ListTest(list_tests.CommonTest):
         check(10)       # check our checking code
         check(1000000)
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_iterator_pickle(self):
         # Userlist iterators don't support pickling yet since
         # they are based on generators.
@@ -94,6 +96,7 @@ class ListTest(list_tests.CommonTest):
         d = pickle.dumps(it)
         self.assertEqual(self.type2test(it), self.type2test(data)[1:])
 
+    @unittest.skip("TODO: Implement nohtyP pickling")
     def test_reversed_pickle(self):
         data = self.type2test([4, 5, 6, 7])
         it = itorg = reversed(data)

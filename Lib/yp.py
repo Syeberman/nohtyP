@@ -9,7 +9,7 @@ yp.py - Python wrapper for nohtyP
 # TODO __all__, or underscores
 
 from ctypes import *
-import sys, weakref, operator, pickle
+import sys, weakref, operator, pickle, reprlib
 
 ypdll = cdll.nohtyP
 
@@ -524,6 +524,7 @@ yp_func( c_void, "yp_insertC", ((c_ypObject_pp, "sequence"),
     (c_yp_ssize_t, "i"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
+yp_func( c_ypObject_p, "yp_popindexC", ((c_ypObject_pp, "sequence"), (c_yp_ssize_t, "i")) )
 
 # ypObject *yp_pop( ypObject **sequence );
 
@@ -531,6 +532,7 @@ yp_func( c_void, "yp_insertC", ((c_ypObject_pp, "sequence"),
 yp_func( c_void, "yp_remove", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")) )
 
 # void yp_reverse( ypObject **sequence );
+yp_func( c_void, "yp_reverse", ((c_ypObject_pp, "sequence"), ) )
 
 # void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse );
 
@@ -959,8 +961,9 @@ class ypObject( c_ypObject_p ):
     def index( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_indexC4( self, x, i, j, yp_None )
     def count( self, x ): return _yp_countC( self, x, yp_None )
     def append( self, x ): _yp_append( self, x )
-    def extend( self, t ): _yp_extend( self, t )
+    def extend( self, t ): _yp_extend( self, _yp_iterable( t ) )
     def insert( self, i, x ): _yp_insertC( self, i, x )
+    def reverse( self ): _yp_reverse( self )
 
     def isdisjoint( self, other ):
         return _yp_isdisjoint( self, _yp_iterable( other ) )
@@ -1252,11 +1255,6 @@ c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
 
 class _ypTuple( ypObject ):
-    # FIXME When nohtyP supports str/repr, replace this faked-out version
-    def __str__( self ):
-        return "(%s)" % ", ".join( repr( x ) for x in self )
-    __repr__ = __str__
-
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
     def __mul__( self, factor ): return _yp_repeatC( self, factor )
@@ -1268,12 +1266,22 @@ class yp_tuple( _ypTuple ):
     def __new__( cls, iterable=_yp_arg_missing ):
         if iterable is _yp_arg_missing: return _yp_tupleN( )
         return _yp_tuple( _yp_iterable( iterable ) )
+    # FIXME When nohtyP supports str/repr, replace this faked-out version
+    def __str__( self ):
+        return "(%s)" % ", ".join( repr( x ) for x in self )
+    __repr__ = __str__
 _yp_tuple_empty = yp_tuple( )
 
 @pytype( list, 21 )
 class yp_list( _ypTuple ):
     def __new__( cls, iterable=_yp_tuple_empty ):
         return _yp_list( _yp_iterable( iterable ) )
+    # FIXME When nohtyP supports str/repr, replace this faked-out version
+    @reprlib.recursive_repr( "[...]" )
+    def __str__( self ):
+        return "[%s]" % ", ".join( repr( x ) for x in self )
+    __repr__ = __str__
+    def pop( self, i=-1 ): return _yp_popindexC( self, i )
     def __iadd__( self, other ): 
         _yp_extend( self, other )
         return self
