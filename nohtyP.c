@@ -3494,7 +3494,7 @@ static void _ypSlice_delslice_memmove( void *array, yp_ssize_t length, yp_ssize_
         yp_ssize_t remaining = slicelength;
         yp_uint8_t *chunk_dst = bytes + (start * elemsize);
         yp_uint8_t *chunk_src = chunk_dst + elemsize;
-        yp_ssize_t  chunk_len = step * elemsize;
+        yp_ssize_t  chunk_len = (step - 1) * elemsize;
         while( remaining > 1 ) {
             memmove( chunk_dst, chunk_src, chunk_len );
             chunk_dst += chunk_len;
@@ -3856,7 +3856,8 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
     if( slicelength < 1 ) return yp_None; // no-op
-    _ypSlice_delslice_memmove( ypBytes_DATA( b ), ypBytes_LEN( b ), 1, 
+    // Add one to the length to include the hidden null-terminator
+    _ypSlice_delslice_memmove( ypBytes_DATA( b ), ypBytes_LEN( b )+1, 1, 
             start, stop, step, slicelength );
     ypBytes_LEN( b ) -= slicelength;
     return yp_None;
