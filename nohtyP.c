@@ -4956,6 +4956,21 @@ static ypObject *list_popindex( ypObject *sq, yp_ssize_t i )
     return result;
 }
 
+// XXX Adapted from Python's reverse_slice
+static ypObject *list_reverse( ypObject *sq )
+{
+    ypObject **lo = ypTuple_ARRAY( sq );
+    ypObject **hi = lo + ypTuple_LEN( sq ) - 1;
+    while( lo < hi ) {
+        ypObject *t = *lo;
+        *lo = *hi;
+        *hi = t;
+        lo += 1;
+        hi -= 1;
+    }
+    return yp_None;
+}
+
 static ypObject *list_delindex( ypObject *sq, yp_ssize_t i )
 {
     ypObject *result = list_popindex( sq, i );
@@ -5318,7 +5333,7 @@ static ypSequenceMethods ypList_as_sequence = {
     list_irepeat,                   // tp_irepeat
     list_insert,                    // tp_insert
     list_popindex,                  // tp_popindex
-    MethodError_objproc,            // tp_reverse
+    list_reverse,                   // tp_reverse
     MethodError_sortfunc            // tp_sort
 };
 
