@@ -520,6 +520,8 @@ yp_func( c_void, "yp_extend", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "t"))
 yp_func( c_void, "yp_irepeatC", ((c_ypObject_pp, "sequence"), (c_yp_ssize_t, "factor")) )
 
 # void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
+yp_func( c_void, "yp_insertC", ((c_ypObject_pp, "sequence"), 
+    (c_yp_ssize_t, "i"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
 
@@ -958,6 +960,7 @@ class ypObject( c_ypObject_p ):
     def count( self, x ): return _yp_countC( self, x, yp_None )
     def append( self, x ): _yp_append( self, x )
     def extend( self, t ): _yp_extend( self, t )
+    def insert( self, i, x ): _yp_insertC( self, i, x )
 
     def isdisjoint( self, other ):
         return _yp_isdisjoint( self, _yp_iterable( other ) )

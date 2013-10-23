@@ -4739,6 +4739,8 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
         yp_ssize_t newLen = ypTuple_LEN( sq ) + growBy;
 
         // Ensure there's enough space allocated; after this, failure is impossible
+        // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE, 
+        // copying large amounts of data twice; optimize
         if( growBy > 0 ) {
             if( ypTuple_ALLOCLEN( sq ) < newLen ) {
                 ypObject *result = _ypTuple_resize( sq, newLen, 0 );
@@ -5010,12 +5012,17 @@ static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
     return yp_None;
 }
 
+// TODO Python's ins1 does an item-by-item copy rather than a memmove...inefficient? ...fix?
 static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
 {
-    ypObject *result;
+    // Check for exceptions, then adjust the index (noting it should behave like sq[i:i]=[x])
     if( yp_isexceptionC( x ) ) return x;
-    result = ypSequence_AdjustIndexC( ypTuple_LEN( sq ), &i );
-    if( yp_isexceptionC( result ) ) return result;
+    if( i < 0 ) {
+        i += ypTuple_LEN( sq );
+        if( i < 0 ) i = 0;
+    } else if( i > ypTuple_LEN( sq ) ) {
+        i = ypTuple_LEN( sq );
+    }
 
     // Resize if necessary
     // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE, copying
@@ -5023,7 +5030,7 @@ static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
     // happens?)
     if( ypTuple_ALLOCLEN( sq ) - ypTuple_LEN( sq ) < 1 ) {
         // TODO over-allocate
-        result = _ypTuple_resize( sq, ypTuple_LEN( sq ) + 1, 0 );
+        ypObject *result = _ypTuple_resize( sq, ypTuple_LEN( sq ) + 1, 0 );
         if( yp_isexceptionC( result ) ) return result;
     }
 
