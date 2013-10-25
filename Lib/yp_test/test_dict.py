@@ -278,6 +278,8 @@ class DictTest(unittest.TestCase):
         d = yp_dict(zip(range(6), range(6)))
         self.assertEqual(yp_dict.fromkeys(d, 0), yp_dict(zip(range(6), [0]*6)))
 
+    @unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
+    def test_fromkeys_fastpath_subclass(self):
         class baddict3(yp_dict):
             def __new__(cls):
                 return d

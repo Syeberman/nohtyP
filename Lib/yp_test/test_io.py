@@ -19,6 +19,7 @@
 # test both implementations. This file has lots of examples.
 ################################################################################
 
+from yp import *
 import abc
 import array
 import errno
@@ -35,7 +36,7 @@ import weakref
 import _testcapi
 from collections import deque, UserList
 from itertools import cycle, count
-from test import support
+from yp_test import support
 
 import codecs
 import io  # C implementation of io
@@ -265,6 +266,7 @@ class PyMockNonBlockWriterIO(MockNonBlockWriterIO, pyio.RawIOBase):
     BlockingIOError = pyio.BlockingIOError
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class IOTest(unittest.TestCase):
 
     def setUp(self):
@@ -834,6 +836,7 @@ class SizeofTest:
         self.assertEqual(sys.getsizeof(bufio), size + bufsize2)
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
     read_mode = "rb"
 
@@ -1082,6 +1085,7 @@ class PyBufferedReaderTest(BufferedReaderTest):
     tp = pyio.BufferedReader
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
     write_mode = "wb"
 
@@ -1378,6 +1382,7 @@ class CBufferedWriterTest(BufferedWriterTest, SizeofTest):
 class PyBufferedWriterTest(BufferedWriterTest):
     tp = pyio.BufferedWriter
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BufferedRWPairTest(unittest.TestCase):
 
     def test_constructor(self):
@@ -1855,6 +1860,7 @@ class StatefulIncrementalDecoder(codecs.IncrementalDecoder):
 codecs.register(StatefulIncrementalDecoder.lookupTestDecoder)
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class StatefulIncrementalDecoderTest(unittest.TestCase):
     """
     Make sure the StatefulIncrementalDecoder actually works.
@@ -1898,6 +1904,7 @@ class StatefulIncrementalDecoderTest(unittest.TestCase):
         self.assertEqual(d.decode(b'oiabcd'), '')
         self.assertEqual(d.decode(b'', 1), 'abcd.')
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TextIOWrapperTest(unittest.TestCase):
 
     def setUp(self):
@@ -2630,6 +2637,7 @@ class PyTextIOWrapperTest(TextIOWrapperTest):
     pass
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class IncrementalNewlineDecoderTest(unittest.TestCase):
 
     def check_newline_decoding_utf8(self, decoder):
@@ -2745,6 +2753,7 @@ class PyIncrementalNewlineDecoderTest(IncrementalNewlineDecoderTest):
 
 # XXX Tests for open()
 
+@unittest.skip( "TODO: convert to yp.py" )
 class MiscIOTest(unittest.TestCase):
 
     def tearDown(self):
@@ -3023,6 +3032,7 @@ class PyMiscIOTest(MiscIOTest):
     io = pyio
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 @unittest.skipIf(os.name == 'nt', 'POSIX signals required for this test.')
 class SignalsTest(unittest.TestCase):
 

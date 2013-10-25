@@ -1162,7 +1162,7 @@ class AssortedBytesTest(unittest.TestCase):
         self.assertEqual(bytes(b"abc") < b"ab", False)
         self.assertEqual(bytes(b"abc") <= b"ab", False)
 
-    @test.support.requires_docstrings
+    @yp_test.support.requires_docstrings
     def test_doc(self):
         self.assertIsNotNone(bytearray.__doc__)
         self.assertTrue(bytearray.__doc__.startswith("bytearray("), bytearray.__doc__)

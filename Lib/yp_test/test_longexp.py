@@ -1,6 +1,8 @@
+from yp import *
 import unittest
-from test import support
+from yp_test import support
 
+@unittest.skip( "TODO: convert to yp.py" )
 class LongExpText(unittest.TestCase):
     def test_longexp(self):
         REPS = 65580

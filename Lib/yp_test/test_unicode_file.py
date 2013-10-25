@@ -1,11 +1,12 @@
 # Test some Unicode file name semantics
 # We dont test many operations on files other than
 # that their names can be used with Unicode characters.
+from yp import *
 import os, glob, time, shutil
 import unicodedata
 
 import unittest
-from test.support import (run_unittest, rmtree,
+from yp_test.support import (run_unittest, rmtree,
     TESTFN_ENCODING, TESTFN_UNICODE, TESTFN_UNENCODABLE, create_empty_file)
 
 if not os.path.supports_unicode_filenames:
@@ -20,6 +21,7 @@ def remove_if_exists(filename):
     if os.path.exists(filename):
         os.unlink(filename)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestUnicodeFiles(unittest.TestCase):
     # The 'do_' functions are the actual tests.  They generally assume the
     # file already exists etc.
