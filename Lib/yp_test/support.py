@@ -71,7 +71,7 @@ __all__ = [
     "TestHandler", "Matcher", "can_symlink", "skip_unless_symlink",
     "skip_unless_xattr", "import_fresh_module", "requires_zlib",
     "PIPE_MAX_SIZE", "failfast", "anticipate_failure", "run_with_tz",
-    "requires_bz2", "requires_lzma"
+    "requires_bz2", "requires_lzma", "suppress_crash_popup",
     ]
 
 class Error(Exception):
@@ -573,10 +573,12 @@ def _is_ipv6_enabled():
 IPV6_ENABLED = _is_ipv6_enabled()
 
 
-# A constant likely larger than the underlying OS pipe buffer size.
-# Windows limit seems to be around 512B, and most Unix kernels have a 64K pipe
-# buffer size: take 1M to be sure.
-PIPE_MAX_SIZE = 1024 * 1024
+# A constant likely larger than the underlying OS pipe buffer size, to
+# make writes blocking.
+# Windows limit seems to be around 512 B, and many Unix kernels have a
+# 64 KiB pipe buffer size or 16 * PAGE_SIZE: take a few megs to be sure.
+# (see issue #17835 for a discussion of this number).
+PIPE_MAX_SIZE = 4 *1024 * 1024 + 1
 
 
 # decorator for skipping tests on non-IEEE 754 platforms
@@ -603,6 +605,49 @@ else:
 # module name.
 TESTFN = "{}_{}_tmp".format(TESTFN, os.getpid())
 
+# FS_NONASCII: non-ASCII character encodable by os.fsencode(),
+# or None if there is no such character.
+FS_NONASCII = None
+for character in (
+    # First try printable and common characters to have a readable filename.
+    # For each character, the encoding list are just example of encodings able
+    # to encode the character (the list is not exhaustive).
+
+    # U+00E6 (Latin Small Letter Ae): cp1252, iso-8859-1
+    '\u00E6',
+    # U+0130 (Latin Capital Letter I With Dot Above): cp1254, iso8859_3
+    '\u0130',
+    # U+0141 (Latin Capital Letter L With Stroke): cp1250, cp1257
+    '\u0141',
+    # U+03C6 (Greek Small Letter Phi): cp1253
+    '\u03C6',
+    # U+041A (Cyrillic Capital Letter Ka): cp1251
+    '\u041A',
+    # U+05D0 (Hebrew Letter Alef): Encodable to cp424
+    '\u05D0',
+    # U+060C (Arabic Comma): cp864, cp1006, iso8859_6, mac_arabic
+    '\u060C',
+    # U+062A (Arabic Letter Teh): cp720
+    '\u062A',
+    # U+0E01 (Thai Character Ko Kai): cp874
+    '\u0E01',
+
+    # Then try more "special" characters. "special" because they may be
+    # interpreted or displayed differently depending on the exact locale
+    # encoding and the font.
+
+    # U+00A0 (No-Break Space)
+    '\u00A0',
+    # U+20AC (Euro Sign)
+    '\u20AC',
+):
+    try:
+        os.fsdecode(os.fsencode(character))
+    except UnicodeError:
+        pass
+    else:
+        FS_NONASCII = character
+        break
 
 # TESTFN_UNICODE is a non-ascii filename
 TESTFN_UNICODE = TESTFN + "-\xe0\xf2\u0258\u0141\u011f"
@@ -647,6 +692,41 @@ elif sys.platform != 'darwin':
         # the byte 0xff. Skip some unicode filename tests.
         pass
 
+# TESTFN_UNDECODABLE is a filename (bytes type) that should *not* be able to be
+# decoded from the filesystem encoding (in strict mode). It can be None if we
+# cannot generate such filename (ex: the latin1 encoding can decode any byte
+# sequence). On UNIX, TESTFN_UNDECODABLE can be decoded by os.fsdecode() thanks
+# to the surrogateescape error handler (PEP 383), but not from the filesystem
+# encoding in strict mode.
+TESTFN_UNDECODABLE = None
+for name in (
+    # b'\xff' is not decodable by os.fsdecode() with code page 932. Windows
+    # accepts it to create a file or a directory, or don't accept to enter to
+    # such directory (when the bytes name is used). So test b'\xe7' first: it is
+    # not decodable from cp932.
+    b'\xe7w\xf0',
+    # undecodable from ASCII, UTF-8
+    b'\xff',
+    # undecodable from iso8859-3, iso8859-6, iso8859-7, cp424, iso8859-8, cp856
+    # and cp857
+    b'\xae\xd5'
+    # undecodable from UTF-8 (UNIX and Mac OS X)
+    b'\xed\xb2\x80', b'\xed\xb4\x80',
+    # undecodable from shift_jis, cp869, cp874, cp932, cp1250, cp1251, cp1252,
+    # cp1253, cp1254, cp1255, cp1257, cp1258
+    b'\x81\x98',
+):
+    try:
+        name.decode(TESTFN_ENCODING)
+    except UnicodeDecodeError:
+        TESTFN_UNDECODABLE = os.fsencode(TESTFN) + name
+        break
+
+if FS_NONASCII:
+    TESTFN_NONASCII = TESTFN + '-' + FS_NONASCII
+else:
+    TESTFN_NONASCII = None
+
 # Save the initial cwd
 SAVEDCWD = os.getcwd()
 
@@ -680,7 +760,7 @@ def temp_cwd(name='tempcwd', quiet=False, path=None):
     except OSError:
         if not quiet:
             raise
-        warnings.warn('tests may fail, unable to change the CWD to ' + name,
+        warnings.warn('tests may fail, unable to change the CWD to ' + path,
                       RuntimeWarning, stacklevel=3)
     try:
         yield os.getcwd()
@@ -1232,7 +1312,7 @@ def run_with_tz(tz):
             try:
                 return func(*args, **kwds)
             finally:
-                if orig_tz == None:
+                if orig_tz is None:
                     del os.environ['TZ']
                 else:
                     os.environ['TZ'] = orig_tz
@@ -1509,6 +1589,16 @@ def run_unittest(*classes):
         return False
     _filter_suite(suite, case_pred)
     _run_suite(suite)
+
+#=======================================================================
+# Check for the presence of docstrings.
+
+HAVE_DOCSTRINGS = (check_impl_detail(cpython=False) or
+                   sys.platform == 'win32' or
+                   sysconfig.get_config_var('WITH_DOC_STRINGS'))
+
+requires_docstrings = unittest.skipUnless(HAVE_DOCSTRINGS,
+                                          "test requires docstrings")
 
 
 #=======================================================================
@@ -1816,6 +1906,30 @@ def skip_unless_xattr(test):
     ok = can_xattr()
     msg = "no non-broken extended attribute support"
     return test if ok else unittest.skip(msg)(test)
+
+
+if sys.platform.startswith('win'):
+    @contextlib.contextmanager
+    def suppress_crash_popup():
+        """Disable Windows Error Reporting dialogs using SetErrorMode."""
+        # see http://msdn.microsoft.com/en-us/library/windows/desktop/ms680621%28v=vs.85%29.aspx
+        # GetErrorMode is not available on Windows XP and Windows Server 2003,
+        # but SetErrorMode returns the previous value, so we can use that
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        SEM_NOGPFAULTERRORBOX = 0x02
+        old_error_mode = k32.SetErrorMode(SEM_NOGPFAULTERRORBOX)
+        k32.SetErrorMode(old_error_mode | SEM_NOGPFAULTERRORBOX)
+        try:
+            yield
+        finally:
+            k32.SetErrorMode(old_error_mode)
+else:
+    # this is a no-op for other platforms
+    @contextlib.contextmanager
+    def suppress_crash_popup():
+        yield
+
 
 def patch(test_instance, object_to_patch, attr_name, new_value):
     """Override 'object_to_patch'.'attr_name' with 'new_value'.
