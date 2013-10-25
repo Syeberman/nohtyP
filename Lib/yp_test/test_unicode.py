@@ -5,13 +5,14 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
 
 """#"
+from yp import *
 import _string
 import codecs
 import struct
 import sys
 import unittest
 import warnings
-from test import support, string_tests
+from yp_test import support, string_tests
 
 # Error handling (bad decoder return)
 def search_function(encoding):
@@ -31,6 +32,7 @@ def search_function(encoding):
         return None
 codecs.register(search_function)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class UnicodeTest(string_tests.CommonTest,
         string_tests.MixinStrUnicodeUserStringTest,
         string_tests.MixinStrUnicodeTest,
@@ -2185,6 +2187,7 @@ class UnicodeTest(string_tests.CommonTest,
                 self.assertEqual(abcdef.decode('unicode_internal'), text)
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class StringModuleTest(unittest.TestCase):
     def test_formatter_parser(self):
         def parse(format):

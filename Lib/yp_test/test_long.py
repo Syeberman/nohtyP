@@ -1,5 +1,6 @@
+from yp import *
 import unittest
-from test import support
+from yp_test import support
 
 import sys
 
@@ -121,6 +122,7 @@ def truediv(a, b):
     return -result if negative else result
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class LongTest(unittest.TestCase):
 
     # Get quasi-random long consisting of ndigits digits (in base BASE).

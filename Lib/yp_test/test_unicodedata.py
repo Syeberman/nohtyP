@@ -6,11 +6,12 @@
 
 """
 
+from yp import *
 import sys
 import unittest
 import hashlib
 import subprocess
-import test.support
+import yp_test.support
 
 encoding = 'utf-8'
 errors = 'surrogatepass'
@@ -18,6 +19,7 @@ errors = 'surrogatepass'
 
 ### Run tests
 
+@unittest.skip( "TODO: convert to yp.py" )
 class UnicodeMethodsTest(unittest.TestCase):
 
     # update this, if the database changes
@@ -66,6 +68,7 @@ class UnicodeMethodsTest(unittest.TestCase):
         result = h.hexdigest()
         self.assertEqual(result, self.expectedchecksum)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class UnicodeDatabaseTest(unittest.TestCase):
 
     def setUp(self):
@@ -313,7 +316,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
                                  r"\u%.4x should not be a linebreak" % i)
 
 def test_main():
-    test.support.run_unittest(
+    yp_test.support.run_unittest(
         UnicodeMiscTest,
         UnicodeMethodsTest,
         UnicodeFunctionsTest

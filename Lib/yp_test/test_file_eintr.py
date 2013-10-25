@@ -8,12 +8,13 @@
 # the problems prior to the issue12268 patch reliably on Linux and OSX.
 #  - gregory.p.smith
 
+from yp import *
 import os
 import select
 import signal
 import subprocess
 import sys
-from test.support import run_unittest
+from yp_test.support import run_unittest
 import time
 import unittest
 
@@ -21,6 +22,7 @@ import unittest
 from _io import FileIO
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 @unittest.skipUnless(os.name == 'posix', 'tests requires a posix system.')
 class TestFileIOSignalInterrupt(unittest.TestCase):
     def setUp(self):

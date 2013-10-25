@@ -5,8 +5,9 @@
 #  no function, but it still must parse correctly.
 from __future__ import print_function
 
+from yp import *
 import unittest
-from test import support
+from yp_test import support
 
 try:
     # 3.x
@@ -48,6 +49,7 @@ class ClassWith__str__:
     def __str__(self):
         return self.x
 
+@unittest.skip( "TODO: convert to yp.py" )
 class TestPrint(unittest.TestCase):
     def check(self, expected, args,
             sep=NotDefined, end=NotDefined, file=NotDefined):

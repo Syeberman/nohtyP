@@ -1,5 +1,6 @@
 # Adapted from test_file.py by Daniel Stutzbach
 
+from yp import *
 import sys
 import os
 import io
@@ -10,11 +11,12 @@ from weakref import proxy
 from functools import wraps
 import _testcapi
 
-from test.support import TESTFN, check_warnings, run_unittest, make_bad_fd
+from yp_test.support import TESTFN, check_warnings, run_unittest, make_bad_fd
 from collections import UserList
 
 from _io import FileIO as _FileIO
 
+@unittest.skip( "TODO: convert to yp.py" )
 class AutoFileTests(unittest.TestCase):
     # file tests for which a test file is automatically set up
 
@@ -260,6 +262,7 @@ class AutoFileTests(unittest.TestCase):
         a = array('b', b'x'*10)
         f.readinto(a)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class OtherFileTests(unittest.TestCase):
 
     def testAbles(self):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from test import support
+from yp import *
+from yp_test import support
 import array
 import marshal
 import sys
@@ -21,6 +22,7 @@ class HelperMixin:
         finally:
             support.unlink(support.TESTFN)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class IntTestCase(unittest.TestCase, HelperMixin):
     def test_ints(self):
         # Test the full range of Python ints.
@@ -58,6 +60,7 @@ class IntTestCase(unittest.TestCase, HelperMixin):
         for b in (True, False):
             self.helper(b)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class FloatTestCase(unittest.TestCase, HelperMixin):
     def test_floats(self):
         # Test a few floats
@@ -85,6 +88,7 @@ class FloatTestCase(unittest.TestCase, HelperMixin):
                 self.helper(f, 1)
             n *= 123.4567
 
+@unittest.skip( "TODO: convert to yp.py" )
 class StringTestCase(unittest.TestCase, HelperMixin):
     def test_unicode(self):
         for s in ["", "Andr\xe8 Previn", "abc", " "*10000]:
@@ -98,11 +102,13 @@ class StringTestCase(unittest.TestCase, HelperMixin):
         for s in [b"", b"Andr\xe8 Previn", b"abc", b" "*10000]:
             self.helper(s)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class ExceptionTestCase(unittest.TestCase):
     def test_exceptions(self):
         new = marshal.loads(marshal.dumps(StopIteration))
         self.assertEqual(StopIteration, new)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class CodeTestCase(unittest.TestCase):
     def test_code(self):
         co = ExceptionTestCase.test_exceptions.__code__
@@ -131,6 +137,7 @@ class CodeTestCase(unittest.TestCase):
             if isinstance(obj, types.CodeType):
                 self.assertIs(co.co_filename, obj.co_filename)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class ContainerTestCase(unittest.TestCase, HelperMixin):
     d = {'astring': 'foo@bar.baz.spam',
          'afloat': 7283.43,
@@ -156,6 +163,7 @@ class ContainerTestCase(unittest.TestCase, HelperMixin):
             self.helper(constructor(self.d.keys()))
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BufferTestCase(unittest.TestCase, HelperMixin):
 
     def test_bytearray(self):
@@ -176,6 +184,7 @@ class BufferTestCase(unittest.TestCase, HelperMixin):
         self.assertEqual(new, b"abc")
 
 
+@unittest.skip( "TODO: convert to yp.py" )
 class BugsTestCase(unittest.TestCase):
     def test_bug_5888452(self):
         # Simple-minded check for SF 588452: Debug build crashes
@@ -286,6 +295,7 @@ class NullWriter:
     def write(self, s):
         pass
 
+@unittest.skip( "TODO: convert to yp.py" )
 @unittest.skipIf(LARGE_SIZE > sys.maxsize, "test cannot run on 32-bit systems")
 class LargeValuesTestCase(unittest.TestCase):
     def check_unmarshallable(self, data):

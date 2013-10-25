@@ -1,3 +1,4 @@
+from yp import *
 import sys
 import os
 import unittest
@@ -7,7 +8,7 @@ from weakref import proxy
 import io
 import _pyio as pyio
 
-from test.support import TESTFN, run_unittest
+from yp_test.support import TESTFN, run_unittest
 from collections import UserList
 
 class AutoFileTests:
@@ -128,9 +129,11 @@ class AutoFileTests:
     def testReadWhenWriting(self):
         self.assertRaises(IOError, self.f.read)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class CAutoFileTests(AutoFileTests, unittest.TestCase):
     open = io.open
 
+@unittest.skip( "TODO: convert to yp.py" )
 class PyAutoFileTests(AutoFileTests, unittest.TestCase):
     open = staticmethod(pyio.open)
 
@@ -322,9 +325,11 @@ class OtherFileTests:
         finally:
             os.unlink(TESTFN)
 
+@unittest.skip( "TODO: convert to yp.py" )
 class COtherFileTests(OtherFileTests, unittest.TestCase):
     open = io.open
 
+@unittest.skip( "TODO: convert to yp.py" )
 class PyOtherFileTests(OtherFileTests, unittest.TestCase):
     open = staticmethod(pyio.open)
 

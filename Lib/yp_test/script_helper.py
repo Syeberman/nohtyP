@@ -13,7 +13,7 @@ import shutil
 import zipfile
 
 from imp import source_from_cache
-from test.support import make_legacy_pyc, strip_python_stderr
+from yp_test.support import make_legacy_pyc, strip_python_stderr
 
 # Executing the interpreter in a subprocess
 def _assert_python(expected_success, *args, **env_vars):
