@@ -6,6 +6,7 @@ from yp import *
 import unittest, string, sys, struct
 from yp_test import support
 from collections import UserList
+import _testcapi
 
 class Sequence:
     def __init__(self, seq='wxyz'): self.seq = seq
@@ -20,7 +21,7 @@ class BadSeq2(Sequence):
     def __init__(self): self.seq = ['a', 'b', 'c']
     def __len__(self): return 8
 
-class BaseTest(unittest.TestCase):
+class BaseTest:
     # These tests are for buffers of values (bytes) and not
     # specific to character interpretation, used for bytes objects
     # and various string implementations
@@ -714,27 +715,6 @@ class CommonTest(BaseTest):
 
         self.checkraises(TypeError, 'hello', 'capitalize', 42)
 
-    def test_lower(self):
-        self.checkequal('hello', 'HeLLo', 'lower')
-        self.checkequal('hello', 'hello', 'lower')
-        self.checkraises(TypeError, 'hello', 'lower', 42)
-
-    def test_upper(self):
-        self.checkequal('HELLO', 'HeLLo', 'upper')
-        self.checkequal('HELLO', 'HELLO', 'upper')
-        self.checkraises(TypeError, 'hello', 'upper', 42)
-
-    def test_expandtabs(self):
-        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs')
-        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs', 8)
-        self.checkequal('abc\rab  def\ng   hi', 'abc\rab\tdef\ng\thi', 'expandtabs', 4)
-        self.checkequal('abc\r\nab  def\ng   hi', 'abc\r\nab\tdef\ng\thi', 'expandtabs', 4)
-        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs')
-        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs', 8)
-        self.checkequal('abc\r\nab\r\ndef\ng\r\nhi', 'abc\r\nab\r\ndef\ng\r\nhi', 'expandtabs', 4)
-
-        self.checkraises(TypeError, 'hello', 'expandtabs', 42, 42)
-
     def test_additional_split(self):
         self.checkequal(['this', 'is', 'the', 'split', 'function'],
             'this is the split function', 'split')
@@ -1206,6 +1186,19 @@ class MixinStrUnicodeUserStringTest:
         # Outrageously large width or precision should raise ValueError.
         self.checkraises(ValueError, '%%%df' % (2**64), '__mod__', (3.2))
         self.checkraises(ValueError, '%%.%df' % (2**64), '__mod__', (3.2))
+
+        self.checkraises(OverflowError, '%*s', '__mod__',
+                         (_testcapi.PY_SSIZE_T_MAX + 1, ''))
+        self.checkraises(OverflowError, '%.*f', '__mod__',
+                         (_testcapi.INT_MAX + 1, 1. / 7))
+        # Issue 15989
+        self.checkraises(OverflowError, '%*s', '__mod__',
+                         (1 << (_testcapi.PY_SSIZE_T_MAX.bit_length() + 1), ''))
+        self.checkraises(OverflowError, '%.*f', '__mod__',
+                         (_testcapi.UINT_MAX + 1, 1. / 7))
+
+        class X(object): pass
+        self.checkraises(TypeError, 'abc', '__mod__', X())
 
     def test_floatformatting(self):
         # float formatting

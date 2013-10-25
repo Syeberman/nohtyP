@@ -2,7 +2,7 @@ from yp import *
 import sys
 
 import unittest
-from yp_test.support import run_unittest
+from yp_test import support
 
 # TODO There may be tests in Python's test_long that are applicable to us as well
 # TODO Replace maxsize with nohtyP's version?
@@ -106,10 +106,6 @@ class IntTestCases(unittest.TestCase):
 
         self.assertRaises(ValueError, yp_int, "0b", 2)
         self.assertRaises(ValueError, yp_int, "0b", 0)
-
-        # Bug #3236: Return small longs from PyLong_FromString
-        self.assertTrue(yp_int("10") is 10)
-        self.assertTrue(yp_int("-1") is -1)
 
         # SF bug 1334662: int(string, base) wrong answers
         # Various representations of 2**32 evaluated to 0
@@ -285,6 +281,12 @@ class IntTestCases(unittest.TestCase):
                     return 42
             self.assertEqual(yp_int(JustTrunc()), 42)
 
+            class ExceptionalTrunc(base):
+                def __trunc__(self):
+                    1 / 0
+            with self.assertRaises(ZeroDivisionError):
+                yp_int(ExceptionalTrunc())
+
             for trunc_result_base in (object, Classic):
                 class Integral(trunc_result_base):
                     def __int__(self):
@@ -313,6 +315,18 @@ class IntTestCases(unittest.TestCase):
                     self.fail("Failed to raise TypeError with %s" %
                               ((base, trunc_result_base),))
 
+                # Regression test for bugs.python.org/issue16060.
+                class BadInt(trunc_result_base):
+                    def __int__(self):
+                        return 42.0
+
+                class TruncReturnsBadInt(base):
+                    def __trunc__(self):
+                        return BadInt()
+
+                with self.assertRaises(TypeError):
+                    yp_int(TruncReturnsBadInt())
+
     @unittest.skip("Not applicable to nohtyP")
     def test_error_message(self):
         testlist = ('\xbd', '123\xbd', '  123 456  ')
@@ -325,7 +339,7 @@ class IntTestCases(unittest.TestCase):
                 self.fail("Expected yp_int(%r) to raise a ValueError", s)
 
 def test_main():
-    run_unittest(IntTestCases)
+    support.run_unittest(IntTestCases)
 
 if __name__ == "__main__":
     test_main()
