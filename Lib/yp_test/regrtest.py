@@ -38,7 +38,7 @@ Verbosity
 
 Selecting tests
 
--r/--random     -- randomize test execution order (see below)
+-r/--randomize  -- randomize test execution order (see below)
    --randseed   -- pass a random seed to reproduce a previous random run
 -f/--fromfile   -- read names of tests to run from a file (see below)
 -x/--exclude    -- arguments are tests to *exclude*
@@ -301,12 +301,12 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'hvqxsoS:rf:lu:t:TD:NLR:FdwWM:nj:Gm:',
             ['help', 'verbose', 'verbose2', 'verbose3', 'quiet',
-             'exclude', 'single', 'slow', 'random', 'fromfile', 'findleaks',
+             'exclude', 'single', 'slow', 'randomize', 'fromfile=', 'findleaks',
              'use=', 'threshold=', 'coverdir=', 'nocoverdir',
              'runleaks', 'huntrleaks=', 'memlimit=', 'randseed=',
              'multiprocess=', 'coverage', 'slaveargs=', 'forever', 'debug',
              'start=', 'nowindows', 'header', 'testdir=', 'timeout=', 'wait',
-             'failfast', 'match'])
+             'failfast', 'match='])
     except getopt.error as msg:
         usage(msg)
 
@@ -556,10 +556,10 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             next_single_test = alltests[alltests.index(selected[0])+1]
         except IndexError:
             next_single_test = None
-    # Remove all the tests that precede start if it's set.
+    # Remove all the selected tests that precede start if it's set.
     if start:
         try:
-            del tests[:tests.index(start)]
+            del selected[:selected.index(start)]
         except ValueError:
             print("Couldn't find starting test (%s), using all tests" % start)
     if randomize:
