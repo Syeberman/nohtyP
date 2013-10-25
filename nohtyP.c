@@ -1526,6 +1526,7 @@ ypObject *yp_unfrozen_copy( ypObject *x ) {
 
 // XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
 // maybe even those should be copied as well...or just those that contain other objects
+// TODO It'd be nice to share code with yp_deepcopy_visitor
 static ypObject *_yp_unfrozen_deepcopy( ypObject *x, void *memo ) {
     // TODO don't forget to discard the new objects on error
     // TODO trap recursion & test
@@ -1546,6 +1547,7 @@ ypObject *yp_frozen_copy( ypObject *x ) {
 
 // XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
 // maybe even those should be copied as well...or just those that contain other objects
+// TODO It'd be nice to share code with yp_deepcopy_visitor
 static ypObject *_yp_frozen_deepcopy( ypObject *x, void *memo ) {
     // TODO trap recursion & test
     return yp_NotImplementedError;
@@ -1562,16 +1564,44 @@ ypObject *yp_copy( ypObject *x ) {
     return ypObject_IS_MUTABLE( x ) ? yp_unfrozen_copy( x ) : yp_frozen_copy( x );
 }
 
-// XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
-// maybe even those should be copied as well...or just those that contain other objects
-static ypObject *_yp_deepcopy( ypObject *x, void *memo ) {
-    // TODO trap recursion & test
-    return yp_NotImplementedError;
+// Use this as the visitor for deep copies (copying exactly the same types)
+// XXX Remember: deep copies always copy everything except immutable immortals
+// TODO Maybe those should be copied as well...or just those that contain other objects?
+static ypObject *yp_deepcopy_visitor( ypObject *x, void *_memo ) {
+    ypObject **memo = (ypObject **) _memo;
+    ypObject *id;
+    ypObject *result;
+
+    // Avoid recursion: we only make one copy of each object
+    id = yp_intC( (yp_ssize_t) x ); // new ref FIXME
+    result = yp_getitem( *memo, id );
+    if( !yp_isexceptionC( result ) ) {
+        yp_decref( id );
+        return result; // we've already made a copy of this object; return it
+    } else if( !yp_isexceptionC2( result, yp_KeyError ) ) {
+        yp_decref( id );
+        return result; // some (unexpected) error occured
+    }
+
+    // If we get here, then this is the first time visiting this object
+    if( ypObject_IS_MUTABLE( x ) ) {
+        result = ypObject_TYPE( x )->tp_unfrozen_copy( x, yp_deepcopy_visitor, memo );
+    } else {
+        result = ypObject_TYPE( x )->tp_frozen_copy( x, yp_deepcopy_visitor, memo );
+    }
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( id );
+        return result;
+    }
+    yp_setitem( memo, id, result );
+    yp_decref( id );
+    if( yp_isexceptionC( *memo ) ) return *memo;
+    return result;
 }
 
 ypObject *yp_deepcopy( ypObject *x ) {
     ypObject *memo = yp_dictK( 0 );
-    ypObject *result = _yp_deepcopy( x, memo );
+    ypObject *result = yp_deepcopy_visitor( x, &memo );
     yp_decref( memo );
     return result;
 }
@@ -2067,6 +2097,10 @@ int yp_isexceptionCN( ypObject *x, int n, ... )
  * Types
  *************************************************************************************************/
 
+static ypObject *type_frozen_copy( ypObject *t, visitfunc copy_visitor, void *copy_memo ) {
+    return yp_incref( t );
+}
+
 static ypObject *type_bool( ypObject *t ) {
     return yp_True;
 }
@@ -2083,8 +2117,8 @@ static ypTypeObject ypType_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    type_frozen_copy,               // tp_unfrozen_copy
+    type_frozen_copy,               // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2141,7 +2175,9 @@ static ypTypeObject ypType_Type = {
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
-// FIXME this needs to happen
+static ypObject *nonetype_frozen_copy( ypObject *n, visitfunc copy_visitor, void *copy_memo ) {
+    return yp_None;
+}
 
 ypObject *nonetype_bool( ypObject *n ) {
     return yp_False;
@@ -2165,8 +2201,8 @@ static ypTypeObject ypNoneType_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    nonetype_frozen_copy,           // tp_unfrozen_copy
+    nonetype_frozen_copy,           // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2234,6 +2270,10 @@ typedef struct {
 } ypBoolObject;
 #define _ypBool_VALUE( b ) ( ((ypBoolObject *)b)->value )
 
+static ypObject *bool_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
+    return b;
+}
+
 static ypObject *bool_bool( ypObject *b ) {
     return b;
 }
@@ -2272,8 +2312,8 @@ static ypTypeObject ypBool_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    bool_frozen_copy,               // tp_unfrozen_copy
+    bool_frozen_copy,               // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -3038,6 +3078,14 @@ static ypObject *float_dealloc( ypObject *f ) {
     return yp_None;
 }
 
+static ypObject *float_unfrozen_copy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
+    return yp_floatstoreC( ypFloat_VALUE( f ) );
+}
+
+static ypObject *float_frozen_copy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
+    return yp_floatC( ypFloat_VALUE( f ) );
+}
+
 static ypObject *float_bool( ypObject *f ) {
     return ypBool_FROM_C( ypFloat_VALUE( f ) != 0.0 );
 }
@@ -3086,8 +3134,8 @@ static ypTypeObject ypFloat_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    float_unfrozen_copy,            // tp_unfrozen_copy
+    float_frozen_copy,              // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -3149,8 +3197,8 @@ static ypTypeObject ypFloatStore_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    float_unfrozen_copy,            // tp_unfrozen_copy
+    float_frozen_copy,              // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -3653,7 +3701,22 @@ static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssi
     return;
 }
 
-// TODO Returns yp_None or an exception
+
+static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) 
+{
+    ypObject *copy = _yp_bytearray_new( ypBytes_LEN( b ) );
+    if( yp_isexceptionC( copy ) ) return copy;
+    memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
+    return copy;
+}
+
+static ypObject *bytes_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) 
+{
+    ypObject *copy = _yp_bytes_new( ypBytes_LEN( b ) );
+    if( yp_isexceptionC( copy ) ) return copy;
+    memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
+    return copy;
+}
 
 static ypObject *bytes_bool( ypObject *b ) {
     return ypBool_FROM_C( ypBytes_LEN( b ) );
@@ -3997,8 +4060,8 @@ static ypTypeObject ypBytes_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    bytes_unfrozen_copy,            // tp_unfrozen_copy
+    bytes_frozen_copy,              // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -4080,8 +4143,8 @@ static ypTypeObject ypByteArray_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    bytes_unfrozen_copy,            // tp_unfrozen_copy
+    bytes_frozen_copy,              // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -4230,6 +4293,22 @@ static ypObject *_yp_chrarray_new( yp_ssize_t len )
 }
 
 
+static ypObject *str_unfrozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) 
+{
+    ypObject *copy = _yp_chrarray_new( ypStr_LEN( s ) );
+    if( yp_isexceptionC( copy ) ) return copy;
+    memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), ypStr_LEN( s ) );
+    return copy;
+}
+
+static ypObject *str_frozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) 
+{
+    ypObject *copy = _yp_str_new( ypStr_LEN( s ) );
+    if( yp_isexceptionC( copy ) ) return copy;
+    memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), ypStr_LEN( s ) );
+    return copy;
+}
+
 static ypObject *str_bool( ypObject *s ) {
     return ypBool_FROM_C( ypStr_LEN( s ) );
 }
@@ -4342,8 +4421,8 @@ static ypTypeObject ypStr_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    str_unfrozen_copy,              // tp_unfrozen_copy
+    str_frozen_copy,                // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -4425,8 +4504,8 @@ static ypTypeObject ypChrArray_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    str_unfrozen_copy,              // tp_unfrozen_copy
+    str_frozen_copy,                // tp_frozen_copy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
