@@ -903,6 +903,10 @@ ypAPI ypObject * const yp_s_ignore;    // "ignore"
 ypAPI ypObject * const yp_s_replace;   // "replace"
 
 // XXX Additional bytes- and str-specific methods will be added in a future version
+// TODO Not supported by bytes/bytearrays: str.encode str.format str.format_map str.isidentifier 
+// str.isnumeric str.isdecimal str.isprintable
+// TODO Not supported by str/chrarrays: decode, fromhex
+// TODO Different semantics between bytes and strs: translate, maketrans
 
 
 /*

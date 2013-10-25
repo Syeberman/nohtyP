@@ -16,6 +16,8 @@
 #include <Windows.h>
 #endif
 
+// TODO wrap Python's unittest module with a version that requires the args to be ypObjects
+
 
 /*************************************************************************************************
  * Static assertions for nohtyP.h
