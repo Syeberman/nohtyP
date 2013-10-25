@@ -278,6 +278,14 @@ class DictTest(unittest.TestCase):
         d = yp_dict(zip(range(6), range(6)))
         self.assertEqual(yp_dict.fromkeys(d, 0), yp_dict(zip(range(6), [0]*6)))
 
+        class baddict3(yp_dict):
+            def __new__(cls):
+                return d
+        d = yp_dict({i : i for i in range(10)})
+        res = d.copy()
+        res.update(a=None, b=None, c=None)
+        self.assertEqual(baddict3.fromkeys({"a", "b", "c"}), res)
+
     def test_copy(self):
         d = yp_dict({1:1, 2:2, 3:3})
         self.assertEqual(d.copy(), yp_dict({1:1, 2:2, 3:3}))
