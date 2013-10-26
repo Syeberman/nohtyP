@@ -3528,7 +3528,7 @@ static void _ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssi
 
 // Used to remove elements from an array containing length elements, each of elemsize bytes.
 // start, stop, step, and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC,
-// and slicelength must be >0 (slicelength==0 is a no-op).  Any references in the removed elements 
+// and slicelength must be >0 (slicelength==0 is a no-op).  Any references in the removed elements
 // must have already been discarded.
 static void _ypSlice_delslice_memmove( void *array, yp_ssize_t length, yp_ssize_t elemsize,
         yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength )
@@ -3593,70 +3593,61 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 typedef struct _ypBytesObject ypBytesObject;
 yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
-#define ypBytes_DATA( b ) ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
+#define ypBytes_DATA( b )       ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
 // TODO what if ob_len is the "invalid" value?
-#define ypBytes_LEN( b )  ( ((ypObject *)b)->ob_len )
+#define ypBytes_LEN( b )        ( ((ypObject *)b)->ob_len )
+#define ypBytes_ALLOCLEN( b )   ( ((ypObject *)b)->ob_alloclen )
 
-// TODO _yp_bytes_empty (remember NULL terminator)
+// Empty bytes can be represented by this, immortal object
+// TODO Can we use this in more places...anywhere we'd return a possibly-empty bytes?
+static ypBytesObject _yp_bytes_empty_struct = {
+    { ypBytes_CODE, ypObject_REFCNT_IMMORTAL,
+    0, 0, ypObject_HASH_INVALID, "" } };
+static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 
-// Return a new bytes object with uninitialized data of the given length, or an exception
-static ypObject *_yp_bytes_new( yp_ssize_t len )
-{
-    ypObject *b;
-    if( len < 0 ) len = 0; // TODO return a new ref to an immortal b'' object
-    b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, ypBytes_CODE, len+1 );
-    if( yp_isexceptionC( b ) ) return b;
-    ypBytes_DATA( b )[len] = '\0';
-    ypBytes_LEN( b ) = len;
-    return b;
-}
+// Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or 
+// inserting bytes (the new space is uninitialized).  Assumes enough space is allocated for the 
+// move.  Recall that memmove handles overlap.
+#define ypBytes_ELEMMOVE( b, dest, src ) \
+    memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src) );
 
-// Return a new bytearray object with uninitialized data of the given length, or an exception
+// Return a new bytes/bytearray object with the given alloclen.  If type is immutable and
+// alloclen_fixed is true (indicating the object will never grow), the data is placed inline with
+// one allocation.
+// XXX Remember that alloclen should account for the null terminator; also remember to add that
+// null terminator
+// TODO Put protection in place to detect when INLINE objects attempt to be resized
+// TODO Extend alloclen_fixed to other areas
 // TODO Over-allocate to avoid future resizings
-static ypObject *_yp_bytearray_new( yp_ssize_t len )
+static ypObject *_ypBytes_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
 {
     ypObject *b;
-    if( len < 0 ) len = 0;
-    b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, ypByteArray_CODE, len+1, 0 );
+    if( type == ypBytes_CODE && alloclen_fixed ) {
+        if( alloclen < 1+1 ) return _yp_bytes_empty;
+        b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, alloclen+1 );
+    } else {
+        b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, alloclen+1, 0 );
+    }
     if( yp_isexceptionC( b ) ) return b;
-    ypBytes_DATA( b )[len] = '\0';
-    ypBytes_LEN( b ) = len;
     return b;
 }
 
-// Return a new bytes or bytearray object (depending on b) with uninitialzed data of the given
-// length, or an exception
-static ypObject *_ypBytes_new_sametype( ypObject *b, yp_ssize_t len )
+// XXX Check for the possiblity of a lazy shallow copy before calling this function
+static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
 {
-    if( ypObject_IS_MUTABLE( b ) ) {
-        return _yp_bytearray_new( len );
-    } else {
-        return _yp_bytes_new( len );
-    }
+    ypObject *copy = _ypBytes_new( type, ypBytes_LEN( b )+1, alloclen_fixed );
+    if( yp_isexceptionC( copy ) ) return copy;
+    memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b )+1 );
+    ypBytes_LEN( copy ) = ypBytes_LEN( b );
+    return copy;
 }
 
-// Returns a copy of the bytes or bytearray object; the new object will have the given length. If
-// len is less than ypBytes_LEN( b ), data is truncated; if equal, returns an exact copy; if
-// greater, extra bytes are uninitialized.
-static ypObject *_ypBytes_copy( ypObject *b, yp_ssize_t len )
+// Shrinks or grows the bytearray; if shrinking, ensure length is updated
+// XXX Remember that required should account for the null terminator
+// XXX Check alloclen first to avoid unnecessary resizes
+static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t required, yp_ssize_t extra )
 {
-    ypObject *newB = _ypBytes_new_sametype( b, len );
-    if( yp_isexceptionC( newB ) ) return newB;
-    memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), MIN( len, ypBytes_LEN( b ) ) );
-    return newB;
-}
-
-// Shrinks or grows the bytearray; any new bytes are uninitialized.  Returns yp_None on success,
-// exception on error.
-// XXX Unlike other "resize" functions, this one updates ypBytes_LEN (TODO standardize?)
-// TODO over-allocate as appropriate
-static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t newLen )
-{
-    ypObject *result = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, 0 );
-    if( yp_isexceptionC( result ) ) return result;
-    ypBytes_DATA( b )[newLen] = '\0';
-    ypBytes_LEN( b ) = newLen;
-    return yp_None;
+    return ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, required, extra );
 }
 
 // If x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
@@ -3704,20 +3695,17 @@ static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssi
 }
 
 
-static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) 
-{
-    ypObject *copy = _yp_bytearray_new( ypBytes_LEN( b ) );
-    if( yp_isexceptionC( copy ) ) return copy;
-    memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
-    return copy;
+static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypBytes_copy( ypByteArray_CODE, b, TRUE );
 }
 
-static ypObject *bytes_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) 
+static ypObject *bytes_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo )
 {
-    ypObject *copy = _yp_bytes_new( ypBytes_LEN( b ) );
-    if( yp_isexceptionC( copy ) ) return copy;
-    memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
-    return copy;
+    // A shallow copy of a bytes to a bytes doesn't require an actual copy
+    if( copy_visitor == yp_shallowcopy_visitor && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) {
+        return yp_incref( b );
+    }
+    return _ypBytes_copy( ypBytes_CODE, b, TRUE );
 }
 
 static ypObject *bytes_bool( ypObject *b ) {
@@ -3770,32 +3758,44 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
 {
     yp_uint8_t *x_data;
     yp_ssize_t x_len;
+    yp_ssize_t newLen;
     ypObject *newB;
 
     _ypBytes_coerce_bytes( x, &x_data, &x_len );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
-    newB = _ypBytes_copy( b, ypBytes_LEN( b ) + x_len );
+    newLen = ypBytes_LEN( b ) + x_len;
+    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
+    memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
     memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), x_data, x_len );
+    ypBytes_DATA( newB )[newLen] = '\0';
+    ypBytes_LEN( newB ) = newLen;
     return newB;
 }
 
 // Returns yp_None or an exception
+// TODO over-allocate as appropriate
 static ypObject *bytearray_extend( ypObject *b, ypObject *x )
 {
     yp_uint8_t *x_data;
     yp_ssize_t x_len;
+    yp_ssize_t newLen;
     ypObject *result;
 
     _ypBytes_coerce_bytes( x, &x_data, &x_len );
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
-    result = _ypBytes_resize( b, ypBytes_LEN( b ) + x_len );
-    if( yp_isexceptionC( result ) ) return result;
+    newLen = ypBytes_LEN( b ) + x_len;
+    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+        result = _ypBytes_resize( b, newLen+1, 0 );
+        if( yp_isexceptionC( result ) ) return result;
+    }
 
     memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), x_data, x_len );
+    ypBytes_DATA( b )[newLen] = '\0';
+    ypBytes_LEN( b ) = newLen;
     return yp_None;
 }
 
@@ -3850,7 +3850,7 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &newLen );
     if( yp_isexceptionC( result ) ) return result;
 
-    newB = _ypBytes_new_sametype( b, newLen );
+    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
     if( step == 1 ) {
@@ -3861,6 +3861,8 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
             ypBytes_DATA( newB )[i] = ypBytes_DATA( b )[ypSlice_INDEX( start, step, i )];
         }
     }
+    ypBytes_DATA( newB )[newLen] = '\0';
+    ypBytes_LEN( newB ) = newLen;
     return newB;
 }
 
@@ -3884,24 +3886,27 @@ static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     if( yp_isexceptionC( result ) ) return result;
 
     if( step == 1 ) {
-        if( x_len > slicelength ) {
-            // bytearray is growing
-            yp_ssize_t growBy = x_len - slicelength;
-            yp_ssize_t oldLen = ypBytes_LEN( b );
-            result = _ypBytes_resize( b, oldLen + growBy );
-            if( yp_isexceptionC( result ) ) return result;
-            // memmove allows overlap
-            memmove( ypBytes_DATA( b )+stop+growBy, ypBytes_DATA( b )+stop, oldLen-stop );
-        } else if( x_len < slicelength ) {
-            // bytearray is shrinking
-            yp_ssize_t shrinkBy = slicelength - x_len;
-            // memmove allows overlap
-            memmove( ypBytes_DATA( b )+stop-shrinkBy, ypBytes_DATA( b )+stop,
-                    ypBytes_LEN( b )-stop );
-            ypBytes_LEN( b ) -= shrinkBy;
+        yp_ssize_t growBy = x_len - slicelength; // negative means array shrinking
+        yp_ssize_t newLen = ypBytes_LEN( b ) + growBy;
+
+        // Ensure there's enough space allocated; after this, failure is impossible
+        // FIXME The resize might have to copy data, _then_ we'll also do the ypBytes_ELEMMOVE,
+        // copying large amounts of data twice; optimize
+        // TODO Over-allocate
+        if( growBy > 0 ) {
+            if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+                result = _ypBytes_resize( b, newLen+1, 0 );
+                if( yp_isexceptionC( result ) ) return result;
+            }
         }
+
+        // Adjust remaining items
+        ypBytes_ELEMMOVE( b, stop+growBy, stop );
+
         // There are now x_len bytes starting at b[start] waiting for x_data
         memcpy( ypBytes_DATA( b )+start, x_data, x_len );
+        ypBytes_DATA( b )[newLen] = '\0';
+        ypBytes_LEN( b ) = newLen;
     } else {
         yp_ssize_t i;
         if( x_len != slicelength ) return yp_ValueError;
@@ -3923,7 +3928,7 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     if( yp_isexceptionC( result ) ) return result;
     if( slicelength < 1 ) return yp_None; // no-op
     // Add one to the length to include the hidden null-terminator
-    _ypSlice_delslice_memmove( ypBytes_DATA( b ), ypBytes_LEN( b )+1, 1, 
+    _ypSlice_delslice_memmove( ypBytes_DATA( b ), ypBytes_LEN( b )+1, 1,
             start, stop, step, slicelength );
     ypBytes_LEN( b ) -= slicelength;
     return yp_None;
@@ -4218,8 +4223,7 @@ ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *le
 
 // Public constructors
 
-static ypObject *_ypBytesC( ypObject *(*allocator)( yp_ssize_t ),
-    const yp_uint8_t *source, yp_ssize_t len )
+static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
 {
     ypObject *b;
 
@@ -4229,22 +4233,32 @@ static ypObject *_ypBytesC( ypObject *(*allocator)( yp_ssize_t ),
     } else {
         if( len < 0 ) len = strlen( (const char *) source );
     }
-    b = allocator( len );
+    b = _ypBytes_new( type, len+1, TRUE );
 
     // Initialize the data
     if( source == NULL ) {
-        memset( ypBytes_DATA( b ), 0, len );
+        memset( ypBytes_DATA( b ), 0, len+1 );
     } else {
         memcpy( ypBytes_DATA( b ), source, len );
+        ypBytes_DATA( b )[len] = '\0';
     }
+    ypBytes_LEN( b ) = len;
     return b;
 }
 ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len ) {
-    return _ypBytesC( _yp_bytes_new, source, len );
+    return _ypBytesC( ypBytes_CODE, source, len );
 }
 ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
-    return _ypBytesC( _yp_bytearray_new, source, len );
+    return _ypBytesC( ypByteArray_CODE, source, len );
 }
+
+/*
+static ypObject *_ypBytes( int type, const yp_uint8_t *source, yp_ssize_t len )
+{
+}
+ypObject *yp_bytes( ypObject *source );
+ypObject *yp_bytearray( ypObject *source );
+*/
 
 
 /*************************************************************************************************
@@ -4295,7 +4309,7 @@ static ypObject *_yp_chrarray_new( yp_ssize_t len )
 }
 
 
-static ypObject *str_unfrozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) 
+static ypObject *str_unfrozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo )
 {
     ypObject *copy = _yp_chrarray_new( ypStr_LEN( s ) );
     if( yp_isexceptionC( copy ) ) return copy;
@@ -4303,7 +4317,7 @@ static ypObject *str_unfrozen_copy( ypObject *s, visitfunc copy_visitor, void *c
     return copy;
 }
 
-static ypObject *str_frozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) 
+static ypObject *str_frozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo )
 {
     ypObject *copy = _yp_str_new( ypStr_LEN( s ) );
     if( yp_isexceptionC( copy ) ) return copy;
@@ -4711,6 +4725,7 @@ static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, v
 
 // Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded before calling.
 // Returns yp_None on success, exception on error.
+// TODO Ensure calling code first checks alloclen!
 static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t required, yp_ssize_t extra )
 {
     return ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
@@ -4755,7 +4770,7 @@ static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
         ypObject *result = _ypTuple_resize( sq, newLen, 0 );
         if( yp_isexceptionC( result ) ) return result;
     }
-    memcpy( ypTuple_ARRAY( sq )+ypTuple_LEN( sq ), ypTuple_ARRAY( x ), 
+    memcpy( ypTuple_ARRAY( sq )+ypTuple_LEN( sq ), ypTuple_ARRAY( x ),
             ypTuple_LEN( x )*sizeof( ypObject * ) );
     for( i = ypTuple_LEN( sq ); i < newLen; i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
     ypTuple_LEN( sq ) = newLen;
@@ -4800,7 +4815,7 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
 
 // XXX sq and x must _not_ be the same object (pass a copy of x if so)
 static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step );
-static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq, 
+static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
         yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x )
 {
     ypObject *result;
@@ -4820,11 +4835,11 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
         yp_ssize_t newLen = ypTuple_LEN( sq ) + growBy;
 
         // Ensure there's enough space allocated; after this, failure is impossible
-        // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE, 
+        // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE,
         // copying large amounts of data twice; optimize
         if( growBy > 0 ) {
             if( ypTuple_ALLOCLEN( sq ) < newLen ) {
-                ypObject *result = _ypTuple_resize( sq, newLen, 0 );
+                result = _ypTuple_resize( sq, newLen, 0 );
                 if( yp_isexceptionC( result ) ) return result;
             }
         }
@@ -4834,7 +4849,7 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
         ypTuple_ELEMMOVE( sq, stop+growBy, stop );
 
         // There are now ypTuple_LEN( x ) elements starting at sq[start] waiting for x's items
-        memcpy( ypTuple_ARRAY( sq )+start, ypTuple_ARRAY( x ), 
+        memcpy( ypTuple_ARRAY( sq )+start, ypTuple_ARRAY( x ),
             ypTuple_LEN( x )*sizeof( ypObject * ) );
         for( i = start; i < start+ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
         ypTuple_LEN( sq ) = newLen;
@@ -5074,7 +5089,7 @@ static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
     for( i = 0; i < slicelength; i++ ) {
         yp_decref( ypTuple_ARRAY( sq )[ypSlice_INDEX( start, step, i )] );
     }
-    _ypSlice_delslice_memmove( ypTuple_ARRAY( sq ), ypTuple_LEN( sq ), sizeof( ypObject * ), 
+    _ypSlice_delslice_memmove( ypTuple_ARRAY( sq ), ypTuple_LEN( sq ), sizeof( ypObject * ),
             start, stop, step, slicelength );
     ypTuple_LEN( sq ) -= slicelength;
     return yp_None;

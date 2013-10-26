@@ -356,6 +356,23 @@ ypAPI ypObject *yp_rangeC( yp_int_t stop );
 ypAPI ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len );
 ypAPI ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len );
 
+// Returns a new reference to a bytes/bytearray encoded from the given str or chrarray object.  The
+// Python-equivalent default for encoding is yp_s_utf_8, while for errors it is yp_s_strict.
+ypAPI ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors );
+ypAPI ypObject *yp_bytearray3( ypObject *source, ypObject *encoding, ypObject *errors );
+
+// Returns a new reference to a bytes/bytearray object, depending on the type of source:
+//  - integer: the array will have that size and be initialized with null bytes
+//  - iterable: it must be an iterable of integers in range(256) used to initialize the array (this
+//  includes bytes and bytearray objects)
+// Use yp_bytes3 if source is a string; nohtyP does not currently support a "buffer interface".
+ypAPI ypObject *yp_bytes( ypObject *source );
+ypAPI ypObject *yp_bytearray( ypObject *source );
+
+// Returns a new reference to an empty bytes/bytearray.
+ypAPI ypObject *yp_bytes0( void );
+ypAPI ypObject *yp_bytearray0( void );
+
 // Returns a new reference to a str/chrarray decoded from the given bytes.  source and len are as
 // in yp_bytesC.  The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
 // ascii-encoded source), while for errors it is yp_s_strict.  Equivalent to:
