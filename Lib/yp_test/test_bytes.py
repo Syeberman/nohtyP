@@ -1163,6 +1163,7 @@ class AssortedBytesTest(unittest.TestCase):
         self.assertEqual(yp_bytes(b"abc") < b"ab", False)
         self.assertEqual(yp_bytes(b"abc") <= b"ab", False)
 
+    @unittest.skip("Not applicable to nohtyP")
     @yp_test.support.requires_docstrings
     def test_doc(self):
         self.assertIsNotNone(yp_bytearray.__doc__)

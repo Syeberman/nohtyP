@@ -1213,19 +1213,30 @@ class yp_float( ypObject ):
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
-@pytype( bytes, 16 )
-class yp_bytes( ypObject ):
+class _ypBytes( ypObject ):
     def __new__( cls, source=0, encoding=None, errors=None ):
-        if isinstance( source, (bytes, bytearray) ):
-            return _yp_bytesC( source, len( source ) )
+        if isinstance( source, (yp_bytes, yp_bytearray) ):
+            raise NotImplementedError
+        elif isinstance( source, (bytes, bytearray) ):
+            return cls._yp_constructor( source, len( source ) )
         elif isinstance( source, str ):
             raise NotImplementedError
         elif isinstance( source, (int, yp_int) ):
-            return _yp_bytesC( None, source )
+            return cls._yp_constructor( None, source )
         # else if it has the buffer interface
         # else if it is an iterable
         else:
             raise TypeError( type( source ) )
+
+@pytype( bytes, 16 )
+class yp_bytes( _ypBytes ):
+    _yp_constructor = _yp_bytesC
+
+# FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
+# FIXME Just generally move more of this logic into nohtyP, when available
+@pytype( bytearray, 17 )
+class yp_bytearray( _ypBytes ):
+    _yp_constructor = _yp_bytearrayC
 
 # FIXME When nohtyP has types that have string representations, update this
 # FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
