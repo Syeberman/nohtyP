@@ -3623,7 +3623,7 @@ static ypObject *_ypBytes_new( int type, yp_ssize_t alloclen, int alloclen_fixed
 {
     ypObject *b;
     if( type == ypBytes_CODE && alloclen_fixed ) {
-        if( alloclen < 1+1 ) return _yp_bytes_empty;
+        if( alloclen < 1+1 ) return _yp_bytes_empty; // FIXME is this safe everywhere??
         b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, alloclen+1 );
     } else {
         b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, alloclen+1, 0 );
@@ -4252,13 +4252,29 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
     return _ypBytesC( ypByteArray_CODE, source, len );
 }
 
-/*
-static ypObject *_ypBytes( int type, const yp_uint8_t *source, yp_ssize_t len )
+static ypObject *_ypBytes( int type, ypObject *source )
 {
+    ypObject *exc = yp_None;
+    int source_pair = ypObject_TYPE_PAIR_CODE( source );
+
+    if( source_pair == ypBytes_CODE ) {
+        if( ypObject_TYPE_CODE( source ) == ypBytes_CODE ) return yp_incref( source );
+        return _ypBytes_copy( type, source, TRUE );
+    } else if( source_pair == ypInt_CODE ) {
+        yp_ssize_t len = yp_asssizeC( source, &exc );
+        if( yp_isexceptionC( exc ) ) return exc;
+        return _ypBytesC( type, NULL, len );
+    } else {
+        // TODO Handle a generic iterator
+        return yp_NotImplementedError;
+    }
 }
-ypObject *yp_bytes( ypObject *source );
-ypObject *yp_bytearray( ypObject *source );
-*/
+ypObject *yp_bytes( ypObject *source ) {
+    return _ypBytes( ypBytes_CODE, source );
+}
+ypObject *yp_bytearray( ypObject *source ) {
+    return _ypBytes( ypByteArray_CODE, source );
+}
 
 
 /*************************************************************************************************
