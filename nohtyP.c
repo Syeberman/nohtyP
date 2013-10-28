@@ -3605,8 +3605,8 @@ static ypBytesObject _yp_bytes_empty_struct = {
     0, 0, ypObject_HASH_INVALID, "" } };
 static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 
-// Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or 
-// inserting bytes (the new space is uninitialized).  Assumes enough space is allocated for the 
+// Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or
+// inserting bytes (the new space is uninitialized).  Assumes enough space is allocated for the
 // move.  Recall that memmove handles overlap.
 #define ypBytes_ELEMMOVE( b, dest, src ) \
     memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src) );
@@ -3657,7 +3657,7 @@ static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
     yp_int_t asint;
     yp_uint8_t retval;
 
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x ); 
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x );
     asint = yp_asintC( x, exc );
     retval = (yp_uint8_t) (asint & 0xFFu);
     if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_ValueError );
@@ -3683,9 +3683,9 @@ static void _ypBytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t 
 }
 
 // If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
-// x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
+// x is a fellow bytes, set *x_data and *x_len.  Otherwise, returns an exception.
 // TODO After support added for generic iterators, see if this can be removed
-static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
+static ypObject *_ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
         yp_uint8_t *storage )
 {
     ypObject *exc = yp_None;
@@ -3693,24 +3693,21 @@ static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssi
 
     if( x_pair == ypBool_CODE || x_pair == ypInt_CODE ) {
         *storage = _ypBytes_asuint8C( x, &exc );
-        if( !yp_isexceptionC( exc ) ) {
-            *x_data = storage;
-            *x_len = 1;
-            return;
-        }
+        if( yp_isexceptionC( exc ) ) return exc;
+        *x_data = storage;
+        *x_len = 1;
+        return yp_None;
     } else if( x_pair == ypBytes_CODE ) {
         *x_data = ypBytes_DATA( x );
         *x_len = ypBytes_LEN( x );
-        return;
+        return yp_None;
+    } else {
+        return_yp_BAD_TYPE( x );
     }
-
-    *x_data = NULL;
-    *x_len = 0;
-    return;
 }
 
 // Used by tp_repeat et al to perform the necessary memcpy's.  b's array must be allocated
-// to hold (factor*n)+1 bytes, and the bytes to repeat must be in the first n elements of the array.  
+// to hold (factor*n)+1 bytes, and the bytes to repeat must be in the first n elements of the array.
 // Further, factor and n must both be greater than zero.  Null-terminates the result.  Cannot fail.
 static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
 {
@@ -3724,14 +3721,14 @@ static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
 }
 
 // growhint is the number of additional items, not including x, that are expected to be added to b
-// XXX Does _not_ write out the null-terminator; do "b[len(b)]=0" when this returns 
+// XXX Does _not_ write out the null-terminator; do "b[len(b)]=0" when this returns
 static ypObject *_ypBytes_push( ypObject *b, ypObject *x, yp_ssize_t growhint )
 {
     ypObject *exc = yp_None;
     yp_ssize_t newLen = ypBytes_LEN( b ) + 1;
     ypObject *result;
     yp_uint8_t x_asbyte;
-    
+
     x_asbyte = _ypBytes_asuint8C( x, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
 
@@ -3832,8 +3829,8 @@ static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssiz
     yp_ssize_t b_rlen;     // remaining length
     yp_uint8_t *b_rdata;   // remaining data
 
-    _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
-    if( x_data == NULL ) return_yp_BAD_TYPE( x );
+    result = _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
+    if( yp_isexceptionC( result ) ) return result;
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
     if( yp_isexceptionC( result ) ) return result;
@@ -3848,17 +3845,6 @@ static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssiz
     }
     *i = -1;
     return yp_None;
-}
-
-// Returns yp_True, yp_False, or an exception
-static ypObject *bytes_contains( ypObject *b, ypObject *x )
-{
-    ypObject *result;
-    yp_ssize_t i = -1;
-
-    result = bytes_find( b, x, 0, yp_SLICE_USELEN, &i );
-    if( yp_isexceptionC( result ) ) return result;
-    return ypBool_FROM_C( i >= 0 );
 }
 
 // Returns new reference or an exception
@@ -4065,10 +4051,20 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
     newLen = ypBytes_LEN( b ) * factor;
     result = _ypBytes_resize( b, newLen+1, 0 );
     if( yp_isexceptionC( result ) ) return result;
-    
+
     _ypBytes_repeat_memcpy( b, factor, ypBytes_LEN( b ) );
     ypBytes_LEN( b ) = newLen;
     return yp_None;
+}
+
+static ypObject *bytes_contains( ypObject *b, ypObject *x )
+{
+    ypObject *result;
+    yp_ssize_t i = -1;
+
+    result = bytes_find( b, x, 0, yp_SLICE_USELEN, &i );
+    if( yp_isexceptionC( result ) ) return result;
+    return ypBool_FROM_C( i >= 0 );
 }
 
 static ypObject *bytes_len( ypObject *b, yp_ssize_t *len )
@@ -4103,8 +4099,8 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
     yp_ssize_t b_rlen;     // remaining length
     yp_uint8_t *b_rdata;   // remaining data
 
-    _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
-    if( x_data == NULL ) return_yp_BAD_TYPE( x );
+    result = _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
+    if( yp_isexceptionC( result ) ) return result;
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
     if( yp_isexceptionC( result ) ) return result;
@@ -4244,7 +4240,7 @@ static ypTypeObject ypBytes_Type = {
     TypeError_objobjproc,           // tp_send
 
     // Container operations
-    MethodError_objobjproc,         // tp_contains
+    bytes_contains,                 // tp_contains
     bytes_len,                      // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
@@ -4327,7 +4323,7 @@ static ypTypeObject ypByteArray_Type = {
     TypeError_objobjproc,           // tp_send
 
     // Container operations
-    MethodError_objobjproc,         // tp_contains
+    bytes_contains,                 // tp_contains
     bytes_len,                      // tp_len
     bytearray_push,                 // tp_push
     bytearray_clear,                // tp_clear
@@ -8608,7 +8604,7 @@ ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t
     // remains allocated and isn't modified.  As such, limit this function to those containers that
     // we *know* will keep the object allocated (so long as _they_ aren't modified, of course).
     if( container_pair != ypTuple_CODE && container_pair != ypFrozenDict_CODE ) {
-        return yp_TypeError;
+        return_yp_BAD_TYPE( container );
     }
 
     x = yp_getitem( container, key );
