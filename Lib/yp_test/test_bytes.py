@@ -573,9 +573,9 @@ class BaseBytesTest:
         self.assertEqual(b.rstrip(), b' \t\n\r\f\vabc')
 
     def test_strip_bytearray(self):
-        self.assertEqual(self.type2test(b'abc').strip(memoryview(b'ac')), b'b')
-        self.assertEqual(self.type2test(b'abc').lstrip(memoryview(b'ac')), b'bc')
-        self.assertEqual(self.type2test(b'abc').rstrip(memoryview(b'ac')), b'ab')
+        self.assertEqual(self.type2test(b'abc').strip(b'ac'), b'b')
+        self.assertEqual(self.type2test(b'abc').lstrip(b'ac'), b'bc')
+        self.assertEqual(self.type2test(b'abc').rstrip(b'ac'), b'ab')
 
     def test_strip_string_error(self):
         self.assertRaises(TypeError, self.type2test(b'abc').strip, 'b')
@@ -885,7 +885,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         b[3:] = b'foo'
         self.assertEqual(b, yp_bytearray([0, 1, 2, 102, 111, 111]))
 
-        b[:3] = memoryview(b'foo')
+        b[:3] = b'foo'
         self.assertEqual(b, yp_bytearray([102, 111, 111, 102, 111, 111]))
 
         b[3:4] = []
@@ -1085,6 +1085,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(b, b"")
         self.assertEqual(c, b"")
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_resize_forbidden(self):
         # #4509: can't resize a bytearray when there are buffer exports, even
         # if it wouldn't reallocate the underlying buffer.
@@ -1173,7 +1174,7 @@ class AssortedBytesTest(unittest.TestCase):
 
     def test_from_bytearray(self):
         sample = yp_bytes(b"Hello world\n\x80\x81\xfe\xff")
-        buf = memoryview(sample)
+        buf = sample._asbytes( )
         b = yp_bytearray(buf)
         self.assertEqual(b, yp_bytearray(sample))
 
@@ -1218,10 +1219,10 @@ class AssortedBytesTest(unittest.TestCase):
         self.assertRaises(TypeError, ba.translate, None, None)
 
     def test_split_bytearray(self):
-        self.assertEqual(b'a b'.split(memoryview(b' ')), [b'a', b'b'])
+        self.assertEqual(b'a b'.split(b' '), [b'a', b'b'])
 
     def test_rsplit_bytearray(self):
-        self.assertEqual(b'a b'.rsplit(memoryview(b' ')), [b'a', b'b'])
+        self.assertEqual(b'a b'.rsplit(b' '), [b'a', b'b'])
 
     def test_return_self(self):
         # bytearray.replace must always return a new bytearray
