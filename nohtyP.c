@@ -8320,7 +8320,8 @@ ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssiz
     _yp_REDIRECT2( sequence, tp_as_sequence, tp_getslice, (sequence, i, j, k) );
 }
 
-yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) {
+yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) 
+{
     yp_ssize_t index;
     ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_find(
             sequence, x, i, j, &index );
@@ -8334,7 +8335,8 @@ yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc ) {
     return yp_findC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
-yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) {
+yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) 
+{
     ypObject *subexc = yp_None;
     yp_ssize_t result = yp_findC4( sequence, x, i, j, &subexc );
     if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( -1, exc, subexc );
@@ -8346,14 +8348,20 @@ yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc ) {
     return yp_indexC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
-yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+        ypObject **exc ) 
+{
     yp_ssize_t count;
     ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_count(
-            sequence, x, 0, yp_SLICE_USELEN, &count );
+            sequence, x, i, j, &count );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
     // TODO make this a debug-only check?
     if( count < 0 ) return_yp_CEXC_ERR( 0, exc, yp_SystemError );
     return count;
+}
+
+yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+    return yp_countC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
 void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x ) {
