@@ -3645,13 +3645,23 @@ static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
 // Shrinks or grows the bytearray; if shrinking, ensure length is updated
 // XXX Remember that required should account for the null terminator
 // XXX Check alloclen first to avoid unnecessary resizes
+// TODO Split this into grow and shrink functions (here and elsewhere) that check alloclen
 static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t required, yp_ssize_t extra )
 {
     return ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, required, extra );
 }
 
+// As yp_asuint8C, but raises yp_ValueError when value out of range
+static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
+    yp_int_t asint = yp_asintC( x, exc );
+    yp_uint8_t retval = (yp_uint8_t) asint;
+    if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_ValueError );
+    return retval;
+}
+
 // If x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
 // TODO note http://bugs.python.org/issue12170 and ensure we stay consistent
+// TODO After support added for generic iterators, see if this can be removed
 static void _ypBytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
@@ -3669,16 +3679,16 @@ static void _ypBytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t 
 
 // If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
 // x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
-// TODO: to be correct, ValueError should be raised when int out of range(256)
+// TODO After support added for generic iterators, see if this can be removed
 static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
         yp_uint8_t *storage )
 {
-    ypObject *result;
+    ypObject *exc = yp_None;
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
 
     if( x_pair == ypBool_CODE || x_pair == ypInt_CODE ) {
-        *storage = yp_asuint8C( x, &result );
-        if( !yp_isexceptionC( result ) ) {
+        *storage = _ypBytes_asuint8C( x, &exc );
+        if( !yp_isexceptionC( exc ) ) {
             *x_data = storage;
             *x_len = 1;
             return;
@@ -3694,6 +3704,84 @@ static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssi
     return;
 }
 
+// growhint is the number of additional items, not including x, that are expected to be added to b
+// XXX Does _not_ write out the null-terminator; do "b[len(b)]=0" when this returns 
+static ypObject *_ypBytes_push( ypObject *b, ypObject *x, yp_ssize_t growhint )
+{
+    ypObject *exc = yp_None;
+    yp_ssize_t newLen = ypBytes_LEN( b ) + 1;
+    ypObject *result;
+    yp_uint8_t x_asbyte;
+    
+    x_asbyte = _ypBytes_asuint8C( x, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+
+    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+        if( growhint < 0 ) growhint = 0;
+        result = _ypBytes_resize( b, newLen+1, growhint );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    ypBytes_DATA( b )[ypBytes_LEN( b )] = x_asbyte;
+    ypBytes_LEN( b ) = newLen;
+    return yp_None;
+}
+
+// Extends b with the contents of x, a fellow byte object; always writes the null-terminator
+// TODO over-allocate as appropriate
+static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
+{
+    ypObject *result;
+    yp_ssize_t newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
+    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+        result = _ypBytes_resize( b, newLen+1, 0 );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
+    ypBytes_DATA( b )[newLen] = '\0';
+    ypBytes_LEN( b ) = newLen;
+    return yp_None;
+}
+
+// XXX Does _not_ write out the null-terminator; do "b[len(b)]=0" when this returns (even on error)
+static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64_t *mi_state )
+{
+    ypObject *exc = yp_None;
+    ypObject *x;
+    ypObject *result;
+    yp_ssize_t lenhint = yp_miniiter_lenhintC( mi, mi_state, &exc ); // zero on error
+
+    while( 1 ) {
+        x = yp_miniiter_next( mi, mi_state ); // new ref
+        if( yp_isexceptionC( x ) ) {
+            if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
+            return x;
+        }
+        lenhint -= 1; // check for <0 only when we need it in _ypBytes_push
+        result = _ypBytes_push( b, x, lenhint );
+        yp_decref( x );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    return yp_None;
+}
+
+// Extends b with the contents of x; always writes the null-terminator
+static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
+{
+    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypBytes_CODE ) {
+        return _ypBytes_extend_from_bytes( b, iterable );
+    } else {
+        ypObject *result;
+        yp_uint64_t mi_state;
+        ypObject *mi = yp_miniiter( iterable, &mi_state ); // new ref
+        if( yp_isexceptionC( mi ) ) return mi;
+        result = _ypBytes_extend_from_iter( b, mi, &mi_state );
+        ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0'; // up to us to add null-terminator
+        yp_decref( mi );
+        return result;
+    }
+}
+
+// Public Methods
 
 static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
     return _ypBytes_copy( ypByteArray_CODE, b, TRUE );
@@ -3765,7 +3853,7 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     newLen = ypBytes_LEN( b ) + x_len;
-    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, TRUE );
+    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
@@ -3775,29 +3863,7 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     return newB;
 }
 
-// Returns yp_None or an exception
-// TODO over-allocate as appropriate
-static ypObject *bytearray_extend( ypObject *b, ypObject *x )
-{
-    yp_uint8_t *x_data;
-    yp_ssize_t x_len;
-    yp_ssize_t newLen;
-    ypObject *result;
-
-    _ypBytes_coerce_bytes( x, &x_data, &x_len );
-    if( x_data == NULL ) return_yp_BAD_TYPE( x );
-
-    newLen = ypBytes_LEN( b ) + x_len;
-    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
-        result = _ypBytes_resize( b, newLen+1, 0 );
-        if( yp_isexceptionC( result ) ) return result;
-    }
-
-    memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), x_data, x_len );
-    ypBytes_DATA( b )[newLen] = '\0';
-    ypBytes_LEN( b ) = newLen;
-    return yp_None;
-}
+#define bytearray_extend _ypBytes_extend
 
 // TODO bytes_repeat
 // TODO bytes_irepeat
@@ -3813,11 +3879,12 @@ static ypObject *bytes_getindex( ypObject *b, yp_ssize_t i )
 // Returns yp_None or an exception
 static ypObject *bytearray_setindex( ypObject *b, yp_ssize_t i, ypObject *x )
 {
-    ypObject *result = yp_None;
+    ypObject *exc = yp_None;
+    ypObject *result;
     yp_uint8_t x_value;
 
-    x_value = yp_asuint8C( x, &result );
-    if( yp_isexceptionC( result ) ) return result;
+    x_value = _ypBytes_asuint8C( x, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
 
     result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
     if( yp_isexceptionC( result ) ) return result;
@@ -3850,7 +3917,7 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &newLen );
     if( yp_isexceptionC( result ) ) return result;
 
-    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, TRUE );
+    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
     if( step == 1 ) {
@@ -4233,7 +4300,7 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
     } else {
         if( len < 0 ) len = strlen( (const char *) source );
     }
-    b = _ypBytes_new( type, len+1, TRUE );
+    b = _ypBytes_new( type, len+1, /*alloclen_fixed=*/TRUE );
 
     // Initialize the data
     if( source == NULL ) {
@@ -4265,8 +4332,28 @@ static ypObject *_ypBytes( int type, ypObject *source )
         if( yp_isexceptionC( exc ) ) return exc;
         return _ypBytesC( type, NULL, len );
     } else {
-        // TODO Handle a generic iterator
-        return yp_NotImplementedError;
+        // Treat it as a generic iterator
+        ypObject *newB;
+        ypObject *result;
+        yp_ssize_t lenhint = yp_lenC( source, &exc );
+        if( yp_isexceptionC( exc ) ) {
+            // Ignore errors determining lenhint; it just means we can't pre-allocate
+            lenhint = yp_iter_lenhintC( source, &exc );
+        } else if( lenhint == 0 ) {
+            // yp_lenC reports an empty iterable, so we can shortcut _ypBytes_extend
+            newB = _ypBytes_new( type, 0+1, /*alloclen_fixed=*/TRUE );
+            ypBytes_DATA( newB )[0] = '\0';
+            return newB;
+        }
+
+        newB = _ypBytes_new( type, lenhint+1, /*alloclen_fixed=*/FALSE );
+        if( yp_isexceptionC( newB ) ) return newB;
+        result = _ypBytes_extend( newB, source );
+        if( yp_isexceptionC( result ) ) {
+            yp_decref( newB );
+            return result;
+        }
+        return newB;
     }
 }
 ypObject *yp_bytes( ypObject *source ) {
@@ -4715,7 +4802,7 @@ static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen ) {
     return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, type, alloclen, 0 );
 }
 
-// TODO Ensure shallow copies are efficient
+// TODO Ensure shallow copies are efficient (memcpy, etc)
 // TODO Shallow copies of tuples to tuples can just return incref( x )...where to handle?
 static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
 {
@@ -5515,6 +5602,7 @@ static ypTypeObject ypList_Type = {
 // Constructors
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+// TODO iterble may be a fellow tuple, which we could copy more efficiently
 static ypObject *_ypTuple( int type, ypObject *iterable )
 {
     ypObject *exc = yp_None;

@@ -1247,6 +1247,9 @@ class _ypBytes( ypObject ):
 class yp_bytes( _ypBytes ):
     _ypBytes_constructorC = _yp_bytesC
     _ypBytes_constructor = _yp_bytes
+    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    def __str__( self ): return str( self._asbytes( ) )
+    __repr__ = __str__
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
@@ -1254,6 +1257,9 @@ class yp_bytes( _ypBytes ):
 class yp_bytearray( _ypBytes ):
     _ypBytes_constructorC = _yp_bytearrayC
     _ypBytes_constructor = _yp_bytearray
+    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    def __str__( self ): return "bytearray(%r)" % self._asbytes( )
+    __repr__ = __str__
 
 # FIXME When nohtyP has types that have string representations, update this
 # FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
