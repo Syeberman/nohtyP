@@ -3704,6 +3704,20 @@ static void _ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssi
     return;
 }
 
+// Used by tp_repeat et al to perform the necessary memcpy's.  b's array must be allocated
+// to hold (factor*n)+1 bytes, and the bytes to repeat must be in the first n elements of the array.  
+// Further, factor and n must both be greater than zero.  Null-terminates the result.  Cannot fail.
+static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
+{
+    yp_uint8_t *data = ypBytes_DATA( b );
+    size_t copied; // the number of times [:n] has been repeated (starts at 1, of course)
+    for( copied = 1; copied*2 < factor; copied *= 2 ) {
+        memcpy( data+(n*copied), data+0, n*copied );
+    }
+    memcpy( data+(n*copied), data+0, n*(factor-copied) ); // no-op if factor==copied
+    data[factor*n] = '\0';
+}
+
 // growhint is the number of additional items, not including x, that are expected to be added to b
 // XXX Does _not_ write out the null-terminator; do "b[len(b)]=0" when this returns 
 static ypObject *_ypBytes_push( ypObject *b, ypObject *x, yp_ssize_t growhint )
@@ -3863,10 +3877,35 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     return newB;
 }
 
-#define bytearray_extend _ypBytes_extend
+static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
+{
+    int b_type = ypObject_TYPE_CODE( b );
+    yp_ssize_t newLen;
+    ypObject *newB;
 
-// TODO bytes_repeat
-// TODO bytes_irepeat
+    if( b_type == ypBytes_CODE ) {
+        // If the result will be an empty array, return _yp_bytes_empty
+        if( ypBytes_LEN( b ) < 1 || factor < 1 ) return _yp_bytes_empty;
+        // If the result will be an exact copy, since we're immutable just return self
+        if( factor == 1 ) return yp_incref( b );
+    } else {
+        // If the result will be an empty list, return a new, empty list
+        if( ypBytes_LEN( b ) < 1 || factor < 1 ) {
+            return _ypBytes_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
+        }
+        // If the result will be an exact copy, let the code below make that copy
+    }
+
+    if( factor > yp_SSIZE_T_MAX / ypBytes_LEN( b ) ) return yp_MemoryError;
+    newLen = ypBytes_LEN( b ) * factor;
+    newB = _ypBytes_new( b_type, newLen+1, /*alloclen_fixed=*/TRUE ); // new ref
+    if( yp_isexceptionC( newB ) ) return newB;
+
+    memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
+    _ypBytes_repeat_memcpy( newB, factor, ypBytes_LEN( b ) );
+    ypBytes_LEN( newB ) = newLen;
+    return newB;
+}
 
 // Returns new reference or an exception
 static ypObject *bytes_getindex( ypObject *b, yp_ssize_t i )
@@ -4001,17 +4040,45 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     return yp_None;
 }
 
+// TODO bytes_getitem, setitem, delitem...need generic functions to redirect to getindexC et al
+
+#define bytearray_extend _ypBytes_extend
+
+static ypObject *bytearray_clear( ypObject *b );
+static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
+{
+    ypObject *result;
+    yp_ssize_t newLen;
+
+    if( ypBytes_LEN( b ) < 1 || factor == 1 ) return yp_None; // no-op
+    if( factor < 1 ) return bytearray_clear( b );
+
+    if( factor > yp_SSIZE_T_MAX / ypBytes_LEN( b ) ) return yp_MemoryError;
+    newLen = ypBytes_LEN( b ) * factor;
+    result = _ypBytes_resize( b, newLen+1, 0 );
+    if( yp_isexceptionC( result ) ) return result;
+    
+    _ypBytes_repeat_memcpy( b, factor, ypBytes_LEN( b ) );
+    ypBytes_LEN( b ) = newLen;
+    return yp_None;
+}
+
+static ypObject *bytes_len( ypObject *b, yp_ssize_t *len )
+{
+    *len = ypBytes_LEN( b );
+    return yp_None;
+}
+
 static ypObject *bytearray_push( ypObject *b, ypObject *x ) {
     // TODO over-allocate via growhint
     return _ypBytes_push( b, x, 0 );
 }
 
-// TODO bytes_getitem, setitem, delitem...need generic functions to redirect to getindexC et al
-
-// Returns yp_None or an exception
-static ypObject *bytes_len( ypObject *b, yp_ssize_t *len )
+// TODO If we're ever going to shrink allocated memory, clear is definitely one place to do it
+static ypObject *bytearray_clear( ypObject *b )
 {
-    *len = ypBytes_LEN( b );
+    ypBytes_DATA( b )[0] = '\0';
+    ypBytes_LEN( b ) = 0;
     return yp_None;
 }
 
@@ -4109,7 +4176,7 @@ static ypObject *bytes_dealloc( ypObject *b ) {
 
 static ypSequenceMethods ypBytes_as_sequence = {
     bytes_concat,                   // tp_concat
-    MethodError_objssizeproc,       // tp_repeat
+    bytes_repeat,                   // tp_repeat
     bytes_getindex,                 // tp_getindex
     bytes_getslice,                 // tp_getslice
     bytes_find,                     // tp_find
@@ -4191,8 +4258,8 @@ static ypTypeObject ypBytes_Type = {
 };
 
 static ypSequenceMethods ypByteArray_as_sequence = {
-    MethodError_objobjproc,         // tp_concat
-    MethodError_objssizeproc,       // tp_repeat
+    bytes_concat,                   // tp_concat
+    bytes_repeat,                   // tp_repeat
     bytes_getindex,                 // tp_getindex
     bytes_getslice,                 // tp_getslice
     bytes_find,                     // tp_find
@@ -4202,8 +4269,8 @@ static ypSequenceMethods ypByteArray_as_sequence = {
     bytearray_delindex,             // tp_delindex
     bytearray_delslice,             // tp_delslice
     bytearray_push,                 // tp_append
-    MethodError_objobjproc,         // tp_extend
-    MethodError_objssizeproc,       // tp_irepeat
+    bytearray_extend,               // tp_extend
+    bytearray_irepeat,              // tp_irepeat
     MethodError_objssizeobjproc,    // tp_insert
     MethodError_objssizeproc,       // tp_popindex
     MethodError_objproc,            // tp_reverse
@@ -4255,7 +4322,7 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_objobjproc,         // tp_contains
     bytes_len,                      // tp_len
     bytearray_push,                 // tp_push
-    MethodError_objproc,            // tp_clear
+    bytearray_clear,                // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjobjproc,      // tp_remove
     _ypSequence_getdefault,         // tp_getdefault
@@ -5391,6 +5458,7 @@ static ypObject *list_push( ypObject *sq, ypObject *x ) {
     return _ypTuple_push( sq, x, 0 );
 }
 
+// TODO If we're ever going to shrink allocated memory, clear is definitely one place to do it
 static ypObject *list_clear( ypObject *sq )
 {
     while( ypTuple_LEN( sq ) > 0 ) {
