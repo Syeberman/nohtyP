@@ -1242,6 +1242,12 @@ class _ypBytes( ypObject ):
         size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
         _yp_asbytesCX( self, data, size )
         return string_at( data.contents, size.contents )
+    
+    # nohtyP currently doesn't overload yp_add et al, but Python expects this
+    def __add__( self, other ): return _yp_concat( self, other )
+    def __mul__( self, factor ): return _yp_repeatC( self, factor )
+
+    def __rmul__( self, factor ): return _yp_repeatC( self, factor )
 
 @pytype( bytes, 16 )
 class yp_bytes( _ypBytes ):

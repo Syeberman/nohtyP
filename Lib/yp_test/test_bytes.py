@@ -585,6 +585,7 @@ class BaseBytesTest:
         self.assertRaises(TypeError, self.type2test(b'abc').lstrip, 'b')
         self.assertRaises(TypeError, self.type2test(b'abc').rstrip, 'b')
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_center(self):
         # Fill character can be either bytes or bytearray (issue 12380)
         b = self.type2test(b'abc')
@@ -592,6 +593,7 @@ class BaseBytesTest:
             self.assertEqual(b.center(7, fill_type(b'-')),
                              self.type2test(b'--abc--'))
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_ljust(self):
         # Fill character can be either bytes or bytearray (issue 12380)
         b = self.type2test(b'abc')
@@ -599,6 +601,7 @@ class BaseBytesTest:
             self.assertEqual(b.ljust(7, fill_type(b'-')),
                              self.type2test(b'abc----'))
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_rjust(self):
         # Fill character can be either bytes or bytearray (issue 12380)
         b = self.type2test(b'abc')
@@ -693,6 +696,7 @@ class BaseBytesTest:
 class BytesTest(BaseBytesTest, unittest.TestCase):
     type2test = yp_bytes
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_buffer_is_readonly(self):
         fd = os.dup(sys.stdin.fileno())
         with open(fd, "rb", buffering=0) as f:
@@ -744,6 +748,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
     def test_nohash(self):
         self.assertRaises(TypeError, hash, yp_bytearray())
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_bytearray_api(self):
         short_sample = yp_bytes(b"Hello world\n")
         sample = short_sample + yp_bytes(b"\0")*(20 - len(short_sample))
