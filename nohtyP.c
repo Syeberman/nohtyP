@@ -4001,6 +4001,11 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     return yp_None;
 }
 
+static ypObject *bytearray_push( ypObject *b, ypObject *x ) {
+    // TODO over-allocate via growhint
+    return _ypBytes_push( b, x, 0 );
+}
+
 // TODO bytes_getitem, setitem, delitem...need generic functions to redirect to getindexC et al
 
 // Returns yp_None or an exception
@@ -4196,7 +4201,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
     bytearray_setslice,             // tp_setslice
     bytearray_delindex,             // tp_delindex
     bytearray_delslice,             // tp_delslice
-    MethodError_objobjproc,         // tp_append
+    bytearray_push,                 // tp_append
     MethodError_objobjproc,         // tp_extend
     MethodError_objssizeproc,       // tp_irepeat
     MethodError_objssizeobjproc,    // tp_insert
@@ -4249,7 +4254,7 @@ static ypTypeObject ypByteArray_Type = {
     // Container operations
     MethodError_objobjproc,         // tp_contains
     bytes_len,                      // tp_len
-    MethodError_objobjproc,         // tp_push
+    bytearray_push,                 // tp_push
     MethodError_objproc,            // tp_clear
     MethodError_objproc,            // tp_pop
     MethodError_objobjobjproc,      // tp_remove
