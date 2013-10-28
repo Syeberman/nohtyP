@@ -657,8 +657,13 @@ ypAPI yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_s
         ypObject **exc );
 ypAPI yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
 
-// Returns the total number of non-overlapping occurences of x in sequence.  Returns 0 and sets
-// *exc on error.
+// Returns the total number of non-overlapping occurences of x in sequence[i:j].  Returns 0 and 
+// sets *exc on error.  As in Python, types such as tuples inspect only one item at a time,
+// while types such as strs look for a particular sub-sequence of items.
+ypAPI yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+        ypObject **exc );
+
+// Equivalent to yp_countC4( sequence, x, 0, yp_SLICE_USELEN, exc ).
 ypAPI yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc );
 
 // Sets the i-th item of *sequence, origin zero, to x.  Negative indicies are handled as in

@@ -491,6 +491,8 @@ yp_func( c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
 
 # yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_findC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+    (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
 
 # yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc );
 
@@ -500,9 +502,12 @@ yp_func( c_yp_ssize_t, "yp_indexC4", ((c_ypObject_p, "sequence"), (c_ypObject_p,
     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
 # yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
 
+# yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+#        ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_countC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+    (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
+
 # yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc );
-yp_func( c_yp_ssize_t, "yp_countC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"), 
-    c_ypObject_pp_exc) )
 
 # void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 
@@ -972,7 +977,7 @@ class ypObject( c_ypObject_p ):
     def pop( self ): return _yp_pop( self )
 
     def index( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_indexC4( self, x, i, j, yp_None )
-    def count( self, x ): return _yp_countC( self, x, yp_None )
+    def count( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_countC4( self, x, i, j, yp_None )
     def append( self, x ): _yp_append( self, x )
     def extend( self, t ): _yp_extend( self, _yp_iterable( t ) )
     def insert( self, i, x ): _yp_insertC( self, i, x )
