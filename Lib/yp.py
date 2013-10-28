@@ -842,6 +842,8 @@ yp_func( c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 
 
 # ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
+yp_func( c_ypObject_p, "yp_asbytesCX", ((c_ypObject_p, "seq"),
+    (c_char_pp, "bytes"), (c_yp_ssize_t_p, "len")) )
 
 # ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
 #        ypObject * *encoding );
@@ -1232,11 +1234,14 @@ class _ypBytes( ypObject ):
             return cls._ypBytes_constructor( source )
         elif isinstance( source, (bytes, bytearray) ):
             return cls._ypBytes_constructorC( source, len( source ) )
-        elif isinstance( source, memoryview ):
-            return cls._ypBytes_constructorC( source.tobytes( ), len( source ) )
         # else if it has the buffer interface
         else:
             return cls._ypBytes_constructor( _yp_iterable( source ) )
+    def _asbytes( self ):
+        data = c_char_pp( c_char_p( ) )
+        size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
+        _yp_asbytesCX( self, data, size )
+        return string_at( data.contents, size.contents )
 
 @pytype( bytes, 16 )
 class yp_bytes( _ypBytes ):
