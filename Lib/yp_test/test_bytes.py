@@ -104,6 +104,11 @@ class BaseBytesTest:
         self.assertRaises(TypeError, self.type2test, ["0"])
         self.assertRaises(TypeError, self.type2test, [0.0])
         self.assertRaises(TypeError, self.type2test, [None])
+
+    @unittest.skip("Not applicable to nohtyP")
+    def test_constructor_type_errors_user_type(self):
+        class C:
+            pass
         self.assertRaises(TypeError, self.type2test, [C()])
 
     def test_constructor_value_errors(self):

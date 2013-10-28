@@ -3652,10 +3652,14 @@ static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t required, yp_ssize_t e
     return ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, required, extra );
 }
 
-// As yp_asuint8C, but raises yp_ValueError when value out of range
+// As yp_asuint8C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
 static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
-    yp_int_t asint = yp_asintC( x, exc );
-    yp_uint8_t retval = (yp_uint8_t) asint;
+    yp_int_t asint;
+    yp_uint8_t retval;
+
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x ); 
+    asint = yp_asintC( x, exc );
+    retval = (yp_uint8_t) asint;
     if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_ValueError );
     return retval;
 }
