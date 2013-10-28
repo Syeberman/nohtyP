@@ -319,6 +319,17 @@ yp_func( c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")
 # ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len );
 yp_func( c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
 
+# ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors );
+# ypObject *yp_bytearray3( ypObject *source, ypObject *encoding, ypObject *errors );
+
+# ypObject *yp_bytes( ypObject *source );
+yp_func( c_ypObject_p, "yp_bytes", ((c_ypObject_p, "source"), ) )
+# ypObject *yp_bytearray( ypObject *source );
+yp_func( c_ypObject_p, "yp_bytearray", ((c_ypObject_p, "source"), ) )
+
+# ypObject *yp_bytes0( void );
+# ypObject *yp_bytearray0( void );
+
 # ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
 #         ypObject *encoding, ypObject *errors );
 yp_func( c_ypObject_p, "yp_str_frombytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
@@ -1215,28 +1226,29 @@ class yp_float( ypObject ):
 # FIXME Just generally move more of this logic into nohtyP, when available
 class _ypBytes( ypObject ):
     def __new__( cls, source=0, encoding=None, errors=None ):
-        if isinstance( source, (yp_bytes, yp_bytearray) ):
-            raise NotImplementedError
-        elif isinstance( source, (bytes, bytearray) ):
-            return cls._yp_constructor( source, len( source ) )
-        elif isinstance( source, str ):
+        if isinstance( source, str ):
             raise NotImplementedError
         elif isinstance( source, (int, yp_int) ):
-            return cls._yp_constructor( None, source )
+            return cls._ypBytes_constructor( source )
+        elif isinstance( source, (bytes, bytearray) ):
+            return cls._ypBytes_constructorC( source, len( source ) )
+        elif isinstance( source, memoryview ):
+            return cls._ypBytes_constructorC( source.tobytes( ), len( source ) )
         # else if it has the buffer interface
-        # else if it is an iterable
         else:
-            raise TypeError( type( source ) )
+            return cls._ypBytes_constructor( _yp_iterable( source ) )
 
 @pytype( bytes, 16 )
 class yp_bytes( _ypBytes ):
-    _yp_constructor = _yp_bytesC
+    _ypBytes_constructorC = _yp_bytesC
+    _ypBytes_constructor = _yp_bytes
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
 @pytype( bytearray, 17 )
 class yp_bytearray( _ypBytes ):
-    _yp_constructor = _yp_bytearrayC
+    _ypBytes_constructorC = _yp_bytearrayC
+    _ypBytes_constructor = _yp_bytearray
 
 # FIXME When nohtyP has types that have string representations, update this
 # FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
