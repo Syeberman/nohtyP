@@ -3616,6 +3616,7 @@ static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 // one allocation.
 // XXX Remember that alloclen should account for the null terminator; also remember to add that
 // null terminator
+// XXX Check for the _yp_bytes_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Extend alloclen_fixed to other areas
 // TODO Over-allocate to avoid future resizings
@@ -3623,7 +3624,6 @@ static ypObject *_ypBytes_new( int type, yp_ssize_t alloclen, int alloclen_fixed
 {
     ypObject *b;
     if( type == ypBytes_CODE && alloclen_fixed ) {
-        if( alloclen < 1+1 ) return _yp_bytes_empty; // FIXME is this safe everywhere??
         b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, alloclen+1 );
     } else {
         b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, alloclen+1, 0 );
@@ -3633,6 +3633,7 @@ static ypObject *_ypBytes_new( int type, yp_ssize_t alloclen, int alloclen_fixed
 }
 
 // XXX Check for the possiblity of a lazy shallow copy before calling this function
+// XXX Check for the _yp_bytes_empty case first
 static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
 {
     ypObject *copy = _ypBytes_new( type, ypBytes_LEN( b )+1, alloclen_fixed );
@@ -3803,6 +3804,7 @@ static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void 
 
 static ypObject *bytes_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo )
 {
+    if( ypBytes_LEN( b ) < 1 ) return _yp_bytes_empty;
     // A shallow copy of a bytes to a bytes doesn't require an actual copy
     if( copy_visitor == yp_shallowcopy_visitor && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) {
         return yp_incref( b );
@@ -3867,6 +3869,7 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     if( x_data == NULL ) return_yp_BAD_TYPE( x );
 
     newLen = ypBytes_LEN( b ) + x_len;
+    if( newLen < 1 && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return _yp_bytes_empty;
     newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
@@ -3956,6 +3959,7 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &newLen );
     if( yp_isexceptionC( result ) ) return result;
 
+    if( newLen < 1 && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return _yp_bytes_empty;
     newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
@@ -4372,6 +4376,7 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
     } else {
         if( len < 0 ) len = strlen( (const char *) source );
     }
+    if( len < 1 && type == ypBytes_CODE ) return _yp_bytes_empty;
     b = _ypBytes_new( type, len+1, /*alloclen_fixed=*/TRUE );
 
     // Initialize the data
@@ -4397,7 +4402,10 @@ static ypObject *_ypBytes( int type, ypObject *source )
     int source_pair = ypObject_TYPE_PAIR_CODE( source );
 
     if( source_pair == ypBytes_CODE ) {
-        if( ypObject_TYPE_CODE( source ) == ypBytes_CODE ) return yp_incref( source );
+        if( type == ypBytes_CODE ) {
+            if( ypBytes_LEN( source ) < 1 ) return _yp_bytes_empty;
+            if( ypObject_TYPE_CODE( source ) == ypBytes_CODE ) return yp_incref( source );
+        }
         return _ypBytes_copy( type, source, TRUE );
     } else if( source_pair == ypInt_CODE ) {
         yp_ssize_t len = yp_asssizeC( source, &exc );
@@ -4413,6 +4421,7 @@ static ypObject *_ypBytes( int type, ypObject *source )
             lenhint = yp_iter_lenhintC( source, &exc );
         } else if( lenhint == 0 ) {
             // yp_lenC reports an empty iterable, so we can shortcut _ypBytes_extend
+            if( type == ypBytes_CODE ) return _yp_bytes_empty;
             newB = _ypBytes_new( type, 0+1, /*alloclen_fixed=*/TRUE );
             ypBytes_DATA( newB )[0] = '\0';
             return newB;
@@ -4876,6 +4885,7 @@ static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen ) {
 
 // TODO Ensure shallow copies are efficient (memcpy, etc)
 // TODO Shallow copies of tuples to tuples can just return incref( x )...where to handle?
+// TODO There's also the _yp_tuple_empty case
 static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
 {
     ypObject *sq;
