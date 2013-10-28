@@ -1187,6 +1187,7 @@ class AssortedBytesTest(unittest.TestCase):
         self.assertEqual(str(yp_bytearray(b'x')), "bytearray(b'x')")
         self.assertEqual(str(yp_bytearray(b'\x80')), "bytearray(b'\\x80')")
 
+    @unittest.skip("TODO Implement encoding in nohtyP")
     def test_literal(self):
         tests =  [
             (b"Wonderful spam", "Wonderful spam"),
