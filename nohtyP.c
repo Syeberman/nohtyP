@@ -3026,23 +3026,23 @@ yp_int_t yp_asintC( ypObject *x, ypObject **exc )
 // zero, which can be represented in every integer type, so we won't override any yp_TypeError
 // errors.
 // TODO review http://blog.reverberate.org/2012/12/testing-for-integer-overflow-in-c-and-c.html
-#define _ypInt_PUBLIC_AS_C_FUNCTION( name ) \
+#define _ypInt_PUBLIC_AS_C_FUNCTION( name, mask ) \
 yp_ ## name ## _t yp_as ## name ## C( ypObject *x, ypObject **exc ) { \
     yp_int_t asint = yp_asintC( x, exc ); \
-    yp_ ## name ## _t retval = (yp_ ## name ## _t) asint; \
+    yp_ ## name ## _t retval = (yp_ ## name ## _t) (asint & (mask)); \
     if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_OverflowError ); \
     return retval; \
 }
-_ypInt_PUBLIC_AS_C_FUNCTION( int8 );
-_ypInt_PUBLIC_AS_C_FUNCTION( uint8 );
-_ypInt_PUBLIC_AS_C_FUNCTION( int16 );
-_ypInt_PUBLIC_AS_C_FUNCTION( uint16 );
-_ypInt_PUBLIC_AS_C_FUNCTION( int32 );
-_ypInt_PUBLIC_AS_C_FUNCTION( uint32 );
+_ypInt_PUBLIC_AS_C_FUNCTION( int8,   0xFF );
+_ypInt_PUBLIC_AS_C_FUNCTION( uint8,  0xFFu );
+_ypInt_PUBLIC_AS_C_FUNCTION( int16,  0xFFFF );
+_ypInt_PUBLIC_AS_C_FUNCTION( uint16, 0xFFFFu );
+_ypInt_PUBLIC_AS_C_FUNCTION( int32,  0xFFFFFFFF );
+_ypInt_PUBLIC_AS_C_FUNCTION( uint32, 0xFFFFFFFFu );
 #if SIZE_MAX <= 0xFFFFFFFFu // 32-bit (or less) platform
 yp_STATIC_ASSERT( sizeof( yp_ssize_t ) < sizeof( yp_int_t ), sizeof_yp_ssize_lt_yp_int );
-_ypInt_PUBLIC_AS_C_FUNCTION( ssize );
-_ypInt_PUBLIC_AS_C_FUNCTION( hash );
+_ypInt_PUBLIC_AS_C_FUNCTION( ssize,  (yp_ssize_t) SIZE_MAX );
+_ypInt_PUBLIC_AS_C_FUNCTION( hash,   (yp_hash_t) SIZE_MAX );
 #endif
 
 // The functions below assume/assert that yp_int_t is 64 bits
@@ -3659,7 +3659,7 @@ static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
 
     if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x ); 
     asint = yp_asintC( x, exc );
-    retval = (yp_uint8_t) asint;
+    retval = (yp_uint8_t) (asint & 0xFFu);
     if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_ValueError );
     return retval;
 }
