@@ -36,11 +36,13 @@ else:
         return func
 
 
-class Indexable:
-    def __init__(self, value=0):
-        self.value = value
-    def __index__(self):
-        return self.value
+# XXX __index__ doesn't apply to nohtyP, so fake this out
+Indexable = int
+#class Indexable:
+#    def __init__(self, value=0):
+#        self.value = value
+#    def __index__(self):
+#        return self.value
 
 
 class BaseBytesTest:
@@ -430,6 +432,7 @@ class BaseBytesTest:
         self.assertEqual(b.rindex(i, 3, 9), 7)
         self.assertRaises(ValueError, b.rindex, w, 1, 3)
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_replace(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.replace(b'i', b'a'), b'massassappa')
@@ -959,6 +962,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(b, b1)
         self.assertTrue(b is b1)
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_alloc(self):
         b = yp_bytearray()
         alloc = b.__alloc__()
@@ -1054,6 +1058,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         b.insert(0, Indexable(ord('A')))
         self.assertEqual(b, b'A')
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_copied(self):
         # Issue 4348.  Make sure that operations that don't mutate the array
         # copy the bytes.
@@ -1201,6 +1206,7 @@ class AssortedBytesTest(unittest.TestCase):
             self.assertRaises(SyntaxError, eval,
                               'b"%s"' % chr(c))
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_translate(self):
         b = yp_bytes(b'hello')
         ba = yp_bytearray(b)
@@ -1225,6 +1231,7 @@ class AssortedBytesTest(unittest.TestCase):
     def test_rsplit_bytearray(self):
         self.assertEqual(b'a b'.rsplit(b' '), [b'a', b'b'])
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_return_self(self):
         # bytearray.replace must always return a new bytearray
         b = yp_bytearray()
@@ -1265,6 +1272,7 @@ class BytearrayPEP3137Test(unittest.TestCase,
     def marshal(self, x):
         return yp_bytearray(x)
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_returns_new_copy(self):
         val = self.marshal(b'1234')
         # On immutable types these MAY return a reference to themselves
@@ -1383,6 +1391,7 @@ class ByteArraySubclass(yp_bytearray):
 class BytesSubclass(yp_bytes):
     pass
 
+@unittest.skip("Not applicable to nohtyP")
 class ByteArraySubclassTest(SubclassTest, unittest.TestCase):
     type2test = yp_bytearray
     subclass2test = ByteArraySubclass
@@ -1398,6 +1407,7 @@ class ByteArraySubclassTest(SubclassTest, unittest.TestCase):
         self.assertEqual(x, yp_bytes(b"abcd"))
 
 
+@unittest.skip("Not applicable to nohtyP")
 class BytesSubclassTest(SubclassTest, unittest.TestCase):
     type2test = yp_bytes
     subclass2test = BytesSubclass
