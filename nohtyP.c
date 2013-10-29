@@ -3608,9 +3608,9 @@ static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 
 // Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or
 // inserting bytes (the new space is uninitialized).  Assumes enough space is allocated for the
-// move.  Recall that memmove handles overlap.
+// move.  Recall that memmove handles overlap.  Also adjusts null terminator
 #define ypBytes_ELEMMOVE( b, dest, src ) \
-    memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src) );
+    memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src)+1 );
 
 // Return a new bytes/bytearray object with the given alloclen.  If type is immutable and
 // alloclen_fixed is true (indicating the object will never grow), the data is placed inline with
@@ -3828,12 +3828,11 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
             }
         }
 
-        // Adjust remaining items
+        // Adjust remaining items and null terminator
         ypBytes_ELEMMOVE( b, stop+growBy, stop );
 
         // There are now len(x) bytes starting at b[start] waiting for x's data
         memcpy( ypBytes_DATA( b )+start, ypBytes_DATA( x ), ypBytes_LEN( x ) );
-        ypBytes_DATA( b )[newLen] = '\0';
         ypBytes_LEN( b ) = newLen;
     } else {
         yp_ssize_t i;
@@ -3956,7 +3955,6 @@ static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
     return newB;
 }
 
-// Returns new reference or an exception
 static ypObject *bytes_getindex( ypObject *b, yp_ssize_t i )
 {
     ypObject *result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
@@ -3964,7 +3962,6 @@ static ypObject *bytes_getindex( ypObject *b, yp_ssize_t i )
     return yp_intC( ypBytes_DATA( b )[i] );
 }
 
-// Returns yp_None or an exception
 static ypObject *bytearray_setindex( ypObject *b, yp_ssize_t i, ypObject *x )
 {
     ypObject *exc = yp_None;
@@ -3981,7 +3978,6 @@ static ypObject *bytearray_setindex( ypObject *b, yp_ssize_t i, ypObject *x )
     return yp_None;
 }
 
-// Returns yp_None or an exception
 static ypObject *bytearray_delindex( ypObject *b, yp_ssize_t i )
 {
     ypObject *result;
@@ -3989,13 +3985,11 @@ static ypObject *bytearray_delindex( ypObject *b, yp_ssize_t i )
     result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
     if( yp_isexceptionC( result ) ) return result;
 
-    // memmove allows overlap; don't bother reallocating
-    memmove( ypBytes_DATA( b )+i, ypBytes_DATA( b )+i+1, ypBytes_LEN( b )-i-1 );
+    ypBytes_ELEMMOVE( b, i, i+1 );
     ypBytes_LEN( b ) -= 1;
     return yp_None;
 }
 
-// Returns new reference or an exception
 static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
     ypObject *result;
@@ -4038,7 +4032,6 @@ static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     }
 }
 
-// Returns yp_None or an exception
 static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step )
 {
@@ -4107,9 +4100,19 @@ static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
     // Make room at i and add x_asbyte
     ypBytes_ELEMMOVE( b, i+1, i );
     ypBytes_DATA( b )[i] = x_asbyte;
-    ypBytes_DATA( b )[newLen] = '\0';
     ypBytes_LEN( b ) = newLen;
     return yp_None;
+}
+
+static ypObject *bytearray_popindex( ypObject *b, yp_ssize_t i )
+{
+    ypObject *result = ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i );
+    if( yp_isexceptionC( result ) ) return result;
+
+    result = yp_intC( ypBytes_DATA( b )[i] );
+    ypBytes_ELEMMOVE( b, i, i+1 );
+    ypBytes_LEN( b ) -= 1;
+    return result;
 }
 
 static ypObject *bytes_contains( ypObject *b, ypObject *x )
@@ -4139,6 +4142,17 @@ static ypObject *bytearray_clear( ypObject *b )
     ypBytes_DATA( b )[0] = '\0';
     ypBytes_LEN( b ) = 0;
     return yp_None;
+}
+
+static ypObject *bytearray_pop( ypObject *b )
+{
+    ypObject *result;
+
+    if( ypBytes_LEN( b ) < 1 ) return yp_IndexError;
+    result = yp_intC( ypBytes_DATA( b )[ypBytes_LEN( b )-1] );
+    ypBytes_LEN( b ) -= 1;
+    ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0';
+    return result;
 }
 
 // TODO allow custom min/max methods?
@@ -4331,7 +4345,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
     bytearray_extend,               // tp_extend
     bytearray_irepeat,              // tp_irepeat
     bytearray_insert,               // tp_insert
-    MethodError_objssizeproc,       // tp_popindex
+    bytearray_popindex,             // tp_popindex
     MethodError_objproc,            // tp_reverse
     MethodError_sortfunc            // tp_sort
 };
@@ -4382,7 +4396,7 @@ static ypTypeObject ypByteArray_Type = {
     bytes_len,                      // tp_len
     bytearray_push,                 // tp_push
     bytearray_clear,                // tp_clear
-    MethodError_objproc,            // tp_pop
+    bytearray_pop,                  // tp_pop
     MethodError_objobjobjproc,      // tp_remove
     _ypSequence_getdefault,         // tp_getdefault
     _ypSequence_setitem,            // tp_setitem
