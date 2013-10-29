@@ -924,7 +924,9 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
                 b[3:4] = elem
 
     def test_extended_set_del_slice(self):
-        indices = (0, None, 1, 3, 19, 300, 1<<333, -1, -2, -31, -300)
+        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        #indices = (0, None, 1, 3, 19, 300, 1<<333, -1, -2, -31, -300)
+        indices = (0, None, 1, 3, 19, 300,         -1, -2, -31, -300)
         for start in indices:
             for stop in indices:
                 # Skip invalid step 0

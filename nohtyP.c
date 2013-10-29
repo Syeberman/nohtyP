@@ -3791,6 +3791,56 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
     }
 }
 
+// XXX b and x must _not_ be the same object (pass a copy of x if so)
+static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t step );
+static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t step, ypObject *x )
+{
+    ypObject *result;
+    yp_ssize_t slicelength;
+
+    // TODO enable debug assert
+    // yp_assert( b != x );
+
+    if( step == 1 && ypBytes_LEN( x ) == 0 ) return bytearray_delslice( b, start, stop, step );
+
+    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
+    if( yp_isexceptionC( result ) ) return result;
+
+    if( step == 1 ) {
+        yp_ssize_t growBy = ypBytes_LEN( x ) - slicelength; // negative means array shrinking
+        yp_ssize_t newLen = ypBytes_LEN( b ) + growBy;
+
+        // Ensure there's enough space allocated; after this, failure is impossible
+        // FIXME The resize might have to copy data, _then_ we'll also do the ypBytes_ELEMMOVE,
+        // copying large amounts of data twice; optimize
+        // TODO Over-allocate
+        if( growBy > 0 ) {
+            if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+                result = _ypBytes_resize( b, newLen+1, 0 );
+                if( yp_isexceptionC( result ) ) return result;
+            }
+        }
+
+        // Adjust remaining items
+        ypBytes_ELEMMOVE( b, stop+growBy, stop );
+
+        // There are now len(x) bytes starting at b[start] waiting for x's data
+        memcpy( ypBytes_DATA( b )+start, ypBytes_DATA( x ), ypBytes_LEN( x ) );
+        ypBytes_DATA( b )[newLen] = '\0';
+        ypBytes_LEN( b ) = newLen;
+    } else {
+        yp_ssize_t i;
+        if( ypBytes_LEN( x ) != slicelength ) return yp_ValueError;
+        for( i = 0; i < slicelength; i++ ) {
+            ypBytes_DATA( b )[ypSlice_INDEX( start, step, i )] = ypBytes_DATA( x )[i];
+        }
+    }
+    return yp_None;
+}
+
+
 // Public Methods
 
 static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
@@ -3960,55 +4010,20 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     return newB;
 }
 
-// Returns yp_None or an exception
-// TODO handle b == x! (and elsewhere?)
-static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t step );
 static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step, ypObject *x )
 {
-    ypObject *result;
-    yp_ssize_t slicelength;
-    yp_uint8_t *x_data;
-    yp_ssize_t x_len;
-
-    _ypBytes_coerce_bytes( x, &x_data, &x_len );
-    if( x_data == NULL ) return_yp_BAD_TYPE( x );
-    if( step == 1 && x_len == 0 ) return bytearray_delslice( b, start, stop, step );
-
-    result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
-    if( yp_isexceptionC( result ) ) return result;
-
-    if( step == 1 ) {
-        yp_ssize_t growBy = x_len - slicelength; // negative means array shrinking
-        yp_ssize_t newLen = ypBytes_LEN( b ) + growBy;
-
-        // Ensure there's enough space allocated; after this, failure is impossible
-        // FIXME The resize might have to copy data, _then_ we'll also do the ypBytes_ELEMMOVE,
-        // copying large amounts of data twice; optimize
-        // TODO Over-allocate
-        if( growBy > 0 ) {
-            if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
-                result = _ypBytes_resize( b, newLen+1, 0 );
-                if( yp_isexceptionC( result ) ) return result;
-            }
-        }
-
-        // Adjust remaining items
-        ypBytes_ELEMMOVE( b, stop+growBy, stop );
-
-        // There are now x_len bytes starting at b[start] waiting for x_data
-        memcpy( ypBytes_DATA( b )+start, x_data, x_len );
-        ypBytes_DATA( b )[newLen] = '\0';
-        ypBytes_LEN( b ) = newLen;
+    // If x is not a fellow bytes, or if it is the same object as b, then a copy must be made
+    if( ypObject_TYPE_PAIR_CODE( x ) == ypBytes_CODE && b != x ) {
+        return _ypBytes_setslice_from_bytes( b, start, stop, step, x );
     } else {
-        yp_ssize_t i;
-        if( x_len != slicelength ) return yp_ValueError;
-        for( i = 0; i < slicelength; i++ ) {
-            ypBytes_DATA( b )[ypSlice_INDEX( start, step, i )] = x_data[i];
-        }
+        ypObject *result;
+        ypObject *x_asbytes = yp_bytes( x );
+        if( yp_isexceptionC( x_asbytes ) ) return x_asbytes;
+        result = _ypBytes_setslice_from_bytes( b, start, stop, step, x_asbytes );
+        yp_decref( x_asbytes );
+        return result;
     }
-    return yp_None;
 }
 
 // Returns yp_None or an exception
@@ -5032,6 +5047,7 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
         // Ensure there's enough space allocated; after this, failure is impossible
         // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE,
         // copying large amounts of data twice; optimize
+        // TODO Over-allocate
         if( growBy > 0 ) {
             if( ypTuple_ALLOCLEN( sq ) < newLen ) {
                 result = _ypTuple_resize( sq, newLen, 0 );
@@ -5043,7 +5059,7 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
         for( i = start; i < stop; i++ ) yp_decref( ypTuple_ARRAY( sq )[i] );
         ypTuple_ELEMMOVE( sq, stop+growBy, stop );
 
-        // There are now ypTuple_LEN( x ) elements starting at sq[start] waiting for x's items
+        // There are now len(x) elements starting at sq[start] waiting for x's items
         memcpy( ypTuple_ARRAY( sq )+start, ypTuple_ARRAY( x ),
             ypTuple_LEN( x )*sizeof( ypObject * ) );
         for( i = start; i < start+ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
