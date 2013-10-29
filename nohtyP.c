@@ -4435,6 +4435,7 @@ static ypObject *_ypBytes( int type, ypObject *source )
     } else if( source_pair == ypInt_CODE ) {
         yp_ssize_t len = yp_asssizeC( source, &exc );
         if( yp_isexceptionC( exc ) ) return exc;
+        if( len < 0 ) return yp_ValueError;
         return _ypBytesC( type, NULL, len );
     } else {
         // Treat it as a generic iterator
