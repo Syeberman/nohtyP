@@ -4048,8 +4048,6 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     return yp_None;
 }
 
-// TODO bytes_getitem, setitem, delitem...need generic functions to redirect to getindexC et al
-
 #define bytearray_extend _ypBytes_extend
 
 static ypObject *bytearray_clear( ypObject *b );
@@ -4113,6 +4111,21 @@ static ypObject *bytearray_popindex( ypObject *b, yp_ssize_t i )
     ypBytes_ELEMMOVE( b, i, i+1 );
     ypBytes_LEN( b ) -= 1;
     return result;
+}
+
+// XXX Adapted from Python's reverse_slice
+static ypObject *bytearray_reverse( ypObject *b )
+{
+    yp_uint8_t *lo = ypBytes_DATA( b );
+    yp_uint8_t *hi = lo + ypBytes_LEN( b ) - 1;
+    while( lo < hi ) {
+        yp_uint8_t t = *lo;
+        *lo = *hi;
+        *hi = t;
+        lo += 1;
+        hi -= 1;
+    }
+    return yp_None;
 }
 
 static ypObject *bytes_contains( ypObject *b, ypObject *x )
@@ -4368,7 +4381,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
     bytearray_irepeat,              // tp_irepeat
     bytearray_insert,               // tp_insert
     bytearray_popindex,             // tp_popindex
-    MethodError_objproc,            // tp_reverse
+    bytearray_reverse,              // tp_reverse
     MethodError_sortfunc            // tp_sort
 };
 
