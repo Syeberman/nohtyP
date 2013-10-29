@@ -853,6 +853,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(bb, b'abcd')
         self.assertEqual(b, b'abc')
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_regexps(self):
         def by(s):
             return yp_bytearray(map(ord, s))

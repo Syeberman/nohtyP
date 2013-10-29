@@ -1285,6 +1285,9 @@ class yp_bytearray( _ypBytes ):
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def __str__( self ): return "bytearray(%r)" % self._asbytes( )
     __repr__ = __str__
+    def pop( self, i=_yp_arg_missing ):
+        if i is _yp_arg_missing: return _yp_pop( self )
+        else: return _yp_popindexC( self, i )
     def __iadd__( self, other ): 
         _yp_extend( self, other )
         return self
@@ -1346,7 +1349,9 @@ class yp_list( _ypTuple ):
     def __str__( self ):
         return "[%s]" % ", ".join( repr( x ) for x in self )
     __repr__ = __str__
-    def pop( self, i=-1 ): return _yp_popindexC( self, i )
+    def pop( self, i=_yp_arg_missing ):
+        if i is _yp_arg_missing: return _yp_pop( self )
+        else: return _yp_popindexC( self, i )
     def __iadd__( self, other ): 
         _yp_extend( self, other )
         return self
