@@ -1272,6 +1272,12 @@ class yp_bytearray( _ypBytes ):
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def __str__( self ): return "bytearray(%r)" % self._asbytes( )
     __repr__ = __str__
+    def __iadd__( self, other ): 
+        _yp_extend( self, other )
+        return self
+    def __imul__( self, factor ): 
+        _yp_irepeatC( self, factor )
+        return self
 
 # FIXME When nohtyP has types that have string representations, update this
 # FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
