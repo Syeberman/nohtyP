@@ -4070,6 +4070,40 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
     return yp_None;
 }
 
+static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
+{
+    ypObject *exc = yp_None;
+    yp_ssize_t newLen = ypBytes_LEN( b ) + 1;
+    yp_uint8_t x_asbyte;
+
+    // Check for exceptions, then adjust the index (noting it should behave like b[i:i]=[x])
+    x_asbyte = _ypBytes_asuint8C( x, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    if( i < 0 ) {
+        i += ypBytes_LEN( b );
+        if( i < 0 ) i = 0;
+    } else if( i > ypBytes_LEN( b ) ) {
+        i = ypBytes_LEN( b );
+    }
+
+    // Resize if necessary
+    // FIXME The resize might have to copy data, _then_ we'll also do the ypBytes_ELEMMOVE, copying
+    // large amounts of data twice; optimize (and...are there other areas of the code where this
+    // happens?)
+    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+        // TODO over-allocate
+        ypObject *result = _ypBytes_resize( b, newLen+1, 0 );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+
+    // Make room at i and add x_asbyte
+    ypBytes_ELEMMOVE( b, i+1, i );
+    ypBytes_DATA( b )[i] = x_asbyte;
+    ypBytes_DATA( b )[newLen] = '\0';
+    ypBytes_LEN( b ) = newLen;
+    return yp_None;
+}
+
 static ypObject *bytes_contains( ypObject *b, ypObject *x )
 {
     ypObject *result;
@@ -4086,25 +4120,9 @@ static ypObject *bytes_len( ypObject *b, yp_ssize_t *len )
     return yp_None;
 }
 
-// TODO over-allocate via growhint
 static ypObject *bytearray_push( ypObject *b, ypObject *x ) 
 {
-    ypObject *exc = yp_None;
-    yp_ssize_t newLen = ypBytes_LEN( b ) + 1;
-    ypObject *result;
-    yp_uint8_t x_asbyte;
-
-    x_asbyte = _ypBytes_asuint8C( x, &exc );
-    if( yp_isexceptionC( exc ) ) return exc;
-
-    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
-        result = _ypBytes_resize( b, newLen+1, 0 );
-        if( yp_isexceptionC( result ) ) return result;
-    }
-    ypBytes_DATA( b )[ypBytes_LEN( b )] = x_asbyte;
-    ypBytes_DATA( b )[newLen] = '\0';
-    ypBytes_LEN( b ) = newLen;
-    return yp_None;
+    return bytearray_insert( b, yp_SLICE_USELEN, x );
 }
 
 // TODO If we're ever going to shrink allocated memory, clear is definitely one place to do it
@@ -4304,7 +4322,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
     bytearray_push,                 // tp_append
     bytearray_extend,               // tp_extend
     bytearray_irepeat,              // tp_irepeat
-    MethodError_objssizeobjproc,    // tp_insert
+    bytearray_insert,               // tp_insert
     MethodError_objssizeproc,       // tp_popindex
     MethodError_objproc,            // tp_reverse
     MethodError_sortfunc            // tp_sort
