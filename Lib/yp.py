@@ -1264,9 +1264,13 @@ class _ypBytes( ypObject ):
     
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
-    def __mul__( self, factor ): return _yp_repeatC( self, factor )
+    def __mul__( self, factor ): 
+        if isinstance( factor, float ): raise TypeError
+        return _yp_repeatC( self, factor )
 
-    def __rmul__( self, factor ): return _yp_repeatC( self, factor )
+    def __rmul__( self, factor ): 
+        if isinstance( factor, float ): raise TypeError
+        return _yp_repeatC( self, factor )
 
 @pytype( bytes, 16 )
 class yp_bytes( _ypBytes ):
@@ -1292,6 +1296,7 @@ class yp_bytearray( _ypBytes ):
         _yp_extend( self, other )
         return self
     def __imul__( self, factor ): 
+        if isinstance( factor, float ): raise TypeError
         _yp_irepeatC( self, factor )
         return self
 
@@ -1325,9 +1330,13 @@ c_ypObject_p_value( "yp_s_strict" )
 class _ypTuple( ypObject ):
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
-    def __mul__( self, factor ): return _yp_repeatC( self, factor )
+    def __mul__( self, factor ): 
+        if isinstance( factor, float ): raise TypeError
+        return _yp_repeatC( self, factor )
 
-    def __rmul__( self, factor ): return _yp_repeatC( self, factor )
+    def __rmul__( self, factor ): 
+        if isinstance( factor, float ): raise TypeError
+        return _yp_repeatC( self, factor )
 
 @pytype( tuple, 20 )
 class yp_tuple( _ypTuple ):
@@ -1356,6 +1365,7 @@ class yp_list( _ypTuple ):
         _yp_extend( self, other )
         return self
     def __imul__( self, factor ): 
+        if isinstance( factor, float ): raise TypeError
         _yp_irepeatC( self, factor )
         return self
 
