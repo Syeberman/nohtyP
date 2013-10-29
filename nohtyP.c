@@ -3777,8 +3777,12 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
 // Extends b with the contents of x; always writes the null-terminator
 static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
 {
-    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypBytes_CODE ) {
+    int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
+
+    if( iterable_pair == ypBytes_CODE ) {
         return _ypBytes_extend_from_bytes( b, iterable );
+    } else if( iterable_pair == ypStr_CODE ) {
+        return yp_TypeError;
     } else {
         ypObject *result;
         yp_uint64_t mi_state;
