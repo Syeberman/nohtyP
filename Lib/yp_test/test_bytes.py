@@ -94,7 +94,10 @@ class BaseBytesTest:
         self.assertEqual(self.type2test(1), b'\x00')
         self.assertEqual(self.type2test(5), b'\x00\x00\x00\x00\x00')
         self.assertRaises(ValueError, self.type2test, -1)
+        self.assertEqual(self.type2test(b'0'), b'0')
 
+    @unittest.skip("TODO Implement encoding in nohtyP")
+    def test_from_ssize_not_actually_ssize(self):
         self.assertEqual(self.type2test('0', 'ascii'), b'0')
         self.assertEqual(self.type2test(b'0'), b'0')
         self.assertRaises(OverflowError, self.type2test, sys.maxsize + 1)
@@ -283,6 +286,7 @@ class BaseBytesTest:
             self.assertNotIn(f(b"dab"), b)
             self.assertNotIn(f(b"abd"), b)
 
+    @unittest.skip("TODO Implement fromhex in nohtyP")
     def test_fromhex(self):
         self.assertRaises(TypeError, self.type2test.fromhex)
         self.assertRaises(TypeError, self.type2test.fromhex, 1)
@@ -382,6 +386,8 @@ class BaseBytesTest:
         self.assertEqual(b.find(i, 1, 3), 1)
         self.assertEqual(b.find(w, 1, 3), -1)
 
+    @unittest.skip("Not applicable to nohtyP")
+    def test_find_raise_correct_exception_msg(self):
         for index in (-1, 256, sys.maxsize + 1):
             self.assertRaisesRegex(
                 ValueError, r'byte must be in range\(0, 256\)',
@@ -687,7 +693,7 @@ class BaseBytesTest:
             self.assertRaises(ValueError, method, 256)
             self.assertRaises(ValueError, method, 9999)
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @unittest.skip("Not applicable to nohtyP")
     def test_find_etc_raise_correct_error_messages(self):
         # issue 11828
         b = self.type2test(b'hello')
@@ -923,6 +929,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
             with self.assertRaises(ValueError):
                 b[3:4] = elem
 
+    @unittest.skip("TODO re-enable (it just takes a long time)")
     def test_extended_set_del_slice(self):
         # XXX ctypes truncates large ints, making them look valid in nohtyP tests
         #indices = (0, None, 1, 3, 19, 300, 1<<333, -1, -2, -31, -300)

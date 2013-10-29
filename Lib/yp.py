@@ -976,6 +976,7 @@ class ypObject( c_ypObject_p ):
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
 
+    def find( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_findC4( self, x, i, j, yp_None )
     def index( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_indexC4( self, x, i, j, yp_None )
     def count( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_countC4( self, x, i, j, yp_None )
     def append( self, x ): _yp_append( self, x )
