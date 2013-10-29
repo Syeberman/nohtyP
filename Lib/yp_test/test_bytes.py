@@ -65,14 +65,16 @@ class BaseBytesTest:
         self.assertRaises(IndexError, lambda: b[0])
         self.assertRaises(IndexError, lambda: b[1])
         self.assertRaises(IndexError, lambda: b[sys.maxsize])
-        self.assertRaises(IndexError, lambda: b[sys.maxsize+1])
-        self.assertRaises(IndexError, lambda: b[10**100])
+        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        #self.assertRaises(IndexError, lambda: b[sys.maxsize+1])
+        #self.assertRaises(IndexError, lambda: b[10**100])
         self.assertRaises(IndexError, lambda: b[-1])
         self.assertRaises(IndexError, lambda: b[-2])
         self.assertRaises(IndexError, lambda: b[-sys.maxsize])
         self.assertRaises(IndexError, lambda: b[-sys.maxsize-1])
-        self.assertRaises(IndexError, lambda: b[-sys.maxsize-2])
-        self.assertRaises(IndexError, lambda: b[-10**100])
+        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        #self.assertRaises(IndexError, lambda: b[-sys.maxsize-2])
+        #self.assertRaises(IndexError, lambda: b[-10**100])
 
     def test_from_list(self):
         ints = list(range(256))
@@ -200,6 +202,7 @@ class BaseBytesTest:
                 for step in indices[1:]:
                     self.assertEqual(b[start:stop:step], self.type2test(L[start:stop:step]))
 
+    @unittest.skip("TODO Implement encoding in nohtyP")
     def test_encoding(self):
         sample = "Hello world\n\u1234\u5678\u9abc"
         for enc in ("utf-8", "utf-16"):
@@ -209,6 +212,7 @@ class BaseBytesTest:
         b = self.type2test(sample, "latin-1", "ignore")
         self.assertEqual(b, self.type2test(sample[:-3], "utf-8"))
 
+    @unittest.skip("TODO Implement encoding in nohtyP")
     def test_decode(self):
         sample = "Hello world\n\u1234\u5678\u9abc\def0\def0"
         for enc in ("utf-8", "utf-16"):
@@ -328,6 +332,7 @@ class BaseBytesTest:
         self.assertEqual(b.count(i, 1, 3), 1)
         self.assertEqual(b.count(p, 7, 9), 1)
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_startswith(self):
         b = self.type2test(b'hello')
         self.assertFalse(self.type2test().startswith(b"anything"))
@@ -342,6 +347,7 @@ class BaseBytesTest:
         self.assertIn('bytes', exc)
         self.assertIn('tuple', exc)
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_endswith(self):
         b = self.type2test(b'hello')
         self.assertFalse(yp_bytearray().endswith(b"anything"))
@@ -629,6 +635,7 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test.maketrans, b'abc', b'xyzq')
         self.assertRaises(TypeError, self.type2test.maketrans, 'abc', 'def')
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_none_arguments(self):
         # issue 11828
         b = self.type2test(b'hello')
@@ -680,6 +687,7 @@ class BaseBytesTest:
             self.assertRaises(ValueError, method, 256)
             self.assertRaises(ValueError, method, 9999)
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_find_etc_raise_correct_error_messages(self):
         # issue 11828
         b = self.type2test(b'hello')
@@ -995,16 +1003,16 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(a[5:], orig)
         a = yp_bytearray(b'')
         # Test iterators that don't have a __length_hint__
-        a.extend(map(int, orig * 25))
-        a.extend(int(x) for x in orig * 25)
+        a.extend(map(yp_int, orig * 25))
+        a.extend(yp_int(x) for x in orig * 25)
         self.assertEqual(a, orig * 50)
         self.assertEqual(a[-5:], orig)
         a = yp_bytearray(b'')
-        a.extend(iter(map(int, orig * 50)))
+        a.extend(iter(map(yp_int, orig * 50)))
         self.assertEqual(a, orig * 50)
         self.assertEqual(a[-5:], orig)
         a = yp_bytearray(b'')
-        a.extend(list(map(int, orig * 50)))
+        a.extend(list(map(yp_int, orig * 50)))
         self.assertEqual(a, orig * 50)
         self.assertEqual(a[-5:], orig)
         a = yp_bytearray(b'')
