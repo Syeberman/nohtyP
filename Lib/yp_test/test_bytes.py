@@ -458,6 +458,7 @@ class BaseBytesTest:
         self.assertEqual(b.replace(b'i', b'a'), b'massassappa')
         self.assertEqual(b.replace(b'ss', b'x'), b'mixixippi')
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_split(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.split(b'i'), [b'm', b'ss', b'ss', b'pp', b''])
@@ -472,6 +473,7 @@ class BaseBytesTest:
         b = self.type2test(b'a b c d')
         self.assertEqual(b.split(maxsplit=1), [b'a', b'b c d'])
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_whitespace(self):
         for b in (b'  arf  barf  ', b'arf\tbarf', b'arf\nbarf', b'arf\rbarf',
                   b'arf\fbarf', b'arf\vbarf'):
@@ -487,13 +489,16 @@ class BaseBytesTest:
         self.assertEqual(self.type2test(b'  a  bb  c  ').split(None, 2), [b'a', b'bb', b'c  '])
         self.assertEqual(self.type2test(b'  a  bb  c  ').split(None, 3), [b'a', b'bb', b'c'])
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_string_error(self):
         self.assertRaises(TypeError, self.type2test(b'a b').split, ' ')
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_unicodewhitespace(self):
         b = self.type2test(b"\x09\x0A\x0B\x0C\x0D\x1C\x1D\x1E\x1F")
         self.assertEqual(b.split(), [b'\x1c\x1d\x1e\x1f'])
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.rsplit(b'i'), [b'm', b'ss', b'ss', b'pp', b''])
@@ -508,6 +513,7 @@ class BaseBytesTest:
         b = self.type2test(b'a b c d')
         self.assertEqual(b.rsplit(maxsplit=1), [b'a b c', b'd'])
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_whitespace(self):
         for b in (b'  arf  barf  ', b'arf\tbarf', b'arf\nbarf', b'arf\rbarf',
                   b'arf\fbarf', b'arf\vbarf'):
@@ -520,9 +526,11 @@ class BaseBytesTest:
         self.assertEqual(self.type2test(b'  a  bb  c  ').rsplit(None, 2), [b'  a', b'bb', b'c'])
         self.assertEqual(self.type2test(b'  a  bb  c  ').rsplit(None, 3), [b'a', b'bb', b'c'])
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_string_error(self):
         self.assertRaises(TypeError, self.type2test(b'a b').rsplit, ' ')
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_unicodewhitespace(self):
         b = self.type2test(b"\x09\x0A\x0B\x0C\x0D\x1C\x1D\x1E\x1F")
         self.assertEqual(b.rsplit(), [b'\x1c\x1d\x1e\x1f'])
@@ -736,6 +744,7 @@ class BytesTest(BaseBytesTest, unittest.TestCase):
         with open(fd, "rb", buffering=0) as f:
             self.assertRaises(TypeError, f.readinto, yp_bytes())
 
+    @unittest.skip("Not applicable to nohtyP")
     def test_custom(self):
         class A:
             def __bytes__(self):
@@ -755,6 +764,7 @@ class BytesTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(yp_bytes(A()), b'a')
 
     # Test PyBytes_FromFormat()
+    @unittest.skip("Not applicable to nohtyP")
     def test_from_format(self):
         yp_test.support.import_module('ctypes')
         from ctypes import pythonapi, py_object, c_int, c_char_p
@@ -1269,9 +1279,11 @@ class AssortedBytesTest(unittest.TestCase):
         self.assertRaises(TypeError, b.translate, None, None)
         self.assertRaises(TypeError, ba.translate, None, None)
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_bytearray(self):
         self.assertEqual(b'a b'.split(b' '), [b'a', b'b'])
 
+    @unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_bytearray(self):
         self.assertEqual(b'a b'.rsplit(b' '), [b'a', b'b'])
 
@@ -1311,6 +1323,7 @@ class AssortedBytesTest(unittest.TestCase):
     # the rest that make sense (the code can be cleaned up to use modern
     # unittest methods at the same time).
 
+@unittest.skip("TODO Implement string methods in nohtyP")
 class BytearrayPEP3137Test(unittest.TestCase,
                        yp_test.buffer_tests.MixinBytesBufferCommonTests):
     def marshal(self, x):
