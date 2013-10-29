@@ -3625,9 +3625,9 @@ static ypObject *_ypBytes_new( int type, yp_ssize_t alloclen, int alloclen_fixed
 {
     ypObject *b;
     if( type == ypBytes_CODE && alloclen_fixed ) {
-        b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, alloclen+1 );
+        b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, alloclen );
     } else {
-        b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, alloclen+1, 0 );
+        b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, alloclen, 0 );
     }
     if( yp_isexceptionC( b ) ) return b;
     return b;
@@ -3937,9 +3937,9 @@ static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
         // If the result will be an exact copy, since we're immutable just return self
         if( factor == 1 ) return yp_incref( b );
     } else {
-        // If the result will be an empty list, return a new, empty list
+        // If the result will be an empty array, return a new, empty array
         if( ypBytes_LEN( b ) < 1 || factor < 1 ) {
-            return _ypBytes_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
+            return _ypBytes_new( ypByteArray_CODE, 0+1, /*alloclen_fixed=*/TRUE );
         }
         // If the result will be an exact copy, let the code below make that copy
     }
