@@ -4019,9 +4019,13 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
 static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step, ypObject *x )
 {
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+
     // If x is not a fellow bytes, or if it is the same object as b, then a copy must be made
-    if( ypObject_TYPE_PAIR_CODE( x ) == ypBytes_CODE && b != x ) {
+    if( x_pair == ypBytes_CODE && b != x ) {
         return _ypBytes_setslice_from_bytes( b, start, stop, step, x );
+    } else if( x_pair == ypInt_CODE || x_pair == ypStr_CODE ) {
+        return yp_TypeError;
     } else {
         ypObject *result;
         ypObject *x_asbytes = yp_bytes( x );
