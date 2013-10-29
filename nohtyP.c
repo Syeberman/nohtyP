@@ -3608,7 +3608,7 @@ static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 
 // Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or
 // inserting bytes (the new space is uninitialized).  Assumes enough space is allocated for the
-// move.  Recall that memmove handles overlap.  Also adjusts null terminator
+// move.  Recall that memmove handles overlap.  Also adjusts null terminator.
 #define ypBytes_ELEMMOVE( b, dest, src ) \
     memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src)+1 );
 
@@ -4155,6 +4155,28 @@ static ypObject *bytearray_pop( ypObject *b )
     return result;
 }
 
+// onmissing must be an immortal, or NULL
+static ypObject *bytearray_remove( ypObject *b, ypObject *x, ypObject *onmissing )
+{
+    ypObject *exc = yp_None;
+    yp_uint8_t x_asbyte;
+    yp_ssize_t i;
+
+    x_asbyte = _ypBytes_asuint8C( x, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    
+    for( i = 0; i < ypBytes_LEN( b ); i++ ) {
+        if( x_asbyte != ypBytes_DATA( b )[i] ) continue;
+
+        // We found a match to remove
+        ypBytes_ELEMMOVE( b, i, i+1 );
+        ypBytes_LEN( b ) -= 1;
+        return yp_None;
+    }
+    if( onmissing == NULL ) return yp_ValueError;
+    return onmissing;
+}
+
 // TODO allow custom min/max methods?
 
 static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
@@ -4397,7 +4419,7 @@ static ypTypeObject ypByteArray_Type = {
     bytearray_push,                 // tp_push
     bytearray_clear,                // tp_clear
     bytearray_pop,                  // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
+    bytearray_remove,               // tp_remove
     _ypSequence_getdefault,         // tp_getdefault
     _ypSequence_setitem,            // tp_setitem
     _ypSequence_delitem,            // tp_delitem
