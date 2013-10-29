@@ -657,6 +657,15 @@ ypAPI yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_s
         ypObject **exc );
 ypAPI yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
 
+// Similar to yp_findC4, yp_indexC4, etc, except returns the _highest_ index (it starts
+// searching "from the right".)
+ypAPI yp_ssize_t yp_rfindC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+        ypObject **exc );
+ypAPI yp_ssize_t yp_rfindC( ypObject *sequence, ypObject *x, ypObject **exc );
+ypAPI yp_ssize_t yp_rindexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+        ypObject **exc );
+ypAPI yp_ssize_t yp_rindexC( ypObject *sequence, ypObject *x, ypObject **exc );
+
 // Returns the total number of non-overlapping occurences of x in sequence[i:j].  Returns 0 and 
 // sets *exc on error.  As in Python, types such as tuples inspect only one item at a time,
 // while types such as strs look for a particular sub-sequence of items.

@@ -125,7 +125,8 @@ typedef ypObject *(*miniiterfunc)( ypObject *, yp_uint64_t * );
 typedef ypObject *(*miniiter_lenhintfunc)( ypObject *, yp_uint64_t *, yp_ssize_t * );
 typedef ypObject *(*lenfunc)( ypObject *, yp_ssize_t * );
 typedef ypObject *(*countfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
-typedef ypObject *(*findfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
+typedef enum { yp_FIND_FORWARD, yp_FIND_REVERSE } findfunc_direction;
+typedef ypObject *(*findfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, findfunc_direction, yp_ssize_t * );
 typedef ypObject *(*sortfunc)( ypObject *, yp_sort_key_func_t, ypObject * );
 typedef ypObject *(*popitemfunc)( ypObject *, ypObject **, ypObject ** );
 
@@ -312,7 +313,7 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
     static ypObject *name ## _miniiter_lenhfunc( ypObject *x, yp_uint64_t *state, yp_ssize_t *lenhint ) { return retval; } \
     static ypObject *name ## _lenfunc( ypObject *x, yp_ssize_t *len ) { return retval; } \
     static ypObject *name ## _countfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count ) { return retval; } \
-    static ypObject *name ## _findfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *index ) { return retval; } \
+    static ypObject *name ## _findfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index ) { return retval; } \
     static ypObject *name ## _sortfunc( ypObject *x, yp_sort_key_func_t key, ypObject *reverse ) { return retval; } \
     static ypObject *name ## _popitemfunc( ypObject *x, ypObject **key, ypObject **value ) { return retval; } \
     \
@@ -3767,7 +3768,7 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
         }
         ypBytes_DATA( b )[newLen-1] = x_asbyte;
     }
-    
+
     // Modifying len here allows us to bail easily above, relying on the calling code to replace
     // the null terminator at the right position
     ypBytes_LEN( b ) = newLen;
@@ -3867,29 +3868,36 @@ static ypObject *bytes_bool( ypObject *b ) {
 
 // Returns yp_None or an exception
 static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t *i )
+        findfunc_direction direction, yp_ssize_t *i )
 {
     yp_uint8_t *x_data;
     yp_ssize_t x_len;
     yp_uint8_t storage;
     ypObject *result;
-    yp_ssize_t step = 1;
-    yp_ssize_t b_rlen;     // remaining length
-    yp_uint8_t *b_rdata;   // remaining data
+    yp_ssize_t step = 1;    // may change to -1
+    yp_ssize_t b_rlen;      // remaining length
+    yp_uint8_t *b_rdata;    // remaining data
 
     result = _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
     if( yp_isexceptionC( result ) ) return result;
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
     if( yp_isexceptionC( result ) ) return result;
-    b_rdata = ypBytes_DATA( b ) + start;
+    if( direction == yp_FIND_FORWARD ) {
+        b_rdata = ypBytes_DATA( b ) + start;
+        // step is already 1
+    } else {
+        b_rdata = ypBytes_DATA( b ) + stop - x_len;
+        step = -1;
+    }
 
     while( b_rlen >= x_len ) {
         if( memcmp( b_rdata, x_data, x_len ) == 0 ) {
             *i = b_rdata - ypBytes_DATA( b );
             return yp_None;
         }
-        b_rdata++; b_rlen--;
+        b_rdata += step;
+        b_rlen--;
     }
     *i = -1;
     return yp_None;
@@ -4109,7 +4117,7 @@ static ypObject *bytes_contains( ypObject *b, ypObject *x )
     ypObject *result;
     yp_ssize_t i = -1;
 
-    result = bytes_find( b, x, 0, yp_SLICE_USELEN, &i );
+    result = bytes_find( b, x, 0, yp_SLICE_USELEN, yp_FIND_FORWARD, &i );
     if( yp_isexceptionC( result ) ) return result;
     return ypBool_FROM_C( i >= 0 );
 }
@@ -4120,7 +4128,7 @@ static ypObject *bytes_len( ypObject *b, yp_ssize_t *len )
     return yp_None;
 }
 
-static ypObject *bytearray_push( ypObject *b, ypObject *x ) 
+static ypObject *bytearray_push( ypObject *b, ypObject *x )
 {
     return bytearray_insert( b, yp_SLICE_USELEN, x );
 }
@@ -5205,17 +5213,20 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
 }
 
 static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t *index )
+        findfunc_direction direction, yp_ssize_t *index )
 {
     ypObject *result;
-    yp_ssize_t step = 1; // ignored; assumed unchanged by ypSlice_AdjustIndicesC
-    yp_ssize_t newLen; // ignored
+    yp_ssize_t step = 1;    // may change to -1
+    yp_ssize_t sq_rlen;     // remaining length
     yp_ssize_t i;
 
-    result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &newLen );
+    result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &sq_rlen );
     if( yp_isexceptionC( result ) ) return result;
+    if( direction == yp_FIND_REVERSE ) {
+        _ypSlice_InvertIndicesC( &start, &stop, &step, sq_rlen );
+    }
 
-    for( i = start; i < stop; i++ ) {
+    for( i = start; sq_rlen > 0; i += step, sq_rlen-- ) {
         ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
         if( yp_isexceptionC( result ) ) return result;
         if( ypBool_IS_TRUE_C( result ) ) {
@@ -8369,11 +8380,11 @@ ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssiz
     _yp_REDIRECT2( sequence, tp_as_sequence, tp_getslice, (sequence, i, j, k) );
 }
 
-yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) 
+yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc )
 {
     yp_ssize_t index;
     ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_find(
-            sequence, x, i, j, &index );
+            sequence, x, i, j, yp_FIND_FORWARD, &index );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( -1, exc, result );
     // TODO make this a debug-only check?
     if( index < -1 ) return_yp_CEXC_ERR( -1, exc, yp_SystemError );
@@ -8384,7 +8395,8 @@ yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc ) {
     return yp_findC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
-yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc ) 
+yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+        ypObject **exc )
 {
     ypObject *subexc = yp_None;
     yp_ssize_t result = yp_findC4( sequence, x, i, j, &subexc );
@@ -8397,8 +8409,38 @@ yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc ) {
     return yp_indexC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
+yp_ssize_t yp_rfindC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+        ypObject **exc )
+{
+    yp_ssize_t index;
+    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_find(
+            sequence, x, i, j, yp_FIND_REVERSE, &index );
+    if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( -1, exc, result );
+    // TODO make this a debug-only check?
+    if( index < -1 ) return_yp_CEXC_ERR( -1, exc, yp_SystemError );
+    return index;
+}
+
+yp_ssize_t yp_rfindC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+    return yp_rfindC4( sequence, x, 0, yp_SLICE_USELEN, exc );
+}
+
+yp_ssize_t yp_rindexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+        ypObject **exc )
+{
+    ypObject *subexc = yp_None;
+    yp_ssize_t result = yp_rfindC4( sequence, x, i, j, &subexc );
+    if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( -1, exc, subexc );
+    if( result == -1 ) return_yp_CEXC_ERR( -1, exc, yp_ValueError );
+    return result;
+}
+
+yp_ssize_t yp_rindexC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+    return yp_rindexC4( sequence, x, 0, yp_SLICE_USELEN, exc );
+}
+
 yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-        ypObject **exc ) 
+        ypObject **exc )
 {
     yp_ssize_t count;
     ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_count(
