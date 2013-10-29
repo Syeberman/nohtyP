@@ -3720,28 +3720,6 @@ static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
     data[factor*n] = '\0';
 }
 
-// growhint is the number of additional items, not including x, that are expected to be added to b
-// XXX Does _not_ write out the null-terminator; do "b[len(b)]=0" when this returns
-static ypObject *_ypBytes_push( ypObject *b, ypObject *x, yp_ssize_t growhint )
-{
-    ypObject *exc = yp_None;
-    yp_ssize_t newLen = ypBytes_LEN( b ) + 1;
-    ypObject *result;
-    yp_uint8_t x_asbyte;
-
-    x_asbyte = _ypBytes_asuint8C( x, &exc );
-    if( yp_isexceptionC( exc ) ) return exc;
-
-    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
-        if( growhint < 0 ) growhint = 0;
-        result = _ypBytes_resize( b, newLen+1, growhint );
-        if( yp_isexceptionC( result ) ) return result;
-    }
-    ypBytes_DATA( b )[ypBytes_LEN( b )] = x_asbyte;
-    ypBytes_LEN( b ) = newLen;
-    return yp_None;
-}
-
 // Extends b with the contents of x, a fellow byte object; always writes the null-terminator
 // TODO over-allocate as appropriate
 static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
@@ -3758,13 +3736,17 @@ static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
     return yp_None;
 }
 
-// XXX Does _not_ write out the null-terminator; do "b[len(b)]=0" when this returns (even on error)
+// Extends b with the items yielded from x; never writes the null-terminator, and only updates
+// length once the iterator is exhausted
+// XXX Do "b[len(b)]=0" when this returns (even on error)
 static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64_t *mi_state )
 {
     ypObject *exc = yp_None;
     ypObject *x;
-    ypObject *result;
+    yp_uint8_t x_asbyte;
     yp_ssize_t lenhint = yp_miniiter_lenhintC( mi, mi_state, &exc ); // zero on error
+    yp_ssize_t newLen = ypBytes_LEN( b );
+    ypObject *result;
 
     while( 1 ) {
         x = yp_miniiter_next( mi, mi_state ); // new ref
@@ -3772,11 +3754,23 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
             if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
             return x;
         }
-        lenhint -= 1; // check for <0 only when we need it in _ypBytes_push
-        result = _ypBytes_push( b, x, lenhint );
+        x_asbyte = _ypBytes_asuint8C( x, &exc );
         yp_decref( x );
-        if( yp_isexceptionC( result ) ) return result;
+        if( yp_isexceptionC( exc ) ) return exc;
+
+        lenhint -= 1; // check for <0 only when we need it
+        newLen += 1;
+        if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+            if( lenhint < 0 ) lenhint = 0;
+            result = _ypBytes_resize( b, newLen+1, lenhint );
+            if( yp_isexceptionC( result ) ) return result;
+        }
+        ypBytes_DATA( b )[newLen-1] = x_asbyte;
     }
+    
+    // Modifying len here allows us to bail easily above, relying on the calling code to replace
+    // the null terminator at the right position
+    ypBytes_LEN( b ) = newLen;
     return yp_None;
 }
 
@@ -4073,9 +4067,25 @@ static ypObject *bytes_len( ypObject *b, yp_ssize_t *len )
     return yp_None;
 }
 
-static ypObject *bytearray_push( ypObject *b, ypObject *x ) {
-    // TODO over-allocate via growhint
-    return _ypBytes_push( b, x, 0 );
+// TODO over-allocate via growhint
+static ypObject *bytearray_push( ypObject *b, ypObject *x ) 
+{
+    ypObject *exc = yp_None;
+    yp_ssize_t newLen = ypBytes_LEN( b ) + 1;
+    ypObject *result;
+    yp_uint8_t x_asbyte;
+
+    x_asbyte = _ypBytes_asuint8C( x, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+
+    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+        result = _ypBytes_resize( b, newLen+1, 0 );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    ypBytes_DATA( b )[ypBytes_LEN( b )] = x_asbyte;
+    ypBytes_DATA( b )[newLen] = '\0';
+    ypBytes_LEN( b ) = newLen;
+    return yp_None;
 }
 
 // TODO If we're ever going to shrink allocated memory, clear is definitely one place to do it
