@@ -1,4 +1,4 @@
-This is nohtyP version 0.1.0
+This is nohtyP version 0.5.0
 ============================
 
 Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
@@ -14,7 +14,7 @@ Build Instructions
 ------------------
 
 In the simplest case, just add nohtyP.c and nohtyP.h to your C project, and
-call yp_initialize on start-up.
+call yp_initialize on start-up.  nohtyP also builds as a DLL.
 
 The Build directory contains makefiles for various compilers and targets; for
 example, the following will build nohtyP.dll under Visual Studio 10:
@@ -83,7 +83,7 @@ Copyright (c) 1991-1995 Stichting Mathematisch Centrum.  All rights reserved.
 See the file "LICENSE" for information on the history of this software, terms &
 conditions for usage, and a DISCLAIMER OF ALL WARRANTIES.
 
-nohtyP is patterned after, and contains source from, Python 3.0 and above.
+nohtyP is patterned after, and contains source from, Python 2.7 and above.
 nohtyP has always been released under a Python Software Foundation (PSF) 
 license.  Source taken from Python comes from distributions containing *no*
 GNU General Public License (GPL) code.  As such, nohtyP may be used in 
