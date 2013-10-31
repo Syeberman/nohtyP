@@ -9,6 +9,7 @@ yp.py - Python wrapper for nohtyP
 # TODO __all__, or underscores
 
 from ctypes import *
+from ctypes import _SimpleCData
 import sys, weakref, operator, pickle, reprlib
 
 ypdll = cdll.nohtyP
@@ -46,6 +47,12 @@ class yp_param:
     def preconvert( self, x ):
         if issubclass( self.type, (c_ypObject_p, c_ypObject_pp) ):
             return self.type.from_param( x )
+        elif issubclass( self.type, _SimpleCData ):
+            if self.type._type_ in "PzZ": return x  # skip pointers
+            converted = self.type( x ).value
+            if converted != x: 
+                raise OverflowError( "overflow in ctypes argument (%r != %r)" % (converted, x) )
+            return x
         else:
             return x
 
