@@ -274,15 +274,14 @@ c_yp_generator_func_t = CFUNCTYPE( c_void_p, c_ypObject_p, c_ypObject_p )
 # ypObject *yp_intC( yp_int_t value );
 yp_func( c_ypObject_p, "yp_intC", ((c_yp_int_t, "value"), ) )
 # ypObject *yp_intstoreC( yp_int_t value );
-yp_func( c_ypObject_p, "yp_intstoreC", ((c_yp_int_t, "value"), ) )
 
-# ypObject *yp_int_strC( const char *string, int base );
-# ypObject *yp_intstore_strC( const char *string, int base );
+# ypObject *yp_int_baseC( ypObject *x, yp_int_t base );
+yp_func( c_ypObject_p, "yp_int_baseC", ((c_ypObject_p, "x"), (c_yp_int_t, "base")) )
+# ypObject *yp_intstore_baseC( ypObject *x, yp_int_t base );
 
 # ypObject *yp_int( ypObject *x );
 yp_func( c_ypObject_p, "yp_int", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_intstore( ypObject *x );
-yp_func( c_ypObject_p, "yp_intstore", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_floatC( yp_float_t value );
 yp_func( c_ypObject_p, "yp_floatC", ((c_yp_float_t, "value"), ) )
@@ -1086,11 +1085,13 @@ def pytype( pytypes, ypcode ):
 
 @pytype( BaseException, 2 )
 class yp_BaseException( ypObject ):
-    def __new__( cls ): raise NotImplementedError( "can't instantiate yp_BaseException directly" )
+    def __new__( cls, *args, **kwargs ):
+        raise NotImplementedError( "can't instantiate yp_BaseException directly" )
 
 @pytype( type, 4 )
 class yp_type( ypObject ):
-    def __new__( cls ): raise NotImplementedError( "can't instantiate yp_type directly" )
+    def __new__( cls, *args, **kwargs ):
+        raise NotImplementedError( "can't instantiate yp_type directly" )
 c_ypObject_p_value( "yp_type_invalidated" )
 c_ypObject_p_value( "yp_type_exception" )
 c_ypObject_p_value( "yp_type_type" )
@@ -1114,7 +1115,8 @@ c_ypObject_p_value( "yp_type_dict" )
 
 @pytype( type( None ), 6 )
 class yp_NoneType( ypObject ):
-    def __new__( cls ): raise NotImplementedError( "can't instantiate yp_NoneType directly" )
+    def __new__( cls, *args, **kwargs ):
+        raise NotImplementedError( "can't instantiate yp_NoneType directly" )
     @classmethod
     def _frompython( cls, pyobj ):
         assert pyobj is None
@@ -1223,11 +1225,12 @@ def _yp_iterable( iterable ):
 
 @pytype( int, 10 )
 class yp_int( ypObject ):
-    def __new__( cls, x=0, base=None ):
-        if base is None:
+    def __new__( cls, x=0, base=_yp_arg_missing ):
+        if base is _yp_arg_missing:
             if isinstance( x, int ): return _yp_intC( x )
             return _yp_int( x )
-        raise NotImplementedError
+        else:
+            return _yp_int_baseC( x, base )
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def __str__( self ): return str( _yp_asintC( self, yp_None ) )
     def __repr__( self ): return repr( _yp_asintC( self, yp_None ) )
