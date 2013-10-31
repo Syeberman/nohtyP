@@ -592,6 +592,245 @@ static int _yp_recursion_limit = 1000;
 
 
 /*************************************************************************************************
+ * Locale-independent ctype.h-like macros
+ * XXX This entire section is adapted from Python's pyctype.c and pyctype.h
+ *************************************************************************************************/
+
+#define _yp_CTF_LOWER  0x01
+#define _yp_CTF_UPPER  0x02
+#define _yp_CTF_ALPHA  (_yp_CTF_LOWER|_yp_CTF_UPPER)
+#define _yp_CTF_DIGIT  0x04
+#define _yp_CTF_ALNUM  (_yp_CTF_ALPHA|_yp_CTF_DIGIT)
+#define _yp_CTF_SPACE  0x08
+#define _yp_CTF_XDIGIT 0x10
+
+/* Unlike their C counterparts, the following macros are meant only for yp_uint8_t values. */
+#define yp_ISLOWER(c)  (_yp_ctype_table[c] & _yp_CTF_LOWER)
+#define yp_ISUPPER(c)  (_yp_ctype_table[c] & _yp_CTF_UPPER)
+#define yp_ISALPHA(c)  (_yp_ctype_table[c] & _yp_CTF_ALPHA)
+#define yp_ISDIGIT(c)  (_yp_ctype_table[c] & _yp_CTF_DIGIT)
+#define yp_ISXDIGIT(c) (_yp_ctype_table[c] & _yp_CTF_XDIGIT)
+#define yp_ISALNUM(c)  (_yp_ctype_table[c] & _yp_CTF_ALNUM)
+#define yp_ISSPACE(c)  (_yp_ctype_table[c] & _yp_CTF_SPACE)
+
+#define yp_TOLOWER(c) (_yp_ctype_tolower[c])
+#define yp_TOUPPER(c) (_yp_ctype_toupper[c])
+
+// XXX Adapted from Python's pyctype.c and pyctype.h
+// TODO In Python, this is a table of unsigned ints, which is unnecessarily large; report and fix
+const yp_uint8_t _yp_ctype_table[256] = {
+    0, /* 0x0 '\x00' */
+    0, /* 0x1 '\x01' */
+    0, /* 0x2 '\x02' */
+    0, /* 0x3 '\x03' */
+    0, /* 0x4 '\x04' */
+    0, /* 0x5 '\x05' */
+    0, /* 0x6 '\x06' */
+    0, /* 0x7 '\x07' */
+    0, /* 0x8 '\x08' */
+    _yp_CTF_SPACE, /* 0x9 '\t' */
+    _yp_CTF_SPACE, /* 0xa '\n' */
+    _yp_CTF_SPACE, /* 0xb '\v' */
+    _yp_CTF_SPACE, /* 0xc '\f' */
+    _yp_CTF_SPACE, /* 0xd '\r' */
+    0, /* 0xe '\x0e' */
+    0, /* 0xf '\x0f' */
+    0, /* 0x10 '\x10' */
+    0, /* 0x11 '\x11' */
+    0, /* 0x12 '\x12' */
+    0, /* 0x13 '\x13' */
+    0, /* 0x14 '\x14' */
+    0, /* 0x15 '\x15' */
+    0, /* 0x16 '\x16' */
+    0, /* 0x17 '\x17' */
+    0, /* 0x18 '\x18' */
+    0, /* 0x19 '\x19' */
+    0, /* 0x1a '\x1a' */
+    0, /* 0x1b '\x1b' */
+    0, /* 0x1c '\x1c' */
+    0, /* 0x1d '\x1d' */
+    0, /* 0x1e '\x1e' */
+    0, /* 0x1f '\x1f' */
+    _yp_CTF_SPACE, /* 0x20 ' ' */
+    0, /* 0x21 '!' */
+    0, /* 0x22 '"' */
+    0, /* 0x23 '#' */
+    0, /* 0x24 '$' */
+    0, /* 0x25 '%' */
+    0, /* 0x26 '&' */
+    0, /* 0x27 "'" */
+    0, /* 0x28 '(' */
+    0, /* 0x29 ')' */
+    0, /* 0x2a '*' */
+    0, /* 0x2b '+' */
+    0, /* 0x2c ',' */
+    0, /* 0x2d '-' */
+    0, /* 0x2e '.' */
+    0, /* 0x2f '/' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x30 '0' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x31 '1' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x32 '2' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x33 '3' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x34 '4' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x35 '5' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x36 '6' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x37 '7' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x38 '8' */
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x39 '9' */
+    0, /* 0x3a ':' */
+    0, /* 0x3b ';' */
+    0, /* 0x3c '<' */
+    0, /* 0x3d '=' */
+    0, /* 0x3e '>' */
+    0, /* 0x3f '?' */
+    0, /* 0x40 '@' */
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x41 'A' */
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x42 'B' */
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x43 'C' */
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x44 'D' */
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x45 'E' */
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x46 'F' */
+    _yp_CTF_UPPER, /* 0x47 'G' */
+    _yp_CTF_UPPER, /* 0x48 'H' */
+    _yp_CTF_UPPER, /* 0x49 'I' */
+    _yp_CTF_UPPER, /* 0x4a 'J' */
+    _yp_CTF_UPPER, /* 0x4b 'K' */
+    _yp_CTF_UPPER, /* 0x4c 'L' */
+    _yp_CTF_UPPER, /* 0x4d 'M' */
+    _yp_CTF_UPPER, /* 0x4e 'N' */
+    _yp_CTF_UPPER, /* 0x4f 'O' */
+    _yp_CTF_UPPER, /* 0x50 'P' */
+    _yp_CTF_UPPER, /* 0x51 'Q' */
+    _yp_CTF_UPPER, /* 0x52 'R' */
+    _yp_CTF_UPPER, /* 0x53 'S' */
+    _yp_CTF_UPPER, /* 0x54 'T' */
+    _yp_CTF_UPPER, /* 0x55 'U' */
+    _yp_CTF_UPPER, /* 0x56 'V' */
+    _yp_CTF_UPPER, /* 0x57 'W' */
+    _yp_CTF_UPPER, /* 0x58 'X' */
+    _yp_CTF_UPPER, /* 0x59 'Y' */
+    _yp_CTF_UPPER, /* 0x5a 'Z' */
+    0, /* 0x5b '[' */
+    0, /* 0x5c '\\' */
+    0, /* 0x5d ']' */
+    0, /* 0x5e '^' */
+    0, /* 0x5f '_' */
+    0, /* 0x60 '`' */
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x61 'a' */
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x62 'b' */
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x63 'c' */
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x64 'd' */
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x65 'e' */
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x66 'f' */
+    _yp_CTF_LOWER, /* 0x67 'g' */
+    _yp_CTF_LOWER, /* 0x68 'h' */
+    _yp_CTF_LOWER, /* 0x69 'i' */
+    _yp_CTF_LOWER, /* 0x6a 'j' */
+    _yp_CTF_LOWER, /* 0x6b 'k' */
+    _yp_CTF_LOWER, /* 0x6c 'l' */
+    _yp_CTF_LOWER, /* 0x6d 'm' */
+    _yp_CTF_LOWER, /* 0x6e 'n' */
+    _yp_CTF_LOWER, /* 0x6f 'o' */
+    _yp_CTF_LOWER, /* 0x70 'p' */
+    _yp_CTF_LOWER, /* 0x71 'q' */
+    _yp_CTF_LOWER, /* 0x72 'r' */
+    _yp_CTF_LOWER, /* 0x73 's' */
+    _yp_CTF_LOWER, /* 0x74 't' */
+    _yp_CTF_LOWER, /* 0x75 'u' */
+    _yp_CTF_LOWER, /* 0x76 'v' */
+    _yp_CTF_LOWER, /* 0x77 'w' */
+    _yp_CTF_LOWER, /* 0x78 'x' */
+    _yp_CTF_LOWER, /* 0x79 'y' */
+    _yp_CTF_LOWER, /* 0x7a 'z' */
+    0, /* 0x7b '{' */
+    0, /* 0x7c '|' */
+    0, /* 0x7d '}' */
+    0, /* 0x7e '~' */
+    0, /* 0x7f '\x7f' */
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+// XXX Adapted from Python's pyctype.c and pyctype.h
+const yp_uint8_t _yp_ctype_tolower[256] = {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+    0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+    0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+    0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+    0x40, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,
+    0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,
+    0x78, 0x79, 0x7a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,
+    0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,
+    0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+    0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
+    0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7,
+    0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
+    0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7,
+    0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf,
+    0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7,
+    0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf,
+    0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7,
+    0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf,
+    0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7,
+    0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef,
+    0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
+    0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
+};
+
+// XXX Adapted from Python's pyctype.c and pyctype.h
+const yp_uint8_t _yp_ctype_toupper[256] = {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+    0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+    0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+    0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+    0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+    0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
+    0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+    0x60, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+    0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
+    0x58, 0x59, 0x5a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+    0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
+    0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7,
+    0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
+    0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7,
+    0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf,
+    0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7,
+    0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf,
+    0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7,
+    0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf,
+    0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7,
+    0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef,
+    0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
+    0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
+};
+
+
+/*************************************************************************************************
  * nohtyP memory allocations
  *************************************************************************************************/
 
@@ -2406,6 +2645,134 @@ typedef yp_float_t (*unaryFLfunc)( yp_float_t, ypObject ** );
 yp_IMMORTAL_INT( yp_sys_maxint, yp_INT_T_MAX );
 yp_IMMORTAL_INT( yp_sys_minint, yp_INT_T_MIN );
 
+// XXX Adapted from Python's _PyLong_DigitValue
+/* Table of digit values for 8-bit string -> integer conversion.
+ * '0' maps to 0, ..., '9' maps to 9.
+ * 'a' and 'A' map to 10, ..., 'z' and 'Z' map to 35.
+ * All other indices map to 37.
+ * Note that when converting a base B string, a yp_uint8_t c is a legitimate
+ * base B digit iff _ypInt_digit_value[c] < B.
+ */
+unsigned char _ypInt_digit_value[256] = {
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  37, 37, 37, 37, 37, 37,
+    37, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+    25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 37, 37, 37, 37, 37,
+    37, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+    25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+    37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+};
+
+// XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
+static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8_t *bytes, 
+        yp_int_t base )
+{
+    ypObject *exc = yp_None;
+    int negateResult;
+    yp_int_t result;
+    yp_int_t digit;
+
+    // Skip leading whitespace
+    while( 1 ) {
+        if( *bytes == '\0' ) return yp_ValueError;
+        if( !yp_ISSPACE( *bytes ) ) break;
+        bytes++;
+    }
+
+    // We're pointing to a non-whitespace character; see if there's a sign we should consume
+    negateResult = FALSE;
+    if( *bytes == '+' ) {
+        bytes++;
+    } else if( *bytes == '-' ) {
+        negateResult = TRUE;
+        bytes++;
+    }
+
+    // We could be pointing to anything; determine if any prefix agrees with base
+    if( *bytes == '0' ) {
+        // We can safely consume this leading zero in all cases, as it cannot change the value
+        bytes++;
+        if( *bytes == '\0' || yp_ISSPACE( *bytes ) ) {
+            // We've just parsed the string b"0", b"  0  ", etc; take a shortcut
+            result = 0; 
+            goto endofdigits;
+        } else if( *bytes == 'b' || *bytes == 'B' ) {
+            if( base == 0 ) base = 2;
+            if( base == 2 ) bytes++; // consume this character only if the base agrees
+        } else if( *bytes == 'o' || *bytes == 'O' ) {
+            if( base == 0 ) base = 8;
+            if( base == 8 ) bytes++; // (ditto)
+        } else if( *bytes == 'x' || *bytes == 'X' ) {
+            if( base == 0 ) base = 16;
+            if( base == 16 ) bytes++; // (ditto)
+        } else {
+            // Leading zeroes are allowed if the value is zero, regardless of base (ie "00000");
+            // once again, it's always safe to consume leading zeroes
+            while( *bytes == '0' ) bytes++;
+            if( *bytes == '\0' || yp_ISSPACE( *bytes ) ) {
+                result = 0;
+                goto endofdigits;
+            }
+            // We're now pointing to the first non-zero digit
+            // For non-zero values, leading zeroes are not allowed when base is zero
+            if( base == 0 ) return yp_ValueError;
+        }
+    }
+    if( base == 0 ) {
+        base = 10; // a Python literal without a prefix is base 10
+    } else if( base < 2 || base > 36 ) {
+        return yp_ValueError;
+    }
+
+    // We could be pointing to anything; make sure there's at least one, valid digit; 
+    // _ypInt_digit_value[*bytes]>=base ensures we stop at the null-terminator, whitespace, and 
+    // invalid characters
+    digit = _ypInt_digit_value[*bytes];
+    if( digit >= base ) return yp_ValueError;
+    bytes++;
+    result = 0;
+    while( 1 ) {
+        // We avoid checking exc until we've exhausted the digits: any errors are never cleared
+        result = yp_addL( yp_mulL( result, base, &exc ), digit, &exc );
+        
+        // Get the next digit
+        digit = _ypInt_digit_value[*bytes];
+        if( digit >= base ) {
+            // Any errors in the yp_addL/yp_mulL math mean we've overflown yp_int_t
+            if( yp_isexceptionC( exc ) ) return yp_OverflowError;
+            goto endofdigits;
+        }
+        bytes++;
+    }
+
+    // Ensure there's only whitespace left in the string, and return the new integer
+    // TODO How do we parse yp_sys_minint?  We can't negate it from a positive value (see
+    // PY_ABS_LONG_MIN comments)
+endofdigits:
+    while( 1 ) {
+        if( *bytes == '\0' ) break;
+        if( !yp_ISSPACE( *bytes ) ) return yp_ValueError;
+        bytes++;
+    }
+    if( negateResult ) {
+        result = yp_negL( result, &exc );
+        if( yp_isexceptionC( exc ) ) return yp_OverflowError;
+    }
+    return allocator( result );   
+}
+
+
+// Public Methods
+
 static ypObject *int_dealloc( ypObject *i ) {
     ypMem_FREE_FIXED( i );
     return yp_None;
@@ -2991,19 +3358,53 @@ ypObject *yp_intstoreC( yp_int_t value )
     return i;
 }
 
-static ypObject *_ypInt( ypObject *(*allocator)( yp_int_t ), ypObject *x )
+// base is ignored if x is not a bytes or string
+static ypObject *_ypInt( ypObject *(*allocator)( yp_int_t ), ypObject *x, yp_int_t base )
 {
     ypObject *exc = yp_None;
-    yp_int_t x_asint = yp_asintC( x, &exc );
-    if( yp_isexceptionC( exc ) ) return exc;
-    return allocator( x_asint );
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+
+    if( x_pair == ypInt_CODE ) {
+        return allocator( ypInt_VALUE( x ) );
+    } else if( x_pair == ypFloat_CODE ) {
+        yp_int_t x_asint = yp_asintFL( ypFloat_VALUE( x ), &exc );
+        if( yp_isexceptionC( exc ) ) return exc;
+        return allocator( x_asint );
+    } else if( x_pair == ypBool_CODE ) {
+        return allocator( ypBool_IS_TRUE_C( x ) );
+    } else if( x_pair == ypBytes_CODE ) {
+        yp_uint8_t *bytes;
+        ypObject *result = yp_asbytesCX( x, &bytes, NULL );
+        if( yp_isexceptionC( result ) ) return yp_ValueError; // contains null bytes
+        return _ypInt_from_ascii( allocator, bytes, base );
+    } else if( x_pair == ypStr_CODE ) {
+        // TODO Implement decoding
+        yp_uint8_t *encoded;
+        ypObject *encoding;
+        ypObject *result = yp_asencodedCX( x, &encoded, NULL, &encoding );
+        if( yp_isexceptionC( result ) ) return yp_ValueError; // contains null bytes
+        if( encoding != yp_s_latin_1 ) return yp_NotImplementedError;
+        return _ypInt_from_ascii( allocator, encoded, base );
+    } else {
+        return_yp_BAD_TYPE( x );
+    }
+}
+ypObject *yp_int_baseC( ypObject *x, yp_int_t base ) {
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    if( x_pair != ypBytes_CODE && x_pair != ypStr_CODE ) return_yp_BAD_TYPE( x );
+    return _ypInt( yp_intC, x, base );
+}
+ypObject *yp_intstore_baseC( ypObject *x, yp_int_t base ) {
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    if( x_pair != ypBytes_CODE && x_pair != ypStr_CODE ) return_yp_BAD_TYPE( x );
+    return _ypInt( yp_intstoreC, x, base );
 }
 ypObject *yp_int( ypObject *x ) {
     if( ypObject_TYPE_CODE( x ) == ypInt_CODE ) return yp_incref( x );
-    return _ypInt( yp_intC, x );
+    return _ypInt( yp_intC, x, 10 );
 }
 ypObject *yp_intstore( ypObject *x ) {
-    return _ypInt( yp_intstoreC, x );
+    return _ypInt( yp_intstoreC, x, 10 );
 }
 
 // Public conversion functions
