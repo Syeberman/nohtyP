@@ -28,7 +28,8 @@ L = [
         ('', ValueError),
         (' ', ValueError),
         ('  \t\t  ', ValueError),
-        ("\u0200", ValueError)
+        # TODO Support full Unicode in nohtyP
+        #("\u0200", ValueError)
 ]
 
 class IntTestCases(unittest.TestCase):
@@ -44,7 +45,8 @@ class IntTestCases(unittest.TestCase):
         self.assertEqual(yp_int(-3.5), -3)
         self.assertEqual(yp_int("-3"), -3)
         self.assertEqual(yp_int(" -3 "), -3)
-        self.assertEqual(yp_int("\N{EM SPACE}-3\N{EN SPACE}"), -3)
+        # TODO Support full Unicode in nohtyP
+        #self.assertEqual(yp_int("\N{EM SPACE}-3\N{EN SPACE}"), -3)
         # Different base:
         self.assertEqual(yp_int("10",16), 16)
         # Test conversion from strings and various anomalies
@@ -223,6 +225,10 @@ class IntTestCases(unittest.TestCase):
         self.assertEqual(yp_int('2qhxjlj', 34), 4294967297)
         self.assertEqual(yp_int('2br45qc', 35), 4294967297)
         self.assertEqual(yp_int('1z141z5', 36), 4294967297)
+
+    @unittest.skip("TODO: Support full Unicode in nohtyP")
+    def test_basic_unicode(self):
+        self.assertEqual(yp_int("\N{EM SPACE}-3\N{EN SPACE}"), -3)
 
     @unittest.skip("REWORK: nohtyP doesn't have user-defined types yet")
     def test_intconversion(self):
