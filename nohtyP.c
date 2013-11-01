@@ -2968,7 +2968,7 @@ yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc )
 // described at http://www.fefe.de/intof.html, although it requires abs(x) and abs(y), meaning
 // we need to handle yp_INT_T_MIN specially because we can't negate it.
 // TODO Ensure our test suite exercises this fully
-yp_int_t _yp_mulL_minint( yp_int_t y, ypObject **exc )
+static yp_int_t _yp_mulL_minint( yp_int_t y, ypObject **exc )
 {
     // When multiplying yp_INT_T_MIN, there are only two values of y that won't overflow
     if( y == 0 ) return 0;
@@ -3052,27 +3052,128 @@ yp_float_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc )
 
 yp_int_t yp_floordivL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x / y; // TODO overflow check
+    yp_int_t div, mod;
+    yp_divmodL( x, y, &div, &mod, exc );
+    return div;
 }
 
 yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x % y; // TODO overflow check
+    yp_int_t div, mod;
+    yp_divmodL( x, y, &div, &mod, exc );
+    return mod;
+}
+
+// XXX Adapted from Python 2.7's i_divmod
+void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *_div, yp_int_t *_mod, ypObject **exc )
+{
+    yp_int_t xdivy, xmody;
+
+    if (y == 0) {
+        *exc = yp_ZeroDivisionError;
+        goto error;
+    }
+    /* (-sys.maxint-1)/-1 is the only overflow case. */
+    if (y == -1 && x == yp_INT_T_MIN) {
+        *exc = yp_OverflowError;
+        goto error;
+    }
+
+    xdivy = x / y;
+    /* xdiv*y can overflow on platforms where x/y gives floor(x/y)
+     * for x and y with differing signs. (This is unusual
+     * behaviour, and C99 prohibits it, but it's allowed by C89;
+     * for an example of overflow, take x = LONG_MIN, y = 5 or x =
+     * LONG_MAX, y = -5.)  However, x - xdivy*y is always
+     * representable as a long, since it lies strictly between
+     * -abs(y) and abs(y).  We add casts to avoid intermediate
+     * overflow.
+     */
+    xmody = yp_UINT_MATH( x, -, yp_UINT_MATH( xdivy, *, y ) );
+    /* If the signs of x and y differ, and the remainder is non-0,
+     * C89 doesn't define whether xdivy is now the floor or the
+     * ceiling of the infinitely precise quotient.  We want the floor,
+     * and we have it iff the remainder's sign matches y's.
+     */
+    if (xmody && ((y ^ xmody) < 0) /* i.e. and signs differ */) {
+        xmody += y;
+        --xdivy;
+        //yp_assert(xmody && ((y ^ xmody) >= 0));
+    }
+    *_div = xdivy;
+    *_mod = xmody;
+    return;
+
+error:
+    *_div = 0;
+    *_mod = 0;
 }
 
 yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    yp_int_t result;
+    return yp_powL3( x, y, 0, exc );
+}
 
-    // TODO A negative exponent results in a float, which we can't return, so determine a good
-    // error to raise
-    // XXX Note that we return what yp_asintC on the float result would return: zero
-    if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
+// XXX Adapted from Python 2.7's int_pow
+yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
+{
+    yp_int_t result, temp, prev;
+    if (y < 0) {
+        if (z != 0) {
+            // "pow() 2nd argument cannot be negative when 3rd argument specified"
+            return_yp_CEXC_ERR( 0, exc, yp_ValueError );
+        }
+        // XXX A negative exponent means a float should be returned, which we can't do here, so
+        // this is handled at higher levels
+        return_yp_CEXC_ERR( 0, exc, yp_ValueError );
+    }
 
-    // TODO Is there a better implementation?
+    /*
+     * XXX: The original exponentiation code stopped looping
+     * when temp hit zero; this code will continue onwards
+     * unnecessarily, but at least it won't cause any errors.
+     * Hopefully the speed improvement from the fast exponentiation
+     * will compensate for the slight inefficiency.
+     * XXX: Better handling of overflows is desperately needed.
+     */
+    temp = x;
     result = 1;
-    for( /*y already set*/; y > 0; y-- ) result = yp_mulL( result, x, exc );
-    return result;
+    while (y > 0) {
+        prev = result;              /* Save value for overflow check */
+        if (y & 1) {
+            /*
+             * The (unsigned long) cast below ensures that the multiplication
+             * is interpreted as an unsigned operation rather than a signed one
+             * (C99 6.3.1.8p1), thus avoiding the perils of undefined behaviour
+             * from signed arithmetic overflow (C99 6.5p5).  See issue #12973.
+             */
+            result = yp_UINT_MATH(result, *, temp);
+            if (temp == 0)
+                break; /* Avoid result / 0 */
+            if (result / temp != prev) {
+                return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+            }
+        }
+        y >>= 1;               /* Shift exponent down by 1 bit */
+        if (y==0) break;
+        prev = temp;
+        temp = yp_UINT_MATH(temp, *, temp);  /* Square the value of temp */
+        if (prev != 0 && temp / prev != prev) {
+            return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+        }
+        if (z) {
+            /* If we did a multiplication, perform a modulo */
+            result = result % z;
+            temp = temp % z;
+        }
+    }
+    if (z) {
+        yp_int_t div;
+        yp_divmodL(result, z, &div, &result, exc);
+        return result;
+    } else {
+        return result;
+    }
 }
 
 yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
