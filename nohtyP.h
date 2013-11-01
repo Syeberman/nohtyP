@@ -1027,8 +1027,7 @@ ypAPI void yp_iampFC( ypObject **x, yp_float_t y );
 ypAPI void yp_ixorFC( ypObject **x, yp_float_t y );
 ypAPI void yp_ibarFC( ypObject **x, yp_float_t y );
 
-// Library routines for nohtyP integer operations on C types.  Returns a reasonable value and sets
-// *exc on error; "reasonable" usually means "truncated".
+// Library routines for nohtyP integer operations on C types.  Returns zero and sets *exc on error.
 ypAPI yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc );
@@ -1048,8 +1047,8 @@ ypAPI yp_int_t yp_posL( yp_int_t x, ypObject **exc );
 ypAPI yp_int_t yp_absL( yp_int_t x, ypObject **exc );
 ypAPI yp_int_t yp_invertL( yp_int_t x, ypObject **exc );
 
-// Library routines for nohtyP floating-point operations on C types.  Returns a reasonable value
-// and sets *exc on error; "reasonable" usually means "truncated".
+// Library routines for nohtyP floating-point operations on C types.  Returns zero and sets *exc 
+// on error.
 ypAPI yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc );
