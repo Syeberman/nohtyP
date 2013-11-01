@@ -230,6 +230,241 @@ class IntTestCases(unittest.TestCase):
     def test_basic_unicode(self):
         self.assertEqual(yp_int("\N{EM SPACE}-3\N{EN SPACE}"), -3)
 
+    def test_yp_int_parse_boundaries(self):
+        inrange = (
+            (0x7ffffffffffffffe, (
+                '111111111111111111111111111111111111111111111111111111111111110', # base=2
+                '2021110011022210012102010021220101220220', # base=3
+                '13333333333333333333333333333332', # base=4
+                '1104332401304422434310311211', # base=5
+                '1540241003031030222122210', # base=6
+                '22341010611245052052266', # base=7
+                '777777777777777777776', # base=8
+                '67404283172107811826', # base=9
+                '9223372036854775806', # base=10
+                '1728002635214590696', # base=11
+                '41a792678515120366', # base=12
+                '10b269549075433c36', # base=13
+                '4340724c6c71dc7a6', # base=14
+                '160e2ad3246366806', # base=15
+                '7ffffffffffffffe', # base=16
+                '33d3d8307b214007', # base=17
+                '16agh595df825fa6', # base=18
+                'ba643dci0ffeehg', # base=19
+                '5cbfjia3fh26ja6', # base=20
+                '2heiciiie82dh96', # base=21
+                '1adaibb21dckfa6', # base=22
+                'i6k448cf4192c1', # base=23
+                'acd772jnc9l0l6', # base=24
+                '64ie1focnn5g76', # base=25
+                '3igoecjbmca686', # base=26
+                '27c48l5b37oaoo', # base=27
+                '1bk39f3ah3dmq6', # base=28
+                'q1se8f0m04isa', # base=29
+                'hajppbc1fc206', # base=30
+                'bm03i95hia436', # base=31
+                '7vvvvvvvvvvvu', # base=32
+                '5hg4ck9jd4u36', # base=33
+                '3tdtk1v8j6tpo', # base=34
+                '2pijmikexrxp6', # base=35
+                '1y2p0ij32e8e6', # base=36
+            )),
+            (-0x7fffffffffffffff, (
+                '-111111111111111111111111111111111111111111111111111111111111111', # base=2
+                '-2021110011022210012102010021220101220221', # base=3
+                '-13333333333333333333333333333333', # base=4
+                '-1104332401304422434310311212', # base=5
+                '-1540241003031030222122211', # base=6
+                '-22341010611245052052300', # base=7
+                '-777777777777777777777', # base=8
+                '-67404283172107811827', # base=9
+                '-9223372036854775807', # base=10
+                '-1728002635214590697', # base=11
+                '-41a792678515120367', # base=12
+                '-10b269549075433c37', # base=13
+                '-4340724c6c71dc7a7', # base=14
+                '-160e2ad3246366807', # base=15
+                '-7fffffffffffffff', # base=16
+                '-33d3d8307b214008', # base=17
+                '-16agh595df825fa7', # base=18
+                '-ba643dci0ffeehh', # base=19
+                '-5cbfjia3fh26ja7', # base=20
+                '-2heiciiie82dh97', # base=21
+                '-1adaibb21dckfa7', # base=22
+                '-i6k448cf4192c2', # base=23
+                '-acd772jnc9l0l7', # base=24
+                '-64ie1focnn5g77', # base=25
+                '-3igoecjbmca687', # base=26
+                '-27c48l5b37oaop', # base=27
+                '-1bk39f3ah3dmq7', # base=28
+                '-q1se8f0m04isb', # base=29
+                '-hajppbc1fc207', # base=30
+                '-bm03i95hia437', # base=31
+                '-7vvvvvvvvvvvv', # base=32
+                '-5hg4ck9jd4u37', # base=33
+                '-3tdtk1v8j6tpp', # base=34
+                '-2pijmikexrxp7', # base=35
+                '-1y2p0ij32e8e7', # base=36
+            )),
+            (0x7fffffffffffffff, (
+                '111111111111111111111111111111111111111111111111111111111111111', # base=2
+                '2021110011022210012102010021220101220221', # base=3
+                '13333333333333333333333333333333', # base=4
+                '1104332401304422434310311212', # base=5
+                '1540241003031030222122211', # base=6
+                '22341010611245052052300', # base=7
+                '777777777777777777777', # base=8
+                '67404283172107811827', # base=9
+                '9223372036854775807', # base=10
+                '1728002635214590697', # base=11
+                '41a792678515120367', # base=12
+                '10b269549075433c37', # base=13
+                '4340724c6c71dc7a7', # base=14
+                '160e2ad3246366807', # base=15
+                '7fffffffffffffff', # base=16
+                '33d3d8307b214008', # base=17
+                '16agh595df825fa7', # base=18
+                'ba643dci0ffeehh', # base=19
+                '5cbfjia3fh26ja7', # base=20
+                '2heiciiie82dh97', # base=21
+                '1adaibb21dckfa7', # base=22
+                'i6k448cf4192c2', # base=23
+                'acd772jnc9l0l7', # base=24
+                '64ie1focnn5g77', # base=25
+                '3igoecjbmca687', # base=26
+                '27c48l5b37oaop', # base=27
+                '1bk39f3ah3dmq7', # base=28
+                'q1se8f0m04isb', # base=29
+                'hajppbc1fc207', # base=30
+                'bm03i95hia437', # base=31
+                '7vvvvvvvvvvvv', # base=32
+                '5hg4ck9jd4u37', # base=33
+                '3tdtk1v8j6tpp', # base=34
+                '2pijmikexrxp7', # base=35
+                '1y2p0ij32e8e7', # base=36
+            )),
+            (-0x8000000000000000, (
+                '-1000000000000000000000000000000000000000000000000000000000000000', # base=2
+                '-2021110011022210012102010021220101220222', # base=3
+                '-20000000000000000000000000000000', # base=4
+                '-1104332401304422434310311213', # base=5
+                '-1540241003031030222122212', # base=6
+                '-22341010611245052052301', # base=7
+                '-1000000000000000000000', # base=8
+                '-67404283172107811828', # base=9
+                '-9223372036854775808', # base=10
+                '-1728002635214590698', # base=11
+                '-41a792678515120368', # base=12
+                '-10b269549075433c38', # base=13
+                '-4340724c6c71dc7a8', # base=14
+                '-160e2ad3246366808', # base=15
+                '-8000000000000000', # base=16
+                '-33d3d8307b214009', # base=17
+                '-16agh595df825fa8', # base=18
+                '-ba643dci0ffeehi', # base=19
+                '-5cbfjia3fh26ja8', # base=20
+                '-2heiciiie82dh98', # base=21
+                '-1adaibb21dckfa8', # base=22
+                '-i6k448cf4192c3', # base=23
+                '-acd772jnc9l0l8', # base=24
+                '-64ie1focnn5g78', # base=25
+                '-3igoecjbmca688', # base=26
+                '-27c48l5b37oaoq', # base=27
+                '-1bk39f3ah3dmq8', # base=28
+                '-q1se8f0m04isc', # base=29
+                '-hajppbc1fc208', # base=30
+                '-bm03i95hia438', # base=31
+                '-8000000000000', # base=32
+                '-5hg4ck9jd4u38', # base=33
+                '-3tdtk1v8j6tpq', # base=34
+                '-2pijmikexrxp8', # base=35
+                '-1y2p0ij32e8e8', # base=36
+            )),
+        )
+        for value, strings in inrange:
+            for base, string in enumerate( strings, 2 ):
+                self.assertEqual(yp_int(string, base), value)
+
+        outofrange = (
+            (0x8000000000000000, (
+                '1000000000000000000000000000000000000000000000000000000000000000', # base=2
+                '2021110011022210012102010021220101220222', # base=3
+                '20000000000000000000000000000000', # base=4
+                '1104332401304422434310311213', # base=5
+                '1540241003031030222122212', # base=6
+                '22341010611245052052301', # base=7
+                '1000000000000000000000', # base=8
+                '67404283172107811828', # base=9
+                '9223372036854775808', # base=10
+                '1728002635214590698', # base=11
+                '41a792678515120368', # base=12
+                '10b269549075433c38', # base=13
+                '4340724c6c71dc7a8', # base=14
+                '160e2ad3246366808', # base=15
+                '8000000000000000', # base=16
+                '33d3d8307b214009', # base=17
+                '16agh595df825fa8', # base=18
+                'ba643dci0ffeehi', # base=19
+                '5cbfjia3fh26ja8', # base=20
+                '2heiciiie82dh98', # base=21
+                '1adaibb21dckfa8', # base=22
+                'i6k448cf4192c3', # base=23
+                'acd772jnc9l0l8', # base=24
+                '64ie1focnn5g78', # base=25
+                '3igoecjbmca688', # base=26
+                '27c48l5b37oaoq', # base=27
+                '1bk39f3ah3dmq8', # base=28
+                'q1se8f0m04isc', # base=29
+                'hajppbc1fc208', # base=30
+                'bm03i95hia438', # base=31
+                '8000000000000', # base=32
+                '5hg4ck9jd4u38', # base=33
+                '3tdtk1v8j6tpq', # base=34
+                '2pijmikexrxp8', # base=35
+                '1y2p0ij32e8e8', # base=36
+            )),
+            (-0x8000000000000001, (
+                '-1000000000000000000000000000000000000000000000000000000000000001', # base=2
+                '-2021110011022210012102010021220101221000', # base=3
+                '-20000000000000000000000000000001', # base=4
+                '-1104332401304422434310311214', # base=5
+                '-1540241003031030222122213', # base=6
+                '-22341010611245052052302', # base=7
+                '-1000000000000000000001', # base=8
+                '-67404283172107811830', # base=9
+                '-9223372036854775809', # base=10
+                '-1728002635214590699', # base=11
+                '-41a792678515120369', # base=12
+                '-10b269549075433c39', # base=13
+                '-4340724c6c71dc7a9', # base=14
+                '-160e2ad3246366809', # base=15
+                '-8000000000000001', # base=16
+                '-33d3d8307b21400a', # base=17
+                '-16agh595df825fa9', # base=18
+                '-ba643dci0ffeei0', # base=19
+                '-5cbfjia3fh26ja9', # base=20
+                '-2heiciiie82dh99', # base=21
+                '-1adaibb21dckfa9', # base=22
+                '-i6k448cf4192c4', # base=23
+                '-acd772jnc9l0l9', # base=24
+                '-64ie1focnn5g79', # base=25
+                '-3igoecjbmca689', # base=26
+                '-27c48l5b37oap0', # base=27
+                '-1bk39f3ah3dmq9', # base=28
+                '-q1se8f0m04isd', # base=29
+                '-hajppbc1fc209', # base=30
+                '-bm03i95hia439', # base=31
+                '-8000000000001', # base=32
+                '-5hg4ck9jd4u39', # base=33
+                '-3tdtk1v8j6tpr', # base=34
+                '-2pijmikexrxp9', # base=35
+                '-1y2p0ij32e8e9', # base=36
+            )),
+        )
+        for value, strings in outofrange:
+            for base, string in enumerate( strings, 2 ):
+                self.assertRaises(OverflowError, yp_int, string, base)
+
     @unittest.skip("REWORK: nohtyP doesn't have user-defined types yet")
     def test_intconversion(self):
         # Test __int__()
