@@ -90,8 +90,9 @@ class IntTestCases(unittest.TestCase):
         self.assertRaises(ValueError, yp_int, '123\0', 10)
         self.assertRaises(ValueError, yp_int, '123\x00 245', 20)
 
-        x = yp_int('1' * 600)
-        self.assertIsInstance(x, yp_int)
+        #x = yp_int('1' * 600)
+        #self.assertIsInstance(x, yp_int)
+        self.assertRaises(OverflowError, yp_int, '1' * 600)
 
 
         self.assertRaises(TypeError, yp_int, 1, 12)

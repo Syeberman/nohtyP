@@ -2673,7 +2673,7 @@ unsigned char _ypInt_digit_value[256] = {
 };
 
 // XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
-static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8_t *bytes, 
+static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8_t *bytes,
         yp_int_t base )
 {
     ypObject *exc = yp_None;
@@ -2703,7 +2703,7 @@ static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8
         bytes++;
         if( *bytes == '\0' || yp_ISSPACE( *bytes ) ) {
             // We've just parsed the string b"0", b"  0  ", etc; take a shortcut
-            result = 0; 
+            result = 0;
             goto endofdigits;
         } else if( *bytes == 'b' || *bytes == 'B' ) {
             if( base == 0 ) base = 2;
@@ -2733,18 +2733,16 @@ static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8
         return yp_ValueError;
     }
 
-    // We could be pointing to anything; make sure there's at least one, valid digit; 
-    // _ypInt_digit_value[*bytes]>=base ensures we stop at the null-terminator, whitespace, and 
-    // invalid characters
+    // We could be pointing to anything; make sure there's at least one, valid digit.
+    // _ypInt_digit_value[*bytes]>=base ensures we stop at the null-terminator, whitespace, and
+    // invalid characters.  We avoid checking exc until we've exhausted the digits: any errors are
+    // never cleared.
     digit = _ypInt_digit_value[*bytes];
     if( digit >= base ) return yp_ValueError;
     bytes++;
     result = 0;
     while( 1 ) {
-        // We avoid checking exc until we've exhausted the digits: any errors are never cleared
-        result = yp_addL( yp_mulL( result, base, &exc ), digit, &exc );
-        
-        // Get the next digit
+        result = yp_addL( result, digit, &exc );
         digit = _ypInt_digit_value[*bytes];
         if( digit >= base ) {
             // Any errors in the yp_addL/yp_mulL math mean we've overflown yp_int_t
@@ -2752,6 +2750,7 @@ static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8
             goto endofdigits;
         }
         bytes++;
+        result = yp_mulL( result, base, &exc );
     }
 
     // Ensure there's only whitespace left in the string, and return the new integer
@@ -2767,7 +2766,7 @@ endofdigits:
         result = yp_negL( result, &exc );
         if( yp_isexceptionC( exc ) ) return yp_OverflowError;
     }
-    return allocator( result );   
+    return allocator( result );
 }
 
 
@@ -2943,19 +2942,104 @@ static ypTypeObject ypIntStore_Type = {
     MethodError_MappingMethods      // tp_as_mapping
 };
 
+// For when we need to work with unsigned yp_int_t's in the math below; casting to unsigned helps
+// avoid undefined behaviour on overflow.
+typedef yp_uint64_t _yp_uint_t;
+yp_STATIC_ASSERT( sizeof( _yp_uint_t ) == sizeof( yp_int_t ), sizeof_yp_uint_eq_yp_int );
+#define yp_UINT_MATH( x, op, y ) ((yp_int_t) (((_yp_uint_t)x) op ((_yp_uint_t)y)))
+
+// XXX Adapted from Python 2.7's int_add
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x + y; // TODO overflow check
+    yp_int_t result = yp_UINT_MATH( x, +, y );
+    if( (result^x) < 0 && (result^y) < 0 ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    return result;
 }
 
+// XXX Adapted from Python 2.7's int_sub
 yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x - y; // TODO overflow check
+    yp_int_t result = yp_UINT_MATH( x, -, y );
+    if( (result^x) < 0 && (result^~y) < 0 ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    return result;
 }
 
+// Python 2.7's int_mul uses the phrase "close enough", which scares me.  I prefer the method
+// described at http://www.fefe.de/intof.html, although it requires abs(x) and abs(y), meaning
+// we need to handle yp_INT_T_MIN specially because we can't negate it.
+// TODO Ensure our test suite exercises this fully
+yp_int_t _yp_mulL_minint( yp_int_t y, ypObject **exc )
+{
+    // When multiplying yp_INT_T_MIN, there are only two values of y that won't overflow
+    if( y == 0 ) return 0;
+    if( y == 1 ) return yp_INT_T_MIN;
+    return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+}
 yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x * y; // TODO overflow check
+    yp_int_t result, sign = 1;
+    yp_int_t x_hi, x_lo, y_hi, y_lo;
+    yp_int_t result_hi;
+    const yp_int_t num_bits_halved = sizeof( yp_int_t ) / 2 * 8;
+    const yp_int_t bit_mask_halved = (1ull << num_bits_halved) - 1ull;
+
+    if( x == yp_INT_T_MIN ) return _yp_mulL_minint( y, exc );
+    if( y == yp_INT_T_MIN ) return _yp_mulL_minint( x, exc );
+    if( x < 0 ) { sign = -sign; x = -x; }
+    if( y < 0 ) { sign = -sign; y = -y; }
+    // x and y are now 63-bit numbers
+
+    /* Adapted from http://www.fefe.de/intof.html:
+     * Split both numbers in two 32-bit parts. Let's write "<< 32" as "* shift" to make this easier
+     * to read. Basically if we write the first number as a1 shift + a0 and the second number as
+     * b1 shift + b0, then the product is
+     *      (a1 shift + a0) * (b1 shift + b0) ==
+     *          a1 b1 shift shift + a1 b0 shift + a0 b1 shift + a0 b0
+     * The first term is shifted by 64 bits, so if both a1 and b1 are nonzero, we have an overflow
+     * right there and can abort. For the second and third part we do the 32x32->64 multiplication
+     * we just used to check for overflow for 31-bit numbers. Since we already know that either a1
+     * or b1 is zero, we can simply calculate
+     *      a=(uint64_t)(a1)*b0+(uint64_t)(a0)*b1;
+     * At least one half of this term will be zero, so we can't have an overflow in the addition.
+     * Then, if a > 0x7fffffff, we have an overflow in the multiplication and can abort. If we got
+     * this far, the result is
+     *      (a << 32) + (uint64_t)(a0)*b0;
+     * We still need to check for overflow in this addition, then we can return the result.
+     */
+
+    // Split x and y into high and low halves
+    x_hi = yp_UINT_MATH( x, >>, num_bits_halved );
+    x_lo = yp_UINT_MATH( x, &, bit_mask_halved );
+    y_hi = yp_UINT_MATH( y, >>, num_bits_halved );
+    y_lo = yp_UINT_MATH( y, &, bit_mask_halved );
+
+    // Determine the intermediate value of the high-part of the result
+    if( x_hi == 0 ) {
+        if( y_hi == 0 ) {
+            // We can take a shortcut in the case of x and y being small values
+            result = yp_UINT_MATH( x_lo, *, y_lo );
+            goto adjustforsign;
+        }
+        result_hi = yp_UINT_MATH( x_lo, *, y_hi );
+    } else if( y_hi == 0 ) {
+        result_hi = yp_UINT_MATH( x_hi, *, y_lo );
+    } else {
+        return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    }
+    
+    // Check that the itermediate high-part of the result won't overflow when shifted, then shift
+    // and add with the low-part of the result
+    if( result_hi > yp_UINT_MATH( bit_mask_halved, >>, 1 ) ) {
+        return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    }
+    result = yp_UINT_MATH( result_hi, <<, num_bits_halved ) + yp_UINT_MATH( x_lo, *, y_lo );
+
+    // Finally, check that the addition didn't overflow, then adjust for sign and return
+adjustforsign:
+    if( result < 0 ) {
+        return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    }
+    return sign * result;
 }
 
 // XXX Operands are fist converted to float, then divided; result always a float
@@ -4582,7 +4666,7 @@ static ypObject *bytearray_remove( ypObject *b, ypObject *x, ypObject *onmissing
 
     x_asbyte = _ypBytes_asuint8C( x, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
-    
+
     for( i = 0; i < ypBytes_LEN( b ); i++ ) {
         if( x_asbyte != ypBytes_DATA( b )[i] ) continue;
 
