@@ -470,6 +470,12 @@ int yp_isexceptionC( ypObject *x ) {
 #define return_yp_K_FUNC        return_yp_V_FUNC
 #define return_yp_K_FUNC_void   return_yp_V_FUNC_void
 
+// For when we need to work with unsigned yp_int_t's in the math below; casting to unsigned helps
+// avoid undefined behaviour on overflow.
+typedef yp_uint64_t _yp_uint_t;
+yp_STATIC_ASSERT( sizeof( _yp_uint_t ) == sizeof( yp_int_t ), sizeof_yp_uint_eq_yp_int );
+#define yp_UINT_MATH( x, op, y ) ((yp_int_t) (((_yp_uint_t)x) op ((_yp_uint_t)y)))
+
 #ifdef _MSC_VER
 #define yp_IS_NAN _isnan
 #define yp_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
@@ -2676,10 +2682,12 @@ unsigned char _ypInt_digit_value[256] = {
 static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8_t *bytes,
         yp_int_t base )
 {
-    ypObject *exc = yp_None;
-    int negateResult;
+    int sign;
     yp_int_t result;
     yp_int_t digit;
+    yp_int_t x_hi, x_lo, y_lo;
+    const yp_int_t num_bits_halved = sizeof( yp_int_t ) / 2 * 8;
+    const yp_int_t bit_mask_halved = (1ull << num_bits_halved) - 1ull;
 
     // Skip leading whitespace
     while( 1 ) {
@@ -2689,12 +2697,14 @@ static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8
     }
 
     // We're pointing to a non-whitespace character; see if there's a sign we should consume
-    negateResult = FALSE;
     if( *bytes == '+' ) {
+        sign = 1;
         bytes++;
     } else if( *bytes == '-' ) {
-        negateResult = TRUE;
+        sign = -1;
         bytes++;
+    } else {
+        sign = 1;
     }
 
     // We could be pointing to anything; determine if any prefix agrees with base
@@ -2735,38 +2745,75 @@ static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8
 
     // We could be pointing to anything; make sure there's at least one, valid digit.
     // _ypInt_digit_value[*bytes]>=base ensures we stop at the null-terminator, whitespace, and
-    // invalid characters.  We avoid checking exc until we've exhausted the digits: any errors are
-    // never cleared.
+    // invalid characters.
     digit = _ypInt_digit_value[*bytes];
     if( digit >= base ) return yp_ValueError;
     bytes++;
-    result = 0;
+    result = digit;
     while( 1 ) {
-        result = yp_addL( result, digit, &exc );
         digit = _ypInt_digit_value[*bytes];
-        if( digit >= base ) {
-            // Any errors in the yp_addL/yp_mulL math mean we've overflown yp_int_t
-            if( yp_isexceptionC( exc ) ) return yp_OverflowError;
-            goto endofdigits;
-        }
+        if( digit >= base ) goto endofdigits;
         bytes++;
-        result = yp_mulL( result, base, &exc );
+
+        // This is a specialized version of yp_mulL taking into account:
+        //  - x (ie result) and y (ie base) are both positive
+        //  - y is small (<37), which easily fits in num_bits_halved-1
+        //  - overflowing to exactly yp_INT_T_MIN may not actually be an error
+
+        // Split x and y into high and low halves
+        x_hi = yp_UINT_MATH( result, >>, num_bits_halved );
+        x_lo = yp_UINT_MATH( result, &, bit_mask_halved );
+        y_lo = yp_UINT_MATH( base, &, bit_mask_halved );
+
+        // Determine the intermediate value of the high-part of the result
+        if( x_hi == 0 ) {
+            // We can take a shortcut in the case of x and y being small values
+            result = yp_UINT_MATH( x_lo, *, y_lo );
+        } else {
+            result = yp_UINT_MATH( x_hi, *, y_lo );
+            // Check that the itermediate high-part of the result won't overflow when shifted, then
+            // shift and add with the low-part of the result, then check overflow again
+            if( result > bit_mask_halved ) return yp_OverflowError;
+            result = yp_UINT_MATH( result, <<, num_bits_halved );
+            if( result < 0 ) {
+                // If adding x_lo*y_lo and digit would not change the value, then check for the
+                // yp_INT_T_MIN case; otherwise, we would definitely overflow
+                if( x_lo == 0 && digit == 0 ) goto checkforintmin;
+                return yp_OverflowError;
+            }
+            result = yp_UINT_MATH( result, +, yp_UINT_MATH( x_lo, *, y_lo ) );
+        }
+        if( result < 0 ) {
+            // If adding digit would not change the value, then check for the yp_INT_T_MIN
+            // case; otherwise, adding digit would definitely overflow
+            if( digit == 0 ) goto checkforintmin;
+            return yp_OverflowError;
+        }
+
+        // This is a specialized version of yp_addL taking into account:
+        //  - x (ie result) and y (ie digit) are both positive
+        //  - overflowing to exactly yp_INT_T_MIN may not actually be an error
+        result = yp_UINT_MATH( result, +, digit );
+        if( result < 0 ) goto checkforintmin;
     }
 
     // Ensure there's only whitespace left in the string, and return the new integer
-    // TODO How do we parse yp_sys_minint?  We can't negate it from a positive value (see
-    // PY_ABS_LONG_MIN comments)
 endofdigits:
     while( 1 ) {
         if( *bytes == '\0' ) break;
         if( !yp_ISSPACE( *bytes ) ) return yp_ValueError;
         bytes++;
     }
-    if( negateResult ) {
-        result = yp_negL( result, &exc );
-        if( yp_isexceptionC( exc ) ) return yp_OverflowError;
+    return allocator( sign * result );
+
+checkforintmin:
+    // If we overflowed to exactly yp_INT_T_MIN, and our result is supposed to be negative,
+    // and there are no more digits, then we've decoded yp_INT_T_MIN
+    if( result == yp_INT_T_MIN && sign < 0 && _ypInt_digit_value[*bytes] >= base ) {
+        sign = 1; // result is already negative
+        goto endofdigits;
     }
-    return allocator( result );
+    return yp_OverflowError;
 }
 
 
@@ -2942,12 +2989,6 @@ static ypTypeObject ypIntStore_Type = {
     MethodError_MappingMethods      // tp_as_mapping
 };
 
-// For when we need to work with unsigned yp_int_t's in the math below; casting to unsigned helps
-// avoid undefined behaviour on overflow.
-typedef yp_uint64_t _yp_uint_t;
-yp_STATIC_ASSERT( sizeof( _yp_uint_t ) == sizeof( yp_int_t ), sizeof_yp_uint_eq_yp_int );
-#define yp_UINT_MATH( x, op, y ) ((yp_int_t) (((_yp_uint_t)x) op ((_yp_uint_t)y)))
-
 // XXX Adapted from Python 2.7's int_add
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
@@ -3026,7 +3067,7 @@ yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc )
     } else {
         return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
     }
-    
+
     // Check that the itermediate high-part of the result won't overflow when shifted, then shift
     // and add with the low-part of the result
     if( result_hi > yp_UINT_MATH( bit_mask_halved, >>, 1 ) ) {
