@@ -838,6 +838,9 @@ yp_func( c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 
 # ypObject *yp_sum( ypObject *iterable );
 
+# ypObject * const yp_sys_maxint;
+# ypObject * const yp_sys_minint;
+
 
 # ypObject *yp_type( ypObject *object );
 
@@ -1238,11 +1241,14 @@ class yp_int( ypObject ):
             return _yp_int( x )
         else:
             return _yp_int_baseC( x, base )
+    def _asint( self ): return _yp_asintC( self, yp_None )
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    def __str__( self ): return str( _yp_asintC( self, yp_None ) )
-    def __repr__( self ): return repr( _yp_asintC( self, yp_None ) )
+    def __str__( self ): return str( self._asint( ) )
+    def __repr__( self ): return repr( self._asint( ) )
 _yp_i_zero = yp_int( 0 )
 _yp_i_one = yp_int( 1 )
+c_ypObject_p_value( "yp_sys_maxint" )
+c_ypObject_p_value( "yp_sys_minint" )
 
 @pytype( float, 12 )
 class yp_float( ypObject ):

@@ -5,7 +5,6 @@ import unittest
 from yp_test import support
 
 # TODO There may be tests in Python's test_long that are applicable to us as well
-# TODO Replace maxsize with nohtyP's version?
 
 # Extra assurance that we're not accidentally testing Python's int
 def int( *args, **kwargs ): raise NotImplementedError( "convert script to yp_int here" )
@@ -21,7 +20,7 @@ L = [
         (' 314', yp_int(314)),
         ('314 ', yp_int(314)),
         ('  \t\t  314  \t\t  ', yp_int(314)),
-        (repr(sys.maxsize), yp_int(sys.maxsize)),
+        (repr(yp_sys_maxint._asint()), yp_sys_maxint),
         ('  1x', ValueError),
         ('  1  ', yp_int(1)),
         ('  1\02  ', ValueError),
@@ -62,12 +61,12 @@ class IntTestCases(unittest.TestCase):
                     except ValueError:
                         pass
 
-        s = repr(-1-sys.maxsize)
+        s = repr(-1-yp_sys_maxint._asint())
         x = yp_int(s)
-        self.assertEqual(x+1, -sys.maxsize)
+        self.assertEqual(x+1, -yp_sys_maxint)
         self.assertIsInstance(x, yp_int)
-        # should return int
-        self.assertEqual(yp_int(s[1:]), sys.maxsize+1)
+        # should overflow
+        self.assertRaises(OverflowError, yp_int, s[1:])
 
         # should return int
         x = yp_int(1e100)
@@ -79,7 +78,7 @@ class IntTestCases(unittest.TestCase):
         # SF bug 434186:  0x80000000/2 != 0x80000000>>1.
         # Worked by accident in Windows release build, but failed in debug build.
         # Failed in all Linux builds.
-        x = yp_int(-1-sys.maxsize)
+        x = -1-yp_sys_maxint
         self.assertEqual(x >> 1, x//2)
 
         self.assertRaises(ValueError, yp_int, '123\0')
