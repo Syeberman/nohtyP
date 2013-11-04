@@ -2993,7 +2993,9 @@ static ypTypeObject ypIntStore_Type = {
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
     yp_int_t result = yp_UINT_MATH( x, +, y );
-    if( (result^x) < 0 && (result^y) < 0 ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    if( (result^x) < 0 && (result^y) < 0 ) {
+        return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    }
     return result;
 }
 
@@ -3001,7 +3003,9 @@ yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
     yp_int_t result = yp_UINT_MATH( x, -, y );
-    if( (result^x) < 0 && (result^~y) < 0 ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    if( (result^x) < 0 && (result^~y) < 0 ) {
+        return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    }
     return result;
 }
 
@@ -3016,6 +3020,8 @@ static yp_int_t _yp_mulL_minint( yp_int_t y, ypObject **exc )
     if( y == 1 ) return yp_INT_T_MIN;
     return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
 }
+// TODO test that yp_mulL( yp_INT_T_MIN/2, 2 ) returns yp_INT_T_MIN (and 4, 8, 16, ...)
+// TODO ...and then we can use this again in _ypInt_from_ascii!
 yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
     yp_int_t result, sign = 1;
@@ -3086,8 +3092,13 @@ adjustforsign:
 // XXX Operands are fist converted to float, then divided; result always a float
 yp_float_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    yp_float_t x_asfloat = yp_asfloatL( x, exc );
-    yp_float_t y_asfloat = yp_asfloatL( y, exc );
+    ypObject *subexc = yp_None;
+    yp_float_t x_asfloat, y_asfloat;
+
+    x_asfloat = yp_asfloatL( x, &subexc );
+    if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( 0.0, exc, subexc );
+    y_asfloat = yp_asfloatL( y, &subexc );
+    if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( 0.0, exc, subexc );
     return yp_truedivFL( x_asfloat, y_asfloat, exc );
 }
 
@@ -3217,34 +3228,52 @@ yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
     }
 }
 
+// Verify that this platform sign-extends on right-shifts (assumes compiler uses same rules
+// as target processor, which it should)
+yp_STATIC_ASSERT( (-1ll >> 1) == -1ll, right_shift_sign_extends );
+
+// XXX Adapted from Python 2.7's int_lshift
 yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x << y; // TODO overflow check
+    yp_int_t result;
+    if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_ValueError ); // negative shift count
+    if( x == 0 ) return x; // 0 can be shifted by 50 million bits for all we care
+    if( y >= (sizeof( yp_int_t ) * 8) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    result = x << y;
+    if( x != (result >> y) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    return result;
 }
 
+// XXX Adapted from Python 2.7's int_rshift
 yp_int_t yp_rshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x >> y; // TODO overflow check
+    if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_ValueError ); // negative shift count
+    if( y >= (sizeof( yp_int_t ) * 8) ) {
+        return x < 0 ? -1 : 0;
+    }
+    return x >> y;
 }
 
 yp_int_t yp_ampL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x & y; // TODO overflow check
+    return x & y;
 }
 
 yp_int_t yp_xorL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x ^ y; // TODO overflow check
+    return x ^ y;
 }
 
 yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    return x | y; // TODO overflow check
+    return x | y;
 }
 
+// XXX Adapted from Python 2.7's int_neg
 yp_int_t yp_negL( yp_int_t x, ypObject **exc )
 {
-    return -x; // TODO overflow check
+    if( x == yp_INT_T_MIN ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    return -x;
 }
 
 yp_int_t yp_posL( yp_int_t x, ypObject **exc )
@@ -3260,7 +3289,7 @@ yp_int_t yp_absL( yp_int_t x, ypObject **exc )
 
 yp_int_t yp_invertL( yp_int_t x, ypObject **exc )
 {
-    return ~x; // TODO overflow check
+    return ~x;
 }
 
 // XXX Overloading of add/etc currently not supported
