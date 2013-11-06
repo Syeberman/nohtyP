@@ -1,9 +1,9 @@
 from yp import *
-import unittest
+from yp_test import yp_unittest
 from yp_test import support
 
-@unittest.skip( "TODO: convert to yp.py" )
-class LongExpText(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class LongExpText(yp_unittest.TestCase):
     def test_longexp(self):
         REPS = 65580
         l = eval("[" + "2," * REPS + "]")

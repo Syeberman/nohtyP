@@ -185,7 +185,7 @@ import sysconfig
 import tempfile
 import time
 import traceback
-import unittest
+from yp_test import yp_unittest
 import warnings
 from inspect import isabstract
 
@@ -1213,10 +1213,10 @@ def runtest_inner(test, verbose, quiet,
             the_package = __import__(abstest, globals(), locals(), [])
             the_module = getattr(the_package, test)
             # If the test has a test_main, that will run the appropriate
-            # tests.  If not, use normal unittest test loading.
+            # tests.  If not, use normal yp_unittest test loading.
             test_runner = getattr(the_module, "test_main", None)
             if test_runner is None:
-                tests = unittest.TestLoader().loadTestsFromModule(the_module)
+                tests = yp_unittest.TestLoader().loadTestsFromModule(the_module)
                 test_runner = lambda: support.run_unittest(tests)
             test_runner()
             if huntrleaks:
@@ -1228,7 +1228,7 @@ def runtest_inner(test, verbose, quiet,
             print(test, "skipped --", msg)
             sys.stdout.flush()
         return RESOURCE_DENIED, test_time
-    except unittest.SkipTest as msg:
+    except yp_unittest.SkipTest as msg:
         if not quiet:
             print(test, "skipped --", msg)
             sys.stdout.flush()

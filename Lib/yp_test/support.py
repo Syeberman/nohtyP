@@ -13,7 +13,7 @@ import os
 import platform
 import shutil
 import warnings
-import unittest
+from yp_test import yp_unittest
 import importlib
 import collections.abc
 import re
@@ -80,7 +80,7 @@ class Error(Exception):
 class TestFailed(Error):
     """Test failed."""
 
-class ResourceDenied(unittest.SkipTest):
+class ResourceDenied(yp_unittest.SkipTest):
     """Test skipped because it requested a disallowed resource.
 
     This is raised when a test calls requires() for a resource that
@@ -113,7 +113,7 @@ def import_module(name, deprecated=False):
         try:
             return importlib.import_module(name)
         except ImportError as msg:
-            raise unittest.SkipTest(str(msg))
+            raise yp_unittest.SkipTest(str(msg))
 
 
 def _save_and_remove_module(name, orig_modules):
@@ -149,7 +149,7 @@ def anticipate_failure(condition):
        associated tracker issue.
     """
     if condition:
-        return unittest.expectedFailure
+        return yp_unittest.expectedFailure
     return lambda f: f
 
 
@@ -196,7 +196,7 @@ def get_attribute(obj, name):
     try:
         attribute = getattr(obj, name)
     except AttributeError:
-        raise unittest.SkipTest("object %r has no attribute %r" % (obj, name))
+        raise yp_unittest.SkipTest("object %r has no attribute %r" % (obj, name))
     else:
         return attribute
 
@@ -379,7 +379,7 @@ def requires(resource, msg=None):
     executing.
     """
     if resource == 'gui' and not _is_gui_available():
-        raise unittest.SkipTest("Cannot use the 'gui' resource")
+        raise yp_unittest.SkipTest("Cannot use the 'gui' resource")
     # see if the caller's module is __main__ - if so, treat as if
     # the resource was set
     if sys._getframe(1).f_globals.get("__name__") == "__main__":
@@ -408,7 +408,7 @@ def _requires_unix_version(sysname, min_version):
                 else:
                     if version < min_version:
                         min_version_txt = '.'.join(map(str, min_version))
-                        raise unittest.SkipTest(
+                        raise yp_unittest.SkipTest(
                             "%s version %s or higher required, not %s"
                             % (sysname, min_version_txt, version_txt))
         return wrapper
@@ -451,7 +451,7 @@ def requires_mac_ver(*min_version):
                 else:
                     if version < min_version:
                         min_version_txt = '.'.join(map(str, min_version))
-                        raise unittest.SkipTest(
+                        raise yp_unittest.SkipTest(
                             "Mac OS X %s or higher required, not %s"
                             % (min_version_txt, version_txt))
             return func(*args, **kw)
@@ -582,15 +582,15 @@ PIPE_MAX_SIZE = 4 *1024 * 1024 + 1
 
 
 # decorator for skipping tests on non-IEEE 754 platforms
-requires_IEEE_754 = unittest.skipUnless(
+requires_IEEE_754 = yp_unittest.skipUnless(
     float.__getformat__("double").startswith("IEEE"),
     "test requires IEEE 754 doubles")
 
-requires_zlib = unittest.skipUnless(zlib, 'requires zlib')
+requires_zlib = yp_unittest.skipUnless(zlib, 'requires zlib')
 
-requires_bz2 = unittest.skipUnless(bz2, 'requires bz2')
+requires_bz2 = yp_unittest.skipUnless(bz2, 'requires bz2')
 
-requires_lzma = unittest.skipUnless(lzma, 'requires lzma')
+requires_lzma = yp_unittest.skipUnless(lzma, 'requires lzma')
 
 is_jython = sys.platform.startswith('java')
 
@@ -1300,7 +1300,7 @@ def run_with_tz(tz):
             try:
                 tzset = time.tzset
             except AttributeError:
-                raise unittest.SkipTest("tzset required")
+                raise yp_unittest.SkipTest("tzset required")
             if 'TZ' in os.environ:
                 orig_tz = os.environ['TZ']
             else:
@@ -1408,7 +1408,7 @@ def bigmemtest(size, memuse, dry_run=True):
 
             if ((real_max_memuse or not dry_run)
                 and real_max_memuse < maxsize * memuse):
-                raise unittest.SkipTest(
+                raise yp_unittest.SkipTest(
                     "not enough memory: %.1fG minimum needed"
                     % (size * memuse / (1024 ** 3)))
 
@@ -1437,10 +1437,10 @@ def bigaddrspacetest(f):
     def wrapper(self):
         if max_memuse < MAX_Py_ssize_t:
             if MAX_Py_ssize_t >= 2**63 - 1 and max_memuse >= 2**31:
-                raise unittest.SkipTest(
+                raise yp_unittest.SkipTest(
                     "not enough memory: try a 32-bit build instead")
             else:
-                raise unittest.SkipTest(
+                raise yp_unittest.SkipTest(
                     "not enough memory: %.1fG minimum needed"
                     % (MAX_Py_ssize_t / (1024 ** 3)))
         else:
@@ -1448,11 +1448,11 @@ def bigaddrspacetest(f):
     return wrapper
 
 #=======================================================================
-# unittest integration.
+# yp_unittest integration.
 
 class BasicTestRunner:
     def run(self, test):
-        result = unittest.TestResult()
+        result = yp_unittest.TestResult()
         test(result)
         return result
 
@@ -1461,11 +1461,11 @@ def _id(obj):
 
 def requires_resource(resource):
     if resource == 'gui' and not _is_gui_available():
-        return unittest.skip("resource 'gui' is not available")
+        return yp_unittest.skip("resource 'gui' is not available")
     if is_resource_enabled(resource):
         return _id
     else:
-        return unittest.skip("resource {0!r} is not enabled".format(resource))
+        return yp_unittest.skip("resource {0!r} is not enabled".format(resource))
 
 def cpython_only(test):
     """
@@ -1484,7 +1484,7 @@ def impl_detail(msg=None, **guards):
             msg = "implementation detail specific to {0}"
         guardnames = sorted(guardnames.keys())
         msg = msg.format(' or '.join(guardnames))
-    return unittest.skip(msg)
+    return yp_unittest.skip(msg)
 
 def _parse_guards(guards):
     # Returns a tuple ({platform_name: run_me}, default_value)
@@ -1538,7 +1538,7 @@ def _filter_suite(suite, pred):
     """Recursively filter test cases in a suite based on a predicate."""
     newtests = []
     for test in suite._tests:
-        if isinstance(test, unittest.TestSuite):
+        if isinstance(test, yp_unittest.TestSuite):
             _filter_suite(test, pred)
             newtests.append(test)
         else:
@@ -1547,9 +1547,9 @@ def _filter_suite(suite, pred):
     suite._tests = newtests
 
 def _run_suite(suite):
-    """Run tests from a unittest.TestSuite-derived class."""
+    """Run tests from a yp_unittest.TestSuite-derived class."""
     if verbose:
-        runner = unittest.TextTestRunner(sys.stdout, verbosity=2,
+        runner = yp_unittest.TextTestRunner(sys.stdout, verbosity=2,
                                          failfast=failfast)
     else:
         runner = BasicTestRunner()
@@ -1567,19 +1567,19 @@ def _run_suite(suite):
 
 
 def run_unittest(*classes):
-    """Run tests from unittest.TestCase-derived classes."""
-    valid_types = (unittest.TestSuite, unittest.TestCase)
-    suite = unittest.TestSuite()
+    """Run tests from yp_unittest.TestCase-derived classes."""
+    valid_types = (yp_unittest.TestSuite, yp_unittest.TestCase)
+    suite = yp_unittest.TestSuite()
     for cls in classes:
         if isinstance(cls, str):
             if cls in sys.modules:
-                suite.addTest(unittest.findTestCases(sys.modules[cls]))
+                suite.addTest(yp_unittest.findTestCases(sys.modules[cls]))
             else:
                 raise ValueError("str arguments must be keys in sys.modules")
         elif isinstance(cls, valid_types):
             suite.addTest(cls)
         else:
-            suite.addTest(unittest.makeSuite(cls))
+            suite.addTest(yp_unittest.makeSuite(cls))
     def case_pred(test):
         if match_tests is None:
             return True
@@ -1597,7 +1597,7 @@ HAVE_DOCSTRINGS = (check_impl_detail(cpython=False) or
                    sys.platform == 'win32' or
                    sysconfig.get_config_var('WITH_DOC_STRINGS'))
 
-requires_docstrings = unittest.skipUnless(HAVE_DOCSTRINGS,
+requires_docstrings = yp_unittest.skipUnless(HAVE_DOCSTRINGS,
                                           "test requires docstrings")
 
 
@@ -1871,7 +1871,7 @@ def skip_unless_symlink(test):
     """Skip decorator for tests that require functional symlink"""
     ok = can_symlink()
     msg = "Requires functional symlink implementation"
-    return test if ok else unittest.skip(msg)(test)
+    return test if ok else yp_unittest.skip(msg)(test)
 
 _can_xattr = None
 def can_xattr():
@@ -1905,7 +1905,7 @@ def skip_unless_xattr(test):
     """Skip decorator for tests that require functional extended attributes"""
     ok = can_xattr()
     msg = "no non-broken extended attribute support"
-    return test if ok else unittest.skip(msg)(test)
+    return test if ok else yp_unittest.skip(msg)(test)
 
 
 if sys.platform.startswith('win'):

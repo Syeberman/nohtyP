@@ -3,7 +3,7 @@ from yp_test import support, seq_tests
 
 import gc
 import pickle
-import unittest
+from yp_test import yp_unittest
 
 # Extra assurance that we're not accidentally testing Python's tuple and list
 def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
@@ -59,7 +59,7 @@ class TupleTest(seq_tests.CommonTest):
                 yield i
         self.assertEqual(yp_list(yp_tuple(f())), yp_list(range(1000)))
 
-    @unittest.skip("TODO re-enable (it just takes a long time)")
+    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
     def test_hash(self):
         # See SF bug 942952:  Weakness in tuple hash
         # The hash should:
@@ -107,7 +107,7 @@ class TupleTest(seq_tests.CommonTest):
         gc.collect()
         self.assertTrue(gc.is_tracked(t), t)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_literals(self):
         # Test GC-optimization of tuple literals
@@ -129,7 +129,7 @@ class TupleTest(seq_tests.CommonTest):
         self._tracked(yp_tuple((set(),)))
         self._tracked(yp_tuple((x, y, z)))
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def check_track_dynamic(self, tp, always_track):
         x, y, z = 1.5, "a", []
 
@@ -150,13 +150,13 @@ class TupleTest(seq_tests.CommonTest):
         self._tracked(tp(yp_tuple([obj]) for obj in [x, y, z]))
         self._tracked(yp_tuple(tp([obj]) for obj in [x, y, z]))
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_dynamic(self):
         # Test GC-optimization of dynamically constructed tuples.
         self.check_track_dynamic(yp_tuple, False)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_subtypes(self):
         # Tuple subtypes must always be tracked
@@ -164,13 +164,13 @@ class TupleTest(seq_tests.CommonTest):
             pass
         self.check_track_dynamic(MyTuple, True)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_bug7466(self):
         # Trying to untrack an unfinished tuple could crash Python
         self._not_tracked(yp_tuple(gc.collect() for i in range(101)))
 
-    @unittest.skip("TODO re-enable (it just takes a long time)")
+    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):
@@ -181,7 +181,7 @@ class TupleTest(seq_tests.CommonTest):
         check(10)       # check our checking code
         check(1000000)
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_iterator_pickle(self):
         # Userlist iterators don't support pickling yet since
         # they are based on generators.
@@ -197,7 +197,7 @@ class TupleTest(seq_tests.CommonTest):
         d = pickle.dumps(it)
         self.assertEqual(self.type2test(it), self.type2test(data)[1:])
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_reversed_pickle(self):
         data = self.type2test([4, 5, 6, 7])
         itorg = reversed(data)

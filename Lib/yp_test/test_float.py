@@ -1,6 +1,7 @@
 
 from yp import *
-import unittest, struct
+from yp_test import yp_unittest
+import struct
 import os
 import sys
 from yp_test import support
@@ -13,17 +14,17 @@ INF = float("inf")
 NAN = float("nan")
 
 have_getformat = hasattr(float, "__getformat__")
-requires_getformat = unittest.skipUnless(have_getformat,
+requires_getformat = yp_unittest.skipUnless(have_getformat,
                                          "requires __getformat__")
-requires_setformat = unittest.skipUnless(hasattr(float, "__setformat__"),
+requires_setformat = yp_unittest.skipUnless(hasattr(float, "__setformat__"),
                                          "requires __setformat__")
 
 #locate file with float format test values
 test_dir = os.path.dirname(__file__) or os.curdir
 format_testfile = os.path.join(test_dir, 'formatfloat_testcases.txt')
 
-@unittest.skip( "TODO: convert to yp.py" )
-class GeneralFloatCases(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class GeneralFloatCases(yp_unittest.TestCase):
 
     def test_float(self):
         self.assertEqual(float(3.14), 3.14)
@@ -422,9 +423,9 @@ class GeneralFloatCases(unittest.TestCase):
             #self.assertTrue(0.0 > pow_op(-2.0, -1047) > -1e-315)
 
 
-@unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip( "TODO: convert to yp.py" )
 @requires_setformat
-class FormatFunctionsTestCase(unittest.TestCase):
+class FormatFunctionsTestCase(yp_unittest.TestCase):
 
     def setUp(self):
         self.save_formats = {'double':float.__getformat__('double'),
@@ -474,9 +475,9 @@ LE_FLOAT_NAN = bytes(reversed(BE_FLOAT_NAN))
 # on non-IEEE platforms, attempting to unpack a bit pattern
 # representing an infinity or a NaN should raise an exception.
 
-@unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip( "TODO: convert to yp.py" )
 @requires_setformat
-class UnknownFormatTestCase(unittest.TestCase):
+class UnknownFormatTestCase(yp_unittest.TestCase):
     def setUp(self):
         self.save_formats = {'double':float.__getformat__('double'),
                              'float':float.__getformat__('float')}
@@ -507,8 +508,8 @@ class UnknownFormatTestCase(unittest.TestCase):
 # is accident (today).
 # let's also try to guarantee that -0.0 and 0.0 don't get confused.
 
-@unittest.skip( "TODO: convert to yp.py" )
-class IEEEFormatTestCase(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class IEEEFormatTestCase(yp_unittest.TestCase):
 
     @support.requires_IEEE_754
     def test_double_specials_do_unpack(self):
@@ -526,8 +527,8 @@ class IEEEFormatTestCase(unittest.TestCase):
                           ('<f', LE_FLOAT_NAN)]:
             struct.unpack(fmt, data)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class FormatTestCase(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class FormatTestCase(yp_unittest.TestCase):
 
     def test_format(self):
         # these should be rewritten to use both format(x, spec) and
@@ -602,8 +603,8 @@ class FormatTestCase(unittest.TestCase):
         self.assertEqual(format(1234.56, '.4'), '1.235e+03')
         self.assertEqual(format(12345.6, '.4'), '1.235e+04')
 
-@unittest.skip( "TODO: convert to yp.py" )
-class ReprTestCase(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class ReprTestCase(yp_unittest.TestCase):
     def test_repr(self):
         floats_file = open(os.path.join(os.path.split(__file__)[0],
                            'floating_points.txt'))
@@ -615,7 +616,7 @@ class ReprTestCase(unittest.TestCase):
             self.assertEqual(v, eval(repr(v)))
         floats_file.close()
 
-    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+    @yp_unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
                          "applies only when using short float repr style")
     def test_short_repr(self):
         # test short float repr introduced in Python 3.1.  One aspect
@@ -667,9 +668,9 @@ class ReprTestCase(unittest.TestCase):
             self.assertEqual(repr(float(s)), str(float(s)))
             self.assertEqual(repr(float(negs)), str(float(negs)))
 
-@unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip( "TODO: convert to yp.py" )
 @support.requires_IEEE_754
-class RoundTestCase(unittest.TestCase):
+class RoundTestCase(yp_unittest.TestCase):
 
     def test_inf_nan(self):
         self.assertRaises(OverflowError, round, INF)
@@ -703,7 +704,7 @@ class RoundTestCase(unittest.TestCase):
         self.assertRaises(OverflowError, round, 1.6e308, -308)
         self.assertRaises(OverflowError, round, -1.7e308, -308)
 
-    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+    @yp_unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
                          "applies only when using short float repr style")
     def test_previous_round_bugs(self):
         # particular cases that have occurred in bug reports
@@ -721,7 +722,7 @@ class RoundTestCase(unittest.TestCase):
         self.assertEqual(round(85.0, -1), 80.0)
         self.assertEqual(round(95.0, -1), 100.0)
 
-    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+    @yp_unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
                          "applies only when using short float repr style")
     def test_matches_float_format(self):
         # round should give the same results as float formatting
@@ -779,8 +780,8 @@ class RoundTestCase(unittest.TestCase):
 
 # Beginning with Python 2.6 float has cross platform compatible
 # ways to create and represent inf and nan
-@unittest.skip( "TODO: convert to yp.py" )
-class InfNanTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class InfNanTest(yp_unittest.TestCase):
     def test_inf_from_str(self):
         self.assertTrue(isinf(float("inf")))
         self.assertTrue(isinf(float("+inf")))
@@ -873,7 +874,7 @@ class InfNanTest(unittest.TestCase):
         self.assertEqual(copysign(1.0, float('inf')), 1.0)
         self.assertEqual(copysign(1.0, float('-inf')), -1.0)
 
-    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+    @yp_unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
                          "applies only when using short float repr style")
     def test_nan_signs(self):
         # When using the dtoa.c code, the sign of float('nan') should
@@ -884,8 +885,8 @@ class InfNanTest(unittest.TestCase):
 
 fromHex = float.fromhex
 toHex = float.hex
-@unittest.skip( "TODO: convert to yp.py" )
-class HexFloatTestCase(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class HexFloatTestCase(yp_unittest.TestCase):
     MAX = fromHex('0x.fffffffffffff8p+1024')  # max normal
     MIN = fromHex('0x1p-1022')                # min normal
     TINY = fromHex('0x0.0000000000001p-1022') # min subnormal

@@ -5,7 +5,7 @@ import sys
 import os
 import io
 import errno
-import unittest
+from yp_test import yp_unittest
 from array import array
 from weakref import proxy
 from functools import wraps
@@ -16,8 +16,8 @@ from collections import UserList
 
 from _io import FileIO as _FileIO
 
-@unittest.skip( "TODO: convert to yp.py" )
-class AutoFileTests(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class AutoFileTests(yp_unittest.TestCase):
     # file tests for which a test file is automatically set up
 
     def setUp(self):
@@ -153,7 +153,7 @@ class AutoFileTests(unittest.TestCase):
         else:
             self.fail("Should have raised IOError")
 
-    @unittest.skipIf(os.name == 'nt', "test only works on a POSIX-like system")
+    @yp_unittest.skipIf(os.name == 'nt', "test only works on a POSIX-like system")
     def testOpenDirFD(self):
         fd = os.open('.', os.O_RDONLY)
         with self.assertRaises(IOError) as cm:
@@ -262,8 +262,8 @@ class AutoFileTests(unittest.TestCase):
         a = array('b', b'x'*10)
         f.readinto(a)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class OtherFileTests(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class OtherFileTests(yp_unittest.TestCase):
 
     def testAbles(self):
         try:

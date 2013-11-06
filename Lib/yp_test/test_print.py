@@ -6,7 +6,7 @@
 from __future__ import print_function
 
 from yp import *
-import unittest
+from yp_test import yp_unittest
 from yp_test import support
 
 try:
@@ -49,8 +49,8 @@ class ClassWith__str__:
     def __str__(self):
         return self.x
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestPrint(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestPrint(yp_unittest.TestCase):
     def check(self, expected, args,
             sep=NotDefined, end=NotDefined, file=NotDefined):
         # Capture sys.stdout in a StringIO.  Call print with args,

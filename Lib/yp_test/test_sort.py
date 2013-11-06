@@ -2,7 +2,7 @@ from yp import *
 from yp_test import support
 import random
 import sys
-import unittest
+from yp_test import yp_unittest
 from functools import cmp_to_key
 
 verbose = support.verbose
@@ -41,8 +41,8 @@ def check(tag, expected, raw, compare=None):
             nerrors += 1
             return
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestBase(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestBase(yp_unittest.TestCase):
     def testStressfully(self):
         # Try a variety of sizes at and around powers of 2, and at powers of 10.
         sizes = [0]
@@ -133,8 +133,8 @@ class TestBase(unittest.TestCase):
 
 #==============================================================================
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestBugs(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestBugs(yp_unittest.TestCase):
 
     def test_bug453523(self):
         # bug 453523 -- list.sort() crasher.
@@ -171,8 +171,8 @@ class TestBugs(unittest.TestCase):
 
 #==============================================================================
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestDecorateSortUndecorate(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestDecorateSortUndecorate(yp_unittest.TestCase):
 
     def test_decorated(self):
         data = 'The quick Brown fox Jumped over The lazy Dog'.split()

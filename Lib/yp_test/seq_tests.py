@@ -2,7 +2,7 @@
 Tests common to tuple, list and UserList.UserList
 """
 
-import unittest
+from yp_test import yp_unittest
 import sys
 import pickle
 
@@ -85,7 +85,7 @@ def itermulti(seqn):
     'Test multiple tiers of iterators'
     return chain(map(lambda x:x, iterfunc(IterGen(Sequence(seqn)))))
 
-class CommonTest(unittest.TestCase):
+class CommonTest(yp_unittest.TestCase):
     # The type to be tested
     type2test = None
 
@@ -192,7 +192,7 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(u[-100:100:-1], self.type2test([]))
         self.assertEqual(u[-100:100:2], self.type2test([0, 2, 4]))
 
-    @unittest.skip("Not applicable to nohtyP (yp_ssize_t doesn't go that high)")
+    @yp_unittest.skip("Not applicable to nohtyP (yp_ssize_t doesn't go that high)")
     def test_getslice_long_ints(self):
         # Test extreme cases with long ints
         a = self.type2test([0,1,2,3,4])
@@ -208,7 +208,7 @@ class CommonTest(unittest.TestCase):
 
         self.assertRaises(TypeError, u.__contains__)
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_contains_fake(self):
         class AllEq:
             # Sequences must use rich comparison against each item
@@ -220,7 +220,7 @@ class CommonTest(unittest.TestCase):
         self.assertNotIn(AllEq(), self.type2test([]))
         self.assertIn(AllEq(), self.type2test([1]))
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_contains_order(self):
         # Sequences must test in-order.  If a rich comparison has side
         # effects, these will be visible to tests against later members.
@@ -269,7 +269,7 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(u2+u2+u2, u2*3)
         self.assertEqual(u2+u2+u2, 3*u2)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_addmul_subclass(self):
         class subclass(self.type2test):
             pass
@@ -343,7 +343,7 @@ class CommonTest(unittest.TestCase):
 
         self.assertRaises(TypeError, a.count)
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_count_badobj(self):
         class BadExc(Exception):
             pass
@@ -376,7 +376,7 @@ class CommonTest(unittest.TestCase):
 
         self.assertRaises(TypeError, u.index)
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_index_badobj(self):
         class BadExc(Exception):
             pass
@@ -390,7 +390,7 @@ class CommonTest(unittest.TestCase):
         a = self.type2test([0, 1, 2, 3])
         self.assertRaises(BadExc, a.index, BadCmp())
 
-    @unittest.skip("Not applicable to nohtyP (yp_ssize_t doesn't go that high)")
+    @yp_unittest.skip("Not applicable to nohtyP (yp_ssize_t doesn't go that high)")
     def test_index_long_ints(self):
         a = self.type2test([-2, -1, 0, 0, 1, 2])
         self.assertEqual(a.index(0), 2)
@@ -405,7 +405,7 @@ class CommonTest(unittest.TestCase):
         self.assertRaises(ValueError, a.index, 0, 4*sys.maxsize,-4*sys.maxsize)
         self.assertRaises(ValueError, a.index, 2, 0, -10)
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickle(self):
         lst = self.type2test([4, 5, 6, 7])
         lst2 = pickle.loads(pickle.dumps(lst))

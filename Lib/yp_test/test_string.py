@@ -1,10 +1,11 @@
 from yp import *
-import unittest, string
+from yp_test import yp_unittest
+import string
 from yp_test import support
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-class ModuleTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class ModuleTest(yp_unittest.TestCase):
 
     def test_attrs(self):
         string.whitespace

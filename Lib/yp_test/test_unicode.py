@@ -10,7 +10,7 @@ import _string
 import codecs
 import struct
 import sys
-import unittest
+from yp_test import yp_unittest
 import warnings
 from yp_test import support, string_tests
 
@@ -32,11 +32,11 @@ def search_function(encoding):
         return None
 codecs.register(search_function)
 
-@unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UnicodeTest(string_tests.CommonTest,
         string_tests.MixinStrUnicodeUserStringTest,
         string_tests.MixinStrUnicodeTest,
-        unittest.TestCase):
+        yp_unittest.TestCase):
 
     type2test = str
 
@@ -2187,8 +2187,8 @@ class UnicodeTest(string_tests.CommonTest,
                 self.assertEqual(abcdef.decode('unicode_internal'), text)
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-class StringModuleTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class StringModuleTest(yp_unittest.TestCase):
     def test_formatter_parser(self):
         def parse(format):
             return list(_string.formatter_parser(format))
@@ -2240,4 +2240,4 @@ class StringModuleTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

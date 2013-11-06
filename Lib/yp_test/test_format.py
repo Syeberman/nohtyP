@@ -3,7 +3,7 @@ from yp_test.support import verbose, TestFailed
 import locale
 import sys
 import yp_test.support as support
-import unittest
+from yp_test import yp_unittest
 
 maxsize = support.MAX_Py_ssize_t
 
@@ -48,8 +48,8 @@ def testformat(formatstr, args, output=None, limit=None, overflowok=False):
                 print('yes')
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-class FormatTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class FormatTest(yp_unittest.TestCase):
     def test_format(self):
         testformat("%.1d", (1,), "1")
         testformat("%.*d", (sys.maxsize,1), overflowok=True)  # expect overflow
@@ -316,4 +316,4 @@ def test_main():
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

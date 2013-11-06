@@ -16,15 +16,15 @@ import subprocess
 import sys
 from yp_test.support import run_unittest
 import time
-import unittest
+from yp_test import yp_unittest
 
 # Test import all of the things we're about to try testing up front.
 from _io import FileIO
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-@unittest.skipUnless(os.name == 'posix', 'tests requires a posix system.')
-class TestFileIOSignalInterrupt(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skipUnless(os.name == 'posix', 'tests requires a posix system.')
+class TestFileIOSignalInterrupt(yp_unittest.TestCase):
     def setUp(self):
         self._process = None
 
@@ -230,7 +230,7 @@ class TestTextIOSignalInterrupt(TestFileIOSignalInterrupt):
 def test_main():
     test_cases = [
             tc for tc in globals().values()
-            if isinstance(tc, type) and issubclass(tc, unittest.TestCase)]
+            if isinstance(tc, type) and issubclass(tc, yp_unittest.TestCase)]
     run_unittest(*test_cases)
 
 

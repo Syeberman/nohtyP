@@ -1,11 +1,11 @@
 
 from yp import *
 import os, filecmp, shutil, tempfile
-import unittest
+from yp_test import yp_unittest
 from yp_test import support
 
-@unittest.skip( "TODO: convert to yp.py" )
-class FileCompareTestCase(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class FileCompareTestCase(yp_unittest.TestCase):
     def setUp(self):
         self.name = support.TESTFN
         self.name_same = support.TESTFN + '-same'
@@ -42,8 +42,8 @@ class FileCompareTestCase(unittest.TestCase):
         self.assertFalse(filecmp.cmp(self.name, self.dir),
                     "File and directory compare as equal")
 
-@unittest.skip( "TODO: convert to yp.py" )
-class DirCompareTestCase(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class DirCompareTestCase(yp_unittest.TestCase):
     def setUp(self):
         tmpdir = tempfile.gettempdir()
         self.dir = os.path.join(tmpdir, 'dir')

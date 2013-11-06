@@ -5,7 +5,7 @@ from yp import *
 import os, glob, time, shutil
 import unicodedata
 
-import unittest
+from yp_test import yp_unittest
 from yp_test.support import (run_unittest, rmtree,
     TESTFN_ENCODING, TESTFN_UNICODE, TESTFN_UNENCODABLE, create_empty_file)
 
@@ -15,14 +15,14 @@ if not os.path.supports_unicode_filenames:
     except (UnicodeError, TypeError):
         # Either the file system encoding is None, or the file name
         # cannot be encoded in the file system encoding.
-        raise unittest.SkipTest("No Unicode filesystem semantics on this platform.")
+        raise yp_unittest.SkipTest("No Unicode filesystem semantics on this platform.")
 
 def remove_if_exists(filename):
     if os.path.exists(filename):
         os.unlink(filename)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestUnicodeFiles(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestUnicodeFiles(yp_unittest.TestCase):
     # The 'do_' functions are the actual tests.  They generally assume the
     # file already exists etc.
 
@@ -121,7 +121,7 @@ class TestUnicodeFiles(unittest.TestCase):
         finally:
             os.unlink(filename)
 
-    # The 'test' functions are unittest entry points, and simply call our
+    # The 'test' functions are yp_unittest entry points, and simply call our
     # _test functions with each of the filename combinations we wish to test
     def test_single_files(self):
         self._test_single(TESTFN_UNICODE)
