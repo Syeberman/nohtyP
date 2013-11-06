@@ -1,5 +1,5 @@
 from yp import *
-import unittest
+from yp_test import yp_unittest
 from yp_test import support
 
 import collections, random, string
@@ -11,9 +11,9 @@ import pickle
 def dict( *args, **kwargs ): raise NotImplementedError( "convert script to yp_dict here" )
 
 
-class DictTest(unittest.TestCase):
+class DictTest(yp_unittest.TestCase):
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_invalid_keyword_arguments(self):
         class Custom(dict):
             pass
@@ -25,7 +25,7 @@ class DictTest(unittest.TestCase):
 
     def test_constructor(self):
         # calling built-in types without argument must return empty
-        self.assertEqual(len(yp_dict()), 0)
+        self.assertEqual(yp_len(yp_dict()), 0)
         self.assertIsNot(yp_dict(), yp_dict())
 
     def test_literal_constructor(self):
@@ -45,7 +45,7 @@ class DictTest(unittest.TestCase):
         self.assertIs(yp_bool(yp_dict()), yp_False)
         self.assertIs(yp_bool(yp_dict({1: 2})), yp_True)
 
-    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_keys(self):
         d = yp_dict()
         self.assertEqual(set(d.keys()), set())
@@ -56,7 +56,7 @@ class DictTest(unittest.TestCase):
         self.assertRaises(TypeError, d.keys, None)
         self.assertEqual(repr(yp_dict(a=1).keys()), "dict_keys(['a'])")
 
-    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_values(self):
         d = yp_dict()
         self.assertEqual(set(d.values()), set())
@@ -65,7 +65,7 @@ class DictTest(unittest.TestCase):
         self.assertRaises(TypeError, d.values, None)
         self.assertEqual(repr(yp_dict(a=1).values()), "dict_values([1])")
 
-    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_items(self):
         d = yp_dict()
         self.assertEqual(set(d.items()), set())
@@ -78,8 +78,9 @@ class DictTest(unittest.TestCase):
     def test_contains(self):
         d = yp_dict()
         self.assertNotIn('a', d)
-        self.assertFalse('a' in d)
-        self.assertTrue('a' not in d)
+        # XXX Not applicable to nohtyP
+        #self.assertFalse('a' in d)
+        #self.assertTrue('a' not in d)
         d = yp_dict({'a': 1, 'b': 2})
         self.assertIn('a', d)
         self.assertIn('b', d)
@@ -89,9 +90,9 @@ class DictTest(unittest.TestCase):
 
     def test_len(self):
         d = yp_dict()
-        self.assertEqual(len(d), 0)
+        self.assertEqual(yp_len(d), 0)
         d = yp_dict({'a': 1, 'b': 2})
-        self.assertEqual(len(d), 2)
+        self.assertEqual(yp_len(d), 2)
 
     def test_getitem(self):
         d = yp_dict({'a': 1, 'b': 2})
@@ -106,7 +107,7 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(TypeError, d.__getitem__)
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_getitem_badobj(self):
         class BadEq(object):
             def __eq__(self, other):
@@ -229,7 +230,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(d.fromkeys(g()), yp_dict({1:None}))
         self.assertRaises(TypeError, yp_dict().fromkeys, 3)
 
-    @unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
+    @yp_unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
     def test_fromkeys_subclass1(self):
         class dictlike(yp_dict): pass
         self.assertEqual(dictlike.fromkeys('a'), yp_dict({'a':None}))
@@ -263,7 +264,7 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(Exc, yp_dict.fromkeys, BadSeq())
 
-    @unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
+    @yp_unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
     def test_fromkeys_subclass2(self):
         class Exc(Exception): pass
 
@@ -278,7 +279,7 @@ class DictTest(unittest.TestCase):
         d = yp_dict(zip(range(6), range(6)))
         self.assertEqual(yp_dict.fromkeys(d, 0), yp_dict(zip(range(6), [0]*6)))
 
-    @unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
+    @yp_unittest.skip("REWORK: nohtyP dicts aren't naturally subclassable")
     def test_fromkeys_fastpath_subclass(self):
         class baddict3(yp_dict):
             def __new__(cls):
@@ -315,10 +316,10 @@ class DictTest(unittest.TestCase):
         d.setdefault('key', []).append(3)
         self.assertEqual(d['key'][0], 3)
         d.setdefault('key', []).append(4)
-        self.assertEqual(len(d['key']), 2)
+        self.assertEqual(yp_len(d['key']), 2)
         self.assertRaises(TypeError, d.setdefault)
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_setdefault_badobj(self):
         class Exc(Exception): pass
 
@@ -335,7 +336,7 @@ class DictTest(unittest.TestCase):
         x.fail = True
         self.assertRaises(Exc, d.setdefault, x, [])
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_setdefault_atomic(self):
         # Issue #13521: setdefault() calls __hash__ and __eq__ only once.
         class Hashed(object):
@@ -356,7 +357,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(hashed2.hash_count, 1)
         self.assertEqual(hashed1.eq_count + hashed2.eq_count, 1)
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_setitem_atomic_at_resize(self):
         class Hashed(object):
             def __init__(self):
@@ -398,7 +399,7 @@ class DictTest(unittest.TestCase):
                     self.assertEqual(va, int(str(ka)))
                     kb, vb = tb = b.popitem()
                     self.assertEqual(vb, int(str(kb)))
-                    self.assertFalse(copymode < 0 and ta != tb)
+                    self.assertFalse(yp_bool(copymode < 0 and ta != tb))
                 self.assertFalse(a)
                 self.assertFalse(b)
 
@@ -413,7 +414,7 @@ class DictTest(unittest.TestCase):
         self.assertRaises(KeyError, d.pop, 'ghi')
 
         self.assertEqual(d.pop(k), v)
-        self.assertEqual(len(d), 0)
+        self.assertEqual(yp_len(d), 0)
 
         self.assertRaises(KeyError, d.pop, k)
 
@@ -423,7 +424,7 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(TypeError, d.pop)
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_pop_badobj(self):
         class Exc(Exception): pass
 
@@ -440,7 +441,7 @@ class DictTest(unittest.TestCase):
         x.fail = True
         self.assertRaises(Exc, d.pop, x)
 
-    @unittest.skip( "TODO: Implement mutation detection in nohtyP?" )
+    @yp_unittest.skip( "TODO: Implement mutation detection in nohtyP?" )
     def test_mutating_iteration(self):
         # changing yp_dict size during iteration
         d = yp_dict()
@@ -449,7 +450,7 @@ class DictTest(unittest.TestCase):
             for i in d:
                 d[i+1] = 1
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_mutating_lookup(self):
         # changing yp_dict during a lookup (issue #14417)
         class NastyKey:
@@ -476,7 +477,7 @@ class DictTest(unittest.TestCase):
         d[key2] = 2
         self.assertEqual(d, yp_dict({key2: 2}))
 
-    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_repr(self):
         d = yp_dict()
         self.assertEqual(repr(d), '{}')
@@ -499,7 +500,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(yp_dict(), yp_dict())
         self.assertEqual(yp_dict({1: 2}), yp_dict({1: 2}))
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_eq_badobj(self):
         class Exc(Exception): pass
 
@@ -563,7 +564,7 @@ class DictTest(unittest.TestCase):
         self.assertTrue(larger != larger3)
         self.assertFalse(larger == larger3)
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_errors_in_view_containment_check(self):
         class C:
             def __eq__(self, other):
@@ -628,7 +629,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(yp_dict({1:1}).items() | {2}, {(1,1), 2})
         self.assertEqual({2} | yp_dict({1:1}).items(), {(1,1), 2})
 
-    @unittest.skip( "TODO: Implement __missing__ (or similar) in nohtyP?" )
+    @yp_unittest.skip( "TODO: Implement __missing__ (or similar) in nohtyP?" )
     def test_missing(self):
         # Make sure yp_dict doesn't have a __missing__ method
         self.assertFalse(hasattr(yp_dict, "__missing__"))
@@ -679,7 +680,7 @@ class DictTest(unittest.TestCase):
             d[(1,)]
         #self.assertEqual(c.exception.args, ((1,),)) # not applicable to nohtyP
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_bad_key(self):
         # Dictionary lookups should fail if __eq__() raises an exception.
         class CustomException(Exception):
@@ -724,7 +725,7 @@ class DictTest(unittest.TestCase):
         for i in range(5, 9):  # i==8 was the problem
             d[i] = i
 
-    @unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
+    @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_resize2(self):
         # Another yp_dict resizing bug (SF bug #1456209).
         # This caused Segmentation faults or Illegal instructions.
@@ -755,7 +756,7 @@ class DictTest(unittest.TestCase):
                  'f': None, 'g': None, 'h': None})
         d = yp_dict()
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_container_iterator(self):
         # Bug #3680: tp_traverse was not implemented for dictiter and
         # dictview objects.
@@ -784,7 +785,7 @@ class DictTest(unittest.TestCase):
         gc.collect()
         self.assertTrue(gc.is_tracked(t), t)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_literals(self):
         # Test GC-optimization of yp_dict literals
@@ -803,7 +804,7 @@ class DictTest(unittest.TestCase):
         self._tracked(yp_dict({1: yp_dict()}))
         self._tracked(yp_dict({1: set()}))
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_dynamic(self):
         # Test GC-optimization of dynamically-created dicts
@@ -868,7 +869,7 @@ class DictTest(unittest.TestCase):
         d.update([(x, y), (z, w)])
         self._tracked(d)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     @support.cpython_only
     def test_track_subtypes(self):
         # Dict subtypes are always tracked
@@ -876,7 +877,7 @@ class DictTest(unittest.TestCase):
             pass
         self._tracked(MyDict())
 
-    @unittest.skip( "TODO: Implement pickling in nohtyP" )
+    @yp_unittest.skip( "TODO: Implement pickling in nohtyP" )
     def test_iterator_pickling(self):
         data = yp_dict({1:"a", 2:"b", 3:"c"})
         it = iter(data)
@@ -894,7 +895,7 @@ class DictTest(unittest.TestCase):
         del data[drop]
         self.assertEqual(sorted(it), sorted(data))
 
-    @unittest.skip( "TODO: Implement pickling in nohtyP" )
+    @yp_unittest.skip( "TODO: Implement pickling in nohtyP" )
     def test_itemiterator_pickling(self):
         data = yp_dict({1:"a", 2:"b", 3:"c"})
         # dictviews aren't picklable, only their iterators
@@ -916,7 +917,7 @@ class DictTest(unittest.TestCase):
         del data[drop[0]]
         self.assertEqual(yp_dict(it), data)
 
-    @unittest.skip( "TODO: Implement pickling in nohtyP" )
+    @yp_unittest.skip( "TODO: Implement pickling in nohtyP" )
     def test_valuesiterator_pickling(self):
         data = yp_dict({1:"a", 2:"b", 3:"c"})
         # data.values() isn't picklable, only its iterator
@@ -932,6 +933,7 @@ class DictTest(unittest.TestCase):
         values = list(it) + [drop]
         self.assertEqual(sorted(values), sorted(list(data.values())))
 
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_instance_dict_getattr_str_subclass(self):
         class Foo:
             def __init__(self, msg):
@@ -942,6 +944,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(f.msg, getattr(f, _str('msg')))
         self.assertEqual(f.msg, f.__dict__[_str('msg')])
 
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_object_set_item_single_instance_non_str_key(self):
         class Foo: pass
         f = Foo()
@@ -957,7 +960,7 @@ class GeneralMappingTests(mapping_tests.BasicTestMappingProtocol):
 class Dict(yp_dict):
     pass
 
-@unittest.skip("Not applicable to nohtyP")
+@yp_unittest.skip("Not applicable to nohtyP")
 class SubclassMappingTests(mapping_tests.BasicTestMappingProtocol):
     type2test = Dict
 

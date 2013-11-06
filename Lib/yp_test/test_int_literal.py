@@ -4,11 +4,11 @@ This is complex because of changes due to PEP 237.
 """
 
 from yp import *
-import unittest
+from yp_test import yp_unittest
 from yp_test import support
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestHexOctBin(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestHexOctBin(yp_unittest.TestCase):
 
     def test_hex_baseline(self):
         # A few upper/lowercase tests

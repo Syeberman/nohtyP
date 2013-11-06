@@ -8,7 +8,7 @@
 
 from yp import *
 import sys
-import unittest
+from yp_test import yp_unittest
 import hashlib
 import subprocess
 import yp_test.support
@@ -19,8 +19,8 @@ errors = 'surrogatepass'
 
 ### Run tests
 
-@unittest.skip( "TODO: convert to yp.py" )
-class UnicodeMethodsTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class UnicodeMethodsTest(yp_unittest.TestCase):
 
     # update this, if the database changes
     expectedchecksum = 'bf7a78f1a532421b5033600102e23a92044dbba9'
@@ -68,8 +68,8 @@ class UnicodeMethodsTest(unittest.TestCase):
         result = h.hexdigest()
         self.assertEqual(result, self.expectedchecksum)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class UnicodeDatabaseTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class UnicodeDatabaseTest(yp_unittest.TestCase):
 
     def setUp(self):
         # In case unicodedata is not available, this will raise an ImportError,

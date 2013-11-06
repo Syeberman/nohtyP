@@ -1,7 +1,7 @@
 from yp import *
 import sys
 import os
-import unittest
+from yp_test import yp_unittest
 from array import array
 from weakref import proxy
 
@@ -129,12 +129,12 @@ class AutoFileTests:
     def testReadWhenWriting(self):
         self.assertRaises(IOError, self.f.read)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class CAutoFileTests(AutoFileTests, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class CAutoFileTests(AutoFileTests, yp_unittest.TestCase):
     open = io.open
 
-@unittest.skip( "TODO: convert to yp.py" )
-class PyAutoFileTests(AutoFileTests, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class PyAutoFileTests(AutoFileTests, yp_unittest.TestCase):
     open = staticmethod(pyio.open)
 
 
@@ -325,12 +325,12 @@ class OtherFileTests:
         finally:
             os.unlink(TESTFN)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class COtherFileTests(OtherFileTests, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class COtherFileTests(OtherFileTests, yp_unittest.TestCase):
     open = io.open
 
-@unittest.skip( "TODO: convert to yp.py" )
-class PyOtherFileTests(OtherFileTests, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class PyOtherFileTests(OtherFileTests, yp_unittest.TestCase):
     open = staticmethod(pyio.open)
 
 
@@ -341,4 +341,4 @@ def tearDownModule():
         os.unlink(TESTFN)
 
 if __name__ == '__main__':
-    unittest.main()
+    yp_unittest.main()

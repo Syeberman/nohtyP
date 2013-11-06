@@ -30,7 +30,7 @@ import random
 import signal
 import sys
 import time
-import unittest
+from yp_test import yp_unittest
 import warnings
 import weakref
 import _testcapi
@@ -266,8 +266,8 @@ class PyMockNonBlockWriterIO(MockNonBlockWriterIO, pyio.RawIOBase):
     BlockingIOError = pyio.BlockingIOError
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-class IOTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class IOTest(yp_unittest.TestCase):
 
     def setUp(self):
         support.unlink(support.TESTFN)
@@ -836,8 +836,8 @@ class SizeofTest:
         self.assertEqual(sys.getsizeof(bufio), size + bufsize2)
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class BufferedReaderTest(yp_unittest.TestCase, CommonBufferedTests):
     read_mode = "rb"
 
     def test_constructor(self):
@@ -955,7 +955,7 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
 
         self.assertEqual(b"abcdefg", bufio.read())
 
-    @unittest.skipUnless(threading, 'Threading required for this test.')
+    @yp_unittest.skipUnless(threading, 'Threading required for this test.')
     @support.requires_resource('cpu')
     def test_threads(self):
         try:
@@ -1085,8 +1085,8 @@ class PyBufferedReaderTest(BufferedReaderTest):
     tp = pyio.BufferedReader
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class BufferedWriterTest(yp_unittest.TestCase, CommonBufferedTests):
     write_mode = "wb"
 
     def test_constructor(self):
@@ -1262,7 +1262,7 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
         with self.open(support.TESTFN, "rb", buffering=0) as f:
             self.assertEqual(f.read(), b"abc")
 
-    @unittest.skipUnless(threading, 'Threading required for this test.')
+    @yp_unittest.skipUnless(threading, 'Threading required for this test.')
     @support.requires_resource('cpu')
     def test_threads(self):
         try:
@@ -1382,8 +1382,8 @@ class CBufferedWriterTest(BufferedWriterTest, SizeofTest):
 class PyBufferedWriterTest(BufferedWriterTest):
     tp = pyio.BufferedWriter
 
-@unittest.skip( "TODO: convert to yp.py" )
-class BufferedRWPairTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class BufferedRWPairTest(yp_unittest.TestCase):
 
     def test_constructor(self):
         pair = self.tp(self.MockRawIO(), self.MockRawIO())
@@ -1860,8 +1860,8 @@ class StatefulIncrementalDecoder(codecs.IncrementalDecoder):
 codecs.register(StatefulIncrementalDecoder.lookupTestDecoder)
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-class StatefulIncrementalDecoderTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class StatefulIncrementalDecoderTest(yp_unittest.TestCase):
     """
     Make sure the StatefulIncrementalDecoder actually works.
     """
@@ -1904,8 +1904,8 @@ class StatefulIncrementalDecoderTest(unittest.TestCase):
         self.assertEqual(d.decode(b'oiabcd'), '')
         self.assertEqual(d.decode(b'', 1), 'abcd.')
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TextIOWrapperTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TextIOWrapperTest(yp_unittest.TestCase):
 
     def setUp(self):
         self.testdata = b"AAA\r\nBBB\rCCC\r\nDDD\nEEE\r\n"
@@ -2498,7 +2498,7 @@ class TextIOWrapperTest(unittest.TestCase):
             self.assertEqual(f.errors, "replace")
 
     @support.no_tracing
-    @unittest.skipUnless(threading, 'Threading required for this test.')
+    @yp_unittest.skipUnless(threading, 'Threading required for this test.')
     def test_threads_write(self):
         # Issue6750: concurrent writes could duplicate data
         event = threading.Event()
@@ -2637,8 +2637,8 @@ class PyTextIOWrapperTest(TextIOWrapperTest):
     pass
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-class IncrementalNewlineDecoderTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class IncrementalNewlineDecoderTest(yp_unittest.TestCase):
 
     def check_newline_decoding_utf8(self, decoder):
         # UTF-8 specific tests for a newline decoder
@@ -2753,8 +2753,8 @@ class PyIncrementalNewlineDecoderTest(IncrementalNewlineDecoderTest):
 
 # XXX Tests for open()
 
-@unittest.skip( "TODO: convert to yp.py" )
-class MiscIOTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class MiscIOTest(yp_unittest.TestCase):
 
     def tearDown(self):
         support.unlink(support.TESTFN)
@@ -2943,11 +2943,11 @@ class MiscIOTest(unittest.TestCase):
                 with self.open(support.TESTFN, **kwargs) as f:
                     self.assertRaises(TypeError, pickle.dumps, f, protocol)
 
-    @unittest.skipUnless(fcntl, 'fcntl required for this test')
+    @yp_unittest.skipUnless(fcntl, 'fcntl required for this test')
     def test_nonblock_pipe_write_bigbuf(self):
         self._test_nonblock_pipe_write(16*1024)
 
-    @unittest.skipUnless(fcntl, 'fcntl required for this test')
+    @yp_unittest.skipUnless(fcntl, 'fcntl required for this test')
     def test_nonblock_pipe_write_smallbuf(self):
         self._test_nonblock_pipe_write(1024)
 
@@ -3032,9 +3032,9 @@ class PyMiscIOTest(MiscIOTest):
     io = pyio
 
 
-@unittest.skip( "TODO: convert to yp.py" )
-@unittest.skipIf(os.name == 'nt', 'POSIX signals required for this test.')
-class SignalsTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skipIf(os.name == 'nt', 'POSIX signals required for this test.')
+class SignalsTest(yp_unittest.TestCase):
 
     def setUp(self):
         self.oldalrm = signal.signal(signal.SIGALRM, self.alarm_interrupt)
@@ -3045,7 +3045,7 @@ class SignalsTest(unittest.TestCase):
     def alarm_interrupt(self, sig, frame):
         1/0
 
-    @unittest.skipUnless(threading, 'Threading required for this test.')
+    @yp_unittest.skipUnless(threading, 'Threading required for this test.')
     def check_interrupted_write(self, item, bytes, **fdopen_kwargs):
         """Check that a partial write, when it gets interrupted, properly
         invokes the signal handler, and bubbles up the exception raised
@@ -3162,7 +3162,7 @@ class SignalsTest(unittest.TestCase):
         self.check_interrupted_read_retry(lambda x: x,
                                           mode="r")
 
-    @unittest.skipUnless(threading, 'Threading required for this test.')
+    @yp_unittest.skipUnless(threading, 'Threading required for this test.')
     def check_interrupted_write_retry(self, item, **fdopen_kwargs):
         """Check that a buffered write, when it gets interrupted (either
         returning a partial result or EINTR), properly invokes the signal
@@ -3269,8 +3269,8 @@ def load_tests(*args):
             for name, obj in py_io_ns.items():
                 setattr(test, name, obj)
 
-    suite = unittest.TestSuite([unittest.makeSuite(test) for test in tests])
+    suite = yp_unittest.TestSuite([yp_unittest.makeSuite(test) for test in tests])
     return suite
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

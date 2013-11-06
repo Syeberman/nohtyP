@@ -3,10 +3,17 @@ Common tests shared by test_str, test_unicode, test_userstring and test_string.
 """
 
 from yp import *
-import unittest, string, sys, struct
+from yp_test import yp_unittest
+import string, sys, struct
 from yp_test import support
 from collections import UserList
 import _testcapi
+
+# Extra assurance that we're not accidentally testing Python's types...unless we mean to
+_str = str
+def bytes( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytes here" )
+def bytearray( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytearray here" )
+def str( *args, **kwargs ): raise NotImplementedError( "convert script to yp_str here" )
 
 class Sequence:
     def __init__(self, seq='wxyz'): self.seq = seq
@@ -39,7 +46,7 @@ class BaseTest:
     # as str objects. fixtesttype() can be used to propagate
     # these arguments to the appropriate type
     def fixtype(self, obj):
-        if isinstance(obj, str):
+        if isinstance(obj, (_str, yp_str)):
             return self.__class__.type2test(obj)
         elif isinstance(obj, list):
             return [self.fixtype(x) for x in obj]
@@ -480,7 +487,7 @@ class BaseTest:
         self.checkraises(ValueError, 'hello', 'rsplit', '')
         self.checkraises(ValueError, 'hello', 'rsplit', '', 0)
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_replace(self):
         EQ = self.checkequal
 
@@ -632,8 +639,8 @@ class BaseTest:
 
         # XXX Commented out. Is there any reason to support buffer objects
         # as arguments for str.replace()?  GvR
-##         ba = bytearray('a')
-##         bb = bytearray('b')
+##         ba = yp_bytearray('a')
+##         bb = yp_bytearray('b')
 ##         EQ("bbc", "abc", "replace", ba, bb)
 ##         EQ("aac", "abc", "replace", bb, ba)
 
@@ -1131,13 +1138,13 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, ' ', 'join')
         self.checkraises(TypeError, ' ', 'join', 7)
-        self.checkraises(TypeError, ' ', 'join', [1, 2, bytes()])
+        self.checkraises(TypeError, ' ', 'join', [1, 2, yp_bytes()])
         try:
             def f():
                 yield 4 + ""
             self.fixtype(' ').join(f())
         except TypeError as e:
-            if '+' not in str(e):
+            if '+' not in _str(e):
                 self.fail('join() ate exception message')
         else:
             self.fail('exception not raised')
@@ -1157,7 +1164,7 @@ class MixinStrUnicodeUserStringTest:
             self.checkraises((ValueError, OverflowError), '%c', '__mod__', ordinal)
 
         longvalue = sys.maxsize + 10
-        slongvalue = str(longvalue)
+        slongvalue = yp_str(longvalue)
         self.checkequal(' 42', '%3ld', '__mod__', 42)
         self.checkequal('42', '%d', '__mod__', 42.0)
         self.checkequal(slongvalue, '%d', '__mod__', longvalue)
@@ -1341,7 +1348,7 @@ class MixinStrUnicodeTest:
         self.assertIs(s1, s2)
 
         # Should also test mixed-type join.
-        if t is str:
+        if t is yp_str:
             s1 = subclass("abcd")
             s2 = "".join([s1])
             self.assertIsNot(s1, s2)
@@ -1355,12 +1362,12 @@ class MixinStrUnicodeTest:
 ##             s1 = subclass("abcd")
 ##             s2 = "".join([s1])
 ##             self.assertIsNot(s1, s2)
-##             self.assertIs(type(s2), str) # promotes!
+##             self.assertIs(type(s2), yp_str) # promotes!
 
 ##             s1 = t("abcd")
 ##             s2 = "".join([s1])
 ##             self.assertIsNot(s1, s2)
-##             self.assertIs(type(s2), str) # promotes!
+##             self.assertIs(type(s2), yp_str) # promotes!
 
         else:
             self.fail("unexpected type for MixinStrUnicodeTest %r" % t)

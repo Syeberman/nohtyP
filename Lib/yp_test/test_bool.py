@@ -1,7 +1,7 @@
 # Test properties of bool promised by PEP 285
 
 from yp import *
-import unittest
+from yp_test import yp_unittest
 from yp_test import support
 
 import os
@@ -10,9 +10,9 @@ import os
 # redefine True/False because they are keywords
 def bool( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bool here" )
 
-class BoolTest(unittest.TestCase):
+class BoolTest(yp_unittest.TestCase):
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_subclass(self):
         try:
             class C(bool):
@@ -30,14 +30,15 @@ class BoolTest(unittest.TestCase):
             print(yp_False, yp_True, file=fo)
             fo.close()
             fo = open(support.TESTFN, "r")
-            self.assertEqual(fo.read(), 'False True\n')
+            with self.nohtyPCheck(False):
+                self.assertEqual(fo.read(), 'False True\n')
         finally:
             fo.close()
             os.remove(support.TESTFN)
 
     def test_repr(self):
-        self.assertEqual(repr(yp_False), 'False')
-        self.assertEqual(repr(yp_True), 'True')
+        self.assertEqual(yp_repr(yp_False), 'False')
+        self.assertEqual(yp_repr(yp_True), 'True')
         self.assertEqual(eval(repr(yp_False)), yp_False)
         self.assertEqual(eval(repr(yp_True)), yp_True)
 
@@ -177,24 +178,24 @@ class BoolTest(unittest.TestCase):
         self.assertIs(yp_bool(""), yp_False)
         self.assertIs(yp_bool(), yp_False)
 
-    @unittest.skip("TODO: Enable when formatting supported in nohtyP")
+    @yp_unittest.skip("TODO: Enable when formatting supported in nohtyP")
     def test_format(self):
         self.assertEqual("%d" % yp_False, "0")
         self.assertEqual("%d" % yp_True, "1")
         self.assertEqual("%x" % yp_False, "0")
         self.assertEqual("%x" % yp_True, "1")
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_hasattr(self):
         self.assertIs(hasattr([], "append"), yp_True)
         self.assertIs(hasattr([], "wobble"), yp_False)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_callable(self):
         self.assertIs(callable(len), yp_True)
         self.assertIs(callable(1), yp_False)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_isinstance(self):
         self.assertIs(isinstance(yp_True, yp_bool), yp_True)
         self.assertIs(isinstance(yp_False, yp_bool), yp_True)
@@ -203,7 +204,7 @@ class BoolTest(unittest.TestCase):
         self.assertIs(isinstance(1, yp_bool), yp_False)
         self.assertIs(isinstance(0, yp_bool), yp_False)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_issubclass(self):
         self.assertIs(issubclass(yp_bool, yp_int), yp_True)
         self.assertIs(issubclass(yp_int, yp_bool), yp_False)
@@ -212,7 +213,7 @@ class BoolTest(unittest.TestCase):
         self.assertIs(yp_dict( {} ).__contains__( 1 ), yp_False)
         self.assertIs(yp_dict( {1:1} ).__contains__( 1 ), yp_True)
 
-    @unittest.skip("TODO: Enable when nohtyP has proper str type")
+    @yp_unittest.skip("TODO: Enable when nohtyP has proper str type")
     def test_string(self):
         self.assertIs(yp_str( "xyz" ).endswith("z"), yp_True)
         self.assertIs(yp_str( "xyz" ).endswith("x"), yp_False)
@@ -252,7 +253,7 @@ class BoolTest(unittest.TestCase):
         self.assertNotIsInstance(yp_True ^ 1, yp_bool)
         self.assertIs(yp_True ^ yp_True, yp_False)
 
-    @unittest.skip("TODO: Implement files in nohtyP")
+    @yp_unittest.skip("TODO: Implement files in nohtyP")
     def test_fileclosed(self):
         try:
             f = open(support.TESTFN, "w")
@@ -269,7 +270,7 @@ class BoolTest(unittest.TestCase):
                   yp_type_set, yp_type_str, yp_type_tuple, yp_type_type]:
             self.assertIs(yp_bool(t), yp_True)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_operator(self):
         import operator
         self.assertIs(operator.truth(0), yp_False)
@@ -285,13 +286,13 @@ class BoolTest(unittest.TestCase):
         self.assertIs(operator.is_not(yp_True, yp_True), yp_False)
         self.assertIs(operator.is_not(yp_True, yp_False), yp_True)
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_marshal(self):
         import marshal
         self.assertIs(marshal.loads(marshal.dumps(yp_True)), yp_True)
         self.assertIs(marshal.loads(marshal.dumps(yp_False)), yp_False)
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickle(self):
         import pickle
         self.assertIs(pickle.loads(pickle.dumps(yp_True)), yp_True)
@@ -299,7 +300,7 @@ class BoolTest(unittest.TestCase):
         self.assertIs(pickle.loads(pickle.dumps(yp_True, yp_True)), yp_True)
         self.assertIs(pickle.loads(pickle.dumps(yp_False, yp_True)), yp_False)
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_picklevalues(self):
         # Test for specific backwards-compatible pickle values
         import pickle
@@ -310,7 +311,7 @@ class BoolTest(unittest.TestCase):
         self.assertEqual(pickle.dumps(yp_True, protocol=2), b'\x80\x02\x88.')
         self.assertEqual(pickle.dumps(yp_False, protocol=2), b'\x80\x02\x89.')
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_convert_to_bool(self):
         # Verify that TypeError occurs when bad things are returned
         # from __bool__().  This isn't really a bool test, but
@@ -342,7 +343,7 @@ class BoolTest(unittest.TestCase):
                 return -1
         self.assertRaises(ValueError, yp_bool, Eggs())
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
         # this will start failing if __len__ changes assertions
@@ -358,7 +359,7 @@ class BoolTest(unittest.TestCase):
                 except (Exception) as e_len:
                     self.assertEqual(str(e_bool), str(e_len))
 
-    @unittest.skip("TODO: Implement real/imag/etc in nohtyP")
+    @yp_unittest.skip("TODO: Implement real/imag/etc in nohtyP")
     def test_real_and_imag(self):
         self.assertEqual(yp_True.real, 1)
         self.assertEqual(yp_True.imag, 0)

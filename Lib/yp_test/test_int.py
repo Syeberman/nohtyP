@@ -1,10 +1,8 @@
 from yp import *
 import sys
 
-import unittest
+from yp_test import yp_unittest
 from yp_test import support
-
-# TODO There may be tests in Python's test_long that are applicable to us as well
 
 # Extra assurance that we're not accidentally testing Python's int
 def int( *args, **kwargs ): raise NotImplementedError( "convert script to yp_int here" )
@@ -31,7 +29,7 @@ L = [
         #("\u0200", ValueError)
 ]
 
-class IntTestCases(unittest.TestCase):
+class IntTestCases(yp_unittest.TestCase):
 
     def test_basic(self):
         self.assertEqual(yp_int(314), 314)
@@ -226,7 +224,7 @@ class IntTestCases(unittest.TestCase):
         self.assertEqual(yp_int('2br45qc', 35), 4294967297)
         self.assertEqual(yp_int('1z141z5', 36), 4294967297)
 
-    @unittest.skip("TODO: Support full Unicode in nohtyP")
+    @yp_unittest.skip("TODO: Support full Unicode in nohtyP")
     def test_basic_unicode(self):
         self.assertEqual(yp_int("\N{EM SPACE}-3\N{EN SPACE}"), -3)
 
@@ -465,7 +463,7 @@ class IntTestCases(unittest.TestCase):
             for base, string in enumerate( strings, 2 ):
                 self.assertRaises(OverflowError, yp_int, string, base)
 
-    @unittest.skip("REWORK: nohtyP doesn't have user-defined types yet")
+    @yp_unittest.skip("REWORK: nohtyP doesn't have user-defined types yet")
     def test_intconversion(self):
         # Test __int__()
         class ClassicMissingMethods:
@@ -568,7 +566,7 @@ class IntTestCases(unittest.TestCase):
                 with self.assertRaises(TypeError):
                     yp_int(TruncReturnsBadInt())
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_error_message(self):
         testlist = ('\xbd', '123\xbd', '  123 456  ')
         for s in testlist:

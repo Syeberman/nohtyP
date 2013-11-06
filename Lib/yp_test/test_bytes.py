@@ -13,7 +13,7 @@ import copy
 import functools
 import pickle
 import tempfile
-import unittest
+from yp_test import yp_unittest
 import yp_test.support
 import yp_test.string_tests
 import yp_test.buffer_tests
@@ -96,7 +96,7 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test, -1)
         self.assertEqual(self.type2test(b'0'), b'0')
 
-    @unittest.skip("TODO Implement encoding in nohtyP")
+    @yp_unittest.skip("TODO Implement encoding in nohtyP")
     def test_from_ssize_not_actually_ssize(self):
         self.assertEqual(self.type2test('0', 'ascii'), b'0')
         self.assertEqual(self.type2test(b'0'), b'0')
@@ -110,7 +110,7 @@ class BaseBytesTest:
         self.assertRaises(TypeError, self.type2test, [0.0])
         self.assertRaises(TypeError, self.type2test, [None])
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_constructor_type_errors_user_type(self):
         class C:
             pass
@@ -205,7 +205,7 @@ class BaseBytesTest:
                 for step in indices[1:]:
                     self.assertEqual(b[start:stop:step], self.type2test(L[start:stop:step]))
 
-    @unittest.skip("TODO Implement encoding in nohtyP")
+    @yp_unittest.skip("TODO Implement encoding in nohtyP")
     def test_encoding(self):
         sample = "Hello world\n\u1234\u5678\u9abc"
         for enc in ("utf-8", "utf-16"):
@@ -215,7 +215,7 @@ class BaseBytesTest:
         b = self.type2test(sample, "latin-1", "ignore")
         self.assertEqual(b, self.type2test(sample[:-3], "utf-8"))
 
-    @unittest.skip("TODO Implement encoding in nohtyP")
+    @yp_unittest.skip("TODO Implement encoding in nohtyP")
     def test_decode(self):
         sample = "Hello world\n\u1234\u5678\u9abc\def0\def0"
         for enc in ("utf-8", "utf-16"):
@@ -286,7 +286,7 @@ class BaseBytesTest:
             self.assertNotIn(f(b"dab"), b)
             self.assertNotIn(f(b"abd"), b)
 
-    @unittest.skip("TODO Implement fromhex in nohtyP")
+    @yp_unittest.skip("TODO Implement fromhex in nohtyP")
     def test_fromhex(self):
         self.assertRaises(TypeError, self.type2test.fromhex)
         self.assertRaises(TypeError, self.type2test.fromhex, 1)
@@ -302,7 +302,7 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test.fromhex, '\x00')
         self.assertRaises(ValueError, self.type2test.fromhex, '12   \x00   34')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_join(self):
         self.assertEqual(self.type2test(b"").join([]), b"")
         self.assertEqual(self.type2test(b"").join([b""]), b"")
@@ -337,7 +337,7 @@ class BaseBytesTest:
         self.assertEqual(b.count(i, 1, 3), 1)
         self.assertEqual(b.count(p, 7, 9), 1)
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_startswith(self):
         b = self.type2test(b'hello')
         self.assertFalse(self.type2test().startswith(b"anything"))
@@ -352,7 +352,7 @@ class BaseBytesTest:
         self.assertIn('bytes', exc)
         self.assertIn('tuple', exc)
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_endswith(self):
         b = self.type2test(b'hello')
         self.assertFalse(yp_bytearray().endswith(b"anything"))
@@ -387,7 +387,7 @@ class BaseBytesTest:
         self.assertEqual(b.find(i, 1, 3), 1)
         self.assertEqual(b.find(w, 1, 3), -1)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_find_raise_correct_exception_msg(self):
         for index in (-1, 256, sys.maxsize + 1):
             self.assertRaisesRegex(
@@ -452,13 +452,13 @@ class BaseBytesTest:
         self.assertEqual(b.rindex(i, 3, 9), 7)
         self.assertRaises(ValueError, b.rindex, w, 1, 3)
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_replace(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.replace(b'i', b'a'), b'massassappa')
         self.assertEqual(b.replace(b'ss', b'x'), b'mixixippi')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_split(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.split(b'i'), [b'm', b'ss', b'ss', b'pp', b''])
@@ -473,7 +473,7 @@ class BaseBytesTest:
         b = self.type2test(b'a b c d')
         self.assertEqual(b.split(maxsplit=1), [b'a', b'b c d'])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_whitespace(self):
         for b in (b'  arf  barf  ', b'arf\tbarf', b'arf\nbarf', b'arf\rbarf',
                   b'arf\fbarf', b'arf\vbarf'):
@@ -489,16 +489,16 @@ class BaseBytesTest:
         self.assertEqual(self.type2test(b'  a  bb  c  ').split(None, 2), [b'a', b'bb', b'c  '])
         self.assertEqual(self.type2test(b'  a  bb  c  ').split(None, 3), [b'a', b'bb', b'c'])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_string_error(self):
         self.assertRaises(TypeError, self.type2test(b'a b').split, ' ')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_unicodewhitespace(self):
         b = self.type2test(b"\x09\x0A\x0B\x0C\x0D\x1C\x1D\x1E\x1F")
         self.assertEqual(b.split(), [b'\x1c\x1d\x1e\x1f'])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.rsplit(b'i'), [b'm', b'ss', b'ss', b'pp', b''])
@@ -513,7 +513,7 @@ class BaseBytesTest:
         b = self.type2test(b'a b c d')
         self.assertEqual(b.rsplit(maxsplit=1), [b'a b c', b'd'])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_whitespace(self):
         for b in (b'  arf  barf  ', b'arf\tbarf', b'arf\nbarf', b'arf\rbarf',
                   b'arf\fbarf', b'arf\vbarf'):
@@ -526,29 +526,29 @@ class BaseBytesTest:
         self.assertEqual(self.type2test(b'  a  bb  c  ').rsplit(None, 2), [b'  a', b'bb', b'c'])
         self.assertEqual(self.type2test(b'  a  bb  c  ').rsplit(None, 3), [b'a', b'bb', b'c'])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_string_error(self):
         self.assertRaises(TypeError, self.type2test(b'a b').rsplit, ' ')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_unicodewhitespace(self):
         b = self.type2test(b"\x09\x0A\x0B\x0C\x0D\x1C\x1D\x1E\x1F")
         self.assertEqual(b.rsplit(), [b'\x1c\x1d\x1e\x1f'])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_partition(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.partition(b'ss'), (b'mi', b'ss', b'issippi'))
         self.assertEqual(b.partition(b'w'), (b'mississippi', b'', b''))
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rpartition(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.rpartition(b'ss'), (b'missi', b'ss', b'ippi'))
         self.assertEqual(b.rpartition(b'i'), (b'mississipp', b'i', b''))
         self.assertEqual(b.rpartition(b'w'), (b'', b'', b'mississippi'))
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickling(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             for b in b"", b"a", b"abc", b"\xffab\x80", b"\0\0\377\0\0":
@@ -557,7 +557,7 @@ class BaseBytesTest:
                 q = pickle.loads(ps)
                 self.assertEqual(b, q)
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_iterator_pickling(self):
         for b in b"", b"a", b"abc", b"\xffab\x80", b"\0\0\377\0\0":
             it = itorg = iter(self.type2test(b))
@@ -576,7 +576,7 @@ class BaseBytesTest:
             it = pickle.loads(d)
             self.assertEqual(list(it), data[1:])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_strip(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.strip(b'i'), b'mississipp')
@@ -586,7 +586,7 @@ class BaseBytesTest:
         self.assertEqual(b.strip(b'pim'), b'ssiss')
         self.assertEqual(b.strip(b), b'')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_lstrip(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.lstrip(b'i'), b'mississippi')
@@ -595,7 +595,7 @@ class BaseBytesTest:
         self.assertEqual(b.lstrip(b'im'), b'ssissippi')
         self.assertEqual(b.lstrip(b'pim'), b'ssissippi')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rstrip(self):
         b = self.type2test(b'mississippi')
         self.assertEqual(b.rstrip(b'i'), b'mississipp')
@@ -604,26 +604,26 @@ class BaseBytesTest:
         self.assertEqual(b.rstrip(b'im'), b'mississipp')
         self.assertEqual(b.rstrip(b'pim'), b'mississ')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_strip_whitespace(self):
         b = self.type2test(b' \t\n\r\f\vabc \t\n\r\f\v')
         self.assertEqual(b.strip(), b'abc')
         self.assertEqual(b.lstrip(), b'abc \t\n\r\f\v')
         self.assertEqual(b.rstrip(), b' \t\n\r\f\vabc')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_strip_bytearray(self):
         self.assertEqual(self.type2test(b'abc').strip(b'ac'), b'b')
         self.assertEqual(self.type2test(b'abc').lstrip(b'ac'), b'bc')
         self.assertEqual(self.type2test(b'abc').rstrip(b'ac'), b'ab')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_strip_string_error(self):
         self.assertRaises(TypeError, self.type2test(b'abc').strip, 'b')
         self.assertRaises(TypeError, self.type2test(b'abc').lstrip, 'b')
         self.assertRaises(TypeError, self.type2test(b'abc').rstrip, 'b')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_center(self):
         # Fill character can be either bytes or bytearray (issue 12380)
         b = self.type2test(b'abc')
@@ -631,7 +631,7 @@ class BaseBytesTest:
             self.assertEqual(b.center(7, fill_type(b'-')),
                              self.type2test(b'--abc--'))
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_ljust(self):
         # Fill character can be either bytes or bytearray (issue 12380)
         b = self.type2test(b'abc')
@@ -639,7 +639,7 @@ class BaseBytesTest:
             self.assertEqual(b.ljust(7, fill_type(b'-')),
                              self.type2test(b'abc----'))
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rjust(self):
         # Fill character can be either bytes or bytearray (issue 12380)
         b = self.type2test(b'abc')
@@ -647,13 +647,13 @@ class BaseBytesTest:
             self.assertEqual(b.rjust(7, fill_type(b'-')),
                              self.type2test(b'----abc'))
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_ord(self):
         b = self.type2test(b'\0A\x7f\x80\xff')
         self.assertEqual([ord(b[i:i+1]) for i in range(len(b))],
                          [0, 65, 127, 128, 255])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_maketrans(self):
         transtable = b'\000\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037 !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`xyzdefghijklmnopqrstuvwxyz{|}~\177\200\201\202\203\204\205\206\207\210\211\212\213\214\215\216\217\220\221\222\223\224\225\226\227\230\231\232\233\234\235\236\237\240\241\242\243\244\245\246\247\250\251\252\253\254\255\256\257\260\261\262\263\264\265\266\267\270\271\272\273\274\275\276\277\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317\320\321\322\323\324\325\326\327\330\331\332\333\334\335\336\337\340\341\342\343\344\345\346\347\350\351\352\353\354\355\356\357\360\361\362\363\364\365\366\367\370\371\372\373\374\375\376\377'
         self.assertEqual(self.type2test.maketrans(b'abc', b'xyz'), transtable)
@@ -662,7 +662,7 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test.maketrans, b'abc', b'xyzq')
         self.assertRaises(TypeError, self.type2test.maketrans, 'abc', 'def')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_none_arguments(self):
         # issue 11828
         b = self.type2test(b'hello')
@@ -714,7 +714,7 @@ class BaseBytesTest:
             self.assertRaises(ValueError, method, 256)
             self.assertRaises(ValueError, method, 9999)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_find_etc_raise_correct_error_messages(self):
         # issue 11828
         b = self.type2test(b'hello')
@@ -735,16 +735,16 @@ class BaseBytesTest:
                                 x, None, None, None)
 
 
-class BytesTest(BaseBytesTest, unittest.TestCase):
+class BytesTest(BaseBytesTest, yp_unittest.TestCase):
     type2test = yp_bytes
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_buffer_is_readonly(self):
         fd = os.dup(sys.stdin.fileno())
         with open(fd, "rb", buffering=0) as f:
             self.assertRaises(TypeError, f.readinto, yp_bytes())
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_custom(self):
         class A:
             def __bytes__(self):
@@ -764,7 +764,7 @@ class BytesTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(yp_bytes(A()), b'a')
 
     # Test PyBytes_FromFormat()
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_from_format(self):
         yp_test.support.import_module('ctypes')
         from ctypes import pythonapi, py_object, c_int, c_char_p
@@ -786,13 +786,13 @@ class BytesTest(BaseBytesTest, unittest.TestCase):
                          b's:cstr')
 
 
-class ByteArrayTest(BaseBytesTest, unittest.TestCase):
+class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
     type2test = yp_bytearray
 
     def test_nohash(self):
         self.assertRaises(TypeError, hash, yp_bytearray())
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_bytearray_api(self):
         short_sample = yp_bytes(b"Hello world\n")
         sample = short_sample + yp_bytes(b"\0")*(20 - len(short_sample))
@@ -863,7 +863,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(bb, b'abcd')
         self.assertEqual(b, b'abc')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_regexps(self):
         def by(s):
             return yp_bytearray(map(ord, s))
@@ -956,7 +956,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
             with self.assertRaises(ValueError):
                 b[3:4] = elem
 
-    @unittest.skip("TODO re-enable (it just takes a long time)")
+    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
     def test_extended_set_del_slice(self):
         # XXX ctypes truncates large ints, making them look valid in nohtyP tests
         #indices = (0, None, 1, 3, 19, 300, 1<<333, -1, -2, -31, -300)
@@ -1018,7 +1018,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(b, b1)
         self.assertTrue(b is b1)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_alloc(self):
         b = yp_bytearray()
         alloc = b.__alloc__()
@@ -1114,7 +1114,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         b.insert(0, Indexable(ord('A')))
         self.assertEqual(b, b'A')
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_copied(self):
         # Issue 4348.  Make sure that operations that don't mutate the array
         # copy the bytes.
@@ -1125,7 +1125,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         x = yp_bytearray(b'')
         self.assertFalse(x is x.translate(t))
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_partition_bytearray_doesnt_share_nullstring(self):
         a, b, c = yp_bytearray(b"x").partition(b"y")
         self.assertEqual(b, b"")
@@ -1147,7 +1147,7 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(b, b"")
         self.assertEqual(c, b"")
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_resize_forbidden(self):
         # #4509: can't resize a bytearray when there are buffer exports, even
         # if it wouldn't reallocate the underlying buffer.
@@ -1181,18 +1181,18 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
         self.assertEqual(b, orig)
 
 
-class AssortedBytesTest(unittest.TestCase):
+class AssortedBytesTest(yp_unittest.TestCase):
     #
     # Test various combinations of bytes and bytearray
     #
 
     @check_bytes_warnings
     def test_repr_str(self):
-        for f in str, repr:
+        for f in yp_str, yp_repr:
             self.assertEqual(f(yp_bytearray()), "bytearray(b'')")
             self.assertEqual(f(yp_bytearray([0])), "bytearray(b'\\x00')")
             self.assertEqual(f(yp_bytearray([0, 1, 254, 255])),
-                             "bytearray(b'\\x00\\x01\\xfe\\xff')")
+                            "bytearray(b'\\x00\\x01\\xfe\\xff')")
             self.assertEqual(f(b"abc"), "b'abc'")
             self.assertEqual(f(b"'"), '''b"'"''') # '''
             self.assertEqual(f(b"'\""), r"""b'\'"'""") # '
@@ -1226,7 +1226,7 @@ class AssortedBytesTest(unittest.TestCase):
         self.assertEqual(yp_bytes(b"abc") < b"ab", False)
         self.assertEqual(yp_bytes(b"abc") <= b"ab", False)
 
-    @unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     @yp_test.support.requires_docstrings
     def test_doc(self):
         self.assertIsNotNone(yp_bytearray.__doc__)
@@ -1242,14 +1242,14 @@ class AssortedBytesTest(unittest.TestCase):
 
     @check_bytes_warnings
     def test_to_str(self):
-        self.assertEqual(str(b''), "b''")
-        self.assertEqual(str(b'x'), "b'x'")
-        self.assertEqual(str(b'\x80'), "b'\\x80'")
-        self.assertEqual(str(yp_bytearray(b'')), "bytearray(b'')")
-        self.assertEqual(str(yp_bytearray(b'x')), "bytearray(b'x')")
-        self.assertEqual(str(yp_bytearray(b'\x80')), "bytearray(b'\\x80')")
+        self.assertEqual(yp_str(b''), "b''")
+        self.assertEqual(yp_str(b'x'), "b'x'")
+        self.assertEqual(yp_str(b'\x80'), "b'\\x80'")
+        self.assertEqual(yp_str(yp_bytearray(b'')), "bytearray(b'')")
+        self.assertEqual(yp_str(yp_bytearray(b'x')), "bytearray(b'x')")
+        self.assertEqual(yp_str(yp_bytearray(b'\x80')), "bytearray(b'\\x80')")
 
-    @unittest.skip("TODO Implement encoding in nohtyP")
+    @yp_unittest.skip("TODO Implement encoding in nohtyP")
     def test_literal(self):
         tests =  [
             (b"Wonderful spam", "Wonderful spam"),
@@ -1263,7 +1263,7 @@ class AssortedBytesTest(unittest.TestCase):
             self.assertRaises(SyntaxError, eval,
                               'b"%s"' % chr(c))
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_translate(self):
         b = yp_bytes(b'hello')
         ba = yp_bytearray(b)
@@ -1282,15 +1282,15 @@ class AssortedBytesTest(unittest.TestCase):
         self.assertRaises(TypeError, b.translate, None, None)
         self.assertRaises(TypeError, ba.translate, None, None)
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_bytearray(self):
         self.assertEqual(b'a b'.split(b' '), [b'a', b'b'])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_bytearray(self):
         self.assertEqual(b'a b'.rsplit(b' '), [b'a', b'b'])
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_return_self(self):
         # bytearray.replace must always return a new bytearray
         b = yp_bytearray()
@@ -1324,15 +1324,15 @@ class AssortedBytesTest(unittest.TestCase):
 
     # I've started porting some of those into bytearray_tests.py, we should port
     # the rest that make sense (the code can be cleaned up to use modern
-    # unittest methods at the same time).
+    # yp_unittest methods at the same time).
 
-@unittest.skip("TODO Implement string methods in nohtyP")
-class BytearrayPEP3137Test(unittest.TestCase,
+@yp_unittest.skip("TODO Implement string methods in nohtyP")
+class BytearrayPEP3137Test(yp_unittest.TestCase,
                        yp_test.buffer_tests.MixinBytesBufferCommonTests):
     def marshal(self, x):
         return yp_bytearray(x)
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_returns_new_copy(self):
         val = self.marshal(b'1234')
         # On immutable types these MAY return a reference to themselves
@@ -1370,11 +1370,11 @@ class FixedStringTest(yp_test.string_tests.BaseTest):
     def test_lower(self):
         pass
 
-class ByteArrayAsStringTest(FixedStringTest, unittest.TestCase):
+class ByteArrayAsStringTest(FixedStringTest, yp_unittest.TestCase):
     type2test = yp_bytearray
     contains_bytes = True
 
-class BytesAsStringTest(FixedStringTest, unittest.TestCase):
+class BytesAsStringTest(FixedStringTest, yp_unittest.TestCase):
     type2test = yp_bytes
     contains_bytes = True
 
@@ -1405,7 +1405,7 @@ class SubclassTest:
         # test repeat
         self.assertTrue(a*5 == _a*5)
 
-    @unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_join(self):
         # Make sure join returns a NEW object for single item sequences
         # involving a subclass.
@@ -1419,7 +1419,7 @@ class SubclassTest:
         s3 = s1.join([b"abcd"])
         self.assertTrue(type(s3) is self.type2test)
 
-    @unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickle(self):
         a = self.subclass2test(b"abcd")
         a.x = 10
@@ -1453,8 +1453,8 @@ class ByteArraySubclass(yp_bytearray):
 class BytesSubclass(yp_bytes):
     pass
 
-@unittest.skip("Not applicable to nohtyP")
-class ByteArraySubclassTest(SubclassTest, unittest.TestCase):
+@yp_unittest.skip("Not applicable to nohtyP")
+class ByteArraySubclassTest(SubclassTest, yp_unittest.TestCase):
     type2test = yp_bytearray
     subclass2test = ByteArraySubclass
 
@@ -1469,11 +1469,11 @@ class ByteArraySubclassTest(SubclassTest, unittest.TestCase):
         self.assertEqual(x, yp_bytes(b"abcd"))
 
 
-@unittest.skip("Not applicable to nohtyP")
-class BytesSubclassTest(SubclassTest, unittest.TestCase):
+@yp_unittest.skip("Not applicable to nohtyP")
+class BytesSubclassTest(SubclassTest, yp_unittest.TestCase):
     type2test = yp_bytes
     subclass2test = BytesSubclass
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

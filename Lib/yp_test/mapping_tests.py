@@ -1,12 +1,12 @@
 # tests common to dict and UserDict
 from yp import *
-import unittest
+from yp_test import yp_unittest
 import collections
 
 # nohtyP: Calls to dict are OK here: it's for comparing yp_dict with dict
 
 
-class BasicTestMappingProtocol(unittest.TestCase):
+class BasicTestMappingProtocol(yp_unittest.TestCase):
     # This base class can be used to check that an object conforms to the
     # mapping protocol
 
@@ -30,7 +30,7 @@ class BasicTestMappingProtocol(unittest.TestCase):
         return x
 
     def __init__(self, *args, **kw):
-        unittest.TestCase.__init__(self, *args, **kw)
+        yp_unittest.TestCase.__init__(self, *args, **kw)
         self.reference = self._reference().copy()
 
         # A (key, value) pair not in the mapping
@@ -138,10 +138,10 @@ class BasicTestMappingProtocol(unittest.TestCase):
         self.assertEqual(self._empty_mapping(), self._empty_mapping())
 
     def test_bool(self):
-        self.assertTrue(not self._empty_mapping())
-        self.assertTrue(self.reference)
-        self.assertTrue(bool(self._empty_mapping()) is False)
-        self.assertTrue(bool(self.reference) is True)
+        self.assertTrue(yp_bool(not self._empty_mapping()))
+        self.assertTrue(yp_bool(self.reference))
+        self.assertIs(yp_bool(self._empty_mapping()), yp_False)
+        self.assertIs(yp_bool(self.reference), yp_True)
 
     def test_keys(self):
         d = self._empty_mapping()
@@ -610,7 +610,7 @@ class TestHashMappingProtocol(TestMappingProtocol):
         else:
             self.fail("changing dict size during iteration doesn't raise Error")
 
-    @unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
     def test_repr(self):
         d = self._empty_mapping()
         self.assertEqual(repr(d), '{}')

@@ -9,7 +9,7 @@ import re
 import fileinput
 import collections
 import builtins
-import unittest
+from yp_test import yp_unittest
 
 try:
     import bz2
@@ -46,8 +46,8 @@ def remove_tempfiles(*names):
         if name:
             safe_unlink(name)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class BufferSizesTests(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class BufferSizesTests(yp_unittest.TestCase):
     def test_buffer_sizes(self):
         # First, run the tests with default and teeny buffer size.
         for round, bs in (0, 0), (1, 30):
@@ -146,8 +146,8 @@ class UnconditionallyRaise:
         self.invoked = True
         raise self.exception_type()
 
-@unittest.skip( "TODO: convert to yp.py" )
-class FileInputTests(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class FileInputTests(yp_unittest.TestCase):
 
     def test_zero_byte_files(self):
         t1 = t2 = t3 = t4 = None
@@ -359,7 +359,7 @@ class FileInputTests(unittest.TestCase):
         self.assertTrue(os_fstat_replacement.invoked,
                         "os.fstat() was not invoked")
 
-    @unittest.skipIf(not hasattr(os, "chmod"), "os.chmod does not exist")
+    @yp_unittest.skipIf(not hasattr(os, "chmod"), "os.chmod does not exist")
     def test_readline_os_chmod_raises_OSError(self):
         """Tests invoking FileInput.readline() when os.chmod() raises OSError.
            This exception should be silently discarded."""
@@ -449,8 +449,8 @@ class MockFileInput:
         self.invocation_counts["isstdin"] += 1
         return self.return_values["isstdin"]
 
-@unittest.skip( "TODO: convert to yp.py" )
-class BaseFileInputGlobalMethodsTest(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class BaseFileInputGlobalMethodsTest(yp_unittest.TestCase):
     """Base class for unit tests for the global function of
        the fileinput module."""
 
@@ -752,8 +752,8 @@ class InvocationRecorder:
         self.invocation_count += 1
         self.last_invocation = (args, kwargs)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class Test_hook_compressed(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class Test_hook_compressed(yp_unittest.TestCase):
     """Unit tests for fileinput.hook_compressed()"""
 
     def setUp(self):
@@ -765,7 +765,7 @@ class Test_hook_compressed(unittest.TestCase):
     def test_no_ext(self):
         self.do_test_use_builtin_open("abcd", 2)
 
-    @unittest.skipUnless(gzip, "Requires gzip and zlib")
+    @yp_unittest.skipUnless(gzip, "Requires gzip and zlib")
     def test_gz_ext_fake(self):
         original_open = gzip.open
         gzip.open = self.fake_open
@@ -777,7 +777,7 @@ class Test_hook_compressed(unittest.TestCase):
         self.assertEqual(self.fake_open.invocation_count, 1)
         self.assertEqual(self.fake_open.last_invocation, (("test.gz", 3), {}))
 
-    @unittest.skipUnless(bz2, "Requires bz2")
+    @yp_unittest.skipUnless(bz2, "Requires bz2")
     def test_bz2_ext_fake(self):
         original_open = bz2.BZ2File
         bz2.BZ2File = self.fake_open
@@ -815,8 +815,8 @@ class Test_hook_compressed(unittest.TestCase):
         builtins.open = new_open_func
         return original_open
 
-@unittest.skip( "TODO: convert to yp.py" )
-class Test_hook_encoded(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class Test_hook_encoded(yp_unittest.TestCase):
     """Unit tests for fileinput.hook_encoded()"""
 
     def test(self):

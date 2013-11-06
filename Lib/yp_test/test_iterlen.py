@@ -42,7 +42,7 @@ enumerate(iter('abc')).
 """
 
 from yp import *
-import unittest
+from yp_test import yp_unittest
 from yp_test import support
 from itertools import repeat
 from collections import deque
@@ -88,8 +88,8 @@ class TestTemporarilyImmutable(TestInvariantWithoutMutations):
 
 ## ------- Concrete Type Tests -------
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestRepeat(TestInvariantWithoutMutations, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = repeat(None, n)
@@ -98,68 +98,68 @@ class TestRepeat(TestInvariantWithoutMutations, unittest.TestCase):
         # The repeat() object can also be infinite
         self.assertRaises(TypeError, len, repeat(None))
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestXrange(TestInvariantWithoutMutations, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestXrange(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = iter(range(n))
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestXrangeCustomReversed(TestInvariantWithoutMutations, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestXrangeCustomReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = reversed(range(n))
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestTuple(TestInvariantWithoutMutations, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestTuple(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = iter(tuple(range(n)))
 
 ## ------- Types that should not be mutated during iteration -------
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestDeque(TestTemporarilyImmutable, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestDeque(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
         d = deque(range(n))
         self.it = iter(d)
         self.mutate = d.pop
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestDequeReversed(TestTemporarilyImmutable, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
         d = deque(range(n))
         self.it = reversed(d)
         self.mutate = d.pop
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestDictKeys(TestTemporarilyImmutable, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestDictKeys(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
         d = dict.fromkeys(range(n))
         self.it = iter(d)
         self.mutate = d.popitem
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestDictItems(TestTemporarilyImmutable, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestDictItems(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
         d = dict.fromkeys(range(n))
         self.it = iter(d.items())
         self.mutate = d.popitem
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestDictValues(TestTemporarilyImmutable, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestDictValues(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
         d = dict.fromkeys(range(n))
         self.it = iter(d.values())
         self.mutate = d.popitem
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestSet(TestTemporarilyImmutable, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestSet(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
         d = set(range(n))
@@ -168,8 +168,8 @@ class TestSet(TestTemporarilyImmutable, unittest.TestCase):
 
 ## ------- Types that can mutate during iteration -------
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestList(TestInvariantWithoutMutations, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = iter(range(n))
@@ -188,8 +188,8 @@ class TestList(TestInvariantWithoutMutations, unittest.TestCase):
         d.extend(range(20))
         self.assertEqual(len(it), 0)
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestListReversed(TestInvariantWithoutMutations, unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = reversed(range(n))
@@ -226,8 +226,8 @@ class NoneLengthHint(object):
     def __length_hint__(self):
         return None
 
-@unittest.skip( "TODO: convert to yp.py" )
-class TestLengthHintExceptions(unittest.TestCase):
+@yp_unittest.skip( "TODO: convert to yp.py" )
+class TestLengthHintExceptions(yp_unittest.TestCase):
 
     def test_issue1242657(self):
         self.assertRaises(RuntimeError, list, BadLen())
@@ -244,4 +244,4 @@ class TestLengthHintExceptions(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

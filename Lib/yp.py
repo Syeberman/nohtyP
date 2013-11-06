@@ -971,6 +971,11 @@ class ypObject( c_ypObject_p ):
         # TODO if every class uses the default _frompython, then remove it, it's not needed
         return cls( pyobj )
 
+    # __str__ and __repr__ must always return a Python str, but we want nohtyP-aware code to be
+    # able to get the original yp_str object via _yp_str/_yp_repr
+    def __str__( self ): return str( self._yp_str( ) )
+    def __repr__( self ): return str( self._yp_repr( ) )
+
     def copy( self ): return _yp_copy( self )
     def __copy__( self ): return _yp_copy( self )
     def __deepcopy__( self, memo ): return _yp_deepcopy( self )
@@ -1144,7 +1149,8 @@ class yp_bool( ypObject ):
     def _as_int( self ): return _yp_i_one if self.value == yp_True.value else _yp_i_zero
 
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    def __repr__( self ): return "True" if self.value == yp_True.value else "False"
+    def _yp_str( self ): return yp_s_True if self.value == yp_True.value else yp_s_False
+    _yp_repr = _yp_str
 
     def __bool__( self ): return self.value == yp_True.value
     def __lt__( self, other ): return bool( self ) <  other
@@ -1243,12 +1249,16 @@ class yp_int( ypObject ):
             return _yp_int_baseC( x, base )
     def _asint( self ): return _yp_asintC( self, yp_None )
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    def __str__( self ): return str( self._asint( ) )
-    def __repr__( self ): return repr( self._asint( ) )
+    def _yp_str( self ): return yp_str( self._asint( ) )
+    def _yp_repr( self ): return yp_repr( self._asint( ) )
 _yp_i_zero = yp_int( 0 )
 _yp_i_one = yp_int( 1 )
 c_ypObject_p_value( "yp_sys_maxint" )
 c_ypObject_p_value( "yp_sys_minint" )
+
+def yp_len( x ):
+    """Returns len( x ) as a yp_int"""
+    return yp_int( len( x ) )
 
 @pytype( float, 12 )
 class yp_float( ypObject ):
@@ -1256,8 +1266,8 @@ class yp_float( ypObject ):
         if isinstance( x, float ): return _yp_floatC( x )
         return _yp_float( x )
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    def __str__( self ): return str( _yp_asfloatC( self, yp_None ) )
-    def __repr__( self ): return repr( _yp_asfloatC( self, yp_None ) )
+    def _yp_str( self ): return yp_str( _yp_asfloatC( self, yp_None ) )
+    def _yp_repr( self ): return yp_repr( _yp_asfloatC( self, yp_None ) )
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
@@ -1293,8 +1303,8 @@ class yp_bytes( _ypBytes ):
     _ypBytes_constructorC = _yp_bytesC
     _ypBytes_constructor = _yp_bytes
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    def __str__( self ): return str( self._asbytes( ) )
-    __repr__ = __str__
+    def _yp_str( self ): return yp_str( self._asbytes( ) )
+    _yp_repr = _yp_str
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
@@ -1303,8 +1313,8 @@ class yp_bytearray( _ypBytes ):
     _ypBytes_constructorC = _yp_bytearrayC
     _ypBytes_constructor = _yp_bytearray
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    def __str__( self ): return "bytearray(%r)" % self._asbytes( )
-    __repr__ = __str__
+    def _yp_str( self ): return yp_str( "bytearray(%r)" % self._asbytes( ) )
+    _yp_repr = _yp_str
     def pop( self, i=_yp_arg_missing ):
         if i is _yp_arg_missing: return _yp_pop( self )
         else: return _yp_popindexC( self, i )
@@ -1325,6 +1335,7 @@ class yp_str( ypObject ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
             if object is _yp_arg_missing:
                 return _yp_str_frombytesC( None, 0, yp_s_latin_1, yp_s_strict )
+            if isinstance( object, ypObject ): return object._yp_str( )
             encoded = str( object ).encode( "latin-1" )
             return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
         else:
@@ -1338,10 +1349,18 @@ class yp_str( ypObject ):
         assert encoding[0] == yp_s_latin_1
         return string_at( encoded.contents, size.contents ).decode( "latin-1" )
     # FIXME When nohtyP supports repr, replace this faked-out version
-    def __repr__( self ): return repr( str( self ) )
+    def _yp_str( self ): return self
+    def _yp_repr( self ): return repr( str( self ) )
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
+yp_s_True = yp_str( "True" )
+yp_s_False = yp_str( "False" )
+
+def yp_repr( object ):
+    """Returns repr( object ) as a yp_str"""
+    if isinstance( object, ypObject ): return object._yp_repr( )
+    return yp_str( repr( object ) )
 
 class _ypTuple( ypObject ):
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
@@ -1360,9 +1379,9 @@ class yp_tuple( _ypTuple ):
         if iterable is _yp_arg_missing: return _yp_tupleN( )
         return _yp_tuple( _yp_iterable( iterable ) )
     # FIXME When nohtyP supports str/repr, replace this faked-out version
-    def __str__( self ):
-        return "(%s)" % ", ".join( repr( x ) for x in self )
-    __repr__ = __str__
+    def _yp_str( self ):
+        return yp_str( "(%s)" % ", ".join( repr( x ) for x in self ) )
+    _yp_repr = _yp_str
 _yp_tuple_empty = yp_tuple( )
 
 @pytype( list, 21 )
@@ -1371,9 +1390,9 @@ class yp_list( _ypTuple ):
         return _yp_list( _yp_iterable( iterable ) )
     # FIXME When nohtyP supports str/repr, replace this faked-out version
     @reprlib.recursive_repr( "[...]" )
-    def __str__( self ):
-        return "[%s]" % ", ".join( repr( x ) for x in self )
-    __repr__ = __str__
+    def _yp_str( self ):
+        return yp_str( "[%s]" % ", ".join( repr( x ) for x in self ) )
+    _yp_repr = _yp_str
     def pop( self, i=_yp_arg_missing ):
         if i is _yp_arg_missing: return _yp_pop( self )
         else: return _yp_popindexC( self, i )
