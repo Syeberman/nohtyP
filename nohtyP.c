@@ -2065,6 +2065,8 @@ static ypObject *_yp_cachedhash_visitor( ypObject *x, void *_memo, yp_hash_t *ha
     *recursion_depth += 1;
     result = ypObject_TYPE( x )->tp_currenthash( x, _yp_cachedhash_visitor, _memo, hash );
     *recursion_depth -= 1;
+    // XXX We can't record the cached hash here: consider that yp_hash on a tuple with mutable
+    // objects cannot succeed, but we (ie yp_currenthash) _can_
     return result;
 }
 yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc )
@@ -2433,7 +2435,8 @@ ypObject *nonetype_bool( ypObject *n ) {
 
 static ypObject *nonetype_currenthash( ypObject *n,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
-    *hash = yp_HashPointer( yp_None );
+    // Since we never contain mutable objects, we can cache our hash
+    *hash = ypObject_CACHED_HASH( yp_None ) = yp_HashPointer( yp_None );
     return yp_None;
 }
 
@@ -3778,6 +3781,8 @@ static ypObject *float_currenthash( ypObject *f,
 {
     // This must remain consistent with the other numeric types
     *hash = yp_HashDouble( ypFloat_VALUE( f ) );
+    // Since we never contain mutable objects, we can cache our hash
+    if( !ypObject_IS_MUTABLE( f ) ) ypObject_CACHED_HASH( f ) = *hash;
     return yp_None;
 }
 
@@ -4934,6 +4939,8 @@ static ypObject *bytes_ne( ypObject *b, ypObject *x ) {
 static ypObject *bytes_currenthash( ypObject *b,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
+    // Since we never contain mutable objects, we can cache our hash
+    if( !ypObject_IS_MUTABLE( b ) ) ypObject_CACHED_HASH( b ) = *hash;
     return yp_None;
 }
 
@@ -5346,6 +5353,8 @@ static ypObject *str_ne( ypObject *s, ypObject *x ) {
 static ypObject *str_currenthash( ypObject *s,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypStr_DATA( s ), ypStr_LEN( s ) );
+    // Since we never contain mutable objects, we can cache our hash
+    if( !ypObject_IS_MUTABLE( s ) ) ypObject_CACHED_HASH( s ) = *hash;
     return yp_None;
 }
 
