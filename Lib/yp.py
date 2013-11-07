@@ -1136,6 +1136,9 @@ class yp_NoneType( ypObject ):
     def _frompython( cls, pyobj ):
         assert pyobj is None
         return yp_None
+    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    def _yp_str( self ): return yp_s_None
+    _yp_repr = _yp_str
 c_ypObject_p_value( "yp_None" )
 
 @pytype( bool, 8 )
@@ -1354,6 +1357,7 @@ class yp_str( ypObject ):
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
+yp_s_None = yp_str( "None" )
 yp_s_True = yp_str( "True" )
 yp_s_False = yp_str( "False" )
 
