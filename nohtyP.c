@@ -566,18 +566,19 @@ static yp_hash_t yp_HashPointer( void *p )
 
 // Return the hash of the given number of bytes; always succeeds
 // XXX Adapted from Python's _Py_HashBytes
-// FIXME On the Release build, this seems to return inconsistent results
 static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
 {
     yp_uhash_t x;
     yp_ssize_t i;
 
     if( len == 0 ) return 0;
+    x = 0; /*(yp_uhash_t) _yp_HashSecret.prefix;*/
     x ^= (yp_uhash_t) *p << 7;
     for (i = 0; i < len; i++) {
         x = (_ypHASH_MULTIPLIER * x) ^ (yp_uhash_t) *p++;
     }
     x ^= (yp_uhash_t) len;
+    /*x ^= (yp_uhash_t) _yp_HashSecret.suffix;*/
     if (x == (yp_uhash_t) ypObject_HASH_INVALID) {
         x = (yp_uhash_t) (ypObject_HASH_INVALID-1);
     }
