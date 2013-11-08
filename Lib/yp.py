@@ -1274,14 +1274,20 @@ def yp_len( x ):
     if not isinstance( x, ypObject ): raise TypeError( "expected ypObject in yp_len" )
     return yp_int( _yp_lenC( x, yp_None ) )
 
+def yp_hash( x ):
+    """Returns hash( x ) of a ypObject as a yp_int"""
+    if not isinstance( x, ypObject ): raise TypeError( "expected ypObject in yp_hash" )
+    return yp_int( _yp_hashC( x, yp_None ) )
+
 @pytype( yp_type_float, float )
 class yp_float( ypObject ):
     def __new__( cls, x=0.0 ):
         if isinstance( x, float ): return _yp_floatC( x )
         return _yp_float( x )
+    def _asfloat( self ): return _yp_asfloatC( self, yp_None )
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    def _yp_str( self ): return yp_str( _yp_asfloatC( self, yp_None ) )
-    def _yp_repr( self ): return yp_repr( _yp_asfloatC( self, yp_None ) )
+    def _yp_str( self ): return yp_str( str( self._asfloat( ) ) )
+    def _yp_repr( self ): return yp_str( repr( self._asfloat( ) ) )
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
@@ -1420,6 +1426,12 @@ class yp_list( _ypTuple ):
         if isinstance( factor, float ): raise TypeError
         _yp_irepeatC( self, factor )
         return self
+
+# FIXME When nohtyP supports sorting, replace this faked-out version
+def yp_sorted( x, *, key=None, reverse=False ):
+    """Returns sorted( x ) of a ypObject as a yp_list"""
+    if not isinstance( x, ypObject ): raise TypeError( "expected ypObject in yp_sorted" )
+    return yp_list( sorted( x, key=key, reverse=reverse ) )
 
 class _ypSet( ypObject ):
     def __new__( cls, iterable=_yp_tuple_empty ):

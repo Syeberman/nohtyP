@@ -58,14 +58,14 @@ class TestJointOps:
         self.assertRaises(TypeError, yp_set().__init__, a=1)
 
     def test_uniquification(self):
-        actual = sorted(self.s)
+        actual = yp_sorted(self.s)
         expected = sorted(self.d)
         self.assertEqual(actual, expected)
         self.assertRaises(PassThru, self.thetype, check_pass_thru())
         self.assertRaises(TypeError, self.thetype, [[]])
 
     def test_len(self):
-        self.assertEqual(yp_len(self.s), yp_len(self.d))
+        self.assertEqual(yp_len(self.s), len(self.d))
 
     def test_contains(self):
         with self.nohtyPCheck(enabled=False):
@@ -77,8 +77,9 @@ class TestJointOps:
 
     def test_union(self):
         u = self.s.union(self.otherword)
-        for c in self.letters:
-            self.assertEqual(c in u, c in self.d or c in self.otherword)
+        with self.nohtyPCheck(enabled=False):
+            for c in self.letters:
+                self.assertEqual(c in u, c in self.d or c in self.otherword)
         self.assertEqual(self.s, self.thetype(self.word))
         self.assertEqual(yp_type(u), self.basetype)
         self.assertRaises(PassThru, self.s.union, check_pass_thru())
@@ -107,8 +108,9 @@ class TestJointOps:
 
     def test_intersection(self):
         i = self.s.intersection(self.otherword)
-        for c in self.letters:
-            self.assertEqual(c in i, c in self.d and c in self.otherword)
+        with self.nohtyPCheck(enabled=False):
+            for c in self.letters:
+                self.assertEqual(c in i, c in self.d and c in self.otherword)
         self.assertEqual(self.s, self.thetype(self.word))
         self.assertEqual(yp_type(i), self.basetype)
         self.assertRaises(PassThru, self.s.intersection, check_pass_thru())
@@ -137,7 +139,8 @@ class TestJointOps:
                     actual = s1.isdisjoint(s2)
                     expected = f(s1, s2)
                     self.assertEqual(actual, expected)
-                    self.assertTrue(actual is yp_True or actual is yp_False)
+                    with self.nohtyPCheck(enabled=False):
+                        self.assertTrue(actual is yp_True or actual is yp_False)
 
     def test_and(self):
         i = self.s.intersection(self.otherword)
@@ -180,8 +183,9 @@ class TestJointOps:
 
     def test_symmetric_difference(self):
         i = self.s.symmetric_difference(self.otherword)
-        for c in self.letters:
-            self.assertEqual(c in i, (c in self.d) ^ (c in self.otherword))
+        with self.nohtyPCheck(enabled=False):
+            for c in self.letters:
+                self.assertEqual(c in i, (c in self.d) ^ (c in self.otherword))
         self.assertEqual(self.s, self.thetype(self.word))
         self.assertEqual(yp_type(i), self.basetype)
         self.assertRaises(PassThru, self.s.symmetric_difference, check_pass_thru())
@@ -404,7 +408,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         self.assertEqual(s, t)
 
     def test_hash(self):
-        self.assertRaises(TypeError, hash, self.s)
+        self.assertRaises(TypeError, yp_hash, self.s)
 
     def test_clear(self):
         self.s.clear()
@@ -476,14 +480,14 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         s.discard(self.thetype(self.word))
 
     def test_pop(self):
-        for i in range(yp_len(self.s)):
+        for i in range(len(self.s)):
             elem = self.s.pop()
             self.assertNotIn(elem, self.s)
         self.assertRaises(KeyError, self.s.pop)
 
     def test_update(self):
         retval = self.s.update(self.otherword)
-        self.assertEqual(retval, None)
+        self.assertEqual(retval, yp_None)
         for c in (self.word + self.otherword):
             self.assertIn(c, self.s)
         self.assertRaises(PassThru, self.s.update, check_pass_thru())
@@ -491,13 +495,13 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         for p, q in (('cdc', 'abcd'), ('efgfe', 'abcefg'), ('ccb', 'abc'), ('ef', 'abcef')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
                 s = self.thetype('abcba')
-                self.assertEqual(s.update(C(p)), None)
+                self.assertEqual(s.update(C(p)), yp_None)
                 self.assertEqual(s, yp_set(q))
         for p in ('cdc', 'efgfe', 'ccb', 'ef', 'abcda'):
             q = 'ahi'
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
                 s = self.thetype('abcba')
-                self.assertEqual(s.update(C(p), C(q)), None)
+                self.assertEqual(s.update(C(p), C(q)), yp_None)
                 self.assertEqual(s, yp_set(s) | yp_set(p) | yp_set(q))
 
     def test_ior(self):
@@ -507,7 +511,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
 
     def test_intersection_update(self):
         retval = self.s.intersection_update(self.otherword)
-        self.assertEqual(retval, None)
+        self.assertEqual(retval, yp_None)
         for c in (self.word + self.otherword):
             if c in self.otherword and c in self.word:
                 self.assertIn(c, self.s)
@@ -522,12 +526,12 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         for p, q in (('cdc', 'c'), ('efgfe', ''), ('ccb', 'bc'), ('ef', '')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
                 s = self.thetype('abcba')
-                self.assertEqual(s.intersection_update(C(p)), None)
+                self.assertEqual(s.intersection_update(C(p)), yp_None)
                 self.assertEqual(s, yp_set(q))
                 ss = 'abcba'
                 s = self.thetype(ss)
                 t = 'cbc'
-                self.assertEqual(s.intersection_update(C(p), C(t)), None)
+                self.assertEqual(s.intersection_update(C(p), C(t)), yp_None)
                 self.assertEqual(s, yp_set('abcba')&yp_set(p)&yp_set(t))
 
     def test_iand(self):
@@ -540,7 +544,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
 
     def test_difference_update(self):
         retval = self.s.difference_update(self.otherword)
-        self.assertEqual(retval, None)
+        self.assertEqual(retval, yp_None)
         for c in (self.word + self.otherword):
             if c in self.word and c not in self.otherword:
                 self.assertIn(c, self.s)
@@ -555,7 +559,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         for p, q in (('cdc', 'ab'), ('efgfe', 'abc'), ('ccb', 'a'), ('ef', 'abc')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
                 s = self.thetype('abcba')
-                self.assertEqual(s.difference_update(C(p)), None)
+                self.assertEqual(s.difference_update(C(p)), yp_None)
                 self.assertEqual(s, yp_set(q))
 
                 s = self.thetype('abcdefghih')
@@ -580,7 +584,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
 
     def test_symmetric_difference_update(self):
         retval = self.s.symmetric_difference_update(self.otherword)
-        self.assertEqual(retval, None)
+        self.assertEqual(retval, yp_None)
         for c in (self.word + self.otherword):
             if (c in self.word) ^ (c in self.otherword):
                 self.assertIn(c, self.s)
@@ -591,7 +595,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         for p, q in (('cdc', 'abd'), ('efgfe', 'abcefg'), ('ccb', 'a'), ('ef', 'abcef')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
                 s = self.thetype('abcba')
-                self.assertEqual(s.symmetric_difference_update(C(p)), None)
+                self.assertEqual(s.symmetric_difference_update(C(p)), yp_None)
                 self.assertEqual(s, yp_set(q))
 
     def test_ixor(self):
@@ -709,8 +713,8 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
         self.assertIs(s, t)
 
     def test_hash(self):
-        self.assertEqual(hash(self.thetype('abcdeb')),
-                         hash(self.thetype('ebecda')))
+        self.assertEqual(yp_hash(self.thetype('abcdeb')),
+                         yp_hash(self.thetype('ebecda')))
 
         # make sure that all permutations give the same hash value
         n = 100
@@ -718,7 +722,7 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
         results = yp_set()
         for i in range(200):
             shuffle(seq)
-            results.add(hash(self.thetype(seq)))
+            results.add(yp_hash(self.thetype(seq)))
         self.assertEqual(yp_len(results), 1)
 
     def test_copy(self):
@@ -737,15 +741,16 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
 
     def test_hash_caching(self):
         f = self.thetype('abcdcda')
-        self.assertEqual(hash(f), hash(f))
+        self.assertEqual(yp_hash(f), yp_hash(f))
 
+    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
     def test_hash_effectiveness(self):
         n = 13
         hashvalues = yp_set()
         addhashvalue = hashvalues.add
         elemmasks = [(i+1, 1<<i) for i in range(n)]
         for i in range(2**n):
-            addhashvalue(hash(yp_frozenset([e for e, m in elemmasks if m&i])))
+            addhashvalue(yp_hash(yp_frozenset([e for e, m in elemmasks if m&i])))
         self.assertEqual(yp_len(hashvalues), 2**n)
 
 class FrozenSetSubclass(yp_frozenset):
@@ -1268,7 +1273,7 @@ class TestMutate(yp_unittest.TestCase):
         self.assertEqual(yp_len(self.set), 0)
 
     def test_pop(self):
-        popped = {}
+        popped = yp_dict( )
         while self.set:
             popped[self.set.pop()] = None
         self.assertEqual(yp_len(popped), yp_len(self.values))
@@ -1371,10 +1376,10 @@ class TestOnlySetsInBinaryOps:
 
     def test_eq_ne(self):
         # Unlike the others, this is testing that == and != *are* allowed.
-        self.assertEqual(self.other == self.set, False)
-        self.assertEqual(self.set == self.other, False)
-        self.assertEqual(self.other != self.set, True)
-        self.assertEqual(self.set != self.other, True)
+        self.assertEqual(self.other == self.set, yp_False)
+        self.assertEqual(self.set == self.other, yp_False)
+        self.assertEqual(self.other != self.set, yp_True)
+        self.assertEqual(self.set != self.other, yp_True)
 
     def test_ge_gt_le_lt(self):
         self.assertRaises(TypeError, lambda: self.set < self.other)
@@ -1539,20 +1544,18 @@ class TestCopying:
 
     def test_copy(self):
         dup = self.set.copy()
-        dup_list = sorted(dup, key=repr)
-        set_list = sorted(self.set, key=repr)
-        with self.nohtyPCheck(enabled=False):
-            self.assertEqual(len(dup_list), len(set_list))
+        dup_list = yp_sorted(dup, key=repr)
+        set_list = yp_sorted(self.set, key=repr)
+        self.assertEqual(yp_len(dup_list), yp_len(set_list))
         for i in range(len(dup_list)):
             self.assertIs(dup_list[i], set_list[i])
 
     def test_deep_copy(self):
         dup = copy.deepcopy(self.set)
         ##print yp_type(dup), repr(dup)
-        dup_list = sorted(dup, key=repr)
-        set_list = sorted(self.set, key=repr)
-        with self.nohtyPCheck(enabled=False):
-            self.assertEqual(len(dup_list), len(set_list))
+        dup_list = yp_sorted(dup, key=repr)
+        set_list = yp_sorted(self.set, key=repr)
+        self.assertEqual(yp_len(dup_list), yp_len(set_list))
         for i in range(len(dup_list)):
             self.assertEqual(dup_list[i], set_list[i])
 
@@ -1651,7 +1654,7 @@ class I:
     def __iter__(self):
         return self
     def __next__(self):
-        if self.i >= yp_len(self.seqn): raise StopIteration
+        if self.i >= len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
         return v
@@ -1714,7 +1717,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
         for cons in (yp_set, yp_frozenset):
             for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
                 for g in (G, I, Ig, S, L, R):
-                    self.assertEqual(sorted(cons(g(s)), key=repr), sorted(g(s), key=repr))
+                    self.assertEqual(yp_sorted(cons(g(s)), key=repr), sorted(g(s), key=repr))
                 self.assertRaises(TypeError, cons , X(s))
                 self.assertRaises(TypeError, cons , N(s))
                 self.assertRaises(ZeroDivisionError, cons , E(s))
@@ -1729,7 +1732,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
                     if isinstance(expected, yp_bool):
                         self.assertEqual(actual, expected)
                     else:
-                        self.assertEqual(sorted(actual, key=repr), sorted(expected, key=repr))
+                        self.assertEqual(yp_sorted(actual, key=repr), yp_sorted(expected, key=repr))
                 self.assertRaises(TypeError, meth, X(s))
                 self.assertRaises(TypeError, meth, N(s))
                 self.assertRaises(ZeroDivisionError, meth, E(s))
@@ -1743,7 +1746,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
                     t = s.copy()
                     getattr(s, methname)(list(g(data)))
                     getattr(t, methname)(g(data))
-                    self.assertEqual(sorted(s, key=repr), sorted(t, key=repr))
+                    self.assertEqual(yp_sorted(s, key=repr), yp_sorted(t, key=repr))
 
                 self.assertRaises(TypeError, getattr(yp_set('january'), methname), X(data))
                 self.assertRaises(TypeError, getattr(yp_set('january'), methname), N(data))
@@ -1806,7 +1809,7 @@ def linegraph(G):
     """Graph, the vertices of which are edges of G,
     with two vertices being adjacent iff the corresponding
     edges share a vertex."""
-    L = {}
+    L = yp_dict( )
     for x in G:
         for y in G[x]:
             nx = [yp_frozenset([x,z]) for z in G[x] if z != y]
@@ -1877,6 +1880,7 @@ class TestGraphs(yp_unittest.TestCase):
         facesizes = collections.defaultdict(int)
         for face in cubofaces:
             facesizes[yp_len(face)] += 1
+        facesizes = yp_dict( facesizes )
         self.assertEqual(facesizes[3], 8)       # eight triangular faces
         self.assertEqual(facesizes[4], 6)       # six square faces
 
