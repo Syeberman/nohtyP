@@ -65,11 +65,12 @@ class TestJointOps:
         self.assertRaises(TypeError, self.thetype, [[]])
 
     def test_len(self):
-        self.assertEqual(len(self.s), len(self.d))
+        self.assertEqual(yp_len(self.s), yp_len(self.d))
 
     def test_contains(self):
-        for c in self.letters:
-            self.assertEqual(c in self.s, c in self.d)
+        with self.nohtyPCheck(enabled=False):
+            for c in self.letters:
+                self.assertEqual(c in self.s, c in self.d)
         self.assertNotIn(yp_list(), self.s) # nohtyP sets accept mutable types for "in"
         s = self.thetype([yp_frozenset(self.letters)])
         self.assertIn(self.thetype(self.letters), s)
@@ -79,7 +80,7 @@ class TestJointOps:
         for c in self.letters:
             self.assertEqual(c in u, c in self.d or c in self.otherword)
         self.assertEqual(self.s, self.thetype(self.word))
-        self.assertEqual(type(u), self.basetype)
+        self.assertEqual(yp_type(u), self.basetype)
         self.assertRaises(PassThru, self.s.union, check_pass_thru())
         self.assertRaises(TypeError, self.s.union, [[]])
         for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
@@ -109,7 +110,7 @@ class TestJointOps:
         for c in self.letters:
             self.assertEqual(c in i, c in self.d and c in self.otherword)
         self.assertEqual(self.s, self.thetype(self.word))
-        self.assertEqual(type(i), self.basetype)
+        self.assertEqual(yp_type(i), self.basetype)
         self.assertRaises(PassThru, self.s.intersection, check_pass_thru())
         for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
             self.assertEqual(self.thetype('abcba').intersection(C('cdc')), yp_set('cc'))
@@ -120,9 +121,9 @@ class TestJointOps:
         s = self.thetype('abcba')
         z = s.intersection()
         if self.thetype == yp_frozenset:
-            self.assertEqual(id(s), id(z))
+            self.assertIs(s, z)
         else:
-            self.assertNotEqual(id(s), id(z))
+            self.assertIsNot(s, z)
 
     def test_isdisjoint(self):
         def f(s1, s2):
@@ -151,10 +152,11 @@ class TestJointOps:
 
     def test_difference(self):
         i = self.s.difference(self.otherword)
-        for c in self.letters:
-            self.assertEqual(c in i, c in self.d and c not in self.otherword)
+        with self.nohtyPCheck(enabled=False):
+            for c in self.letters:
+                self.assertEqual(c in i, c in self.d and c not in self.otherword)
         self.assertEqual(self.s, self.thetype(self.word))
-        self.assertEqual(type(i), self.basetype)
+        self.assertEqual(yp_type(i), self.basetype)
         self.assertRaises(PassThru, self.s.difference, check_pass_thru())
         self.assertEqual(self.s, self.s.difference([[]])) # nohtyP sets accept mutable types here
         for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
@@ -181,7 +183,7 @@ class TestJointOps:
         for c in self.letters:
             self.assertEqual(c in i, (c in self.d) ^ (c in self.otherword))
         self.assertEqual(self.s, self.thetype(self.word))
-        self.assertEqual(type(i), self.basetype)
+        self.assertEqual(yp_type(i), self.basetype)
         self.assertRaises(PassThru, self.s.symmetric_difference, check_pass_thru())
         self.assertRaises(TypeError, self.s.symmetric_difference, [[]])
         for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
@@ -212,7 +214,7 @@ class TestJointOps:
     def test_setOfFrozensets(self):
         t = map(yp_frozenset, ['abcdef', 'bcd', 'bdcb', 'fed', 'fedccba'])
         s = self.thetype(t)
-        self.assertEqual(len(s), 3)
+        self.assertEqual(yp_len(s), 3)
 
     def test_sub_and_super(self):
         p, q, r = map(self.thetype, ['ab', 'abcde', 'def'])
@@ -236,7 +238,7 @@ class TestJointOps:
             p = pickle.dumps(self.s, i)
             dup = pickle.loads(p)
             self.assertEqual(self.s, dup, "%s != %s" % (self.s, dup))
-            if type(self.s) not in (yp_set, yp_frozenset):
+            if yp_type(self.s) not in (yp_set, yp_frozenset):
                 self.s.x = 10
                 p = pickle.dumps(self.s)
                 dup = pickle.loads(p)
@@ -250,7 +252,7 @@ class TestJointOps:
         it = pickle.loads(d)
         # Set iterators unpickle as list iterators due to the
         # undefined order of set items.
-        # self.assertEqual(type(itorg), type(it))
+        # self.assertEqual(yp_type(itorg), yp_type(it))
         self.assertTrue(isinstance(it, collections.abc.Iterator))
         self.assertEqual(self.thetype(it), data)
 
@@ -275,10 +277,10 @@ class TestJointOps:
         t = Tracer(10)
         s = self.thetype([t])
         dup = copy.deepcopy(s)
-        self.assertNotEqual(id(s), id(dup))
+        self.assertIsNot(s, dup)
         for elem in dup:
             newt = elem
-        self.assertNotEqual(id(t), id(newt))
+        self.assertIsNot(t, newt)
         self.assertEqual(t.value + 1, newt.value)
 
     @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
@@ -394,7 +396,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
     def test_constructor_identity(self):
         s = self.thetype(range(3))
         t = self.thetype(s)
-        self.assertNotEqual(id(s), id(t))
+        self.assertIsNot(s, t)
 
     def test_set_literal(self):
         s = yp_set([1,2,3])
@@ -407,13 +409,13 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
     def test_clear(self):
         self.s.clear()
         self.assertEqual(self.s, yp_set())
-        self.assertEqual(len(self.s), 0)
+        self.assertEqual(yp_len(self.s), 0)
 
     def test_copy(self):
         dup = self.s.copy()
         self.assertEqual(self.s, dup)
-        self.assertNotEqual(id(self.s), id(dup))
-        self.assertEqual(type(dup), self.basetype)
+        self.assertIsNot(self.s, dup)
+        self.assertEqual(yp_type(dup), self.basetype)
 
     def test_add(self):
         self.s.add('Q')
@@ -474,7 +476,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         s.discard(self.thetype(self.word))
 
     def test_pop(self):
-        for i in range(len(self.s)):
+        for i in range(yp_len(self.s)):
             elem = self.s.pop()
             self.assertNotIn(elem, self.s)
         self.assertRaises(KeyError, self.s.pop)
@@ -699,12 +701,12 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
                yp_frozenset(yp_dict()), yp_frozenset(yp_frozenset()),
                yp_frozenset(f), f]
         # All of the empty yp_frozensets should have just one id()
-        self.assertEqual(len(yp_set(map(id, efs))), 1)
+        self.assertEqual(yp_len(yp_set(map(id, efs))), 1)
 
     def test_constructor_identity(self):
         s = self.thetype(range(3))
         t = self.thetype(s)
-        self.assertEqual(id(s), id(t))
+        self.assertIs(s, t)
 
     def test_hash(self):
         self.assertEqual(hash(self.thetype('abcdeb')),
@@ -717,19 +719,19 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
         for i in range(200):
             shuffle(seq)
             results.add(hash(self.thetype(seq)))
-        self.assertEqual(len(results), 1)
+        self.assertEqual(yp_len(results), 1)
 
     def test_copy(self):
         dup = self.s.copy()
-        self.assertEqual(id(self.s), id(dup))
+        self.assertIs(self.s, dup)
 
     def test_frozen_as_dictkey(self):
         seq = list(range(10)) + list('abcdefg') + ['apple']
         key1 = self.thetype(seq)
         key2 = self.thetype(reversed(seq))
         self.assertEqual(key1, key2)
-        self.assertNotEqual(id(key1), id(key2))
-        d = {}
+        self.assertIsNot(key1, key2)
+        d = yp_dict( )
         d[key1] = 42
         self.assertEqual(d[key2], 42)
 
@@ -744,7 +746,7 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
         elemmasks = [(i+1, 1<<i) for i in range(n)]
         for i in range(2**n):
             addhashvalue(hash(yp_frozenset([e for e, m in elemmasks if m&i])))
-        self.assertEqual(len(hashvalues), 2**n)
+        self.assertEqual(yp_len(hashvalues), 2**n)
 
 class FrozenSetSubclass(yp_frozenset):
     pass
@@ -777,7 +779,7 @@ class TestFrozenSetSubclass(TestFrozenSet):
                Frozenset(range(0)), Frozenset(Frozenset()),
                Frozenset(yp_frozenset()), f, F, Frozenset(f), Frozenset(F)]
         # All empty yp_frozenset subclass instances should have different ids
-        self.assertEqual(len(yp_set(map(id, efs))), len(efs))
+        self.assertEqual(yp_len(yp_set(map(id, efs))), yp_len(efs))
 
 # Tests taken from test_sets.py =============================================
 
@@ -817,7 +819,7 @@ class TestBasicOps:
             support.unlink(support.TESTFN)
 
     def test_length(self):
-        self.assertEqual(len(self.set), self.length)
+        self.assertEqual(yp_len(self.set), self.length)
 
     def test_self_equality(self):
         self.assertEqual(self.set, self.set)
@@ -890,7 +892,7 @@ class TestBasicOps:
         setiter = iter(self.set)
         # note: __length_hint__ is an internal undocumented API,
         # don't rely on it in your own programs
-        self.assertEqual(setiter.__length_hint__(), len(self.set))
+        self.assertEqual(setiter.__length_hint__(), yp_len(self.set))
 
     @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickling(self):
@@ -1046,7 +1048,7 @@ class TestSetOfSets(yp_unittest.TestCase):
         inner = yp_frozenset([1])
         outer = yp_set([inner])
         element = outer.pop()
-        self.assertEqual(type(element), yp_frozenset)
+        self.assertEqual(yp_type(element), yp_frozenset)
         outer.add(inner)        # Rebuild set of sets with .add method
         outer.remove(inner)
         self.assertEqual(outer, yp_set())   # Verify that remove worked
@@ -1232,7 +1234,7 @@ class TestMutate(yp_unittest.TestCase):
         for v in self.values:
             tmp.add(v)
             expected_len += 1
-            self.assertEqual(len(tmp), expected_len)
+            self.assertEqual(yp_len(tmp), expected_len)
         self.assertEqual(tmp, self.set)
 
     def test_remove_present(self):
@@ -1247,11 +1249,11 @@ class TestMutate(yp_unittest.TestCase):
             pass
 
     def test_remove_until_empty(self):
-        expected_len = len(self.set)
+        expected_len = yp_len(self.set)
         for v in self.values:
             self.set.remove(v)
             expected_len -= 1
-            self.assertEqual(len(self.set), expected_len)
+            self.assertEqual(yp_len(self.set), expected_len)
 
     def test_discard_present(self):
         self.set.discard("c")
@@ -1263,13 +1265,13 @@ class TestMutate(yp_unittest.TestCase):
 
     def test_clear(self):
         self.set.clear()
-        self.assertEqual(len(self.set), 0)
+        self.assertEqual(yp_len(self.set), 0)
 
     def test_pop(self):
         popped = {}
         while self.set:
             popped[self.set.pop()] = None
-        self.assertEqual(len(popped), len(self.values))
+        self.assertEqual(yp_len(popped), yp_len(self.values))
         for v in self.values:
             self.assertIn(v, popped)
 
@@ -1539,16 +1541,18 @@ class TestCopying:
         dup = self.set.copy()
         dup_list = sorted(dup, key=repr)
         set_list = sorted(self.set, key=repr)
-        self.assertEqual(len(dup_list), len(set_list))
+        with self.nohtyPCheck(enabled=False):
+            self.assertEqual(len(dup_list), len(set_list))
         for i in range(len(dup_list)):
-            self.assertTrue(dup_list[i] is set_list[i])
+            self.assertIs(dup_list[i], set_list[i])
 
     def test_deep_copy(self):
         dup = copy.deepcopy(self.set)
-        ##print type(dup), repr(dup)
+        ##print yp_type(dup), repr(dup)
         dup_list = sorted(dup, key=repr)
         set_list = sorted(self.set, key=repr)
-        self.assertEqual(len(dup_list), len(set_list))
+        with self.nohtyPCheck(enabled=False):
+            self.assertEqual(len(dup_list), len(set_list))
         for i in range(len(dup_list)):
             self.assertEqual(dup_list[i], set_list[i])
 
@@ -1647,7 +1651,7 @@ class I:
     def __iter__(self):
         return self
     def __next__(self):
-        if self.i >= len(self.seqn): raise StopIteration
+        if self.i >= yp_len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
         return v
@@ -1667,7 +1671,7 @@ class X:
         self.seqn = seqn
         self.i = 0
     def __next__(self):
-        if self.i >= len(self.seqn): raise StopIteration
+        if self.i >= yp_len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
         return v
@@ -1842,16 +1846,16 @@ class TestGraphs(yp_unittest.TestCase):
 
         g = cube(3)                             # vert --> {v1, v2, v3}
         vertices1 = yp_set(g)
-        self.assertEqual(len(vertices1), 8)     # eight vertices
+        self.assertEqual(yp_len(vertices1), 8)     # eight vertices
         for edge in g.values():
-            self.assertEqual(len(edge), 3)      # each vertex connects to three edges
+            self.assertEqual(yp_len(edge), 3)      # each vertex connects to three edges
         vertices2 = yp_set(v for edges in g.values() for v in edges)
         self.assertEqual(vertices1, vertices2)  # edge vertices in original set
 
         cubefaces = faces(g)
-        self.assertEqual(len(cubefaces), 6)     # six faces
+        self.assertEqual(yp_len(cubefaces), 6)     # six faces
         for face in cubefaces:
-            self.assertEqual(len(face), 4)      # each face is a square
+            self.assertEqual(yp_len(face), 4)      # each face is a square
 
     def test_cuboctahedron(self):
 
@@ -1861,24 +1865,24 @@ class TestGraphs(yp_unittest.TestCase):
 
         g = cube(3)
         cuboctahedron = linegraph(g)            # V( --> {V1, V2, V3, V4}
-        self.assertEqual(len(cuboctahedron), 12)# twelve vertices
+        self.assertEqual(yp_len(cuboctahedron), 12)# twelve vertices
 
         vertices = yp_set(cuboctahedron)
         for edges in cuboctahedron.values():
-            self.assertEqual(len(edges), 4)     # each vertex connects to four other vertices
+            self.assertEqual(yp_len(edges), 4)     # each vertex connects to four other vertices
         othervertices = yp_set(edge for edges in cuboctahedron.values() for edge in edges)
         self.assertEqual(vertices, othervertices)   # edge vertices in original set
 
         cubofaces = faces(cuboctahedron)
         facesizes = collections.defaultdict(int)
         for face in cubofaces:
-            facesizes[len(face)] += 1
+            facesizes[yp_len(face)] += 1
         self.assertEqual(facesizes[3], 8)       # eight triangular faces
         self.assertEqual(facesizes[4], 6)       # six square faces
 
         for vertex in cuboctahedron:
             edge = vertex                       # Cuboctahedron vertices are edges in Cube
-            self.assertEqual(len(edge), 2)      # Two cube vertices define an edge
+            self.assertEqual(yp_len(edge), 2)      # Two cube vertices define an edge
             for cubevert in edge:
                 self.assertIn(cubevert, g)
 

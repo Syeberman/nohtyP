@@ -33,7 +33,7 @@ def _yp_transmute_and_cache( obj ):
     if obj.value is None: raise ValueError
     try: return _yp_pyobj_cache[obj.value] # try to use an existing object
     except KeyError:
-        obj.__class__ = ypObject._ypcode2yp[obj._yp_typecode]
+        obj.__class__ = ypObject._yptype2yp[_yp_type( obj ).value]
         _yp_pyobj_cache[obj.value] = obj
         return obj
 
@@ -50,7 +50,7 @@ class yp_param:
         elif issubclass( self.type, _SimpleCData ):
             if self.type._type_ in "PzZ": return x  # skip pointers
             converted = self.type( x ).value
-            if converted != x: 
+            if converted != x:
                 raise OverflowError( "overflow in ctypes argument (%r != %r)" % (converted, x) )
             return x
         else:
@@ -110,10 +110,18 @@ class c_ypObject_p( c_void_p ):
     def _yp_errcheck( self ):
         if self.value is None: raise ValueError
         ypObject_p_errcheck( self )
-    @property
-    def _yp_typecode( self ):
-        return int.from_bytes( string_at( self.value, 4 ), byteorder=sys.byteorder )
     def __reduce__( self ): raise pickle.PicklingError( "can't pickle nohtyP types (yet)" )
+    def __del__( self ):
+        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
+        # "Python guarantees that globals whose name begins with a single underscore are deleted
+        # from their module before other globals are deleted"
+        # FIXME Why is self.value sometimes None (ie a null pointer)?  Should never happen.
+        try:
+            if self.value is not None: _yp_decref( self )
+        except: pass
+        return # FIXME Causing a Segmentation Fault sometimes?!?!
+        try: self.value = yp_None.value
+        except: pass
 class c_ypObject_p_no_errcheck( c_ypObject_p ):
     def _yp_errcheck( self ):
         if self.value is None: raise ValueError
@@ -553,7 +561,7 @@ yp_func( c_void, "yp_extend", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "t"))
 yp_func( c_void, "yp_irepeatC", ((c_ypObject_pp, "sequence"), (c_yp_ssize_t, "factor")) )
 
 # void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
-yp_func( c_void, "yp_insertC", ((c_ypObject_pp, "sequence"), 
+yp_func( c_void, "yp_insertC", ((c_ypObject_pp, "sequence"),
     (c_yp_ssize_t, "i"), (c_ypObject_p, "x")) )
 
 # ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
@@ -843,6 +851,7 @@ yp_func( c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 
 
 # ypObject *yp_type( ypObject *object );
+yp_func( c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ) )
 
 # ypObject * const yp_type_invalidated;
 # ypObject * const yp_type_exception;
@@ -944,25 +953,16 @@ class ypObject( c_ypObject_p ):
         if cls is ypObject: raise NotImplementedError( "can't instantiate ypObject directly" )
         return super( ).__new__( cls )
     def __init__( self, *args, **kwargs ): pass
-    def __del__( self ):
-        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
-        # "Python guarantees that globals whose name begins with a single underscore are deleted
-        # from their module before other globals are deleted"
-        # FIXME Why is self.value sometimes None (ie a null pointer)?  Should never happen.
-        try:
-            if self.value is not None: _yp_decref( self )
-        except: pass
-        return # FIXME Causing a Segmentation Fault sometimes?!?!
-        try: self.value = yp_None.value
-        except: pass
     _pytype2yp = {}
-    _ypcode2yp = {}
+    _yptype2yp = {}
     @classmethod
     def frompython( cls, pyobj ):
         """ypObject.frompython is a factory that returns the correct yp_* object based on the type
         of pyobj.  All other .frompython class methods always return that exact type.
         """
         if isinstance( pyobj, ypObject ): return pyobj
+        if isinstance( pyobj, type ) and issubclass( pyobj, ypObject ):
+            return pyobj._yp_type
         if cls is ypObject: cls = cls._pytype2yp[type( pyobj )]
         return cls._frompython( pyobj )
     @classmethod
@@ -1042,13 +1042,13 @@ class ypObject( c_ypObject_p ):
         if stop is None: stop = _yp_SLICE_DEFAULT
         if step is None: step = 1
         return func( self, start, stop, step, *args )
-    def __getitem__( self, key ): 
+    def __getitem__( self, key ):
         if isinstance( key, slice ): return self._slice( _yp_getsliceC4, key )
         else: return _yp_getitem( self, key )
-    def __setitem__( self, key, value ): 
+    def __setitem__( self, key, value ):
         if isinstance( key, slice ): self._slice( _yp_setsliceC5, key, value )
         else: _yp_setitem( self, key, value )
-    def __delitem__( self, key ): 
+    def __delitem__( self, key ):
         if isinstance( key, slice ): self._slice( _yp_delsliceC4, key )
         else: _yp_delitem( self, key )
     def get( self, key, defval=None ): return _yp_getdefault( self, key, defval )
@@ -1089,27 +1089,32 @@ class ypObject( c_ypObject_p ):
     def __rxor__( self, other ): return self._arithmetic( _yp_xor, other, self )
     def __ror__( self, other ): return self._arithmetic( _yp_bar, other, self )
 
-def pytype( pytypes, ypcode ):
+def pytype( yptype, pytypes ):
     if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
     def _pytype( cls ):
+        cls._yp_type = yptype
         for pytype in pytypes:
             ypObject._pytype2yp[pytype] = cls
-        ypObject._ypcode2yp[ypcode] = cls
+        ypObject._yptype2yp[yptype.value] = cls
         return cls
     return _pytype
 
-@pytype( BaseException, 2 )
-class yp_BaseException( ypObject ):
-    def __new__( cls, *args, **kwargs ):
-        raise NotImplementedError( "can't instantiate yp_BaseException directly" )
-
-@pytype( type, 4 )
+# There's a circular reference between yp_type_type and yp_type we need to dance around
+yp_type_type = c_ypObject_p.in_dll( ypdll, "yp_type_type" )
 class yp_type( ypObject ):
-    def __new__( cls, *args, **kwargs ):
-        raise NotImplementedError( "can't instantiate yp_type directly" )
+    _yp_type = yp_type_type
+    def __new__( cls, object ):
+        if not isinstance( object, ypObject ): raise TypeError( "expected ypObject in yp_type" )
+        return object._yp_type
+yp_type_type.__class__ = yp_type
+_yp_pyobj_cache[yp_type_type.value] = yp_type_type
+ypObject._pytype2yp[type] = yp_type
+ypObject._yptype2yp[yp_type_type.value] = yp_type
+
+# Now that the "type(type) is type" issue has been dealt with, we can import the other type
+# objects as normal
 c_ypObject_p_value( "yp_type_invalidated" )
 c_ypObject_p_value( "yp_type_exception" )
-c_ypObject_p_value( "yp_type_type" )
 c_ypObject_p_value( "yp_type_NoneType" )
 c_ypObject_p_value( "yp_type_bool" )
 c_ypObject_p_value( "yp_type_int" )
@@ -1128,7 +1133,12 @@ c_ypObject_p_value( "yp_type_set" )
 c_ypObject_p_value( "yp_type_frozendict" )
 c_ypObject_p_value( "yp_type_dict" )
 
-@pytype( type( None ), 6 )
+@pytype( yp_type_exception, BaseException )
+class yp_BaseException( ypObject ):
+    def __new__( cls, *args, **kwargs ):
+        raise NotImplementedError( "can't instantiate yp_BaseException directly" )
+
+@pytype( yp_type_NoneType, type( None ) )
 class yp_NoneType( ypObject ):
     def __new__( cls, *args, **kwargs ):
         raise NotImplementedError( "can't instantiate yp_NoneType directly" )
@@ -1141,7 +1151,7 @@ class yp_NoneType( ypObject ):
     _yp_repr = _yp_str
 c_ypObject_p_value( "yp_None" )
 
-@pytype( bool, 8 )
+@pytype( yp_type_bool, bool )
 class yp_bool( ypObject ):
     def __new__( cls, x=False ):
         if isinstance( x, c_ypObject_p ):
@@ -1207,7 +1217,7 @@ class yp_bool( ypObject ):
 c_ypObject_p_value( "yp_True" )
 c_ypObject_p_value( "yp_False" )
 
-@pytype( (iter, type(x for x in ())), 15 )
+@pytype( yp_type_iter, (iter, type(x for x in ())) )
 class yp_iter( ypObject ):
     def _pygenerator_func( self, yp_self, yp_value ):
         try:
@@ -1242,7 +1252,7 @@ def _yp_iterable( iterable ):
     if isinstance( iterable, str ): return yp_str( iterable )
     return yp_iter( iterable )
 
-@pytype( int, 10 )
+@pytype( yp_type_int, int )
 class yp_int( ypObject ):
     def __new__( cls, x=0, base=_yp_arg_missing ):
         if base is _yp_arg_missing:
@@ -1252,18 +1262,19 @@ class yp_int( ypObject ):
             return _yp_int_baseC( x, base )
     def _asint( self ): return _yp_asintC( self, yp_None )
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
-    def _yp_str( self ): return yp_str( self._asint( ) )
-    def _yp_repr( self ): return yp_repr( self._asint( ) )
+    def _yp_str( self ): return yp_str( str( self._asint( ) ) )
+    def _yp_repr( self ): return yp_str( repr( self._asint( ) ) )
 _yp_i_zero = yp_int( 0 )
 _yp_i_one = yp_int( 1 )
 c_ypObject_p_value( "yp_sys_maxint" )
 c_ypObject_p_value( "yp_sys_minint" )
 
 def yp_len( x ):
-    """Returns len( x ) as a yp_int"""
-    return yp_int( len( x ) )
+    """Returns len( x ) of a ypObject as a yp_int"""
+    if not isinstance( x, ypObject ): raise TypeError( "expected ypObject in yp_len" )
+    return yp_int( _yp_lenC( x, yp_None ) )
 
-@pytype( float, 12 )
+@pytype( yp_type_float, float )
 class yp_float( ypObject ):
     def __new__( cls, x=0.0 ):
         if isinstance( x, float ): return _yp_floatC( x )
@@ -1290,18 +1301,18 @@ class _ypBytes( ypObject ):
         size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
         _yp_asbytesCX( self, data, size )
         return string_at( data.contents, size.contents )
-    
+
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
-    def __mul__( self, factor ): 
+    def __mul__( self, factor ):
         if isinstance( factor, float ): raise TypeError
         return _yp_repeatC( self, factor )
 
-    def __rmul__( self, factor ): 
+    def __rmul__( self, factor ):
         if isinstance( factor, float ): raise TypeError
         return _yp_repeatC( self, factor )
 
-@pytype( bytes, 16 )
+@pytype( yp_type_bytes, bytes )
 class yp_bytes( _ypBytes ):
     _ypBytes_constructorC = _yp_bytesC
     _ypBytes_constructor = _yp_bytes
@@ -1311,7 +1322,7 @@ class yp_bytes( _ypBytes ):
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
-@pytype( bytearray, 17 )
+@pytype( yp_type_bytearray, bytearray )
 class yp_bytearray( _ypBytes ):
     _ypBytes_constructorC = _yp_bytearrayC
     _ypBytes_constructor = _yp_bytearray
@@ -1321,10 +1332,10 @@ class yp_bytearray( _ypBytes ):
     def pop( self, i=_yp_arg_missing ):
         if i is _yp_arg_missing: return _yp_pop( self )
         else: return _yp_popindexC( self, i )
-    def __iadd__( self, other ): 
+    def __iadd__( self, other ):
         _yp_extend( self, other )
         return self
-    def __imul__( self, factor ): 
+    def __imul__( self, factor ):
         if isinstance( factor, float ): raise TypeError
         _yp_irepeatC( self, factor )
         return self
@@ -1332,15 +1343,17 @@ class yp_bytearray( _ypBytes ):
 # FIXME When nohtyP has types that have string representations, update this
 # FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
 # FIXME Just generally move more of this logic into nohtyP, when available
-@pytype( str, 18 )
+@pytype( yp_type_str, str )
 class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
             if object is _yp_arg_missing:
                 return _yp_str_frombytesC( None, 0, yp_s_latin_1, yp_s_strict )
             if isinstance( object, ypObject ): return object._yp_str( )
-            encoded = str( object ).encode( "latin-1" )
-            return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
+            if isinstance( object, str ):
+                encoded = object.encode( "latin-1" )
+                return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
+            raise TypeError( "expected ypObject or str in yp_str" )
         else:
             raise NotImplementedError
     # Just as yp_bool.__bool__ must return a bool, so to must this return a str
@@ -1362,22 +1375,22 @@ yp_s_True = yp_str( "True" )
 yp_s_False = yp_str( "False" )
 
 def yp_repr( object ):
-    """Returns repr( object ) as a yp_str"""
-    if isinstance( object, ypObject ): return object._yp_repr( )
-    return yp_str( repr( object ) )
+    """Returns repr( object ) of a ypObject as a yp_str"""
+    if not isinstance( object, ypObject ): raise TypeError( "expected ypObject in yp_repr" )
+    return object._yp_repr( )
 
 class _ypTuple( ypObject ):
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
-    def __mul__( self, factor ): 
+    def __mul__( self, factor ):
         if isinstance( factor, float ): raise TypeError
         return _yp_repeatC( self, factor )
 
-    def __rmul__( self, factor ): 
+    def __rmul__( self, factor ):
         if isinstance( factor, float ): raise TypeError
         return _yp_repeatC( self, factor )
 
-@pytype( tuple, 20 )
+@pytype( yp_type_tuple, tuple )
 class yp_tuple( _ypTuple ):
     def __new__( cls, iterable=_yp_arg_missing ):
         if iterable is _yp_arg_missing: return _yp_tupleN( )
@@ -1388,7 +1401,7 @@ class yp_tuple( _ypTuple ):
     _yp_repr = _yp_str
 _yp_tuple_empty = yp_tuple( )
 
-@pytype( list, 21 )
+@pytype( yp_type_list, list )
 class yp_list( _ypTuple ):
     def __new__( cls, iterable=_yp_tuple_empty ):
         return _yp_list( _yp_iterable( iterable ) )
@@ -1400,10 +1413,10 @@ class yp_list( _ypTuple ):
     def pop( self, i=_yp_arg_missing ):
         if i is _yp_arg_missing: return _yp_pop( self )
         else: return _yp_popindexC( self, i )
-    def __iadd__( self, other ): 
+    def __iadd__( self, other ):
         _yp_extend( self, other )
         return self
-    def __imul__( self, factor ): 
+    def __imul__( self, factor ):
         if isinstance( factor, float ): raise TypeError
         _yp_irepeatC( self, factor )
         return self
@@ -1459,11 +1472,11 @@ class _ypSet( ypObject ):
 
     def add( self, elem ): _yp_set_add( self, elem )
 
-@pytype( frozenset, 22 )
+@pytype( yp_type_frozenset, frozenset )
 class yp_frozenset( _ypSet ):
     _ypSet_constructor = _yp_frozenset
 
-@pytype( set, 23 )
+@pytype( yp_type_set, set )
 class yp_set( _ypSet ):
     _ypSet_constructor = _yp_set
 
@@ -1519,7 +1532,7 @@ class _items_dictview( _setlike_dictview ):
 # FIXME Adapt the Python test suite to test for frozendict, adding in tests similar to those found
 # between list/tuple and set/frozenset (ie the singleton empty frozendict, etc)
 
-@pytype( dict, 25 )
+@pytype( yp_type_dict, dict )
 class yp_dict( ypObject ):
     def __new__( cls, *args, **kwargs ):
         if len( args ) == 0:
