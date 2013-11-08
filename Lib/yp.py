@@ -1154,11 +1154,9 @@ c_ypObject_p_value( "yp_None" )
 @pytype( yp_type_bool, bool )
 class yp_bool( ypObject ):
     def __new__( cls, x=False ):
-        if isinstance( x, c_ypObject_p ):
-            return _yp_bool( x )
-        else:
-            return yp_True if x else yp_False
-        pass
+        if isinstance( x, ypObject ): return _yp_bool( x )
+        if isinstance( x, bool ): return yp_True if x else yp_False
+        raise TypeError( "expected ypObject or bool in yp_bool" )
     def _as_int( self ): return _yp_i_one if self.value == yp_True.value else _yp_i_zero
 
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
@@ -1430,7 +1428,8 @@ class yp_list( _ypTuple ):
 # FIXME When nohtyP supports sorting, replace this faked-out version
 def yp_sorted( x, *, key=None, reverse=False ):
     """Returns sorted( x ) of a ypObject as a yp_list"""
-    if not isinstance( x, ypObject ): raise TypeError( "expected ypObject in yp_sorted" )
+    if not isinstance( x, (ypObject, _setlike_dictview, _values_dictview) ): 
+        raise TypeError( "expected ypObject in yp_sorted" )
     return yp_list( sorted( x, key=key, reverse=reverse ) )
 
 class _ypSet( ypObject ):
