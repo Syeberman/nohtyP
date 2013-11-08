@@ -111,17 +111,6 @@ class c_ypObject_p( c_void_p ):
         if self.value is None: raise ValueError
         ypObject_p_errcheck( self )
     def __reduce__( self ): raise pickle.PicklingError( "can't pickle nohtyP types (yet)" )
-    def __del__( self ):
-        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
-        # "Python guarantees that globals whose name begins with a single underscore are deleted
-        # from their module before other globals are deleted"
-        # FIXME Why is self.value sometimes None (ie a null pointer)?  Should never happen.
-        try:
-            if self.value is not None: _yp_decref( self )
-        except: pass
-        return # FIXME Causing a Segmentation Fault sometimes?!?!
-        try: self.value = yp_None.value
-        except: pass
 class c_ypObject_p_no_errcheck( c_ypObject_p ):
     def _yp_errcheck( self ):
         if self.value is None: raise ValueError
@@ -953,6 +942,17 @@ class ypObject( c_ypObject_p ):
         if cls is ypObject: raise NotImplementedError( "can't instantiate ypObject directly" )
         return super( ).__new__( cls )
     def __init__( self, *args, **kwargs ): pass
+    def __del__( self ):
+        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
+        # "Python guarantees that globals whose name begins with a single underscore are deleted
+        # from their module before other globals are deleted"
+        # FIXME Why is self.value sometimes None (ie a null pointer)?  Should never happen.
+        try:
+            if self.value is not None: _yp_decref( self )
+        except: pass
+        return # FIXME Causing a Segmentation Fault sometimes?!?!
+        try: self.value = yp_None.value
+        except: pass
     _pytype2yp = {}
     _yptype2yp = {}
     @classmethod
