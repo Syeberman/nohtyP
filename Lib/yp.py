@@ -1001,16 +1001,21 @@ class ypObject( c_ypObject_p ):
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
 
-    def find( self, x, i=0, j=_yp_SLICE_USELEN ): 
-        return yp_int( _yp_findC4( self, x, i, j, yp_None ) )
-    def index( self, x, i=0, j=_yp_SLICE_USELEN ): 
-        return yp_int( _yp_indexC4( self, x, i, j, yp_None ) )
-    def rfind( self, x, i=0, j=_yp_SLICE_USELEN ): 
-        return yp_int( _yp_rfindC4( self, x, i, j, yp_None ) )
-    def rindex( self, x, i=0, j=_yp_SLICE_USELEN ): 
-        return yp_int( _yp_rindexC4( self, x, i, j, yp_None ) )
-    def count( self, x, i=0, j=_yp_SLICE_USELEN ): 
-        return yp_int( _yp_countC4( self, x, i, j, yp_None ) )
+    def _sliceSearch( self, func, x, i, j ):
+        if i is None: i = 0
+        if j is None: j = _yp_SLICE_USELEN
+        return yp_int( func( self, x, i, j, yp_None ) )
+    def find( self, x, i=None, j=None ):
+        return self._sliceSearch( _yp_findC4, x, i, j )
+    def index( self, x, i=None, j=None ):
+        return self._sliceSearch( _yp_indexC4, x, i, j )
+    def rfind( self, x, i=None, j=None ):
+        return self._sliceSearch( _yp_rfindC4, x, i, j )
+    def rindex( self, x, i=None, j=None ):
+        return self._sliceSearch( _yp_rindexC4, x, i, j )
+    def count( self, x, i=None, j=None ):
+        return self._sliceSearch( _yp_countC4, x, i, j )
+
     def append( self, x ): _yp_append( self, x )
     def extend( self, t ): _yp_extend( self, _yp_iterable( t ) )
     def insert( self, i, x ): _yp_insertC( self, i, x )
@@ -1433,7 +1438,7 @@ class yp_list( _ypTuple ):
 # FIXME When nohtyP supports sorting, replace this faked-out version
 def yp_sorted( x, *, key=None, reverse=False ):
     """Returns sorted( x ) of a ypObject as a yp_list"""
-    if not isinstance( x, (ypObject, _setlike_dictview, _values_dictview) ): 
+    if not isinstance( x, (ypObject, _setlike_dictview, _values_dictview) ):
         raise TypeError( "expected ypObject in yp_sorted" )
     return yp_list( sorted( x, key=key, reverse=reverse ) )
 
