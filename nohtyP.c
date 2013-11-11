@@ -9089,6 +9089,11 @@ ypObject *yp_throw( ypObject *iterator, ypObject *exc ) {
     _yp_REDIRECT1( iterator, tp_send, (iterator, exc) );
 }
 
+ypObject *yp_reversed( ypObject *x ) {
+    _yp_REDIRECT1( x, tp_iter_reversed, (x) );
+    // TODO Ensure the result is an iterator or an exception
+}
+
 ypObject *yp_contains( ypObject *container, ypObject *x ) {
     _yp_REDIRECT1( container, tp_contains, (container, x) );
 }

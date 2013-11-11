@@ -49,19 +49,20 @@ class BaseBytesTest:
 
     def test_basics(self):
         b = self.type2test()
-        self.assertEqual(type(b), self.type2test)
-        self.assertEqual(b.__class__, self.type2test)
+        self.assertEqual(yp_type(b), self.type2test)
+        # XXX Not applicable to nohtyP
+        #self.assertEqual(b.__class__, self.type2test)
 
     def test_copy(self):
         a = self.type2test(b"abcd")
         for copy_method in (copy.copy, copy.deepcopy):
             b = copy_method(a)
             self.assertEqual(a, b)
-            self.assertEqual(type(a), type(b))
+            self.assertEqual(yp_type(a), yp_type(b))
 
     def test_empty_sequence(self):
         b = self.type2test()
-        self.assertEqual(len(b), 0)
+        self.assertEqual(yp_len(b), 0)
         self.assertRaises(IndexError, lambda: b[0])
         self.assertRaises(IndexError, lambda: b[1])
         self.assertRaises(IndexError, lambda: b[sys.maxsize])
@@ -77,15 +78,15 @@ class BaseBytesTest:
         #self.assertRaises(IndexError, lambda: b[-10**100])
 
     def test_from_list(self):
-        ints = list(range(256))
+        ints = yp_list(range(256))
         b = self.type2test(i for i in ints)
-        self.assertEqual(len(b), 256)
-        self.assertEqual(list(b), ints)
+        self.assertEqual(yp_len(b), 256)
+        self.assertEqual(yp_list(b), ints)
 
     def test_from_index(self):
         b = self.type2test([Indexable(), Indexable(1), Indexable(254),
                             Indexable(255)])
-        self.assertEqual(list(b), [0, 1, 254, 255])
+        self.assertEqual(yp_list(b), [0, 1, 254, 255])
         self.assertRaises(ValueError, self.type2test, [Indexable(-1)])
         self.assertRaises(ValueError, self.type2test, [Indexable(256)])
 
@@ -168,9 +169,9 @@ class BaseBytesTest:
         self.assertEqual(self.type2test() != str(), True)
 
     def test_reversed(self):
-        input = list(map(ord, "Hello"))
+        input = yp_list(map(ord, "Hello"))
         b = self.type2test(input)
-        output = list(reversed(b))
+        output = yp_list(yp_reversed(b))
         input.reverse()
         self.assertEqual(output, input)
 
@@ -805,7 +806,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
             with open(tfn, "rb") as f:
                 b = yp_bytearray(20)
                 n = f.readinto(b)
-            self.assertEqual(n, len(short_sample))
+            self.assertEqual(n, yp_len(short_sample))
             self.assertEqual(list(b), list(sample))
             # Test writing in binary mode
             with open(tfn, "wb") as f:
@@ -821,7 +822,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
     def test_reverse(self):
         b = yp_bytearray(b'hello')
-        self.assertEqual(b.reverse(), None)
+        self.assertEqual(b.reverse(), yp_None)
         self.assertEqual(b, b'olleh')
         b = yp_bytearray(b'hello1') # test even number of items
         b.reverse()
@@ -915,7 +916,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
     def test_setslice(self):
         b = yp_bytearray(range(10))
-        self.assertEqual(list(b), list(range(10)))
+        self.assertEqual(yp_list(b), yp_list(range(10)))
 
         b[0:5] = yp_bytearray([1, 1, 1, 1, 1])
         self.assertEqual(b, yp_bytearray([1, 1, 1, 1, 1, 5, 6, 7, 8, 9]))
@@ -992,7 +993,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b += yp_bytes(b"def")
         self.assertEqual(b, b"abcdef")
         self.assertEqual(b, b1)
-        self.assertTrue(b is b1)
+        self.assertIs(b, b1)
         b += yp_bytes(b"xyz")
         self.assertEqual(b, b"abcdefxyz")
         try:
@@ -1008,7 +1009,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b *= 3
         self.assertEqual(b, b"abcabcabc")
         self.assertEqual(b, b1)
-        self.assertTrue(b is b1)
+        self.assertIs(b, b1)
 
     def test_irepeat_1char(self):
         b = yp_bytearray(b"x")
@@ -1016,7 +1017,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b *= 100
         self.assertEqual(b, yp_bytes(b"x")*100)
         self.assertEqual(b, b1)
-        self.assertTrue(b is b1)
+        self.assertIs(b, b1)
 
     @yp_unittest.skip("Not applicable to nohtyP")
     def test_alloc(self):
@@ -1027,7 +1028,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         for i in range(100):
             b += yp_bytes(b"x")
             alloc = b.__alloc__()
-            self.assertTrue(alloc >= len(b))
+            self.assertGreaterEqual(alloc, yp_len(b))
             if alloc not in seq:
                 seq.append(alloc)
 
@@ -1054,7 +1055,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         a = yp_bytearray(b'')
         self.assertRaises(ValueError, a.extend, [0, 1, 2, 256])
         self.assertRaises(ValueError, a.extend, [0, 1, 2, -1])
-        self.assertEqual(len(a), 0)
+        self.assertEqual(yp_len(a), 0)
         a = yp_bytearray(b'')
         a.extend([Indexable(ord('a'))])
         self.assertEqual(a, b'a')
@@ -1093,10 +1094,10 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b = yp_bytearray(b'hell')
         b.append(ord('o'))
         self.assertEqual(b, b'hello')
-        self.assertEqual(b.append(100), None)
+        self.assertEqual(b.append(100), yp_None)
         b = yp_bytearray()
         b.append(ord('A'))
-        self.assertEqual(len(b), 1)
+        self.assertEqual(yp_len(b), 1)
         self.assertRaises(TypeError, lambda: b.append(b'o'))
         b = yp_bytearray()
         b.append(Indexable(ord('A')))
