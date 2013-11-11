@@ -1193,38 +1193,38 @@ class AssortedBytesTest(yp_unittest.TestCase):
             self.assertEqual(f(yp_bytearray([0])), "bytearray(b'\\x00')")
             self.assertEqual(f(yp_bytearray([0, 1, 254, 255])),
                             "bytearray(b'\\x00\\x01\\xfe\\xff')")
-            self.assertEqual(f(b"abc"), "b'abc'")
-            self.assertEqual(f(b"'"), '''b"'"''') # '''
-            self.assertEqual(f(b"'\""), r"""b'\'"'""") # '
+            self.assertEqual(f(yp_bytes(b"abc")), "b'abc'")
+            self.assertEqual(f(yp_bytes(b"'")), '''b"'"''') # '''
+            self.assertEqual(f(yp_bytes(b"'\"")), r"""b'\'"'""") # '
 
     def test_compare_bytes_to_bytearray(self):
-        self.assertEqual(b"abc" == yp_bytes(b"abc"), True)
-        self.assertEqual(b"ab" != yp_bytes(b"abc"), True)
-        self.assertEqual(b"ab" <= yp_bytes(b"abc"), True)
-        self.assertEqual(b"ab" < yp_bytes(b"abc"), True)
-        self.assertEqual(b"abc" >= yp_bytes(b"ab"), True)
-        self.assertEqual(b"abc" > yp_bytes(b"ab"), True)
+        self.assertEqual(b"abc" == yp_bytes(b"abc"), yp_True)
+        self.assertEqual(b"ab" != yp_bytes(b"abc"), yp_True)
+        self.assertEqual(b"ab" <= yp_bytes(b"abc"), yp_True)
+        self.assertEqual(b"ab" < yp_bytes(b"abc"), yp_True)
+        self.assertEqual(b"abc" >= yp_bytes(b"ab"), yp_True)
+        self.assertEqual(b"abc" > yp_bytes(b"ab"), yp_True)
 
-        self.assertEqual(b"abc" != yp_bytes(b"abc"), False)
-        self.assertEqual(b"ab" == yp_bytes(b"abc"), False)
-        self.assertEqual(b"ab" > yp_bytes(b"abc"), False)
-        self.assertEqual(b"ab" >= yp_bytes(b"abc"), False)
-        self.assertEqual(b"abc" < yp_bytes(b"ab"), False)
-        self.assertEqual(b"abc" <= yp_bytes(b"ab"), False)
+        self.assertEqual(b"abc" != yp_bytes(b"abc"), yp_False)
+        self.assertEqual(b"ab" == yp_bytes(b"abc"), yp_False)
+        self.assertEqual(b"ab" > yp_bytes(b"abc"), yp_False)
+        self.assertEqual(b"ab" >= yp_bytes(b"abc"), yp_False)
+        self.assertEqual(b"abc" < yp_bytes(b"ab"), yp_False)
+        self.assertEqual(b"abc" <= yp_bytes(b"ab"), yp_False)
 
-        self.assertEqual(yp_bytes(b"abc") == b"abc", True)
-        self.assertEqual(yp_bytes(b"ab") != b"abc", True)
-        self.assertEqual(yp_bytes(b"ab") <= b"abc", True)
-        self.assertEqual(yp_bytes(b"ab") < b"abc", True)
-        self.assertEqual(yp_bytes(b"abc") >= b"ab", True)
-        self.assertEqual(yp_bytes(b"abc") > b"ab", True)
+        self.assertEqual(yp_bytes(b"abc") == b"abc", yp_True)
+        self.assertEqual(yp_bytes(b"ab") != b"abc", yp_True)
+        self.assertEqual(yp_bytes(b"ab") <= b"abc", yp_True)
+        self.assertEqual(yp_bytes(b"ab") < b"abc", yp_True)
+        self.assertEqual(yp_bytes(b"abc") >= b"ab", yp_True)
+        self.assertEqual(yp_bytes(b"abc") > b"ab", yp_True)
 
-        self.assertEqual(yp_bytes(b"abc") != b"abc", False)
-        self.assertEqual(yp_bytes(b"ab") == b"abc", False)
-        self.assertEqual(yp_bytes(b"ab") > b"abc", False)
-        self.assertEqual(yp_bytes(b"ab") >= b"abc", False)
-        self.assertEqual(yp_bytes(b"abc") < b"ab", False)
-        self.assertEqual(yp_bytes(b"abc") <= b"ab", False)
+        self.assertEqual(yp_bytes(b"abc") != b"abc", yp_False)
+        self.assertEqual(yp_bytes(b"ab") == b"abc", yp_False)
+        self.assertEqual(yp_bytes(b"ab") > b"abc", yp_False)
+        self.assertEqual(yp_bytes(b"ab") >= b"abc", yp_False)
+        self.assertEqual(yp_bytes(b"abc") < b"ab", yp_False)
+        self.assertEqual(yp_bytes(b"abc") <= b"ab", yp_False)
 
     @yp_unittest.skip("Not applicable to nohtyP")
     @yp_test.support.requires_docstrings
@@ -1242,9 +1242,9 @@ class AssortedBytesTest(yp_unittest.TestCase):
 
     @check_bytes_warnings
     def test_to_str(self):
-        self.assertEqual(yp_str(b''), "b''")
-        self.assertEqual(yp_str(b'x'), "b'x'")
-        self.assertEqual(yp_str(b'\x80'), "b'\\x80'")
+        self.assertEqual(yp_str(yp_bytes(b'')), "b''")
+        self.assertEqual(yp_str(yp_bytes(b'x')), "b'x'")
+        self.assertEqual(yp_str(yp_bytes(b'\x80')), "b'\\x80'")
         self.assertEqual(yp_str(yp_bytearray(b'')), "bytearray(b'')")
         self.assertEqual(yp_str(yp_bytearray(b'x')), "bytearray(b'x')")
         self.assertEqual(yp_str(yp_bytearray(b'\x80')), "bytearray(b'\\x80')")
@@ -1355,7 +1355,8 @@ class FixedStringTest(yp_test.string_tests.BaseTest):
 
     def fixtype(self, obj):
         if isinstance(obj, str):
-            return obj.encode("utf-8")
+            # FIXME The code that Python has here ignores type2test; report and fix
+            return self.__class__.type2test(obj.encode("utf-8"))
         return super().fixtype(obj)
 
     # Currently the bytes containment testing uses a single integer

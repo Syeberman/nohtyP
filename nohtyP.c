@@ -4872,10 +4872,29 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
     result = _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
     if( yp_isexceptionC( result ) ) return result;
 
+    // XXX start and stop are _almost_ like slice notation, except in the case of len(x)==0
+    // and (unadjusted) start>len(b).  While we're at it, we can short-cut a b_rlen==0 case.
+    if( start >= ypBytes_LEN( b ) ) {
+        if( x_len < 1 ) {
+            *n = (start == ypBytes_LEN( b ) ? 1 : 0);
+        } else {
+            *n = 0;
+        }
+        return yp_None;
+    }
+
+    // Adjust the indicies, then check for the empty array case: it "matches" every byte position,
+    // including the end of the slice, unless the unadjusted start value is larger than len(b)
+    // (which is handled above)
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
     if( yp_isexceptionC( result ) ) return result;
-    b_rdata = ypBytes_DATA( b ) + start;
+    if( x_len < 1 ) {
+        *n = b_rlen + 1;
+        return yp_None;
+    }
 
+    // Do the counting
+    b_rdata = ypBytes_DATA( b ) + start;
     *n = 0;
     while( b_rlen >= x_len ) {
         if( memcmp( b_rdata, x_data, x_len ) == 0 ) {
