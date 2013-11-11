@@ -71,18 +71,19 @@ class BaseTest:
             result,
             realresult
         )
+        # XXX Not applicable to nohtyP
         # if the original is returned make sure that
         # this doesn't happen with subclasses
-        if obj is realresult:
-            try:
-                class subtype(self.__class__.type2test):
-                    pass
-            except TypeError:
-                pass  # Skip this if we can't subclass
-            else:
-                obj = subtype(obj)
-                realresult = getattr(obj, methodname)(*args)
-                self.assertIsNot(obj, realresult)
+        #if obj is realresult:
+        #    try:
+        #        class subtype(self.__class__.type2test):
+        #            pass
+        #    except TypeError:
+        #        pass  # Skip this if we can't subclass
+        #    else:
+        #        obj = subtype(obj)
+        #        realresult = getattr(obj, methodname)(*args)
+        #        self.assertIsNot(obj, realresult)
 
     # check that obj.method(*args) raises exc
     def checkraises(self, exc, obj, methodname, *args):
@@ -137,6 +138,7 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'count', 42)
 
+    def test_count_combinations(self):
         # For a variety of combinations,
         #    verify that str.count() matches an equivalent function
         #    replacing all occurrences and then differencing the string lengths
