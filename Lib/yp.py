@@ -1001,11 +1001,16 @@ class ypObject( c_ypObject_p ):
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
 
-    def find( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_findC4( self, x, i, j, yp_None )
-    def index( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_indexC4( self, x, i, j, yp_None )
-    def rfind( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_rfindC4( self, x, i, j, yp_None )
-    def rindex( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_rindexC4( self, x, i, j, yp_None )
-    def count( self, x, i=0, j=_yp_SLICE_USELEN ): return _yp_countC4( self, x, i, j, yp_None )
+    def find( self, x, i=0, j=_yp_SLICE_USELEN ): 
+        return yp_int( _yp_findC4( self, x, i, j, yp_None ) )
+    def index( self, x, i=0, j=_yp_SLICE_USELEN ): 
+        return yp_int( _yp_indexC4( self, x, i, j, yp_None ) )
+    def rfind( self, x, i=0, j=_yp_SLICE_USELEN ): 
+        return yp_int( _yp_rfindC4( self, x, i, j, yp_None ) )
+    def rindex( self, x, i=0, j=_yp_SLICE_USELEN ): 
+        return yp_int( _yp_rindexC4( self, x, i, j, yp_None ) )
+    def count( self, x, i=0, j=_yp_SLICE_USELEN ): 
+        return yp_int( _yp_countC4( self, x, i, j, yp_None ) )
     def append( self, x ): _yp_append( self, x )
     def extend( self, t ): _yp_extend( self, _yp_iterable( t ) )
     def insert( self, i, x ): _yp_insertC( self, i, x )

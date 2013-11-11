@@ -14,12 +14,12 @@ class ListTest(list_tests.CommonTest):
 
     def test_basic(self):
         self.assertEqual(yp_list([]), yp_list())
-        self.assertEqual(len(yp_list()), 0)
-        self.assertEqual(len(yp_list([])), 0)
+        self.assertEqual(yp_len(yp_list()), 0)
+        self.assertEqual(yp_len(yp_list([])), 0)
         l0_3 = yp_list([0, 1, 2, 3])
         l0_3_bis = yp_list(l0_3)
         self.assertEqual(l0_3, l0_3_bis)
-        self.assertTrue(l0_3 is not l0_3_bis)
+        self.assertIsNot(l0_3, l0_3_bis)
         self.assertEqual(yp_list(()), yp_list())
         self.assertEqual(yp_list((0, 1, 2, 3)), yp_list([0, 1, 2, 3]))
         self.assertEqual(yp_list(''), yp_list())
@@ -49,17 +49,17 @@ class ListTest(list_tests.CommonTest):
 
     def test_truth(self):
         super().test_truth()
-        self.assertTrue(not yp_list())
+        self.assertFalse(yp_list())
         self.assertTrue(yp_list([42]))
 
     def test_identity(self):
-        self.assertTrue(yp_list() is not yp_list())
+        self.assertIsNot(yp_list(), yp_list())
 
     def test_len(self):
         super().test_len()
-        self.assertEqual(len(yp_list()), 0)
-        self.assertEqual(len(yp_list([0])), 1)
-        self.assertEqual(len(yp_list([0, 1, 2])), 3)
+        self.assertEqual(yp_len(yp_list()), 0)
+        self.assertEqual(yp_len(yp_list([0])), 1)
+        self.assertEqual(yp_len(yp_list([0, 1, 2])), 3)
 
     def test_overflow(self):
         lst = yp_list([4, 5, 6, 7])

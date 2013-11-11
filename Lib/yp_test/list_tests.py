@@ -32,7 +32,7 @@ class CommonTest(seq_tests.CommonTest):
         # Mutables always return a new object
         a = self.type2test([1, 2, 3])
         b = self.type2test(a)
-        self.assertNotEqual(id(a), id(b))
+        self.assertIsNot(a, b)
         self.assertEqual(a, b)
 
     def test_repr(self):
@@ -41,21 +41,23 @@ class CommonTest(seq_tests.CommonTest):
         a0 = self.type2test(l0)
         a2 = self.type2test(l2)
 
-        self.assertEqual(str(a0), str(l0))
-        self.assertEqual(repr(a0), repr(l0))
-        self.assertEqual(repr(a2), repr(l2))
-        self.assertEqual(str(a2), "[0, 1, 2]")
-        self.assertEqual(repr(a2), "[0, 1, 2]")
+        self.assertEqual(yp_str(a0), str(l0))
+        self.assertEqual(yp_repr(a0), repr(l0))
+        self.assertEqual(yp_repr(a2), repr(l2))
+        self.assertEqual(yp_str(a2), "[0, 1, 2]")
+        self.assertEqual(yp_repr(a2), "[0, 1, 2]")
 
         a2.append(a2)
         a2.append(3)
-        self.assertEqual(str(a2), "[0, 1, 2, [...], 3]")
-        self.assertEqual(repr(a2), "[0, 1, 2, [...], 3]")
+        self.assertEqual(yp_str(a2), "[0, 1, 2, [...], 3]")
+        self.assertEqual(yp_repr(a2), "[0, 1, 2, [...], 3]")
 
-        l0 = []
+    @yp_unittest.skip("TODO Support repr in nohtyP")
+    def test_repr_recursive(self):
+        l0 = self.type2test()
         for i in range(sys.getrecursionlimit() + 100):
-            l0 = [l0]
-        self.assertRaises(RuntimeError, repr, l0)
+            l0 = self.type2test(l0)
+        self.assertRaises(RuntimeError, yp_repr, l0)
 
     def test_print(self):
         d = self.type2test(range(200))
@@ -67,7 +69,7 @@ class CommonTest(seq_tests.CommonTest):
             with open(support.TESTFN, "w") as fo:
                 fo.write(str(d))
             with open(support.TESTFN, "r") as fo:
-                self.assertEqual(fo.read(), repr(d))
+                self.assertEqual(fo.read(), yp_repr(d))
         finally:
             os.remove(support.TESTFN)
 
@@ -556,7 +558,8 @@ class CommonTest(seq_tests.CommonTest):
         s = self.type2test([])
         oldid = id(s)
         s *= 10
-        self.assertEqual(id(s), oldid)
+        with self.nohtyPCheck(enabled=False):
+            self.assertEqual(id(s), oldid)
 
     def test_extendedslicing(self):
         #  subscript
