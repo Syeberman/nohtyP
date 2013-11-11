@@ -2,6 +2,7 @@
 Tests common to tuple, list and UserList.UserList
 """
 
+from yp import *
 from yp_test import yp_unittest
 import sys
 import pickle
@@ -114,11 +115,11 @@ class CommonTest(yp_unittest.TestCase):
                 return self.__data[i]
         s = OtherSeq(u0)
         v0 = self.type2test(s)
-        self.assertEqual(len(v0), len(s))
+        self.assertEqual(yp_len(v0), len(s))
 
         s = "this is also a sequence"
         vv = self.type2test(s)
-        self.assertEqual(len(vv), len(s))
+        self.assertEqual(yp_len(vv), len(s))
 
         # Create from various iteratables
         for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
@@ -141,8 +142,8 @@ class CommonTest(yp_unittest.TestCase):
             self.assertEqual(u[i], i)
             self.assertEqual(u[int(i)], i)
         for i in range(-len(u), -1):
-            self.assertEqual(u[i], len(u)+i)
-            self.assertEqual(u[int(i)], len(u)+i)
+            self.assertEqual(u[i], yp_len(u)+i)
+            self.assertEqual(u[int(i)], yp_len(u)+i)
         self.assertRaises(IndexError, u.__getitem__, -len(u)-1)
         self.assertRaises(IndexError, u.__getitem__, len(u))
         self.assertRaises(ValueError, u.__getitem__, slice(0,10,0))
@@ -237,10 +238,10 @@ class CommonTest(yp_unittest.TestCase):
         self.assertRaises(DoNotTestEq, checklast.__contains__, 1)
 
     def test_len(self):
-        self.assertEqual(len(self.type2test()), 0)
-        self.assertEqual(len(self.type2test([])), 0)
-        self.assertEqual(len(self.type2test([0])), 1)
-        self.assertEqual(len(self.type2test([0, 1, 2])), 3)
+        self.assertEqual(yp_len(self.type2test()), 0)
+        self.assertEqual(yp_len(self.type2test([])), 0)
+        self.assertEqual(yp_len(self.type2test([0])), 1)
+        self.assertEqual(yp_len(self.type2test([0, 1, 2])), 3)
 
     def test_minmax(self):
         u = self.type2test([0, 1, 2])
@@ -308,7 +309,8 @@ class CommonTest(yp_unittest.TestCase):
             for n in range(-3, 5):
                 self.assertEqual(self.type2test(s*n), self.type2test(s)*n)
             self.assertEqual(self.type2test(s)*(-4), self.type2test([]))
-            self.assertEqual(id(s), id(s*1))
+            # This doesn't test self.type2test...
+            #self.assertEqual(id(s), id(s*1))
 
     def test_bigrepeat(self):
         import sys
