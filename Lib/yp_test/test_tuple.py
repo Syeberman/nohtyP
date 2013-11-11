@@ -18,10 +18,10 @@ class TupleTest(seq_tests.CommonTest):
         super().test_constructors()
         # calling built-in types without argument must return empty
         self.assertIs(yp_tuple(), yp_tuple())
-        self.assertEqual(len(yp_tuple()), 0)
+        self.assertEqual(yp_len(yp_tuple()), 0)
         t0_3 = yp_tuple((0, 1, 2, 3))
         t0_3_bis = yp_tuple(t0_3)
-        self.assertTrue(t0_3 is t0_3_bis)
+        self.assertIs(t0_3, t0_3_bis)
         self.assertEqual(yp_tuple([]), yp_tuple())
         self.assertEqual(yp_tuple([0, 1, 2, 3]), yp_tuple((0, 1, 2, 3)))
         self.assertEqual(yp_tuple(''), yp_tuple())
@@ -29,28 +29,28 @@ class TupleTest(seq_tests.CommonTest):
 
     def test_truth(self):
         super().test_truth()
-        self.assertTrue(not yp_tuple())
+        self.assertFalse(yp_tuple())
         self.assertTrue(yp_tuple((42, )))
 
     def test_len(self):
         super().test_len()
-        self.assertEqual(len(yp_tuple()), 0)
-        self.assertEqual(len(yp_tuple((0,))), 1)
-        self.assertEqual(len(yp_tuple((0, 1, 2))), 3)
+        self.assertEqual(yp_len(yp_tuple()), 0)
+        self.assertEqual(yp_len(yp_tuple((0,))), 1)
+        self.assertEqual(yp_len(yp_tuple((0, 1, 2))), 3)
 
     def test_iadd(self):
         super().test_iadd()
         u = yp_tuple((0, 1))
         u2 = u
         u += yp_tuple((2, 3))
-        self.assertTrue(u is not u2)
+        self.assertIsNot(u, u2)
 
     def test_imul(self):
         super().test_imul()
         u = yp_tuple((0, 1))
         u2 = u
         u *= 3
-        self.assertTrue(u is not u2)
+        self.assertIsNot(u, u2)
 
     def test_tupleresizebug(self):
         # Check that a specific bug in _PyTuple_Resize() is squashed.
@@ -90,10 +90,10 @@ class TupleTest(seq_tests.CommonTest):
         a0 = self.type2test(l0)
         a2 = self.type2test(l2)
 
-        self.assertEqual(str(a0), repr(l0))
-        self.assertEqual(str(a2), repr(l2))
-        self.assertEqual(repr(a0), "()")
-        self.assertEqual(repr(a2), "(0, 1, 2)")
+        self.assertEqual(yp_str(a0), yp_repr(l0))
+        self.assertEqual(yp_str(a2), yp_repr(l2))
+        self.assertEqual(yp_repr(a0), "()")
+        self.assertEqual(yp_repr(a2), "(0, 1, 2)")
 
     def _not_tracked(self, t):
         # Nested tuples can take several collections to untrack
@@ -175,7 +175,7 @@ class TupleTest(seq_tests.CommonTest):
         # Check the repr of large list objects
         def check(n):
             l = yp_tuple((0,)) * n
-            s = repr(l)
+            s = yp_repr(l)
             self.assertEqual(s,
                 '(' + ', '.join(['0'] * n) + ')')
         check(10)       # check our checking code
