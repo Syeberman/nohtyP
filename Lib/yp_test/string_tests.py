@@ -252,6 +252,8 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'rfind', 42)
 
+    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    def test_rfind_combinations(self):
         # For a variety of combinations,
         #    verify that str.rfind() matches __contains__
         #    and that the found substring is really at that location
@@ -268,15 +270,18 @@ class BaseTest:
         teststrings = [self.fixtype(ts) for ts in teststrings]
         for i in teststrings:
             for j in teststrings:
-                loc = i.rfind(j)
+                loc = i.rfind(j)._asint()
                 r1 = (loc != -1)
                 r2 = j in i
-                self.assertEqual(r1, r2)
+                with self.nohtyPCheck(enabled=False):
+                    self.assertEqual(r1, r2)
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
+    def test_rfind_issues(self):
         # issue 7458
-        self.checkequal(-1, 'ab', 'rfind', 'xxx', sys.maxsize + 1, 0)
+        # XXX Not applicable to nohtyP: ints don't go up that high
+        #self.checkequal(-1, 'ab', 'rfind', 'xxx', sys.maxsize + 1, 0)
 
         # issue #15534
         self.checkequal(0, '<......\u043c...', "rfind", "<")
@@ -332,16 +337,19 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'rindex', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_lower(self):
         self.checkequal('hello', 'HeLLo', 'lower')
         self.checkequal('hello', 'hello', 'lower')
         self.checkraises(TypeError, 'hello', 'lower', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_upper(self):
         self.checkequal('HELLO', 'HeLLo', 'upper')
         self.checkequal('HELLO', 'HELLO', 'upper')
         self.checkraises(TypeError, 'hello', 'upper', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_expandtabs(self):
         self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs')
         self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs', 8)
@@ -358,6 +366,7 @@ class BaseTest:
             self.checkraises(OverflowError,
                              '\ta\n\tb', 'expandtabs', sys.maxsize)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_split(self):
         # by a char
         self.checkequal(['a', 'b', 'c', 'd'], 'a|b|c|d', 'split', '|')
@@ -426,6 +435,7 @@ class BaseTest:
         self.checkraises(ValueError, 'hello', 'split', '')
         self.checkraises(ValueError, 'hello', 'split', '', 0)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit(self):
         # by a char
         self.checkequal(['a', 'b', 'c', 'd'], 'a|b|c|d', 'rsplit', '|')
@@ -679,6 +689,7 @@ class BaseTest:
         self.checkraises(TypeError, 'hello', 'replace', 42, 'h')
         self.checkraises(TypeError, 'hello', 'replace', 'h', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_replace_overflow(self):
         # Check for overflow checking on 32 bit machines
         if sys.maxsize != 2147483647 or struct.calcsize("P") > 4:
@@ -761,6 +772,7 @@ class CommonTest(BaseTest):
         # mixed use of str and unicode
         self.checkequal(['a', 'b', 'c d'], 'a b c d', 'split', ' ', 2)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_additional_rsplit(self):
         self.checkequal(['this', 'is', 'the', 'rsplit', 'function'],
                          'this is the rsplit function', 'rsplit')

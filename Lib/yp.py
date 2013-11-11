@@ -451,6 +451,7 @@ yp_func( c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObje
 # ypObject *yp_min( ypObject *iterable );
 
 # ypObject *yp_reversed( ypObject *seq );
+yp_func( c_ypObject_p, "yp_reversed", ((c_ypObject_p, "seq"), ) )
 
 # ypObject *yp_zipN( int n, ... );
 # ypObject *yp_zipV( int n, va_list args );
@@ -994,6 +995,7 @@ class ypObject( c_ypObject_p ):
     def __hash__( self ): return _yp_hashC( self, yp_None )
 
     def __next__( self ): return _yp_next( self )
+    def __reversed__( self ): return _yp_reversed( self )
 
     def __contains__( self, x ): return _yp_contains( self, x )
     def __len__( self ): return _yp_lenC( self, yp_None )
@@ -1259,6 +1261,11 @@ def _yp_iterable( iterable ):
     if isinstance( iterable, c_ypObject_p ): return iterable
     if isinstance( iterable, str ): return yp_str( iterable )
     return yp_iter( iterable )
+
+def yp_reversed( x ):
+    """Returns reversed( x ) of a ypObject as a yp_iter"""
+    if not isinstance( x, ypObject ): raise TypeError( "expected ypObject in yp_reversed" )
+    return _yp_reversed( x )
 
 @pytype( yp_type_int, int )
 class yp_int( ypObject ):
