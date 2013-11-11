@@ -169,13 +169,13 @@ class BoolTest(yp_unittest.TestCase):
         #self.assertIs(not yp_False, yp_True)
 
     def test_convert(self):
-        self.assertRaises(TypeError, yp_bool, 42, 42)
-        self.assertIs(yp_bool(10), yp_True)
-        self.assertIs(yp_bool(1), yp_True)
-        self.assertIs(yp_bool(-1), yp_True)
-        self.assertIs(yp_bool(0), yp_False)
-        self.assertIs(yp_bool("hello"), yp_True)
-        self.assertIs(yp_bool(""), yp_False)
+        self.assertRaises(TypeError, yp_bool, yp_int(42), yp_int(42))
+        self.assertIs(yp_bool(yp_int(10)), yp_True)
+        self.assertIs(yp_bool(yp_int(1)), yp_True)
+        self.assertIs(yp_bool(yp_int(-1)), yp_True)
+        self.assertIs(yp_bool(yp_int(0)), yp_False)
+        self.assertIs(yp_bool(yp_str("hello")), yp_True)
+        self.assertIs(yp_bool(yp_str("")), yp_False)
         self.assertIs(yp_bool(), yp_False)
 
     @yp_unittest.skip("TODO: Enable when formatting supported in nohtyP")
