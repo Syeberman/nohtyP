@@ -4542,6 +4542,17 @@ static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssiz
     result = _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
     if( yp_isexceptionC( result ) ) return result;
 
+    // XXX start and stop are _almost_ like slice notation, except in the case of len(x)==0
+    // and (unadjusted) start>len(b).  While we're at it, we can short-cut a b_rlen==0 case.
+    if( start >= ypBytes_LEN( b ) ) {
+        if( x_len < 1 ) {
+            *i = (start == ypBytes_LEN( b ) ? ypBytes_LEN( b ) : -1);
+        } else {
+            *i = -1;
+        }
+        return yp_None;
+    }
+
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &b_rlen );
     if( yp_isexceptionC( result ) ) return result;
     if( direction == yp_FIND_FORWARD ) {

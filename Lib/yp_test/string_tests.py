@@ -138,6 +138,7 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'count', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_count_combinations(self):
         # For a variety of combinations,
         #    verify that str.count() matches an equivalent function
@@ -198,8 +199,11 @@ class BaseTest:
         self.checkequal(-1, '', 'find', 'xx', sys.maxsize, 0)
 
         # issue 7458
-        self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
-
+        # XXX Not applicable to nohtyP: ints don't go up that high
+        #self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
+   
+    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    def test_find_combinations(self):
         # For a variety of combinations,
         #    verify that str.find() matches __contains__
         #    and that the found substring is really at that location
@@ -216,10 +220,11 @@ class BaseTest:
         teststrings = [self.fixtype(ts) for ts in teststrings]
         for i in teststrings:
             for j in teststrings:
-                loc = i.find(j)
+                loc = i.find(j)._asint()
                 r1 = (loc != -1)
                 r2 = j in i
-                self.assertEqual(r1, r2)
+                with self.nohtyPCheck(enabled=False):
+                    self.assertEqual(r1, r2)
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
