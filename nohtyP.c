@@ -9445,7 +9445,6 @@ void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t xC ) {
     yp_decref( x );
 }
 
-
 ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
         yp_ssize_t *size, ypObject * *encoding )
 {
@@ -9487,6 +9486,36 @@ void yp_i2o_setitemC( ypObject **container, yp_int_t keyC, ypObject *x ) {
     yp_decref( key );
 }
 
+yp_int_t yp_i2i_getitemC( ypObject *container, yp_int_t keyC, ypObject **exc ) {
+    ypObject *key = yp_intC( keyC );
+    yp_int_t x = yp_o2i_getitemC( container, key, exc );
+    yp_decref( key );
+    return x;
+}
+
+void yp_i2i_setitemC( ypObject **container, yp_int_t keyC, yp_int_t xC ) {
+    ypObject *key = yp_intC( keyC );
+    yp_o2i_setitemC( container, key, xC );
+    yp_decref( key );
+}
+
+ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t keyC, const yp_uint8_t * *encoded,
+        yp_ssize_t *size, ypObject * *encoding )
+{
+    ypObject *key = yp_intC( keyC );
+    ypObject *result = yp_o2s_getitemCX( container, key, encoded, size, encoding );
+    yp_decref( key );
+    return result;
+}
+
+void yp_i2s_setitemC4( ypObject **container, yp_int_t keyC,
+        const yp_uint8_t *xC, yp_ssize_t x_lenC )
+{
+    ypObject *key = yp_intC( keyC );
+    yp_o2s_setitemC4( container, key, xC, x_lenC );
+    yp_decref( key );
+}
+
 ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC ) {
     ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
     ypObject *x = yp_getitem( container, key );
@@ -9499,19 +9528,6 @@ void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t 
 {
     ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
     yp_setitem( container, key, x );
-    yp_decref( key );
-}
-
-yp_int_t yp_i2i_getitemC( ypObject *container, yp_int_t keyC, ypObject **exc ) {
-    ypObject *key = yp_intC( keyC );
-    yp_int_t x = yp_o2i_getitemC( container, key, exc );
-    yp_decref( key );
-    return x;
-}
-
-void yp_i2i_setitemC( ypObject **container, yp_int_t keyC, yp_int_t xC ) {
-    ypObject *key = yp_intC( keyC );
-    yp_o2i_setitemC( container, key, xC );
     yp_decref( key );
 }
 
