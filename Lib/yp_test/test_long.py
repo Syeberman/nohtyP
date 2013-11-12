@@ -344,6 +344,7 @@ class LongTest(yp_unittest.TestCase):
             mapper.__name__, got, expected, x)
         self.assertEqual(got, expected, msg)
 
+    @yp_unittest.skip("TODO Implement yp_str/yp_repr in nohtyP")
     def test_format(self):
         for x in special:
             self.check_format_1(x)
@@ -650,6 +651,7 @@ class LongTest(yp_unittest.TestCase):
                 eq(x > y, Rcmp > 0, Frm("%r > %r %d", x, y, Rcmp))
                 eq(x >= y, Rcmp >= 0, Frm("%r >= %r %d", x, y, Rcmp))
 
+    @yp_unittest.skip("TODO Implement yp_str/yp_repr in nohtyP")
     def test__format__(self):
         self.assertEqual(format(123456789, 'd'), '123456789')
         self.assertEqual(format(123456789, 'd'), '123456789')

@@ -1208,6 +1208,15 @@ ypAPI void yp_o2s_setitemC4( ypObject **container, ypObject *key,
 ypAPI ypObject *yp_i2o_getitemC( ypObject *container, yp_int_t key );
 ypAPI void yp_i2o_setitemC( ypObject **container, yp_int_t key, ypObject *x );
 
+// Operations on containers that map integers to integers
+ypAPI yp_int_t yp_i2i_getitemC( ypObject *container, yp_int_t key, ypObject **exc );
+ypAPI void yp_i2i_setitemC( ypObject **container, yp_int_t key, yp_int_t x );
+
+// Operations on containers that map integers to strings
+// yp_i2s_getitemCX is documented below, and must be used carefully!
+ypAPI void yp_i2s_setitemC4( ypObject **container, yp_int_t key,
+        const yp_uint8_t *x, yp_ssize_t x_len );
+
 // Operations on containers that map strings to objects.  Note that if the value of the string is
 // known at compile-time, as in:
 //      value = yp_s2o_getitemC3( o, "mykey", -1 );
@@ -1217,10 +1226,6 @@ ypAPI void yp_i2o_setitemC( ypObject **container, yp_int_t key, ypObject *x );
 ypAPI ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len );
 ypAPI void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len,
         ypObject *x );
-
-// Operations on containers that map integers to integers
-ypAPI yp_int_t yp_i2i_getitemC( ypObject *container, yp_int_t key, ypObject **exc );
-ypAPI void yp_i2i_setitemC( ypObject **container, yp_int_t key, yp_int_t x );
 
 // Operations on containers that map strings to integers
 ypAPI yp_int_t yp_s2i_getitemC3( ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len,
@@ -1335,7 +1340,7 @@ ypAPI ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize
 // str and chrarrays internally store their Unicode characters in particular encodings, usually
 // depending on the contents of the string.  This function sets *encoded to the beginning of that
 // data, *size to the number of bytes in encoded, and *encoding to the immortal str representing
-// the encoding used (yp_s_latin_1, perhaps).  *encoding will point into internal object memory
+// the encoding used (yp_s_latin_1, perhaps).  *encoded will point into internal object memory
 // which MUST NOT be modified; furthermore, the string itself must not be modified while using the
 // array.  As a special case, if size is NULL, the string must not contain null characters and
 // *encoded will point to a null-terminated string.  On error, sets *encoded to NULL, *size to
@@ -1352,10 +1357,16 @@ ypAPI ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssiz
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
 //  yp_asencodedCX( yp_getitem( container, key ), encoded, size, encoding )
-// For all other types, this raises yp_TypeError, and sets the outputs accordingly.  *encoding
+// For all other types, this raises yp_TypeError, and sets the outputs accordingly.  *encoded
 // will point into internal object memory which MUST NOT be modified; furthermore, the string
 // itself must neither be modified nor removed from the container while using the array.
 ypAPI ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
+        yp_ssize_t *size, ypObject * *encoding );
+
+// Similar to yp_o2s_getitemCX, except key is a yp_int_t.  *encoded will point into internal object
+// memory which MUST NOT be modified; furthermore, the string itself must neither be modified nor
+// removed from the container while using the array.
+ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_uint8_t * *encoded,
         yp_ssize_t *size, ypObject * *encoding );
 
 
