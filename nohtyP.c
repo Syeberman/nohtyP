@@ -4311,26 +4311,9 @@ static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
     return retval;
 }
 
-// If x is a fellow bytes, set *x_data and *x_len.  Otherwise, set *x_data=NULL and *x_len=0.
-// TODO note http://bugs.python.org/issue12170 and ensure we stay consistent
-// TODO After support added for generic iterators, see if this can be removed
-static void _ypBytes_coerce_bytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len )
-{
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
-
-    if( x_pair == ypBytes_CODE ) {
-        *x_data = ypBytes_DATA( x );
-        *x_len = ypBytes_LEN( x );
-        return;
-    }
-
-    *x_data = NULL;
-    *x_len = 0;
-    return;
-}
-
 // If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
 // x is a fellow bytes, set *x_data and *x_len.  Otherwise, returns an exception.
+// TODO note http://bugs.python.org/issue12170 and ensure we stay consistent
 // TODO After support added for generic iterators, see if this can be removed
 static ypObject *_ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
         yp_uint8_t *storage )
@@ -4559,24 +4542,21 @@ static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssiz
     return yp_None;
 }
 
-// Returns new reference or an exception
 static ypObject *bytes_concat( ypObject *b, ypObject *x )
 {
-    yp_uint8_t *x_data;
-    yp_ssize_t x_len;
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
     yp_ssize_t newLen;
     ypObject *newB;
 
-    _ypBytes_coerce_bytes( x, &x_data, &x_len );
-    if( x_data == NULL ) return_yp_BAD_TYPE( x );
+    if( x_pair != ypBytes_CODE ) return_yp_BAD_TYPE( x );
 
-    newLen = ypBytes_LEN( b ) + x_len;
+    newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
     if( newLen < 1 && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return _yp_bytes_empty;
     newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
-    memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), x_data, x_len );
+    memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
     ypBytes_DATA( newB )[newLen] = '\0';
     ypBytes_LEN( newB ) = newLen;
     return newB;
@@ -5237,7 +5217,7 @@ ypObject *yp_bytearray( ypObject *source ) {
  *************************************************************************************************/
 
 // TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
-// struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
+// struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_STR_LATIN1 et al
 typedef struct _ypStrObject ypStrObject;
 yp_STATIC_ASSERT( offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_str_inline_data );
 
@@ -5252,55 +5232,83 @@ yp_STATIC_ASSERT( offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 
 // TODO what if ob_len is the "invalid" value?
 #define ypStr_LEN( s )  ( ((ypObject *)s)->ob_len )
 
-// TODO _yp_str_empty (remember NULL terminator)
+// Empty strs can be represented by this, immortal object
+// TODO Can we use this in more places...anywhere we'd return a possibly-empty strs?
+static ypStrObject _yp_str_empty_struct = {
+    { ypStr_CODE, ypObject_REFCNT_IMMORTAL,
+    0, 0, ypObject_HASH_INVALID, "" } };
+static ypObject * const _yp_str_empty = (ypObject *) &_yp_str_empty_struct;
 
-// Return a new str object with uninitialized data of the given length, or an exception
-static ypObject *_yp_str_new( yp_ssize_t len )
-{
-    ypObject *s;
-    if( len < 0 ) len = 0; // TODO return a new ref to an immortal "" object
-    s = ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, len+1 );
-    if( yp_isexceptionC( s ) ) return s;
-    ypStr_DATA( s )[len] = '\0';
-    ypStr_LEN( s ) = len;
-    return s;
-}
-
-// Return a new chrarray object with uninitialized data of the given length, or an exception
+// Return a new str/chrarray object with the given alloclen.  If type is immutable and
+// alloclen_fixed is true (indicating the object will never grow), the data is placed inline with
+// one allocation.
+// XXX Remember that alloclen should account for the null terminator; also remember to add that
+// null terminator
+// XXX Check for the _yp_str_empty case first
+// TODO Put protection in place to detect when INLINE objects attempt to be resized
+// TODO Extend alloclen_fixed to other areas
 // TODO Over-allocate to avoid future resizings
-static ypObject *_yp_chrarray_new( yp_ssize_t len )
+static ypObject *_ypStr_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
 {
     ypObject *s;
-    if( len < 0 ) len = 0;
-    s = ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, ypChrArray_CODE, len+1, 0 );
+    if( type == ypStr_CODE && alloclen_fixed ) {
+        s = ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, type, alloclen );
+    } else {
+        s = ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, alloclen, 0 );
+    }
     if( yp_isexceptionC( s ) ) return s;
-    ypStr_DATA( s )[len] = '\0';
-    ypStr_LEN( s ) = len;
     return s;
 }
 
-
-static ypObject *str_unfrozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo )
+// XXX Check for the possiblity of a lazy shallow copy before calling this function
+// XXX Check for the _yp_str_empty case first
+static ypObject *_ypStr_copy( int type, ypObject *s, int alloclen_fixed )
 {
-    ypObject *copy = _yp_chrarray_new( ypStr_LEN( s ) );
+    ypObject *copy = _ypStr_new( type, ypStr_LEN( s )+1, alloclen_fixed );
     if( yp_isexceptionC( copy ) ) return copy;
-    memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), ypStr_LEN( s ) );
+    memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), ypStr_LEN( s )+1 );
+    ypStr_LEN( copy ) = ypStr_LEN( s );
     return copy;
+}
+
+static ypObject *str_unfrozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypStr_copy( ypChrArray_CODE, s, TRUE );
 }
 
 static ypObject *str_frozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo )
 {
-    ypObject *copy = _yp_str_new( ypStr_LEN( s ) );
-    if( yp_isexceptionC( copy ) ) return copy;
-    memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), ypStr_LEN( s ) );
-    return copy;
+    if( ypStr_LEN( s ) < 1 ) return _yp_str_empty;
+    // A shallow copy of a str to a str doesn't require an actual copy
+    if( copy_visitor == yp_shallowcopy_visitor && ypObject_TYPE_CODE( s ) == ypStr_CODE ) {
+        return yp_incref( s );
+    }
+    return _ypStr_copy( ypStr_CODE, s, TRUE );
 }
 
 static ypObject *str_bool( ypObject *s ) {
     return ypBool_FROM_C( ypStr_LEN( s ) );
 }
 
-// Returns new reference or an exception
+static ypObject *str_concat( ypObject *s, ypObject *x )
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    yp_ssize_t newLen;
+    ypObject *newS;
+
+    if( x_pair != ypStr_CODE ) return_yp_BAD_TYPE( x );
+
+    newLen = ypStr_LEN( s ) + ypStr_LEN( x );
+    if( newLen < 1 && ypObject_TYPE_CODE( s ) == ypStr_CODE ) return _yp_str_empty;
+    newS = _ypStr_new( ypObject_TYPE_CODE( s ), newLen+1, /*alloclen_fixed=*/TRUE );
+    if( yp_isexceptionC( newS ) ) return newS;
+
+    memcpy( ypStr_DATA( newS ), ypStr_DATA( s ), ypStr_LEN( s ) );
+    memcpy( ypStr_DATA( newS )+ypStr_LEN( s ), ypStr_DATA( x ), ypStr_LEN( x ) );
+    ypStr_DATA( newS )[newLen] = '\0';
+    ypStr_LEN( newS ) = newLen;
+    return newS;
+}
+
 static ypObject *str_getindex( ypObject *s, yp_ssize_t i )
 {
     ypObject *result = ypSequence_AdjustIndexC( ypStr_LEN( s ), &i );
@@ -5379,7 +5387,7 @@ static ypObject *str_dealloc( ypObject *s ) {
 }
 
 static ypSequenceMethods ypStr_as_sequence = {
-    MethodError_objobjproc,         // tp_concat
+    str_concat,                     // tp_concat
     MethodError_objssizeproc,       // tp_repeat
     str_getindex,                   // tp_getindex
     MethodError_objsliceproc,       // tp_getslice
@@ -5462,7 +5470,7 @@ static ypTypeObject ypStr_Type = {
 };
 
 static ypSequenceMethods ypChrArray_as_sequence = {
-    MethodError_objobjproc,         // tp_concat
+    str_concat,                     // tp_concat
     MethodError_objssizeproc,       // tp_repeat
     str_getindex,                   // tp_getindex
     MethodError_objsliceproc,       // tp_getslice
@@ -5573,8 +5581,7 @@ ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t
 
 // FIXME completely ignoring encoding/errors, and assuming source is latin-1 (when we should be
 // assuming it's utf-8 by default)
-static ypObject *_ypStrC( ypObject *(*allocator)( yp_ssize_t ),
-    const yp_uint8_t *source, yp_ssize_t len )
+static ypObject *_ypStrC( int type, const yp_uint8_t *source, yp_ssize_t len )
 {
     ypObject *s;
 
@@ -5584,29 +5591,34 @@ static ypObject *_ypStrC( ypObject *(*allocator)( yp_ssize_t ),
     } else {
         if( len < 0 ) len = strlen( (const char *) source );
     }
-    s = allocator( len );
+    if( len < 1 && type == ypStr_CODE ) return _yp_str_empty;
+    s = _ypStr_new( type, len+1, /*alloclen_fixed=*/TRUE );
 
     // Initialize the data
     if( source == NULL ) {
         memset( ypStr_DATA( s ), 0, len );
     } else {
         memcpy( ypStr_DATA( s ), source, len );
+        ypStr_DATA( s )[len] = '\0';
     }
+    ypStr_LEN( s ) = len;
     return s;
 }
 ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors ) {
-    return _ypStrC( _yp_str_new, source, len );
+    if( encoding != yp_s_latin_1 ) return yp_NotImplementedError;
+    return _ypStrC( ypStr_CODE, source, len );
 }
 ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors ) {
-    return _ypStrC( _yp_chrarray_new, source, len );
+    if( encoding != yp_s_latin_1 ) return yp_NotImplementedError;
+    return _ypStrC( ypChrArray_CODE, source, len );
 }
 ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
-    return _ypStrC( _yp_str_new, source, len );
+    return _ypStrC( ypStr_CODE, source, len );
 }
 ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
-    return _ypStrC( _yp_chrarray_new, source, len );
+    return _ypStrC( ypChrArray_CODE, source, len );
 }
 
 ypObject *yp_chrC( yp_int_t i ) {
@@ -5614,7 +5626,7 @@ ypObject *yp_chrC( yp_int_t i ) {
 
     if( i < 0x00 || i > 0xFF ) return yp_SystemLimitationError;
     source[0] = (yp_uint8_t) i;
-    return _ypStrC( _yp_str_new, source, 1 );
+    return _ypStrC( ypStr_CODE, source, 1 );
 }
 
 // Immortal constants
