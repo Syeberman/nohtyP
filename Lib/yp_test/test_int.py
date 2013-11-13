@@ -1,5 +1,6 @@
 from yp import *
 import sys
+import random
 
 from yp_test import yp_unittest
 from yp_test import support
@@ -486,6 +487,46 @@ class IntTestCases(yp_unittest.TestCase):
                 y = sign * (1 << i)
                 x = minint // y
                 self.assertEqual(yp_int(x) * yp_int(y), minint)
+
+    def _yp_int_against_python(self, op, *py_args):
+        # Keep the second operand small for certain operations
+        if op in (operator.lshift, operator.rshift, operator.pow):
+            py_args = (py_args[0], py_args[1]%128)
+
+        msg = "operator.%s(%s)" % (op.__name__, ", ".join(repr(x) for x in py_args))
+        yp_args = tuple(yp_int(x) for x in py_args)
+        
+        # Any exception raised by Python should be raised by us
+        try: py_result = op(*py_args)
+        except BaseException as e:
+            self.assertRaises(type(e), op, *yp_args)
+            return
+        
+        # Additionally, if the result doesn't fit a yp_int_t, we expect an overflow
+        try: yp_result = yp_int(py_result)
+        except: 
+            self.assertRaises(OverflowError, op, *yp_args)
+            return
+    
+        # Finally, check that we calculate the same result
+        self.assertEqual(op(*yp_args), yp_result, msg=msg)
+
+    def test_yp_int_against_python(self):
+        maxint = yp_sys_maxint._asint()
+        minint = yp_sys_minint._asint()
+
+        # TODO Support operator.truediv in nohtyP
+        unaryOps = (operator.abs, operator.inv, operator.neg, operator.pos)
+        binaryOps = (operator.add, operator.and_, operator.floordiv, operator.lshift,
+            operator.mod, operator.mul, operator.or_, operator.pow, operator.rshift,
+            operator.sub, operator.xor)
+        for _ in range(250):
+            x = random.randrange(minint, maxint+1)
+            y = random.randrange(minint, maxint+1)
+            for op in unaryOps:
+                self._yp_int_against_python(op, x)
+            for op in binaryOps:
+                self._yp_int_against_python(op, x, y)
 
     @yp_unittest.skip("REWORK: nohtyP doesn't have user-defined types yet")
     def test_intconversion(self):
