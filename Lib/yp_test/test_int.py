@@ -4,7 +4,8 @@ import sys
 from yp_test import yp_unittest
 from yp_test import support
 
-# Extra assurance that we're not accidentally testing Python's int
+# Extra assurance that we're not accidentally testing Python's int...unless we mean to
+_int = int
 def int( *args, **kwargs ): raise NotImplementedError( "convert script to yp_int here" )
 
 L = [
@@ -460,8 +461,31 @@ class IntTestCases(yp_unittest.TestCase):
             )),
         )
         for value, strings in outofrange:
-            for base, string in enumerate( strings, 2 ):
+            for base, string in enumerate(strings, 2):
                 self.assertRaises(OverflowError, yp_int, string, base)
+
+    def test_yp_int_mul_minint(self):
+        minint = yp_sys_minint._asint()
+
+        # Run through all possible expressions, and some overflows, with minint as an operand
+        self.assertEqual(yp_sys_minint*yp_int(0), minint*0)
+        self.assertEqual(yp_int(0)*yp_sys_minint, minint*0)
+        self.assertEqual(yp_sys_minint*yp_int(1), minint*1)
+        self.assertEqual(yp_int(1)*yp_sys_minint, minint*1)
+        self.assertRaises(OverflowError, lambda: yp_sys_minint*yp_int(-1))
+        self.assertRaises(OverflowError, lambda: yp_int(-1)*yp_sys_minint)
+        self.assertRaises(OverflowError, lambda: yp_sys_minint*yp_int(2))
+        self.assertRaises(OverflowError, lambda: yp_int(2)*yp_sys_minint)
+
+        # Run through all possible expressions with minint minint as a result, skipping:
+        #   - i==0 would make y==1 and -1, which is tested above
+        #   - i==bit_length-1 would make x==1 and -1
+        #   - i==bit_length would overflow yp_int_t
+        for i in range(1, minint.bit_length()-1):
+            for sign in (1, -1):
+                y = sign * (1 << i)
+                x = minint // y
+                self.assertEqual(yp_int(x) * yp_int(y), minint)
 
     @yp_unittest.skip("REWORK: nohtyP doesn't have user-defined types yet")
     def test_intconversion(self):
