@@ -3551,6 +3551,34 @@ _ypInt_PUBLIC_UNARY_FUNCTION( pos );
 _ypInt_PUBLIC_UNARY_FUNCTION( abs );
 _ypInt_PUBLIC_UNARY_FUNCTION( invert );
 
+// XXX Adapted from Python 2.7's bits_in_ulong
+static const yp_uint8_t _BitLengthTable[32] = {
+    0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4,
+    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5
+};
+yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc )
+{
+    yp_int_t x_abs;
+    yp_int_t x_bits;
+
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x );
+
+    x_abs = ypInt_VALUE( x );
+    if( x_abs < 0 ) {
+        if( x_abs == yp_INT_T_MIN ) return sizeof( yp_int_t ) * 8;
+        x_abs = -x_abs;
+    }
+
+    x_bits = 0;
+    while( x_abs >= 32 ) {
+        x_bits += 6;
+        x_abs >>= 6;
+    }
+    x_bits += _BitLengthTable[x_abs];
+    return x_bits;
+}
+
+
 // Public constructors
 
 // This pre-allocates an array of immortal ints for yp_intC to return
