@@ -1102,6 +1102,10 @@ ypAPI ypObject *yp_sumV( int n, va_list args );
 // Sums the items of iterable and returns the total.
 ypAPI ypObject *yp_sum( ypObject *iterable );
 
+// Return the number of bits necessary to represent an integer in binary, excluding the sign and
+// leading zeroes.  Returns zero and sets *exc on error.
+ypAPI yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc );
+
 // The maximum and minimum integer values, as immortal objects.
 ypAPI ypObject * const yp_sys_maxint;
 ypAPI ypObject * const yp_sys_minint;

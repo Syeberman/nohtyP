@@ -836,6 +836,9 @@ yp_func( c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 
 # ypObject *yp_sum( ypObject *iterable );
 
+# yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc );
+yp_func( c_yp_int_t, "yp_int_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
+
 # ypObject * const yp_sys_maxint;
 # ypObject * const yp_sys_minint;
 
@@ -1279,6 +1282,7 @@ class yp_int( ypObject ):
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asint( ) ) )
     def _yp_repr( self ): return yp_str( repr( self._asint( ) ) )
+    def bit_length( self ): return yp_int( _yp_int_bit_lengthC( self, yp_None ) )
 _yp_i_zero = yp_int( 0 )
 _yp_i_one = yp_int( 1 )
 c_ypObject_p_value( "yp_sys_maxint" )
