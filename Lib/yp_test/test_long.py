@@ -240,12 +240,15 @@ class LongTest(yp_unittest.TestCase):
         # Test products of long strings of 1 bits -- (2**x-1)*(2**y-1) ==
         # 2**(x+y) - 2**x - 2**y + 1, so the proper result is easy to check.
         for abits in bits:
-            a = (1 << abits) - 1
+            try: a = yp_int((1 << abits) - 1)
+            except OverflowError: continue
             for bbits in bits:
                 if bbits < abits:
                     continue
-                b = (1 << bbits) - 1
-                x = a * b
+                try: b = yp_int((1 << bbits) - 1)
+                except OverflowError: continue
+                try: x = a * b
+                except OverflowError: continue
                 y = ((1 << (abits + bbits)) -
                      (1 << abits) -
                      (1 << bbits) +
@@ -376,8 +379,11 @@ class LongTest(yp_unittest.TestCase):
     def test_long(self):
         # Check conversions from string
         LL = [
-                ('1' + '0'*20, 10**20),
-                ('1' + '0'*100, 10**100)
+                ('1' + '0'*5, 10**5),
+                ('1' + '0'*18, 10**18),
+                ('0' + '0'*100, 0),
+                #('1' + '0'*20, 10**20),
+                #('1' + '0'*100, 10**100)
         ]
         for s, v in LL:
             for sign in "", "+", "-":
@@ -423,7 +429,8 @@ class LongTest(yp_unittest.TestCase):
                           2**100, -2**100,
                           ]
         for base in invalid_bases:
-            self.assertRaises(ValueError, yp_int, '42', base)
+            try: self.assertRaises(ValueError, yp_int, '42', base)
+            except OverflowError: pass
 
 
     @yp_unittest.skip("Not applicable to nohtyP")
@@ -459,6 +466,7 @@ class LongTest(yp_unittest.TestCase):
                "Got {}, expected {}.".format(n, actual, expected))
         self.assertEqual(actual, expected, msg)
 
+    @yp_unittest.skip("TODO: Implement floats in nohtyP")
     @support.requires_IEEE_754
     def test_float_conversion(self):
 
@@ -529,6 +537,7 @@ class LongTest(yp_unittest.TestCase):
             self.check_float_conversion(value)
             self.check_float_conversion(-value)
 
+    @yp_unittest.skip("TODO: Implement floats in nohtyP")
     def test_float_overflow(self):
         for x in -2.0, -1.0, 0.0, 1.0, 2.0:
             self.assertEqual(yp_float(yp_int(x)), x)
@@ -560,6 +569,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertNotEqual(yp_float(shuge), yp_int(shuge),
             "float(shuge) should not equal int(shuge)")
 
+    @yp_unittest.skip("TODO: Implement logs in nohtyP")
     def test_logs(self):
         LOG10E = math.log10(math.e)
 
@@ -588,10 +598,10 @@ class LongTest(yp_unittest.TestCase):
         # represents all Python ints, longs and floats exactly).
         class Rat:
             def __init__(self, value):
-                if isinstance(value, yp_int):
+                if isinstance(value, (int, yp_int)):
                     self.n = value
                     self.d = 1
-                elif isinstance(value, yp_float):
+                elif isinstance(value, (float, yp_float)):
                     # Convert to exact rational equivalent.
                     f, e = math.frexp(abs(value))
                     assert f == 0 or 0.5 <= f < 1.0
@@ -655,8 +665,10 @@ class LongTest(yp_unittest.TestCase):
         # 1 << 20000 should exceed all double formats.  int(1e200) is to
         # check that we get equality with 1e200 above.
         t = yp_int(1e200)
-        cases.extend([0, 1, 2, 1 << 20000, t-1, t, t+1])
-        cases.extend([-x for x in cases])
+        #cases.extend([0, 1, 2, 1 << 20000, t-1, t, t+1])
+        #cases.extend([-x for x in cases])
+        cases.extend([0, 1, 2,                  t, t+1])
+        cases.extend([  -1,-2,                  t,-(t+1)])
         for x in cases:
             Rx = Rat(x)
             for y in cases:
@@ -1032,6 +1044,7 @@ class LongTest(yp_unittest.TestCase):
         for e in bad_exponents:
             self.assertRaises(TypeError, round, 3, e)
 
+    @yp_unittest.skip("TODO Implement to_bytes/from_bytes in nohtyP")
     def test_to_bytes(self):
         def check(tests, byteorder, signed=False):
             for test, expected in tests.items():
@@ -1131,6 +1144,7 @@ class LongTest(yp_unittest.TestCase):
                          b'\xff\xff\xff\xff\xff')
         self.assertRaises(OverflowError, (1).to_bytes, 0, 'big')
 
+    @yp_unittest.skip("TODO Implement to_bytes/from_bytes in nohtyP")
     def test_from_bytes(self):
         def check(tests, byteorder, signed=False):
             for test, expected in tests.items():
