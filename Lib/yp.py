@@ -706,6 +706,8 @@ yp_func( c_ypObject_p, "yp_floordiv", ((c_ypObject_p, "x"), (c_ypObject_p, "y"))
 # ypObject *yp_mod( ypObject *x, ypObject *y );
 yp_func( c_ypObject_p, "yp_mod", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod );
+yp_func( c_void, "yp_divmod", ((c_ypObject_p, "x"), (c_ypObject_p, "y"),
+    (c_ypObject_pp, "div"), (c_ypObject_pp, "mod")) )
 # ypObject *yp_pow( ypObject *x, ypObject *y );
 yp_func( c_ypObject_p, "yp_pow", ((c_ypObject_p, "x"), (c_ypObject_p, "y")) )
 # ypObject *yp_pow3( ypObject *x, ypObject *y, ypObject *z );
@@ -1103,6 +1105,15 @@ class ypObject( c_ypObject_p ):
     def __rand__( self, other ): return self._arithmetic( _yp_amp, other, self )
     def __rxor__( self, other ): return self._arithmetic( _yp_xor, other, self )
     def __ror__( self, other ): return self._arithmetic( _yp_bar, other, self )
+
+    # divmod is a little more complicated
+    def __divmod__( self, other ):
+        div_p = c_ypObject_pp( yp_None )
+        mod_p = c_ypObject_pp( yp_None )
+        _yp_divmod( self, other, div_p, mod_p )
+        return (div_p[0], mod_p[0])
+    def __rdivmod__( self, other ): 
+        return ypObject.frompython( other ).__divmod__( self )
 
 def pytype( yptype, pytypes ):
     if not isinstance( pytypes, tuple ): pytypes = (pytypes, )
