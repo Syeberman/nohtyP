@@ -3474,6 +3474,78 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
     return yp_floatC( result );
 }
 
+static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObject **mod, int mutable )
+{
+    ypObject *exc = yp_None;
+    ypObject *(*allocator)( yp_int_t ) = mutable ? yp_intstoreC : yp_intC;
+    yp_int_t divC, modC;
+    yp_divmodL( x, y, &divC, &modC, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    *div = allocator( divC ); // new ref
+    if( yp_isexceptionC( *div ) ) return *div;
+    *mod = allocator( modC ); // new ref
+    if( yp_isexceptionC( *mod ) ) {
+        yp_decref( *div );
+        return *mod;
+    }
+    return yp_None;
+}
+static ypObject *_yp_divmod_floats( yp_float_t x, yp_float_t y, ypObject **div, ypObject **mod, int mutable  )
+{
+    ypObject *exc = yp_None;
+    ypObject *(*allocator)( yp_float_t ) = mutable ? yp_floatstoreC : yp_floatC;
+    yp_float_t divC, modC;
+    yp_divmodFL( x, y, &divC, &modC, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    *div = allocator( divC ); // new ref
+    if( yp_isexceptionC( *div ) ) return *div;
+    *mod = allocator( modC ); // new ref
+    if( yp_isexceptionC( *mod ) ) {
+        yp_decref( *div );
+        return *mod;
+    }
+    return yp_None;
+}
+static ypObject *_yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod )
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int y_pair = ypObject_TYPE_PAIR_CODE( y );
+    int mutable = ypObject_IS_MUTABLE( x );
+    ypObject *exc = yp_None;
+
+    // Coerce the numeric operands to a common type
+    if( y_pair == ypInt_CODE ) {
+        if( x_pair == ypInt_CODE ) {
+            return _yp_divmod_ints( ypInt_VALUE( x ), ypInt_VALUE( y ), div, mod, mutable );
+        } else if( x_pair == ypFloat_CODE ) {
+            yp_float_t y_asfloat = yp_asfloatC( y, &exc );
+            if( yp_isexceptionC( exc ) ) return exc;
+            return _yp_divmod_floats( ypFloat_VALUE( x ), y_asfloat, div, mod, mutable );
+        } else {
+            return_yp_BAD_TYPE( x );
+        }
+    } else if( y_pair == ypFloat_CODE ) {
+        if( x_pair == ypInt_CODE ) {
+            yp_float_t x_asfloat = yp_asfloatC( x, &exc );
+            if( yp_isexceptionC( exc ) ) return exc;
+            return _yp_divmod_floats( x_asfloat, ypFloat_VALUE( y ), div, mod, mutable );
+        } else if( x_pair == ypFloat_CODE ) {
+            return _yp_divmod_floats( ypFloat_VALUE( x ), ypFloat_VALUE( y ), div, mod, mutable );
+        } else {
+            return_yp_BAD_TYPE( x );
+        }
+    } else {
+        return_yp_BAD_TYPE( y );
+    }
+}
+void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod ) {
+    // Ensure both div and mod are set to an exception on error
+    ypObject *result = _yp_divmod( x, y, div, mod );
+    if( yp_isexceptionC( result ) ) {
+        *div = *mod = result;
+    }
+}
+
 static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryFLfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( *x );
@@ -3955,6 +4027,11 @@ yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc )
 yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0.0, exc, yp_NotImplementedError );
+}
+
+void yp_divmodFL( yp_float_t x, yp_float_t y, yp_float_t *_div, yp_float_t *_mod, ypObject **exc )
+{
+    *exc = yp_NotImplementedError;
 }
 
 yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc )

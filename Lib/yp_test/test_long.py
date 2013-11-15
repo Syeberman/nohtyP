@@ -29,20 +29,22 @@ BASE = 2 ** SHIFT
 MASK = BASE - 1
 KARATSUBA_CUTOFF = 70   # from longobject.c
 
+MAXBITS = yp_sys_maxint._asint().bit_length()
 # Max number of base BASE digits to use in test cases.  Doubling
 # this will more than double the runtime.
-MAXDIGITS = 15
+MAXDIGITS = MAXBITS // sys.int_info.bits_per_digit
 
 # build some special values
-special = [0, 1, 2, BASE, BASE >> 1, 0x5555555555555555, 0xaaaaaaaaaaaaaaaa]
+special = [yp_int(0), yp_int(1), yp_int(2), yp_int(BASE), yp_int(BASE >> 1), 
+        yp_int(0x5555555555555555), yp_int(0x2aaaaaaaaaaaaaaa)]
 #  some solid strings of one bits
-p2 = 4  # 0 and 1 already added
+p2 = yp_int(4)  # 0 and 1 already added
 for i in range(2*SHIFT):
-    special.append(p2 - 1)
+    special.append(yp_int(p2 - 1))
     p2 = p2 << 1
 del p2
 # add complements & negations
-special += [~x for x in special] + [-x for x in special]
+special += [yp_int(~x) for x in special] + [yp_int(-x) for x in special]
 
 DBL_MAX = sys.float_info.max
 DBL_MAX_EXP = sys.float_info.max_exp
@@ -137,25 +139,26 @@ class LongTest(yp_unittest.TestCase):
     # The sign of the number is also random.
 
     def getran(self, ndigits):
-        self.assertTrue(ndigits > 0)
-        nbits_hi = ndigits * SHIFT
-        nbits_lo = nbits_hi - SHIFT + 1
-        answer = 0
-        nbits = 0
-        r = yp_int(random.random() * (SHIFT * 2)) | 1  # force 1 bits to start
-        while nbits < nbits_lo:
-            bits = (r >> 1) + 1
-            bits = min(bits, nbits_hi - nbits)
-            self.assertTrue(1 <= bits <= SHIFT)
-            nbits = nbits + bits
-            answer = answer << bits
-            if r & 1:
-                answer = answer | ((1 << bits) - 1)
-            r = yp_int(random.random() * (SHIFT * 2))
-        self.assertTrue(nbits_lo <= nbits <= nbits_hi)
-        if random.random() < 0.5:
-            answer = -answer
-        return answer
+        with self.nohtyPCheck(enabled=False):
+            self.assertTrue(ndigits > 0)
+            nbits_hi = ndigits * SHIFT
+            nbits_lo = nbits_hi - SHIFT + 1
+            answer = 0
+            nbits = 0
+            r = yp_int(random.random() * (SHIFT * 2)) | 1  # force 1 bits to start
+            while nbits < nbits_lo:
+                bits = (r >> 1) + 1
+                bits = min(bits, nbits_hi - nbits)
+                self.assertTrue(1 <= bits <= SHIFT)
+                nbits = nbits + bits
+                answer = answer << bits
+                if r & 1:
+                    answer = answer | ((1 << bits) - 1)
+                r = yp_int(random.random() * (SHIFT * 2))
+            self.assertTrue(nbits_lo <= nbits <= nbits_hi)
+            if random.random() < 0.5:
+                answer = -answer
+            return answer
 
     # Get random long consisting of ndigits random digits (relative to base
     # BASE).  The sign bit is also random.
@@ -169,11 +172,15 @@ class LongTest(yp_unittest.TestCase):
         return answer
 
     def check_division(self, x, y):
+        x = yp_int(x)
+        y = yp_int(y)
         eq = self.assertEqual
         q, r = divmod(x, y)
         q2, r2 = x//y, x%y
-        pab, pba = x*y, y*x
-        eq(pab, pba, Frm("multiplication does not commute for %r and %r", x, y))
+        try:
+            pab, pba = x*y, y*x
+            eq(pab, pba, Frm("multiplication does not commute for %r and %r", x, y))
+        except OverflowError: pass # ignore overflows here
         eq(q, q2, Frm("divmod returns different quotient than / for %r and %r", x, y))
         eq(r, r2, Frm("divmod returns different mod than %% for %r and %r", x, y))
         eq(x, q*y + r, Frm("x != q*y + r after divmod on x=%r, y=%r", x, y))
@@ -183,9 +190,10 @@ class LongTest(yp_unittest.TestCase):
             self.assertTrue(y < r <= 0, Frm("bad mod from divmod on %r and %r", x, y))
 
     def test_division(self):
-        digits = list(range(1, MAXDIGITS+1)) + list(range(KARATSUBA_CUTOFF,
-                                                      KARATSUBA_CUTOFF + 14))
-        digits.append(KARATSUBA_CUTOFF * 3)
+        #digits = list(range(1, MAXDIGITS+1)) + list(range(KARATSUBA_CUTOFF,
+        #                                              KARATSUBA_CUTOFF + 14))
+        #digits.append(KARATSUBA_CUTOFF * 3)
+        digits = list(range(1, MAXDIGITS+1))
         for lenx in digits:
             x = self.getran(lenx)
             for leny in digits:
@@ -196,19 +204,20 @@ class LongTest(yp_unittest.TestCase):
         # current long division implementation
 
         # 30-bit cases involving a quotient digit estimate of BASE+1
-        self.check_division(1231948412290879395966702881,
-                            1147341367131428698)
-        self.check_division(815427756481275430342312021515587883,
-                       707270836069027745)
-        self.check_division(627976073697012820849443363563599041,
-                       643588798496057020)
-        self.check_division(1115141373653752303710932756325578065,
-                       1038556335171453937726882627)
+        # XXX Too large for nohtyP
+        #self.check_division(1231948412290879395966702881,
+        #                    1147341367131428698)
+        #self.check_division(815427756481275430342312021515587883,
+        #               707270836069027745)
+        #self.check_division(627976073697012820849443363563599041,
+        #               643588798496057020)
+        #self.check_division(1115141373653752303710932756325578065,
+        #               1038556335171453937726882627)
         # 30-bit cases that require the post-subtraction correction step
-        self.check_division(922498905405436751940989320930368494,
-                       949985870686786135626943396)
-        self.check_division(768235853328091167204009652174031844,
-                       1091555541180371554426545266)
+        #self.check_division(922498905405436751940989320930368494,
+        #               949985870686786135626943396)
+        #self.check_division(768235853328091167204009652174031844,
+        #               1091555541180371554426545266)
 
         # 15-bit cases involving a quotient digit estimate of BASE+1
         self.check_division(20172188947443, 615611397)
@@ -245,6 +254,7 @@ class LongTest(yp_unittest.TestCase):
                     Frm("bad result for a*b: a=%r, b=%r, x=%r, y=%r", a, b, x, y))
 
     def check_bitop_identities_1(self, x):
+        x = yp_int(x)
         eq = self.assertEqual
         eq(x & 0, 0, Frm("x & 0 != 0 for x=%r", x))
         eq(x | 0, x, Frm("x | 0 != x for x=%r", x))
@@ -262,7 +272,12 @@ class LongTest(yp_unittest.TestCase):
         eq(-x, 1 + ~x, Frm("not -x == 1 + ~x for x=%r", x))
         eq(-x, ~(x-1), Frm("not -x == ~(x-1) forx =%r", x))
         for n in range(2*SHIFT):
-            p2 = 2 ** n
+            n = yp_int(n)
+            # Skip shifts too large for nohtyP
+            try: x << n
+            except OverflowError: continue
+
+            p2 = yp_int(2 ** n)
             eq(x << n >> n, x,
                 Frm("x << n >> n != x for x=%r, n=%r", (x, n)))
             eq(x // p2, x >> n,
@@ -275,6 +290,8 @@ class LongTest(yp_unittest.TestCase):
                 Frm("not x & -p2 == x & ~(p2 - 1) for x=%r n=%r p2=%r", (x, n, p2)))
 
     def check_bitop_identities_2(self, x, y):
+        x = yp_int(x)
+        y = yp_int(y)
         eq = self.assertEqual
         eq(x & y, y & x, Frm("x & y != y & x for x=%r, y=%r", (x, y)))
         eq(x | y, y | x, Frm("x | y != y | x for x=%r, y=%r", (x, y)))
@@ -290,6 +307,9 @@ class LongTest(yp_unittest.TestCase):
              Frm("x ^ y == (x | y) & (~x | ~y) for x=%r, y=%r", (x, y)))
 
     def check_bitop_identities_3(self, x, y, z):
+        x = yp_int(x)
+        y = yp_int(y)
+        z = yp_int(z)
         eq = self.assertEqual
         eq((x & y) & z, x & (y & z),
              Frm("(x & y) & z != x & (y & z) for x=%r, y=%r, z=%r", (x, y, z)))
@@ -406,8 +426,8 @@ class LongTest(yp_unittest.TestCase):
             self.assertRaises(ValueError, yp_int, '42', base)
 
 
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_conversion(self):
-
         class JustLong:
             # test that __long__ no longer used in 3.x
             def __long__(self):
@@ -723,6 +743,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertRaises(OverflowError, yp_int, yp_float('-inf'))
         self.assertRaises(ValueError, yp_int, yp_float('nan'))
 
+    @yp_unittest.skip("TODO: Implement true division in nohtyP")
     def test_true_division(self):
         huge = 1 << 40000
         mhuge = -huge
@@ -787,6 +808,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertEqual(expected, got, "Incorrectly rounded division {}/{}: "
                          "expected {}, got {}".format(a, b, expected, got))
 
+    @yp_unittest.skip("TODO: Implement true division in nohtyP")
     @support.requires_IEEE_754
     def test_correctly_rounded_true_division(self):
         # more stringent tests than those above, checking that the
