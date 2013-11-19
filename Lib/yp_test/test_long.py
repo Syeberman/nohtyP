@@ -8,6 +8,11 @@ import random
 import math
 import array
 
+# TODO Review these tests very carefully against the original to ensure we're testing nohtyP
+# correctly (for example, that we are testing the operations on yp_ints and not converting the
+# operation's result to yp_int, or that we aren't ignoring an important case just because of an
+# overflow)
+
 # Extra assurance that we're not accidentally testing Python's int or float...unless we mean to
 _int = int
 _float = float
@@ -35,7 +40,7 @@ MAXBITS = yp_sys_maxint._asint().bit_length()
 MAXDIGITS = MAXBITS // sys.int_info.bits_per_digit
 
 # build some special values
-special = [yp_int(0), yp_int(1), yp_int(2), yp_int(BASE), yp_int(BASE >> 1), 
+special = [yp_int(0), yp_int(1), yp_int(2), yp_int(BASE), yp_int(BASE >> 1),
         yp_int(0x5555555555555555), yp_int(0x2aaaaaaaaaaaaaaa)]
 #  some solid strings of one bits
 p2 = yp_int(4)  # 0 and 1 already added
@@ -598,10 +603,11 @@ class LongTest(yp_unittest.TestCase):
         # represents all Python ints, longs and floats exactly).
         class Rat:
             def __init__(self, value):
-                if isinstance(value, (int, yp_int)):
-                    self.n = value
+                if isinstance(value, (_int, yp_int)):
+                    self.n = yp_int(value)
                     self.d = 1
-                elif isinstance(value, (float, yp_float)):
+                elif isinstance(value, (_float, yp_float)):
+                    if isinstance(value, yp_float): value = value._asfloat()
                     # Convert to exact rational equivalent.
                     f, e = math.frexp(abs(value))
                     assert f == 0 or 0.5 <= f < 1.0
@@ -615,7 +621,7 @@ class LongTest(yp_unittest.TestCase):
                     # invariant: |value| = (top + f) * 2**e exactly
                     while f:
                         f = math.ldexp(f, CHUNK)
-                        digit = yp_int(f)
+                        digit = _int(f)
                         assert digit >> CHUNK == 0
                         top = (top << CHUNK) | digit
                         f -= digit
@@ -631,7 +637,7 @@ class LongTest(yp_unittest.TestCase):
                         d = 1 << -e
                     if value < 0:
                         n = -n
-                    self.n = n
+                    self.n = yp_float(n)
                     self.d = d
                     assert yp_float(n) / yp_float(d) == value
                 else:
@@ -670,11 +676,15 @@ class LongTest(yp_unittest.TestCase):
         cases.extend([0, 1, 2,                  t, t+1])
         cases.extend([  -1,-2,                  t,-(t+1)])
         for x in cases:
-            Rx = Rat(x)
+            try: Rx = Rat(x)
+            except OverflowError: continue
             for y in cases:
-                Ry = Rat(y)
-                Rcmp = (Rx > Ry) - (Rx < Ry)
-                xycmp = (x > y) - (x < y)
+                try: Ry = Rat(y)
+                except OverflowError: continue
+                try: Rcmp = (Rx > Ry) - (Rx < Ry)
+                except OverflowError: continue
+                try: xycmp = (x > y) - (x < y)
+                except OverflowError: continue
                 eq(Rcmp, xycmp, Frm("%r %r %d %d", x, y, Rcmp, xycmp))
                 eq(x == y, Rcmp == 0, Frm("%r == %r %d", x, y, Rcmp))
                 eq(x != y, Rcmp != 0, Frm("%r != %r %d", x, y, Rcmp))
@@ -750,6 +760,7 @@ class LongTest(yp_unittest.TestCase):
                 self.assertEqual(format(value, format_spec),
                                  format(yp_float(value), format_spec))
 
+    @yp_unittest.skip("TODO: Implement floats in nohtyP")
     def test_nan_inf(self):
         self.assertRaises(OverflowError, yp_int, yp_float('inf'))
         self.assertRaises(OverflowError, yp_int, yp_float('-inf'))
@@ -915,21 +926,22 @@ class LongTest(yp_unittest.TestCase):
 
     def test_small_ints(self):
         for i in range(-5, 257):
-            self.assertTrue(i is i + 0)
-            self.assertTrue(i is i * 1)
-            self.assertTrue(i is i - 0)
-            self.assertTrue(i is i // 1)
-            self.assertTrue(i is i & -1)
-            self.assertTrue(i is i | 0)
-            self.assertTrue(i is i ^ 0)
-            self.assertTrue(i is ~~i)
-            self.assertTrue(i is i**1)
-            self.assertTrue(i is yp_int(str(i)))
-            self.assertTrue(i is i<<2>>2, str(i))
+            i = yp_int(i)
+            self.assertIs(i, i + 0)
+            self.assertIs(i, i * 1)
+            self.assertIs(i, i - 0)
+            self.assertIs(i, i // 1)
+            self.assertIs(i, i & -1)
+            self.assertIs(i, i | 0)
+            self.assertIs(i, i ^ 0)
+            self.assertIs(i, ~~i)
+            self.assertIs(i, i**1)
+            self.assertIs(i, yp_int(str(i)))
+            self.assertIs(i, i<<2>>2, str(i))
         # corner cases
-        i = 1 << 70
-        self.assertTrue(i - i is 0)
-        self.assertTrue(0 * i is 0)
+        i = yp_int(1 << 30)
+        self.assertIs(i - i, yp_int(0))
+        self.assertIs(0 * i, yp_int(0))
 
     def test_bit_length(self):
         tiny = 1e-10
@@ -970,6 +982,7 @@ class LongTest(yp_unittest.TestCase):
             self.assertEqual((a+1).bit_length(), i+1)
             self.assertEqual((-a-1).bit_length(), i+1)
 
+    @yp_unittest.skip("TODO: Implement floats in nohtyP")
     def test_round(self):
         # check round-half-even algorithm. For round to nearest ten;
         # rounding map is invariant under adding multiples of 20
