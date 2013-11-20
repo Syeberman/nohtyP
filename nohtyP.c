@@ -3324,37 +3324,39 @@ static void iarithmetic( ypObject **x, ypObject *y, iarithCfunc intop, iarithFCf
     return_yp_INPLACE_BAD_TYPE( x, y );
 }
 
-static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop, int mutable )
+static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop, 
+        int result_mutable )
 {
     ypObject *exc = yp_None;
     yp_int_t result = intop( x, y, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
-    if( mutable ) return yp_intstoreC( result );
+    if( result_mutable ) return yp_intstoreC( result );
     return yp_intC( result );
 }
-static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithFLfunc floatop, int mutable )
+static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithFLfunc floatop, 
+        int result_mutable )
 {
     ypObject *exc = yp_None;
     yp_float_t result = floatop( x, y, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
-    if( mutable ) return yp_floatstoreC( result );
+    if( result_mutable ) return yp_floatstoreC( result );
     return yp_floatC( result );
 }
 static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithFLfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    int mutable = ypObject_IS_MUTABLE( x );
+    int result_mutable = ypObject_IS_MUTABLE( x );
     ypObject *exc = yp_None;
 
     // Coerce the numeric operands to a common type
     if( y_pair == ypInt_CODE ) {
         if( x_pair == ypInt_CODE ) {
-            return arithmetic_intop( ypInt_VALUE( x ), ypInt_VALUE( y ), intop, mutable );
+            return arithmetic_intop( ypInt_VALUE( x ), ypInt_VALUE( y ), intop, result_mutable );
         } else if( x_pair == ypFloat_CODE ) {
             yp_float_t y_asfloat = yp_asfloatC( y, &exc );
             if( yp_isexceptionC( exc ) ) return exc;
-            return arithmetic_floatop( ypFloat_VALUE( x ), y_asfloat, floatop, mutable );
+            return arithmetic_floatop( ypFloat_VALUE( x ), y_asfloat, floatop, result_mutable );
         } else {
             return_yp_BAD_TYPE( x );
         }
@@ -3362,9 +3364,10 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithFL
         if( x_pair == ypInt_CODE ) {
             yp_float_t x_asfloat = yp_asfloatC( x, &exc );
             if( yp_isexceptionC( exc ) ) return exc;
-            return arithmetic_floatop( x_asfloat, ypFloat_VALUE( y ), floatop, mutable );
+            return arithmetic_floatop( x_asfloat, ypFloat_VALUE( y ), floatop, result_mutable );
         } else if( x_pair == ypFloat_CODE ) {
-            return arithmetic_floatop( ypFloat_VALUE( x ), ypFloat_VALUE( y ), floatop, mutable );
+            return arithmetic_floatop( ypFloat_VALUE( x ), ypFloat_VALUE( y ), floatop, 
+                    result_mutable );
         } else {
             return_yp_BAD_TYPE( x );
         }
@@ -3441,7 +3444,7 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    int mutable = ypObject_IS_MUTABLE( x );
+    int result_mutable = ypObject_IS_MUTABLE( x );
     ypObject *exc = yp_None;
     yp_float_t result;
 
@@ -3470,14 +3473,15 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
         return_yp_BAD_TYPE( y );
     }
     if( yp_isexceptionC( exc ) ) return exc;
-    if( mutable ) return yp_floatstoreC( result );
+    if( result_mutable ) return yp_floatstoreC( result );
     return yp_floatC( result );
 }
 
-static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObject **mod, int mutable )
+static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObject **mod, 
+        int result_mutable )
 {
     ypObject *exc = yp_None;
-    ypObject *(*allocator)( yp_int_t ) = mutable ? yp_intstoreC : yp_intC;
+    ypObject *(*allocator)( yp_int_t ) = result_mutable ? yp_intstoreC : yp_intC;
     yp_int_t divC, modC;
     yp_divmodL( x, y, &divC, &modC, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
@@ -3490,10 +3494,11 @@ static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObje
     }
     return yp_None;
 }
-static ypObject *_yp_divmod_floats( yp_float_t x, yp_float_t y, ypObject **div, ypObject **mod, int mutable  )
+static ypObject *_yp_divmod_floats( yp_float_t x, yp_float_t y, ypObject **div, ypObject **mod, 
+        int result_mutable  )
 {
     ypObject *exc = yp_None;
-    ypObject *(*allocator)( yp_float_t ) = mutable ? yp_floatstoreC : yp_floatC;
+    ypObject *(*allocator)( yp_float_t ) = result_mutable ? yp_floatstoreC : yp_floatC;
     yp_float_t divC, modC;
     yp_divmodFL( x, y, &divC, &modC, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
@@ -3510,17 +3515,17 @@ static ypObject *_yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject 
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    int mutable = ypObject_IS_MUTABLE( x );
+    int result_mutable = ypObject_IS_MUTABLE( x );
     ypObject *exc = yp_None;
 
     // Coerce the numeric operands to a common type
     if( y_pair == ypInt_CODE ) {
         if( x_pair == ypInt_CODE ) {
-            return _yp_divmod_ints( ypInt_VALUE( x ), ypInt_VALUE( y ), div, mod, mutable );
+            return _yp_divmod_ints( ypInt_VALUE( x ), ypInt_VALUE( y ), div, mod, result_mutable );
         } else if( x_pair == ypFloat_CODE ) {
             yp_float_t y_asfloat = yp_asfloatC( y, &exc );
             if( yp_isexceptionC( exc ) ) return exc;
-            return _yp_divmod_floats( ypFloat_VALUE( x ), y_asfloat, div, mod, mutable );
+            return _yp_divmod_floats( ypFloat_VALUE( x ), y_asfloat, div, mod, result_mutable );
         } else {
             return_yp_BAD_TYPE( x );
         }
@@ -3528,9 +3533,10 @@ static ypObject *_yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject 
         if( x_pair == ypInt_CODE ) {
             yp_float_t x_asfloat = yp_asfloatC( x, &exc );
             if( yp_isexceptionC( exc ) ) return exc;
-            return _yp_divmod_floats( x_asfloat, ypFloat_VALUE( y ), div, mod, mutable );
+            return _yp_divmod_floats( x_asfloat, ypFloat_VALUE( y ), div, mod, result_mutable );
         } else if( x_pair == ypFloat_CODE ) {
-            return _yp_divmod_floats( ypFloat_VALUE( x ), ypFloat_VALUE( y ), div, mod, mutable );
+            return _yp_divmod_floats( ypFloat_VALUE( x ), ypFloat_VALUE( y ), div, mod, 
+                    result_mutable );
         } else {
             return_yp_BAD_TYPE( x );
         }
