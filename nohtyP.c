@@ -911,8 +911,8 @@ static void *_default_yp_malloc_resize( yp_ssize_t *actual,
     return newp;
 }
 static void _default_yp_free( void *p ) {
-    free( p );
     DEBUG( "free: 0x%08X", p );
+    free( p );
 }
 
 // If all else fails, rely on the standard C malloc/free functions
@@ -1139,9 +1139,9 @@ static ypObject *_ypMem_realloc_container_variable(
 static void _ypMem_free_container( ypObject *ob, yp_ssize_t offsetof_inline )
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    DEBUG( "FREE_CONTAINER: 0x%08X", ob );
     if( ob->ob_data != inlineptr ) yp_free( ob->ob_data );
     yp_free( ob );
-    DEBUG( "FREE_CONTAINER: 0x%08X", ob );
 }
 #define ypMem_FREE_CONTAINER( ob, obStruct ) \
     _ypMem_free_container( ob, offsetof( obStruct, ob_inline_data ) )
@@ -1176,10 +1176,10 @@ void yp_decref( ypObject *x )
 
     if( ypObject_REFCNT( x ) <= 1 ) {
         // TODO Errors currently ignored...should we log them instead?
-        ypObject_TYPE( x )->tp_dealloc( x );
         DEBUG( "decref (dealloc): 0x%08X", x );
+        ypObject_TYPE( x )->tp_dealloc( x );
     } else {
-        ypObject_REFCNT( x ) += 1;
+        ypObject_REFCNT( x ) -= 1;
         DEBUG( "decref: 0x%08X refcnt %d", x, ypObject_REFCNT( x ) );
     }
 }
