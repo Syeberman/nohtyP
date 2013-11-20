@@ -1232,18 +1232,16 @@ yp_STATIC_ASSERT( offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT ==
 
 static ypObject *iter_traverse( ypObject *i, visitfunc visitor, void *memo )
 {
-    yp_uint8_t *p = ypIter_STATE( i );
-    yp_uint8_t *p_end = p + ypIter_STATE_SIZE( i );
+    ypObject **p = (ypObject **) ypIter_STATE( i );
     yp_uint32_t locs = ypIter_OBJLOCS( i );
     ypObject *result;
 
     while( locs ) { // while there are still more objects to be found...
         if( locs & 0x1u ) {
-            // p is pointing at an object; call visitor
-            result = visitor( (ypObject *)p, memo );
+            result = visitor( *p, memo );
             if( yp_isexceptionC( result ) ) return result;
         }
-        p += sizeof( ypObject * );
+        p += 1;
         locs >>= 1;
     }
     return yp_None;
