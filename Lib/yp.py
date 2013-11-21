@@ -155,10 +155,7 @@ c_multiN_ypObject_p = (c_int, "n", 0)
 c_multiK_ypObject_p = (c_int, "n", 0)
 assert c_multiN_ypObject_p is not c_multiK_ypObject_p
 
-# XXX Initialize nohtyP
 # void yp_initialize( yp_initialize_kwparams *kwparams );
-yp_func( c_void, "yp_initialize", ((c_void_p, "kwparams"), ), errcheck=False )
-_yp_initialize( None )
 
 # ypObject *yp_incref( ypObject *x );
 yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
@@ -941,6 +938,29 @@ def ypObject_p_errcheck( x ):
 yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc")) )
 
 # int yp_isexceptionCN( ypObject *x, int n, ... );
+
+# typedef struct _yp_initialize_kwparams {...} yp_initialize_kwparams;
+class c_yp_initialize_kwparams( Structure ):
+    _fields_ = [
+        ("struct_size", c_yp_ssize_t),
+        ("yp_malloc", c_void_p),
+        ("yp_malloc_resize", c_void_p),
+        ("yp_free", c_void_p),
+        ("everything_immortal", c_int),
+    ]
+# void yp_initialize( yp_initialize_kwparams *kwparams );
+yp_func( c_void, "yp_initialize", ((POINTER( c_yp_initialize_kwparams ), "kwparams"), ), 
+        errcheck=False )
+
+# Initialize nohtyP
+_yp_initparams = c_yp_initialize_kwparams(
+    struct_size=sizeof( c_yp_initialize_kwparams ),
+    yp_malloc=None,
+    yp_malloc_resize=None,
+    yp_free=None,
+    everything_immortal=False
+)
+_yp_initialize( _yp_initparams )
 
 
 class ypObject( c_ypObject_p ):
