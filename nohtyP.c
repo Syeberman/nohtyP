@@ -857,22 +857,14 @@ static void *_dummy_yp_malloc_resize( yp_ssize_t *actual,
         void *p, yp_ssize_t size, yp_ssize_t extra ) { return NULL; }
 static void _dummy_yp_free( void *p ) { }
 
-// Allocates at least size bytes of memory, setting *actual to the actual amount of memory
-// allocated, and returning the pointer to the buffer.  On error, returns NULL, and *actual is
-// undefined.  This will allocate memory even when size==0.
+// See docs for yp_initialize_kwparams.yp_malloc in nohtyP.h
 static void *(*yp_malloc)( yp_ssize_t *actual, yp_ssize_t size ) = _dummy_yp_malloc;
 
-// Resizes the given buffer in-place if possible, returning p; otherwise, allocates a new buffer
-// and returns a pointer to it.  This function *never* copies data to the new buffer and *never*
-// frees the old buffer: it is up to the caller to do this if a new buffer is returned.  In either
-// case, *actual is set to the actual amount of memory allocated by the returned pointer.  The
-// resized/new buffer will be at least size bytes; extra is a hint as to how much the buffer should
-// be over-allocated.  On error, returns NULL, p is not modified, and *actual is undefined.  This
-// will allocate memory even when size==0.
+// See docs for yp_initialize_kwparams.yp_malloc_resize in nohtyP.h
 static void *(*yp_malloc_resize)( yp_ssize_t *actual,
         void *p, yp_ssize_t size, yp_ssize_t extra ) = _dummy_yp_malloc_resize;
 
-// Frees memory returned by yp_malloc and yp_malloc_resize.
+// See docs for yp_initialize_kwparams.yp_free in nohtyP.h
 static void (*yp_free)( void *p );
 
 // Microsoft gives a couple options for heaps; let's stick with the standard malloc/free plus
@@ -952,6 +944,11 @@ static void (*_default_yp_free)( void *p ) = free;
 
 // FIXME this section could use another pass to review and clean up docs/code/etc
 
+// This should be one of exactly two possible values, 1 (the default) or ypObject_REFCNT_IMMORTAL,
+// depending on yp_initialize's everything_immortal parameter
+static yp_uint32_t _ypMem_starting_refcnt = 1;
+yp_STATIC_ASSERT( sizeof( _ypMem_starting_refcnt ) == yp_sizeof_member( ypObject, ob_refcnt ), sizeof_starting_refcnt );
+
 // Declares the ob_inline_data array for container object structures
 #define yp_INLINE_DATA _yp_INLINE_DATA
 
@@ -964,7 +961,7 @@ static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
     ob->ob_alloclen = ypObject_LEN_INVALID;
     ob->ob_data = NULL;
     ob->ob_type = type;
-    ob->ob_refcnt = 1;
+    ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = ypObject_LEN_INVALID;
     DEBUG( "MALLOC_FIXED: type %d 0x%08X", type, ob );
@@ -993,7 +990,7 @@ static ypObject *_ypMem_malloc_container_inline(
     ob->ob_alloclen = alloclen;
     ob->ob_data = ((yp_uint8_t *)ob) + offsetof_inline;
     ob->ob_type = type;
-    ob->ob_refcnt = 1;
+    ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
     DEBUG( "MALLOC_CONTAINER_INLINE: type %d 0x%08X alloclen %d", type, ob, alloclen );
@@ -1052,7 +1049,7 @@ static ypObject *_ypMem_malloc_container_variable(
 
     ob->ob_alloclen = alloclen;
     ob->ob_type = type;
-    ob->ob_refcnt = 1;
+    ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
     DEBUG( "MALLOC_CONTAINER_VARIABLE: type %d 0x%08X alloclen %d", type, ob, alloclen );
@@ -2988,9 +2985,9 @@ static yp_int_t _yp_mulL_minint( yp_int_t y, ypObject **exc )
     return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
 }
 
-// Special case of yp_mulL where both x and y are positive, or zero.  Returns yp_INT_T_MIN if 
+// Special case of yp_mulL where both x and y are positive, or zero.  Returns yp_INT_T_MIN if
 // x*y overflows to _exactly_ that value; it will be up to the caller to determine if this is
-// a valid result.  All other overflows will return a negative number strictly larger than 
+// a valid result.  All other overflows will return a negative number strictly larger than
 // yp_INT_T_MIN.
 static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y )
 {
@@ -3037,8 +3034,8 @@ static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y )
     if( result_hi & ~bit_mask_halved ) return -1; // overflow
     result_hi = yp_UINT_MATH( result_hi, <<, num_bits_halved );
     if( result_hi < 0 ) {
-        // If adding x_lo*y_lo would not change result_hi, then we may be dealing with 
-        // yp_INT_T_MIN, so return result_hi unchanged; otherwise, we would definitely overflow, 
+        // If adding x_lo*y_lo would not change result_hi, then we may be dealing with
+        // yp_INT_T_MIN, so return result_hi unchanged; otherwise, we would definitely overflow,
         // so return -1
         if( x_lo == 0 || y_lo == 0 ) return result_hi;
         return -1;
@@ -3065,7 +3062,7 @@ yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc )
     if( x < 0 ) { sign = -sign; x = -x; }
     if( y < 0 ) { sign = -sign; y = -y; }
 
-    // If we overflow to exactly yp_INT_T_MIN, and our result is supposed to be negative, then 
+    // If we overflow to exactly yp_INT_T_MIN, and our result is supposed to be negative, then
     // we've calculated yp_INT_T_MIN; all other overflows are errors
     result = _yp_mulL_posints( x, y );
     if( result < 0 ) {
@@ -3322,7 +3319,7 @@ static void iarithmetic( ypObject **x, ypObject *y, iarithCfunc intop, iarithFCf
     return_yp_INPLACE_BAD_TYPE( x, y );
 }
 
-static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop, 
+static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop,
         int result_mutable )
 {
     ypObject *exc = yp_None;
@@ -3331,7 +3328,7 @@ static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop,
     if( result_mutable ) return yp_intstoreC( result );
     return yp_intC( result );
 }
-static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithFLfunc floatop, 
+static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithFLfunc floatop,
         int result_mutable )
 {
     ypObject *exc = yp_None;
@@ -3364,7 +3361,7 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithFL
             if( yp_isexceptionC( exc ) ) return exc;
             return arithmetic_floatop( x_asfloat, ypFloat_VALUE( y ), floatop, result_mutable );
         } else if( x_pair == ypFloat_CODE ) {
-            return arithmetic_floatop( ypFloat_VALUE( x ), ypFloat_VALUE( y ), floatop, 
+            return arithmetic_floatop( ypFloat_VALUE( x ), ypFloat_VALUE( y ), floatop,
                     result_mutable );
         } else {
             return_yp_BAD_TYPE( x );
@@ -3475,7 +3472,7 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
     return yp_floatC( result );
 }
 
-static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObject **mod, 
+static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObject **mod,
         int result_mutable )
 {
     ypObject *exc = yp_None;
@@ -3492,7 +3489,7 @@ static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObje
     }
     return yp_None;
 }
-static ypObject *_yp_divmod_floats( yp_float_t x, yp_float_t y, ypObject **div, ypObject **mod, 
+static ypObject *_yp_divmod_floats( yp_float_t x, yp_float_t y, ypObject **div, ypObject **mod,
         int result_mutable  )
 {
     ypObject *exc = yp_None;
@@ -3533,7 +3530,7 @@ static ypObject *_yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject 
             if( yp_isexceptionC( exc ) ) return exc;
             return _yp_divmod_floats( x_asfloat, ypFloat_VALUE( y ), div, mod, result_mutable );
         } else if( x_pair == ypFloat_CODE ) {
-            return _yp_divmod_floats( ypFloat_VALUE( x ), ypFloat_VALUE( y ), div, mod, 
+            return _yp_divmod_floats( ypFloat_VALUE( x ), ypFloat_VALUE( y ), div, mod,
                     result_mutable );
         } else {
             return_yp_BAD_TYPE( x );
@@ -9726,17 +9723,60 @@ ypObject * const yp_type_dict = (ypObject *) &ypDict_Type;
  * Initialization
  *************************************************************************************************/
 
+static yp_initialize_kwparams _default_initialize = {
+    sizeof( yp_initialize_kwparams ),
+    _default_yp_malloc,
+    _default_yp_malloc_resize,
+    _default_yp_free,
+    /*everything_immortal=*/FALSE
+};
+
+// Helpful macro, for use only by yp_initialize, to retrieve a parameter from kwparams.  Returns
+// the default value if kwparams is too small to hold the parameter, or if the expression
+// "kwparams->key default_cond" (ie "kwparams->yp_malloc ==NULL") evaluates to true.
+#define _yp_INIT_PARAM_END( key ) \
+    (offsetof( yp_initialize_kwparams, key ) + yp_sizeof_member( yp_initialize_kwparams, key ))
+#define yp_INIT_PARAM2( key, default_cond ) \
+    ( kwparams->struct_size < _yp_INIT_PARAM_END( key ) ? \
+        _default_initialize.key \
+      : kwparams->key default_cond ? \
+        _default_initialize.key \
+      : /*else*/ \
+        kwparams->key \
+    )
+#define yp_INIT_PARAM1( key ) \
+    ( kwparams->struct_size < _yp_INIT_PARAM_END( key ) ? \
+        _default_initialize.key \
+      : /*else*/ \
+        kwparams->key \
+    )
+
 // TODO Make use of yp_initialize_kwparams to accept configuration values from the user
 void yp_initialize( const yp_initialize_kwparams *kwparams )
 {
+    static int initialized = FALSE;
+
 #ifdef _MSC_VER
     // TODO memory leak detection that should only be enabled for debug builds
     // _CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 
-    yp_malloc = _default_yp_malloc;
-    yp_malloc_resize = _default_yp_malloc_resize;
-    yp_free = _default_yp_free;
+    // yp_initialize can only be called once
+    if( initialized ) return;
+    initialized = TRUE;
+
+    if( kwparams == NULL ) kwparams = &_default_initialize;
+
+    yp_malloc           = yp_INIT_PARAM2( yp_malloc,         ==NULL );
+    yp_malloc_resize    = yp_INIT_PARAM2( yp_malloc_resize,  ==NULL );
+    yp_free             = yp_INIT_PARAM2( yp_free,           ==NULL );
+
+    if( yp_INIT_PARAM1( everything_immortal ) ) {
+        // All objects will be created immortal
+        _ypMem_starting_refcnt = ypObject_REFCNT_IMMORTAL;
+    } else {
+        _ypMem_starting_refcnt = 1;
+    }
 
     // TODO Config param idea: "minimum" or "average" or "usual" or "preferred" allocation
     // size...something that indicates that malloc handles these sizes particularly well.  The
@@ -9751,3 +9791,4 @@ void yp_initialize( const yp_initialize_kwparams *kwparams )
     // will be this size, as int/float, when they become small objects, will only allocate a
     // fraction of this.)
 }
+

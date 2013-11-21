@@ -1320,9 +1320,44 @@ ypAPI int yp_isexceptionCN( ypObject *x, int n, ... );
  */
 
 // yp_initialize accepts a number of parameters to customize nohtyP behaviour
-// TODO Actually provide "a number of parameters"
+// XXX Offsets must not change between versions: deprecate, don't delete, members from this struct
 typedef struct _yp_initialize_kwparams {
     yp_ssize_t struct_size;     // set to sizeof( yp_initialize_kwparams )
+
+    // yp_malloc, yp_malloc_resize, and yp_free allow you to specify custom memory allocation APIs.
+    // It is recommended to set these to NULL to use nohtyP's internal defaults.  Any functions you
+    // supply should behave exactly as documented, and you are encouraged to run the full suite of
+    // tests with your API.  (See _default_yp_malloc et al in nohtyP.c for examples.)
+
+    // Allocates at least size bytes of memory, setting *actual to the actual amount of memory
+    // allocated, and returning the pointer to the buffer.  On error, returns NULL, and *actual is
+    // undefined.  This must succeed when size==0, and must fail when size<0.
+    void *(*yp_malloc)( yp_ssize_t *actual, yp_ssize_t size );
+
+    // Resizes the given buffer in-place if possible, otherwise allocates a new buffer.  There are
+    // three possible scenarios:
+    //  - On error, returns NULL, p is not freed, and *actual is undefined
+    //  - On successful in-place resize, returns p, and *actual is the amount of memory now 
+    //  allocated by p
+    //  - Otherwise, returns a pointer to the new buffer, p is not freed, and *actual is the amount
+    //  of memory allocated to the new buffer; nohtyP will then copy the data and call yp_free(p)
+    // The resized/new buffer will be at least size bytes; extra is a hint as to how much the 
+    // buffer should be over-allocated, which may be ignored.  This must succeed when size==0 or 
+    // extra==0, and must fail when size<0 or extra<0.
+    // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
+    void *(*yp_malloc_resize)( yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra );
+
+    // Frees memory returned by yp_malloc and yp_malloc_resize.
+    void (*yp_free)( void *p );
+
+    // Setting everything_immortal to true forces all allocated objects to be immortal, effectively
+    // disabling yp_incref and yp_decref.  When false, the default and recommended option, objects
+    // are deallocated when their reference count reaches zero.  Setting this option will leak 
+    // considerable amounts of memory, but if the number of objects allocated by your program is
+    // bounded you may notice a small performance improvement.
+    // XXX Use this option carefully, and profile to ensure it actually provides a benefit!
+    int everything_immortal;
+
 } yp_initialize_kwparams;
 
 
