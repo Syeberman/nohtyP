@@ -1423,6 +1423,17 @@ class yp_str( ypObject ):
     # FIXME When nohtyP supports repr, replace this faked-out version
     def _yp_str( self ): return self
     def _yp_repr( self ): return repr( str( self ) )
+
+    # nohtyP currently doesn't overload yp_add et al, but Python expects this
+    def __add__( self, other ): return _yp_concat( self, other )
+    def __mul__( self, factor ):
+        if isinstance( factor, float ): raise TypeError
+        return _yp_repeatC( self, factor )
+
+    def __rmul__( self, factor ):
+        if isinstance( factor, float ): raise TypeError
+        return _yp_repeatC( self, factor )
+
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
