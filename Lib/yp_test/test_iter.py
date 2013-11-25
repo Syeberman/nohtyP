@@ -71,7 +71,7 @@ class TestCase(yp_unittest.TestCase):
     def check_iterator(self, it, seq, pickle=True):
         if pickle:
             self.check_pickle(it, seq)
-        res = []
+        res = yp_list()
         while 1:
             try:
                 val = next(it)
@@ -84,12 +84,13 @@ class TestCase(yp_unittest.TestCase):
     def check_for_loop(self, expr, seq, pickle=True):
         if pickle:
             self.check_pickle(yp_iter(expr), seq)
-        res = []
+        res = yp_list()
         for val in expr:
             res.append(val)
         self.assertEqual(res, seq)
 
     # Helper to check picklability
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def check_pickle(self, itorg, seq):
         d = pickle.dumps(itorg)
         it = pickle.loads(d)
@@ -117,7 +118,7 @@ class TestCase(yp_unittest.TestCase):
         seq = yp_list(range(10))
         it = yp_iter(seq)
         it2 = yp_iter(it)
-        self.assertTrue(it is it2)
+        self.assertIs(it, it2)
 
     # Test that for loops over iterators work
     def test_iter_for_loop(self):
@@ -126,24 +127,24 @@ class TestCase(yp_unittest.TestCase):
     # Test several independent iterators over the same list
     def test_iter_independence(self):
         seq = range(3)
-        res = []
+        res = yp_list()
         for i in yp_iter(seq):
             for j in yp_iter(seq):
                 for k in yp_iter(seq):
-                    res.append((i, j, k))
+                    res.append(yp_tuple((i, j, k)))
         self.assertEqual(res, TRIPLETS)
 
     # Test triple list comprehension using iterators
     def test_nested_comprehensions_iter(self):
         seq = range(3)
-        res = [(i, j, k)
-               for i in yp_iter(seq) for j in yp_iter(seq) for k in yp_iter(seq)]
+        res = yp_list([yp_tuple((i, j, k))
+               for i in yp_iter(seq) for j in yp_iter(seq) for k in yp_iter(seq)])
         self.assertEqual(res, TRIPLETS)
 
     # Test triple list comprehension without iterators
     def test_nested_comprehensions_for(self):
         seq = range(3)
-        res = [(i, j, k) for i in seq for j in seq for k in seq]
+        res = yp_list([yp_tuple((i, j, k)) for i in seq for j in seq for k in seq])
         self.assertEqual(res, TRIPLETS)
 
     # Test a class with __iter__ in a for loop
@@ -208,7 +209,7 @@ class TestCase(yp_unittest.TestCase):
             if i == 10:
                 raise RuntimeError
             return i
-        res = []
+        res = yp_list()
         try:
             for x in yp_iter(spam, 20):
                 res.append(x)
@@ -224,7 +225,7 @@ class TestCase(yp_unittest.TestCase):
                 if i == 10:
                     raise RuntimeError
                 return SequenceClass.__getitem__(self, i)
-        res = []
+        res = yp_list()
         try:
             for x in MySequenceClass(20):
                 res.append(x)
@@ -248,11 +249,11 @@ class TestCase(yp_unittest.TestCase):
 
     # Test an empty list
     def test_iter_empty(self):
-        self.check_for_loop(yp_iter([]), [])
+        self.check_for_loop(yp_iter(yp_list()), [])
 
     # Test a tuple
     def test_iter_tuple(self):
-        self.check_for_loop(yp_iter((0,1,2,3,4,5,6,7,8,9)), yp_list(range(10)))
+        self.check_for_loop(yp_iter(yp_tuple((0,1,2,3,4,5,6,7,8,9))), yp_list(range(10)))
 
     # Test a range
     def test_iter_range(self):
@@ -260,7 +261,7 @@ class TestCase(yp_unittest.TestCase):
 
     # Test a string
     def test_iter_string(self):
-        self.check_for_loop(yp_iter("abcde"), ["a", "b", "c", "d", "e"])
+        self.check_for_loop(yp_iter(yp_str("abcde")), ["a", "b", "c", "d", "e"])
 
     # Test a directory
     def test_iter_dict(self):
@@ -270,6 +271,7 @@ class TestCase(yp_unittest.TestCase):
         self.check_for_loop(dict, yp_list(dict.keys()))
 
     # Test a file
+    @yp_unittest.skip("TODO: Implement file in nohtyP")
     def test_iter_file(self):
         f = open(TESTFN, "w")
         try:
@@ -292,9 +294,9 @@ class TestCase(yp_unittest.TestCase):
     def test_builtin_list(self):
         self.assertEqual(yp_list(SequenceClass(5)), yp_list(range(5)))
         self.assertEqual(yp_list(SequenceClass(0)), [])
-        self.assertEqual(yp_list(()), [])
+        self.assertEqual(yp_list(yp_tuple()), [])
 
-        d = {"one": 1, "two": 2, "three": 3}
+        d = yp_dict({"one": 1, "two": 2, "three": 3})
         self.assertEqual(yp_list(d), yp_list(d.keys()))
 
         self.assertRaises(TypeError, yp_list, yp_list)
@@ -323,11 +325,11 @@ class TestCase(yp_unittest.TestCase):
     def test_builtin_tuple(self):
         self.assertEqual(yp_tuple(SequenceClass(5)), (0, 1, 2, 3, 4))
         self.assertEqual(yp_tuple(SequenceClass(0)), ())
-        self.assertEqual(yp_tuple([]), ())
-        self.assertEqual(yp_tuple(()), ())
-        self.assertEqual(yp_tuple("abc"), ("a", "b", "c"))
+        self.assertEqual(yp_tuple(yp_list()), ())
+        self.assertEqual(yp_tuple(), ())
+        self.assertEqual(yp_tuple(yp_str("abc")), ("a", "b", "c"))
 
-        d = {"one": 1, "two": 2, "three": 3}
+        d = yp_dict({"one": 1, "two": 2, "three": 3})
         self.assertEqual(yp_tuple(d), yp_tuple(d.keys()))
 
         self.assertRaises(TypeError, yp_tuple, yp_list)
@@ -361,7 +363,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(yp_list(filter(None, ())), [])
         self.assertEqual(yp_list(filter(None, "abc")), ["a", "b", "c"])
 
-        d = {"one": 1, "two": 2, "three": 3}
+        d = yp_dict({"one": 1, "two": 2, "three": 3})
         self.assertEqual(yp_list(filter(None, d)), yp_list(d.keys()))
 
         self.assertRaises(TypeError, filter, None, yp_list)
@@ -408,7 +410,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(max(8, -1), 8)
         self.assertEqual(min(8, -1), -1)
 
-        d = {"one": 1, "two": 2, "three": 3}
+        d = yp_dict({"one": 1, "two": 2, "three": 3})
         self.assertEqual(max(d), "two")
         self.assertEqual(min(d), "one")
         self.assertEqual(max(d.values()), 3)
@@ -439,7 +441,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(yp_list(map(lambda x: x+1, SequenceClass(5))),
                          yp_list(range(1, 6)))
 
-        d = {"one": 1, "two": 2, "three": 3}
+        d = yp_dict({"one": 1, "two": 2, "three": 3})
         self.assertEqual(yp_list(map(lambda k, d=d: (k, d[k]), d)),
                          yp_list(d.items()))
         dkeys = yp_list(d.keys())
@@ -468,8 +470,8 @@ class TestCase(yp_unittest.TestCase):
     @yp_unittest.skip("TODO: Implement zip in nohtyP")
     def test_builtin_zip(self):
         self.assertEqual(yp_list(zip()), [])
-        self.assertEqual(yp_list(zip(*[])), [])
-        self.assertEqual(yp_list(zip(*[(1, 2), 'ab'])), [(1, 'a'), (2, 'b')])
+        self.assertEqual(yp_list(zip(*yp_list())), [])
+        self.assertEqual(yp_list(zip(*yp_list([(1, 2), 'ab']))), [(1, 'a'), (2, 'b')])
 
         self.assertRaises(TypeError, zip, None)
         self.assertRaises(TypeError, zip, range(10), 42)
@@ -480,7 +482,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(yp_list(zip(SequenceClass(3))),
                          [(0,), (1,), (2,)])
 
-        d = {"one": 1, "two": 2, "three": 3}
+        d = yp_dict({"one": 1, "two": 2, "three": 3})
         self.assertEqual(yp_list(d.items()), yp_list(zip(d, d.values())))
 
         # Generate all ints starting at constructor arg.
@@ -545,6 +547,7 @@ class TestCase(yp_unittest.TestCase):
             for y in NoGuessLen5(), Guess3Len5(), Guess30Len5():
                 self.assertEqual(lzip(x, y), expected)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_unicode_join_endcase(self):
 
         # This class inserts a Unicode object into its argument's natural
@@ -561,7 +564,7 @@ class TestCase(yp_unittest.TestCase):
                 i = self.i
                 self.i = i+1
                 if i == 2:
-                    return "fooled you!"
+                    return yp_str("fooled you!")
                 return next(self.it)
 
         f = open(TESTFN, "w")
@@ -577,7 +580,7 @@ class TestCase(yp_unittest.TestCase):
         # whether string.join() can manage to remember everything it's seen
         # and pass that on to unicode.join().
         try:
-            got = " - ".join(OhPhooey(f))
+            got = yp_str(" - ").join(OhPhooey(f))
             self.assertEqual(got, "a\n - b\n - fooled you! - c\n")
         finally:
             f.close()
@@ -632,15 +635,15 @@ class TestCase(yp_unittest.TestCase):
     @yp_unittest.skip("TODO: Implement countOf in nohtyP")
     def test_countOf(self):
         from operator import countOf
-        self.assertEqual(countOf([1,2,2,3,2,5], 2), 3)
-        self.assertEqual(countOf((1,2,2,3,2,5), 2), 3)
-        self.assertEqual(countOf("122325", "2"), 3)
-        self.assertEqual(countOf("122325", "6"), 0)
+        self.assertEqual(countOf(yp_list([1,2,2,3,2,5]), 2), 3)
+        self.assertEqual(countOf(yp_tuple((1,2,2,3,2,5)), 2), 3)
+        self.assertEqual(countOf(yp_str("122325"), "2"), 3)
+        self.assertEqual(countOf(yp_str("122325"), "6"), 0)
 
         self.assertRaises(TypeError, countOf, 42, 1)
         self.assertRaises(TypeError, countOf, countOf, countOf)
 
-        d = {"one": 3, "two": 3, "three": 3, 1j: 2j}
+        d = yp_dict({"one": 3, "two": 3, "three": 3, 1j: 2j})
         for k in d:
             self.assertEqual(countOf(d, k), 1)
         self.assertEqual(countOf(d.values(), 3), 3)
@@ -654,7 +657,7 @@ class TestCase(yp_unittest.TestCase):
             f.close()
         f = open(TESTFN, "r")
         try:
-            for letter, count in ("a", 1), ("b", 2), ("c", 1), ("d", 0):
+            for letter, count in yp_tuple((("a", 1), ("b", 2), ("c", 1), ("d", 0))):
                 f.seek(0, 0)
                 self.assertEqual(countOf(f, letter + "\n"), count)
         finally:
@@ -668,18 +671,18 @@ class TestCase(yp_unittest.TestCase):
     @yp_unittest.skip("TODO: Implement indexOf in nohtyP")
     def test_indexOf(self):
         from operator import indexOf
-        self.assertEqual(indexOf([1,2,2,3,2,5], 1), 0)
-        self.assertEqual(indexOf((1,2,2,3,2,5), 2), 1)
-        self.assertEqual(indexOf((1,2,2,3,2,5), 3), 3)
-        self.assertEqual(indexOf((1,2,2,3,2,5), 5), 5)
-        self.assertRaises(ValueError, indexOf, (1,2,2,3,2,5), 0)
-        self.assertRaises(ValueError, indexOf, (1,2,2,3,2,5), 6)
+        self.assertEqual(indexOf(yp_list([1,2,2,3,2,5]), 1), 0)
+        self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 2), 1)
+        self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 3), 3)
+        self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 5), 5)
+        self.assertRaises(ValueError, indexOf, yp_tuple((1,2,2,3,2,5)), 0)
+        self.assertRaises(ValueError, indexOf, yp_tuple((1,2,2,3,2,5)), 6)
 
-        self.assertEqual(indexOf("122325", "2"), 1)
-        self.assertEqual(indexOf("122325", "5"), 5)
-        self.assertRaises(ValueError, indexOf, "122325", "6")
+        self.assertEqual(indexOf(yp_str("122325"), "2"), 1)
+        self.assertEqual(indexOf(yp_str("122325"), "5"), 5)
+        self.assertRaises(ValueError, indexOf, yp_str("122325"), "6")
 
-        self.assertRaises(TypeError, indexOf, 42, 1)
+        self.assertRaises(TypeError, indexOf, yp_int(42), 1)
         self.assertRaises(TypeError, indexOf, indexOf, indexOf)
 
         f = open(TESTFN, "w")
@@ -707,6 +710,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertRaises(ValueError, indexOf, iclass, -1)
 
     # Test iterators with file.writelines().
+    @yp_unittest.skip("TODO: Implement file in nohtyP")
     def test_writelines(self):
         f = open(TESTFN, "w")
 
@@ -714,10 +718,10 @@ class TestCase(yp_unittest.TestCase):
             self.assertRaises(TypeError, f.writelines, None)
             self.assertRaises(TypeError, f.writelines, 42)
 
-            f.writelines(["1\n", "2\n"])
-            f.writelines(("3\n", "4\n"))
-            f.writelines({'5\n': None})
-            f.writelines({})
+            f.writelines(yp_list(["1\n", "2\n"]))
+            f.writelines(yp_tuple(("3\n", "4\n")))
+            f.writelines(yp_dict({'5\n': None}))
+            f.writelines(yp_dict())
 
             # Try a big chunk too.
             class Iterator:
@@ -760,6 +764,7 @@ class TestCase(yp_unittest.TestCase):
 
 
     # Test iterators on RHS of unpacking assignments.
+    @yp_unittest.skip("REWORK Test nohtyP's yp_unpack here")
     def test_unpack_iter(self):
         a, b = 1, 2
         self.assertEqual((a, b), (1, 2))
@@ -813,6 +818,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual((a, b, c), (0, 1, 42))
 
 
+    @yp_unittest.skip("Not applicable to nohtyP")
     @cpython_only
     def test_ref_counting_behavior(self):
         class C(object):
@@ -851,13 +857,13 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(yp_list(b), [])
 
     def test_sinkstate_tuple(self):
-        a = (0, 1, 2, 3, 4)
+        a = yp_tuple((0, 1, 2, 3, 4))
         b = yp_iter(a)
         self.assertEqual(yp_list(b), yp_list(range(5)))
         self.assertEqual(yp_list(b), [])
 
     def test_sinkstate_string(self):
-        a = "abcde"
+        a = yp_str("abcde")
         b = yp_iter(a)
         self.assertEqual(yp_list(b), ['a', 'b', 'c', 'd', 'e'])
         self.assertEqual(yp_list(b), [])
@@ -885,7 +891,7 @@ class TestCase(yp_unittest.TestCase):
     def test_sinkstate_dict(self):
         # XXX For a more thorough test, see towards the end of:
         # http://mail.python.org/pipermail/python-dev/2002-July/026512.html
-        a = {1:1, 2:2, 0:0, 4:4, 3:3}
+        a = yp_dict({1:1, 2:2, 0:0, 4:4, 3:3})
         for b in yp_iter(a), a.keys(), a.items(), a.values():
             b = yp_iter(a)
             self.assertEqual(yp_len(yp_list(b)), 5)
