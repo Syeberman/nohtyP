@@ -46,18 +46,31 @@ from yp_test import yp_unittest
 from yp_test import support
 from itertools import repeat
 from collections import deque
-from builtins import len as _len
+from yp import _yp_lenC, _yp_iter_lenhintC
+
+# Extra assurance that we're not accidentally testing Python's data types
+def iter( *args, **kwargs ): raise NotImplementedError( "convert script to yp_iter here" )
+def bytes( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytes here" )
+def bytearray( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytearray here" )
+def str( *args, **kwargs ): raise NotImplementedError( "convert script to yp_str here" )
+def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
+def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
+def frozenset( *args, **kwargs ): raise NotImplementedError( "convert script to yp_frozenset here" )
+def set( *args, **kwargs ): raise NotImplementedError( "convert script to yp_set here" )
+def dict( *args, **kwargs ): raise NotImplementedError( "convert script to yp_dict here" )
+# TODO same for yp_range, yp_min, yp_max, etc
+# TODO yp_iter(x) throws TypeError if x not a ypObject
 
 n = 10
 
-def len(obj):
+def yp_len(obj):
+    if not isinstance(obj, ypObject): 
+        raise TypeError("expected ypObject in yp_len")
     try:
-        return _len(obj)
+        return yp_int(_yp_lenC(obj, yp_None))
     except TypeError:
         try:
-            # note: this is an internal undocumented API,
-            # don't rely on it in your own programs
-            return obj.__length_hint__()
+            return yp_int(_yp_iter_lenhintC(obj, yp_None))
         except AttributeError:
             raise TypeError
 
@@ -66,11 +79,11 @@ class TestInvariantWithoutMutations:
     def test_invariant(self):
         it = self.it
         for i in reversed(range(1, n+1)):
-            self.assertEqual(len(it), i)
+            self.assertEqual(yp_len(it), i)
             next(it)
-        self.assertEqual(len(it), 0)
+        self.assertEqual(yp_len(it), 0)
         self.assertRaises(StopIteration, next, it)
-        self.assertEqual(len(it), 0)
+        self.assertEqual(yp_len(it), 0)
 
 class TestTemporarilyImmutable(TestInvariantWithoutMutations):
 
@@ -79,16 +92,15 @@ class TestTemporarilyImmutable(TestInvariantWithoutMutations):
         # length immutability  during iteration
 
         it = self.it
-        self.assertEqual(len(it), n)
+        self.assertEqual(yp_len(it), n)
         next(it)
-        self.assertEqual(len(it), n-1)
+        self.assertEqual(yp_len(it), n-1)
         self.mutate()
         self.assertRaises(RuntimeError, next, it)
-        self.assertEqual(len(it), 0)
+        self.assertEqual(yp_len(it), 0)
 
 ## ------- Concrete Type Tests -------
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -96,37 +108,34 @@ class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def test_no_len_for_infinite_repeat(self):
         # The repeat() object can also be infinite
-        self.assertRaises(TypeError, len, repeat(None))
+        self.assertRaises(TypeError, yp_len, repeat(None))
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestXrange(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = iter(range(n))
+        self.it = yp_iter(range(n))
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestXrangeCustomReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = reversed(range(n))
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestTuple(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = iter(tuple(range(n)))
+        self.it = yp_iter(yp_tuple(range(n)))
 
 ## ------- Types that should not be mutated during iteration -------
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip("Not applicable to nohtyP")
 class TestDeque(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
         d = deque(range(n))
-        self.it = iter(d)
+        self.it = yp_iter(d)
         self.mutate = d.pop
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip("Not applicable to nohtyP")
 class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
@@ -134,113 +143,106 @@ class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
         self.it = reversed(d)
         self.mutate = d.pop
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestDictKeys(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
-        d = dict.fromkeys(range(n))
-        self.it = iter(d)
+        d = yp_dict.fromkeys(range(n))
+        self.it = yp_iter(d)
         self.mutate = d.popitem
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestDictItems(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
-        d = dict.fromkeys(range(n))
-        self.it = iter(d.items())
+        d = yp_dict.fromkeys(range(n))
+        self.it = yp_iter(d.items())
         self.mutate = d.popitem
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestDictValues(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
-        d = dict.fromkeys(range(n))
-        self.it = iter(d.values())
+        d = yp_dict.fromkeys(range(n))
+        self.it = yp_iter(d.values())
         self.mutate = d.popitem
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestSet(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
-        d = set(range(n))
-        self.it = iter(d)
+        d = yp_set(range(n))
+        self.it = yp_iter(d)
         self.mutate = d.pop
 
 ## ------- Types that can mutate during iteration -------
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = iter(range(n))
+        self.it = yp_iter(range(n))
 
     def test_mutation(self):
-        d = list(range(n))
-        it = iter(d)
+        d = yp_list(range(n))
+        it = yp_iter(d)
         next(it)
         next(it)
-        self.assertEqual(len(it), n-2)
+        self.assertEqual(yp_len(it), n-2)
         d.append(n)
-        self.assertEqual(len(it), n-1)  # grow with append
+        self.assertEqual(yp_len(it), n-1)  # grow with append
         d[1:] = []
-        self.assertEqual(len(it), 0)
-        self.assertEqual(list(it), [])
+        self.assertEqual(yp_len(it), 0)
+        self.assertEqual(yp_list(it), [])
         d.extend(range(20))
-        self.assertEqual(len(it), 0)
+        self.assertEqual(yp_len(it), 0)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = reversed(range(n))
 
     def test_mutation(self):
-        d = list(range(n))
+        d = yp_list(range(n))
         it = reversed(d)
         next(it)
         next(it)
-        self.assertEqual(len(it), n-2)
+        self.assertEqual(yp_len(it), n-2)
         d.append(n)
-        self.assertEqual(len(it), n-2)  # ignore append
+        self.assertEqual(yp_len(it), n-2)  # ignore append
         d[1:] = []
-        self.assertEqual(len(it), 0)
-        self.assertEqual(list(it), [])  # confirm invariant
+        self.assertEqual(yp_len(it), 0)
+        self.assertEqual(yp_list(it), [])  # confirm invariant
         d.extend(range(20))
-        self.assertEqual(len(it), 0)
+        self.assertEqual(yp_len(it), 0)
 
 ## -- Check to make sure exceptions are not suppressed by __length_hint__()
 
 
 class BadLen(object):
-    def __iter__(self): return iter(range(10))
+    def __iter__(self): return yp_iter(range(10))
     def __len__(self):
         raise RuntimeError('hello')
 
 class BadLengthHint(object):
-    def __iter__(self): return iter(range(10))
+    def __iter__(self): return yp_iter(range(10))
     def __length_hint__(self):
         raise RuntimeError('hello')
 
 class NoneLengthHint(object):
-    def __iter__(self): return iter(range(10))
+    def __iter__(self): return yp_iter(range(10))
     def __length_hint__(self):
         return None
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestLengthHintExceptions(yp_unittest.TestCase):
 
     def test_issue1242657(self):
-        self.assertRaises(RuntimeError, list, BadLen())
-        self.assertRaises(RuntimeError, list, BadLengthHint())
-        self.assertRaises(RuntimeError, [].extend, BadLen())
-        self.assertRaises(RuntimeError, [].extend, BadLengthHint())
-        b = bytearray(range(10))
+        self.assertRaises(RuntimeError, yp_list, BadLen())
+        self.assertRaises(RuntimeError, yp_list, BadLengthHint())
+        self.assertRaises(RuntimeError, yp_list().extend, BadLen())
+        self.assertRaises(RuntimeError, yp_list().extend, BadLengthHint())
+        b = yp_bytearray(range(10))
         self.assertRaises(RuntimeError, b.extend, BadLen())
         self.assertRaises(RuntimeError, b.extend, BadLengthHint())
 
     def test_invalid_hint(self):
         # Make sure an invalid result doesn't muck-up the works
-        self.assertEqual(list(NoneLengthHint()), list(range(10)))
+        self.assertEqual(yp_list(NoneLengthHint()), yp_list(range(10)))
 
 
 if __name__ == "__main__":
