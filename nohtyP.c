@@ -1375,13 +1375,13 @@ static ypTypeObject ypIter_Type = {
 // Public functions
 
 // TODO Python has named this __length_hint__; do same?  http://www.python.org/dev/peps/pep-0424
-yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc )
+yp_ssize_t yp_iter_lenhintC( ypObject *i, ypObject **exc )
 {
     yp_ssize_t lenhint;
-    if( ypObject_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
-        return_yp_CEXC_BAD_TYPE( 0, exc, iterator );
+    if( ypObject_TYPE_PAIR_CODE( i ) != ypFrozenIter_CODE ) {
+        return_yp_CEXC_BAD_TYPE( 0, exc, i );
     }
-    lenhint = ypIter_LENHINT( iterator );
+    lenhint = ypIter_LENHINT( i );
     return lenhint < 0 ? 0 : lenhint;
 }
 
@@ -1389,15 +1389,15 @@ yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc )
 // TODO what if we violated the normal rules and inspected *exc on input: if an exception, return
 // as if that error occured
 // TODO alternatively/additionally, document that this always succeeds if iterator _is_ one
-ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size )
+ypObject *yp_iter_stateX( ypObject *i, void **state, yp_ssize_t *size )
 {
-    if( ypObject_TYPE_PAIR_CODE( iterator ) != ypFrozenIter_CODE ) {
+    if( ypObject_TYPE_PAIR_CODE( i ) != ypFrozenIter_CODE ) {
         *state = NULL;
         *size = 0;
-        return_yp_BAD_TYPE( iterator );
+        return_yp_BAD_TYPE( i );
     }
-    *state = ypIter_STATE( iterator );
-    *size = ypIter_STATE_SIZE( iterator );
+    *state = ypIter_STATE( i );
+    *size = ypIter_STATE_SIZE( i );
     return yp_None;
 }
 

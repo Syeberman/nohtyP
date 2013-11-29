@@ -1277,9 +1277,15 @@ class yp_iter( ypObject ):
     def __new__( cls, object, sentinel=_yp_arg_missing ):
         if sentinel is not _yp_arg_missing: object = iter( object, sentinel )
         if isinstance( object, ypObject ): return _yp_iter( object )
+        if isinstance( object, (_setlike_dictview, _values_dictview) ): return iter( object )
 
+        lenhint = NotImplemented
         try: lenhint = len( object )
-        except: lenhint = 0 # TODO try Python's lenhint?
+        except TypeError:
+            if hasattr( object, "__length_hint__" ):
+                try: lenhint = int( object.__length_hint__( ) )
+                except TypeError: pass
+        if lenhint == NotImplemented: lenhint = 0 # if all else fails...
         self = super( ).__new__( cls )
         self._pyiter = iter( object )
         self._pycallback = c_yp_generator_func_t( self._pygenerator_func )
