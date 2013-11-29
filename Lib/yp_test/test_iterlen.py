@@ -143,28 +143,36 @@ class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
         self.it = reversed(d)
         self.mutate = d.pop
 
-class TestDictKeys(TestTemporarilyImmutable, yp_unittest.TestCase):
+# XXX Unlike cpython, but allowed by the Python docs, nohtyP dicts and sets do not raise an error
+# if mutated during iteration
+# FIXME Create tests like for list that verify this behaviour
+
+#class TestDictKeys(TestTemporarilyImmutable, yp_unittest.TestCase):
+class TestDictKeys(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         d = yp_dict.fromkeys(range(n))
         self.it = yp_iter(d)
         self.mutate = d.popitem
 
-class TestDictItems(TestTemporarilyImmutable, yp_unittest.TestCase):
+#class TestDictItems(TestTemporarilyImmutable, yp_unittest.TestCase):
+class TestDictItems(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         d = yp_dict.fromkeys(range(n))
         self.it = yp_iter(d.items())
         self.mutate = d.popitem
 
-class TestDictValues(TestTemporarilyImmutable, yp_unittest.TestCase):
+#class TestDictValues(TestTemporarilyImmutable, yp_unittest.TestCase):
+class TestDictValues(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         d = yp_dict.fromkeys(range(n))
         self.it = yp_iter(d.values())
         self.mutate = d.popitem
 
-class TestSet(TestTemporarilyImmutable, yp_unittest.TestCase):
+#class TestSet(TestTemporarilyImmutable, yp_unittest.TestCase):
+class TestSet(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         d = yp_set(range(n))
@@ -176,7 +184,7 @@ class TestSet(TestTemporarilyImmutable, yp_unittest.TestCase):
 class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = yp_iter(range(n))
+        self.it = yp_iter(yp_list(range(n)))
 
     def test_mutation(self):
         d = yp_list(range(n))
@@ -185,9 +193,11 @@ class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
         next(it)
         self.assertEqual(yp_len(it), n-2)
         d.append(n)
-        self.assertEqual(yp_len(it), n-1)  # grow with append
+        #self.assertEqual(yp_len(it), n-1)  # grow with append
+        self.assertEqual(yp_len(it), n-2)  # XXX nohtyP's hints don't change
         d[1:] = []
-        self.assertEqual(yp_len(it), 0)
+        #self.assertEqual(yp_len(it), 0)
+        self.assertEqual(yp_len(it), n-2)  # XXX nohtyP's hints don't change
         self.assertEqual(yp_list(it), [])
         d.extend(range(20))
         self.assertEqual(yp_len(it), 0)
@@ -195,18 +205,19 @@ class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
 class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = reversed(range(n))
+        self.it = yp_reversed(yp_list(range(n)))
 
     def test_mutation(self):
         d = yp_list(range(n))
-        it = reversed(d)
+        it = yp_reversed(d)
         next(it)
         next(it)
         self.assertEqual(yp_len(it), n-2)
         d.append(n)
         self.assertEqual(yp_len(it), n-2)  # ignore append
         d[1:] = []
-        self.assertEqual(yp_len(it), 0)
+        #self.assertEqual(yp_len(it), 0)
+        self.assertEqual(yp_len(it), n-2)  # XXX nohtyP's hints don't change
         self.assertEqual(yp_list(it), [])  # confirm invariant
         d.extend(range(20))
         self.assertEqual(yp_len(it), 0)
