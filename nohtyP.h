@@ -20,18 +20,16 @@
  *      yp_setitem( &dict, key, value );
  *      if( yp_isexceptionC( dict ) ) printf( "unhashable key, dict discarded" );
  * If you don't want the modified object discarded on error, use the 'E' version, which returns an
- * exception on error, otherwise yp_None:
+ * exception on error and yp_None otherwise:
  *      result = yp_setitemE( dict, key, value );
  *      if( yp_isexceptionC( result ) ) printf( "unhashable key, dict not modified" );
  * Finally, functions that return C values accept a ypObject** that is set to the exception; it is
  * set _only_ on error, and existing values are not discarded, so the variable should first be
  * initialized to an immortal:
- *      ypObject *result = yp_None;
- *      len = yp_lenC( x, &result );
- *      if( yp_isexceptionC( result ) ) printf( "x isn't a container" );
- * Exception objects are immortal, allowing you to return immediately, without having to call
- * yp_decref, if an error occurs.  Unless explicitly documented as "always succeeds", _any_
- * function can return an exception.
+ *      ypObject *exc = yp_None;
+ *      len = yp_lenC( x, &exc );
+ *      if( yp_isexceptionC( exc ) ) printf( "x isn't a container" );
+ * Unless explicitly documented as "always succeeds", _any_ function can return an exception.
  *
  * It is possible to string together function calls without checking for errors in-between.  When
  * an exception object is used as input to a function, it is immediately returned.  This allows you
@@ -44,14 +42,14 @@
  *      if( yp_isexceptionC( newdict ) ) abort( );
  *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
- * threads; this includes updating reference counts, so immutables are not inherently threadsafe!
+ * threads; this includes modifying reference counts, so don't assume immutables are threadsafe!
  * One strategy to ensure safety is to deep copy objects before exchanging between threads.
  * Sharing immutable, immortal objects is always safe.
  *
  * Certain functions are given postfixes to highlight their unique behaviour:
  *  C - C native types are accepted and returned where appropriate
- *  F - A version of "C" that accepts floats in place of ints
  *  L - Library routines that operate strictly on C types
+ *  F - A version of "C" or "L" that accepts floats in place of ints
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
  *  V - A version of "N" or "K" that accepts a va_list in place of ...
@@ -128,121 +126,6 @@ ypAPI void yp_decrefV( int n, va_list args );
 
 // Returns true (non-zero) if x is an exception, else false.  Always succeeds.
 ypAPI int yp_isexceptionC( ypObject *x );
-
-
-/*
- * Freezing, "Unfreezing", and Invalidating
- */
-
-// All objects support a one-way freeze function that makes them immutable, an unfrozen_copy
-// function that returns a mutable copy, and a one-way invalidate function that renders the object
-// useless; there are also deep variants to these functions.  Supplying an invalidated object to a
-// function results in yp_InvalidatedError.  Freezing and invalidating are two examples of object
-// transmutation, where the type of the object is converted to a different type.  Unlike Python,
-// most objects are copied in memory, even immutables, as copying is one method for maintaining
-// threadsafety.
-
-// Transmutes *x to its associated immutable type.  If *x is already immutable this is a no-op.
-ypAPI void yp_freeze( ypObject **x );
-
-// Freezes *x and, recursively, all contained objects.
-ypAPI void yp_deepfreeze( ypObject **x );
-
-// Returns a new reference to a mutable shallow copy of x.  If x has no associated mutable type an
-// immutable copy is returned.  May also return yp_MemoryError.
-ypAPI ypObject *yp_unfrozen_copy( ypObject *x );
-
-// Creates a mutable copy of x and, recursively, all contained objects, returning a new reference.
-ypAPI ypObject *yp_unfrozen_deepcopy( ypObject *x );
-
-// Returns a new reference to an immutable shallow copy of x.  If x has no associated immutable
-// type a new, invalidated object is returned.  May also return yp_MemoryError.
-ypAPI ypObject *yp_frozen_copy( ypObject *x );
-
-// Creates an immutable copy of x and, recursively, all contained objects, returning a new
-// reference.
-ypAPI ypObject *yp_frozen_deepcopy( ypObject *x );
-
-// Returns a new reference to an exact, shallow copy of x.  May also return yp_MemoryError.
-ypAPI ypObject *yp_copy( ypObject *x );
-
-// Creates an exact copy of x and, recursively, all contained objects, returning a new reference.
-ypAPI ypObject *yp_deepcopy( ypObject *x );
-
-// Discards all contained objects in *x, deallocates _some_ memory, and transmutes it to the
-// ypInvalidated type (rendering the object useless).  If *x is immortal or already invalidated
-// this is a no-op; immutable objects _can_ be invalidated.
-ypAPI void yp_invalidate( ypObject **x );
-
-// Invalidates *x and, recursively, all contained objects.
-ypAPI void yp_deepinvalidate( ypObject **x );
-
-
-/*
- * Boolean Operations and Comparisons
- */
-
-// Unlike Python, bools do not (currently) support arithmetic.
-
-// There are exactly two boolean values, both immortal: yp_True and yp_False.
-ypAPI ypObject * const yp_True;
-ypAPI ypObject * const yp_False;
-
-// Returns the immortal yp_False if the object should be considered false (yp_None, a number equal
-// to zero, or a container of zero length), otherwise yp_True.
-ypAPI ypObject *yp_bool( ypObject *x );
-
-// Returns the immortal yp_True if x is considered false, otherwise yp_False.
-ypAPI ypObject *yp_not( ypObject *x );
-
-// Returns a *new* reference to y if x is false, otherwise to x.  Unlike Python, both arguments
-// are always evaluated.  You may find yp_anyN more convenient, as it returns an immortal.
-ypAPI ypObject *yp_or( ypObject *x, ypObject *y );
-
-// A convenience function to "or" n objects.  Returns yp_False if n is zero, and the first object
-// if n is one.  Returns a *new* reference; you may find yp_anyN more convenient, as it returns an
-// immortal.
-ypAPI ypObject *yp_orN( int n, ... );
-ypAPI ypObject *yp_orV( int n, va_list args );
-
-// Equivalent to yp_bool( yp_orN( n, ... ) ).  (Returns an immortal.)
-ypAPI ypObject *yp_anyN( int n, ... );
-ypAPI ypObject *yp_anyV( int n, va_list args );
-
-// Returns the immortal yp_True if any element of iterable is true; if the iterable is empty,
-// returns yp_False.  Stops iterating at the first true element.
-ypAPI ypObject *yp_any( ypObject *iterable );
-
-// Returns a *new* reference to x if x is false, otherwise to y.  Unlike Python, both
-// arguments are always evaluated.  You may find yp_allN more convenient, as it returns an
-// immortal.
-ypAPI ypObject *yp_and( ypObject *x, ypObject *y );
-
-// A convenience function to "and" n objects.  Returns yp_True if n is zero, and the first object
-// if n is one.  Returns a *new* reference; you may find yp_allN more convenient, as it returns an
-// immortal.
-ypAPI ypObject *yp_andN( int n, ... );
-ypAPI ypObject *yp_andV( int n, va_list args );
-
-// Equivalent to yp_bool( yp_andN( n, ... ) ).  (Returns an immortal.)
-ypAPI ypObject *yp_allN( int n, ... );
-ypAPI ypObject *yp_allV( int n, va_list args );
-
-// Returns the immortal yp_True if all elements of iterable are true or the iterable is empty.
-// Stops iterating at the first false element.
-ypAPI ypObject *yp_all( ypObject *iterable );
-
-// Implements the "less than" (x<y), "less than or equal" (x<=y), "equal" (x==y), "not equal"
-// (x!=y), "greater than or equal" (x>=y), and "greater than" (x>y) comparisons.  Returns the
-// immortal yp_True if the condition is true, otherwise yp_False.
-ypAPI ypObject *yp_lt( ypObject *x, ypObject *y );
-ypAPI ypObject *yp_le( ypObject *x, ypObject *y );
-ypAPI ypObject *yp_eq( ypObject *x, ypObject *y );
-ypAPI ypObject *yp_ne( ypObject *x, ypObject *y );
-ypAPI ypObject *yp_ge( ypObject *x, ypObject *y );
-ypAPI ypObject *yp_gt( ypObject *x, ypObject *y );
-
-// You may also be interested in yp_IF and yp_WHILE for working with boolean operations; see below.
 
 
 /*
@@ -325,7 +208,7 @@ ypAPI ypObject *yp_floatstoreC( yp_float_t value );
 ypAPI ypObject *yp_float( ypObject *x );
 ypAPI ypObject *yp_floatstore( ypObject *x );
 
-// Returns a new reference to an iterator for object x.  It is usually unsafe to modify an object
+// Returns a new reference to an iterator for object x.  It is usually unwise to modify an object
 // being iterated over.
 ypAPI ypObject *yp_iter( ypObject *x );
 
@@ -339,7 +222,12 @@ ypAPI ypObject *yp_generatorCV( yp_generator_func_t func, yp_ssize_t lenhint, in
 // Similar to yp_generatorCN, but accepts an arbitrary structure (or array) of the given
 // size which will be copied into the iterator and maintained as state.  If state contains any
 // objects, their offsets must be given as the variable arguments; new references to these objects
-// will be created.  (Note that these objects cannot be contained in a union.)
+// will be created.  (Note that these objects cannot be contained in a union; if they exist in
+// an array you must list _each_ _individual_ offset.)
+//  Ex: typedef struct { int x; int y; ypObject *obj1; ypObject *obj2 } mystruct;
+//      mystruct state = { 20, 40, yp_None, yp_False };
+//      gen = yp_generator_fromstructCN( mygenfunc, 0, &state, sizeof( mystruct ),
+//                  2, offsetof( mystruct, obj1 ), offsetof( mystruct, obj2 ) );
 ypAPI ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint,
         void *state, yp_ssize_t size, int n, ... );
 ypAPI ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint,
@@ -377,9 +265,9 @@ ypAPI ypObject *yp_bytearray0( void );
 // in yp_bytesC.  The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
 // ascii-encoded source), while for errors it is yp_s_strict.  Equivalent to:
 //  yp_str3( yp_bytesC( source, len ), encoding, errors )
-ypAPI ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+ypAPI ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors );
-ypAPI ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+ypAPI ypObject *yp_chrarray_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors );
 
 // Equivalent to yp_str3( yp_bytesC( source, len ), yp_s_utf_8, yp_s_strict ). Note that in Python,
@@ -413,8 +301,9 @@ ypAPI ypObject *yp_tupleV( int n, va_list args );
 ypAPI ypObject *yp_listN( int n, ... );
 ypAPI ypObject *yp_listV( int n, va_list args );
 
-// Returns a new reference to a tuple/list made from factor shallow copies of yp_tupleN( n, ... )
-// concatenated.  Equivalent to "factor * (obj0, obj1, ...)" in Python.
+// Returns a new reference to a tuple/list made from factor shallow-copies of yp_tupleN( n, ... )
+// concatenated; the length will be factor*n.  Equivalent to "factor * (obj0, obj1, ...)" in 
+// Python.
 //  Ex: pre-allocate a list of length 99: yp_list_repeatCN( 99, 1, yp_None )
 //  Ex: an 8-tuple containing alternating bools: yp_tuple_repeatCN( 4, 2, yp_False, yp_True )
 ypAPI ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... );
@@ -478,6 +367,73 @@ ypAPI ypObject *yp_frozendict( ypObject *x );
 ypAPI ypObject *yp_dict( ypObject *x );
 
 // XXX The file type will be added in a future version
+
+
+/*
+ * Boolean Operations and Comparisons
+ */
+
+// Unlike Python, bools do not (currently) support arithmetic.
+
+// There are exactly two boolean values, both immortal: yp_True and yp_False.
+ypAPI ypObject * const yp_True;
+ypAPI ypObject * const yp_False;
+
+// Returns the immortal yp_False if the object should be considered false (yp_None, a number equal
+// to zero, or a container of zero length), otherwise yp_True.
+ypAPI ypObject *yp_bool( ypObject *x );
+
+// Returns the immortal yp_True if x is considered false, otherwise yp_False.
+ypAPI ypObject *yp_not( ypObject *x );
+
+// Returns a *new* reference to y if x is false, otherwise to x.  Unlike Python, both arguments
+// are always evaluated.  You may find yp_anyN more convenient, as it returns an immortal.
+ypAPI ypObject *yp_or( ypObject *x, ypObject *y );
+
+// A convenience function to "or" n objects.  Returns yp_False if n is zero, and the first object
+// if n is one.  Returns a *new* reference; you may find yp_anyN more convenient, as it returns an
+// immortal.
+ypAPI ypObject *yp_orN( int n, ... );
+ypAPI ypObject *yp_orV( int n, va_list args );
+
+// Equivalent to yp_bool( yp_orN( n, ... ) ).  (Returns an immortal.)
+ypAPI ypObject *yp_anyN( int n, ... );
+ypAPI ypObject *yp_anyV( int n, va_list args );
+
+// Returns the immortal yp_True if any element of iterable is true; if the iterable is empty,
+// returns yp_False.  Stops iterating at the first true element.
+ypAPI ypObject *yp_any( ypObject *iterable );
+
+// Returns a *new* reference to x if x is false, otherwise to y.  Unlike Python, both
+// arguments are always evaluated.  You may find yp_allN more convenient, as it returns an
+// immortal.
+ypAPI ypObject *yp_and( ypObject *x, ypObject *y );
+
+// A convenience function to "and" n objects.  Returns yp_True if n is zero, and the first object
+// if n is one.  Returns a *new* reference; you may find yp_allN more convenient, as it returns an
+// immortal.
+ypAPI ypObject *yp_andN( int n, ... );
+ypAPI ypObject *yp_andV( int n, va_list args );
+
+// Equivalent to yp_bool( yp_andN( n, ... ) ).  (Returns an immortal.)
+ypAPI ypObject *yp_allN( int n, ... );
+ypAPI ypObject *yp_allV( int n, va_list args );
+
+// Returns the immortal yp_True if all elements of iterable are true or the iterable is empty.
+// Stops iterating at the first false element.
+ypAPI ypObject *yp_all( ypObject *iterable );
+
+// Implements the "less than" (x<y), "less than or equal" (x<=y), "equal" (x==y), "not equal"
+// (x!=y), "greater than or equal" (x>=y), and "greater than" (x>y) comparisons.  Returns the
+// immortal yp_True if the condition is true, otherwise yp_False.
+ypAPI ypObject *yp_lt( ypObject *x, ypObject *y );
+ypAPI ypObject *yp_le( ypObject *x, ypObject *y );
+ypAPI ypObject *yp_eq( ypObject *x, ypObject *y );
+ypAPI ypObject *yp_ne( ypObject *x, ypObject *y );
+ypAPI ypObject *yp_ge( ypObject *x, ypObject *y );
+ypAPI ypObject *yp_gt( ypObject *x, ypObject *y );
+
+// You may also be interested in yp_IF and yp_WHILE for working with boolean operations; see below.
 
 
 /*
@@ -916,7 +872,7 @@ ypAPI ypObject *yp_iter_values( ypObject *mapping );
 // object returns an object of the same type, so yp_getsliceC4 on a chrarray object returns
 // another chrarray object, and so forth.
 
-// Immortal strs representing common encodings, for convience with yp_str_frombytesC et al.
+// Immortal strs representing common encodings, for convience with yp_str_frombytesC4 et al.
 ypAPI ypObject * const yp_s_ascii;     // "ascii"
 ypAPI ypObject * const yp_s_latin_1;   // "latin_1"
 ypAPI ypObject * const yp_s_utf_32;    // "utf_32"
@@ -928,7 +884,7 @@ ypAPI ypObject * const yp_s_utf_16_le; // "utf_16_le"
 ypAPI ypObject * const yp_s_utf_8;     // "utf_8"
 
 // Immortal strs representing common string decode error handling schemes, for convience with
-// yp_str_frombytesC et al.
+// yp_str_frombytesC4 et al.
 ypAPI ypObject * const yp_s_strict;    // "strict"
 ypAPI ypObject * const yp_s_ignore;    // "ignore"
 ypAPI ypObject * const yp_s_replace;   // "replace"
@@ -1114,6 +1070,54 @@ ypAPI ypObject * const yp_sys_minint;
 
 
 /*
+ * Freezing, "Unfreezing", and Invalidating
+ */
+
+// All objects support a one-way freeze function that makes them immutable, an unfrozen_copy
+// function that returns a mutable copy, and a one-way invalidate function that renders the object
+// useless; there are also deep variants to these functions.  Supplying an invalidated object to a
+// function results in yp_InvalidatedError.  Freezing and invalidating are two examples of object
+// transmutation, where the type of the object is converted to a different type.  Unlike Python,
+// most objects are copied in memory, even immutables, as copying is one method for maintaining
+// threadsafety.
+
+// Transmutes *x to its associated immutable type.  If *x is already immutable this is a no-op.
+ypAPI void yp_freeze( ypObject **x );
+
+// Freezes *x and, recursively, all contained objects.
+ypAPI void yp_deepfreeze( ypObject **x );
+
+// Returns a new reference to a mutable shallow copy of x.  If x has no associated mutable type an
+// immutable copy is returned.  May also return yp_MemoryError.
+ypAPI ypObject *yp_unfrozen_copy( ypObject *x );
+
+// Creates a mutable copy of x and, recursively, all contained objects, returning a new reference.
+ypAPI ypObject *yp_unfrozen_deepcopy( ypObject *x );
+
+// Returns a new reference to an immutable shallow copy of x.  If x has no associated immutable
+// type a new, invalidated object is returned.  May also return yp_MemoryError.
+ypAPI ypObject *yp_frozen_copy( ypObject *x );
+
+// Creates an immutable copy of x and, recursively, all contained objects, returning a new
+// reference.
+ypAPI ypObject *yp_frozen_deepcopy( ypObject *x );
+
+// Returns a new reference to an exact, shallow copy of x.  May also return yp_MemoryError.
+ypAPI ypObject *yp_copy( ypObject *x );
+
+// Creates an exact copy of x and, recursively, all contained objects, returning a new reference.
+ypAPI ypObject *yp_deepcopy( ypObject *x );
+
+// Discards all contained objects in *x, deallocates _some_ memory, and transmutes it to the
+// ypInvalidated type (rendering the object useless).  If *x is immortal or already invalidated
+// this is a no-op; immutable objects _can_ be invalidated.
+ypAPI void yp_invalidate( ypObject **x );
+
+// Invalidates *x and, recursively, all contained objects.
+ypAPI void yp_deepinvalidate( ypObject **x );
+
+
+/*
  * Type Operations
  */
 
@@ -1168,7 +1172,7 @@ ypAPI ypObject * const yp_type_dict;
 // TODO mini iterators for yp_iter_values, yp_iter_items, etc
 
 // Returns a new reference to a mini iterator for object x and initializes *state to the iterator's
-// starting state.  *state is opaque: you must *not* modify it directly.  It is usually unsafe to
+// starting state.  *state is opaque: you must *not* modify it directly.  It is usually unwise to
 // modify an object being iterated over.
 ypAPI ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state );
 

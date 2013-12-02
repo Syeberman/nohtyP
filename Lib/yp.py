@@ -330,13 +330,13 @@ yp_func( c_ypObject_p, "yp_bytearray", ((c_ypObject_p, "source"), ) )
 # ypObject *yp_bytes0( void );
 # ypObject *yp_bytearray0( void );
 
-# ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+# ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
 #         ypObject *encoding, ypObject *errors );
-yp_func( c_ypObject_p, "yp_str_frombytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
+yp_func( c_ypObject_p, "yp_str_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
             (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
-# ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+# ypObject *yp_chrarray_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
 #         ypObject *encoding, ypObject *errors );
-yp_func( c_ypObject_p, "yp_chrarray_frombytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
+yp_func( c_ypObject_p, "yp_chrarray_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
             (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 
 # ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors );
@@ -1410,11 +1410,11 @@ class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
             if object is _yp_arg_missing:
-                return _yp_str_frombytesC( None, 0, yp_s_latin_1, yp_s_strict )
+                return _yp_str_frombytesC4( None, 0, yp_s_latin_1, yp_s_strict )
             if isinstance( object, ypObject ): return object._yp_str( )
             if isinstance( object, str ):
                 encoded = object.encode( "latin-1" )
-                return _yp_str_frombytesC( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
+                return _yp_str_frombytesC4( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
             raise TypeError( "expected ypObject or str in yp_str" )
         else:
             raise NotImplementedError
