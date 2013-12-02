@@ -5710,12 +5710,12 @@ static ypObject *_ypStrC( int type, const yp_uint8_t *source, yp_ssize_t len )
     ypStr_LEN( s ) = len;
     return s;
 }
-ypObject *yp_str_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors ) {
     if( encoding != yp_s_latin_1 ) return yp_NotImplementedError;
     return _ypStrC( ypStr_CODE, source, len );
 }
-ypObject *yp_chrarray_frombytesC( const yp_uint8_t *source, yp_ssize_t len,
+ypObject *yp_chrarray_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors ) {
     if( encoding != yp_s_latin_1 ) return yp_NotImplementedError;
     return _ypStrC( ypChrArray_CODE, source, len );
