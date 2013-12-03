@@ -1389,7 +1389,7 @@ yp_ssize_t yp_iter_lenhintC( ypObject *i, ypObject **exc )
 // TODO what if we violated the normal rules and inspected *exc on input: if an exception, return
 // as if that error occured
 // TODO alternatively/additionally, document that this always succeeds if iterator _is_ one
-ypObject *yp_iter_stateX( ypObject *i, void **state, yp_ssize_t *size )
+ypObject *yp_iter_stateCX( ypObject *i, void **state, yp_ssize_t *size )
 {
     if( ypObject_TYPE_PAIR_CODE( i ) != ypFrozenIter_CODE ) {
         *state = NULL;

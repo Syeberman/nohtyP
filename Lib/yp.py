@@ -422,7 +422,7 @@ yp_func( c_ypObject_p, "yp_next", ((c_ypObject_p, "iterator"), ) )
 # yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 yp_func( c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc) )
 
-# ypObject *yp_iter_stateX( ypObject *iterator, void **state, yp_ssize_t *size );
+# ypObject *yp_iter_stateCX( ypObject *iterator, void **state, yp_ssize_t *size );
 
 # void yp_close( ypObject **iterator );
 
@@ -876,7 +876,7 @@ yp_func( c_ypObject_p, "yp_asbytesCX", ((c_ypObject_p, "seq"),
 yp_func( c_ypObject_p, "yp_asencodedCX", ((c_ypObject_p, "seq"),
     (c_char_pp, "encoded"), (c_yp_ssize_t_p, "size"), (c_ypObject_pp, "encoding")) )
 
-# ypObject *yp_itemarrayX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );
+# ypObject *yp_itemarrayCX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );
 
 
 _ypExc2py = {}
