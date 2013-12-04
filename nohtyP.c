@@ -3154,10 +3154,6 @@ yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
 {
     yp_int_t result, temp, prev;
     if (y < 0) {
-        if (z != 0) {
-            // "pow() 2nd argument cannot be negative when 3rd argument specified"
-            return_yp_CEXC_ERR( 0, exc, yp_ValueError );
-        }
         // XXX A negative exponent means a float should be returned, which we can't do here, so
         // this is handled at higher levels
         return_yp_CEXC_ERR( 0, exc, yp_ValueError );
@@ -3679,6 +3675,11 @@ static ypIntObject _ypInt_pre_allocated[] = {
 
     _ypInt_PREALLOC( 256 ),
 };
+
+ypObject * const yp_i_neg_one = (ypObject *) &(_ypInt_pre_allocated[-1 - _ypInt_PREALLOC_START]);
+ypObject * const yp_i_zero    = (ypObject *) &(_ypInt_pre_allocated[ 0 - _ypInt_PREALLOC_START]);
+ypObject * const yp_i_one     = (ypObject *) &(_ypInt_pre_allocated[ 1 - _ypInt_PREALLOC_START]);
+ypObject * const yp_i_two     = (ypObject *) &(_ypInt_pre_allocated[ 2 - _ypInt_PREALLOC_START]);
 
 ypObject *yp_intC( yp_int_t value )
 {
