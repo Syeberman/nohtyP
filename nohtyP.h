@@ -453,9 +453,9 @@ ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
  * Iterator Operations
  */
 
-// As per Python, an "iterator" is an object that implements yp_next, while an "iterable" is an
-// object that implements yp_iter.  Examples of iterables include range, bytes, str, tuple, set,
-// and dict; examples of iterators include files and generators.
+// An "iterator" is an object that implements yp_next, while an "iterable" is an object that
+// implements yp_iter.  Examples of iterables include range, bytes, str, tuple, set, and dict;
+// examples of iterators include files and generators.
 
 // Unlike other functions that modify their inputs, yp_send et al do not discard iterator on error.
 // Instead, the error is returned and the iterator is closed.
@@ -583,18 +583,12 @@ ypAPI ypObject *yp_pop( ypObject **container );
 // yp_repeatC.  They are _not_ supported by frozenset and frozendict because those types do not
 // store their elements in any particular order.
 
-// Sequences are indexed origin zero.  Negative indicies are relative to the end of the sequence: 
-// in effect, when i is negative it is substituted with len(s)+i.  The slice of s from i to j with 
-// step k is the sequence of items with indices i, i+k, i+2*k, i+3*k and so on, stopping when j is 
-// reached (but never including j); k cannot be zero.  A single index outside of 
-// range(-len(s),len(s)) raises a yp_IndexError, but in a slice this special behaviour applies:
-//  - if i>=len(s) and k>0, or i<-len(s) and k<0, the slice is empty
-//  - if i>=len(s) and k<0, the (reversed) slice starts with the last element
-//  - if i<-len(s) and k>0, the slice starts with the first element
-//  - if j>=len(s) and k<0, or j<-len(s) and k>0, the slice is empty
-//  - if j>=len(s) and k>0, the slice ends after the last element
-//  - if j<-len(s) and k<0, the (reversed) slice ends after the first element
-// Also see yp_SLICE_DEFAULT and yp_SLICE_USELEN below.
+// Sequences are indexed origin zero.  Negative indicies are relative to the end of the sequence:
+// in effect, when i is negative it is substituted with len(s)+i.  The slice of s from i to j with
+// step k is the sequence of items with indices i, i+k, i+2*k, i+3*k and so on, stopping when j is
+// reached (but never including j); k cannot be zero.  A single index outside of
+// range(-len(s),len(s)) raises a yp_IndexError, but in a slice such an index gets clamped to the
+// bounds of the sequence.  see yp_SLICE_DEFAULT and yp_SLICE_USELEN below for more information.
 
 // Returns a new reference to the concatenation of sequence and x.
 ypAPI ypObject *yp_concat( ypObject *sequence, ypObject *x );
@@ -614,8 +608,8 @@ ypAPI ypObject *yp_getitem( ypObject *sequence, ypObject *key );
 
 // Returns the lowest index in sequence where x is found, such that x is contained in the slice
 // sequence[i:j], or -1 if x is not found.  Returns -1 and sets *exc on error; *exc is _not_ set
-// if x is simply not found.  As in Python, types such as tuples inspect only one item at a time,
-// while types such as strs look for a particular sub-sequence of items.
+// if x is simply not found.  Types such as tuples inspect only one item at a time, while types
+// such as strs look for a particular sub-sequence of items.
 ypAPI yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
         ypObject **exc );
 
@@ -637,8 +631,8 @@ ypAPI yp_ssize_t yp_rindexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_
 ypAPI yp_ssize_t yp_rindexC( ypObject *sequence, ypObject *x, ypObject **exc );
 
 // Returns the total number of non-overlapping occurences of x in sequence[i:j].  Returns 0 and
-// sets *exc on error.  As in Python, types such as tuples inspect only one item at a time,
-// while types such as strs look for a particular sub-sequence of items.
+// sets *exc on error.  Types such as tuples inspect only one item at a time, while types such as
+// strs look for a particular sub-sequence of items.
 ypAPI yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
         ypObject **exc );
 
@@ -722,10 +716,19 @@ ypAPI void yp_sort( ypObject **sequence );
 #define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
 
 // When given to a slice-like start/stop C argument, signals that len(s) should be substituted for
-// the argument.  In other words, it signals that the slice should start/stop at the end of the 
+// the argument.  In other words, it signals that the slice should start/stop at the end of the
 // sequence.
 //  Ex: The nohtyP equivalent of "[:]" is "0, yp_SLICE_USELEN, 1"
 #define yp_SLICE_USELEN  yp_SSIZE_T_MAX
+
+// When an index in a slice is outside of range(-len(s),len(s)), it gets clamped to the bounds of
+// the sequence.  Specifically:
+//  - if i>=len(s) and k>0, or i<-len(s) and k<0, the slice is empty
+//  - if i>=len(s) and k<0, the (reversed) slice starts with the last element
+//  - if i<-len(s) and k>0, the slice starts with the first element
+//  - if j>=len(s) and k<0, or j<-len(s) and k>0, the slice is empty
+//  - if j>=len(s) and k>0, the slice ends after the last element
+//  - if j<-len(s) and k<0, the (reversed) slice ends after the first element
 
 
 /*
@@ -815,21 +818,12 @@ ypAPI ypObject *yp_pop( ypObject **set );
  * Mapping Operations
  */
 
-// frozendicts and dicts are both mapping objects.
+// frozendicts and dicts are both mapping objects.  Note that yp_contains, yp_in, yp_not_in,
+// and yp_iter operate solely on a mapping's keys.
 
 // Returns a new reference to the value of mapping with the given key.  Returns yp_KeyError if key
 // is not in the map.
 ypAPI ypObject *yp_getitem( ypObject *mapping, ypObject *key );
-
-// Adds or replaces the value of *mapping with the given key, setting it to x.  On error, *mapping
-// is discarded and set to an exception.
-ypAPI void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x );
-
-// Removes the item with the given key from *mapping.  Raises yp_KeyError if key is not in
-// *mapping.  On error, *mapping is discarded and set to an exception.
-ypAPI void yp_delitem( ypObject **mapping, ypObject *key );
-
-// As in Python, yp_contains, yp_in, yp_not_in, and yp_iter operate solely on a mapping's keys.
 
 // Similar to yp_getitem, but returns a new reference to defval if key is not in the map.  defval
 // _can_ be an exception; the Python-equivalent "default" for defval is yp_None.
@@ -841,12 +835,26 @@ ypAPI ypObject *yp_iter_items( ypObject *mapping );
 // Returns a new reference to an iterator that yields mapping's keys.
 ypAPI ypObject *yp_iter_keys( ypObject *mapping );
 
+// Returns a new reference to an iterator that yields mapping's values.
+ypAPI ypObject *yp_iter_values( ypObject *mapping );
+
+// Adds or replaces the value of *mapping with the given key, setting it to x.  On error, *mapping
+// is discarded and set to an exception.
+ypAPI void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x );
+
+// Removes the item with the given key from *mapping.  Raises yp_KeyError if key is not in
+// *mapping.  On error, *mapping is discarded and set to an exception.
+ypAPI void yp_delitem( ypObject **mapping, ypObject *key );
+
 // If key is in mapping, remove it and return a new reference to its value, else return a new
-// reference to defval.  defval _can_ be an exception; if it is, then a missing key is treated as
+// reference to defval.  defval _can_ be an exception: if it is, then a missing key is treated as
 // an error (including discarding *mapping).  The Python-equivalent "default" of defval is
 // yp_KeyError.  On error, *mapping is discarded and set to an exception _and_ that exception is
 // returned.  Note that yp_push and yp_pop are not applicable for mapping objects.
 ypAPI ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
+
+// Equivalent to yp_popvalue3( mapping, key, yp_KeyError ).
+ypAPI ypObject *yp_popvalue2( ypObject **mapping, ypObject *key );
 
 // Removes an arbitrary item from *mapping and returns new references to its *key and *value.  If
 // mapping is empty yp_KeyError is raised.  On error, *mapping is discarded and set to an exception
@@ -870,20 +878,17 @@ ypAPI void yp_updateKV( ypObject **mapping, int n, va_list args );
 ypAPI void yp_updateN( ypObject **mapping, int n, ... );
 ypAPI void yp_updateV( ypObject **mapping, int n, va_list args );
 
-// Returns a new reference to an iterator that yields mapping's values.
-ypAPI ypObject *yp_iter_values( ypObject *mapping );
-
 
 /*
  * Bytes & String Operations
  */
 
 // Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return
-// immutable ints for these types, and will only accept ints for yp_setindexC; single-byte bytes
-// and bytearray objects _are_ accepted for certain operations like yp_contains.  Contrast this to
-// strs and chrarrays, whose elements are strictly immutable, single-character strs.  Slicing an
-// object returns an object of the same type, so yp_getsliceC4 on a chrarray object returns
-// another chrarray object, and so forth.
+// immutable ints for these types, and will only accept ints for yp_setindexC.  The individual
+// elements of strs and chrarrays are single-character (immutable) strs.
+
+// Slicing an object always returns an object of the same type, so yp_getsliceC4 on a bytearray
+// will return a bytearray, while a slice of a str is another str, and so forth.
 
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC4 et al.
 ypAPI ypObject * const yp_s_ascii;     // "ascii"
@@ -903,10 +908,6 @@ ypAPI ypObject * const yp_s_ignore;    // "ignore"
 ypAPI ypObject * const yp_s_replace;   // "replace"
 
 // XXX Additional bytes- and str-specific methods will be added in a future version
-// TODO Not supported by bytes/bytearrays: str.encode str.format str.format_map str.isidentifier
-// str.isnumeric str.isdecimal str.isprintable
-// TODO Not supported by str/chrarrays: decode, fromhex
-// TODO Different semantics between bytes and strs: translate, maketrans
 
 
 /*
@@ -989,7 +990,6 @@ ypAPI void yp_itruedivFC( ypObject **x, yp_float_t y );
 ypAPI void yp_ifloordivFC( ypObject **x, yp_float_t y );
 ypAPI void yp_imodFC( ypObject **x, yp_float_t y );
 ypAPI void yp_ipowFC( ypObject **x, yp_float_t y );
-ypAPI void yp_ipowFC3( ypObject **x, yp_float_t y, yp_float_t z );
 ypAPI void yp_ilshiftFC( ypObject **x, yp_float_t y );
 ypAPI void yp_irshiftFC( ypObject **x, yp_float_t y );
 ypAPI void yp_iampFC( ypObject **x, yp_float_t y );
@@ -998,7 +998,10 @@ ypAPI void yp_ibarFC( ypObject **x, yp_float_t y );
 
 // Library routines for nohtyP integer operations on C types.  Returns zero and sets *exc on error.
 // Additional notes:
+//  - yp_truedivL returns a floating-point number
 //  - If z is 0, yp_powL3 returns x to the power y, otherwise x to the power y modulo z
+//  - If y is negative, yp_powL and yp_powL3 raise yp_ValueError, as the result should be a
+//  floating-point number; use yp_powFL for negative exponents instead
 ypAPI yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc );
@@ -1019,8 +1022,7 @@ ypAPI yp_int_t yp_absL( yp_int_t x, ypObject **exc );
 ypAPI yp_int_t yp_invertL( yp_int_t x, ypObject **exc );
 
 // Library routines for nohtyP floating-point operations on C types.  Returns zero and sets *exc
-// on error.  Additional notes:
-//  - If z is 0.0, yp_powFL3 returns x to the power y, otherwise x to the power y modulo z
+// on error.
 ypAPI yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc );
@@ -1030,7 +1032,6 @@ ypAPI yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI void yp_divmodFL( yp_float_t x, yp_float_t y,
         yp_float_t *div, yp_float_t *mod, ypObject **exc );
 ypAPI yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI yp_float_t yp_powFL3( yp_float_t x, yp_float_t y, yp_float_t z, ypObject **exc );
 ypAPI yp_float_t yp_lshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_rshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_ampFL( yp_float_t x, yp_float_t y, ypObject **exc );
@@ -1079,7 +1080,11 @@ ypAPI yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc );
 ypAPI ypObject * const yp_sys_maxint;
 ypAPI ypObject * const yp_sys_minint;
 
-// TODO yp_i_zero, yp_i_one, yp_i_neg_one, etc?
+// Immortal ints representing common values, for convenience.
+ypAPI ypObject * const yp_i_neg_one;
+ypAPI ypObject * const yp_i_zero;
+ypAPI ypObject * const yp_i_one;
+ypAPI ypObject * const yp_i_two;
 
 
 /*

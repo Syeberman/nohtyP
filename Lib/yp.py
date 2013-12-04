@@ -766,7 +766,6 @@ yp_func( c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ) )
 # void yp_ifloordivFC( ypObject **x, yp_float_t y );
 # void yp_imodFC( ypObject **x, yp_float_t y );
 # void yp_ipowFC( ypObject **x, yp_float_t y );
-# void yp_ipowFC3( ypObject **x, yp_float_t y, yp_float_t z );
 # void yp_ilshiftFC( ypObject **x, yp_float_t y );
 # void yp_irshiftFC( ypObject **x, yp_float_t y );
 # void yp_iampFC( ypObject **x, yp_float_t y );
@@ -800,7 +799,6 @@ yp_func( c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ) )
 # yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc );
 # void yp_divmodFL( yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc );
 # yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_powFL3( yp_float_t x, yp_float_t y, yp_float_t z, ypObject **exc );
 # yp_float_t yp_lshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
 # yp_float_t yp_rshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
 # yp_float_t yp_ampFL( yp_float_t x, yp_float_t y, ypObject **exc );
@@ -840,6 +838,11 @@ yp_func( c_yp_int_t, "yp_int_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_e
 
 # ypObject * const yp_sys_maxint;
 # ypObject * const yp_sys_minint;
+
+# ypObject * const yp_i_neg_one;
+# ypObject * const yp_i_zero;
+# ypObject * const yp_i_one;
+# ypObject * const yp_i_two;
 
 
 # ypObject *yp_type( ypObject *object );
@@ -1203,7 +1206,7 @@ class yp_bool( ypObject ):
         if isinstance( x, ypObject ): return _yp_bool( x )
         if isinstance( x, bool ): return yp_True if x else yp_False
         raise TypeError( "expected ypObject or bool in yp_bool" )
-    def _as_int( self ): return _yp_i_one if self.value == yp_True.value else _yp_i_zero
+    def _as_int( self ): return yp_i_one if self.value == yp_True.value else yp_i_zero
 
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_s_True if self.value == yp_True.value else yp_s_False
@@ -1320,10 +1323,12 @@ class yp_int( ypObject ):
     def _yp_str( self ): return yp_str( str( self._asint( ) ) )
     def _yp_repr( self ): return yp_str( repr( self._asint( ) ) )
     def bit_length( self ): return yp_int( _yp_int_bit_lengthC( self, yp_None ) )
-_yp_i_zero = yp_int( 0 )
-_yp_i_one = yp_int( 1 )
 c_ypObject_p_value( "yp_sys_maxint" )
 c_ypObject_p_value( "yp_sys_minint" )
+c_ypObject_p_value( "yp_i_neg_one" )
+c_ypObject_p_value( "yp_i_zero" )
+c_ypObject_p_value( "yp_i_one" )
+c_ypObject_p_value( "yp_i_two" )
 
 def yp_len( x ):
     """Returns len( x ) of a ypObject as a yp_int"""
