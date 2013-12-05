@@ -1425,7 +1425,7 @@ typedef struct _yp_initialize_kwparams {
 // Sets *bytes to NULL, *len to zero (if len is not NULL), and returns an exception on error.
 ypAPI ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
 
-// str and chrarrays internally store their Unicode characters in particular encodings, usually
+// str and chrarray internally store their Unicode characters in particular encodings, usually
 // depending on the contents of the string.  This function sets *encoded to the beginning of that
 // data, *size to the number of bytes in encoded, and *encoding to the immortal str representing
 // the encoding used (yp_s_latin_1, perhaps).  *encoded will point into internal object memory
@@ -1462,7 +1462,7 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
  * Optional Macros
  *
  * These macros may make working with nohtyP easier, but are not required.  They are best described
- * by the nohtyP examples, but are documented below.
+ * by the examples in ypExamples.c, but are documented below.
  */
 
 #ifdef yp_FUTURE
@@ -1516,6 +1516,7 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 #ifdef yp_FUTURE
 // yp_FOR: A series of macros to emulate a for/else with exception handling.  To be used strictly
 // as follows (including braces):
+//      ypObject *x = yp_NameError; // initialize to any new or immortal reference
 //      yp_FOR( x, expression ) {
 //          // suite
 //      } yp_FOR_ELSE {             // optional
@@ -1543,10 +1544,10 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 // Before a new reference is assigned to the target variable, the previous reference in the target
 // is automatically discarded.  As such:
 //  - if the iterator yields no values, the target's value does not change
-//  - the target will retain a reference to the last successfully-yielded value outside of the loop
-//  (and in the else- and exception-suites, for that matter)
-//  - the target *must* have a value before the loop (initializing to yp_NameError mimics Python's
-//  behaviour when the iterator yields no values)
+//  - when the loop completes, the target will retain a reference to the last successfully-yielded
+//  value; this includes the else- and exception-suites
+//  - the target *must* have a value before the loop; initializing to yp_NameError mimics Python's
+//  behaviour when the iterator yields no values
 //  - if you assign a new value to the target, remember to discard the previous reference yourself;
 //  also, this new value will be discarded on subsequently-yielded values
 //  - if you want to retain a reference to a yielded value before moving to the next one, create
