@@ -441,7 +441,6 @@ static void yp_breakonerr( ypObject *err ) {
 int yp_isexceptionC( ypObject *x ) {
     return yp_IS_EXCEPTION_C( x );
 }
-#define yp_isexceptionC yp_IS_EXCEPTION_C // force-inline yp_isexceptionC below
 
 // Return sizeof for a structure member
 #define yp_sizeof_member( structType, member ) \
@@ -1477,10 +1476,10 @@ static ypObject *_iter_constructing_visitor( ypObject *x, void *memo ) {
 ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint,
         void *state, yp_ssize_t size, int n, ... )
 {
-    return_yp_V_FUNC( ypObject *, yp_generator_fromstructCV,
+    return_yp_V_FUNC( ypObject *, yp_generator_fromstructCNV,
             (func, lenhint, state, size, n, args), n );
 }
-ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint,
+ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhint,
         void *state, yp_ssize_t size, int n, va_list args )
 {
     ypObject *iterator;
@@ -1891,9 +1890,9 @@ ypObject *yp_or( ypObject *x, ypObject *y )
 }
 
 ypObject *yp_orN( int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_orV, (n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_orNV, (n, args), n );
 }
-ypObject *yp_orV( int n, va_list args )
+ypObject *yp_orNV( int n, va_list args )
 {
     ypObject *x;
     ypObject *b;
@@ -1909,9 +1908,9 @@ ypObject *yp_orV( int n, va_list args )
 }
 
 ypObject *yp_anyN( int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_anyV, (n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_anyNV, (n, args), n );
 }
-ypObject *yp_anyV( int n, va_list args ) {
+ypObject *yp_anyNV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return yp_any( iter_args );
 }
@@ -1944,9 +1943,9 @@ ypObject *yp_and( ypObject *x, ypObject *y )
 }
 
 ypObject *yp_andN( int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_andV, (n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_andNV, (n, args), n );
 }
-ypObject *yp_andV( int n, va_list args )
+ypObject *yp_andNV( int n, va_list args )
 {
     ypObject *x;
     ypObject *b;
@@ -1962,9 +1961,9 @@ ypObject *yp_andV( int n, va_list args )
 }
 
 ypObject *yp_allN( int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_allV, (n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_allNV, (n, args), n );
 }
-ypObject *yp_allV( int n, va_list args ) {
+ypObject *yp_allNV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return yp_all( iter_args );
 }
@@ -2640,11 +2639,11 @@ typedef struct {
 
 // Signatures of some specialized arithmetic functions
 typedef yp_int_t (*arithLfunc)( yp_int_t, yp_int_t, ypObject ** );
-typedef yp_float_t (*arithFLfunc)( yp_float_t, yp_float_t, ypObject ** );
+typedef yp_float_t (*arithLFfunc)( yp_float_t, yp_float_t, ypObject ** );
 typedef void (*iarithCfunc)( ypObject **, yp_int_t );
-typedef void (*iarithFCfunc)( ypObject **, yp_float_t );
+typedef void (*iarithCFfunc)( ypObject **, yp_float_t );
 typedef yp_int_t (*unaryLfunc)( yp_int_t, ypObject ** );
-typedef yp_float_t (*unaryFLfunc)( yp_float_t, ypObject ** );
+typedef yp_float_t (*unaryLFfunc)( yp_float_t, ypObject ** );
 
 // Public, immortal objects
 yp_IMMORTAL_INT( yp_sys_maxint, yp_INT_T_MAX );
@@ -3082,7 +3081,7 @@ yp_float_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc )
     if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( 0.0, exc, subexc );
     y_asfloat = yp_asfloatL( y, &subexc );
     if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( 0.0, exc, subexc );
-    return yp_truedivFL( x_asfloat, y_asfloat, exc );
+    return yp_truedivLF( x_asfloat, y_asfloat, exc );
 }
 
 yp_int_t yp_floordivL( yp_int_t x, yp_int_t y, ypObject **exc )
@@ -3272,7 +3271,7 @@ yp_int_t yp_invertL( yp_int_t x, ypObject **exc )
 }
 
 // XXX Overloading of add/etc currently not supported
-static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithFCfunc floatop )
+static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithCFfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
@@ -3298,7 +3297,7 @@ static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithFCfu
     return_yp_INPLACE_BAD_TYPE( x, *x );
 }
 
-static void iarithmetic( ypObject **x, ypObject *y, iarithCfunc intop, iarithFCfunc floatop )
+static void iarithmetic( ypObject **x, ypObject *y, iarithCfunc intop, iarithCFfunc floatop )
 {
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
     ypObject *exc = yp_None;
@@ -3324,16 +3323,16 @@ static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop,
     if( result_mutable ) return yp_intstoreC( result );
     return yp_intC( result );
 }
-static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithFLfunc floatop,
+static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithLFfunc floatop,
         int result_mutable )
 {
     ypObject *exc = yp_None;
     yp_float_t result = floatop( x, y, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
-    if( result_mutable ) return yp_floatstoreC( result );
-    return yp_floatC( result );
+    if( result_mutable ) return yp_floatstoreCF( result );
+    return yp_floatCF( result );
 }
-static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithFLfunc floatop )
+static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithLFfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
@@ -3370,13 +3369,13 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithFL
 // Defined here are yp_iaddC (et al), yp_iadd (et al), and yp_add (et al)
 #define _ypInt_PUBLIC_ARITH_FUNCTION( name ) \
     void yp_i ## name ## C( ypObject **x, yp_int_t y ) { \
-        iarithmeticC( x, y, yp_ ## name ## L, yp_i ## name ## FC ); \
+        iarithmeticC( x, y, yp_ ## name ## L, yp_i ## name ## CF ); \
     } \
     void yp_i ## name( ypObject **x, ypObject *y ) { \
-        iarithmetic( x, y, yp_i ## name ## C, yp_i ## name ## FC ); \
+        iarithmetic( x, y, yp_i ## name ## C, yp_i ## name ## CF ); \
     } \
     ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
-        return arithmetic( x, y, yp_ ## name ## L, yp_ ## name ## FL ); \
+        return arithmetic( x, y, yp_ ## name ## L, yp_ ## name ## LF ); \
     }
 _ypInt_PUBLIC_ARITH_FUNCTION( add );
 _ypInt_PUBLIC_ARITH_FUNCTION( sub );
@@ -3401,13 +3400,13 @@ void yp_itruedivC( ypObject **x, yp_int_t y )
         yp_float_t result = yp_truedivL( ypInt_VALUE( *x ), y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         yp_decref( *x );
-        *x = yp_floatC( result );
+        *x = yp_floatCF( result );
         return;
 
     } else if( x_pair == ypFloat_CODE ) {
         yp_float_t y_asfloat = yp_asfloatL( y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
-        yp_itruedivFC( x, y_asfloat );
+        yp_itruedivCF( x, y_asfloat );
         return;
     }
 
@@ -3424,7 +3423,7 @@ void yp_itruediv( ypObject **x, ypObject *y )
         return;
 
     } else if( y_pair == ypFloat_CODE ) {
-        yp_itruedivFC( x, ypFloat_VALUE( y ) );
+        yp_itruedivCF( x, ypFloat_VALUE( y ) );
         return;
     }
 
@@ -3446,7 +3445,7 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
         } else if( x_pair == ypFloat_CODE ) {
             yp_float_t y_asfloat = yp_asfloatC( y, &exc );
             if( yp_isexceptionC( exc ) ) return exc;
-            result = yp_truedivFL( ypFloat_VALUE( x ), y_asfloat, &exc );
+            result = yp_truedivLF( ypFloat_VALUE( x ), y_asfloat, &exc );
         } else {
             return_yp_BAD_TYPE( x );
         }
@@ -3454,9 +3453,9 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
         if( x_pair == ypInt_CODE ) {
             yp_float_t x_asfloat = yp_asfloatC( x, &exc );
             if( yp_isexceptionC( exc ) ) return exc;
-            result = yp_truedivFL( x_asfloat, ypFloat_VALUE( y ), &exc );
+            result = yp_truedivLF( x_asfloat, ypFloat_VALUE( y ), &exc );
         } else if( x_pair == ypFloat_CODE ) {
-            result = yp_truedivFL( ypFloat_VALUE( x ), ypFloat_VALUE( y ), &exc );
+            result = yp_truedivLF( ypFloat_VALUE( x ), ypFloat_VALUE( y ), &exc );
         } else {
             return_yp_BAD_TYPE( x );
         }
@@ -3464,8 +3463,8 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
         return_yp_BAD_TYPE( y );
     }
     if( yp_isexceptionC( exc ) ) return exc;
-    if( result_mutable ) return yp_floatstoreC( result );
-    return yp_floatC( result );
+    if( result_mutable ) return yp_floatstoreCF( result );
+    return yp_floatCF( result );
 }
 
 static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObject **mod,
@@ -3489,9 +3488,9 @@ static ypObject *_yp_divmod_floats( yp_float_t x, yp_float_t y, ypObject **div, 
         int result_mutable  )
 {
     ypObject *exc = yp_None;
-    ypObject *(*allocator)( yp_float_t ) = result_mutable ? yp_floatstoreC : yp_floatC;
+    ypObject *(*allocator)( yp_float_t ) = result_mutable ? yp_floatstoreCF : yp_floatCF;
     yp_float_t divC, modC;
-    yp_divmodFL( x, y, &divC, &modC, &exc );
+    yp_divmodLF( x, y, &divC, &modC, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     *div = allocator( divC ); // new ref
     if( yp_isexceptionC( *div ) ) return *div;
@@ -3543,7 +3542,7 @@ void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod ) {
     }
 }
 
-static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryFLfunc floatop )
+static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryLFfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
@@ -3568,7 +3567,7 @@ static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryFLfunc floatop
         } else {
             if( result == ypFloat_VALUE( *x ) ) return;
             yp_decref( *x );
-            *x = yp_floatC( result );
+            *x = yp_floatCF( result );
         }
         return;
 
@@ -3577,7 +3576,7 @@ static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryFLfunc floatop
     }
 }
 
-static ypObject *unaryoperation( ypObject *x, unaryLfunc intop, unaryFLfunc floatop )
+static ypObject *unaryoperation( ypObject *x, unaryLfunc intop, unaryLFfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     ypObject *exc = yp_None;
@@ -3596,10 +3595,10 @@ static ypObject *unaryoperation( ypObject *x, unaryLfunc intop, unaryFLfunc floa
         yp_float_t result = floatop( ypFloat_VALUE( x ), &exc );
         if( yp_isexceptionC( exc ) ) return exc;
         if( ypObject_IS_MUTABLE( x ) ) {
-            return yp_floatstoreC( result );
+            return yp_floatstoreCF( result );
         } else {
             if( result == ypFloat_VALUE( x ) ) return yp_incref( x );
-            return yp_floatC( result );
+            return yp_floatCF( result );
         }
 
     } else {
@@ -3610,10 +3609,10 @@ static ypObject *unaryoperation( ypObject *x, unaryLfunc intop, unaryFLfunc floa
 // Defined here are yp_ineg (et al), and yp_neg (et al)
 #define _ypInt_PUBLIC_UNARY_FUNCTION( name ) \
     void yp_i ## name( ypObject **x ) { \
-        iunaryoperation( x, yp_ ## name ## L, yp_ ## name ## FL ); \
+        iunaryoperation( x, yp_ ## name ## L, yp_ ## name ## LF ); \
     } \
     ypObject *yp_ ## name( ypObject *x ) { \
-        return unaryoperation( x, yp_ ## name ## L, yp_ ## name ## FL ); \
+        return unaryoperation( x, yp_ ## name ## L, yp_ ## name ## LF ); \
     }
 _ypInt_PUBLIC_UNARY_FUNCTION( neg );
 _ypInt_PUBLIC_UNARY_FUNCTION( pos );
@@ -3712,7 +3711,7 @@ static ypObject *_ypInt( ypObject *(*allocator)( yp_int_t ), ypObject *x, yp_int
     if( x_pair == ypInt_CODE ) {
         return allocator( ypInt_VALUE( x ) );
     } else if( x_pair == ypFloat_CODE ) {
-        yp_int_t x_asint = yp_asintFL( ypFloat_VALUE( x ), &exc );
+        yp_int_t x_asint = yp_asintLF( ypFloat_VALUE( x ), &exc );
         if( yp_isexceptionC( exc ) ) return exc;
         return allocator( x_asint );
     } else if( x_pair == ypBool_CODE ) {
@@ -3761,7 +3760,7 @@ yp_int_t yp_asintC( ypObject *x, ypObject **exc )
     if( x_pair == ypInt_CODE ) {
         return ypInt_VALUE( x );
     } else if( x_pair == ypFloat_CODE ) {
-        return yp_asintFL( ypFloat_VALUE( x ), exc );
+        return yp_asintLF( ypFloat_VALUE( x ), exc );
     } else if( x_pair == ypBool_CODE ) {
         return ypBool_IS_TRUE_C( x );
     }
@@ -3828,11 +3827,11 @@ static ypObject *float_dealloc( ypObject *f ) {
 }
 
 static ypObject *float_unfrozen_copy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
-    return yp_floatstoreC( ypFloat_VALUE( f ) );
+    return yp_floatstoreCF( ypFloat_VALUE( f ) );
 }
 
 static ypObject *float_frozen_copy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
-    return yp_floatC( ypFloat_VALUE( f ) );
+    return yp_floatCF( ypFloat_VALUE( f ) );
 }
 
 static ypObject *float_bool( ypObject *f ) {
@@ -3999,96 +3998,96 @@ static ypTypeObject ypFloatStore_Type = {
     MethodError_MappingMethods      // tp_as_mapping
 };
 
-yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_addLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return x + y; // TODO overflow check
 }
 
-yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_subLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return x - y; // TODO overflow check
 }
 
-yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_mulLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return x * y; // TODO overflow check
 }
 
-yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_truedivLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return x / y; // TODO overflow check
 }
 
 // XXX Although the return value is a whole number, in Python if one of the operands are floats,
 // the result is a float
-yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_floordivLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0, exc, yp_NotImplementedError );
 }
 
-yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_modLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0.0, exc, yp_NotImplementedError );
 }
 
-void yp_divmodFL( yp_float_t x, yp_float_t y, yp_float_t *_div, yp_float_t *_mod, ypObject **exc )
+void yp_divmodLF( yp_float_t x, yp_float_t y, yp_float_t *_div, yp_float_t *_mod, ypObject **exc )
 {
     *exc = yp_NotImplementedError;
 }
 
-yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_powLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return pow( x, y ); // TODO overflow check
 }
 
 // FIXME Bit operations involving floats aren't supported; remove from public API and make static
-yp_float_t yp_lshiftFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_lshiftLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
-yp_float_t yp_rshiftFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_rshiftLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
-yp_float_t yp_ampFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_ampLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
-yp_float_t yp_xorFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_xorLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
-yp_float_t yp_barFL( yp_float_t x, yp_float_t y, ypObject **exc )
+yp_float_t yp_barLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
-yp_float_t yp_negFL( yp_float_t x, ypObject **exc )
+yp_float_t yp_negLF( yp_float_t x, ypObject **exc )
 {
     return -x; // TODO overflow check
 }
 
-yp_float_t yp_posFL( yp_float_t x, ypObject **exc )
+yp_float_t yp_posLF( yp_float_t x, ypObject **exc )
 {
     return x;
 }
 
-yp_float_t yp_absFL( yp_float_t x, ypObject **exc )
+yp_float_t yp_absLF( yp_float_t x, ypObject **exc )
 {
-    if( x < 0.0 ) return yp_negFL( x, exc );
+    if( x < 0.0 ) return yp_negLF( x, exc );
     return x;
 }
 
-yp_float_t yp_invertFL( yp_float_t x, ypObject **exc )
+yp_float_t yp_invertLF( yp_float_t x, ypObject **exc )
 {
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
-static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
+static void iarithmeticCF( ypObject **x, yp_float_t y, arithLFfunc floatop )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
@@ -4101,7 +4100,7 @@ static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
             ypFloat_VALUE( x ) = result;
         } else {
             yp_decref( *x );
-            *x = yp_floatC( result );
+            *x = yp_floatCF( result );
         }
         return;
 
@@ -4111,17 +4110,17 @@ static void iarithmeticFC( ypObject **x, yp_float_t y, arithFLfunc floatop )
         result = floatop( ypFloat_VALUE( *x ), y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         yp_decref( *x );
-        *x = yp_floatC( result );
+        *x = yp_floatCF( result );
         return;
     }
 
     return_yp_INPLACE_BAD_TYPE( x, *x );
 }
 
-// Defined here are yp_iaddFC (et al)
+// Defined here are yp_iaddCF (et al)
 #define _ypFloat_PUBLIC_ARITH_FUNCTION( name ) \
-    void yp_i ## name ## FC( ypObject **x, yp_float_t y ) { \
-        iarithmeticFC( x, y, yp_ ## name ## FL ); \
+    void yp_i ## name ## CF( ypObject **x, yp_float_t y ) { \
+        iarithmeticCF( x, y, yp_ ## name ## LF ); \
     }
 _ypFloat_PUBLIC_ARITH_FUNCTION( add );
 _ypFloat_PUBLIC_ARITH_FUNCTION( sub );
@@ -4138,7 +4137,7 @@ _ypFloat_PUBLIC_ARITH_FUNCTION( bar );
 
 // Public constructors
 
-ypObject *yp_floatC( yp_float_t value )
+ypObject *yp_floatCF( yp_float_t value )
 {
     ypObject *f = ypMem_MALLOC_FIXED( ypFloatObject, ypFloat_CODE );
     if( yp_isexceptionC( f ) ) return f;
@@ -4146,7 +4145,7 @@ ypObject *yp_floatC( yp_float_t value )
     return f;
 }
 
-ypObject *yp_floatstoreC( yp_float_t value )
+ypObject *yp_floatstoreCF( yp_float_t value )
 {
     ypObject *f = ypMem_MALLOC_FIXED( ypFloatObject, ypFloatStore_CODE );
     if( yp_isexceptionC( f ) ) return f;
@@ -4163,10 +4162,10 @@ static ypObject *_ypFloat( ypObject *(*allocator)( yp_float_t ), ypObject *x )
 }
 ypObject *yp_float( ypObject *x ) {
     if( ypObject_TYPE_CODE( x ) == ypFloat_CODE ) return yp_incref( x );
-    return _ypFloat( yp_floatC, x );
+    return _ypFloat( yp_floatCF, x );
 }
 ypObject *yp_floatstore( ypObject *x ) {
-    return _ypFloat( yp_floatstoreC, x );
+    return _ypFloat( yp_floatstoreCF, x );
 }
 
 // Public conversion functions
@@ -4191,7 +4190,7 @@ yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc )
     return (yp_float_t) x;
 }
 
-yp_int_t yp_asintFL( yp_float_t x, ypObject **exc )
+yp_int_t yp_asintLF( yp_float_t x, ypObject **exc )
 {
     // TODO Implement this as Python does
     return (yp_int_t) x;
@@ -6625,9 +6624,9 @@ static ypObject *_ypTuple( int type, ypObject *iterable )
 
 ypObject *yp_tupleN( int n, ... ) {
     if( n < 1 ) return _yp_tuple_empty;
-    return_yp_V_FUNC( ypObject *, yp_tupleV, (n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_tupleNV, (n, args), n );
 }
-ypObject *yp_tupleV( int n, va_list args ) {
+ypObject *yp_tupleNV( int n, va_list args ) {
     // TODO Return _yp_tuple_empty on n<1??
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypTuple( ypTuple_CODE, iter_args );
@@ -6639,9 +6638,9 @@ ypObject *yp_tuple( ypObject *iterable ) {
 
 ypObject *yp_listN( int n, ... ) {
     if( n < 1 ) return _ypTuple_new( ypList_CODE, 0 );
-    return_yp_V_FUNC( ypObject *, yp_listV, (n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_listNV, (n, args), n );
 }
-ypObject *yp_listV( int n, va_list args ) {
+ypObject *yp_listNV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypTuple( ypList_CODE, iter_args );
 }
@@ -6649,7 +6648,7 @@ ypObject *yp_list( ypObject *iterable ) {
     return _ypTuple( ypList_CODE, iterable );
 }
 
-static ypObject *_ypTuple_repeatCV( int type, yp_ssize_t factor, int n, va_list args )
+static ypObject *_ypTuple_repeatCNV( int type, yp_ssize_t factor, int n, va_list args )
 {
     ypObject *newSq;
     yp_ssize_t i;
@@ -6685,17 +6684,17 @@ static ypObject *_ypTuple_repeatCV( int type, yp_ssize_t factor, int n, va_list 
 }
 
 ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCV, (ypTuple_CODE, factor, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCNV, (ypTuple_CODE, factor, n, args), n );
 }
-ypObject *yp_tuple_repeatCV( yp_ssize_t factor, int n, va_list args ) {
-    return _ypTuple_repeatCV( ypTuple_CODE, factor, n, args );
+ypObject *yp_tuple_repeatCNV( yp_ssize_t factor, int n, va_list args ) {
+    return _ypTuple_repeatCNV( ypTuple_CODE, factor, n, args );
 }
 
 ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCV, (ypList_CODE, factor, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCNV, (ypList_CODE, factor, n, args), n );
 }
-ypObject *yp_list_repeatCV( yp_ssize_t factor, int n, va_list args ) {
-    return _ypTuple_repeatCV( ypList_CODE, factor, n, args );
+ypObject *yp_list_repeatCNV( yp_ssize_t factor, int n, va_list args ) {
+    return _ypTuple_repeatCNV( ypList_CODE, factor, n, args );
 }
 
 
@@ -8026,9 +8025,9 @@ static ypObject *_ypSet( int type, ypObject *iterable )
 
 ypObject *yp_frozensetN( int n, ... ) {
     if( n < 1 ) return _yp_frozenset_empty;
-    return_yp_V_FUNC( ypObject *, yp_frozensetV, (n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_frozensetNV, (n, args), n );
 }
-ypObject *yp_frozensetV( int n, va_list args ) {
+ypObject *yp_frozensetNV( int n, va_list args ) {
     // TODO Return _yp_frozenset_empty on n<1??
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypSet( ypFrozenSet_CODE, iter_args );
@@ -8040,9 +8039,9 @@ ypObject *yp_frozenset( ypObject *iterable ) {
 
 ypObject *yp_setN( int n, ... ) {
     if( n < 1 ) return _ypSet_new( ypSet_CODE, 0 );
-    return_yp_V_FUNC( ypObject *, yp_setV, (n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_setNV, (n, args), n );
 }
-ypObject *yp_setV( int n, va_list args ) {
+ypObject *yp_setNV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypSet( ypSet_CODE, iter_args );
 }
@@ -9013,7 +9012,7 @@ ypObject *yp_dictKV( int n, va_list args ) {
 }
 
 
-static ypObject *_ypDict_fromkeysV( int type, ypObject *value, int n, va_list args )
+static ypObject *_ypDict_fromkeysNV( int type, ypObject *value, int n, va_list args )
 {
     yp_ssize_t spaceleft;
     ypObject *result = yp_None;
@@ -9039,18 +9038,18 @@ static ypObject *_ypDict_fromkeysV( int type, ypObject *value, int n, va_list ar
 
 ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
     if( n < 1 ) return _yp_frozendict_empty;
-    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysV, (ypFrozenDict_CODE, value, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n );
 }
-ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args ) {
-    return _ypDict_fromkeysV( ypFrozenDict_CODE, value, n, args );
+ypObject *yp_frozendict_fromkeysNV( ypObject *value, int n, va_list args ) {
+    return _ypDict_fromkeysNV( ypFrozenDict_CODE, value, n, args );
 }
 
 ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
     if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
-    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysV, (ypDict_CODE, value, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n );
 }
-ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args ) {
-    return _ypDict_fromkeysV( ypDict_CODE, value, n, args );
+ypObject *yp_dict_fromkeysNV( ypObject *value, int n, va_list args ) {
+    return _ypDict_fromkeysNV( ypDict_CODE, value, n, args );
 }
 
 
@@ -9378,23 +9377,23 @@ ypObject *yp_issuperset( ypObject *set, ypObject *x ) {
 }
 
 ypObject *yp_unionN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_unionV, (set, n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_unionNV, (set, n, args), n );
 }
-ypObject *yp_unionV( ypObject *set, int n, va_list args ) {
+ypObject *yp_unionNV( ypObject *set, int n, va_list args ) {
     _yp_REDIRECT2( set, tp_as_set, tp_union, (set, n, args) );
 }
 
 ypObject *yp_intersectionN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_intersectionV, (set, n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_intersectionNV, (set, n, args), n );
 }
-ypObject *yp_intersectionV( ypObject *set, int n, va_list args ) {
+ypObject *yp_intersectionNV( ypObject *set, int n, va_list args ) {
     _yp_REDIRECT2( set, tp_as_set, tp_intersection, (set, n, args) );
 }
 
 ypObject *yp_differenceN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_differenceV, (set, n, args), n );
+    return_yp_V_FUNC( ypObject *, yp_differenceNV, (set, n, args), n );
 }
-ypObject *yp_differenceV( ypObject *set, int n, va_list args ) {
+ypObject *yp_differenceNV( ypObject *set, int n, va_list args ) {
     _yp_REDIRECT2( set, tp_as_set, tp_difference, (set, n, args) );
 }
 
@@ -9403,23 +9402,23 @@ ypObject *yp_symmetric_difference( ypObject *set, ypObject *x ) {
 }
 
 void yp_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_updateV, (set, n, args), n );
+    return_yp_V_FUNC_void( yp_updateNV, (set, n, args), n );
 }
-void yp_updateV( ypObject **set, int n, va_list args ) {
+void yp_updateNV( ypObject **set, int n, va_list args ) {
     _yp_INPLACE1( set, tp_update, (*set, n, args) );
 }
 
 void yp_intersection_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_intersection_updateV, (set, n, args), n );
+    return_yp_V_FUNC_void( yp_intersection_updateNV, (set, n, args), n );
 }
-void yp_intersection_updateV( ypObject **set, int n, va_list args ) {
+void yp_intersection_updateNV( ypObject **set, int n, va_list args ) {
     _yp_INPLACE2( set, tp_as_set, tp_intersection_update, (*set, n, args) );
 }
 
 void yp_difference_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_difference_updateV, (set, n, args), n );
+    return_yp_V_FUNC_void( yp_difference_updateNV, (set, n, args), n );
 }
-void yp_difference_updateV( ypObject **set, int n, va_list args ) {
+void yp_difference_updateNV( ypObject **set, int n, va_list args ) {
     _yp_INPLACE2( set, tp_as_set, tp_difference_update, (*set, n, args) );
 }
 

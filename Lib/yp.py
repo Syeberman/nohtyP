@@ -161,13 +161,13 @@ assert c_multiN_ypObject_p is not c_multiK_ypObject_p
 yp_func( c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_increfN( int n, ... );
-# void yp_increfV( int n, va_list args );
+# void yp_increfNV( int n, va_list args );
 
 # void yp_decref( ypObject *x );
 yp_func( c_void, "yp_decref", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_decrefN( int n, ... );
-# void yp_decrefV( int n, va_list args );
+# void yp_decrefNV( int n, va_list args );
 
 # Disable errcheck for this to avoid an infinite recursion, as it's used by c_ypObject_p's errcheck
 # int yp_isexceptionC( ypObject *x );
@@ -212,20 +212,20 @@ yp_func( c_ypObject_p, "yp_not", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_or( ypObject *x, ypObject *y );
 
 # ypObject *yp_orN( int n, ... );
-# ypObject *yp_orV( int n, va_list args );
+# ypObject *yp_orNV( int n, va_list args );
 
 # ypObject *yp_anyN( int n, ... );
-# ypObject *yp_anyV( int n, va_list args );
+# ypObject *yp_anyNV( int n, va_list args );
 
 # ypObject *yp_any( ypObject *iterable );
 
 # ypObject *yp_and( ypObject *x, ypObject *y );
 
 # ypObject *yp_andN( int n, ... );
-# ypObject *yp_andV( int n, va_list args );
+# ypObject *yp_andNV( int n, va_list args );
 
 # ypObject *yp_allN( int n, ... );
-# ypObject *yp_allV( int n, va_list args );
+# ypObject *yp_allNV( int n, va_list args );
 
 # ypObject *yp_all( ypObject *iterable );
 yp_func( c_ypObject_p, "yp_all", ((c_ypObject_p, "iterable"), ) )
@@ -284,10 +284,9 @@ yp_func( c_ypObject_p, "yp_int_baseC", ((c_ypObject_p, "x"), (c_yp_int_t, "base"
 yp_func( c_ypObject_p, "yp_int", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_intstore( ypObject *x );
 
-# ypObject *yp_floatC( yp_float_t value );
-yp_func( c_ypObject_p, "yp_floatC", ((c_yp_float_t, "value"), ) )
-# ypObject *yp_floatstoreC( yp_float_t value );
-yp_func( c_ypObject_p, "yp_floatstoreC", ((c_yp_float_t, "value"), ) )
+# ypObject *yp_floatCF( yp_float_t value );
+yp_func( c_ypObject_p, "yp_floatCF", ((c_yp_float_t, "value"), ) )
+# ypObject *yp_floatstoreCF( yp_float_t value );
 
 # ypObject *yp_float_strC( const char *string );
 # ypObject *yp_floatstore_strC( const char *string );
@@ -295,17 +294,16 @@ yp_func( c_ypObject_p, "yp_floatstoreC", ((c_yp_float_t, "value"), ) )
 # ypObject *yp_float( ypObject *x );
 yp_func( c_ypObject_p, "yp_float", ((c_ypObject_p, "x"), ) )
 # ypObject *yp_floatstore( ypObject *x );
-yp_func( c_ypObject_p, "yp_floatstore", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_iter( ypObject *x );
 yp_func( c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ) )
 
 # ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
-# ypObject *yp_generatorCV( yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args );
+# ypObject *yp_generatorCNV( yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args );
 
 # ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint,
 #         void *state, yp_ssize_t size, int n, ... );
-# ypObject *yp_generator_fromstructCV( yp_generator_func_t func, yp_ssize_t lenhint,
+# ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhint,
 #         void *state, yp_ssize_t size, int n, va_list args );
 yp_func( c_ypObject_p, "yp_generator_fromstructCN",
         ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"),
@@ -353,14 +351,14 @@ yp_func( c_ypObject_p, "yp_chrarray_frombytesC4", ((c_char_p, "source"), (c_yp_s
 # ypObject *yp_tupleN( int n, ... );
 yp_func( c_ypObject_p, "yp_tupleN", (c_multiN_ypObject_p, ) )
 
-# ypObject *yp_tupleV( int n, va_list args );
+# ypObject *yp_tupleNV( int n, va_list args );
 # ypObject *yp_listN( int n, ... );
-# ypObject *yp_listV( int n, va_list args );
+# ypObject *yp_listNV( int n, va_list args );
 
 # ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... );
-# ypObject *yp_tuple_repeatCV( yp_ssize_t factor, int n, va_list args );
+# ypObject *yp_tuple_repeatCNV( yp_ssize_t factor, int n, va_list args );
 # ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... );
-# ypObject *yp_list_repeatCV( yp_ssize_t factor, int n, va_list args );
+# ypObject *yp_list_repeatCNV( yp_ssize_t factor, int n, va_list args );
 
 # ypObject *yp_tuple( ypObject *iterable );
 yp_func( c_ypObject_p, "yp_tuple", ((c_ypObject_p, "iterable"), ) )
@@ -373,10 +371,10 @@ yp_func( c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ) )
 # ypObject *yp_sorted( ypObject *iterable );
 
 # ypObject *yp_frozensetN( int n, ... );
-# ypObject *yp_frozensetV( int n, va_list args );
+# ypObject *yp_frozensetNV( int n, va_list args );
 yp_func( c_ypObject_p, "yp_frozensetN", (c_multiN_ypObject_p, ) )
 # ypObject *yp_setN( int n, ... );
-# ypObject *yp_setV( int n, va_list args );
+# ypObject *yp_setNV( int n, va_list args );
 yp_func( c_ypObject_p, "yp_setN", (c_multiN_ypObject_p, ) )
 
 # ypObject *yp_frozenset( ypObject *iterable );
@@ -391,9 +389,9 @@ yp_func( c_ypObject_p, "yp_set", ((c_ypObject_p, "iterable"), ) )
 yp_func( c_ypObject_p, "yp_dictK", (c_multiK_ypObject_p, ) )
 
 # ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... );
-# ypObject *yp_frozendict_fromkeysV( ypObject *value, int n, va_list args );
+# ypObject *yp_frozendict_fromkeysNV( ypObject *value, int n, va_list args );
 # ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
-# ypObject *yp_dict_fromkeysV( ypObject *value, int n, va_list args );
+# ypObject *yp_dict_fromkeysNV( ypObject *value, int n, va_list args );
 yp_func( c_ypObject_p, "yp_dict_fromkeysN", ((c_ypObject_p, "value"), c_multiN_ypObject_p) )
 
 # ypObject *yp_frozendict( ypObject *x );
@@ -432,14 +430,14 @@ yp_func( c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObje
 # ypObject *yp_filterfalse( yp_filter_function_t function, ypObject *iterable );
 
 # ypObject *yp_max_keyN( yp_sort_key_func_t key, int n, ... );
-# ypObject *yp_max_keyV( yp_sort_key_func_t key, int n, va_list args );
+# ypObject *yp_max_keyNV( yp_sort_key_func_t key, int n, va_list args );
 # ypObject *yp_min_keyN( yp_sort_key_func_t key, int n, ... );
-# ypObject *yp_min_keyV( yp_sort_key_func_t key, int n, va_list args );
+# ypObject *yp_min_keyNV( yp_sort_key_func_t key, int n, va_list args );
 
 # ypObject *yp_maxN( int n, ... );
-# ypObject *yp_maxV( int n, va_list args );
+# ypObject *yp_maxNV( int n, va_list args );
 # ypObject *yp_minN( int n, ... );
-# ypObject *yp_minV( int n, va_list args );
+# ypObject *yp_minNV( int n, va_list args );
 
 # ypObject *yp_max_key( ypObject *iterable, yp_sort_key_func_t key );
 # ypObject *yp_min_key( ypObject *iterable, yp_sort_key_func_t key );
@@ -451,7 +449,7 @@ yp_func( c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObje
 yp_func( c_ypObject_p, "yp_reversed", ((c_ypObject_p, "seq"), ) )
 
 # ypObject *yp_zipN( int n, ... );
-# ypObject *yp_zipV( int n, va_list args );
+# ypObject *yp_zipNV( int n, va_list args );
 
 
 # ypObject *yp_contains( ypObject *container, ypObject *x );
@@ -585,30 +583,30 @@ yp_func( c_ypObject_p, "yp_issuperset", ((c_ypObject_p, "set"), (c_ypObject_p, "
 # ypObject *yp_gt( ypObject *set, ypObject *x );
 
 # ypObject *yp_unionN( ypObject *set, int n, ... );
-# ypObject *yp_unionV( ypObject *set, int n, va_list args );
+# ypObject *yp_unionNV( ypObject *set, int n, va_list args );
 yp_func( c_ypObject_p, "yp_unionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_intersectionN( ypObject *set, int n, ... );
-# ypObject *yp_intersectionV( ypObject *set, int n, va_list args );
+# ypObject *yp_intersectionNV( ypObject *set, int n, va_list args );
 yp_func( c_ypObject_p, "yp_intersectionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_differenceN( ypObject *set, int n, ... );
-# ypObject *yp_differenceV( ypObject *set, int n, va_list args );
+# ypObject *yp_differenceNV( ypObject *set, int n, va_list args );
 yp_func( c_ypObject_p, "yp_differenceN", ((c_ypObject_p, "set"), c_multiN_ypObject_p) )
 
 # ypObject *yp_symmetric_difference( ypObject *set, ypObject *x );
 yp_func( c_ypObject_p, "yp_symmetric_difference", ((c_ypObject_p, "set"), (c_ypObject_p, "x")) )
 
 # void yp_updateN( ypObject **set, int n, ... );
-# void yp_updateV( ypObject **set, int n, va_list args );
+# void yp_updateNV( ypObject **set, int n, va_list args );
 yp_func( c_void, "yp_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_intersection_updateN( ypObject **set, int n, ... );
-# void yp_intersection_updateV( ypObject **set, int n, va_list args );
+# void yp_intersection_updateNV( ypObject **set, int n, va_list args );
 yp_func( c_void, "yp_intersection_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_difference_updateN( ypObject **set, int n, ... );
-# void yp_difference_updateV( ypObject **set, int n, va_list args );
+# void yp_difference_updateNV( ypObject **set, int n, va_list args );
 yp_func( c_void, "yp_difference_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p) )
 
 # void yp_symmetric_difference_update( ypObject **set, ypObject *x );
@@ -667,7 +665,7 @@ yp_func( c_ypObject_p, "yp_setdefault",
 yp_func( c_void, "yp_updateK", ((c_ypObject_pp, "mapping"), c_multiK_ypObject_p) )
 
 # void yp_updateN( ypObject **mapping, int n, ... );
-# void yp_updateV( ypObject **mapping, int n, va_list args );
+# void yp_updateNV( ypObject **mapping, int n, va_list args );
 
 # ypObject *yp_iter_values( ypObject *mapping );
 yp_func( c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ) )
@@ -759,18 +757,18 @@ yp_func( c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ) )
 # void yp_ixorC( ypObject **x, yp_int_t y );
 # void yp_ibarC( ypObject **x, yp_int_t y );
 
-# void yp_iaddFC( ypObject **x, yp_float_t y );
-# void yp_isubFC( ypObject **x, yp_float_t y );
-# void yp_imulFC( ypObject **x, yp_float_t y );
-# void yp_itruedivFC( ypObject **x, yp_float_t y );
-# void yp_ifloordivFC( ypObject **x, yp_float_t y );
-# void yp_imodFC( ypObject **x, yp_float_t y );
-# void yp_ipowFC( ypObject **x, yp_float_t y );
-# void yp_ilshiftFC( ypObject **x, yp_float_t y );
-# void yp_irshiftFC( ypObject **x, yp_float_t y );
-# void yp_iampFC( ypObject **x, yp_float_t y );
-# void yp_ixorFC( ypObject **x, yp_float_t y );
-# void yp_ibarFC( ypObject **x, yp_float_t y );
+# void yp_iaddCF( ypObject **x, yp_float_t y );
+# void yp_isubCF( ypObject **x, yp_float_t y );
+# void yp_imulCF( ypObject **x, yp_float_t y );
+# void yp_itruedivCF( ypObject **x, yp_float_t y );
+# void yp_ifloordivCF( ypObject **x, yp_float_t y );
+# void yp_imodCF( ypObject **x, yp_float_t y );
+# void yp_ipowCF( ypObject **x, yp_float_t y );
+# void yp_ilshiftCF( ypObject **x, yp_float_t y );
+# void yp_irshiftCF( ypObject **x, yp_float_t y );
+# void yp_iampCF( ypObject **x, yp_float_t y );
+# void yp_ixorCF( ypObject **x, yp_float_t y );
+# void yp_ibarCF( ypObject **x, yp_float_t y );
 
 # yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
 # yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc );
@@ -791,23 +789,23 @@ yp_func( c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ) )
 # yp_int_t yp_absL( yp_int_t x, ypObject **exc );
 # yp_int_t yp_invertL( yp_int_t x, ypObject **exc );
 
-# yp_float_t yp_addFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_subFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_mulFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_truedivFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_floordivFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_modFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# void yp_divmodFL( yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc );
-# yp_float_t yp_powFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_lshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_rshiftFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_ampFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_xorFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_barFL( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_negFL( yp_float_t x, ypObject **exc );
-# yp_float_t yp_posFL( yp_float_t x, ypObject **exc );
-# yp_float_t yp_absFL( yp_float_t x, ypObject **exc );
-# yp_float_t yp_invertFL( yp_float_t x, ypObject **exc );
+# yp_float_t yp_addLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_subLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_mulLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_truedivLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_floordivLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_modLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# void yp_divmodLF( yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc );
+# yp_float_t yp_powLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_lshiftLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_rshiftLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_ampLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_xorLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_barLF( yp_float_t x, yp_float_t y, ypObject **exc );
+# yp_float_t yp_negLF( yp_float_t x, ypObject **exc );
+# yp_float_t yp_posLF( yp_float_t x, ypObject **exc );
+# yp_float_t yp_absLF( yp_float_t x, ypObject **exc );
+# yp_float_t yp_invertLF( yp_float_t x, ypObject **exc );
 
 # yp_int_t yp_asintC( ypObject *x, ypObject **exc );
 yp_func( c_yp_int_t, "yp_asintC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
@@ -824,12 +822,12 @@ yp_func( c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 # yp_float32_t yp_asfloat32C( ypObject *x, ypObject **exc );
 # yp_float64_t yp_asfloat64C( ypObject *x, ypObject **exc );
 # yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc );
-# yp_int_t yp_asintFL( yp_float_t x, ypObject **exc );
+# yp_int_t yp_asintLF( yp_float_t x, ypObject **exc );
 
 # ypObject *yp_roundC( ypObject *x, int ndigits );
 
 # ypObject *yp_sumN( int n, ... );
-# ypObject *yp_sumV( int n, va_list args );
+# ypObject *yp_sumNV( int n, va_list args );
 
 # ypObject *yp_sum( ypObject *iterable );
 
@@ -1343,7 +1341,7 @@ def yp_hash( x ):
 @pytype( yp_type_float, float )
 class yp_float( ypObject ):
     def __new__( cls, x=0.0 ):
-        if isinstance( x, float ): return _yp_floatC( x )
+        if isinstance( x, float ): return _yp_floatCF( x )
         return _yp_float( x )
     def _asfloat( self ): return _yp_asfloatC( self, yp_None )
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
