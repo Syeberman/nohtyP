@@ -217,7 +217,7 @@ ypAPI ypObject *yp_iter( ypObject *x );
 // is a clue to consumers of the generator how many items will be yielded; use zero if this is not
 // known.
 ypAPI ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
-ypAPI ypObject *yp_generatorCNV( yp_generator_func_t func, yp_ssize_t lenhint, 
+ypAPI ypObject *yp_generatorCNV( yp_generator_func_t func, yp_ssize_t lenhint,
         int n, va_list args );
 
 // Similar to yp_generatorCN, but accepts an arbitrary structure (or array) of the given
@@ -1620,19 +1620,21 @@ struct _ypStrObject {
 #define _ypObject_REFCNT_IMMORTAL   (0x7FFFFFFFu)
 // Set ob_hash to this value for uninitialized hashes (tp_hash will be called and ob_hash updated)
 #define _ypObject_HASH_INVALID      ((yp_hash_t) -1)
+// Set ob_len or ob_alloclen to this value to signal an invalid length
+#define _ypObject_LEN_INVALID       (-1)
 
 // These type codes must match those in nohtyP.c
-#define _ypInt_CODE                  ( 10u)
-#define _ypBytes_CODE                ( 16u)
-#define _ypStr_CODE                  ( 18u)
+#define _ypInt_CODE                 ( 10u)
+#define _ypBytes_CODE               ( 16u)
+#define _ypStr_CODE                 ( 18u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
 #define _yp_IMMORTAL_HEAD_INIT( type, data, len ) \
     { type, _ypObject_REFCNT_IMMORTAL, \
-      len, 0, _ypObject_HASH_INVALID, data }
+      len, _ypObject_LEN_INVALID, _ypObject_HASH_INVALID, data }
 #define yp_IMMORTAL_INT( name, value ) \
     static struct _ypIntObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypInt_CODE, NULL, 0 ), (value) }; \
+        _ypInt_CODE, NULL, _ypObject_LEN_INVALID ), (value) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
