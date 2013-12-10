@@ -57,11 +57,11 @@ class yp_param:
             return x
 
 def yp_func_errcheck( result, func, args ):
-    getattr( result, "_yp_errcheck", int )( )
-    for arg in args: getattr( arg, "_yp_errcheck", int )( )
     if isinstance( result, c_ypObject_p ):
         result = _yp_transmute_and_cache( result )
         # Returned references are always new; no need to incref
+    getattr( result, "_yp_errcheck", int )( )
+    for arg in args: getattr( arg, "_yp_errcheck", int )( )
     return result
 
 def yp_func( retval, name, paramtuple, errcheck=True ):
@@ -107,13 +107,8 @@ class c_ypObject_p( c_void_p ):
     def from_param( cls, val ):
         if isinstance( val, c_ypObject_p ): return val
         return ypObject.frompython( val )
-    def _yp_errcheck( self ):
-        if self.value is None: raise ValueError
-        ypObject_p_errcheck( self )
+    def _yp_errcheck( self ): pass
     def __reduce__( self ): raise pickle.PicklingError( "can't pickle nohtyP types (yet)" )
-class c_ypObject_p_no_errcheck( c_ypObject_p ):
-    def _yp_errcheck( self ):
-        if self.value is None: raise ValueError
 
 def c_ypObject_p_value( name ):
     value = c_ypObject_p.in_dll( ypdll, name )
@@ -131,7 +126,7 @@ class c_ypObject_pp( c_ypObject_p*1 ):
         obj = cls( c_ypObject_p.from_param( val ) )
         return obj
     def _yp_errcheck( self ):
-        ypObject_p_errcheck( self[0] )
+        self[0]._yp_errcheck( )
     def __del__( self ):
         # FIXME Make __del__ work during shutdown
         try: _yp_decref( self[0] )
@@ -169,7 +164,6 @@ yp_func( c_void, "yp_decref", ((c_ypObject_p, "x"), ), errcheck=False )
 # void yp_decrefN( int n, ... );
 # void yp_decrefNV( int n, va_list args );
 
-# Disable errcheck for this to avoid an infinite recursion, as it's used by c_ypObject_p's errcheck
 # int yp_isexceptionC( ypObject *x );
 yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False )
 
@@ -870,12 +864,13 @@ yp_func( c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ) )
 
 # ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
 yp_func( c_ypObject_p, "yp_asbytesCX", ((c_ypObject_p, "seq"),
-    (c_char_pp, "bytes"), (c_yp_ssize_t_p, "len")) )
+    (c_char_pp, "bytes"), (c_yp_ssize_t_p, "len")), errcheck=False )
 
 # ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
 #        ypObject * *encoding );
 yp_func( c_ypObject_p, "yp_asencodedCX", ((c_ypObject_p, "seq"),
-    (c_char_pp, "encoded"), (c_yp_ssize_t_p, "size"), (c_ypObject_pp, "encoding")) )
+    (c_char_pp, "encoded"), (c_yp_ssize_t_p, "size"), (c_ypObject_pp, "encoding")),
+    errcheck=False )
 
 # ypObject *yp_itemarrayCX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );
 
@@ -928,12 +923,6 @@ ypObject_p_exception( "yp_MethodError", AttributeError, one_to_one=False )
 ypObject_p_exception( "yp_SystemLimitationError", SystemError, one_to_one=False )
 # Raised when an invalidated object is passed to a function; subexception of yp_TypeError
 ypObject_p_exception( "yp_InvalidatedError", TypeError, one_to_one=False )
-
-def ypObject_p_errcheck( x ):
-    """Raises the appropriate Python exception if x is a nohtyP exception"""
-    if _yp_isexceptionC( x ):
-        name, pyExc = _ypExc2py[x.value]
-        raise pyExc( name )
 
 # int yp_isexceptionC2( ypObject *x, ypObject *exc );
 yp_func( c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc")) )
@@ -1184,6 +1173,11 @@ c_ypObject_p_value( "yp_type_dict" )
 class yp_BaseException( ypObject ):
     def __new__( cls, *args, **kwargs ):
         raise NotImplementedError( "can't instantiate yp_BaseException directly" )
+    def _yp_errcheck( self ):
+        """Raises the appropriate Python exception"""
+        super( )._yp_errcheck( )
+        name, pyExc = _ypExc2py[self.value]
+        raise pyExc( name )
 
 @pytype( yp_type_NoneType, type( None ) )
 class yp_NoneType( ypObject ):
@@ -1361,11 +1355,19 @@ class _ypBytes( ypObject ):
         # else if it has the buffer interface
         else:
             return cls._ypBytes_constructor( _yp_iterable( source ) )
-    def _asbytes( self ):
+    def _get_data_size( self ):
         data = c_char_pp( c_char_p( ) )
         size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
-        _yp_asbytesCX( self, data, size )
-        return string_at( data.contents, size.contents )
+        # errcheck disabled for _yp_asbytesCX, so do it here
+        _yp_asbytesCX( self, data, size )._yp_errcheck( )
+        return cast( data.contents, c_void_p ), size[0]
+    def _asbytes( self ):
+        data, size = self._get_data_size( )
+        return string_at( data, size )
+    def _yp_errcheck( self ):
+        super( )._yp_errcheck( )
+        data, size = self._get_data_size( )
+        assert string_at( data.value+size, 1 ) == b"\x00", "missing null terminator"
 
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
@@ -1421,14 +1423,24 @@ class yp_str( ypObject ):
             raise TypeError( "expected ypObject or str in yp_str" )
         else:
             raise NotImplementedError
-    # Just as yp_bool.__bool__ must return a bool, so to must this return a str
-    def __str__( self ):
+    def _get_encoded_size_encoding( self ):
         encoded = c_char_pp( c_char_p( ) )
         size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
         encoding = c_ypObject_pp( yp_None )
-        _yp_asencodedCX( self, encoded, size, encoding )
-        assert encoding[0] == yp_s_latin_1
-        return string_at( encoded.contents, size.contents ).decode( "latin-1" )
+        # errcheck disabled for _yp_asencodedCX, so do it here
+        _yp_asencodedCX( self, encoded, size, encoding )._yp_errcheck( )
+        assert encoding[0] is yp_s_latin_1
+        return cast( encoded.contents, c_void_p ), size[0], "latin-1"
+    def _yp_errcheck( self ):
+        super( )._yp_errcheck( )
+        encoded, size, encoding = self._get_encoded_size_encoding( )
+        assert encoding == "latin-1"
+        assert string_at( encoded.value+size, 1 ) == b"\x00", "missing null terminator"
+        
+    # Just as yp_bool.__bool__ must return a bool, so to must this return a str
+    def __str__( self ):
+        encoded, size, encoding = self._get_encoded_size_encoding( )
+        return string_at( encoded, size ).decode( encoding )
     # FIXME When nohtyP supports repr, replace this faked-out version
     def _yp_str( self ): return self
     def _yp_repr( self ): return repr( str( self ) )
@@ -1632,7 +1644,7 @@ class yp_dict( ypObject ):
     def keys( self ): return _keys_dictview( self )
     def values( self ): return _values_dictview( self )
     def items( self ): return _items_dictview( self )
-    def pop( self, key, default=c_ypObject_p_no_errcheck( _yp_KeyError.value ) ):
+    def pop( self, key, default=_yp_KeyError ):
         return _yp_popvalue3( self, key, default )
     def popitem( self ):
         key_p = c_ypObject_pp( yp_None )

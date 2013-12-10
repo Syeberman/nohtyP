@@ -4376,8 +4376,6 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
  * Sequence of bytes
  *************************************************************************************************/
 
-// TODO ensure it is always null-terminated
-
 // struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
 typedef struct _ypBytesObject ypBytesObject;
 yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
@@ -4716,7 +4714,7 @@ static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
     } else {
         // If the result will be an empty array, return a new, empty array
         if( ypBytes_LEN( b ) < 1 || factor < 1 ) {
-            return _ypBytes_new( ypByteArray_CODE, 0+1, /*alloclen_fixed=*/TRUE );
+            return yp_bytearrayC( NULL, 0 );
         }
         // If the result will be an exact copy, let the code below make that copy
     }
