@@ -924,6 +924,7 @@ ypAPI ypObject * const yp_s_replace;   // "replace"
 //  - If z is yp_None, yp_pow3 returns x to the power y, otherwise x to the power y modulo z
 //  - To avoid confusion with the logical operators of the same name, yp_amp implements bitwise
 //  and, while yp_bar implements bitwise or
+//  - Bitwise operations (lshift/rshift/amp/xor/bar/invert) are only applicable to integers
 //  - Unlike Python, non-numeric types do not (currently) overload these operators
 ypAPI ypObject *yp_add( ypObject *x, ypObject *y );
 ypAPI ypObject *yp_sub( ypObject *x, ypObject *y );
@@ -934,14 +935,14 @@ ypAPI ypObject *yp_mod( ypObject *x, ypObject *y );
 ypAPI void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod );
 ypAPI ypObject *yp_pow( ypObject *x, ypObject *y );
 ypAPI ypObject *yp_pow3( ypObject *x, ypObject *y, ypObject *z );
+ypAPI ypObject *yp_neg( ypObject *x );
+ypAPI ypObject *yp_pos( ypObject *x );
+ypAPI ypObject *yp_abs( ypObject *x );
 ypAPI ypObject *yp_lshift( ypObject *x, ypObject *y );
 ypAPI ypObject *yp_rshift( ypObject *x, ypObject *y );
 ypAPI ypObject *yp_amp( ypObject *x, ypObject *y );
 ypAPI ypObject *yp_xor( ypObject *x, ypObject *y );
 ypAPI ypObject *yp_bar( ypObject *x, ypObject *y );
-ypAPI ypObject *yp_neg( ypObject *x );
-ypAPI ypObject *yp_pos( ypObject *x );
-ypAPI ypObject *yp_abs( ypObject *x );
 ypAPI ypObject *yp_invert( ypObject *x );
 
 // In-place versions of the above; if the object *x can be modified to hold the result, it is,
@@ -956,14 +957,14 @@ ypAPI void yp_ifloordiv( ypObject **x, ypObject *y );
 ypAPI void yp_imod( ypObject **x, ypObject *y );
 ypAPI void yp_ipow( ypObject **x, ypObject *y );
 ypAPI void yp_ipow3( ypObject **x, ypObject *y, ypObject *z );
+ypAPI void yp_ineg( ypObject **x );
+ypAPI void yp_ipos( ypObject **x );
+ypAPI void yp_iabs( ypObject **x );
 ypAPI void yp_ilshift( ypObject **x, ypObject *y );
 ypAPI void yp_irshift( ypObject **x, ypObject *y );
 ypAPI void yp_iamp( ypObject **x, ypObject *y );
 ypAPI void yp_ixor( ypObject **x, ypObject *y );
 ypAPI void yp_ibar( ypObject **x, ypObject *y );
-ypAPI void yp_ineg( ypObject **x );
-ypAPI void yp_ipos( ypObject **x );
-ypAPI void yp_iabs( ypObject **x );
 ypAPI void yp_iinvert( ypObject **x );
 
 // Versions of yp_iadd et al that accept a C integer as the second argument.  Remember that *x may
@@ -991,11 +992,6 @@ ypAPI void yp_itruedivCF( ypObject **x, yp_float_t y );
 ypAPI void yp_ifloordivCF( ypObject **x, yp_float_t y );
 ypAPI void yp_imodCF( ypObject **x, yp_float_t y );
 ypAPI void yp_ipowCF( ypObject **x, yp_float_t y );
-ypAPI void yp_ilshiftCF( ypObject **x, yp_float_t y );
-ypAPI void yp_irshiftCF( ypObject **x, yp_float_t y );
-ypAPI void yp_iampCF( ypObject **x, yp_float_t y );
-ypAPI void yp_ixorCF( ypObject **x, yp_float_t y );
-ypAPI void yp_ibarCF( ypObject **x, yp_float_t y );
 
 // Library routines for nohtyP integer operations on C types.  Returns zero and sets *exc on error.
 // Additional notes:
@@ -1012,14 +1008,14 @@ ypAPI yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc );
 ypAPI yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc );
+ypAPI yp_int_t yp_negL( yp_int_t x, ypObject **exc );
+ypAPI yp_int_t yp_posL( yp_int_t x, ypObject **exc );
+ypAPI yp_int_t yp_absL( yp_int_t x, ypObject **exc );
 ypAPI yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_rshiftL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_ampL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_xorL( yp_int_t x, yp_int_t y, ypObject **exc );
 ypAPI yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject **exc );
-ypAPI yp_int_t yp_negL( yp_int_t x, ypObject **exc );
-ypAPI yp_int_t yp_posL( yp_int_t x, ypObject **exc );
-ypAPI yp_int_t yp_absL( yp_int_t x, ypObject **exc );
 ypAPI yp_int_t yp_invertL( yp_int_t x, ypObject **exc );
 
 // Library routines for nohtyP floating-point operations on C types.  Returns zero and sets *exc
@@ -1033,15 +1029,9 @@ ypAPI yp_float_t yp_modLF( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI void yp_divmodLF( yp_float_t x, yp_float_t y,
         yp_float_t *div, yp_float_t *mod, ypObject **exc );
 ypAPI yp_float_t yp_powLF( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI yp_float_t yp_lshiftLF( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI yp_float_t yp_rshiftLF( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI yp_float_t yp_ampLF( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI yp_float_t yp_xorLF( yp_float_t x, yp_float_t y, ypObject **exc );
-ypAPI yp_float_t yp_barLF( yp_float_t x, yp_float_t y, ypObject **exc );
 ypAPI yp_float_t yp_negLF( yp_float_t x, ypObject **exc );
 ypAPI yp_float_t yp_posLF( yp_float_t x, ypObject **exc );
 ypAPI yp_float_t yp_absLF( yp_float_t x, ypObject **exc );
-ypAPI yp_float_t yp_invertLF( yp_float_t x, ypObject **exc );
 
 // Conversion routines from C types or objects to C types.  Returns a reasonable value and sets
 // *exc on error; "reasonable" usually means "truncated".  Converting a float to an int truncates
