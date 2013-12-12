@@ -4381,12 +4381,10 @@ typedef struct _ypBytesObject ypBytesObject;
 yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
 #define ypBytes_DATA( b )       ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
-// TODO what if ob_len is the "invalid" value?
 #define ypBytes_LEN( b )        ( ((ypObject *)b)->ob_len )
 #define ypBytes_ALLOCLEN( b )   ( ((ypObject *)b)->ob_alloclen )
 
 // Empty bytes can be represented by this, immortal object
-// TODO Can we use this in more places...anywhere we'd return a possibly-empty bytes?
 static ypBytesObject _yp_bytes_empty_struct = {
     { ypBytes_CODE, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, "" } };
@@ -4453,8 +4451,6 @@ static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
 
 // If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
 // x is a fellow bytes, set *x_data and *x_len.  Otherwise, returns an exception.
-// TODO note http://bugs.python.org/issue12170 and ensure we stay consistent
-// TODO After support added for generic iterators, see if this can be removed
 static ypObject *_ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
         yp_uint8_t *storage )
 {
@@ -5054,7 +5050,7 @@ static ypObject *bytes_gt( ypObject *b, ypObject *x ) {
 }
 
 // Returns true (1) if the two bytes/bytearrays are equal.  Size is a quick way to check equality.
-// TODO The pre-computed hash, if any, would also be a quick check
+// TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
 static int _ypBytes_are_equal( ypObject *b, ypObject *x ) {
     yp_ssize_t b_len = ypBytes_LEN( b );
     yp_ssize_t x_len = ypBytes_LEN( x );
@@ -5359,23 +5355,17 @@ ypObject *yp_bytearray( ypObject *source ) {
  *************************************************************************************************/
 
 // TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
+
 // struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_STR_LATIN1 et al
 typedef struct _ypStrObject ypStrObject;
 yp_STATIC_ASSERT( offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_str_inline_data );
 
-// TODO getindex for bytearray (and byte) returns an immutable integer, so getindex for chrarray
-// should return an immutable str-of-len-one, which is also consistent with Python's str
-
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
 
-// TODO add checks to ensure invalid Unicode codepoints don't get added
-
 #define ypStr_DATA( s ) ( (yp_uint8_t *) ((ypObject *)s)->ob_data )
-// TODO what if ob_len is the "invalid" value?
 #define ypStr_LEN( s )  ( ((ypObject *)s)->ob_len )
 
 // Empty strs can be represented by this, immortal object
-// TODO Can we use this in more places...anywhere we'd return a possibly-empty strs?
 static ypStrObject _yp_str_empty_struct = {
     { ypStr_CODE, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, "" } };
@@ -5497,7 +5487,7 @@ static ypObject *str_gt( ypObject *s, ypObject *x ) {
 }
 
 // Returns true (1) if the two str/chrarrays are equal.  Size is a quick way to check equality.
-// TODO The pre-computed hash, if any, would also be a quick check
+// TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
 static int _ypStr_are_equal( ypObject *s, ypObject *x ) {
     yp_ssize_t b_len = ypStr_LEN( s );
     yp_ssize_t x_len = ypStr_LEN( x );
@@ -5794,14 +5784,11 @@ yp_IMMORTAL_STR_LATIN1( yp_s_replace,   "replace" );
  * Sequence of generic items
  *************************************************************************************************/
 
-// TODO Eventually, use timsort, but for now C's qsort should be fine
-
 typedef struct {
     ypObject_HEAD
     yp_INLINE_DATA( ypObject * );
 } ypTupleObject;
 #define ypTuple_ARRAY( sq )     ( (ypObject **) ((ypObject *)sq)->ob_data )
-// TODO what if ob_len is the "invalid" value?
 #define ypTuple_LEN( sq )       ( ((ypObject *)sq)->ob_len )
 #define ypTuple_ALLOCLEN( sq )  ( ((ypObject *)sq)->ob_alloclen )
 
@@ -6663,14 +6650,17 @@ static ypObject *_ypTuple( int type, ypObject *iterable )
     return newSq;
 }
 
-ypObject *yp_tupleN( int n, ... ) {
-    if( n < 1 ) return _yp_tuple_empty;
-    return_yp_V_FUNC( ypObject *, yp_tupleNV, (n, args), n );
-}
-ypObject *yp_tupleNV( int n, va_list args ) {
-    // TODO Return _yp_tuple_empty on n<1??
+static ypObject *_yp_tupleNV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypTuple( ypTuple_CODE, iter_args );
+}
+ypObject *yp_tupleN( int n, ... ) {
+    if( n < 1 ) return _yp_tuple_empty;
+    return_yp_V_FUNC( ypObject *, _yp_tupleNV, (n, args), n );
+}
+ypObject *yp_tupleNV( int n, va_list args ) {
+    if( n < 1 ) return _yp_tuple_empty;
+    return _yp_tupleNV( n, args );
 }
 ypObject *yp_tuple( ypObject *iterable ) {
     if( ypObject_TYPE_CODE( iterable ) == ypTuple_CODE ) return yp_incref( iterable );
@@ -8064,14 +8054,17 @@ static ypObject *_ypSet( int type, ypObject *iterable )
     return newSo;
 }
 
-ypObject *yp_frozensetN( int n, ... ) {
-    if( n < 1 ) return _yp_frozenset_empty;
-    return_yp_V_FUNC( ypObject *, yp_frozensetNV, (n, args), n );
-}
-ypObject *yp_frozensetNV( int n, va_list args ) {
-    // TODO Return _yp_frozenset_empty on n<1??
+static ypObject *_yp_frozensetNV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypSet( ypFrozenSet_CODE, iter_args );
+}
+ypObject *yp_frozensetN( int n, ... ) {
+    if( n < 1 ) return _yp_frozenset_empty;
+    return_yp_V_FUNC( ypObject *, _yp_frozensetNV, (n, args), n );
+}
+ypObject *yp_frozensetNV( int n, va_list args ) {
+    if( n < 1 ) return _yp_frozenset_empty;
+    return _yp_frozensetNV( n, args );
 }
 ypObject *yp_frozenset( ypObject *iterable ) {
     if( ypObject_TYPE_CODE( iterable ) == ypFrozenSet_CODE ) return yp_incref( iterable );
@@ -9033,14 +9026,17 @@ static ypObject *_ypDict( int type, ypObject *x )
     return newMp;
 }
 
-ypObject *yp_frozendictK( int n, ... ) {
-    if( n < 1 ) return _yp_frozendict_empty;
-    return_yp_V_FUNC( ypObject *, yp_frozendictKV, (n, args), n );
-}
-ypObject *yp_frozendictKV( int n, va_list args ) {
-    // TODO Return _yp_frozendict_empty on n<1??
+static ypObject *_yp_frozendictKV( int n, va_list args ) {
     yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
     return _ypDict( ypFrozenDict_CODE, iter_args );
+}
+ypObject *yp_frozendictK( int n, ... ) {
+    if( n < 1 ) return _yp_frozendict_empty;
+    return_yp_V_FUNC( ypObject *, _yp_frozendictKV, (n, args), n );
+}
+ypObject *yp_frozendictKV( int n, va_list args ) {
+    if( n < 1 ) return _yp_frozendict_empty;
+    return _yp_frozendictKV( n, args );
 }
 
 ypObject *yp_dictK( int n, ... ) {
@@ -9082,6 +9078,7 @@ ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
     return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n );
 }
 ypObject *yp_frozendict_fromkeysNV( ypObject *value, int n, va_list args ) {
+    if( n < 1 ) return _yp_frozendict_empty;
     return _ypDict_fromkeysNV( ypFrozenDict_CODE, value, n, args );
 }
 
@@ -9761,7 +9758,7 @@ ypObject * const yp_type_dict = (ypObject *) &ypDict_Type;
  * Initialization
  *************************************************************************************************/
 
-static yp_initialize_kwparams _default_initialize = {
+static const yp_initialize_kwparams _default_initialize = {
     sizeof( yp_initialize_kwparams ),
     _default_yp_malloc,
     _default_yp_malloc_resize,
@@ -9789,7 +9786,6 @@ static yp_initialize_kwparams _default_initialize = {
         kwparams->key \
     )
 
-// TODO Make use of yp_initialize_kwparams to accept configuration values from the user
 void yp_initialize( const yp_initialize_kwparams *kwparams )
 {
     static int initialized = FALSE;
