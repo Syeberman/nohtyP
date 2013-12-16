@@ -6426,7 +6426,6 @@ static ypObject *tuple_ne( ypObject *sq, ypObject *x ) {
 }
 
 // XXX Adapted from Python's tuplehash
-// TODO Do we want to allow currenthash to work on circular references and, if so, how?
 static ypObject *tuple_currenthash( ypObject *sq,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
@@ -6691,7 +6690,7 @@ static ypTypeObject ypList_Type = {
 // Constructors
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-// TODO iterble may be a fellow tuple, which we could copy more efficiently
+// XXX Check for the "fellow tuple/list" case _before_ calling this function
 static ypObject *_ypTuple( int type, ypObject *iterable )
 {
     ypObject *exc = yp_None;
@@ -6730,7 +6729,11 @@ ypObject *yp_tupleNV( int n, va_list args ) {
     return _yp_tupleNV( n, args );
 }
 ypObject *yp_tuple( ypObject *iterable ) {
-    if( ypObject_TYPE_CODE( iterable ) == ypTuple_CODE ) return yp_incref( iterable );
+    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
+        if( ypTuple_LEN( iterable ) < 1 ) return _yp_tuple_empty;
+        if( ypObject_TYPE_CODE( iterable ) == ypTuple_CODE ) return yp_incref( iterable );
+        return _ypTuple_copy_shallow( ypTuple_CODE, iterable, /*alloclen_fixed=*/TRUE );
+    }
     return _ypTuple( ypTuple_CODE, iterable );
 }
 
@@ -6743,6 +6746,9 @@ ypObject *yp_listNV( int n, va_list args ) {
     return _ypTuple( ypList_CODE, iter_args );
 }
 ypObject *yp_list( ypObject *iterable ) {
+    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
+        return _ypTuple_copy_shallow( ypList_CODE, iterable, /*alloclen_fixed=*/TRUE );
+    }
     return _ypTuple( ypList_CODE, iterable );
 }
 
@@ -6910,9 +6916,11 @@ static yp_ssize_t _ypSet_calc_resize_minused( yp_ssize_t newlen )
 #endif
 
 // Returns a new, empty set or frozenset object to hold minused entries
+// XXX Check for the _yp_frozenset_empty first
+// TODO Extend alloclen_fixed here
+// TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO can use CONTAINER_INLINE if minused is a firm max length for the frozenset
-// XXX A minused of zero may mean lenhint is unreliable; we may still grow the frozenset, so don't
-// return _yp_frozenset_empty!
+// TODO Over-allocate to avoid future resizings
 static ypObject *_ypSet_new( int type, yp_ssize_t minused )
 {
     yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
@@ -8097,6 +8105,7 @@ void yp_set_add( ypObject **set, ypObject *x )
 // Constructors
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+// TODO Do an efficient shallow copy if iterable is a fellow set (in yp_frozenset/yp_set)
 static ypObject *_ypSet( int type, ypObject *iterable )
 {
     ypObject *exc = yp_None;
@@ -8232,7 +8241,8 @@ static void _ypDict_discard_value_refs( ypObject *mp )
     }
 }
 
-static ypObject *_ypDict_copy_shallowcopy( int type, ypObject *x )
+// XXX Check for the "lazy shallow copy" and "_yp_frozendict_empty" cases first
+static ypObject *_ypDict_copy_shallow( int type, ypObject *x )
 {
     ypObject *keyset;
     yp_ssize_t alloclen;
@@ -8240,11 +8250,6 @@ static ypObject *_ypDict_copy_shallowcopy( int type, ypObject *x )
     ypObject **values;
     yp_ssize_t valuesleft;
     yp_ssize_t i;
-
-    // A shallow copy of a frozendict to a frozendict doesn't require an actual copy
-    if( type == ypFrozenDict_CODE && ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
-        return yp_incref( x );
-    }
 
     // Share the keyset object with our fellow dict
     keyset = ypDict_KEYSET( x );
@@ -8265,13 +8270,19 @@ static ypObject *_ypDict_copy_shallowcopy( int type, ypObject *x )
     return mp;
 }
 
+// Will perform a lazy shallow copy if copy_visitor is yp_shallowcopy_visitor
+// XXX Check for the _yp_frozendict_empty case first
 // TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
 // either a) optimizing x first, or b) not sharing the keyset of this object
 static ypObject *_ypDict_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
 {
     // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
     if( copy_visitor == yp_shallowcopy_visitor ) {
-        return _ypDict_copy_shallowcopy( type, x );
+        // A shallow copy of a frozendict to a frozendict doesn't require an actual copy
+        if( type == ypFrozenDict_CODE && ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) {
+            return yp_incref( x );
+        }
+        return _ypDict_copy_shallow( type, x );
     }
 
     // Otherwise, copying takes a bit more effort
@@ -8561,6 +8572,7 @@ static ypObject *frozendict_unfrozen_copy( ypObject *x, visitfunc copy_visitor, 
 }
 
 static ypObject *frozendict_frozen_copy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
+    if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
     return _ypDict_copy( ypFrozenDict_CODE, x, copy_visitor, copy_memo );
 }
 
@@ -9068,7 +9080,7 @@ static ypTypeObject ypDict_Type = {
 
 // Constructors
 // XXX x may be an yp_ONSTACK_ITER_KVALIST: use carefully
-// XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
+// XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy_shallow
 // TODO Perhaps this should be broken up, and a _ypDict_update_from_valist created
 static ypObject *_ypDict( int type, ypObject *x )
 {
@@ -9107,6 +9119,15 @@ ypObject *yp_frozendictKV( int n, va_list args ) {
     if( n < 1 ) return _yp_frozendict_empty;
     return _yp_frozendictKV( n, args );
 }
+ypObject *yp_frozendict( ypObject *x ) {
+    // If x is a fellow dict then perform a copy so we can share keysets
+    if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
+        if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
+        if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
+        return _ypDict_copy_shallow( ypFrozenDict_CODE, x );
+    }
+    return _ypDict( ypFrozenDict_CODE, x );
+}
 
 ypObject *yp_dictK( int n, ... ) {
     if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
@@ -9116,7 +9137,13 @@ ypObject *yp_dictKV( int n, va_list args ) {
     yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
     return _ypDict( ypDict_CODE, iter_args );
 }
-
+ypObject *yp_dict( ypObject *x ) {
+    // If x is a fellow dict then perform a copy so we can share keysets
+    if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
+        return _ypDict_copy_shallow( ypDict_CODE, x );
+    }
+    return _ypDict( ypDict_CODE, x );
+}
 
 static ypObject *_ypDict_fromkeysNV( int type, ypObject *value, int n, va_list args )
 {
@@ -9213,22 +9240,6 @@ ypObject *yp_frozendict_fromkeys( ypObject *iterable, ypObject *value ) {
 }
 ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
     return _ypDict_fromkeys( ypDict_CODE, iterable, value );
-}
-
-ypObject *yp_frozendict( ypObject *x ) {
-    // If x is a fellow dict then perform a copy so we can share keysets
-    // XXX Note _ypDict_copy_shallowcopy optimizes the "x also a frozendict" case
-    if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
-        return _ypDict_copy_shallowcopy( ypFrozenDict_CODE, x );
-    }
-    return _ypDict( ypFrozenDict_CODE, x );
-}
-ypObject *yp_dict( ypObject *x ) {
-    // If x is a fellow dict then perform a copy so we can share keysets
-    if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
-        return _ypDict_copy_shallowcopy( ypDict_CODE, x );
-    }
-    return _ypDict( ypDict_CODE, x );
 }
 
 
