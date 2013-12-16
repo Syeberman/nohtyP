@@ -1882,6 +1882,10 @@ ypObject *yp_deepcopy( ypObject *x ) {
     return result;
 }
 
+// TODO CONTAINER_INLINE objects won't release any of their memory on invalidation.  This is a 
+// tradeoff in the interests of reducing individual allocations.  Perhaps there should be a limit
+// on how large to make CONTAINER_INLINE objects, or perhaps we should try to shrink the
+// invalidated object in-place (if supported by the heap).
 void yp_invalidate( ypObject **x )
 {
     // TODO implement
@@ -4407,14 +4411,11 @@ static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypBytes_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
 {
-    ypObject *b;
     if( type == ypBytes_CODE && alloclen_fixed ) {
-        b = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, alloclen );
+        return ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, alloclen );
     } else {
-        b = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, alloclen, 0 );
+        return ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, alloclen, 0 );
     }
-    if( yp_isexceptionC( b ) ) return b;
-    return b;
 }
 
 // XXX Check for the possiblity of a lazy shallow copy before calling this function
@@ -4611,7 +4612,7 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
 // Public Methods
 
 static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypBytes_copy( ypByteArray_CODE, b, TRUE );
+    return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *bytes_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo )
@@ -4621,7 +4622,7 @@ static ypObject *bytes_frozen_copy( ypObject *b, visitfunc copy_visitor, void *c
     if( copy_visitor == yp_shallowcopy_visitor && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) {
         return yp_incref( b );
     }
-    return _ypBytes_copy( ypBytes_CODE, b, TRUE );
+    return _ypBytes_copy( ypBytes_CODE, b, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *bytes_bool( ypObject *b ) {
@@ -5310,7 +5311,7 @@ static ypObject *_ypBytes( int type, ypObject *source )
             if( ypBytes_LEN( source ) < 1 ) return _yp_bytes_empty;
             if( ypObject_TYPE_CODE( source ) == ypBytes_CODE ) return yp_incref( source );
         }
-        return _ypBytes_copy( type, source, TRUE );
+        return _ypBytes_copy( type, source, /*alloclen_fixed=*/TRUE );
     } else if( source_pair == ypInt_CODE ) {
         yp_ssize_t len = yp_asssizeC( source, &exc );
         if( yp_isexceptionC( exc ) ) return exc;
@@ -5382,14 +5383,11 @@ static ypObject * const _yp_str_empty = (ypObject *) &_yp_str_empty_struct;
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypStr_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
 {
-    ypObject *s;
     if( type == ypStr_CODE && alloclen_fixed ) {
-        s = ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, type, alloclen );
+        return ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, type, alloclen );
     } else {
-        s = ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, alloclen, 0 );
+        return ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, alloclen, 0 );
     }
-    if( yp_isexceptionC( s ) ) return s;
-    return s;
 }
 
 // XXX Check for the possiblity of a lazy shallow copy before calling this function
@@ -5807,24 +5805,50 @@ static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
     memmove( ypTuple_ARRAY( sq )+(dest), ypTuple_ARRAY( sq )+(src), \
             (ypTuple_LEN( sq )-(src)) * sizeof( ypObject * ) );
 
-// FIXME in general, we need a way to determine when we can use the _INLINE variant
-// Returns a new tuple or list of len zero, but allocated for alloclen elements
-// XXX An alloclen of zero may mean lenhint is unreliable; we may still grow the tuple, so don't
-// return _yp_tuple_empty!
-static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen ) {
-    return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, type, alloclen, 0 );
+
+// Return a new tuple/list object with the given alloclen.  If type is immutable and
+// alloclen_fixed is true (indicating the object will never grow), the data is placed inline
+// with one allocation.
+// XXX Check for the _yp_tuple_empty case first
+// TODO Put protection in place to detect when INLINE objects attempt to be resized
+// TODO Over-allocate to avoid future resizings
+static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen, int alloclen_fixed ) {
+    if( type == ypTuple_CODE && alloclen_fixed ) {
+        return ypMem_MALLOC_CONTAINER_INLINE( ypTupleObject, type, alloclen );
+    } else {
+        return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, type, alloclen, 0 );
+    }
 }
 
-// TODO Ensure shallow copies are efficient (memcpy, etc)
-// TODO Shallow copies of tuples to tuples can just return incref( x )...where to handle?
-// TODO There's also the _yp_tuple_empty case
-static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
+// XXX Check for the "lazy shallow copy" and "_yp_tuple_empty" cases first
+static ypObject *_ypTuple_copy_shallow( int type, ypObject *x, int alloclen_fixed )
+{
+    yp_ssize_t i;
+    ypObject *sq = _ypTuple_new( type, ypTuple_LEN( x ), alloclen_fixed );
+    if( yp_isexceptionC( sq ) ) return sq;
+    memcpy( ypTuple_ARRAY( sq ), ypTuple_ARRAY( x ), ypTuple_LEN( x )*sizeof( ypObject * ) );
+    for( i = 0; i < ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
+    ypTuple_LEN( sq ) = ypTuple_LEN( x );
+    return sq;
+}
+
+// XXX Check for the _yp_tuple_empty case first
+static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, 
+        int alloclen_fixed )
 {
     ypObject *sq;
     yp_ssize_t i;
     ypObject *item;
 
-    sq = _ypTuple_new( type, ypTuple_LEN( x ) );
+    if( copy_visitor == yp_shallowcopy_visitor ) {
+        // A shallow copy of a tuple to a tuple doesn't require an actual copy
+        if( type == ypTuple_CODE && ypObject_TYPE_CODE( x ) == ypTuple_CODE ) {
+            return yp_incref( x );
+        }
+        return _ypTuple_copy_shallow( type, x, alloclen_fixed );
+    }
+
+    sq = _ypTuple_new( type, ypTuple_LEN( x ), alloclen_fixed );
     if( yp_isexceptionC( sq ) ) return sq;
 
     // Update sq's len on each item so yp_decref can clean up after mid-copy failures
@@ -5988,19 +6012,20 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
     ypObject *newSq;
     ypObject *result;
     yp_ssize_t lenhint = yp_lenC( iterable, &exc );
-    int iterable_empty = 0; // set to 1 if iterable is known to be empty
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
     } else if( lenhint == 0 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
-        iterable_empty = 1;
+        if( ypObject_TYPE_CODE( sq ) == ypTuple_CODE ) return yp_incref( sq );
+        return _ypTuple_copy_shallow( ypList_CODE, sq, /*alloclen_fixed=*/TRUE );
     }
 
-    newSq = _ypTuple_new( ypObject_TYPE_CODE( sq ), ypTuple_LEN( sq )+lenhint );
+    newSq = _ypTuple_new( ypObject_TYPE_CODE( sq ), ypTuple_LEN( sq )+lenhint, 
+            /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newSq ) ) return newSq;
-    result = _ypTuple_extend( newSq, sq );
-    if( !iterable_empty && !yp_isexceptionC( result ) ) {
+    result = _ypTuple_extend_from_tuple( newSq, sq );
+    if( !yp_isexceptionC( result ) ) {
         result = _ypTuple_extend( newSq, iterable );
     }
     if( yp_isexceptionC( result ) ) {
@@ -6023,12 +6048,14 @@ static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
         if( factor == 1 ) return yp_incref( sq );
     } else {
         // If the result will be an empty list, return a new, empty list
-        if( ypTuple_LEN( sq ) < 1 || factor < 1 ) return _ypTuple_new( ypList_CODE, 0 );
+        if( ypTuple_LEN( sq ) < 1 || factor < 1 ) {
+            return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
+        }
         // If the result will be an exact copy, let the code below make that copy
     }
 
     if( factor > yp_SSIZE_T_MAX / ypTuple_LEN( sq ) ) return yp_MemoryError;
-    newSq = _ypTuple_new( sq_type, ypTuple_LEN( sq ) * factor ); // new ref
+    newSq = _ypTuple_new( sq_type, ypTuple_LEN( sq )*factor, /*alloclen_fixed=*/TRUE ); // new ref
     if( yp_isexceptionC( newSq ) ) return newSq;
 
     memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ), ypTuple_LEN( sq )*sizeof( ypObject * ) );
@@ -6068,11 +6095,11 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
         if( step == 1 && newLen == ypTuple_LEN( sq ) ) return yp_incref( sq );
     } else {
         // If the result will be an empty list, return a new, empty list
-        if( newLen < 1 ) return _ypTuple_new( ypList_CODE, 0 );
+        if( newLen < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
         // If the result will be an exact copy, let the code below make that copy
     }
 
-    newSq = _ypTuple_new( sq_type, newLen );
+    newSq = _ypTuple_new( sq_type, newLen, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newSq ) ) return newSq;
 
     if( step == 1 ) {
@@ -6289,11 +6316,12 @@ static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
 }
 
 static ypObject *tuple_unfrozen_copy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypTuple_copy( ypList_CODE, sq, copy_visitor, copy_memo );
+    return _ypTuple_copy( ypList_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *tuple_frozen_copy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypTuple_copy( ypTuple_CODE, sq, copy_visitor, copy_memo );
+    if( ypTuple_LEN( sq ) < 1 ) return _yp_tuple_empty;
+    return _ypTuple_copy( ypTuple_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *tuple_bool( ypObject *sq ) {
@@ -6452,8 +6480,6 @@ static ypObject *tuple_dealloc( ypObject *sq )
     ypMem_FREE_CONTAINER( sq, ypTupleObject );
     return yp_None;
 }
-
-#define list_extend _ypTuple_extend
 
 static ypSequenceMethods ypTuple_as_sequence = {
     tuple_concat,                   // tp_concat
@@ -6637,10 +6663,10 @@ static ypObject *_ypTuple( int type, ypObject *iterable )
     } else if( lenhint == 0 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if( type == ypTuple_CODE ) return _yp_tuple_empty;
-        return _ypTuple_new( type, 0 );
+        return _ypTuple_new( type, 0, /*alloclen_fixed=*/TRUE );
     }
 
-    newSq = _ypTuple_new( type, lenhint );
+    newSq = _ypTuple_new( type, lenhint, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newSq ) ) return newSq;
     result = _ypTuple_extend( newSq, iterable );
     if( yp_isexceptionC( result ) ) {
@@ -6668,7 +6694,7 @@ ypObject *yp_tuple( ypObject *iterable ) {
 }
 
 ypObject *yp_listN( int n, ... ) {
-    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0 );
+    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
     return_yp_V_FUNC( ypObject *, yp_listNV, (n, args), n );
 }
 ypObject *yp_listNV( int n, va_list args ) {
@@ -6687,11 +6713,11 @@ static ypObject *_ypTuple_repeatCNV( int type, yp_ssize_t factor, int n, va_list
 
     if( factor < 1 || n < 1 ) {
         if( type == ypTuple_CODE ) return _yp_tuple_empty;
-        return _ypTuple_new( type, 0 );
+        return _ypTuple_new( type, 0, /*alloclen_fixed=*/TRUE );
     }
 
     if( factor > yp_SSIZE_T_MAX / n ) return yp_MemoryError;
-    newSq = _ypTuple_new( type, factor*n ); // new ref
+    newSq = _ypTuple_new( type, factor*n, /*alloclen_fixed=*/TRUE ); // new ref
     if( yp_isexceptionC( newSq ) ) return newSq;
 
     // Extract the objects from args first; we incref these later, which makes it easier to bail
