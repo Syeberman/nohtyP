@@ -1102,7 +1102,7 @@ static ypObject *_ypMem_malloc_container_variable(
 // used.  extra is a hint as to how much the buffer should be over-allocated, which may be ignored.
 // This function will always resize the data, so first check to see if a resize is necessary.  Any
 // objects in the truncated section must have already been discarded.  required and extra cannot
-// be negative; ob_alloclen may be larger than requested.
+// be negative; ob_alloclen may be larger than requested.  Does not update ob_len.
 // TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
 // TODO Let the caller move data around and free the old buffer
 static ypObject *_ypMem_realloc_container_variable(
@@ -1128,8 +1128,8 @@ static ypObject *_ypMem_realloc_container_variable(
             memcpy( inlineptr, ob->ob_data, required * sizeof_elems );
             yp_free( ob->ob_data );
             ob->ob_data = inlineptr;
+            ob->ob_alloclen = inlinelen;
         }
-        ob->ob_alloclen = inlinelen;
         yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (to inline): 0x%08X alloclen %d", ob, ob->ob_alloclen );
         return yp_None;
     }
@@ -1164,6 +1164,30 @@ static ypObject *_ypMem_realloc_container_variable(
 #define ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, required, extra ) \
     _ypMem_realloc_container_variable( ob, offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (required), (extra) )
+
+// Equivalent, but optimized, version of:
+//  ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, 0, 0 )
+// Will always reset ob_data to the inline buffer, freeing the separate buffer (if there is one).
+// Any contained objects must have already been discarded; no memory is copied.  Always succeeds.
+// TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
+static void _ypMem_realloc_container_variable_clear(
+        ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems )
+{
+    void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    yp_ssize_t inlinelen = (_ypMem_ideal_size-offsetof_inline) / sizeof_elems;
+    if( inlinelen < 0 ) inlinelen = 0;
+
+    // Free any separately-allocated buffer
+    if( ob->ob_data != inlineptr ) {
+        yp_free( ob->ob_data );
+        ob->ob_data = inlineptr;
+        ob->ob_alloclen = inlinelen;
+    }
+    yp_DEBUG( "REALLOC_CONTAINER_VARIABLE_CLEAR: 0x%08X alloclen %d", ob, ob->ob_alloclen );
+}
+#define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( ob, obStruct ) \
+    _ypMem_realloc_container_variable_clear( ob, offsetof( obStruct, ob_inline_data ), \
+            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Frees an object allocated with ypMem_MALLOC_FIXED
 #define ypMem_FREE_FIXED yp_free
@@ -4384,9 +4408,10 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 typedef struct _ypBytesObject ypBytesObject;
 yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
-#define ypBytes_DATA( b )       ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
-#define ypBytes_LEN( b )        ( ((ypObject *)b)->ob_len )
-#define ypBytes_ALLOCLEN( b )   ( ((ypObject *)b)->ob_alloclen )
+#define ypBytes_DATA( b )           ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
+#define ypBytes_LEN( b )            ( ((ypObject *)b)->ob_len )
+#define ypBytes_ALLOCLEN( b )       ( ((ypObject *)b)->ob_alloclen )
+#define ypBytes_INLINE_DATA( b )    ( ((ypBytesObject *)b)->ob_inline_data )
 
 // Empty bytes can be represented by this, immortal object
 static ypBytesObject _yp_bytes_empty_struct = {
@@ -4929,9 +4954,11 @@ static ypObject *bytearray_push( ypObject *b, ypObject *x )
     return bytearray_insert( b, yp_SLICE_USELEN, x );
 }
 
-// TODO If we're ever going to shrink allocated memory, clear is definitely one place to do it
 static ypObject *bytearray_clear( ypObject *b )
 {
+    ypObject *result = _ypBytes_resize( b, 0+1, 0 );
+    if( yp_isexceptionC( result ) ) return result;
+    yp_ASSERT( ypBytes_DATA( b ) == ypBytes_INLINE_DATA( b ), "bytearray_clear didn't allocate inline!" ); 
     ypBytes_DATA( b )[0] = '\0';
     ypBytes_LEN( b ) = 0;
     return yp_None;
@@ -5363,8 +5390,9 @@ yp_STATIC_ASSERT( offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 
 
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
 
-#define ypStr_DATA( s ) ( (yp_uint8_t *) ((ypObject *)s)->ob_data )
-#define ypStr_LEN( s )  ( ((ypObject *)s)->ob_len )
+#define ypStr_DATA( s )         ( (yp_uint8_t *) ((ypObject *)s)->ob_data )
+#define ypStr_LEN( s )          ( ((ypObject *)s)->ob_len )
+#define ypStr_INLINE_DATA( s )  ( ((ypStrObject *)s)->ob_inline_data )
 
 // Empty strs can be represented by this, immortal object
 static ypStrObject _yp_str_empty_struct = {
@@ -5457,10 +5485,10 @@ static ypObject *str_len( ypObject *s, yp_ssize_t *len )
 
 // Returns -1, 0, or 1 as per memcmp
 static int _ypStr_relative_cmp( ypObject *s, ypObject *x ) {
-    yp_ssize_t b_len = ypStr_LEN( s );
+    yp_ssize_t s_len = ypStr_LEN( s );
     yp_ssize_t x_len = ypStr_LEN( x );
-    int cmp = memcmp( ypStr_DATA( s ), ypStr_DATA( x ), MIN( b_len, x_len ) );
-    if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0);
+    int cmp = memcmp( ypStr_DATA( s ), ypStr_DATA( x ), MIN( s_len, x_len ) );
+    if( cmp == 0 ) cmp = s_len < x_len ? -1 : (s_len > x_len ? 1 : 0);
     return cmp;
 }
 static ypObject *str_lt( ypObject *s, ypObject *x ) {
@@ -5487,10 +5515,10 @@ static ypObject *str_gt( ypObject *s, ypObject *x ) {
 // Returns true (1) if the two str/chrarrays are equal.  Size is a quick way to check equality.
 // TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
 static int _ypStr_are_equal( ypObject *s, ypObject *x ) {
-    yp_ssize_t b_len = ypStr_LEN( s );
+    yp_ssize_t s_len = ypStr_LEN( s );
     yp_ssize_t x_len = ypStr_LEN( x );
-    if( b_len != x_len ) return 0;
-    return memcmp( ypStr_DATA( s ), ypStr_DATA( x ), b_len ) == 0;
+    if( s_len != x_len ) return 0;
+    return memcmp( ypStr_DATA( s ), ypStr_DATA( x ), s_len ) == 0;
 }
 static ypObject *str_eq( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_True;
@@ -5786,9 +5814,10 @@ typedef struct {
     ypObject_HEAD
     yp_INLINE_DATA( ypObject * );
 } ypTupleObject;
-#define ypTuple_ARRAY( sq )     ( (ypObject **) ((ypObject *)sq)->ob_data )
-#define ypTuple_LEN( sq )       ( ((ypObject *)sq)->ob_len )
-#define ypTuple_ALLOCLEN( sq )  ( ((ypObject *)sq)->ob_alloclen )
+#define ypTuple_ARRAY( sq )         ( (ypObject **) ((ypObject *)sq)->ob_data )
+#define ypTuple_LEN( sq )           ( ((ypObject *)sq)->ob_len )
+#define ypTuple_ALLOCLEN( sq )      ( ((ypObject *)sq)->ob_alloclen )
+#define ypTuple_INLINE_DATA( sq )   ( ((ypTupleObject *)sq)->ob_inline_data )
 
 // Empty tuples can be represented by this, immortal object
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty tuple?
@@ -5814,7 +5843,7 @@ static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen, int alloclen_fixed ) {
     if( type == ypTuple_CODE && alloclen_fixed ) {
-        return ypMem_MALLOC_CONTAINER_INLINE( ypTupleObject, type, alloclen );
+        return ypMem_MALLOC_CONTAINER_INLINE( ypTupleObject, ypTuple_CODE, alloclen );
     } else {
         return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, type, alloclen, 0 );
     }
@@ -5832,6 +5861,7 @@ static ypObject *_ypTuple_copy_shallow( int type, ypObject *x, int alloclen_fixe
     return sq;
 }
 
+// Will perform a lazy shallow copy if copy_visitor is yp_shallowcopy_visitor
 // XXX Check for the _yp_tuple_empty case first
 static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, 
         int alloclen_fixed )
@@ -5866,7 +5896,7 @@ static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, v
 
 // Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded before calling.
 // Returns yp_None on success, exception on error.
-// TODO Ensure calling code first checks alloclen!
+// TODO Create two functions: one that shrinks and one that grows
 static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t required, yp_ssize_t extra )
 {
     return ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
@@ -6246,8 +6276,6 @@ static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
     return yp_None;
 }
 
-// TODO getitem et al
-
 #define list_extend _ypTuple_extend
 
 static ypObject *list_clear( ypObject *sq );
@@ -6365,7 +6393,6 @@ _ypTuple_RELATIVE_CMP_FUNCTION( ge, >= );
 _ypTuple_RELATIVE_CMP_FUNCTION( gt, > );
 
 // Returns yp_True if the two tuples/lists are equal.  Size is a quick way to check equality.
-// TODO The pre-computed hash, if any, would also be a quick check
 // FIXME comparison functions can recurse, just like currenthash...fix!
 static ypObject *tuple_eq( ypObject *sq, ypObject *x )
 {
@@ -6375,6 +6402,17 @@ static ypObject *tuple_eq( ypObject *sq, ypObject *x )
     if( sq == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypTuple_CODE ) return yp_ComparisonNotImplemented;
     if( sq_len != ypTuple_LEN( x ) ) return yp_False;
+
+    // We need to inspect all our items for equality, which could be time-intensive.  It's fairly 
+    // obvious that the pre-computed hash, if available, can save us some time when sq!=x.
+    if( ypObject_CACHED_HASH( sq ) != ypObject_HASH_INVALID && 
+        ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID && 
+        ypObject_CACHED_HASH( sq ) != ypObject_CACHED_HASH( x ) ) return yp_False;
+    // TODO What if we haven't cached this hash yet, but we could?  Calculating the hash now could 
+    // speed up future comparisons against these objects.  But!  What if we're a tuple of mutable
+    // objects...we will then attempt to calculate the hash on every comparison, only to fail.  If
+    // we had a flag to differentiate "tuple of mutables" with "not yet computed"...crap, that
+    // still wouldn't quite work, because what if we freeze those mutables?
 
     for( i = 0; i < sq_len; i++ ) {
         ypObject *result = yp_eq( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] );
@@ -6435,13 +6473,16 @@ static ypObject *list_push( ypObject *sq, ypObject *x ) {
     return _ypTuple_push( sq, x, 0 );
 }
 
-// TODO If we're ever going to shrink allocated memory, clear is definitely one place to do it
 static ypObject *list_clear( ypObject *sq )
 {
+    // XXX yp_decref _could_ run code that requires us to be in a good state, so pop items from the
+    // end one-at-a-time
     while( ypTuple_LEN( sq ) > 0 ) {
-        yp_decref( ypTuple_ARRAY( sq )[ypTuple_LEN( sq )-1] );
         ypTuple_LEN( sq ) -= 1;
+        yp_decref( ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] );
     }
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( sq, ypTupleObject );
+    yp_ASSERT( ypTuple_ARRAY( sq ) == ypTuple_INLINE_DATA( sq ), "list_clear didn't allocate inline!" ); 
     return yp_None;
 }
 
@@ -6663,7 +6704,7 @@ static ypObject *_ypTuple( int type, ypObject *iterable )
     } else if( lenhint == 0 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if( type == ypTuple_CODE ) return _yp_tuple_empty;
-        return _ypTuple_new( type, 0, /*alloclen_fixed=*/TRUE );
+        return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
     }
 
     newSq = _ypTuple_new( type, lenhint, /*alloclen_fixed=*/FALSE );
@@ -6713,7 +6754,7 @@ static ypObject *_ypTuple_repeatCNV( int type, yp_ssize_t factor, int n, va_list
 
     if( factor < 1 || n < 1 ) {
         if( type == ypTuple_CODE ) return _yp_tuple_empty;
-        return _ypTuple_new( type, 0, /*alloclen_fixed=*/TRUE );
+        return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
     }
 
     if( factor > yp_SSIZE_T_MAX / n ) return yp_MemoryError;
@@ -7814,6 +7855,7 @@ static ypObject *set_clear( ypObject *so ) {
     _ypSet_discard_key_refs( so );
     // FIXME there's a memcpy in this that we can and should avoid
     ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, ypSet_MINSIZE );
+    yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" ); 
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     ypSet_ALLOCLEN( so ) = ypSet_MINSIZE; // we can't make use of the excess anyway
     ypSet_LEN( so ) = 0;
@@ -8600,6 +8642,7 @@ static ypObject *dict_clear( ypObject *mp ) {
     _ypDict_discard_value_refs( mp );
     // FIXME there's a memcpy in this that we can and should avoid
     ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, alloclen );
+    yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ), "dict_clear didn't allocate inline!" ); 
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     ypDict_LEN( mp ) = 0;
     ypDict_KEYSET( mp ) = keyset;
