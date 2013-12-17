@@ -11,7 +11,7 @@
  * detailed documentation can be found at http://docs.python.org/3/.
  *
  * Most functions borrow inputs, create their own references, and output new references.  Errors
- * are handled in one of four ways.  Functions that return objects simply return an appropriate
+ * are handled in one of three ways.  Functions that return objects simply return an appropriate
  * exception object on error:
  *      value = yp_getitem( dict, key );
  *      if( yp_isexceptionC( value ) ) printf( "unknown key" );
@@ -19,27 +19,36 @@
  * exception on error, discarding the original reference:
  *      yp_setitem( &dict, key, value );
  *      if( yp_isexceptionC( dict ) ) printf( "unhashable key, dict discarded" );
- * If you don't want the modified object discarded on error, use the 'E' version, which returns an
- * exception on error and yp_None otherwise:
- *      result = yp_setitemE( dict, key, value );
- *      if( yp_isexceptionC( result ) ) printf( "unhashable key, dict not modified" );
- * Finally, functions that return C values accept a ypObject** that is set to the exception; it is
- * set _only_ on error, and existing values are not discarded, so the variable should first be
- * initialized to an immortal:
+ * If you don't want the modified object discarded on error, use the 'E' version of the function.
+ * Such functions accept a ypObject** that is set to the exception; it is set _only_ on error,
+ * and existing values are not discarded, so the variable should first be initialized to an
+ * immortal:
+ *      ypObject *exc = yp_None;
+ *      yp_setitemE( dict, key, value, &exc );
+ *      if( yp_isexceptionC( exc ) ) printf( "unhashable key, dict not modified" );
+ * This method is also used for functions that return C values:
  *      ypObject *exc = yp_None;
  *      len = yp_lenC( x, &exc );
  *      if( yp_isexceptionC( exc ) ) printf( "x isn't a container" );
  * Unless explicitly documented as "always succeeds", _any_ function can return an exception.
  *
- * It is possible to string together function calls without checking for errors in-between.  When
- * an exception object is used as input to a function, it is immediately returned.  This allows you
- * to check for errors only at the end of a block of code:
+ * These error handling methods are designed for a specific purpose: to allow combining multiple 
+ * function calls without checking for errors in-between.  When an exception object is used as 
+ * input to a function, it is immediately returned, allowing you to check for errors only at the 
+ * end of a block of code:
  *      newdict = yp_dictK( 0 );            // newdict might be yp_MemoryError
  *      value = yp_getitem( olddict, key ); // value could be yp_KeyError
  *      yp_iaddC( &value, 5 );              // possibly replaces value with yp_TypeError
  *      yp_setitem( &newdict, key, value ); // if value is an exception, newdict will be too
  *      yp_decref( value );                 // a no-op if value is an exception
  *      if( yp_isexceptionC( newdict ) ) abort( );
+ * Similarly, for 'E' and 'C' functions:
+ *      ypObject *exc = yp_None;            // ensure exc is initialized to an immortal
+ *      value = yp_getitem( dict, key );    // value could be yp_KeyError
+ *      lenC = yp_lenC( obj, &exc );        // possibly sets exc to yp_TypeError
+ *      yp_setindexE( obj, lenC/2, value, &exc ); // if value is an exception, exc will be too
+ *      yp_decref( value );                 // a no-op if value is an exception
+ *      if( yp_isexceptionC( exc ) ) abort( );
  *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
  * threads; this includes modifying reference counts, so don't assume immutables are threadsafe!
@@ -797,9 +806,9 @@ ypAPI void yp_symmetric_difference_update( ypObject **set, ypObject *x );
 ypAPI void yp_push( ypObject **set, ypObject *x );
 ypAPI void yp_set_add( ypObject **set, ypObject *x );
 
-// If x is already contained in set, returns yp_KeyError; otherwise, adds x to set and returns
-// the immortal yp_None.  Returns an exception on error; set is never discarded.
-ypAPI ypObject *yp_pushuniqueE( ypObject *set, ypObject *x );
+// If x is already contained in set, raises yp_KeyError; otherwise, adds x to set.  Sets *exc
+// on error (set is never discarded).
+ypAPI void yp_pushuniqueE( ypObject *set, ypObject *x, ypObject **exc );
 
 // Removes element x from *set.  Raises yp_KeyError if x is not contained in *set.  On error,
 // *set is discarded and set to an exception.

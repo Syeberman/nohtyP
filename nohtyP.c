@@ -471,6 +471,7 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
 //  - it's an invalidated object, so return yp_InvalidatedError
 //  - it's an exception, so return it
 //  - it's some other type, so return yp_TypeError
+// TODO It'd be nice to remove a comparison from this, as a minor efficiency, but not sure how
 #define yp_BAD_TYPE( bad_ob ) ( \
     ypObject_TYPE_PAIR_CODE( bad_ob ) == ypInvalidated_CODE ? \
         yp_InvalidatedError : \
@@ -1786,17 +1787,18 @@ void yp_freeze( ypObject **x )
 
 static ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
 {
+    ypObject *exc = yp_None;
     ypObject *memo = (ypObject *) _memo;
     ypObject *id;
     ypObject *result;
 
     // Avoid recursion: we only have to visit each object once
     id = yp_intC( (yp_ssize_t) x );
-    result = yp_pushuniqueE( memo, id );
+    yp_pushuniqueE( memo, id, &exc );
     yp_decref( id );
-    if( yp_isexceptionC( result ) ) {
-        if( yp_isexceptionC2( result, yp_KeyError ) ) return yp_None; // already in set
-        return result;
+    if( yp_isexceptionC( exc ) ) {
+        if( yp_isexceptionC2( exc, yp_KeyError ) ) return yp_None; // already in set
+        return exc;
     }
 
     // Freeze current object before going deep
@@ -9262,6 +9264,18 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
     do {ypTypeObject *type = ypObject_TYPE( ob ); \
         return type->tp_suite->suite_meth args; } while( 0 )
 
+#define _yp_REDIRECT_EXC1( ob, tp_meth, args, pExc ) \
+    do {ypTypeObject *type = ypObject_TYPE( ob ); \
+        ypObject *result = type->tp_meth args; \
+        if( yp_isexceptionC( result ) ) *pExc = result; \
+        return; } while( 0 )
+
+#define _yp_REDIRECT_EXC2( ob, tp_suite, suite_meth, args, pExc ) \
+    do {ypTypeObject *type = ypObject_TYPE( ob ); \
+        ypObject *result = type->tp_suite->suite_meth args; \
+        if( yp_isexceptionC( result ) ) *pExc = result; \
+        return; } while( 0 )
+
 #define _yp_INPLACE1( pOb, tp_meth, args ) \
     do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
         ypObject *result = type->tp_meth args; \
@@ -9541,8 +9555,8 @@ void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
     _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, (*set, x) );
 }
 
-ypObject *yp_pushuniqueE( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_pushunique, (set, x) );
+void yp_pushuniqueE( ypObject *set, ypObject *x, ypObject **exc ) {
+    _yp_REDIRECT_EXC2( set, tp_as_set, tp_pushunique, (set, x), exc );
 }
 
 void yp_discard( ypObject **set, ypObject *x ) {
