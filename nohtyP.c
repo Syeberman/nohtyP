@@ -6825,7 +6825,6 @@ typedef struct {
 
 #define ypSet_TABLE( so )               ( (ypSet_KeyEntry *) ((ypObject *)so)->ob_data )
 #define ypSet_SET_TABLE( so, value )    ( ((ypObject *)so)->ob_data = (void *) (value) )
-// TODO what if ob_len is the "invalid" value?
 #define ypSet_LEN( so )                 ( ((ypObject *)so)->ob_len )
 #define ypSet_FILL( so )                ( ((ypSetObject *)so)->fill )
 #define ypSet_ALLOCLEN( so )            ( ((ypObject *)so)->ob_alloclen )
@@ -6838,11 +6837,21 @@ typedef struct {
 #define ypSet_MINSIZE (8)
 yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-offsetof( ypSetObject, ob_inline_data )) / sizeof( ypSet_KeyEntry ) >= ypSet_MINSIZE, ypSet_minsize_inline );
 
+// The threshold at which we resize the set, expressed as a fraction of alloclen (ie 2/3)
+#define ypSet_RESIZE_AT_NMR (2) // numerator
+#define ypSet_RESIZE_AT_DNM (3) // denominator
+
+// We don't want the multiplications in _ypSet_space_remaining and _ypSet_calc_alloclen
+// overflowing, so we impose a separate limit on the maximum len and alloclen for sets
+#define ypSet_LEN_MAX   (MIN( MIN( yp_SSIZE_T_MAX/ypSet_RESIZE_AT_NMR, \
+                                   yp_SSIZE_T_MAX/ypSet_RESIZE_AT_DNM), \
+                                   ypObject_LEN_MAX ))
+
+// A placeholder to replace deleted entries in the hash table
 static ypObject _ypSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 0 );
 static ypObject *ypSet_dummy = &_ypSet_dummy;
 
 // Empty frozensets can be represented by this, immortal object
-// TODO Can we use this in more places...anywhere we'd return a possibly-empty frozenset?
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_MINSIZE] = {0};
 static ypSetObject _yp_frozenset_empty_struct = {
     { ypFrozenSet_CODE, ypObject_REFCNT_IMMORTAL,
@@ -6870,6 +6879,8 @@ typedef struct {
 // TODO ensure we aren't unnecessarily resizing: if the old and new alloclens will be the same,
 // and we don't have dummy entries, then resizing is a waste of effort.
 // XXX Adapted from PyDict_SetItem, although our thresholds are slightly different
+// TODO If we make this threshold configurable, the assert should be in yp_initialize
+yp_STATIC_ASSERT( ypSet_RESIZE_AT_NMR <= yp_SSIZE_T_MAX / ypSet_LEN_MAX, ypSet_space_remaining_cant_overflow );
 static yp_ssize_t _ypSet_space_remaining( ypObject *so )
 {
     /* If fill >= 2/3 size, adjust size.  Normally, this doubles or
@@ -6877,23 +6888,33 @@ static yp_ssize_t _ypSet_space_remaining( ypObject *so )
      * (if ma_fill is much larger than se_used, meaning a lot of dict
      * keys have been deleted).
      */
-    yp_ssize_t retval = (ypSet_ALLOCLEN( so )*2) / 3;
+    // XXX The static assert above ensures this multiplication can't overflow
+    yp_ssize_t retval = (ypSet_ALLOCLEN( so )*ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM;
     retval -= ypSet_FILL( so );
     if( retval <= 0 ) return 0; // should resize before adding keys
     return retval;
 }
 
 // Returns the alloclen that will fit minused entries, or <1 on error
-// XXX Adapted from Python's dictresize; keep in-sync with _ypSet_space_remaining
+// XXX Adapted from Python's dictresize
 // TODO Need to carefully review how expected len becomes minused becomes alloclen; need to also
 // review that pre-allocating 6, say, will mean no resizes if 6 are added
+// TODO Can we improve?
+// TODO If we make this threshold configurable, the assert should be in yp_initialize
+yp_STATIC_ASSERT( ypSet_RESIZE_AT_DNM <= yp_SSIZE_T_MAX / ypSet_LEN_MAX, ypSet_calc_alloclen_cant_overflow );
 static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
 {
-    yp_ssize_t minentries = ((minused * 3) / 2) + 1; // recall we fill to 2/3 size
+    yp_ssize_t minentries;
     yp_ssize_t alloclen;
+
+    yp_ASSERT( minused >= 0, "minused cannot be negative" );
+    if( minused > ypSet_LEN_MAX ) return -1;
+    // XXX The static assert and minused check above ensure this multiplication can't overflow
+    minentries = ((minused * ypSet_RESIZE_AT_DNM) / ypSet_RESIZE_AT_NMR) + 1;
     for( alloclen = ypSet_MINSIZE;
          alloclen <= minentries && alloclen > 0;
          alloclen <<= 1 );
+    if( alloclen > ypSet_LEN_MAX ) return -1;
     return alloclen;
 }
 
@@ -6925,11 +6946,12 @@ static yp_ssize_t _ypSet_calc_resize_minused( yp_ssize_t newlen )
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypSet_new( int type, yp_ssize_t minused )
 {
-    yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
     ypObject *so;
-    if( alloclen < 1 ) return yp_MemoryError;
+    yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
+    if( alloclen < 1 ) return yp_SystemLimitationError;
     so = ypMem_MALLOC_CONTAINER_VARIABLE( ypSetObject, type, alloclen, 0 );
     if( yp_isexceptionC( so ) ) return so;
+    // FIXME But wait, what if _ypMem_ideal_size allows us to be _larger_ than minsize?
     ypSet_ALLOCLEN( so ) = alloclen; // we can't make use of the excess anyway
     ypSet_FILL( so ) = 0;
     memset( ypSet_TABLE( so ), 0, alloclen * sizeof( ypSet_KeyEntry ) );
@@ -6937,6 +6959,8 @@ static ypObject *_ypSet_new( int type, yp_ssize_t minused )
 }
 
 // Discards all references; called before clearing or deleting the set
+// TODO yp_decref _could_ run code that requires us to be in a good state...but
+// this isn't as easy as for a tuple.  We may be forced to use the safer _ypSet_pop.
 static void _ypSet_discard_key_refs( ypObject *so )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
@@ -7105,8 +7129,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     // could fit in-line (idea: if currently in-line, then just force that the new array be
     // malloc'd...will need to malloc something anyway)
     newalloclen = _ypSet_calc_alloclen( minused );
-    if( newalloclen < 1 ) return yp_MemoryError;
-    if( newalloclen > ypObject_LEN_MAX ) return yp_SystemLimitationError;
+    if( newalloclen < 1 ) return yp_SystemLimitationError;
     newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * sizeof( ypSet_KeyEntry ) );
     if( newkeys == NULL ) return yp_MemoryError;
     memset( newkeys, 0, newalloclen * sizeof( ypSet_KeyEntry ) );
@@ -7117,6 +7140,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     ypSet_SET_TABLE( so, newkeys );
     ypSet_LEN( so ) = 0;
     ypSet_FILL( so ) = 0;
+    // FIXME But wait, what if _ypMem_ideal_size allows us to be _larger_ than newalloclen?
     ypSet_ALLOCLEN( so ) = newalloclen;
 
     // Move the keys from the old table before free'ing it
@@ -7163,6 +7187,7 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
     // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.
     if( growhint < 0 ) growhint = 0;
+    // TODO check for overflow?
     newlen = ypSet_LEN( so )+1 + growhint;
     result = _ypSet_resize( so, newlen );   // invalidates loc
     if( yp_isexceptionC( result ) ) return result;
@@ -7540,7 +7565,7 @@ typedef struct {
     yp_uint32_t keysleft;
     yp_uint32_t index;
 } ypSetMiState;
-yp_STATIC_ASSERT( ypObject_LEN_MAX <= 0xFFFFFFFFu, len_fits_32_bits );
+yp_STATIC_ASSERT( ypSet_LEN_MAX <= 0xFFFFFFFFu, len_fits_32_bits );
 yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypSetMiState ), ypSetMiState_fits_uint64 );
 
 static ypObject *frozenset_miniiter( ypObject *so, yp_uint64_t *_state )
@@ -7867,6 +7892,7 @@ static ypObject *set_clear( ypObject *so ) {
     ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, ypSet_MINSIZE );
     yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" ); 
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
+    // FIXME But wait, what if _ypMem_ideal_size allows us to be _larger_ than minsize?
     ypSet_ALLOCLEN( so ) = ypSet_MINSIZE; // we can't make use of the excess anyway
     ypSet_LEN( so ) = 0;
     ypSet_FILL( so ) = 0;
@@ -8155,6 +8181,7 @@ ypObject *yp_setN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_setNV, (n, args), n );
 }
 ypObject *yp_setNV( int n, va_list args ) {
+    // FIXME check for negative n
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypSet( ypSet_CODE, iter_args );
 }
@@ -8367,6 +8394,7 @@ static ypObject *_ypDict_push_newkey( ypObject *mp, ypSet_KeyEntry **key_loc, yp
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
     // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.
     if( growhint < 0 ) growhint = 0;
+    // FIXME check for newlen overflow?
     newlen = ypDict_LEN( mp )+1 + growhint;
     result = _ypDict_resize( mp, newlen );  // invalidates keyset and *key_loc
     if( yp_isexceptionC( result ) ) return result;
@@ -8824,7 +8852,7 @@ typedef struct {
     yp_uint32_t values : 1;
     yp_uint32_t index : 31;
 } ypDictMiState;
-yp_STATIC_ASSERT( ypObject_LEN_MAX <= 0x7FFFFFFFu, len_fits_31_bits );
+yp_STATIC_ASSERT( ypSet_LEN_MAX <= 0x7FFFFFFFu, len_fits_31_bits );
 yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
 
 static ypObject *frozendict_miniiter_items( ypObject *mp, yp_uint64_t *_state )
@@ -9136,6 +9164,7 @@ ypObject *yp_dictK( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_dictKV, (n, args), n );
 }
 ypObject *yp_dictKV( int n, va_list args ) {
+    // FIXME check for negative n
     yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
     return _ypDict( ypDict_CODE, iter_args );
 }
@@ -9185,6 +9214,7 @@ ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
     return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n );
 }
 ypObject *yp_dict_fromkeysNV( ypObject *value, int n, va_list args ) {
+    // FIXME check for negative N
     return _ypDict_fromkeysNV( ypDict_CODE, value, n, args );
 }
 
