@@ -156,10 +156,6 @@ typedef size_t yp_uhash_t;
 #define ypObject_LEN_INVALID        _ypObject_LEN_INVALID
 
 // The largest length that can be stored in ob_len and ob_alloclen
-// XXX Among other considerations, we avoid lengths that use the last bit so we can check for
-// overflow using "len<0" after these calculations:
-//  - len_x + len_y
-//  - len_x + len_y + 1 (adding null terminator to bytes/str)
 #define ypObject_LEN_MAX            (0x7FFFFFFF)
 
 // Lengths and hashes can be cached in the object for easy retrieval
@@ -1072,7 +1068,7 @@ static ypObject *_ypMem_malloc_container_variable(
     yp_ASSERT( required >= 0, "required cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
     if( required > ypObject_LEN_MAX ) return yp_SystemLimitationError;
-    if( required+extra > ypObject_LEN_MAX ) extra = ypObject_LEN_MAX - required;
+    if( extra > ypObject_LEN_MAX - required ) extra = ypObject_LEN_MAX - required;
 
     // Allocate object memory, update alloclen based on actual size of buffer allocated, then see
     // if the data can fit inline or if it needs a separate buffer
@@ -1126,7 +1122,7 @@ static ypObject *_ypMem_realloc_container_variable(
     yp_ASSERT( required >= 0, "required cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
     if( required > ypObject_LEN_MAX ) return yp_SystemLimitationError;
-    if( extra > ypObject_LEN_MAX-required ) extra = ypObject_LEN_MAX - required;
+    if( extra > ypObject_LEN_MAX - required ) extra = ypObject_LEN_MAX - required;
 
     // If the minimum required allocation can fit inline, then prefer that over a separate buffer
     if( required <= inlinelen ) {
@@ -1917,7 +1913,7 @@ ypObject *yp_deepcopy( ypObject *x ) {
     return result;
 }
 
-// TODO CONTAINER_INLINE objects won't release any of their memory on invalidation.  This is a 
+// TODO CONTAINER_INLINE objects won't release any of their memory on invalidation.  This is a
 // tradeoff in the interests of reducing individual allocations.  Perhaps there should be a limit
 // on how large to make CONTAINER_INLINE objects, or perhaps we should try to shrink the
 // invalidated object in-place (if supported by the heap).
@@ -3067,6 +3063,7 @@ static yp_int_t _yp_mulL_minint( yp_int_t y, ypObject **exc )
 // x*y overflows to _exactly_ that value; it will be up to the caller to determine if this is
 // a valid result.  All other overflows will return a negative number strictly larger than
 // yp_INT_T_MIN.
+// TODO It would be easier just to check "x > max/y"...how does the performance compare, though?
 static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y )
 {
     /* Adapted from http://www.fefe.de/intof.html (note this describes unsigned 64-bit numbers,
@@ -4278,7 +4275,7 @@ yp_int_t yp_asintLF( yp_float_t x, ypObject **exc )
  * Common sequence functions
  *************************************************************************************************/
 
-// Using the given length, adjusts negative indicies to positive.  Returns false if the adjusted 
+// Using the given length, adjusts negative indicies to positive.  Returns false if the adjusted
 // index is out-of-bounds, else true.
 static int ypSequence_AdjustIndexC( yp_ssize_t length, yp_ssize_t *i )
 {
@@ -4436,21 +4433,22 @@ static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 #define ypBytes_ELEMMOVE( b, dest, src ) \
     memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src)+1 );
 
-// Return a new bytes/bytearray object with the given alloclen.  If type is immutable and
-// alloclen_fixed is true (indicating the object will never grow), the data is placed inline with
-// one allocation.
-// XXX Remember that alloclen should account for the null terminator; also remember to add that
-// null terminator
+// Return a new bytes/bytearray object that can fit the given requiredLen plus the null terminator.
+// If type is immutable and alloclen_fixed is true (indicating the object will never grow), the
+// data is placed inline with one allocation.
+// XXX Remember to add the null terminator
 // XXX Check for the _yp_bytes_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Extend alloclen_fixed to other areas
 // TODO Over-allocate to avoid future resizings
-static ypObject *_ypBytes_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
+static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed )
 {
+    yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
+    if( requiredLen > ypObject_LEN_MAX-1 ) return yp_SystemLimitationError;
     if( type == ypBytes_CODE && alloclen_fixed ) {
-        return ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, alloclen );
+        return ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, requiredLen+1 );
     } else {
-        return ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, alloclen, 0 );
+        return ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, requiredLen+1, 0 );
     }
 }
 
@@ -4458,20 +4456,22 @@ static ypObject *_ypBytes_new( int type, yp_ssize_t alloclen, int alloclen_fixed
 // XXX Check for the _yp_bytes_empty case first
 static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
 {
-    ypObject *copy = _ypBytes_new( type, ypBytes_LEN( b )+1, alloclen_fixed );
+    ypObject *copy = _ypBytes_new( type, ypBytes_LEN( b ), alloclen_fixed );
     if( yp_isexceptionC( copy ) ) return copy;
     memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b )+1 );
     ypBytes_LEN( copy ) = ypBytes_LEN( b );
     return copy;
 }
 
-// Shrinks or grows the bytearray; if shrinking, ensure length is updated
-// XXX Remember that required should account for the null terminator
+// Shrinks or grows the bytearray to fit the given requiredLen plus the null terminator.
+// XXX If shrinking, ensure length is updated
 // XXX Check alloclen first to avoid unnecessary resizes
 // TODO Split this into grow and shrink functions (here and elsewhere) that check alloclen
-static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t required, yp_ssize_t extra )
+static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra )
 {
-    return ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, required, extra );
+    yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
+    if( requiredLen > ypObject_LEN_MAX-1 ) return yp_SystemLimitationError;
+    return ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, requiredLen+1, extra );
 }
 
 // As yp_asuint8C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
@@ -4528,10 +4528,12 @@ static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
 static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
 {
     ypObject *result;
-    // TODO check for overflow?!
-    yp_ssize_t newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
-    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
-        result = _ypBytes_resize( b, newLen+1, 0 );
+    yp_ssize_t newLen;
+
+    if( ypBytes_LEN( b ) > ypObject_LEN_MAX - ypBytes_LEN( x ) ) return yp_SystemLimitationError;
+    newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
+    if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
+        result = _ypBytes_resize( b, newLen, 0 );
         if( yp_isexceptionC( result ) ) return result;
     }
     memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
@@ -4563,11 +4565,11 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
         if( yp_isexceptionC( exc ) ) return exc;
 
         lenhint -= 1; // check for <0 only when we need it
-        // TODO check for overflow?!
+        if( newLen > ypObject_LEN_MAX - 1 ) return yp_SystemLimitationError;
         newLen += 1;
-        if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+        if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
             if( lenhint < 0 ) lenhint = 0;
-            result = _ypBytes_resize( b, newLen+1, lenhint );
+            result = _ypBytes_resize( b, newLen, lenhint );
             if( yp_isexceptionC( result ) ) return result;
         }
         ypBytes_DATA( b )[newLen-1] = x_asbyte;
@@ -4616,7 +4618,8 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
     if( yp_isexceptionC( result ) ) return result;
 
     if( step == 1 ) {
-        // TODO check for overflow?!
+        // Note that -len(b)<=growBy<=len(x), so the growBy calculation can't overflow.  However,
+        // the newLen calculation might if growBy>0.
         yp_ssize_t growBy = ypBytes_LEN( x ) - slicelength; // negative means array shrinking
         yp_ssize_t newLen = ypBytes_LEN( b ) + growBy;
 
@@ -4625,8 +4628,9 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
         // copying large amounts of data twice; optimize
         // TODO Over-allocate
         if( growBy > 0 ) {
-            if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
-                result = _ypBytes_resize( b, newLen+1, 0 );
+            if( ypBytes_LEN( b ) > ypObject_LEN_MAX - growBy ) return yp_SystemLimitationError;
+            if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
+                result = _ypBytes_resize( b, newLen, 0 );
                 if( yp_isexceptionC( result ) ) return result;
             }
         }
@@ -4724,9 +4728,10 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
 
     if( x_pair != ypBytes_CODE ) return_yp_BAD_TYPE( x );
 
+    if( ypBytes_LEN( b ) > ypObject_LEN_MAX - ypBytes_LEN( x ) ) return yp_SystemLimitationError;
     newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
     if( newLen < 1 && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return _yp_bytes_empty;
-    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, /*alloclen_fixed=*/TRUE );
+    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
@@ -4757,7 +4762,7 @@ static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
 
     if( factor > yp_SSIZE_T_MAX / ypBytes_LEN( b ) ) return yp_MemoryError;
     newLen = ypBytes_LEN( b ) * factor;
-    newB = _ypBytes_new( b_type, newLen+1, /*alloclen_fixed=*/TRUE ); // new ref
+    newB = _ypBytes_new( b_type, newLen, /*alloclen_fixed=*/TRUE ); // new ref
     if( yp_isexceptionC( newB ) ) return newB;
 
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
@@ -4812,7 +4817,7 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     if( yp_isexceptionC( result ) ) return result;
 
     if( newLen < 1 && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return _yp_bytes_empty;
-    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen+1, /*alloclen_fixed=*/TRUE );
+    newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
     if( step == 1 ) {
@@ -4877,7 +4882,7 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
 
     if( factor > yp_SSIZE_T_MAX / ypBytes_LEN( b ) ) return yp_MemoryError;
     newLen = ypBytes_LEN( b ) * factor;
-    result = _ypBytes_resize( b, newLen+1, 0 );
+    result = _ypBytes_resize( b, newLen, 0 );
     if( yp_isexceptionC( result ) ) return result;
 
     _ypBytes_repeat_memcpy( b, factor, ypBytes_LEN( b ) );
@@ -4888,8 +4893,7 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
 static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
 {
     ypObject *exc = yp_None;
-    // TODO check for overflow?!
-    yp_ssize_t newLen = ypBytes_LEN( b ) + 1;
+    yp_ssize_t newLen;
     yp_uint8_t x_asbyte;
 
     // Check for exceptions, then adjust the index (noting it should behave like b[i:i]=[x])
@@ -4906,9 +4910,11 @@ static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
     // FIXME The resize might have to copy data, _then_ we'll also do the ypBytes_ELEMMOVE, copying
     // large amounts of data twice; optimize (and...are there other areas of the code where this
     // happens?)
-    if( ypBytes_ALLOCLEN( b ) < newLen+1 ) {
+    if( ypBytes_LEN( b ) > ypObject_LEN_MAX - 1 ) return yp_SystemLimitationError;
+    newLen = ypBytes_LEN( b ) + 1;
+    if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
         // TODO over-allocate
-        ypObject *result = _ypBytes_resize( b, newLen+1, 0 );
+        ypObject *result = _ypBytes_resize( b, newLen, 0 );
         if( yp_isexceptionC( result ) ) return result;
     }
 
@@ -4922,7 +4928,7 @@ static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
 static ypObject *bytearray_popindex( ypObject *b, yp_ssize_t i )
 {
     ypObject *result;
-    
+
     if( !ypSequence_AdjustIndexC( ypBytes_LEN( b ), &i ) ) {
         return yp_IndexError;
     }
@@ -4971,9 +4977,9 @@ static ypObject *bytearray_push( ypObject *b, ypObject *x )
 
 static ypObject *bytearray_clear( ypObject *b )
 {
-    ypObject *result = _ypBytes_resize( b, 0+1, 0 );
+    ypObject *result = _ypBytes_resize( b, 0, 0 );
     if( yp_isexceptionC( result ) ) return result;
-    yp_ASSERT( ypBytes_DATA( b ) == ypBytes_INLINE_DATA( b ), "bytearray_clear didn't allocate inline!" ); 
+    yp_ASSERT( ypBytes_DATA( b ) == ypBytes_INLINE_DATA( b ), "bytearray_clear didn't allocate inline!" );
     ypBytes_DATA( b )[0] = '\0';
     ypBytes_LEN( b ) = 0;
     return yp_None;
@@ -5324,7 +5330,7 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
         if( len < 0 ) len = strlen( (const char *) source );
     }
     if( len < 1 && type == ypBytes_CODE ) return _yp_bytes_empty;
-    b = _ypBytes_new( type, len+1, /*alloclen_fixed=*/TRUE );
+    b = _ypBytes_new( type, len, /*alloclen_fixed=*/TRUE );
 
     // Initialize the data
     if( source == NULL ) {
@@ -5370,12 +5376,12 @@ static ypObject *_ypBytes( int type, ypObject *source )
         } else if( lenhint == 0 ) {
             // yp_lenC reports an empty iterable, so we can shortcut _ypBytes_extend
             if( type == ypBytes_CODE ) return _yp_bytes_empty;
-            newB = _ypBytes_new( type, 0+1, /*alloclen_fixed=*/TRUE );
+            newB = _ypBytes_new( type, 0, /*alloclen_fixed=*/TRUE );
             ypBytes_DATA( newB )[0] = '\0';
             return newB;
         }
 
-        newB = _ypBytes_new( type, lenhint+1, /*alloclen_fixed=*/FALSE );
+        newB = _ypBytes_new( type, lenhint, /*alloclen_fixed=*/FALSE );
         if( yp_isexceptionC( newB ) ) return newB;
         result = _ypBytes_extend( newB, source );
         if( yp_isexceptionC( result ) ) {
@@ -5849,7 +5855,6 @@ static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
     memmove( ypTuple_ARRAY( sq )+(dest), ypTuple_ARRAY( sq )+(src), \
             (ypTuple_LEN( sq )-(src)) * sizeof( ypObject * ) );
 
-
 // Return a new tuple/list object with the given alloclen.  If type is immutable and
 // alloclen_fixed is true (indicating the object will never grow), the data is placed inline
 // with one allocation.
@@ -5878,7 +5883,7 @@ static ypObject *_ypTuple_copy_shallow( int type, ypObject *x, int alloclen_fixe
 
 // Will perform a lazy shallow copy if copy_visitor is yp_shallowcopy_visitor
 // XXX Check for the _yp_tuple_empty case first
-static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, 
+static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
         int alloclen_fixed )
 {
     ypObject *sq;
@@ -5937,9 +5942,9 @@ static void _ypTuple_repeat_memcpy( ypObject *sq, size_t factor, size_t n )
 static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
 {
     ypObject *result;
-    if( ypTuple_ALLOCLEN( sq ) - ypTuple_LEN( sq ) < 1 ) {
+    if( ypTuple_LEN( sq ) > ypObject_LEN_MAX - 1 ) return yp_SystemLimitationError;
+    if( ypTuple_ALLOCLEN( sq ) < ypTuple_LEN( sq )+1 ) {
         if( growhint < 0 ) growhint = 0;
-        // TODO check for overflow?!
         result = _ypTuple_resize( sq, ypTuple_LEN( sq )+1, growhint );
         if( yp_isexceptionC( result ) ) return result;
     }
@@ -5952,8 +5957,10 @@ static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
 static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
 {
     yp_ssize_t i;
-    // TODO check for overflow?!
-    yp_ssize_t newLen = ypTuple_LEN( sq ) + ypTuple_LEN( x );
+    yp_ssize_t newLen;
+
+    if( ypTuple_LEN( sq ) > ypObject_LEN_MAX - ypTuple_LEN( x ) ) return yp_SystemLimitationError;
+    newLen = ypTuple_LEN( sq ) + ypTuple_LEN( x );
     if( ypTuple_ALLOCLEN( sq ) < newLen ) {
         ypObject *result = _ypTuple_resize( sq, newLen, 0 );
         if( yp_isexceptionC( result ) ) return result;
@@ -6017,7 +6024,8 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
     if( yp_isexceptionC( result ) ) return result;
 
     if( step == 1 ) {
-        // TODO check for overflow?!
+        // Note that -len(sq)<=growBy<=len(x), so the growBy calculation can't overflow.  However,
+        // the newLen calculation might if growBy>0.
         yp_ssize_t growBy = ypTuple_LEN( x ) - slicelength; // negative means list shrinking
         yp_ssize_t newLen = ypTuple_LEN( sq ) + growBy;
 
@@ -6026,6 +6034,7 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
         // copying large amounts of data twice; optimize
         // TODO Over-allocate
         if( growBy > 0 ) {
+            if( ypTuple_LEN( sq ) > ypObject_LEN_MAX - growBy ) return yp_SystemLimitationError;
             if( ypTuple_ALLOCLEN( sq ) < newLen ) {
                 result = _ypTuple_resize( sq, newLen, 0 );
                 if( yp_isexceptionC( result ) ) return result;
@@ -6063,13 +6072,19 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
+        if( lenhint > ypObject_LEN_MAX - ypTuple_LEN( sq ) ) {
+            lenhint = ypObject_LEN_MAX - ypTuple_LEN( sq );
+        }
     } else if( lenhint == 0 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if( ypObject_TYPE_CODE( sq ) == ypTuple_CODE ) return yp_incref( sq );
         return _ypTuple_copy_shallow( ypList_CODE, sq, /*alloclen_fixed=*/TRUE );
+    } else if( lenhint > ypObject_LEN_MAX - ypTuple_LEN( sq ) ) {
+        // yp_lenC reports that we don't have room to add their elements
+        return yp_SystemLimitationError;
     }
 
-    newSq = _ypTuple_new( ypObject_TYPE_CODE( sq ), ypTuple_LEN( sq )+lenhint, 
+    newSq = _ypTuple_new( ypObject_TYPE_CODE( sq ), ypTuple_LEN( sq )+lenhint,
             /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newSq ) ) return newSq;
     result = _ypTuple_extend_from_tuple( newSq, sq );
@@ -6240,7 +6255,7 @@ static ypObject *list_setslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
 static ypObject *list_popindex( ypObject *sq, yp_ssize_t i )
 {
     ypObject *result;
-    
+
     if( !ypSequence_AdjustIndexC( ypTuple_LEN( sq ), &i ) ) {
         return yp_IndexError;
     }
@@ -6336,10 +6351,10 @@ static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
     // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE, copying
     // large amounts of data twice; optimize (and...are there other areas of the code where this
     // happens?)
-    if( ypTuple_ALLOCLEN( sq ) - ypTuple_LEN( sq ) < 1 ) {
+    if( ypTuple_LEN( sq ) > ypObject_LEN_MAX - 1 ) return yp_SystemLimitationError;
+    if( ypTuple_ALLOCLEN( sq ) < ypTuple_LEN( sq )+1 ) {
         // TODO over-allocate
-        // TODO check for overflow?!
-        ypObject *result = _ypTuple_resize( sq, ypTuple_LEN( sq ) + 1, 0 );
+        ypObject *result = _ypTuple_resize( sq, ypTuple_LEN( sq )+1, 0 );
         if( yp_isexceptionC( result ) ) return result;
     }
 
@@ -6422,12 +6437,12 @@ static ypObject *tuple_eq( ypObject *sq, ypObject *x )
     if( ypObject_TYPE_PAIR_CODE( x ) != ypTuple_CODE ) return yp_ComparisonNotImplemented;
     if( sq_len != ypTuple_LEN( x ) ) return yp_False;
 
-    // We need to inspect all our items for equality, which could be time-intensive.  It's fairly 
+    // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when sq!=x.
-    if( ypObject_CACHED_HASH( sq ) != ypObject_HASH_INVALID && 
-        ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID && 
+    if( ypObject_CACHED_HASH( sq ) != ypObject_HASH_INVALID &&
+        ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
         ypObject_CACHED_HASH( sq ) != ypObject_CACHED_HASH( x ) ) return yp_False;
-    // TODO What if we haven't cached this hash yet, but we could?  Calculating the hash now could 
+    // TODO What if we haven't cached this hash yet, but we could?  Calculating the hash now could
     // speed up future comparisons against these objects.  But!  What if we're a tuple of mutable
     // objects...we will then attempt to calculate the hash on every comparison, only to fail.  If
     // we had a flag to differentiate "tuple of mutables" with "not yet computed"...crap, that
@@ -6500,7 +6515,7 @@ static ypObject *list_clear( ypObject *sq )
         yp_decref( ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] );
     }
     ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( sq, ypTupleObject );
-    yp_ASSERT( ypTuple_ARRAY( sq ) == ypTuple_INLINE_DATA( sq ), "list_clear didn't allocate inline!" ); 
+    yp_ASSERT( ypTuple_ARRAY( sq ) == ypTuple_INLINE_DATA( sq ), "list_clear didn't allocate inline!" );
     return yp_None;
 }
 
@@ -7888,7 +7903,7 @@ static ypObject *set_clear( ypObject *so ) {
     _ypSet_discard_key_refs( so );
     // FIXME there's a memcpy in this that we can and should avoid
     ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, 0 );
-    yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" ); 
+    yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     // FIXME But wait, what if _ypMem_ideal_size allows us to be _larger_ than minsize?
     ypSet_ALLOCLEN( so ) = ypSet_MINSIZE; // we can't make use of the excess anyway
@@ -8687,7 +8702,7 @@ static ypObject *dict_clear( ypObject *mp ) {
     _ypDict_discard_value_refs( mp );
     // FIXME there's a memcpy in this that we can and should avoid
     ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, 0 );
-    yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ), "dict_clear didn't allocate inline!" ); 
+    yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ), "dict_clear didn't allocate inline!" );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     ypDict_LEN( mp ) = 0;
     ypDict_KEYSET( mp ) = keyset;
