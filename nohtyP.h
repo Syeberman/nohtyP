@@ -32,9 +32,9 @@
  *      if( yp_isexceptionC( exc ) ) printf( "x isn't a container" );
  * Unless explicitly documented as "always succeeds", _any_ function can return an exception.
  *
- * These error handling methods are designed for a specific purpose: to allow combining multiple 
- * function calls without checking for errors in-between.  When an exception object is used as 
- * input to a function, it is immediately returned, allowing you to check for errors only at the 
+ * These error handling methods are designed for a specific purpose: to allow combining multiple
+ * function calls without checking for errors in-between.  When an exception object is used as
+ * input to a function, it is immediately returned, allowing you to check for errors only at the
  * end of a block of code:
  *      newdict = yp_dictK( 0 );            // newdict might be yp_MemoryError
  *      value = yp_getitem( olddict, key ); // value could be yp_KeyError
@@ -1347,6 +1347,8 @@ ypAPI ypObject * const yp_BufferError;
 
 // Raised when the object does not support the given method; subexception of yp_AttributeError.
 ypAPI ypObject * const yp_MethodError;
+// Raised when an allocation size calculation overflows; subexception of yp_MemoryError.
+ypAPI ypObject * const yp_MemorySizeOverflowError;
 // Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError.
 ypAPI ypObject * const yp_SystemLimitationError;
 // Raised when an invalidated object is passed to a function; subexception of yp_TypeError.

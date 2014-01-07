@@ -919,6 +919,8 @@ ypObject_p_exception( "yp_BufferError", BufferError )
 
 # Raised when the object does not support the given method; subexception of yp_AttributeError
 ypObject_p_exception( "yp_MethodError", AttributeError, one_to_one=False )
+# Raised when an allocation size calculation overflows; subexception of yp_MemoryError
+ypObject_p_exception( "yp_MemorySizeOverflowError", MemoryError, one_to_one=False )
 # Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError
 ypObject_p_exception( "yp_SystemLimitationError", SystemError, one_to_one=False )
 # Raised when an invalidated object is passed to a function; subexception of yp_TypeError
