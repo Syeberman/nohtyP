@@ -1379,7 +1379,7 @@ typedef struct _yp_initialize_kwparams {
 
     // Allocates at least size bytes of memory, setting *actual to the actual amount of memory
     // allocated, and returning the pointer to the buffer.  On error, returns NULL, and *actual is
-    // undefined.  This must succeed when size==0, and must fail when size<0.
+    // undefined.  This must succeed when size==0, and must fail (or abort) when size<0.
     void *(*yp_malloc)( yp_ssize_t *actual, yp_ssize_t size );
 
     // Resizes the given buffer in-place if possible, otherwise allocates a new buffer.  There are
@@ -1391,7 +1391,7 @@ typedef struct _yp_initialize_kwparams {
     //  of memory allocated to the new buffer; nohtyP will then copy the data and call yp_free(p)
     // The resized/new buffer will be at least size bytes; extra is a hint as to how much the
     // buffer should be over-allocated, which may be ignored.  This must succeed when size==0 or
-    // extra==0, and must fail when size<0 or extra<0.
+    // extra==0, and must fail (or abort) when size<0 or extra<0.
     // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
     void *(*yp_malloc_resize)( yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra );
 
@@ -1579,6 +1579,7 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
  */
 
 // This structure is likely to change in future versions; it should only exist in-memory
+// XXX dicts repurpose ob_alloclen to hold a search finger for popitem
 // TODO what do we gain by caching the hash?  We already jump through hoops to use the hash
 // stored in the hash table where possible.
 // TODO Is there a way to reduce the size of type+refcnt+len+alloclen to 64 bits, without hitting
@@ -1618,9 +1619,9 @@ struct _ypStrObject {
 // Set ob_refcnt to this value for immortal objects
 #define _ypObject_REFCNT_IMMORTAL   (0x7FFFFFFFu)
 // Set ob_hash to this value for uninitialized hashes (tp_hash will be called and ob_hash updated)
-#define _ypObject_HASH_INVALID      ((yp_hash_t) -1)
+#define _ypObject_HASH_INVALID      ((yp_hash_t)  -1)
 // Set ob_len or ob_alloclen to this value to signal an invalid length
-#define _ypObject_LEN_INVALID       (-1)
+#define _ypObject_LEN_INVALID       ((yp_ssize_t) -1)
 
 // These type codes must match those in nohtyP.c
 #define _ypInt_CODE                 ( 10u)
