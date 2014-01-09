@@ -263,8 +263,10 @@ typedef struct {
 
     // Freezing, copying, and invalidating
     objproc tp_freeze;
-    traversefunc tp_unfrozen_copy;
-    traversefunc tp_frozen_copy;
+    objproc tp_unfrozen_copy;
+    objproc tp_frozen_copy;
+    traversefunc tp_unfrozen_deepcopy;
+    traversefunc tp_frozen_deepcopy;
     objproc tp_invalidate; /* clear, then transmute self to ypInvalidated */
 
     // Boolean operations and comparisons
@@ -1412,8 +1414,10 @@ static ypTypeObject ypIter_Type = {
 
     // Freezing, copying, and invalidating
     MethodError_objproc,            // tp_freeze
-    MethodError_traversefunc,       // tp_unfrozen_copy
-    MethodError_traversefunc,       // tp_frozen_copy
+    MethodError_objproc,            // tp_unfrozen_copy
+    MethodError_objproc,            // tp_frozen_copy
+    MethodError_traversefunc,       // tp_unfrozen_deepcopy
+    MethodError_traversefunc,       // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -1846,21 +1850,14 @@ void yp_deepfreeze( ypObject **x )
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( x, result );
 }
 
-// Use this, and a memo of NULL, as the visitor for shallow copies
-// TODO Every implementation of tp_*_copy has a special-case for when this copy_visitor is used.
-// Perhaps we should have tp_*_copy (for shallow) and tp_*_deepcopy, similar to Python.
-static ypObject *yp_shallowcopy_visitor( ypObject *x, void *memo ) {
-    return yp_incref( x );
-}
-
 ypObject *yp_unfrozen_copy( ypObject *x ) {
-    return ypObject_TYPE( x )->tp_unfrozen_copy( x, yp_shallowcopy_visitor, NULL );
+    return ypObject_TYPE( x )->tp_unfrozen_copy( x );
 }
 
 // XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
 // maybe even those should be copied as well...or just those that contain other objects
-// TODO It'd be nice to share code with yp_deepcopy_visitor
-static ypObject *_yp_unfrozen_deepcopy( ypObject *x, void *memo ) {
+// TODO It'd be nice to share code with yp_deepcopy2
+static ypObject *yp_unfrozen_deepcopy2( ypObject *x, void *memo ) {
     // TODO don't forget to discard the new objects on error
     // TODO trap recursion & test
     return yp_NotImplementedError;
@@ -1868,20 +1865,20 @@ static ypObject *_yp_unfrozen_deepcopy( ypObject *x, void *memo ) {
 
 ypObject *yp_unfrozen_deepcopy( ypObject *x ) {
     ypObject *memo = yp_dictK( 0 );
-    ypObject *result = _yp_unfrozen_deepcopy( x, memo );
+    ypObject *result = yp_unfrozen_deepcopy2( x, memo );
     yp_decref( memo );
     return result;
 }
 
 ypObject *yp_frozen_copy( ypObject *x ) {
     if( !ypObject_IS_MUTABLE( x ) ) return yp_incref( x );
-    return ypObject_TYPE( x )->tp_frozen_copy( x, yp_shallowcopy_visitor, NULL );
+    return ypObject_TYPE( x )->tp_frozen_copy( x );
 }
 
 // XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
 // maybe even those should be copied as well...or just those that contain other objects
-// TODO It'd be nice to share code with yp_deepcopy_visitor
-static ypObject *_yp_frozen_deepcopy( ypObject *x, void *memo ) {
+// TODO It'd be nice to share code with yp_deepcopy2
+static ypObject *yp_frozen_deepcopy2( ypObject *x, void *memo ) {
     // TODO don't forget to discard the new objects on error
     // TODO trap recursion & test
     return yp_NotImplementedError;
@@ -1889,7 +1886,7 @@ static ypObject *_yp_frozen_deepcopy( ypObject *x, void *memo ) {
 
 ypObject *yp_frozen_deepcopy( ypObject *x ) {
     ypObject *memo = yp_dictK( 0 );
-    ypObject *result = _yp_frozen_deepcopy( x, memo );
+    ypObject *result = yp_frozen_deepcopy2( x, memo );
     yp_decref( memo );
     return result;
 }
@@ -1901,7 +1898,7 @@ ypObject *yp_copy( ypObject *x ) {
 // Use this as the visitor for deep copies (copying exactly the same types)
 // XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
 // maybe even those should be copied as well...or just those that contain other objects
-static ypObject *yp_deepcopy_visitor( ypObject *x, void *_memo ) {
+static ypObject *yp_deepcopy2( ypObject *x, void *_memo ) {
     ypObject **memo = (ypObject **) _memo;
     ypObject *id;
     ypObject *result;
@@ -1919,9 +1916,9 @@ static ypObject *yp_deepcopy_visitor( ypObject *x, void *_memo ) {
 
     // If we get here, then this is the first time visiting this object
     if( ypObject_IS_MUTABLE( x ) ) {
-        result = ypObject_TYPE( x )->tp_unfrozen_copy( x, yp_deepcopy_visitor, memo );
+        result = ypObject_TYPE( x )->tp_unfrozen_deepcopy( x, yp_deepcopy2, memo );
     } else {
-        result = ypObject_TYPE( x )->tp_frozen_copy( x, yp_deepcopy_visitor, memo );
+        result = ypObject_TYPE( x )->tp_frozen_deepcopy( x, yp_deepcopy2, memo );
     }
     if( yp_isexceptionC( result ) ) {
         yp_decref( id );
@@ -1935,7 +1932,7 @@ static ypObject *yp_deepcopy_visitor( ypObject *x, void *_memo ) {
 
 ypObject *yp_deepcopy( ypObject *x ) {
     ypObject *memo = yp_dictK( 0 );
-    ypObject *result = yp_deepcopy_visitor( x, &memo );
+    ypObject *result = yp_deepcopy2( x, &memo );
     yp_decref( memo );
     return result;
 }
@@ -2195,8 +2192,10 @@ static ypTypeObject ypInvalidated_Type = {
 
     // Freezing, copying, and invalidating
     InvalidatedError_objproc,           // tp_freeze
-    InvalidatedError_traversefunc,      // tp_unfrozen_copy
-    InvalidatedError_traversefunc,      // tp_frozen_copy
+    InvalidatedError_objproc,           // tp_unfrozen_copy
+    InvalidatedError_objproc,           // tp_frozen_copy
+    InvalidatedError_traversefunc,      // tp_unfrozen_deepcopy
+    InvalidatedError_traversefunc,      // tp_frozen_deepcopy
     InvalidatedError_objproc,           // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2272,8 +2271,10 @@ static ypTypeObject ypException_Type = {
 
     // Freezing, copying, and invalidating
     ExceptionMethod_objproc,            // tp_freeze
-    ExceptionMethod_traversefunc,       // tp_unfrozen_copy
-    ExceptionMethod_traversefunc,       // tp_frozen_copy
+    ExceptionMethod_objproc,            // tp_unfrozen_copy
+    ExceptionMethod_objproc,            // tp_frozen_copy
+    ExceptionMethod_traversefunc,       // tp_unfrozen_deepcopy
+    ExceptionMethod_traversefunc,       // tp_frozen_deepcopy
     ExceptionMethod_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2434,7 +2435,11 @@ int yp_isexceptionCN( ypObject *x, int n, ... )
  * Types
  *************************************************************************************************/
 
-static ypObject *type_frozen_copy( ypObject *t, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *type_frozen_copy( ypObject *t ) {
+    return yp_incref( t );
+}
+
+static ypObject *type_frozen_deepcopy( ypObject *t, visitfunc copy_visitor, void *copy_memo ) {
     return yp_incref( t );
 }
 
@@ -2456,6 +2461,8 @@ static ypTypeObject ypType_Type = {
     MethodError_objproc,            // tp_freeze
     type_frozen_copy,               // tp_unfrozen_copy
     type_frozen_copy,               // tp_frozen_copy
+    type_frozen_deepcopy,           // tp_unfrozen_deepcopy
+    type_frozen_deepcopy,           // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2512,7 +2519,11 @@ static ypTypeObject ypType_Type = {
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
-static ypObject *nonetype_frozen_copy( ypObject *n, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *nonetype_frozen_copy( ypObject *n ) {
+    return yp_None;
+}
+
+static ypObject *nonetype_frozen_deepcopy( ypObject *n, visitfunc copy_visitor, void *copy_memo ) {
     return yp_None;
 }
 
@@ -2541,6 +2552,8 @@ static ypTypeObject ypNoneType_Type = {
     MethodError_objproc,            // tp_freeze
     nonetype_frozen_copy,           // tp_unfrozen_copy
     nonetype_frozen_copy,           // tp_frozen_copy
+    nonetype_frozen_deepcopy,       // tp_unfrozen_deepcopy
+    nonetype_frozen_deepcopy,       // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2607,7 +2620,11 @@ typedef struct {
 } ypBoolObject;
 #define _ypBool_VALUE( b ) ( ((ypBoolObject *)b)->value )
 
-static ypObject *bool_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *bool_frozen_copy( ypObject *b ) {
+    return b;
+}
+
+static ypObject *bool_frozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
     return b;
 }
 
@@ -2651,6 +2668,8 @@ static ypTypeObject ypBool_Type = {
     MethodError_objproc,            // tp_freeze
     bool_frozen_copy,               // tp_unfrozen_copy
     bool_frozen_copy,               // tp_frozen_copy
+    bool_frozen_deepcopy,           // tp_unfrozen_deepcopy
+    bool_frozen_deepcopy,           // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -2893,11 +2912,19 @@ static ypObject *int_dealloc( ypObject *i ) {
     return yp_None;
 }
 
-static ypObject *int_unfrozen_copy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *int_unfrozen_copy( ypObject *i ) {
     return yp_intstoreC( ypInt_VALUE( i ) );
 }
 
-static ypObject *int_frozen_copy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *int_frozen_copy( ypObject *i ) {
+    return yp_intC( ypInt_VALUE( i ) );
+}
+
+static ypObject *int_unfrozen_deepcopy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
+    return yp_intstoreC( ypInt_VALUE( i ) );
+}
+
+static ypObject *int_frozen_deepcopy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
     return yp_intC( ypInt_VALUE( i ) );
 }
 
@@ -2946,6 +2973,8 @@ static ypTypeObject ypInt_Type = {
     MethodError_objproc,            // tp_freeze
     int_unfrozen_copy,              // tp_unfrozen_copy
     int_frozen_copy,                // tp_frozen_copy
+    int_unfrozen_deepcopy,          // tp_unfrozen_deepcopy
+    int_frozen_deepcopy,            // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -3009,6 +3038,8 @@ static ypTypeObject ypIntStore_Type = {
     MethodError_objproc,            // tp_freeze
     int_unfrozen_copy,              // tp_unfrozen_copy
     int_frozen_copy,                // tp_frozen_copy
+    int_unfrozen_deepcopy,          // tp_unfrozen_deepcopy
+    int_frozen_deepcopy,            // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -3928,11 +3959,19 @@ static ypObject *float_dealloc( ypObject *f ) {
     return yp_None;
 }
 
-static ypObject *float_unfrozen_copy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *float_unfrozen_copy( ypObject *f ) {
     return yp_floatstoreCF( ypFloat_VALUE( f ) );
 }
 
-static ypObject *float_frozen_copy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *float_frozen_copy( ypObject *f ) {
+    return yp_floatCF( ypFloat_VALUE( f ) );
+}
+
+static ypObject *float_unfrozen_deepcopy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
+    return yp_floatstoreCF( ypFloat_VALUE( f ) );
+}
+
+static ypObject *float_frozen_deepcopy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
     return yp_floatCF( ypFloat_VALUE( f ) );
 }
 
@@ -3988,6 +4027,8 @@ static ypTypeObject ypFloat_Type = {
     MethodError_objproc,            // tp_freeze
     float_unfrozen_copy,            // tp_unfrozen_copy
     float_frozen_copy,              // tp_frozen_copy
+    float_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
+    float_frozen_deepcopy,          // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -4051,6 +4092,8 @@ static ypTypeObject ypFloatStore_Type = {
     MethodError_objproc,            // tp_freeze
     float_unfrozen_copy,            // tp_unfrozen_copy
     float_frozen_copy,              // tp_frozen_copy
+    float_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
+    float_frozen_deepcopy,          // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -4686,17 +4729,23 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
 
 // Public Methods
 
-static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *bytes_unfrozen_copy( ypObject *b ) {
     return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *bytes_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo )
-{
+static ypObject *bytes_frozen_copy( ypObject *b ) {
     if( ypBytes_LEN( b ) < 1 ) return _yp_bytes_empty;
     // A shallow copy of a bytes to a bytes doesn't require an actual copy
-    if( copy_visitor == yp_shallowcopy_visitor && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) {
-        return yp_incref( b );
-    }
+    if( ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return yp_incref( b );
+    return _ypBytes_copy( ypBytes_CODE, b, /*alloclen_fixed=*/TRUE );
+}
+
+static ypObject *bytes_unfrozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE );
+}
+
+static ypObject *bytes_frozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
+    if( ypBytes_LEN( b ) < 1 ) return _yp_bytes_empty;
     return _ypBytes_copy( ypBytes_CODE, b, /*alloclen_fixed=*/TRUE );
 }
 
@@ -5197,6 +5246,8 @@ static ypTypeObject ypBytes_Type = {
     MethodError_objproc,            // tp_freeze
     bytes_unfrozen_copy,            // tp_unfrozen_copy
     bytes_frozen_copy,              // tp_frozen_copy
+    bytes_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
+    bytes_frozen_deepcopy,          // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -5280,6 +5331,8 @@ static ypTypeObject ypByteArray_Type = {
     MethodError_objproc,            // tp_freeze
     bytes_unfrozen_copy,            // tp_unfrozen_copy
     bytes_frozen_copy,              // tp_frozen_copy
+    bytes_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
+    bytes_frozen_deepcopy,          // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -5488,17 +5541,23 @@ static ypObject *_ypStr_copy( int type, ypObject *s, int alloclen_fixed )
     return copy;
 }
 
-static ypObject *str_unfrozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *str_unfrozen_copy( ypObject *s ) {
     return _ypStr_copy( ypChrArray_CODE, s, TRUE );
 }
 
-static ypObject *str_frozen_copy( ypObject *s, visitfunc copy_visitor, void *copy_memo )
-{
+static ypObject *str_frozen_copy( ypObject *s ) {
     if( ypStr_LEN( s ) < 1 ) return _yp_str_empty;
     // A shallow copy of a str to a str doesn't require an actual copy
-    if( copy_visitor == yp_shallowcopy_visitor && ypObject_TYPE_CODE( s ) == ypStr_CODE ) {
-        return yp_incref( s );
-    }
+    if( ypObject_TYPE_CODE( s ) == ypStr_CODE ) return yp_incref( s );
+    return _ypStr_copy( ypStr_CODE, s, TRUE );
+}
+
+static ypObject *str_unfrozen_deepcopy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypStr_copy( ypChrArray_CODE, s, TRUE );
+}
+
+static ypObject *str_frozen_deepcopy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) {
+    if( ypStr_LEN( s ) < 1 ) return _yp_str_empty;
     return _ypStr_copy( ypStr_CODE, s, TRUE );
 }
 
@@ -5639,6 +5698,8 @@ static ypTypeObject ypStr_Type = {
     MethodError_objproc,            // tp_freeze
     str_unfrozen_copy,              // tp_unfrozen_copy
     str_frozen_copy,                // tp_frozen_copy
+    str_unfrozen_deepcopy,          // tp_unfrozen_deepcopy
+    str_frozen_deepcopy,            // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -5722,6 +5783,8 @@ static ypTypeObject ypChrArray_Type = {
     MethodError_objproc,            // tp_freeze
     str_unfrozen_copy,              // tp_unfrozen_copy
     str_frozen_copy,                // tp_frozen_copy
+    str_unfrozen_deepcopy,          // tp_unfrozen_deepcopy
+    str_frozen_deepcopy,            // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -5915,7 +5978,7 @@ static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen, int alloclen_fixed
 }
 
 // XXX Check for the "lazy shallow copy" and "_yp_tuple_empty" cases first
-static ypObject *_ypTuple_copy_shallow( int type, ypObject *x, int alloclen_fixed )
+static ypObject *_ypTuple_copy( int type, ypObject *x, int alloclen_fixed )
 {
     yp_ssize_t i;
     ypObject *sq = _ypTuple_new( type, ypTuple_LEN( x ), alloclen_fixed );
@@ -5926,22 +5989,13 @@ static ypObject *_ypTuple_copy_shallow( int type, ypObject *x, int alloclen_fixe
     return sq;
 }
 
-// Will perform a lazy shallow copy if copy_visitor is yp_shallowcopy_visitor
 // XXX Check for the _yp_tuple_empty case first
-static ypObject *_ypTuple_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
+static ypObject *_ypTuple_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
         int alloclen_fixed )
 {
     ypObject *sq;
     yp_ssize_t i;
     ypObject *item;
-
-    if( copy_visitor == yp_shallowcopy_visitor ) {
-        // A shallow copy of a tuple to a tuple doesn't require an actual copy
-        if( type == ypTuple_CODE && ypObject_TYPE_CODE( x ) == ypTuple_CODE ) {
-            return yp_incref( x );
-        }
-        return _ypTuple_copy_shallow( type, x, alloclen_fixed );
-    }
 
     sq = _ypTuple_new( type, ypTuple_LEN( x ), alloclen_fixed );
     if( yp_isexceptionC( sq ) ) return sq;
@@ -6124,7 +6178,7 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
     } else if( lenhint == 0 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if( ypObject_TYPE_CODE( sq ) == ypTuple_CODE ) return yp_incref( sq );
-        return _ypTuple_copy_shallow( ypList_CODE, sq, /*alloclen_fixed=*/FALSE );
+        return _ypTuple_copy( ypList_CODE, sq, /*alloclen_fixed=*/FALSE );
     } else if( lenhint > iterable_maxLen ) {
         // yp_lenC reports that we don't have room to add their elements
         return yp_MemorySizeOverflowError;
@@ -6423,13 +6477,24 @@ static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
     return yp_None;
 }
 
-static ypObject *tuple_unfrozen_copy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypTuple_copy( ypList_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
+static ypObject *tuple_unfrozen_copy( ypObject *sq ) {
+    return _ypTuple_copy( ypList_CODE, sq, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *tuple_frozen_copy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *tuple_frozen_copy( ypObject *sq ) {
     if( ypTuple_LEN( sq ) < 1 ) return _yp_tuple_empty;
-    return _ypTuple_copy( ypTuple_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
+    // A shallow copy of a tuple to a tuple doesn't require an actual copy
+    if( ypObject_TYPE_CODE( sq ) == ypTuple_CODE ) return yp_incref( sq );
+    return _ypTuple_copy( ypTuple_CODE, sq, /*alloclen_fixed=*/TRUE );
+}
+
+static ypObject *tuple_unfrozen_deepcopy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypTuple_deepcopy( ypList_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
+}
+
+static ypObject *tuple_frozen_deepcopy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
+    if( ypTuple_LEN( sq ) < 1 ) return _yp_tuple_empty;
+    return _ypTuple_deepcopy( ypTuple_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *tuple_bool( ypObject *sq ) {
@@ -6635,6 +6700,8 @@ static ypTypeObject ypTuple_Type = {
     MethodError_objproc,            // tp_freeze
     tuple_unfrozen_copy,            // tp_unfrozen_copy
     tuple_frozen_copy,              // tp_frozen_copy
+    tuple_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
+    tuple_frozen_deepcopy,          // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -6718,6 +6785,8 @@ static ypTypeObject ypList_Type = {
     MethodError_objproc,            // tp_freeze
     tuple_unfrozen_copy,            // tp_unfrozen_copy
     tuple_frozen_copy,              // tp_frozen_copy
+    tuple_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
+    tuple_frozen_deepcopy,          // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -6816,7 +6885,7 @@ ypObject *yp_tuple( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         if( ypTuple_LEN( iterable ) < 1 ) return _yp_tuple_empty;
         if( ypObject_TYPE_CODE( iterable ) == ypTuple_CODE ) return yp_incref( iterable );
-        return _ypTuple_copy_shallow( ypTuple_CODE, iterable, /*alloclen_fixed=*/TRUE );
+        return _ypTuple_copy( ypTuple_CODE, iterable, /*alloclen_fixed=*/TRUE );
     }
     return _ypTuple( ypTuple_CODE, iterable );
 }
@@ -6835,7 +6904,7 @@ ypObject *yp_listNV( int n, va_list args ) {
 }
 ypObject *yp_list( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
-        return _ypTuple_copy_shallow( ypList_CODE, iterable, /*alloclen_fixed=*/FALSE );
+        return _ypTuple_copy( ypList_CODE, iterable, /*alloclen_fixed=*/FALSE );
     }
     return _ypTuple( ypList_CODE, iterable );
 }
@@ -7038,7 +7107,7 @@ static ypObject *_ypSet_new( int type, yp_ssize_t minused, int alloclen_fixed )
 // would be just as dirty as the original.  But if the original isn't "too dirty"...
 static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
         ypSet_KeyEntry **ep );
-static ypObject *_ypSet_copy_shallow( int type, ypObject *x, int alloclen_fixed )
+static ypObject *_ypSet_copy( int type, ypObject *x, int alloclen_fixed )
 {
     yp_ssize_t keysleft = ypSet_LEN( x );
     ypSet_KeyEntry *otherkeys = ypSet_TABLE( x );
@@ -7058,9 +7127,8 @@ static ypObject *_ypSet_copy_shallow( int type, ypObject *x, int alloclen_fixed 
     return so;
 }
 
-// Will perform a lazy shallow copy if copy_visitor is yp_shallowcopy_visitor
 // XXX Check for the _yp_frozenset_empty case first
-static ypObject *_ypSet_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
+static ypObject *_ypSet_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
         int alloclen_fixed )
 {
     yp_ssize_t keysleft = ypSet_LEN( x );
@@ -7069,14 +7137,6 @@ static ypObject *_ypSet_copy( int type, ypObject *x, visitfunc copy_visitor, voi
     yp_ssize_t i;
     ypObject *key;
     ypSet_KeyEntry *loc;
-
-    if( copy_visitor == yp_shallowcopy_visitor ) {
-        // A shallow copy of a frozenset to a frozenset doesn't require an actual copy
-        if( type == ypFrozenSet_CODE && ypObject_TYPE_CODE( x ) == ypFrozenSet_CODE ) {
-            return yp_incref( x );
-        }
-        return _ypSet_copy_shallow( type, x, alloclen_fixed );
-    }
 
     so = _ypSet_new( type, keysleft, alloclen_fixed );
     if( yp_isexceptionC( so ) ) return so;
@@ -7484,7 +7544,7 @@ static ypObject *_ypSet_intersection_update_from_iter(
     // implement this as ypSet_intersection?
     // Unfortunately, we need to create a short-lived copy of so.  It's either that, or convert
     // mi to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
-    so_toremove = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    so_toremove = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( so_toremove ) ) return so_toremove;
 
     // Remove items from so_toremove that are yielded by mi.  so_toremove is then a set
@@ -7634,13 +7694,24 @@ static ypObject *frozenset_freeze( ypObject *so ) {
     return yp_None; // no-op, currently
 }
 
-static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypSet_copy( ypSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
+static ypObject *frozenset_unfrozen_copy( ypObject *so  ) {
+    return _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *frozenset_frozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *frozenset_frozen_copy( ypObject *so ) {
     if( ypSet_LEN( so ) < 1 ) return _yp_frozenset_empty;
-    return _ypSet_copy( ypFrozenSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
+    // A shallow copy of a frozenset to a frozenset doesn't require an actual copy
+    if( ypObject_TYPE_CODE( so ) == ypFrozenSet_CODE ) return yp_incref( so );
+    return _ypSet_copy( ypFrozenSet_CODE, so, /*alloclen_fixed=*/TRUE );
+}
+
+static ypObject *frozenset_unfrozen_deepcopy( ypObject *so, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypSet_deepcopy( ypSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
+}
+
+static ypObject *frozenset_frozen_deepcopy( ypObject *so, visitfunc copy_visitor, void *copy_memo ) {
+    if( ypSet_LEN( so ) < 1 ) return _yp_frozenset_empty;
+    return _ypSet_deepcopy( ypFrozenSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *frozenset_bool( ypObject *so ) {
@@ -7921,7 +7992,7 @@ static ypObject *frozenset_union( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -7939,7 +8010,7 @@ static ypObject *frozenset_intersection( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_intersection_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -7957,7 +8028,7 @@ static ypObject *frozenset_difference( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_difference_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -7973,7 +8044,7 @@ static ypObject *frozenset_symmetric_difference( ypObject *so, ypObject *x )
     ypObject *result;
     ypObject *newSo;
 
-    newSo = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_symmetric_difference_update( newSo, x );
     if( yp_isexceptionC( result ) ) {
@@ -8104,6 +8175,8 @@ static ypTypeObject ypFrozenSet_Type = {
     frozenset_freeze,               // tp_freeze
     frozenset_unfrozen_copy,        // tp_unfrozen_copy
     frozenset_frozen_copy,          // tp_frozen_copy
+    frozenset_unfrozen_deepcopy,    // tp_unfrozen_deepcopy
+    frozenset_frozen_deepcopy,      // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -8184,6 +8257,8 @@ static ypTypeObject ypSet_Type = {
     frozenset_freeze,               // tp_freeze
     frozenset_unfrozen_copy,        // tp_unfrozen_copy
     frozenset_frozen_copy,          // tp_frozen_copy
+    frozenset_unfrozen_deepcopy,    // tp_unfrozen_deepcopy
+    frozenset_frozen_deepcopy,      // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -8295,7 +8370,7 @@ ypObject *yp_frozenset( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypFrozenSet_CODE ) {
         if( ypSet_LEN( iterable ) < 1 ) return _yp_frozenset_empty;
         if( ypObject_TYPE_CODE( iterable ) == ypFrozenSet_CODE ) return yp_incref( iterable );
-        return _ypSet_copy_shallow( ypFrozenSet_CODE, iterable, /*alloclen_fixed=*/TRUE );
+        return _ypSet_copy( ypFrozenSet_CODE, iterable, /*alloclen_fixed=*/TRUE );
     }
     return _ypSet( ypFrozenSet_CODE, iterable );
 }
@@ -8314,7 +8389,7 @@ ypObject *yp_setNV( int n, va_list args ) {
 }
 ypObject *yp_set( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypFrozenSet_CODE ) {
-        return _ypSet_copy_shallow( ypSet_CODE, iterable, /*alloclen_fixed=*/FALSE );
+        return _ypSet_copy( ypSet_CODE, iterable, /*alloclen_fixed=*/FALSE );
     }
     return _ypSet( ypSet_CODE, iterable );
 }
@@ -8406,8 +8481,9 @@ static void _ypDict_discard_value_refs( ypObject *mp )
     }
 }
 
+// If we are performing a shallow copy, we can share keysets and quickly memcpy the values
 // XXX Check for the "lazy shallow copy" and "_yp_frozendict_empty" cases first
-static ypObject *_ypDict_copy_shallow( int type, ypObject *x )
+static ypObject *_ypDict_copy( int type, ypObject *x )
 {
     ypObject *keyset;
     yp_ssize_t alloclen;
@@ -8435,23 +8511,12 @@ static ypObject *_ypDict_copy_shallow( int type, ypObject *x )
     return mp;
 }
 
-// Will perform a lazy shallow copy if copy_visitor is yp_shallowcopy_visitor
 // XXX Check for the _yp_frozendict_empty case first
 // TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
 // either a) optimizing x first, or b) not sharing the keyset of this object
-static ypObject *_ypDict_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
+static ypObject *_ypDict_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
 {
-    // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
-    if( copy_visitor == yp_shallowcopy_visitor ) {
-        // A shallow copy of a frozendict to a frozendict doesn't require an actual copy
-        if( type == ypFrozenDict_CODE && ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) {
-            return yp_incref( x );
-        }
-        return _ypDict_copy_shallow( type, x );
-    }
-
-    // Otherwise, copying takes a bit more effort
-    // TODO We can't use copy_visitor to copy the keys, because it might be unfrozen_copy_visitor!
+    // TODO We can't use copy_visitor to copy the keys, because it might be yp_unfrozen_deepcopy2!
     return yp_NotImplementedError;
 }
 
@@ -8644,8 +8709,6 @@ static void _ypDict_iter_items_next( ypObject *itemiter, ypObject **key, ypObjec
 }
 
 // XXX Check for the mp==other case _before_ calling this function
-// XXX We're trusting that copy_visitor will behave properly and return an object that has the same
-// hash as the original and that is unequal to anything else in the other set
 static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
@@ -8745,13 +8808,24 @@ static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *mem
     return yp_None;
 }
 
-static ypObject *frozendict_unfrozen_copy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypDict_copy( ypDict_CODE, x, copy_visitor, copy_memo );
+static ypObject *frozendict_unfrozen_copy( ypObject *x ) {
+    return _ypDict_copy( ypDict_CODE, x );
 }
 
-static ypObject *frozendict_frozen_copy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *frozendict_frozen_copy( ypObject *x ) {
     if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
-    return _ypDict_copy( ypFrozenDict_CODE, x, copy_visitor, copy_memo );
+    // A shallow copy of a frozendict to a frozendict doesn't require an actual copy
+    if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
+    return _ypDict_copy( ypFrozenDict_CODE, x );
+}
+
+static ypObject *frozendict_unfrozen_deepcopy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
+    return _ypDict_deepcopy( ypDict_CODE, x, copy_visitor, copy_memo );
+}
+
+static ypObject *frozendict_frozen_deepcopy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
+    if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
+    return _ypDict_deepcopy( ypFrozenDict_CODE, x, copy_visitor, copy_memo );
 }
 
 static ypObject *frozendict_bool( ypObject *mp ) {
@@ -9135,6 +9209,8 @@ static ypTypeObject ypFrozenDict_Type = {
     MethodError_objproc,            // tp_freeze
     frozendict_unfrozen_copy,       // tp_unfrozen_copy
     frozendict_frozen_copy,         // tp_frozen_copy
+    MethodError_traversefunc,       // tp_unfrozen_deepcopy
+    MethodError_traversefunc,       // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -9211,6 +9287,8 @@ static ypTypeObject ypDict_Type = {
     MethodError_objproc,            // tp_freeze
     frozendict_unfrozen_copy,       // tp_unfrozen_copy
     frozendict_frozen_copy,         // tp_frozen_copy
+    MethodError_traversefunc,       // tp_unfrozen_deepcopy
+    MethodError_traversefunc,       // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -9262,7 +9340,7 @@ static ypTypeObject ypDict_Type = {
 
 // Constructors
 // XXX x may be an yp_ONSTACK_ITER_KVALIST: use carefully
-// XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy_shallow
+// XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
 // TODO Perhaps this should be broken up, and a _ypDict_update_from_valist created
 static ypObject *_ypDict( int type, ypObject *x )
 {
@@ -9310,7 +9388,7 @@ ypObject *yp_frozendict( ypObject *x ) {
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
         if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
         if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
-        return _ypDict_copy_shallow( ypFrozenDict_CODE, x );
+        return _ypDict_copy( ypFrozenDict_CODE, x );
     }
     return _ypDict( ypFrozenDict_CODE, x );
 }
@@ -9330,7 +9408,7 @@ ypObject *yp_dictKV( int n, va_list args ) {
 ypObject *yp_dict( ypObject *x ) {
     // If x is a fellow dict then perform a copy so we can share keysets
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
-        return _ypDict_copy_shallow( ypDict_CODE, x );
+        return _ypDict_copy( ypDict_CODE, x );
     }
     return _ypDict( ypDict_CODE, x );
 }
