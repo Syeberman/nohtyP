@@ -1847,6 +1847,8 @@ void yp_deepfreeze( ypObject **x )
 }
 
 // Use this, and a memo of NULL, as the visitor for shallow copies
+// TODO Every implementation of tp_*_copy has a special-case for when this copy_visitor is used.
+// Perhaps we should have tp_*_copy (for shallow) and tp_*_deepcopy, similar to Python.
 static ypObject *yp_shallowcopy_visitor( ypObject *x, void *memo ) {
     return yp_incref( x );
 }
@@ -4470,14 +4472,13 @@ static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 // XXX Remember to add the null terminator
 // XXX Check for the _yp_bytes_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
-// TODO Extend alloclen_fixed to other areas
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed )
 {
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
     yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
-    if( type == ypBytes_CODE && alloclen_fixed ) {
-        return ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, type, requiredLen+1 );
+    if( alloclen_fixed && type == ypBytes_CODE ) {
+        return ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, ypBytes_CODE, requiredLen+1 );
     } else {
         return ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, requiredLen+1, 0 );
     }
@@ -4686,7 +4687,7 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
 // Public Methods
 
 static ypObject *bytes_unfrozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/TRUE );
+    return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE );
 }
 
 static ypObject *bytes_frozen_copy( ypObject *b, visitfunc copy_visitor, void *copy_memo )
@@ -5410,7 +5411,7 @@ static ypObject *_ypBytes( int type, ypObject *source )
         } else if( lenhint == 0 ) {
             // yp_lenC reports an empty iterable, so we can shortcut _ypBytes_extend
             if( type == ypBytes_CODE ) return _yp_bytes_empty;
-            newB = _ypBytes_new( type, 0, /*alloclen_fixed=*/TRUE );
+            newB = _ypBytes_new( ypByteArray_CODE, 0, /*alloclen_fixed=*/FALSE );
             if( yp_isexceptionC( newB ) ) return newB;
             ypBytes_DATA( newB )[0] = '\0';
             return newB;
@@ -5466,12 +5467,11 @@ static ypObject * const _yp_str_empty = (ypObject *) &_yp_str_empty_struct;
 // null terminator
 // XXX Check for the _yp_str_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
-// TODO Extend alloclen_fixed to other areas
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypStr_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
 {
-    if( type == ypStr_CODE && alloclen_fixed ) {
-        return ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, type, alloclen );
+    if( alloclen_fixed && type == ypStr_CODE ) {
+        return ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, alloclen );
     } else {
         return ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, alloclen, 0 );
     }
@@ -5907,7 +5907,7 @@ static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
 static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen, int alloclen_fixed ) {
     yp_ASSERT( alloclen >= 0, "alloclen cannot be negative" );
     yp_ASSERT( alloclen <= ypTuple_LEN_MAX, "alloclen cannot be >max" );
-    if( type == ypTuple_CODE && alloclen_fixed ) {
+    if( alloclen_fixed && type == ypTuple_CODE ) {
         return ypMem_MALLOC_CONTAINER_INLINE( ypTupleObject, ypTuple_CODE, alloclen );
     } else {
         return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, type, alloclen, 0 );
@@ -6124,7 +6124,7 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
     } else if( lenhint == 0 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if( ypObject_TYPE_CODE( sq ) == ypTuple_CODE ) return yp_incref( sq );
-        return _ypTuple_copy_shallow( ypList_CODE, sq, /*alloclen_fixed=*/TRUE );
+        return _ypTuple_copy_shallow( ypList_CODE, sq, /*alloclen_fixed=*/FALSE );
     } else if( lenhint > iterable_maxLen ) {
         // yp_lenC reports that we don't have room to add their elements
         return yp_MemorySizeOverflowError;
@@ -6158,7 +6158,7 @@ static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
     } else {
         // If the result will be an empty list, return a new, empty list
         if( ypTuple_LEN( sq ) < 1 || factor < 1 ) {
-            return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
+            return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
         }
         // If the result will be an exact copy, let the code below make that copy
     }
@@ -6204,7 +6204,7 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
         if( step == 1 && newLen == ypTuple_LEN( sq ) ) return yp_incref( sq );
     } else {
         // If the result will be an empty list, return a new, empty list
-        if( newLen < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
+        if( newLen < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
         // If the result will be an exact copy, let the code below make that copy
     }
 
@@ -6424,7 +6424,7 @@ static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
 }
 
 static ypObject *tuple_unfrozen_copy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypTuple_copy( ypList_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
+    return _ypTuple_copy( ypList_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
 }
 
 static ypObject *tuple_frozen_copy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
@@ -6784,7 +6784,7 @@ static ypObject *_ypTuple( int type, ypObject *iterable )
     } else if( lenhint == 0 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if( type == ypTuple_CODE ) return _yp_tuple_empty;
-        return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
+        return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
     } else if( lenhint > ypTuple_LEN_MAX ) {
         // yp_lenC reports that we don't have room to add their elements
         return yp_MemorySizeOverflowError;
@@ -6821,17 +6821,21 @@ ypObject *yp_tuple( ypObject *iterable ) {
     return _ypTuple( ypTuple_CODE, iterable );
 }
 
-ypObject *yp_listN( int n, ... ) {
-    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
-    return_yp_V_FUNC( ypObject *, yp_listNV, (n, args), n );
-}
-ypObject *yp_listNV( int n, va_list args ) {
+static ypObject *_yp_listNV( int n, va_list args ) {
     yp_ONSTACK_ITER_VALIST( iter_args, n, args );
     return _ypTuple( ypList_CODE, iter_args );
 }
+ypObject *yp_listN( int n, ... ) {
+    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
+    return_yp_V_FUNC( ypObject *, _yp_listNV, (n, args), n );
+}
+ypObject *yp_listNV( int n, va_list args ) {
+    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
+    return _yp_listNV( n, args );
+}
 ypObject *yp_list( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
-        return _ypTuple_copy_shallow( ypList_CODE, iterable, /*alloclen_fixed=*/TRUE );
+        return _ypTuple_copy_shallow( ypList_CODE, iterable, /*alloclen_fixed=*/FALSE );
     }
     return _ypTuple( ypList_CODE, iterable );
 }
@@ -6844,7 +6848,7 @@ static ypObject *_ypTuple_repeatCNV( int type, yp_ssize_t factor, int n, va_list
 
     if( factor < 1 || n < 1 ) {
         if( type == ypTuple_CODE ) return _yp_tuple_empty;
-        return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/TRUE );
+        return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
     }
 
     if( factor > ypTuple_LEN_MAX / n ) return yp_MemorySizeOverflowError;
@@ -7008,30 +7012,56 @@ static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
 
 // Returns a new, empty set or frozenset object to hold minused entries
 // XXX Check for the _yp_frozenset_empty first
-// TODO Extend alloclen_fixed here
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
-// TODO can use CONTAINER_INLINE if minused is a firm max length for the frozenset
 // TODO Over-allocate to avoid future resizings
-static ypObject *_ypSet_new( int type, yp_ssize_t minused )
+static ypObject *_ypSet_new( int type, yp_ssize_t minused, int alloclen_fixed )
 {
     ypObject *so;
     yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
     if( alloclen < 1 ) return yp_MemorySizeOverflowError;
-    so = ypMem_MALLOC_CONTAINER_VARIABLE( ypSetObject, type, alloclen, 0 );
+    if( alloclen_fixed && type == ypSet_CODE ) {
+        so = ypMem_MALLOC_CONTAINER_INLINE( ypSetObject, ypSet_CODE, alloclen );
+    } else {
+        so = ypMem_MALLOC_CONTAINER_VARIABLE( ypSetObject, type, alloclen, 0 );
+    }
     if( yp_isexceptionC( so ) ) return so;
-    // FIXME But wait, what if _ypMem_ideal_size allows us to be _larger_ than minsize?
-    ypSet_ALLOCLEN( so ) = alloclen; // we can't make use of the excess anyway
+    // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
+    ypSet_ALLOCLEN( so ) = alloclen;
     ypSet_FILL( so ) = 0;
     memset( ypSet_TABLE( so ), 0, alloclen * sizeof( ypSet_KeyEntry ) );
     yp_ASSERT( _ypSet_space_remaining( so ) >= minused, "new set doesn't have requested room" );
     return so;
 }
 
-// TODO Ensure shallow copies are efficient
-// TODO Shallow copies of frozensets to frozensets can just return incref( x )...where to handle?
+// XXX Check for the "lazy shallow copy" and "_yp_frozenset_empty" cases first
+// TODO It's tempting to look into memcpy to copy the tables, although that would mean the copy
+// would be just as dirty as the original.  But if the original isn't "too dirty"...
 static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
         ypSet_KeyEntry **ep );
-static ypObject *_ypSet_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
+static ypObject *_ypSet_copy_shallow( int type, ypObject *x, int alloclen_fixed )
+{
+    yp_ssize_t keysleft = ypSet_LEN( x );
+    ypSet_KeyEntry *otherkeys = ypSet_TABLE( x );
+    ypObject *so;
+    yp_ssize_t i;
+    ypSet_KeyEntry *loc;
+
+    so = _ypSet_new( type, keysleft, alloclen_fixed );
+    if( yp_isexceptionC( so ) ) return so;
+
+    // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
+        keysleft -= 1;
+        _ypSet_movekey_clean( so, yp_incref( otherkeys[i].se_key ), otherkeys[i].se_hash, &loc );
+    }
+    return so;
+}
+
+// Will perform a lazy shallow copy if copy_visitor is yp_shallowcopy_visitor
+// XXX Check for the _yp_frozenset_empty case first
+static ypObject *_ypSet_copy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
+        int alloclen_fixed )
 {
     yp_ssize_t keysleft = ypSet_LEN( x );
     ypSet_KeyEntry *otherkeys = ypSet_TABLE( x );
@@ -7040,7 +7070,15 @@ static ypObject *_ypSet_copy( int type, ypObject *x, visitfunc copy_visitor, voi
     ypObject *key;
     ypSet_KeyEntry *loc;
 
-    so = _ypSet_new( type, keysleft );
+    if( copy_visitor == yp_shallowcopy_visitor ) {
+        // A shallow copy of a frozenset to a frozenset doesn't require an actual copy
+        if( type == ypFrozenSet_CODE && ypObject_TYPE_CODE( x ) == ypFrozenSet_CODE ) {
+            return yp_incref( x );
+        }
+        return _ypSet_copy_shallow( type, x, alloclen_fixed );
+    }
+
+    so = _ypSet_new( type, keysleft, alloclen_fixed );
     if( yp_isexceptionC( so ) ) return so;
 
     // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean
@@ -7089,7 +7127,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     ypSet_SET_TABLE( so, newkeys );
     ypSet_LEN( so ) = 0;
     ypSet_FILL( so ) = 0;
-    // FIXME But wait, what if _ypMem_ideal_size allows us to be _larger_ than newalloclen?
+    // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
     ypSet_ALLOCLEN( so ) = newalloclen;
     yp_ASSERT( _ypSet_space_remaining( so ) >= minused, "resized set doesn't have requested room" );
 
@@ -7418,6 +7456,7 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
     // break once so is empty because we aren't expecting any errors from _ypSet_lookkey.
     for( i = 0; keysleft > 0; i++ ) {
         if( ypSet_LEN( so ) < 1 ) break;
+        yp_ASSERT( keys == ypSet_TABLE( so ) && i < ypSet_ALLOCLEN( so ), "removing keys shouldn't resize set" );
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
         keysleft -= 1;
         result = _ypSet_lookkey( other, keys[i].se_key, keys[i].se_hash, &other_loc );
@@ -7428,8 +7467,7 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
     return yp_None;
 }
 
-// FIXME This _allows_ mi to yield mutable values, unlike issubset; standardize
-static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo );
+// TODO This _allows_ mi to yield mutable values, unlike issubset; standardize
 static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_t *mi_state );
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other );
 static ypObject *_ypSet_intersection_update_from_iter(
@@ -7438,11 +7476,11 @@ static ypObject *_ypSet_intersection_update_from_iter(
     ypObject *so_toremove;
     ypObject *result;
 
-    // FIXME can we do this without creating a copy or, alternatively, would it be better to
+    // TODO can we do this without creating a copy or, alternatively, would it be better to
     // implement this as ypSet_intersection?
     // Unfortunately, we need to create a short-lived copy of so.  It's either that, or convert
     // mi to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
-    so_toremove = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL ); // new ref
+    so_toremove = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( so_toremove ) ) return so_toremove;
 
     // Remove items from so_toremove that are yielded by mi.  so_toremove is then a set
@@ -7498,7 +7536,7 @@ static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *othe
     return yp_None;
 }
 
-// FIXME This _allows_ mi to yield mutable values, unlike issubset; standardize
+// TODO This _allows_ mi to yield mutable values, unlike issubset; standardize
 static ypObject *_ypSet_difference_update_from_iter(
         ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
 {
@@ -7592,16 +7630,13 @@ static ypObject *frozenset_freeze( ypObject *so ) {
     return yp_None; // no-op, currently
 }
 
-// TODO Make shallow copies (copy_visitor == yp_shallowcopy_visitor) efficient (unless there's a
-// lot of wasted space)
 static ypObject *frozenset_unfrozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypSet_copy( ypSet_CODE, so, copy_visitor, copy_memo );
+    return _ypSet_copy( ypSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
 }
 
-// TODO Make shallow copies (copy_visitor == yp_shallowcopy_visitor) efficient (unless there's a
-// lot of wasted space)
 static ypObject *frozenset_frozen_copy( ypObject *so, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypSet_copy( ypFrozenSet_CODE, so, copy_visitor, copy_memo );
+    if( ypSet_LEN( so ) < 1 ) return _yp_frozenset_empty;
+    return _ypSet_copy( ypFrozenSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *frozenset_bool( ypObject *so ) {
@@ -7882,7 +7917,7 @@ static ypObject *frozenset_union( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    newSo = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -7900,7 +7935,7 @@ static ypObject *frozenset_intersection( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    newSo = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_intersection_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -7918,7 +7953,7 @@ static ypObject *frozenset_difference( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    newSo = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_difference_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -7934,7 +7969,7 @@ static ypObject *frozenset_symmetric_difference( ypObject *so, ypObject *x )
     ypObject *result;
     ypObject *newSo;
 
-    newSo = frozenset_unfrozen_copy( so, yp_shallowcopy_visitor, NULL );
+    newSo = _ypSet_copy_shallow( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_symmetric_difference_update( newSo, x );
     if( yp_isexceptionC( result ) ) {
@@ -7968,7 +8003,7 @@ static ypObject *set_clear( ypObject *so ) {
     ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, 0 );
     yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
-    // FIXME But wait, what if _ypMem_ideal_size allows us to be _larger_ than minsize?
+    // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
     ypSet_ALLOCLEN( so ) = ypSet_MINSIZE; // we can't make use of the excess anyway
     ypSet_LEN( so ) = 0;
     ypSet_FILL( so ) = 0;
@@ -8209,7 +8244,7 @@ void yp_set_add( ypObject **set, ypObject *x )
 // Constructors
 
 // XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
-// TODO Do an efficient shallow copy if iterable is a fellow set (in yp_frozenset/yp_set)
+// XXX Check for the "fellow frozenset/set" case _before_ calling this function
 static ypObject *_ypSet( int type, ypObject *iterable )
 {
     ypObject *exc = yp_None;
@@ -8220,15 +8255,16 @@ static ypObject *_ypSet( int type, ypObject *iterable )
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
         if( lenhint > ypSet_LEN_MAX ) lenhint = ypSet_LEN_MAX;
-    } else if( lenhint == 0 && type == ypFrozenSet_CODE ) {
-        // yp_lenC reports an empty iterable, so we can shortcut frozenset creation
-        return _yp_frozenset_empty;
+    } else if( lenhint == 0 ) {
+        // yp_lenC reports an empty iterable, so we can shortcut _ypSet_update
+        if( type == ypFrozenSet_CODE ) return _yp_frozenset_empty;
+        return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
     } else if( lenhint > ypSet_LEN_MAX ) {
         // yp_lenC reports that we don't have room to add their elements
         return yp_MemorySizeOverflowError;
     }
 
-    newSo = _ypSet_new( type, lenhint );
+    newSo = _ypSet_new( type, lenhint, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newSo ) ) return newSo;
     // TODO make sure _yp_set_update is efficient for pre-sized objects
     result = _ypSet_update( newSo, iterable );
@@ -8252,7 +8288,11 @@ ypObject *yp_frozensetNV( int n, va_list args ) {
     return _yp_frozensetNV( n, args );
 }
 ypObject *yp_frozenset( ypObject *iterable ) {
-    if( ypObject_TYPE_CODE( iterable ) == ypFrozenSet_CODE ) return yp_incref( iterable );
+    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypFrozenSet_CODE ) {
+        if( ypSet_LEN( iterable ) < 1 ) return _yp_frozenset_empty;
+        if( ypObject_TYPE_CODE( iterable ) == ypFrozenSet_CODE ) return yp_incref( iterable );
+        return _ypSet_copy_shallow( ypFrozenSet_CODE, iterable, /*alloclen_fixed=*/TRUE );
+    }
     return _ypSet( ypFrozenSet_CODE, iterable );
 }
 
@@ -8261,14 +8301,17 @@ static ypObject *_yp_setNV( int n, va_list args ) {
     return _ypSet( ypSet_CODE, iter_args );
 }
 ypObject *yp_setN( int n, ... ) {
-    if( n < 1 ) return _ypSet_new( ypSet_CODE, 0 );
+    if( n < 1 ) return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
     return_yp_V_FUNC( ypObject *, _yp_setNV, (n, args), n );
 }
 ypObject *yp_setNV( int n, va_list args ) {
-    if( n < 1 ) return _ypSet_new( ypSet_CODE, 0 );
+    if( n < 1 ) return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
     return _yp_setNV( n, args );
 }
 ypObject *yp_set( ypObject *iterable ) {
+    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypFrozenSet_CODE ) {
+        return _ypSet_copy_shallow( ypSet_CODE, iterable, /*alloclen_fixed=*/FALSE );
+    }
     return _ypSet( ypSet_CODE, iterable );
 }
 
@@ -8282,7 +8325,8 @@ ypObject *yp_set( ypObject *iterable ) {
 
 // XXX keyset requires care!  It is potentially shared among multiple dicts, so we cannot remove
 // keys or resize it.  It identifies itself as a frozendict, yet we add keys to it, so it is not
-// truly immutable.  As such, it cannot be exposed outside of the set/dict implementations.
+// truly immutable.  As such, it cannot be exposed outside of the set/dict implementations.  On the
+// plus side, we can allocate it's data inline (via alloclen_fixed).
 // TODO investigate how/when the keyset will be shared between dicts
 
 // ypDictObject and ypDict_LEN are defined above, for use by the set code
@@ -8320,17 +8364,17 @@ static ypDictObject _yp_frozendict_empty_struct = {
     (ypObject *) &_yp_frozenset_empty_struct };
 static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empty_struct;
 
-// TODO can use CONTAINER_INLINE if we're sure the frozendict won't grow past minused while being
-// created
-// XXX A minused of zero may mean lenhint is unreliable; we may still grow the frozendict, so don't
-// return _yp_frozendict_empty!
+// XXX Check for the _yp_frozendict_empty case first
+// TODO Extend alloclen_fixed here
+// TODO Put protection in place to detect when INLINE objects attempt to be resized
+// TODO Over-allocate to avoid future resizings
 static ypObject *_ypDict_new( int type, yp_ssize_t minused )
 {
     ypObject *keyset;
     yp_ssize_t alloclen;
     ypObject *mp;
 
-    keyset = _ypSet_new( ypFrozenSet_CODE, minused );
+    keyset = _ypSet_new( ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
     mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
@@ -8402,6 +8446,7 @@ static ypObject *_ypDict_copy( int type, ypObject *x, visitfunc copy_visitor, vo
     }
 
     // Otherwise, copying takes a bit more effort
+    // TODO We can't use copy_visitor to copy the keys, because it might be unfrozen_copy_visitor!
     return yp_NotImplementedError;
 }
 
@@ -8427,7 +8472,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     // TODO allocate the value array in-line, then handle the case where both old and new value
     // arrays could fit in-line (idea: if currently in-line, then just force that the new array be
     // malloc'd...will need to malloc something anyway)
-    newkeyset = _ypSet_new( ypFrozenSet_CODE, minused );
+    newkeyset = _ypSet_new( ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newkeyset ) ) return newkeyset;
     newalloclen = ypSet_ALLOCLEN( newkeyset );
     // XXX The static assert and minused checks above ensure this can't overflow
@@ -8743,6 +8788,10 @@ static ypObject *frozendict_ne( ypObject *mp, ypObject *x ) {
     return ypBool_NOT( result );
 }
 
+// TODO frozendict_currenthash, when implemented, will need to consider the currenthashes of its
+// values as well as its keys.  Just as a tuple with mutable items can't be hashed, hashing a
+// frozendict with mutable values will be an error.
+
 static ypObject *frozendict_contains( ypObject *mp, ypObject *key )
 {
     yp_hash_t hash;
@@ -8767,7 +8816,7 @@ static ypObject *dict_clear( ypObject *mp ) {
     yp_ssize_t alloclen;
     if( ypDict_LEN( mp ) < 1 ) return yp_None;
 
-    keyset = _ypSet_new( ypFrozenSet_CODE, 0 );
+    keyset = _ypSet_new( ypFrozenSet_CODE, 0, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
 
