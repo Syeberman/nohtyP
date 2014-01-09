@@ -429,6 +429,22 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         self.assertEqual(self.s, dup)
         self.assertRaises(TypeError, self.s.add, [])
 
+    def test_add_resize_inline(self):
+        # Ensure _ypSet_resize handles moving data back and forth from the inline buff
+        # TODO Dip into the internals to ensure we're testing what we think
+        ints = yp_list(range((0x80*2)//3 - 1))
+        s = self.thetype()  # inline
+        self.assertEqual(s, yp_set())
+        s.add(-100)         # still inline
+        self.assertEqual(s, yp_set((-100,)))
+        for i in ints: s.add(i)     # now in seperate buff
+        self.assertEqual(yp_len(s), len(ints)+1)
+        self.assertIn(-100, s)
+        for i in ints: s.remove(i)  # still in same buff (no resize on remove)
+        self.assertEqual(s, yp_set((-100,)))
+        s.add(-101)         # back to inline
+        self.assertEqual(s, yp_set((-100, -101)))
+
     def test_remove(self):
         self.s.remove('a')
         self.assertNotIn('a', self.s)
