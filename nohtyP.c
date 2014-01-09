@@ -6930,8 +6930,8 @@ yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-offsetof( ypSetObject, ob_inline_da
 // We don't want the multiplications in _ypSet_space_remaining, _ypSet_calc_alloclen, and
 // _ypSet_resize overflowing, so we impose a separate limit on the maximum len and alloclen for
 // sets
-// XXX ypSet_ALLOCLEN_MAX may be larger than the true maximum; if only there was an easy way to
-// round down to the nearest power of 2 (if it isn't a power of 2 already)
+// XXX ypSet_ALLOCLEN_MAX may be larger than the true maximum
+// TODO We could calculate the exact maximum in yp_initialize...
 #define ypSet_ALLOCLEN_MAX   ( (yp_ssize_t) MIN( MIN( MIN( \
                     yp_SSIZE_T_MAX/ypSet_RESIZE_AT_NMR, \
                     yp_SSIZE_T_MAX/ypSet_RESIZE_AT_DNM ), \
@@ -7097,8 +7097,7 @@ static ypObject *_ypSet_copy( int type, ypObject *x, visitfunc copy_visitor, voi
 
 // Resizes the set to the smallest size that will hold minused values.  If you want to reduce the
 // need for future resizes, call with a larger minused.  Returns yp_None, or an exception on error.
-// TODO ensure we aren't unnecessarily resizing: if the old and new alloclens will be the same,
-// and we don't have dummy entries, then resizing is a waste of effort.
+// XXX We can't use ypMem_REALLOC_CONTAINER_VARIABLE because we can never resize in-place
 // TODO Do we want to split minused into required and extra, like in other areas?
 yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / sizeof( ypSet_KeyEntry ), ypSet_resize_cant_overflow );
 static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
@@ -7110,15 +7109,20 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     yp_ssize_t keysleft;
     yp_ssize_t i;
     ypSet_KeyEntry *loc;
+    yp_ssize_t inlinelen = 
+        (_ypMem_ideal_size-offsetof( ypSetObject, ob_inline_data )) / sizeof( ypSet_KeyEntry );
+    if( inlinelen < 0 ) inlinelen = 0;
 
-    // TODO allocate the table in-line, then handle the case where both old and new tables
-    // could fit in-line (idea: if currently in-line, then just force that the new array be
-    // malloc'd...will need to malloc something anyway)
+    // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
     newalloclen = _ypSet_calc_alloclen( minused );
     if( newalloclen < 1 ) return yp_MemorySizeOverflowError;
-    // XXX The static assert and _ypSet_calc_alloclen checks above ensure this can't overflow
-    newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * sizeof( ypSet_KeyEntry ) );
-    if( newkeys == NULL ) return yp_MemoryError;
+    if( newalloclen <= inlinelen && ypSet_TABLE( so ) != ypSet_INLINE_DATA( so ) ) {
+        newkeys = ypSet_INLINE_DATA( so );
+    } else {
+        // XXX The static assert and _ypSet_calc_alloclen checks above ensure this can't overflow
+        newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * sizeof( ypSet_KeyEntry ) );
+        if( newkeys == NULL ) return yp_MemoryError;
+    }
     memset( newkeys, 0, newalloclen * sizeof( ypSet_KeyEntry ) );
 
     // Failures are impossible from here on, so swap-in the new table
@@ -8354,6 +8358,7 @@ ypObject *yp_set( ypObject *iterable ) {
 // So long as each entry in the dict's value array is no larger than each entry in the set's
 // key/hash array, we can share ypSet_ALLOCLEN_MAX and ypSet_LEN_MAX without fear of overflow
 yp_STATIC_ASSERT( sizeof( ypObject * ) <= sizeof( ypSet_KeyEntry ), ypDict_data_not_larger_than_set_data );
+yp_STATIC_ASSERT( (yp_SSIZE_T_MAX-sizeof( ypDictObject )) / sizeof( ypObject * ) >= ypSet_ALLOCLEN_MAX, ypDict_alloclen_max_not_smaller_than_set_alloclen_max );
 
 // Empty frozendicts can be represented by this, immortal object
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty frozendict?
@@ -8468,21 +8473,27 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     yp_ssize_t i;
     ypObject *value;
     ypSet_KeyEntry *newkey_loc;
+    yp_ssize_t inlinelen = 
+        (_ypMem_ideal_size-offsetof( ypDictObject, ob_inline_data )) / sizeof( ypObject * );
+    if( inlinelen < 0 ) inlinelen = 0;
 
-    // TODO allocate the value array in-line, then handle the case where both old and new value
-    // arrays could fit in-line (idea: if currently in-line, then just force that the new array be
-    // malloc'd...will need to malloc something anyway)
+    // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
     newkeyset = _ypSet_new( ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newkeyset ) ) return newkeyset;
     newalloclen = ypSet_ALLOCLEN( newkeyset );
-    // XXX The static assert and minused checks above ensure this can't overflow
-    newvalues = (ypObject **) yp_malloc( &newsize, newalloclen * sizeof( ypObject * ) );
-    if( newvalues == NULL ) {
-        yp_decref( newkeyset );
-        return yp_MemoryError;
+    if( newalloclen <= inlinelen && ypDict_VALUES( mp ) != ypDict_INLINE_DATA( mp ) ) {
+        newvalues = ypDict_INLINE_DATA( mp );
+    } else {
+        // XXX The static assert and minused checks above ensure this can't overflow
+        newvalues = (ypObject **) yp_malloc( &newsize, newalloclen * sizeof( ypObject * ) );
+        if( newvalues == NULL ) {
+            yp_decref( newkeyset );
+            return yp_MemoryError;
+        }
     }
     memset( newvalues, 0, newalloclen * sizeof( ypObject * ) );
 
+    // Move the keys and values from the old tables
     oldkeys = ypSet_TABLE( ypDict_KEYSET( mp ) );
     oldvalues = ypDict_VALUES( mp );
     valuesleft = ypDict_LEN( mp );
@@ -8495,6 +8506,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
         newvalues[ypSet_ENTRY_INDEX( newkeyset, newkey_loc )] = oldvalues[i];
     }
 
+    // Free the old tables and swap-in the new ones
     yp_decref( ypDict_KEYSET( mp ) );
     ypDict_KEYSET( mp ) = newkeyset;
     if( oldvalues != ypDict_INLINE_DATA( mp ) ) yp_free( oldvalues );

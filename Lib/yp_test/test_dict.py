@@ -357,6 +357,22 @@ class DictTest(yp_unittest.TestCase):
         self.assertEqual(hashed2.hash_count, 1)
         self.assertEqual(hashed1.eq_count + hashed2.eq_count, 1)
 
+    def test_setitem_resize_inline(self):
+        # Ensure _ypDict_resize handles moving data back and forth from the inline buff
+        # TODO Dip into the internals to ensure we're testing what we think
+        ints = yp_list(range((0x80*2)//3 - 1))
+        d = yp_dict()       # inline
+        self.assertEqual(d, yp_dict())
+        d[-100] = None      # still inline
+        self.assertEqual(d, yp_dict({-100: None}))
+        for i in ints: d[i] = None  # now in seperate buff
+        self.assertEqual(yp_len(d), len(ints)+1)
+        self.assertIn(-100, d)
+        for i in ints: del d[i]     # still in same buff (no resize on remove)
+        self.assertEqual(d, yp_dict({-100: None}))
+        d[-101] = None      # back to inline
+        self.assertEqual(d, yp_dict({-100: None, -101: None}))
+
     @yp_unittest.skip("REWORK: nohtyP dicts don't store user-defined types")
     def test_setitem_atomic_at_resize(self):
         class Hashed(object):
