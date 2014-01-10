@@ -1124,22 +1124,28 @@ static ypObject *_ypMem_malloc_container_variable(
     _ypMem_malloc_container_variable( offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (required), (extra) )
 
-// Resizes ob_data, the variable-portion of ob, and returns yp_None.  On error, ob is not modified,
-// and an exception is returned.  required is the minimum ob_alloclen required, and the minimum
-// number of elements that will be preserved; if required can fit inline, the inline buffer is
+// Resizes ob_data, the variable-portion of ob, and returns the previous value of ob_data
+// ("oldptr").  There are three possible scenarios:
+//  - On error, returns NULL, and ob is not modified
+//  - If ob_data can be resized in-place, updates ob_alloclen and returns ob_data; in this case, no
+//  memcpy is necessary, as the buffer has not moved
+//  - Otherwise, updates ob_alloclen and returns oldptr (which is not freed); in this case, you
+//  will need to copy the data from oldptr then free it with:
+//      ypMem_REALLOC_CONTAINER_FREE_OLDPTR( ob, obStruct, oldptr )
+// Required is the minimum ob_alloclen required; if required can fit inline, the inline buffer is
 // used.  extra is a hint as to how much the buffer should be over-allocated, which may be ignored.
-// This function will always resize the data, so first check to see if a resize is necessary.  Any
-// objects in the truncated section must have already been discarded.  required and extra cannot
-// be negative and required*sizeof_elems cannot overflow; ob_alloclen may be larger than requested.
-// Does not update ob_len.
+// This function will always resize the data, so first check to see if a resize is necessary.
+// required and extra cannot be negative and required*sizeof_elems cannot overflow; ob_alloclen
+// may be larger than requested.  Does not update ob_len.
+// XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
 // XXX We require that each type knows and checks for their maximum length to avoid overflow here
 // TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
-// TODO Let the caller move data around and free the old buffer
-static ypObject *_ypMem_realloc_container_variable(
+static void *_ypMem_realloc_container_variable(
         ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems,
         yp_ssize_t required, yp_ssize_t extra )
 {
     void *newptr;
+    void *oldptr;
     yp_ssize_t size;
     yp_ssize_t extra_size;
     yp_ssize_t alloclen;
@@ -1155,53 +1161,58 @@ static ypObject *_ypMem_realloc_container_variable(
 
     // If the minimum required allocation can fit inline, then prefer that over a separate buffer
     if( required <= inlinelen ) {
-        // If the data is currently not inline, move it there, then free the other buffer
-        if( ob->ob_data != inlineptr ) {
-            memcpy( inlineptr, ob->ob_data, required * sizeof_elems );
-            yp_free( ob->ob_data );
-            ob->ob_data = inlineptr;
-            ob->ob_alloclen = inlinelen;
-        }
+        oldptr = ob->ob_data;   // might equal inlineptr
+        ob->ob_data = inlineptr;
+        ob->ob_alloclen = inlinelen;
         yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (to inline): 0x%08X alloclen %d", ob, ob->ob_alloclen );
-        return yp_None;
+        return oldptr;
     }
 
     // If the data is currently inline, it must be moved out into a separate buffer
     if( ob->ob_data == inlineptr ) {
         newptr = yp_malloc( &size, _ypMem_calc_extra_size( required+extra, sizeof_elems ) );
-        if( newptr == NULL ) return yp_MemoryError;
-        memcpy( newptr, ob->ob_data, inlinelen * sizeof_elems );
+        if( newptr == NULL ) return NULL;
+        oldptr = ob->ob_data;   // can't possibly equal newptr
         ob->ob_data = newptr;
         alloclen = size / sizeof_elems; // rounds down
         if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
         ob->ob_alloclen = alloclen;
         yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (from inline): 0x%08X alloclen %d", ob, alloclen );
-        return yp_None;
+        return oldptr;
     }
 
     // Otherwise, let yp_malloc_resize determine if we can expand in-place or need to memcpy
     extra_size = _ypMem_calc_extra_size( extra, sizeof_elems );
     newptr = yp_malloc_resize( &size, ob->ob_data, required * sizeof_elems, extra_size );
-    if( newptr == NULL ) return yp_MemoryError;
-    if( newptr != ob->ob_data ) {
-        memcpy( newptr, ob->ob_data, MIN(ob->ob_alloclen * sizeof_elems, size) );
-        yp_free( ob->ob_data );
-        ob->ob_data = newptr;
-    }
+    if( newptr == NULL ) return NULL;
+    oldptr = ob->ob_data;       // might equal newptr
+    ob->ob_data = newptr;
     alloclen = size / sizeof_elems; // rounds down
     if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
     ob->ob_alloclen = alloclen;
     yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (malloc_resize): 0x%08X alloclen %d", ob, alloclen );
-    return yp_None;
+    return oldptr;
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, required, extra ) \
     _ypMem_realloc_container_variable( ob, offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (required), (extra) )
 
-// Equivalent, but optimized, version of:
-//  ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, 0, 0 )
-// Will always reset ob_data to the inline buffer, freeing the separate buffer (if there is one).
-// Any contained objects must have already been discarded; no memory is copied.  Always succeeds.
+// Called after a successful ypMem_REALLOC_CONTAINER_VARIABLE to free the previous value of ob_data
+// ("oldptr").  If ob_data was resized in-place, or if oldptr is the inline buffer, this is a
+// no-op.  Always succeeds.
+// TODO Should we allow the oldptr==ob_data case?
+static void _ypMem_realloc_container_free_oldptr(
+        ypObject *ob, yp_ssize_t offsetof_inline, void *oldptr )
+{
+    void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    yp_DEBUG( "REALLOC_CONTAINER_FREE_OLDPTR: 0x%08X", ob );
+    if( oldptr != ob->ob_data && oldptr != inlineptr ) yp_free( oldptr );
+}
+#define ypMem_REALLOC_CONTAINER_FREE_OLDPTR( ob, obStruct, oldptr ) \
+    _ypMem_realloc_container_free_oldptr( ob, offsetof( obStruct, ob_inline_data ), oldptr )
+
+// Resets ob_data to the inline buffer and frees the separate buffer (if there is one).  Any
+// contained objects must have already been discarded; no memory is copied.  Always succeeds.
 // TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
 static void _ypMem_realloc_container_variable_clear(
         ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems )
@@ -1225,7 +1236,7 @@ static void _ypMem_realloc_container_variable_clear(
 // Frees an object allocated with ypMem_MALLOC_FIXED
 #define ypMem_FREE_FIXED yp_free
 
-// Frees an object allocated with either ypMem_REALLOC_CONTAINER_* macro
+// Frees an object allocated with either ypMem_MALLOC_CONTAINER_* macro
 static void _ypMem_free_container( ypObject *ob, yp_ssize_t offsetof_inline )
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
@@ -4544,9 +4555,17 @@ static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
 // TODO Split this into grow and shrink functions (here and elsewhere) that check alloclen
 static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra )
 {
+    void *oldptr;
+    yp_ssize_t oldalloclen = ypBytes_ALLOCLEN( b );
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
     yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
-    return ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, requiredLen+1, extra );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, requiredLen+1, extra );
+    if( oldptr == NULL ) return yp_MemoryError;
+    if( ypBytes_DATA( b ) != oldptr ) {
+        memcpy( ypBytes_DATA( b ), oldptr, MIN( oldalloclen, requiredLen )+1 );
+    }
+    ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
+    return yp_None;
 }
 
 // As yp_asuint8C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
@@ -4599,6 +4618,7 @@ static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
 }
 
 // Extends b with the contents of x, a fellow byte object; always writes the null-terminator
+// XXX Remember that b and x may be the same object
 // TODO over-allocate as appropriate
 static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
 {
@@ -5058,8 +5078,9 @@ static ypObject *bytearray_push( ypObject *b, ypObject *x )
 
 static ypObject *bytearray_clear( ypObject *b )
 {
-    ypObject *result = _ypBytes_resize( b, 0, 0 );
-    if( yp_isexceptionC( result ) ) return result;
+    void *oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, 0+1, 0 );
+    // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
+    if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
     yp_ASSERT( ypBytes_DATA( b ) == ypBytes_INLINE_DATA( b ), "bytearray_clear didn't allocate inline!" );
     ypBytes_DATA( b )[0] = '\0';
     ypBytes_LEN( b ) = 0;
@@ -6018,9 +6039,17 @@ static ypObject *_ypTuple_deepcopy( int type, ypObject *x, visitfunc copy_visito
 // TODO Create two functions: one that shrinks and one that grows
 static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t required, yp_ssize_t extra )
 {
+    void *oldptr;
     yp_ASSERT( required >= 0, "required cannot be negative" );
     yp_ASSERT( required <= ypTuple_LEN_MAX, "required cannot be >max" );
-    return ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
+    if( oldptr == NULL ) return yp_MemoryError;
+    if( ypTuple_ARRAY( sq ) != oldptr ) {
+        memcpy( ypTuple_ARRAY( sq ), oldptr,
+                MIN( ypTuple_LEN( sq ), required ) * sizeof( ypObject * ) );
+    }
+    ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
+    return yp_None;
 }
 
 // Used by tp_repeat et al to perform the necessary memcpy's.  sq's array must be allocated
@@ -7169,7 +7198,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     yp_ssize_t keysleft;
     yp_ssize_t i;
     ypSet_KeyEntry *loc;
-    yp_ssize_t inlinelen = 
+    yp_ssize_t inlinelen =
         (_ypMem_ideal_size-offsetof( ypSetObject, ob_inline_data )) / sizeof( ypSet_KeyEntry );
     if( inlinelen < 0 ) inlinelen = 0;
 
@@ -8071,13 +8100,17 @@ static ypObject *set_push( ypObject *so, ypObject *x ) {
     return yp_None;
 }
 
-static ypObject *set_clear( ypObject *so ) {
+static ypObject *set_clear( ypObject *so )
+{
+    void *oldptr;
     if( ypSet_FILL( so ) < 1 ) return yp_None;
+
     _ypSet_discard_key_refs( so );
-    // FIXME there's a memcpy in this that we can and should avoid
-    ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, 0 );
-    yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, 0 );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
+    if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( so, ypSetObject, oldptr );
+    yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" );
+
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
     ypSet_ALLOCLEN( so ) = ypSet_MINSIZE; // we can't make use of the excess anyway
     ypSet_LEN( so ) = 0;
@@ -8483,6 +8516,7 @@ static void _ypDict_discard_value_refs( ypObject *mp )
 
 // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
 // XXX Check for the "lazy shallow copy" and "_yp_frozendict_empty" cases first
+// TODO Is there a point where the original is so dirty that we'd be better spinning a new keyset?
 static ypObject *_ypDict_copy( int type, ypObject *x )
 {
     ypObject *keyset;
@@ -8538,7 +8572,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     yp_ssize_t i;
     ypObject *value;
     ypSet_KeyEntry *newkey_loc;
-    yp_ssize_t inlinelen = 
+    yp_ssize_t inlinelen =
         (_ypMem_ideal_size-offsetof( ypDictObject, ob_inline_data )) / sizeof( ypObject * );
     if( inlinelen < 0 ) inlinelen = 0;
 
@@ -8900,19 +8934,21 @@ static ypObject *frozendict_len( ypObject *mp, yp_ssize_t *len ) {
 static ypObject *dict_clear( ypObject *mp ) {
     ypObject *keyset;
     yp_ssize_t alloclen;
+    void *oldptr;
     if( ypDict_LEN( mp ) < 1 ) return yp_None;
 
     keyset = _ypSet_new( ypFrozenSet_CODE, 0, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
 
-    yp_decref( ypDict_KEYSET( mp ) );
     _ypDict_discard_value_refs( mp );
-    // FIXME there's a memcpy in this that we can and should avoid
-    ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, 0 );
-    yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ), "dict_clear didn't allocate inline!" );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, 0 );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
+    if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( mp, ypDictObject, oldptr );
+    yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ), "dict_clear didn't allocate inline!" );
+
     ypDict_LEN( mp ) = 0;
+    yp_decref( ypDict_KEYSET( mp ) );
     ypDict_KEYSET( mp ) = keyset;
     memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
     return yp_None;
