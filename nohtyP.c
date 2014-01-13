@@ -4556,15 +4556,15 @@ static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
 static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra )
 {
     void *oldptr;
-    yp_ssize_t oldalloclen = ypBytes_ALLOCLEN( b );
+    yp_ssize_t oldalloclen = ypBytes_ALLOCLEN( b ); // FIXME should use LEN
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
     yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
     oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, requiredLen+1, extra );
     if( oldptr == NULL ) return yp_MemoryError;
     if( ypBytes_DATA( b ) != oldptr ) {
         memcpy( ypBytes_DATA( b ), oldptr, MIN( oldalloclen, requiredLen )+1 );
+        ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
     }
-    ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
     return yp_None;
 }
 
@@ -4647,6 +4647,7 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
     yp_uint8_t x_asbyte;
     yp_ssize_t lenhint = yp_miniiter_lenhintC( mi, mi_state, &exc ); // zero on error
     yp_ssize_t newLen = ypBytes_LEN( b );
+    // FIXME track alloclen-1 (maxLen or resizeAtLen?)
     ypObject *result;
 
     while( 1 ) {
@@ -4658,8 +4659,8 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
         x_asbyte = _ypBytes_asuint8C( x, &exc );
         yp_decref( x );
         if( yp_isexceptionC( exc ) ) return exc;
-
         lenhint -= 1; // check for <0 only when we need it
+
         if( newLen > ypBytes_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
         newLen += 1;
         if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
@@ -4697,6 +4698,37 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
     }
 }
 
+// Called on a setslice of step 1 and positive growBy, or an insert.  Will shift the data at 
+// b[stop:] to start at b[stop+growBy]; the data at b[start:stop+growBy] will be uninitialized.  
+// Updates ypBytes_LEN and writes the null terminator.  On error, b is not modified.
+static ypObject *_ypBytes_setslice_grow( ypObject *b, yp_ssize_t start, yp_ssize_t stop, 
+        yp_ssize_t growBy, yp_ssize_t extra )
+{
+    yp_ssize_t newLen;
+    yp_uint8_t *oldptr;
+    yp_ASSERT( growBy >= 1, "growBy cannot be less than 1" );
+
+    // Ensure there's enough space allocated
+    if( ypBytes_LEN( b ) > ypBytes_LEN_MAX - growBy ) return yp_MemorySizeOverflowError;
+    newLen = ypBytes_LEN( b ) + growBy;
+    if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
+        oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, extra );
+        if( oldptr == NULL ) return yp_MemoryError;
+        if( ypBytes_DATA( b ) == oldptr ) {
+            ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
+        } else {
+            // The data doesn't overlap, so use memcpy
+            memcpy( ypBytes_DATA( b ), oldptr, start );
+            memcpy( ypBytes_DATA( b )+stop+growBy, oldptr+stop, ypBytes_LEN( b )-stop+1 );
+            ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
+        }
+    } else {
+        ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
+    }
+    ypBytes_LEN( b ) = newLen;
+    return yp_None;
+}
+
 // XXX b and x must _not_ be the same object (pass a copy of x if so)
 static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t step );
@@ -4713,29 +4745,20 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
     if( yp_isexceptionC( result ) ) return result;
 
     if( step == 1 ) {
-        // Note that -len(b)<=growBy<=len(x), so the growBy calculation can't overflow.  However,
-        // the newLen calculation might if growBy>0.
+        // Note that -len(b)<=growBy<=len(x), so the growBy calculation can't overflow
         yp_ssize_t growBy = ypBytes_LEN( x ) - slicelength; // negative means array shrinking
-        yp_ssize_t newLen = ypBytes_LEN( b ) + growBy;
-
-        // Ensure there's enough space allocated; after this, failure is impossible
-        // FIXME The resize might have to copy data, _then_ we'll also do the ypBytes_ELEMMOVE,
-        // copying large amounts of data twice; optimize
-        // TODO Over-allocate
         if( growBy > 0 ) {
-            if( ypBytes_LEN( b ) > ypBytes_LEN_MAX - growBy ) return yp_MemorySizeOverflowError;
-            if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
-                result = _ypBytes_resize( b, newLen, 0 );
-                if( yp_isexceptionC( result ) ) return result;
-            }
+            // TODO Over-allocate?
+            result = _ypBytes_setslice_grow( b, start, stop, growBy, 0 );
+            if( yp_isexceptionC( result ) ) return result;
+        } else if( growBy < 0 ) {
+            // Shrinking, so we know we have enough memory allocated
+            ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
+            ypBytes_LEN( b ) += growBy;
         }
-
-        // Adjust remaining items and null terminator
-        ypBytes_ELEMMOVE( b, stop+growBy, stop );
 
         // There are now len(x) bytes starting at b[start] waiting for x's data
         memcpy( ypBytes_DATA( b )+start, ypBytes_DATA( x ), ypBytes_LEN( x ) );
-        ypBytes_LEN( b ) = newLen;
     } else {
         yp_ssize_t i;
         if( ypBytes_LEN( x ) != slicelength ) return yp_ValueError;
@@ -4983,6 +5006,7 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
 
     if( factor > ypBytes_LEN_MAX / ypBytes_LEN( b ) ) return yp_MemorySizeOverflowError;
     newLen = ypBytes_LEN( b ) * factor;
+    // FIXME we should check alloclen first
     result = _ypBytes_resize( b, newLen, 0 );
     if( yp_isexceptionC( result ) ) return result;
 
@@ -4994,8 +5018,8 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
 static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
 {
     ypObject *exc = yp_None;
-    yp_ssize_t newLen;
     yp_uint8_t x_asbyte;
+    ypObject *result;
 
     // Check for exceptions, then adjust the index (noting it should behave like b[i:i]=[x])
     x_asbyte = _ypBytes_asuint8C( x, &exc );
@@ -5007,22 +5031,11 @@ static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
         i = ypBytes_LEN( b );
     }
 
-    // Resize if necessary
-    // FIXME The resize might have to copy data, _then_ we'll also do the ypBytes_ELEMMOVE, copying
-    // large amounts of data twice; optimize (and...are there other areas of the code where this
-    // happens?)
-    if( ypBytes_LEN( b ) > ypBytes_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
-    newLen = ypBytes_LEN( b ) + 1;
-    if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
-        // TODO over-allocate
-        ypObject *result = _ypBytes_resize( b, newLen, 0 );
-        if( yp_isexceptionC( result ) ) return result;
-    }
-
     // Make room at i and add x_asbyte
-    ypBytes_ELEMMOVE( b, i+1, i );
+    // TODO over-allocate
+    result = _ypBytes_setslice_grow( b, i, i, 1, 0 );
+    if( yp_isexceptionC( result ) ) return result;
     ypBytes_DATA( b )[i] = x_asbyte;
-    ypBytes_LEN( b ) = newLen;
     return yp_None;
 }
 
@@ -6047,8 +6060,8 @@ static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t required, yp_ssize_t 
     if( ypTuple_ARRAY( sq ) != oldptr ) {
         memcpy( ypTuple_ARRAY( sq ), oldptr,
                 MIN( ypTuple_LEN( sq ), required ) * sizeof( ypObject * ) );
+        ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
     }
-    ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
     return yp_None;
 }
 

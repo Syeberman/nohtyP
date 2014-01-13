@@ -957,6 +957,14 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
             with self.assertRaises(ValueError):
                 b[3:4] = elem
 
+    def test_setslice_large_growth(self):
+        # Tests that _ypBytes_setslice_grow properly handles when a new buffer is allocated
+        b1 = yp_bytes(range(255))*5
+        b2 = yp_bytes((0x80, 0x80))
+        b = yp_bytearray(b2*2)  # data should be inline
+        b[2:2] = b1             # data should have moved out
+        self.assertEqual(b, b2+b1+b2)
+
     @yp_unittest.skip("TODO re-enable (it just takes a long time)")
     def test_extended_set_del_slice(self):
         # XXX ctypes truncates large ints, making them look valid in nohtyP tests
