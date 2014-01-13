@@ -1027,6 +1027,12 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertEqual(b, b1)
         self.assertIs(b, b1)
 
+    def test_irepeat_large_growth(self):
+        # Tests that bytearray_irepeat properly handles when a new buffer is allocated
+        b = yp_bytearray(b"x")  # data should be inline
+        b *= 1000               # data should have moved out
+        self.assertEqual(b, yp_bytes(b"x")*1000)
+
     @yp_unittest.skip("Not applicable to nohtyP")
     def test_alloc(self):
         b = yp_bytearray()
@@ -1067,6 +1073,14 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         a = yp_bytearray(b'')
         a.extend([Indexable(ord('a'))])
         self.assertEqual(a, b'a')
+
+    def test_extend_large_growth(self):
+        # Tests that _ypBytes_extend_from_bytes properly handles when a new buffer is allocated
+        b1 = yp_bytes(range(255))*5
+        b2 = yp_bytes((0x80, 0x80))
+        b = yp_bytearray(b2)    # data should be inline
+        b.extend(b1)            # data should have moved out
+        self.assertEqual(b, b2+b1)
 
     def test_remove(self):
         b = yp_bytearray(b'hello')
