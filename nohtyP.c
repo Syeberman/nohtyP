@@ -4549,25 +4549,6 @@ static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
     return copy;
 }
 
-// Shrinks or grows the bytearray to fit the given requiredLen plus the null terminator.
-// XXX If shrinking, ensure length is updated
-// XXX Check alloclen first to avoid unnecessary resizes
-// TODO Split this into grow and shrink functions (here and elsewhere) that check alloclen
-static ypObject *_ypBytes_resize( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra )
-{
-    void *oldptr;
-    yp_ssize_t oldalloclen = ypBytes_ALLOCLEN( b ); // FIXME should use LEN
-    yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
-    yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
-    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, requiredLen+1, extra );
-    if( oldptr == NULL ) return yp_MemoryError;
-    if( ypBytes_DATA( b ) != oldptr ) {
-        memcpy( ypBytes_DATA( b ), oldptr, MIN( oldalloclen, requiredLen )+1 );
-        ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
-    }
-    return yp_None;
-}
-
 // As yp_asuint8C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
 static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
     yp_int_t asint;
@@ -4604,8 +4585,9 @@ static ypObject *_ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, y
 }
 
 // Used by tp_repeat et al to perform the necessary memcpy's.  b's array must be allocated
-// to hold (factor*n)+1 bytes, and the bytes to repeat must be in the first n elements of the array.
-// Further, factor and n must both be greater than zero.  Null-terminates the result.  Cannot fail.
+// to hold (factor*n)+1 bytes, and the bytes to repeat must be in the first n elements of the
+// array.  Further, factor and n must both be greater than zero.  Null-terminates the result, but
+// does not update len.  Cannot fail.
 static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
 {
     yp_uint8_t *data = ypBytes_DATA( b );
@@ -4622,14 +4604,17 @@ static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
 // TODO over-allocate as appropriate
 static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
 {
-    ypObject *result;
     yp_ssize_t newLen;
 
     if( ypBytes_LEN( b ) > ypBytes_LEN_MAX - ypBytes_LEN( x ) ) return yp_MemorySizeOverflowError;
     newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
     if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
-        result = _ypBytes_resize( b, newLen, 0 );
-        if( yp_isexceptionC( result ) ) return result;
+        void *oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, 0 );
+        if( oldptr == NULL ) return yp_MemoryError;
+        if( ypBytes_DATA( b ) != oldptr ) {
+            memcpy( ypBytes_DATA( b ), oldptr, ypBytes_LEN( b ) );
+            ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
+        }
     }
     memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
     ypBytes_DATA( b )[newLen] = '\0';
@@ -4647,8 +4632,7 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
     yp_uint8_t x_asbyte;
     yp_ssize_t lenhint = yp_miniiter_lenhintC( mi, mi_state, &exc ); // zero on error
     yp_ssize_t newLen = ypBytes_LEN( b );
-    // FIXME track alloclen-1 (maxLen or resizeAtLen?)
-    ypObject *result;
+    void *oldptr;
 
     while( 1 ) {
         x = yp_miniiter_next( mi, mi_state ); // new ref
@@ -4665,8 +4649,12 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
         newLen += 1;
         if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
             if( lenhint < 0 ) lenhint = 0;
-            result = _ypBytes_resize( b, newLen, lenhint );
-            if( yp_isexceptionC( result ) ) return result;
+            oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, lenhint );
+            if( oldptr == NULL ) return yp_MemoryError;
+            if( ypBytes_DATA( b ) != oldptr ) {
+                memcpy( ypBytes_DATA( b ), oldptr, newLen-1 ); // -1 for the byte we haven't written
+                ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
+            }
         }
         ypBytes_DATA( b )[newLen-1] = x_asbyte;
     }
@@ -4698,10 +4686,10 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
     }
 }
 
-// Called on a setslice of step 1 and positive growBy, or an insert.  Will shift the data at 
-// b[stop:] to start at b[stop+growBy]; the data at b[start:stop+growBy] will be uninitialized.  
+// Called on a setslice of step 1 and positive growBy, or an insert.  Will shift the data at
+// b[stop:] to start at b[stop+growBy]; the data at b[start:stop+growBy] will be uninitialized.
 // Updates ypBytes_LEN and writes the null terminator.  On error, b is not modified.
-static ypObject *_ypBytes_setslice_grow( ypObject *b, yp_ssize_t start, yp_ssize_t stop, 
+static ypObject *_ypBytes_setslice_grow( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t growBy, yp_ssize_t extra )
 {
     yp_ssize_t newLen;
@@ -4998,7 +4986,6 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
 static ypObject *bytearray_clear( ypObject *b );
 static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
 {
-    ypObject *result;
     yp_ssize_t newLen;
 
     if( ypBytes_LEN( b ) < 1 || factor == 1 ) return yp_None; // no-op
@@ -5006,9 +4993,14 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
 
     if( factor > ypBytes_LEN_MAX / ypBytes_LEN( b ) ) return yp_MemorySizeOverflowError;
     newLen = ypBytes_LEN( b ) * factor;
-    // FIXME we should check alloclen first
-    result = _ypBytes_resize( b, newLen, 0 );
-    if( yp_isexceptionC( result ) ) return result;
+    if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
+        void *oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, 0 );
+        if( oldptr == NULL ) return yp_MemoryError;
+        if( ypBytes_DATA( b ) != oldptr ) {
+            memcpy( ypBytes_DATA( b ), oldptr, ypBytes_LEN( b ) );
+            ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
+        }
+    }
 
     _ypBytes_repeat_memcpy( b, factor, ypBytes_LEN( b ) );
     ypBytes_LEN( b ) = newLen;
