@@ -195,6 +195,14 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, a.__setitem__)
 
+    def test_setslice_large_growth(self):
+        # Tests that _ypTuple_setslice_grow properly handles when a new buffer is allocated
+        a1 = yp_tuple(range(1000,2000))
+        a2 = yp_tuple((a1, ))
+        a = yp_list(a2*4)   # data should be inline
+        a[1:3] = a1         # data should have moved out, a[1] and a[2] discarded
+        self.assertEqual(a, a2+a1+a2)
+
     def test_delslice(self):
         a = self.type2test([0, 1])
         del a[1:2]

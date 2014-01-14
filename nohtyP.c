@@ -6039,24 +6039,6 @@ static ypObject *_ypTuple_deepcopy( int type, ypObject *x, visitfunc copy_visito
     return sq;
 }
 
-// Shrinks or grows the tuple; if shrinking, ensure excess elements are discarded before calling.
-// Returns yp_None on success, exception on error.
-// TODO Create two functions: one that shrinks and one that grows
-static ypObject *_ypTuple_resize( ypObject *sq, yp_ssize_t required, yp_ssize_t extra )
-{
-    void *oldptr;
-    yp_ASSERT( required >= 0, "required cannot be negative" );
-    yp_ASSERT( required <= ypTuple_LEN_MAX, "required cannot be >max" );
-    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
-    if( oldptr == NULL ) return yp_MemoryError;
-    if( ypTuple_ARRAY( sq ) != oldptr ) {
-        memcpy( ypTuple_ARRAY( sq ), oldptr,
-                MIN( ypTuple_LEN( sq ), required ) * sizeof( ypObject * ) );
-        ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
-    }
-    return yp_None;
-}
-
 // Used by tp_repeat et al to perform the necessary memcpy's.  sq's array must be allocated
 // to hold factor*n objects, the objects to repeat must be in the first n elements of the array,
 // and the rest of the array must not contain any references (they will be overwritten).  Further,
@@ -6072,6 +6054,22 @@ static void _ypTuple_repeat_memcpy( ypObject *sq, size_t factor, size_t n )
     memcpy( array+(n*copied), array+0, n_size*(factor-copied) ); // no-op if factor==copied
 }
 
+// Called on push/append, extend, or irepeat to increase the allocated size of the tuple.  Does not
+// update ypTuple_LEN.
+static ypObject *_ypTuple_extend_grow( ypObject *sq, yp_ssize_t required, yp_ssize_t extra )
+{
+    void *oldptr;
+    yp_ASSERT( required >= ypTuple_LEN( sq ), "required cannot be <len(sq)" );
+    yp_ASSERT( required <= ypTuple_LEN_MAX, "required cannot be >max" );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
+    if( oldptr == NULL ) return yp_MemoryError;
+    if( ypTuple_ARRAY( sq ) != oldptr ) {
+        memcpy( ypTuple_ARRAY( sq ), oldptr, ypTuple_LEN( sq ) * sizeof( ypObject * ) );
+        ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
+    }
+    return yp_None;
+}
+
 // growhint is the number of additional items, not including x, that are expected to be added to
 // the tuple
 static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
@@ -6080,7 +6078,7 @@ static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
     if( ypTuple_LEN( sq ) > ypTuple_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
     if( ypTuple_ALLOCLEN( sq ) < ypTuple_LEN( sq )+1 ) {
         if( growhint < 0 ) growhint = 0;
-        result = _ypTuple_resize( sq, ypTuple_LEN( sq )+1, growhint );
+        result = _ypTuple_extend_grow( sq, ypTuple_LEN( sq )+1, growhint );
         if( yp_isexceptionC( result ) ) return result;
     }
     ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] = yp_incref( x );
@@ -6097,7 +6095,7 @@ static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
     if( ypTuple_LEN( sq ) > ypTuple_LEN_MAX - ypTuple_LEN( x ) ) return yp_MemorySizeOverflowError;
     newLen = ypTuple_LEN( sq ) + ypTuple_LEN( x );
     if( ypTuple_ALLOCLEN( sq ) < newLen ) {
-        ypObject *result = _ypTuple_resize( sq, newLen, 0 );
+        ypObject *result = _ypTuple_extend_grow( sq, newLen, 0 );
         if( yp_isexceptionC( result ) ) return result;
     }
     memcpy( ypTuple_ARRAY( sq )+ypTuple_LEN( sq ), ypTuple_ARRAY( x ),
@@ -6143,6 +6141,55 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
     }
 }
 
+// Called by setslice to discard the items at sq[start:stop] and shift the items at sq[stop:] to 
+// start at sq[stop+growBy]; the pointers at sq[start:stop+growBy] will be uninitialized.  sq must
+// have enough space allocated for the move. Updates ypTuple_LEN.  Cannot fail.
+static void _ypTuple_setslice_elemmove( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t growBy ) 
+{
+    yp_ssize_t i;
+    yp_ASSERT( growBy >= -ypTuple_LEN( sq ), "growBy cannot be less than -len(sq)" );
+    yp_ASSERT( ypTuple_LEN( sq )+growBy <= ypTuple_ALLOCLEN( sq ), "must be enough space for move" );
+    for( i = start; i < stop; i++ ) yp_decref( ypTuple_ARRAY( sq )[i] );
+    ypTuple_ELEMMOVE( sq, stop+growBy, stop );
+    ypTuple_LEN( sq ) += growBy;
+}
+
+// Called on a setslice of step 1 and positive growBy, or an insert.  Similar to
+// _ypTuple_setslice_elemmove, except sq will grow if it doesn't have enough space allocated.  On
+// error, sq is not modified.
+static ypObject *_ypTuple_setslice_grow( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t growBy, yp_ssize_t extra ) 
+{
+    yp_ssize_t newLen;
+    ypObject **oldptr;
+    yp_ssize_t i;
+    yp_ASSERT( growBy >= 1, "growBy cannot be less than 1" );
+   
+    // XXX We have to be careful that we do not discard items or otherwise modify sq until failure
+    // becomes impossible
+    if( ypTuple_LEN( sq ) > ypTuple_LEN_MAX - growBy ) return yp_MemorySizeOverflowError;
+    newLen = ypTuple_LEN( sq ) + growBy;
+    if( ypTuple_ALLOCLEN( sq ) < newLen ) {
+        oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, newLen, extra );
+        if( oldptr == NULL ) return yp_MemoryError;
+        if( ypTuple_ARRAY( sq ) == oldptr ) {
+            _ypTuple_setslice_elemmove( sq, start, stop, growBy );
+        } else {
+            // The data doesn't overlap, so use memcpy, remembering to discard sq[start:stop]
+            for( i = start; i < stop; i++ ) yp_decref( oldptr[i] );
+            memcpy( ypTuple_ARRAY( sq ), oldptr, start * sizeof( ypObject * ) );
+            memcpy( ypTuple_ARRAY( sq )+stop+growBy, oldptr+stop,
+                    (ypTuple_LEN( sq )-stop) * sizeof( ypObject * ) );
+            ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
+            ypTuple_LEN( sq ) = newLen;
+        }
+    } else {
+        _ypTuple_setslice_elemmove( sq, start, stop, growBy );
+    }
+    return yp_None;
+}
+
 // XXX sq and x must _not_ be the same object (pass a copy of x if so)
 static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step );
 static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
@@ -6159,32 +6206,21 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
     if( yp_isexceptionC( result ) ) return result;
 
     if( step == 1 ) {
-        // Note that -len(sq)<=growBy<=len(x), so the growBy calculation can't overflow.  However,
-        // the newLen calculation might if growBy>0.
+        // Note that -len(sq)<=growBy<=len(x), so the growBy calculation can't overflow
         yp_ssize_t growBy = ypTuple_LEN( x ) - slicelength; // negative means list shrinking
-        yp_ssize_t newLen = ypTuple_LEN( sq ) + growBy;
-
-        // Ensure there's enough space allocated; after this, failure is impossible
-        // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE,
-        // copying large amounts of data twice; optimize
-        // TODO Over-allocate
         if( growBy > 0 ) {
-            if( ypTuple_LEN( sq ) > ypTuple_LEN_MAX - growBy ) return yp_MemorySizeOverflowError;
-            if( ypTuple_ALLOCLEN( sq ) < newLen ) {
-                result = _ypTuple_resize( sq, newLen, 0 );
-                if( yp_isexceptionC( result ) ) return result;
-            }
+            // TODO Over-allocate?
+            result = _ypTuple_setslice_grow( sq, start, stop, growBy, 0 );
+            if( yp_isexceptionC( result ) ) return result;
+        } else {
+            // Called even on growBy==0, as we need to discard items
+            _ypTuple_setslice_elemmove( sq, start, stop, growBy );            
         }
-
-        // Discard items in target area, then adjust remaining items
-        for( i = start; i < stop; i++ ) yp_decref( ypTuple_ARRAY( sq )[i] );
-        ypTuple_ELEMMOVE( sq, stop+growBy, stop );
 
         // There are now len(x) elements starting at sq[start] waiting for x's items
         memcpy( ypTuple_ARRAY( sq )+start, ypTuple_ARRAY( x ),
             ypTuple_LEN( x )*sizeof( ypObject * ) );
         for( i = start; i < start+ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
-        ypTuple_LEN( sq ) = newLen;
     } else {
         if( ypTuple_LEN( x ) != slicelength ) return yp_ValueError;
         for( i = 0; i < slicelength; i++ ) {
@@ -6456,7 +6492,7 @@ static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
     if( factor < 1 ) return list_clear( sq );
 
     if( factor > ypTuple_LEN_MAX / startLen ) return yp_MemorySizeOverflowError;
-    result = _ypTuple_resize( sq, startLen * factor, 0 );
+    result = _ypTuple_extend_grow( sq, startLen * factor, 0 );
     if( yp_isexceptionC( result ) ) return result;
 
     _ypTuple_repeat_memcpy( sq, factor, startLen );
@@ -6472,6 +6508,8 @@ static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
 // TODO Python's ins1 does an item-by-item copy rather than a memmove...inefficient? ...fix?
 static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
 {
+    ypObject *result;
+    
     // Check for exceptions, then adjust the index (noting it should behave like sq[i:i]=[x])
     if( yp_isexceptionC( x ) ) return x;
     if( i < 0 ) {
@@ -6481,21 +6519,11 @@ static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
         i = ypTuple_LEN( sq );
     }
 
-    // Resize if necessary
-    // FIXME The resize might have to copy data, _then_ we'll also do the ypTuple_ELEMMOVE, copying
-    // large amounts of data twice; optimize (and...are there other areas of the code where this
-    // happens?)
-    if( ypTuple_LEN( sq ) > ypTuple_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
-    if( ypTuple_ALLOCLEN( sq ) < ypTuple_LEN( sq )+1 ) {
-        // TODO over-allocate
-        ypObject *result = _ypTuple_resize( sq, ypTuple_LEN( sq )+1, 0 );
-        if( yp_isexceptionC( result ) ) return result;
-    }
-
     // Make room at i and add x
-    ypTuple_ELEMMOVE( sq, i+1, i );
+    // TODO over-allocate
+    result = _ypTuple_setslice_grow( sq, i, i, 1, 0 );
+    if( yp_isexceptionC( result ) ) return result;
     ypTuple_ARRAY( sq )[i] = yp_incref( x );
-    ypTuple_LEN( sq ) += 1;
     return yp_None;
 }
 
