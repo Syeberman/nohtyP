@@ -59,7 +59,7 @@
 #define _yp_ASSERT( ... )
 #endif
 #define yp_ASSERT( expr, ... )  _yp_ASSERT( "nohtyP.c", _yp_S__LINE__, expr, __VA_ARGS__ )
-#define yp_ASSERT1( expr )      yp_ASSERT( expr, "" )
+#define yp_ASSERT1( expr )      yp_ASSERT( expr, "assertion failed" )
 
 // Issues a breakpoint if the debugger is attached, on supported platforms
 // TODO Debug only, and use only at the point the error is "raised" (rename to yp_raise?)
@@ -1271,6 +1271,14 @@ void yp_increfN( yp_ssize_t n, ... )
     va_end( args );
 }
 
+// TODO Python has Py_TRASHCAN_SAFE_BEGIN/END to prevent long deallocation chains from hosing the
+// stack.  Do we need something similar (without locking!) and, if so, are there other recursive
+// chains that we need to protect this way (aside from _yp_recursion_limit)?
+// TODO We could modify tp_dealloc to accept a memo, and create a yp_decref_from_dealloc, say, that
+// accepts it.  The memo would track the recursion depth and a pointer to a singly-linked list.
+// Once _yp_recursion_limit is hit, the object is added to the linked list and only freed once the
+// recursion depth is zero; ob_hash is abused to point to the next object (it shouldn't be used by
+// an object with no references).
 void yp_decref( ypObject *x )
 {
     if( ypObject_REFCNT( x ) >= ypObject_REFCNT_IMMORTAL ) return; // no-op
@@ -7050,9 +7058,9 @@ typedef struct {
 
 #define ypSet_PERTURB_SHIFT (5)
 
-// This tests that, by default, the inline data is enough to hold ypSet_MINSIZE elements
-#define ypSet_MINSIZE (8)
-yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-offsetof( ypSetObject, ob_inline_data )) / sizeof( ypSet_KeyEntry ) >= ypSet_MINSIZE, ypSet_minsize_inline );
+// This tests that, by default, the inline data is enough to hold ypSet_ALLOCLEN_MIN elements
+#define ypSet_ALLOCLEN_MIN (8)
+yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-offsetof( ypSetObject, ob_inline_data )) / sizeof( ypSet_KeyEntry ) >= ypSet_ALLOCLEN_MIN, ypSet_minsize_inline );
 
 // The threshold at which we resize the set, expressed as a fraction of alloclen (ie 2/3)
 #define ypSet_RESIZE_AT_NMR (2) // numerator
@@ -7076,10 +7084,10 @@ static ypObject _ypSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 
 static ypObject *ypSet_dummy = &_ypSet_dummy;
 
 // Empty frozensets can be represented by this, immortal object
-static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_MINSIZE] = {0};
+static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {0};
 static ypSetObject _yp_frozenset_empty_struct = {
     { ypFrozenSet_CODE, ypObject_REFCNT_IMMORTAL,
-    0, ypSet_MINSIZE, ypObject_HASH_INVALID, _yp_frozenset_empty_data }, 0 };
+    0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozenset_empty_data }, 0 };
 static ypObject * const _yp_frozenset_empty = (ypObject *) &_yp_frozenset_empty_struct;
 
 // Returns true if the given ypSet_KeyEntry contains a valid key
@@ -7110,7 +7118,7 @@ static yp_ssize_t _ypSet_space_remaining( ypObject *so )
      * (if ma_fill is much larger than se_used, meaning a lot of dict
      * keys have been deleted).
      */
-    // XXX The static assert above ensures this multiplication can't overflow
+    // XXX ypSet_space_remaining_cant_overflow ensures this can't overflow
     yp_ssize_t retval = (ypSet_ALLOCLEN( so )*ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM;
     retval -= ypSet_FILL( so );
     if( retval <= 0 ) return 0; // should resize before adding keys
@@ -7129,9 +7137,9 @@ static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
 
     yp_ASSERT( minused >= 0, "minused cannot be negative" );
     yp_ASSERT( minused <= ypSet_LEN_MAX, "minused cannot be greater than max" );
-    // XXX The static assert and ypSet_LEN_MAX check above ensure this can't overflow
+    // XXX ypSet_calc_alloclen_cant_overflow ensures this can't overflow
     minentries = ((minused * ypSet_RESIZE_AT_DNM) / ypSet_RESIZE_AT_NMR) + 1;
-    for( alloclen = ypSet_MINSIZE;
+    for( alloclen = ypSet_ALLOCLEN_MIN;
          alloclen <= minentries && alloclen > 0;
          alloclen <<= 1 );
     // TODO If we could trust that ypSet_ALLOCLEN_MAX was the true maximum (ie, a power of 2), then
@@ -7190,6 +7198,8 @@ static ypObject *_ypSet_copy( int type, ypObject *x, int alloclen_fixed )
 }
 
 // XXX Check for the _yp_frozenset_empty case first
+// XXX We're trusting that copy_visitor will behave properly and return an object that has the same
+// hash as the original and that is unequal to anything else in the other set
 static ypObject *_ypSet_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
         int alloclen_fixed )
 {
@@ -7234,6 +7244,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     yp_ssize_t inlinelen =
         (_ypMem_ideal_size-offsetof( ypSetObject, ob_inline_data )) / sizeof( ypSet_KeyEntry );
     if( inlinelen < 0 ) inlinelen = 0;
+    yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
 
     // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
     newalloclen = _ypSet_calc_alloclen( minused );
@@ -7241,7 +7252,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     if( newalloclen <= inlinelen && ypSet_TABLE( so ) != ypSet_INLINE_DATA( so ) ) {
         newkeys = ypSet_INLINE_DATA( so );
     } else {
-        // XXX The static assert and _ypSet_calc_alloclen checks above ensure this can't overflow
+        // XXX ypSet_resize_cant_overflow ensures this can't overflow
         newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * sizeof( ypSet_KeyEntry ) );
         if( newkeys == NULL ) return yp_MemoryError;
     }
@@ -7266,22 +7277,6 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     if( oldkeys != ypSet_INLINE_DATA( so ) ) yp_free( oldkeys );
     yp_DEBUG( "_ypSet_resize: 0x%08X table 0x%08X  (was 0x%08X)", so, newkeys, oldkeys );
     return yp_None;
-}
-
-// Discards all references; called before clearing or deleting the set
-// TODO yp_decref _could_ run code that requires us to be in a good state...but
-// this isn't as easy as for a tuple.  We may be forced to use the safer _ypSet_pop.
-static void _ypSet_discard_key_refs( ypObject *so )
-{
-    ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    yp_ssize_t keysleft = ypSet_LEN( so );
-    yp_ssize_t i;
-
-    for( i = 0; keysleft > 0; i++ ) {
-        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
-        keysleft -= 1;
-        yp_decref( keys[i].se_key );
-    }
 }
 
 // Sets *loc to where the key should go in the table; it may already be there, in fact!  Returns
@@ -7502,8 +7497,6 @@ static ypObject *_ypSet_issubset( ypObject *so, ypObject *x )
 }
 
 // XXX Check for the so==other case _before_ calling this function
-// XXX We're trusting that copy_visitor will behave properly and return an object that has the same
-// hash as the original and that is unequal to anything else in the other set
 static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
 {
     yp_ssize_t keysleft = ypSet_LEN( other );
@@ -7551,7 +7544,6 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_
 // XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 {
-    // TODO determine when/where/how the set should be resized
     int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
     ypObject *mi;
     yp_uint64_t mi_state;
@@ -8135,25 +8127,38 @@ static ypObject *set_push( ypObject *so, ypObject *x ) {
 
 static ypObject *set_clear( ypObject *so )
 {
-    void *oldptr;
+    ypSet_KeyEntry *oldkeys = ypSet_TABLE( so );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t i;
+
     if( ypSet_FILL( so ) < 1 ) return yp_None;
+ 
+    // Discard the old keys
+    // TODO yp_decref _could_ run code that requires us to be in a good state...but this isn't as
+    // easy as for a list.  Once we start accepting arbitrary dealloc code, we may be forced to 
+    // use the safer _ypSet_removekey.
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &oldkeys[i] ) ) continue;
+        keysleft -= 1;
+        yp_decref( oldkeys[i].se_key );
+    }
 
-    _ypSet_discard_key_refs( so );
-    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( so, ypSetObject, ypSet_MINSIZE, 0 );
-    // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
-    if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( so, ypSetObject, oldptr );
+    // Free memory
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( so, ypSetObject );
     yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" );
+    yp_ASSERT( ypSet_ALLOCLEN( so ) >= ypSet_ALLOCLEN_MIN, "set inlinelen must be at least ypSet_ALLOCLEN_MIN" );
 
+    // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    ypSet_ALLOCLEN( so ) = ypSet_MINSIZE; // we can't make use of the excess anyway
+    ypSet_ALLOCLEN( so ) = ypSet_ALLOCLEN_MIN; // we can't make use of the excess anyway
     ypSet_LEN( so ) = 0;
     ypSet_FILL( so ) = 0;
-    memset( ypSet_TABLE( so ), 0, ypSet_MINSIZE * sizeof( ypSet_KeyEntry ) );
+    memset( ypSet_TABLE( so ), 0, ypSet_ALLOCLEN_MIN * sizeof( ypSet_KeyEntry ) );
     return yp_None;
 }
 
-// Note the difference between this, which removes an arbitrary key, and
-// _ypSet_pop, which removes a specific key
+// Note the difference between this, which removes an arbitrary key, and _ypSet_pop, which removes 
+// a specific key
 // XXX Adapted from Python's set_pop
 static ypObject *set_pop( ypObject *so ) {
     register yp_ssize_t i = 0;
@@ -8205,7 +8210,16 @@ static ypObject *set_remove( ypObject *so, ypObject *x, ypObject *onmissing )
 
 static ypObject *frozenset_dealloc( ypObject *so )
 {
-    _ypSet_discard_key_refs( so );
+    ypSet_KeyEntry *keys = ypSet_TABLE( so );
+    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t i;
+
+    // Nobody is referencing us, so yp_decref doesn't require us to be in a good state
+    for( i = 0; keysleft > 0; i++ ) {
+        if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
+        keysleft -= 1;
+        yp_decref( keys[i].se_key );
+    }
     ypMem_FREE_CONTAINER( so, ypSetObject );
     return yp_None;
 }
@@ -8503,10 +8517,10 @@ yp_STATIC_ASSERT( (yp_SSIZE_T_MAX-sizeof( ypDictObject )) / sizeof( ypObject * )
 
 // Empty frozendicts can be represented by this, immortal object
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty frozendict?
-static ypObject _yp_frozendict_empty_data[ypSet_MINSIZE] = {0};
+static ypObject _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {0};
 static ypDictObject _yp_frozendict_empty_struct = {
     { ypFrozenDict_CODE, ypObject_REFCNT_IMMORTAL,
-    0, ypSet_MINSIZE, ypObject_HASH_INVALID, _yp_frozendict_empty_data },
+    0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozendict_empty_data },
     (ypObject *) &_yp_frozenset_empty_struct };
 static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empty_struct;
 
@@ -8531,20 +8545,6 @@ static ypObject *_ypDict_new( int type, yp_ssize_t minused )
     ypDict_KEYSET( mp ) = keyset;
     memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
     return mp;
-}
-
-// Discards all value references; called before clearing or deleting the dict
-static void _ypDict_discard_value_refs( ypObject *mp )
-{
-    ypObject **values = ypDict_VALUES( mp );
-    yp_ssize_t valuesleft = ypDict_LEN( mp );
-    yp_ssize_t i;
-
-    for( i = 0; valuesleft > 0; i++ ) {
-        if( values[i] == NULL ) continue;
-        valuesleft -= 1;
-        yp_decref( values[i] );
-    }
 }
 
 // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
@@ -8608,6 +8608,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     yp_ssize_t inlinelen =
         (_ypMem_ideal_size-offsetof( ypDictObject, ob_inline_data )) / sizeof( ypObject * );
     if( inlinelen < 0 ) inlinelen = 0;
+    yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
 
     // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
     newkeyset = _ypSet_new( ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE );
@@ -8616,7 +8617,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     if( newalloclen <= inlinelen && ypDict_VALUES( mp ) != ypDict_INLINE_DATA( mp ) ) {
         newvalues = ypDict_INLINE_DATA( mp );
     } else {
-        // XXX The static assert and minused checks above ensure this can't overflow
+        // XXX ypDict_resize_cant_overflow ensures this can't overflow
         newvalues = (ypObject **) yp_malloc( &newsize, newalloclen * sizeof( ypObject * ) );
         if( newvalues == NULL ) {
             yp_decref( newkeyset );
@@ -8967,21 +8968,44 @@ static ypObject *frozendict_len( ypObject *mp, yp_ssize_t *len ) {
 static ypObject *dict_clear( ypObject *mp ) {
     ypObject *keyset;
     yp_ssize_t alloclen;
+    ypObject **oldvalues = ypDict_VALUES( mp );
+    yp_ssize_t valuesleft = ypDict_LEN( mp );
+    yp_ssize_t i;
     void *oldptr;
+
     if( ypDict_LEN( mp ) < 1 ) return yp_None;
 
+    // Create a new keyset
+    // TODO Rather than creating a new keyset which we may never need, use _yp_frozenset_empty, 
+    // leaving it to _ypDict_push to allocate a new keyset...BUT this means _yp_frozenset_empty
+    // needs an alloclen of zero, or else we're going to try adding keys to it.
     keyset = _ypSet_new( ypFrozenSet_CODE, 0, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
+    yp_ASSERT( alloclen == ypSet_ALLOCLEN_MIN, "expect alloclen of ypSet_ALLOCLEN_MIN for new keyset" );
 
-    _ypDict_discard_value_refs( mp );
+    // Discard the old values
+    // TODO yp_decref _could_ run code that requires us to be in a good state...but this isn't as
+    // easy as for a list.  Once we start accepting arbitrary dealloc code, we may be forced to
+    // keep ypDict_VALUES and ypDict_LEN up-to-date.
+    for( i = 0; valuesleft > 0; i++ ) {
+        if( oldvalues[i] == NULL ) continue;
+        valuesleft -= 1;
+        yp_decref( oldvalues[i] );
+    }
+
+    // Free memory
+    // TODO ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR would be better, if we could trust that alloclen
+    // was always ypSet_ALLOCLEN_MIN, and that inlinelen for dicts was >=ypSet_ALLOCLEN_MIN
+    yp_decref( ypDict_KEYSET( mp ) );
     oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, 0 );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( mp, ypDictObject, oldptr );
     yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ), "dict_clear didn't allocate inline!" );
+    yp_ASSERT( mp->ob_alloclen >= ypSet_ALLOCLEN_MIN, "dict inlinelen must be at least ypSet_ALLOCLEN_MIN" );
 
+    // Update our attributes and return
     ypDict_LEN( mp ) = 0;
-    yp_decref( ypDict_KEYSET( mp ) );
     ypDict_KEYSET( mp ) = keyset;
     memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
     return yp_None;
@@ -9238,15 +9262,19 @@ static ypObject *frozendict_miniiter_lenhint(
     return yp_None;
 }
 
-static ypObject *_frozendict_dealloc_visitor( ypObject *x, void *memo ) {
-    yp_decref( x );
-    return yp_None;
-}
-
 static ypObject *frozendict_dealloc( ypObject *mp )
 {
+    ypObject **values = ypDict_VALUES( mp );
+    yp_ssize_t valuesleft = ypDict_LEN( mp );
+    yp_ssize_t i;
+
+    // Nobody is referencing us, so yp_decref doesn't require us to be in a good state
     yp_decref( ypDict_KEYSET( mp ) );
-    _ypDict_discard_value_refs( mp );
+    for( i = 0; valuesleft > 0; i++ ) {
+        if( values[i] == NULL ) continue;
+        valuesleft -= 1;
+        yp_decref( values[i] );
+    }
     ypMem_FREE_CONTAINER( mp, ypDictObject );
     return yp_None;
 }
