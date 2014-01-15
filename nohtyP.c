@@ -6149,11 +6149,11 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
     }
 }
 
-// Called by setslice to discard the items at sq[start:stop] and shift the items at sq[stop:] to 
+// Called by setslice to discard the items at sq[start:stop] and shift the items at sq[stop:] to
 // start at sq[stop+growBy]; the pointers at sq[start:stop+growBy] will be uninitialized.  sq must
 // have enough space allocated for the move. Updates ypTuple_LEN.  Cannot fail.
 static void _ypTuple_setslice_elemmove( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t growBy ) 
+        yp_ssize_t growBy )
 {
     yp_ssize_t i;
     yp_ASSERT( growBy >= -ypTuple_LEN( sq ), "growBy cannot be less than -len(sq)" );
@@ -6167,13 +6167,13 @@ static void _ypTuple_setslice_elemmove( ypObject *sq, yp_ssize_t start, yp_ssize
 // _ypTuple_setslice_elemmove, except sq will grow if it doesn't have enough space allocated.  On
 // error, sq is not modified.
 static ypObject *_ypTuple_setslice_grow( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t growBy, yp_ssize_t extra ) 
+        yp_ssize_t growBy, yp_ssize_t extra )
 {
     yp_ssize_t newLen;
     ypObject **oldptr;
     yp_ssize_t i;
     yp_ASSERT( growBy >= 1, "growBy cannot be less than 1" );
-   
+
     // XXX We have to be careful that we do not discard items or otherwise modify sq until failure
     // becomes impossible
     if( ypTuple_LEN( sq ) > ypTuple_LEN_MAX - growBy ) return yp_MemorySizeOverflowError;
@@ -6222,7 +6222,7 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
             if( yp_isexceptionC( result ) ) return result;
         } else {
             // Called even on growBy==0, as we need to discard items
-            _ypTuple_setslice_elemmove( sq, start, stop, growBy );            
+            _ypTuple_setslice_elemmove( sq, start, stop, growBy );
         }
 
         // There are now len(x) elements starting at sq[start] waiting for x's items
@@ -6517,7 +6517,7 @@ static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
 static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
 {
     ypObject *result;
-    
+
     // Check for exceptions, then adjust the index (noting it should behave like sq[i:i]=[x])
     if( yp_isexceptionC( x ) ) return x;
     if( i < 0 ) {
@@ -7158,8 +7158,8 @@ static ypObject *_ypSet_new( int type, yp_ssize_t minused, int alloclen_fixed )
     ypObject *so;
     yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
     if( alloclen < 1 ) return yp_MemorySizeOverflowError;
-    if( alloclen_fixed && type == ypSet_CODE ) {
-        so = ypMem_MALLOC_CONTAINER_INLINE( ypSetObject, ypSet_CODE, alloclen );
+    if( alloclen_fixed && type == ypFrozenSet_CODE ) {
+        so = ypMem_MALLOC_CONTAINER_INLINE( ypSetObject, ypFrozenSet_CODE, alloclen );
     } else {
         so = ypMem_MALLOC_CONTAINER_VARIABLE( ypSetObject, type, alloclen, 0 );
     }
@@ -7946,7 +7946,11 @@ static ypObject *frozenset_eq( ypObject *so, ypObject *x )
     if( so == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     if( ypSet_LEN( so ) != ypSet_LEN( x ) ) return yp_False;
-    // FIXME Compare stored hashes (they should be equal if so and x are equal)
+    // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
+    // obvious that the pre-computed hash, if available, can save us some time when so!=x.
+    if( ypObject_CACHED_HASH( so ) != ypObject_HASH_INVALID &&
+        ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
+        ypObject_CACHED_HASH( so ) != ypObject_CACHED_HASH( x ) ) return yp_False;
     return _ypSet_issubset( so, x );
 }
 
@@ -8111,7 +8115,7 @@ static ypObject *frozenset_symmetric_difference( ypObject *so, ypObject *x )
 
 static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
-    // TODO Adapt PyDict_SetItem logic via growhint
+    // TODO Over-allocate
     ypObject *result = _ypSet_push( so, x, &spaceleft, 0 );
     if( yp_isexceptionC( result ) ) return result;
     return result == yp_True ? yp_None : yp_KeyError;
@@ -8119,7 +8123,7 @@ static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
 
 static ypObject *set_push( ypObject *so, ypObject *x ) {
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
-    // TODO Adapt PyDict_SetItem logic via growhint
+    // TODO Over-allocate
     ypObject *result = _ypSet_push( so, x, &spaceleft, 0 );
     if( yp_isexceptionC( result ) ) return result;
     return yp_None;
@@ -8132,10 +8136,10 @@ static ypObject *set_clear( ypObject *so )
     yp_ssize_t i;
 
     if( ypSet_FILL( so ) < 1 ) return yp_None;
- 
+
     // Discard the old keys
     // TODO yp_decref _could_ run code that requires us to be in a good state...but this isn't as
-    // easy as for a list.  Once we start accepting arbitrary dealloc code, we may be forced to 
+    // easy as for a list.  Once we start accepting arbitrary dealloc code, we may be forced to
     // use the safer _ypSet_removekey.
     for( i = 0; keysleft > 0; i++ ) {
         if( !ypSet_ENTRY_USED( &oldkeys[i] ) ) continue;
@@ -8157,7 +8161,7 @@ static ypObject *set_clear( ypObject *so )
     return yp_None;
 }
 
-// Note the difference between this, which removes an arbitrary key, and _ypSet_pop, which removes 
+// Note the difference between this, which removes an arbitrary key, and _ypSet_pop, which removes
 // a specific key
 // XXX Adapted from Python's set_pop
 static ypObject *set_pop( ypObject *so ) {
@@ -8425,7 +8429,6 @@ static ypObject *_ypSet( int type, ypObject *iterable )
 
     newSo = _ypSet_new( type, lenhint, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newSo ) ) return newSo;
-    // TODO make sure _yp_set_update is efficient for pre-sized objects
     result = _ypSet_update( newSo, iterable );
     if( yp_isexceptionC( result ) ) {
         yp_decref( newSo );
@@ -8486,7 +8489,6 @@ ypObject *yp_set( ypObject *iterable ) {
 // keys or resize it.  It identifies itself as a frozendict, yet we add keys to it, so it is not
 // truly immutable.  As such, it cannot be exposed outside of the set/dict implementations.  On the
 // plus side, we can allocate it's data inline (via alloclen_fixed).
-// TODO investigate how/when the keyset will be shared between dicts
 
 // ypDictObject and ypDict_LEN are defined above, for use by the set code
 #define ypDict_KEYSET( mp )         ( ((ypDictObject *)mp)->keyset )
@@ -8501,11 +8503,6 @@ ypObject *yp_set( ypObject *iterable ) {
 // searching
 #define ypDict_POPITEM_FINGER( mp ) ( ((ypObject *)mp)->ob_alloclen )
 
-// Returns the index of the given ypSet_KeyEntry in the hash table
-// TODO needed?
-#define ypDict_ENTRY_INDEX( mp, loc ) \
-    ( ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), loc ) )
-
 // Returns a pointer to the value element corresponding to the given key location
 #define ypDict_VALUE_ENTRY( mp, key_loc ) \
     ( &(ypDict_VALUES( mp )[ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), key_loc )]) )
@@ -8516,7 +8513,6 @@ yp_STATIC_ASSERT( sizeof( ypObject * ) <= sizeof( ypSet_KeyEntry ), ypDict_data_
 yp_STATIC_ASSERT( (yp_SSIZE_T_MAX-sizeof( ypDictObject )) / sizeof( ypObject * ) >= ypSet_ALLOCLEN_MAX, ypDict_alloclen_max_not_smaller_than_set_alloclen_max );
 
 // Empty frozendicts can be represented by this, immortal object
-// TODO Can we use this in more places...anywhere we'd return a possibly-empty frozendict?
 static ypObject _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {0};
 static ypDictObject _yp_frozendict_empty_struct = {
     { ypFrozenDict_CODE, ypObject_REFCNT_IMMORTAL,
@@ -8524,20 +8520,25 @@ static ypDictObject _yp_frozendict_empty_struct = {
     (ypObject *) &_yp_frozenset_empty_struct };
 static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empty_struct;
 
+// Returns a new, empty dict or frozendict object to hold minused entries
 // XXX Check for the _yp_frozendict_empty case first
-// TODO Extend alloclen_fixed here
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
-static ypObject *_ypDict_new( int type, yp_ssize_t minused )
+static ypObject *_ypDict_new( int type, yp_ssize_t minused, int alloclen_fixed )
 {
     ypObject *keyset;
     yp_ssize_t alloclen;
     ypObject *mp;
 
+    // We always allocate our keyset's data INLINE
     keyset = _ypSet_new( ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
-    mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
+    if( alloclen_fixed && type == ypFrozenDict_CODE ) {
+        mp = ypMem_MALLOC_CONTAINER_INLINE( ypDictObject, ypFrozenDict_CODE, alloclen );
+    } else {
+        mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
+    }
     if( yp_isexceptionC( mp ) ) {
         yp_decref( keyset );
         return mp;
@@ -8550,7 +8551,7 @@ static ypObject *_ypDict_new( int type, yp_ssize_t minused )
 // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
 // XXX Check for the "lazy shallow copy" and "_yp_frozendict_empty" cases first
 // TODO Is there a point where the original is so dirty that we'd be better spinning a new keyset?
-static ypObject *_ypDict_copy( int type, ypObject *x )
+static ypObject *_ypDict_copy( int type, ypObject *x, int alloclen_fixed )
 {
     ypObject *keyset;
     yp_ssize_t alloclen;
@@ -8562,7 +8563,11 @@ static ypObject *_ypDict_copy( int type, ypObject *x )
     // Share the keyset object with our fellow dict
     keyset = ypDict_KEYSET( x );
     alloclen = ypSet_ALLOCLEN( keyset );
-    mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
+    if( alloclen_fixed && type == ypFrozenDict_CODE ) {
+        mp = ypMem_MALLOC_CONTAINER_INLINE( ypDictObject, ypFrozenDict_CODE, alloclen );
+    } else {
+        mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type, alloclen, 0 );
+    }
     if( yp_isexceptionC( mp ) ) return mp;
     ypDict_KEYSET( mp ) = yp_incref( keyset );
 
@@ -8581,7 +8586,8 @@ static ypObject *_ypDict_copy( int type, ypObject *x )
 // XXX Check for the _yp_frozendict_empty case first
 // TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
 // either a) optimizing x first, or b) not sharing the keyset of this object
-static ypObject *_ypDict_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo )
+static ypObject *_ypDict_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
+        int alloclen_fixed )
 {
     // TODO We can't use copy_visitor to copy the keys, because it might be yp_unfrozen_deepcopy2!
     return yp_NotImplementedError;
@@ -8877,23 +8883,23 @@ static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *mem
 }
 
 static ypObject *frozendict_unfrozen_copy( ypObject *x ) {
-    return _ypDict_copy( ypDict_CODE, x );
+    return _ypDict_copy( ypDict_CODE, x, /*alloclen_fixed=*/FALSE );
 }
 
 static ypObject *frozendict_frozen_copy( ypObject *x ) {
     if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
     // A shallow copy of a frozendict to a frozendict doesn't require an actual copy
     if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
-    return _ypDict_copy( ypFrozenDict_CODE, x );
+    return _ypDict_copy( ypFrozenDict_CODE, x, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *frozendict_unfrozen_deepcopy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
-    return _ypDict_deepcopy( ypDict_CODE, x, copy_visitor, copy_memo );
+    return _ypDict_deepcopy( ypDict_CODE, x, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
 }
 
 static ypObject *frozendict_frozen_deepcopy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
     if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
-    return _ypDict_deepcopy( ypFrozenDict_CODE, x, copy_visitor, copy_memo );
+    return _ypDict_deepcopy( ypFrozenDict_CODE, x, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
 static ypObject *frozendict_bool( ypObject *mp ) {
@@ -8914,7 +8920,11 @@ static ypObject *frozendict_eq( ypObject *mp, ypObject *x )
     if( mp == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenDict_CODE ) return yp_ComparisonNotImplemented;
     if( ypDict_LEN( mp ) != ypDict_LEN( x ) ) return yp_False;
-    // FIXME Compare stored hashes (they should be equal if mp and x are equal)
+    // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
+    // obvious that the pre-computed hash, if available, can save us some time when mp!=x.
+    if( ypObject_CACHED_HASH( mp ) != ypObject_HASH_INVALID &&
+        ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
+        ypObject_CACHED_HASH( mp ) != ypObject_CACHED_HASH( x ) ) return yp_False;
 
     valuesleft = ypDict_LEN( mp );
     for( mp_i = 0; valuesleft > 0; mp_i++ ) {
@@ -8930,7 +8940,7 @@ static ypObject *frozendict_eq( ypObject *mp, ypObject *x )
         x_value = *ypDict_VALUE_ENTRY( x, x_key_loc );
         if( x_value == NULL ) return yp_False;
 
-        // If the values are not equal, than neither are mp and x
+        // If the values are not equal, then neither are mp and x
         result = yp_eq( mp_value, x_value );
         if( result != yp_True ) return result; // yp_False or an exception
     }
@@ -8976,7 +8986,7 @@ static ypObject *dict_clear( ypObject *mp ) {
     if( ypDict_LEN( mp ) < 1 ) return yp_None;
 
     // Create a new keyset
-    // TODO Rather than creating a new keyset which we may never need, use _yp_frozenset_empty, 
+    // TODO Rather than creating a new keyset which we may never need, use _yp_frozenset_empty,
     // leaving it to _ypDict_push to allocate a new keyset...BUT this means _yp_frozenset_empty
     // needs an alloclen of zero, or else we're going to try adding keys to it.
     keyset = _ypSet_new( ypFrozenSet_CODE, 0, /*alloclen_fixed=*/TRUE );
@@ -9449,15 +9459,16 @@ static ypObject *_ypDict( int type, ypObject *x )
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( x, &exc );
         if( lenhint > ypSet_LEN_MAX ) lenhint = ypSet_LEN_MAX;
-    } else if( lenhint == 0 && type == ypFrozenDict_CODE ) {
-        // yp_lenC reports an empty iterable, so we can shortcut frozendict creation
-        return _yp_frozendict_empty;
+    } else if( lenhint == 0 ) {
+        // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update
+        if( type == ypFrozenDict_CODE ) return _yp_frozenset_empty;
+        return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     } else if( lenhint > ypSet_LEN_MAX ) {
         // yp_lenC reports that we don't have room to add their elements
         return yp_MemorySizeOverflowError;
     }
 
-    newMp = _ypDict_new( type, lenhint );
+    newMp = _ypDict_new( type, lenhint, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newMp ) ) return newMp;
     // TODO make sure _ypDict_update is efficient for pre-sized objects
     result = _ypDict_update( newMp, x );
@@ -9485,7 +9496,7 @@ ypObject *yp_frozendict( ypObject *x ) {
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
         if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
         if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
-        return _ypDict_copy( ypFrozenDict_CODE, x );
+        return _ypDict_copy( ypFrozenDict_CODE, x, /*alloclen_fixed=*/TRUE );
     }
     return _ypDict( ypFrozenDict_CODE, x );
 }
@@ -9495,17 +9506,17 @@ static ypObject *_yp_dictKV( int n, va_list args ) {
     return _ypDict( ypDict_CODE, iter_args );
 }
 ypObject *yp_dictK( int n, ... ) {
-    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
+    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     return_yp_V_FUNC( ypObject *, _yp_dictKV, (n, args), n );
 }
 ypObject *yp_dictKV( int n, va_list args ) {
-    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
+    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     return _yp_dictKV( n, args );
 }
 ypObject *yp_dict( ypObject *x ) {
     // If x is a fellow dict then perform a copy so we can share keysets
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
-        return _ypDict_copy( ypDict_CODE, x );
+        return _ypDict_copy( ypDict_CODE, x, /*alloclen_fixed=*/FALSE );
     }
     return _ypDict( ypDict_CODE, x );
 }
@@ -9518,7 +9529,7 @@ static ypObject *_ypDict_fromkeysNV( int type, ypObject *value, int n, va_list a
     ypObject *newMp;
 
     if( n > ypSet_LEN_MAX ) return yp_MemorySizeOverflowError;
-    newMp = _ypDict_new( type, n );
+    newMp = _ypDict_new( type, n, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newMp ) ) return newMp;
     spaceleft = _ypSet_space_remaining( ypDict_KEYSET( newMp ) );
 
@@ -9545,11 +9556,11 @@ ypObject *yp_frozendict_fromkeysNV( ypObject *value, int n, va_list args ) {
 }
 
 ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
-    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
+    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n );
 }
 ypObject *yp_dict_fromkeysNV( ypObject *value, int n, va_list args ) {
-    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0 );
+    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     return _ypDict_fromkeysNV( ypDict_CODE, value, n, args );
 }
 
@@ -9568,9 +9579,10 @@ static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
         if( lenhint > ypSet_LEN_MAX ) lenhint = ypSet_LEN_MAX;
-    } else if( lenhint == 0 && type == ypFrozenDict_CODE ) {
-        // yp_lenC reports an empty iterable, so we can shortcut frozendict creation
-        return _yp_frozendict_empty;
+    } else if( lenhint == 0 ) {
+        // yp_lenC reports an empty iterable, so we can shortcut _ypDict_push
+        if( type == ypFrozenDict_CODE ) return _yp_frozendict_empty;
+        return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     } else if( lenhint > ypSet_LEN_MAX ) {
         // yp_lenC reports that we don't have room to add their elements
         return yp_MemorySizeOverflowError;
@@ -9579,7 +9591,7 @@ static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value
     mi = yp_miniiter( iterable, &mi_state ); // new ref
     if( yp_isexceptionC( mi ) ) return mi;
 
-    newMp = _ypDict_new( type, lenhint ); // new ref
+    newMp = _ypDict_new( type, lenhint, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( newMp ) ) {
         yp_decref( mi );
         return newMp;
