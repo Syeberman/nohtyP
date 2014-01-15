@@ -1762,44 +1762,6 @@ static ypObject *_iter_valist_generator( ypObject *i, ypObject *value )
     return yp_incref( va_arg( ypIterValist_ARGS( i ), ypObject * ) );
 }
 
-// XXX Be _especially_ careful working with this: it always yields the same yp_ONSTACK_ITER_VALIST
-// object, which it "revives" for a new pair of arguments every time it's yielded.  Not only are
-// you denied retaining references to these objects, you are denied retaining a reference to
-// previously-yielded yp_ONSTACK_ITER_VALISTs.
-// TODO Is there a way to improve this using miniiters and a yp_iter_kvalist immortal object?
-#define ypIterKValist_SUBITER( i ) (*((ypObject **) ((ypObject *)i)->ob_data))
-
-// Don't include subiter in ob_objlocs
-#define yp_ONSTACK_ITER_KVALIST( name, n, args ) \
-    ypIterObject _ ## name ## _subiter_struct = { \
-        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, &(args), ypObject_LEN_INVALID ), \
-        0, 0x0u, _iter_closed_generator, args}; \
-    ypObject * const _ ## name ## _subiter = (ypObject *) &_ ## name ## _subiter_struct; \
-    ypIterObject _ ## name ## _struct = { \
-        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, &_ ## name ## _subiter, ypObject_LEN_INVALID ), \
-        n, 0x0u, _iter_kvalist_generator}; \
-    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-
-static ypObject *_iter_kvalist_generator( ypObject *i, ypObject *value )
-{
-    yp_ssize_t left;
-    ypObject *subiter;
-
-    if( yp_isexceptionC( value ) ) return value;
-    if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
-
-    // Ensure the sub-iterator consumed all the items from va_list it should have
-    subiter = ypIterKValist_SUBITER( i );
-    for( left = ypIter_LENHINT( subiter ); left > 0; left-- ) {
-        va_arg( ypIterValist_ARGS( subiter ), ypObject * );
-    }
-
-    // Reset the sub-iterator, and yield it again
-    ypIter_LENHINT( subiter ) = 2;
-    ypIter_FUNC( subiter ) = _iter_valist_generator;
-    return subiter;
-}
-
 
 /*************************************************************************************************
  * Freezing, "unfreezing", and invalidating
@@ -8710,7 +8672,6 @@ static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int
     ypObject **value_loc;
 
     // Look for the appropriate entry in the hash table
-    // TODO yp_isexceptionC used internally should be a macro
     hash = yp_hashC( key, &result );
     if( yp_isexceptionC( result ) ) return result;  // also verifies key is not an exception
     if( yp_isexceptionC( value ) ) return value;    // verifies value is not an exception
@@ -8771,7 +8732,6 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
 // in particular, yp_ValueError is returned if exactly 2 values are not returned.
 // XXX Yes, the yielded value can be any iterable, even a set or dict (good luck guessing which
 // will be the key, and which the value)
-// XXX itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
 static void _ypDict_iter_items_next( ypObject *itemiter, ypObject **key, ypObject **value )
 {
     ypObject *keyvaliter = yp_next( itemiter ); // new ref
@@ -8805,7 +8765,6 @@ static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
     return yp_None;
 }
 
-// XXX *itemiter may be an yp_ONSTACK_ITER_KVALIST: use carefully
 static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject *itemiter )
 {
     ypObject *exc = yp_None;
@@ -8845,7 +8804,7 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
     if( x_pair == ypFrozenDict_CODE ) {
         return _ypDict_update_from_dict( mp, x );
     } else {
-        // FIXME replace with yp_miniiter_items once supported
+        // TODO replace with yp_miniiter_items once supported
         itemiter = yp_iter_items( x ); // new ref
         if( yp_isexceptionC2( itemiter, yp_MethodError ) ) itemiter = yp_iter( x ); // new ref
         if( yp_isexceptionC( itemiter ) ) return itemiter;
@@ -9051,7 +9010,7 @@ static ypObject *frozendict_getdefault( ypObject *mp, ypObject *key, ypObject *d
 static ypObject *dict_setitem( ypObject *mp, ypObject *key, ypObject *value )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
-    // TODO Adapt PyDict_SetItem logic via growhint
+    // TODO Over-allocate
     ypObject *result = _ypDict_push( mp, key, value, 1, &spaceleft, 0 );
     if( yp_isexceptionC( result ) ) return result;
     return yp_None;
@@ -9073,9 +9032,10 @@ static ypObject *dict_popvalue( ypObject *mp, ypObject *key, ypObject *defval )
     return result;
 }
 
-// Note the difference between this, which removes an arbitrary item, and
-// _ypDict_pop, which removes a specific item
-// XXX Make sure not to leave references in *key and *value on error
+// Note the difference between this, which removes an arbitrary item, and _ypDict_pop, which 
+// removes a specific item
+// XXX Make sure not to leave references in *key and *value on error (yp_popitem will set to
+// exception)
 // XXX Adapted from Python's set_pop
 static ypObject *dict_popitem( ypObject *mp, ypObject **key, ypObject **value )
 {
@@ -9130,7 +9090,7 @@ static ypObject *dict_setdefault( ypObject *mp, ypObject *key, ypObject *defval 
             ypDict_LEN( mp ) += 1;
         } else {
             yp_ssize_t spaceleft = _ypSet_space_remaining( keyset );
-            // TODO Adapt PyDict_SetItem logic via growhint
+            // TODO Over-allocate
             result = _ypDict_push_newkey( mp, &key_loc, key, hash, defval, &spaceleft, 0 );
             // value_loc is no longer valid
             if( yp_isexceptionC( result ) ) return result;
@@ -9141,10 +9101,6 @@ static ypObject *dict_setdefault( ypObject *mp, ypObject *key, ypObject *defval 
     }
 }
 
-// TODO Investigate if this is better than using yp_ONSTACK_ITER_KVALIST and, if so, update other
-// "K" functions similarly (I'm pretty sure it is)
-// FIXME instead, wait until we need a resize, then since we're resizing anyway, resize to fit
-// the given n
 static ypObject *dict_updateK( ypObject *mp, int n, va_list args )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
@@ -9446,9 +9402,42 @@ static ypTypeObject ypDict_Type = {
 };
 
 // Constructors
-// XXX x may be an yp_ONSTACK_ITER_KVALIST: use carefully
+
+static ypObject *_ypDictKV( int type, int n, va_list args )
+{
+    ypObject *exc = yp_None;
+    ypObject *newMp;
+    ypObject *result;
+
+    newMp = _ypDict_new( type, n, /*alloclen_fixed=*/TRUE );
+    if( yp_isexceptionC( newMp ) ) return newMp;
+    result = dict_updateK( newMp, n, args );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( newMp );
+        return result;
+    }
+    return newMp;
+}
+
+ypObject *yp_frozendictK( int n, ... ) {
+    if( n < 1 ) return _yp_frozendict_empty;
+    return_yp_V_FUNC( ypObject *, _ypDictKV, (ypFrozenDict_CODE, n, args), n );
+}
+ypObject *yp_frozendictKV( int n, va_list args ) {
+    if( n < 1 ) return _yp_frozendict_empty;
+    return _ypDictKV( ypFrozenDict_CODE, n, args );
+}
+
+ypObject *yp_dictK( int n, ... ) {
+    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
+    return_yp_V_FUNC( ypObject *, _ypDictKV, (ypDict_CODE, n, args), n );
+}
+ypObject *yp_dictKV( int n, va_list args ) {
+    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
+    return _ypDictKV( ypDict_CODE, n, args );
+}
+
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
-// TODO Perhaps this should be broken up, and a _ypDict_update_from_valist created
 static ypObject *_ypDict( int type, ypObject *x )
 {
     ypObject *exc = yp_None;
@@ -9470,7 +9459,6 @@ static ypObject *_ypDict( int type, ypObject *x )
 
     newMp = _ypDict_new( type, lenhint, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newMp ) ) return newMp;
-    // TODO make sure _ypDict_update is efficient for pre-sized objects
     result = _ypDict_update( newMp, x );
     if( yp_isexceptionC( result ) ) {
         yp_decref( newMp );
@@ -9479,18 +9467,6 @@ static ypObject *_ypDict( int type, ypObject *x )
     return newMp;
 }
 
-static ypObject *_yp_frozendictKV( int n, va_list args ) {
-    yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
-    return _ypDict( ypFrozenDict_CODE, iter_args );
-}
-ypObject *yp_frozendictK( int n, ... ) {
-    if( n < 1 ) return _yp_frozendict_empty;
-    return_yp_V_FUNC( ypObject *, _yp_frozendictKV, (n, args), n );
-}
-ypObject *yp_frozendictKV( int n, va_list args ) {
-    if( n < 1 ) return _yp_frozendict_empty;
-    return _yp_frozendictKV( n, args );
-}
 ypObject *yp_frozendict( ypObject *x ) {
     // If x is a fellow dict then perform a copy so we can share keysets
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
@@ -9501,18 +9477,6 @@ ypObject *yp_frozendict( ypObject *x ) {
     return _ypDict( ypFrozenDict_CODE, x );
 }
 
-static ypObject *_yp_dictKV( int n, va_list args ) {
-    yp_ONSTACK_ITER_KVALIST( iter_args, n, args );
-    return _ypDict( ypDict_CODE, iter_args );
-}
-ypObject *yp_dictK( int n, ... ) {
-    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return_yp_V_FUNC( ypObject *, _yp_dictKV, (n, args), n );
-}
-ypObject *yp_dictKV( int n, va_list args ) {
-    if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return _yp_dictKV( n, args );
-}
 ypObject *yp_dict( ypObject *x ) {
     // If x is a fellow dict then perform a copy so we can share keysets
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
@@ -9563,7 +9527,6 @@ ypObject *yp_dict_fromkeysNV( ypObject *value, int n, va_list args ) {
     if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     return _ypDict_fromkeysNV( ypDict_CODE, value, n, args );
 }
-
 
 static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value )
 {
