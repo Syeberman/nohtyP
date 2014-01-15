@@ -1265,9 +1265,8 @@ ypObject *yp_incref( ypObject *x )
 void yp_increfN( yp_ssize_t n, ... )
 {
     va_list args;
-    int i;
     va_start( args, n );
-    for( i = 0; i < n; i++ ) yp_incref( va_arg( args, ypObject * ) );
+    for( /*n already set*/; n > 0; n-- ) yp_incref( va_arg( args, ypObject * ) );
     va_end( args );
 }
 
@@ -1297,9 +1296,8 @@ void yp_decref( ypObject *x )
 void yp_decrefN( yp_ssize_t n, ... )
 {
     va_list args;
-    int i;
     va_start( args, n );
-    for( i = 0; i < n; i++ ) yp_decref( va_arg( args, ypObject * ) );
+    for( /*n already set*/; n > 0; n-- ) yp_decref( va_arg( args, ypObject * ) );
     va_end( args );
 }
 
@@ -1737,33 +1735,6 @@ static ypObject *_ypSequence_miniiter_lenh( ypObject *x, yp_uint64_t *_state, yp
 
 
 /*************************************************************************************************
- * Special (and dangerous) iterators for working with variable arguments of ypObject*s
- *************************************************************************************************/
-
-// XXX Be very careful working with these: only pass them to trusted functions that will not
-// attempt to retain a reference to these objects after returning.  These aren't your typical
-// objects: they're allocated on the stack.  While this could be dangerous, it also reduces
-// duplicating code between versions that handle va_args and those that handle iterables.
-// TODO Is there a way to improve this using miniiters and a yp_iter_valist immortal object?
-#define ypIterValist_ARGS( i ) (*((va_list *) ((ypObject *)i)->ob_data))
-
-// The number of arguments is stored in ob_lenhint, which is automatically decremented by yp_next
-// after each yielded value.
-#define yp_ONSTACK_ITER_VALIST( name, n, args ) \
-    ypIterObject _ ## name ## _struct = { \
-        yp_IMMORTAL_HEAD_INIT( ypIter_CODE, &(args), ypObject_LEN_INVALID ), \
-        n, 0x0u, _iter_valist_generator}; \
-    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-
-static ypObject *_iter_valist_generator( ypObject *i, ypObject *value )
-{
-    if( yp_isexceptionC( value ) ) return value;
-    if( ypIter_LENHINT( i ) < 1 ) return yp_StopIteration;
-    return yp_incref( va_arg( ypIterValist_ARGS( i ), ypObject * ) );
-}
-
-
-/*************************************************************************************************
  * Freezing, "unfreezing", and invalidating
  *************************************************************************************************/
 
@@ -1984,10 +1955,13 @@ ypObject *yp_anyN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_anyNV, (n, args), n );
 }
 ypObject *yp_anyNV( int n, va_list args ) {
-    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return yp_any( iter_args );
+    for( /*n already set*/; n > 0; n-- ) {
+        ypObject *b = yp_bool( va_arg( args, ypObject * ) );
+        if( b != yp_False ) return b; // exit on yp_True or exception
+    }
+    return yp_False;
 }
-// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+
 ypObject *yp_any( ypObject *iterable )
 {
     ypObject *mi;
@@ -2037,10 +2011,13 @@ ypObject *yp_allN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_allNV, (n, args), n );
 }
 ypObject *yp_allNV( int n, va_list args ) {
-    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return yp_all( iter_args );
+    for( /*n already set*/; n > 0; n-- ) {
+        ypObject *b = yp_bool( va_arg( args, ypObject * ) );
+        if( b != yp_True ) return b; // exit on yp_False or exception
+    }
+    return yp_True;
 }
-// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+
 ypObject *yp_all( ypObject *iterable )
 {
     ypObject *mi;
@@ -6870,7 +6847,41 @@ static ypTypeObject ypList_Type = {
 
 // Constructors
 
-// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+static ypObject *_ypTupleNV( int type, int n, va_list args )
+{
+    // We keep len updated so we can just decref newSq on failure
+    ypObject *newSq = _ypTuple_new( type, n, /*alloclen_fixed=*/TRUE );
+    if( yp_isexceptionC( newSq ) ) return newSq;
+    for( /*n already set*/; n > 0; n-- ) {
+        ypObject *x = va_arg( args, ypObject * );
+        if( yp_isexceptionC( x ) ) {
+            yp_decref( newSq );
+            return x;
+        }
+        ypTuple_ARRAY( newSq )[ypTuple_LEN( newSq )] = yp_incref( x );
+        ypTuple_LEN( newSq ) += 1;
+    }
+    return newSq;
+}
+
+ypObject *yp_tupleN( int n, ... ) {
+    if( n < 1 ) return _yp_tuple_empty;
+    return_yp_V_FUNC( ypObject *, _ypTupleNV, (ypTuple_CODE, n, args), n );
+}
+ypObject *yp_tupleNV( int n, va_list args ) {
+    if( n < 1 ) return _yp_tuple_empty;
+    return _ypTupleNV( ypTuple_CODE, n, args );
+}
+
+ypObject *yp_listN( int n, ... ) {
+    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
+    return_yp_V_FUNC( ypObject *, _ypTupleNV, (ypList_CODE, n, args), n );
+}
+ypObject *yp_listNV( int n, va_list args ) {
+    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
+    return _ypTupleNV( ypList_CODE, n, args );
+}
+
 // XXX Check for the "fellow tuple/list" case _before_ calling this function
 static ypObject *_ypTuple( int type, ypObject *iterable )
 {
@@ -6901,18 +6912,6 @@ static ypObject *_ypTuple( int type, ypObject *iterable )
     return newSq;
 }
 
-static ypObject *_yp_tupleNV( int n, va_list args ) {
-    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return _ypTuple( ypTuple_CODE, iter_args );
-}
-ypObject *yp_tupleN( int n, ... ) {
-    if( n < 1 ) return _yp_tuple_empty;
-    return_yp_V_FUNC( ypObject *, _yp_tupleNV, (n, args), n );
-}
-ypObject *yp_tupleNV( int n, va_list args ) {
-    if( n < 1 ) return _yp_tuple_empty;
-    return _yp_tupleNV( n, args );
-}
 ypObject *yp_tuple( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         if( ypTuple_LEN( iterable ) < 1 ) return _yp_tuple_empty;
@@ -6922,18 +6921,6 @@ ypObject *yp_tuple( ypObject *iterable ) {
     return _ypTuple( ypTuple_CODE, iterable );
 }
 
-static ypObject *_yp_listNV( int n, va_list args ) {
-    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return _ypTuple( ypList_CODE, iter_args );
-}
-ypObject *yp_listN( int n, ... ) {
-    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return_yp_V_FUNC( ypObject *, _yp_listNV, (n, args), n );
-}
-ypObject *yp_listNV( int n, va_list args ) {
-    if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return _yp_listNV( n, args );
-}
 ypObject *yp_list( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         return _ypTuple_copy( ypList_CODE, iterable, /*alloclen_fixed=*/FALSE );
@@ -7477,7 +7464,6 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
     return yp_None;
 }
 
-// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
 static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
 {
     ypObject *exc = yp_None;
@@ -8368,7 +8354,47 @@ void yp_set_add( ypObject **set, ypObject *x )
 
 // Constructors
 
-// XXX iterable may be an yp_ONSTACK_ITER_VALIST: use carefully
+static ypObject *_ypSetNV( int type, int n, va_list args )
+{
+    yp_ssize_t spaceleft;
+    ypObject *result;
+    ypObject *newSo = _ypSet_new( type, n, /*alloclen_fixed=*/TRUE );
+    if( yp_isexceptionC( newSo ) ) return newSo;
+    spaceleft = _ypSet_space_remaining( newSo );
+    while( n > 0 ) {
+        ypObject *x = va_arg( args, ypObject * );
+        if( yp_isexceptionC( x ) ) {
+            yp_decref( newSo );
+            return x;
+        }
+        n -= 1;
+        result = _ypSet_push( newSo, x, &spaceleft, n );
+        if( yp_isexceptionC( result ) ) {
+            yp_decref( newSo );
+            return result;
+        }
+    }
+    return newSo;
+}
+
+ypObject *yp_frozensetN( int n, ... ) {
+    if( n < 1 ) return _yp_frozenset_empty;
+    return_yp_V_FUNC( ypObject *, _ypSetNV, (ypFrozenSet_CODE, n, args), n );
+}
+ypObject *yp_frozensetNV( int n, va_list args ) {
+    if( n < 1 ) return _yp_frozenset_empty;
+    return _ypSetNV( ypFrozenSet_CODE, n, args );
+}
+
+ypObject *yp_setN( int n, ... ) {
+    if( n < 1 ) return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
+    return_yp_V_FUNC( ypObject *, _ypSetNV, (ypSet_CODE, n, args), n );
+}
+ypObject *yp_setNV( int n, va_list args ) {
+    if( n < 1 ) return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
+    return _ypSetNV( ypSet_CODE, n, args );
+}
+
 // XXX Check for the "fellow frozenset/set" case _before_ calling this function
 static ypObject *_ypSet( int type, ypObject *iterable )
 {
@@ -8399,18 +8425,6 @@ static ypObject *_ypSet( int type, ypObject *iterable )
     return newSo;
 }
 
-static ypObject *_yp_frozensetNV( int n, va_list args ) {
-    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return _ypSet( ypFrozenSet_CODE, iter_args );
-}
-ypObject *yp_frozensetN( int n, ... ) {
-    if( n < 1 ) return _yp_frozenset_empty;
-    return_yp_V_FUNC( ypObject *, _yp_frozensetNV, (n, args), n );
-}
-ypObject *yp_frozensetNV( int n, va_list args ) {
-    if( n < 1 ) return _yp_frozenset_empty;
-    return _yp_frozensetNV( n, args );
-}
 ypObject *yp_frozenset( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypFrozenSet_CODE ) {
         if( ypSet_LEN( iterable ) < 1 ) return _yp_frozenset_empty;
@@ -8420,18 +8434,6 @@ ypObject *yp_frozenset( ypObject *iterable ) {
     return _ypSet( ypFrozenSet_CODE, iterable );
 }
 
-static ypObject *_yp_setNV( int n, va_list args ) {
-    yp_ONSTACK_ITER_VALIST( iter_args, n, args );
-    return _ypSet( ypSet_CODE, iter_args );
-}
-ypObject *yp_setN( int n, ... ) {
-    if( n < 1 ) return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return_yp_V_FUNC( ypObject *, _yp_setNV, (n, args), n );
-}
-ypObject *yp_setNV( int n, va_list args ) {
-    if( n < 1 ) return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return _yp_setNV( n, args );
-}
 ypObject *yp_set( ypObject *iterable ) {
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypFrozenSet_CODE ) {
         return _ypSet_copy( ypSet_CODE, iterable, /*alloclen_fixed=*/FALSE );
@@ -9032,7 +9034,7 @@ static ypObject *dict_popvalue( ypObject *mp, ypObject *key, ypObject *defval )
     return result;
 }
 
-// Note the difference between this, which removes an arbitrary item, and _ypDict_pop, which 
+// Note the difference between this, which removes an arbitrary item, and _ypDict_pop, which
 // removes a specific item
 // XXX Make sure not to leave references in *key and *value on error (yp_popitem will set to
 // exception)
@@ -9201,6 +9203,8 @@ static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
     // Find the requested data
     if( state->keys ) {
         if( state->values ) {
+            // TODO An internal _yp_tuple2, which trusts it won't be passed exceptions, would be
+            // quite efficient here
             result = yp_tupleN( 2, ypSet_TABLE( ypDict_KEYSET( mp ) )[index].se_key,
                                    ypDict_VALUES( mp )[index] );
         } else {
