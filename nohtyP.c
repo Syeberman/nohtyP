@@ -1940,7 +1940,7 @@ ypObject *yp_orNV( int n, va_list args )
 {
     ypObject *x;
     ypObject *b;
-    if( n == 0 ) return yp_False;
+    if( n < 1 ) return yp_False;
     for( /*n already set*/; n > 1; n-- ) {
         x = va_arg( args, ypObject * );
         b = yp_bool( x );
@@ -1996,7 +1996,7 @@ ypObject *yp_andNV( int n, va_list args )
 {
     ypObject *x;
     ypObject *b;
-    if( n == 0 ) return yp_True;
+    if( n < 1 ) return yp_True;
     for( /*n already set*/; n > 1; n-- ) {
         x = va_arg( args, ypObject * );
         b = yp_bool( x );
@@ -2045,9 +2045,11 @@ extern ypObject * const yp_ComparisonNotImplemented;
     ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
         ypTypeObject *type = ypObject_TYPE( x ); \
         ypObject *result = type->tp_ ## name( x, y ); \
+        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), "tp_" #name " must return yp_True, yp_False, or an exception" ); \
         if( result != yp_ComparisonNotImplemented ) return result; \
         type = ypObject_TYPE( y ); \
         result = type->tp_ ## reflection( y, x ); \
+        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), "tp_" #reflection " must return yp_True, yp_False, or an exception" ); \
         if( result != yp_ComparisonNotImplemented ) return result; \
         return defval; \
     }
@@ -4731,7 +4733,6 @@ static ypObject *bytes_bool( ypObject *b ) {
     return ypBool_FROM_C( ypBytes_LEN( b ) );
 }
 
-// Returns yp_None or an exception
 static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *i )
 {
@@ -5567,7 +5568,6 @@ static ypObject *str_getindex( ypObject *s, yp_ssize_t i, ypObject *defval )
     return yp_chrC( ypStr_DATA( s )[i] );
 }
 
-// Returns yp_None or an exception
 static ypObject *str_len( ypObject *s, yp_ssize_t *len )
 {
     *len = ypStr_LEN( s );
@@ -9600,10 +9600,7 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
 // These are the functions that simply redirect to object methods; more complex public functions
 // are found elsewhere.
 
-// TODO do/while(0)
-
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
-// TODO _return_yp_REDIRECT, etc
 #define _yp_REDIRECT1( ob, tp_meth, args ) \
     do {ypTypeObject *type = ypObject_TYPE( ob ); \
         return type->tp_meth args; } while( 0 )
@@ -9611,6 +9608,18 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
 #define _yp_REDIRECT2( ob, tp_suite, suite_meth, args ) \
     do {ypTypeObject *type = ypObject_TYPE( ob ); \
         return type->tp_suite->suite_meth args; } while( 0 )
+
+#define _yp_REDIRECT_BOOL1( ob, tp_meth, args ) \
+    do {ypTypeObject *type = ypObject_TYPE( ob ); \
+        ypObject *result = type->tp_meth args; \
+        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), #tp_meth " must return yp_True, yp_False, or an exception" ); \
+        return result; } while( 0 )
+
+#define _yp_REDIRECT_BOOL2( ob, tp_suite, suite_meth, args ) \
+    do {ypTypeObject *type = ypObject_TYPE( ob ); \
+        ypObject *result = type->tp_suite->suite_meth args; \
+        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), #suite_meth " must return yp_True, yp_False, or an exception" ); \
+        return result; } while( 0 )
 
 #define _yp_REDIRECT_EXC1( ob, tp_meth, args, pExc ) \
     do {ypTypeObject *type = ypObject_TYPE( ob ); \
@@ -9649,13 +9658,11 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
         return result; } while( 0 )
 
 ypObject *yp_bool( ypObject *x ) {
-    _yp_REDIRECT1( x, tp_bool, (x) );
-    // TODO Ensure the result is yp_True, yp_False, or an exception
+    _yp_REDIRECT_BOOL1( x, tp_bool, (x) );
 }
 
 ypObject *yp_iter( ypObject *x ) {
     _yp_REDIRECT1( x, tp_iter, (x) );
-    // TODO Ensure the result is an iterator or an exception
 }
 
 ypObject *yp_send( ypObject *iterator, ypObject *value ) {
@@ -9673,14 +9680,13 @@ ypObject *yp_throw( ypObject *iterator, ypObject *exc ) {
 
 ypObject *yp_reversed( ypObject *x ) {
     _yp_REDIRECT1( x, tp_iter_reversed, (x) );
-    // TODO Ensure the result is an iterator or an exception
 }
 
 ypObject *yp_contains( ypObject *container, ypObject *x ) {
-    _yp_REDIRECT1( container, tp_contains, (container, x) );
+    _yp_REDIRECT_BOOL1( container, tp_contains, (container, x) );
 }
 ypObject *yp_in( ypObject *x, ypObject *container ) {
-    _yp_REDIRECT1( container, tp_contains, (container, x) );
+    _yp_REDIRECT_BOOL1( container, tp_contains, (container, x) );
 }
 
 ypObject *yp_not_in( ypObject *x, ypObject *container ) {
@@ -9842,15 +9848,15 @@ void yp_sort( ypObject **sequence ) {
 }
 
 ypObject *yp_isdisjoint( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_isdisjoint, (set, x) );
+    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_isdisjoint, (set, x) );
 }
 
 ypObject *yp_issubset( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_issubset, (set, x) );
+    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_issubset, (set, x) );
 }
 
 ypObject *yp_issuperset( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_issuperset, (set, x) );
+    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_issuperset, (set, x) );
 }
 
 ypObject *yp_unionN( ypObject *set, int n, ... ) {
