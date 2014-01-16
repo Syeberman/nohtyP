@@ -4,10 +4,14 @@
 \.dll$
 \.exe$
 \.o$
+\.obj$
 \.so$
 \.pyc$
 \.pyo$
 /__pycache__/
+
+# Local SCons files
+\.sconsign.dblite$
 
 # Local Visual Studio files
 \.vcxproj.user$
@@ -17,7 +21,6 @@
 /Debug/
 /Release/
 /ipch/
-
 
 # OS generated files
 \.DS_Store$
