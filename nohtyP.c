@@ -25,7 +25,7 @@
 // yp_DEBUG_LEVEL controls how aggressively nohtyP should debug itself at runtime:
 //  - 0: no debugging (default)
 //  - 1: yp_ASSERT (minimal debugging)
-//  - 20: yp_DEBUG (print debugging)
+//  - 10: yp_DEBUG (print debugging)
 #ifndef yp_DEBUG_LEVEL
     // Check for well-known debug defines; inspired from http://nothings.org/stb/stb_h.html
     #if defined( DEBUG ) || defined( _DEBUG ) || defined( DBG )
@@ -72,7 +72,7 @@ static void yp_breakonerr( ypObject *err ) {
 #define yp_breakonerr( err )
 #endif
 
-#if yp_DEBUG_LEVEL >= 20
+#if yp_DEBUG_LEVEL >= 10
 #define yp_DEBUG0( fmt ) do { _flushall( ); fprintf( stderr, fmt "\n" ); _flushall( ); } while( 0 )
 #define yp_DEBUG( fmt, ... ) do { _flushall( ); fprintf( stderr, fmt "\n", __VA_ARGS__ ); _flushall( ); } while( 0 )
 #else
@@ -913,7 +913,6 @@ static void (*yp_free)( void *p );
 // _msize and _expand
 #ifdef _MSC_VER
 #include <malloc.h>
-#include <crtdbg.h> // For debugging only
 static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
 {
     void *p;
@@ -988,7 +987,6 @@ static void (*_default_yp_free)( void *p ) = free;
  * nohtyP object allocations
  *************************************************************************************************/
 
-// FIXME this section could use another pass to review and clean up docs/code/etc
 // TODO The alloclen can be larger than asked, which is fine, except if the object has an
 // artificially-lower maximum and it's relying on alloclen to keep it there...is that a problem?
 
@@ -3476,7 +3474,7 @@ _ypInt_PUBLIC_ARITH_FUNCTION( mul );
 // truediv implemented separately, as result is always a float
 _ypInt_PUBLIC_ARITH_FUNCTION( floordiv );
 _ypInt_PUBLIC_ARITH_FUNCTION( mod );
-// FIXME if pow has a negative exponent, the result must be a float
+// TODO if pow has a negative exponent, the result must be a float
 _ypInt_PUBLIC_ARITH_FUNCTION( pow );
 _ypInt_PUBLIC_ARITH_FUNCTION( lshift );
 _ypInt_PUBLIC_ARITH_FUNCTION( rshift );
@@ -7988,7 +7986,7 @@ static ypObject *set_symmetric_difference_update( ypObject *so, ypObject *x )
 
 // XXX We redirect the new-object set methods to the in-place versions.  Among other things, this
 // helps to avoid duplicating code.
-// FIXME ...except we are creating objects that we destroy then create new ones, which can probably
+// TODO ...except we are creating objects that we destroy then create new ones, which can probably
 // be optimized in certain cases, so rethink these four methods.  At the very least, can we avoid
 // the yp_freeze?
 static ypObject *frozenset_union( ypObject *so, int n, va_list args )
@@ -10237,11 +10235,6 @@ static const yp_initialize_kwparams _default_initialize = {
 void yp_initialize( const yp_initialize_kwparams *kwparams )
 {
     static int initialized = FALSE;
-
-#ifdef _MSC_VER
-    // TODO memory leak detection that should only be enabled for debug builds
-    // _CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
-#endif
 
     // yp_initialize can only be called once
     if( initialized ) {

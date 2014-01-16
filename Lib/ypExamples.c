@@ -10,6 +10,11 @@
 #include <stdio.h>
 #include <process.h> // FIXME for system
 
+#ifdef _MSC_VER
+#include <crtdbg.h> // For debugging only
+#endif
+
+
 // FIXME track mallocs/inrefs/decrefs/frees and ensure no memory leaks
 
 /*
@@ -405,6 +410,11 @@ EXAMPLE( LoopStatements, FOR_ELSE )
 
 int main( int argc, char *argv[], char *envp[] )
 {
+    // Enable memory leak detection, if supported by the heap
+#ifdef _MSC_VER
+    _CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
+#endif
+
     yp_initialize( NULL );
     return ypExamples( ); // TODO complete
 }
