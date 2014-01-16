@@ -1,0 +1,34 @@
+import os.path, sys
+
+# Confirm that scons' top-level directory, the current directory, _is_ the project top
+if not os.path.exists( "nohtyP.c" ):
+    raise EnvironmentError( "run SCons from top project dir (or use make.bat, or scons -C)" )
+
+objDir = "#Build/scons"
+
+vs100Dir = "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0"
+windowsSDKDir = "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.0A"
+system32Dir = "C:\\Windows\\system32"
+
+
+env = Environment( )
+env["ENV"]["PATH"] = [
+        vs100Dir+"/VC/bin",
+        vs100Dir+"/Common7/IDE",
+        system32Dir,
+        ]
+env["CPPPATH"] = [
+        "#", 
+        "#Lib",
+        vs100Dir+"/VC/include",
+        windowsSDKDir+"/Include",
+        ]
+env["LIBPATH"] = [
+        vs100Dir+"/VC/lib",
+        windowsSDKDir+"/Lib",
+        ]
+env.VariantDir( objDir, "#", duplicate=False )
+env.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
+
+env.SharedLibrary( objDir+"/nohtyP", source=objDir+"/nohtyP.c" )
+
