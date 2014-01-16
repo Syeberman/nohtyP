@@ -1,0 +1,33 @@
+from os.path import join as joinpath
+from os.path import abspath
+
+topDir = abspath( ".." )
+buildDir = joinpath( topDir, "Build" )
+libDir = joinpath( topDir, "Lib" )
+
+vs100Dir = "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0"
+windowsSDKDir = "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.0A"
+system32Dir = "C:\\Windows\\system32"
+
+
+env = Environment( )
+env["ENV"]["PATH"] = [
+        joinpath( vs100Dir, "VC", "bin" ),
+        joinpath( vs100Dir, "Common7", "IDE" ),
+        system32Dir,
+        ]
+env["CPPPATH"] = [
+        topDir, 
+        libDir,
+        joinpath( vs100Dir, "VC", "include" ),
+        joinpath( windowsSDKDir, "Include" ),
+        ]
+env["LIBPATH"] = [
+        joinpath( vs100Dir, "VC", "lib" ),
+        joinpath( windowsSDKDir, "Lib" ),
+        ]
+env.VariantDir( joinpath( buildDir, "scons" ), topDir, duplicate=False )
+
+env.SharedLibrary( joinpath( buildDir, "scons", "nohtyP" ),
+        source=joinpath( buildDir, "scons", "nohtyP.c" ) )
+
