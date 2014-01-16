@@ -4,31 +4,56 @@ import os.path, sys
 if not os.path.exists( "nohtyP.c" ):
     raise EnvironmentError( "run SCons from top project dir (or use make.bat, or scons -C)" )
 
-objDir = "#Build/scons"
+# Require that all construction variable names exist, and that indexes out of range are not allowed
+# TODO: AllowSubstExceptions( )
 
+env = Environment( )
+# Maintain a separate object file directory, and don't copy source files there
+env["OBJDIR"] = "#Build/scons"
+env.VariantDir( "$OBJDIR", "#", duplicate=False )
+# Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory
+env.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
+# For dependencies, first consider timestamps, then MD5 checksums
+env.Decider( "MD5-timestamp" )
+
+# Settings to build using VS10.0
 vs100Dir = "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0"
 windowsSDKDir = "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.0A"
 system32Dir = "C:\\Windows\\system32"
+env.AppendENVPath(
+        "PATH", os.pathsep.join( [
+            vs100Dir+"/VC/bin",
+            vs100Dir+"/Common7/IDE",
+            system32Dir,
+            ] )
+        )
+env.AppendUnique(
+        CPPPATH=[
+            vs100Dir+"/VC/include",
+            windowsSDKDir+"/Include",
+            ],
+        LIBPATH=[
+            vs100Dir+"/VC/lib",
+            windowsSDKDir+"/Lib",
+            ],
+        CPPDEFINES=[
+            "WIN32",
+            "NDEBUG",   # TODO _DEBUG on debug build
+            "_WINDOWS",
+            "_USRDLL",
+            ]
+        )
 
-
-env = Environment( )
-env["ENV"]["PATH"] = [
-        vs100Dir+"/VC/bin",
-        vs100Dir+"/Common7/IDE",
-        system32Dir,
-        ]
-env["CPPPATH"] = [
-        "#", 
-        "#Lib",
-        vs100Dir+"/VC/include",
-        windowsSDKDir+"/Include",
-        ]
-env["LIBPATH"] = [
-        vs100Dir+"/VC/lib",
-        windowsSDKDir+"/Lib",
-        ]
-env.VariantDir( objDir, "#", duplicate=False )
-env.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
-
-env.SharedLibrary( objDir+"/nohtyP", source=objDir+"/nohtyP.c" )
+# How to build nohtyP.dll
+env.PrependUnique(
+        CPPPATH=[
+            "#",
+            "#Lib",
+            ],
+        CPPDEFINES=[
+            "yp_ENABLE_SHARED",
+            "yp_BUILD_CORE",
+            ]
+        )
+env.SharedLibrary( "$OBJDIR/nohtyP", source="$OBJDIR/nohtyP.c" )
 
