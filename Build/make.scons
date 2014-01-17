@@ -4,56 +4,35 @@ import os.path
 if not os.path.exists( "nohtyP.c" ):
     Exit( "Run SCons from top project dir (or use make.bat, or scons -C)" )
 
-# Require that all construction variable names exist, and that indexes out of range are not allowed
-# XXX This requires variables implicitly used by SCons to be defined, at least to the empty string
-AllowSubstExceptions( )
-
 # Command-line build variables
 vars = Variables( None )
 
 # Generic build environment applicable to all compilers/targets
-env = Environment( variables=vars )
-# Require that unknown command-line variables are not used
+# FIXME SCons 2.3.0 doesn't detect 64-bit systems that only have 32-bit tools installed
+env = Environment( variables=vars, TARGET_ARCH="x86" ) # FIXME remove TARGET_ARCH
+
+# Require that only known command-line variables are used
 vars_unknown = vars.UnknownVariables( )
 if vars_unknown: Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
+
+# Require that construction variable names exist at expansion, then add those allowed to be empty
+AllowSubstExceptions( )
+env.Append( CPPFLAGS="", SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", LIBPATH="", PCH="", )
+
 # Maintain a separate object file directory, and don't copy source files there
 env["OBJDIR"] = "#Build/scons"
 env.VariantDir( "$OBJDIR", "#", duplicate=False )
+
 # Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory
 env.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
+
 # For dependencies, first consider timestamps, then MD5 checksums
 env.Decider( "MD5-timestamp" )
-# These are used by SCons regardless of compiler
-env.Append( CPPFLAGS="", SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", )
 
-# Settings to build using VS10.0
-vs100Dir = "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0"
-windowsSDKDir = "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.0A"
-system32Dir = "C:\\Windows\\system32"
-env.AppendENVPath(
-        "PATH", os.pathsep.join( [
-            vs100Dir+"/VC/bin",
-            vs100Dir+"/Common7/IDE",
-            system32Dir,
-            ] )
-        )
-env.AppendUnique(
-        CPPPATH=[
-            vs100Dir+"/VC/include",
-            windowsSDKDir+"/Include",
-            ],
-        LIBPATH=[
-            vs100Dir+"/VC/lib",
-            windowsSDKDir+"/Lib",
-            ],
-        CPPDEFINES=[
-            "WIN32",
-            "NDEBUG",   # TODO _DEBUG on debug build
-            "_WINDOWS",
-            "_USRDLL",
-            ],
-        PCH="", 
-        )
+# Always use cmd.exe on Windows, regardless of user's shell; ignored on other platforms
+env["ENV"]["COMSPEC"] = "cmd.exe"
+
+# TODO Are we missing command-line defines from the vcxproj file that cl doesn't implicitly add?
 
 # How to build nohtyP.dll
 env.PrependUnique(
@@ -67,5 +46,6 @@ env.PrependUnique(
             ],
         PDB="", LIBS="",
         )
+
 env.SharedLibrary( "$OBJDIR/nohtyP", source="$OBJDIR/nohtyP.c" )
 
