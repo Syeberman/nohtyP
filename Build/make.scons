@@ -1,14 +1,21 @@
-import os.path, sys
+import os.path
 
 # Confirm that scons' top-level directory, the current directory, _is_ the project top
 if not os.path.exists( "nohtyP.c" ):
-    raise EnvironmentError( "run SCons from top project dir (or use make.bat, or scons -C)" )
+    Exit( "Run SCons from top project dir (or use make.bat, or scons -C)" )
 
 # Require that all construction variable names exist, and that indexes out of range are not allowed
 # XXX This requires variables implicitly used by SCons to be defined, at least to the empty string
 AllowSubstExceptions( )
 
-env = Environment( )
+# Command-line build variables
+vars = Variables( None )
+
+# Generic build environment applicable to all compilers/targets
+env = Environment( variables=vars )
+# Require that unknown command-line variables are not used
+vars_unknown = vars.UnknownVariables( )
+if vars_unknown: Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
 # Maintain a separate object file directory, and don't copy source files there
 env["OBJDIR"] = "#Build/scons"
 env.VariantDir( "$OBJDIR", "#", duplicate=False )
