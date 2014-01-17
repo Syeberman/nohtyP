@@ -4,24 +4,30 @@
 \.dll$
 \.exe$
 \.exp$
+\.idb$
+\.ilk$
+\.lastbuildstate$
 \.lib$
 \.o$
 \.obj$
 \.so$
+\.pdb$
 \.pyc$
 \.pyo$
+\.tlog$
+/Debug/
+/Release/
 /__pycache__/
 
 # Local SCons files
 \.sconsign.dblite$
 
 # Local Visual Studio files
+\.ipch$
 \.vcxproj.user$
 \.sdf$
 \.suo$
 \.opensdf$
-/Debug/
-/Release/
 /ipch/
 
 # OS generated files
@@ -30,7 +36,6 @@
 \.Trashes$
 /ehthumbs.db$
 /Thumbs.db$
-
 
 # Temporary files
 \.tmp$

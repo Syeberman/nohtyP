@@ -5,7 +5,8 @@ if not os.path.exists( "nohtyP.c" ):
     raise EnvironmentError( "run SCons from top project dir (or use make.bat, or scons -C)" )
 
 # Require that all construction variable names exist, and that indexes out of range are not allowed
-# TODO: AllowSubstExceptions( )
+# XXX This requires variables implicitly used by SCons to be defined, at least to the empty string
+AllowSubstExceptions( )
 
 env = Environment( )
 # Maintain a separate object file directory, and don't copy source files there
@@ -15,6 +16,8 @@ env.VariantDir( "$OBJDIR", "#", duplicate=False )
 env.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
 # For dependencies, first consider timestamps, then MD5 checksums
 env.Decider( "MD5-timestamp" )
+# These are used by SCons regardless of compiler
+env.Append( CPPFLAGS="", SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", )
 
 # Settings to build using VS10.0
 vs100Dir = "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0"
@@ -41,7 +44,8 @@ env.AppendUnique(
             "NDEBUG",   # TODO _DEBUG on debug build
             "_WINDOWS",
             "_USRDLL",
-            ]
+            ],
+        PCH="", 
         )
 
 # How to build nohtyP.dll
@@ -53,7 +57,8 @@ env.PrependUnique(
         CPPDEFINES=[
             "yp_ENABLE_SHARED",
             "yp_BUILD_CORE",
-            ]
+            ],
+        PDB="", LIBS="",
         )
 env.SharedLibrary( "$OBJDIR/nohtyP", source="$OBJDIR/nohtyP.c" )
 
