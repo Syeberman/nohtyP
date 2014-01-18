@@ -9590,6 +9590,183 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
     return _ypDict_fromkeys( ypDict_CODE, iterable, value );
 }
 
+#if 0
+/*************************************************************************************************
+ * Immutable sequence of integers (range)
+ *************************************************************************************************/
+
+// TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
+
+// TODO: Decide whether to use the ob_len, which might not be large enough, or just calculate
+// on-the-fly
+typedef struct {
+    ypObject_HEAD
+    yp_int_t start;
+    yp_int_t stop;
+    yp_int_t step;
+    yp_ssize_t len;
+} ypRangeObject;
+
+#define ypRange_START( r )          ( ((ypRangeObject *)r)->start )
+#define ypRange_STOP( r )           ( ((ypRangeObject *)r)->stop )
+#define ypRange_STEP( r )           ( ((ypRangeObject *)r)->step )
+#define ypRange_LEN( r )            ( ((ypRangeObject *)r)->len )
+
+static ypObject *range_frozen_copy( ypObject *r, visitfunc copy_visitor, void *copy_memo )
+{
+    // A shallow copy of a range doesn't require an actual copy
+    if( copy_visitor == yp_shallowcopy_visitor ) {
+        return yp_incref( r );
+    }
+    return yp_NotImplementedError; // TODO implement
+}
+
+static ypObject *range_bool( ypObject *r ) {
+    return ypBool_FROM_C( ypRange_LEN( r ) );
+}
+
+static ypObject *range_getindex( ypObject *r, yp_ssize_t i )
+{
+    return yp_NotImplementedError;
+}
+
+static ypObject *range_len( ypObject *r, yp_ssize_t *len )
+{
+    *len = ypRange_LEN( r );
+    return yp_None;
+}
+
+// Returns true (1) if the two ranges are equal
+static int _ypRange_are_equal( ypObject *_r, ypObject *_x ) {
+    yp_ssize_t r_len = ypRange_LEN( r );
+    yp_ssize_t x_len = ypRange_LEN( x );
+    if( r_len != x_len ) return 0;
+    return yp_NotImplementedError;
+}
+static ypObject *range_eq( ypObject *r, ypObject *x ) {
+    if( r == x ) return yp_True;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( _ypRange_are_equal( r, x ) );
+}
+static ypObject *range_ne( ypObject *r, ypObject *x ) {
+    if( r == x ) return yp_False;
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
+    return ypBool_FROM_C( !_ypRange_are_equal( r, x ) );
+}
+
+// TODO Unless Python does differently, this should return the same hash tuple(r) would return
+static ypObject *range_currenthash( ypObject *r,
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *range_dealloc( ypObject *r ) {
+    ypMem_FREE_CONTAINER( r, ypRangeObject );
+    return yp_None;
+}
+
+static ypSequenceMethods ypRange_as_sequence = {
+    MethodError_objobjproc,         // tp_concat
+    MethodError_objssizeproc,       // tp_repeat
+    MethodError_objssizeproc,       // tp_getindex
+    MethodError_objsliceproc,       // tp_getslice
+    MethodError_findfunc,           // tp_find
+    MethodError_countfunc,          // tp_count
+    MethodError_objssizeobjproc,    // tp_setindex
+    MethodError_objsliceobjproc,    // tp_setslice
+    MethodError_objssizeproc,       // tp_delindex
+    MethodError_objsliceproc,       // tp_delslice
+    MethodError_objobjproc,         // tp_append
+    MethodError_objobjproc,         // tp_extend
+    MethodError_objssizeproc,       // tp_irepeat
+    MethodError_objssizeobjproc,    // tp_insert
+    MethodError_objssizeproc,       // tp_popindex
+    MethodError_objproc,            // tp_reverse
+    MethodError_sortfunc            // tp_sort
+};
+
+static ypTypeObject ypRange_Type = {
+    yp_TYPE_HEAD_INIT,
+    NULL,                           // tp_name
+
+    // Object fundamentals
+    range_dealloc,                  // tp_dealloc
+    NoRefs_traversefunc,            // tp_traverse
+    NULL,                           // tp_str
+    NULL,                           // tp_repr
+
+    // Freezing, copying, and invalidating
+    MethodError_objproc,            // tp_freeze
+    range_frozen_copy,              // tp_unfrozen_copy
+    range_frozen_copy,              // tp_frozen_copy
+    MethodError_objproc,            // tp_invalidate
+
+    // Boolean operations and comparisons
+    range_bool,                     // tp_bool
+    NotImplemented_comparefunc,     // tp_lt
+    NotImplemented_comparefunc,     // tp_le
+    range_eq,                       // tp_eq
+    range_ne,                       // tp_ne
+    NotImplemented_comparefunc,     // tp_ge
+    NotImplemented_comparefunc,     // tp_gt
+
+    // Generic object operations
+    range_currenthash,              // tp_currenthash
+    MethodError_objproc,            // tp_close
+
+    // Number operations
+    MethodError_NumberMethods,      // tp_as_number
+
+    // Iterator operations
+    _ypSequence_miniiter,           // tp_miniiter
+    _ypSequence_miniiter_rev,       // tp_miniiter_reversed
+    _ypSequence_miniiter_next,      // tp_miniiter_next
+    _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
+    _ypIter_from_miniiter,          // tp_iter
+    _ypIter_from_miniiter_rev,      // tp_iter_reversed
+    TypeError_objobjproc,           // tp_send
+
+    // Container operations
+    MethodError_objobjproc,         // tp_contains
+    range_len,                      // tp_len
+    MethodError_objobjproc,         // tp_push
+    MethodError_objproc,            // tp_clear
+    MethodError_objproc,            // tp_pop
+    MethodError_objobjobjproc,      // tp_remove
+    _ypSequence_getdefault,         // tp_getdefault
+    MethodError_objobjobjproc,      // tp_setitem
+    MethodError_objobjproc,         // tp_delitem
+    MethodError_objvalistproc,      // tp_update
+
+    // Sequence operations
+    &ypRange_as_sequence,           // tp_as_sequence
+
+    // Set operations
+    MethodError_SetMethods,         // tp_as_set
+
+    // Mapping operations
+    MethodError_MappingMethods      // tp_as_mapping
+};
+
+// XXX Adapted from PySlice_GetIndicesEx
+ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
+{
+    if( step == 0 ) return yp_ValueError;
+    
+    if( (step < 0 && stop  >= start) ||
+        (step > 0 && start >= stop ) ) {
+        return _yp_range_empty;
+    }
+
+    // Adjust stop to 1 plus the last number
+    stop = (stop - start) / step
+
+
+}
+ypObject *yp_rangeC( yp_int_t stop ) {
+    return yp_rangeC3( 0, stop, 1 );
+}
+#endif
 
 /*************************************************************************************************
  * Common object methods
