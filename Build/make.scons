@@ -7,9 +7,8 @@ if not os.path.exists( "nohtyP.c" ):
 # Command-line build variables
 vars = Variables( None )
 
-# Generic build environment applicable to all compilers/targets
-# FIXME SCons 2.3.0 doesn't detect 64-bit systems that only have 32-bit tools installed
-env = Environment( variables=vars, TARGET_ARCH="x86" ) # FIXME remove TARGET_ARCH
+# Generic build environment applicable to all compilers/targets and used internally by SCons
+env = DefaultEnvironment( variables=vars )
 
 # Require that only known command-line variables are used
 vars_unknown = vars.UnknownVariables( )
@@ -32,13 +31,10 @@ env.Decider( "MD5-timestamp" )
 # Always use cmd.exe on Windows, regardless of user's shell; ignored on other platforms
 env["ENV"]["COMSPEC"] = "cmd.exe"
 
-# TODO Are we missing command-line defines from the vcxproj file that cl doesn't implicitly add?
-
 # How to build nohtyP.dll
 env.PrependUnique(
         CPPPATH=[
             "#",
-            "#Lib",
             ],
         CPPDEFINES=[
             "yp_ENABLE_SHARED",
