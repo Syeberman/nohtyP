@@ -81,6 +81,9 @@ extern "C" {
 #include <stdarg.h>
 #include <limits.h>
 
+// To link to nohtyP statically, simply add nohtyP.c to your project: no special defines are
+// required.  To link to nohtyP dynamically, first build nohtyP.c as a shared library with
+// yp_ENABLE_SHARED and yp_BUILD_CORE, then include nohtyP.h with yp_ENABLE_SHARED defined.
 #ifdef yp_ENABLE_SHARED
 #ifdef yp_BUILD_CORE
 #define ypAPI extern __declspec( dllexport )
