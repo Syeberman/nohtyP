@@ -8,7 +8,7 @@ if not os.path.exists( "nohtyP.c" ):
 vars = Variables( None )
 
 # Generic build environment applicable to all compilers/targets and used internally by SCons
-env = DefaultEnvironment( variables=vars )
+rootEnv = DefaultEnvironment( tools=[], variables=vars )
 
 # Require that only known command-line variables are used
 vars_unknown = vars.UnknownVariables( )
@@ -16,22 +16,27 @@ if vars_unknown: Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
 
 # Require that construction variable names exist at expansion, then add those allowed to be empty
 AllowSubstExceptions( )
-env.Append( CPPFLAGS="", SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", LIBPATH="", PCH="", )
-
-# Maintain a separate object file directory, and don't copy source files there
-env["OBJDIR"] = "#Build/scons"
-env.VariantDir( "$OBJDIR", "#", duplicate=False )
+rootEnv.Append( CPPFLAGS="", SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", LIBPATH="", PCH="", )
 
 # Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory
-env.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
+rootEnv.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
 
 # For dependencies, first consider timestamps, then MD5 checksums
-env.Decider( "MD5-timestamp" )
+rootEnv.Decider( "MD5-timestamp" )
 
 # Always use cmd.exe on Windows, regardless of user's shell; ignored on other platforms
-env["ENV"]["COMSPEC"] = "cmd.exe"
+rootEnv["ENV"]["COMSPEC"] = "cmd.exe"
+
+
+# TODO Support more compilers, control from command-line
+env = rootEnv.Clone( tools=["msvs_100", ], toolpath=["#Build/Tools", ] )
+env["OBJDIR"] = "#Build/${yp_COMPILER}/${PLATFORM}_${TARGET_ARCH}_Release"
+
+# Maintain a separate object file directory, and don't copy source files there
+env.VariantDir( "$OBJDIR", "#", duplicate=False )
 
 # How to build nohtyP.dll
+# TODO Implement as an SConscript?
 env.PrependUnique(
         CPPPATH=[
             "#",
@@ -44,4 +49,5 @@ env.PrependUnique(
         )
 
 env.SharedLibrary( "$OBJDIR/nohtyP", source="$OBJDIR/nohtyP.c" )
+# TODO Remove the target directory entirely?
 
