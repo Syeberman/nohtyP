@@ -12,7 +12,7 @@ _mslinkTool = SCons.Tool.Tool( "mslink" )
 # Determine the exact version of tool installed, if any.  For nohtyP's purposes, we don't
 # distinguish between the regular and Express versions.
 # XXX get_vs_by_version is internal to SCons and may change in the future
-_msvsSupportedVersions = ("10.0", "10.0Exp")
+_msvsSupportedVersions = ("11.0", "11.0Exp")
 for _msvsVersion in _msvsSupportedVersions:
     try:
         if SCons.Tool.MSCommon.vs.get_vs_by_version( _msvsVersion ): break
