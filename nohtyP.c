@@ -159,8 +159,8 @@ typedef size_t yp_uhash_t;
 #define ypObject_LEN_MAX            ((yp_ssize_t) 0x7FFFFFFF)
 
 // Lengths and hashes can be cached in the object for easy retrieval
-#define ypObject_CACHED_LEN( ob )   ((yp_ssize_t) ((ypObject *)(ob))->ob_len)  // negative if invalid
-#define ypObject_CACHED_HASH( ob )  ((yp_hash_t)  ((ypObject *)(ob))->ob_hash) // HASH_INVALID if invalid
+#define ypObject_CACHED_LEN( ob )   (((ypObject *)(ob))->ob_len)  // negative if invalid
+#define ypObject_CACHED_HASH( ob )  (((ypObject *)(ob))->ob_hash) // HASH_INVALID if invalid
 
 // Base "constructor" for immortal objects
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
@@ -1260,7 +1260,7 @@ ypObject *yp_incref( ypObject *x )
     return x;
 }
 
-void yp_increfN( yp_ssize_t n, ... )
+void yp_increfN( int n, ... )
 {
     va_list args;
     va_start( args, n );
@@ -1291,7 +1291,7 @@ void yp_decref( ypObject *x )
     }
 }
 
-void yp_decrefN( yp_ssize_t n, ... )
+void yp_decrefN( int n, ... )
 {
     va_list args;
     va_start( args, n );
