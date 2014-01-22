@@ -23,7 +23,6 @@ def generate( env ):
     if _msvsVersion is None:
         raise SCons.Errors.UserError( "Visual Studio version %r is not installed" % _msvsSupportedVersions[0] )
     env["MSVC_VERSION"] = _msvsVersion
-    env["yp_COMPILER"] = os.path.splitext( os.path.basename( __file__ ) )[0]
     _msvsTool.generate( env )
     _msvcTool.generate( env )
     _mslinkTool.generate( env )
