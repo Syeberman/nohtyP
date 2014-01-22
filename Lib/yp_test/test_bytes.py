@@ -121,14 +121,16 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test, [-1])
         self.assertRaises(ValueError, self.type2test, [-sys.maxsize])
         self.assertRaises(ValueError, self.type2test, [-sys.maxsize-1])
-        self.assertRaises(ValueError, self.type2test, [-sys.maxsize-2])
-        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        self.assertRaises(ValueError, self.type2test, [yp_sys_minint])
+        # XXX nohtyP doesn't currently support long-style ints
+        #self.assertRaises(ValueError, self.type2test, [-sys.maxsize-2])
         #self.assertRaises(ValueError, self.type2test, [-10**100])
         self.assertRaises(ValueError, self.type2test, [256])
         self.assertRaises(ValueError, self.type2test, [257])
         self.assertRaises(ValueError, self.type2test, [sys.maxsize])
-        self.assertRaises(ValueError, self.type2test, [sys.maxsize+1])
-        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        self.assertRaises(ValueError, self.type2test, [yp_sys_maxint])
+        # XXX nohtyP doesn't currently support long-style ints
+        #self.assertRaises(ValueError, self.type2test, [sys.maxsize+1])
         #self.assertRaises(ValueError, self.type2test, [10**100])
 
     def test_compare(self):
