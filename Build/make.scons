@@ -7,7 +7,7 @@ if not os.path.exists( "nohtyP.c" ):
 compilers = ("msvs_120", "msvs_110", "msvs_100", "msvs_90")
 oses = ("win32", )
 archs = ("amd64", "x86")
-configurations = ("release", "debug")
+configurations = ("release", "debug") # TODO an analyze configuration
 
 
 # Command-line build variables

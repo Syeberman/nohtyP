@@ -1,37 +1,6 @@
-
-import os.path
-import SCons.Errors
-import SCons.Tool
-import SCons.Tool.MSCommon.vs
-
-# Without a toolpath argument this will find SCons' tool module
-_msvsTool = SCons.Tool.Tool( "msvs" )
-_msvcTool = SCons.Tool.Tool( "msvc" )
-_mslinkTool = SCons.Tool.Tool( "mslink" )
-
-# Determine the exact version of tool installed, if any.  For nohtyP's purposes, we don't
-# distinguish between the regular and Express versions.
-# XXX get_vs_by_version is internal to SCons and may change in the future
-_msvsSupportedVersions = ("11.0", "11.0Exp")
-for _msvsVersion in _msvsSupportedVersions:
-    try:
-        if SCons.Tool.MSCommon.vs.get_vs_by_version( _msvsVersion ): break
-    except SCons.Errors.UserError: pass # "not supported by SCons"
-else: _msvsVersion = None
-
-def generate( env ):
-    if _msvsVersion is None:
-        raise SCons.Errors.UserError( "Visual Studio %r is not installed" % _msvsSupportedVersions[0] )
-    env["MSVC_VERSION"] = _msvsVersion
-    _msvsTool.generate( env )
-    _msvcTool.generate( env )
-    _mslinkTool.generate( env )
-    if not env.WhereIs( "$CC" ):
-        raise SCons.Errors.StopError( "Visual Studio %r (%r) configuration failed" % (_msvsSupportedVersions[0], env["TARGET_ARCH"]) )
-
-    # TODO Options for warning levels, debug/release, etc
-
-def exists( env ):
-    return _msvsVersion is not None
-
+import msvs_common
+_generate, _exists = msvs_common.DefineMSVSToolFunctions( 11.0, ("11.0", "11.0Exp") )
+# Define new functions so that we remain in any stack traces involving these functions
+def generate( *args, **kwargs ): return _generate( *args, **kwargs )
+def exists( *args, **kwargs ): return _exists( *args, **kwargs )
 
