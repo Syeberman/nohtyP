@@ -21,11 +21,13 @@ else: _msvsVersion = None
 
 def generate( env ):
     if _msvsVersion is None:
-        raise SCons.Errors.UserError( "Visual Studio version %r is not installed" % _msvsSupportedVersions[0] )
+        raise SCons.Errors.UserError( "Visual Studio %r is not installed" % _msvsSupportedVersions[0] )
     env["MSVC_VERSION"] = _msvsVersion
     _msvsTool.generate( env )
     _msvcTool.generate( env )
     _mslinkTool.generate( env )
+    if not env.WhereIs( "$CC" ):
+        raise SCons.Errors.StopError( "Visual Studio %r (%r) configuration failed" % (_msvsSupportedVersions[0], env["TARGET_ARCH"]) )
 
     # TODO Options for warning levels, debug/release, etc
 
