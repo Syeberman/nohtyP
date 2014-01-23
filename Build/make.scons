@@ -4,9 +4,9 @@ import os.path, itertools
 if not os.path.exists( "nohtyP.c" ):
     Exit( "Run SCons from top project dir (or use make.bat, or scons -C)" )
 
-compilers = ("msvs_110", "msvs_100")
+compilers = ("msvs_120", "msvs_110", "msvs_100", "msvs_90")
 oses = ("win32", )
-archs = ("x86_64", "x86")
+archs = ("amd64", "x86")
 configurations = ("release", "debug")
 
 
@@ -58,10 +58,13 @@ for variant in itertools.product( compilers, oses, archs, configurations ):
     # Visual Studio only supports Windows
     if compiler.startswith( "msvs_" ) and os != "win32": continue
 
-    variantEnv = rootEnv.Clone( tools=[compiler, ], toolpath=["#Build/Tools", ],
-            COMPILER=compiler, TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
-    # TODO Skip compilers that can't be found, unless we want an error in that case
-    if not variantEnv.WhereIs( "$CC" ): continue
+    # Skip compilers that can't be found (TODO unless we want an error in that case?)
+    # TODO: This script is slow...I suspect it's a result of cloning so much.  Profile, then fix.
+    # TODO: Record compiler version information in the variant directory
+    try:
+        variantEnv = rootEnv.Clone( tools=[compiler, ], toolpath=["#Build/Tools", ],
+                COMPILER=compiler, TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
+    except Exception: continue
     # TODO Remove the target directory entirely on clean?
     variantEnv["VARIANTDIR"] = "#Build/${COMPILER}/${TARGET_OS}_${TARGET_ARCH}_${CONFIGURATION}"
     # Maintain a separate directory for intermediate and target files, but don't copy source files
