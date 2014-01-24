@@ -162,6 +162,11 @@ typedef size_t yp_uhash_t;
 #define ypObject_CACHED_LEN( ob )   (((ypObject *)(ob))->ob_len)  // negative if invalid
 #define ypObject_CACHED_HASH( ob )  (((ypObject *)(ob))->ob_hash) // HASH_INVALID if invalid
 
+// The number of elements allocated to the variable-portion of the object
+// XXX Do not set a length >ypObject_LEN_MAX, or a negative length !=ypObject_LEN_INVALID
+#define ypObject_ALLOCLEN( ob )             ((yp_ssize_t) ((ypObject *)(ob))->ob_alloclen)   // negative if invalid
+#define ypObject_SET_ALLOCLEN( ob, len )    (((ypObject *)(ob))->ob_alloclen = (_yp_ob_alloclen_t) (len))
+
 // Base "constructor" for immortal objects
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
@@ -1015,7 +1020,7 @@ static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
     yp_ssize_t size;
     ypObject *ob = (ypObject *) yp_malloc( &size, sizeof_obStruct );
     if( ob == NULL ) return yp_MemoryError;
-    ob->ob_alloclen = ypObject_LEN_INVALID;
+    ypObject_SET_ALLOCLEN( ob, ypObject_LEN_INVALID );
     ob->ob_data = NULL;
     ob->ob_type = type;
     ob->ob_refcnt = _ypMem_starting_refcnt;
@@ -1049,7 +1054,7 @@ static ypObject *_ypMem_malloc_container_inline(
     alloclen = (size - offsetof_inline) / sizeof_elems; // rounds down
     if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
 
-    ob->ob_alloclen = alloclen;
+    ypObject_SET_ALLOCLEN( ob, alloclen );
     ob->ob_data = ((yp_uint8_t *)ob) + offsetof_inline;
     ob->ob_type = type;
     ob->ob_refcnt = _ypMem_starting_refcnt;
@@ -1110,7 +1115,7 @@ static ypObject *_ypMem_malloc_container_variable(
     }
     if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
 
-    ob->ob_alloclen = alloclen;
+    ypObject_SET_ALLOCLEN( ob, alloclen );
     ob->ob_type = type;
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
@@ -1161,8 +1166,8 @@ static void *_ypMem_realloc_container_variable(
     if( required <= inlinelen ) {
         oldptr = ob->ob_data;   // might equal inlineptr
         ob->ob_data = inlineptr;
-        ob->ob_alloclen = inlinelen;
-        yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (to inline): 0x%08X alloclen %d", ob, ob->ob_alloclen );
+        ypObject_SET_ALLOCLEN( ob, inlinelen );
+        yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (to inline): 0x%08X alloclen %d", ob, ypObject_ALLOCLEN( ob ) );
         return oldptr;
     }
 
@@ -1174,7 +1179,7 @@ static void *_ypMem_realloc_container_variable(
         ob->ob_data = newptr;
         alloclen = size / sizeof_elems; // rounds down
         if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
-        ob->ob_alloclen = alloclen;
+        ypObject_SET_ALLOCLEN( ob, alloclen );
         yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (from inline): 0x%08X alloclen %d", ob, alloclen );
         return oldptr;
     }
@@ -1187,7 +1192,7 @@ static void *_ypMem_realloc_container_variable(
     ob->ob_data = newptr;
     alloclen = size / sizeof_elems; // rounds down
     if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
-    ob->ob_alloclen = alloclen;
+    ypObject_SET_ALLOCLEN( ob, alloclen );
     yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (malloc_resize): 0x%08X alloclen %d", ob, alloclen );
     return oldptr;
 }
@@ -1223,9 +1228,9 @@ static void _ypMem_realloc_container_variable_clear(
     if( ob->ob_data != inlineptr ) {
         yp_free( ob->ob_data );
         ob->ob_data = inlineptr;
-        ob->ob_alloclen = inlinelen;
+        ypObject_SET_ALLOCLEN( ob, inlinelen );
     }
-    yp_DEBUG( "REALLOC_CONTAINER_VARIABLE_CLEAR: 0x%08X alloclen %d", ob, ob->ob_alloclen );
+    yp_DEBUG( "REALLOC_CONTAINER_VARIABLE_CLEAR: 0x%08X alloclen %d", ob, ypObject_ALLOCLEN( ob ) );
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( ob, obStruct ) \
     _ypMem_realloc_container_variable_clear( ob, offsetof( obStruct, ob_inline_data ), \
@@ -1327,7 +1332,7 @@ typedef struct {
 yp_STATIC_ASSERT( offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_iter_inline_data );
 
 #define ypIter_STATE( i )       ( ((ypObject *)i)->ob_data )
-#define ypIter_STATE_SIZE( i )  ( ((ypObject *)i)->ob_alloclen )
+#define ypIter_STATE_SIZE       ypObject_ALLOCLEN
 #define ypIter_LENHINT( i )     ( ((ypIterObject *)i)->ob_lenhint )
 // ob_objlocs: bit n is 1 if (n*sizeof(ypObject *)) is the offset of an object in state
 #define ypIter_OBJLOCS( i )     ( ((ypIterObject *)i)->ob_objlocs )
@@ -4447,7 +4452,7 @@ yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT =
 
 #define ypBytes_DATA( b )           ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
 #define ypBytes_LEN                 ypObject_CACHED_LEN
-#define ypBytes_ALLOCLEN( b )       ( ((ypObject *)b)->ob_alloclen )
+#define ypBytes_ALLOCLEN            ypObject_ALLOCLEN
 #define ypBytes_INLINE_DATA( b )    ( ((ypBytesObject *)b)->ob_inline_data )
 
 // The maximum possible length of a bytes (not including null terminator)
@@ -5909,7 +5914,7 @@ typedef struct {
 } ypTupleObject;
 #define ypTuple_ARRAY( sq )         ( (ypObject **) ((ypObject *)sq)->ob_data )
 #define ypTuple_LEN                 ypObject_CACHED_LEN
-#define ypTuple_ALLOCLEN( sq )      ( ((ypObject *)sq)->ob_alloclen )
+#define ypTuple_ALLOCLEN            ypObject_ALLOCLEN
 #define ypTuple_INLINE_DATA( sq )   ( ((ypTupleObject *)sq)->ob_inline_data )
 
 // The maximum possible length of a tuple
@@ -6999,7 +7004,7 @@ typedef struct {
 #define ypSet_SET_TABLE( so, value )    ( ((ypObject *)so)->ob_data = (void *) (value) )
 #define ypSet_LEN                       ypObject_CACHED_LEN
 #define ypSet_FILL( so )                ( ((ypSetObject *)so)->fill )
-#define ypSet_ALLOCLEN( so )            ( ((ypObject *)so)->ob_alloclen )
+#define ypSet_ALLOCLEN                  ypObject_ALLOCLEN
 #define ypSet_MASK( so )                ( ypSet_ALLOCLEN( so ) - 1 )
 #define ypSet_INLINE_DATA( so )         ( ((ypSetObject *)so)->ob_inline_data )
 
@@ -8971,7 +8976,7 @@ static ypObject *dict_clear( ypObject *mp ) {
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( mp, ypDictObject, oldptr );
     yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ), "dict_clear didn't allocate inline!" );
-    yp_ASSERT( mp->ob_alloclen >= ypSet_ALLOCLEN_MIN, "dict inlinelen must be at least ypSet_ALLOCLEN_MIN" );
+    yp_ASSERT( ypObject_ALLOCLEN( mp ) >= ypSet_ALLOCLEN_MIN, "dict inlinelen must be at least ypSet_ALLOCLEN_MIN" );
 
     // Update our attributes and return
     ypDict_LEN( mp ) = 0;
