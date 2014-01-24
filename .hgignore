@@ -17,6 +17,8 @@
 \.tlog$
 /Debug/
 /Release/
+_debug/
+_release/
 /__pycache__/
 
 # Local SCons files
