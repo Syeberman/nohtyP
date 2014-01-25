@@ -49,14 +49,27 @@ def nohtyP_SharedLibrary( env ):
             )
     return env.SharedLibrary( "$VARIANTDIR/nohtyP", source="$VARIANTDIR/nohtyP.c" ), 
 
-# TODO Create aliases that group all compilers, compiler-versions, compiler-version-targets, etc...
-# TODO Programmatically-control the Default() targets via command-line variables
-for variant in itertools.product( compilers, oses, archs, configurations ):
-    compiler, os, arch, configuration = variant
+variants = []
+for combination in itertools.product( compilers, oses, archs, configurations ):
+    compiler_name, os, arch, configuration = combination
     # TODO Support cross-compiling OSes, if possible
     if os != rootEnv["PLATFORM"]: continue
     # Visual Studio only supports Windows
-    if compiler.startswith( "msvs_" ) and os != "win32": continue
+    if compiler_name.startswith( "msvs_" ) and os != "win32": continue
+
+    variants.append( combination )
+"""
+    # TODO you can pass Tool objects direct to Clone
+    compiler = Tool( compiler_name, toolpath=["#Build/Tools", ] )
+    dir = "#Build/%s/%s_%s_%s" % (compiler, os, arch, configuration)
+"""
+# TODO Set up aliases for various targets, a default or native target (for the one build that can
+# be tested on this system)
+
+# TODO Create aliases that group all compilers, compiler-versions, compiler-version-targets, etc...
+# TODO Programmatically-control the Default() targets via command-line variables
+for variant in variants:
+    compiler, os, arch, configuration = variant
 
     # Skip compilers that can't be found (TODO unless we want an error in that case?)
     # TODO: This script is slow...I suspect it's a result of cloning so much.  Profile, then fix.
