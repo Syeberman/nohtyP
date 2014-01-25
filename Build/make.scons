@@ -4,12 +4,6 @@ import os.path, itertools
 if not os.path.exists( "nohtyP.c" ):
     Exit( "Run SCons from top project dir (or use make.bat, or scons -C)" )
 
-compilers = ("msvs_120", "msvs_110", "msvs_100", "msvs_90")
-oses = ("win32", )
-archs = ("amd64", "x86")
-configurations = ("release", "debug") # TODO an analyze configuration
-
-
 # Command-line build variables
 vars = Variables( None )
 
@@ -47,35 +41,42 @@ def nohtyP_SharedLibrary( env ):
                 ],
             PDB="", LIBS="",
             )
-    return env.SharedLibrary( "$VARIANTDIR/nohtyP", source="$VARIANTDIR/nohtyP.c" ), 
+    return env.SharedLibrary( "$VARIANTDIR/nohtyP", source="$VARIANTDIR/nohtyP.c" ),
+
+
+compiler_names = ("msvs_120", "msvs_110", "msvs_100", "msvs_90")
+oses = ("win32", )
+archs = ("amd64", "x86")
+configurations = ("release", "debug") # TODO an analyze configuration
 
 variants = []
-for combination in itertools.product( compilers, oses, archs, configurations ):
-    compiler_name, os, arch, configuration = combination
-    # TODO Support cross-compiling OSes, if possible
-    if os != rootEnv["PLATFORM"]: continue
-    # Visual Studio only supports Windows
-    if compiler_name.startswith( "msvs_" ) and os != "win32": continue
 
-    variants.append( combination )
-"""
-    # TODO you can pass Tool objects direct to Clone
-    compiler = Tool( compiler_name, toolpath=["#Build/Tools", ] )
-    dir = "#Build/%s/%s_%s_%s" % (compiler, os, arch, configuration)
-"""
+for compiler_name in compiler_names:
+    compiler = Tool( compiler_name, toolpath=["Build/Tools", ] )
+    if not compiler.exists( rootEnv ): continue
+    for combination in itertools.product( oses, archs, configurations ):
+        os, arch, configuration = combination
+        # TODO Support cross-compiling OSes, if possible
+        if os != rootEnv["PLATFORM"]: continue
+        # Visual Studio only supports Windows
+        if compiler.name.startswith( "msvs_" ) and os != "win32": continue
+
+        dir = "#Build/%s/%s_%s_%s" % (compiler, os, arch, configuration)
+        variants.append( (compiler, os, arch, configuration, dir) )
+
 # TODO Set up aliases for various targets, a default or native target (for the one build that can
 # be tested on this system)
 
 # TODO Create aliases that group all compilers, compiler-versions, compiler-version-targets, etc...
 # TODO Programmatically-control the Default() targets via command-line variables
 for variant in variants:
-    compiler, os, arch, configuration = variant
+    compiler, os, arch, configuration, dir = variant
 
     # Skip compilers that can't be found (TODO unless we want an error in that case?)
     # TODO: This script is slow...I suspect it's a result of cloning so much.  Profile, then fix.
     # TODO: Record compiler version information in the variant directory
     try:
-        variantEnv = rootEnv.Clone( tools=[compiler, ], toolpath=["#Build/Tools", ],
+        variantEnv = rootEnv.Clone( tools=[compiler, ],
                 COMPILER=compiler, TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
     except Exception: continue
     # TODO Remove the target directory entirely on clean?
