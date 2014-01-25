@@ -1,6 +1,6 @@
 # XXX NOT a SCons tool module; instead, a library for the msvs_* tool modules
 
-import os.path
+import os, os.path
 import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
@@ -14,15 +14,18 @@ _mslinkTool = SCons.Tool.Tool( "mslink" )
 def ApplyMSVSOptions( env, version ):
     """Updates env with MSVS-specific compiler options for nohtyP.  version is numeric (ie 12.0).
     """
+    # FIXME look for more "ignoring unknown option" in build output
     def addCcFlags( *args ): env.AppendUnique( CCFLAGS=list( args ) )
     addCcFlags(
-            # Warning level 3, warnings-as-errors, security compile- and runtime-checks
-            "/W3", "/WX", "/sdl",
+            # Warning level 3, warnings-as-errors
+            "/W3", "/WX", 
+            # Security compile- and runtime-checks (for all builds); /sdl implies /GS
+            "/sdl" if version >= 11.0 else "/GS",
             # Function-level linking, disable minimal rebuild, disable runtime type info
             "/Gy", "/Gm-", "/GR-",
             # Source/assembly listing, exception handling model
-            # FIXME assembly file written to top-level directory
-            "/FAs", "/EHsc",
+            # TODO .asm not removed on clean
+            "/FAs", "/Fa${TARGET.dir}"+os.sep, "/EHsc",
             )
     if env["CONFIGURATION"] == "debug":
         addCcFlags( 
@@ -50,6 +53,9 @@ def ApplyMSVSOptions( env, version ):
     else:
         addCppDefines( "NDEBUG" )
     # TODO "WIN32" "_WINDOWS" "_USRDLL" "_WINDLL" "_UNICODE" "UNICODE"?
+
+    # TODO nohtyP.obj : MSIL .netmodule or module compiled with /GL found; restarting link
+    # with /LTCG; add /LTCG to the link command line to improve linker performance
 
 
 """
