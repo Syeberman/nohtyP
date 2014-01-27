@@ -39,9 +39,9 @@ def nohtyP_SharedLibrary( env ):
                 "yp_BUILD_CORE",
                 "yp_DEBUG_LEVEL=%s" % ("1" if env["CONFIGURATION"] == "debug" else "0"),
                 ],
-            PDB="", LIBS="",
+            PDB="$VTOP/nohtyP.pdb", LIBS="",
             )
-    return env.SharedLibrary( "$VARIANTDIR/nohtyP", source="$VARIANTDIR/nohtyP.c" ),
+    return env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
 
 
 compiler_names = ("msvs_120", "msvs_110", "msvs_100", "msvs_90")
@@ -61,8 +61,8 @@ for compiler_name in compiler_names:
         # Visual Studio only supports Windows
         if compiler.name.startswith( "msvs_" ) and os != "win32": continue
 
-        dir = "#Build/%s/%s_%s_%s" % (compiler, os, arch, configuration)
-        variants.append( (compiler, os, arch, configuration, dir) )
+        vtop = "#Build/%s/%s_%s_%s" % (compiler, os, arch, configuration)
+        variants.append( (compiler, os, arch, configuration, vtop) )
 
 # TODO Set up aliases for various targets, a default or native target (for the one build that can
 # be tested on this system)
@@ -70,7 +70,7 @@ for compiler_name in compiler_names:
 # TODO Create aliases that group all compilers, compiler-versions, compiler-version-targets, etc...
 # TODO Programmatically-control the Default() targets via command-line variables
 for variant in variants:
-    compiler, os, arch, configuration, dir = variant
+    compiler, os, arch, configuration, vtop = variant
 
     # Skip compilers that can't be found (TODO unless we want an error in that case?)
     # TODO: This script is slow...I suspect it's a result of cloning so much.  Profile, then fix.
@@ -80,9 +80,11 @@ for variant in variants:
                 COMPILER=compiler, TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
     except Exception: continue
     # TODO Remove the target directory entirely on clean?
-    variantEnv["VARIANTDIR"] = "#Build/${COMPILER}/${TARGET_OS}_${TARGET_ARCH}_${CONFIGURATION}"
+    variantEnv["VTOP"] = vtop
     # Maintain a separate directory for intermediate and target files, but don't copy source files
-    variantEnv.VariantDir( "$VARIANTDIR", "#", duplicate=False )
+    variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
+    # TODO Scripts to update version numbers in source, build scripts, etc
+    variantEnv.AppendUnique( LINKFLAGS=["/VERSION:0.5", ] )
 
     nohtyP_SharedLibrary( variantEnv.Clone( ) )
 
