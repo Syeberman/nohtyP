@@ -158,14 +158,15 @@ typedef size_t yp_uhash_t;
 // The largest length that can be stored in ob_len and ob_alloclen
 #define ypObject_LEN_MAX            ((yp_ssize_t) 0x7FFFFFFF)
 
-// Lengths and hashes can be cached in the object for easy retrieval
-#define ypObject_CACHED_LEN( ob )   (((ypObject *)(ob))->ob_len)  // negative if invalid
-#define ypObject_CACHED_HASH( ob )  (((ypObject *)(ob))->ob_hash) // HASH_INVALID if invalid
-
-// The number of elements allocated to the variable-portion of the object
+// The length, and allocated length, of the object
 // XXX Do not set a length >ypObject_LEN_MAX, or a negative length !=ypObject_LEN_INVALID
+#define ypObject_CACHED_LEN( ob )           ((yp_ssize_t) ((ypObject *)(ob))->ob_len)  // negative if invalid
+#define ypObject_SET_CACHED_LEN( ob, len )  (((ypObject *)(ob))->ob_len = (_yp_ob_len_t) (len))
 #define ypObject_ALLOCLEN( ob )             ((yp_ssize_t) ((ypObject *)(ob))->ob_alloclen)   // negative if invalid
-#define ypObject_SET_ALLOCLEN( ob, len )    (((ypObject *)(ob))->ob_alloclen = (_yp_ob_alloclen_t) (len))
+#define ypObject_SET_ALLOCLEN( ob, len )    (((ypObject *)(ob))->ob_alloclen = (_yp_ob_len_t) (len))
+
+// Hashes can be cached in the object for easy retrieval
+#define ypObject_CACHED_HASH( ob )  (((ypObject *)(ob))->ob_hash) // HASH_INVALID if invalid
 
 // Base "constructor" for immortal objects
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
@@ -1309,10 +1310,13 @@ void yp_decrefN( int n, ... )
  * Iterators
  *************************************************************************************************/
 
+typedef yp_int32_t _yp_iter_lenhint_t;
+#define ypIter_LENHINT_MAX  ((yp_ssize_t) 0x7FFFFFFF)
+
 // _ypIterObject_HEAD shared with friendly classes below
 #define _ypIterObject_HEAD_NO_PADDING \
     ypObject_HEAD \
-    yp_int32_t ob_lenhint; \
+    _yp_iter_lenhint_t ob_lenhint; \
     yp_uint32_t ob_objlocs; \
     yp_generator_func_t ob_func;
 // To ensure that ob_inline_data is aligned properly, we need to pad on some platforms
@@ -1333,10 +1337,16 @@ yp_STATIC_ASSERT( offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT ==
 
 #define ypIter_STATE( i )       ( ((ypObject *)i)->ob_data )
 #define ypIter_STATE_SIZE       ypObject_ALLOCLEN
+#define ypIter_SET_STATE_SIZE   ypObject_SET_ALLOCLEN
 #define ypIter_LENHINT( i )     ( ((ypIterObject *)i)->ob_lenhint )
 // ob_objlocs: bit n is 1 if (n*sizeof(ypObject *)) is the offset of an object in state
 #define ypIter_OBJLOCS( i )     ( ((ypIterObject *)i)->ob_objlocs )
 #define ypIter_FUNC( i )        ( ((ypIterObject *)i)->ob_func )
+
+// The maximum possible length of an iter
+#define ypIter_STATE_SIZE_MAX ( (yp_ssize_t) MIN( \
+            yp_SSIZE_T_MAX-sizeof( ypIterObject ), \
+            ypObject_LEN_MAX ) )
 
 // Iterator methods
 
@@ -1600,6 +1610,7 @@ ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhi
     yp_ssize_t objloc_index;
 
     if( size < 0 ) return yp_ValueError;
+    if( size > ypIter_STATE_SIZE_MAX ) return yp_MemorySizeOverflowError;
 
     // Determine the location of the objects.  There are a few errors the user could make:
     //  - an offset for a ypObject* that is at least partially outside of state; ignore these
@@ -1621,10 +1632,11 @@ ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhi
 
     // Set attributes, increment reference counts, and return
     i->ob_len = ypObject_LEN_INVALID;
-    ypIter_LENHINT( i ) = lenhint;
+    if( lenhint > ypIter_LENHINT_MAX ) lenhint = ypIter_LENHINT_MAX;
+    ypIter_LENHINT( i ) = (_yp_iter_lenhint_t) lenhint;
     ypIter_FUNC( i ) = func;
     memcpy( ypIter_STATE( i ), state, size );
-    ypIter_STATE_SIZE( i ) = size;
+    ypIter_SET_STATE_SIZE( i, size );
     ypIter_OBJLOCS( i ) = objlocs;
     iter_traverse( i, _iter_constructing_visitor, NULL ); // never fails
     return i;
@@ -1675,11 +1687,12 @@ static ypObject *_ypMiIter_from_miniiter( ypObject *x, miniiterfunc mi_construct
     // Set the attributes and return (mi_state set above)
     i->ob_len = ypObject_LEN_INVALID;
     ypIter_STATE( i ) = &(ypMiIter_MI( i ));
-    ypIter_STATE_SIZE( i ) = sizeof( ypMiIterObject ) - offsetof( ypMiIterObject, mi );
+    ypIter_SET_STATE_SIZE( i, sizeof( ypMiIterObject ) - offsetof( ypMiIterObject, mi ) );
     ypIter_FUNC( i ) = _ypMiIter_generator;
     ypIter_OBJLOCS( i ) = 0x1u;  // indicates mi at state offset zero
     ypMiIter_MI( i ) = mi;
-    ypIter_LENHINT( i ) = lenhint;
+    if( lenhint > ypIter_LENHINT_MAX ) lenhint = ypIter_LENHINT_MAX;
+    ypIter_LENHINT( i ) = (_yp_iter_lenhint_t) lenhint;
     return i;
 }
 
@@ -4452,6 +4465,7 @@ yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT =
 
 #define ypBytes_DATA( b )           ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
 #define ypBytes_LEN                 ypObject_CACHED_LEN
+#define ypBytes_SET_LEN             ypObject_SET_CACHED_LEN
 #define ypBytes_ALLOCLEN            ypObject_ALLOCLEN
 #define ypBytes_INLINE_DATA( b )    ( ((ypBytesObject *)b)->ob_inline_data )
 
@@ -4497,7 +4511,7 @@ static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
     ypObject *copy = _ypBytes_new( type, ypBytes_LEN( b ), alloclen_fixed );
     if( yp_isexceptionC( copy ) ) return copy;
     memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b )+1 );
-    ypBytes_LEN( copy ) = ypBytes_LEN( b );
+    ypBytes_SET_LEN( copy, ypBytes_LEN( b ) );
     return copy;
 }
 
@@ -4570,7 +4584,7 @@ static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
     }
     memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
     ypBytes_DATA( b )[newLen] = '\0';
-    ypBytes_LEN( b ) = newLen;
+    ypBytes_SET_LEN( b, newLen );
     return yp_None;
 }
 
@@ -4613,7 +4627,7 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64
 
     // Modifying len here allows us to bail easily above, relying on the calling code to replace
     // the null terminator at the right position
-    ypBytes_LEN( b ) = newLen;
+    ypBytes_SET_LEN( b, newLen );
     return yp_None;
 }
 
@@ -4665,7 +4679,7 @@ static ypObject *_ypBytes_setslice_grow( ypObject *b, yp_ssize_t start, yp_ssize
     } else {
         ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
     }
-    ypBytes_LEN( b ) = newLen;
+    ypBytes_SET_LEN( b, newLen );
     return yp_None;
 }
 
@@ -4694,7 +4708,7 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
         } else if( growBy < 0 ) {
             // Shrinking, so we know we have enough memory allocated
             ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
-            ypBytes_LEN( b ) += growBy;
+            ypBytes_SET_LEN( b, ypBytes_LEN( b ) + growBy );
         }
 
         // There are now len(x) bytes starting at b[start] waiting for x's data
@@ -4800,7 +4814,7 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
     memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
     ypBytes_DATA( newB )[newLen] = '\0';
-    ypBytes_LEN( newB ) = newLen;
+    ypBytes_SET_LEN( newB, newLen );
     return newB;
 }
 
@@ -4830,7 +4844,7 @@ static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
 
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
     _ypBytes_repeat_memcpy( newB, factor, ypBytes_LEN( b ) );
-    ypBytes_LEN( newB ) = newLen;
+    ypBytes_SET_LEN( newB, newLen );
     return newB;
 }
 
@@ -4866,7 +4880,7 @@ static ypObject *bytearray_delindex( ypObject *b, yp_ssize_t i )
     }
 
     ypBytes_ELEMMOVE( b, i, i+1 );
-    ypBytes_LEN( b ) -= 1;
+    ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
     return yp_None;
 }
 
@@ -4892,7 +4906,7 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
         }
     }
     ypBytes_DATA( newB )[newLen] = '\0';
-    ypBytes_LEN( newB ) = newLen;
+    ypBytes_SET_LEN( newB, newLen );
     return newB;
 }
 
@@ -4928,7 +4942,7 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     // Add one to the length to include the hidden null-terminator
     _ypSlice_delslice_memmove( ypBytes_DATA( b ), ypBytes_LEN( b )+1, 1,
             start, stop, step, slicelength );
-    ypBytes_LEN( b ) -= slicelength;
+    ypBytes_SET_LEN( b, ypBytes_LEN( b ) - slicelength );
     return yp_None;
 }
 
@@ -4954,7 +4968,7 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
     }
 
     _ypBytes_repeat_memcpy( b, factor, ypBytes_LEN( b ) );
-    ypBytes_LEN( b ) = newLen;
+    ypBytes_SET_LEN( b, newLen );
     return yp_None;
 }
 
@@ -4992,7 +5006,7 @@ static ypObject *bytearray_popindex( ypObject *b, yp_ssize_t i )
 
     result = yp_intC( ypBytes_DATA( b )[i] );
     ypBytes_ELEMMOVE( b, i, i+1 );
-    ypBytes_LEN( b ) -= 1;
+    ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
     return result;
 }
 
@@ -5039,7 +5053,7 @@ static ypObject *bytearray_clear( ypObject *b )
     if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
     yp_ASSERT( ypBytes_DATA( b ) == ypBytes_INLINE_DATA( b ), "bytearray_clear didn't allocate inline!" );
     ypBytes_DATA( b )[0] = '\0';
-    ypBytes_LEN( b ) = 0;
+    ypBytes_SET_LEN( b, 0 );
     return yp_None;
 }
 
@@ -5049,7 +5063,7 @@ static ypObject *bytearray_pop( ypObject *b )
 
     if( ypBytes_LEN( b ) < 1 ) return yp_IndexError;
     result = yp_intC( ypBytes_DATA( b )[ypBytes_LEN( b )-1] );
-    ypBytes_LEN( b ) -= 1;
+    ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
     ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0';
     return result;
 }
@@ -5069,7 +5083,7 @@ static ypObject *bytearray_remove( ypObject *b, ypObject *x, ypObject *onmissing
 
         // We found a match to remove
         ypBytes_ELEMMOVE( b, i, i+1 );
-        ypBytes_LEN( b ) -= 1;
+        ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
         return yp_None;
     }
     if( onmissing == NULL ) return yp_ValueError;
@@ -5403,7 +5417,7 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
         memcpy( ypBytes_DATA( b ), source, len );
         ypBytes_DATA( b )[len] = '\0';
     }
-    ypBytes_LEN( b ) = len;
+    ypBytes_SET_LEN( b, len );
     return b;
 }
 ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len ) {
@@ -5482,6 +5496,7 @@ yp_STATIC_ASSERT( offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 
 
 #define ypStr_DATA( s )         ( (yp_uint8_t *) ((ypObject *)s)->ob_data )
 #define ypStr_LEN               ypObject_CACHED_LEN
+#define ypStr_SET_LEN           ypObject_SET_CACHED_LEN
 #define ypStr_INLINE_DATA( s )  ( ((ypStrObject *)s)->ob_inline_data )
 
 // Empty strs can be represented by this, immortal object
@@ -5514,7 +5529,7 @@ static ypObject *_ypStr_copy( int type, ypObject *s, int alloclen_fixed )
     ypObject *copy = _ypStr_new( type, ypStr_LEN( s )+1, alloclen_fixed );
     if( yp_isexceptionC( copy ) ) return copy;
     memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), ypStr_LEN( s )+1 );
-    ypStr_LEN( copy ) = ypStr_LEN( s );
+    ypStr_SET_LEN( copy, ypStr_LEN( s ) );
     return copy;
 }
 
@@ -5558,7 +5573,7 @@ static ypObject *str_concat( ypObject *s, ypObject *x )
     memcpy( ypStr_DATA( newS ), ypStr_DATA( s ), ypStr_LEN( s ) );
     memcpy( ypStr_DATA( newS )+ypStr_LEN( s ), ypStr_DATA( x ), ypStr_LEN( x ) );
     ypStr_DATA( newS )[newLen] = '\0';
-    ypStr_LEN( newS ) = newLen;
+    ypStr_SET_LEN( newS, newLen );
     return newS;
 }
 
@@ -5859,7 +5874,7 @@ static ypObject *_ypStrC( int type, const yp_uint8_t *source, yp_ssize_t len )
         memcpy( ypStr_DATA( s ), source, len );
         ypStr_DATA( s )[len] = '\0';
     }
-    ypStr_LEN( s ) = len;
+    ypStr_SET_LEN( s, len );
     return s;
 }
 ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
@@ -5914,6 +5929,7 @@ typedef struct {
 } ypTupleObject;
 #define ypTuple_ARRAY( sq )         ( (ypObject **) ((ypObject *)sq)->ob_data )
 #define ypTuple_LEN                 ypObject_CACHED_LEN
+#define ypTuple_SET_LEN             ypObject_SET_CACHED_LEN
 #define ypTuple_ALLOCLEN            ypObject_ALLOCLEN
 #define ypTuple_INLINE_DATA( sq )   ( ((ypTupleObject *)sq)->ob_inline_data )
 
@@ -5961,7 +5977,7 @@ static ypObject *_ypTuple_copy( int type, ypObject *x, int alloclen_fixed )
     if( yp_isexceptionC( sq ) ) return sq;
     memcpy( ypTuple_ARRAY( sq ), ypTuple_ARRAY( x ), ypTuple_LEN( x )*sizeof( ypObject * ) );
     for( i = 0; i < ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
-    ypTuple_LEN( sq ) = ypTuple_LEN( x );
+    ypTuple_SET_LEN( sq, ypTuple_LEN( x ) );
     return sq;
 }
 
@@ -5984,7 +6000,7 @@ static ypObject *_ypTuple_deepcopy( int type, ypObject *x, visitfunc copy_visito
             return item;
         }
         ypTuple_ARRAY( sq )[i] = item;
-        ypTuple_LEN( sq ) += 1;
+        ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) + 1 );
     }
     return sq;
 }
@@ -6032,7 +6048,7 @@ static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
         if( yp_isexceptionC( result ) ) return result;
     }
     ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] = yp_incref( x );
-    ypTuple_LEN( sq ) += 1;
+    ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) + 1 );
     return yp_None;
 }
 
@@ -6051,7 +6067,7 @@ static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
     memcpy( ypTuple_ARRAY( sq )+ypTuple_LEN( sq ), ypTuple_ARRAY( x ),
             ypTuple_LEN( x )*sizeof( ypObject * ) );
     for( i = ypTuple_LEN( sq ); i < newLen; i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
-    ypTuple_LEN( sq ) = newLen;
+    ypTuple_SET_LEN( sq, newLen );
     return yp_None;
 }
 
@@ -6102,7 +6118,7 @@ static void _ypTuple_setslice_elemmove( ypObject *sq, yp_ssize_t start, yp_ssize
     yp_ASSERT( ypTuple_LEN( sq )+growBy <= ypTuple_ALLOCLEN( sq ), "must be enough space for move" );
     for( i = start; i < stop; i++ ) yp_decref( ypTuple_ARRAY( sq )[i] );
     ypTuple_ELEMMOVE( sq, stop+growBy, stop );
-    ypTuple_LEN( sq ) += growBy;
+    ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) + growBy );
 }
 
 // Called on a setslice of step 1 and positive growBy, or an insert.  Similar to
@@ -6132,7 +6148,7 @@ static ypObject *_ypTuple_setslice_grow( ypObject *sq, yp_ssize_t start, yp_ssiz
             memcpy( ypTuple_ARRAY( sq )+stop+growBy, oldptr+stop,
                     (ypTuple_LEN( sq )-stop) * sizeof( ypObject * ) );
             ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
-            ypTuple_LEN( sq ) = newLen;
+            ypTuple_SET_LEN( sq, newLen );
         }
     } else {
         _ypTuple_setslice_elemmove( sq, start, stop, growBy );
@@ -6244,7 +6260,7 @@ static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
     memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ), ypTuple_LEN( sq )*sizeof( ypObject * ) );
     _ypTuple_repeat_memcpy( newSq, factor, ypTuple_LEN( sq ) );
 
-    ypTuple_LEN( newSq ) = factor*ypTuple_LEN( sq );
+    ypTuple_SET_LEN( newSq, factor*ypTuple_LEN( sq ) );
     for( i = 0; i < ypTuple_LEN( newSq ); i++ ) {
         yp_incref( ypTuple_ARRAY( newSq )[i] );
     }
@@ -6294,7 +6310,7 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
                 yp_incref( ypTuple_ARRAY( sq )[ypSlice_INDEX( start, step, i )] );
         }
     }
-    ypTuple_LEN( newSq ) = newLen;
+    ypTuple_SET_LEN( newSq, newLen );
     return newSq;
 }
 
@@ -6382,7 +6398,7 @@ static ypObject *list_popindex( ypObject *sq, yp_ssize_t i )
 
     result = ypTuple_ARRAY( sq )[i];
     ypTuple_ELEMMOVE( sq, i, i+1 );
-    ypTuple_LEN( sq ) -= 1;
+    ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) - 1 );
     return result;
 }
 
@@ -6425,7 +6441,7 @@ static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
     }
     _ypSlice_delslice_memmove( ypTuple_ARRAY( sq ), ypTuple_LEN( sq ), sizeof( ypObject * ),
             start, stop, step, slicelength );
-    ypTuple_LEN( sq ) -= slicelength;
+    ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) - slicelength );
     return yp_None;
 }
 
@@ -6448,7 +6464,7 @@ static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
     _ypTuple_repeat_memcpy( sq, factor, startLen );
 
     // Remember that we already have references for [:startLen]
-    ypTuple_LEN( sq ) *= factor;
+    ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) * factor );
     for( i = startLen; i < ypTuple_LEN( sq ); i++ ) {
         yp_incref( ypTuple_ARRAY( sq )[i] );
     }
@@ -6634,7 +6650,7 @@ static ypObject *list_clear( ypObject *sq )
     // XXX yp_decref _could_ run code that requires us to be in a good state, so pop items from the
     // end one-at-a-time
     while( ypTuple_LEN( sq ) > 0 ) {
-        ypTuple_LEN( sq ) -= 1;
+        ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) - 1 );
         yp_decref( ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] );
     }
     ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( sq, ypTupleObject );
@@ -6645,7 +6661,7 @@ static ypObject *list_clear( ypObject *sq )
 static ypObject *list_pop( ypObject *sq )
 {
     if( ypTuple_LEN( sq ) < 1 ) return yp_IndexError;
-    ypTuple_LEN( sq ) -= 1;
+    ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) - 1 );
     return ypTuple_ARRAY( sq )[ypTuple_LEN( sq )];
 }
 
@@ -6661,7 +6677,7 @@ static ypObject *list_remove( ypObject *sq, ypObject *x, ypObject *onmissing )
         // result must be yp_True, so we found a match to remove
         yp_decref( ypTuple_ARRAY( sq )[i] );
         ypTuple_ELEMMOVE( sq, i, i+1 );
-        ypTuple_LEN( sq ) -= 1;
+        ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) - 1 );
         return yp_None;
     }
     if( onmissing == NULL ) return yp_ValueError;
@@ -6862,7 +6878,7 @@ static ypObject *_ypTupleNV( int type, int n, va_list args )
             return x;
         }
         ypTuple_ARRAY( newSq )[ypTuple_LEN( newSq )] = yp_incref( x );
-        ypTuple_LEN( newSq ) += 1;
+        ypTuple_SET_LEN( newSq, ypTuple_LEN( newSq ) + 1 );
     }
     return newSq;
 }
@@ -6959,7 +6975,7 @@ static ypObject *_ypTuple_repeatCNV( int type, yp_ssize_t factor, int n, va_list
 
     // Now set the other attributes, increment the reference counts, and return
     // TODO Do we want a back-door way to increment the reference counts by n?
-    ypTuple_LEN( newSq ) = factor*n;
+    ypTuple_SET_LEN( newSq, factor*n );
     for( i = 0; i < ypTuple_LEN( newSq ); i++ ) {
         yp_incref( ypTuple_ARRAY( newSq )[i] );
     }
@@ -7003,8 +7019,10 @@ typedef struct {
 #define ypSet_TABLE( so )               ( (ypSet_KeyEntry *) ((ypObject *)so)->ob_data )
 #define ypSet_SET_TABLE( so, value )    ( ((ypObject *)so)->ob_data = (void *) (value) )
 #define ypSet_LEN                       ypObject_CACHED_LEN
+#define ypSet_SET_LEN                   ypObject_SET_CACHED_LEN
 #define ypSet_FILL( so )                ( ((ypSetObject *)so)->fill )
 #define ypSet_ALLOCLEN                  ypObject_ALLOCLEN
+#define ypSet_SET_ALLOCLEN              ypObject_SET_ALLOCLEN
 #define ypSet_MASK( so )                ( ypSet_ALLOCLEN( so ) - 1 )
 #define ypSet_INLINE_DATA( so )         ( ((ypSetObject *)so)->ob_inline_data )
 
@@ -7055,7 +7073,8 @@ typedef struct {
     ypObject *keyset;
     yp_INLINE_DATA( ypObject * );
 } ypDictObject;
-#define ypDict_LEN  ypObject_CACHED_LEN
+#define ypDict_LEN      ypObject_CACHED_LEN
+#define ypDict_SET_LEN  ypObject_SET_CACHED_LEN
 
 // Before adding keys to the set, call this function to determine if a resize is necessary.
 // Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
@@ -7117,7 +7136,7 @@ static ypObject *_ypSet_new( int type, yp_ssize_t minused, int alloclen_fixed )
     }
     if( yp_isexceptionC( so ) ) return so;
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    ypSet_ALLOCLEN( so ) = alloclen;
+    ypSet_SET_ALLOCLEN( so, alloclen );
     ypSet_FILL( so ) = 0;
     memset( ypSet_TABLE( so ), 0, alloclen * sizeof( ypSet_KeyEntry ) );
     yp_ASSERT( _ypSet_space_remaining( so ) >= minused, "new set doesn't have requested room" );
@@ -7214,10 +7233,10 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     oldkeys = ypSet_TABLE( so );
     keysleft = ypSet_LEN( so );
     ypSet_SET_TABLE( so, newkeys );
-    ypSet_LEN( so ) = 0;
+    ypSet_SET_LEN( so, 0 );
     ypSet_FILL( so ) = 0;
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    ypSet_ALLOCLEN( so ) = newalloclen;
+    ypSet_SET_ALLOCLEN( so, newalloclen );
     yp_ASSERT( _ypSet_space_remaining( so ) >= minused, "resized set doesn't have requested room" );
 
     // Move the keys from the old table before free'ing it
@@ -7301,7 +7320,7 @@ static void _ypSet_movekey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
     if( loc->se_key == NULL ) ypSet_FILL( so ) += 1;
     loc->se_key = key;
     loc->se_hash = hash;
-    ypSet_LEN( so ) += 1;
+    ypSet_SET_LEN( so, ypSet_LEN( so ) + 1 );
 }
 
 // Steals key and adds it to the *clean* hash table.  Only use if the key is known to be absent
@@ -7326,7 +7345,7 @@ static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
     ypSet_FILL( so ) += 1;
     (*ep)->se_key = key;
     (*ep)->se_hash = hash;
-    ypSet_LEN( so ) += 1;
+    ypSet_SET_LEN( so, ypSet_LEN( so ) + 1 );
 }
 
 // Removes the key at the given location from the hash table and returns the reference to it (the
@@ -7335,7 +7354,7 @@ static ypObject *_ypSet_removekey( ypObject *so, ypSet_KeyEntry *loc )
 {
     ypObject *oldkey = loc->se_key;
     loc->se_key = ypSet_dummy;
-    ypSet_LEN( so ) -= 1;
+    ypSet_SET_LEN( so, ypSet_LEN( so ) - 1 );
     return oldkey;
 }
 
@@ -8105,8 +8124,8 @@ static ypObject *set_clear( ypObject *so )
 
     // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    ypSet_ALLOCLEN( so ) = ypSet_ALLOCLEN_MIN; // we can't make use of the excess anyway
-    ypSet_LEN( so ) = 0;
+    ypSet_SET_ALLOCLEN( so, ypSet_ALLOCLEN_MIN ); // we can't make use of the excess anyway
+    ypSet_SET_LEN( so, 0 );
     ypSet_FILL( so ) = 0;
     memset( ypSet_TABLE( so ), 0, ypSet_ALLOCLEN_MIN * sizeof( ypSet_KeyEntry ) );
     return yp_None;
@@ -8468,7 +8487,8 @@ ypObject *yp_set( ypObject *iterable ) {
 // ypMem_* macros to resize the dict, so we repurpose mp->ob_alloclen to be the search finger for
 // dict_popitem; if it gets corrupted, it's no big deal, because it's just a place to start
 // searching
-#define ypDict_POPITEM_FINGER( mp ) ( ((ypObject *)mp)->ob_alloclen )
+#define ypDict_POPITEM_FINGER       ypObject_ALLOCLEN
+#define ypDict_SET_POPITEM_FINGER   ypObject_SET_ALLOCLEN
 
 // Returns a pointer to the value element corresponding to the given key location
 #define ypDict_VALUE_ENTRY( mp, key_loc ) \
@@ -8539,7 +8559,8 @@ static ypObject *_ypDict_copy( int type, ypObject *x, int alloclen_fixed )
     ypDict_KEYSET( mp ) = yp_incref( keyset );
 
     // Now copy over the values; since we share keysets, the values all line up in the same place
-    valuesleft = ypDict_LEN( mp ) = ypDict_LEN( x );
+    valuesleft = ypDict_LEN( x );
+    ypDict_SET_LEN( mp, valuesleft );
     values = ypDict_VALUES( mp );
     memcpy( values, ypDict_VALUES( x ), alloclen * sizeof( ypObject * ) );
     for( i = 0; valuesleft > 0; i++ ) {
@@ -8638,7 +8659,7 @@ static ypObject *_ypDict_push_newkey( ypObject *mp, ypSet_KeyEntry **key_loc, yp
     if( *spaceleft >= 1 ) {
         _ypSet_movekey( keyset, *key_loc, yp_incref( key ), hash );
         *ypDict_VALUE_ENTRY( mp, *key_loc ) = yp_incref( value );
-        ypDict_LEN( mp ) += 1;
+        ypDict_SET_LEN( mp, ypDict_LEN( mp ) + 1 );
         *spaceleft -= 1;
         return yp_True;
     }
@@ -8656,7 +8677,7 @@ static ypObject *_ypDict_push_newkey( ypObject *mp, ypSet_KeyEntry **key_loc, yp
     keyset = ypDict_KEYSET( mp );
     _ypSet_movekey_clean( keyset, yp_incref( key ), hash, key_loc );
     *ypDict_VALUE_ENTRY( mp, *key_loc ) = yp_incref( value );
-    ypDict_LEN( mp ) += 1;
+    ypDict_SET_LEN( mp, ypDict_LEN( mp ) + 1 );
     *spaceleft = _ypSet_space_remaining( keyset );
     return yp_True;
 }
@@ -8688,7 +8709,7 @@ static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int
         value_loc = ypDict_VALUE_ENTRY( mp, key_loc );
         if( *value_loc == NULL ) {
             *value_loc = yp_incref( value );
-            ypDict_LEN( mp ) += 1;
+            ypDict_SET_LEN( mp, ypDict_LEN( mp ) + 1 );
         } else {
             if( !override ) return yp_False;
             yp_decref( *value_loc );
@@ -8728,7 +8749,7 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
     // Otherwise, we need to remove the value
     oldvalue = *value_loc;
     *value_loc = NULL;
-    ypDict_LEN( mp ) -= 1;
+    ypDict_SET_LEN( mp, ypDict_LEN( mp ) - 1 );
     return oldvalue; // new ref
 }
 
@@ -8979,7 +9000,7 @@ static ypObject *dict_clear( ypObject *mp ) {
     yp_ASSERT( ypObject_ALLOCLEN( mp ) >= ypSet_ALLOCLEN_MIN, "dict inlinelen must be at least ypSet_ALLOCLEN_MIN" );
 
     // Update our attributes and return
-    ypDict_LEN( mp ) = 0;
+    ypDict_SET_LEN( mp, 0 );
     ypDict_KEYSET( mp ) = keyset;
     memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
     return yp_None;
@@ -9066,8 +9087,8 @@ static ypObject *dict_popitem( ypObject *mp, ypObject **key, ypObject **value )
     *key = yp_incref( ypSet_TABLE( ypDict_KEYSET( mp ) )[i].se_key );
     *value = values[i];
     values[i] = NULL;
-    ypDict_LEN( mp ) -= 1;
-    ypDict_POPITEM_FINGER( mp ) = i + 1;  /* next place to start */
+    ypDict_SET_LEN( mp, ypDict_LEN( mp ) - 1 );
+    ypDict_SET_POPITEM_FINGER( mp, i + 1 );  /* next place to start */
     return yp_None;
 }
 
@@ -9092,7 +9113,7 @@ static ypObject *dict_setdefault( ypObject *mp, ypObject *key, ypObject *defval 
     if( *value_loc == NULL ) {
         if( ypSet_ENTRY_USED( key_loc ) ) {
             *value_loc = yp_incref( defval );
-            ypDict_LEN( mp ) += 1;
+            ypDict_SET_LEN( mp, ypDict_LEN( mp ) + 1 );
         } else {
             yp_ssize_t spaceleft = _ypSet_space_remaining( keyset );
             // TODO Over-allocate
@@ -9135,12 +9156,13 @@ static ypObject *dict_update( ypObject *mp, int n, va_list args )
     return yp_None;
 }
 
+typedef yp_uint32_t _yp_dict_mi_len_t;
 typedef struct {
-    yp_uint32_t keys : 1;
-    yp_uint32_t itemsleft : 31;
+    _yp_dict_mi_len_t keys : 1;
+    _yp_dict_mi_len_t itemsleft : 31;
     // aligned
-    yp_uint32_t values : 1;
-    yp_uint32_t index : 31;
+    _yp_dict_mi_len_t values : 1;
+    _yp_dict_mi_len_t index : 31;
 } ypDictMiState;
 yp_STATIC_ASSERT( ypSet_LEN_MAX <= 0x7FFFFFFFu, len_fits_31_bits );
 yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
@@ -9195,7 +9217,7 @@ static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
     // Find the next entry
     while( 1 ) {
         if( index >= ypDict_ALLOCLEN( mp ) ) {
-            state->index = index;
+            state->index = ypDict_ALLOCLEN( mp );
             state->itemsleft = 0;
             return yp_StopIteration;
         }
@@ -9223,7 +9245,7 @@ static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
     if( yp_isexceptionC( result ) ) return result;
 
     // Update state and return
-    state->index = index + 1;
+    state->index = (_yp_dict_mi_len_t) (index + 1);
     state->itemsleft -= 1;
     return result;
 }
@@ -9757,7 +9779,7 @@ static ypTypeObject ypRange_Type = {
 ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
 {
     if( step == 0 ) return yp_ValueError;
-    
+
     if( (step < 0 && stop  >= start) ||
         (step > 0 && start >= stop ) ) {
         return _yp_range_empty;
