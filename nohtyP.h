@@ -1590,14 +1590,14 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 // TODO Is there a way to reduce the size of type+refcnt+len+alloclen to 64 bits, without hitting
 // potential performance issues?
 // TODO Do like Python and have just type+refcnt for non-containers
-typedef yp_int32_t _yp_ob_alloclen_t;
+typedef yp_int32_t _yp_ob_len_t;
 struct _ypObject {
-    yp_uint32_t         ob_type;        // type code
-    yp_uint32_t         ob_refcnt;      // reference count
-    yp_int32_t          ob_len;         // length of object
-    _yp_ob_alloclen_t   ob_alloclen;    // allocated length
-    yp_hash_t           ob_hash;        // cached hash for immutables
-    void *              ob_data;        // pointer to object data
+    yp_uint32_t     ob_type;        // type code
+    yp_uint32_t     ob_refcnt;      // reference count
+    _yp_ob_len_t    ob_len;         // length of object
+    _yp_ob_len_t    ob_alloclen;    // allocated length
+    yp_hash_t       ob_hash;        // cached hash for immutables
+    void *          ob_data;        // pointer to object data
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
 
