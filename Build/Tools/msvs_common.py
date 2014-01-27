@@ -5,17 +5,19 @@ import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
 
-# Without a toolpath argument this will find SCons' tool module
+
+# Without a toolpath argument this will find SCons' tool modules
 _msvsTool = SCons.Tool.Tool( "msvs" )
 _msvcTool = SCons.Tool.Tool( "msvc" )
 _mslinkTool = SCons.Tool.Tool( "mslink" )
 
+# TODO http://randomascii.wordpress.com/2012/07/22/more-adventures-in-failing-to-crash-properly/
 
 def ApplyMSVSOptions( env, version ):
     """Updates env with MSVS-specific compiler options for nohtyP.  version is numeric (ie 12.0).
     """
-    # FIXME look for more "ignoring unknown option" in build output
     def addCcFlags( *args ): env.AppendUnique( CCFLAGS=list( args ) )
+    # TODO /analyze? (enable /Wall, disable /WX, supress individual warnings)
     addCcFlags(
             # Warning level 3, warnings-as-errors
             "/W3", "/WX", 
@@ -52,7 +54,6 @@ def ApplyMSVSOptions( env, version ):
         addCppDefines( "_DEBUG" )
     else:
         addCppDefines( "NDEBUG" )
-    # TODO "WIN32" "_WINDOWS" "_USRDLL" "_WINDLL" "_UNICODE" "UNICODE"?
 
     # TODO nohtyP.obj : MSIL .netmodule or module compiled with /GL found; restarting link
     # with /LTCG; add /LTCG to the link command line to improve linker performance
@@ -69,6 +70,8 @@ def ApplyMSVSOptions( env, version ):
             )
     if env["CONFIGURATION"] == "debug":
         addLinkFlags(
+                # Disable optimizations
+                "/OPT:NOREF", "/OPT:NOICF",
                 # Add DebuggableAttribute (because I don't know?)
                 "/ASSEMBLYDEBUG",
                 )
@@ -79,27 +82,6 @@ def ApplyMSVSOptions( env, version ):
                 # Link-time code generation; required by /GL cc flag
                 "/LTCG", 
                 )
-    # TODO these? "kernel32.lib" "user32.lib" "gdi32.lib" "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib" "odbc32.lib" "odbccp32.lib" 
-"""
-
-TODO Ensure /Zi or /Z7 and /DEBUG gets added when PDB used, and that /Fd"Debug\vc120.pdb" isn't needed
-TODO /analyze? (enable /Wall when analyzing, then decide what to supress)
-
-SCons - cl
-cl /FoBuild\msvs_120\win32_amd64_debug\nohtyP.obj   /c nohtyP.c /nologo /Dyp_ENABLE_SHARED /Dyp_BUILD_CORE /Dyp_DEBUG_LEVEL=1 /I.
-cl /FoBuild\msvs_120\win32_amd64_release\nohtyP.obj /c nohtyP.c /nologo /Dyp_ENABLE_SHARED /Dyp_BUILD_CORE /Dyp_DEBUG_LEVEL=0 /I.
-cl /FoBuild\msvs_120\win32_x86_debug\nohtyP.obj     /c nohtyP.c /nologo /Dyp_ENABLE_SHARED /Dyp_BUILD_CORE /Dyp_DEBUG_LEVEL=1 /I.
-cl /FoBuild\msvs_120\win32_x86_release\nohtyP.obj   /c nohtyP.c /nologo /Dyp_ENABLE_SHARED /Dyp_BUILD_CORE /Dyp_DEBUG_LEVEL=0 /I.
-
-SCons - link
-link /nologo /dll /out:Build\msvs_120\win32_amd64_debug\nohtyP.dll   /implib:Build\msvs_120\win32_amd64_debug\nohtyP.lib   Build\msvs_120\win32_amd64_debug\nohtyP.obj
-link /nologo /dll /out:Build\msvs_120\win32_amd64_release\nohtyP.dll /implib:Build\msvs_120\win32_amd64_release\nohtyP.lib Build\msvs_120\win32_amd64_release\nohtyP.obj
-link /nologo /dll /out:Build\msvs_120\win32_x86_debug\nohtyP.dll     /implib:Build\msvs_120\win32_x86_debug\nohtyP.lib     Build\msvs_120\win32_x86_debug\nohtyP.obj
-link /nologo /dll /out:Build\msvs_120\win32_x86_release\nohtyP.dll   /implib:Build\msvs_120\win32_x86_release\nohtyP.lib   Build\msvs_120\win32_x86_release\nohtyP.obj
-
-TODO http://randomascii.wordpress.com/2012/07/22/more-adventures-in-failing-to-crash-properly/
-"""
-
 
 def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
     """Returns (generate, exists), suitable for use as the SCons tool module functions."""
@@ -127,7 +109,4 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
         return version is not None
 
     return generate, exists
-
-
-
 
