@@ -36,7 +36,7 @@ def ApplyMSVSOptions( env, version ):
                 )
     else:
         addCcFlags( 
-                # Whole program optimization, full speed optimizations, 
+                # Optimize: Whole program, full speed; /GL requires /LTCG link flag
                 "/GL", "/Ox",
                 # Multithreaded and DLL MSVCRT
                 "/MD",
@@ -56,15 +56,33 @@ def ApplyMSVSOptions( env, version ):
 
     # TODO nohtyP.obj : MSIL .netmodule or module compiled with /GL found; restarting link
     # with /LTCG; add /LTCG to the link command line to improve linker performance
-
-
+    def addLinkFlags( *args ): env.AppendUnique( LINKFLAGS=list( args ) )
+    addLinkFlags(
+            # Warnings-as-errors
+            "/WX",
+            # Large address aware (>2GB)
+            "/LARGEADDRESSAWARE",
+            # Disable incremental linking
+            "/INCREMENTAL:NO",
+            # Create a mapfile, include exported functions
+            "/MAP", "/MAPINFO:EXPORTS",
+            )
+    if env["CONFIGURATION"] == "debug":
+        addLinkFlags(
+                # Add DebuggableAttribute (because I don't know?)
+                "/ASSEMBLYDEBUG",
+                )
+    else:
+        addLinkFlags(
+                # Eliminate unreferenced funcs/data, fold identical COMDATs
+                "/OPT:REF", "/OPT:ICF",
+                # Link-time code generation; required by /GL cc flag
+                "/LTCG", 
+                )
+    # TODO these? "kernel32.lib" "user32.lib" "gdi32.lib" "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib" "odbc32.lib" "odbccp32.lib" 
 """
-VS 2013 - link debug
-/OUT:"C:\OpenSource\nohtyP\Build\VS12.0\Debug\nohtyP.dll"   /MANIFEST /PROFILE       /NXCOMPAT /PDB:"C:\OpenSource\nohtyP\Build\VS12.0\Debug\nohtyP.pdb"   /DYNAMICBASE /MAPINFO:EXPORTS "kernel32.lib" "user32.lib" "gdi32.lib" "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib" "odbc32.lib" "odbccp32.lib" /LARGEADDRESSAWARE /IMPLIB:"C:\OpenSource\nohtyP\Build\VS12.0\Debug\nohtyP.lib"   /VERSION:"VersionHere" /DEBUG /DLL /MACHINE:X86 /WX                   /INCREMENTAL:NO /PGD:"C:\OpenSource\nohtyP\Build\VS12.0\Debug\nohtyP.pgd"   /SUBSYSTEM:WINDOWS /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /ManifestFile:"Debug\nohtyP.dll.intermediate.manifest"   /MAP":C:\OpenSource\nohtyP\Build\VS12.0\Debug\nohtyP.map"            /ERRORREPORT:PROMPT /NOLOGO /ASSEMBLYDEBUG /TLBID:1
-VS 2013 - link release
-/OUT:"C:\OpenSource\nohtyP\Build\VS12.0\Release\nohtyP.dll" /MANIFEST          /LTCG /NXCOMPAT /PDB:"C:\OpenSource\nohtyP\Build\VS12.0\Release\nohtyP.pdb" /DYNAMICBASE /MAPINFO:EXPORTS "kernel32.lib" "user32.lib" "gdi32.lib" "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib" "odbc32.lib" "odbccp32.lib" /LARGEADDRESSAWARE /IMPLIB:"C:\OpenSource\nohtyP\Build\VS12.0\Release\nohtyP.lib" /VERSION:"VersionHere" /DEBUG /DLL /MACHINE:X86 /WX /OPT:REF /SAFESEH /INCREMENTAL:NO /PGD:"C:\OpenSource\nohtyP\Build\VS12.0\Release\nohtyP.pgd" /SUBSYSTEM:WINDOWS /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /ManifestFile:"Release\nohtyP.dll.intermediate.manifest" /MAP":C:\OpenSource\nohtyP\Build\VS12.0\Release\nohtyP.map" /OPT:ICF /ERRORREPORT:PROMPT /NOLOGO                /TLBID:1
 
-TODO Ensure /Zi or /Z7 gets added when PDB used, and that /Fd"Debug\vc120.pdb" isn't needed
+TODO Ensure /Zi or /Z7 and /DEBUG gets added when PDB used, and that /Fd"Debug\vc120.pdb" isn't needed
 TODO /analyze? (enable /Wall when analyzing, then decide what to supress)
 
 SCons - cl
