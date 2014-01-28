@@ -29,15 +29,18 @@ def _updateCcEmitters( env ):
             builder.emitter[source_suffix] = functools.partial( 
                     _ccEmitter, parent_emitter=parent_emitter ) 
 
-def _linkEmitter( target, source, env ):
+def _linkEmitter( target, source, env, msvs_version ):
     t = str( target[0] )
     assert t.endswith( ".dll" ) or t.endswith( ".exe" )
-    target.append( t + ".manifest" )
+    # Manifest files were required starting with MSVS 2005, and ending with 2010
+    # TODO Should we embed the manifest for these versions? (Can Scons handle the details?)
+    if 8.0 <= msvs_version < 10.0: target.append( t + ".manifest" )
     target.append( t[:-4] + ".map" ) # TODO do better
     return target, source
-def _updateLinkEmitters( env ):
-    env.Append( PROGEMITTER=[_linkEmitter, ], SHLIBEMITTER=[_linkEmitter, ], 
-            LDMODULEEMITTER=[_linkEmitter, ] )
+def _updateLinkEmitters( env, version ):
+    emitter = functools.partial( _linkEmitter, msvs_version=version )
+    env.Append( PROGEMITTER=[emitter, ], SHLIBEMITTER=[emitter, ], 
+            LDMODULEEMITTER=[emitter, ] )
 
 
 def ApplyMSVSOptions( env, version ):
@@ -108,8 +111,8 @@ def ApplyMSVSOptions( env, version ):
                 # Link-time code generation; required by /GL cc flag
                 "/LTCG", 
                 )
-    # Ensure SCons knows to clean .manifest, .map, etc
-    _updateLinkEmitters( env )
+    # Ensure SCons knows to clean .map, etc
+    _updateLinkEmitters( env, version )
 
 def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
     """Returns (generate, exists), suitable for use as the SCons tool module functions."""
