@@ -1,6 +1,6 @@
 # XXX NOT a SCons tool module; instead, a library for the msvs_* tool modules
 
-import os, os.path
+import os, os.path, sys, functools
 import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
@@ -12,6 +12,33 @@ _msvcTool = SCons.Tool.Tool( "msvc" )
 _mslinkTool = SCons.Tool.Tool( "mslink" )
 
 # TODO http://randomascii.wordpress.com/2012/07/22/more-adventures-in-failing-to-crash-properly/
+
+# It's a lot of work to add target files to a compilation!
+# TODO Just add native .asm, .map, etc support to SCons
+def _ccEmitter( target, source, env, parent_emitter ):
+    # Emitters appear to be inconsistent in whether they modify target/source, or return new objs
+    target, source = parent_emitter( target, source, env )
+    t = str( target[0] )
+    assert t.endswith( ".obj" )
+    target.append( t[:-4] + ".asm" ) # TODO do better
+    return target, source
+def _updateCcEmitters( env ):
+    builders = (env['BUILDERS']['StaticObject'], env['BUILDERS']['SharedObject'])
+    for builder in builders:
+        for source_suffix, parent_emitter in builder.emitter.items( ):
+            builder.emitter[source_suffix] = functools.partial( 
+                    _ccEmitter, parent_emitter=parent_emitter ) 
+
+def _linkEmitter( target, source, env ):
+    t = str( target[0] )
+    assert t.endswith( ".dll" ) or t.endswith( ".exe" )
+    target.append( t + ".manifest" )
+    target.append( t[:-4] + ".map" ) # TODO do better
+    return target, source
+def _updateLinkEmitters( env ):
+    env.Append( PROGEMITTER=[_linkEmitter, ], SHLIBEMITTER=[_linkEmitter, ], 
+            LDMODULEEMITTER=[_linkEmitter, ] )
+
 
 def ApplyMSVSOptions( env, version ):
     """Updates env with MSVS-specific compiler options for nohtyP.  version is numeric (ie 12.0).
@@ -25,8 +52,7 @@ def ApplyMSVSOptions( env, version ):
             "/sdl" if version >= 11.0 else "/GS",
             # Function-level linking, disable minimal rebuild, disable runtime type info
             "/Gy", "/Gm-", "/GR-",
-            # Source/assembly listing, exception handling model
-            # TODO .asm not removed on clean
+            # Source/assembly listing (.asm), exception handling model
             "/FAs", "/Fa${TARGET.dir}"+os.sep, "/EHsc",
             )
     if env["CONFIGURATION"] == "debug":
@@ -48,6 +74,8 @@ def ApplyMSVSOptions( env, version ):
     addCcFlags( "/Oy-" )
     # Improved debugging of optimized code: http://wp.me/p1fTCO-my
     if version >= 12.0: addCcFlags( "/d2Zi+" )
+    # Ensure SCons knows to clean .asm, etc
+    _updateCcEmitters( env )
 
     def addCppDefines( *args ): env.AppendUnique( CPPDEFINES=list( args ) )
     if env["CONFIGURATION"] == "debug":
@@ -55,8 +83,6 @@ def ApplyMSVSOptions( env, version ):
     else:
         addCppDefines( "NDEBUG" )
 
-    # TODO nohtyP.obj : MSIL .netmodule or module compiled with /GL found; restarting link
-    # with /LTCG; add /LTCG to the link command line to improve linker performance
     def addLinkFlags( *args ): env.AppendUnique( LINKFLAGS=list( args ) )
     addLinkFlags(
             # Warnings-as-errors
@@ -65,7 +91,7 @@ def ApplyMSVSOptions( env, version ):
             "/LARGEADDRESSAWARE",
             # Disable incremental linking
             "/INCREMENTAL:NO",
-            # Create a mapfile, include exported functions
+            # Create a mapfile (.map), include exported functions
             "/MAP", "/MAPINFO:EXPORTS",
             )
     if env["CONFIGURATION"] == "debug":
@@ -82,6 +108,8 @@ def ApplyMSVSOptions( env, version ):
                 # Link-time code generation; required by /GL cc flag
                 "/LTCG", 
                 )
+    # Ensure SCons knows to clean .manifest, .map, etc
+    _updateLinkEmitters( env )
 
 def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
     """Returns (generate, exists), suitable for use as the SCons tool module functions."""
