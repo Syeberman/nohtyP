@@ -49,42 +49,38 @@ oses = ("win32", )
 archs = ("amd64", "x86")
 configurations = ("release", "debug") # TODO an analyze configuration
 
-variants = []
-
 for compiler_name in compiler_names:
+    # FIXME does this even speed things up?
     compiler = Tool( compiler_name, toolpath=["Build/Tools", ] )
     if not compiler.exists( rootEnv ): continue
-    for combination in itertools.product( oses, archs, configurations ):
-        os, arch, configuration = combination
+
+    for os, arch, configuration in itertools.product( oses, archs, configurations ):
         # TODO Support cross-compiling OSes, if possible
         if os != rootEnv["PLATFORM"]: continue
         # Visual Studio only supports Windows
-        if compiler.name.startswith( "msvs_" ) and os != "win32": continue
+        if compiler_name.startswith( "msvs_" ) and os != "win32": continue
 
-        vtop = "#Build/%s/%s_%s_%s" % (compiler, os, arch, configuration)
-        variants.append( (compiler, os, arch, configuration, vtop) )
+        # Skip compilers that can't be found (TODO unless we want an error in that case?)
+        # TODO: This script is slow...I suspect it's a result of cloning so much.  Profile, then fix.
+        # TODO: Record compiler version information in the variant directory
+        try:
+            variantEnv = rootEnv.Clone( tools=[compiler, ], COMPILER=compiler, 
+                    TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
+        except Exception: continue
+
+        # TODO Remove the target directory entirely on clean?
+        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, os, arch, configuration)
+
+        # Maintain a separate directory for intermediate and target files, but don't copy files
+        variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
+        # TODO Scripts to update version numbers in source, build scripts, etc
+        #variantEnv.AppendUnique( LINKFLAGS=["/VERSION:0.5", ] )
+
+        nohtyP_SharedLibrary( variantEnv.Clone( ) )
 
 # TODO Set up aliases for various targets, a default or native target (for the one build that can
 # be tested on this system)
-
 # TODO Create aliases that group all compilers, compiler-versions, compiler-version-targets, etc...
-# TODO Programmatically-control the Default() targets via command-line variables
-for variant in variants:
-    compiler, os, arch, configuration, vtop = variant
 
-    # Skip compilers that can't be found (TODO unless we want an error in that case?)
-    # TODO: This script is slow...I suspect it's a result of cloning so much.  Profile, then fix.
-    # TODO: Record compiler version information in the variant directory
-    try:
-        variantEnv = rootEnv.Clone( tools=[compiler, ],
-                COMPILER=compiler, TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
-    except Exception: continue
-    # TODO Remove the target directory entirely on clean?
-    variantEnv["VTOP"] = vtop
-    # Maintain a separate directory for intermediate and target files, but don't copy source files
-    variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
-    # TODO Scripts to update version numbers in source, build scripts, etc
-    variantEnv.AppendUnique( LINKFLAGS=["/VERSION:0.5", ] )
 
-    nohtyP_SharedLibrary( variantEnv.Clone( ) )
 
