@@ -33,16 +33,14 @@ def _updateCcEmitters( env ):
             builder.emitter[source_suffix] = functools.partial( 
                     _ccEmitter, parent_emitter=parent_emitter ) 
 
-def _linkEmitter( target, source, env, msvs_version ):
+def _linkEmitter( target, source, env ):
     t = str( target[0] )
     assert t.endswith( ".dll" ) or t.endswith( ".exe" )
-    #if _crtRequiresManifest( msvs_version ): target.append( t + ".manifest" )
     target.append( t[:-4] + ".map" ) # TODO do better
     return target, source
 def _updateLinkEmitters( env, version ):
-    emitter = functools.partial( _linkEmitter, msvs_version=version )
-    env.Append( PROGEMITTER=[emitter, ], SHLIBEMITTER=[emitter, ], 
-            LDMODULEEMITTER=[emitter, ] )
+    env.Append( PROGEMITTER=[_linkEmitter, ], SHLIBEMITTER=[_linkEmitter, ], 
+            LDMODULEEMITTER=[_linkEmitter, ] )
 
 
 def ApplyMSVSOptions( env, version ):
@@ -83,10 +81,6 @@ def ApplyMSVSOptions( env, version ):
     _updateCcEmitters( env )
 
     def addCppDefines( *args ): env.AppendUnique( CPPDEFINES=list( args ) )
-    # FIXME
-    # A fresh "2008 SP1" install builds against the "2008" CRT version, but does not install that
-    # older version in winsxs (or, it is removed by the redist package), causing problems.
-    #if _crtRequiresManifest( version ): addCppDefines( "_BIND_TO_CURRENT_VCLIBS_VERSION=1" )
     if env["CONFIGURATION"] == "debug":
         addCppDefines( "_DEBUG" )
     else:
