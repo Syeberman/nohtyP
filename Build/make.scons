@@ -1,6 +1,8 @@
 import os.path, itertools
 import SCons.Errors
 
+# TODO support scons -h for build options
+
 # Confirm that scons' top-level directory, the current directory, _is_ the project top
 if not os.path.exists( "nohtyP.c" ):
     Exit( "Run SCons from top project dir (or use make.bat, or scons -C)" )
@@ -45,10 +47,22 @@ def nohtyP_SharedLibrary( env ):
     return env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
 
 
+# List these in order of decreasing "preference"; the first variant that matches will be chosen as
+# "native" (ie the default target)
 compiler_names = ("msvs_120", "msvs_110", "msvs_100", "msvs_90")
 oses = ("win32", )
 archs = ("amd64", "x86")
 configurations = ("release", "debug") # TODO an analyze configuration
+
+native_os = rootEnv["PLATFORM"]
+# TODO HOST_ARCH not supported outside of Windows
+if rootEnv["HOST_ARCH"] == "x86_64":
+    native_archs = ("amd64", "x86")
+else:
+    native_archs = (rootEnv["HOST_ARCH"], )
+
+# The native targets ("debug", "release", etc) should each copy files from a single variant
+nativeTargetsCreated = set( )
 
 for compiler_name in compiler_names:
     # FIXME does this even speed things up?
@@ -57,31 +71,46 @@ for compiler_name in compiler_names:
 
     for os, arch, configuration in itertools.product( oses, archs, configurations ):
         # TODO Support cross-compiling OSes, if possible
-        if os != rootEnv["PLATFORM"]: continue
+        if os != native_os: continue
         # Visual Studio only supports Windows
         if compiler_name.startswith( "msvs_" ) and os != "win32": continue
 
         # Skip compilers that can't be found (TODO unless we want an error in that case?)
-        # TODO: This script is slow...I suspect it's a result of cloning so much.  Profile, then fix.
+        # TODO: This script is slow due to vcvarsall.bat executing 52 times; cache in SCons
         # TODO: Record compiler version information in the variant directory
         try:
             variantEnv = rootEnv.Clone( tools=[compiler, ], COMPILER=compiler, 
                     TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
         except (SCons.Errors.UserError, SCons.Errors.StopError): continue
 
-        # TODO Remove the target directory entirely on clean?
-        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, os, arch, configuration)
-
         # Maintain a separate directory for intermediate and target files, but don't copy files
+        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, os, arch, configuration)
         variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
+
         # TODO Scripts to update version numbers in source, build scripts, etc
         #variantEnv.AppendUnique( LINKFLAGS=["/VERSION:0.5", ] )
 
-        nohtyP_SharedLibrary( variantEnv.Clone( ) )
+        targets = []
+        targets.append( nohtyP_SharedLibrary( variantEnv.Clone( ) ) )
 
-# TODO Set up aliases for various targets, a default or native target (for the one build that can
-# be tested on this system)
-# TODO Create aliases that group all compilers, compiler-versions, compiler-version-targets, etc...
+        # Pick one variant from each configuration that matches the host system, and copy it to the
+        # Build/native directory for easy access
+        if os == native_os and arch in native_archs:
+            if configuration not in nativeTargetsCreated:
+                # TODO put "release" right in Build/native?
+                native_dest = "#Build/native/%s" % configuration
+                native_target = variantEnv.Install( native_dest, targets )
+                targets.append( native_target )
+                Alias( configuration, native_target )
+                Alias( "native", native_target )
+                nativeTargetsCreated.add( configuration )
 
+        Alias( "all", targets )
+        Alias( compiler_name, targets )
+        Alias( "_".join( (compiler_name, os) ), targets )
+        Alias( "_".join( (compiler_name, os, arch) ), targets )
+        Alias( "_".join( (compiler_name, os, arch, configuration) ), targets )
 
+# If SCons is called without targets, build the "native" target
+Default( Alias( "native" ) )
 
