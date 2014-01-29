@@ -1,4 +1,5 @@
 import os.path, itertools
+import SCons.Errors
 
 # Confirm that scons' top-level directory, the current directory, _is_ the project top
 if not os.path.exists( "nohtyP.c" ):
@@ -66,7 +67,7 @@ for compiler_name in compiler_names:
         try:
             variantEnv = rootEnv.Clone( tools=[compiler, ], COMPILER=compiler, 
                     TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
-        except Exception: continue
+        except (SCons.Errors.UserError, SCons.Errors.StopError): continue
 
         # TODO Remove the target directory entirely on clean?
         variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, os, arch, configuration)
