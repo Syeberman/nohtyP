@@ -13,6 +13,10 @@ _mslinkTool = SCons.Tool.Tool( "mslink" )
 
 # TODO http://randomascii.wordpress.com/2012/07/22/more-adventures-in-failing-to-crash-properly/
 
+def _crtRequiresManifest( version ):
+    """Manifest files were required for the CRT starting with MSVS 2005, and ending with 2010."""
+    return 8.0 <= version < 10.0
+
 # It's a lot of work to add target files to a compilation!
 # TODO Just add native .asm, .map, etc support to SCons
 def _ccEmitter( target, source, env, parent_emitter ):
@@ -32,9 +36,7 @@ def _updateCcEmitters( env ):
 def _linkEmitter( target, source, env, msvs_version ):
     t = str( target[0] )
     assert t.endswith( ".dll" ) or t.endswith( ".exe" )
-    # Manifest files were required starting with MSVS 2005, and ending with 2010
-    # TODO Should we embed the manifest for these versions? (Can Scons handle the details?)
-    if 8.0 <= msvs_version < 10.0: target.append( t + ".manifest" )
+    #if _crtRequiresManifest( msvs_version ): target.append( t + ".manifest" )
     target.append( t[:-4] + ".map" ) # TODO do better
     return target, source
 def _updateLinkEmitters( env, version ):
@@ -81,6 +83,10 @@ def ApplyMSVSOptions( env, version ):
     _updateCcEmitters( env )
 
     def addCppDefines( *args ): env.AppendUnique( CPPDEFINES=list( args ) )
+    # FIXME
+    # A fresh "2008 SP1" install builds against the "2008" CRT version, but does not install that
+    # older version in winsxs (or, it is removed by the redist package), causing problems.
+    #if _crtRequiresManifest( version ): addCppDefines( "_BIND_TO_CURRENT_VCLIBS_VERSION=1" )
     if env["CONFIGURATION"] == "debug":
         addCppDefines( "_DEBUG" )
     else:
@@ -111,6 +117,8 @@ def ApplyMSVSOptions( env, version ):
                 # Link-time code generation; required by /GL cc flag
                 "/LTCG", 
                 )
+    # If the CRT for this MSVC version needs a manifest, make sure it's embedded
+    if _crtRequiresManifest( version ): env["WINDOWS_EMBED_MANIFEST"] = True
     # Ensure SCons knows to clean .map, etc
     _updateLinkEmitters( env, version )
 
