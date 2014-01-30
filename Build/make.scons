@@ -7,6 +7,23 @@ import SCons.Errors
 if not os.path.exists( "nohtyP.c" ):
     Exit( "Run SCons from top project dir (or use make.bat, or scons -C)" )
 
+
+# Adds nohtyP.dll/libnotyP.so/etc as a target in env
+def nohtyP_SharedLibrary( env ):
+    env.PrependUnique(
+            CPPPATH=[
+                "#",
+                ],
+            CPPDEFINES=[
+                "yp_ENABLE_SHARED",
+                "yp_BUILD_CORE",
+                "yp_DEBUG_LEVEL=%s" % ("1" if env["CONFIGURATION"] == "debug" else "0"),
+                ],
+            PDB="$VTOP/nohtyP.pdb", LIBS="",
+            )
+    return env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
+
+
 # Command-line build variables
 vars = Variables( None )
 
@@ -31,20 +48,22 @@ rootEnv.Decider( "MD5-timestamp" )
 rootEnv["ENV"]["COMSPEC"] = "cmd.exe"
 
 
-# Adds nohtyP.dll/libnotyP.so/etc as a target in env
-def nohtyP_SharedLibrary( env ):
-    env.PrependUnique(
-            CPPPATH=[
-                "#",
-                ],
-            CPPDEFINES=[
-                "yp_ENABLE_SHARED",
-                "yp_BUILD_CORE",
-                "yp_DEBUG_LEVEL=%s" % ("1" if env["CONFIGURATION"] == "debug" else "0"),
-                ],
-            PDB="$VTOP/nohtyP.pdb", LIBS="",
-            )
-    return env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
+# Site-specific tool configuration.  For some tools, this caches the results of lengthy
+# auto-detection; for other tools that don't have version-dependent auto-detect, this allows the
+# user to tell us where they put the other versions.
+siteTools_name = os.path.abspath( "Build/site-tools.py" )
+siteTools_dict = {}
+if not os.path.exists( siteTools_name ):
+    with open( siteTools_name, "w" ) as outfile: 
+        outfile.write( "# Holds site-specific configuration options for the compilers and other tools.\n" )
+        outfile.write( "# Edit as appropriate.  Missing entries added automatically.  Rebuilt if deleted.\n\n" )
+else:
+    with open( siteTools_name ) as infile:
+        exec( infile.read( ), siteTools_dict )
+def siteToolsFunction( ): 
+    """Returns the file name of site-tools.py, and a dictionary of current variables."""
+    return siteTools_name, siteTools_dict
+rootEnv["SITE_TOOLS"] = siteToolsFunction # a function so Clone doesn't deepcopy it
 
 
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as

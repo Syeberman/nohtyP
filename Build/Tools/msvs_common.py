@@ -4,7 +4,13 @@ import os, os.path, sys, functools
 import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
+import SCons.Warnings
 
+
+# Disables "MSVC_USE_SCRIPT set to False" warnings.  Unfortunately, also disables "No version of 
+# Visual Studio compiler found" et al, but these are actually errors and they're trapped
+# separately.
+SCons.Warnings.suppressWarningClass( SCons.Warnings.VisualCMissingWarning )
 
 # Without a toolpath argument this will find SCons' tool modules
 _msvsTool = SCons.Tool.Tool( "msvs" )
@@ -131,11 +137,36 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
         if version is None:
             raise SCons.Errors.UserError( "Visual Studio %r is not installed" % supportedVersions[0] )
         env["MSVC_VERSION"] = version
+
+        # Caching INCLUDE, LIB, etc in site-tools.py bypasses the slow vcvars*.bat calls on
+        # subsequent builds
+        siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
+        var_names = ("INCLUDE", "LIB", "LIBPATH", "PATH")
+        compilerName = env["COMPILER"].name
+        compilerEnv_name = "%s_%s_ENV" % (compilerName.upper( ), env["TARGET_ARCH"].upper( ))
+        compilerEnv = siteTools_dict.get( compilerEnv_name, None )
+        if compilerEnv:
+            env["MSVC_USE_SCRIPT"] = None # disable autodetection, vcvars*.bat, etc
+            for var_name in var_names:
+                env.PrependENVPath( var_name, compilerEnv[var_name], delete_existing=False )
+
         _msvsTool.generate( env )
         _msvcTool.generate( env )
         _mslinkTool.generate( env )
         if not env.WhereIs( "$CC" ):
             raise SCons.Errors.StopError( "Visual Studio %r (%r) configuration failed" % (supportedVersions[0], env["TARGET_ARCH"]) )
+
+        # Add an entry for this compiler in site-tools.py if it doesn't already exist
+        if not compilerEnv:
+            compilerEnv = siteTools_dict[compilerEnv_name] = {}
+            for var_name in var_names: 
+                compilerEnv[var_name] = env["ENV"][var_name]
+            with open( siteTools_name, "a" ) as outfile:
+                outfile.write( "%s = {\n" % compilerEnv_name )
+                for var_name in var_names:
+                    outfile.write( "    %r: %r,\n" % (var_name, compilerEnv[var_name]) )
+                outfile.write( "}\n\n" )
+
         ApplyMSVSOptions( env, numericVersion )
 
     def exists( env ):

@@ -26,6 +26,7 @@
 
 # Local SCons files
 \.sconsign.dblite$
+^Build/site-tools.py$
 
 # Local Visual Studio files
 \.ipch$
