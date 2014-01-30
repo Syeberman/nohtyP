@@ -1,4 +1,5 @@
 # Compiled source
+\.asm$
 \.com$
 \.class$
 \.dll$
@@ -8,6 +9,7 @@
 \.ilk$
 \.lastbuildstate$
 \.lib$
+\.map$
 \.o$
 \.obj$
 \.so$
@@ -15,10 +17,11 @@
 \.pyc$
 \.pyo$
 \.tlog$
-/Debug/
-/Release/
-_debug/
-_release/
+^Build/.*/Debug/
+^Build/.*/Release/
+^Build/native/
+^Build/.*_debug/
+^Build/.*_release/
 /__pycache__/
 
 # Local SCons files
