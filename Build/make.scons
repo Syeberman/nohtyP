@@ -36,7 +36,7 @@ if vars_unknown: Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
 
 # Require that construction variable names exist at expansion, then add those allowed to be empty
 AllowSubstExceptions( )
-rootEnv.Append( CPPFLAGS="", SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", LIBPATH="", PCH="",
+rootEnv.Replace( CPPFLAGS=[], SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", LIBPATH=[], PCH="",
         WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="" )
 
 # Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory
@@ -47,6 +47,9 @@ rootEnv.Decider( "MD5-timestamp" )
 
 # Always use cmd.exe on Windows, regardless of user's shell; ignored on other platforms
 rootEnv["ENV"]["COMSPEC"] = "cmd.exe"
+
+# TODO Scripts to update version numbers in source, build scripts, etc
+rootEnv.Replace( NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0 )
 
 
 # Site-specific tool configuration.  For some tools, this caches the results of lengthy
@@ -72,7 +75,9 @@ rootEnv["SITE_TOOLS"] = siteToolsFunction # a function so Clone doesn't deepcopy
 compiler_names = ("msvs_120", "msvs_110", "msvs_100", "msvs_90", "mingw") # TODO similar gcc support
 oses = ("win32", )
 archs = ("amd64", "x86")
-configurations = ("release", "debug") # TODO an analyze configuration
+# TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
+# lint agains the compiler's headers
+configurations = ("release", "debug")
 
 native_os = rootEnv["PLATFORM"]
 # TODO HOST_ARCH not supported outside of Windows
@@ -92,8 +97,6 @@ for compiler_name in compiler_names:
     for os, arch, configuration in itertools.product( oses, archs, configurations ):
         # TODO Support cross-compiling OSes, if possible
         if os != native_os: continue
-        # Visual Studio only supports Windows
-        if compiler_name.startswith( "msvs_" ) and os != "win32": continue
 
         # Skip compilers that can't be found (TODO unless we want an error in that case?)
         # TODO: This script is slow due to vcvarsall.bat executing 52 times; cache in SCons
@@ -107,9 +110,6 @@ for compiler_name in compiler_names:
         variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, os, arch, configuration)
         variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
 
-        # TODO Scripts to update version numbers in source, build scripts, etc
-        #variantEnv.AppendUnique( LINKFLAGS=["/VERSION:0.5", ] )
-
         targets = []
         targets.append( nohtyP_SharedLibrary( variantEnv.Clone( ) ) )
 
@@ -117,8 +117,10 @@ for compiler_name in compiler_names:
         # Build/native directory for easy access
         if os == native_os and arch in native_archs:
             if configuration not in nativeTargetsCreated:
-                # TODO put "release" right in Build/native?
-                native_dest = "#Build/native/%s" % configuration
+                if configuration == "release":
+                    native_dest = "#Build/native"
+                else:
+                    native_dest = "#Build/native/%s" % configuration
                 native_target = variantEnv.Install( native_dest, targets )
                 targets.append( native_target )
                 Alias( configuration, native_target )

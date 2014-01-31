@@ -102,6 +102,8 @@ def ApplyMSVSOptions( env, version ):
             "/INCREMENTAL:NO",
             # Create a mapfile (.map), include exported functions
             "/MAP", "/MAPINFO:EXPORTS",
+            # Version stamp
+            "/VERSION:${NOHTYP_MAJOR}.${NOHTYP_MINOR}"
             )
     if env["CONFIGURATION"] == "debug":
         addLinkFlags(
@@ -134,8 +136,10 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
     else: version = None
 
     def generate( env ):
-        if version is None:
-            raise SCons.Errors.UserError( "Visual Studio %r is not installed" % supportedVersions[0] )
+        if version is None: raise SCons.Errors.UserError( "Visual Studio %r is not installed" % supportedVersions[0] )
+        if env["TARGET_OS"] != "win32": raise SCons.Errors.StopError( "Visual Studio doesn't build for OS %r" % env["TARGET_OS"] )
+        # TARGET_ARCH is verified by vcvars*.bat
+        if env["CONFIGURATION"] not in ("release", "debug"): raise SCons.Errors.StopError( "Visual Studio doesn't support the %r configuration (yet)" % env["CONFIGURATION"] )
         env["MSVC_VERSION"] = version
 
         # Caching INCLUDE, LIB, etc in site-tools.py bypasses the slow vcvars*.bat calls on
