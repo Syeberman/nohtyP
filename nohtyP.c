@@ -567,7 +567,7 @@ yp_STATIC_ASSERT( sizeof( _yp_uint_t ) == sizeof( yp_int_t ), sizeof_yp_uint_eq_
 
 // Return the hash of the given double; always succeeds
 // XXX Adapted from Python's _Py_HashDouble
-yp_hash_t yp_HashDouble( double v )
+static yp_hash_t yp_HashDouble( double v )
 {
     int e, sign;
     double m;
@@ -2516,7 +2516,7 @@ static ypObject *nonetype_frozen_deepcopy( ypObject *n, visitfunc copy_visitor, 
     return yp_None;
 }
 
-ypObject *nonetype_bool( ypObject *n ) {
+static ypObject *nonetype_bool( ypObject *n ) {
     return yp_False;
 }
 
