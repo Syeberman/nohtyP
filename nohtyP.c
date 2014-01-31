@@ -13,8 +13,18 @@
 #include <float.h>
 #include <math.h>
 
-#ifdef _MSC_VER
+#ifdef _MSC_VER // MSVC
 #include <Windows.h>
+#endif
+
+#ifdef __GNUC__ // GCC
+#define GCC_VER (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+#include <stdint.h>
+#endif
+
+#ifndef TRUE
+#define TRUE    (1==1)
+#define FALSE   (0==1)
 #endif
 
 
@@ -99,14 +109,8 @@ yp_STATIC_ASSERT( sizeof( yp_uint64_t ) == 8, sizeof_uint64 );
 yp_STATIC_ASSERT( sizeof( yp_float32_t ) == 4, sizeof_float32 );
 yp_STATIC_ASSERT( sizeof( yp_float64_t ) == 8, sizeof_float64 );
 yp_STATIC_ASSERT( sizeof( yp_ssize_t ) == sizeof( size_t ), sizeof_ssize );
+yp_STATIC_ASSERT( yp_SSIZE_T_MAX == (SIZE_MAX/2), ssize_max );
 #define yp_MAX_ALIGNMENT (8)  // The maximum possible required alignment of any entity
-
-// Temporarily disable "integral constant overflow" warnings for this test
-#pragma warning( push )
-#pragma warning( disable : 4307 )
-yp_STATIC_ASSERT( yp_SSIZE_T_MAX+1 < yp_SSIZE_T_MAX, ssize_max );
-yp_STATIC_ASSERT( yp_SSIZE_T_MIN-1 > yp_SSIZE_T_MIN, ssize_min );
-#pragma warning( pop )
 
 yp_STATIC_ASSERT( sizeof( struct _ypObject ) == 16+(2*sizeof( void * )), sizeof_ypObject );
 
@@ -533,10 +537,14 @@ yp_STATIC_ASSERT( sizeof( _yp_uint_t ) == sizeof( yp_int_t ), sizeof_yp_uint_eq_
 #define yp_UINT_MATH( x, op, y ) ((yp_int_t) (((_yp_uint_t)x) op ((_yp_uint_t)y)))
 #define yp_USIZE_MATH( x, op, y ) ((yp_ssize_t) (((size_t)x) op ((size_t)y)))
 
-#ifdef _MSC_VER
+#if defined( _MSC_VER )
 #define yp_IS_NAN _isnan
 #define yp_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
 #define yp_IS_FINITE(X) _finite(X)
+#elif defined( GCC_VER )
+#define yp_IS_NAN isnan
+#define yp_IS_INFINITY(X) (!finite(X) && !isnan(X))
+#define yp_IS_FINITE(X) finite(X)
 #else
 #error Need to port Py_IS_NAN et al to nohtyP for this platform
 #endif
@@ -548,7 +556,7 @@ yp_STATIC_ASSERT( sizeof( _yp_uint_t ) == sizeof( yp_int_t ), sizeof_yp_uint_eq_
 // Parameters used for the numeric hash implementation.  Numeric hashes are based on reduction
 // modulo the prime 2**_PyHASH_BITS - 1.
 // XXX Adapted from Python's pyport.h
-#if SIZE_MAX == 0xFFFFFFFFu
+#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu
 #define _ypHASH_BITS 31
 #else
 #define _ypHASH_BITS 61
@@ -956,10 +964,13 @@ static void _default_yp_free( void *p ) {
     free( p );
 }
 
+// TODO GCC-optimized version
+
 // If all else fails, rely on the standard C malloc/free functions
 #else
 // Rounds allocations up to a multiple that should be easy for most heaps without wasting space for
 // the smallest objects (ie ints); don't call with a negative size
+// TODO yp_DEBUG statements
 #define _yp_DEFAULT_MALLOC_ROUNDTO (16)
 static yp_ssize_t _default_yp_malloc_good_size( yp_ssize_t size )
 {
@@ -985,7 +996,9 @@ static void *_default_yp_malloc_resize( yp_ssize_t *actual,
     *actual = _default_yp_malloc_good_size( size );
     return malloc( *actual );
 }
-static void (*_default_yp_free)( void *p ) = free;
+static void _default_yp_free( void *p ) {
+    free( p );
+}
 #endif
 
 
@@ -1072,7 +1085,7 @@ static ypObject *_ypMem_malloc_container_inline(
 // XXX 64-bit PyDictObject is 128 bytes...we are larger!
 // XXX Cannot change once objects are allocated
 // TODO Static asserts to ensure that certain-sized objects fit with one allocation, then optimize
-#if SIZE_MAX <= 0xFFFFFFFFu // 32-bit (or less) platform
+#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
 #define _ypMem_ideal_size_DEFAULT (128)
 #else
 #define _ypMem_ideal_size_DEFAULT (256)
@@ -1322,7 +1335,7 @@ typedef yp_int32_t _yp_iter_lenhint_t;
 // To ensure that ob_inline_data is aligned properly, we need to pad on some platforms
 // TODO If we use ob_len to store the lenhint, yp_lenC would have to always call tp_len, but then
 // we could trim 8 bytes off all iterators
-#if SIZE_MAX == 0xFFFFFFFFu // 32-bit (or less) platform
+#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
 #define _ypIterObject_HEAD \
     _ypIterObject_HEAD_NO_PADDING \
     void *_ob_padding;
@@ -2776,7 +2789,7 @@ unsigned char _ypInt_digit_value[256] = {
 
 // XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
 static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y );
-static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), yp_uint8_t *bytes,
+static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), const yp_uint8_t *bytes,
         yp_int_t base )
 {
     int sign;
@@ -3826,13 +3839,13 @@ static ypObject *_ypInt( ypObject *(*allocator)( yp_int_t ), ypObject *x, yp_int
     } else if( x_pair == ypBool_CODE ) {
         return allocator( ypBool_IS_TRUE_C( x ) );
     } else if( x_pair == ypBytes_CODE ) {
-        yp_uint8_t *bytes;
+        const yp_uint8_t *bytes;
         ypObject *result = yp_asbytesCX( x, &bytes, NULL );
         if( yp_isexceptionC( result ) ) return yp_ValueError; // contains null bytes
         return _ypInt_from_ascii( allocator, bytes, base );
     } else if( x_pair == ypStr_CODE ) {
         // TODO Implement decoding
-        yp_uint8_t *encoded;
+        const yp_uint8_t *encoded;
         ypObject *encoding;
         ypObject *result = yp_asencodedCX( x, &encoded, NULL, &encoding );
         if( yp_isexceptionC( result ) ) return yp_ValueError; // contains null bytes
@@ -3894,10 +3907,10 @@ _ypInt_PUBLIC_AS_C_FUNCTION( int16,  0xFFFF );
 _ypInt_PUBLIC_AS_C_FUNCTION( uint16, 0xFFFFu );
 _ypInt_PUBLIC_AS_C_FUNCTION( int32,  0xFFFFFFFF );
 _ypInt_PUBLIC_AS_C_FUNCTION( uint32, 0xFFFFFFFFu );
-#if SIZE_MAX <= 0xFFFFFFFFu // 32-bit (or less) platform
+#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
 yp_STATIC_ASSERT( sizeof( yp_ssize_t ) < sizeof( yp_int_t ), sizeof_yp_ssize_lt_yp_int );
-_ypInt_PUBLIC_AS_C_FUNCTION( ssize,  (yp_ssize_t) SIZE_MAX );
-_ypInt_PUBLIC_AS_C_FUNCTION( hash,   (yp_hash_t) SIZE_MAX );
+_ypInt_PUBLIC_AS_C_FUNCTION( ssize,  (yp_ssize_t) 0xFFFFFFFF );
+_ypInt_PUBLIC_AS_C_FUNCTION( hash,   (yp_hash_t) 0xFFFFFFFF );
 #endif
 
 // The functions below assume/assert that yp_int_t is 64 bits
@@ -3911,7 +3924,7 @@ yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc ) {
     return (yp_uint64_t) asint;
 }
 
-#if SIZE_MAX > 0xFFFFFFFFu // 64-bit (or more) platform
+#if yp_SSIZE_T_MAX > 0x7FFFFFFFu // 64-bit (or more) platform
 yp_STATIC_ASSERT( sizeof( yp_ssize_t ) == sizeof( yp_int_t ), sizeof_yp_ssize_eq_yp_int );
 yp_ssize_t yp_asssizeC( ypObject *x, ypObject **exc ) {
     return yp_asintC( x, exc );

@@ -80,10 +80,11 @@ extern "C" {
 #endif
 #include <stdarg.h>
 #include <limits.h>
+#include <sys/types.h>
 
 // To link to nohtyP statically, simply add nohtyP.c to your project: no special defines are
 // required.  To link to nohtyP dynamically, first build nohtyP.c as a shared library with
-// yp_ENABLE_SHARED and yp_BUILD_CORE, then include nohtyP.h with yp_ENABLE_SHARED defined.
+// yp_ENABLE_SHARED and yp_BUILD_CORE, then include nohtyP.h with yp_ENABLE_SHARED.
 #ifdef yp_ENABLE_SHARED
 #ifdef yp_BUILD_CORE
 #define ypAPI extern __declspec( dllexport )
@@ -160,14 +161,22 @@ typedef long long           yp_int64_t;
 typedef unsigned long long  yp_uint64_t;
 typedef float               yp_float32_t;
 typedef double              yp_float64_t;
-#if SIZE_MAX == 0xFFFFFFFFu
-typedef yp_int32_t          yp_ssize_t;
+
+// Size- and length-related C types
+#ifdef SSIZE_MAX
+typedef ssize_t     yp_ssize_t;
+#define yp_SSIZE_T_MAX SSIZE_MAX
 #else
-typedef yp_int64_t          yp_ssize_t;
+#if SIZE_MAX == 0xFFFFFFFFu
+typedef yp_int32_t  yp_ssize_t;
+#define yp_SSIZE_T_MAX (0x7FFFFFFF)
+#else
+typedef yp_int64_t  yp_ssize_t;
+#define yp_SSIZE_T_MAX (0x7FFFFFFFFFFFFFFFLL)
 #endif
-typedef yp_ssize_t          yp_hash_t;
-#define yp_SSIZE_T_MAX ((yp_ssize_t) (SIZE_MAX / 2))
+#endif
 #define yp_SSIZE_T_MIN (-yp_SSIZE_T_MAX - 1)
+typedef yp_ssize_t  yp_hash_t;
 
 // C types used to represent the numeric objects within nohtyP
 typedef yp_int64_t      yp_int_t;

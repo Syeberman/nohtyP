@@ -36,7 +36,8 @@ if vars_unknown: Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
 
 # Require that construction variable names exist at expansion, then add those allowed to be empty
 AllowSubstExceptions( )
-rootEnv.Append( CPPFLAGS="", SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", LIBPATH="", PCH="", )
+rootEnv.Append( CPPFLAGS="", SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", LIBPATH="", PCH="",
+        WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="" )
 
 # Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory
 rootEnv.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
@@ -68,7 +69,7 @@ rootEnv["SITE_TOOLS"] = siteToolsFunction # a function so Clone doesn't deepcopy
 
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
 # "native" (ie the default target)
-compiler_names = ("msvs_120", "msvs_110", "msvs_100", "msvs_90")
+compiler_names = ("msvs_120", "msvs_110", "msvs_100", "msvs_90", "mingw") # TODO similar gcc support
 oses = ("win32", )
 archs = ("amd64", "x86")
 configurations = ("release", "debug") # TODO an analyze configuration
