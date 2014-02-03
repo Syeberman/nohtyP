@@ -21,23 +21,25 @@ else:
 def _ccEmitter( target, source, env, parent_emitter ):
     # Emitters appear to be inconsistent in whether they modify target/source, or return new objs
     target, source = parent_emitter( target, source, env )
-    for s in source:
-        s_base = os.path.splitext( s.path )[0]
-        # FIXME When we add these to target, they become inputs into the linker phase, and gcc then
-        # chokes and dies.  So...how are we supposed to get these files cleaned?
-        for ext in (".i", ".s"): target.append( s_base + ext )
+    # TODO Remove these asserts once we've gotten this right
+    assert len( source ) == 1
+    assert os.path.splitext( target[0].path )[1] == ".o"
+    s_base = os.path.splitext( source[0].path )[0]
+    for ext in (".i", ".s"): env.Clean( target[0], s_base+ext )
     return target, source
 def _updateCcEmitters( env ):
     builders = (env['BUILDERS']['StaticObject'], env['BUILDERS']['SharedObject'])
+    # TODO Instead, translate the emitter into a ListEmitter
     for builder in builders:
         for source_suffix, parent_emitter in builder.emitter.items( ):
             builder.emitter[source_suffix] = functools.partial( 
                     _ccEmitter, parent_emitter=parent_emitter ) 
 
 def _linkEmitter( target, source, env ):
-    t = str( target[0] )
-    assert t.endswith( ".dll" ) or t.endswith( ".exe" )
-    #target.append( os.path.splitext( t )[0] + ".map" )
+    t_base, t_ext = os.path.splitext( target[0].path )
+    # TODO Remove these asserts once we've gotten this right
+    assert t_ext in (".dll", ".exe")
+    for ext in (".map", ): env.Clean( target[0], t_base+ext )
     return target, source
 def _updateLinkEmitters( env, version ):
     env.Append( PROGEMITTER=[_linkEmitter, ], SHLIBEMITTER=[_linkEmitter, ], 
@@ -97,7 +99,7 @@ def ApplyGCCOptions( env, version ):
     # XXX Must come after any other optimization compiler options
     addCcFlags( "-fno-omit-frame-pointer" )
     # Ensure SCons knows to clean .s, etc
-    # FIXME _updateCcEmitters( env )
+    _updateCcEmitters( env )
 
     def addCppDefines( *args ): env.AppendUnique( CPPDEFINES=list( args ) )
     if env["CONFIGURATION"] == "debug":
