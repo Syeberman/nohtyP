@@ -503,9 +503,10 @@ int yp_isexceptionC( ypObject *x ) {
     return yp_IS_EXCEPTION_C( x );
 }
 
-// Return sizeof for a structure member
-#define yp_sizeof_member( structType, member ) \
-    sizeof( ((structType *)0)->member )
+// sizeof and offsetof as yp_ssize_t, and sizeof a structure member
+#define yp_sizeof( x ) ((yp_ssize_t) sizeof( x ))
+#define yp_offsetof( structType, member ) ((yp_ssize_t) offsetof( structType, member ))
+#define yp_sizeof_member( structType, member ) yp_sizeof( ((structType *)0)->member )
 
 // For N functions (that take variable arguments); to be used as follows:
 //      return_yp_V_FUNC( ypObject *, yp_foobarV, (x, n, args), n )
@@ -533,7 +534,7 @@ int yp_isexceptionC( ypObject *x ) {
 // For when we need to work with unsigned yp_int_t's in the math below; casting to unsigned helps
 // avoid undefined behaviour on overflow.
 typedef yp_uint64_t _yp_uint_t;
-yp_STATIC_ASSERT( sizeof( _yp_uint_t ) == sizeof( yp_int_t ), sizeof_yp_uint_eq_yp_int );
+yp_STATIC_ASSERT( yp_sizeof( _yp_uint_t ) == yp_sizeof( yp_int_t ), sizeof_yp_uint_eq_yp_int );
 #define yp_UINT_MATH( x, op, y ) ((yp_int_t) (((_yp_uint_t)x) op ((_yp_uint_t)y)))
 #define yp_USIZE_MATH( x, op, y ) ((yp_ssize_t) (((size_t)x) op ((size_t)y)))
 
@@ -623,7 +624,7 @@ static yp_hash_t yp_HashPointer( void *p )
     size_t y = (size_t) p;
     /* bottom 3 or 4 bits are likely to be 0; rotate y by 4 to avoid
        excessive hash collisions for dicts and sets */
-    y = (y >> 4) | (y << (8 * sizeof( void * ) - 4));
+    y = (y >> 4) | (y << (8 * yp_sizeof( void * ) - 4));
     x = (yp_hash_t) y;
     if (x == ypObject_HASH_INVALID) x -= 1;
     return x;
@@ -1012,7 +1013,7 @@ static void _default_yp_free( void *p ) {
 // This should be one of exactly two possible values, 1 (the default) or ypObject_REFCNT_IMMORTAL,
 // depending on yp_initialize's everything_immortal parameter
 static yp_uint32_t _ypMem_starting_refcnt = 1;
-yp_STATIC_ASSERT( sizeof( _ypMem_starting_refcnt ) == yp_sizeof_member( ypObject, ob_refcnt ), sizeof_starting_refcnt );
+yp_STATIC_ASSERT( yp_sizeof( _ypMem_starting_refcnt ) == yp_sizeof_member( ypObject, ob_refcnt ), sizeof_starting_refcnt );
 
 // Declares the ob_inline_data array for container object structures
 #define yp_INLINE_DATA _yp_INLINE_DATA
@@ -1043,7 +1044,7 @@ static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
     yp_DEBUG( "MALLOC_FIXED: type %d 0x%08X", type, ob );
     return ob;
 }
-#define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( sizeof( obStruct ), (type) )
+#define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( yp_sizeof( obStruct ), (type) )
 
 // Returns a malloc'd buffer for a container object holding alloclen elements in-line, or exception
 // on failure.  The container can neither grow nor shrink after allocation.  ob_inline_data in
@@ -1078,7 +1079,7 @@ static ypObject *_ypMem_malloc_container_inline(
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_INLINE( obStruct, type, alloclen ) \
-    _ypMem_malloc_container_inline( offsetof( obStruct, ob_inline_data ), \
+    _ypMem_malloc_container_inline( yp_offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (alloclen) )
 
 // TODO Make this configurable via yp_initialize
@@ -1138,7 +1139,7 @@ static ypObject *_ypMem_malloc_container_variable(
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_VARIABLE( obStruct, type, required, extra ) \
-    _ypMem_malloc_container_variable( offsetof( obStruct, ob_inline_data ), \
+    _ypMem_malloc_container_variable( yp_offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (required), (extra) )
 
 // Resizes ob_data, the variable-portion of ob, and returns the previous value of ob_data
@@ -1211,7 +1212,7 @@ static void *_ypMem_realloc_container_variable(
     return oldptr;
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, required, extra ) \
-    _ypMem_realloc_container_variable( ob, offsetof( obStruct, ob_inline_data ), \
+    _ypMem_realloc_container_variable( ob, yp_offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (required), (extra) )
 
 // Called after a successful ypMem_REALLOC_CONTAINER_VARIABLE to free the previous value of ob_data
@@ -1226,7 +1227,7 @@ static void _ypMem_realloc_container_free_oldptr(
     if( oldptr != ob->ob_data && oldptr != inlineptr ) yp_free( oldptr );
 }
 #define ypMem_REALLOC_CONTAINER_FREE_OLDPTR( ob, obStruct, oldptr ) \
-    _ypMem_realloc_container_free_oldptr( ob, offsetof( obStruct, ob_inline_data ), oldptr )
+    _ypMem_realloc_container_free_oldptr( ob, yp_offsetof( obStruct, ob_inline_data ), oldptr )
 
 // Resets ob_data to the inline buffer and frees the separate buffer (if there is one).  Any
 // contained objects must have already been discarded; no memory is copied.  Always succeeds.
@@ -1247,7 +1248,7 @@ static void _ypMem_realloc_container_variable_clear(
     yp_DEBUG( "REALLOC_CONTAINER_VARIABLE_CLEAR: 0x%08X alloclen %d", ob, ypObject_ALLOCLEN( ob ) );
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( ob, obStruct ) \
-    _ypMem_realloc_container_variable_clear( ob, offsetof( obStruct, ob_inline_data ), \
+    _ypMem_realloc_container_variable_clear( ob, yp_offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Frees an object allocated with ypMem_MALLOC_FIXED
@@ -1262,7 +1263,7 @@ static void _ypMem_free_container( ypObject *ob, yp_ssize_t offsetof_inline )
     yp_free( ob );
 }
 #define ypMem_FREE_CONTAINER( ob, obStruct ) \
-    _ypMem_free_container( ob, offsetof( obStruct, ob_inline_data ) )
+    _ypMem_free_container( ob, yp_offsetof( obStruct, ob_inline_data ) )
 
 
 /*************************************************************************************************
@@ -1346,19 +1347,19 @@ typedef struct {
     _ypIterObject_HEAD
     yp_INLINE_DATA( yp_uint8_t );
 } ypIterObject;
-yp_STATIC_ASSERT( offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_iter_inline_data );
+yp_STATIC_ASSERT( yp_offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_iter_inline_data );
 
 #define ypIter_STATE( i )       ( ((ypObject *)i)->ob_data )
 #define ypIter_STATE_SIZE       ypObject_ALLOCLEN
 #define ypIter_SET_STATE_SIZE   ypObject_SET_ALLOCLEN
 #define ypIter_LENHINT( i )     ( ((ypIterObject *)i)->ob_lenhint )
-// ob_objlocs: bit n is 1 if (n*sizeof(ypObject *)) is the offset of an object in state
+// ob_objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state
 #define ypIter_OBJLOCS( i )     ( ((ypIterObject *)i)->ob_objlocs )
 #define ypIter_FUNC( i )        ( ((ypIterObject *)i)->ob_func )
 
 // The maximum possible length of an iter
 #define ypIter_STATE_SIZE_MAX ( (yp_ssize_t) MIN( \
-            yp_SSIZE_T_MAX-sizeof( ypIterObject ), \
+            yp_SSIZE_T_MAX-yp_sizeof( ypIterObject ), \
             ypObject_LEN_MAX ) )
 
 // Iterator methods
@@ -1632,9 +1633,9 @@ ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhi
     for( /*n already set*/; n > 0; n-- ) {
         objoffset = va_arg( args, yp_ssize_t );
         if( objoffset < 0 ) continue;
-        if( objoffset+sizeof( ypObject * ) > (size_t) size ) continue;
-        if( objoffset%sizeof( ypObject * ) != 0 ) return yp_SystemLimitationError;
-        objloc_index = objoffset / sizeof( ypObject * );
+        if( objoffset > size - yp_sizeof( ypObject * ) ) continue;
+        if( objoffset%yp_sizeof( ypObject * ) != 0 ) return yp_SystemLimitationError;
+        objloc_index = objoffset / yp_sizeof( ypObject * );
         if( objloc_index > 31 ) return yp_SystemLimitationError;
         objlocs |= (0x1u << objloc_index);
     }
@@ -1700,7 +1701,7 @@ static ypObject *_ypMiIter_from_miniiter( ypObject *x, miniiterfunc mi_construct
     // Set the attributes and return (mi_state set above)
     i->ob_len = ypObject_LEN_INVALID;
     ypIter_STATE( i ) = &(ypMiIter_MI( i ));
-    ypIter_SET_STATE_SIZE( i, sizeof( ypMiIterObject ) - offsetof( ypMiIterObject, mi ) );
+    ypIter_SET_STATE_SIZE( i, yp_sizeof( ypMiIterObject ) - yp_offsetof( ypMiIterObject, mi ) );
     ypIter_FUNC( i ) = _ypMiIter_generator;
     ypIter_OBJLOCS( i ) = 0x1u;  // indicates mi at state offset zero
     ypMiIter_MI( i ) = mi;
@@ -1722,7 +1723,7 @@ static ypObject *_ypIter_from_miniiter_rev( ypObject *x ) {
 
 // Generic Mini Iterator Methods for Sequences
 
-yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( yp_ssize_t ), ssize_fits_uint64 );
+yp_STATIC_ASSERT( yp_sizeof( yp_uint64_t ) >= yp_sizeof( yp_ssize_t ), ssize_fits_uint64 );
 
 static ypObject *_ypSequence_miniiter( ypObject *x, yp_uint64_t *state ) {
     *state = 0; // start at zero (first element) and count up
@@ -3132,7 +3133,7 @@ static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y )
      *      (a << 32) + (uint64_t)(a0)*b0;
      * We still need to check for overflow in this addition, then we can return the result.
      */
-    const yp_int_t num_bits_halved = sizeof( yp_int_t ) / 2 * 8;
+    const yp_int_t num_bits_halved = yp_sizeof( yp_int_t ) / 2 * 8;
     const yp_int_t bit_mask_halved = (1ull << num_bits_halved) - 1ull;
     yp_int_t result_hi, result_lo;
 
@@ -3338,7 +3339,7 @@ yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
     yp_int_t result;
     if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_ValueError ); // negative shift count
     if( x == 0 ) return x; // 0 can be shifted by 50 million bits for all we care
-    if( y >= (sizeof( yp_int_t ) * 8) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    if( y >= (yp_sizeof( yp_int_t ) * 8) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
     result = x << y;
     if( x != (result >> y) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
     return result;
@@ -3348,7 +3349,7 @@ yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
 yp_int_t yp_rshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
     if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_ValueError ); // negative shift count
-    if( y >= (sizeof( yp_int_t ) * 8) ) {
+    if( y >= (yp_sizeof( yp_int_t ) * 8) ) {
         return x < 0 ? -1 : 0;
     }
     return x >> y;
@@ -3755,7 +3756,7 @@ yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc )
 
     x_abs = ypInt_VALUE( x );
     if( x_abs < 0 ) {
-        if( x_abs == yp_INT_T_MIN ) return sizeof( yp_int_t ) * 8;
+        if( x_abs == yp_INT_T_MIN ) return yp_sizeof( yp_int_t ) * 8;
         x_abs = -x_abs;
     }
 
@@ -3908,13 +3909,13 @@ _ypInt_PUBLIC_AS_C_FUNCTION( uint16, 0xFFFFu );
 _ypInt_PUBLIC_AS_C_FUNCTION( int32,  0xFFFFFFFF );
 _ypInt_PUBLIC_AS_C_FUNCTION( uint32, 0xFFFFFFFFu );
 #if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
-yp_STATIC_ASSERT( sizeof( yp_ssize_t ) < sizeof( yp_int_t ), sizeof_yp_ssize_lt_yp_int );
+yp_STATIC_ASSERT( yp_sizeof( yp_ssize_t ) < yp_sizeof( yp_int_t ), sizeof_yp_ssize_lt_yp_int );
 _ypInt_PUBLIC_AS_C_FUNCTION( ssize,  (yp_ssize_t) 0xFFFFFFFF );
 _ypInt_PUBLIC_AS_C_FUNCTION( hash,   (yp_hash_t) 0xFFFFFFFF );
 #endif
 
 // The functions below assume/assert that yp_int_t is 64 bits
-yp_STATIC_ASSERT( sizeof( yp_int_t ) == 8, sizeof_yp_int );
+yp_STATIC_ASSERT( yp_sizeof( yp_int_t ) == 8, sizeof_yp_int );
 yp_int64_t yp_asint64C( ypObject *x, ypObject **exc ) {
     return yp_asintC( x, exc );
 }
@@ -3925,7 +3926,7 @@ yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc ) {
 }
 
 #if yp_SSIZE_T_MAX > 0x7FFFFFFFu // 64-bit (or more) platform
-yp_STATIC_ASSERT( sizeof( yp_ssize_t ) == sizeof( yp_int_t ), sizeof_yp_ssize_eq_yp_int );
+yp_STATIC_ASSERT( yp_sizeof( yp_ssize_t ) == yp_sizeof( yp_int_t ), sizeof_yp_ssize_eq_yp_int );
 yp_ssize_t yp_asssizeC( ypObject *x, ypObject **exc ) {
     return yp_asintC( x, exc );
 }
@@ -4474,7 +4475,7 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 
 // struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
 typedef struct _ypBytesObject ypBytesObject;
-yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
+yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
 #define ypBytes_DATA( b )           ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
 #define ypBytes_LEN                 ypObject_CACHED_LEN
@@ -4484,7 +4485,7 @@ yp_STATIC_ASSERT( offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT =
 
 // The maximum possible length of a bytes (not including null terminator)
 #define ypBytes_LEN_MAX ( (yp_ssize_t) MIN( \
-            yp_SSIZE_T_MAX-sizeof( ypBytesObject ), \
+            yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
             ypObject_LEN_MAX ) - 1 /* -1 for null terminator */ )
 
 // Empty bytes can be represented by this, immortal object
@@ -5503,7 +5504,7 @@ ypObject *yp_bytearray( ypObject *source ) {
 
 // struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_STR_LATIN1 et al
 typedef struct _ypStrObject ypStrObject;
-yp_STATIC_ASSERT( offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_str_inline_data );
+yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_str_inline_data );
 
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
 
@@ -5948,7 +5949,7 @@ typedef struct {
 
 // The maximum possible length of a tuple
 #define ypTuple_LEN_MAX     ( (yp_ssize_t) MIN( \
-            (yp_SSIZE_T_MAX-sizeof( ypTupleObject )) / sizeof( ypObject * ), \
+            (yp_SSIZE_T_MAX-yp_sizeof( ypTupleObject )) / yp_sizeof( ypObject * ), \
             ypObject_LEN_MAX ) )
 
 // Empty tuples can be represented by this, immortal object
@@ -5964,7 +5965,7 @@ static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
 // is allocated for the move.  Recall that memmove handles overlap.
 #define ypTuple_ELEMMOVE( sq, dest, src ) \
     memmove( ypTuple_ARRAY( sq )+(dest), ypTuple_ARRAY( sq )+(src), \
-            (ypTuple_LEN( sq )-(src)) * sizeof( ypObject * ) );
+            (ypTuple_LEN( sq )-(src)) * yp_sizeof( ypObject * ) );
 
 // Return a new tuple/list object with the given alloclen.  If type is immutable and
 // alloclen_fixed is true (indicating the object will never grow), the data is placed inline
@@ -5988,7 +5989,7 @@ static ypObject *_ypTuple_copy( int type, ypObject *x, int alloclen_fixed )
     yp_ssize_t i;
     ypObject *sq = _ypTuple_new( type, ypTuple_LEN( x ), alloclen_fixed );
     if( yp_isexceptionC( sq ) ) return sq;
-    memcpy( ypTuple_ARRAY( sq ), ypTuple_ARRAY( x ), ypTuple_LEN( x )*sizeof( ypObject * ) );
+    memcpy( ypTuple_ARRAY( sq ), ypTuple_ARRAY( x ), ypTuple_LEN( x )*yp_sizeof( ypObject * ) );
     for( i = 0; i < ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
     ypTuple_SET_LEN( sq, ypTuple_LEN( x ) );
     return sq;
@@ -6026,7 +6027,7 @@ static void _ypTuple_repeat_memcpy( ypObject *sq, size_t factor, size_t n )
 {
     ypObject **array = ypTuple_ARRAY( sq );
     size_t copied; // the number of times [:n] has been repeated (starts at 1, of course)
-    size_t n_size = n * sizeof( ypObject * );
+    size_t n_size = n * yp_sizeof( ypObject * );
     for( copied = 1; copied*2 < factor; copied *= 2 ) {
         memcpy( array+(n*copied), array+0, n_size*copied );
     }
@@ -6043,7 +6044,7 @@ static ypObject *_ypTuple_extend_grow( ypObject *sq, yp_ssize_t required, yp_ssi
     oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
     if( oldptr == NULL ) return yp_MemoryError;
     if( ypTuple_ARRAY( sq ) != oldptr ) {
-        memcpy( ypTuple_ARRAY( sq ), oldptr, ypTuple_LEN( sq ) * sizeof( ypObject * ) );
+        memcpy( ypTuple_ARRAY( sq ), oldptr, ypTuple_LEN( sq ) * yp_sizeof( ypObject * ) );
         ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
     }
     return yp_None;
@@ -6078,7 +6079,7 @@ static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
         if( yp_isexceptionC( result ) ) return result;
     }
     memcpy( ypTuple_ARRAY( sq )+ypTuple_LEN( sq ), ypTuple_ARRAY( x ),
-            ypTuple_LEN( x )*sizeof( ypObject * ) );
+            ypTuple_LEN( x )*yp_sizeof( ypObject * ) );
     for( i = ypTuple_LEN( sq ); i < newLen; i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
     ypTuple_SET_LEN( sq, newLen );
     return yp_None;
@@ -6157,9 +6158,9 @@ static ypObject *_ypTuple_setslice_grow( ypObject *sq, yp_ssize_t start, yp_ssiz
         } else {
             // The data doesn't overlap, so use memcpy, remembering to discard sq[start:stop]
             for( i = start; i < stop; i++ ) yp_decref( oldptr[i] );
-            memcpy( ypTuple_ARRAY( sq ), oldptr, start * sizeof( ypObject * ) );
+            memcpy( ypTuple_ARRAY( sq ), oldptr, start * yp_sizeof( ypObject * ) );
             memcpy( ypTuple_ARRAY( sq )+stop+growBy, oldptr+stop,
-                    (ypTuple_LEN( sq )-stop) * sizeof( ypObject * ) );
+                    (ypTuple_LEN( sq )-stop) * yp_sizeof( ypObject * ) );
             ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
             ypTuple_SET_LEN( sq, newLen );
         }
@@ -6198,7 +6199,7 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
 
         // There are now len(x) elements starting at sq[start] waiting for x's items
         memcpy( ypTuple_ARRAY( sq )+start, ypTuple_ARRAY( x ),
-            ypTuple_LEN( x )*sizeof( ypObject * ) );
+            ypTuple_LEN( x )*yp_sizeof( ypObject * ) );
         for( i = start; i < start+ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
     } else {
         if( ypTuple_LEN( x ) != slicelength ) return yp_ValueError;
@@ -6270,7 +6271,7 @@ static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
     newSq = _ypTuple_new( sq_type, ypTuple_LEN( sq )*factor, /*alloclen_fixed=*/TRUE ); // new ref
     if( yp_isexceptionC( newSq ) ) return newSq;
 
-    memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ), ypTuple_LEN( sq )*sizeof( ypObject * ) );
+    memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ), ypTuple_LEN( sq )*yp_sizeof( ypObject * ) );
     _ypTuple_repeat_memcpy( newSq, factor, ypTuple_LEN( sq ) );
 
     ypTuple_SET_LEN( newSq, factor*ypTuple_LEN( sq ) );
@@ -6315,7 +6316,8 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
     if( yp_isexceptionC( newSq ) ) return newSq;
 
     if( step == 1 ) {
-        memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq )+start, newLen * sizeof( ypObject * ) );
+        memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq )+start,
+                newLen * yp_sizeof( ypObject * ) );
         for( i = 0; i < newLen; i++ ) yp_incref( ypTuple_ARRAY( newSq )[i] );
     } else {
         for( i = 0; i < newLen; i++ ) {
@@ -6342,7 +6344,7 @@ static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssi
     }
 
     for( i = start; sq_rlen > 0; i += step, sq_rlen-- ) {
-        ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
+        result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
         if( yp_isexceptionC( result ) ) return result;
         if( ypBool_IS_TRUE_C( result ) ) {
             *index = i;
@@ -6366,7 +6368,7 @@ static ypObject *tuple_count( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ss
     if( yp_isexceptionC( result ) ) return result;
 
     for( i = start; i < stop; i++ ) {
-        ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
+        result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
         if( yp_isexceptionC( result ) ) return result;
         if( ypBool_IS_TRUE_C( result ) ) n += 1;
     }
@@ -6452,7 +6454,7 @@ static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
     for( i = 0; i < slicelength; i++ ) {
         yp_decref( ypTuple_ARRAY( sq )[ypSlice_INDEX( start, step, i )] );
     }
-    _ypSlice_delslice_memmove( ypTuple_ARRAY( sq ), ypTuple_LEN( sq ), sizeof( ypObject * ),
+    _ypSlice_delslice_memmove( ypTuple_ARRAY( sq ), ypTuple_LEN( sq ), yp_sizeof( ypObject * ),
             start, stop, step, slicelength );
     ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) - slicelength );
     return yp_None;
@@ -7043,7 +7045,7 @@ typedef struct {
 
 // This tests that, by default, the inline data is enough to hold ypSet_ALLOCLEN_MIN elements
 #define ypSet_ALLOCLEN_MIN (8)
-yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-offsetof( ypSetObject, ob_inline_data )) / sizeof( ypSet_KeyEntry ) >= ypSet_ALLOCLEN_MIN, ypSet_minsize_inline );
+yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-yp_offsetof( ypSetObject, ob_inline_data )) / yp_sizeof( ypSet_KeyEntry ) >= ypSet_ALLOCLEN_MIN, ypSet_minsize_inline );
 
 // The threshold at which we resize the set, expressed as a fraction of alloclen (ie 2/3)
 #define ypSet_RESIZE_AT_NMR (2) // numerator
@@ -7057,7 +7059,7 @@ yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-offsetof( ypSetObject, ob_inline_da
 #define ypSet_ALLOCLEN_MAX   ( (yp_ssize_t) MIN( MIN( MIN( \
                     yp_SSIZE_T_MAX/ypSet_RESIZE_AT_NMR, \
                     yp_SSIZE_T_MAX/ypSet_RESIZE_AT_DNM ), \
-                    (yp_SSIZE_T_MAX-sizeof( ypSetObject )) / sizeof( ypSet_KeyEntry ) ), \
+                    (yp_SSIZE_T_MAX-yp_sizeof( ypSetObject )) / yp_sizeof( ypSet_KeyEntry ) ), \
                     ypObject_LEN_MAX ) )
 #define ypSet_LEN_MAX \
     ( (yp_ssize_t) (ypSet_ALLOCLEN_MAX*ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM )
@@ -7067,7 +7069,7 @@ static ypObject _ypSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 
 static ypObject *ypSet_dummy = &_ypSet_dummy;
 
 // Empty frozensets can be represented by this, immortal object
-static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {0};
+static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject _yp_frozenset_empty_struct = {
     { ypFrozenSet_CODE, ypObject_REFCNT_IMMORTAL,
     0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozenset_empty_data }, 0 };
@@ -7151,7 +7153,7 @@ static ypObject *_ypSet_new( int type, yp_ssize_t minused, int alloclen_fixed )
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
     ypSet_SET_ALLOCLEN( so, alloclen );
     ypSet_FILL( so ) = 0;
-    memset( ypSet_TABLE( so ), 0, alloclen * sizeof( ypSet_KeyEntry ) );
+    memset( ypSet_TABLE( so ), 0, alloclen * yp_sizeof( ypSet_KeyEntry ) );
     yp_ASSERT( _ypSet_space_remaining( so ) >= minused, "new set doesn't have requested room" );
     return so;
 }
@@ -7215,7 +7217,7 @@ static ypObject *_ypSet_deepcopy( int type, ypObject *x, visitfunc copy_visitor,
 // need for future resizes, call with a larger minused.  Returns yp_None, or an exception on error.
 // XXX We can't use ypMem_REALLOC_CONTAINER_VARIABLE because we can never resize in-place
 // TODO Do we want to split minused into required and extra, like in other areas?
-yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / sizeof( ypSet_KeyEntry ), ypSet_resize_cant_overflow );
+yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof( ypSet_KeyEntry ), ypSet_resize_cant_overflow );
 static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
 {
     yp_ssize_t newalloclen;
@@ -7226,7 +7228,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     yp_ssize_t i;
     ypSet_KeyEntry *loc;
     yp_ssize_t inlinelen =
-        (_ypMem_ideal_size-offsetof( ypSetObject, ob_inline_data )) / sizeof( ypSet_KeyEntry );
+        (_ypMem_ideal_size-yp_offsetof( ypSetObject, ob_inline_data )) / yp_sizeof( ypSet_KeyEntry );
     if( inlinelen < 0 ) inlinelen = 0;
     yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
 
@@ -7237,10 +7239,10 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
         newkeys = ypSet_INLINE_DATA( so );
     } else {
         // XXX ypSet_resize_cant_overflow ensures this can't overflow
-        newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * sizeof( ypSet_KeyEntry ) );
+        newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * yp_sizeof( ypSet_KeyEntry ) );
         if( newkeys == NULL ) return yp_MemoryError;
     }
-    memset( newkeys, 0, newalloclen * sizeof( ypSet_KeyEntry ) );
+    memset( newkeys, 0, newalloclen * yp_sizeof( ypSet_KeyEntry ) );
 
     // Failures are impossible from here on, so swap-in the new table
     oldkeys = ypSet_TABLE( so );
@@ -7789,7 +7791,7 @@ typedef struct {
     yp_uint32_t index;
 } ypSetMiState;
 yp_STATIC_ASSERT( ypSet_LEN_MAX <= 0xFFFFFFFFu, len_fits_32_bits );
-yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypSetMiState ), ypSetMiState_fits_uint64 );
+yp_STATIC_ASSERT( yp_sizeof( yp_uint64_t ) >= yp_sizeof( ypSetMiState ), ypSetMiState_fits_uint64 );
 
 static ypObject *frozenset_miniiter( ypObject *so, yp_uint64_t *_state )
 {
@@ -8140,7 +8142,7 @@ static ypObject *set_clear( ypObject *so )
     ypSet_SET_ALLOCLEN( so, ypSet_ALLOCLEN_MIN ); // we can't make use of the excess anyway
     ypSet_SET_LEN( so, 0 );
     ypSet_FILL( so ) = 0;
-    memset( ypSet_TABLE( so ), 0, ypSet_ALLOCLEN_MIN * sizeof( ypSet_KeyEntry ) );
+    memset( ypSet_TABLE( so ), 0, ypSet_ALLOCLEN_MIN * yp_sizeof( ypSet_KeyEntry ) );
     return yp_None;
 }
 
@@ -8509,11 +8511,11 @@ ypObject *yp_set( ypObject *iterable ) {
 
 // So long as each entry in the dict's value array is no larger than each entry in the set's
 // key/hash array, we can share ypSet_ALLOCLEN_MAX and ypSet_LEN_MAX without fear of overflow
-yp_STATIC_ASSERT( sizeof( ypObject * ) <= sizeof( ypSet_KeyEntry ), ypDict_data_not_larger_than_set_data );
-yp_STATIC_ASSERT( (yp_SSIZE_T_MAX-sizeof( ypDictObject )) / sizeof( ypObject * ) >= ypSet_ALLOCLEN_MAX, ypDict_alloclen_max_not_smaller_than_set_alloclen_max );
+yp_STATIC_ASSERT( yp_sizeof( ypObject * ) <= yp_sizeof( ypSet_KeyEntry ), ypDict_data_not_larger_than_set_data );
+yp_STATIC_ASSERT( (yp_SSIZE_T_MAX-yp_sizeof( ypDictObject )) / yp_sizeof( ypObject * ) >= ypSet_ALLOCLEN_MAX, ypDict_alloclen_max_not_smaller_than_set_alloclen_max );
 
 // Empty frozendicts can be represented by this, immortal object
-static ypObject _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {0};
+static ypObject _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypDictObject _yp_frozendict_empty_struct = {
     { ypFrozenDict_CODE, ypObject_REFCNT_IMMORTAL,
     0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozendict_empty_data },
@@ -8544,7 +8546,7 @@ static ypObject *_ypDict_new( int type, yp_ssize_t minused, int alloclen_fixed )
         return mp;
     }
     ypDict_KEYSET( mp ) = keyset;
-    memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
+    memset( ypDict_VALUES( mp ), 0, alloclen * yp_sizeof( ypObject * ) );
     return mp;
 }
 
@@ -8575,7 +8577,7 @@ static ypObject *_ypDict_copy( int type, ypObject *x, int alloclen_fixed )
     valuesleft = ypDict_LEN( x );
     ypDict_SET_LEN( mp, valuesleft );
     values = ypDict_VALUES( mp );
-    memcpy( values, ypDict_VALUES( x ), alloclen * sizeof( ypObject * ) );
+    memcpy( values, ypDict_VALUES( x ), alloclen * yp_sizeof( ypObject * ) );
     for( i = 0; valuesleft > 0; i++ ) {
         if( values[i] == NULL ) continue;
         valuesleft -= 1;
@@ -8599,7 +8601,7 @@ static ypObject *_ypDict_deepcopy( int type, ypObject *x, visitfunc copy_visitor
 // XXX If ever this is rewritten to use the ypMem_* macros, remember that mp->ob_alloclen is _not_
 // the allocation length: it has been repurposed (see ypDict_POPITEM_FINGER)
 // TODO Do we want to split minused into required and extra, like in other areas?
-yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / sizeof( ypObject * ), ypDict_resize_cant_overflow );
+yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof( ypObject * ), ypDict_resize_cant_overflow );
 static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
 {
     ypObject *newkeyset;
@@ -8613,7 +8615,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     ypObject *value;
     ypSet_KeyEntry *newkey_loc;
     yp_ssize_t inlinelen =
-        (_ypMem_ideal_size-offsetof( ypDictObject, ob_inline_data )) / sizeof( ypObject * );
+        (_ypMem_ideal_size-yp_offsetof( ypDictObject, ob_inline_data )) / yp_sizeof( ypObject * );
     if( inlinelen < 0 ) inlinelen = 0;
     yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
 
@@ -8625,13 +8627,13 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
         newvalues = ypDict_INLINE_DATA( mp );
     } else {
         // XXX ypDict_resize_cant_overflow ensures this can't overflow
-        newvalues = (ypObject **) yp_malloc( &newsize, newalloclen * sizeof( ypObject * ) );
+        newvalues = (ypObject **) yp_malloc( &newsize, newalloclen * yp_sizeof( ypObject * ) );
         if( newvalues == NULL ) {
             yp_decref( newkeyset );
             return yp_MemoryError;
         }
     }
-    memset( newvalues, 0, newalloclen * sizeof( ypObject * ) );
+    memset( newvalues, 0, newalloclen * yp_sizeof( ypObject * ) );
 
     // Move the keys and values from the old tables
     oldkeys = ypSet_TABLE( ypDict_KEYSET( mp ) );
@@ -9015,7 +9017,7 @@ static ypObject *dict_clear( ypObject *mp ) {
     // Update our attributes and return
     ypDict_SET_LEN( mp, 0 );
     ypDict_KEYSET( mp ) = keyset;
-    memset( ypDict_VALUES( mp ), 0, alloclen * sizeof( ypObject * ) );
+    memset( ypDict_VALUES( mp ), 0, alloclen * yp_sizeof( ypObject * ) );
     return yp_None;
 }
 
@@ -9178,7 +9180,7 @@ typedef struct {
     _yp_dict_mi_len_t index : 31;
 } ypDictMiState;
 yp_STATIC_ASSERT( ypSet_LEN_MAX <= 0x7FFFFFFFu, len_fits_31_bits );
-yp_STATIC_ASSERT( sizeof( yp_uint64_t ) >= sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
+yp_STATIC_ASSERT( yp_sizeof( yp_uint64_t ) >= yp_sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
 
 static ypObject *frozendict_miniiter_items( ypObject *mp, yp_uint64_t *_state )
 {
@@ -10422,7 +10424,7 @@ ypObject * const yp_type_dict = (ypObject *) &ypDict_Type;
  *************************************************************************************************/
 
 static const yp_initialize_kwparams _default_initialize = {
-    sizeof( yp_initialize_kwparams ),
+    yp_sizeof( yp_initialize_kwparams ),
     _default_yp_malloc,
     _default_yp_malloc_resize,
     _default_yp_free,
@@ -10433,7 +10435,7 @@ static const yp_initialize_kwparams _default_initialize = {
 // the default value if kwparams is too small to hold the parameter, or if the expression
 // "kwparams->key default_cond" (ie "kwparams->yp_malloc ==NULL") evaluates to true.
 #define _yp_INIT_PARAM_END( key ) \
-    (offsetof( yp_initialize_kwparams, key ) + yp_sizeof_member( yp_initialize_kwparams, key ))
+    (yp_offsetof( yp_initialize_kwparams, key ) + yp_sizeof_member( yp_initialize_kwparams, key ))
 #define yp_INIT_PARAM2( key, default_cond ) \
     ( kwparams->struct_size < _yp_INIT_PARAM_END( key ) ? \
         _default_initialize.key \
