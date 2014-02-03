@@ -10,8 +10,10 @@ import SCons.Warnings
 _platform_name = SCons.Platform.Platform( ).name
 if _platform_name in ("win32", "cygwin"):
     _tools = [SCons.Tool.Tool( "mingw" ), ]
+    _supportedArchs = ("x86", ) # TODO enable 64-bit on Windows
 else:
     _tools = [SCons.Tool.Tool( x ) for x in ("gcc", "g++", "gnulink")]
+    _supportedArchs = ("x86", "amd64")
 
 
 # It's a lot of work to add target files to a compilation!
@@ -19,9 +21,11 @@ else:
 def _ccEmitter( target, source, env, parent_emitter ):
     # Emitters appear to be inconsistent in whether they modify target/source, or return new objs
     target, source = parent_emitter( target, source, env )
-    t = str( target[0] )
-    assert t.endswith( ".o" )
-    target.append( os.path.splitext( t )[0] + ".s" )
+    for s in source:
+        s_base = os.path.splitext( s.path )[0]
+        # FIXME When we add these to target, they become inputs into the linker phase, and gcc then
+        # chokes and dies.  So...how are we supposed to get these files cleaned?
+        for ext in (".i", ".s"): target.append( s_base + ext )
     return target, source
 def _updateCcEmitters( env ):
     builders = (env['BUILDERS']['StaticObject'], env['BUILDERS']['SharedObject'])
@@ -40,11 +44,23 @@ def _updateLinkEmitters( env, version ):
             LDMODULEEMITTER=[_linkEmitter, ] )
 
 
+def _archOptions( env ):
+    arch2opts = {
+            "x86": ("-m32", ),
+            "amd64": ("-m64", ),
+            }
+    opts = arch2opts.get( env["TARGET_ARCH"], None )
+    if opts is None: raise SCons.Errors.StopError( "not yet supporting %r with gcc" % env["TARGET_ARCH"] )
+    return opts
+
 def ApplyGCCOptions( env, version ):
     """Updates env with GCC-specific compiler options for nohtyP.  version is numeric (ie 4.8).
     """
+    archOpts = _archOptions( env )
+
     def addCcFlags( *args ): env.AppendUnique( CCFLAGS=list( args ) )
     # TODO analyze? (enable -Wextra, disable -Werror, supress individual warnings)
+    addCcFlags( *archOpts )
     addCcFlags(
             # Warnings-as-errors, all (avoidable) warnings, 
             "-Werror", "-Wall", "-Wsign-compare", "-Wundef", "-Wstrict-prototypes",
@@ -56,11 +72,11 @@ def ApplyGCCOptions( env, version ):
             "-Wno-unused", "-Wno-pointer-sign", "-Wno-maybe-uninitialized",
             # Debugging information
             "-g3",
-            # Save intermediate files (.i, .s, etc)
-            "-save-temps", "-fverbose-asm",
             # TODO Is there an /sdl or /GS equivalent for gcc?
+            # Save intermediate files (.i and .s)
+            "-save-temps=obj", "-fverbose-asm",
             # Source/assembly listing (.s) TODO preprocessed?
-            "-masm=intel", #"-Wa,-aln",
+            #"-Wa,-alns=${TARGET.base}.s",
             )
     if env["CONFIGURATION"] == "debug":
         addCcFlags( 
@@ -92,6 +108,7 @@ def ApplyGCCOptions( env, version ):
     return # FIXME
 
     def addLinkFlags( *args ): env.AppendUnique( LINKFLAGS=list( args ) )
+    addLinkFlags( *archOpts )
     addLinkFlags(
             # Warnings-as-errors
             "/WX",
@@ -134,7 +151,7 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
 
     def generate( env ):
         if env["TARGET_OS"] != env["HOST_OS"]: raise SCons.Errors.StopError( "not yet supporting cross-OS compile in GCC" )
-        # TODO if env["TARGET_ARCH"] != env["HOST_ARCH"]: raise SCons.Errors.StopError( "not yet supporting cross-arch compile in GCC" )
+        if env["TARGET_ARCH"] not in _supportedArchs: raise SCons.Errors.StopError( "not yet supporting %r in GCC" % env["TARGET_ARCH"] )
         if env["CONFIGURATION"] not in ("release", "debug"): raise SCons.Errors.StopError( "GCC doesn't support the %r configuration (yet)" % env["CONFIGURATION"] )
 
         # TODO Read info from site-tools.py to make this compiler easier to find?
