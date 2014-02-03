@@ -44,7 +44,7 @@ def ApplyGCCOptions( env, version ):
     """Updates env with GCC-specific compiler options for nohtyP.  version is numeric (ie 4.8).
     """
     def addCcFlags( *args ): env.AppendUnique( CCFLAGS=list( args ) )
-    # TODO /analyze? (enable -Wextra, disable -Werror, supress individual warnings)
+    # TODO analyze? (enable -Wextra, disable -Werror, supress individual warnings)
     addCcFlags(
             # Warnings-as-errors, all (avoidable) warnings, 
             "-Werror", "-Wall", "-Wsign-compare", "-Wundef", "-Wstrict-prototypes",
@@ -52,7 +52,8 @@ def ApplyGCCOptions( env, version ):
             "-Wold-style-definition", "-Wmissing-parameter-type",
             "-Wshadow",
             # Disable some warnings
-            "-Wno-unused", "-Wno-pointer-sign",
+            # TODO maybe-uninitialized would be good during analyze
+            "-Wno-unused", "-Wno-pointer-sign", "-Wno-maybe-uninitialized",
             # Debugging information
             "-g3",
             # Save intermediate files (.i, .s, etc)
@@ -65,8 +66,11 @@ def ApplyGCCOptions( env, version ):
         addCcFlags( 
                 # Disable (non-debuggable) optimizations
                 "-Og",
-                # Runtime checks: int overflow, stack overflow, buffer overflow
-                "-ftrapv", "-fstack-check", "-fmudflapth",
+                # Runtime checks: int overflow, stack overflow, 
+                "-ftrapv", "-fstack-check", 
+                # Runtime check: buffer overflow (needs -fmudflap to linker)
+                # TODO Not supported on MinGW/Windows, apparently
+                #"-fmudflapth",
                 )
     else:
         addCcFlags( 
@@ -103,7 +107,7 @@ def ApplyGCCOptions( env, version ):
     if env["CONFIGURATION"] == "debug":
         addLinkFlags(
                 # Required by -fmudflap above
-                "-fmudflap",
+                #"-fmudflap",
                 # Disable optimizations
                 "/OPT:NOREF", "/OPT:NOICF",
                 # Add DebuggableAttribute (because I don't know?)
