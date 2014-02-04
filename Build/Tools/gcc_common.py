@@ -64,7 +64,7 @@ def ApplyGCCOptions( env, version ):
     # TODO analyze? (enable -Wextra, disable -Werror, supress individual warnings)
     addCcFlags( *archOpts )
     addCcFlags(
-            # Warnings-as-errors, all (avoidable) warnings, 
+            # Warnings-as-errors, all (avoidable) warnings
             "-Werror", "-Wall", "-Wsign-compare", "-Wundef", "-Wstrict-prototypes",
             "-Wmissing-prototypes", "-Wmissing-declarations", "-Wold-style-declaration",
             "-Wold-style-definition", "-Wmissing-parameter-type",
@@ -92,7 +92,7 @@ def ApplyGCCOptions( env, version ):
                 )
     else:
         addCcFlags( 
-                # Optimize: for speed, whole program
+                # Optimize: for speed, whole program (needs -flto to linker)
                 "-O3", "-flto",
                 )
     # Disable frame-pointer omission (ie frame pointers will be available on all builds)
@@ -107,42 +107,30 @@ def ApplyGCCOptions( env, version ):
     else:
         addCppDefines( "NDEBUG" )
 
-    return # FIXME
-
     def addLinkFlags( *args ): env.AppendUnique( LINKFLAGS=list( args ) )
     addLinkFlags( *archOpts )
     addLinkFlags(
-            # Warnings-as-errors
-            "/WX",
-            # Large address aware (>2GB)
-            "/LARGEADDRESSAWARE",
-            # Disable incremental linking
-            "/INCREMENTAL:NO",
-            # Create a mapfile (.map), include exported functions
-            "/MAP", "/MAPINFO:EXPORTS",
-            # Version stamp
-            "/VERSION:${NOHTYP_MAJOR}.${NOHTYP_MINOR}"
+            # Warnings-as-errors, all (avoidable) warnings
+            "-Werror", "-Wall",
+            # Large address aware (>2GB), static libgcc (arithmetic, mostly)
+            "-Wl,--large-address-aware", "-static-libgcc",
+            # Create a mapfile (.map)
+            "-Wl,-Map,${TARGET.base}.map",
+            # TODO Version stamp?
             )
     if env["CONFIGURATION"] == "debug":
         addLinkFlags(
-                # Required by -fmudflap above
+                # Disable (non-debuggable) optimizations
+                "-Og",
+                # Runtime check: buffer overflow (needs -fmudflap* to compiler)
+                # TODO Not supported on MinGW/Windows, apparently
                 #"-fmudflap",
-                # Disable optimizations
-                "/OPT:NOREF", "/OPT:NOICF",
-                # Add DebuggableAttribute (because I don't know?)
-                "/ASSEMBLYDEBUG",
                 )
     else:
         addLinkFlags(
-                # Required by -flto above
-                "-flto",
-                # Eliminate unreferenced funcs/data, fold identical COMDATs
-                "/OPT:REF", "/OPT:ICF",
-                # Link-time code generation; required by /GL cc flag
-                "/LTCG", 
+                # Optimize: for speed, whole program (needs -flto to compiler)
+                "-O3", "-flto",
                 )
-    # If the CRT for this MSVC version needs a manifest, make sure it's embedded
-    if _crtRequiresManifest( version ): env["WINDOWS_EMBED_MANIFEST"] = True
     # Ensure SCons knows to clean .map, etc
     _updateLinkEmitters( env, version )
 
