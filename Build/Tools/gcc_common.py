@@ -41,7 +41,7 @@ def _archOptions( targ_os, targ_arch ):
             "amd64": ("-m64", ),
             }
     try: opts = arch2opts[targ_arch]
-    except KeyError: raise #SCons.Errors.StopError( "not yet supporting %r with gcc" % targ_arch )
+    except KeyError: SCons.Errors.StopError( "not yet supporting %r with gcc" % targ_arch )
     return opts
 
 _test_gcc_cache = {}
