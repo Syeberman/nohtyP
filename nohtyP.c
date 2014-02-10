@@ -363,6 +363,9 @@ static ypTypeObject *ypTypeTable[255];
 #define ypFrozenDict_CODE           ( 24u)
 #define ypDict_CODE                 ( 25u)
 
+#define ypRange_CODE                ( 26u)
+// no mutable ypRange type          ( 27u)
+
 yp_STATIC_ASSERT( _ypInt_CODE == ypInt_CODE, ypInt_CODE );
 yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE );
 yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
@@ -4378,13 +4381,18 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
     }
 
     // Calculate slicelength
-    if( (*step < 0 && *stop  >= *start) ||
-        (*step > 0 && *start >= *stop )    ) {
-        *slicelength = 0;
-    } else if( *step < 0 ) {
-        *slicelength = (*stop - *start + 1) / (*step) + 1;
+    if( *step < 0 ) {
+        if( *stop >= *start ) {
+            *slicelength = 0;
+        } else {
+            *slicelength = (*stop - *start + 1) / (*step) + 1;
+        }
     } else {
-        *slicelength = (*stop - *start - 1) / (*step) + 1;
+        if( *start >= *stop ) {
+            *slicelength = 0;
+        } else {
+            *slicelength = (*stop - *start - 1) / (*step) + 1;
+        }
     }
 
     return yp_None;
@@ -9632,35 +9640,45 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
     return _ypDict_fromkeys( ypDict_CODE, iterable, value );
 }
 
-#if 0
+
 /*************************************************************************************************
- * Immutable sequence of integers (range)
+ * Immutable "start + i*step" sequence of integers
  *************************************************************************************************/
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
-// TODO: Decide whether to use the ob_len, which might not be large enough, or just calculate
-// on-the-fly
 typedef struct {
     ypObject_HEAD
     yp_int_t start;
-    yp_int_t stop;
     yp_int_t step;
-    yp_ssize_t len;
 } ypRangeObject;
 
-#define ypRange_START( r )          ( ((ypRangeObject *)r)->start )
-#define ypRange_STOP( r )           ( ((ypRangeObject *)r)->stop )
-#define ypRange_STEP( r )           ( ((ypRangeObject *)r)->step )
-#define ypRange_LEN( r )            ( ((ypRangeObject *)r)->len )
+#define ypRange_START( r )  ( ((ypRangeObject *)r)->start )
+#define ypRange_STEP( r )   ( ((ypRangeObject *)r)->step )
+#define ypRange_LEN         ypObject_CACHED_LEN
+#define ypRange_SET_LEN     ypObject_SET_CACHED_LEN
 
-static ypObject *range_frozen_copy( ypObject *r, visitfunc copy_visitor, void *copy_memo )
+// Use yp_rangeC( 0 ) as the standard empty struct
+static ypRangeObject _yp_range_empty_struct = {
+    { ypRange_CODE, ypObject_REFCNT_IMMORTAL,
+    0, 0, ypObject_HASH_INVALID, NULL }, 0, 1 };
+static ypObject * const _yp_range_empty = (ypObject *) &_yp_range_empty_struct;
+
+static ypObject *range_frozen_copy( ypObject *r ) {
+    return yp_incref( r );
+}
+
+static ypObject *range_frozen_deepcopy( ypObject *r, visitfunc copy_visitor, void *copy_memo )
 {
-    // A shallow copy of a range doesn't require an actual copy
-    if( copy_visitor == yp_shallowcopy_visitor ) {
-        return yp_incref( r );
-    }
-    return yp_NotImplementedError; // TODO implement
+    ypObject *newR;
+
+    if( ypRange_LEN( r ) < 1 ) return _yp_range_empty;
+    newR = ypMem_MALLOC_FIXED( ypRangeObject, ypRange_CODE );
+    if( yp_isexceptionC( newR ) ) return newR;
+    ypRange_START( newR ) = ypRange_START( r );
+    ypRange_STEP( newR ) = ypRange_STEP( r );
+    ypRange_SET_LEN( newR, ypRange_LEN( r ) );
+    return newR;
 }
 
 static ypObject *range_bool( ypObject *r ) {
@@ -9679,21 +9697,23 @@ static ypObject *range_len( ypObject *r, yp_ssize_t *len )
 }
 
 // Returns true (1) if the two ranges are equal
-static int _ypRange_are_equal( ypObject *_r, ypObject *_x ) {
+static ypObject *_ypRange_are_equal( ypObject *_r, ypObject *_x ) {
+#if 0
     yp_ssize_t r_len = ypRange_LEN( r );
     yp_ssize_t x_len = ypRange_LEN( x );
     if( r_len != x_len ) return 0;
+#endif
     return yp_NotImplementedError;
 }
 static ypObject *range_eq( ypObject *r, ypObject *x ) {
     if( r == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
-    return ypBool_FROM_C( _ypRange_are_equal( r, x ) );
+    return _ypRange_are_equal( r, x );
 }
 static ypObject *range_ne( ypObject *r, ypObject *x ) {
     if( r == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
-    return ypBool_FROM_C( !_ypRange_are_equal( r, x ) );
+    return ypBool_NOT( _ypRange_are_equal( r, x ) );
 }
 
 // TODO Unless Python does differently, this should return the same hash tuple(r) would return
@@ -9703,14 +9723,14 @@ static ypObject *range_currenthash( ypObject *r,
 }
 
 static ypObject *range_dealloc( ypObject *r ) {
-    ypMem_FREE_CONTAINER( r, ypRangeObject );
+    ypMem_FREE_FIXED( r );
     return yp_None;
 }
 
 static ypSequenceMethods ypRange_as_sequence = {
     MethodError_objobjproc,         // tp_concat
     MethodError_objssizeproc,       // tp_repeat
-    MethodError_objssizeproc,       // tp_getindex
+    MethodError_objssizeobjproc,    // tp_getindex
     MethodError_objsliceproc,       // tp_getslice
     MethodError_findfunc,           // tp_find
     MethodError_countfunc,          // tp_count
@@ -9741,6 +9761,8 @@ static ypTypeObject ypRange_Type = {
     MethodError_objproc,            // tp_freeze
     range_frozen_copy,              // tp_unfrozen_copy
     range_frozen_copy,              // tp_frozen_copy
+    range_frozen_deepcopy,          // tp_unfrozen_deepcopy
+    range_frozen_deepcopy,          // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -9793,22 +9815,31 @@ static ypTypeObject ypRange_Type = {
 // XXX Adapted from PySlice_GetIndicesEx
 ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
 {
+    yp_int_t len;
+    ypObject *newR;
+
     if( step == 0 ) return yp_ValueError;
 
-    if( (step < 0 && stop  >= start) ||
-        (step > 0 && start >= stop ) ) {
-        return _yp_range_empty;
+    if( step < 0 ) {
+        if( stop >= start ) return _yp_range_empty;
+        len = (stop - start + 1) / step + 1;
+    } else {
+        if( start >= stop ) return _yp_range_empty;
+        len = (stop - start - 1) / step + 1;
     }
+    if( len > ypObject_LEN_MAX ) return yp_SystemLimitationError;
 
-    // Adjust stop to 1 plus the last number
-    stop = (stop - start) / step
-
-
+    newR = ypMem_MALLOC_FIXED( ypRangeObject, ypRange_CODE );
+    if( yp_isexceptionC( newR ) ) return newR;
+    ypRange_START( newR ) = start;
+    ypRange_STEP( newR ) = step;
+    ypRange_SET_LEN( newR, len );
+    return newR;
 }
 ypObject *yp_rangeC( yp_int_t stop ) {
     return yp_rangeC3( 0, stop, 1 );
 }
-#endif
+
 
 /*************************************************************************************************
  * Common object methods
@@ -10390,6 +10421,9 @@ static ypTypeObject *ypTypeTable[255] = {
 
     &ypFrozenDict_Type, /* ypFrozenDict_CODE           ( 24u) */
     &ypDict_Type,       /* ypDict_CODE                 ( 25u) */
+
+    &ypRange_Type,      /* ypRange_CODE                ( 26u) */
+    &ypRange_Type,      /*                             ( 27u) */
 };
 
 ypObject *yp_type( ypObject *object ) {
