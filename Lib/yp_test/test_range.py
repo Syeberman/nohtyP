@@ -7,6 +7,9 @@ import sys
 import pickle
 import itertools
 
+# Extra assurance that we're not accidentally testing Python's range
+def range( *args, **kwargs ): raise NotImplementedError( "convert script to yp_range here" )
+
 # pure Python implementations (3 args only), for comparison
 def pyrange(start, stop, step):
     if (start - stop) // step < 0:
@@ -22,7 +25,6 @@ def pyrange_reversed(start, stop, step):
     return pyrange(stop - step, start - step, -step)
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class RangeTest(yp_unittest.TestCase):
     def assert_iterators_equal(self, xs, ys, test_id, limit=None):
         # check that an iterator xs matches the expected results ys,
@@ -46,99 +48,99 @@ class RangeTest(yp_unittest.TestCase):
                           'expected {}, got {}'.format(test_id, i, y, x))
 
     def test_range(self):
-        self.assertEqual(list(range(3)), [0, 1, 2])
-        self.assertEqual(list(range(1, 5)), [1, 2, 3, 4])
-        self.assertEqual(list(range(0)), [])
-        self.assertEqual(list(range(-3)), [])
-        self.assertEqual(list(range(1, 10, 3)), [1, 4, 7])
-        self.assertEqual(list(range(5, -5, -3)), [5, 2, -1, -4])
+        self.assertEqual(list(yp_range(3)), [0, 1, 2])
+        self.assertEqual(list(yp_range(1, 5)), [1, 2, 3, 4])
+        self.assertEqual(list(yp_range(0)), [])
+        self.assertEqual(list(yp_range(-3)), [])
+        self.assertEqual(list(yp_range(1, 10, 3)), [1, 4, 7])
+        self.assertEqual(list(yp_range(5, -5, -3)), [5, 2, -1, -4])
 
         a = 10
         b = 100
         c = 50
 
-        self.assertEqual(list(range(a, a+2)), [a, a+1])
-        self.assertEqual(list(range(a+2, a, -1)), [a+2, a+1])
-        self.assertEqual(list(range(a+4, a, -2)), [a+4, a+2])
+        self.assertEqual(list(yp_range(a, a+2)), [a, a+1])
+        self.assertEqual(list(yp_range(a+2, a, -1)), [a+2, a+1])
+        self.assertEqual(list(yp_range(a+4, a, -2)), [a+4, a+2])
 
-        seq = list(range(a, b, c))
+        seq = list(yp_range(a, b, c))
         self.assertIn(a, seq)
         self.assertNotIn(b, seq)
         self.assertEqual(len(seq), 2)
 
-        seq = list(range(b, a, -c))
+        seq = list(yp_range(b, a, -c))
         self.assertIn(b, seq)
         self.assertNotIn(a, seq)
         self.assertEqual(len(seq), 2)
 
-        seq = list(range(-a, -b, -c))
+        seq = list(yp_range(-a, -b, -c))
         self.assertIn(-a, seq)
         self.assertNotIn(-b, seq)
         self.assertEqual(len(seq), 2)
 
-        self.assertRaises(TypeError, range)
-        self.assertRaises(TypeError, range, 1, 2, 3, 4)
-        self.assertRaises(ValueError, range, 1, 2, 0)
+        self.assertRaises(TypeError, yp_range)
+        self.assertRaises(TypeError, yp_range, 1, 2, 3, 4)
+        self.assertRaises(ValueError, yp_range, 1, 2, 0)
 
-        self.assertRaises(TypeError, range, 0.0, 2, 1)
-        self.assertRaises(TypeError, range, 1, 2.0, 1)
-        self.assertRaises(TypeError, range, 1, 2, 1.0)
-        self.assertRaises(TypeError, range, 1e100, 1e101, 1e101)
+        self.assertRaises(TypeError, yp_range, 0.0, 2, 1)
+        self.assertRaises(TypeError, yp_range, 1, 2.0, 1)
+        self.assertRaises(TypeError, yp_range, 1, 2, 1.0)
+        self.assertRaises(TypeError, yp_range, 1e100, 1e101, 1e101)
 
-        self.assertRaises(TypeError, range, 0, "spam")
-        self.assertRaises(TypeError, range, 0, 42, "spam")
+        self.assertRaises(TypeError, yp_range, 0, "spam")
+        self.assertRaises(TypeError, yp_range, 0, 42, "spam")
 
-        self.assertEqual(len(range(0, sys.maxsize, sys.maxsize-1)), 2)
+        self.assertEqual(len(yp_range(0, sys.maxsize, sys.maxsize-1)), 2)
 
-        r = range(-sys.maxsize, sys.maxsize, 2)
+        r = yp_range(-sys.maxsize, sys.maxsize, 2)
         self.assertEqual(len(r), sys.maxsize)
 
     def test_large_operands(self):
-        x = range(10**20, 10**20+10, 3)
+        x = yp_range(10**20, 10**20+10, 3)
         self.assertEqual(len(x), 4)
         self.assertEqual(len(list(x)), 4)
 
-        x = range(10**20+10, 10**20, 3)
+        x = yp_range(10**20+10, 10**20, 3)
         self.assertEqual(len(x), 0)
         self.assertEqual(len(list(x)), 0)
 
-        x = range(10**20, 10**20+10, -3)
+        x = yp_range(10**20, 10**20+10, -3)
         self.assertEqual(len(x), 0)
         self.assertEqual(len(list(x)), 0)
 
-        x = range(10**20+10, 10**20, -3)
+        x = yp_range(10**20+10, 10**20, -3)
         self.assertEqual(len(x), 4)
         self.assertEqual(len(list(x)), 4)
 
-        # Now test range() with longs
-        self.assertEqual(list(range(-2**100)), [])
-        self.assertEqual(list(range(0, -2**100)), [])
-        self.assertEqual(list(range(0, 2**100, -1)), [])
-        self.assertEqual(list(range(0, 2**100, -1)), [])
+        # Now test yp_range() with longs
+        self.assertEqual(list(yp_range(-2**100)), [])
+        self.assertEqual(list(yp_range(0, -2**100)), [])
+        self.assertEqual(list(yp_range(0, 2**100, -1)), [])
+        self.assertEqual(list(yp_range(0, 2**100, -1)), [])
 
         a = int(10 * sys.maxsize)
         b = int(100 * sys.maxsize)
         c = int(50 * sys.maxsize)
 
-        self.assertEqual(list(range(a, a+2)), [a, a+1])
-        self.assertEqual(list(range(a+2, a, -1)), [a+2, a+1])
-        self.assertEqual(list(range(a+4, a, -2)), [a+4, a+2])
+        self.assertEqual(list(yp_range(a, a+2)), [a, a+1])
+        self.assertEqual(list(yp_range(a+2, a, -1)), [a+2, a+1])
+        self.assertEqual(list(yp_range(a+4, a, -2)), [a+4, a+2])
 
-        seq = list(range(a, b, c))
+        seq = list(yp_range(a, b, c))
         self.assertIn(a, seq)
         self.assertNotIn(b, seq)
         self.assertEqual(len(seq), 2)
         self.assertEqual(seq[0], a)
         self.assertEqual(seq[-1], a+c)
 
-        seq = list(range(b, a, -c))
+        seq = list(yp_range(b, a, -c))
         self.assertIn(b, seq)
         self.assertNotIn(a, seq)
         self.assertEqual(len(seq), 2)
         self.assertEqual(seq[0], b)
         self.assertEqual(seq[-1], b-c)
 
-        seq = list(range(-a, -b, -c))
+        seq = list(yp_range(-a, -b, -c))
         self.assertIn(-a, seq)
         self.assertNotIn(-b, seq)
         self.assertEqual(len(seq), 2)
@@ -158,7 +160,7 @@ class RangeTest(yp_unittest.TestCase):
         a = -sys.maxsize
         b = sys.maxsize
         expected_len = b - a
-        x = range(a, b)
+        x = yp_range(a, b)
         self.assertIn(a, x)
         self.assertNotIn(b, x)
         self.assertRaises(OverflowError, len, x)
@@ -175,7 +177,7 @@ class RangeTest(yp_unittest.TestCase):
         a = 0
         b = 2 * sys.maxsize
         expected_len = b - a
-        x = range(a, b)
+        x = yp_range(a, b)
         self.assertIn(a, x)
         self.assertNotIn(b, x)
         self.assertRaises(OverflowError, len, x)
@@ -193,7 +195,7 @@ class RangeTest(yp_unittest.TestCase):
         b = sys.maxsize**10
         c = 2*sys.maxsize
         expected_len = 1 + (b - a) // c
-        x = range(a, b, c)
+        x = yp_range(a, b, c)
         self.assertIn(a, x)
         self.assertNotIn(b, x)
         self.assertRaises(OverflowError, len, x)
@@ -211,7 +213,7 @@ class RangeTest(yp_unittest.TestCase):
         b = 0
         c = -2*sys.maxsize
         expected_len = 1 + (b - a) // c
-        x = range(a, b, c)
+        x = yp_range(a, b, c)
         self.assertIn(a, x)
         self.assertNotIn(b, x)
         self.assertRaises(OverflowError, len, x)
@@ -226,36 +228,36 @@ class RangeTest(yp_unittest.TestCase):
             x[expected_len]
 
     def test_invalid_invocation(self):
-        self.assertRaises(TypeError, range)
-        self.assertRaises(TypeError, range, 1, 2, 3, 4)
-        self.assertRaises(ValueError, range, 1, 2, 0)
+        self.assertRaises(TypeError, yp_range)
+        self.assertRaises(TypeError, yp_range, 1, 2, 3, 4)
+        self.assertRaises(ValueError, yp_range, 1, 2, 0)
         a = int(10 * sys.maxsize)
-        self.assertRaises(ValueError, range, a, a + 1, int(0))
-        self.assertRaises(TypeError, range, 1., 1., 1.)
-        self.assertRaises(TypeError, range, 1e100, 1e101, 1e101)
-        self.assertRaises(TypeError, range, 0, "spam")
-        self.assertRaises(TypeError, range, 0, 42, "spam")
+        self.assertRaises(ValueError, yp_range, a, a + 1, int(0))
+        self.assertRaises(TypeError, yp_range, 1., 1., 1.)
+        self.assertRaises(TypeError, yp_range, 1e100, 1e101, 1e101)
+        self.assertRaises(TypeError, yp_range, 0, "spam")
+        self.assertRaises(TypeError, yp_range, 0, 42, "spam")
         # Exercise various combinations of bad arguments, to check
         # refcounting logic
-        self.assertRaises(TypeError, range, 0.0)
-        self.assertRaises(TypeError, range, 0, 0.0)
-        self.assertRaises(TypeError, range, 0.0, 0)
-        self.assertRaises(TypeError, range, 0.0, 0.0)
-        self.assertRaises(TypeError, range, 0, 0, 1.0)
-        self.assertRaises(TypeError, range, 0, 0.0, 1)
-        self.assertRaises(TypeError, range, 0, 0.0, 1.0)
-        self.assertRaises(TypeError, range, 0.0, 0, 1)
-        self.assertRaises(TypeError, range, 0.0, 0, 1.0)
-        self.assertRaises(TypeError, range, 0.0, 0.0, 1)
-        self.assertRaises(TypeError, range, 0.0, 0.0, 1.0)
+        self.assertRaises(TypeError, yp_range, 0.0)
+        self.assertRaises(TypeError, yp_range, 0, 0.0)
+        self.assertRaises(TypeError, yp_range, 0.0, 0)
+        self.assertRaises(TypeError, yp_range, 0.0, 0.0)
+        self.assertRaises(TypeError, yp_range, 0, 0, 1.0)
+        self.assertRaises(TypeError, yp_range, 0, 0.0, 1)
+        self.assertRaises(TypeError, yp_range, 0, 0.0, 1.0)
+        self.assertRaises(TypeError, yp_range, 0.0, 0, 1)
+        self.assertRaises(TypeError, yp_range, 0.0, 0, 1.0)
+        self.assertRaises(TypeError, yp_range, 0.0, 0.0, 1)
+        self.assertRaises(TypeError, yp_range, 0.0, 0.0, 1.0)
 
     def test_index(self):
-        u = range(2)
+        u = yp_range(2)
         self.assertEqual(u.index(0), 0)
         self.assertEqual(u.index(1), 1)
         self.assertRaises(ValueError, u.index, 2)
 
-        u = range(-2, 3)
+        u = yp_range(-2, 3)
         self.assertEqual(u.count(0), 1)
         self.assertEqual(u.index(0), 2)
         self.assertRaises(TypeError, u.index)
@@ -269,25 +271,25 @@ class RangeTest(yp_unittest.TestCase):
                     raise BadExc()
                 return False
 
-        a = range(4)
+        a = yp_range(4)
         self.assertRaises(BadExc, a.index, BadCmp())
 
-        a = range(-2, 3)
+        a = yp_range(-2, 3)
         self.assertEqual(a.index(0), 2)
-        self.assertEqual(range(1, 10, 3).index(4), 1)
-        self.assertEqual(range(1, -10, -3).index(-5), 2)
+        self.assertEqual(yp_range(1, 10, 3).index(4), 1)
+        self.assertEqual(yp_range(1, -10, -3).index(-5), 2)
 
-        self.assertEqual(range(10**20).index(1), 1)
-        self.assertEqual(range(10**20).index(10**20 - 1), 10**20 - 1)
+        self.assertEqual(yp_range(10**20).index(1), 1)
+        self.assertEqual(yp_range(10**20).index(10**20 - 1), 10**20 - 1)
 
-        self.assertRaises(ValueError, range(1, 2**100, 2).index, 2**87)
-        self.assertEqual(range(1, 2**100, 2).index(2**87+1), 2**86)
+        self.assertRaises(ValueError, yp_range(1, 2**100, 2).index, 2**87)
+        self.assertEqual(yp_range(1, 2**100, 2).index(2**87+1), 2**86)
 
         class AlwaysEqual(object):
             def __eq__(self, other):
                 return True
         always_equal = AlwaysEqual()
-        self.assertEqual(range(10).index(always_equal), 0)
+        self.assertEqual(yp_range(10).index(always_equal), 0)
 
     def test_user_index_method(self):
         bignum = 2*sys.maxsize
@@ -299,74 +301,74 @@ class RangeTest(yp_unittest.TestCase):
                 self.n = int(n)
             def __index__(self):
                 return self.n
-        self.assertEqual(list(range(I(bignum), I(bignum + 1))), [bignum])
-        self.assertEqual(list(range(I(smallnum), I(smallnum + 1))), [smallnum])
+        self.assertEqual(list(yp_range(I(bignum), I(bignum + 1))), [bignum])
+        self.assertEqual(list(yp_range(I(smallnum), I(smallnum + 1))), [smallnum])
 
         # User-defined class with a failing __index__ method
         class IX:
             def __index__(self):
                 raise RuntimeError
-        self.assertRaises(RuntimeError, range, IX())
+        self.assertRaises(RuntimeError, yp_range, IX())
 
         # User-defined class with an invalid __index__ method
         class IN:
             def __index__(self):
                 return "not a number"
 
-        self.assertRaises(TypeError, range, IN())
+        self.assertRaises(TypeError, yp_range, IN())
 
         # Test use of user-defined classes in slice indices.
-        self.assertEqual(list(range(10)[:I(5)]), list(range(5)))
+        self.assertEqual(list(yp_range(10)[:I(5)]), list(yp_range(5)))
 
         with self.assertRaises(RuntimeError):
-            range(0, 10)[:IX()]
+            yp_range(0, 10)[:IX()]
 
         with self.assertRaises(TypeError):
-            range(0, 10)[:IN()]
+            yp_range(0, 10)[:IN()]
 
     def test_count(self):
-        self.assertEqual(range(3).count(-1), 0)
-        self.assertEqual(range(3).count(0), 1)
-        self.assertEqual(range(3).count(1), 1)
-        self.assertEqual(range(3).count(2), 1)
-        self.assertEqual(range(3).count(3), 0)
-        self.assertIs(type(range(3).count(-1)), int)
-        self.assertIs(type(range(3).count(1)), int)
-        self.assertEqual(range(10**20).count(1), 1)
-        self.assertEqual(range(10**20).count(10**20), 0)
-        self.assertEqual(range(3).index(1), 1)
-        self.assertEqual(range(1, 2**100, 2).count(2**87), 0)
-        self.assertEqual(range(1, 2**100, 2).count(2**87+1), 1)
+        self.assertEqual(yp_range(3).count(-1), 0)
+        self.assertEqual(yp_range(3).count(0), 1)
+        self.assertEqual(yp_range(3).count(1), 1)
+        self.assertEqual(yp_range(3).count(2), 1)
+        self.assertEqual(yp_range(3).count(3), 0)
+        self.assertIs(type(yp_range(3).count(-1)), int)
+        self.assertIs(type(yp_range(3).count(1)), int)
+        self.assertEqual(yp_range(10**20).count(1), 1)
+        self.assertEqual(yp_range(10**20).count(10**20), 0)
+        self.assertEqual(yp_range(3).index(1), 1)
+        self.assertEqual(yp_range(1, 2**100, 2).count(2**87), 0)
+        self.assertEqual(yp_range(1, 2**100, 2).count(2**87+1), 1)
 
         class AlwaysEqual(object):
             def __eq__(self, other):
                 return True
         always_equal = AlwaysEqual()
-        self.assertEqual(range(10).count(always_equal), 10)
+        self.assertEqual(yp_range(10).count(always_equal), 10)
 
-        self.assertEqual(len(range(sys.maxsize, sys.maxsize+10)), 10)
+        self.assertEqual(len(yp_range(sys.maxsize, sys.maxsize+10)), 10)
 
     def test_repr(self):
-        self.assertEqual(repr(range(1)), 'range(0, 1)')
-        self.assertEqual(repr(range(1, 2)), 'range(1, 2)')
-        self.assertEqual(repr(range(1, 2, 3)), 'range(1, 2, 3)')
+        self.assertEqual(repr(yp_range(1)), 'range(0, 1)')
+        self.assertEqual(repr(yp_range(1, 2)), 'range(1, 2)')
+        self.assertEqual(repr(yp_range(1, 2, 3)), 'range(1, 2, 3)')
 
     def test_pickling(self):
         testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1),
                      (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
             for t in testcases:
-                r = range(*t)
+                r = yp_range(*t)
                 self.assertEqual(list(pickle.loads(pickle.dumps(r, proto))),
                                  list(r))
 
     def test_iterator_pickling(self):
         testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1),
                      (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
             for t in testcases:
-                it = itorg = iter(range(*t))
-                data = list(range(*t))
+                it = itorg = iter(yp_range(*t))
+                data = list(yp_range(*t))
 
                 d = pickle.dumps(it)
                 it = pickle.loads(d)
@@ -387,36 +389,36 @@ class RangeTest(yp_unittest.TestCase):
         # because the range validation step was eating the exception
         # before NULL was returned.
         with self.assertRaises(TypeError):
-            range([], 1, -1)
+            yp_range([], 1, -1)
 
     def test_types(self):
         # Non-integer objects *equal* to any of the range's items are supposed
         # to be contained in the range.
-        self.assertIn(1.0, range(3))
-        self.assertIn(True, range(3))
-        self.assertIn(1+0j, range(3))
+        self.assertIn(1.0, yp_range(3))
+        self.assertIn(True, yp_range(3))
+        self.assertIn(1+0j, yp_range(3))
 
         class C1:
             def __eq__(self, other): return True
-        self.assertIn(C1(), range(3))
+        self.assertIn(C1(), yp_range(3))
 
         # Objects are never coerced into other types for comparison.
         class C2:
             def __int__(self): return 1
             def __index__(self): return 1
-        self.assertNotIn(C2(), range(3))
+        self.assertNotIn(C2(), yp_range(3))
         # ..except if explicitly told so.
-        self.assertIn(int(C2()), range(3))
+        self.assertIn(int(C2()), yp_range(3))
 
-        # Check that the range.__contains__ optimization is only
+        # Check that the yp_range.__contains__ optimization is only
         # used for ints, not for instances of subclasses of int.
         class C3(int):
             def __eq__(self, other): return True
-        self.assertIn(C3(11), range(10))
-        self.assertIn(C3(11), list(range(10)))
+        self.assertIn(C3(11), yp_range(10))
+        self.assertIn(C3(11), list(yp_range(10)))
 
     def test_strided_limits(self):
-        r = range(0, 101, 2)
+        r = yp_range(0, 101, 2)
         self.assertIn(0, r)
         self.assertNotIn(1, r)
         self.assertIn(2, r)
@@ -424,23 +426,23 @@ class RangeTest(yp_unittest.TestCase):
         self.assertIn(100, r)
         self.assertNotIn(101, r)
 
-        r = range(0, -20, -1)
+        r = yp_range(0, -20, -1)
         self.assertIn(0, r)
         self.assertIn(-1, r)
         self.assertIn(-19, r)
         self.assertNotIn(-20, r)
 
-        r = range(0, -20, -2)
+        r = yp_range(0, -20, -2)
         self.assertIn(-18, r)
         self.assertNotIn(-19, r)
         self.assertNotIn(-20, r)
 
     def test_empty(self):
-        r = range(0)
+        r = yp_range(0)
         self.assertNotIn(0, r)
         self.assertNotIn(1, r)
 
-        r = range(0, -10)
+        r = yp_range(0, -10)
         self.assertNotIn(0, r)
         self.assertNotIn(-1, r)
         self.assertNotIn(1, r)
@@ -458,13 +460,13 @@ class RangeTest(yp_unittest.TestCase):
                        for step in (-2**63, -2**31, -2, -1, 1, 2)]
 
         for start, end, step in test_ranges:
-            iter1 = range(start, end, step)
+            iter1 = yp_range(start, end, step)
             iter2 = pyrange(start, end, step)
             test_id = "range({}, {}, {})".format(start, end, step)
             # check first 100 entries
             self.assert_iterators_equal(iter1, iter2, test_id, limit=100)
 
-            iter1 = reversed(range(start, end, step))
+            iter1 = reversed(yp_range(start, end, step))
             iter2 = pyrange_reversed(start, end, step)
             test_id = "reversed(range({}, {}, {}))".format(start, end, step)
             self.assert_iterators_equal(iter1, iter2, test_id, limit=100)
@@ -474,11 +476,11 @@ class RangeTest(yp_unittest.TestCase):
             i = slice(start, stop, step)
             self.assertEqual(list(r[i]), list(r)[i])
             self.assertEqual(len(r[i]), len(list(r)[i]))
-        for r in [range(10),
-                  range(0),
-                  range(1, 9, 3),
-                  range(8, 0, -3),
-                  range(sys.maxsize+1, sys.maxsize+10),
+        for r in [yp_range(10),
+                  yp_range(0),
+                  yp_range(1, 9, 3),
+                  yp_range(8, 0, -3),
+                  yp_range(sys.maxsize+1, sys.maxsize+10),
                   ]:
             check(0, 2)
             check(0, 20)
@@ -490,7 +492,7 @@ class RangeTest(yp_unittest.TestCase):
             check(-1, -3, -1)
 
     def test_contains(self):
-        r = range(10)
+        r = yp_range(10)
         self.assertIn(0, r)
         self.assertIn(1, r)
         self.assertIn(5.0, r)
@@ -498,7 +500,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(-1, r)
         self.assertNotIn(10, r)
         self.assertNotIn("", r)
-        r = range(9, -1, -1)
+        r = yp_range(9, -1, -1)
         self.assertIn(0, r)
         self.assertIn(1, r)
         self.assertIn(5.0, r)
@@ -506,7 +508,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(-1, r)
         self.assertNotIn(10, r)
         self.assertNotIn("", r)
-        r = range(0, 10, 2)
+        r = yp_range(0, 10, 2)
         self.assertIn(0, r)
         self.assertNotIn(1, r)
         self.assertNotIn(5.0, r)
@@ -514,7 +516,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(-1, r)
         self.assertNotIn(10, r)
         self.assertNotIn("", r)
-        r = range(9, -1, -2)
+        r = yp_range(9, -1, -2)
         self.assertNotIn(0, r)
         self.assertIn(1, r)
         self.assertIn(5.0, r)
@@ -524,16 +526,16 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn("", r)
 
     def test_reverse_iteration(self):
-        for r in [range(10),
-                  range(0),
-                  range(1, 9, 3),
-                  range(8, 0, -3),
-                  range(sys.maxsize+1, sys.maxsize+10),
+        for r in [yp_range(10),
+                  yp_range(0),
+                  yp_range(1, 9, 3),
+                  yp_range(8, 0, -3),
+                  yp_range(sys.maxsize+1, sys.maxsize+10),
                   ]:
             self.assertEqual(list(reversed(r)), list(r)[::-1])
 
     def test_issue11845(self):
-        r = range(*slice(1, 18, 2).indices(20))
+        r = yp_range(*slice(1, 18, 2).indices(20))
         values = {None, 0, 1, -1, 2, -2, 5, -5, 19, -19,
                   20, -20, 21, -21, 30, -30, 99, -99}
         for i in values:
@@ -542,21 +544,21 @@ class RangeTest(yp_unittest.TestCase):
                     r[i:j:k]
 
     def test_comparison(self):
-        test_ranges = [range(0), range(0, -1), range(1, 1, 3),
-                       range(1), range(5, 6), range(5, 6, 2),
-                       range(5, 7, 2), range(2), range(0, 4, 2),
-                       range(0, 5, 2), range(0, 6, 2)]
-        test_tuples = list(map(tuple, test_ranges))
+        test_ranges = yp_list( [yp_range(0), yp_range(0, -1), yp_range(1, 1, 3),
+                       yp_range(1), yp_range(5, 6), yp_range(5, 6, 2),
+                       yp_range(5, 7, 2), yp_range(2), yp_range(0, 4, 2),
+                       yp_range(0, 5, 2), yp_range(0, 6, 2)] )
+        test_tuples = yp_list(map(yp_tuple, test_ranges))
 
         # Check that equality of ranges matches equality of the corresponding
         # tuples for each pair from the test lists above.
-        ranges_eq = [a == b for a in test_ranges for b in test_ranges]
-        tuples_eq = [a == b for a in test_tuples for b in test_tuples]
-        self.assertEqual(ranges_eq, tuples_eq)
+        ranges_eq = yp_list( a == b for a in test_ranges for b in test_ranges )
+        tuples_eq = yp_list( a == b for a in test_tuples for b in test_tuples )
+        self.assertSequenceEqual(ranges_eq, tuples_eq)
 
         # Check that != correctly gives the logical negation of ==
-        ranges_ne = [a != b for a in test_ranges for b in test_ranges]
-        self.assertEqual(ranges_ne, [not x for x in ranges_eq])
+        ranges_ne = yp_list( a != b for a in test_ranges for b in test_ranges )
+        self.assertSequenceEqual(ranges_ne, yp_list( not x for x in ranges_eq ))
 
         # Equal ranges should have equal hashes.
         for a in test_ranges:
@@ -565,44 +567,45 @@ class RangeTest(yp_unittest.TestCase):
                     self.assertEqual(hash(a), hash(b))
 
         # Ranges are unequal to other types (even sequence types)
-        self.assertIs(range(0) == (), False)
-        self.assertIs(() == range(0), False)
-        self.assertIs(range(2) == [0, 1], False)
+        self.assertIs(yp_range(0) == (), False)
+        self.assertIs(() == yp_range(0), False)
+        self.assertIs(yp_range(2) == [0, 1], False)
 
         # Huge integers aren't a problem.
-        self.assertEqual(range(0, 2**100 - 1, 2),
-                         range(0, 2**100, 2))
-        self.assertEqual(hash(range(0, 2**100 - 1, 2)),
-                         hash(range(0, 2**100, 2)))
-        self.assertNotEqual(range(0, 2**100, 2),
-                            range(0, 2**100 + 1, 2))
-        self.assertEqual(range(2**200, 2**201 - 2**99, 2**100),
-                         range(2**200, 2**201, 2**100))
-        self.assertEqual(hash(range(2**200, 2**201 - 2**99, 2**100)),
-                         hash(range(2**200, 2**201, 2**100)))
-        self.assertNotEqual(range(2**200, 2**201, 2**100),
-                            range(2**200, 2**201 + 1, 2**100))
+        self.assertEqual(yp_range(0, 2**100 - 1, 2),
+                         yp_range(0, 2**100, 2))
+        self.assertEqual(hash(yp_range(0, 2**100 - 1, 2)),
+                         hash(yp_range(0, 2**100, 2)))
+        self.assertNotEqual(yp_range(0, 2**100, 2),
+                            yp_range(0, 2**100 + 1, 2))
+        self.assertEqual(yp_range(2**200, 2**201 - 2**99, 2**100),
+                         yp_range(2**200, 2**201, 2**100))
+        self.assertEqual(hash(yp_range(2**200, 2**201 - 2**99, 2**100)),
+                         hash(yp_range(2**200, 2**201, 2**100)))
+        self.assertNotEqual(yp_range(2**200, 2**201, 2**100),
+                            yp_range(2**200, 2**201 + 1, 2**100))
 
         # Order comparisons are not implemented for ranges.
         with self.assertRaises(TypeError):
-            range(0) < range(0)
+            yp_range(0) < yp_range(0)
         with self.assertRaises(TypeError):
-            range(0) > range(0)
+            yp_range(0) > yp_range(0)
         with self.assertRaises(TypeError):
-            range(0) <= range(0)
+            yp_range(0) <= yp_range(0)
         with self.assertRaises(TypeError):
-            range(0) >= range(0)
+            yp_range(0) >= yp_range(0)
 
 
+    @yp_unittest.skip("nohtyP does not (currently) store exact range attributes")
     def test_attributes(self):
         # test the start, stop and step attributes of range objects
-        self.assert_attrs(range(0), 0, 0, 1)
-        self.assert_attrs(range(10), 0, 10, 1)
-        self.assert_attrs(range(-10), 0, -10, 1)
-        self.assert_attrs(range(0, 10, 1), 0, 10, 1)
-        self.assert_attrs(range(0, 10, 3), 0, 10, 3)
-        self.assert_attrs(range(10, 0, -1), 10, 0, -1)
-        self.assert_attrs(range(10, 0, -3), 10, 0, -3)
+        self.assert_attrs(yp_range(0), 0, 0, 1)
+        self.assert_attrs(yp_range(10), 0, 10, 1)
+        self.assert_attrs(yp_range(-10), 0, -10, 1)
+        self.assert_attrs(yp_range(0, 10, 1), 0, 10, 1)
+        self.assert_attrs(yp_range(0, 10, 3), 0, 10, 3)
+        self.assert_attrs(yp_range(10, 0, -1), 10, 0, -1)
+        self.assert_attrs(yp_range(10, 0, -3), 10, 0, -3)
 
     def assert_attrs(self, rangeobj, start, stop, step):
         self.assertEqual(rangeobj.start, start)

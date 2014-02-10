@@ -304,7 +304,10 @@ yp_func( c_ypObject_p, "yp_generator_fromstructCN",
             (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p) )
 
 # ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
+yp_func( c_ypObject_p, "yp_rangeC3",
+        ((c_yp_int_t, "start"), (c_yp_int_t, "stop"), (c_yp_int_t, "step")) )
 # ypObject *yp_rangeC( yp_int_t stop );
+yp_func( c_ypObject_p, "yp_rangeC", ((c_yp_int_t, "stop"), ) )
 
 # ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len );
 yp_func( c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
@@ -860,6 +863,7 @@ yp_func( c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ) )
 # ypObject * const yp_type_set;
 # ypObject * const yp_type_frozendict;
 # ypObject * const yp_type_dict;
+# ypObject * const yp_type_range;
 
 
 # ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
@@ -941,7 +945,7 @@ class c_yp_initialize_kwparams( Structure ):
         ("everything_immortal", c_int),
     ]
 # void yp_initialize( yp_initialize_kwparams *kwparams );
-yp_func( c_void, "yp_initialize", ((POINTER( c_yp_initialize_kwparams ), "kwparams"), ), 
+yp_func( c_void, "yp_initialize", ((POINTER( c_yp_initialize_kwparams ), "kwparams"), ),
         errcheck=False )
 
 # Initialize nohtyP
@@ -1124,7 +1128,7 @@ class ypObject( c_ypObject_p ):
         mod_p = c_ypObject_pp( yp_None )
         _yp_divmod( self, other, div_p, mod_p )
         return (div_p[0], mod_p[0])
-    def __rdivmod__( self, other ): 
+    def __rdivmod__( self, other ):
         return ypObject.frompython( other ).__divmod__( self )
 
 def pytype( yptype, pytypes ):
@@ -1170,6 +1174,7 @@ c_ypObject_p_value( "yp_type_frozenset" )
 c_ypObject_p_value( "yp_type_set" )
 c_ypObject_p_value( "yp_type_frozendict" )
 c_ypObject_p_value( "yp_type_dict" )
+c_ypObject_p_value( "yp_type_range" )
 
 @pytype( yp_type_exception, BaseException )
 class yp_BaseException( ypObject ):
@@ -1438,7 +1443,7 @@ class yp_str( ypObject ):
         encoded, size, encoding = self._get_encoded_size_encoding( )
         assert encoding == "latin-1"
         assert string_at( encoded.value+size, 1 ) == b"\x00", "missing null terminator"
-        
+
     # Just as yp_bool.__bool__ must return a bool, so to must this return a str
     def __str__( self ):
         encoded, size, encoding = self._get_encoded_size_encoding( )
@@ -1660,6 +1665,16 @@ class yp_dict( ypObject ):
             raise TypeError( "update expected at most 1 arguments, got %d" % len( args ) )
         _yp_updateN( self, _yp_dict_iterable( args[0] ) )
         if len( kwargs ) > 0: _yp_updateK( self, *_yp_flatten_dict( kwargs ) )
+
+@pytype( yp_type_range, range )
+class yp_range( ypObject ):
+    @staticmethod
+    def _new_range( start, stop, step=1 ):
+        return _yp_rangeC3( start, stop, step )
+    def __new__( cls, *args ):
+        if len( args ) == 1: return _yp_rangeC( args[0] )
+        return cls._new_range( *args )
+
 
 # FIXME integrate this somehow with unittest
 #import os
