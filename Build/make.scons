@@ -99,20 +99,21 @@ for compiler_name in compiler_names:
         # TODO Support cross-compiling OSes, if possible
         if os != native_os: continue
 
+        # Maintain a separate directory for intermediate and target files, but don't copy files
+        variantEnv = rootEnv.Clone( tools=[], COMPILER=compiler,
+                TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
+        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, os, arch, configuration)
+        variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
+
         # Skip compilers that can't be found (TODO unless we want an error in that case?)
         # TODO: This script is slow due to vcvarsall.bat executing 52 times; cache in SCons
         # TODO: Record compiler version information in the variant directory
         try:
-            variantEnv = rootEnv.Clone( tools=[compiler, ], COMPILER=compiler,
-                    TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
+            compilerEnv = variantEnv.Clone( tools=[compiler, ] )
         except (SCons.Errors.UserError, SCons.Errors.StopError): continue
 
-        # Maintain a separate directory for intermediate and target files, but don't copy files
-        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, os, arch, configuration)
-        variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
-
         targets = []
-        targets.append( nohtyP_SharedLibrary( variantEnv.Clone( ) ) )
+        targets.append( nohtyP_SharedLibrary( compilerEnv.Clone( ) ) )
 
         # Pick one variant from each configuration that matches the host system, and copy it to the
         # Build/native directory for easy access
