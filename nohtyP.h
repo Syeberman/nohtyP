@@ -1178,6 +1178,7 @@ ypAPI ypObject * const yp_type_frozenset;
 ypAPI ypObject * const yp_type_set;
 ypAPI ypObject * const yp_type_frozendict;
 ypAPI ypObject * const yp_type_dict;
+ypAPI ypObject * const yp_type_range;
 
 
 /*

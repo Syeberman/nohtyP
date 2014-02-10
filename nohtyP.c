@@ -9650,13 +9650,23 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
 typedef struct {
     ypObject_HEAD
     yp_int_t start;
-    yp_int_t step;
+    yp_int_t step;  // all ranges of len < 2 have a step of 1
 } ypRangeObject;
 
 #define ypRange_START( r )  ( ((ypRangeObject *)r)->start )
 #define ypRange_STEP( r )   ( ((ypRangeObject *)r)->step )
 #define ypRange_LEN         ypObject_CACHED_LEN
 #define ypRange_SET_LEN     ypObject_SET_CACHED_LEN
+
+// Returns the value at i, assuming i is an adjusted index
+#define ypRange_GET_INDEX( r, i )   (ypRange_START( r ) + (ypRange_STEP( r ) * (i)))
+
+// Returns true if the two ranges are equal, assuming x is also a range
+#define ypRange_ARE_EQUAL( r, x ) \
+    ( ypRange_LEN( r ) == ypRange_LEN( x ) && \
+      ypRange_START( r ) == ypRange_START( x ) && \
+      ypRange_STEP( r ) == ypRange_STEP( x ) \
+    )
 
 // Use yp_rangeC( 0 ) as the standard empty struct
 static ypRangeObject _yp_range_empty_struct = {
@@ -9685,9 +9695,13 @@ static ypObject *range_bool( ypObject *r ) {
     return ypBool_FROM_C( ypRange_LEN( r ) );
 }
 
-static ypObject *range_getindex( ypObject *r, yp_ssize_t i )
+static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
 {
-    return yp_NotImplementedError;
+    if( !ypSequence_AdjustIndexC( ypRange_LEN( r ), &i ) ) {
+        if( defval == NULL ) return yp_IndexError;
+        return yp_incref( defval );
+    }
+    return yp_intC( ypRange_GET_INDEX( r, i ) );
 }
 
 static ypObject *range_len( ypObject *r, yp_ssize_t *len )
@@ -9696,24 +9710,15 @@ static ypObject *range_len( ypObject *r, yp_ssize_t *len )
     return yp_None;
 }
 
-// Returns true (1) if the two ranges are equal
-static ypObject *_ypRange_are_equal( ypObject *_r, ypObject *_x ) {
-#if 0
-    yp_ssize_t r_len = ypRange_LEN( r );
-    yp_ssize_t x_len = ypRange_LEN( x );
-    if( r_len != x_len ) return 0;
-#endif
-    return yp_NotImplementedError;
-}
 static ypObject *range_eq( ypObject *r, ypObject *x ) {
     if( r == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
-    return _ypRange_are_equal( r, x );
+    return ypBool_FROM_C( ypRange_ARE_EQUAL( r, x ) );
 }
 static ypObject *range_ne( ypObject *r, ypObject *x ) {
     if( r == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
-    return ypBool_NOT( _ypRange_are_equal( r, x ) );
+    return ypBool_FROM_C( !ypRange_ARE_EQUAL( r, x ) );
 }
 
 // TODO Unless Python does differently, this should return the same hash tuple(r) would return
@@ -9730,7 +9735,7 @@ static ypObject *range_dealloc( ypObject *r ) {
 static ypSequenceMethods ypRange_as_sequence = {
     MethodError_objobjproc,         // tp_concat
     MethodError_objssizeproc,       // tp_repeat
-    MethodError_objssizeobjproc,    // tp_getindex
+    range_getindex,                 // tp_getindex
     MethodError_objsliceproc,       // tp_getslice
     MethodError_findfunc,           // tp_find
     MethodError_countfunc,          // tp_count
@@ -9812,22 +9817,38 @@ static ypTypeObject ypRange_Type = {
     MethodError_MappingMethods      // tp_as_mapping
 };
 
-// XXX Adapted from PySlice_GetIndicesEx
+// XXX Adapted from Python's get_len_of_range
 ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
 {
     yp_int_t len;
     ypObject *newR;
 
+    // Denying yp_INT_T_MIN ensures step can be negated
     if( step == 0 ) return yp_ValueError;
+    if( step == yp_INT_T_MIN ) return yp_SystemLimitationError;
 
+    /* -------------------------------------------------------------
+    If step > 0 and lo >= hi, or step < 0 and lo <= hi, the range is empty.
+    Else for step > 0, if n values are in the range, the last one is
+    lo + (n-1)*step, which must be <= hi-1.  Rearranging,
+    n <= (hi - lo - 1)/step + 1, so taking the floor of the RHS gives
+    the proper value.  Since lo < hi in this case, hi-lo-1 >= 0, so
+    the RHS is non-negative and so truncation is the same as the
+    floor.  Letting M be the largest positive long, the worst case
+    for the RHS numerator is hi=M, lo=-M-1, and then
+    hi-lo-1 = M-(-M-1)-1 = 2*M.  Therefore unsigned long has enough
+    precision to compute the RHS exactly.  The analysis for step < 0
+    is similar.
+    ---------------------------------------------------------------*/
     if( step < 0 ) {
         if( stop >= start ) return _yp_range_empty;
-        len = (stop - start + 1) / step + 1;
+        len = 1 + (start - 1 - stop) / (-step);
     } else {
         if( start >= stop ) return _yp_range_empty;
-        len = (stop - start - 1) / step + 1;
+        len = 1 + (stop - 1 - start) / step;
     }
     if( len > ypObject_LEN_MAX ) return yp_SystemLimitationError;
+    if( len < 2 ) step = 1; // makes comparisons easier
 
     newR = ypMem_MALLOC_FIXED( ypRangeObject, ypRange_CODE );
     if( yp_isexceptionC( newR ) ) return newR;
@@ -10451,6 +10472,7 @@ ypObject * const yp_type_frozenset = (ypObject *) &ypFrozenSet_Type;
 ypObject * const yp_type_set = (ypObject *) &ypSet_Type;
 ypObject * const yp_type_frozendict = (ypObject *) &ypFrozenDict_Type;
 ypObject * const yp_type_dict = (ypObject *) &ypDict_Type;
+ypObject * const yp_type_range = (ypObject *) &ypRange_Type;
 
 
 /*************************************************************************************************
