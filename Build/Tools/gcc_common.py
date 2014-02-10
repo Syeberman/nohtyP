@@ -78,8 +78,10 @@ def _test_gcc( gcc, re_dumpversion, targ_os, targ_arch ):
             outfile.write( "void main(){}\n" )
 
     # Test to see if gcc supports the target
+    env = dict( os.environ )
+    env["PATH"] = os.path.dirname( gcc ) + os.pathsep + env.get( "PATH", "" )
     gcc_result = subprocess.call( [gcc, "test.c"]+list( archOpts ),
-            cwd=_test_gcc_temp_dir, stdout=_devnul, stderr=_devnul )
+            cwd=_test_gcc_temp_dir, stdout=_devnul, stderr=_devnul, env=env )
     gcc_cache[targ_arch] = (gcc_result == 0) # gcc returns non-zero on error
     return gcc_cache[targ_arch]
 
@@ -87,7 +89,7 @@ def _test_gcc( gcc, re_dumpversion, targ_os, targ_arch ):
 def _find( env, re_dumpversion ):
     """Find a gcc executable that can build our target OS and arch, returning the path or None."""
     if env["TARGET_OS"] != env["HOST_OS"]: raise SCons.Errors.StopError( "not yet supporting cross-OS compile in GCC" )
-    binDirs = list( env["ENV"].get( "PATH", "" ).split( os.pathsep ) )
+    binDirs = list( os.environ.get( "PATH", "" ).split( os.pathsep ) )
     binDirs.extend( _gcc_paths_found )
     for binDir in binDirs:
         gcc = os.path.join( binDir, "gcc" )
