@@ -395,13 +395,12 @@ class DictTest(yp_unittest.TestCase):
         self.assertEqual(hashed2.hash_count, 1)
         self.assertEqual(hashed1.eq_count + hashed2.eq_count, 1)
 
-    @support.requires_resource('cpu')
-    def test_popitem(self):
+    def check_popitem(self, log2sizes):
         # yp_dict.popitem()
         for copymode in -1, +1:
             # -1: b has same structure as a
             # +1: b is a.copy()
-            for log2size in range(12):
+            for log2size in log2sizes:
                 size = 2**log2size
                 a = yp_dict()
                 b = yp_dict()
@@ -422,6 +421,13 @@ class DictTest(yp_unittest.TestCase):
 
         d = yp_dict()
         self.assertRaises(KeyError, d.popitem)
+
+    def test_popitem(self):
+        self.check_popitem(range(9))
+
+    @support.requires_resource('cpu')
+    def test_popitem_cpu(self):
+        self.check_popitem(range(9,12))
 
     def test_pop(self):
         # Tests for pop with specified key

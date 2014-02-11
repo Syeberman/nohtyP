@@ -7,6 +7,7 @@ should be modernized).
 
 from yp import *
 import os
+import random
 import re
 import sys
 import copy
@@ -197,17 +198,25 @@ class BaseBytesTest:
         self.assertEqual(b[-5:100], by("world"))
         self.assertEqual(b[-100:5], by("Hello"))
 
-    @yp_test.support.requires_resource('cpu')
-    def test_extended_getslice(self):
+    def check_extended_getslice(self, sample):
         # Test extended slicing by comparing with list slicing.
         L = list(range(255))
         b = self.type2test(L)
         indices = (0, None, 1, 3, 19, 100, -1, -2, -31, -100)
-        for start in indices:
-            for stop in indices:
+        for start in sample(indices):
+            for stop in sample(indices):
                 # Skip step 0 (invalid)
-                for step in indices[1:]:
+                for step in sample(indices[1:]):
                     self.assertEqual(b[start:stop:step], self.type2test(L[start:stop:step]))
+
+    def test_extended_getslice(self):
+        # Sample just a few random indicies for each of start, stop, and step
+        self.check_extended_getslice(lambda x: random.sample(x,3))
+    
+    @yp_test.support.requires_resource('cpu')
+    def test_extended_getslice_cpu(self):
+        # Check all indicies
+        self.check_extended_getslice(lambda x: x)
 
     @yp_unittest.skip("TODO Implement encoding in nohtyP")
     def test_encoding(self):
@@ -968,15 +977,14 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b[2:2] = b1             # data should have moved out
         self.assertEqual(b, b2+b1+b2)
 
-    @yp_test.support.requires_resource('cpu')
-    def test_extended_set_del_slice(self):
+    def check_extended_set_del_slice(self, sample):
         # XXX ctypes truncates large ints, making them look valid in nohtyP tests
         #indices = (0, None, 1, 3, 19, 300, 1<<333, -1, -2, -31, -300)
         indices = (0, None, 1, 3, 19, 300,         -1, -2, -31, -300)
-        for start in indices:
-            for stop in indices:
+        for start in sample(indices):
+            for stop in sample(indices):
                 # Skip invalid step 0
-                for step in indices[1:]:
+                for step in sample(indices[1:]):
                     L = list(range(255))
                     b = yp_bytearray(L)
                     # Make sure we have a slice of exactly the right length,
@@ -990,6 +998,15 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
                     del L[start:stop:step]
                     del b[start:stop:step]
                     self.assertEqual(b, yp_bytearray(L))
+
+    def test_extended_set_del_slice(self):
+        # Sample just a few random indicies for each of start, stop, and step
+        self.check_extended_set_del_slice(lambda x: random.sample(x,3))
+    
+    @yp_test.support.requires_resource('cpu')
+    def test_extended_set_del_slice_cpu(self):
+        # Check all indicies
+        self.check_extended_set_del_slice(lambda x: x)
 
     def test_setslice_trap(self):
         # This test verifies that we correctly handle assigning self
