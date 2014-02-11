@@ -279,6 +279,10 @@ class LongTest(yp_unittest.TestCase):
         eq(x ^ ~x, -1, Frm("x ^ ~x != -1 for x=%r", x))
         eq(-x, 1 + ~x, Frm("not -x == 1 + ~x for x=%r", x))
         eq(-x, ~(x-1), Frm("not -x == ~(x-1) forx =%r", x))
+
+    def check_bitop_identities_1_cpu(self, x):
+        x = yp_int(x)
+        eq = self.assertEqual
         for n in range(2*SHIFT):
             n = yp_int(n)
             # Skip shifts too large for nohtyP
@@ -330,14 +334,27 @@ class LongTest(yp_unittest.TestCase):
         eq(x | (y & z), (x | y) & (x | z),
              Frm("x | (y & z) != (x | y) & (x | z) for x=%r, y=%r, z=%r", (x, y, z)))
 
-    @support.requires_resource('cpu')
     def test_bitop_identities(self):
+        self.check_bitop_identities_1(random.choice(special))
+        digits = range(1, MAXDIGITS+1)
+        lenx = random.choice(digits)
+        x = self.getran(lenx)
+        self.check_bitop_identities_1(x)
+        leny = random.choice(digits)
+        y = self.getran(leny)
+        self.check_bitop_identities_2(x, y)
+        self.check_bitop_identities_3(x, y, self.getran((lenx + leny)//2))
+
+    @support.requires_resource('cpu')
+    def test_bitop_identities_cpu(self):
         for x in special:
             self.check_bitop_identities_1(x)
+            self.check_bitop_identities_1_cpu(x)
         digits = range(1, MAXDIGITS+1)
         for lenx in digits:
             x = self.getran(lenx)
             self.check_bitop_identities_1(x)
+            self.check_bitop_identities_1_cpu(x)
             for leny in digits:
                 y = self.getran(leny)
                 self.check_bitop_identities_2(x, y)
@@ -944,11 +961,9 @@ class LongTest(yp_unittest.TestCase):
         self.assertIs(i - i, yp_int(0))
         self.assertIs(0 * i, yp_int(0))
 
-    @support.requires_resource('cpu')
-    def test_bit_length(self):
+    def check_bit_length(self, x_values):
         tiny = 1e-10
-        # Use a step of a nice prime number to cut down on the runtime of this test
-        for x in range(-65000, 65000, 37):
+        for x in x_values:
             x = yp_int(x)
             k = x.bit_length()
             # Check equivalence with Python version
@@ -983,6 +998,13 @@ class LongTest(yp_unittest.TestCase):
             self.assertEqual((-a).bit_length(), i+1)
             self.assertEqual((a+1).bit_length(), i+1)
             self.assertEqual((-a-1).bit_length(), i+1)
+
+    def test_bit_length(self):
+        self.check_bit_length(random.sample(range(-130000, 130000),500))
+
+    @support.requires_resource('cpu')
+    def test_bit_length_cpu(self):
+        self.check_bit_length(range(-65000, 65000))
 
     @yp_unittest.skip("TODO: Implement floats in nohtyP")
     def test_round(self):
