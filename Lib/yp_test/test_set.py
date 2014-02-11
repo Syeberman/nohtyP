@@ -759,7 +759,7 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
         f = self.thetype('abcdcda')
         self.assertEqual(yp_hash(f), yp_hash(f))
 
-    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    @support.requires_resource('cpu')
     def test_hash_effectiveness(self):
         n = 13
         hashvalues = yp_set()
@@ -1729,6 +1729,7 @@ def L(seqn):
 
 class TestVariousIteratorArgs(yp_unittest.TestCase):
 
+    @support.requires_resource('cpu')
     def test_constructor(self):
         for cons in (yp_set, yp_frozenset):
             for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
@@ -1738,6 +1739,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
                 self.assertRaises(TypeError, cons , N(s))
                 self.assertRaises(ZeroDivisionError, cons , E(s))
 
+    @support.requires_resource('cpu')
     def test_inline_methods(self):
         s = yp_set('november')
         for data in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5), 'december'):
@@ -1753,6 +1755,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
                 self.assertRaises(TypeError, meth, N(s))
                 self.assertRaises(ZeroDivisionError, meth, E(s))
 
+    @support.requires_resource('cpu')
     def test_inplace_methods(self):
         for data in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5), 'december'):
             for methname in ('update', 'intersection_update',

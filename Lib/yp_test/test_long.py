@@ -330,6 +330,7 @@ class LongTest(yp_unittest.TestCase):
         eq(x | (y & z), (x | y) & (x | z),
              Frm("x | (y & z) != (x | y) & (x | z) for x=%r, y=%r, z=%r", (x, y, z)))
 
+    @support.requires_resource('cpu')
     def test_bitop_identities(self):
         for x in special:
             self.check_bitop_identities_1(x)
@@ -943,6 +944,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertIs(i - i, yp_int(0))
         self.assertIs(0 * i, yp_int(0))
 
+    @support.requires_resource('cpu')
     def test_bit_length(self):
         tiny = 1e-10
         # Use a step of a nice prime number to cut down on the runtime of this test

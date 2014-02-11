@@ -395,6 +395,7 @@ class DictTest(yp_unittest.TestCase):
         self.assertEqual(hashed2.hash_count, 1)
         self.assertEqual(hashed1.eq_count + hashed2.eq_count, 1)
 
+    @support.requires_resource('cpu')
     def test_popitem(self):
         # yp_dict.popitem()
         for copymode in -1, +1:
