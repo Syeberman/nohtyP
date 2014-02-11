@@ -59,7 +59,7 @@ class TupleTest(seq_tests.CommonTest):
                 yield i
         self.assertEqual(yp_list(yp_tuple(f())), yp_list(range(1000)))
 
-    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    @support.requires_resource('cpu')
     def test_hash(self):
         # See SF bug 942952:  Weakness in tuple hash
         # The hash should:
@@ -77,12 +77,12 @@ class TupleTest(seq_tests.CommonTest):
         #      is sorely suspect.
 
         N=50
-        base = _list(yp_int(x) for x in range(N))
-        xp = [yp_tuple((i, j)) for i in base for j in base]
-        inps = base + [yp_tuple((i, j)) for i in base for j in xp] + \
-                     [yp_tuple((i, j)) for i in xp for j in base] + xp + _list(zip(base))
-        collisions = len(inps) - len(set(map(hash, inps)))
-        self.assertTrue(collisions <= 15)
+        base = yp_list(yp_int(x) for x in range(N))
+        xp = yp_list(yp_tuple((i, j)) for i in base for j in base)
+        inps = base + yp_list(yp_tuple((i, j)) for i in base for j in xp) + \
+                     yp_list(yp_tuple((i, j)) for i in xp for j in base) + xp + yp_list(zip(base))
+        collisions = yp_len(inps) - yp_len(yp_set(map(yp_hash, inps)))
+        self.assertLessEqual(collisions, 15)
 
     def test_repr(self):
         l0 = yp_tuple()
@@ -170,7 +170,7 @@ class TupleTest(seq_tests.CommonTest):
         # Trying to untrack an unfinished tuple could crash Python
         self._not_tracked(yp_tuple(gc.collect() for i in range(101)))
 
-    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    @support.requires_resource('cpu')
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):

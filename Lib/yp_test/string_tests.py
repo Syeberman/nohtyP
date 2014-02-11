@@ -202,7 +202,7 @@ class BaseTest:
         # XXX Not applicable to nohtyP: ints don't go up that high
         #self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
    
-    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    @support.requires_resource('cpu')
     def test_find_combinations(self):
         # For a variety of combinations,
         #    verify that str.find() matches __contains__
@@ -252,7 +252,7 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'rfind', 42)
 
-    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    @support.requires_resource('cpu')
     def test_rfind_combinations(self):
         # For a variety of combinations,
         #    verify that str.rfind() matches __contains__

@@ -69,12 +69,12 @@ class ListTest(list_tests.CommonTest):
         self.assertRaises((MemoryError, OverflowError), mul, lst, n)
         self.assertRaises((MemoryError, OverflowError), imul, lst, n)
 
-    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    @support.requires_resource('cpu')
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):
             l = yp_list([0]) * n
-            s = repr(l)
+            s = yp_repr(l)
             self.assertEqual(s,
                 '[' + ', '.join(['0'] * n) + ']')
         check(10)       # check our checking code

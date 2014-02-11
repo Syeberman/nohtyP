@@ -424,12 +424,10 @@ class IOTest(yp_unittest.TestCase):
         # therefore the resource must be enabled to run this test.
         if sys.platform[:3] == 'win' or sys.platform == 'darwin':
             if not support.is_resource_enabled("largefile"):
-                print("\nTesting large file ops skipped on %s." % sys.platform,
-                      file=sys.stderr)
-                print("It requires %d bytes and a long time." % self.LARGE,
-                      file=sys.stderr)
-                print("Use 'regrtest.py -u largefile test_io' to run it.",
-                      file=sys.stderr)
+                raise yp_unittest.SkipTest(
+                    "Testing large file ops skipped, it requires %d bytes and "
+                    "a long time. Use 'regrtest.py -u largefile test_io' to "
+                    "run it." % self.LARGE)
                 return
         with self.open(support.TESTFN, "w+b", 0) as f:
             self.large_file_ops(f)

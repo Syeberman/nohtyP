@@ -197,6 +197,7 @@ class BaseBytesTest:
         self.assertEqual(b[-5:100], by("world"))
         self.assertEqual(b[-100:5], by("Hello"))
 
+    @yp_test.support.requires_resource('cpu')
     def test_extended_getslice(self):
         # Test extended slicing by comparing with list slicing.
         L = list(range(255))
@@ -967,7 +968,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b[2:2] = b1             # data should have moved out
         self.assertEqual(b, b2+b1+b2)
 
-    @yp_unittest.skip("TODO re-enable (it just takes a long time)")
+    @yp_test.support.requires_resource('cpu')
     def test_extended_set_del_slice(self):
         # XXX ctypes truncates large ints, making them look valid in nohtyP tests
         #indices = (0, None, 1, 3, 19, 300, 1<<333, -1, -2, -31, -300)
