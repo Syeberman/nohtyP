@@ -569,6 +569,16 @@ yp_STATIC_ASSERT( yp_sizeof( _yp_uint_t ) == yp_sizeof( yp_int_t ), sizeof_yp_ui
 #define _ypHASH_INF 314159
 #define _ypHASH_NAN 0
 
+// Return the hash of the given int; always succeeds
+static yp_hash_t yp_HashInt( yp_int_t v )
+{
+    // FIXME int is larger than hash on 32-bit systems, so this truncates data, which we don't
+    // want; better is to adapt the long_hash algorithm to this datatype
+    yp_hash_t hash = (yp_hash_t) v;
+    if( hash == ypObject_HASH_INVALID ) hash -= 1;
+    return hash;
+}
+
 // Return the hash of the given double; always succeeds
 // XXX Adapted from Python's _Py_HashDouble
 static yp_hash_t yp_HashDouble( double v )
@@ -2945,10 +2955,7 @@ static ypObject *int_currenthash( ypObject *i,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
     // This must remain consistent with the other numeric types
-    // FIXME int is larger than hash on 32-bit systems, so this truncates data, which we don't
-    // want; better is to adapt the long_hash algorithm to this datatype
-    *hash = (yp_hash_t) ypInt_VALUE( i );
-    if( *hash == ypObject_HASH_INVALID ) *hash -= 1;
+    *hash = yp_HashInt( ypInt_VALUE( i ) );
     return yp_None;
 }
 
@@ -9649,7 +9656,7 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
 
 typedef struct {
     ypObject_HEAD
-    yp_int_t start;
+    yp_int_t start; // all ranges of len < 1 have a start of 0
     yp_int_t step;  // all ranges of len < 2 have a step of 1
 } ypRangeObject;
 
@@ -9658,10 +9665,17 @@ typedef struct {
 #define ypRange_LEN         ypObject_CACHED_LEN
 #define ypRange_SET_LEN     ypObject_SET_CACHED_LEN
 
+// We normalize start and step for small ranges to make comparisons and hashes easier; use this to
+// ensure we've done it correctly
+#define ypRange_ASSERT_NORMALIZED( r ) \
+    do {yp_ASSERT( ypRange_LEN( r ) > 0 || ypRange_START( r ) == 0, "empty range should have start of 0" ); \
+        yp_ASSERT( ypRange_LEN( r ) > 1 || ypRange_STEP( r ) == 1, "0- or 1-range should have step of 1" ); \
+    } while( 0 )
+
 // Returns the value at i, assuming i is an adjusted index
 #define ypRange_GET_INDEX( r, i )   (ypRange_START( r ) + (ypRange_STEP( r ) * (i)))
 
-// Returns true if the two ranges are equal, assuming x is also a range
+// Returns true if the two ranges are equal (assuming r and x both pass ypRange_ASSERT_NORMALIZED)
 #define ypRange_ARE_EQUAL( r, x ) \
     ( ypRange_LEN( r ) == ypRange_LEN( x ) && \
       ypRange_START( r ) == ypRange_START( x ) && \
@@ -9711,20 +9725,52 @@ static ypObject *range_len( ypObject *r, yp_ssize_t *len )
 }
 
 static ypObject *range_eq( ypObject *r, ypObject *x ) {
+    ypRange_ASSERT_NORMALIZED( r );
+    ypRange_ASSERT_NORMALIZED( x );
     if( r == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( ypRange_ARE_EQUAL( r, x ) );
 }
 static ypObject *range_ne( ypObject *r, ypObject *x ) {
-    if( r == x ) return yp_False;
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
-    return ypBool_FROM_C( !ypRange_ARE_EQUAL( r, x ) );
+    ypObject *result = range_eq( r, x );
+    return ypBool_NOT( result );
 }
 
-// TODO Unless Python does differently, this should return the same hash tuple(r) would return
+/* Hash function for range objects.  Rough C equivalent of
+   if not len(r):
+       return hash((len(r), 0, 1))
+   if len(r) == 1:
+       return hash((len(r), r.start, 1))
+   return hash((len(r), r.start, r.step))
+*/
+// XXX Where Python uses None for start if len<1, we use 0, and where it uses None for step if
+// len<2, we use 1
+// XXX Adapted from Python's tuplehash and range_hash
 static ypObject *range_currenthash( ypObject *r,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
-    return yp_NotImplementedError;
+        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+{
+    yp_uhash_t x = 0x345678;
+    yp_uhash_t mult = _ypHASH_MULTIPLIER;
+
+    ypRange_ASSERT_NORMALIZED( r );
+
+    x = (x ^ yp_HashInt( ypRange_LEN( r ) )) * mult;
+    mult += (yp_hash_t)(82520L + 2 + 2);
+
+    x = (x ^ yp_HashInt( ypRange_START( r ) )) * mult;
+    mult += (yp_hash_t)(82520L + 1 + 1);
+
+    x = (x ^ yp_HashInt( ypRange_STEP( r ) )) * mult;
+    mult += (yp_hash_t)(82520L + 0 + 0);
+
+    x += 97531L;
+    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
+        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
+    }
+    *hash = (yp_hash_t)x;
+    // Since we never contain mutable objects, we can cache our hash
+    ypObject_CACHED_HASH( yp_None ) = *hash;
+    return yp_None;
 }
 
 static ypObject *range_dealloc( ypObject *r ) {

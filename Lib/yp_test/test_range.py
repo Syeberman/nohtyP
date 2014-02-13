@@ -564,12 +564,12 @@ class RangeTest(yp_unittest.TestCase):
         for a in test_ranges:
             for b in test_ranges:
                 if a == b:
-                    self.assertEqual(hash(a), hash(b))
+                    self.assertEqual(yp_hash(a), yp_hash(b))
 
         # Ranges are unequal to other types (even sequence types)
-        self.assertIs(yp_range(0) == (), False)
-        self.assertIs(() == yp_range(0), False)
-        self.assertIs(yp_range(2) == [0, 1], False)
+        self.assertFalse(yp_range(0) == ())
+        self.assertFalse(() == yp_range(0))
+        self.assertFalse(yp_range(2) == [0, 1])
 
         # Huge integers aren't a problem.
         self.assertEqual(yp_range(0, 2**100 - 1, 2),
