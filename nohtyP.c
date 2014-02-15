@@ -9718,17 +9718,17 @@ static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
     return yp_intC( ypRange_GET_INDEX( r, i ) );
 }
 
-static ypObject *range_len( ypObject *r, yp_ssize_t *len )
-{
+static ypObject *range_len( ypObject *r, yp_ssize_t *len ) {
     *len = ypRange_LEN( r );
     return yp_None;
 }
 
-static ypObject *range_eq( ypObject *r, ypObject *x ) {
-    ypRange_ASSERT_NORMALIZED( r );
-    ypRange_ASSERT_NORMALIZED( x );
+static ypObject *range_eq( ypObject *r, ypObject *x ) 
+{
     if( r == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
+    ypRange_ASSERT_NORMALIZED( r );
+    ypRange_ASSERT_NORMALIZED( x );
     return ypBool_FROM_C( ypRange_ARE_EQUAL( r, x ) );
 }
 static ypObject *range_ne( ypObject *r, ypObject *x ) {
@@ -9866,7 +9866,7 @@ static ypTypeObject ypRange_Type = {
 // XXX Adapted from Python's get_len_of_range
 ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
 {
-    yp_int_t len;
+    _yp_uint_t ulen;
     ypObject *newR;
 
     // Denying yp_INT_T_MIN ensures step can be negated
@@ -9886,21 +9886,26 @@ ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
     precision to compute the RHS exactly.  The analysis for step < 0
     is similar.
     ---------------------------------------------------------------*/
+    // Cast to unsigned to avoid undefined behaviour (a la yp_UINT_MATH)
     if( step < 0 ) {
         if( stop >= start ) return _yp_range_empty;
-        len = 1 + (start - 1 - stop) / (-step);
+        ulen = ((_yp_uint_t) start) - 1u - ((_yp_uint_t) stop);
+        ulen = 1u + ulen / ((_yp_uint_t) -step);
     } else {
         if( start >= stop ) return _yp_range_empty;
-        len = 1 + (stop - 1 - start) / step;
+        ulen = ((_yp_uint_t) stop) - 1u - ((_yp_uint_t) start);
+        ulen = 1u + ulen / ((_yp_uint_t) step);
     }
-    if( len > ypObject_LEN_MAX ) return yp_SystemLimitationError;
-    if( len < 2 ) step = 1; // makes comparisons easier
+    // TODO We could store len in our own _yp_uint_t field, to allow for larger ranges
+    if( ulen > ((_yp_uint_t) ypObject_LEN_MAX) ) return yp_SystemLimitationError;
+    if( ulen < 2 ) step = 1; // makes comparisons easier
 
     newR = ypMem_MALLOC_FIXED( ypRangeObject, ypRange_CODE );
     if( yp_isexceptionC( newR ) ) return newR;
     ypRange_START( newR ) = start;
     ypRange_STEP( newR ) = step;
-    ypRange_SET_LEN( newR, len );
+    ypRange_SET_LEN( newR, ulen );
+    ypRange_ASSERT_NORMALIZED( newR );
     return newR;
 }
 ypObject *yp_rangeC( yp_int_t stop ) {

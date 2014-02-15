@@ -571,6 +571,8 @@ class RangeTest(yp_unittest.TestCase):
         self.assertFalse(() == yp_range(0))
         self.assertFalse(yp_range(2) == [0, 1])
 
+    @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
+    def test_comparison_long_ints(self):
         # Huge integers aren't a problem.
         self.assertEqual(yp_range(0, 2**100 - 1, 2),
                          yp_range(0, 2**100, 2))
@@ -585,6 +587,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotEqual(yp_range(2**200, 2**201, 2**100),
                             yp_range(2**200, 2**201 + 1, 2**100))
 
+    def test_comparison_relative(self):
         # Order comparisons are not implemented for ranges.
         with self.assertRaises(TypeError):
             yp_range(0) < yp_range(0)
