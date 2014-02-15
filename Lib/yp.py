@@ -491,23 +491,31 @@ yp_func( c_yp_ssize_t, "yp_findC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, 
     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
 
 # yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_findC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+    c_ypObject_pp_exc) )
 
 # yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc );
 yp_func( c_yp_ssize_t, "yp_indexC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
 # yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_indexC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+    c_ypObject_pp_exc) )
 
 # yp_ssize_t yp_rfindC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc );
 yp_func( c_yp_ssize_t, "yp_rfindC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
 # yp_ssize_t yp_rfindC( ypObject *sequence, ypObject *x, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_rfindC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+    c_ypObject_pp_exc) )
 # yp_ssize_t yp_rindexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc );
 yp_func( c_yp_ssize_t, "yp_rindexC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
 # yp_ssize_t yp_rindexC( ypObject *sequence, ypObject *x, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_rindexC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+    c_ypObject_pp_exc) )
 
 # yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #        ypObject **exc );
@@ -515,6 +523,8 @@ yp_func( c_yp_ssize_t, "yp_countC4", ((c_ypObject_p, "sequence"), (c_ypObject_p,
     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc) )
 
 # yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc );
+yp_func( c_yp_ssize_t, "yp_countC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+    c_ypObject_pp_exc) )
 
 # void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
 
@@ -1024,20 +1034,22 @@ class ypObject( c_ypObject_p ):
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
 
-    def _sliceSearch( self, func, x, i, j ):
+    def _sliceSearch( self, func2, func4, x, i, j ):
+        if i is None and j is None: 
+            return yp_int( func2( self, x, yp_None ) )
         if i is None: i = 0
         if j is None: j = _yp_SLICE_USELEN
-        return yp_int( func( self, x, i, j, yp_None ) )
+        return yp_int( func4( self, x, i, j, yp_None ) )
     def find( self, x, i=None, j=None ):
-        return self._sliceSearch( _yp_findC4, x, i, j )
+        return self._sliceSearch( _yp_findC, _yp_findC4, x, i, j )
     def index( self, x, i=None, j=None ):
-        return self._sliceSearch( _yp_indexC4, x, i, j )
+        return self._sliceSearch( _yp_indexC, _yp_indexC4, x, i, j )
     def rfind( self, x, i=None, j=None ):
-        return self._sliceSearch( _yp_rfindC4, x, i, j )
+        return self._sliceSearch( _yp_rfindC, _yp_rfindC4, x, i, j )
     def rindex( self, x, i=None, j=None ):
-        return self._sliceSearch( _yp_rindexC4, x, i, j )
+        return self._sliceSearch( _yp_rindexC, _yp_rindexC4, x, i, j )
     def count( self, x, i=None, j=None ):
-        return self._sliceSearch( _yp_countC4, x, i, j )
+        return self._sliceSearch( _yp_countC, _yp_countC4, x, i, j )
 
     def append( self, x ): _yp_append( self, x )
     def extend( self, t ): _yp_extend( self, _yp_iterable( t ) )
