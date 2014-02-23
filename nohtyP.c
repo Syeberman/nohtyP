@@ -9718,6 +9718,28 @@ static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
     return yp_intC( ypRange_GET_INDEX( r, i ) );
 }
 
+static ypObject *range_contains( ypObject *r, ypObject *x )
+{
+    yp_int_t r_end;
+    yp_int_t x_asint;
+
+    // TODO ints-as-floats, like 5.0, are allowed
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return yp_False;
+    x_asint = ypInt_VALUE( x );
+
+    r_end = ypRange_GET_INDEX( r, ypRange_LEN( r ) );
+    if( ypRange_STEP( r ) < 0 ) {
+        if( x_asint <= r_end || ypRange_START( r ) < x_asint ) {
+            return yp_False;
+        }
+    } else {
+        if( x_asint < ypRange_START( r ) || r_end <= x_asint ) {
+            return yp_False;
+        }
+    }
+    return ypBool_FROM_C( (x_asint - ypRange_START( r )) % ypRange_STEP( r ) == 0 );
+}
+
 static ypObject *range_len( ypObject *r, yp_ssize_t *len ) {
     *len = ypRange_LEN( r );
     return yp_None;
@@ -9842,7 +9864,7 @@ static ypTypeObject ypRange_Type = {
     TypeError_objobjproc,           // tp_send
 
     // Container operations
-    MethodError_objobjproc,         // tp_contains
+    range_contains,                 // tp_contains
     range_len,                      // tp_len
     MethodError_objobjproc,         // tp_push
     MethodError_objproc,            // tp_clear
