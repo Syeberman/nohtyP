@@ -458,7 +458,8 @@ yp_func( c_ypObject_p, "yp_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container"
 yp_func( c_ypObject_p, "yp_not_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")) )
 
 # yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
-yp_func( c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc) )
+yp_func( c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc), 
+        errcheck=False )
 
 # void yp_push( ypObject **container, ypObject *x );
 yp_func( c_void, "yp_push", ((c_ypObject_pp, "container"), (c_ypObject_p, "x")) )
@@ -1029,7 +1030,12 @@ class ypObject( c_ypObject_p ):
     def __reversed__( self ): return _yp_reversed( self )
 
     def __contains__( self, x ): return _yp_contains( self, x )
-    def __len__( self ): return _yp_lenC( self, yp_None )
+    def __len__( self ): 
+        # errcheck disabled for _yp_lenC, so do it here
+        exc = c_ypObject_pp( yp_None )
+        result = _yp_lenC( self, exc )
+        exc._yp_errcheck( )
+        return result
     def push( self, x ): _yp_push( self, x )
     def clear( self ): _yp_clear( self )
     def pop( self ): return _yp_pop( self )
@@ -1344,7 +1350,7 @@ c_ypObject_p_value( "yp_i_two" )
 def yp_len( x ):
     """Returns len( x ) of a ypObject as a yp_int"""
     if not isinstance( x, ypObject ): raise TypeError( "expected ypObject in yp_len" )
-    return yp_int( _yp_lenC( x, yp_None ) )
+    return yp_int( len( x ) )
 
 def yp_hash( x ):
     """Returns hash( x ) of a ypObject as a yp_int"""
@@ -1387,6 +1393,7 @@ class _ypBytes( ypObject ):
         super( )._yp_errcheck( )
         data, size = self._get_data_size( )
         assert string_at( data.value+size, 1 ) == b"\x00", "missing null terminator"
+        return data, size
 
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
@@ -1405,6 +1412,12 @@ class yp_bytes( _ypBytes ):
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asbytes( ) ) )
     _yp_repr = _yp_str
+    def _yp_errcheck( self ):
+        data, size = super( )._yp_errcheck( )
+        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        #if size < 1 and "_yp_bytes_empty" in globals( ):
+        #    assert self is _yp_bytes_empty, "an empty bytes should be _yp_bytes_empty"
+_yp_bytes_empty = yp_bytes( )
 
 # FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
 # FIXME Just generally move more of this logic into nohtyP, when available
@@ -1455,6 +1468,9 @@ class yp_str( ypObject ):
         encoded, size, encoding = self._get_encoded_size_encoding( )
         assert encoding == "latin-1"
         assert string_at( encoded.value+size, 1 ) == b"\x00", "missing null terminator"
+        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        #if size < 1 and "_yp_str_empty" in globals( ):
+        #    assert self is _yp_str_empty, "an empty str should be _yp_str_empty"
 
     # Just as yp_bool.__bool__ must return a bool, so to must this return a str
     def __str__( self ):
@@ -1477,6 +1493,7 @@ class yp_str( ypObject ):
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
 c_ypObject_p_value( "yp_s_strict" )
+_yp_str_empty = yp_str( )
 yp_s_None = yp_str( "None" )
 yp_s_True = yp_str( "True" )
 yp_s_False = yp_str( "False" )
@@ -1502,6 +1519,11 @@ class yp_tuple( _ypTuple ):
     def __new__( cls, iterable=_yp_arg_missing ):
         if iterable is _yp_arg_missing: return _yp_tupleN( )
         return _yp_tuple( _yp_iterable( iterable ) )
+    def _yp_errcheck( self ):
+        super( )._yp_errcheck( )
+        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        #if len( self ) < 1 and "_yp_tuple_empty" in globals( ):
+        #    assert self is _yp_tuple_empty, "an empty tuple should be _yp_tuple_empty"
     # FIXME When nohtyP supports str/repr, replace this faked-out version
     def _yp_str( self ):
         return yp_str( "(%s)" % ", ".join( repr( x ) for x in self ) )
@@ -1589,6 +1611,12 @@ class _ypSet( ypObject ):
 @pytype( yp_type_frozenset, frozenset )
 class yp_frozenset( _ypSet ):
     _ypSet_constructor = _yp_frozenset
+    def _yp_errcheck( self ):
+        super( )._yp_errcheck( )
+        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        #if len( self ) < 1 and "_yp_frozenset_empty" in globals( ):
+        #    assert self is _yp_frozenset_empty, "an empty frozenset should be _yp_frozenset_empty"
+_yp_frozenset_empty = yp_frozenset( )
 
 @pytype( yp_type_set, set )
 class yp_set( _ypSet ):
@@ -1686,7 +1714,11 @@ class yp_range( ypObject ):
     def __new__( cls, *args ):
         if len( args ) == 1: return _yp_rangeC( args[0] )
         return cls._new_range( *args )
-
+    def _yp_errcheck( self ):
+        super( )._yp_errcheck( )
+        if len( self ) < 1 and "_yp_range_empty" in globals( ):
+            assert self is _yp_range_empty, "an empty range should be _yp_range_empty"
+_yp_range_empty = yp_range( 0 )
 
 # FIXME integrate this somehow with unittest
 #import os
