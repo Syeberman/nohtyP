@@ -4826,17 +4826,24 @@ static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssiz
     return yp_None;
 }
 
+// Called when concatenating with an empty object: can simply make a copy (ensuring proper type)
+static ypObject *_bytes_concat_copy( int type, ypObject *b )
+{
+    if( type == ypBytes_CODE ) return bytes_frozen_copy( b );
+    return bytes_unfrozen_copy( b );
+}
 static ypObject *bytes_concat( ypObject *b, ypObject *x )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
     yp_ssize_t newLen;
     ypObject *newB;
 
-    if( x_pair != ypBytes_CODE ) return_yp_BAD_TYPE( x );
+    // Check the type, and optimize the case where b or x are empty
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return_yp_BAD_TYPE( x );
+    if( ypBytes_LEN( x ) < 1 ) return _bytes_concat_copy( ypObject_TYPE_CODE( b ), b );
+    if( ypBytes_LEN( b ) < 1 ) return _bytes_concat_copy( ypObject_TYPE_CODE( b ), x );
 
     if( ypBytes_LEN( b ) > ypBytes_LEN_MAX - ypBytes_LEN( x ) ) return yp_MemorySizeOverflowError;
     newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
-    if( newLen < 1 && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return _yp_bytes_empty;
     newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
@@ -5481,7 +5488,7 @@ static ypObject *_ypBytes( int type, ypObject *source )
             // Ignore errors determining lenhint; it just means we can't pre-allocate
             lenhint = yp_iter_lenhintC( source, &exc );
             if( lenhint > ypBytes_LEN_MAX ) lenhint = ypBytes_LEN_MAX;
-        } else if( lenhint == 0 ) {
+        } else if( lenhint < 1 ) {
             // yp_lenC reports an empty iterable, so we can shortcut _ypBytes_extend
             if( type == ypBytes_CODE ) return _yp_bytes_empty;
             newB = _ypBytes_new( ypByteArray_CODE, 0, /*alloclen_fixed=*/FALSE );
@@ -5586,16 +5593,24 @@ static ypObject *str_bool( ypObject *s ) {
     return ypBool_FROM_C( ypStr_LEN( s ) );
 }
 
+// Called when concatenating with an empty object: can simply make a copy (ensuring proper type)
+static ypObject *_str_concat_copy( int type, ypObject *s )
+{
+    if( type == ypStr_CODE ) return str_frozen_copy( s );
+    return str_unfrozen_copy( s );
+}
 static ypObject *str_concat( ypObject *s, ypObject *x )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     yp_ssize_t newLen;
     ypObject *newS;
 
+    // Check the type, and optimize the case where s or x are empty
     if( x_pair != ypStr_CODE ) return_yp_BAD_TYPE( x );
+    if( ypStr_LEN( x ) < 1 ) return _str_concat_copy( ypObject_TYPE_CODE( s ), s );
+    if( ypStr_LEN( s ) < 1 ) return _str_concat_copy( ypObject_TYPE_CODE( s ), x );
 
     newLen = ypStr_LEN( s ) + ypStr_LEN( x );
-    if( newLen < 1 && ypObject_TYPE_CODE( s ) == ypStr_CODE ) return _yp_str_empty;
     newS = _ypStr_new( ypObject_TYPE_CODE( s ), newLen+1, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newS ) ) return newS;
 
@@ -6235,12 +6250,20 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
     ypObject *newSq;
     ypObject *result;
     yp_ssize_t iterable_maxLen = ypTuple_LEN_MAX - ypTuple_LEN( sq );
-    yp_ssize_t lenhint = yp_lenC( iterable, &exc );
+    yp_ssize_t lenhint;
+
+    // Optimize the case where sq is empty (an empty iterable is special-cased below)
+    if( ypTuple_LEN( sq ) < 1 ) {
+        if( ypObject_TYPE_CODE( sq ) == ypTuple_CODE ) return yp_tuple( iterable );
+        return yp_list( iterable );
+    }
+
+    lenhint = yp_lenC( iterable, &exc );
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
         if( lenhint > iterable_maxLen ) lenhint = iterable_maxLen;
-    } else if( lenhint == 0 ) {
+    } else if( lenhint < 1 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if( ypObject_TYPE_CODE( sq ) == ypTuple_CODE ) return yp_incref( sq );
         return _ypTuple_copy( ypList_CODE, sq, /*alloclen_fixed=*/FALSE );
@@ -6942,7 +6965,7 @@ static ypObject *_ypTuple( int type, ypObject *iterable )
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
         if( lenhint > ypTuple_LEN_MAX ) lenhint = ypTuple_LEN_MAX;
-    } else if( lenhint == 0 ) {
+    } else if( lenhint < 1 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if( type == ypTuple_CODE ) return _yp_tuple_empty;
         return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
@@ -7284,6 +7307,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
 // yp_None, or an exception on error.
 // TODO The dict implementation has a bunch of these for various scenarios; let's keep it simple
 // for now, but investigate...
+// TODO Update as per http://bugs.python.org/issue18771?
 // XXX Adapted from Python's lookdict in dictobject.c
 static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t hash,
         ypSet_KeyEntry **loc )
@@ -8458,7 +8482,7 @@ static ypObject *_ypSet( int type, ypObject *iterable )
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
         if( lenhint > ypSet_LEN_MAX ) lenhint = ypSet_LEN_MAX;
-    } else if( lenhint == 0 ) {
+    } else if( lenhint < 1 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypSet_update
         if( type == ypFrozenSet_CODE ) return _yp_frozenset_empty;
         return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
@@ -9507,7 +9531,7 @@ static ypObject *_ypDict( int type, ypObject *x )
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( x, &exc );
         if( lenhint > ypSet_LEN_MAX ) lenhint = ypSet_LEN_MAX;
-    } else if( lenhint == 0 ) {
+    } else if( lenhint < 1 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update
         if( type == ypFrozenDict_CODE ) return _yp_frozenset_empty;
         return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
@@ -9601,7 +9625,7 @@ static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
         if( lenhint > ypSet_LEN_MAX ) lenhint = ypSet_LEN_MAX;
-    } else if( lenhint == 0 ) {
+    } else if( lenhint < 1 ) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_push
         if( type == ypFrozenDict_CODE ) return _yp_frozendict_empty;
         return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
@@ -9723,7 +9747,7 @@ static ypObject *range_len( ypObject *r, yp_ssize_t *len ) {
     return yp_None;
 }
 
-static ypObject *range_eq( ypObject *r, ypObject *x ) 
+static ypObject *range_eq( ypObject *r, ypObject *x )
 {
     if( r == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypRange_CODE ) return yp_ComparisonNotImplemented;
