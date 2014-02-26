@@ -55,11 +55,11 @@
 #define _yp_S__LINE__ _yp_S_(__LINE__)
 
 #if yp_DEBUG_LEVEL >= 1
-#define _yp_ASSERT( file, line, expr, ... ) \
+#define _yp_ASSERT( s_file, s_line, expr, ... ) \
     do { \
         if( !(expr) ) { \
-            _flushall( ); \
-            fprintf( stderr, "%s", "\n  File " file ", line " line "\n    " #expr "\n" ); \
+            (void) _flushall( ); \
+            fprintf( stderr, "%s", "\n  File " s_file ", line " s_line "\n    " #expr "\n" ); \
             fprintf( stderr, "yp_ASSERT: " __VA_ARGS__ ); \
             fprintf( stderr, "\n" ); \
             abort( ); \
@@ -83,8 +83,8 @@ static void yp_breakonerr( ypObject *err ) {
 #endif
 
 #if yp_DEBUG_LEVEL >= 10
-#define yp_DEBUG0( fmt ) do { _flushall( ); fprintf( stderr, fmt "\n" ); _flushall( ); } while( 0 )
-#define yp_DEBUG( fmt, ... ) do { _flushall( ); fprintf( stderr, fmt "\n", __VA_ARGS__ ); _flushall( ); } while( 0 )
+#define yp_DEBUG0( fmt ) do { (void) _flushall( ); fprintf( stderr, fmt "\n" ); (void) _flushall( ); } while( 0 )
+#define yp_DEBUG( fmt, ... ) do { (void) _flushall( ); fprintf( stderr, fmt "\n", __VA_ARGS__ ); (void) _flushall( ); } while( 0 )
 #else
 #define yp_DEBUG0( fmt )
 #define yp_DEBUG( fmt, ... )
@@ -538,8 +538,8 @@ int yp_isexceptionC( ypObject *x ) {
 // avoid undefined behaviour on overflow.
 typedef yp_uint64_t _yp_uint_t;
 yp_STATIC_ASSERT( yp_sizeof( _yp_uint_t ) == yp_sizeof( yp_int_t ), sizeof_yp_uint_eq_yp_int );
-#define yp_UINT_MATH( x, op, y ) ((yp_int_t) (((_yp_uint_t)x) op ((_yp_uint_t)y)))
-#define yp_USIZE_MATH( x, op, y ) ((yp_ssize_t) (((size_t)x) op ((size_t)y)))
+#define yp_UINT_MATH( x, op, y ) ((yp_int_t) (((_yp_uint_t)(x)) op ((_yp_uint_t)(y))))
+#define yp_USIZE_MATH( x, op, y ) ((yp_ssize_t) (((size_t)(x)) op ((size_t)(y))))
 
 #if defined( _MSC_VER )
 #define yp_IS_NAN _isnan
@@ -1409,7 +1409,7 @@ static ypObject *iter_close( ypObject *i )
     ypObject *result = ypIter_FUNC( i )( i, yp_GeneratorExit );
 
     // Close off this iterator
-    iter_traverse( i, _iter_closing_visitor, NULL ); // never fails
+    (void) iter_traverse( i, _iter_closing_visitor, NULL ); // never fails
     ypIter_OBJLOCS( i ) = 0x0u; // they are all discarded now...
     ypIter_LENHINT( i ) = 0;
     ypIter_FUNC( i ) = _iter_closed_generator;
@@ -1448,12 +1448,12 @@ static ypObject *iter_send( ypObject *i, ypObject *value )
     // iter_close fails just ignore it: result is already set to an exception.
     ypObject *result = ypIter_FUNC( i )( i, value );
     ypIter_LENHINT( i ) -= 1;
-    if( yp_isexceptionC( result ) ) iter_close( i );
+    if( yp_isexceptionC( result ) ) (void) iter_close( i );
     return result;
 }
 
 static ypObject *iter_dealloc( ypObject *i ) {
-    iter_close( i ); // ignore errors; discards all references
+    (void) iter_close( i ); // ignore errors; discards all references
     ypMem_FREE_CONTAINER( i, ypIterObject );
     return yp_None;
 }
@@ -1665,7 +1665,7 @@ ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhi
     memcpy( ypIter_STATE( i ), state, size );
     ypIter_SET_STATE_SIZE( i, size );
     ypIter_OBJLOCS( i ) = objlocs;
-    iter_traverse( i, _iter_constructing_visitor, NULL ); // never fails
+    (void) iter_traverse( i, _iter_constructing_visitor, NULL ); // never fails
     return i;
 }
 
@@ -1799,12 +1799,10 @@ static ypObject *_yp_freeze( ypObject *x )
     newType = ypTypeTable[newCode];
     yp_ASSERT( newType != NULL, "all types should have an immutable counterpart" );
 
-    // Freeze the object, cache the final hash (via yp_hashC), possibly reduce memory usage, etc
+    // Freeze the object, possibly reduce memory usage, etc
     exc = newType->tp_freeze( x );
     if( yp_isexceptionC( exc ) ) return exc;
     ypObject_SET_TYPE_CODE( x, newCode );
-    x->ob_hash = ypObject_HASH_INVALID; // just in case
-    yp_hashC( x, &exc );
     return exc;
 }
 
@@ -2094,7 +2092,7 @@ extern ypObject * const yp_ComparisonNotImplemented;
         result = type->tp_ ## reflection( y, x ); \
         yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), "tp_" #reflection " must return yp_True, yp_False, or an exception" ); \
         if( result != yp_ComparisonNotImplemented ) return result; \
-        return defval; \
+        return (defval); \
     }
 _ypBool_PUBLIC_CMP_FUNCTION( lt, gt, yp_TypeError );
 _ypBool_PUBLIC_CMP_FUNCTION( le, ge, yp_TypeError );
@@ -2336,7 +2334,7 @@ static ypTypeObject ypException_Type = {
     yp_IMMORTAL_STR_LATIN1( name ## _name, #name ); \
     static ypExceptionObject _ ## name ## _struct = { \
         yp_IMMORTAL_HEAD_INIT( ypException_CODE, NULL, 0 ), \
-        (ypObject *) &_ ## name ## _name_struct, superptr }; \
+        (ypObject *) &_ ## name ## _name_struct, (superptr) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define _yp_IMMORTAL_EXCEPTION( name, super ) \
     _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, (ypObject *) &_ ## super ## _struct )
@@ -3341,7 +3339,7 @@ yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
 
 // Verify that this platform sign-extends on right-shifts (assumes compiler uses same rules
 // as target processor, which it should)
-yp_STATIC_ASSERT( (-1ll >> 1) == -1ll, right_shift_sign_extends );
+yp_STATIC_ASSERT( (-1LL >> 1) == -1LL, right_shift_sign_extends );
 
 // XXX Adapted from Python 2.7's int_lshift
 yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
@@ -3433,7 +3431,6 @@ static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithCFfu
 static void iarithmetic( ypObject **x, ypObject *y, iarithCfunc intop, iarithCFfunc floatop )
 {
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    ypObject *exc = yp_None;
 
     if( y_pair == ypInt_CODE ) {
         intop( x, ypInt_VALUE( y ) );
@@ -3549,7 +3546,6 @@ void yp_itruedivC( ypObject **x, yp_int_t y )
 void yp_itruediv( ypObject **x, ypObject *y )
 {
     int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    ypObject *exc = yp_None;
 
     if( y_pair == ypInt_CODE ) {
         yp_itruedivC( x, ypInt_VALUE( y ) );
@@ -4221,7 +4217,7 @@ static void iarithmeticCF( ypObject **x, yp_float_t y, arithLFfunc floatop )
     } else if( x_pair == ypInt_CODE ) {
         yp_float_t x_asfloat = yp_asfloatC( *x, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
-        result = floatop( ypFloat_VALUE( *x ), y, &exc );
+        result = floatop( x_asfloat, y, &exc );
         if( yp_isexceptionC( exc ) ) return_yp_INPLACE_ERR( x, exc );
         yp_decref( *x );
         *x = yp_floatCF( result );
@@ -7316,7 +7312,6 @@ static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t
     register size_t perturb;
     register ypSet_KeyEntry *freeslot;
     register size_t mask = (size_t) ypSet_MASK( so );
-    ypSet_KeyEntry *table = ypSet_TABLE( so );
     ypSet_KeyEntry *ep0 = ypSet_TABLE( so );
     register ypSet_KeyEntry *ep;
     register ypObject *cmp;
@@ -7357,7 +7352,8 @@ static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t
             freeslot = ep;
         }
     }
-    return yp_SystemError; // NOT REACHED
+    //lint -unreachable
+    return yp_SystemError;
 
 // When the code jumps here, it means ep points to the proper entry
 success:
@@ -9355,8 +9351,8 @@ static ypTypeObject ypFrozenDict_Type = {
     MethodError_objproc,            // tp_freeze
     frozendict_unfrozen_copy,       // tp_unfrozen_copy
     frozendict_frozen_copy,         // tp_frozen_copy
-    MethodError_traversefunc,       // tp_unfrozen_deepcopy
-    MethodError_traversefunc,       // tp_frozen_deepcopy
+    frozendict_unfrozen_deepcopy,   // tp_unfrozen_deepcopy
+    frozendict_frozen_deepcopy,     // tp_frozen_deepcopy
     MethodError_objproc,            // tp_invalidate
 
     // Boolean operations and comparisons
@@ -9488,7 +9484,6 @@ static ypTypeObject ypDict_Type = {
 
 static ypObject *_ypDictKV( int type, int n, va_list args )
 {
-    ypObject *exc = yp_None;
     ypObject *newMp;
     ypObject *result;
 
