@@ -1155,6 +1155,19 @@ static ypObject *_ypMem_malloc_container_variable(
     _ypMem_malloc_container_variable( yp_offsetof( obStruct, ob_inline_data ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (required), (extra) )
 
+// Returns the allocated length of the inline data buffer for the given object, which must have
+// been allocated with ypMem_MALLOC_CONTAINER_VARIABLE.
+// TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
+static yp_ssize_t _ypMem_inlinelen_container_variable( 
+        yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems ) {
+    yp_ssize_t inlinelen = (_ypMem_ideal_size-offsetof_inline) / sizeof_elems;
+    if( inlinelen < 0 ) return 0;
+    return inlinelen;
+}
+#define ypMem_INLINELEN_CONTAINER_VARIABLE( ob, obStruct ) \
+    _ypMem_inlinelen_container_variable( yp_offsetof( obStruct, ob_inline_data ), \
+            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
+
 // Resizes ob_data, the variable-portion of ob, and returns the previous value of ob_data
 // ("oldptr").  There are three possible scenarios:
 //  - On error, returns NULL, and ob is not modified
@@ -1170,7 +1183,6 @@ static ypObject *_ypMem_malloc_container_variable(
 // may be larger than requested.  Does not update ob_len.
 // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
 // XXX We require that each type knows and checks for their maximum length to avoid overflow here
-// TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
 static void *_ypMem_realloc_container_variable(
         ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems,
         yp_ssize_t required, yp_ssize_t extra )
@@ -1181,8 +1193,7 @@ static void *_ypMem_realloc_container_variable(
     yp_ssize_t extra_size;
     yp_ssize_t alloclen;
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
-    yp_ssize_t inlinelen = (_ypMem_ideal_size-offsetof_inline) / sizeof_elems;
-    if( inlinelen < 0 ) inlinelen = 0;
+    yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, sizeof_elems );
 
     yp_ASSERT( required >= 0, "required cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
@@ -1244,13 +1255,11 @@ static void _ypMem_realloc_container_free_oldptr(
 
 // Resets ob_data to the inline buffer and frees the separate buffer (if there is one).  Any
 // contained objects must have already been discarded; no memory is copied.  Always succeeds.
-// TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
 static void _ypMem_realloc_container_variable_clear(
         ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems )
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
-    yp_ssize_t inlinelen = (_ypMem_ideal_size-offsetof_inline) / sizeof_elems;
-    if( inlinelen < 0 ) inlinelen = 0;
+    yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, sizeof_elems );
 
     // Free any separately-allocated buffer
     if( ob->ob_data != inlineptr ) {
@@ -7261,9 +7270,7 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     yp_ssize_t keysleft;
     yp_ssize_t i;
     ypSet_KeyEntry *loc;
-    yp_ssize_t inlinelen =
-        (_ypMem_ideal_size-yp_offsetof( ypSetObject, ob_inline_data )) / yp_sizeof( ypSet_KeyEntry );
-    if( inlinelen < 0 ) inlinelen = 0;
+    yp_ssize_t inlinelen = ypMem_INLINELEN_CONTAINER_VARIABLE( so, ypSetObject );
     yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
 
     // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
@@ -8649,9 +8656,7 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
     yp_ssize_t i;
     ypObject *value;
     ypSet_KeyEntry *newkey_loc;
-    yp_ssize_t inlinelen =
-        (_ypMem_ideal_size-yp_offsetof( ypDictObject, ob_inline_data )) / yp_sizeof( ypObject * );
-    if( inlinelen < 0 ) inlinelen = 0;
+    yp_ssize_t inlinelen = ypMem_INLINELEN_CONTAINER_VARIABLE( mp, ypDictObject );
     yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
 
     // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
