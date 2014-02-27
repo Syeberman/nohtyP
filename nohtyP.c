@@ -935,7 +935,7 @@ static void *(*yp_malloc_resize)( yp_ssize_t *actual,
         void *p, yp_ssize_t size, yp_ssize_t extra ) = _dummy_yp_malloc_resize;
 
 // See docs for yp_initialize_kwparams.yp_free in nohtyP.h
-static void (*yp_free)( void *p );
+static void (*yp_free)( void *p ) = _dummy_yp_free;
 
 // Microsoft gives a couple options for heaps; let's stick with the standard malloc/free plus
 // _msize and _expand
@@ -8891,11 +8891,6 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
 }
 
 // Public methods
-
-static ypObject *_frozendict_decref_visitor( ypObject *x, void *memo ) {
-    yp_decref( x );
-    return yp_None;
-}
 
 static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *memo )
 {

@@ -1616,7 +1616,7 @@ struct _ypObject {
     ypObject ob_base;
 // Declares the ob_inline_data array for container object structures
 #define _yp_INLINE_DATA( elemType ) \
-    elemType ob_inline_data[1]
+    elemType ob_inline_data[]
 
 // These structures are likely to change in future versions; they should only exist in-memory
 struct _ypIntObject {
