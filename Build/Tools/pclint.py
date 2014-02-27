@@ -3,6 +3,7 @@
 
 raise NotImplementedError( "TODO implement PC-Lint support" )
 
+# Default on Windows is c:\lint
 
 """
 lint-nt.exe
