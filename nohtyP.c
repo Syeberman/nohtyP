@@ -9761,6 +9761,46 @@ static ypRangeObject _yp_range_empty_struct = {
     0, 0, ypObject_HASH_INVALID, NULL }, 0, 1 };
 static ypObject * const _yp_range_empty = (ypObject *) &_yp_range_empty_struct;
 
+// Determines the index in r for the given object x, or -1 if it isn't in the range
+// XXX If using *index as an actual index, ensure it doesn't overflow yp_ssize_t
+static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_int_t *index ) 
+{
+    ypObject *exc = yp_None;
+    yp_int_t r_end;
+    yp_int_t x_offset;
+    yp_int_t x_asint = yp_asint_exactC( x, &exc );
+    if( yp_isexceptionC( exc ) ) {
+        // If x isn't an int or float, or can't be exactly converted to an equal int, then it's not
+        // contained in this range
+        if( yp_isexceptionCN( exc, 2, yp_TypeError, yp_ArithmeticError ) ) {
+            *index = -1;
+            return yp_None;
+        }
+        return exc;
+    }
+
+    r_end = ypRange_GET_INDEX( r, ypRange_LEN( r ) );
+    if( ypRange_STEP( r ) < 0 ) {
+        if( x_asint <= r_end || ypRange_START( r ) < x_asint ) {
+            *index = -1;
+            return yp_None;
+        }
+    } else {
+        if( x_asint < ypRange_START( r ) || r_end <= x_asint ) {
+            *index = -1;
+            return yp_None;
+        }
+    }
+
+    x_offset = x_asint - ypRange_START( r );
+    if( x_offset % ypRange_STEP( r ) == 0 ) {
+        *index = x_offset / ypRange_STEP( r );
+    } else {
+        *index = -1;
+    }
+    return yp_None;
+}
+
 static ypObject *range_frozen_copy( ypObject *r ) {
     return yp_incref( r );
 }
@@ -9793,29 +9833,56 @@ static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
 
 static ypObject *range_contains( ypObject *r, ypObject *x )
 {
-    ypObject *exc = yp_None;
-    yp_int_t r_end;
-    yp_int_t x_asint = yp_asint_exactC( x, &exc );
-    if( yp_isexceptionC( exc ) ) {
-        // If x isn't an int or float, or can't be exactly converted to an equal int, then it's not
-        // contained in this range
-        if( yp_isexceptionCN( exc, 2, yp_TypeError, yp_ArithmeticError ) ) {
-            return yp_False;
-        }
-        return exc;
-    }
+    yp_int_t index;
+    ypObject *result = _ypRange_find( r, x, &index );
+    if( yp_isexceptionC( result ) ) return result;
+    return ypBool_FROM_C( index >= 0 );
+}
 
-    r_end = ypRange_GET_INDEX( r, ypRange_LEN( r ) );
-    if( ypRange_STEP( r ) < 0 ) {
-        if( x_asint <= r_end || ypRange_START( r ) < x_asint ) {
-            return yp_False;
-        }
+
+static ypObject *range_find( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+        findfunc_direction direction, yp_ssize_t *_index )
+{
+    yp_ssize_t step = 1;    // won't actually change
+    yp_ssize_t slicelength; // unnecessary
+    yp_int_t index;
+    ypObject *result = _ypRange_find( r, x, &index );
+    if( yp_isexceptionC( result ) ) return result;
+
+    result = ypSlice_AdjustIndicesC( ypRange_LEN( r ), &start, &stop, &step, &slicelength );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // This assertion assures that index==-1 (ie item not in range) won't be confused
+    yp_ASSERT( start >= 0, "ypSlice_AdjustIndicesC returned negative start" );
+    if( start <= index && index < stop ) {
+        if( index > yp_SSIZE_T_MAX ) return yp_OverflowError;
+        *_index = (yp_ssize_t) index;
     } else {
-        if( x_asint < ypRange_START( r ) || r_end <= x_asint ) {
-            return yp_False;
-        }
+        *_index = -1;
     }
-    return ypBool_FROM_C( (x_asint - ypRange_START( r )) % ypRange_STEP( r ) == 0 );
+    return yp_None;
+}
+
+static ypObject *range_count( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+        yp_ssize_t *count )
+{
+    yp_ssize_t step = 1;    // won't actually change
+    yp_ssize_t slicelength; // unnecessary
+    yp_int_t index;
+    ypObject *result = _ypRange_find( r, x, &index );
+    if( yp_isexceptionC( result ) ) return result;
+
+    result = ypSlice_AdjustIndicesC( ypRange_LEN( r ), &start, &stop, &step, &slicelength );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // This assertion assures that index==-1 (ie item not in range) won't be confused
+    yp_ASSERT( start >= 0, "ypSlice_AdjustIndicesC returned negative start" );
+    if( start <= index && index < stop ) {
+        *count = 1;
+    } else {
+        *count = 0;
+    }
+    return yp_None;
 }
 
 static ypObject *range_len( ypObject *r, yp_ssize_t *len ) {
@@ -9883,8 +9950,8 @@ static ypSequenceMethods ypRange_as_sequence = {
     MethodError_objssizeproc,       // tp_repeat
     range_getindex,                 // tp_getindex
     MethodError_objsliceproc,       // tp_getslice
-    MethodError_findfunc,           // tp_find
-    MethodError_countfunc,          // tp_count
+    range_find,                     // tp_find
+    range_count,                    // tp_count
     MethodError_objssizeobjproc,    // tp_setindex
     MethodError_objsliceobjproc,    // tp_setslice
     MethodError_objssizeproc,       // tp_delindex
