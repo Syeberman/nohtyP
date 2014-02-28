@@ -251,7 +251,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertRaises(TypeError, yp_range, 0.0, 0.0, 1)
         self.assertRaises(TypeError, yp_range, 0.0, 0.0, 1.0)
 
-    def test_index(self):
+    def test_index_1(self):
         u = yp_range(2)
         self.assertEqual(u.index(0), 0)
         self.assertEqual(u.index(1), 1)
@@ -265,6 +265,8 @@ class RangeTest(yp_unittest.TestCase):
         class BadExc(Exception):
             pass
 
+    @yp_unittest.skip("nohtyP doesn't support custom user types")
+    def test_index_badcmp(self):
         class BadCmp:
             def __eq__(self, other):
                 if other == 2:
@@ -274,17 +276,22 @@ class RangeTest(yp_unittest.TestCase):
         a = yp_range(4)
         self.assertRaises(BadExc, a.index, BadCmp())
 
+    def test_index_2(self):
         a = yp_range(-2, 3)
         self.assertEqual(a.index(0), 2)
         self.assertEqual(yp_range(1, 10, 3).index(4), 1)
         self.assertEqual(yp_range(1, -10, -3).index(-5), 2)
 
+    @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
+    def test_index_long_ints(self):
         self.assertEqual(yp_range(10**20).index(1), 1)
         self.assertEqual(yp_range(10**20).index(10**20 - 1), 10**20 - 1)
 
         self.assertRaises(ValueError, yp_range(1, 2**100, 2).index, 2**87)
         self.assertEqual(yp_range(1, 2**100, 2).index(2**87+1), 2**86)
 
+    @yp_unittest.skip("nohtyP doesn't support custom user types")
+    def test_index_always_equal(self):
         class AlwaysEqual(object):
             def __eq__(self, other):
                 return True
@@ -332,20 +339,27 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(yp_range(3).count(1), 1)
         self.assertEqual(yp_range(3).count(2), 1)
         self.assertEqual(yp_range(3).count(3), 0)
-        self.assertIs(type(yp_range(3).count(-1)), int)
-        self.assertIs(type(yp_range(3).count(1)), int)
+        # Not applicable to nohtyP
+        #self.assertIs(type(yp_range(3).count(-1)), int)
+        #self.assertIs(type(yp_range(3).count(1)), int)
+
+    @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
+    def test_count_long_ints(self):
         self.assertEqual(yp_range(10**20).count(1), 1)
         self.assertEqual(yp_range(10**20).count(10**20), 0)
-        self.assertEqual(yp_range(3).index(1), 1)
+        self.assertEqual(yp_range(3).index(1), 1) # ? Why is this here...
         self.assertEqual(yp_range(1, 2**100, 2).count(2**87), 0)
         self.assertEqual(yp_range(1, 2**100, 2).count(2**87+1), 1)
-
+    
+    @yp_unittest.skip("nohtyP doesn't support custom user types")
+    def test_count_always_equal(self):
         class AlwaysEqual(object):
             def __eq__(self, other):
                 return True
         always_equal = AlwaysEqual()
         self.assertEqual(yp_range(10).count(always_equal), 10)
 
+        # ? Why is this here...
         self.assertEqual(len(yp_range(sys.maxsize, sys.maxsize+10)), 10)
 
     def test_repr(self):
