@@ -3945,6 +3945,27 @@ yp_hash_t yp_ashashC( ypObject *x, ypObject **exc ) {
 }
 #endif
 
+// TODO Make this a public API?
+// Similar to yp_int and yp_asintC, but raises yp_ArithmeticError rather than truncating a float 
+// toward zero.  An important property is that yp_int_exact(x) will equal x.
+// XXX Inspired by Python's Decimal.to_integral_exact; yp_ArithmeticError may be replaced with a
+// more-specific sub-exception in the future
+// ypObject *yp_int_exact( ypObject *x );
+static yp_int_t yp_asint_exactLF( yp_float_t x, ypObject **exc );
+static yp_int_t yp_asint_exactC( ypObject *x, ypObject **exc ) 
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+
+    if( x_pair == ypInt_CODE ) {
+        return ypInt_VALUE( x );
+    } else if( x_pair == ypFloat_CODE ) {
+        return yp_asint_exactLF( ypFloat_VALUE( x ), exc );
+    } else if( x_pair == ypBool_CODE ) {
+        return ypBool_IS_TRUE_C( x );
+    }
+    return_yp_CEXC_BAD_TYPE( 0, exc, x );
+}
+
 
 /*************************************************************************************************
  * Floats
@@ -4335,10 +4356,43 @@ yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc )
     return (yp_float_t) x;
 }
 
+// XXX Adapted from Python's float_trunc
 yp_int_t yp_asintLF( yp_float_t x, ypObject **exc )
 {
-    // TODO Implement this as Python does
-    return (yp_int_t) x;
+    yp_float_t wholepart;           /* integral portion of x, rounded toward 0 */
+
+    (void)modf(x, &wholepart);
+    /* Try to get out cheap if this fits in a Python int.  The attempt
+     * to cast to long must be protected, as C doesn't define what
+     * happens if the double is too big to fit in a long.  Some rare
+     * systems raise an exception then (RISCOS was mentioned as one,
+     * and someone using a non-default option on Sun also bumped into
+     * that).  Note that checking for >= and <= LONG_{MIN,MAX} would
+     * still be vulnerable:  if a long has more bits of precision than
+     * a double, casting MIN/MAX to double may yield an approximation,
+     * and if that's rounded up, then, e.g., wholepart=LONG_MAX+1 would
+     * yield true from the C expression wholepart<=LONG_MAX, despite
+     * that wholepart is actually greater than LONG_MAX.
+     */
+    if (yp_INT_T_MIN < wholepart && wholepart < yp_INT_T_MAX) {
+        return (yp_int_t)wholepart;
+    }
+    return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+}
+
+// TODO make this public?
+// XXX Adapted from Python's float_trunc
+static yp_int_t yp_asint_exactLF( yp_float_t x, ypObject **exc )
+{
+    yp_float_t wholepart;           /* integral portion of x, rounded toward 0 */
+
+    if (modf(x, &wholepart) != 0.0) {   /* returns fractional portion of x */
+        return_yp_CEXC_ERR( 0, exc, yp_ArithmeticError );
+    }
+    if (yp_INT_T_MIN < wholepart && wholepart < yp_INT_T_MAX) {
+        return (yp_int_t)wholepart;
+    }
+    return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
 }
 
 
@@ -9720,12 +9774,17 @@ static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
 
 static ypObject *range_contains( ypObject *r, ypObject *x )
 {
+    ypObject *exc = yp_None;
     yp_int_t r_end;
-    yp_int_t x_asint;
-
-    // TODO ints-as-floats, like 5.0, are allowed
-    if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return yp_False;
-    x_asint = ypInt_VALUE( x );
+    yp_int_t x_asint = yp_asint_exactC( x, &exc );
+    if( yp_isexceptionC( exc ) ) {
+        // If x isn't an int or float, or can't be exactly converted to an equal int, then it's not
+        // contained in this range
+        if( yp_isexceptionCN( exc, 2, yp_TypeError, yp_ArithmeticError ) ) {
+            return yp_False;
+        }
+        return exc;
+    }
 
     r_end = ypRange_GET_INDEX( r, ypRange_LEN( r ) );
     if( ypRange_STEP( r ) < 0 ) {
