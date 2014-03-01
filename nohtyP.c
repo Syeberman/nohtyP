@@ -9746,7 +9746,7 @@ typedef struct {
     } while( 0 )
 
 // Returns the value at i, assuming i is an adjusted index
-#define ypRange_GET_INDEX( r, i )   (ypRange_START( r ) + (ypRange_STEP( r ) * (i)))
+#define ypRange_GET_INDEX( r, i )   ((yp_int_t) (ypRange_START( r ) + (ypRange_STEP( r ) * (i))))
 
 // Returns true if the two ranges are equal (assuming r and x both pass ypRange_ASSERT_NORMALIZED)
 #define ypRange_ARE_EQUAL( r, x ) \
@@ -9763,7 +9763,7 @@ static ypObject * const _yp_range_empty = (ypObject *) &_yp_range_empty_struct;
 
 // Determines the index in r for the given object x, or -1 if it isn't in the range
 // XXX If using *index as an actual index, ensure it doesn't overflow yp_ssize_t
-static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_int_t *index ) 
+static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_ssize_t *index ) 
 {
     ypObject *exc = yp_None;
     yp_int_t r_end;
@@ -9779,6 +9779,7 @@ static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_int_t *index )
         return exc;
     }
 
+    yp_ASSERT( ypRange_LEN( r ) <= yp_SSIZE_T_MAX, "range.find not supporting range lengths >yp_SSIZE_T_MAX" );
     r_end = ypRange_GET_INDEX( r, ypRange_LEN( r ) );
     if( ypRange_STEP( r ) < 0 ) {
         if( x_asint <= r_end || ypRange_START( r ) < x_asint ) {
@@ -9794,7 +9795,8 @@ static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_int_t *index )
 
     x_offset = x_asint - ypRange_START( r );
     if( x_offset % ypRange_STEP( r ) == 0 ) {
-        *index = x_offset / ypRange_STEP( r );
+        yp_ASSERT( (x_offset / ypRange_STEP( r )) <= yp_SSIZE_T_MAX, "impossibly, range.find calculated an index >yp_SSIZE_T_MAX (?!)" );
+        *index = (yp_ssize_t) (x_offset / ypRange_STEP( r ));
     } else {
         *index = -1;
     }
@@ -9822,6 +9824,7 @@ static ypObject *range_bool( ypObject *r ) {
     return ypBool_FROM_C( ypRange_LEN( r ) );
 }
 
+// XXX Using ypSequence_AdjustIndexC assumes we don't have ranges longer than yp_SSIZE_T_MAX
 static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
 {
     if( !ypSequence_AdjustIndexC( ypRange_LEN( r ), &i ) ) {
@@ -9831,21 +9834,28 @@ static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
     return yp_intC( ypRange_GET_INDEX( r, i ) );
 }
 
+static ypObject *range_getslice( ypObject *r, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
+{
+    return yp_NotImplementedError;
+}
+
+
+
 static ypObject *range_contains( ypObject *r, ypObject *x )
 {
-    yp_int_t index;
+    yp_ssize_t index;
     ypObject *result = _ypRange_find( r, x, &index );
     if( yp_isexceptionC( result ) ) return result;
     return ypBool_FROM_C( index >= 0 );
 }
 
-
+// XXX Using ypSlice_AdjustIndicesC assumes we don't have ranges longer than yp_SSIZE_T_MAX
 static ypObject *range_find( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *_index )
 {
     yp_ssize_t step = 1;    // won't actually change
     yp_ssize_t slicelength; // unnecessary
-    yp_int_t index;
+    yp_ssize_t index;
     ypObject *result = _ypRange_find( r, x, &index );
     if( yp_isexceptionC( result ) ) return result;
 
@@ -9855,20 +9865,20 @@ static ypObject *range_find( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssiz
     // This assertion assures that index==-1 (ie item not in range) won't be confused
     yp_ASSERT( start >= 0, "ypSlice_AdjustIndicesC returned negative start" );
     if( start <= index && index < stop ) {
-        if( index > yp_SSIZE_T_MAX ) return yp_OverflowError;
-        *_index = (yp_ssize_t) index;
+        *_index = index;
     } else {
         *_index = -1;
     }
     return yp_None;
 }
 
+// XXX Using ypSlice_AdjustIndicesC assumes we don't have ranges longer than yp_SSIZE_T_MAX
 static ypObject *range_count( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         yp_ssize_t *count )
 {
     yp_ssize_t step = 1;    // won't actually change
     yp_ssize_t slicelength; // unnecessary
-    yp_int_t index;
+    yp_ssize_t index;
     ypObject *result = _ypRange_find( r, x, &index );
     if( yp_isexceptionC( result ) ) return result;
 
@@ -9949,7 +9959,7 @@ static ypSequenceMethods ypRange_as_sequence = {
     MethodError_objobjproc,         // tp_concat
     MethodError_objssizeproc,       // tp_repeat
     range_getindex,                 // tp_getindex
-    MethodError_objsliceproc,       // tp_getslice
+    range_getslice,                 // tp_getslice
     range_find,                     // tp_find
     range_count,                    // tp_count
     MethodError_objssizeobjproc,    // tp_setindex
@@ -10063,7 +10073,8 @@ ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
         ulen = ((_yp_uint_t) stop) - 1u - ((_yp_uint_t) start);
         ulen = 1u + ulen / ((_yp_uint_t) step);
     }
-    // TODO We could store len in our own _yp_uint_t field, to allow for larger ranges
+    // TODO We could store len in our own _yp_uint_t field, to allow for larger ranges, but a lot
+    // of other code would also have to change
     if( ulen > ((_yp_uint_t) ypObject_LEN_MAX) ) return yp_SystemLimitationError;
     if( ulen < 2 ) step = 1; // makes comparisons easier
 
