@@ -1346,6 +1346,7 @@ c_ypObject_p_value( "yp_i_neg_one" )
 c_ypObject_p_value( "yp_i_zero" )
 c_ypObject_p_value( "yp_i_one" )
 c_ypObject_p_value( "yp_i_two" )
+ypObject_LEN_MAX = yp_int( 0x7FFFFFFF )
 
 def yp_len( x ):
     """Returns len( x ) of a ypObject as a yp_int"""

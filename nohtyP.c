@@ -9834,12 +9834,24 @@ static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
     return yp_intC( ypRange_GET_INDEX( r, i ) );
 }
 
+// XXX Using ypSlice_AdjustIndicesC assumes we don't have ranges longer than yp_SSIZE_T_MAX
 static ypObject *range_getslice( ypObject *r, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    return yp_NotImplementedError;
+    ypObject *result;
+    yp_ssize_t newR_len;
+    ypObject *newR;
+
+    result = ypSlice_AdjustIndicesC( ypRange_LEN( r ), &start, &stop, &step, &newR_len );
+    if( yp_isexceptionC( result ) ) return result;
+    
+    if( newR_len < 1 ) return _yp_range_empty;
+    newR = ypMem_MALLOC_FIXED( ypRangeObject, ypRange_CODE );
+    if( yp_isexceptionC( newR ) ) return newR;
+    ypRange_START( newR ) = ypRange_GET_INDEX( r, start );
+    ypRange_STEP( newR ) = ypRange_STEP( r ) * step;
+    ypRange_SET_LEN( newR, newR_len );
+    return newR;
 }
-
-
 
 static ypObject *range_contains( ypObject *r, ypObject *x )
 {
