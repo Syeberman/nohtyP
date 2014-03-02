@@ -28,10 +28,10 @@ def pyrange_reversed(start, stop, step):
 def pyrange_calc_len(start, stop, step):
     if step < 0:
         if stop >= start: return 0
-        return 1 + (start - 1 - stop) / -step
+        return 1 + (start - 1 - stop) // -step
     else:
         if start >= stop: return 0
-        return 1 + (stop - 1 - start) / step
+        return 1 + (stop - 1 - start) // step
 
 class RangeTest(yp_unittest.TestCase):
     def assert_iterators_equal(self, xs, ys, test_id, limit=None):
@@ -373,9 +373,11 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(len(yp_range(sys.maxsize, sys.maxsize+10)), 10)
 
     def test_repr(self):
-        self.assertEqual(repr(yp_range(1)), 'range(0, 1)')
-        self.assertEqual(repr(yp_range(1, 2)), 'range(1, 2)')
-        self.assertEqual(repr(yp_range(1, 2, 3)), 'range(1, 2, 3)')
+        self.assertEqual(yp_repr(yp_range(1)), 'range(0, 1)')
+        self.assertEqual(yp_repr(yp_range(1, 2)), 'range(1, 2)')
+        # nohtyP normalizes start/end/step depending on the length of the range
+        #self.assertEqual(yp_repr(yp_range(1, 2, 3)), 'range(1, 2, 3)')
+        self.assertEqual(yp_repr(yp_range(1, 7, 3)), 'range(1, 7, 3)')
 
     @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickling(self):
@@ -473,6 +475,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(-1, r)
         self.assertNotIn(1, r)
 
+    @yp_test.support.requires_resource('cpu')
     def test_range_iterators(self):
         # exercise 'fast' iterators, that use a rangeiterobject internally.
         # see issue 7298

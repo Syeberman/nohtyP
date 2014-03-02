@@ -1719,6 +1719,17 @@ class yp_range( ypObject ):
         super( )._yp_errcheck( )
         if len( self ) < 1 and "_yp_range_empty" in globals( ):
             assert self is _yp_range_empty, "an empty range should be _yp_range_empty"
+    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    def _yp_str( self ):
+        self_len = len( self )
+        if self_len < 1: return yp_str( "range(0, 0)" )
+        self_start = self[0]._asint()
+        if self_len < 2: return yp_str( "range(%d, %d)" % (self_start, self_start+1) )
+        self_step = self[1]._asint() - self_start
+        self_end = self_start + (self_len * self_step)
+        if self_step == 1: return yp_str( "range(%d, %d)" % (self_start, self_end) )
+        return yp_str( "range(%d, %d, %d)" % (self_start, self_end, self_step) )
+    _yp_repr = _yp_str
 _yp_range_empty = yp_range( 0 )
 
 # FIXME integrate this somehow with unittest

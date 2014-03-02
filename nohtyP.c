@@ -9817,6 +9817,7 @@ static ypObject *range_frozen_deepcopy( ypObject *r, visitfunc copy_visitor, voi
     ypRange_START( newR ) = ypRange_START( r );
     ypRange_STEP( newR ) = ypRange_STEP( r );
     ypRange_SET_LEN( newR, ypRange_LEN( r ) );
+    ypRange_ASSERT_NORMALIZED( newR );
     return newR;
 }
 
@@ -9848,8 +9849,13 @@ static ypObject *range_getslice( ypObject *r, yp_ssize_t start, yp_ssize_t stop,
     newR = ypMem_MALLOC_FIXED( ypRangeObject, ypRange_CODE );
     if( yp_isexceptionC( newR ) ) return newR;
     ypRange_START( newR ) = ypRange_GET_INDEX( r, start );
-    ypRange_STEP( newR ) = ypRange_STEP( r ) * step;
+    if( newR_len < 2 ) {
+        ypRange_STEP( newR ) = 1;
+    } else {
+        ypRange_STEP( newR ) = ypRange_STEP( r ) * step;
+    }
     ypRange_SET_LEN( newR, newR_len );
+    ypRange_ASSERT_NORMALIZED( newR );
     return newR;
 }
 
