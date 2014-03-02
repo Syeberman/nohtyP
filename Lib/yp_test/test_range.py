@@ -24,6 +24,14 @@ def pyrange_reversed(start, stop, step):
     stop += (start - stop) % step
     return pyrange(stop - step, start - step, -step)
 
+# pure Python implementations (3 args only), for comparison
+def pyrange_calc_len(start, stop, step):
+    if step < 0:
+        if stop >= start: return 0
+        return 1 + (start - 1 - stop) / -step
+    else:
+        if start >= stop: return 0
+        return 1 + (stop - 1 - start) / step
 
 class RangeTest(yp_unittest.TestCase):
     def assert_iterators_equal(self, xs, ys, test_id, limit=None):
@@ -48,35 +56,35 @@ class RangeTest(yp_unittest.TestCase):
                           'expected {}, got {}'.format(test_id, i, y, x))
 
     def test_range(self):
-        self.assertEqual(list(yp_range(3)), [0, 1, 2])
-        self.assertEqual(list(yp_range(1, 5)), [1, 2, 3, 4])
-        self.assertEqual(list(yp_range(0)), [])
-        self.assertEqual(list(yp_range(-3)), [])
-        self.assertEqual(list(yp_range(1, 10, 3)), [1, 4, 7])
-        self.assertEqual(list(yp_range(5, -5, -3)), [5, 2, -1, -4])
+        self.assertEqual(yp_list(yp_range(3)), [0, 1, 2])
+        self.assertEqual(yp_list(yp_range(1, 5)), [1, 2, 3, 4])
+        self.assertEqual(yp_list(yp_range(0)), [])
+        self.assertEqual(yp_list(yp_range(-3)), [])
+        self.assertEqual(yp_list(yp_range(1, 10, 3)), [1, 4, 7])
+        self.assertEqual(yp_list(yp_range(5, -5, -3)), [5, 2, -1, -4])
 
         a = 10
         b = 100
         c = 50
 
-        self.assertEqual(list(yp_range(a, a+2)), [a, a+1])
-        self.assertEqual(list(yp_range(a+2, a, -1)), [a+2, a+1])
-        self.assertEqual(list(yp_range(a+4, a, -2)), [a+4, a+2])
+        self.assertEqual(yp_list(yp_range(a, a+2)), [a, a+1])
+        self.assertEqual(yp_list(yp_range(a+2, a, -1)), [a+2, a+1])
+        self.assertEqual(yp_list(yp_range(a+4, a, -2)), [a+4, a+2])
 
-        seq = list(yp_range(a, b, c))
+        seq = yp_list(yp_range(a, b, c))
         self.assertIn(a, seq)
         self.assertNotIn(b, seq)
-        self.assertEqual(len(seq), 2)
+        self.assertEqual(yp_len(seq), 2)
 
-        seq = list(yp_range(b, a, -c))
+        seq = yp_list(yp_range(b, a, -c))
         self.assertIn(b, seq)
         self.assertNotIn(a, seq)
-        self.assertEqual(len(seq), 2)
+        self.assertEqual(yp_len(seq), 2)
 
-        seq = list(yp_range(-a, -b, -c))
+        seq = yp_list(yp_range(-a, -b, -c))
         self.assertIn(-a, seq)
         self.assertNotIn(-b, seq)
-        self.assertEqual(len(seq), 2)
+        self.assertEqual(yp_len(seq), 2)
 
         self.assertRaises(TypeError, yp_range)
         self.assertRaises(TypeError, yp_range, 1, 2, 3, 4)
@@ -90,11 +98,12 @@ class RangeTest(yp_unittest.TestCase):
         self.assertRaises(TypeError, yp_range, 0, "spam")
         self.assertRaises(TypeError, yp_range, 0, 42, "spam")
 
-        self.assertEqual(len(yp_range(0, sys.maxsize, sys.maxsize-1)), 2)
+        self.assertEqual(yp_len(yp_range(0, sys.maxsize, sys.maxsize-1)), 2)
 
         r = yp_range(-sys.maxsize, sys.maxsize, 2)
-        self.assertEqual(len(r), sys.maxsize)
+        self.assertEqual(yp_len(r), sys.maxsize)
 
+    @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
     def test_large_operands(self):
         x = yp_range(10**20, 10**20+10, 3)
         self.assertEqual(len(x), 4)
@@ -147,6 +156,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(seq[0], -a)
         self.assertEqual(seq[-1], -a-c)
 
+    @yp_unittest.skip("Not applicable to nohtyP (ob_len doesn't go that high)")
     def test_large_range(self):
         # Check long ranges (len > sys.maxsize)
         # len() is expected to fail due to limitations of the __len__ protocol
@@ -367,6 +377,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(repr(yp_range(1, 2)), 'range(1, 2)')
         self.assertEqual(repr(yp_range(1, 2, 3)), 'range(1, 2, 3)')
 
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_pickling(self):
         testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1),
                      (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
@@ -376,6 +387,7 @@ class RangeTest(yp_unittest.TestCase):
                 self.assertEqual(list(pickle.loads(pickle.dumps(r, proto))),
                                  list(r))
 
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_iterator_pickling(self):
         testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1),
                      (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
@@ -474,7 +486,12 @@ class RangeTest(yp_unittest.TestCase):
                        for step in (-2**63, -2**31, -2, -1, 1, 2)]
 
         for start, end, step in test_ranges:
-            iter1 = yp_range(start, end, step)
+            if step == yp_sys_minint._asint() or \
+                    pyrange_calc_len(start, end, step) > ypObject_LEN_MAX._asint():
+                self.assertRaises((SystemError, OverflowError), yp_range, start, end, step)
+                continue
+            try: iter1 = yp_range(start, end, step)
+            except OverflowError: continue
             iter2 = pyrange(start, end, step)
             test_id = "range({}, {}, {})".format(start, end, step)
             # check first 100 entries
