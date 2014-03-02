@@ -308,6 +308,7 @@ class RangeTest(yp_unittest.TestCase):
         always_equal = AlwaysEqual()
         self.assertEqual(yp_range(10).index(always_equal), 0)
 
+    @yp_unittest.skip("nohtyP doesn't support custom user types")
     def test_user_index_method(self):
         bignum = 2*sys.maxsize
         smallnum = 42
@@ -424,8 +425,13 @@ class RangeTest(yp_unittest.TestCase):
         # to be contained in the range.
         self.assertIn(1.0, yp_range(3))
         self.assertIn(True, yp_range(3))
+
+    @yp_unittest.skip("nohtyP doesn't support complex numbers (yet)")
+    def test_types_complex(self):
         self.assertIn(1+0j, yp_range(3))
 
+    @yp_unittest.skip("nohtyP doesn't support custom user types")
+    def test_types_user_types(self):
         class C1:
             def __eq__(self, other): return True
         self.assertIn(C1(), yp_range(3))
@@ -508,8 +514,8 @@ class RangeTest(yp_unittest.TestCase):
     def test_slice(self):
         def check(start, stop, step=None):
             i = slice(start, stop, step)
-            self.assertEqual(list(r[i]), list(r)[i])
-            self.assertEqual(len(r[i]), len(list(r)[i]))
+            self.assertEqual(yp_list(r[i]), yp_list(r)[i])
+            self.assertEqual(yp_len(r[i]), yp_len(yp_list(r)[i]))
         for r in [yp_range(10),
                   yp_range(0),
                   yp_range(1, 9, 3),
@@ -566,7 +572,7 @@ class RangeTest(yp_unittest.TestCase):
                   yp_range(8, 0, -3),
                   yp_range(sys.maxsize+1, sys.maxsize+10),
                   ]:
-            self.assertEqual(list(reversed(r)), list(r)[::-1])
+            self.assertEqual(yp_list(yp_reversed(r)), yp_list(r)[::-1])
 
     def test_issue11845(self):
         r = yp_range(*slice(1, 18, 2).indices(20))
