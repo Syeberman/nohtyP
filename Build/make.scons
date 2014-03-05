@@ -23,6 +23,13 @@ def nohtyP_SharedLibrary( env ):
             )
     return env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
 
+def nohtyP_yp_test( env, sharedLib ):
+    env.PrependENVPath( "PYTHONPATH", "#/Lib" )
+    env.PrependENVPath( "PATH", sharedLib.get_dir( ) )
+    # TODO print something more detailed in build output?
+    return env.Command( "$VTOP/yp_test.log", sharedLib,
+            "python -m yp_test -v > $TARGET" )
+
 
 # Command-line build variables
 vars = Variables( None )
@@ -88,21 +95,22 @@ else:
     native_archs = (rootEnv["HOST_ARCH"], )
 
 # The native targets ("debug", "release", etc) should each copy files from a single variant
-nativeTargetsCreated = set( )
+nativeTargetsToCreate = set( ("debug", "release") )
 
+python3 = Tool( "python_3", toolpath=["Build/Tools", ] )
 for compiler_name in compiler_names:
-    # FIXME does this even speed things up?
     compiler = Tool( compiler_name, toolpath=["Build/Tools", ] )
     if not compiler.exists( rootEnv ): continue
 
-    for os, arch, configuration in itertools.product( oses, archs, configurations ):
+    for targ_os, targ_arch, configuration in itertools.product( oses, archs, configurations ):
         # TODO Support cross-compiling OSes, if possible
-        if os != native_os: continue
+        if targ_os != native_os: continue
 
         # Maintain a separate directory for intermediate and target files, but don't copy files
-        variantEnv = rootEnv.Clone( tools=[], COMPILER=compiler,
-                TARGET_OS=os, TARGET_ARCH=arch, CONFIGURATION=configuration )
-        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, os, arch, configuration)
+        variantEnv = rootEnv.Clone( COMPILER=compiler,
+                TARGET_OS=targ_os, TARGET_ARCH=targ_arch, CONFIGURATION=configuration )
+        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (
+                compiler_name, targ_os, targ_arch, configuration)
         variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
 
         # Skip compilers that can't be found (TODO unless we want an error in that case?)
@@ -112,28 +120,35 @@ for compiler_name in compiler_names:
             compilerEnv = variantEnv.Clone( tools=[compiler, ] )
         except (SCons.Errors.UserError, SCons.Errors.StopError): continue
 
-        targets = []
-        targets.append( nohtyP_SharedLibrary( compilerEnv.Clone( ) ) )
+        sharedLib = nohtyP_SharedLibrary( compilerEnv.Clone( ) )
+        ypTest = nohtyP_yp_test( variantEnv.Clone( tools=[python3, ] ), Flatten( sharedLib )[0] )
+
+        buildTargets = [sharedLib, ]
+        testTargets = [ypTest, ]
 
         # Pick one variant from each configuration that matches the host system, and copy it to the
         # Build/native directory for easy access
-        if os == native_os and arch in native_archs:
-            if configuration not in nativeTargetsCreated:
+        if targ_os == native_os and targ_arch in native_archs:
+            if configuration in nativeTargetsToCreate:
                 if configuration == "release":
                     native_dest = "#Build/native"
                 else:
                     native_dest = "#Build/native/%s" % configuration
-                native_target = variantEnv.Install( native_dest, targets )
-                targets.append( native_target )
-                Alias( configuration, native_target )
-                Alias( "native", native_target )
-                nativeTargetsCreated.add( configuration )
+                native_buildTargets = variantEnv.Install( native_dest, buildTargets )
+                native_testTargets = variantEnv.Install( native_dest, testTargets )
+                buildTargets.append( native_buildTargets )
+                testTargets.append( native_testTargets )
+                Alias( configuration, native_buildTargets )
+                Alias( "test"+configuration, native_testTargets )
+                Alias( "native", native_buildTargets )
+                Alias( "test", native_testTargets )
+                nativeTargetsToCreate.remove( configuration )
 
-        Alias( "all", targets )
-        Alias( compiler_name, targets )
-        Alias( "_".join( (compiler_name, os) ), targets )
-        Alias( "_".join( (compiler_name, os, arch) ), targets )
-        Alias( "_".join( (compiler_name, os, arch, configuration) ), targets )
+        Alias( "all", buildTargets )
+        Alias( compiler_name, buildTargets )
+        Alias( "_".join( (compiler_name, targ_os) ), buildTargets )
+        Alias( "_".join( (compiler_name, targ_os, targ_arch) ), buildTargets )
+        Alias( "_".join( (compiler_name, targ_os, targ_arch, configuration) ), buildTargets )
 
 # If SCons is called without targets, build the "native" target
 Default( Alias( "native" ) )
