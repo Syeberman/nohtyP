@@ -60,7 +60,7 @@ def _find( env, targ_hexversion ):
     pyDirs.extend( _python_paths_found )
     for pyDir in pyDirs:
         python = os.path.join( pyDir, "python" )
-        supported = _test_python( python, re_dumpversion, env["TARGET_OS"], env["TARGET_ARCH"] )
+        supported = _test_python( python, targ_hexversion, env["TARGET_ARCH"] )
         if supported: return python
     return None
 
@@ -70,9 +70,10 @@ def DefinePythonToolFunctions( hexversion, strversion ):
 
     def generate( env ):
         # TODO Read info from site-tools.py to make this compiler easier to find
+        # TODO Make hexversion a range, then pick the Python version that's the latest that fits
 
         # Find a Python that supports our target, and prepend it to the path
-        python_path = _find( env, re_dumpversion )
+        python_path = _find( env, hexversion )
         if not python_path:
             raise SCons.Errors.StopError( "python %s (%r) detection failed" % (strversion, env["TARGET_ARCH"]) )
         path, python = os.path.split( python_path )
