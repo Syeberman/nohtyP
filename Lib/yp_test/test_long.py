@@ -688,11 +688,13 @@ class LongTest(yp_unittest.TestCase):
         cases.extend([0, 1, 2, sys.maxsize, yp_float(sys.maxsize)])
         # 1 << 20000 should exceed all double formats.  int(1e200) is to
         # check that we get equality with 1e200 above.
-        t = yp_int(1e200)
+        # nohtyP doesn't support numbers this large
+        #t = yp_int(1e200)
         #cases.extend([0, 1, 2, 1 << 20000, t-1, t, t+1])
         #cases.extend([-x for x in cases])
-        cases.extend([0, 1, 2,                  t, t+1])
-        cases.extend([  -1,-2,                  t,-(t+1)])
+        self.assertRaises(OverflowError, yp_int, 1e200)
+        cases.extend([0, 1, 2])
+        cases.extend([  -1,-2])
         for x in cases:
             try: Rx = Rat(x)
             except OverflowError: continue

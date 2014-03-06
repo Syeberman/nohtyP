@@ -49,6 +49,7 @@ class yp_param:
             return self.type.from_param( x )
         elif issubclass( self.type, _SimpleCData ):
             if self.type._type_ in "PzZ": return x  # skip pointers
+            if isinstance( x, yp_int ): x = x._asint( )
             converted = self.type( x ).value
             if converted != x:
                 raise OverflowError( "overflow in ctypes argument (%r != %r)" % (converted, x) )

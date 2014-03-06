@@ -100,8 +100,12 @@ class RangeTest(yp_unittest.TestCase):
 
         self.assertEqual(yp_len(yp_range(0, sys.maxsize, sys.maxsize-1)), 2)
 
-        r = yp_range(-sys.maxsize, sys.maxsize, 2)
-        self.assertEqual(yp_len(r), sys.maxsize)
+        # nohtyP has limitations on the length of the range and values of step
+        #r = yp_range(-sys.maxsize, sys.maxsize, 2)
+        #self.assertEqual(yp_len(r), sys.maxsize)
+        self.assertEqual(yp_len(yp_range(0, ypObject_LEN_MAX)), ypObject_LEN_MAX)
+        self.assertRaises(SystemError, yp_range, 0, ypObject_LEN_MAX+1)
+        self.assertRaises(SystemError, yp_range, 0, 1, yp_sys_minint)
 
     @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
     def test_large_operands(self):
@@ -241,10 +245,12 @@ class RangeTest(yp_unittest.TestCase):
         self.assertRaises(TypeError, yp_range)
         self.assertRaises(TypeError, yp_range, 1, 2, 3, 4)
         self.assertRaises(ValueError, yp_range, 1, 2, 0)
-        a = int(10 * sys.maxsize)
-        self.assertRaises(ValueError, yp_range, a, a + 1, int(0))
+        # nohtyP doesn't support values this high
+        #a = int(10 * sys.maxsize)
+        #self.assertRaises(ValueError, yp_range, a, a + 1, int(0))
         self.assertRaises(TypeError, yp_range, 1., 1., 1.)
-        self.assertRaises(TypeError, yp_range, 1e100, 1e101, 1e101)
+        # nohtyP doesn't support values this high
+        #self.assertRaises(TypeError, yp_range, 1e100, 1e101, 1e101)
         self.assertRaises(TypeError, yp_range, 0, "spam")
         self.assertRaises(TypeError, yp_range, 0, 42, "spam")
         # Exercise various combinations of bad arguments, to check
@@ -495,8 +501,8 @@ class RangeTest(yp_unittest.TestCase):
                        for step in (-2**63, -2**31, -2, -1, 1, 2)]
 
         for start, end, step in test_ranges:
-            if step == yp_sys_minint._asint() or \
-                    pyrange_calc_len(start, end, step) > ypObject_LEN_MAX._asint():
+            if step == yp_sys_minint or \
+                    pyrange_calc_len(start, end, step) > ypObject_LEN_MAX:
                 self.assertRaises((SystemError, OverflowError), yp_range, start, end, step)
                 continue
             try: iter1 = yp_range(start, end, step)
@@ -520,7 +526,9 @@ class RangeTest(yp_unittest.TestCase):
                   yp_range(0),
                   yp_range(1, 9, 3),
                   yp_range(8, 0, -3),
-                  yp_range(sys.maxsize+1, sys.maxsize+10),
+                  # nohtyP can't handle values that large
+                  #yp_range(sys.maxsize+1, sys.maxsize+10),
+                  yp_range(yp_sys_maxint-10, yp_sys_maxint),
                   ]:
             check(0, 2)
             check(0, 20)
@@ -570,7 +578,9 @@ class RangeTest(yp_unittest.TestCase):
                   yp_range(0),
                   yp_range(1, 9, 3),
                   yp_range(8, 0, -3),
-                  yp_range(sys.maxsize+1, sys.maxsize+10),
+                  # nohtyP can't handle values that large
+                  #yp_range(sys.maxsize+1, sys.maxsize+10),
+                  yp_range(yp_sys_maxint-10, yp_sys_maxint),
                   ]:
             self.assertEqual(yp_list(yp_reversed(r)), yp_list(r)[::-1])
 
