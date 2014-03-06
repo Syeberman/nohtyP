@@ -58,7 +58,9 @@ def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_li
 def frozenset( *args, **kwargs ): raise NotImplementedError( "convert script to yp_frozenset here" )
 def set( *args, **kwargs ): raise NotImplementedError( "convert script to yp_set here" )
 def dict( *args, **kwargs ): raise NotImplementedError( "convert script to yp_dict here" )
-# TODO same for yp_range, yp_min, yp_max, etc
+def range( *args, **kwargs ): raise NotImplementedError( "convert script to yp_range here" )
+def reversed( *args, **kwargs ): raise NotImplementedError( "convert script to yp_reversed here" )
+# TODO same for yp_min, yp_max, etc
 # TODO yp_iter(x) throws TypeError if x not a ypObject
 
 n = 10
@@ -67,7 +69,7 @@ def yp_len(obj):
     if not isinstance(obj, ypObject): 
         raise TypeError("expected ypObject in yp_len")
     try:
-        return yp_int(_yp_lenC(obj, yp_None))
+        return yp_int(len(obj))
     except TypeError:
         try:
             return yp_int(_yp_iter_lenhintC(obj, yp_None))
@@ -78,7 +80,7 @@ class TestInvariantWithoutMutations:
 
     def test_invariant(self):
         it = self.it
-        for i in reversed(range(1, n+1)):
+        for i in yp_reversed(yp_range(1, n+1)):
             self.assertEqual(yp_len(it), i)
             next(it)
         self.assertEqual(yp_len(it), 0)
@@ -101,7 +103,7 @@ class TestTemporarilyImmutable(TestInvariantWithoutMutations):
 
 ## ------- Concrete Type Tests -------
 
-@yp_unittest.skip("TODO Convert to nohtyP")
+@yp_unittest.skip("Not applicable to nohtyP")
 class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -111,23 +113,20 @@ class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
         # The repeat() object can also be infinite
         self.assertRaises(TypeError, yp_len, repeat(None))
 
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestXrange(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = yp_iter(range(n))
+        self.it = yp_iter(yp_range(n))
 
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestXrangeCustomReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = reversed(range(n))
+        self.it = yp_reversed(yp_range(n))
 
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestTuple(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = yp_iter(yp_tuple(range(n)))
+        self.it = yp_iter(yp_tuple(yp_range(n)))
 
 ## ------- Types that should not be mutated during iteration -------
 
@@ -135,7 +134,7 @@ class TestTuple(TestInvariantWithoutMutations, yp_unittest.TestCase):
 class TestDeque(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
-        d = deque(range(n))
+        d = deque(yp_range(n))
         self.it = yp_iter(d)
         self.mutate = d.pop
 
@@ -143,8 +142,8 @@ class TestDeque(TestTemporarilyImmutable, yp_unittest.TestCase):
 class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
-        d = deque(range(n))
-        self.it = reversed(d)
+        d = deque(yp_range(n))
+        self.it = yp_reversed(d)
         self.mutate = d.pop
 
 # XXX Unlike cpython, but allowed by the Python docs, nohtyP dicts and sets do not raise an error
@@ -152,51 +151,46 @@ class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
 # FIXME Create tests like for list that verify this behaviour
 
 #class TestDictKeys(TestTemporarilyImmutable, yp_unittest.TestCase):
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestDictKeys(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        d = yp_dict.fromkeys(range(n))
+        d = yp_dict.fromkeys(yp_range(n))
         self.it = yp_iter(d)
         self.mutate = d.popitem
 
 #class TestDictItems(TestTemporarilyImmutable, yp_unittest.TestCase):
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestDictItems(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        d = yp_dict.fromkeys(range(n))
+        d = yp_dict.fromkeys(yp_range(n))
         self.it = yp_iter(d.items())
         self.mutate = d.popitem
 
 #class TestDictValues(TestTemporarilyImmutable, yp_unittest.TestCase):
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestDictValues(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        d = yp_dict.fromkeys(range(n))
+        d = yp_dict.fromkeys(yp_range(n))
         self.it = yp_iter(d.values())
         self.mutate = d.popitem
 
 #class TestSet(TestTemporarilyImmutable, yp_unittest.TestCase):
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestSet(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        d = yp_set(range(n))
+        d = yp_set(yp_range(n))
         self.it = yp_iter(d)
         self.mutate = d.pop
 
 ## ------- Types that can mutate during iteration -------
 
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = yp_iter(yp_list(range(n)))
+        self.it = yp_iter(yp_list(yp_range(n)))
 
     def test_mutation(self):
-        d = yp_list(range(n))
+        d = yp_list(yp_range(n))
         it = yp_iter(d)
         next(it)
         next(it)
@@ -208,17 +202,16 @@ class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
         #self.assertEqual(yp_len(it), 0)
         self.assertEqual(yp_len(it), n-2)  # XXX nohtyP's hints don't change
         self.assertEqual(yp_list(it), [])
-        d.extend(range(20))
+        d.extend(yp_range(20))
         self.assertEqual(yp_len(it), 0)
 
-@yp_unittest.skip("TODO Convert to nohtyP")
 class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
-        self.it = yp_reversed(yp_list(range(n)))
+        self.it = yp_reversed(yp_list(yp_range(n)))
 
     def test_mutation(self):
-        d = yp_list(range(n))
+        d = yp_list(yp_range(n))
         it = yp_reversed(d)
         next(it)
         next(it)
@@ -229,24 +222,24 @@ class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
         #self.assertEqual(yp_len(it), 0)
         self.assertEqual(yp_len(it), n-2)  # XXX nohtyP's hints don't change
         self.assertEqual(yp_list(it), [])  # confirm invariant
-        d.extend(range(20))
+        d.extend(yp_range(20))
         self.assertEqual(yp_len(it), 0)
 
 ## -- Check to make sure exceptions are not suppressed by __length_hint__()
 
 
 class BadLen(object):
-    def __iter__(self): return yp_iter(range(10))
+    def __iter__(self): return yp_iter(yp_range(10))
     def __len__(self):
         raise RuntimeError('hello')
 
 class BadLengthHint(object):
-    def __iter__(self): return yp_iter(range(10))
+    def __iter__(self): return yp_iter(yp_range(10))
     def __length_hint__(self):
         raise RuntimeError('hello')
 
 class NoneLengthHint(object):
-    def __iter__(self): return yp_iter(range(10))
+    def __iter__(self): return yp_iter(yp_range(10))
     def __length_hint__(self):
         return None
 
@@ -257,13 +250,13 @@ class TestLengthHintExceptions(yp_unittest.TestCase):
         self.assertRaises(RuntimeError, yp_list, BadLengthHint())
         self.assertRaises(RuntimeError, yp_list().extend, BadLen())
         self.assertRaises(RuntimeError, yp_list().extend, BadLengthHint())
-        b = yp_bytearray(range(10))
+        b = yp_bytearray(yp_range(10))
         self.assertRaises(RuntimeError, b.extend, BadLen())
         self.assertRaises(RuntimeError, b.extend, BadLengthHint())
 
     def test_invalid_hint(self):
         # Make sure an invalid result doesn't muck-up the works
-        self.assertEqual(yp_list(NoneLengthHint()), yp_list(range(10)))
+        self.assertEqual(yp_list(NoneLengthHint()), yp_list(yp_range(10)))
 
 
 if __name__ == "__main__":
