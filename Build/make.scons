@@ -1,7 +1,7 @@
 import os.path, itertools
 import SCons.Errors
 
-# TODO support scons -h for build options
+# FIXME support scons -h for build options
 
 # Confirm that scons' top-level directory, the current directory, _is_ the project top
 if not os.path.exists( "nohtyP.c" ):
