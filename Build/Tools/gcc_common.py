@@ -218,12 +218,20 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
     def generate( env ):
         if env["CONFIGURATION"] not in ("release", "debug"): raise SCons.Errors.StopError( "GCC doesn't support the %r configuration (yet)" % env["CONFIGURATION"] )
 
-        # TODO Read info from site-tools.py to make this compiler easier to find
+        # See if site-tools.py already knows where to find this gcc version
+        siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
+        gcc_siteName = "%s_%s" % (env["COMPILER"].name.upper( ), env["TARGET_ARCH"].upper( ))
+        gcc_path = siteTools_dict.get( gcc_siteName, None )
 
-        # Find a GCC that supports our target, and prepend it to the path
-        gcc_path = _find( env, re_dumpversion )
+        # If site-tools.py came up empty, find a gcc that supports our target, then update 
+        # site-tools.py
         if not gcc_path:
-            raise SCons.Errors.StopError( "gcc %s.%s (%r) detection failed" % (major, minor, env["TARGET_ARCH"]) )
+            gcc_path = _find( env, re_dumpversion )
+            if not gcc_path:
+                raise SCons.Errors.StopError( "gcc %s.%s (%r) detection failed" % (major, minor, env["TARGET_ARCH"]) )
+            siteTools_dict[gcc_siteName] = gcc_path
+            with open( siteTools_name, "a" ) as outfile:
+                outfile.write( "%s = %r\n\n" % (gcc_siteName, gcc_path) )
 
         # The tool (ie mingw) may helpfully try to autodetect and prepend to path...so make sure we
         # prepend *our* path after the tool does its thing
