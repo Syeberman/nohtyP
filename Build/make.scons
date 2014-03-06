@@ -99,7 +99,9 @@ else:
 # The native targets ("debug", "release", etc) should each copy files from a single variant
 nativeTargetsToCreate = set( ("debug", "release") )
 
-python3 = Tool( "python_3", toolpath=["Build/Tools", ] )
+# yp_test requires at least Python 3.3
+python_min33 = Tool( "python_min33", toolpath=["Build/Tools", ] )
+
 for compiler_name in compiler_names:
     compiler = Tool( compiler_name, toolpath=["Build/Tools", ] )
     if not compiler.exists( rootEnv ): continue
@@ -115,27 +117,31 @@ for compiler_name in compiler_names:
                 compiler_name, targ_os, targ_arch, configuration)
         variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
 
-        # Skip compilers that can't be found (TODO unless we want an error in that case?)
-        # TODO: This script is slow due to vcvarsall.bat executing 52 times; cache in SCons
-        # TODO: Record compiler version information in the variant directory
-        try:
-            compilerEnv = variantEnv.Clone( tools=[compiler, ] )
+        # Skip compilers that can't be found
+        try: compilerEnv = variantEnv.Clone( tools=[compiler, ] )
         except (SCons.Errors.UserError, SCons.Errors.StopError): continue
 
+        buildTargets = []
+        testTargets = []
+        
         sharedLib = nohtyP_SharedLibrary( compilerEnv.Clone( ) )
-        ypTest = nohtyP_yp_test( variantEnv.Clone( tools=[python3, ] ), Flatten( sharedLib )[0] )
+        buildTargets.append( sharedLib )
 
-        buildTargets = [sharedLib, ]
-        testTargets = [ypTest, ]
-
-        # Pick one variant from each configuration that matches the host system, and copy it to the
-        # Build/native directory for easy access
         if targ_os == native_os and targ_arch in native_archs:
+            # We can only run yp_test on native OS and architectures, and only if a version
+            # of Python exists that can run against the target architecture
+            try: testTargets.append( 
+                    nohtyP_yp_test( variantEnv.Clone( tools=[python_min33, ] ), 
+                        Flatten( sharedLib )[0] ) )
+            except (SCons.Errors.UserError, SCons.Errors.StopError): continue
+
+            # Pick one variant from each configuration that matches the host system, and copy it 
+            # to the Build/native directory for easy access
             if configuration in nativeTargetsToCreate:
                 if configuration == "release":
                     native_dest = "#Build/native"
                 else:
-                    native_dest = "#Build/native/%s" % configuration
+                    native_dest = "#Build/native/"+configuration
                 # FIXME "make -c debug" not cleaning nohtyP.lib et al
                 native_buildTargets = variantEnv.Install( native_dest, buildTargets )
                 native_testTargets = variantEnv.Install( native_dest, testTargets )
@@ -148,10 +154,12 @@ for compiler_name in compiler_names:
                 nativeTargetsToCreate.remove( configuration )
 
         Alias( "all", buildTargets )
-        Alias( compiler_name, buildTargets )
-        Alias( "_".join( (compiler_name, targ_os) ), buildTargets )
-        Alias( "_".join( (compiler_name, targ_os, targ_arch) ), buildTargets )
-        Alias( "_".join( (compiler_name, targ_os, targ_arch, configuration) ), buildTargets )
+        Alias( "testall", testTargets )
+        heirarchy = (compiler_name, targ_os, targ_arch, configuration)
+        for heirarchyDepth in range( 1, len( heirarchy ) ):
+            heirarchyName = "_".join( heirarchy[:heirarchyDepth] )
+            Alias( heirarchyName, buildTargets )
+            Alias( "test"+heirarchyName, testTargets )
 
 # If SCons is called without targets, build the "native" target
 Default( Alias( "native" ) )
