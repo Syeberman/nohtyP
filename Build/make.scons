@@ -25,7 +25,7 @@ def nohtyP_SharedLibrary( env ):
 
 def nohtyP_yp_test( env, sharedLib ):
     env.PrependENVPath( "PYTHONPATH", "#/Lib" )
-    env.PrependENVPath( "PATH", sharedLib.get_dir( ) )
+    env.PrependENVPath( "PATH", Flatten( sharedLib )[0].get_dir( ) )
     scripts = ("#/Lib/yp.py", Glob("#/Lib/yp_test/*.py"), Glob("#/Lib/yp_test/*.txt"))
     testLog = env.Command( "$VTOP/yp_test.log", (sharedLib, scripts),
             "python -m yp_test -v > $TARGET" )
@@ -97,7 +97,7 @@ else:
     native_archs = (rootEnv["HOST_ARCH"], )
 
 # The native targets ("debug", "release", etc) should each copy files from a single variant
-nativeTargetsToCreate = set( ("debug", "release") )
+nativeTargetsToCreate = set( ("release", "debug") )
 
 # yp_test requires at least Python 3.3
 python_min33 = Tool( "python_min33", toolpath=["Build/Tools", ] )
@@ -129,10 +129,11 @@ for compiler_name in compiler_names:
 
         if targ_os == native_os and targ_arch in native_archs:
             # We can only run yp_test on native OS and architectures, and only if a version
-            # of Python exists that can run against the target architecture
-            try: testTargets.append( 
-                    nohtyP_yp_test( variantEnv.Clone( tools=[python_min33, ] ), 
-                        Flatten( sharedLib )[0] ) )
+            # of Python exists that can run against the target architecture.  Include sharedLib
+            # in testTargets so that "testrelease" will pull them into the native directory.
+            try: testTargets.extend( (
+                    nohtyP_yp_test( variantEnv.Clone( tools=[python_min33, ] ), sharedLib ),
+                    sharedLib ) )
             except (SCons.Errors.UserError, SCons.Errors.StopError): continue
 
             # Pick one variant from each configuration that matches the host system, and copy it 
@@ -142,14 +143,12 @@ for compiler_name in compiler_names:
                     native_dest = "#Build/native"
                 else:
                     native_dest = "#Build/native/"+configuration
-                native_buildTargets = variantEnv.Install( native_dest, buildTargets )
-                native_testTargets = variantEnv.Install( native_dest, testTargets )
-                buildTargets.append( native_buildTargets )
-                testTargets.append( native_testTargets )
-                Alias( configuration, native_buildTargets )
-                Alias( "test"+configuration, native_testTargets )
-                Alias( "native", native_buildTargets )
-                Alias( "test", native_testTargets )
+                buildTargets.append( variantEnv.Install( native_dest, buildTargets ) )
+                testTargets.append( variantEnv.Install( native_dest, testTargets ) )
+                Alias( configuration, buildTargets )
+                Alias( "test"+configuration, testTargets )
+                Alias( "native", buildTargets )
+                Alias( "test", testTargets )
                 nativeTargetsToCreate.remove( configuration )
 
         Alias( "all", buildTargets )
