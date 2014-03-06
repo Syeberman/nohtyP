@@ -5,6 +5,9 @@
  *      License: http://docs.python.org/3/license.html
  */
 
+// TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
+// yp_sys_minint, or yp_sys_maxsize
+
 #include "nohtyP.h"
 #include <stdlib.h>
 #include <stddef.h>

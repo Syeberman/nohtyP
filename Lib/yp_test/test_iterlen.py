@@ -101,6 +101,7 @@ class TestTemporarilyImmutable(TestInvariantWithoutMutations):
 
 ## ------- Concrete Type Tests -------
 
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -110,16 +111,19 @@ class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
         # The repeat() object can also be infinite
         self.assertRaises(TypeError, yp_len, repeat(None))
 
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestXrange(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = yp_iter(range(n))
 
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestXrangeCustomReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = reversed(range(n))
 
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestTuple(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -148,6 +152,7 @@ class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
 # FIXME Create tests like for list that verify this behaviour
 
 #class TestDictKeys(TestTemporarilyImmutable, yp_unittest.TestCase):
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestDictKeys(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -156,6 +161,7 @@ class TestDictKeys(TestInvariantWithoutMutations, yp_unittest.TestCase):
         self.mutate = d.popitem
 
 #class TestDictItems(TestTemporarilyImmutable, yp_unittest.TestCase):
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestDictItems(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -164,6 +170,7 @@ class TestDictItems(TestInvariantWithoutMutations, yp_unittest.TestCase):
         self.mutate = d.popitem
 
 #class TestDictValues(TestTemporarilyImmutable, yp_unittest.TestCase):
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestDictValues(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -172,6 +179,7 @@ class TestDictValues(TestInvariantWithoutMutations, yp_unittest.TestCase):
         self.mutate = d.popitem
 
 #class TestSet(TestTemporarilyImmutable, yp_unittest.TestCase):
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestSet(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -181,6 +189,7 @@ class TestSet(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
 ## ------- Types that can mutate during iteration -------
 
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -202,6 +211,7 @@ class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
         d.extend(range(20))
         self.assertEqual(yp_len(it), 0)
 
+@yp_unittest.skip("TODO Convert to nohtyP")
 class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):

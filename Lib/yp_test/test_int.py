@@ -69,11 +69,13 @@ class IntTestCases(yp_unittest.TestCase):
         self.assertRaises(OverflowError, yp_int, s[1:])
 
         # should return int
-        x = yp_int(1e100)
-        self.assertIsInstance(x, yp_int)
-        x = yp_int(-1e100)
-        self.assertIsInstance(x, yp_int)
-
+        # nohtyP doesn't support numbers this large
+        #x = yp_int(1e100)
+        #self.assertIsInstance(x, yp_int)
+        #x = yp_int(-1e100)
+        #self.assertIsInstance(x, yp_int)
+        self.assertRaises(OverflowError, yp_int, 1e100)
+        self.assertRaises(OverflowError, yp_int, -1e100)
 
         # SF bug 434186:  0x80000000/2 != 0x80000000>>1.
         # Worked by accident in Windows release build, but failed in debug build.

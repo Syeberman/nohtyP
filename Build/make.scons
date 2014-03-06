@@ -26,9 +26,11 @@ def nohtyP_SharedLibrary( env ):
 def nohtyP_yp_test( env, sharedLib ):
     env.PrependENVPath( "PYTHONPATH", "#/Lib" )
     env.PrependENVPath( "PATH", sharedLib.get_dir( ) )
-    # TODO print something more detailed in build output?
-    return env.Command( "$VTOP/yp_test.log", sharedLib,
+    scripts = ("#/Lib/yp.py", Glob("#/Lib/yp_test/*.py"), Glob("#/Lib/yp_test/*.txt"))
+    testLog = env.Command( "$VTOP/yp_test.log", (sharedLib, scripts),
             "python -m yp_test -v > $TARGET" )
+    Clean( sharedLib, testLog )
+    return testLog
 
 
 # Command-line build variables
@@ -134,6 +136,7 @@ for compiler_name in compiler_names:
                     native_dest = "#Build/native"
                 else:
                     native_dest = "#Build/native/%s" % configuration
+                # FIXME "make -c debug" not cleaning nohtyP.lib et al
                 native_buildTargets = variantEnv.Install( native_dest, buildTargets )
                 native_testTargets = variantEnv.Install( native_dest, testTargets )
                 buildTargets.append( native_buildTargets )
