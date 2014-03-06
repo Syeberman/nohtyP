@@ -56,7 +56,6 @@ def _test_python( python, targ_hexversions, targ_arch ):
 def _find( env, targ_hexversions ):
     """Find a python executable that can run our target's arch, returning the path or None.
     Picks the executable with the largest hexversion contained in targ_hexversions."""
-    if env["TARGET_OS"] != env["HOST_OS"]: raise SCons.Errors.StopError( "can only run Python on the native OS" )
     pyDirs = list( os.environ.get( "PATH", "" ).split( os.pathsep ) )
     pyDirs.extend( _python_paths_found )
     pythons = []
@@ -69,22 +68,33 @@ def _find( env, targ_hexversions ):
     pythons.sort( )         # sort by hexversion
     return pythons[-1][1]   # return the python path with the largest hexversion
 
-def DefinePythonToolFunctions( hexversions, strversion ):
+def DefinePythonToolFunctions( hexversions, tool_name ):
     """Returns (generate, exists), suitable for use as the SCons tool module functions.  
     hexversions is a container (possibly a range) of acceptable values of hexversion."""
+    if tool_name == "__main__": raise ImportError( "this tool module cannot be run as a script" )
 
     def generate( env ):
-        # TODO Read info from site-tools.py to make this compiler easier to find
+        if env["TARGET_OS"] != env["HOST_OS"]: raise SCons.Errors.StopError( "can only run Python on the native OS" )
 
-        # Find a Python that supports our target, and prepend it to the path
-        python_path = _find( env, hexversions )
+        # See if site-tools.py already knows where to find this Python version
+        siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
+        python_siteName = "%s_%s" % (tool_name.upper( ), env["TARGET_ARCH"].upper( ))
+        python_path = siteTools_dict.get( python_siteName, None )
+
+        # If site-tools.py came up empty, find a Python that supports our target, then update 
+        # site-tools.py
         if not python_path:
-            raise SCons.Errors.StopError( "python %s (%r) detection failed" % (strversion, env["TARGET_ARCH"]) )
+            python_path = _find( env, hexversions )
+            if not python_path:
+                raise SCons.Errors.StopError( "%s (%r) detection failed" % (tool_name, env["TARGET_ARCH"]) )
+            siteTools_dict[python_siteName] = python_path
+            with open( siteTools_name, "a" ) as outfile:
+                outfile.write( "%s = %r\n\n" % (python_siteName, python_path) )
+
+        # Now, prepend it to the path
         path, python = os.path.split( python_path )
         env.PrependENVPath( "PATH", path )
         env["PYTHON"] = python
-
-        # TODO Add an entry for this compiler in site-tools.py if it doesn't already exist?
 
     def exists( env ):
         return True # FIXME? _find( env, hexversions )
