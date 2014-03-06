@@ -142,7 +142,6 @@ for compiler_name in compiler_names:
                     native_dest = "#Build/native"
                 else:
                     native_dest = "#Build/native/"+configuration
-                # FIXME "make -c debug" not cleaning nohtyP.lib et al
                 native_buildTargets = variantEnv.Install( native_dest, buildTargets )
                 native_testTargets = variantEnv.Install( native_dest, testTargets )
                 buildTargets.append( native_buildTargets )
@@ -161,6 +160,8 @@ for compiler_name in compiler_names:
             Alias( heirarchyName, buildTargets )
             Alias( "test"+heirarchyName, testTargets )
 
-# If SCons is called without targets, build the "native" target
-Default( Alias( "native" ) )
+# The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to 
+# build just the native targets
+if GetOption( "clean" ): Default( "#Build" )
+else: Default( Alias( "native" ) )
 
