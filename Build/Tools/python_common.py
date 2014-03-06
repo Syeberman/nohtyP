@@ -30,9 +30,9 @@ def _arch2maxsize( targ_arch ):
     return opts
 
 _test_python_cache = {}
-def _test_python( python, targ_hexversion, targ_arch ):
-    """Tests if the given python matches the version, and supports the target arch.  Caches
-    results for speed."""
+def _test_python( python, targ_hexversions, targ_arch ):
+    """Tests if the given python matches the version, and supports the target arch.  Returns
+    hexversion if so, None if not.  Caches results for speed."""
     # Get this first so we can fail quickly on new architectures
     targ_maxsize = _arch2maxsize( targ_arch )
 
@@ -47,33 +47,37 @@ def _test_python( python, targ_hexversion, targ_arch ):
     
     # Parse the tuple that was output, failing on error, then see if it meets our requirements
     try: hexversion, maxsize = eval( output, {"__builtins__": None} )
-    except: return False
-    if hexversion < targ_hexversion: return False
-    if maxsize != targ_maxsize: return False
-    return True
+    except: return None
+    if hexversion not in targ_hexversions: return None
+    if maxsize != targ_maxsize: return None
+    return hexversion
 
 # TODO This, or something like it, should be in SCons
-def _find( env, targ_hexversion ):
-    """Find a python executable that can run our target's arch, returning the path or None."""
+def _find( env, targ_hexversions ):
+    """Find a python executable that can run our target's arch, returning the path or None.
+    Picks the executable with the largest hexversion contained in targ_hexversions."""
     if env["TARGET_OS"] != env["HOST_OS"]: raise SCons.Errors.StopError( "can only run Python on the native OS" )
     pyDirs = list( os.environ.get( "PATH", "" ).split( os.pathsep ) )
     pyDirs.extend( _python_paths_found )
+    pythons = []
     for pyDir in pyDirs:
         python = os.path.join( pyDir, "python" )
-        supported = _test_python( python, targ_hexversion, env["TARGET_ARCH"] )
-        if supported: return python
-    return None
+        python_hexversion = _test_python( python, targ_hexversions, env["TARGET_ARCH"] )
+        if python_hexversion is None: continue
+        pythons.append( (python_hexversion, python) )
+    if not pythons: return None
+    pythons.sort( )         # sort by hexversion
+    return pythons[-1][1]   # return the python path with the largest hexversion
 
-
-def DefinePythonToolFunctions( hexversion, strversion ):
-    """Returns (generate, exists), suitable for use as the SCons tool module functions."""
+def DefinePythonToolFunctions( hexversions, strversion ):
+    """Returns (generate, exists), suitable for use as the SCons tool module functions.  
+    hexversions is a container (possibly a range) of acceptable values of hexversion."""
 
     def generate( env ):
         # TODO Read info from site-tools.py to make this compiler easier to find
-        # TODO Make hexversion a range, then pick the Python version that's the latest that fits
 
         # Find a Python that supports our target, and prepend it to the path
-        python_path = _find( env, hexversion )
+        python_path = _find( env, hexversions )
         if not python_path:
             raise SCons.Errors.StopError( "python %s (%r) detection failed" % (strversion, env["TARGET_ARCH"]) )
         path, python = os.path.split( python_path )
@@ -83,7 +87,7 @@ def DefinePythonToolFunctions( hexversion, strversion ):
         # TODO Add an entry for this compiler in site-tools.py if it doesn't already exist?
 
     def exists( env ):
-        return True # FIXME? _find( env, hexversion )
+        return True # FIXME? _find( env, hexversions )
 
     return generate, exists
 
