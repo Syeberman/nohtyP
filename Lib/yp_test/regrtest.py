@@ -1780,10 +1780,9 @@ def _make_temp_dir_for_build(TEMPDIR):
     # Define a writable temp dir that will be used as cwd while running
     # the tests. The name of the dir includes the pid to allow parallel
     # testing (see the -j option).
-    TESTCWD = 'test_python_{}'.format(os.getpid())
-
-    TESTCWD = os.path.join(TEMPDIR, TESTCWD)
-    return TEMPDIR, TESTCWD
+    # FIXME Python creates a directory name based on the PID, which might
+    # already exist; better to use mktemp as intended
+    return TEMPDIR, tempfile.mktemp(prefix="test_python_", dir=TEMPDIR)
 
 if __name__ == '__main__':
     # Remove regrtest.py's own directory from the module search path. Despite
