@@ -931,6 +931,26 @@ ypAPI ypObject * const yp_s_replace;   // "replace"
 
 // XXX Additional bytes- and str-specific methods will be added in a future version
 
+// Returns a new reference to a copy of s with its first character capitalized and the rest
+// lowercased.
+ypAPI ypObject *yp_capitalize( ypObject *s );
+
+// Returns a new reference to a "casefolded" copy of s, for use in caseless matching.  The 
+// casefolding algorithm is described in section 3.13 of the Unicode Standard.
+ypAPI ypObject *yp_casefold( ypObject *s );
+
+// Returns a new reference to s centered in a string of length width.  Padding is done using the
+// specified ord_fillchar for yp_centerC2, or a space for yp_centerC.
+ypAPI ypObject *yp_centerC2( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+ypAPI ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
+
+// Returns the total number of non-overlapping occurences of substring sub in range [start, end].  
+// Returns 0 and sets *exc on error.  For yp_countC, start is 0 and end is yp_SLICE_USELEN.
+ypAPI yp_ssize_t yp_countC4( ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end,
+        ypObject **exc );
+ypAPI yp_ssize_t yp_countC( ypObject *s, ypObject *x, ypObject **exc );
+
+// TODO str.encode is similar to yp_bytes3, but there is a 1-argument version (utf-8, strict)
 
 /*
  * Numeric Operations
