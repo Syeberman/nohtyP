@@ -28,7 +28,7 @@ def nohtyP_yp_test( env, sharedLib ):
     env.PrependENVPath( "PATH", Flatten( sharedLib )[0].get_dir( ) )
     scripts = ("#/Lib/yp.py", Glob("#/Lib/yp_test/*.py"), Glob("#/Lib/yp_test/*.txt"))
     testLog = env.Command( "$VTOP/yp_test.log", (sharedLib, scripts),
-            "python -m yp_test -v > $TARGET" )
+            "$PYTHON -m yp_test -v > $TARGET" )
     Clean( sharedLib, testLog )
     return testLog
 
@@ -99,8 +99,9 @@ else:
 # The native targets ("debug", "release", etc) should each copy files from a single variant
 nativeTargetsToCreate = set( ("release", "debug") )
 
-# yp_test requires at least Python 3.3
+# yp_test requires at least Python 3.3; we don't care which PC-Lint version is used
 python_min33 = Tool( "python_min33", toolpath=["Build/Tools", ] )
+pclint = Tool( "pclint", toolpath=["Build/Tools", ] )
 
 for compiler_name in compiler_names:
     compiler = Tool( compiler_name, toolpath=["Build/Tools", ] )
@@ -120,6 +121,7 @@ for compiler_name in compiler_names:
         # Skip compilers that can't be found
         try: compilerEnv = variantEnv.Clone( tools=[compiler, ] )
         except (SCons.Errors.UserError, SCons.Errors.StopError): continue
+        #pclintEnv = compilerEnv.Clone( tools=[pclint, ] )
 
         buildTargets = []
         testTargets = []
