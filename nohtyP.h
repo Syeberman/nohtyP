@@ -944,13 +944,34 @@ ypAPI ypObject *yp_casefold( ypObject *s );
 ypAPI ypObject *yp_centerC2( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
 ypAPI ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
 
-// Returns the total number of non-overlapping occurences of substring sub in range [start, end].  
-// Returns 0 and sets *exc on error.  For yp_countC, start is 0 and end is yp_SLICE_USELEN.
-ypAPI yp_ssize_t yp_countC4( ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end,
-        ypObject **exc );
-ypAPI yp_ssize_t yp_countC( ypObject *s, ypObject *x, ypObject **exc );
+// Returns a new reference to an encoded version of s as a bytes object.  For yp_encode, encoding 
+// is yp_s_utf_8 and errors is yp_s_strict.
+ypAPI ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors );
+ypAPI ypObject *yp_encode( ypObject *s );
 
-// TODO str.encode is similar to yp_bytes3, but there is a 1-argument version (utf-8, strict)
+// Returns the immortal yp_True if s[start:end] ends with the specified suffix, otherwise 
+// yp_False.  suffix can also be a tuple of suffixes for which to look.  yp_endswithC considers the
+// entire string: start is 0 and end is yp_SLICE_USELEN.
+ypAPI ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end );
+ypAPI ypObject *yp_endswithC( ypObject *s, ypObject *suffix );
+
+// Returns a new reference to s where all tab characters are replaced by one or more spaces,
+// depending on the current column and the given tabsize.  Newline and return characters reset the
+// column to zero; all other characters increment the column by one regardless of how the character
+// is represented when printed.  The Python-equivalent "default" for tabsize is 8.
+ypAPI ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
+
+// yp_formatN( int n, ... ) // must first make a tuple, always
+//      (can we have a version that allows "My {} is {}" to just use positionals directly?)
+// yp_format_iterN( int n, ... ) // ...like this, no arg_names in format?
+// yp_format_seq( ypObject *sequence )  // no keyword arguments
+// yp_formatK( int n, ... ) // must first make a dict, always
+// yp_format_map( ypObject *mapping ) // no positional arguments
+//      and for something really crazy:
+// yp_format_seqN_mapK( int n_args, ..., int n_kwargs, ... ) // creates both tuple and dict
+// yp_format_seq_map( ypObject *sequence, ypObject *mapping )
+// Just like Python's format_map, can use yp_None to ignore a sequence or mapping argument
+
 
 /*
  * Numeric Operations
