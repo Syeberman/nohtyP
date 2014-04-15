@@ -26,6 +26,8 @@
 
 # Local SCons files
 \.sconsign.dblite$
+\.mscommon.log$
+\.sconscript.log$
 ^Build/site-tools.py$
 
 # Local Visual Studio files
@@ -45,4 +47,5 @@
 
 # Temporary files
 \.tmp$
+
 

@@ -1,4 +1,4 @@
-import os.path, itertools
+import os, os.path, itertools, traceback
 import SCons.Errors
 
 # FIXME support scons -h for build options
@@ -32,6 +32,11 @@ def nohtyP_yp_test( env, sharedLib ):
     Clean( sharedLib, testLog )
     return testLog
 
+
+# Logs for SCons- and script-related warnings that can usually be ignored
+# TODO Hidden on Windows
+sconscriptLog = open( "Build/.sconscript.log", "w" )
+os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath( "Build/.mscommon.log" )
 
 # Command-line build variables
 vars = Variables( None )
@@ -120,7 +125,9 @@ for compiler_name in compiler_names:
 
         # Skip compilers that can't be found
         try: compilerEnv = variantEnv.Clone( tools=[compiler, ] )
-        except (SCons.Errors.UserError, SCons.Errors.StopError): continue
+        except (SCons.Errors.UserError, SCons.Errors.StopError):
+            traceback.print_exc( file=sconscriptLog )
+            continue
         #pclintEnv = compilerEnv.Clone( tools=[pclint, ] )
 
         buildTargets = []
@@ -136,7 +143,8 @@ for compiler_name in compiler_names:
             try: testTargets.extend( (
                     nohtyP_yp_test( variantEnv.Clone( tools=[python_min33, ] ), sharedLib ),
                     sharedLib ) )
-            except (SCons.Errors.UserError, SCons.Errors.StopError): continue
+            except (SCons.Errors.UserError, SCons.Errors.StopError):
+                traceback.print_exc( file=sconscriptLog )
 
             # Pick one variant from each configuration that matches the host system, and copy it 
             # to the Build/native directory for easy access
