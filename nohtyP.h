@@ -935,21 +935,22 @@ ypAPI ypObject * const yp_s_replace;   // "replace"
 // lowercased.
 ypAPI ypObject *yp_capitalize( ypObject *s );
 
-// Returns a new reference to a "casefolded" copy of s, for use in caseless matching.  The 
+// Returns a new reference to a "casefolded" copy of s, for use in caseless matching.  The
 // casefolding algorithm is described in section 3.13 of the Unicode Standard.
 ypAPI ypObject *yp_casefold( ypObject *s );
 
 // Returns a new reference to s centered in a string of length width.  Padding is done using the
-// specified ord_fillchar for yp_centerC2, or a space for yp_centerC.
-ypAPI ypObject *yp_centerC2( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+// specified ord_fillchar for yp_centerC3, or a space for yp_centerC.  A copy of s is returned if
+// width is less than or equal to its length.
+ypAPI ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
 ypAPI ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
 
-// Returns a new reference to an encoded version of s as a bytes object.  For yp_encode, encoding 
+// Returns a new reference to an encoded version of s as a bytes object.  For yp_encode, encoding
 // is yp_s_utf_8 and errors is yp_s_strict.
 ypAPI ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors );
 ypAPI ypObject *yp_encode( ypObject *s );
 
-// Returns the immortal yp_True if s[start:end] ends with the specified suffix, otherwise 
+// Returns the immortal yp_True if s[start:end] ends with the specified suffix, otherwise
 // yp_False.  suffix can also be a tuple of suffixes for which to look.  yp_endswithC considers the
 // entire string: start is 0 and end is yp_SLICE_USELEN.
 ypAPI ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end );
@@ -960,6 +961,92 @@ ypAPI ypObject *yp_endswithC( ypObject *s, ypObject *suffix );
 // column to zero; all other characters increment the column by one regardless of how the character
 // is represented when printed.  The Python-equivalent "default" for tabsize is 8.
 ypAPI ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
+
+// Returns the immortal yp_True if all characters in s are alphanumeric and there is at least one
+// character, otherwise yp_False.  A character is alphanumeric if one of the following returns
+// yp_True: yp_isalpha, yp_isdecimal, yp_isdigit, or yp_isnumeric.
+ypAPI ypObject *yp_isalnum( ypObject *s );
+
+// Returns the immortal yp_True if all characters in s are alphabetic and there is at least one
+// character, otherwise yp_False.  Alphabetic characters are those characters defined in the
+// Unicode character database as "Letter".  Note that this is different from the "Alphabetic"
+// property defined in the Unicode Standard.
+ypAPI ypObject *yp_isalpha( ypObject *s );
+
+// Returns the immortal yp_True if all characters in s are decimal characters and there is at least
+// one character, otherwise yp_False.  Decimal characters are those from general category "Nd".
+ypAPI ypObject *yp_isdecimal( ypObject *s );
+
+// Returns the immortal yp_True if all characters in s are digits and there is at least one
+// character, otherwise yp_False.  Digit characters are those that have the property value
+// Numeric_Type=Digit or Numeric_Type=Decimal.
+ypAPI ypObject *yp_isdigit( ypObject *s );
+
+// Returns the immortal yp_True if s is a valid identifier according to the Python language
+// definition, otherwise yp_False.
+ypAPI ypObject *yp_isidentifier( ypObject *s );
+
+// Returns the immortal yp_True if all cased characters in s are lowercase and there is at least
+// one cased character, otherwise yp_False.  Cased characters are those with a general category
+// property of "Lu", "Ll", or "Lt".
+ypAPI ypObject *yp_islower( ypObject *s );
+
+// Returns the immortal yp_True if all characters in s are numeric characters and there is at
+// least one character, otherwise yp_False.  Numeric characters are those that have the Unicode
+// numeric value property.
+ypAPI ypObject *yp_isnumeric( ypObject *s );
+
+// Returns the immortal yp_True if all characters in s are printable or s is empty, otherwise
+// yp_False.  Nonprintable characters are those characters defined in the Unicode character
+// database as "Other" or "Separator", excepting space (0x20) which is considered printable.
+ypAPI ypObject *yp_isprintable( ypObject *s );
+
+// Returns the immortal yp_True if there are only whitespace characters in s and there is at least
+// one character, otherwise yp_False.  Whitespace characters are those characters defined in the
+// Unicode character database as "Other" or "Separator" and those with bidirectional property
+// being one of "WS", "B", or "S".
+ypAPI ypObject *yp_isspace( ypObject *s );
+
+// Returns the immortal yp_True if s is a titlecased string and there is at least one character,
+// otherwise yp_False.  A titlecased string is one where uppercase characters only follow uncased
+// characters, and lowercase characters only cased ones.  Cased characters are those with a
+// general category property of "Lu", "Ll", or "Lt".
+ypAPI ypObject *yp_istitle( ypObject *s );
+
+// Returns the immortal yp_True if all cased characters in s are uppercase and there is at least
+// one cased character, otherwise yp_False.  Cased characters are those with a general category
+// property of "Lu", "Ll", or "Lt".
+ypAPI ypObject *yp_isupper( ypObject *s );
+
+// Returns a new reference to the concatenation of the strings in iterable, using s as the
+// separator between elements.  Raises yp_TypeError if there are any non-string values, including
+// bytes objects.
+ypAPI ypObject *yp_join( ypObject *s, ypObject *iterable );
+
+// Equivalent to yp_join( s, yp_tupleN( n, ... ) ).
+ypAPI ypObject *yp_joinN( ypObject *s, int n, ... );
+ypAPI ypObject *yp_joinNV( ypObject *s, int n, va_list args );
+
+// Returns a new reference to s left-justified in a string of length width.  Padding is done using
+// the specified ord_fillchar for yp_ljustC3, or a space for yp_ljustC.  A copy of s is returned if
+// width is less than or equal to its length.
+ypAPI ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+ypAPI ypObject *yp_ljustC( ypObject *s, yp_ssize_t width );
+
+// Returns a new reference to a lowercased copy of s.  The lowercasing algorithm is described in
+// section 3.13 of the Unicode Standard.
+ypAPI ypObject *yp_lower( ypObject *s );
+
+// Returns a new reference to a copy of s with leading characters removed.  The chars argument is a
+// string specifying the set of characters to be removed; for yp_lstrip, or if chars is yp_None,
+// this defaults to removing whitespace.
+ypAPI ypObject *yp_lstrip2( ypObject *s, ypObject *chars );
+ypAPI ypObject *yp_lstrip( ypObject *s );
+
+
+/*
+ * Bytes & String Formatting Operations
+ */
 
 // yp_formatN( int n, ... ) // must first make a tuple, always
 //      (can we have a version that allows "My {} is {}" to just use positionals directly?)
