@@ -929,8 +929,6 @@ ypAPI ypObject * const yp_s_strict;    // "strict"
 ypAPI ypObject * const yp_s_ignore;    // "ignore"
 ypAPI ypObject * const yp_s_replace;   // "replace"
 
-// XXX Additional bytes- and str-specific methods will be added in a future version
-
 // Returns a new reference to a copy of s with its first character capitalized and the rest
 // lowercased.
 ypAPI ypObject *yp_capitalize( ypObject *s );
@@ -1007,12 +1005,6 @@ ypAPI ypObject *yp_isprintable( ypObject *s );
 // being one of "WS", "B", or "S".
 ypAPI ypObject *yp_isspace( ypObject *s );
 
-// Returns the immortal yp_True if s is a titlecased string and there is at least one character,
-// otherwise yp_False.  A titlecased string is one where uppercase characters only follow uncased
-// characters, and lowercase characters only cased ones.  Cased characters are those with a
-// general category property of "Lu", "Ll", or "Lt".
-ypAPI ypObject *yp_istitle( ypObject *s );
-
 // Returns the immortal yp_True if all cased characters in s are uppercase and there is at least
 // one cased character, otherwise yp_False.  Cased characters are those with a general category
 // property of "Lu", "Ll", or "Lt".
@@ -1033,6 +1025,10 @@ ypAPI ypObject *yp_joinNV( ypObject *s, int n, va_list args );
 ypAPI ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
 ypAPI ypObject *yp_ljustC( ypObject *s, yp_ssize_t width );
 
+// Similar to yp_ljustC3, except s is right-justified.
+ypAPI ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+ypAPI ypObject *yp_rjustC( ypObject *s, yp_ssize_t width );
+
 // Returns a new reference to a lowercased copy of s.  The lowercasing algorithm is described in
 // section 3.13 of the Unicode Standard.
 ypAPI ypObject *yp_lower( ypObject *s );
@@ -1042,6 +1038,54 @@ ypAPI ypObject *yp_lower( ypObject *s );
 // this defaults to removing whitespace.
 ypAPI ypObject *yp_lstrip2( ypObject *s, ypObject *chars );
 ypAPI ypObject *yp_lstrip( ypObject *s );
+
+// Similar to yp_lstrip2, except trailing characters are removed.
+ypAPI ypObject *yp_rstrip2( ypObject *s, ypObject *chars );
+ypAPI ypObject *yp_rstrip( ypObject *s );
+
+// Similar to yp_lstrip2, except both leading and trailing characters are removed.
+ypAPI ypObject *yp_strip2( ypObject *s, ypObject *chars );
+ypAPI ypObject *yp_strip( ypObject *s );
+
+// Splits s at the first occurence of sep and returns new references to 3 objects: *part0 is the
+// part before the separator, *part1 the separator itself, and *part2 the part after.  If the 
+// separator is not found, *part0 is a copy of s, and *part1 and *part2 are empty strings.  Sets
+// all 3 ypObject**s to the same exception on error.
+ypAPI void yp_partition( ypObject *s, ypObject *sep, 
+        ypObject **part0, ypObject **part1, ypObject **part2 );
+
+// Similar to yp_partition, except s is split at the last occurence of sep, and if the separator is
+// not found then *part0 and *part1 are empty strings, and *part2 is a copy of s.
+ypAPI void yp_rpartition( ypObject *s, ypObject *sep, 
+        ypObject **part0, ypObject **part1, ypObject **part2 );
+
+// Returns a new reference to a copy of s with all occurences of substring oldsub replaced by
+// newsub.  For yp_replaceC4, only the first count occurences are replaced.
+ypAPI ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count );
+ypAPI ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub );
+
+// Returns a new reference to a list of words in the string, using sep as the delimiter string.
+// For yp_splitC3, at most maxsplit splits are made; for yp_split2, or if maxsplit is -1, there is
+// no limit on the number of splits made.  If sep is yp_None this behaves as yp_split, otherwise
+// consecutive delimiters are not grouped together and are deemed to delimit empty strings.
+//  Ex: yp_split2( "1,,2", "," ) returns ["1", "", "2"] 
+ypAPI ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+ypAPI ypObject *yp_split2( ypObject *s, ypObject *sep );
+
+// Similar to yp_splitC3, except a different splitting algorithm is used.  Runs of consecutive
+// whitespace are regarded as a single separator and the result will contain no empty strings at
+// the start or end if the string has leading or trailing whitespace.
+//  Ex: yp_split( " 1  2   3  " ) returns ["1", "2", "3"]
+ypAPI ypObject *yp_split( ypObject *s );
+
+// Similar to yp_splitC3, except only performs the *rightmost* splits up to maxsplit.
+//  Ex: yp_rsplitC3( "  1  2   3  ", yp_None, 1 ) returns ["  1  2", "3"]
+ypAPI ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+
+// Returns a new reference to a list of lines in the string, breaking at line boundaries.  Python's
+// "universal newlines" approach is used to split lines.  Line breaks are not included in the
+// resulting list unless keepends is true.
+ypAPI ypObject *yp_splitlines2( ypObject *s, ypObject *keepends );
 
 
 /*
