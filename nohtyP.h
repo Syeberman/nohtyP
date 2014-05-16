@@ -62,7 +62,7 @@
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
  *  V - A version of "N" or "K" that accepts a va_list in place of ...
- *  E - Errors modifying an object do not discard the object (yp_None/exception returned instead)
+ *  E - Errors modifying an object do not discard the object (instead, errors set *exc)
  *  D - Discard after use (ie yp_IFd)
  *  X - Direct access to internal memory or borrowed objects; tread carefully!
  *  # (number) - A function with # inputs that otherwise shares the same name as another function
@@ -929,37 +929,6 @@ ypAPI ypObject * const yp_s_strict;    // "strict"
 ypAPI ypObject * const yp_s_ignore;    // "ignore"
 ypAPI ypObject * const yp_s_replace;   // "replace"
 
-// Returns a new reference to a copy of s with its first character capitalized and the rest
-// lowercased.
-ypAPI ypObject *yp_capitalize( ypObject *s );
-
-// Returns a new reference to a "casefolded" copy of s, for use in caseless matching.  The
-// casefolding algorithm is described in section 3.13 of the Unicode Standard.
-ypAPI ypObject *yp_casefold( ypObject *s );
-
-// Returns a new reference to s centered in a string of length width.  Padding is done using the
-// specified ord_fillchar for yp_centerC3, or a space for yp_centerC.  A copy of s is returned if
-// width is less than or equal to its length.
-ypAPI ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
-ypAPI ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
-
-// Returns a new reference to an encoded version of s as a bytes object.  For yp_encode, encoding
-// is yp_s_utf_8 and errors is yp_s_strict.
-ypAPI ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors );
-ypAPI ypObject *yp_encode( ypObject *s );
-
-// Returns the immortal yp_True if s[start:end] ends with the specified suffix, otherwise
-// yp_False.  suffix can also be a tuple of suffixes for which to look.  yp_endswithC considers the
-// entire string: start is 0 and end is yp_SLICE_USELEN.
-ypAPI ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end );
-ypAPI ypObject *yp_endswithC( ypObject *s, ypObject *suffix );
-
-// Returns a new reference to s where all tab characters are replaced by one or more spaces,
-// depending on the current column and the given tabsize.  Newline and return characters reset the
-// column to zero; all other characters increment the column by one regardless of how the character
-// is represented when printed.  The Python-equivalent "default" for tabsize is 8.
-ypAPI ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
-
 // Returns the immortal yp_True if all characters in s are alphanumeric and there is at least one
 // character, otherwise yp_False.  A character is alphanumeric if one of the following returns
 // yp_True: yp_isalpha, yp_isdecimal, yp_isdigit, or yp_isnumeric.
@@ -1010,14 +979,35 @@ ypAPI ypObject *yp_isspace( ypObject *s );
 // property of "Lu", "Ll", or "Lt".
 ypAPI ypObject *yp_isupper( ypObject *s );
 
-// Returns a new reference to the concatenation of the strings in iterable, using s as the
-// separator between elements.  Raises yp_TypeError if there are any non-string values, including
-// bytes objects.
-ypAPI ypObject *yp_join( ypObject *s, ypObject *iterable );
+// Returns the immortal yp_True if s[start:end] starts with the specified prefix, otherwise
+// yp_False.  prefix can also be a tuple of prefixes for which to look.  yp_startswithC considers
+// the entire string (as if start is 0 and end is yp_SLICE_USELEN).
+ypAPI ypObject *yp_startswithC4( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end );
+ypAPI ypObject *yp_startswithC( ypObject *s, ypObject *prefix );
 
-// Equivalent to yp_join( s, yp_tupleN( n, ... ) ).
-ypAPI ypObject *yp_joinN( ypObject *s, int n, ... );
-ypAPI ypObject *yp_joinNV( ypObject *s, int n, va_list args );
+// Similar to yp_startswithC4, except looks for the given suffix(es) at the end of s[start:end].
+ypAPI ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end );
+ypAPI ypObject *yp_endswithC( ypObject *s, ypObject *suffix );
+
+// Returns a new reference to a lowercased copy of s.  The lowercasing algorithm is described in
+// section 3.13 of the Unicode Standard.
+ypAPI ypObject *yp_lower( ypObject *s );
+
+// Returns a new reference to an uppercased copy of s.  The uppercasing algorithm is described in
+// section 3.13 of the Unicode Standard.
+ypAPI ypObject *yp_upper( ypObject *s );
+
+// Returns a new reference to a "casefolded" copy of s, for use in caseless matching.  The
+// casefolding algorithm is described in section 3.13 of the Unicode Standard.
+ypAPI ypObject *yp_casefold( ypObject *s );
+
+// Returns a new reference to a copy of s with uppercase characters converted to lowercase and
+// vice versa.
+ypAPI ypObject *yp_swapcase( ypObject *s );
+
+// Returns a new reference to a copy of s with its first character capitalized and the rest
+// lowercased.
+ypAPI ypObject *yp_capitalize( ypObject *s );
 
 // Returns a new reference to s left-justified in a string of length width.  Padding is done using
 // the specified ord_fillchar for yp_ljustC3, or a space for yp_ljustC.  A copy of s is returned if
@@ -1029,9 +1019,20 @@ ypAPI ypObject *yp_ljustC( ypObject *s, yp_ssize_t width );
 ypAPI ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
 ypAPI ypObject *yp_rjustC( ypObject *s, yp_ssize_t width );
 
-// Returns a new reference to a lowercased copy of s.  The lowercasing algorithm is described in
-// section 3.13 of the Unicode Standard.
-ypAPI ypObject *yp_lower( ypObject *s );
+// Similar to yp_ljustC3, except s is centered.
+ypAPI ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+ypAPI ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
+
+// Returns a new reference to s where all tab characters are replaced by one or more spaces,
+// depending on the current column and the given tabsize.  Newline and return characters reset the
+// column to zero; all other characters increment the column by one regardless of how the character
+// is represented when printed.  The Python-equivalent "default" for tabsize is 8.
+ypAPI ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
+
+// Returns a new reference to a copy of s with all occurences of substring oldsub replaced by
+// newsub.  For yp_replaceC4, only the first count occurences are replaced.
+ypAPI ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count );
+ypAPI ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub );
 
 // Returns a new reference to a copy of s with leading characters removed.  The chars argument is a
 // string specifying the set of characters to be removed; for yp_lstrip, or if chars is yp_None,
@@ -1047,28 +1048,33 @@ ypAPI ypObject *yp_rstrip( ypObject *s );
 ypAPI ypObject *yp_strip2( ypObject *s, ypObject *chars );
 ypAPI ypObject *yp_strip( ypObject *s );
 
+// Returns a new reference to the concatenation of the strings in iterable, using s as the
+// separator between elements.  Raises yp_TypeError if there are any non-string values, including
+// bytes objects.
+ypAPI ypObject *yp_join( ypObject *s, ypObject *iterable );
+
+// Equivalent to yp_join( s, yp_tupleN( n, ... ) ).
+ypAPI ypObject *yp_joinN( ypObject *s, int n, ... );
+ypAPI ypObject *yp_joinNV( ypObject *s, int n, va_list args );
+
 // Splits s at the first occurence of sep and returns new references to 3 objects: *part0 is the
-// part before the separator, *part1 the separator itself, and *part2 the part after.  If the 
+// part before the separator, *part1 the separator itself, and *part2 the part after.  If the
 // separator is not found, *part0 is a copy of s, and *part1 and *part2 are empty strings.  Sets
 // all 3 ypObject**s to the same exception on error.
-ypAPI void yp_partition( ypObject *s, ypObject *sep, 
+ypAPI void yp_partition( ypObject *s, ypObject *sep,
         ypObject **part0, ypObject **part1, ypObject **part2 );
 
 // Similar to yp_partition, except s is split at the last occurence of sep, and if the separator is
 // not found then *part0 and *part1 are empty strings, and *part2 is a copy of s.
-ypAPI void yp_rpartition( ypObject *s, ypObject *sep, 
+ypAPI void yp_rpartition( ypObject *s, ypObject *sep,
         ypObject **part0, ypObject **part1, ypObject **part2 );
 
-// Returns a new reference to a copy of s with all occurences of substring oldsub replaced by
-// newsub.  For yp_replaceC4, only the first count occurences are replaced.
-ypAPI ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count );
-ypAPI ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub );
-
 // Returns a new reference to a list of words in the string, using sep as the delimiter string.
-// For yp_splitC3, at most maxsplit splits are made; for yp_split2, or if maxsplit is -1, there is
-// no limit on the number of splits made.  If sep is yp_None this behaves as yp_split, otherwise
-// consecutive delimiters are not grouped together and are deemed to delimit empty strings.
-//  Ex: yp_split2( "1,,2", "," ) returns ["1", "", "2"] 
+// For yp_splitC3, only performs the leftmost splits up to maxsplit; for yp_split2, or if maxsplit
+// is -1, there is no limit on the number of splits made.  If sep is yp_None this behaves as
+// yp_split, otherwise consecutive delimiters are not grouped together and are deemed to delimit
+// empty strings.
+//  Ex: yp_split2( "1,,2", "," ) returns ["1", "", "2"]
 ypAPI ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
 ypAPI ypObject *yp_split2( ypObject *s, ypObject *sep );
 
@@ -1078,7 +1084,7 @@ ypAPI ypObject *yp_split2( ypObject *s, ypObject *sep );
 //  Ex: yp_split( " 1  2   3  " ) returns ["1", "2", "3"]
 ypAPI ypObject *yp_split( ypObject *s );
 
-// Similar to yp_splitC3, except only performs the *rightmost* splits up to maxsplit.
+// Similar to yp_splitC3, except only performs the rightmost splits up to maxsplit.
 //  Ex: yp_rsplitC3( "  1  2   3  ", yp_None, 1 ) returns ["  1  2", "3"]
 ypAPI ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
 
@@ -1087,10 +1093,23 @@ ypAPI ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
 // resulting list unless keepends is true.
 ypAPI ypObject *yp_splitlines2( ypObject *s, ypObject *keepends );
 
+// Returns a new reference to an encoded version of s (a str/chrarray) as a bytes object.  For
+// yp_encode, encoding is yp_s_utf_8 and errors is yp_s_strict.
+ypAPI ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors );
+ypAPI ypObject *yp_encode( ypObject *s );
+
+// Returns a new reference to an decoded version of b (a bytes/bytearray) as a str object.  For
+// yp_decode, encoding is yp_s_utf_8 and errors is yp_s_strict.
+ypAPI ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors );
+ypAPI ypObject *yp_decode( ypObject *b );
+
 
 /*
  * Bytes & String Formatting Operations
  */
+
+// The syntax of format strings can be found in Python's documentation:
+//  https://docs.python.org/3/library/string.html#format-string-syntax
 
 // yp_formatN( int n, ... ) // must first make a tuple, always
 //      (can we have a version that allows "My {} is {}" to just use positionals directly?)
