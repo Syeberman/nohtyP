@@ -1111,16 +1111,35 @@ ypAPI ypObject *yp_decode( ypObject *b );
 // The syntax of format strings can be found in Python's documentation:
 //  https://docs.python.org/3/library/string.html#format-string-syntax
 
-// yp_formatN( int n, ... ) // must first make a tuple, always
-//      (can we have a version that allows "My {} is {}" to just use positionals directly?)
-// yp_format_iterN( int n, ... ) // ...like this, no arg_names in format?
-// yp_format_seq( ypObject *sequence )  // no keyword arguments
-// yp_formatK( int n, ... ) // must first make a dict, always
-// yp_format_map( ypObject *mapping ) // no positional arguments
+// Returns a new reference to the result of the string formatting operation.  s can contain literal
+// text or replacement fields delimited by braces ("{" and "}").  Each replacement field contains
+// the numeric index of a positional argument.
+// TODO N can avoid having to make a tuple because it can do va_end/va_start then advance to the
+// desired argument, unless the next argument is advanced anyway.  Alternatively, and maybe it'd
+// have to anyway, is scanning the format string to see if the arguments are in order.
+ypAPI ypObject *yp_formatN( ypObject *s, int n, ... );
+ypAPI ypObject *yp_formatNV( ypObject *s, int n, va_list args );
+
+// Similar to yp_formatN, except each replacement field contains the name of one of the n key/value
+// pairs (for a total of 2*n objects).
+ypAPI ypObject *yp_formatK( ypObject *s, int n, ... );
+ypAPI ypObject *yp_formatKV( ypObject *s, int n, va_list args );
+
+// TODO a version that takes N, and a mapping object
+
+// Similar to yp_formatN, except each replacement field can contain either the numeric index of an
+// item in sequence, or the name of a key from mapping.  Either sequence or mapping can be yp_None
+// to ignore that particular argument.
+ypAPI ypObject *yp_format_seq_map( ypObject *s, ypObject *sequence, ypObject *mapping );
+
+// Convenience functions for yp_format_seq_map( s, sequence, yp_None ) and
+// yp_format_seq_map( s, yp_None, mapping ), respectively.
+ypAPI ypObject *yp_format_seq( ypObject *s, ypObject *sequence );
+ypAPI ypObject *yp_format_map( ypObject *s, ypObject *mapping );
+
+// yp_format_iterN( ypObject *s, int n, ... ) // ...like this, no arg_names in format?
 //      and for something really crazy:
-// yp_format_seqN_mapK( int n_args, ..., int n_kwargs, ... ) // creates both tuple and dict
-// yp_format_seq_map( ypObject *sequence, ypObject *mapping )
-// Just like Python's format_map, can use yp_None to ignore a sequence or mapping argument
+// yp_format_seqN_mapK( ypObject *s, int n_args, ..., int n_kwargs, ... ) // creates both tuple and dict
 
 
 /*
