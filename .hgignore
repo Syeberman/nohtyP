@@ -25,12 +25,16 @@
 /__pycache__/
 
 # Local SCons files
-\.sconsign.dblite$
+\.sconsign\.dblite$
 ^Build/site-tools.py$
+
+# Local PLY files
+lextab\.py$
+yacctab\.py$
 
 # Local Visual Studio files
 \.ipch$
-\.vcxproj.user$
+\.vcxproj\.user$
 \.sdf$
 \.suo$
 \.opensdf$
