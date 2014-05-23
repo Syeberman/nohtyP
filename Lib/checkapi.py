@@ -4,7 +4,7 @@ Author: Sye van der Veen
 Date: May 19, 2014
 """
 
-import sys, re, copy
+import sys, re, copy, collections
 
 # FIXME remove these hard-coded paths
 CppPath = "../pycparser/utils/cpp"
@@ -15,7 +15,6 @@ from pycparser import c_parser, c_generator, c_ast, parse_file
 
 re_FuncName = re.compile( r"^(?P<root>yp_([ois]2[ois]_)?([a-z_]+|(asu?int\d+)|(asfloat\d+)))"
         "(?P<post>(CF?)?(LF?)?(NV?)?(KV?)?E?D?X?\d?)$" )
-Generator = c_generator.CGenerator( )
 
 
 class RemoveDeclNameVisitor( c_ast.NodeVisitor ):
@@ -23,11 +22,16 @@ class RemoveDeclNameVisitor( c_ast.NodeVisitor ):
         node.declname = ""
         self.generic_visit( node )
 RemoveDeclName = RemoveDeclNameVisitor( ).visit
-def ConvertToAbstractType( declnode ):
-    """Returns a deep copy of declnode converted to an abstract type (no declnames)."""
+TypeNameGenerator = c_generator.CGenerator( )
+def GenerateAbstractTypeName( declnode ):
+    """Returns declnode as an abstract type name.  Should only be called on a Decl node or on a
+    FuncDecl's type node."""
     abstract = copy.deepcopy( declnode )
     RemoveDeclName( abstract )
-    return abstract
+    if not isinstance( abstract, c_ast.Decl ):
+        abstract = c_ast.Decl( name=None, quals=[], storage=[], funcspec=[], type=abstract, 
+                init=None, bitsize=None )
+    return TypeNameGenerator.visit( abstract )
 
 
 class ypParameter:
@@ -39,7 +43,7 @@ class ypParameter:
             self.name = self.type = "..."
         else:
             self.name = declnode.name
-            self.type = Generator.visit( ConvertToAbstractType( declnode ) )
+            self.type = GenerateAbstractTypeName( declnode )
         return self
 
     def __str__( self ):
@@ -59,7 +63,9 @@ class ypFunction:
         if len( paramsnode.params ) > 1 or getattr( paramsnode.params[0], "name", "" ) is not None:
             for pdeclnode in paramsnode.params:
                 self.params.append( ypParameter.from_Decl( pdeclnode ) )
+        self.returntype = GenerateAbstractTypeName( returnnode )
         self._complete( )
+        return self
 
     def _complete( self ):
         """Common initialization for ypFunction."""
@@ -67,22 +73,20 @@ class ypFunction:
         assert namematch is not None, self.name
         self.rootname = namematch.group( "root" )
         self.postfixes = namematch.group( "post" )
-        print( self )
 
     def __str__( self ):
-        return "%s %s %r (%s)" % (self.name, self.rootname, self.postfixes,
-                ", ".join( str( x ) for x in self.params ))
+        return "%s (%s): %r" % (
+                self.name, ", ".join( str( x ) for x in self.params ), self.returntype)
 
 
 class ApiVisitor( c_ast.NodeVisitor ):
     """Collects information from nohtyP.h."""
     def __init__( self ):
-        self.entities = []
+        self.functions = []
 
     def visit_Decl( self, node ):
         if isinstance( node.type, c_ast.FuncDecl ):
-            self.entities.append( ypFunction.from_Decl( node ) )
-            # node.show( )
+            self.functions.append( ypFunction.from_Decl( node ) )
 
 
 # TODO Checks to implement
@@ -93,15 +97,29 @@ class ApiVisitor( c_ast.NodeVisitor ):
 #   - C is used iff it contains a C type (an int?)
 #   - F is used iff it contains a float
 #   - L doesn't use ypObject *
-#   - report the functions that belong to the same group, and which is the unadorned version
+
+
+def ReportOnVariants( header ):
+    """Report the functions that belong to the same group, and which is the unadorned version."""
+    root2funcs = collections.defaultdict( list )
+    for func in header.functions:
+        root2funcs[func.rootname].append( func )
+
+    for root, funcs in root2funcs.items( ):
+        funcs.sort( key=lambda x: x.postfixes )
+        print( root )
+        for func in funcs: print( "    ", func )
+        print( )
 
 
 def CheckApi( filename ):
     """Reports potential problems in nohtyP.h (and related files)."""
     # TODO improve cpp_args
     ast = parse_file( filename, use_cpp=True, cpp_path=CppPath, cpp_args=CppArgs )
-    v = ApiVisitor( )
-    v.visit( ast )
+    header = ApiVisitor( )
+    header.visit( ast )
+
+    ReportOnVariants( header )
 
 
 if __name__ == "__main__":
