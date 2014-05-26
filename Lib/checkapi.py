@@ -16,9 +16,12 @@ sys.path.append( "../pycparser" )
 from pycparser import c_parser, c_generator, c_ast, parse_file
 
 
+##
+## Header file parsing
+##
+
 re_FuncName = re.compile( r"^(?P<root>yp_([ois]2[ois]_)?([a-z_]+|(asu?int\d+)|(asfloat\d+)))"
         "(?P<post>(CF?)?(LF?)?(NV?)?(KV?)?E?D?X?\d?)$" )
-
 
 class RemoveDeclNameVisitor( c_ast.NodeVisitor ):
     def visit_TypeDecl( self, node ):
@@ -36,7 +39,6 @@ def GenerateAbstractTypeName( declnode ):
                 init=None, bitsize=None )
     return TypeNameGenerator.visit( abstract )
 
-
 class ypParameter:
     @classmethod
     def from_Decl( cls, declnode ):
@@ -51,7 +53,6 @@ class ypParameter:
 
     def __str__( self ):
         return "%s: %r" % (self.name, self.type)
-
 
 class ypFunction:
     @classmethod
@@ -81,7 +82,6 @@ class ypFunction:
         return "%s (%s): %r" % (
                 self.name, ", ".join( str( x ) for x in self.params ), self.returntype)
 
-
 class ApiVisitor( c_ast.NodeVisitor ):
     """Collects information from nohtyP.h."""
     def __init__( self ):
@@ -91,6 +91,10 @@ class ApiVisitor( c_ast.NodeVisitor ):
         if isinstance( node.type, c_ast.FuncDecl ):
             self.functions.append( ypFunction.from_Decl( node ) )
 
+
+##
+## API consistency checks
+##
 
 # TODO Checks to implement
 #   - ellipsis preceeded by int n
@@ -108,7 +112,7 @@ class ApiVisitor( c_ast.NodeVisitor ):
 #   - the "unadorned" version is the one with the fewest arguments (but not zero)
 
 
-def ReportOnVariants( header ):
+def ReportOnVariants( header, *, print=print ):
     """Report the functions that belong to the same group, and which is the unadorned version."""
     root2funcs = collections.defaultdict( list )
     for func in header.functions:
@@ -116,20 +120,21 @@ def ReportOnVariants( header ):
 
     for root, funcs in sorted( root2funcs.items( ) ):
         if len( funcs ) < 2: continue
+        #if not any( x.name[-1].isdigit( ) for x in funcs ): continue
         funcs.sort( key=lambda x: x.postfixes )
         print( root )
         for func in funcs: print( "    ", func )
         print( )
 
 
-def CheckApi( filename ):
+def CheckApi( filename, *, print=print ):
     """Reports potential problems in nohtyP.h (and related files)."""
     # TODO improve cpp_args
     ast = parse_file( filename, use_cpp=True, cpp_path=CppPath, cpp_args=CppArgs )
     header = ApiVisitor( )
     header.visit( ast )
 
-    ReportOnVariants( header )
+    ReportOnVariants( header, print=print )
 
 
 if __name__ == "__main__":
