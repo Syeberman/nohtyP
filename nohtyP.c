@@ -1582,7 +1582,7 @@ void yp_unpackN( ypObject *iterable, int n, ... )
     mi = yp_miniiter( iterable, &mi_state ); // new ref
     va_start( args, n );
     for( remaining = n; remaining > 0; remaining-- ) {
-        x = yp_miniiter_next( mi, &mi_state ); // new ref
+        x = yp_miniiter_next( &mi, &mi_state ); // new ref
         if( yp_isexceptionC( x ) ) {
             // If the iterable is too short, raise yp_ValueError
             if( yp_isexceptionC2( x, yp_StopIteration ) ) x = yp_ValueError;
@@ -1596,7 +1596,7 @@ void yp_unpackN( ypObject *iterable, int n, ... )
 
     // If we've been successful so far, then ensure we're at the end of iterable
     if( !yp_isexceptionC( x ) ) {
-        x = yp_miniiter_next( mi, &mi_state ); // new ref
+        x = yp_miniiter_next( &mi, &mi_state ); // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) {
             x = yp_None; // success!
         } else if( yp_isexceptionC( x ) ) {
@@ -2024,7 +2024,7 @@ ypObject *yp_any( ypObject *iterable )
 
     mi = yp_miniiter( iterable, &mi_state ); // new ref
     while( 1 ) {
-        x = yp_miniiter_next( mi, &mi_state ); // new ref
+        x = yp_miniiter_next( &mi, &mi_state ); // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
         result = yp_bool( x );
         yp_decref( x );
@@ -2080,7 +2080,7 @@ ypObject *yp_all( ypObject *iterable )
 
     mi = yp_miniiter( iterable, &mi_state ); // new ref
     while( 1 ) {
-        x = yp_miniiter_next( mi, &mi_state ); // new ref
+        x = yp_miniiter_next( &mi, &mi_state ); // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
         result = yp_bool( x );
         yp_decref( x );
@@ -4682,12 +4682,12 @@ static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
 // Extends b with the items yielded from x; never writes the null-terminator, and only updates
 // length once the iterator is exhausted
 // XXX Do "b[len(b)]=0" when this returns (even on error)
-static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject *mi, yp_uint64_t *mi_state )
+static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject **mi, yp_uint64_t *mi_state )
 {
     ypObject *exc = yp_None;
     ypObject *x;
     yp_uint8_t x_asbyte;
-    yp_ssize_t lenhint = yp_miniiter_lenhintC( mi, mi_state, &exc ); // zero on error
+    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc ); // zero on error
     yp_ssize_t newLen = ypBytes_LEN( b );
     void *oldptr;
 
@@ -4736,7 +4736,7 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
         yp_uint64_t mi_state;
         ypObject *mi = yp_miniiter( iterable, &mi_state ); // new ref
         if( yp_isexceptionC( mi ) ) return mi;
-        result = _ypBytes_extend_from_iter( b, mi, &mi_state );
+        result = _ypBytes_extend_from_iter( b, &mi, &mi_state );
         ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0'; // up to us to add null-terminator
         yp_decref( mi );
         return result;
@@ -6177,12 +6177,12 @@ static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
     return yp_None;
 }
 
-static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject *mi, yp_uint64_t *mi_state )
+static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject **mi, yp_uint64_t *mi_state )
 {
     ypObject *exc = yp_None;
     ypObject *x;
     ypObject *result;
-    yp_ssize_t lenhint = yp_miniiter_lenhintC( mi, mi_state, &exc ); // zero on error
+    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc ); // zero on error
 
     while( 1 ) {
         x = yp_miniiter_next( mi, mi_state ); // new ref
@@ -6207,7 +6207,7 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
         yp_uint64_t mi_state;
         ypObject *mi = yp_miniiter( iterable, &mi_state ); // new ref
         if( yp_isexceptionC( mi ) ) return mi;
-        result = _ypTuple_extend_from_iter( sq, mi, &mi_state );
+        result = _ypTuple_extend_from_iter( sq, &mi, &mi_state );
         yp_decref( mi );
         return result;
     }
@@ -7600,13 +7600,13 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
     return yp_None;
 }
 
-static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
+static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **mi, yp_uint64_t *mi_state )
 {
     ypObject *exc = yp_None;
     ypObject *key;
     ypObject *result;
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
-    yp_ssize_t lenhint = yp_miniiter_lenhintC( mi, mi_state, &exc ); // zero on error
+    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc ); // zero on error
 
     while( 1 ) {
         key = yp_miniiter_next( mi, mi_state ); // new ref
@@ -7639,7 +7639,7 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
     } else {
         mi = yp_miniiter( iterable, &mi_state ); // new ref
         if( yp_isexceptionC( mi ) ) return mi;
-        result = _ypSet_update_from_iter( so, mi, &mi_state );
+        result = _ypSet_update_from_iter( so, &mi, &mi_state );
         yp_decref( mi );
         return result;
     }
@@ -7670,10 +7670,10 @@ static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *ot
 }
 
 // TODO This _allows_ mi to yield mutable values, unlike issubset; standardize
-static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject *mi, yp_uint64_t *mi_state );
+static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject **mi, yp_uint64_t *mi_state );
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other );
 static ypObject *_ypSet_intersection_update_from_iter(
-        ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
+        ypObject *so, ypObject **mi, yp_uint64_t *mi_state )
 {
     ypObject *so_toremove;
     ypObject *result;
@@ -7710,7 +7710,7 @@ static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
     } else {
         mi = yp_miniiter( iterable, &mi_state ); // new ref
         if( yp_isexceptionC( mi ) ) return mi;
-        result = _ypSet_intersection_update_from_iter( so, mi, &mi_state );
+        result = _ypSet_intersection_update_from_iter( so, &mi, &mi_state );
         yp_decref( mi );
         return result;
     }
@@ -7740,7 +7740,7 @@ static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *othe
 
 // TODO This _allows_ mi to yield mutable values, unlike issubset; standardize
 static ypObject *_ypSet_difference_update_from_iter(
-        ypObject *so, ypObject *mi, yp_uint64_t *mi_state )
+        ypObject *so, ypObject **mi, yp_uint64_t *mi_state )
 {
     ypObject *result = yp_None;
     ypObject *key;
@@ -7775,7 +7775,7 @@ static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
     } else {
         mi = yp_miniiter( iterable, &mi_state ); // new ref
         if( yp_isexceptionC( mi ) ) return mi;
-        result = _ypSet_difference_update_from_iter( so, mi, &mi_state );
+        result = _ypSet_difference_update_from_iter( so, &mi, &mi_state );
         yp_decref( mi );
         return result;
     }
@@ -8870,7 +8870,7 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
 // in particular, yp_ValueError is returned if exactly 2 values are not returned.
 // XXX Yes, the yielded value can be any iterable, even a set or dict (good luck guessing which
 // will be the key, and which the value)
-static void _ypDict_iter_items_next( ypObject *itemiter, ypObject **key, ypObject **value )
+static void _ypDict_iter_items_next( ypObject **itemiter, ypObject **key, ypObject **value )
 {
     ypObject *keyvaliter = yp_next( itemiter ); // new ref
     if( yp_isexceptionC( keyvaliter ) ) { // including yp_StopIteration
@@ -8903,14 +8903,14 @@ static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
     return yp_None;
 }
 
-static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject *itemiter )
+static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject **itemiter )
 {
     ypObject *exc = yp_None;
     ypObject *result;
     ypObject *key;
     ypObject *value;
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
-    yp_ssize_t lenhint = yp_iter_lenhintC( itemiter, &exc ); // zero on error
+    yp_ssize_t lenhint = yp_iter_lenhintC( *itemiter, &exc ); // zero on error
 
     while( 1 ) {
         _ypDict_iter_items_next( itemiter, &key, &value ); // new refs: key, value
@@ -8946,7 +8946,7 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
         itemiter = yp_iter_items( x ); // new ref
         if( yp_isexceptionC2( itemiter, yp_MethodError ) ) itemiter = yp_iter( x ); // new ref
         if( yp_isexceptionC( itemiter ) ) return itemiter;
-        result = _ypDict_update_from_iter( mp, itemiter );
+        result = _ypDict_update_from_iter( mp, &itemiter );
         yp_decref( itemiter );
         return result;
     }
@@ -9697,7 +9697,7 @@ static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value
     spaceleft = _ypSet_space_remaining( ypDict_KEYSET( newMp ) );
 
     while( 1 ) {
-        key = yp_miniiter_next( mi, &mi_state ); // new ref
+        key = yp_miniiter_next( &mi, &mi_state ); // new ref
         if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break; // end of iterator
             result = key;
@@ -10184,17 +10184,17 @@ ypObject *yp_iter( ypObject *x ) {
     _yp_REDIRECT1( x, tp_iter, (x) );
 }
 
-ypObject *yp_send( ypObject *iterator, ypObject *value ) {
-    _yp_REDIRECT1( iterator, tp_send, (iterator, value) );
+ypObject *yp_send( ypObject **iterator, ypObject *value ) {
+    _yp_INPLACE_RETURN1( iterator, tp_send, (*iterator, value) );
 }
 
-ypObject *yp_next( ypObject *iterator ) {
-    _yp_REDIRECT1( iterator, tp_send, (iterator, yp_None) );
+ypObject *yp_next( ypObject **iterator ) {
+    _yp_INPLACE_RETURN1( iterator, tp_send, (*iterator, yp_None) );
 }
 
-ypObject *yp_throw( ypObject *iterator, ypObject *exc ) {
+ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
     if( !yp_isexceptionC( exc ) ) return yp_TypeError;
-    _yp_REDIRECT1( iterator, tp_send, (iterator, exc) );
+    _yp_INPLACE_RETURN1( iterator, tp_send, (*iterator, exc) );
 }
 
 ypObject *yp_reversed( ypObject *x ) {
@@ -10495,8 +10495,8 @@ ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state ) {
     _yp_REDIRECT1( x, tp_miniiter, (x, state) );
 }
 
-ypObject *yp_miniiter_next( ypObject *mi, yp_uint64_t *state ) {
-    _yp_REDIRECT1( mi, tp_miniiter_next, (mi, state) );
+ypObject *yp_miniiter_next( ypObject **mi, yp_uint64_t *state ) {
+    _yp_INPLACE_RETURN1( mi, tp_miniiter_next, (*mi, state) );
 }
 
 yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **exc ) {

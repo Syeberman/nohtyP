@@ -409,7 +409,7 @@ yp_func( c_yp_hash_t, "yp_hashC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 # ypObject *yp_send( ypObject *iterator, ypObject *value );
 
 # ypObject *yp_next( ypObject *iterator );
-yp_func( c_ypObject_p, "yp_next", ((c_ypObject_p, "iterator"), ) )
+yp_func( c_ypObject_p, "yp_next", ((c_ypObject_pp, "iterator"), ) )
 
 # ypObject *yp_next2( ypObject *iterator, ypObject *defval );
 
