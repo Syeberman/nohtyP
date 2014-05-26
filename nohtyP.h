@@ -466,8 +466,8 @@ ypAPI ypObject *yp_gt( ypObject *x, ypObject *y );
 ypAPI yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
 
 // Returns the _current_ hash value of x; if x is mutable, this value may change between calls.
-// Returns -1 and sets *exc on error.  (Unlike Python, this can calculate the hash value of mutable
-// types.)
+// Returns -1 and sets *exc on error.  Unlike Python, this can calculate the hash value of mutable
+// types.
 ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
 
@@ -481,6 +481,7 @@ ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
 // Unlike other functions that modify their inputs, yp_send et al do not discard iterator on error.
 // Instead, the error is returned and the iterator is closed.
+// FIXME change this behaviour: make them all accept ypObject **
 
 // "Sends" a value into iterator and returns a new reference to the next yielded value,
 // yp_StopIteration if the iterator is exhausted, or another exception.  The value may be ignored
@@ -1783,16 +1784,14 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 // calls.  Best explained with examples:
 //  a.append( b )           --> yp( a,append, b )               --> yp_append( a, b )
 //  a + b                   --> yp( a, add, b )                 --> yp_add( a, b )
-// For methods that take no arguments, use yp0 (unlike elsewhere, the postfix counts the number of
-// arguments to the equivalent Python method):
-//  a.isspace( )            --> yp0( a,isspace )                --> yp_isspace( a )
+// For methods that take no arguments, use yp1 (the '1' counts the object, but not the method):
+//  a.isspace( )            --> yp1( a,isspace )                --> yp_isspace( a )
 // If variadic macros are supported by your compiler, yp can take multiple arguments:
 //  a.setdefault( b, c )    --> yp( &a,setdefault, b, c )       --> yp_setdefault( &a, b, c )
 //  a.startswith( b, 2, 7 ) --> yp( a,startswith4, b, 2, 7 )    --> yp_startswith4( a, b, 2, 7 )
-// If variadic macros are not supported, use yp2, yp3, etc (note how the 4 in startswith4 is 1 plus
-// the 3 in yp3):
-//  a.setdefault( b, c )    --> yp2( &a,setdefault, b, c )      --> yp_setdefault( &a, b, c )
-//  a.startswith( b, 2, 7 ) --> yp3( a,startswith4, b, 2, 7 )   --> yp_startswith4( a, b, 2, 7 )
+// If variadic macros are not supported, use yp3, yp4, etc (and define yp_NO_VARIADIC_MACROS):
+//  a.setdefault( b, c )    --> yp3( &a,setdefault, b, c )      --> yp_setdefault( &a, b, c )
+//  a.startswith( b, 2, 7 ) --> yp4( a,startswith4, b, 2, 7 )   --> yp_startswith4( a, b, 2, 7 )
 #endif
 
 // TODO A macro to get exception info as a string, include file/line info of the place the macro is
@@ -1966,16 +1965,16 @@ struct _ypStrObject {
 
 #ifdef yp_FUTURE
 // The implementation of "yp" is considered "internal"; see above for documentation
-#define yp0( self, method )         yp_ ## method( self )
-#define yp1( self, method, a1 )     yp_ ## method( self, a1 )
+#define yp1( self, method )         yp_ ## method( self )
+#define yp2( self, method, a1 )     yp_ ## method( self, a1 )
 #ifdef yp_NO_VARIADIC_MACROS
-#define yp yp1
+#define yp yp2
 #else
 #define yp( self, method, ... )     yp_ ## method( self, _VA_ARGS_ )
 #endif
-#define yp2( self, method, a1, a2 ) yp_ ## method( self, a1, a2 )
-#define yp3( self, method, a1, a2, a3 ) yp_ ## method( self, a1, a2, a3 )
-#define yp4( self, method, a1, a2, a3, a4 ) yp_ ## method( self, a1, a2, a3, a4 )
+#define yp3( self, method, a1, a2 ) yp_ ## method( self, a1, a2 )
+#define yp4( self, method, a1, a2, a3 ) yp_ ## method( self, a1, a2, a3 )
+#define yp5( self, method, a1, a2, a3, a4 ) yp_ ## method( self, a1, a2, a3, a4 )
 #endif
 
 #ifdef __cplusplus

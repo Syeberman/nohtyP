@@ -4,6 +4,9 @@ Author: Sye van der Veen
 Date: May 19, 2014
 """
 
+# FIXME should yp_popvalue* only return an exception...or should yp_send discard the iterator?
+#   (it's inconsistent)
+
 import sys, re, copy, collections
 
 # FIXME remove these hard-coded paths
@@ -47,7 +50,7 @@ class ypParameter:
         return self
 
     def __str__( self ):
-        return "%r: %r" % (self.name, self.type)
+        return "%s: %r" % (self.name, self.type)
 
 
 class ypFunction:
@@ -92,11 +95,17 @@ class ApiVisitor( c_ast.NodeVisitor ):
 # TODO Checks to implement
 #   - ellipsis preceeded by int n
 #   - ellipsis is in an N or K (va_list is NV or KV)
+#   - every (with exceptions) N or K has a NV or KV
 #   - exc is always ypObject ** and used in C, F, L, and E
+#   - all X functions return a ypObject *
 #   - the count equals the actual arg count (minus exc)
 #   - C is used iff it contains a C type (an int?)
 #   - F is used iff it contains a float
 #   - L doesn't use ypObject *
+#   - a whitelist of X functions?
+#   - determine whether the function mutates or not based on certain patterns (push, pop, set, del,
+#   i*, etc, or first param is iterator, file, etc) and ensure ypObject** is used iff it mutates
+#   - the "unadorned" version is the one with the fewest arguments (but not zero)
 
 
 def ReportOnVariants( header ):
@@ -105,7 +114,8 @@ def ReportOnVariants( header ):
     for func in header.functions:
         root2funcs[func.rootname].append( func )
 
-    for root, funcs in root2funcs.items( ):
+    for root, funcs in sorted( root2funcs.items( ) ):
+        if len( funcs ) < 2: continue
         funcs.sort( key=lambda x: x.postfixes )
         print( root )
         for func in funcs: print( "    ", func )
