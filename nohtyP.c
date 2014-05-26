@@ -10185,16 +10185,39 @@ ypObject *yp_iter( ypObject *x ) {
 }
 
 ypObject *yp_send( ypObject **iterator, ypObject *value ) {
-    _yp_INPLACE_RETURN1( iterator, tp_send, (*iterator, value) );
+    ypTypeObject *type = ypObject_TYPE( *iterator );
+    ypObject *result = type->tp_send( *iterator, value );
+    if( yp_isexceptionC( result ) ) {
+        // tp_send closes *iterator; it's up to us to not treat yp_StopIteration as an "error"
+        if( !yp_isexceptionC2( result, yp_StopIteration ) ) {
+            yp_INPLACE_ERR( iterator, result );
+        }
+    }
+    return result;
 }
 
 ypObject *yp_next( ypObject **iterator ) {
-    _yp_INPLACE_RETURN1( iterator, tp_send, (*iterator, yp_None) );
+    return yp_send( iterator, yp_None );
+}
+
+ypObject *yp_next2( ypObject **iterator, ypObject *defval ) {
+    ypTypeObject *type = ypObject_TYPE( *iterator );
+    ypObject *result = type->tp_send( *iterator, yp_None );
+    // tp_send closes *iterator; it's up to us to return defval in place of yp_StopIteration
+    if( yp_isexceptionC2( result, yp_StopIteration ) ) {
+        result = yp_incref( defval );
+    }
+    if( yp_isexceptionC( result ) ) {
+        if( !yp_isexceptionC2( result, yp_StopIteration ) ) {
+            yp_INPLACE_ERR( iterator, result );
+        }
+    }
+    return result;
 }
 
 ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
     if( !yp_isexceptionC( exc ) ) return yp_TypeError;
-    _yp_INPLACE_RETURN1( iterator, tp_send, (*iterator, exc) );
+    return yp_send( iterator, exc );
 }
 
 ypObject *yp_reversed( ypObject *x ) {
@@ -10496,7 +10519,15 @@ ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state ) {
 }
 
 ypObject *yp_miniiter_next( ypObject **mi, yp_uint64_t *state ) {
-    _yp_INPLACE_RETURN1( mi, tp_miniiter_next, (*mi, state) );
+    ypTypeObject *type = ypObject_TYPE( *mi );
+    ypObject *result = type->tp_miniiter_next( *mi, state );
+    if( yp_isexceptionC( result ) ) {
+        // tp_miniiter_next closes; it's up to us to not treat yp_StopIteration as an "error"
+        if( !yp_isexceptionC2( result, yp_StopIteration ) ) {
+            yp_INPLACE_ERR( mi, result );
+        }
+    }
+    return result;
 }
 
 yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **exc ) {
