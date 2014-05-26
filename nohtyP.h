@@ -477,24 +477,25 @@ ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
 // An "iterator" is an object that implements yp_next, while an "iterable" is an object that
 // implements yp_iter.  Examples of iterables include range, bytes, str, tuple, set, and dict;
-// examples of iterators include files and generators.
+// examples of iterators include files and generators.  It is usually unwise to modify an object
+// being iterated over.
 
-// "Sends" a value into *iterator and returns a new reference to the next yielded value,
-// yp_StopIteration if the iterator is exhausted, or another exception.  The value may be ignored
-// by the iterator.  If value is an exception this behaves like yp_throw.  On error, *iterator is 
-// closed, discarded, and set to an exception, _and_ an exception is returned.
+// "Sends" a value into *iterator and returns a new reference to the next yielded value, or an
+// exception.  The value may be ignored by the iterator.  If value is an exception this behaves
+// like yp_throw.  When the iterator is exhausted, *iterator is closed and yp_StopIteration is
+// returned; on any other error, *iterator is closed, discarded, and set to an exception, _and_ an
+// exception is returned.
 ypAPI ypObject *yp_send( ypObject **iterator, ypObject *value );
 
 // Equivalent to yp_send( iterator, yp_None ).
 ypAPI ypObject *yp_next( ypObject **iterator );
 
-// Similar to yp_next, but returns a new reference to defval when the iterator is exhausted.
-// defval _can_ be an exception; the Python-equivalent "default" of defval is yp_StopIteration.
+// Similar to yp_next, but when the iterator is exhausted, *iterator is closed and a new reference
+// to defval is returned.  defval _can_ be an exception: if it is, then exhaustion is treated as
+// an error as per yp_send (including possibly discarding *iterator).
 ypAPI ypObject *yp_next2( ypObject **iterator, ypObject *defval );
 
-// "Throws" an exception into the iterator and returns a new reference to the next yielded value,
-// yp_StopIteration if the iterator is exhausted, or another exception.  exc _must_ be an
-// exception.
+// Similar to yp_send, but exc _must_ be an exception.
 ypAPI ypObject *yp_throw( ypObject **iterator, ypObject *exc );
 
 // Returns a hint as to how many items are left to be yielded.  The accuracy of this hint depends
@@ -512,10 +513,9 @@ ypAPI yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 ypAPI ypObject *yp_iter_stateCX( ypObject *iterator, void **state, yp_ssize_t *size );
 
 // "Closes" the iterator by calling yp_throw( iterator, yp_GeneratorExit ).  If yp_StopIteration or
-// yp_GeneratorExit is returned by yp_throw, *iterator is not discarded, otherwise *iterator is
-// replaced with an exception.  The behaviour of this function for other types, in particular
-// files, is documented elsewhere.
-// FIXME Is this how yp_send et al should behave too, in terms of discarding *iterator?
+// yp_GeneratorExit is returned by yp_throw, *iterator is not discarded; on any other error,
+// *iterator is discarded and set to an exception.  The behaviour of this function for other
+// types, in particular files, is documented elsewhere.
 ypAPI void yp_close( ypObject **iterator );
 
 // Sets the given n ypObject**s to new references for the values yielded from iterable.  Iterable
@@ -526,11 +526,11 @@ ypAPI void yp_unpackN( ypObject *iterable, int n, ... );
 // Returns a new reference to an iterator that yields values from iterable for which function
 // returns true.  The given function must return new or immortal references, as each returned
 // value will be discarded; to inspect the elements directly, use NULL.
-typedef ypObject *(*yp_filter_function_t)( ypObject *x );
-ypAPI ypObject *yp_filter( yp_filter_function_t function, ypObject *iterable );
+typedef ypObject *(*yp_filter_func_t)( ypObject *x );
+ypAPI ypObject *yp_filter( yp_filter_func_t function, ypObject *iterable );
 
 // Similar to yp_filter, but yields values for which function returns false.
-ypAPI ypObject *yp_filterfalse( yp_filter_function_t function, ypObject *iterable );
+ypAPI ypObject *yp_filterfalse( yp_filter_func_t function, ypObject *iterable );
 
 // Returns a new reference to the largest/smallest of the given n objects.  key is a function that
 // returns new or immortal references that are used as comparison keys; to compare the elements
@@ -1421,10 +1421,11 @@ ypAPI ypObject * const yp_type_range;
 // modify an object being iterated over.
 ypAPI ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state );
 
-// Returns a new reference to the next yielded value from the mini iterator, yp_StopIteration if
-// the iterator is exhausted, or another exception.  state must point to the same data returned
-// by the previous yp_miniiter* call.  On error, *mi is discarded and set to an exception, _and_ an
-// exception is returned.
+// Returns a new reference to the next yielded value from the mini iterator, or an exception.
+// state must point to the same data returned by the previous yp_miniiter* call.  When the mini
+// iterator is exhausted it is closed and yp_StopIteration is returned; on any other error, the
+// mini iterator is closed, *mi is discarded and set to an exception, _and_ an exception is
+// returned.
 ypAPI ypObject *yp_miniiter_next( ypObject **mi, yp_uint64_t *state );
 
 // Returns a hint as to how many items are left to be yielded.  See yp_iter_lenhintC for additional
@@ -1441,11 +1442,12 @@ ypAPI ypObject *yp_miniiter_values( ypObject *x, yp_uint64_t *state );
 // tuple for each key/value pair.
 ypAPI ypObject *yp_miniiter_items( ypObject *x, yp_uint64_t *state );
 
-// Returns new references to the next yielded key/value pair from the mini iterator,
-// yp_StopIteration if the iterator is exhausted, or another exception.  Only applicable for
-// mini iterators returned by yp_miniiter_items, otherwise yp_TypeError is raised.  state must
-// point to the  same data returned by the previous yp_miniiter* call.  On error, *mi is discarded
-// and set to an exception, _and_ both *key and *value are set to exceptions.
+// Returns new references to the next yielded key/value pair from the mini iterator, or an
+// exception.  state must point to the same data returned by the previous yp_miniiter* call.  Only
+// applicable for mini iterators returned by yp_miniiter_items, otherwise yp_TypeError is raised.
+// When the mini iterator is exhausted it is closed and both *key and *value are set to
+// yp_StopIteration; on any other error, the mini iterator is closed, *mi is discarded and set to
+// an exception, _and_ both *key and *value are set to exceptions.
 ypAPI void yp_miniiter_items_next( ypObject **mi, yp_uint64_t *state,
         ypObject **key, ypObject **value );
 
@@ -1938,7 +1940,7 @@ struct _ypStrObject {
     ypObject *_yp_FOR_iter = yp_miniiter( _yp_FOR_expr, &_yp_FOR_state ); \
     decref_expression; \
     while( 1 ) { \
-        _yp_FOR_item = yp_miniiter_next( _yp_FOR_iter, &_yp_FOR_state ); \
+        _yp_FOR_item = yp_miniiter_next( &_yp_FOR_iter, &_yp_FOR_state ); \
         if( yp_isexceptionC( _yp_FOR_item ) ) { \
             if( yp_isexceptionC( _yp_FOR_iter ) ) break; \
             if( yp_isexceptionC2( _yp_FOR_item, yp_StopIteration ) ) _yp_FOR_iter_exhausted = 1; \

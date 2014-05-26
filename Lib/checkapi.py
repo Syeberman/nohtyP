@@ -100,6 +100,7 @@ class ApiVisitor( c_ast.NodeVisitor ):
 #   - ellipsis preceeded by int n
 #   - ellipsis is in an N or K (va_list is NV or KV)
 #   - every (with exceptions) N or K has a NV or KV
+#   - every N or K has a variant that takes a ypObject* in its place
 #   - exc is always ypObject ** and used in C, F, L, and E
 #   - all X functions return a ypObject *
 #   - the count equals the actual arg count (minus exc)
