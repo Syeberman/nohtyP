@@ -18,6 +18,9 @@
 
 #ifdef _MSC_VER // MSVC
 #include <Windows.h>
+#ifndef va_copy
+#define va_copy( d, s ) ( (d) = (s) )
+#endif
 #endif
 
 #ifdef __GNUC__ // GCC
@@ -1562,9 +1565,11 @@ ypObject *yp_iter_stateCX( ypObject *i, void **state, yp_ssize_t *size )
 }
 
 // TODO Double-check and test the boundary conditions in this function
-// XXX iterable may be an yp_ONSTACK_ITER_*: use carefully
 // XXX Yes, Python also allows unpacking of non-sequence iterables: a,b,c={1,2,3} is valid
-void yp_unpackN( ypObject *iterable, int n, ... )
+void yp_unpackN( ypObject *iterable, int n, ... ) {
+    return_yp_V_FUNC_void( yp_unpackNV, (iterable, n, args), n );
+}
+void yp_unpackNV( ypObject *iterable, int n, va_list args_orig )
 {
     yp_uint64_t mi_state;
     ypObject *mi;
@@ -1580,7 +1585,7 @@ void yp_unpackN( ypObject *iterable, int n, ... )
     // succeed when n=0 even though it should probably fail...we should check the yp_miniiter
     // return (here and elsewhere)
     mi = yp_miniiter( iterable, &mi_state ); // new ref
-    va_start( args, n );
+    va_copy( args, args_orig );
     for( remaining = n; remaining > 0; remaining-- ) {
         x = yp_miniiter_next( &mi, &mi_state ); // new ref
         if( yp_isexceptionC( x ) ) {
@@ -1611,7 +1616,7 @@ void yp_unpackN( ypObject *iterable, int n, ... )
     // If an error occured above, then we need to discard the previously-yielded values and set
     // all dests to the exception; otherwise, we're successful, so return
     if( yp_isexceptionC( x ) ) {
-        va_start( args, n );
+        va_copy( args, args_orig );
         for( /*n already set*/; n > remaining; n-- ) {
             dest = va_arg( args, ypObject ** );
             yp_decref( *dest );

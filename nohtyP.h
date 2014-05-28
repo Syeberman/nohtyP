@@ -520,8 +520,9 @@ ypAPI void yp_close( ypObject **iterator );
 
 // Sets the given n ypObject**s to new references for the values yielded from iterable.  Iterable
 // must yield exactly n objects, or else a yp_ValueError is raised.  Sets all n ypObject**s to the
-// same exception on error.  There is no 'V' version of this function.
+// same exception on error.
 ypAPI void yp_unpackN( ypObject *iterable, int n, ... );
+ypAPI void yp_unpackNV( ypObject *iterable, int n, va_list args );
 
 // Returns a new reference to an iterator that yields values from iterable for which function
 // returns true.  The given function must return new or immortal references, as each returned
@@ -1113,9 +1114,9 @@ ypAPI ypObject *yp_decode( ypObject *b );
 // Returns a new reference to the result of the string formatting operation.  s can contain literal
 // text or replacement fields delimited by braces ("{" and "}").  Each replacement field contains
 // the numeric index of a positional argument.
-// TODO N can avoid having to make a tuple because it can do va_end/va_start then advance to the
-// desired argument, unless the next argument is advanced anyway.  Alternatively, and maybe it'd
-// have to anyway, is scanning the format string to see if the arguments are in order.
+// TODO No need to make a tuple.  Assume that most format args are in order.  Do a va_copy of args,
+// and a va_arg to advance to proper index; if index is lower than previously, then va_end/va_copy
+// from original args to restart index.
 ypAPI ypObject *yp_formatN( ypObject *s, int n, ... );
 ypAPI ypObject *yp_formatNV( ypObject *s, int n, va_list args );
 
@@ -1123,8 +1124,6 @@ ypAPI ypObject *yp_formatNV( ypObject *s, int n, va_list args );
 // pairs (for a total of 2*n objects).
 ypAPI ypObject *yp_formatK( ypObject *s, int n, ... );
 ypAPI ypObject *yp_formatKV( ypObject *s, int n, va_list args );
-
-// TODO a version that takes N, and a mapping object
 
 // Similar to yp_formatN, except each replacement field can contain either the numeric index of an
 // item in sequence, or the name of a key from mapping.  Either sequence or mapping can be yp_None
@@ -1135,10 +1134,6 @@ ypAPI ypObject *yp_format_seq_map( ypObject *s, ypObject *sequence, ypObject *ma
 // yp_format_seq_map( s, yp_None, mapping ), respectively.
 ypAPI ypObject *yp_format_seq( ypObject *s, ypObject *sequence );
 ypAPI ypObject *yp_format_map( ypObject *s, ypObject *mapping );
-
-// yp_format_iterN( ypObject *s, int n, ... ) // ...like this, no arg_names in format?
-//      and for something really crazy:
-// yp_format_seqN_mapK( ypObject *s, int n_args, ..., int n_kwargs, ... ) // creates both tuple and dict
 
 
 /*
