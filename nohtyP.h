@@ -300,8 +300,8 @@ ypAPI ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t le
 
 // Returns a new reference to a str/chrarray decoded from the given bytes or bytearray object.  The
 // Python-equivalent default for encoding is yp_s_utf_8, while for errors it is yp_s_strict.
-ypAPI ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors );
-ypAPI ypObject *yp_chrarray3( ypObject *object, ypObject *encoding, ypObject *errors );
+ypAPI ypObject *yp_str3( ypObject *source, ypObject *encoding, ypObject *errors );
+ypAPI ypObject *yp_chrarray3( ypObject *source, ypObject *encoding, ypObject *errors );
 
 // Returns a new reference to the "informal" or nicely-printable string representation of object,
 // as a str/chrarray.  As in Python, passing a bytes object to this function returns the string
@@ -1009,14 +1009,6 @@ ypAPI ypObject *yp_swapcase( ypObject *s );
 // lowercased.
 ypAPI ypObject *yp_capitalize( ypObject *s );
 
-// In-place versions of the above; *s must be mutable.  On error, *s is discarded and replaced with
-// an exception.
-ypAPI void yp_ilower( ypObject **s );
-ypAPI void yp_iupper( ypObject **s );
-ypAPI void yp_icasefold( ypObject **s );
-ypAPI void yp_iswapcase( ypObject **s );
-ypAPI void yp_icapitalize( ypObject **s );
-
 // Returns a new reference to s left-justified in a string of length width.  Padding is done using
 // the specified ord_fillchar for yp_ljustC3, or a space for yp_ljustC.  A copy of s is returned if
 // width is less than or equal to its length.
@@ -1055,15 +1047,6 @@ ypAPI ypObject *yp_rstrip( ypObject *s );
 // Similar to yp_lstrip2, except both leading and trailing characters are removed.
 ypAPI ypObject *yp_strip2( ypObject *s, ypObject *chars );
 ypAPI ypObject *yp_strip( ypObject *s );
-
-// In-place versions of the above; *s must be mutable.  On error, *s is discarded and replaced with
-// an exception.
-ypAPI void yp_ilstrip2( ypObject **s, ypObject *chars );
-ypAPI void yp_ilstrip( ypObject **s );
-ypAPI void yp_irstrip2( ypObject **s, ypObject *chars );
-ypAPI void yp_irstrip( ypObject **s );
-ypAPI void yp_istrip2( ypObject **s, ypObject *chars );
-ypAPI void yp_istrip( ypObject **s );
 
 // Returns a new reference to the concatenation of the strings in iterable, using s as the
 // separator between elements.  Raises yp_TypeError if there are any non-string values, including
@@ -1110,13 +1093,13 @@ ypAPI ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
 // resulting list unless keepends is true.
 ypAPI ypObject *yp_splitlines2( ypObject *s, ypObject *keepends );
 
-// Returns a new reference to an encoded version of s (a str/chrarray) as a bytes object.  For
-// yp_encode, encoding is yp_s_utf_8 and errors is yp_s_strict.
+// Returns a new reference to an encoded version of s (a str/chrarray) as a bytes/bytearray object.
+// For yp_encode, encoding is yp_s_utf_8 and errors is yp_s_strict.
 ypAPI ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors );
 ypAPI ypObject *yp_encode( ypObject *s );
 
-// Returns a new reference to an decoded version of b (a bytes/bytearray) as a str object.  For
-// yp_decode, encoding is yp_s_utf_8 and errors is yp_s_strict.
+// Returns a new reference to an decoded version of b (a bytes/bytearray) as a str/chrarray object.
+// For yp_decode, encoding is yp_s_utf_8 and errors is yp_s_strict.
 ypAPI ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors );
 ypAPI ypObject *yp_decode( ypObject *b );
 
