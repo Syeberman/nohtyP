@@ -4938,9 +4938,7 @@ static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
         if( factor == 1 ) return yp_incref( b );
     } else {
         // If the result will be an empty array, return a new, empty array
-        if( ypBytes_LEN( b ) < 1 || factor < 1 ) {
-            return yp_bytearrayC( NULL, 0 );
-        }
+        if( ypBytes_LEN( b ) < 1 || factor < 1 ) return yp_bytearray0( );
         // If the result will be an exact copy, let the code below make that copy
     }
 
@@ -5000,7 +4998,10 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &newLen );
     if( yp_isexceptionC( result ) ) return result;
 
-    if( newLen < 1 && ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return _yp_bytes_empty;
+    if( newLen < 1 ) {
+        if( ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return _yp_bytes_empty;
+        return yp_bytearray0( );
+    }
     newB = _ypBytes_new( ypObject_TYPE_CODE( b ), newLen, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newB ) ) return newB;
 
@@ -5246,6 +5247,136 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
         }
     }
     return yp_None;
+}
+
+static ypObject *bytes_isalnum( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_isalpha( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_isdecimal( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_isdigit( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_isidentifier( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_islower( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_isnumeric( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_isprintable( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_isspace( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_isupper( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_startswith( ypObject *b, ypObject *prefix, yp_ssize_t start, yp_ssize_t end ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_endswith( ypObject *b, ypObject *suffix, yp_ssize_t start, yp_ssize_t end ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_lower( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_upper( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_casefold( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_swapcase( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_capitalize( ypObject *b ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_ljust( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_rjust( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_center( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_expandtabs( ypObject *b, yp_ssize_t tabsize ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_replace( ypObject *b, ypObject *oldsub, ypObject *newsub, yp_ssize_t count ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_lstrip( ypObject *b, ypObject *chars ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_rstrip( ypObject *b, ypObject *chars ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_strip( ypObject *b, ypObject *chars ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_join( ypObject *b, ypObject *iterable ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_joinN( ypObject *b, int n, va_list args ) {
+    return yp_NotImplementedError;
+}
+
+static void bytes_partition( ypObject *b, ypObject *sep,
+        ypObject **part0, ypObject **part1, ypObject **part2 ) {
+    *part0 = *part1 = *part2 = yp_NotImplementedError;
+}
+
+static void bytes_rpartition( ypObject *b, ypObject *sep,
+        ypObject **part0, ypObject **part1, ypObject **part2 ) {
+    *part0 = *part1 = *part2 = yp_NotImplementedError;
+}
+
+static ypObject *bytes_split( ypObject *b, ypObject *sep, yp_ssize_t maxsplit ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_rsplit( ypObject *b, ypObject *sep, yp_ssize_t maxsplit ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *bytes_splitlines( ypObject *b, ypObject *keepends ) {
+    return yp_NotImplementedError;
 }
 
 // Returns -1, 0, or 1 as per memcmp
@@ -5512,7 +5643,10 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
     } else {
         if( len < 0 ) len = strlen( (const char *) source );
     }
-    if( len < 1 && type == ypBytes_CODE ) return _yp_bytes_empty;
+    if( len < 1 ) {
+        if( type == ypBytes_CODE ) return _yp_bytes_empty;
+        return yp_bytearray0( );
+    }
     if( len > ypBytes_LEN_MAX ) return yp_MemorySizeOverflowError;
     b = _ypBytes_new( type, len, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( b ) ) return b;
@@ -5534,6 +5668,27 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
     return _ypBytesC( ypByteArray_CODE, source, len );
 }
 
+static ypObject *_ypBytes_encode( int type, 
+        ypObject *source, ypObject *encoding, ypObject *errors )
+{
+    if( ypObject_TYPE_PAIR_CODE( source ) != ypStr_CODE ) return_yp_BAD_TYPE( source );
+    return yp_NotImplementedError;
+}
+ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors ) {
+    return _ypBytes_encode( ypBytes_CODE, source, encoding, errors );
+}
+ypObject *yp_bytearray3( ypObject *source, ypObject *encoding, ypObject *errors ) {
+    return _ypBytes_encode( ypByteArray_CODE, source, encoding, errors );
+}
+ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors ) {
+    return _ypBytes_encode( ypObject_IS_MUTABLE( s ) ? ypByteArray_CODE : ypBytes_CODE, 
+            s, encoding, errors );
+}
+ypObject *yp_encode( ypObject *s ) {
+    return _ypBytes_encode( ypObject_IS_MUTABLE( s ) ? ypByteArray_CODE : ypBytes_CODE, 
+            s, yp_s_utf_8, yp_s_strict );
+}
+
 static ypObject *_ypBytes( int type, ypObject *source )
 {
     ypObject *exc = yp_None;
@@ -5543,6 +5698,8 @@ static ypObject *_ypBytes( int type, ypObject *source )
         if( type == ypBytes_CODE ) {
             if( ypBytes_LEN( source ) < 1 ) return _yp_bytes_empty;
             if( ypObject_TYPE_CODE( source ) == ypBytes_CODE ) return yp_incref( source );
+        } else {
+            if( ypBytes_LEN( source ) < 1 ) return yp_bytearray0( );
         }
         return _ypBytes_copy( type, source, /*alloclen_fixed=*/TRUE );
     } else if( source_pair == ypInt_CODE ) {
@@ -5550,6 +5707,9 @@ static ypObject *_ypBytes( int type, ypObject *source )
         if( yp_isexceptionC( exc ) ) return exc;
         if( len < 0 ) return yp_ValueError;
         return _ypBytesC( type, NULL, len );
+    } else if( source_pair == ypStr_CODE ) {
+        // This seems likely enough to handle here, instead of waiting for _ypBytes_extend to fail
+        return yp_TypeError;
     } else {
         // Treat it as a generic iterator
         ypObject *newB;
@@ -5562,10 +5722,7 @@ static ypObject *_ypBytes( int type, ypObject *source )
         } else if( lenhint < 1 ) {
             // yp_lenC reports an empty iterable, so we can shortcut _ypBytes_extend
             if( type == ypBytes_CODE ) return _yp_bytes_empty;
-            newB = _ypBytes_new( ypByteArray_CODE, 0, /*alloclen_fixed=*/FALSE );
-            if( yp_isexceptionC( newB ) ) return newB;
-            ypBytes_DATA( newB )[0] = '\0';
-            return newB;
+            return yp_bytearray0( );
         } else if( lenhint > ypBytes_LEN_MAX ) {
             // yp_lenC reports that we don't have room to add their elements
             return yp_MemorySizeOverflowError;
@@ -5586,6 +5743,16 @@ ypObject *yp_bytes( ypObject *source ) {
 }
 ypObject *yp_bytearray( ypObject *source ) {
     return _ypBytes( ypByteArray_CODE, source );
+}
+
+ypObject *yp_bytes0( void ) {
+    return _yp_bytes_empty;
+}
+ypObject *yp_bytearray0( void ) {
+    ypObject *newB = _ypBytes_new( ypByteArray_CODE, 0, /*alloclen_fixed=*/FALSE );
+    if( yp_isexceptionC( newB ) ) return newB;
+    ypBytes_DATA( newB )[0] = '\0';
+    return newB;
 }
 
 
@@ -5706,6 +5873,137 @@ static ypObject *str_len( ypObject *s, yp_ssize_t *len )
     *len = ypStr_LEN( s );
     return yp_None;
 }
+
+static ypObject *str_isalnum( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_isalpha( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_isdecimal( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_isdigit( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_isidentifier( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_islower( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_isnumeric( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_isprintable( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_isspace( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_isupper( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_startswith( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_endswith( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_lower( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_upper( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_casefold( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_swapcase( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_capitalize( ypObject *s ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_ljust( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_rjust( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_center( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_expandtabs( ypObject *s, yp_ssize_t tabsize ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_replace( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_lstrip( ypObject *s, ypObject *chars ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_rstrip( ypObject *s, ypObject *chars ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_strip( ypObject *s, ypObject *chars ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_join( ypObject *s, ypObject *iterable ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_joinN( ypObject *s, int n, va_list args ) {
+    return yp_NotImplementedError;
+}
+
+static void str_partition( ypObject *s, ypObject *sep,
+        ypObject **part0, ypObject **part1, ypObject **part2 ) {
+    *part0 = *part1 = *part2 = yp_NotImplementedError;
+}
+
+static void str_rpartition( ypObject *s, ypObject *sep,
+        ypObject **part0, ypObject **part1, ypObject **part2 ) {
+    *part0 = *part1 = *part2 = yp_NotImplementedError;
+}
+
+static ypObject *str_split( ypObject *s, ypObject *sep, yp_ssize_t maxsplit ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_rsplit( ypObject *s, ypObject *sep, yp_ssize_t maxsplit ) {
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_splitlines( ypObject *s, ypObject *keepends ) {
+    return yp_NotImplementedError;
+}
+
 
 // Returns -1, 0, or 1 as per memcmp
 static int _ypStr_relative_cmp( ypObject *s, ypObject *x ) {
@@ -5979,7 +6277,10 @@ static ypObject *_ypStrC( int type, const yp_uint8_t *source, yp_ssize_t len )
     } else {
         if( len < 0 ) len = strlen( (const char *) source );
     }
-    if( len < 1 && type == ypStr_CODE ) return _yp_str_empty;
+    if( len < 1 ) {
+        if( type == ypStr_CODE ) return _yp_str_empty;
+        return yp_chrarray0( );
+    }
     s = _ypStr_new( type, len+1, /*alloclen_fixed=*/TRUE );
 
     // Initialize the data
@@ -6009,6 +6310,49 @@ ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
     return _ypStrC( ypChrArray_CODE, source, len );
 }
 
+static ypObject *_ypStr_decode( int type, 
+        ypObject *source, ypObject *encoding, ypObject *errors )
+{
+    if( ypObject_TYPE_PAIR_CODE( source ) != ypBytes_CODE ) return_yp_BAD_TYPE( source );
+    if( encoding != yp_s_latin_1 ) return yp_NotImplementedError;
+    return _ypStrC( type, ypBytes_DATA( source ), ypBytes_LEN( source ) );
+}
+ypObject *yp_str3( ypObject *source, ypObject *encoding, ypObject *errors ) {
+    return _ypStr_decode( ypStr_CODE, source, encoding, errors );
+}
+ypObject *yp_chrarray3( ypObject *source, ypObject *encoding, ypObject *errors ) {
+    return _ypStr_decode( ypChrArray_CODE, source, encoding, errors );
+}
+ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors ) {
+    return _ypStr_decode( ypObject_IS_MUTABLE( b ) ? ypChrArray_CODE : ypStr_CODE, 
+            b, encoding, errors );
+}
+ypObject *yp_decode( ypObject *b ) {
+    return _ypStr_decode( ypObject_IS_MUTABLE( b ) ? ypChrArray_CODE : ypStr_CODE, 
+            b, yp_s_utf_8, yp_s_strict );
+}
+
+static ypObject *_ypStr( int type, ypObject *object ) 
+{
+    return yp_NotImplementedError;
+}
+ypObject *yp_str( ypObject *object ) {
+    return _ypStr( ypStr_CODE, object );
+}
+ypObject *yp_chrarray( ypObject *object ) {
+    return _ypStr( ypChrArray_CODE, object );
+}
+
+ypObject *yp_str0( void ) {
+    return _yp_str_empty;
+}
+ypObject *yp_chrarray0( void ) {
+    ypObject *newS = _ypStr_new( ypChrArray_CODE, 0, /*alloclen_fixed=*/FALSE );
+    if( yp_isexceptionC( newS ) ) return newS;
+    ypStr_DATA( newS )[0] = '\0';
+    return newS;
+}    
+
 ypObject *yp_chrC( yp_int_t i ) {
     yp_uint8_t source[1];
 
@@ -6032,6 +6376,93 @@ yp_IMMORTAL_STR_LATIN1( yp_s_utf_8,     "utf_8" );
 yp_IMMORTAL_STR_LATIN1( yp_s_strict,    "strict" );
 yp_IMMORTAL_STR_LATIN1( yp_s_ignore,    "ignore" );
 yp_IMMORTAL_STR_LATIN1( yp_s_replace,   "replace" );
+
+
+/*************************************************************************************************
+ * String (str, bytes, etc) methods
+ *************************************************************************************************/
+
+// XXX Since it's not likely that anything other than str and bytes will need to implement these
+// methods, they are left out of the type's method table.  This may change in the future.
+
+ypObject *yp_isalnum( ypObject *s );
+
+ypObject *yp_isalpha( ypObject *s );
+
+ypObject *yp_isdecimal( ypObject *s );
+
+ypObject *yp_isdigit( ypObject *s );
+
+ypObject *yp_isidentifier( ypObject *s );
+
+ypObject *yp_islower( ypObject *s );
+
+ypObject *yp_isnumeric( ypObject *s );
+
+ypObject *yp_isprintable( ypObject *s );
+
+ypObject *yp_isspace( ypObject *s );
+
+ypObject *yp_isupper( ypObject *s );
+
+ypObject *yp_startswithC4( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end );
+ypObject *yp_startswithC( ypObject *s, ypObject *prefix );
+
+ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end );
+ypObject *yp_endswithC( ypObject *s, ypObject *suffix );
+
+ypObject *yp_lower( ypObject *s );
+
+ypObject *yp_upper( ypObject *s );
+
+ypObject *yp_casefold( ypObject *s );
+
+ypObject *yp_swapcase( ypObject *s );
+
+ypObject *yp_capitalize( ypObject *s );
+
+ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+ypObject *yp_ljustC( ypObject *s, yp_ssize_t width );
+
+ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+ypObject *yp_rjustC( ypObject *s, yp_ssize_t width );
+
+ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
+
+ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
+
+ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count );
+ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub );
+
+ypObject *yp_lstrip2( ypObject *s, ypObject *chars );
+ypObject *yp_lstrip( ypObject *s );
+
+ypObject *yp_rstrip2( ypObject *s, ypObject *chars );
+ypObject *yp_rstrip( ypObject *s );
+
+ypObject *yp_strip2( ypObject *s, ypObject *chars );
+ypObject *yp_strip( ypObject *s );
+
+ypObject *yp_join( ypObject *s, ypObject *iterable );
+
+ypObject *yp_joinN( ypObject *s, int n, ... );
+ypObject *yp_joinNV( ypObject *s, int n, va_list args );
+
+void yp_partition( ypObject *s, ypObject *sep,
+        ypObject **part0, ypObject **part1, ypObject **part2 );
+
+void yp_rpartition( ypObject *s, ypObject *sep,
+        ypObject **part0, ypObject **part1, ypObject **part2 );
+
+ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+ypObject *yp_split2( ypObject *s, ypObject *sep );
+
+ypObject *yp_split( ypObject *s );
+
+ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+
+ypObject *yp_splitlines2( ypObject *s, ypObject *keepends );
 
 
 /*************************************************************************************************
