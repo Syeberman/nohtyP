@@ -1587,6 +1587,10 @@ void yp_unpackNV( ypObject *iterable, int n, va_list args_orig )
     mi = yp_miniiter( iterable, &mi_state ); // new ref
     va_copy( args, args_orig );
     for( remaining = n; remaining > 0; remaining-- ) {
+        // TODO We're constantly looking up the address of tp_miniiter_next in this loop (here and
+        // in many, many other places, and for many other methods).  What if we cached the
+        // function pointer and called it directly?  Could also have a checker for this file that
+        // looks for generic methods called in loops.
         x = yp_miniiter_next( &mi, &mi_state ); // new ref
         if( yp_isexceptionC( x ) ) {
             // If the iterable is too short, raise yp_ValueError

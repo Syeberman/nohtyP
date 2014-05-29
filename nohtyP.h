@@ -1009,6 +1009,14 @@ ypAPI ypObject *yp_swapcase( ypObject *s );
 // lowercased.
 ypAPI ypObject *yp_capitalize( ypObject *s );
 
+// In-place versions of the above; *s must be mutable.  On error, *s is discarded and replaced with
+// an exception.
+ypAPI void yp_ilower( ypObject **s );
+ypAPI void yp_iupper( ypObject **s );
+ypAPI void yp_icasefold( ypObject **s );
+ypAPI void yp_iswapcase( ypObject **s );
+ypAPI void yp_icapitalize( ypObject **s );
+
 // Returns a new reference to s left-justified in a string of length width.  Padding is done using
 // the specified ord_fillchar for yp_ljustC3, or a space for yp_ljustC.  A copy of s is returned if
 // width is less than or equal to its length.
@@ -1047,6 +1055,15 @@ ypAPI ypObject *yp_rstrip( ypObject *s );
 // Similar to yp_lstrip2, except both leading and trailing characters are removed.
 ypAPI ypObject *yp_strip2( ypObject *s, ypObject *chars );
 ypAPI ypObject *yp_strip( ypObject *s );
+
+// In-place versions of the above; *s must be mutable.  On error, *s is discarded and replaced with
+// an exception.
+ypAPI void yp_ilstrip2( ypObject **s, ypObject *chars );
+ypAPI void yp_ilstrip( ypObject **s );
+ypAPI void yp_irstrip2( ypObject **s, ypObject *chars );
+ypAPI void yp_irstrip( ypObject **s );
+ypAPI void yp_istrip2( ypObject **s, ypObject *chars );
+ypAPI void yp_istrip( ypObject **s );
 
 // Returns a new reference to the concatenation of the strings in iterable, using s as the
 // separator between elements.  Raises yp_TypeError if there are any non-string values, including
