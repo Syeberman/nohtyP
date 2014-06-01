@@ -459,7 +459,7 @@ yp_func( c_ypObject_p, "yp_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container"
 yp_func( c_ypObject_p, "yp_not_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")) )
 
 # yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
-yp_func( c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc), 
+yp_func( c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc),
         errcheck=False )
 
 # void yp_push( ypObject **container, ypObject *x );
@@ -694,7 +694,146 @@ yp_func( c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ) )
 # ypObject *yp_s_ignore;    // "ignore"
 # ypObject *yp_s_replace;   // "replace"
 
-# XXX Additional bytes- and str-specific methods will be added in a future version
+# ypObject *yp_isalnum( ypObject *s );
+yp_func( c_ypObject_p, "yp_isalnum", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isalpha( ypObject *s );
+yp_func( c_ypObject_p, "yp_isalpha", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isdecimal( ypObject *s );
+yp_func( c_ypObject_p, "yp_isdecimal", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isdigit( ypObject *s );
+yp_func( c_ypObject_p, "yp_isdigit", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isidentifier( ypObject *s );
+yp_func( c_ypObject_p, "yp_isidentifier", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_islower( ypObject *s );
+yp_func( c_ypObject_p, "yp_islower", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isnumeric( ypObject *s );
+yp_func( c_ypObject_p, "yp_isnumeric", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isprintable( ypObject *s );
+yp_func( c_ypObject_p, "yp_isprintable", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isspace( ypObject *s );
+yp_func( c_ypObject_p, "yp_isspace", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isupper( ypObject *s );
+yp_func( c_ypObject_p, "yp_isupper", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_startswithC4( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end );
+# ypObject *yp_startswithC( ypObject *s, ypObject *prefix );
+yp_func( c_ypObject_p, "yp_startswithC4", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix"),
+    (c_yp_ssize_t, "start"), (c_yp_ssize_t, "end")) )
+yp_func( c_ypObject_p, "yp_startswithC", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix")) )
+
+# ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end );
+# ypObject *yp_endswithC( ypObject *s, ypObject *suffix );
+yp_func( c_ypObject_p, "yp_endswithC4", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix"),
+    (c_yp_ssize_t, "start"), (c_yp_ssize_t, "end")) )
+yp_func( c_ypObject_p, "yp_endswithC", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix")) )
+
+# ypObject *yp_lower( ypObject *s );
+yp_func( c_ypObject_p, "yp_lower", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_upper( ypObject *s );
+yp_func( c_ypObject_p, "yp_upper", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_casefold( ypObject *s );
+yp_func( c_ypObject_p, "yp_casefold", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_swapcase( ypObject *s );
+yp_func( c_ypObject_p, "yp_swapcase", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_capitalize( ypObject *s );
+yp_func( c_ypObject_p, "yp_capitalize", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+# ypObject *yp_ljustC( ypObject *s, yp_ssize_t width );
+yp_func( c_ypObject_p, "yp_ljustC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
+    (c_yp_int_t, "ord_fillchar")) )
+yp_func( c_ypObject_p, "yp_ljustC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")) )
+
+# ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+# ypObject *yp_rjustC( ypObject *s, yp_ssize_t width );
+yp_func( c_ypObject_p, "yp_rjustC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
+    (c_yp_int_t, "ord_fillchar")) )
+yp_func( c_ypObject_p, "yp_rjustC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")) )
+
+# ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+# ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
+yp_func( c_ypObject_p, "yp_centerC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
+    (c_yp_int_t, "ord_fillchar")) )
+yp_func( c_ypObject_p, "yp_centerC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")) )
+
+# ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
+yp_func( c_ypObject_p, "yp_expandtabsC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "tabsize")) )
+
+# ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count );
+# ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub );
+yp_func( c_ypObject_p, "yp_replaceC4", ((c_ypObject_p, "s"),
+    (c_ypObject_p, "oldsub"), (c_ypObject_p, "newsub"), (c_yp_ssize_t, "count")) )
+yp_func( c_ypObject_p, "yp_replace", ((c_ypObject_p, "s"),
+    (c_ypObject_p, "oldsub"), (c_ypObject_p, "newsub")) )
+
+# ypObject *yp_lstrip2( ypObject *s, ypObject *chars );
+# ypObject *yp_lstrip( ypObject *s );
+yp_func( c_ypObject_p, "yp_lstrip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")) )
+yp_func( c_ypObject_p, "yp_lstrip", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_rstrip2( ypObject *s, ypObject *chars );
+# ypObject *yp_rstrip( ypObject *s );
+yp_func( c_ypObject_p, "yp_rstrip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")) )
+yp_func( c_ypObject_p, "yp_rstrip", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_strip2( ypObject *s, ypObject *chars );
+# ypObject *yp_strip( ypObject *s );
+yp_func( c_ypObject_p, "yp_strip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")) )
+yp_func( c_ypObject_p, "yp_strip", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_join( ypObject *s, ypObject *iterable );
+yp_func( c_ypObject_p, "yp_join", ((c_ypObject_p, "s"), (c_ypObject_p, "iterable")) )
+
+# ypObject *yp_joinN( ypObject *s, int n, ... );
+# ypObject *yp_joinNV( ypObject *s, int n, va_list args );
+yp_func( c_ypObject_p, "yp_joinN", ((c_ypObject_p, "s"), c_multiN_ypObject_p) )
+
+# void yp_partition( ypObject *s, ypObject *sep,
+#        ypObject **part0, ypObject **part1, ypObject **part2 );
+
+# void yp_rpartition( ypObject *s, ypObject *sep,
+#        ypObject **part0, ypObject **part1, ypObject **part2 );
+
+# ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+# ypObject *yp_split2( ypObject *s, ypObject *sep );
+yp_func( c_ypObject_p, "yp_splitC3", ((c_ypObject_p, "s"), (c_ypObject_p, "sep"),
+    (c_yp_ssize_t, "maxsplit")) )
+yp_func( c_ypObject_p, "yp_split2", ((c_ypObject_p, "s"), (c_ypObject_p, "sep")) )
+
+# ypObject *yp_split( ypObject *s );
+yp_func( c_ypObject_p, "yp_split", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+yp_func( c_ypObject_p, "yp_rsplitC3", ((c_ypObject_p, "s"), (c_ypObject_p, "sep"),
+    (c_yp_ssize_t, "maxsplit")) )
+
+# ypObject *yp_splitlines2( ypObject *s, ypObject *keepends );
+yp_func( c_ypObject_p, "yp_splitlines2", ((c_ypObject_p, "s"), (c_ypObject_p, "keepends")) )
+
+# ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors );
+# ypObject *yp_encode( ypObject *s );
+yp_func( c_ypObject_p, "yp_encode3", ((c_ypObject_p, "s"),
+    (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
+yp_func( c_ypObject_p, "yp_encode", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors );
+# ypObject *yp_decode( ypObject *b );
+yp_func( c_ypObject_p, "yp_decode3", ((c_ypObject_p, "b"),
+    (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
+yp_func( c_ypObject_p, "yp_decode", ((c_ypObject_p, "b"), ) )
 
 
 # ypObject *yp_add( ypObject *x, ypObject *y );
@@ -1031,7 +1170,7 @@ class ypObject( c_ypObject_p ):
     def __reversed__( self ): return _yp_reversed( self )
 
     def __contains__( self, x ): return _yp_contains( self, x )
-    def __len__( self ): 
+    def __len__( self ):
         # errcheck disabled for _yp_lenC, so do it here
         exc = c_ypObject_pp( yp_None )
         result = _yp_lenC( self, exc )
@@ -1042,7 +1181,7 @@ class ypObject( c_ypObject_p ):
     def pop( self ): return _yp_pop( self )
 
     def _sliceSearch( self, func2, func4, x, i, j ):
-        if i is None and j is None: 
+        if i is None and j is None:
             return yp_int( func2( self, x, yp_None ) )
         if i is None: i = 0
         if j is None: j = _yp_SLICE_USELEN
@@ -1105,6 +1244,70 @@ class ypObject( c_ypObject_p ):
         else: _yp_delitem( self, key )
     def get( self, key, defval=None ): return _yp_getdefault( self, key, defval )
     def setdefault( self, key, defval=None ): return _yp_setdefault( self, key, defval )
+
+    def isalnum( self ): return _yp_isalnum( self )
+    def isalpha( self ): return _yp_isalpha( self )
+    def isdecimal( self ): return _yp_isdecimal( self )
+    def isdigit( self ): return _yp_isdigit( self )
+    def isidentifier( self ): return _yp_isidentifier( self )
+    def islower( self ): return _yp_islower( self )
+    def isnumeric( self ): return _yp_isnumeric( self )
+    def isprintable( self ): return _yp_isprintable( self )
+    def isspace( self ): return _yp_isspace( self )
+    def isupper( self ): return _yp_isupper( self )
+    def startswith( self, prefix, start=None, end=None ):
+        return self._sliceSearch( _yp_startswithC, _yp_startswithC4, prefix, start, end )
+    def endswith( self, suffix, start=None, end=None ):
+        return self._sliceSearch( _yp_endswithC, _yp_endswithC4, suffix, start, end )
+    def lower( self ): return _yp_lower( self )
+    def upper( self ): return _yp_upper( self )
+    def casefold( self ): return _yp_casefold( self )
+    def swapcase( self ): return _yp_swapcase( self )
+    def capitalize( self ): return _yp_capitalize( self )
+    def ljust( self, width, fillchar=None ):
+        if fillchar is None: return _yp_ljustC( self, width )
+        return _yp_ljustC3( self, width, ord( fillchar ) )
+    def rjust( self, width, fillchar=None ):
+        if fillchar is None: return _yp_rjustC( self, width )
+        return _yp_rjustC3( self, width, ord( fillchar ) )
+    def center( self, width, fillchar=None ):
+        if fillchar is None: return _yp_centerC( self, width )
+        return _yp_centerC3( self, width, ord( fillchar ) )
+    def expandtabs( self, tabsize=8 ): return _yp_expandtabsC( self, tabsize )
+    def replace( self, oldsub, newsub, count=None ):
+        if count is None: return _yp_replace( self, oldsub, newsub )
+        return _yp_replaceC4( self, oldsub, newsub, count )
+    def lstrip( self, chars=_yp_arg_missing ):
+        if chars is _yp_arg_missing: return _yp_lstrip( self )
+        return _yp_lstrip2( self, chars )
+    def rstrip( self, chars=_yp_arg_missing ):
+        if chars is _yp_arg_missing: return _yp_rstrip( self )
+        return _yp_rstrip2( self, chars )
+    def strip( self, chars=_yp_arg_missing ):
+        if chars is _yp_arg_missing: return _yp_strip( self )
+        return _yp_strip2( self, chars )
+    def join( self, iterable ): return _yp_join( self, _yp_iterable( iterable ) )
+    def _split( self, func3, sep, maxsplit ):
+        if maxsplit is _yp_arg_missing:
+            if sep is _yp_arg_missing: return _yp_split( self )
+            return _yp_split2( self, sep )
+        if sep is _yp_arg_missing: sep = yp_None
+        return func3( self, sep, maxsplit )
+    def split( self, sep=_yp_arg_missing, maxsplit=_yp_arg_missing ):
+        return self._split( _yp_splitC3, sep, maxsplit )
+    def rsplit( self, sep=_yp_arg_missing, maxsplit=_yp_arg_missing ):
+        return self._split( _yp_rsplitC3, sep, maxsplit )
+    def splitlines( self, keepends=True ): return _yp_splitlines2( self, keepends )
+    def _encdec( self, func1, func3, encoding, errors ):
+        if errors is None:
+            if encoding is None: return func1( self )
+            errors = yp_s_strict
+        if encoding is None: encoding = yp_s_utf_8
+        return func3( self, encoding, errors )
+    def encode( self, encoding=None, errors=None ):
+        return self._encdec( _yp_encode, _yp_encode3, encoding, errors )
+    def decode( self, encoding=None, errors=None ):
+        return self._encdec( _yp_decode, _yp_decode3, encoding, errors )
 
     # Python requires arithmetic methods to _return_ NotImplemented
     @staticmethod
@@ -1319,6 +1522,7 @@ class yp_iter( ypObject ):
 def _yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
+    # FIXME convert other Python types to nohtyP types, or throw error if they aren't already
     if isinstance( iterable, c_ypObject_p ): return iterable
     if isinstance( iterable, str ): return yp_str( iterable )
     return yp_iter( iterable )
