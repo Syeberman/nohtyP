@@ -652,7 +652,7 @@ ypAPI yp_ssize_t yp_rindexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_
         ypObject **exc );
 ypAPI yp_ssize_t yp_rindexC( ypObject *sequence, ypObject *x, ypObject **exc );
 
-// Returns the total number of non-overlapping occurences of x in sequence[i:j].  Returns 0 and
+// Returns the total number of non-overlapping occurrences of x in sequence[i:j].  Returns 0 and
 // sets *exc on error.  Types such as tuples inspect only one item at a time, while types such as
 // strs look for a particular sub-sequence of items.
 ypAPI yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
@@ -1029,8 +1029,8 @@ ypAPI ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
 // is represented when printed.  The Python-equivalent "default" for tabsize is 8.
 ypAPI ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
 
-// Returns a new reference to a copy of s with all occurences of substring oldsub replaced by
-// newsub.  For yp_replaceC4, only the first count occurences are replaced.
+// Returns a new reference to a copy of s with count occurrences of substring oldsub replaced by
+// newsub.  For yp_replace, or if count is -1, all occurrences are replaced.
 ypAPI ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count );
 ypAPI ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub );
 
@@ -1057,15 +1057,15 @@ ypAPI ypObject *yp_join( ypObject *s, ypObject *iterable );
 ypAPI ypObject *yp_joinN( ypObject *s, int n, ... );
 ypAPI ypObject *yp_joinNV( ypObject *s, int n, va_list args );
 
-// Splits s at the first occurence of sep and returns new references to 3 objects: *part0 is the
+// Splits s at the first occurrence of sep and returns new references to 3 objects: *part0 is the
 // part before the separator, *part1 the separator itself, and *part2 the part after.  If the
 // separator is not found, *part0 is a copy of s, and *part1 and *part2 are empty strings.  Sets
 // all 3 ypObject**s to the same exception on error.
 ypAPI void yp_partition( ypObject *s, ypObject *sep,
         ypObject **part0, ypObject **part1, ypObject **part2 );
 
-// Similar to yp_partition, except s is split at the last occurence of sep, and if the separator is
-// not found then *part0 and *part1 are empty strings, and *part2 is a copy of s.
+// Similar to yp_partition, except s is split at the last occurrence of sep, and if the separator
+// is not found then *part0 and *part1 are empty strings, and *part2 is a copy of s.
 ypAPI void yp_rpartition( ypObject *s, ypObject *sep,
         ypObject **part0, ypObject **part1, ypObject **part2 );
 
