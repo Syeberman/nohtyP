@@ -4714,6 +4714,8 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject **mi, yp_uint6
         if( newLen > ypBytes_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
         newLen += 1;
         if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
+            // TODO Instead do lenhint = MAX( lenhint, ypObject_MIN_LENHINT ) or something (here
+            // and elsewhere) to ensure we at least pre-allocate a little on resize.
             if( lenhint < 0 ) lenhint = 0;
             oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, lenhint );
             if( oldptr == NULL ) return yp_MemoryError;
@@ -5289,11 +5291,13 @@ static ypObject *bytes_isupper( ypObject *b ) {
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_startswith( ypObject *b, ypObject *prefix, yp_ssize_t start, yp_ssize_t end ) {
+static ypObject *bytes_startswith( ypObject *b, ypObject *prefix, 
+        yp_ssize_t start, yp_ssize_t end ) {
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_endswith( ypObject *b, ypObject *suffix, yp_ssize_t start, yp_ssize_t end ) {
+static ypObject *bytes_endswith( ypObject *b, ypObject *suffix, 
+        yp_ssize_t start, yp_ssize_t end ) {
     return yp_NotImplementedError;
 }
 
@@ -5333,7 +5337,14 @@ static ypObject *bytes_expandtabs( ypObject *b, yp_ssize_t tabsize ) {
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_replace( ypObject *b, ypObject *oldsub, ypObject *newsub, yp_ssize_t count ) {
+static ypObject *bytes_replace( ypObject *b, ypObject *oldsub, ypObject *newsub, 
+        yp_ssize_t count ) {
+    if( ypObject_TYPE_PAIR_CODE( oldsub ) != ypBytes_CODE ) return_yp_BAD_TYPE( oldsub );
+    if( ypObject_TYPE_PAIR_CODE( newsub ) != ypBytes_CODE ) return_yp_BAD_TYPE( newsub );
+    if( (ypBytes_LEN( oldsub ) < 1 && ypBytes_LEN( newsub ) < 1) || count == 0 ) {
+        if( ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return yp_incref( b );
+        return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE );
+    }
     return yp_NotImplementedError;
 }
 
