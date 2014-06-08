@@ -1,7 +1,7 @@
 /*
  * nohtyP.c - A Python-like API for C, in one .c and one .h
  *      http://bitbucket.org/Syeberman/nohtyp   [v0.1.0 $Change$]
- *      Copyright © 2001-2013 Python Software Foundation; All Rights Reserved
+ *      Copyright (c) 2001-2013 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  */
 
@@ -182,7 +182,7 @@ typedef size_t yp_uhash_t;
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
 // Base "constructor" for immortal type objects
-#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT( ypType_CODE, NULL, ypObject_LEN_INVALID )
+#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT( ypType_CODE, 0, NULL, ypObject_LEN_INVALID )
 
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)( ypObject * );
@@ -2354,7 +2354,7 @@ static ypTypeObject ypException_Type = {
 #define _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, superptr ) \
     yp_IMMORTAL_STR_LATIN1( name ## _name, #name ); \
     static ypExceptionObject _ ## name ## _struct = { \
-        yp_IMMORTAL_HEAD_INIT( ypException_CODE, NULL, 0 ), \
+        yp_IMMORTAL_HEAD_INIT( ypException_CODE, 0, NULL, 0 ), \
         (ypObject *) &_ ## name ## _name_struct, (superptr) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define _yp_IMMORTAL_EXCEPTION( name, super ) \
@@ -2626,7 +2626,7 @@ static ypTypeObject ypNoneType_Type = {
 };
 
 // No constructors for nonetypes; there is exactly one, immortal object
-static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT( ypNoneType_CODE, NULL, 0 );
+static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT( ypNoneType_CODE, 0, NULL, 0 );
 ypObject * const yp_None = &_yp_None_struct;
 
 
@@ -2745,9 +2745,9 @@ static ypTypeObject ypBool_Type = {
 // No constructors for bools; there are exactly two objects, and they are immortal
 
 // There are exactly two bool objects
-static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 1};
+static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, 0, NULL, 0 ), 1};
 ypObject * const yp_True = (ypObject *) &_yp_True_struct;
-static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, NULL, 0 ), 0};
+static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, 0, NULL, 0 ), 0};
 ypObject * const yp_False = (ypObject *) &_yp_False_struct;
 
 
@@ -3804,7 +3804,7 @@ yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc )
 #define _ypInt_PREALLOC_END   (257)
 static ypIntObject _ypInt_pre_allocated[] = {
     #define _ypInt_PREALLOC( value ) \
-        { yp_IMMORTAL_HEAD_INIT( ypInt_CODE, NULL, ypObject_LEN_INVALID ), (value) }
+        { yp_IMMORTAL_HEAD_INIT( ypInt_CODE, 0, NULL, ypObject_LEN_INVALID ), (value) }
     _ypInt_PREALLOC( -5 ),
     _ypInt_PREALLOC( -4 ),
     _ypInt_PREALLOC( -3 ),
@@ -4556,6 +4556,16 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 
 
 /*************************************************************************************************
+ * String manipulation library (for str and bytes)
+ *************************************************************************************************/
+
+#define ypString_ENC_BYTES  _ypString_ENC_BYTES
+#define ypString_ENC_UCS1   _ypString_ENC_UCS1
+#define ypString_ENC_UCS2   _ypString_ENC_UCS2
+#define ypString_ENC_UCS4   _ypString_ENC_UCS4
+
+
+/*************************************************************************************************
  * Sequence of bytes
  *************************************************************************************************/
 
@@ -4576,7 +4586,7 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 
 // Empty bytes can be represented by this, immortal object
 static ypBytesObject _yp_bytes_empty_struct = {
-    { ypBytes_CODE, ypObject_REFCNT_IMMORTAL,
+    { ypBytes_CODE, 0, ypString_ENC_BYTES, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, "" } };
 static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 
@@ -5786,7 +5796,7 @@ yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT 
 
 // Empty strs can be represented by this, immortal object
 static ypStrObject _yp_str_empty_struct = {
-    { ypStr_CODE, ypObject_REFCNT_IMMORTAL,
+    { ypStr_CODE, 0, ypString_ENC_UCS1, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, "" } };
 static ypObject * const _yp_str_empty = (ypObject *) &_yp_str_empty_struct;
 
@@ -6601,7 +6611,7 @@ typedef struct {
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty tuple?
 static ypObject *_yp_tuple_empty_data[1] = {NULL};
 static ypTupleObject _yp_tuple_empty_struct = {
-    { ypTuple_CODE, ypObject_REFCNT_IMMORTAL,
+    { ypTuple_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, _yp_tuple_empty_data } };
 static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
 
@@ -7718,13 +7728,13 @@ yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-yp_offsetof( ypSetObject, ob_inline
     ( (yp_ssize_t) (ypSet_ALLOCLEN_MAX*ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM )
 
 // A placeholder to replace deleted entries in the hash table
-static ypObject _ypSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, NULL, 0 );
+static ypObject _ypSet_dummy = yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, 0, NULL, 0 );
 static ypObject *ypSet_dummy = &_ypSet_dummy;
 
 // Empty frozensets can be represented by this, immortal object
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject _yp_frozenset_empty_struct = {
-    { ypFrozenSet_CODE, ypObject_REFCNT_IMMORTAL,
+    { ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
     0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozenset_empty_data }, 0 };
 static ypObject * const _yp_frozenset_empty = (ypObject *) &_yp_frozenset_empty_struct;
 
@@ -9169,7 +9179,7 @@ yp_STATIC_ASSERT( (yp_SSIZE_T_MAX-yp_sizeof( ypDictObject )) / yp_sizeof( ypObje
 // Empty frozendicts can be represented by this, immortal object
 static ypObject _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypDictObject _yp_frozendict_empty_struct = {
-    { ypFrozenDict_CODE, ypObject_REFCNT_IMMORTAL,
+    { ypFrozenDict_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
     0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozendict_empty_data },
     (ypObject *) &_yp_frozenset_empty_struct };
 static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empty_struct;
@@ -10313,7 +10323,7 @@ typedef struct {
 
 // Use yp_rangeC( 0 ) as the standard empty struct
 static ypRangeObject _yp_range_empty_struct = {
-    { ypRange_CODE, ypObject_REFCNT_IMMORTAL,
+    { ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, NULL }, 0, 1 };
 static ypObject * const _yp_range_empty = (ypObject *) &_yp_range_empty_struct;
 

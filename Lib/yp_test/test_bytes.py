@@ -1130,6 +1130,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b.insert(0, Indexable(ord('A')))
         self.assertEqual(b, b'A')
 
+    @yp_unittest.skip("TODO: Implement translate")
     def test_copied(self):
         # Issue 4348.  Make sure that operations that don't mutate the array
         # copy the bytes.
@@ -1277,6 +1278,7 @@ class AssortedBytesTest(yp_unittest.TestCase):
             self.assertRaises(SyntaxError, eval,
                               'b"%s"' % chr(c))
 
+    @yp_unittest.skip("TODO: Implement translate")
     def test_translate(self):
         b = yp_bytes(b'hello')
         ba = yp_bytearray(b)
