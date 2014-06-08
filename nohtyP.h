@@ -1,7 +1,7 @@
 /*
  * nohtyP.h - A Python-like API for C, in one .c and one .h
  *      http://bitbucket.org/Syeberman/nohtyp   [v0.1.0 $Change$]
- *      Copyright © 2001-2013 Python Software Foundation; All Rights Reserved
+ *      Copyright (c) 2001-2013 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  *
  * The goal of nohtyP is to enable Python-like code to be written in C.  It is patterned after
@@ -1807,7 +1807,9 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 // TODO Do like Python and have just type+refcnt for non-containers
 typedef yp_int32_t _yp_ob_len_t;
 struct _ypObject {
-    yp_uint32_t     ob_type;        // type code
+    yp_uint16_t     ob_type;        // type code
+    yp_uint8_t      ob_flags;       // type-independent flags
+    yp_uint8_t      ob_type_flags;  // type-specific flags
     yp_uint32_t     ob_refcnt;      // reference count
     _yp_ob_len_t    ob_len;         // length of object
     _yp_ob_len_t    ob_alloclen;    // allocated length
@@ -1843,6 +1845,11 @@ struct _ypStrObject {
 #define _ypObject_HASH_INVALID      ((yp_hash_t)  -1)
 // Set ob_len or ob_alloclen to this value to signal an invalid length
 #define _ypObject_LEN_INVALID       ((yp_ssize_t) -1)
+// Macros on ob_type_flags for string objects (bytes and str)
+#define _ypString_ENC_BYTES         (0u)
+#define _ypString_ENC_UCS1          (1u)
+#define _ypString_ENC_UCS2          (2u)
+#define _ypString_ENC_UCS4          (3u)
 
 // These type codes must match those in nohtyP.c
 #define _ypInt_CODE                 ( 10u)
@@ -1850,22 +1857,24 @@ struct _ypStrObject {
 #define _ypStr_CODE                 ( 18u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-#define _yp_IMMORTAL_HEAD_INIT( type, data, len ) \
-    { type, _ypObject_REFCNT_IMMORTAL, \
+#define _yp_IMMORTAL_HEAD_INIT( type, type_flags, data, len ) \
+    { type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, \
       len, _ypObject_LEN_INVALID, _ypObject_HASH_INVALID, data }
 #define yp_IMMORTAL_INT( name, value ) \
     static struct _ypIntObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypInt_CODE, NULL, _ypObject_LEN_INVALID ), (value) }; \
+        _ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID ), (value) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypBytes_CODE, (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
+        _ypBytes_CODE, _ypString_ENC_BYTES, \
+        (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define yp_IMMORTAL_STR_LATIN1( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypStrObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypStr_CODE, (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
+        _ypStr_CODE, _ypString_ENC_UCS1, \
+        (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
