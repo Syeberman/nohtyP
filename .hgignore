@@ -49,4 +49,6 @@ yacctab\.py$
 
 # Temporary files
 \.tmp$
+\.orig$
+\.rej$
 

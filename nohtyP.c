@@ -1349,6 +1349,136 @@ void yp_decrefN( int n, ... )
 
 
 /*************************************************************************************************
+ * ypVaIter: iterator-like abstraction over va_lists of ypObject*s and iterables
+ * XXX Internal use only!
+ *************************************************************************************************/
+
+// There is a lot of duplication of code where variants of a method accept va_lists of ypObject*s, 
+// or a general-purpose iterable.  This code intends to be a light-weight abstraction over all of 
+// these, but particularly efficient for va_lists; in particular, borrowed references are yielded.
+// Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
+
+typedef union {
+    struct {            // State for ypVaIter_var_*
+        yp_ssize_t n;       // Number of variable arguments remaining
+        va_list args;       // Current state of variable arguments ("borrowed")
+    } var;
+    struct {            // State for ypVaIter_tuple_*
+        yp_ssize_t i;       // Index of next value to yield
+        ypObject *obj;      // The tuple or list object being iterated over (borrowed)
+    } tuple;
+    struct {            // State for ypVaIter_mi_*
+        ypObject *iter;     // Mini iterator object (owned)
+        yp_uint64_t state;  // Mini iterator state
+        ypObject *prev;     // The previously-yielded object (owned, discarded by next)
+    } mi;
+} ypVaIter_state;
+
+// The various ypVaIter_*_new calls return a pointer to one of these method tables, which is used
+// to manipulate the associated ypVaIter_state.
+typedef struct {
+    // Sets *x to a *BORROWED* reference to the next-yielded value (or an exception), and returns
+    // true.  If the iterator is exhausted, returns false, and *x is undefined.
+    int (*next)( ypVaIter_state *state, ypObject **x );
+    // Closes the ypVaIter.  Any further operations on state will be undefined.
+    void (*close)( ypVaIter_state *state );
+} ypVaIter_methods;
+
+
+static int ypVaIter_var_next( ypVaIter_state *state, ypObject **x ) {
+    if( state->var.n <= 0 ) return FALSE;
+    *x = va_arg( state->var.args, ypObject * );
+    state->var.n -= 1;
+    return TRUE;
+}
+
+static void ypVaIter_var_close( ypVaIter_state *state ) {
+    // No-op.  We don't call va_end because it's a "borrowed" reference.
+}
+
+static ypVaIter_methods ypVaIter_var_methods = {
+    ypVaIter_var_next,
+    ypVaIter_var_close
+};
+
+// Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use 
+// ypVaIter_var_methods as the method table.  args is borrowed by state and must not be closed
+// until methods->close is called.
+static void ypVaIter_var_new( ypVaIter_state *state, int n, va_list args ) {
+    state->var.n = n;
+    state->var.args = args;
+}
+
+
+// We make use of tuple's internal macros for speed
+#define ypTuple_ARRAY( sq ) ( (ypObject **) ((ypObject *)sq)->ob_data )
+#define ypTuple_LEN         ypObject_CACHED_LEN
+
+static int ypVaIter_tuple_next( ypVaIter_state *state, ypObject **x ) {
+    if( state->tuple.i >= ypTuple_LEN( state->tuple.obj ) ) return FALSE;
+    *x = ypTuple_ARRAY( state->tuple.obj )[state->tuple.i];
+    state->tuple.i += 1;
+    return TRUE;
+}
+
+static void ypVaIter_tuple_close( ypVaIter_state *state ) {
+    // No-op.  We don't yp_decref because it's a borrowed reference.
+}
+
+static ypVaIter_methods ypVaIter_tuple_methods = {
+    ypVaIter_tuple_next,
+    ypVaIter_tuple_close
+};
+
+// TODO A ypVaIter_tuple_new that checks (or asserts?!) that the object is a tuple?
+
+
+static int ypVaIter_mi_next( ypVaIter_state *state, ypObject **x ) {
+    *x = yp_miniiter_next( &(state->mi.iter), &(state->mi.state) );
+    if( yp_isexceptionC2( *x, yp_StopIteration ) ) return FALSE;
+    // In this API we yield borrowed references; since they are not discarded by the caller, we
+    // need to retain these references ourselves and discard them when done.
+    yp_decref( state->mi.prev );
+    state->mi.prev = *x;
+    return TRUE;
+}
+
+static void ypVaIter_mi_close( ypVaIter_state *state ) {
+    yp_decrefN( 2, state->mi.prev, state->mi.iter );
+}
+
+static ypVaIter_methods ypVaIter_mi_methods = {
+    ypVaIter_mi_next,
+    ypVaIter_mi_close
+};
+
+
+// Initializes state to iterate over the given iterable, sets *methods to the proper method
+// table to use, and returns yp_None.  On error, returns an exception, and *methods and state are
+// undefined.  iterable is borrowed by state and must not be freed until methods->close is called.
+static ypObject *ypVaIter_iterable_new( 
+        const ypVaIter_methods **methods, ypVaIter_state *state, ypObject *iterable ) 
+{
+    // We special-case tuples because we can return borrowed references directly
+    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
+        *methods = &ypVaIter_tuple_methods;
+        state->tuple.i = 0;
+        state->tuple.obj = iterable;
+        return yp_None;
+
+    // We may eventually special-case other types, but for now treat them as generic iterables
+    } else {
+        ypObject *mi = yp_miniiter( iterable, &(state->mi.state) );
+        if( yp_isexceptionC( mi ) ) return mi;
+        *methods = &ypVaIter_mi_methods;
+        state->mi.iter = mi;
+        state->mi.prev = yp_None;
+        return yp_None;
+    }
+}
+
+
+/*************************************************************************************************
  * Iterators
  *************************************************************************************************/
 
@@ -1587,10 +1717,6 @@ void yp_unpackNV( ypObject *iterable, int n, va_list args_orig )
     mi = yp_miniiter( iterable, &mi_state ); // new ref
     va_copy( args, args_orig );
     for( remaining = n; remaining > 0; remaining-- ) {
-        // TODO We're constantly looking up the address of tp_miniiter_next in this loop (here and
-        // in many, many other places, and for many other methods).  What if we cached the
-        // function pointer and called it directly?  Could also have a checker for this file that
-        // looks for generic methods called in loops.
         x = yp_miniiter_next( &mi, &mi_state ); // new ref
         if( yp_isexceptionC( x ) ) {
             // If the iterable is too short, raise yp_ValueError
@@ -4556,13 +4682,27 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 
 
 /*************************************************************************************************
- * String manipulation library (for str and bytes)
+ * String manipulation library (for bytes and str)
  *************************************************************************************************/
 
+// The prefix ypString_* is used for bytes and str, while ypStr_* is strictly the Unicode str type
 #define ypString_ENC_BYTES  _ypString_ENC_BYTES
 #define ypString_ENC_UCS1   _ypString_ENC_UCS1
 #define ypString_ENC_UCS2   _ypString_ENC_UCS2
 #define ypString_ENC_UCS4   _ypString_ENC_UCS4
+
+// XXX Adapted from Python's STRINGLIB(bytes_join)
+// - empty iterable, return 0-len
+// - 1-iterable, return shallow copy of object (if right type)
+// - wrong type
+// - overflow of max size with item
+// - overflow of max size with separator
+// - sequence changing (not a problem here yet)
+// - empty separator is faster...just concatenate
+// - concatenation with separator
+
+
+
 
 
 /*************************************************************************************************
@@ -6596,8 +6736,7 @@ typedef struct {
     ypObject_HEAD
     yp_INLINE_DATA( ypObject * );
 } ypTupleObject;
-#define ypTuple_ARRAY( sq )         ( (ypObject **) ((ypObject *)sq)->ob_data )
-#define ypTuple_LEN                 ypObject_CACHED_LEN
+// ypTuple_ARRAY and ypTuple_LEN are defined above
 #define ypTuple_SET_LEN             ypObject_SET_CACHED_LEN
 #define ypTuple_ALLOCLEN            ypObject_ALLOCLEN
 #define ypTuple_INLINE_DATA( sq )   ( ((ypTupleObject *)sq)->ob_inline_data )
