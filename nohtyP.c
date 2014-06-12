@@ -1349,130 +1349,157 @@ void yp_decrefN( int n, ... )
 
 
 /*************************************************************************************************
- * ypVaIter: iterator-like abstraction over va_lists of ypObject*s and iterables
+ * ypQuickIter: iterator-like abstraction over va_lists of ypObject*s and iterables
  * XXX Internal use only!
  *************************************************************************************************/
 
-// There is a lot of duplication of code where variants of a method accept va_lists of ypObject*s, 
-// or a general-purpose iterable.  This code intends to be a light-weight abstraction over all of 
-// these, but particularly efficient for va_lists; in particular, borrowed references are yielded.
+// This API exists for two key reasons.  The most-important reason is to reduce duplication of 
+// code where variants of a method accept va_lists of ypObject*s, or a general-purpose iterable.  
+// This code intends to be a light-weight abstraction over all of these, but particularly 
+// efficient for va_lists.  In particular, it doesn't require a temporary tuple to be allocated.
+//
+// The second reason is to be "quicker" than even mini iterators in certain cases.  Types such as
+// tuples, sets, and dicts that store arrays of ypObject*s can yield borrowed references directly,
+// saving a pair of incref/decref calls.  This also avoids having to call yp_isexceptionC2 to check
+// for when yp_StopIteration is returned, as next can just return a boolean flag.  These
+// micro-efficiencies wouldn't be important enough on their own to justify this API, but since
+// we're abstracting over va_list anyway we'll take the small benefit.
+//
 // Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
 
+// TODO Inspect all uses of va_list, yp_miniiter, and yp_iter below and see if we can consolidate
+// or simplify some code by using this API
+
 typedef union {
-    struct {            // State for ypVaIter_var_*
+    struct {            // State for ypQuickIter_var_*
         yp_ssize_t n;       // Number of variable arguments remaining
         va_list args;       // Current state of variable arguments ("borrowed")
     } var;
-    struct {            // State for ypVaIter_tuple_*
+    struct {            // State for ypQuickIter_tuple_*
         yp_ssize_t i;       // Index of next value to yield
         ypObject *obj;      // The tuple or list object being iterated over (borrowed)
     } tuple;
-    struct {            // State for ypVaIter_mi_*
-        ypObject *iter;     // Mini iterator object (owned)
+    struct {            // State for ypQuickIter_mi_*
         yp_uint64_t state;  // Mini iterator state
+        ypObject *iter;     // Mini iterator object (owned)
         ypObject *prev;     // The previously-yielded object (owned, discarded by next)
+        yp_ssize_t len;     // >=0 if lenhint is exact; otherwise rely on yp_miniiter_lenhint
     } mi;
-} ypVaIter_state;
+} ypQuickIter_state;
 
-// The various ypVaIter_*_new calls return a pointer to one of these method tables, which is used
-// to manipulate the associated ypVaIter_state.
+// The various ypQuickIter_*_new calls return a pointer to one of these method tables, which is 
+// used to manipulate the associated ypQuickIter_state.
 typedef struct {
     // Sets *x to a *BORROWED* reference to the next-yielded value (or an exception), and returns
     // true.  If the iterator is exhausted, returns false, and *x is undefined.
-    int (*next)( ypVaIter_state *state, ypObject **x );
-    // Closes the ypVaIter.  Any further operations on state will be undefined.
-    void (*close)( ypVaIter_state *state );
-} ypVaIter_methods;
+    int (*next)( ypQuickIter_state *state, ypObject **x );
+    // Sets *lenhint to the number of items left to be yielded.  Returns true if this is an exact
+    // value, or false if this is an estimate.
+    int (*lenhint)( ypQuickIter_state *state, yp_ssize_t *lenhint );
+    // Closes the ypQuickIter.  Any further operations on state will be undefined.
+    void (*close)( ypQuickIter_state *state );
+} ypQuickIter_methods;
 
 
-static int ypVaIter_var_next( ypVaIter_state *state, ypObject **x ) {
+static int ypQuickIter_var_next( ypQuickIter_state *state, ypObject **x ) {
     if( state->var.n <= 0 ) return FALSE;
     *x = va_arg( state->var.args, ypObject * );
     state->var.n -= 1;
     return TRUE;
 }
 
-static void ypVaIter_var_close( ypVaIter_state *state ) {
+static int ypQuickIter_var_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint ) {
+    yp_ASSERT( state->var.n >= 0, "state->var.n should not be negative" );
+    *lenhint = state->var.n;
+    return TRUE;
+}
+
+static void ypQuickIter_var_close( ypQuickIter_state *state ) {
     // No-op.  We don't call va_end because it's a "borrowed" reference.
 }
 
-static ypVaIter_methods ypVaIter_var_methods = {
-    ypVaIter_var_next,
-    ypVaIter_var_close
+static const ypQuickIter_methods ypQuickIter_var_methods = {
+    ypQuickIter_var_next,
+    ypQuickIter_var_lenhint,
+    ypQuickIter_var_close
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use 
-// ypVaIter_var_methods as the method table.  args is borrowed by state and must not be closed
+// ypQuickIter_var_methods as the method table.  args is borrowed by state and must not be closed
 // until methods->close is called.
-static void ypVaIter_var_new( ypVaIter_state *state, int n, va_list args ) {
+static void ypQuickIter_var_new( ypQuickIter_state *state, int n, va_list args ) {
     state->var.n = n;
     state->var.args = args;
 }
 
 
-// We make use of tuple's internal macros for speed
-#define ypTuple_ARRAY( sq ) ( (ypObject **) ((ypObject *)sq)->ob_data )
-#define ypTuple_LEN         ypObject_CACHED_LEN
-
-static int ypVaIter_tuple_next( ypVaIter_state *state, ypObject **x ) {
-    if( state->tuple.i >= ypTuple_LEN( state->tuple.obj ) ) return FALSE;
-    *x = ypTuple_ARRAY( state->tuple.obj )[state->tuple.i];
-    state->tuple.i += 1;
-    return TRUE;
-}
-
-static void ypVaIter_tuple_close( ypVaIter_state *state ) {
-    // No-op.  We don't yp_decref because it's a borrowed reference.
-}
-
-static ypVaIter_methods ypVaIter_tuple_methods = {
-    ypVaIter_tuple_next,
-    ypVaIter_tuple_close
-};
-
-// TODO A ypVaIter_tuple_new that checks (or asserts?!) that the object is a tuple?
+// These are implemented in the tuple section
+static const ypQuickIter_methods ypQuickIter_tuple_methods;
+static void ypQuickIter_tuple_new( ypQuickIter_state *state, ypObject *tuple );
 
 
-static int ypVaIter_mi_next( ypVaIter_state *state, ypObject **x ) {
+static int ypQuickIter_mi_next( ypQuickIter_state *state, ypObject **x ) {
     *x = yp_miniiter_next( &(state->mi.iter), &(state->mi.state) );
     if( yp_isexceptionC2( *x, yp_StopIteration ) ) return FALSE;
+
     // In this API we yield borrowed references; since they are not discarded by the caller, we
     // need to retain these references ourselves and discard them when done.
     yp_decref( state->mi.prev );
     state->mi.prev = *x;
+
+    // If the iterable we were initialized with had a length, len is >=0, and we decrement to zero;
+    // if more than len items are yielded, this goes negative and we start treating it as a hint.
+    // If the iterable didn't have a length, len starts at -1, is decremented from there, and
+    // we rely on yp_miniiter_lenhint; if more than yp_SSIZE_T_MAX are yielded, len will become
+    // positive and treated as an exact hint, but that isn't expected to happen.
+    state->mi.len -= 1;
     return TRUE;
 }
 
-static void ypVaIter_mi_close( ypVaIter_state *state ) {
+static int ypQuickIter_mi_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint ) {
+    if( state->mi.len >= 0 ) {
+        *lenhint = state->mi.len;
+        return TRUE;    // indicates an exact length
+    } else {
+        ypObject *exc = yp_None;
+        *lenhint = yp_miniiter_lenhintC( state->mi.iter, &(state->mi.state), &exc );
+        return FALSE;   // indicates an approximate hint; *lenhint is zero on error
+    }
+}
+
+static void ypQuickIter_mi_close( ypQuickIter_state *state ) {
     yp_decrefN( 2, state->mi.prev, state->mi.iter );
 }
 
-static ypVaIter_methods ypVaIter_mi_methods = {
-    ypVaIter_mi_next,
-    ypVaIter_mi_close
+static const ypQuickIter_methods ypQuickIter_mi_methods = {
+    ypQuickIter_mi_next,
+    ypQuickIter_mi_lenhint,
+    ypQuickIter_mi_close
 };
 
 
 // Initializes state to iterate over the given iterable, sets *methods to the proper method
 // table to use, and returns yp_None.  On error, returns an exception, and *methods and state are
 // undefined.  iterable is borrowed by state and must not be freed until methods->close is called.
-static ypObject *ypVaIter_iterable_new( 
-        const ypVaIter_methods **methods, ypVaIter_state *state, ypObject *iterable ) 
+static ypObject *ypQuickIter_iterable_new( 
+        const ypQuickIter_methods **methods, ypQuickIter_state *state, ypObject *iterable ) 
 {
     // We special-case tuples because we can return borrowed references directly
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
-        *methods = &ypVaIter_tuple_methods;
-        state->tuple.i = 0;
-        state->tuple.obj = iterable;
+        *methods = &ypQuickIter_tuple_methods;
+        ypQuickIter_tuple_new( state, iterable );
         return yp_None;
 
     // We may eventually special-case other types, but for now treat them as generic iterables
     } else {
+        ypObject *exc = yp_None;
         ypObject *mi = yp_miniiter( iterable, &(state->mi.state) );
         if( yp_isexceptionC( mi ) ) return mi;
-        *methods = &ypVaIter_mi_methods;
+        *methods = &ypQuickIter_mi_methods;
         state->mi.iter = mi;
         state->mi.prev = yp_None;
+        state->mi.len = yp_lenC( iterable, &exc );
+        if( yp_isexceptionC( exc ) ) state->mi.len = -1;    // indicates yp_miniiter_lenhintC
         return yp_None;
     }
 }
@@ -2142,6 +2169,7 @@ ypObject *yp_orNV( int n, va_list args )
 ypObject *yp_anyN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_anyNV, (n, args), n );
 }
+// This algorithm is simple enough to not warrant converting to ypQuickIter
 ypObject *yp_anyNV( int n, va_list args ) {
     for( /*n already set*/; n > 0; n-- ) {
         ypObject *b = yp_bool( va_arg( args, ypObject * ) );
@@ -2152,21 +2180,20 @@ ypObject *yp_anyNV( int n, va_list args ) {
 
 ypObject *yp_any( ypObject *iterable )
 {
-    ypObject *mi;
-    yp_uint64_t mi_state;
-    ypObject *x;
-    ypObject *result = yp_False;
+    const ypQuickIter_methods *qi;
+    ypQuickIter_state qi_state;
+    ypObject *x;                    // *borrowed* reference
+    ypObject *retval = yp_False;
 
-    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    x = ypQuickIter_iterable_new( &qi, &qi_state, iterable );
+    if( yp_isexceptionC( x ) ) return x;
     while( 1 ) {
-        x = yp_miniiter_next( &mi, &mi_state ); // new ref
-        if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
-        result = yp_bool( x );
-        yp_decref( x );
-        if( result != yp_False ) break; // exit on yp_True or exception
+        if( !qi->next( &qi_state, &x ) ) break; // exit when exhausted
+        retval = yp_bool( x );
+        if( retval != yp_False ) break;         // exit on yp_True or exception
     }
-    yp_decref( mi );
-    return result;
+    qi->close( &qi_state );
+    return retval;
 }
 
 ypObject *yp_and( ypObject *x, ypObject *y )
@@ -2198,6 +2225,7 @@ ypObject *yp_andNV( int n, va_list args )
 ypObject *yp_allN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_allNV, (n, args), n );
 }
+// This algorithm is simple enough to not warrant converting to ypQuickIter
 ypObject *yp_allNV( int n, va_list args ) {
     for( /*n already set*/; n > 0; n-- ) {
         ypObject *b = yp_bool( va_arg( args, ypObject * ) );
@@ -2208,21 +2236,20 @@ ypObject *yp_allNV( int n, va_list args ) {
 
 ypObject *yp_all( ypObject *iterable )
 {
-    ypObject *mi;
-    yp_uint64_t mi_state;
-    ypObject *x;
-    ypObject *result = yp_True;
+    const ypQuickIter_methods *qi;
+    ypQuickIter_state qi_state;
+    ypObject *x;                    // *borrowed* reference
+    ypObject *retval = yp_True;
 
-    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    x = ypQuickIter_iterable_new( &qi, &qi_state, iterable );
+    if( yp_isexceptionC( x ) ) return x;
     while( 1 ) {
-        x = yp_miniiter_next( &mi, &mi_state ); // new ref
-        if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
-        result = yp_bool( x );
-        yp_decref( x );
-        if( result != yp_True ) break; // exit on yp_False or exception
+        if( !qi->next( &qi_state, &x ) ) break; // exit when exhausted
+        retval = yp_bool( x );
+        if( retval != yp_True ) break;         // exit on yp_False or exception
     }
-    yp_decref( mi );
-    return result;
+    qi->close( &qi_state );
+    return retval;
 }
 
 // Defined here are yp_lt, yp_le, yp_eq, yp_ne, yp_ge, and yp_gt
@@ -6736,7 +6763,9 @@ typedef struct {
     ypObject_HEAD
     yp_INLINE_DATA( ypObject * );
 } ypTupleObject;
-// ypTuple_ARRAY and ypTuple_LEN are defined above
+// We make use of tuple's internal macros for speed
+#define ypTuple_ARRAY( sq )         ( (ypObject **) ((ypObject *)sq)->ob_data )
+#define ypTuple_LEN                 ypObject_CACHED_LEN
 #define ypTuple_SET_LEN             ypObject_SET_CACHED_LEN
 #define ypTuple_ALLOCLEN            ypObject_ALLOCLEN
 #define ypTuple_INLINE_DATA( sq )   ( ((ypTupleObject *)sq)->ob_inline_data )
@@ -7681,22 +7710,63 @@ static ypTypeObject ypList_Type = {
     MethodError_MappingMethods      // tp_as_mapping
 };
 
+
+// Custom ypQuickIter support
+
+static int ypQuickIter_tuple_next( ypQuickIter_state *state, ypObject **x ) {
+    if( state->tuple.i >= ypTuple_LEN( state->tuple.obj ) ) return FALSE;
+    *x = ypTuple_ARRAY( state->tuple.obj )[state->tuple.i];
+    state->tuple.i += 1;
+    return TRUE;
+}
+
+static int ypQuickIter_tuple_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint ) {
+    yp_ASSERT( state->tuple.i >= 0 && state->tuple.i <= ypTuple_LEN( state->tuple.obj ), "state->tuple.i should be in range(len+1)" );
+    *lenhint = ypTuple_LEN( state->tuple.obj ) - state->tuple.i;
+    return TRUE;
+}
+
+static void ypQuickIter_tuple_close( ypQuickIter_state *state ) {
+    // No-op.  We don't yp_decref because it's a borrowed reference.
+}
+
+static const ypQuickIter_methods ypQuickIter_tuple_methods = {
+    ypQuickIter_tuple_next,
+    ypQuickIter_tuple_lenhint,
+    ypQuickIter_tuple_close
+};
+
+// Initializes state with the given tuple.  Always succeeds.  Use ypQuickIter_tuple_methods as the
+// method table.  tuple is borrowed by state and most not be freed until methods->close is called.
+static void ypQuickIter_tuple_new( ypQuickIter_state *state, ypObject *tuple ) {
+    yp_ASSERT( ypObject_TYPE_PAIR_CODE( tuple ) == ypTuple_CODE, "tuple must be a tuple/list" );
+    state->tuple.i = 0;
+    state->tuple.obj = tuple;
+}
+
+
 // Constructors
 
+// XXX Check for the empty tuple/list cases first
 static ypObject *_ypTupleNV( int type, int n, va_list args )
 {
-    // We keep len updated so we can just decref newSq on failure
+    int i;
     ypObject *newSq = _ypTuple_new( type, n, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newSq ) ) return newSq;
-    for( /*n already set*/; n > 0; n-- ) {
+    
+    // Extract the objects from args first; we incref these later, which makes it easier to bail
+    for( i = 0; i < n; i++ ) {
         ypObject *x = va_arg( args, ypObject * );
         if( yp_isexceptionC( x ) ) {
             yp_decref( newSq );
             return x;
         }
-        ypTuple_ARRAY( newSq )[ypTuple_LEN( newSq )] = yp_incref( x );
-        ypTuple_SET_LEN( newSq, ypTuple_LEN( newSq ) + 1 );
+        ypTuple_ARRAY( newSq )[i] = x;
     }
+
+    // Now set the other attributes, increment the reference counts, and return
+    ypTuple_SET_LEN( newSq, n );
+    for( i = 0; i < n; i++ ) yp_incref( ypTuple_ARRAY( newSq )[i] );
     return newSq;
 }
 
@@ -9192,6 +9262,7 @@ void yp_set_add( ypObject **set, ypObject *x )
 
 // Constructors
 
+// FIXME check va_list from here on for ypQuickIter use
 static ypObject *_ypSetNV( int type, int n, va_list args )
 {
     yp_ssize_t spaceleft;
