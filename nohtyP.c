@@ -1352,6 +1352,9 @@ void yp_decrefN( int n, ... )
  * ypQuickIter: iterator-like abstraction over va_lists of ypObject*s and iterables
  * XXX Internal use only!
  *************************************************************************************************/
+// FIXME I'm having second thoughts about the utility of this API.  It really comes down to how
+// much benefit we have sharing the va_list code with the iterable code...and last time there
+// wasn't that much benefit.  ypQuickSeq might be a better choice.
 
 // This API exists for two reasons.  The most-important reason is to reduce duplication of
 // code where variants of a method accept va_lists of ypObject*s, or a general-purpose iterable.
@@ -1368,8 +1371,8 @@ void yp_decrefN( int n, ... )
 //
 // Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
 
-// TODO Inspect all uses of va_list, yp_miniiter, and yp_iter below and see if we can consolidate
-// or simplify some code by using this API
+// TODO Inspect all uses of va_arg, yp_miniiter_next, and yp_next below and see if we can 
+// consolidate or simplify some code by using this API
 
 typedef union {
     struct {            // State for ypQuickIter_var_*
@@ -1392,7 +1395,7 @@ typedef union {
 // used to manipulate the associated ypQuickIter_state.
 typedef struct {
     // Returns a *borrowed* reference to the next yielded value, or an exception.  If the
-    // iterator is exhausted, returns NULL.  The borrowed reference is only valid until next or
+    // iterator is exhausted, returns NULL.  The borrowed reference is only valid until nextX or
     // close is called.
     ypObject *(*nextX)( ypQuickIter_state *state );
     // Sets *lenhint to the number of items left to be yielded.  Returns true if this is an exact
@@ -1471,6 +1474,9 @@ static int ypQuickIter_mi_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint
     } else {
         ypObject *exc = yp_None;
         *lenhint = yp_miniiter_lenhintC( state->mi.iter, &(state->mi.state), &exc );
+        yp_ASSERT( *lenhint >= 0, "negative lenhint from miniiter" );
+        // TODO Instead do lenhint = MAX( lenhint, ypObject_MIN_LENHINT ) or something (here
+        // and elsewhere) to ensure we at least pre-allocate a little on resize.
         return FALSE;   // indicates an approximate hint; *lenhint is zero on error
     }
 }
@@ -2178,7 +2184,6 @@ ypObject *yp_orNV( int n, va_list args )
 ypObject *yp_anyN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_anyNV, (n, args), n );
 }
-// This algorithm is simple enough to not warrant converting to ypQuickIter
 ypObject *yp_anyNV( int n, va_list args ) {
     for( /*n already set*/; n > 0; n-- ) {
         ypObject *b = yp_bool( va_arg( args, ypObject * ) );
@@ -2189,21 +2194,21 @@ ypObject *yp_anyNV( int n, va_list args ) {
 
 ypObject *yp_any( ypObject *iterable )
 {
-    const ypQuickIter_methods *qi;
-    ypQuickIter_state qi_state;
+    ypObject *mi;
+    yp_uint64_t mi_state;
     ypObject *x;
-    ypObject *retval = yp_False;
+    ypObject *result = yp_False;
 
-    x = ypQuickIter_iterable_new( &qi, &qi_state, iterable );
-    if( yp_isexceptionC( x ) ) return x;
+    mi = yp_miniiter( iterable, &mi_state ); // new ref
     while( 1 ) {
-        x = qi->nextX( &qi_state );     // borrowed, or NULL
-        if( x == NULL ) break;          // exit when exhausted
-        retval = yp_bool( x );
-        if( retval != yp_False ) break; // exit on yp_True or exception
+        x = yp_miniiter_next( &mi, &mi_state ); // new ref
+        if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
+        result = yp_bool( x );
+        yp_decref( x );
+        if( result != yp_False ) break; // exit on yp_True or exception
     }
-    qi->close( &qi_state );
-    return retval;
+    yp_decref( mi );
+    return result;
 }
 
 ypObject *yp_and( ypObject *x, ypObject *y )
@@ -2235,7 +2240,6 @@ ypObject *yp_andNV( int n, va_list args )
 ypObject *yp_allN( int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_allNV, (n, args), n );
 }
-// This algorithm is simple enough to not warrant converting to ypQuickIter
 ypObject *yp_allNV( int n, va_list args ) {
     for( /*n already set*/; n > 0; n-- ) {
         ypObject *b = yp_bool( va_arg( args, ypObject * ) );
@@ -2246,21 +2250,21 @@ ypObject *yp_allNV( int n, va_list args ) {
 
 ypObject *yp_all( ypObject *iterable )
 {
-    const ypQuickIter_methods *qi;
-    ypQuickIter_state qi_state;
+    ypObject *mi;
+    yp_uint64_t mi_state;
     ypObject *x;
-    ypObject *retval = yp_True;
+    ypObject *result = yp_True;
 
-    x = ypQuickIter_iterable_new( &qi, &qi_state, iterable );
-    if( yp_isexceptionC( x ) ) return x;
+    mi = yp_miniiter( iterable, &mi_state ); // new ref
     while( 1 ) {
-        x = qi->nextX( &qi_state );     // borrowed, or NULL
-        if( x == NULL ) break;          // exit when exhausted
-        retval = yp_bool( x );
-        if( retval != yp_True ) break;  // exit on yp_False or exception
+        x = yp_miniiter_next( &mi, &mi_state ); // new ref
+        if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
+        result = yp_bool( x );
+        yp_decref( x );
+        if( result != yp_True ) break; // exit on yp_False or exception
     }
-    qi->close( &qi_state );
-    return retval;
+    yp_decref( mi );
+    return result;
 }
 
 // Defined here are yp_lt, yp_le, yp_eq, yp_ne, yp_ge, and yp_gt
@@ -4902,8 +4906,6 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject **mi, yp_uint6
         if( newLen > ypBytes_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
         newLen += 1;
         if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
-            // TODO Instead do lenhint = MAX( lenhint, ypObject_MIN_LENHINT ) or something (here
-            // and elsewhere) to ensure we at least pre-allocate a little on resize.
             if( lenhint < 0 ) lenhint = 0;
             oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, lenhint );
             if( oldptr == NULL ) return yp_MemoryError;
@@ -4933,7 +4935,6 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
     } else {
         ypObject *result;
         yp_uint64_t mi_state;
-        // TODO Can benefit from ypQuickIter because converts to a yp_uint8_t
         ypObject *mi = yp_miniiter( iterable, &mi_state ); // new ref
         if( yp_isexceptionC( mi ) ) return mi;
         result = _ypBytes_extend_from_iter( b, &mi, &mi_state );
@@ -5553,7 +5554,7 @@ static ypObject *bytes_join( ypObject *b, ypObject *iterable ) {
     return yp_NotImplementedError;
 }
 
-// TODO Benefits from a ypQuickIter because bytes_join, and because bytes' array is memcpy'd
+// TODO Benefits from a ypQuickSeq because bytes_join, and because bytes' array is memcpy'd
 static ypObject *bytes_joinN( ypObject *b, int n, va_list args ) {
     return yp_NotImplementedError;
 }
@@ -6179,7 +6180,7 @@ static ypObject *str_join( ypObject *s, ypObject *iterable ) {
     return yp_NotImplementedError;
 }
 
-// TODO Benefits from a ypQuickIter because str_join, and because str's array is memcpy'd
+// TODO Benefits from a ypQuickSeq because str_join, and because str's array is memcpy'd
 static ypObject *str_joinN( ypObject *s, int n, va_list args ) {
     return yp_NotImplementedError;
 }
@@ -6879,6 +6880,8 @@ static ypObject *_ypTuple_extend_grow( ypObject *sq, yp_ssize_t required, yp_ssi
     yp_ASSERT( required >= ypTuple_LEN( sq ), "required cannot be <len(sq)" );
     yp_ASSERT( required <= ypTuple_LEN_MAX, "required cannot be >max" );
     oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject, required, extra );
+    // FIXME I believe this can allocate something larger than ypTuple_LEN_MAX, which means we
+    // always have to check both alloclen and len_max (here and elsewhere).
     if( oldptr == NULL ) return yp_MemoryError;
     if( ypTuple_ARRAY( sq ) != oldptr ) {
         memcpy( ypTuple_ARRAY( sq ), oldptr, ypTuple_LEN( sq ) * yp_sizeof( ypObject * ) );
@@ -6922,9 +6925,6 @@ static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
     return yp_None;
 }
 
-// TODO Benefits from ypQuickIter because push does own incref...
-// (this isn't a good enough reason, and yp_extendN could do the "don't incref until success"
-// va_list trick, and the fellow tuple case is already handled)
 static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject **mi, yp_uint64_t *mi_state )
 {
     ypObject *exc = yp_None;
@@ -7766,8 +7766,6 @@ static void ypQuickIter_tuple_new( ypQuickIter_state *state, ypObject *tuple ) {
 // Constructors
 
 // XXX Check for the empty tuple/list cases first
-// This does not benefit from ypQuickIter because code is currently simple, and error case would
-// become more difficult (would need incref per-item)
 static ypObject *_ypTupleNV( int type, int n, va_list args )
 {
     int i;
@@ -8418,7 +8416,6 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **mi, yp_uint64
 // keys, the set is not resized (important, as yp_setN et al pre-allocate the necessary space).
 // Requires that iterables's items are immutable; unavoidable as they are to be added to the set.
 // XXX Check for the so==iterable case _before_ calling this function
-// ypQuickIter would save an incref, but that's about it
 static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 {
     int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
