@@ -1393,8 +1393,10 @@ typedef struct {
     ypObject *(*next)( ypQuickIter_state *state );
     // Sets *lenhint to the number of items left to be yielded.  Returns true if this is an exact
     // value, or false if this is an estimate.
+    // TODO This masks errors; fix
     int (*lenhint)( ypQuickIter_state *state, yp_ssize_t *lenhint );
     // Closes the ypQuickIter.  Any further operations on state will be undefined.
+    // TODO This masks errors; fix
     void (*close)( ypQuickIter_state *state );
 } ypQuickIter_methods;
 
@@ -1448,8 +1450,8 @@ static void ypQuickIter_tuple_new( ypQuickIter_state *state, ypObject *tuple );
 
 static ypObject *ypQuickIter_mi_next( ypQuickIter_state *state ) {
     // TODO What if we were to store tp_miniiter_next?
-    ypObject *x = yp_miniiter_next( &(state->mi.iter), &(state->mi.state) );
-    if( yp_isexceptionC2( x, yp_StopIteration ) ) return NULL;
+    ypObject *x = yp_miniiter_next( &(state->mi.iter), &(state->mi.state) );    // new ref
+    if( yp_isexceptionC2( x, yp_StopIteration ) ) return NULL;  
     if( state->mi.len >= 0 ) state->mi.len -= 1;
     return x;
 }
@@ -1464,7 +1466,8 @@ static ypObject *ypQuickIter_mi_nextX( ypQuickIter_state *state ) {
     return x;
 }
 
-static int ypQuickIter_mi_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint ) {
+static int ypQuickIter_mi_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint ) 
+{
     if( state->mi.len >= 0 ) {
         *lenhint = state->mi.len;
         return TRUE;    // indicates an exact length
@@ -1496,7 +1499,6 @@ static const ypQuickIter_methods ypQuickIter_mi_methods = {
 static ypObject *ypQuickIter_iterable_new(
         const ypQuickIter_methods **methods, ypQuickIter_state *state, ypObject *iterable )
 {
-    // TODO instead of these if statements, use pointers in the type's method table
     // We special-case tuples because we can return borrowed references directly
     if( FALSE && ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         // FIXME enable this special-case after general case tested (remove FALSE above)
@@ -1545,8 +1547,12 @@ typedef union {
         va_list args;           // Current state of variable arguments ("owned")
         va_list orig_args;      // The starting point for args ("borrowed")
     } var;
-    ypObject *obj;      // State for ypQuickSeq_tuple_*, ypQuickSeq_seq_*, etc (borrowed)
+    ypObject *obj;      // State for ypQuickSeq_tuple_*, etc (borrowed)
     // TODO bytes, str, other seq objs could all have their own state here
+    struct {            // State for ypQuickSeq_seq_*
+        ypObject *obj;          // Sequence object (borrowed)
+        ypObject *to_decref;    // Held for getindexX (owned, discarded by getindexX/close)
+    } seq;
     // TODO sets and dicts can be "indexed" here, in contexts where they would be convereted to a
     // tuple anyway
 } ypQuickSeq_state;
@@ -1561,13 +1567,16 @@ typedef struct {
     // Similar to getindexX, but returns a new reference that will remain valid (until decref).
     ypObject *(*getindex)( ypQuickSeq_state *state, yp_ssize_t i );
     // Returns the total number of elements in the ypQuickSeq.
+    // TODO This masks errors; fix
     yp_ssize_t (*len)( ypQuickSeq_state *state );
     // Closes the ypQuickSeq.  Any further operations on state will be undefined.
+    // TODO This masks errors; fix
     void (*close)( ypQuickSeq_state *state );
 } ypQuickSeq_methods;
 
 
-ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i ) {
+static ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i ) 
+{
     yp_ASSERT( i >= 0, "negative indicies not allowed in ypQuickSeq" );
     if( i >= state->var.len ) return NULL;
 
@@ -1587,15 +1596,15 @@ ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i ) {
     return state->var.x;
 }
 
-ypObject *ypQuickSeq_var_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
+static ypObject *ypQuickSeq_var_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
     return yp_incref( ypQuickSeq_var_getindexX( state, i ) );
 }
 
-yp_ssize_t ypQuickSeq_var_len( ypQuickSeq_state *state ) {
+static yp_ssize_t ypQuickSeq_var_len( ypQuickSeq_state *state ) {
     return state->var.len;
 }
 
-void ypQuickSeq_var_close( ypQuickSeq_state *state ) {
+static void ypQuickSeq_var_close( ypQuickSeq_state *state ) {
     va_end( state->var.args );
 }
 
@@ -1619,6 +1628,83 @@ static void ypQuickSeq_var_new( ypQuickSeq_state *state, int n, va_list args ) {
         state->var.x = va_arg( state->var.args, ypObject * );
     }
 }
+
+
+// TODO A bytes object can return immortal ints in range(256)
+
+
+// These are implemented in the tuple section
+static const ypQuickSeq_methods ypQuickSeq_tuple_methods;
+static void ypQuickSeq_tuple_new( ypQuickSeq_state *state, ypObject *tuple );
+
+
+static ypObject *ypQuickSeq_seq_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
+    ypObject *x;
+    yp_ASSERT( i >= 0, "negative indicies not allowed in ypQuickSeq" );
+    x = yp_getindexC( state->seq.obj, i );      // new ref
+    if( yp_isexceptionC2( x, yp_IndexError ) ) return NULL;
+    return x;
+}
+
+static ypObject *ypQuickSeq_seq_getindexX( ypQuickSeq_state *state, yp_ssize_t i ) {
+    // This function returns borrowed references; since they are not discarded by the caller, we
+    // need to retain these references ourselves and discard them when done.
+    ypObject *x = ypQuickSeq_seq_getindex( state, i );
+    if( x == NULL ) return NULL;
+    yp_decref( state->seq.to_decref );
+    state->seq.to_decref = x;
+    return x;
+}
+
+static yp_ssize_t ypQuickSeq_seq_len( ypQuickSeq_state *state ) {
+    ypObject *exc = yp_None;
+    return yp_lenC( state->seq.obj, &exc );     // returns zero on error
+}
+
+static void ypQuickSeq_seq_close( ypQuickSeq_state *state ) {
+    yp_decref( state->seq.to_decref );
+}
+
+static const ypQuickSeq_methods ypQuickSeq_seq_methods = {
+    ypQuickSeq_seq_getindexX,
+    ypQuickSeq_seq_getindex,
+    ypQuickSeq_seq_len,
+    ypQuickSeq_seq_close
+};
+
+
+// Initializes state with the given sequence, sets *methods to the proper method table to use, and
+// returns yp_None.  On error, returns an exception, and *methods and state are undefined.
+// sequence is borrowed by state and must not be freed until methods->close is called.
+static ypObject *ypQuickSeq_sequence_new( 
+        const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence ) 
+{
+    // We special-case tuples because we can return borrowed references directly
+    if( FALSE && ypObject_TYPE_PAIR_CODE( sequence ) == ypTuple_CODE ) {
+        // FIXME enable this special-case after general case tested (remove FALSE above)
+        *methods = &ypQuickSeq_tuple_methods;
+        ypQuickSeq_tuple_new( state, sequence );
+        return yp_None;
+
+    // We may eventually special-case other types, but for now treat them as generic iterables
+    } else {
+        // All sequences should raise yp_IndexError for yp_SSIZE_T_MAX; all other types should
+        // raise yp_TypeError or somesuch
+        ypObject *result = yp_getindexC( sequence, yp_SSIZE_T_MAX );
+        if( !yp_isexceptionC2( result, yp_IndexError ) ) {
+            if( yp_isexceptionC( result ) ) return result;
+            yp_decref( result ); // discard unexpectedly-returned value
+            return yp_RuntimeError;
+        }
+        *methods = &ypQuickSeq_seq_methods;
+        state->seq.obj = sequence;
+        state->seq.to_decref = yp_None;
+        return yp_None;
+    }
+}
+
+
+// TODO Like tuples, sets and dicts can return borrowed references
 
 
 /*************************************************************************************************
@@ -7867,6 +7953,41 @@ static void ypQuickIter_tuple_new( ypQuickIter_state *state, ypObject *tuple ) {
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( tuple ) == ypTuple_CODE, "tuple must be a tuple/list" );
     state->tuple.i = 0;
     state->tuple.obj = tuple;
+}
+
+
+// Custom ypQuickSeq support
+
+static ypObject *ypQuickSeq_tuple_getindexX( ypQuickSeq_state *state, yp_ssize_t i ) {
+    yp_ASSERT( i >= 0, "negative indicies not allowed in ypQuickSeq" );
+    if( i >= ypTuple_LEN( state->obj ) ) return NULL;
+    return ypTuple_ARRAY( state->obj )[i];
+}
+
+static ypObject *ypQuickSeq_tuple_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
+    return yp_incref( ypQuickSeq_tuple_getindexX( state, i ) );
+}
+
+static yp_ssize_t ypQuickSeq_tuple_len( ypQuickSeq_state *state ) {
+    return ypTuple_LEN( state->obj );
+}
+
+static void ypQuickSeq_tuple_close( ypQuickSeq_state *state ) {
+    // No-op.  We don't yp_decref because it's a borrowed reference.
+}
+
+static const ypQuickSeq_methods ypQuickSeq_tuple_methods = {
+    ypQuickSeq_tuple_getindexX,
+    ypQuickSeq_tuple_getindex,
+    ypQuickSeq_tuple_len,
+    ypQuickSeq_tuple_close
+};
+
+// Initializes state with the given tuple.  Always succeeds.  Use ypQuickSeq_tuple_methods as the
+// method table.  tuple is borrowed by state and must not be freed until methods->close is called.
+static void ypQuickSeq_tuple_new( ypQuickSeq_state *state, ypObject *tuple ) {
+    yp_ASSERT( ypObject_TYPE_PAIR_CODE( tuple ) == ypTuple_CODE, "tuple must be a tuple/list" );
+    state->obj = tuple;
 }
 
 
