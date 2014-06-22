@@ -4920,7 +4920,11 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 #define ypString_ENC_UCS2   _ypString_ENC_UCS2
 #define ypString_ENC_UCS4   _ypString_ENC_UCS4
 
-// XXX Adapted from Python's STRINGLIB(bytes_join)
+static ypObject *ypStringLib_join_sametype( ypObject *s, ypObject *x )
+{
+    return yp_NotImplementedError;
+}
+
 // - empty iterable, return 0-len
 // - 1-iterable, return shallow copy of object (if right type)
 // - wrong type
@@ -4930,8 +4934,11 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 // - empty separator is faster...just concatenate
 // - concatenation with separator
 
-
-
+static ypObject *ypStringLib_join( 
+        ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
+{
+    return yp_NotImplementedError;
+}
 
 
 /*************************************************************************************************
@@ -5737,16 +5744,6 @@ static ypObject *bytes_strip( ypObject *b, ypObject *chars ) {
     return yp_NotImplementedError;
 }
 
-// TODO iterable can also be a bytes, with expected results
-static ypObject *bytes_join( ypObject *b, ypObject *iterable ) {
-    return yp_NotImplementedError;
-}
-
-// TODO Benefits from a ypQuickSeq because bytes_join, and because bytes' array is memcpy'd
-static ypObject *bytes_joinN( ypObject *b, int n, va_list args ) {
-    return yp_NotImplementedError;
-}
-
 static void bytes_partition( ypObject *b, ypObject *sep,
         ypObject **part0, ypObject **part1, ypObject **part2 ) {
     *part0 = *part1 = *part2 = yp_NotImplementedError;
@@ -6364,15 +6361,6 @@ static ypObject *str_strip( ypObject *s, ypObject *chars ) {
     return yp_NotImplementedError;
 }
 
-static ypObject *str_join( ypObject *s, ypObject *iterable ) {
-    return yp_NotImplementedError;
-}
-
-// TODO Benefits from a ypQuickSeq because str_join, and because str's array is memcpy'd
-static ypObject *str_joinN( ypObject *s, int n, va_list args ) {
-    return yp_NotImplementedError;
-}
-
 static void str_partition( ypObject *s, ypObject *sep,
         ypObject **part0, ypObject **part1, ypObject **part2 ) {
     *part0 = *part1 = *part2 = yp_NotImplementedError;
@@ -6777,54 +6765,59 @@ yp_IMMORTAL_STR_LATIN1( yp_s_replace,   "replace" );
 // methods, they are left out of the type's method table.  This may change in the future.
 
 // Assume these are most-likely to be run against str/chrarrays, so put that check first
-#define _ypStr_REDIRECT1( ob, meth, args ) \
+#define _ypStringLib_REDIRECT1( ob, meth, args ) \
     do {int ob_pair = ypObject_TYPE_PAIR_CODE( ob ); \
         if( ob_pair == ypStr_CODE ) return str_ ## meth args; \
         if( ob_pair == ypBytes_CODE ) return bytes_ ## meth args; \
         return_yp_BAD_TYPE( ob ); } while( 0 )
 
+// Returns true if ob is one of the types supported by ypStringLib
+#define _ypStringLib_CHECK( ob ) \
+    (ypObject_TYPE_PAIR_CODE( ob ) == ypStr_CODE || ypObject_TYPE_PAIR_CODE( ob ) == ypBytes_CODE)
+
+
 ypObject *yp_isalnum( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isalnum, (s) );
+    _ypStringLib_REDIRECT1( s, isalnum, (s) );
 }
 
 ypObject *yp_isalpha( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isalpha, (s) );
+    _ypStringLib_REDIRECT1( s, isalpha, (s) );
 }
 
 ypObject *yp_isdecimal( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isdecimal, (s) );
+    _ypStringLib_REDIRECT1( s, isdecimal, (s) );
 }
 
 ypObject *yp_isdigit( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isdigit, (s) );
+    _ypStringLib_REDIRECT1( s, isdigit, (s) );
 }
 
 ypObject *yp_isidentifier( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isidentifier, (s) );
+    _ypStringLib_REDIRECT1( s, isidentifier, (s) );
 }
 
 ypObject *yp_islower( ypObject *s ) {
-    _ypStr_REDIRECT1( s, islower, (s) );
+    _ypStringLib_REDIRECT1( s, islower, (s) );
 }
 
 ypObject *yp_isnumeric( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isnumeric, (s) );
+    _ypStringLib_REDIRECT1( s, isnumeric, (s) );
 }
 
 ypObject *yp_isprintable( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isprintable, (s) );
+    _ypStringLib_REDIRECT1( s, isprintable, (s) );
 }
 
 ypObject *yp_isspace( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isspace, (s) );
+    _ypStringLib_REDIRECT1( s, isspace, (s) );
 }
 
 ypObject *yp_isupper( ypObject *s ) {
-    _ypStr_REDIRECT1( s, isupper, (s) );
+    _ypStringLib_REDIRECT1( s, isupper, (s) );
 }
 
 ypObject *yp_startswithC4( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end ) {
-    _ypStr_REDIRECT1( s, startswith, (s, prefix, start, end) );
+    _ypStringLib_REDIRECT1( s, startswith, (s, prefix, start, end) );
 }
 
 ypObject *yp_startswithC( ypObject *s, ypObject *prefix ) {
@@ -6832,7 +6825,7 @@ ypObject *yp_startswithC( ypObject *s, ypObject *prefix ) {
 }
 
 ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end ) {
-    _ypStr_REDIRECT1( s, endswith, (s, suffix, start, end) );
+    _ypStringLib_REDIRECT1( s, endswith, (s, suffix, start, end) );
 }
 
 ypObject *yp_endswithC( ypObject *s, ypObject *suffix ) {
@@ -6840,27 +6833,27 @@ ypObject *yp_endswithC( ypObject *s, ypObject *suffix ) {
 }
 
 ypObject *yp_lower( ypObject *s ) {
-    _ypStr_REDIRECT1( s, lower, (s) );
+    _ypStringLib_REDIRECT1( s, lower, (s) );
 }
 
 ypObject *yp_upper( ypObject *s ) {
-    _ypStr_REDIRECT1( s, upper, (s) );
+    _ypStringLib_REDIRECT1( s, upper, (s) );
 }
 
 ypObject *yp_casefold( ypObject *s ) {
-    _ypStr_REDIRECT1( s, casefold, (s) );
+    _ypStringLib_REDIRECT1( s, casefold, (s) );
 }
 
 ypObject *yp_swapcase( ypObject *s ) {
-    _ypStr_REDIRECT1( s, swapcase, (s) );
+    _ypStringLib_REDIRECT1( s, swapcase, (s) );
 }
 
 ypObject *yp_capitalize( ypObject *s ) {
-    _ypStr_REDIRECT1( s, capitalize, (s) );
+    _ypStringLib_REDIRECT1( s, capitalize, (s) );
 }
 
 ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    _ypStr_REDIRECT1( s, ljust, (s, width, ord_fillchar) );
+    _ypStringLib_REDIRECT1( s, ljust, (s, width, ord_fillchar) );
 }
 
 ypObject *yp_ljustC( ypObject *s, yp_ssize_t width ) {
@@ -6868,7 +6861,7 @@ ypObject *yp_ljustC( ypObject *s, yp_ssize_t width ) {
 }
 
 ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    _ypStr_REDIRECT1( s, rjust, (s, width, ord_fillchar) );
+    _ypStringLib_REDIRECT1( s, rjust, (s, width, ord_fillchar) );
 }
 
 ypObject *yp_rjustC( ypObject *s, yp_ssize_t width ) {
@@ -6876,7 +6869,7 @@ ypObject *yp_rjustC( ypObject *s, yp_ssize_t width ) {
 }
 
 ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    _ypStr_REDIRECT1( s, center, (s, width, ord_fillchar) );
+    _ypStringLib_REDIRECT1( s, center, (s, width, ord_fillchar) );
 }
 
 ypObject *yp_centerC( ypObject *s, yp_ssize_t width ) {
@@ -6884,11 +6877,11 @@ ypObject *yp_centerC( ypObject *s, yp_ssize_t width ) {
 }
 
 ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize ) {
-    _ypStr_REDIRECT1( s, expandtabs, (s, tabsize) );
+    _ypStringLib_REDIRECT1( s, expandtabs, (s, tabsize) );
 }
 
 ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count ) {
-    _ypStr_REDIRECT1( s, replace, (s, oldsub, newsub, count) );
+    _ypStringLib_REDIRECT1( s, replace, (s, oldsub, newsub, count) );
 }
 
 ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub ) {
@@ -6896,7 +6889,7 @@ ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub ) {
 }
 
 ypObject *yp_lstrip2( ypObject *s, ypObject *chars ) {
-    _ypStr_REDIRECT1( s, lstrip, (s, chars) );
+    _ypStringLib_REDIRECT1( s, lstrip, (s, chars) );
 }
 
 ypObject *yp_lstrip( ypObject *s ) {
@@ -6904,7 +6897,7 @@ ypObject *yp_lstrip( ypObject *s ) {
 }
 
 ypObject *yp_rstrip2( ypObject *s, ypObject *chars ) {
-    _ypStr_REDIRECT1( s, rstrip, (s, chars) );
+    _ypStringLib_REDIRECT1( s, rstrip, (s, chars) );
 }
 
 ypObject *yp_rstrip( ypObject *s ) {
@@ -6912,7 +6905,7 @@ ypObject *yp_rstrip( ypObject *s ) {
 }
 
 ypObject *yp_strip2( ypObject *s, ypObject *chars ) {
-    _ypStr_REDIRECT1( s, strip, (s, chars) );
+    _ypStringLib_REDIRECT1( s, strip, (s, chars) );
 }
 
 ypObject *yp_strip( ypObject *s ) {
@@ -6920,14 +6913,34 @@ ypObject *yp_strip( ypObject *s ) {
 }
 
 ypObject *yp_join( ypObject *s, ypObject *iterable ) {
-    _ypStr_REDIRECT1( s, join, (s, iterable) );
+    ypQuickSeq_methods *methods;
+    ypQuickSeq_state state;
+    ypObject *result;
+
+    if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
+    if( ypObject_TYPE_PAIR_CODE( s ) == ypObject_TYPE_PAIR_CODE( iterable ) ) {
+        return ypStringLib_join_sametype( s, iterable );
+    }
+
+    // FIXME this should accept any given iterable type
+    result = ypQuickSeq_sequence_new( &methods, &state, iterable );
+    if( yp_isexceptionC( result ) ) return result;
+    result = ypStringLib_join( s, methods, &state );
+    methods->close( &state );
+    return result;
 }
 
 ypObject *yp_joinN( ypObject *s, int n, ... ) {
     return_yp_V_FUNC( ypObject *, yp_joinNV, (s, n, args), n );
 }
 ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
-    _ypStr_REDIRECT1( s, joinN, (s, n, args) );
+    ypQuickSeq_state state;
+    ypObject *result;
+    if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
+    ypQuickSeq_var_new( &state, n, args );
+    result = ypStringLib_join( s, &ypQuickSeq_var_methods, &state );
+    ypQuickSeq_var_close( &state );
+    return result;
 }
 
 void yp_partition( ypObject *s, ypObject *sep,
@@ -6937,7 +6950,7 @@ void yp_rpartition( ypObject *s, ypObject *sep,
         ypObject **part0, ypObject **part1, ypObject **part2 );
 
 ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit ) {
-    _ypStr_REDIRECT1( s, split, (s, sep, maxsplit) );
+    _ypStringLib_REDIRECT1( s, split, (s, sep, maxsplit) );
 }
 
 ypObject *yp_split2( ypObject *s, ypObject *sep ) {
@@ -6950,11 +6963,11 @@ ypObject *yp_split( ypObject *s ) {
 
 // TODO use a direction parameter internally like in find/rfind?
 ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit ) {
-    _ypStr_REDIRECT1( s, rsplit, (s, sep, maxsplit) );
+    _ypStringLib_REDIRECT1( s, rsplit, (s, sep, maxsplit) );
 }
 
 ypObject *yp_splitlines2( ypObject *s, ypObject *keepends ) {
-    _ypStr_REDIRECT1( s, splitlines, (s, keepends) );
+    _ypStringLib_REDIRECT1( s, splitlines, (s, keepends) );
 }
 
 
