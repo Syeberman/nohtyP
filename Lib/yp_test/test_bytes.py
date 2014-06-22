@@ -315,16 +315,16 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test.fromhex, '\x00')
         self.assertRaises(ValueError, self.type2test.fromhex, '12   \x00   34')
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_join(self):
-        self.assertEqual(self.type2test(b"").join([]), b"")
-        self.assertEqual(self.type2test(b"").join([b""]), b"")
+        self.assertEqual(self.type2test(b"").join(yp_list([])), b"")
+        self.assertEqual(self.type2test(b"").join(yp_list([b""])), b"")
         for lst in [[b"abc"], [b"a", b"bc"], [b"ab", b"c"], [b"a", b"b", b"c"]]:
-            lst = list(map(self.type2test, lst))
+            lst = yp_list(map(self.type2test, lst))
             self.assertEqual(self.type2test(b"").join(lst), b"abc")
-            self.assertEqual(self.type2test(b"").join(tuple(lst)), b"abc")
-            self.assertEqual(self.type2test(b"").join(iter(lst)), b"abc")
-        self.assertEqual(self.type2test(b".").join([b"ab", b"cd"]), b"ab.cd")
+            self.assertEqual(self.type2test(b"").join(yp_tuple(lst)), b"abc")
+            self.assertEqual(self.type2test(b"").join(yp_iter(lst)), b"abc")
+        self.assertEqual(self.type2test(b".").join(yp_list([b"ab", b"cd"])), b"ab.cd")
+        # TODO nohtyP: sametype, dict, set, strs fail, etc
         # XXX more...
 
     def test_count(self):
