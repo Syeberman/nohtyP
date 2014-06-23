@@ -1846,10 +1846,10 @@ struct _ypStrObject {
 // Set ob_len or ob_alloclen to this value to signal an invalid length
 #define _ypObject_LEN_INVALID       ((yp_ssize_t) -1)
 // Macros on ob_type_flags for string objects (bytes and str)
-#define _ypString_ENC_BYTES         (0u)
-#define _ypString_ENC_UCS1          (1u)
-#define _ypString_ENC_UCS2          (2u)
-#define _ypString_ENC_UCS4          (3u)
+#define _ypStringLib_ENC_BYTES      (0u)
+#define _ypStringLib_ENC_UCS1       (1u)
+#define _ypStringLib_ENC_UCS2       (2u)
+#define _ypStringLib_ENC_UCS4       (3u)
 
 // These type codes must match those in nohtyP.c
 #define _ypInt_CODE                 ( 10u)
@@ -1867,13 +1867,13 @@ struct _ypStrObject {
 #define yp_IMMORTAL_BYTES( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypBytes_CODE, _ypString_ENC_BYTES, \
+        _ypBytes_CODE, _ypStringLib_ENC_BYTES, \
         (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 #define yp_IMMORTAL_STR_LATIN1( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypStrObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypStr_CODE, _ypString_ENC_UCS1, \
+        _ypStr_CODE, _ypStringLib_ENC_UCS1, \
         (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE

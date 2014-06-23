@@ -1391,12 +1391,12 @@ typedef struct {
     ypObject *(*nextX)( ypQuickIter_state *state );
     // Similar to nextX, but returns a new reference that will remain valid (until decref).
     ypObject *(*next)( ypQuickIter_state *state );
-    // Sets *lenhint to the number of items left to be yielded.  Returns true if this is an exact
-    // value, or false if this is an estimate.
-    // TODO This masks errors; fix
-    int (*lenhint)( ypQuickIter_state *state, yp_ssize_t *lenhint );
+    // Returns the number of items left to be yielded.  Sets *isexact to true if this is an exact
+    // value, or false if this is an estimate.  On error, sets *exc, returns zero, and *isexact is
+    // undefined.
+    yp_ssize_t (*lenhint)( ypQuickIter_state *state, int *isexact, ypObject **exc );
     // Closes the ypQuickIter.  Any further operations on state will be undefined.
-    // TODO This masks errors; fix
+    // TODO If any of these close methods raise errors, we'll need to return them
     void (*close)( ypQuickIter_state *state );
 } ypQuickIter_methods;
 
@@ -1411,10 +1411,11 @@ static ypObject *ypQuickIter_var_next( ypQuickIter_state *state ) {
     return yp_incref( ypQuickIter_var_nextX( state ) );
 }
 
-static int ypQuickIter_var_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint ) {
+static yp_ssize_t ypQuickIter_var_lenhint( ypQuickIter_state *state, int *isexact, ypObject **exc )
+{
     yp_ASSERT( state->var.n >= 0, "state->var.n should not be negative" );
-    *lenhint = state->var.n;
-    return TRUE;
+    *isexact = TRUE;
+    return state->var.n;
 }
 
 static void ypQuickIter_var_close( ypQuickIter_state *state ) {
@@ -1466,18 +1467,16 @@ static ypObject *ypQuickIter_mi_nextX( ypQuickIter_state *state ) {
     return x;
 }
 
-static int ypQuickIter_mi_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint ) 
+static yp_ssize_t ypQuickIter_mi_lenhint( ypQuickIter_state *state, int *isexact, ypObject **exc )
 {
     if( state->mi.len >= 0 ) {
-        *lenhint = state->mi.len;
-        return TRUE;    // indicates an exact length
+        *isexact = TRUE;
+        return state->mi.len;
     } else {
-        ypObject *exc = yp_None;
-        *lenhint = yp_miniiter_lenhintC( state->mi.iter, &(state->mi.state), &exc );
-        yp_ASSERT( *lenhint >= 0, "negative lenhint from miniiter" );
         // TODO Instead do lenhint = MAX( lenhint, ypObject_MIN_LENHINT ) or something (here
         // and elsewhere) to ensure we at least pre-allocate a little on resize.
-        return FALSE;   // indicates an approximate hint; *lenhint is zero on error
+        *isexact = FALSE;
+        return yp_miniiter_lenhintC( state->mi.iter, &(state->mi.state), exc );
     }
 }
 
@@ -1566,11 +1565,11 @@ typedef struct {
     ypObject *(*getindexX)( ypQuickSeq_state *state, yp_ssize_t i );
     // Similar to getindexX, but returns a new reference that will remain valid (until decref).
     ypObject *(*getindex)( ypQuickSeq_state *state, yp_ssize_t i );
-    // Returns the total number of elements in the ypQuickSeq.
-    // TODO This masks errors; fix
-    yp_ssize_t (*len)( ypQuickSeq_state *state );
+    // Returns the total number of elements in the ypQuickSeq.  On error, sets *exc and retuns
+    // zero.
+    yp_ssize_t (*len)( ypQuickSeq_state *state, ypObject **exc );
     // Closes the ypQuickSeq.  Any further operations on state will be undefined.
-    // TODO This masks errors; fix
+    // TODO If any of these close methods raise errors, we'll need to return them
     void (*close)( ypQuickSeq_state *state );
 } ypQuickSeq_methods;
 
@@ -1600,7 +1599,7 @@ static ypObject *ypQuickSeq_var_getindex( ypQuickSeq_state *state, yp_ssize_t i 
     return yp_incref( ypQuickSeq_var_getindexX( state, i ) );
 }
 
-static yp_ssize_t ypQuickSeq_var_len( ypQuickSeq_state *state ) {
+static yp_ssize_t ypQuickSeq_var_len( ypQuickSeq_state *state, ypObject **exc ) {
     return state->var.len;
 }
 
@@ -1656,9 +1655,8 @@ static ypObject *ypQuickSeq_seq_getindexX( ypQuickSeq_state *state, yp_ssize_t i
     return x;
 }
 
-static yp_ssize_t ypQuickSeq_seq_len( ypQuickSeq_state *state ) {
-    ypObject *exc = yp_None;
-    return yp_lenC( state->seq.obj, &exc );     // returns zero on error
+static yp_ssize_t ypQuickSeq_seq_len( ypQuickSeq_state *state, ypObject **exc ) {
+    return yp_lenC( state->seq.obj, exc );     // returns zero on error
 }
 
 static void ypQuickSeq_seq_close( ypQuickSeq_state *state ) {
@@ -4914,11 +4912,56 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
  * String manipulation library (for bytes and str)
  *************************************************************************************************/
 
-// The prefix ypString_* is used for bytes and str, while ypStr_* is strictly the Unicode str type
-#define ypString_ENC_BYTES  _ypString_ENC_BYTES
-#define ypString_ENC_UCS1   _ypString_ENC_UCS1
-#define ypString_ENC_UCS2   _ypString_ENC_UCS2
-#define ypString_ENC_UCS4   _ypString_ENC_UCS4
+// The prefix ypStringLib_* is used for bytes and str, while ypStr_* is strictly the str type
+
+// Macros on ob_type_flags for string objects (bytes and str), used to index into
+// ypStringLib_encs.
+#define ypStringLib_ENC_BYTES  _ypStringLib_ENC_BYTES
+#define ypStringLib_ENC_UCS1   _ypStringLib_ENC_UCS1
+#define ypStringLib_ENC_UCS2   _ypStringLib_ENC_UCS2
+#define ypStringLib_ENC_UCS4   _ypStringLib_ENC_UCS4
+
+#define ypStringLib_ENC_CODE( s )   ( ((ypObject *)(s))->ob_type_flags )
+#define ypStringLib_ENC( s )        ( &(ypStringLib_encs[ypStringLib_ENC_CODE( s )]) )
+
+// struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
+typedef struct _ypBytesObject ypBytesObject;
+// struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_STR_LATIN1 et al
+typedef struct _ypStrObject ypStrObject;
+
+// The maximum possible length of any string object (not including null terminator).  While UCS1
+// could technically allow four times as much data as UCS4, for simplicity we use one maximum
+// length for all encodings.  (Consider that an element in the largest UCS1 string could be
+// replaced with a UCS4 character, thus quadrupling its size.)
+#define ypStringLib_LEN_MAX ( (yp_ssize_t) MIN( MIN( \
+            yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
+            (yp_SSIZE_T_MAX-yp_sizeof( ypStrObject )) / 4 /* /4 for elemsize of UCS4 */ ), \
+            ypObject_LEN_MAX ) - 1 /* -1 for null terminator */ )
+
+
+// XXX In general for this table, make sure you do not use type codes with the wrong 
+// ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
+typedef struct {
+    ypObject *empty_immutable;  // Pointer to the immortal, empty immutable for this type
+    ypObject *(*empty_mutable)( void ); // Returns a new, empty mutable version of this type
+
+    // Returns a new type-object with the given requiredLen, plus the null terminator, for this 
+    // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will 
+    // never grow), the data is placed inline with one allocation.
+    // XXX Remember to add the null terminator
+    // XXX Check for the empty_immutable case first: new will _always_ allocate
+    // TODO Put protection in place to detect when INLINE objects attempt to be resized
+    // TODO Over-allocate to avoid future resizings
+    ypObject *(*new)( int type, yp_ssize_t requiredLen, int alloclen_fixed );
+
+    // Returns a new copy of s of the given type.  If type is immutable and alloclen_fixed is true
+    // (indicating the object will never grow), the data is placed inline with one allocation.
+    // XXX Check for lazy shallow copies first: copy will _always_ allocate
+    // XXX Similarly, check for the empty_immutable case first
+    ypObject *(*copy)( int type, ypObject *s, int alloclen_fixed );
+} ypStringLib_encinfo;
+static ypStringLib_encinfo ypStringLib_encs[4];
+
 
 static ypObject *ypStringLib_join_sametype( ypObject *s, ypObject *x )
 {
@@ -4934,9 +4977,33 @@ static ypObject *ypStringLib_join_sametype( ypObject *s, ypObject *x )
 // - empty separator is faster...just concatenate
 // - concatenation with separator
 
+// XXX The object underlying seq must be guaranteed to return the same object per index
 static ypObject *ypStringLib_join( 
         ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
 {
+    ypObject *exc = yp_None;
+    int s_pair = ypObject_TYPE_PAIR_CODE( s );
+    ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
+    yp_ssize_t seq_len;
+    //yp_ssize_t i;
+    ypObject *x;
+
+    // The 0- and 1-seq cases are pretty simple: just return an empty or a copy, respectively
+    seq_len = seq->len( state, &exc );
+    if( yp_isexceptionC( exc ) ) return exc;
+    if( seq_len < 1 ) {
+        if( !ypObject_IS_MUTABLE( s ) ) return s_enc->empty_immutable;
+        return s_enc->empty_mutable( );
+    } else if( seq_len == 1 ) {
+        x = seq->getindexX( state, 0 );     // borrowed
+        if( ypObject_TYPE_PAIR_CODE( x ) != s_pair ) return_yp_BAD_TYPE( x );
+        // Remember we need to return an object of the same type as s.  If s and x are both
+        // immutable then we can rely on a shallow copy.
+        if( !ypObject_IS_MUTABLE( s ) && !ypObject_IS_MUTABLE( x ) ) return yp_incref( x );
+        return s_enc->copy( ypObject_TYPE_CODE( s ), x, /*alloclen_fixed=*/TRUE );
+    }
+
+
     return yp_NotImplementedError;
 }
 
@@ -4945,8 +5012,7 @@ static ypObject *ypStringLib_join(
  * Sequence of bytes
  *************************************************************************************************/
 
-// struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
-typedef struct _ypBytesObject ypBytesObject;
+// ypBytesObject is declared in the StringLib section
 yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
 #define ypBytes_DATA( b )           ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
@@ -4956,15 +5022,13 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 #define ypBytes_INLINE_DATA( b )    ( ((ypBytesObject *)b)->ob_inline_data )
 
 // The maximum possible length of a bytes (not including null terminator)
-#define ypBytes_LEN_MAX ( (yp_ssize_t) MIN( \
-            yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
-            ypObject_LEN_MAX ) - 1 /* -1 for null terminator */ )
+#define ypBytes_LEN_MAX ypStringLib_LEN_MAX
 
 // Empty bytes can be represented by this, immortal object
 static ypBytesObject _yp_bytes_empty_struct = {
-    { ypBytes_CODE, 0, ypString_ENC_BYTES, ypObject_REFCNT_IMMORTAL,
+    { ypBytes_CODE, 0, ypStringLib_ENC_BYTES, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, "" } };
-static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
+#define _yp_bytes_empty     ((ypObject *) &_yp_bytes_empty_struct)
 
 // Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or
 // inserting bytes (the new space is uninitialized).  Assumes enough space is allocated for the
@@ -4981,13 +5045,16 @@ static ypObject * const _yp_bytes_empty = (ypObject *) &_yp_bytes_empty_struct;
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed )
 {
+    ypObject *newB;
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
     yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
     if( alloclen_fixed && type == ypBytes_CODE ) {
-        return ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, ypBytes_CODE, requiredLen+1 );
+        newB = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, ypBytes_CODE, requiredLen+1 );
     } else {
-        return ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, requiredLen+1, 0 );
+        newB = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type, requiredLen+1, 0 );
     }
+    ypStringLib_ENC_CODE( newB ) = ypStringLib_ENC_BYTES;
+    return newB;
 }
 
 // XXX Check for the possiblity of a lazy shallow copy before calling this function
@@ -6149,8 +6216,7 @@ ypObject *yp_bytearray0( void ) {
 
 // TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
 
-// struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_STR_LATIN1 et al
-typedef struct _ypStrObject ypStrObject;
+// ypStrObject is declared in the StringLib section
 yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_str_inline_data );
 
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
@@ -6160,11 +6226,13 @@ yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT 
 #define ypStr_SET_LEN           ypObject_SET_CACHED_LEN
 #define ypStr_INLINE_DATA( s )  ( ((ypStrObject *)s)->ob_inline_data )
 
+#define ypStr_LEN_MAX ypStringLib_LEN_MAX
+
 // Empty strs can be represented by this, immortal object
 static ypStrObject _yp_str_empty_struct = {
-    { ypStr_CODE, 0, ypString_ENC_UCS1, ypObject_REFCNT_IMMORTAL,
+    { ypStr_CODE, 0, ypStringLib_ENC_UCS1, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, "" } };
-static ypObject * const _yp_str_empty = (ypObject *) &_yp_str_empty_struct;
+#define _yp_str_empty   ((ypObject *) &_yp_str_empty_struct)
 
 // Return a new str/chrarray object with the given alloclen.  If type is immutable and
 // alloclen_fixed is true (indicating the object will never grow), the data is placed inline with
@@ -6174,6 +6242,7 @@ static ypObject * const _yp_str_empty = (ypObject *) &_yp_str_empty_struct;
 // XXX Check for the _yp_str_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
+// FIXME ypStr_LEN_MAX protection
 static ypObject *_ypStr_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
 {
     if( alloclen_fixed && type == ypStr_CODE ) {
@@ -6401,6 +6470,7 @@ static ypObject *str_le( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) <= 0 );
+
 }
 static ypObject *str_ge( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_True;
@@ -6764,6 +6834,25 @@ yp_IMMORTAL_STR_LATIN1( yp_s_replace,   "replace" );
 // XXX Since it's not likely that anything other than str and bytes will need to implement these
 // methods, they are left out of the type's method table.  This may change in the future.
 
+
+static ypStringLib_encinfo ypStringLib_encs[4] = {
+    {   // ypStringLib_ENC_BYTES
+        _yp_bytes_empty,        // empty_immutable
+        yp_bytearray0,          // empty_mutable
+        _ypBytes_new,           // new
+        _ypBytes_copy           // copy
+    },
+    {   // ypStringLib_ENC_UCS1
+        0
+    },
+    {   // ypStringLib_ENC_UCS2
+        0
+    },
+    {   // ypStringLib_ENC_UCS4
+        0
+    }
+};
+
 // Assume these are most-likely to be run against str/chrarrays, so put that check first
 #define _ypStringLib_REDIRECT1( ob, meth, args ) \
     do {int ob_pair = ypObject_TYPE_PAIR_CODE( ob ); \
@@ -6997,7 +7086,7 @@ static ypObject *_yp_tuple_empty_data[1] = {NULL};
 static ypTupleObject _yp_tuple_empty_struct = {
     { ypTuple_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, _yp_tuple_empty_data } };
-static ypObject * const _yp_tuple_empty = (ypObject *) &_yp_tuple_empty_struct;
+#define _yp_tuple_empty     ((ypObject *) &_yp_tuple_empty_struct)
 
 // Moves the elements from [src:] to the index dest; this can be used when deleting items (they
 // must be discarded first), or inserting (the new space is uninitialized).  Assumes enough space
@@ -7943,10 +8032,12 @@ static ypObject *ypQuickIter_tuple_next( ypQuickIter_state *state ) {
     return yp_incref( ypQuickIter_tuple_nextX( state ) );
 }
 
-static int ypQuickIter_tuple_lenhint( ypQuickIter_state *state, yp_ssize_t *lenhint ) {
+static yp_ssize_t ypQuickIter_tuple_lenhint( ypQuickIter_state *state, int *isexact, 
+        ypObject **exc ) 
+{
     yp_ASSERT( state->tuple.i >= 0 && state->tuple.i <= ypTuple_LEN( state->tuple.obj ), "state->tuple.i should be in range(len+1)" );
-    *lenhint = ypTuple_LEN( state->tuple.obj ) - state->tuple.i;
-    return TRUE;
+    *isexact = TRUE;
+    return ypTuple_LEN( state->tuple.obj ) - state->tuple.i;
 }
 
 static void ypQuickIter_tuple_close( ypQuickIter_state *state ) {
@@ -7981,7 +8072,7 @@ static ypObject *ypQuickSeq_tuple_getindex( ypQuickSeq_state *state, yp_ssize_t 
     return yp_incref( ypQuickSeq_tuple_getindexX( state, i ) );
 }
 
-static yp_ssize_t ypQuickSeq_tuple_len( ypQuickSeq_state *state ) {
+static yp_ssize_t ypQuickSeq_tuple_len( ypQuickSeq_state *state, ypObject **exc ) {
     return ypTuple_LEN( state->obj );
 }
 
@@ -8204,7 +8295,7 @@ static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject _yp_frozenset_empty_struct = {
     { ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
     0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozenset_empty_data }, 0 };
-static ypObject * const _yp_frozenset_empty = (ypObject *) &_yp_frozenset_empty_struct;
+#define _yp_frozenset_empty     ((ypObject *) &_yp_frozenset_empty_struct)
 
 // Returns true if the given ypSet_KeyEntry contains a valid key
 #define ypSet_ENTRY_USED( loc ) \
@@ -9650,8 +9741,8 @@ static ypObject _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypDictObject _yp_frozendict_empty_struct = {
     { ypFrozenDict_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
     0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozendict_empty_data },
-    (ypObject *) &_yp_frozenset_empty_struct };
-static ypObject * const _yp_frozendict_empty = (ypObject *) &_yp_frozendict_empty_struct;
+    _yp_frozenset_empty };
+#define _yp_frozendict_empty    ((ypObject *) &_yp_frozendict_empty_struct)
 
 // Returns a new, empty dict or frozendict object to hold minused entries
 // XXX Check for the _yp_frozendict_empty case first
@@ -10796,7 +10887,7 @@ typedef struct {
 static ypRangeObject _yp_range_empty_struct = {
     { ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, NULL }, 0, 1 };
-static ypObject * const _yp_range_empty = (ypObject *) &_yp_range_empty_struct;
+#define _yp_range_empty     ((ypObject *) &_yp_range_empty_struct)
 
 // Determines the index in r for the given object x, or -1 if it isn't in the range
 // XXX If using *index as an actual index, ensure it doesn't overflow yp_ssize_t
