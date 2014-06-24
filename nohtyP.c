@@ -1382,7 +1382,7 @@ typedef union {
     } mi;
 } ypQuickIter_state;
 
-// The various ypQuickIter_*_new calls either correspond with, or return a pointer to, one of
+// The various ypQuickIter_new_* calls either correspond with, or return a pointer to, one of
 // these method tables, which is used to manipulate the associated ypQuickIter_state.
 typedef struct {
     // Returns a *borrowed* reference to the next yielded value, or an exception.  If the
@@ -1432,7 +1432,7 @@ static const ypQuickIter_methods ypQuickIter_var_methods = {
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
 // ypQuickIter_var_methods as the method table.  args is borrowed by state and must not be closed
 // until methods->close is called.
-static void ypQuickIter_var_new( ypQuickIter_state *state, int n, va_list args ) {
+static void ypQuickIter_new_fromvar( ypQuickIter_state *state, int n, va_list args ) {
     state->var.n = n;
     state->var.args = args;
 }
@@ -1443,7 +1443,7 @@ static void ypQuickIter_var_new( ypQuickIter_state *state, int n, va_list args )
 
 // These are implemented in the tuple section
 static const ypQuickIter_methods ypQuickIter_tuple_methods;
-static void ypQuickIter_tuple_new( ypQuickIter_state *state, ypObject *tuple );
+static void ypQuickIter_new_fromtuple( ypQuickIter_state *state, ypObject *tuple );
 
 
 // TODO Like tuples, sets and dicts can return borrowed references
@@ -1452,7 +1452,7 @@ static void ypQuickIter_tuple_new( ypQuickIter_state *state, ypObject *tuple );
 static ypObject *ypQuickIter_mi_next( ypQuickIter_state *state ) {
     // TODO What if we were to store tp_miniiter_next?
     ypObject *x = yp_miniiter_next( &(state->mi.iter), &(state->mi.state) );    // new ref
-    if( yp_isexceptionC2( x, yp_StopIteration ) ) return NULL;  
+    if( yp_isexceptionC2( x, yp_StopIteration ) ) return NULL;
     if( state->mi.len >= 0 ) state->mi.len -= 1;
     return x;
 }
@@ -1495,14 +1495,14 @@ static const ypQuickIter_methods ypQuickIter_mi_methods = {
 // Initializes state to iterate over the given iterable, sets *methods to the proper method
 // table to use, and returns yp_None.  On error, returns an exception, and *methods and state are
 // undefined.  iterable is borrowed by state and must not be freed until methods->close is called.
-static ypObject *ypQuickIter_iterable_new(
+static ypObject *ypQuickIter_new_fromiterable(
         const ypQuickIter_methods **methods, ypQuickIter_state *state, ypObject *iterable )
 {
     // We special-case tuples because we can return borrowed references directly
     if( FALSE && ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         // FIXME enable this special-case after general case tested (remove FALSE above)
         *methods = &ypQuickIter_tuple_methods;
-        ypQuickIter_tuple_new( state, iterable );
+        ypQuickIter_new_fromtuple( state, iterable );
         return yp_None;
 
     // We may eventually special-case other types, but for now treat them as generic iterables
@@ -1542,7 +1542,7 @@ typedef union {
     struct {            // State for ypQuickSeq_var_*
         yp_ssize_t len;         // Number of ypObject*s in args/orig_args
         yp_ssize_t i;           // Current index
-        ypObject *x;            // Object at index i (borrowed)
+        ypObject *x;            // Object at index i (borrowed) (invalid if len<1)
         va_list args;           // Current state of variable arguments ("owned")
         va_list orig_args;      // The starting point for args ("borrowed")
     } var;
@@ -1556,7 +1556,7 @@ typedef union {
     // tuple anyway
 } ypQuickSeq_state;
 
-// The various ypQuickIter_*_new calls either correspond with, or return a pointer to, one of
+// The various ypQuickIter_new_* calls either correspond with, or return a pointer to, one of
 // these method tables, which is used to manipulate the associated ypQuickIter_state.
 typedef struct {
     // Returns a *borrowed* reference to the object at index i, or an exception.  If the index is
@@ -1574,7 +1574,7 @@ typedef struct {
 } ypQuickSeq_methods;
 
 
-static ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i ) 
+static ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i )
 {
     yp_ASSERT( i >= 0, "negative indicies not allowed in ypQuickSeq" );
     if( i >= state->var.len ) return NULL;
@@ -1617,7 +1617,7 @@ static const ypQuickSeq_methods ypQuickSeq_var_methods = {
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
 // ypQuickSeq_var_methods as the method table.  args is borrowed by state and must not be closed
 // until methods->close is called.
-static void ypQuickSeq_var_new( ypQuickSeq_state *state, int n, va_list args ) {
+static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list args ) {
     state->var.len = MAX( n, 0 );
     state->var.orig_args = args;        // "borrowed"
     va_copy( state->var.args, args );   // "owned"
@@ -1634,7 +1634,7 @@ static void ypQuickSeq_var_new( ypQuickSeq_state *state, int n, va_list args ) {
 
 // These are implemented in the tuple section
 static const ypQuickSeq_methods ypQuickSeq_tuple_methods;
-static void ypQuickSeq_tuple_new( ypQuickSeq_state *state, ypObject *tuple );
+static void ypQuickSeq_new_fromtuple( ypQuickSeq_state *state, ypObject *tuple );
 
 
 static ypObject *ypQuickSeq_seq_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
@@ -1671,20 +1671,31 @@ static const ypQuickSeq_methods ypQuickSeq_seq_methods = {
 };
 
 
+// For use by ypQuickSeq_new_*.  Returns true if sequence is a built-in sequence object, in which
+// case *methods and state are initialized.
+// XXX The "built-in" distinction is important because we know that getindex will behave sanely
+static int _ypQuickSeq_new_fromsequence_builtins(
+        const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence )
+{
+    if( ypObject_TYPE_PAIR_CODE( sequence ) == ypTuple_CODE ) {
+        *methods = &ypQuickSeq_tuple_methods;
+        ypQuickSeq_new_fromtuple( state, sequence );
+        return TRUE;
+    }
+    // TODO support for the other built-in sequences
+    return FALSE;
+}
+
 // Initializes state with the given sequence, sets *methods to the proper method table to use, and
 // returns yp_None.  On error, returns an exception, and *methods and state are undefined.
 // sequence is borrowed by state and must not be freed until methods->close is called.
-static ypObject *ypQuickSeq_sequence_new( 
-        const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence ) 
+static ypObject *ypQuickSeq_new_fromsequence(
+        const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence )
 {
-    // We special-case tuples because we can return borrowed references directly
-    if( FALSE && ypObject_TYPE_PAIR_CODE( sequence ) == ypTuple_CODE ) {
-        // FIXME enable this special-case after general case tested (remove FALSE above)
-        *methods = &ypQuickSeq_tuple_methods;
-        ypQuickSeq_tuple_new( state, sequence );
+    if( _ypQuickSeq_new_fromsequence_builtins( methods, state, sequence ) ) {
         return yp_None;
 
-    // We may eventually special-case other types, but for now treat them as generic iterables
+    // We may eventually special-case other types, but for now treat them as generic sequences
     } else {
         // All sequences should raise yp_IndexError for yp_SSIZE_T_MAX; all other types should
         // raise yp_TypeError or somesuch
@@ -1701,8 +1712,27 @@ static ypObject *ypQuickSeq_sequence_new(
     }
 }
 
+static const ypQuickSeq_methods ypQuickSeq_tuplefromiter_methods;
+static ypObject *ypQuickSeq_new_tuplefromiter( ypQuickSeq_state *state, ypObject *iterable );
 
-// TODO Like tuples, sets and dicts can return borrowed references
+static ypObject *ypQuickSeq_new_fromiterable(
+        const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *iterable )
+{
+    if( _ypQuickSeq_new_fromsequence_builtins( methods, state, iterable ) ) {
+        return yp_None;
+
+    // TODO _ypQuickSeq_new_fromiterable_builtins because, like tuples, sets and dicts can return
+    // borrowed references
+    // TODO We might want a ypQuickSeq_seq_methods case here, too, but right now we're using this
+    // function in a context where we want to rely strictly on built-ins (ypStringLib_join)
+
+    // We may eventually special-case other types, but for now treat them as generic iterables
+    // and just convert them to tuples
+    } else {
+        *methods = &ypQuickSeq_tuplefromiter_methods;
+        return ypQuickSeq_new_tuplefromiter( state, iterable );
+    }
+}
 
 
 /*************************************************************************************************
@@ -4939,14 +4969,14 @@ typedef struct _ypStrObject ypStrObject;
             ypObject_LEN_MAX ) - 1 /* -1 for null terminator */ )
 
 
-// XXX In general for this table, make sure you do not use type codes with the wrong 
+// XXX In general for this table, make sure you do not use type codes with the wrong
 // ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
 typedef struct {
     ypObject *empty_immutable;  // Pointer to the immortal, empty immutable for this type
     ypObject *(*empty_mutable)( void ); // Returns a new, empty mutable version of this type
 
-    // Returns a new type-object with the given requiredLen, plus the null terminator, for this 
-    // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will 
+    // Returns a new type-object with the given requiredLen, plus the null terminator, for this
+    // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will
     // never grow), the data is placed inline with one allocation.
     // XXX Remember to add the null terminator
     // XXX Check for the empty_immutable case first: new will _always_ allocate
@@ -4978,7 +5008,7 @@ static ypObject *ypStringLib_join_sametype( ypObject *s, ypObject *x )
 // - concatenation with separator
 
 // XXX The object underlying seq must be guaranteed to return the same object per index
-static ypObject *ypStringLib_join( 
+static ypObject *ypStringLib_join(
         ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
 {
     ypObject *exc = yp_None;
@@ -7011,8 +7041,9 @@ ypObject *yp_join( ypObject *s, ypObject *iterable ) {
         return ypStringLib_join_sametype( s, iterable );
     }
 
-    // FIXME this should accept any given iterable type
-    result = ypQuickSeq_sequence_new( &methods, &state, iterable );
+    // XXX ypQuickSeq_new_fromiterable currently converts non-builtin types to tuples, which is
+    // exactly what we want, but ypQuickSeq_new_fromiterable might change in the future
+    result = ypQuickSeq_new_fromiterable( &methods, &state, iterable );
     if( yp_isexceptionC( result ) ) return result;
     result = ypStringLib_join( s, methods, &state );
     methods->close( &state );
@@ -7026,7 +7057,7 @@ ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
     ypQuickSeq_state state;
     ypObject *result;
     if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
-    ypQuickSeq_var_new( &state, n, args );
+    ypQuickSeq_new_fromvar( &state, n, args );
     result = ypStringLib_join( s, &ypQuickSeq_var_methods, &state );
     ypQuickSeq_var_close( &state );
     return result;
@@ -8032,8 +8063,8 @@ static ypObject *ypQuickIter_tuple_next( ypQuickIter_state *state ) {
     return yp_incref( ypQuickIter_tuple_nextX( state ) );
 }
 
-static yp_ssize_t ypQuickIter_tuple_lenhint( ypQuickIter_state *state, int *isexact, 
-        ypObject **exc ) 
+static yp_ssize_t ypQuickIter_tuple_lenhint( ypQuickIter_state *state, int *isexact,
+        ypObject **exc )
 {
     yp_ASSERT( state->tuple.i >= 0 && state->tuple.i <= ypTuple_LEN( state->tuple.obj ), "state->tuple.i should be in range(len+1)" );
     *isexact = TRUE;
@@ -8053,7 +8084,7 @@ static const ypQuickIter_methods ypQuickIter_tuple_methods = {
 
 // Initializes state with the given tuple.  Always succeeds.  Use ypQuickIter_tuple_methods as the
 // method table.  tuple is borrowed by state and most not be freed until methods->close is called.
-static void ypQuickIter_tuple_new( ypQuickIter_state *state, ypObject *tuple ) {
+static void ypQuickIter_new_fromtuple( ypQuickIter_state *state, ypObject *tuple ) {
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( tuple ) == ypTuple_CODE, "tuple must be a tuple/list" );
     state->tuple.i = 0;
     state->tuple.obj = tuple;
@@ -8089,9 +8120,26 @@ static const ypQuickSeq_methods ypQuickSeq_tuple_methods = {
 
 // Initializes state with the given tuple.  Always succeeds.  Use ypQuickSeq_tuple_methods as the
 // method table.  tuple is borrowed by state and must not be freed until methods->close is called.
-static void ypQuickSeq_tuple_new( ypQuickSeq_state *state, ypObject *tuple ) {
+static void ypQuickSeq_new_fromtuple( ypQuickSeq_state *state, ypObject *tuple ) {
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( tuple ) == ypTuple_CODE, "tuple must be a tuple/list" );
     state->obj = tuple;
+}
+
+// A version of the above that discards state->obj; used by ypQuickSeq_new_fromiterable when a
+// temporary tuple needs to be created.  Use ypQuickSeq_tuplefromiter_methods as the method table.
+static void ypQuickSeq_tuplefromiter_close( ypQuickSeq_state *state ) {
+    yp_decref( state->obj );
+}
+static const ypQuickSeq_methods ypQuickSeq_tuplefromiter_methods = {
+    ypQuickSeq_tuple_getindexX,
+    ypQuickSeq_tuple_getindex,
+    ypQuickSeq_tuple_len,
+    ypQuickSeq_tuplefromiter_close
+};
+static ypObject *ypQuickSeq_new_tuplefromiter( ypQuickSeq_state *state, ypObject *iterable ) {
+    state->obj = yp_tuple( iterable );
+    if( yp_isexceptionC( state->obj ) ) return state->obj;
+    return yp_None;
 }
 
 
