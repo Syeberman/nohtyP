@@ -1633,6 +1633,7 @@ static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list args
 
 
 // These are implemented in the tuple section
+static void ypQuickSeq_tuple_close( ypQuickSeq_state *state );
 static const ypQuickSeq_methods ypQuickSeq_tuple_methods;
 static void ypQuickSeq_new_fromtuple( ypQuickSeq_state *state, ypObject *tuple );
 
@@ -1671,10 +1672,10 @@ static const ypQuickSeq_methods ypQuickSeq_seq_methods = {
 };
 
 
-// For use by ypQuickSeq_new_*.  Returns true if sequence is a built-in sequence object, in which
-// case *methods and state are initialized.
+// Returns true if sequence is a supported built-in sequence object, in which case *methods and
+// state are initialized.  Cannot fail, but if sequence is not supported this returns false.
 // XXX The "built-in" distinction is important because we know that getindex will behave sanely
-static int _ypQuickSeq_new_fromsequence_builtins(
+static int ypQuickSeq_new_fromsequence_builtins(
         const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence )
 {
     if( ypObject_TYPE_PAIR_CODE( sequence ) == ypTuple_CODE ) {
@@ -1692,7 +1693,7 @@ static int _ypQuickSeq_new_fromsequence_builtins(
 static ypObject *ypQuickSeq_new_fromsequence(
         const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence )
 {
-    if( _ypQuickSeq_new_fromsequence_builtins( methods, state, sequence ) ) {
+    if( ypQuickSeq_new_fromsequence_builtins( methods, state, sequence ) ) {
         return yp_None;
 
     // We may eventually special-case other types, but for now treat them as generic sequences
@@ -1712,26 +1713,15 @@ static ypObject *ypQuickSeq_new_fromsequence(
     }
 }
 
-static const ypQuickSeq_methods ypQuickSeq_tuplefromiter_methods;
-static ypObject *ypQuickSeq_new_tuplefromiter( ypQuickSeq_state *state, ypObject *iterable );
 
-static ypObject *ypQuickSeq_new_fromiterable(
+// Returns true if iterable is a supported built-in iterable object, in which case *methods and
+// state are initialized.  Cannot fail, but if iterable is not supported this returns false.
+// XXX The "built-in" distinction is important because we know that getindex will behave sanely
+static int ypQuickSeq_new_fromiterable_builtins(
         const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *iterable )
 {
-    if( _ypQuickSeq_new_fromsequence_builtins( methods, state, iterable ) ) {
-        return yp_None;
-
-    // TODO _ypQuickSeq_new_fromiterable_builtins because, like tuples, sets and dicts can return
-    // borrowed references
-    // TODO We might want a ypQuickSeq_seq_methods case here, too, but right now we're using this
-    // function in a context where we want to rely strictly on built-ins (ypStringLib_join)
-
-    // We may eventually special-case other types, but for now treat them as generic iterables
-    // and just convert them to tuples
-    } else {
-        *methods = &ypQuickSeq_tuplefromiter_methods;
-        return ypQuickSeq_new_tuplefromiter( state, iterable );
-    }
+    return ypQuickSeq_new_fromsequence_builtins( methods, state, iterable );
+    // TODO Like tuples, sets and dicts can return borrowed references and can be supported here
 }
 
 
@@ -4944,6 +4934,11 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 
 // The prefix ypStringLib_* is used for bytes and str, while ypStr_* is strictly the str type
 
+// All ypStringLib-supporting types must:
+//  - set ob_type_flags appropriately
+//  - use ob_data, ob_len, and ob_alloclen appropriately
+// TODO define "appropriately" above
+
 // Macros on ob_type_flags for string objects (bytes and str), used to index into
 // ypStringLib_encs.
 #define ypStringLib_ENC_BYTES  _ypStringLib_ENC_BYTES
@@ -4951,13 +4946,15 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 #define ypStringLib_ENC_UCS2   _ypStringLib_ENC_UCS2
 #define ypStringLib_ENC_UCS4   _ypStringLib_ENC_UCS4
 
-#define ypStringLib_ENC_CODE( s )   ( ((ypObject *)(s))->ob_type_flags )
-#define ypStringLib_ENC( s )        ( &(ypStringLib_encs[ypStringLib_ENC_CODE( s )]) )
-
 // struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
 typedef struct _ypBytesObject ypBytesObject;
 // struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_STR_LATIN1 et al
 typedef struct _ypStrObject ypStrObject;
+
+#define ypStringLib_ENC_CODE( s )   ( ((ypObject *)(s))->ob_type_flags )
+#define ypStringLib_ENC( s )        ( &(ypStringLib_encs[ypStringLib_ENC_CODE( s )]) )
+#define ypStringLib_LEN             ypObject_CACHED_LEN
+#define ypStringLib_SET_LEN         ypObject_SET_CACHED_LEN
 
 // The maximum possible length of any string object (not including null terminator).  While UCS1
 // could technically allow four times as much data as UCS4, for simplicity we use one maximum
@@ -4993,7 +4990,7 @@ typedef struct {
 static ypStringLib_encinfo ypStringLib_encs[4];
 
 
-static ypObject *ypStringLib_join_sametype( ypObject *s, ypObject *x )
+static ypObject *ypStringLib_join_from_same( ypObject *s, ypObject *x )
 {
     return yp_NotImplementedError;
 }
@@ -5007,7 +5004,8 @@ static ypObject *ypStringLib_join_sametype( ypObject *s, ypObject *x )
 // - empty separator is faster...just concatenate
 // - concatenation with separator
 
-// XXX The object underlying seq must be guaranteed to return the same object per index
+// XXX The object underlying seq must be guaranteed to return the same object per index.  So, to be
+// safe, convert any non-built-ins to a tuple.
 static ypObject *ypStringLib_join(
         ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
 {
@@ -5015,8 +5013,11 @@ static ypObject *ypStringLib_join(
     int s_pair = ypObject_TYPE_PAIR_CODE( s );
     ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
     yp_ssize_t seq_len;
-    //yp_ssize_t i;
+    yp_ssize_t i;
     ypObject *x;
+    yp_ssize_t result_len;
+    int result_enc_code;
+    //ypObject *result;
 
     // The 0- and 1-seq cases are pretty simple: just return an empty or a copy, respectively
     seq_len = seq->len( state, &exc );
@@ -5033,6 +5034,24 @@ static ypObject *ypStringLib_join(
         return s_enc->copy( ypObject_TYPE_CODE( s ), x, /*alloclen_fixed=*/TRUE );
     }
 
+    // Calculate how long the result is going to be, which encoding we'll use, and ensure seq
+    // contains the correct types
+    if( ypStringLib_LEN( s ) > 0 && (seq_len-1) > ypStringLib_LEN_MAX / ypStringLib_LEN( s ) ) {
+        return yp_MemorySizeOverflowError;
+    }
+    result_len = ypStringLib_LEN( s ) * (seq_len-1);
+    result_enc_code = ypStringLib_ENC_BYTES;    // the lowest code
+    for( i = 0; i < seq_len; i++ ) {
+        x = seq->getindexX( state, i );     // borrowed
+        if( ypObject_TYPE_PAIR_CODE( x ) != s_pair ) return_yp_BAD_TYPE( x );
+        if( result_len > ypStringLib_LEN_MAX - ypStringLib_LEN( s ) ) {
+            return yp_MemorySizeOverflowError;
+        }
+        result_len += ypStringLib_LEN( x );
+        if( result_enc_code < ypStringLib_ENC_CODE( x ) ) {
+            result_enc_code = ypStringLib_ENC_CODE( x );
+        }
+    }
 
     return yp_NotImplementedError;
 }
@@ -5046,8 +5065,8 @@ static ypObject *ypStringLib_join(
 yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
 #define ypBytes_DATA( b )           ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
-#define ypBytes_LEN                 ypObject_CACHED_LEN
-#define ypBytes_SET_LEN             ypObject_SET_CACHED_LEN
+#define ypBytes_LEN                 ypStringLib_LEN
+#define ypBytes_SET_LEN             ypStringLib_SET_LEN
 #define ypBytes_ALLOCLEN            ypObject_ALLOCLEN
 #define ypBytes_INLINE_DATA( b )    ( ((ypBytesObject *)b)->ob_inline_data )
 
@@ -6252,8 +6271,8 @@ yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT 
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
 
 #define ypStr_DATA( s )         ( (yp_uint8_t *) ((ypObject *)s)->ob_data )
-#define ypStr_LEN               ypObject_CACHED_LEN
-#define ypStr_SET_LEN           ypObject_SET_CACHED_LEN
+#define ypStr_LEN               ypStringLib_LEN
+#define ypStr_SET_LEN           ypStringLib_SET_LEN
 #define ypStr_INLINE_DATA( s )  ( ((ypStrObject *)s)->ob_inline_data )
 
 #define ypStr_LEN_MAX ypStringLib_LEN_MAX
@@ -7038,15 +7057,22 @@ ypObject *yp_join( ypObject *s, ypObject *iterable ) {
 
     if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
     if( ypObject_TYPE_PAIR_CODE( s ) == ypObject_TYPE_PAIR_CODE( iterable ) ) {
-        return ypStringLib_join_sametype( s, iterable );
+        return ypStringLib_join_from_same( s, iterable );
     }
 
-    // XXX ypQuickSeq_new_fromiterable currently converts non-builtin types to tuples, which is
-    // exactly what we want, but ypQuickSeq_new_fromiterable might change in the future
-    result = ypQuickSeq_new_fromiterable( &methods, &state, iterable );
-    if( yp_isexceptionC( result ) ) return result;
-    result = ypStringLib_join( s, methods, &state );
-    methods->close( &state );
+    if( ypQuickSeq_new_fromiterable_builtins( &methods, &state, iterable ) ) {
+        result = ypStringLib_join( s, methods, &state );
+        methods->close( &state );
+    } else {
+        // FIXME It would be better to handle this without creating a temporary tuple at all,
+        // so create a ypStringLib_join_from_iter instead
+        ypObject *temptuple = yp_tuple( iterable );
+        if( yp_isexceptionC( temptuple ) ) return temptuple;
+        ypQuickSeq_new_fromtuple( &state, temptuple );
+        result = ypStringLib_join( s, &ypQuickSeq_tuple_methods, &state );
+        ypQuickSeq_tuple_close( &state );
+        yp_decref( temptuple );
+    }
     return result;
 }
 
@@ -8123,23 +8149,6 @@ static const ypQuickSeq_methods ypQuickSeq_tuple_methods = {
 static void ypQuickSeq_new_fromtuple( ypQuickSeq_state *state, ypObject *tuple ) {
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( tuple ) == ypTuple_CODE, "tuple must be a tuple/list" );
     state->obj = tuple;
-}
-
-// A version of the above that discards state->obj; used by ypQuickSeq_new_fromiterable when a
-// temporary tuple needs to be created.  Use ypQuickSeq_tuplefromiter_methods as the method table.
-static void ypQuickSeq_tuplefromiter_close( ypQuickSeq_state *state ) {
-    yp_decref( state->obj );
-}
-static const ypQuickSeq_methods ypQuickSeq_tuplefromiter_methods = {
-    ypQuickSeq_tuple_getindexX,
-    ypQuickSeq_tuple_getindex,
-    ypQuickSeq_tuple_len,
-    ypQuickSeq_tuplefromiter_close
-};
-static ypObject *ypQuickSeq_new_tuplefromiter( ypQuickSeq_state *state, ypObject *iterable ) {
-    state->obj = yp_tuple( iterable );
-    if( yp_isexceptionC( state->obj ) ) return state->obj;
-    return yp_None;
 }
 
 
