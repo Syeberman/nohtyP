@@ -4953,6 +4953,7 @@ typedef struct _ypStrObject ypStrObject;
 
 #define ypStringLib_ENC_CODE( s )   ( ((ypObject *)(s))->ob_type_flags )
 #define ypStringLib_ENC( s )        ( &(ypStringLib_encs[ypStringLib_ENC_CODE( s )]) )
+#define ypStringLib_DATA( s )       ( ((ypObject *)s)->ob_data )
 #define ypStringLib_LEN             ypObject_CACHED_LEN
 #define ypStringLib_SET_LEN         ypObject_SET_CACHED_LEN
 
@@ -4971,6 +4972,17 @@ typedef struct _ypStrObject ypStrObject;
 typedef struct {
     ypObject *empty_immutable;  // Pointer to the immortal, empty immutable for this type
     ypObject *(*empty_mutable)( void ); // Returns a new, empty mutable version of this type
+
+    // Copies len elements from src starting at src_i, and places them at dest starting at dest_i.
+    // src is encoded as per src_enc_code; of course, dest's encoding is assumed by the function.
+    // XXX dest's encoding must be larger or equal to src's
+    void (*elemcopy)( void *dest, yp_ssize_t dest_i, 
+            int src_enc_code, void *src, yp_ssize_t src_i, yp_ssize_t len );
+
+    // Sets dest[dest_i] to value
+    // XXX dest's encoding must be able to store value
+    // TODO What type to use for elements at this level?  yp_int_t, yp_int32_t, or yp_uint32_t?
+    void (*setindex)( void *dest, yp_ssize_t dest_i, yp_int_t value );
 
     // Returns a new type-object with the given requiredLen, plus the null terminator, for this
     // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will
@@ -5004,6 +5016,49 @@ static ypObject *ypStringLib_join_from_same( ypObject *s, ypObject *x )
 // - empty separator is faster...just concatenate
 // - concatenation with separator
 
+// Performs the necessary elemcopy's on behalf of ypStringLib_join, null-terminates, and updates
+// result's length.  Assumes adequate space has already been allocated.
+static void _ypStringLib_join_elemcopy( ypObject *result,
+        ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
+{
+    ypStringLib_encinfo *result_enc = ypStringLib_ENC( result );
+    void *result_data = ypStringLib_DATA( result );
+    yp_ssize_t result_len = 0;
+    yp_ssize_t s_len = ypStringLib_LEN( s );
+    yp_ssize_t i;
+    if( s_len < 1 ) {
+        // The separator is empty, so we just concatenate seq's elements
+        for( i = 0; /*stop at NULL*/; i++ ) {
+            ypObject *x = seq->getindexX( state, i );   // borrowed
+            if( x == NULL ) break;
+            result_enc->elemcopy( result_data, result_len, 
+                    ypStringLib_ENC_CODE( x ), ypStringLib_DATA( x ), 0, ypStringLib_LEN( x ) );
+            result_len += ypStringLib_LEN( x );
+        }
+
+    } else {
+        // We need to insert the separator between seq's elements; recall that we know there is at
+        // least one element in seq
+        int s_enc_code = ypStringLib_ENC_CODE( s );
+        void *s_data = ypStringLib_DATA( s );
+        ypObject *x = seq->getindexX( state, 0 );   // borrowed
+        yp_ASSERT( x != NULL, "_ypStringLib_join_elemcopy passed an empty seq" );
+        for( i = 1; /*stop at NULL*/; i++ ) {
+            result_enc->elemcopy( result_data, result_len, 
+                    ypStringLib_ENC_CODE( x ), ypStringLib_DATA( x ), 0, ypStringLib_LEN( x ) );
+            result_len += ypStringLib_LEN( x );
+            x = seq->getindexX( state, i );   // borrowed
+            if( x == NULL ) break;
+            result_enc->elemcopy( result_data, result_len, s_enc_code, s_data, 0, s_len );
+            result_len += s_len;
+        }
+    }
+
+    // Null-terminate and update the length
+    result_enc->setindex( result_data, result_len, 0 );
+    ypStringLib_SET_LEN( result, result_len );
+}
+
 // XXX The object underlying seq must be guaranteed to return the same object per index.  So, to be
 // safe, convert any non-built-ins to a tuple.
 static ypObject *ypStringLib_join(
@@ -5011,13 +5066,16 @@ static ypObject *ypStringLib_join(
 {
     ypObject *exc = yp_None;
     int s_pair = ypObject_TYPE_PAIR_CODE( s );
+    void *s_data = ypStringLib_DATA( s );
+    yp_ssize_t s_len = ypStringLib_LEN( s );
     ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
     yp_ssize_t seq_len;
     yp_ssize_t i;
     ypObject *x;
     yp_ssize_t result_len;
     int result_enc_code;
-    //ypObject *result;
+    ypStringLib_encinfo *result_enc;
+    ypObject *result;
 
     // The 0- and 1-seq cases are pretty simple: just return an empty or a copy, respectively
     seq_len = seq->len( state, &exc );
@@ -5036,15 +5094,15 @@ static ypObject *ypStringLib_join(
 
     // Calculate how long the result is going to be, which encoding we'll use, and ensure seq
     // contains the correct types
-    if( ypStringLib_LEN( s ) > 0 && (seq_len-1) > ypStringLib_LEN_MAX / ypStringLib_LEN( s ) ) {
+    if( s_len > ypStringLib_LEN_MAX / (seq_len-1) ) {
         return yp_MemorySizeOverflowError;
     }
-    result_len = ypStringLib_LEN( s ) * (seq_len-1);
-    result_enc_code = ypStringLib_ENC_BYTES;    // the lowest code
+    result_len = s_len * (seq_len-1);
+    result_enc_code = ypStringLib_ENC_CODE( s );   // if s is empty the code is UCS1 or BYTES
     for( i = 0; i < seq_len; i++ ) {
         x = seq->getindexX( state, i );     // borrowed
         if( ypObject_TYPE_PAIR_CODE( x ) != s_pair ) return_yp_BAD_TYPE( x );
-        if( result_len > ypStringLib_LEN_MAX - ypStringLib_LEN( s ) ) {
+        if( result_len > ypStringLib_LEN_MAX - ypStringLib_LEN( x ) ) {
             return yp_MemorySizeOverflowError;
         }
         result_len += ypStringLib_LEN( x );
@@ -5053,7 +5111,13 @@ static ypObject *ypStringLib_join(
         }
     }
 
-    return yp_NotImplementedError;
+    // Now we can create the result object and populate it
+    result_enc = &(ypStringLib_encs[result_enc_code]);
+    result = result_enc->new( ypObject_TYPE_CODE( s ), result_len, /*alloclen_fixed=*/TRUE );
+    if( yp_isexceptionC( result ) ) return result;
+    _ypStringLib_join_elemcopy( result, s, seq, state );
+    yp_ASSERT( ypStringLib_LEN( result ) == result_len, "joined result isn't length originally calculated" );
+    return result;
 }
 
 
@@ -5064,7 +5128,7 @@ static ypObject *ypStringLib_join(
 // ypBytesObject is declared in the StringLib section
 yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
-#define ypBytes_DATA( b )           ( (yp_uint8_t *) ((ypObject *)b)->ob_data )
+#define ypBytes_DATA( b )           ( (yp_uint8_t *) ypStringLib_DATA( b ) )
 #define ypBytes_LEN                 ypStringLib_LEN
 #define ypBytes_SET_LEN             ypStringLib_SET_LEN
 #define ypBytes_ALLOCLEN            ypObject_ALLOCLEN
@@ -5095,6 +5159,7 @@ static ypBytesObject _yp_bytes_empty_struct = {
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed )
 {
     ypObject *newB;
+    yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypBytes_CODE, "incorrect bytes type" );
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
     yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
     if( alloclen_fixed && type == ypBytes_CODE ) {
@@ -6270,7 +6335,7 @@ yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT 
 
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
 
-#define ypStr_DATA( s )         ( (yp_uint8_t *) ((ypObject *)s)->ob_data )
+#define ypStr_DATA( s )         ( (yp_uint8_t *) ypStringLib_DATA( s ) )
 #define ypStr_LEN               ypStringLib_LEN
 #define ypStr_SET_LEN           ypStringLib_SET_LEN
 #define ypStr_INLINE_DATA( s )  ( ((ypStrObject *)s)->ob_inline_data )
@@ -6294,11 +6359,16 @@ static ypStrObject _yp_str_empty_struct = {
 // FIXME ypStr_LEN_MAX protection
 static ypObject *_ypStr_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
 {
+    ypObject *newS;
+    yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
+    // TODO checks on requiredLen (once converted from alloclen
     if( alloclen_fixed && type == ypStr_CODE ) {
         return ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, alloclen );
     } else {
         return ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, alloclen, 0 );
     }
+    ypStringLib_ENC_CODE( newS ) = ypStringLib_ENC_UCS1;
+    return newS;
 }
 
 // XXX Check for the possiblity of a lazy shallow copy before calling this function
@@ -6888,6 +6958,8 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
     {   // ypStringLib_ENC_BYTES
         _yp_bytes_empty,        // empty_immutable
         yp_bytearray0,          // empty_mutable
+        NULL,   // FIXME
+        NULL,   // FIXME
         _ypBytes_new,           // new
         _ypBytes_copy           // copy
     },
