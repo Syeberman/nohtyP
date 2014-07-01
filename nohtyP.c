@@ -4872,6 +4872,21 @@ static void _ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssi
 // must be in range(slicelength).
 #define ypSlice_INDEX( start, step, i )  ((start) + (i)*(step))
 
+// Used by tp_repeat et al to perform the necessary memcpy's.  data must be allocated to hold 
+// factor*n_size objects, the bytes to repeat must be in the first n_size bytes of data, and the
+// rest of data must not contain any references (they will be overwritten).  Cannot fail.
+static void _ypSequence_repeat_memcpy( void *_data, size_t factor, size_t n_size )
+{
+    yp_uint8_t *data = (yp_uint8_t *) _data;
+    size_t copied; // the number of times [:n_size] has been repeated (starts at 1, of course)
+    yp_ASSERT( factor <= SIZE_MAX/2 && factor <= yp_SSIZE_T_MAX, "factor too large" );
+    yp_ASSERT( factor <= yp_SSIZE_T_MAX / n_size, "factor*n_size too large" );
+    for( copied = 1; copied*2 < factor; copied *= 2 ) {
+        memcpy( data+(n_size*copied), data+0, n_size*copied );
+    }
+    memcpy( data+(n_size*copied), data+0, n_size*(factor-copied) ); // no-op if factor==copied
+}
+
 // Used to remove elements from an array containing length elements, each of elemsize bytes.
 // start, stop, step, and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC,
 // and slicelength must be >0 (slicelength==0 is a no-op).  Any references in the removed elements
@@ -5234,18 +5249,10 @@ static ypObject *_ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, y
 
 // Used by tp_repeat et al to perform the necessary memcpy's.  b's array must be allocated
 // to hold (factor*n)+1 bytes, and the bytes to repeat must be in the first n elements of the
-// array.  Further, factor and n must both be greater than zero.  Null-terminates the result, but
-// does not update len.  Cannot fail.
-static void _ypBytes_repeat_memcpy( ypObject *b, size_t factor, size_t n )
-{
-    yp_uint8_t *data = ypBytes_DATA( b );
-    size_t copied; // the number of times [:n] has been repeated (starts at 1, of course)
-    for( copied = 1; copied*2 < factor; copied *= 2 ) {
-        memcpy( data+(n*copied), data+0, n*copied );
-    }
-    memcpy( data+(n*copied), data+0, n*(factor-copied) ); // no-op if factor==copied
-    data[factor*n] = '\0';
-}
+// array.  Further, factor and n must both be greater than zero.  Neither null-terminates nor
+// updates len.  Cannot fail.
+#define _ypBytes_repeat_memcpy( b, factor, n ) \
+    _ypSequence_repeat_memcpy( ypBytes_DATA( b ), (factor), (n) )
 
 // Extends b with the contents of x, a fellow byte object; always writes the null-terminator
 // XXX Remember that b and x may be the same object
@@ -5531,6 +5538,7 @@ static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
 
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
     _ypBytes_repeat_memcpy( newB, factor, ypBytes_LEN( b ) );
+    ypBytes_DATA( newB )[newLen] = '\0';
     ypBytes_SET_LEN( newB, newLen );
     return newB;
 }
@@ -5658,6 +5666,7 @@ static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
     }
 
     _ypBytes_repeat_memcpy( b, factor, ypBytes_LEN( b ) );
+    ypBytes_DATA( b )[newLen] = '\0';
     ypBytes_SET_LEN( b, newLen );
     return yp_None;
 }
@@ -7295,16 +7304,9 @@ static ypObject *_ypTuple_deepcopy( int type, ypObject *x, visitfunc copy_visito
 // to hold factor*n objects, the objects to repeat must be in the first n elements of the array,
 // and the rest of the array must not contain any references (they will be overwritten).  Further,
 // factor and n must both be greater than zero.  Cannot fail.
-static void _ypTuple_repeat_memcpy( ypObject *sq, size_t factor, size_t n )
-{
-    ypObject **array = ypTuple_ARRAY( sq );
-    size_t copied; // the number of times [:n] has been repeated (starts at 1, of course)
-    size_t n_size = n * yp_sizeof( ypObject * );
-    for( copied = 1; copied*2 < factor; copied *= 2 ) {
-        memcpy( array+(n*copied), array+0, n_size*copied );
-    }
-    memcpy( array+(n*copied), array+0, n_size*(factor-copied) ); // no-op if factor==copied
-}
+//
+#define _ypTuple_repeat_memcpy( sq, factor, n ) \
+    _ypSequence_repeat_memcpy( ypTuple_ARRAY( sq ), (factor), (n)*sizeof( ypObject * ) )
 
 // Called on push/append, extend, or irepeat to increase the allocated size of the tuple.  Does not
 // update ypTuple_LEN.
