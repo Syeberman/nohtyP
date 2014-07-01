@@ -212,7 +212,7 @@ class BaseBytesTest:
     def test_extended_getslice(self):
         # Sample just a few random indicies for each of start, stop, and step
         self.check_extended_getslice(lambda x: random.sample(x,3))
-    
+
     @yp_test.support.requires_resource('cpu')
     def test_extended_getslice_cpu(self):
         # Check all indicies
@@ -316,6 +316,7 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test.fromhex, '12   \x00   34')
 
     def test_join(self):
+        # TODO Add these back to Python
         self.assertEqual(self.type2test(b"").join(yp_list([])), b"")
         self.assertEqual(self.type2test(b"").join(yp_list([b""])), b"")
         for lst in [[b"abc"], [b"a", b"bc"], [b"ab", b"c"], [b"a", b"b", b"c"]]:
@@ -323,9 +324,26 @@ class BaseBytesTest:
             self.assertEqual(self.type2test(b"").join(lst), b"abc")
             self.assertEqual(self.type2test(b"").join(yp_tuple(lst)), b"abc")
             self.assertEqual(self.type2test(b"").join(yp_iter(lst)), b"abc")
+
+        self.assertEqual(self.type2test(b".").join(yp_list([])), b"")
+        self.assertEqual(self.type2test(b".").join(yp_list([b"ab"])), b"ab")
         self.assertEqual(self.type2test(b".").join(yp_list([b"ab", b"cd"])), b"ab.cd")
-        # TODO nohtyP: sametype, dict, set, strs fail, etc
-        # XXX more...
+        self.assertEqual(self.type2test(b".").join(yp_list([b"ab", b"cd", b"ef"])), b"ab.cd.ef")
+
+        with self.assertRaises(TypeError):
+            self.type2test(b"").join(yp_list(["abc"]))
+
+    def test_join_sametype(self):
+        # TODO Add these back to Python
+        self.assertEqual(self.type2test(b"").join(self.type2test(b"")), b"")
+        self.assertEqual(self.type2test(b"").join(self.type2test(b"a")), b"a")
+        self.assertEqual(self.type2test(b"").join(self.type2test(b"ab")), b"ab")
+        self.assertEqual(self.type2test(b"").join(self.type2test(b"abc")), b"abc")
+        self.assertEqual(self.type2test(b".").join(self.type2test(b"")), b"")
+        self.assertEqual(self.type2test(b".").join(self.type2test(b"a")), b"a")
+        self.assertEqual(self.type2test(b".").join(self.type2test(b"ab")), b"a.b")
+        self.assertEqual(self.type2test(b".").join(self.type2test(b"abc")), b"a.b.c")
+        self.assertEqual(self.type2test(b"..").join(self.type2test(b"abc")), b"a..b..c")
 
     def test_count(self):
         b = self.type2test(b'mississippi')
@@ -1002,7 +1020,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
     def test_extended_set_del_slice(self):
         # Sample just a few random indicies for each of start, stop, and step
         self.check_extended_set_del_slice(lambda x: random.sample(x,3))
-    
+
     @yp_test.support.requires_resource('cpu')
     def test_extended_set_del_slice_cpu(self):
         # Check all indicies
@@ -1449,7 +1467,7 @@ class SubclassTest:
         # test repeat
         self.assertTrue(a*5 == _a*5)
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_join(self):
         # Make sure join returns a NEW object for single item sequences
         # involving a subclass.

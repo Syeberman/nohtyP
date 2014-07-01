@@ -4981,8 +4981,7 @@ typedef struct {
 
     // Sets dest[dest_i] to value
     // XXX dest's encoding must be able to store value
-    // TODO What type to use for elements at this level?  yp_int_t, yp_int32_t, or yp_uint32_t?
-    void (*setindex)( void *dest, yp_ssize_t dest_i, yp_int_t value );
+    void (*setindex)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
 
     // Returns a new type-object with the given requiredLen, plus the null terminator, for this
     // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will
@@ -5148,6 +5147,22 @@ static ypBytesObject _yp_bytes_empty_struct = {
 // move.  Recall that memmove handles overlap.  Also adjusts null terminator.
 #define ypBytes_ELEMMOVE( b, dest, src ) \
     memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src)+1 );
+
+// Copies len elements from src starting at src_i, and places them at dest starting at dest_i
+void ypStringLib_elemcopy_bytes( void *dest, yp_ssize_t dest_i,
+        int src_enc_code, void *src, yp_ssize_t src_i, yp_ssize_t len )
+{
+    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
+    yp_ASSERT( src_enc_code == ypStringLib_ENC_BYTES, "can't mix strs and bytes" );
+    memcpy( ((yp_uint8_t *)dest)+dest_i, ((yp_uint8_t *)src)+src_i, len );
+}
+
+// Sets dest[dest_i] to value
+void ypStringLib_setindex_bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
+    yp_ASSERT( value <= 0xFFu, "value too large for a byte" );
+    ((yp_uint8_t *)dest)[dest_i] = (yp_uint8_t) (value & 0xFFu);
+}
 
 // Return a new bytes/bytearray object that can fit the given requiredLen plus the null terminator.
 // If type is immutable and alloclen_fixed is true (indicating the object will never grow), the
@@ -6956,12 +6971,12 @@ yp_IMMORTAL_STR_LATIN1( yp_s_replace,   "replace" );
 
 static ypStringLib_encinfo ypStringLib_encs[4] = {
     {   // ypStringLib_ENC_BYTES
-        _yp_bytes_empty,        // empty_immutable
-        yp_bytearray0,          // empty_mutable
-        NULL,   // FIXME
-        NULL,   // FIXME
-        _ypBytes_new,           // new
-        _ypBytes_copy           // copy
+        _yp_bytes_empty,            // empty_immutable
+        yp_bytearray0,              // empty_mutable
+        ypStringLib_elemcopy_bytes, // elemcopy
+        ypStringLib_setindex_bytes, // setindex
+        _ypBytes_new,               // new
+        _ypBytes_copy               // copy
     },
     {   // ypStringLib_ENC_UCS1
         0
