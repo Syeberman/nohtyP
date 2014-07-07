@@ -4875,6 +4875,7 @@ static void _ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssi
 // Used by tp_repeat et al to perform the necessary memcpy's.  data must be allocated to hold 
 // factor*n_size objects, the bytes to repeat must be in the first n_size bytes of data, and the
 // rest of data must not contain any references (they will be overwritten).  Cannot fail.
+// FIXME change to ssize_t?
 static void _ypSequence_repeat_memcpy( void *_data, size_t factor, size_t n_size )
 {
     yp_uint8_t *data = (yp_uint8_t *) _data;
@@ -4971,6 +4972,7 @@ typedef struct _ypStrObject ypStrObject;
 #define ypStringLib_DATA( s )       ( ((ypObject *)s)->ob_data )
 #define ypStringLib_LEN             ypObject_CACHED_LEN
 #define ypStringLib_SET_LEN         ypObject_SET_CACHED_LEN
+#define ypStringLib_ALLOCLEN        ypObject_ALLOCLEN
 
 // The maximum possible length of any string object (not including null terminator).  While UCS1
 // could technically allow four times as much data as UCS4, for simplicity we use one maximum
@@ -4985,7 +4987,8 @@ typedef struct _ypStrObject ypStrObject;
 // XXX In general for this table, make sure you do not use type codes with the wrong
 // ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
 typedef struct {
-    ypObject *empty_immutable;  // Pointer to the immortal, empty immutable for this type
+    yp_ssize_t elemsize;                // The size (in bytes) of one character in this encoding
+    ypObject *empty_immutable;          // The immortal, empty immutable for this type
     ypObject *(*empty_mutable)( void ); // Returns a new, empty mutable version of this type
 
     // Copies len elements from src starting at src_i, and places them at dest starting at dest_i.
@@ -5012,9 +5015,71 @@ typedef struct {
     // XXX Check for lazy shallow copies first: copy will _always_ allocate
     // XXX Similarly, check for the empty_immutable case first
     ypObject *(*copy)( int type, ypObject *s, int alloclen_fixed );
+
+    // Called on push/append, extend, or irepeat to increase the allocated size of s to fit
+    // requiredLen (plus null terminator).  Does not update ypStringLib_LEN and does not
+    // null-terminate.
+    // TODO if memory error is the only possible error, consider returning boolean
+    ypObject *(*grow_onextend)( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra );
+
+    // Clears s, possibly freeing some memory.
+    ypObject *(*clear)( ypObject *s );
 } ypStringLib_encinfo;
 static ypStringLib_encinfo ypStringLib_encs[4];
 
+
+// FIXME generalize the repeat code into StringLib and use it for the types
+static ypObject *ypStringLib_repeat( ypObject *s, yp_ssize_t factor )
+{
+    yp_ssize_t s_len = ypStringLib_LEN( s );
+    ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
+    yp_ssize_t newLen;
+    ypObject *newS;
+
+    if( ypObject_IS_MUTABLE( s ) ) {
+        if( s_len < 1 || factor < 1 ) return s_enc->empty_immutable;
+        // If the result will be an exact copy, since we're immutable just return self
+        if( factor == 1 ) return yp_incref( s );
+    } else {
+        if( s_len < 1 || factor < 1 ) return s_enc->empty_mutable( );
+        // If the result will be an exact copy, let the code below make that copy
+    }
+
+    if( factor > ypStringLib_LEN_MAX / s_len ) return yp_MemorySizeOverflowError;
+    newLen = s_len * factor;
+    newS = s_enc->new( ypObject_TYPE_CODE( s ), newLen, /*alloclen_fixed=*/TRUE ); // new ref
+    if( yp_isexceptionC( newS ) ) return newS;
+
+    memcpy( ypStringLib_DATA( newS ), ypStringLib_DATA( s ), s_len * s_enc->elemsize );
+    _ypSequence_repeat_memcpy( ypStringLib_DATA( newS ), factor, s_len * s_enc->elemsize );
+    s_enc->setindex( ypStringLib_DATA( s ), newLen, 0 );
+    ypStringLib_SET_LEN( newS, newLen );
+    return newS;
+}
+
+static ypObject *ypStringLib_irepeat( ypObject *s, yp_ssize_t factor )
+{
+    yp_ssize_t s_len = ypStringLib_LEN( s );
+    ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
+    yp_ssize_t newLen;
+
+    yp_ASSERT( ypObject_IS_MUTABLE( s ), "irepeat called on immutable object" );
+    if( s_len < 1 || factor == 1 ) return yp_None; // no-op
+    if( factor < 1 ) return s_enc->clear( s );
+
+    if( factor > ypStringLib_LEN_MAX / s_len ) return yp_MemorySizeOverflowError;
+    newLen = s_len * factor;
+    if( ypStringLib_ALLOCLEN( s )-1 < newLen ) {
+        // TODO Over-allocate?
+        ypObject *result = s_enc->grow_onextend( s, newLen, 0 );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+
+    _ypSequence_repeat_memcpy( ypStringLib_DATA( s ), factor, s_len * s_enc->elemsize );
+    s_enc->setindex( ypStringLib_DATA( s ), newLen, 0 );
+    ypStringLib_SET_LEN( s, newLen );
+    return yp_None;
+}
 
 static ypObject *ypStringLib_join_from_same( ypObject *s, ypObject *x )
 {
@@ -5145,7 +5210,7 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 #define ypBytes_DATA( b )           ( (yp_uint8_t *) ypStringLib_DATA( b ) )
 #define ypBytes_LEN                 ypStringLib_LEN
 #define ypBytes_SET_LEN             ypStringLib_SET_LEN
-#define ypBytes_ALLOCLEN            ypObject_ALLOCLEN
+#define ypBytes_ALLOCLEN            ypStringLib_ALLOCLEN
 #define ypBytes_INLINE_DATA( b )    ( ((ypBytesObject *)b)->ob_inline_data )
 
 // The maximum possible length of a bytes (not including null terminator)
@@ -5212,6 +5277,25 @@ static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
     return copy;
 }
 
+// Called on push/append, extend, or irepeat to increase the allocated size of b to fit 
+// requiredLen (plus null terminator).  Does not update ypBytes_LEN and does not null-terminate.
+static ypObject *_ypBytes_grow_onextend( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra )
+{
+    void *oldptr;
+    yp_ASSERT( requiredLen >= ypBytes_LEN( b ), "requiredLen cannot be <len(b)" );
+    yp_ASSERT( requiredLen >= ypBytes_ALLOCLEN( b )-1, "_ypBytes_grow_onextend called unnecessarily" );
+    yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, requiredLen+1, extra );
+    // FIXME I believe this can allocate something larger than ypBytes_LEN_MAX, which means we
+    // always have to check both alloclen and len_max (here and elsewhere).
+    if( oldptr == NULL ) return yp_MemoryError;
+    if( ypBytes_DATA( b ) != oldptr ) {
+        memcpy( ypBytes_DATA( b ), oldptr, ypBytes_LEN( b ) );
+        ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
+    }
+    return yp_None;
+}
+
 // As yp_asuint8C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
 static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
     yp_int_t asint;
@@ -5247,13 +5331,6 @@ static ypObject *_ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, y
     }
 }
 
-// Used by tp_repeat et al to perform the necessary memcpy's.  b's array must be allocated
-// to hold (factor*n)+1 bytes, and the bytes to repeat must be in the first n elements of the
-// array.  Further, factor and n must both be greater than zero.  Neither null-terminates nor
-// updates len.  Cannot fail.
-#define _ypBytes_repeat_memcpy( b, factor, n ) \
-    _ypSequence_repeat_memcpy( ypBytes_DATA( b ), (factor), (n) )
-
 // Extends b with the contents of x, a fellow byte object; always writes the null-terminator
 // XXX Remember that b and x may be the same object
 // TODO over-allocate as appropriate
@@ -5264,12 +5341,9 @@ static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
     if( ypBytes_LEN( b ) > ypBytes_LEN_MAX - ypBytes_LEN( x ) ) return yp_MemorySizeOverflowError;
     newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
     if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
-        void *oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, 0 );
-        if( oldptr == NULL ) return yp_MemoryError;
-        if( ypBytes_DATA( b ) != oldptr ) {
-            memcpy( ypBytes_DATA( b ), oldptr, ypBytes_LEN( b ) );
-            ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
-        }
+        // TODO Over-allocate
+        ypObject *result = _ypBytes_grow_onextend( b, newLen, 0 );
+        if( yp_isexceptionC( result ) ) return result;
     }
     memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
     ypBytes_DATA( b )[newLen] = '\0';
@@ -5514,34 +5588,7 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     return newB;
 }
 
-static ypObject *bytes_repeat( ypObject *b, yp_ssize_t factor )
-{
-    int b_type = ypObject_TYPE_CODE( b );
-    yp_ssize_t newLen;
-    ypObject *newB;
-
-    if( b_type == ypBytes_CODE ) {
-        // If the result will be an empty array, return _yp_bytes_empty
-        if( ypBytes_LEN( b ) < 1 || factor < 1 ) return _yp_bytes_empty;
-        // If the result will be an exact copy, since we're immutable just return self
-        if( factor == 1 ) return yp_incref( b );
-    } else {
-        // If the result will be an empty array, return a new, empty array
-        if( ypBytes_LEN( b ) < 1 || factor < 1 ) return yp_bytearray0( );
-        // If the result will be an exact copy, let the code below make that copy
-    }
-
-    if( factor > ypBytes_LEN_MAX / ypBytes_LEN( b ) ) return yp_MemorySizeOverflowError;
-    newLen = ypBytes_LEN( b ) * factor;
-    newB = _ypBytes_new( b_type, newLen, /*alloclen_fixed=*/TRUE ); // new ref
-    if( yp_isexceptionC( newB ) ) return newB;
-
-    memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
-    _ypBytes_repeat_memcpy( newB, factor, ypBytes_LEN( b ) );
-    ypBytes_DATA( newB )[newLen] = '\0';
-    ypBytes_SET_LEN( newB, newLen );
-    return newB;
-}
+#define bytes_repeat ypStringLib_repeat
 
 static ypObject *bytes_getindex( ypObject *b, yp_ssize_t i, ypObject *defval )
 {
@@ -5646,30 +5693,7 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
 
 #define bytearray_extend _ypBytes_extend
 
-static ypObject *bytearray_clear( ypObject *b );
-static ypObject *bytearray_irepeat( ypObject *b, yp_ssize_t factor )
-{
-    yp_ssize_t newLen;
-
-    if( ypBytes_LEN( b ) < 1 || factor == 1 ) return yp_None; // no-op
-    if( factor < 1 ) return bytearray_clear( b );
-
-    if( factor > ypBytes_LEN_MAX / ypBytes_LEN( b ) ) return yp_MemorySizeOverflowError;
-    newLen = ypBytes_LEN( b ) * factor;
-    if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
-        void *oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, newLen+1, 0 );
-        if( oldptr == NULL ) return yp_MemoryError;
-        if( ypBytes_DATA( b ) != oldptr ) {
-            memcpy( ypBytes_DATA( b ), oldptr, ypBytes_LEN( b ) );
-            ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
-        }
-    }
-
-    _ypBytes_repeat_memcpy( b, factor, ypBytes_LEN( b ) );
-    ypBytes_DATA( b )[newLen] = '\0';
-    ypBytes_SET_LEN( b, newLen );
-    return yp_None;
-}
+#define bytearray_irepeat ypStringLib_irepeat
 
 static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
 {
@@ -6385,7 +6409,7 @@ static ypObject *_ypStr_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
 {
     ypObject *newS;
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
-    // TODO checks on requiredLen (once converted from alloclen
+    // TODO checks on requiredLen (once converted from alloclen)
     if( alloclen_fixed && type == ypStr_CODE ) {
         return ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, alloclen );
     } else {
@@ -6980,12 +7004,15 @@ yp_IMMORTAL_STR_LATIN1( yp_s_replace,   "replace" );
 
 static ypStringLib_encinfo ypStringLib_encs[4] = {
     {   // ypStringLib_ENC_BYTES
-        _yp_bytes_empty,            // empty_immutable
-        yp_bytearray0,              // empty_mutable
-        ypStringLib_elemcopy_bytes, // elemcopy
-        ypStringLib_setindex_bytes, // setindex
-        _ypBytes_new,               // new
-        _ypBytes_copy               // copy
+        1,                                  // elemsize
+        _yp_bytes_empty,                    // empty_immutable
+        yp_bytearray0,                      // empty_mutable
+        ypStringLib_elemcopy_bytes,         // elemcopy
+        ypStringLib_setindex_bytes,         // setindex
+        _ypBytes_new,                       // new
+        _ypBytes_copy,                      // copy
+        _ypBytes_grow_onextend,             // grow_onextend
+        bytearray_clear                     // clear
     },
     {   // ypStringLib_ENC_UCS1
         0
