@@ -112,6 +112,10 @@ class ApiVisitor( c_ast.NodeVisitor ):
 #   i*, etc, or first param is iterator, file, etc) and ensure ypObject** is used iff it mutates
 #   - the "unadorned" version is the one with the fewest arguments (but not zero)
 
+# TODO nohtyP.c checks to implement (in a separate script)
+#   - ensure no reference leaks
+#   - for functions that return yp_None for success or exactly one exception type, convert to a
+#   boolean (on the assumption that it's quicker to test)
 
 def ReportOnVariants( header, *, print=print ):
     """Report the functions that belong to the same group, and which is the unadorned version."""
