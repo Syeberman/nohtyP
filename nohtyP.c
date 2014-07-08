@@ -5052,7 +5052,7 @@ static ypObject *ypStringLib_repeat( ypObject *s, yp_ssize_t factor )
 
     memcpy( ypStringLib_DATA( newS ), ypStringLib_DATA( s ), s_len * s_enc->elemsize );
     _ypSequence_repeat_memcpy( ypStringLib_DATA( newS ), factor, s_len * s_enc->elemsize );
-    s_enc->setindex( ypStringLib_DATA( s ), newLen, 0 );
+    s_enc->setindex( ypStringLib_DATA( newS ), newLen, 0 );
     ypStringLib_SET_LEN( newS, newLen );
     return newS;
 }
