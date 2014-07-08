@@ -4997,6 +4997,9 @@ typedef struct {
     void (*elemcopy)( void *dest, yp_ssize_t dest_i, 
             int src_enc_code, void *src, yp_ssize_t src_i, yp_ssize_t len );
 
+    // Gets the ordinal at src[src_i]
+    yp_uint32_t (*getindex)( void *src, yp_ssize_t src_i );
+    
     // Sets dest[dest_i] to value
     // XXX dest's encoding must be able to store value
     void (*setindex)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
@@ -5081,19 +5084,60 @@ static ypObject *ypStringLib_irepeat( ypObject *s, yp_ssize_t factor )
     return yp_None;
 }
 
-static ypObject *ypStringLib_join_from_same( ypObject *s, ypObject *x )
-{
-    return yp_NotImplementedError;
-}
 
-// - empty iterable, return 0-len
-// - 1-iterable, return shallow copy of object (if right type)
-// - wrong type
-// - overflow of max size with item
-// - overflow of max size with separator
-// - sequence changing (not a problem here yet)
-// - empty separator is faster...just concatenate
-// - concatenation with separator
+// There are some efficiencies we can exploit if iterable/x is a fellow string object
+static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
+{
+    yp_ssize_t s_len = ypStringLib_LEN( s );
+    int s_enc_code = ypStringLib_ENC_CODE( s );
+    ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
+    void *x_data = ypStringLib_DATA( x );
+    yp_ssize_t x_len = ypStringLib_LEN( x );
+    int x_enc_code = ypStringLib_ENC_CODE( x );
+    ypStringLib_encinfo *x_enc = ypStringLib_ENC( x );
+    yp_ssize_t i;
+    void *result_data;
+    yp_ssize_t result_len;
+    int result_enc_code;
+    ypStringLib_encinfo *result_enc;
+    ypObject *result;
+
+    if( ypObject_TYPE_PAIR_CODE( s ) != ypObject_TYPE_PAIR_CODE( x ) ) return yp_TypeError;
+
+    // The 0- and 1-seq cases are pretty simple: just return an empty or a copy, respectively
+    if( x_len < 1 ) {
+        if( !ypObject_IS_MUTABLE( s ) ) return s_enc->empty_immutable;
+        return s_enc->empty_mutable( );
+    } else if( s_len < 1 || x_len == 1 ) {
+        // Remember we need to return an object of the same type as s.  If s and x are both
+        // immutable then we can rely on a shallow copy.
+        if( !ypObject_IS_MUTABLE( s ) && !ypObject_IS_MUTABLE( x ) ) return yp_incref( x );
+        return s_enc->copy( ypObject_TYPE_CODE( s ), x, /*alloclen_fixed=*/TRUE );
+    }
+
+    // Calculate how long the result is going to be and which encoding we'll use
+    if( s_len > (ypStringLib_LEN_MAX-x_len) / (x_len-1) ) {
+        return yp_MemorySizeOverflowError;
+    }
+    result_len = (s_len * (x_len-1)) + x_len;
+    result_enc_code = MAX( s_enc_code, x_enc_code );
+
+    // Now we can create the result object...
+    result_enc = &(ypStringLib_encs[result_enc_code]);
+    result = result_enc->new( ypObject_TYPE_CODE( s ), result_len, /*alloclen_fixed=*/TRUE );
+    if( yp_isexceptionC( result ) ) return result;
+
+    // ...and populate it, remembering to null-terminate and update the length
+    result_data = ypStringLib_DATA( result );
+    result_enc->elemcopy( result_data, 1, s_enc_code, ypStringLib_DATA( s ), 0, s_len );
+    _ypSequence_repeat_memcpy( result_data, x_len-1, (s_len+1) * result_enc->elemsize );
+    for( i = 0; i < x_len; i++ ) {
+        result_enc->setindex( result_data, i*(s_len+1), x_enc->getindex( x_data, i ) );
+    }
+    result_enc->setindex( result_data, result_len, 0 );
+    ypStringLib_SET_LEN( result, result_len );
+    return result;
+}
 
 // Performs the necessary elemcopy's on behalf of ypStringLib_join, null-terminates, and updates
 // result's length.  Assumes adequate space has already been allocated.
@@ -5235,6 +5279,12 @@ void ypStringLib_elemcopy_bytes( void *dest, yp_ssize_t dest_i,
     yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
     yp_ASSERT( src_enc_code == ypStringLib_ENC_BYTES, "can't mix strs and bytes" );
     memcpy( ((yp_uint8_t *)dest)+dest_i, ((yp_uint8_t *)src)+src_i, len );
+}
+
+// Gets ordinal at src[src_i]
+yp_uint32_t ypStringLib_getindex_bytes( void *src, yp_ssize_t src_i ) {
+    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
+    return ((yp_uint8_t *)src)[src_i];
 }
 
 // Sets dest[dest_i] to value
@@ -7008,6 +7058,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         _yp_bytes_empty,                    // empty_immutable
         yp_bytearray0,                      // empty_mutable
         ypStringLib_elemcopy_bytes,         // elemcopy
+        ypStringLib_getindex_bytes,         // getindex
         ypStringLib_setindex_bytes,         // setindex
         _ypBytes_new,                       // new
         _ypBytes_copy,                      // copy
@@ -7179,8 +7230,8 @@ ypObject *yp_join( ypObject *s, ypObject *iterable ) {
     ypObject *result;
 
     if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
-    if( ypObject_TYPE_PAIR_CODE( s ) == ypObject_TYPE_PAIR_CODE( iterable ) ) {
-        return ypStringLib_join_from_same( s, iterable );
+    if( _ypStringLib_CHECK( iterable ) ) {
+        return ypStringLib_join_from_string( s, iterable );
     }
 
     if( ypQuickSeq_new_fromiterable_builtins( &methods, &state, iterable ) ) {
