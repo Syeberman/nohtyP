@@ -5031,7 +5031,6 @@ typedef struct {
 static ypStringLib_encinfo ypStringLib_encs[4];
 
 
-// FIXME generalize the repeat code into StringLib and use it for the types
 static ypObject *ypStringLib_repeat( ypObject *s, yp_ssize_t factor )
 {
     yp_ssize_t s_len = ypStringLib_LEN( s );
@@ -7014,6 +7013,7 @@ ypObject *yp_chrarray0( void ) {
     return newS;
 }
 
+// TODO Statically-allocate the first 256 characters?
 ypObject *yp_chrC( yp_int_t i ) {
     yp_uint8_t source[1];
 
@@ -7026,13 +7026,15 @@ ypObject *yp_chrC( yp_int_t i ) {
 
 yp_IMMORTAL_STR_LATIN1( yp_s_ascii,     "ascii" );
 yp_IMMORTAL_STR_LATIN1( yp_s_latin_1,   "latin_1" );
-yp_IMMORTAL_STR_LATIN1( yp_s_utf_32,    "utf_32" );
-yp_IMMORTAL_STR_LATIN1( yp_s_utf_32_be, "utf_32_be" );
-yp_IMMORTAL_STR_LATIN1( yp_s_utf_32_le, "utf_32_le" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_8,     "utf_8" );
 yp_IMMORTAL_STR_LATIN1( yp_s_utf_16,    "utf_16" );
 yp_IMMORTAL_STR_LATIN1( yp_s_utf_16_be, "utf_16_be" );
 yp_IMMORTAL_STR_LATIN1( yp_s_utf_16_le, "utf_16_le" );
-yp_IMMORTAL_STR_LATIN1( yp_s_utf_8,     "utf_8" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_32,    "utf_32" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_32_be, "utf_32_be" );
+yp_IMMORTAL_STR_LATIN1( yp_s_utf_32_le, "utf_32_le" );
+yp_IMMORTAL_STR_LATIN1( yp_s_ucs_2,     "ucs_2" );
+yp_IMMORTAL_STR_LATIN1( yp_s_ucs_4,     "ucs_4" );
 
 yp_IMMORTAL_STR_LATIN1( yp_s_strict,    "strict" );
 yp_IMMORTAL_STR_LATIN1( yp_s_ignore,    "ignore" );
