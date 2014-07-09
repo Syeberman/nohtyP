@@ -5090,10 +5090,8 @@ static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
 {
     yp_ssize_t s_len = ypStringLib_LEN( s );
     int s_enc_code = ypStringLib_ENC_CODE( s );
-    ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
     void *x_data = ypStringLib_DATA( x );
     yp_ssize_t x_len = ypStringLib_LEN( x );
-    int x_enc_code = ypStringLib_ENC_CODE( x );
     ypStringLib_encinfo *x_enc = ypStringLib_ENC( x );
     yp_ssize_t i;
     void *result_data;
@@ -5106,13 +5104,13 @@ static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
 
     // The 0- and 1-seq cases are pretty simple: just return an empty or a copy, respectively
     if( x_len < 1 ) {
-        if( !ypObject_IS_MUTABLE( s ) ) return s_enc->empty_immutable;
-        return s_enc->empty_mutable( );
+        if( !ypObject_IS_MUTABLE( s ) ) return ypStringLib_ENC( s )->empty_immutable;
+        return ypStringLib_ENC( s )->empty_mutable( );
     } else if( s_len < 1 || x_len == 1 ) {
         // Remember we need to return an object of the same type as s.  If s and x are both
         // immutable then we can rely on a shallow copy.
         if( !ypObject_IS_MUTABLE( s ) && !ypObject_IS_MUTABLE( x ) ) return yp_incref( x );
-        return s_enc->copy( ypObject_TYPE_CODE( s ), x, /*alloclen_fixed=*/TRUE );
+        return ypStringLib_ENC( s )->copy( ypObject_TYPE_CODE( s ), x, /*alloclen_fixed=*/TRUE );
     }
 
     // Calculate how long the result is going to be and which encoding we'll use
@@ -5120,7 +5118,7 @@ static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
         return yp_MemorySizeOverflowError;
     }
     result_len = (s_len * (x_len-1)) + x_len;
-    result_enc_code = MAX( s_enc_code, x_enc_code );
+    result_enc_code = MAX( s_enc_code, ypStringLib_ENC_CODE( x ) );
 
     // Now we can create the result object...
     result_enc = &(ypStringLib_encs[result_enc_code]);
@@ -5189,9 +5187,6 @@ static ypObject *ypStringLib_join(
 {
     ypObject *exc = yp_None;
     int s_pair = ypObject_TYPE_PAIR_CODE( s );
-    void *s_data = ypStringLib_DATA( s );
-    yp_ssize_t s_len = ypStringLib_LEN( s );
-    ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
     yp_ssize_t seq_len;
     yp_ssize_t i;
     ypObject *x;
@@ -5204,23 +5199,23 @@ static ypObject *ypStringLib_join(
     seq_len = seq->len( state, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     if( seq_len < 1 ) {
-        if( !ypObject_IS_MUTABLE( s ) ) return s_enc->empty_immutable;
-        return s_enc->empty_mutable( );
+        if( !ypObject_IS_MUTABLE( s ) ) return ypStringLib_ENC( s )->empty_immutable;
+        return ypStringLib_ENC( s )->empty_mutable( );
     } else if( seq_len == 1 ) {
         x = seq->getindexX( state, 0 );     // borrowed
         if( ypObject_TYPE_PAIR_CODE( x ) != s_pair ) return_yp_BAD_TYPE( x );
         // Remember we need to return an object of the same type as s.  If s and x are both
         // immutable then we can rely on a shallow copy.
         if( !ypObject_IS_MUTABLE( s ) && !ypObject_IS_MUTABLE( x ) ) return yp_incref( x );
-        return s_enc->copy( ypObject_TYPE_CODE( s ), x, /*alloclen_fixed=*/TRUE );
+        return ypStringLib_ENC( s )->copy( ypObject_TYPE_CODE( s ), x, /*alloclen_fixed=*/TRUE );
     }
 
     // Calculate how long the result is going to be, which encoding we'll use, and ensure seq
     // contains the correct types
-    if( s_len > ypStringLib_LEN_MAX / (seq_len-1) ) {
+    if( ypStringLib_LEN( s ) > ypStringLib_LEN_MAX / (seq_len-1) ) {
         return yp_MemorySizeOverflowError;
     }
-    result_len = s_len * (seq_len-1);
+    result_len = ypStringLib_LEN( s ) * (seq_len-1);
     result_enc_code = ypStringLib_ENC_CODE( s );   // if s is empty the code is UCS1 or BYTES
     for( i = 0; i < seq_len; i++ ) {
         x = seq->getindexX( state, i );     // borrowed
