@@ -316,7 +316,11 @@ yp_func( c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")
 yp_func( c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
 
 # ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_bytes3", ((c_ypObject_p, "source"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 # ypObject *yp_bytearray3( ypObject *source, ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_bytearray3", ((c_ypObject_p, "source"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 
 # ypObject *yp_bytes( ypObject *source );
 yp_func( c_ypObject_p, "yp_bytes", ((c_ypObject_p, "source"), ) )
@@ -324,7 +328,9 @@ yp_func( c_ypObject_p, "yp_bytes", ((c_ypObject_p, "source"), ) )
 yp_func( c_ypObject_p, "yp_bytearray", ((c_ypObject_p, "source"), ) )
 
 # ypObject *yp_bytes0( void );
+yp_func( c_ypObject_p, "yp_bytes0", () )
 # ypObject *yp_bytearray0( void );
+yp_func( c_ypObject_p, "yp_bytearray0", () )
 
 # ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
 #         ypObject *encoding, ypObject *errors );
@@ -336,13 +342,21 @@ yp_func( c_ypObject_p, "yp_chrarray_frombytesC4", ((c_char_p, "source"), (c_yp_s
             (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 
 # ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_str3", ((c_ypObject_p, "object"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 # ypObject *yp_chrarray3( ypObject *object, ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_chrarray3", ((c_ypObject_p, "object"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 
 # ypObject *yp_str( ypObject *object );
+yp_func( c_ypObject_p, "yp_str", ((c_ypObject_p, "object"), ) )
 # ypObject *yp_chrarray( ypObject *object );
+yp_func( c_ypObject_p, "yp_chrarray", ((c_ypObject_p, "object"), ) )
 
 # ypObject *yp_str0( void );
+yp_func( c_ypObject_p, "yp_str0", () )
 # ypObject *yp_chrarray0( void );
+yp_func( c_ypObject_p, "yp_chrarray0", () )
 
 # ypObject *yp_chrC( yp_int_t i );
 
@@ -1573,12 +1587,10 @@ class yp_float( ypObject ):
     def _yp_str( self ): return yp_str( str( self._asfloat( ) ) )
     def _yp_repr( self ): return yp_str( repr( self._asfloat( ) ) )
 
-# FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
-# FIXME Just generally move more of this logic into nohtyP, when available
 class _ypBytes( ypObject ):
     def __new__( cls, source=0, encoding=None, errors=None ):
         if isinstance( source, str ):
-            raise NotImplementedError
+            return cls._ypBytes_constructor3( source, encoding, errors )
         elif isinstance( source, (int, yp_int) ):
             return cls._ypBytes_constructor( source )
         elif isinstance( source, (bytes, bytearray) ):
@@ -1614,6 +1626,7 @@ class _ypBytes( ypObject ):
 @pytype( yp_type_bytes, bytes )
 class yp_bytes( _ypBytes ):
     _ypBytes_constructorC = _yp_bytesC
+    _ypBytes_constructor3 = _yp_bytes3
     _ypBytes_constructor = _yp_bytes
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asbytes( ) ) )
@@ -1625,11 +1638,10 @@ class yp_bytes( _ypBytes ):
         #    assert self is _yp_bytes_empty, "an empty bytes should be _yp_bytes_empty"
 _yp_bytes_empty = yp_bytes( )
 
-# FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
-# FIXME Just generally move more of this logic into nohtyP, when available
 @pytype( yp_type_bytearray, bytearray )
 class yp_bytearray( _ypBytes ):
     _ypBytes_constructorC = _yp_bytearrayC
+    _ypBytes_constructor3 = _yp_bytearray3
     _ypBytes_constructor = _yp_bytearray
     # FIXME When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( "bytearray(%r)" % self._asbytes( ) )
@@ -1646,42 +1658,42 @@ class yp_bytearray( _ypBytes ):
         return self
 
 # FIXME When nohtyP has types that have string representations, update this
-# FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
 # FIXME Just generally move more of this logic into nohtyP, when available
 @pytype( yp_type_str, str )
 class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
-            if object is _yp_arg_missing:
-                return _yp_str_frombytesC4( None, 0, yp_s_latin_1, yp_s_strict )
+            if object is _yp_arg_missing: return _yp_str0( )
             if isinstance( object, ypObject ): return object._yp_str( )
             if isinstance( object, str ):
-                encoded = object.encode( "latin-1" )
-                return _yp_str_frombytesC4( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
+                encoded = object.encode( "utf-8" )
+                return _yp_str_frombytesC4( encoded, len( encoded ), yp_s_utf_8, yp_s_strict )
             raise TypeError( "expected ypObject or str in yp_str" )
         else:
-            raise NotImplementedError
+            return _yp_str3( object, encoding, errors )
     def _get_encoded_size_encoding( self ):
         encoded = c_char_pp( c_char_p( ) )
         size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
         encoding = c_ypObject_pp( yp_None )
         # errcheck disabled for _yp_asencodedCX, so do it here
         _yp_asencodedCX( self, encoded, size, encoding )._yp_errcheck( )
-        assert encoding[0] is yp_s_latin_1
-        return cast( encoded.contents, c_void_p ), size[0], "latin-1"
+        # _yp_asencodedCX should return one of yp_s_latin_1, yp_s_ucs_2, or yp_s_ucs_4
+        enc_type = _yp_str_enc2type[encoding[0].value]
+        return cast( encoded.contents, enc_type ), size[0], encoding[0]
     def _yp_errcheck( self ):
         super( )._yp_errcheck( )
         encoded, size, encoding = self._get_encoded_size_encoding( )
-        assert encoding == "latin-1"
-        assert string_at( encoded.value+size, 1 ) == b"\x00", "missing null terminator"
+        if encoding is yp_s_ucs_2:
+            pass # FIXME ensure string contains at least one >0xFF character
+        elif encoding is yp_s_ucs_4:
+            pass # FIXME ensure string contains at least one >0xFFFF character
+        assert encoded[size] == 0, "missing null terminator"
         # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if size < 1 and "_yp_str_empty" in globals( ):
         #    assert self is _yp_str_empty, "an empty str should be _yp_str_empty"
 
     # Just as yp_bool.__bool__ must return a bool, so to must this return a str
-    def __str__( self ):
-        encoded, size, encoding = self._get_encoded_size_encoding( )
-        return string_at( encoded, size ).decode( encoding )
+    def __str__( self ): return bytes( self.encode( ) ).decode( )
     # FIXME When nohtyP supports repr, replace this faked-out version
     def _yp_str( self ): return self
     def _yp_repr( self ): return repr( str( self ) )
@@ -1698,7 +1710,12 @@ class yp_str( ypObject ):
 
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
+c_ypObject_p_value( "yp_s_utf_8" )
+c_ypObject_p_value( "yp_s_ucs_2" )
+c_ypObject_p_value( "yp_s_ucs_4" )
 c_ypObject_p_value( "yp_s_strict" )
+_yp_str_enc2type = {yp_s_latin_1.value: POINTER( c_uint8 ), yp_s_ucs_2.value: POINTER( c_uint16 ), 
+        yp_s_ucs_2.value: POINTER( c_uint32 )}
 _yp_str_empty = yp_str( )
 yp_s_None = yp_str( "None" )
 yp_s_True = yp_str( "True" )
