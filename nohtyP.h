@@ -1491,8 +1491,8 @@ ypAPI void yp_i2s_setitemC4( ypObject **container, yp_int_t key,
 // Operations on containers that map strings to objects.  Note that if the value of the string is
 // known at compile-time, as in:
 //      value = yp_s2o_getitemC3( o, "mykey", -1 );
-// it is more-efficient to use yp_IMMORTAL_STR_LATIN1 (also compatible with ascii), as in:
-//      yp_IMMORTAL_STR_LATIN1( s_mykey, "mykey" );
+// it is more-efficient to use yp_IMMORTAL_STR_LATIN_1 (also compatible with ascii), as in:
+//      yp_IMMORTAL_STR_LATIN_1( s_mykey, "mykey" );
 //      value = yp_getitem( o, s_mykey );
 ypAPI ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len );
 ypAPI void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len,
@@ -1523,7 +1523,7 @@ ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssi
 // which is of type "ypObject * const".  value is a latin-1 encoded C string literal that can
 // contain null characters.  The length is calculated while compiling; the hash will be calculated
 // the first time it is accessed.  Note that latin-1 is compatible with an ascii-encoded value.
-//      yp_IMMORTAL_STR_LATIN1( name, value );
+//      yp_IMMORTAL_STR_LATIN_1( name, value );
 
 
 /*
@@ -1849,9 +1849,9 @@ struct _ypStrObject {
 #define _ypObject_LEN_INVALID       ((yp_ssize_t) -1)
 // Macros on ob_type_flags for string objects (bytes and str)
 #define _ypStringLib_ENC_BYTES      (0u)
-#define _ypStringLib_ENC_UCS1       (1u)
-#define _ypStringLib_ENC_UCS2       (2u)
-#define _ypStringLib_ENC_UCS4       (3u)
+#define _ypStringLib_ENC_UCS_1      (1u)
+#define _ypStringLib_ENC_UCS_2      (2u)
+#define _ypStringLib_ENC_UCS_4      (3u)
 
 // These type codes must match those in nohtyP.c
 #define _ypInt_CODE                 ( 10u)
@@ -1872,10 +1872,10 @@ struct _ypStrObject {
         _ypBytes_CODE, _ypStringLib_ENC_BYTES, \
         (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-#define yp_IMMORTAL_STR_LATIN1( name, value ) \
+#define yp_IMMORTAL_STR_LATIN_1( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypStrObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypStr_CODE, _ypStringLib_ENC_UCS1, \
+        _ypStr_CODE, _ypStringLib_ENC_UCS_1, \
         (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE
