@@ -4999,21 +4999,26 @@ typedef struct _ypStrObject ypStrObject;
             (yp_SSIZE_T_MAX-yp_sizeof( ypStrObject )) / 4 /* /4 for elemsize of UCS-4 */ ), \
             ypObject_LEN_MAX ) - 1 /* -1 for null terminator */ )
 
+// Gets the ordinal at src[src_i]
+// TODO remove src_i and rename to getvalue or something
+typedef yp_uint32_t (*ypStringLib_getindexfunc)( void *src, yp_ssize_t src_i );
+
+// Sets dest[dest_i] to value
+// XXX dest's encoding must be able to store value
+// TODO remove dest_i and rename to setvalue or something
+typedef void (*ypStringLib_setindexfunc)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
 
 // XXX In general for this table, make sure you do not use type codes with the wrong
 // ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
+// TODO The more functions we can remove from this table, the better for the optimizer
 typedef struct {
     yp_ssize_t elemsize;                // The size (in bytes) of one character in this encoding
     int sizeshift;                      // len<<sizeshift gives the size in bytes
+    yp_uint32_t max_char;               // Largest character value that can be stored in encoding
     ypObject *empty_immutable;          // The immortal, empty immutable for this type
     ypObject *(*empty_mutable)( void ); // Returns a new, empty mutable version of this type
-
-    // Gets the ordinal at src[src_i]
-    yp_uint32_t (*getindex)( void *src, yp_ssize_t src_i );
-    
-    // Sets dest[dest_i] to value
-    // XXX dest's encoding must be able to store value
-    void (*setindex)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
+    ypStringLib_getindexfunc getindex;  // Gets the ordinal at src[src_i]
+    ypStringLib_setindexfunc setindex;  // Sets dest[dest_i] to value
 
     // Returns a new type-object with the given requiredLen, plus the null terminator, for this
     // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will
@@ -5047,10 +5052,10 @@ static ypStringLib_encinfo ypStringLib_encs[4];
 // A version of ypStringLib_elemcopy that copies from UCS-2 to UCS-4
 // TODO Write multiple elements at once and, if possible, read in multiples too
 static void ypStringLib_elemcopy_4from2( void *_dest, yp_ssize_t dest_i, 
-        void *_src, yp_ssize_t src_i, yp_ssize_t len )
+        const void *_src, yp_ssize_t src_i, yp_ssize_t len )
 {
     yp_uint32_t *dest = ((yp_uint32_t *) _dest) + dest_i;
-    yp_uint16_t *src  = ((yp_uint16_t *) _src)  + src_i;
+    const yp_uint16_t *src = ((yp_uint16_t *) _src) + src_i;
     yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
@@ -5061,10 +5066,10 @@ static void ypStringLib_elemcopy_4from2( void *_dest, yp_ssize_t dest_i,
 // A version of ypStringLib_elemcopy that copies from Latin-1 to UCS-4
 // TODO Write multiple elements at once and, if possible, read in multiples too
 static void ypStringLib_elemcopy_4from1( void *_dest, yp_ssize_t dest_i, 
-        void *_src, yp_ssize_t src_i, yp_ssize_t len )
+        const void *_src, yp_ssize_t src_i, yp_ssize_t len )
 {
     yp_uint32_t *dest = ((yp_uint32_t *) _dest) + dest_i;
-    yp_uint8_t *src   = ((yp_uint8_t *)  _src)  + src_i;
+    const yp_uint8_t *src = ((yp_uint8_t *)  _src) + src_i;
     yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
@@ -5075,10 +5080,10 @@ static void ypStringLib_elemcopy_4from1( void *_dest, yp_ssize_t dest_i,
 // A version of ypStringLib_elemcopy that copies from Latin-1 to UCS-2
 // TODO Write multiple elements at once and, if possible, read in multiples too
 static void ypStringLib_elemcopy_2from1( void *_dest, yp_ssize_t dest_i, 
-        void *_src, yp_ssize_t src_i, yp_ssize_t len )
+        const void *_src, yp_ssize_t src_i, yp_ssize_t len )
 {
     yp_uint16_t *dest = ((yp_uint16_t *) _dest) + dest_i;
-    yp_uint8_t *src   = ((yp_uint8_t *)  _src)  + src_i;
+    const yp_uint8_t *src = ((yp_uint8_t *)  _src) + src_i;
     yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
@@ -5089,14 +5094,15 @@ static void ypStringLib_elemcopy_2from1( void *_dest, yp_ssize_t dest_i,
 // Copies len elements from src starting at src_i, and places them at dest starting at dest_i.
 // dest_sizeshift must be >=src_sizeshift.
 static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t dest_i, 
-        int src_sizeshift, void *src, yp_ssize_t src_i, yp_ssize_t len )
+        int src_sizeshift, const void *src, yp_ssize_t src_i, yp_ssize_t len )
 {
     yp_ASSERT( dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding" );
     yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
     if( dest_sizeshift == src_sizeshift ) {
         // Huzzah!  We get to use the nice-and-quick memcpy
         memcpy( ((yp_uint8_t *) dest) + (dest_i << dest_sizeshift), 
-                ((yp_uint8_t *) src)  + (src_i << dest_sizeshift), len << dest_sizeshift );
+                ((const yp_uint8_t *) src) + (src_i << dest_sizeshift), 
+                len << dest_sizeshift );
     } else if( dest_sizeshift == 2 ) {  // UCS-4
         // If src were sizeshift 2, then we'd have hit the memcpy case
         if( src_sizeshift == 1 ) {
@@ -5329,17 +5335,15 @@ static ypObject *ypStringLib_join(
 
 // UTF-8 encoding and decoding functions
 
-#if 0
 // Returns the number of consecutive ascii bytes starting at start.  Valid for ascii, latin-1, and
 // utf-8 encodings.
 // XXX Adapted from Python's ascii_decode
 # define ypStringLib_ASCII_CHAR_MASK 0x8080808080808080ULL
-typedef yp_uint64_t ypStringLib_ascii_char_t;
-yp_STATIC_ASSERT( ((ypStringLib_ascii_char_t) ypStringLib_ASCII_CHAR_MASK) == ypStringLib_ASCII_CHAR_MASK, ascii_mask_matches_type );
+yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_ASCII_CHAR_MASK) == ypStringLib_ASCII_CHAR_MASK, ascii_mask_matches_type );
 static yp_ssize_t ypStringLib_count_ascii_bytes( const yp_uint8_t *start, const yp_uint8_t *end )
 {
     const yp_uint8_t *p = start;
-    const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof( ypStringLib_ascii_char_t ));
+    const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof( _yp_uint_t ));
 
     /* Fast path for runs of ASCII characters. Given that common UTF-8
         input will consist of an overwhelming majority of ASCII
@@ -5349,11 +5353,11 @@ static yp_ssize_t ypStringLib_count_ascii_bytes( const yp_uint8_t *start, const 
         a penalty for unaligned reads.
     */
 
-    // If we don't contain an aligned ypStringLib_ascii_char_t, jump to the end
-    if( aligned_end - start < yp_sizeof( ypStringLib_ascii_char_t ) ) goto final_loop;
+    // If we don't contain an aligned _yp_uint_t, jump to the end
+    if( aligned_end - start < yp_sizeof( _yp_uint_t ) ) goto final_loop;
 
     // Read the first few bytes until we're aligned
-    while( !yp_IS_ALIGNED( p, yp_sizeof( ypStringLib_ascii_char_t ) ) ) {
+    while( !yp_IS_ALIGNED( p, yp_sizeof( _yp_uint_t ) ) ) {
         if( ((yp_uint8_t) *p) & 0x80 ) return p - start;
         ++p;
     }
@@ -5361,9 +5365,9 @@ static yp_ssize_t ypStringLib_count_ascii_bytes( const yp_uint8_t *start, const 
     // Now read as many aligned ints as we can.  Remember that even though the CHAR_MASK test may
     // fail, there may still be a few ascii bytes
     while( p < aligned_end ) {
-        ypStringLib_ascii_char_t value = *((ypStringLib_ascii_char_t *) p);
+        _yp_uint_t value = *((_yp_uint_t *) p);
         if( value & ypStringLib_ASCII_CHAR_MASK ) break;
-        p += yp_sizeof( ypStringLib_ascii_char_t );
+        p += yp_sizeof( _yp_uint_t );
     }
 
     // Now read the final, unaligned bytes
@@ -5375,15 +5379,29 @@ final_loop:
     return p - start;
 }
 
-// XXX Adapted from Python's STRINGLIB(utf8_decode)
 /* 10xxxxxx */
 #define ypStringLib_IS_CONTINUATION_BYTE(ch) ((ch) >= 0x80 && (ch) < 0xC0)
-static yp_uint32_t ypStringLib_decode_frombytesC_utf8( const yp_uint8_t **inptr, 
-        const yp_uint8_t *end, STRINGLIB_CHAR *dest, Py_ssize_t *outpos )
+
+// ypStringLib_decode_frombytesC_utf_8 either returns one of these values, or the out-of-range
+// character (>0xFF) that was decoded but not written.  The invalid start/continuation values 
+// (2, 3, and 4) are sequential so that value-1 gives the number of bytes that must be skipped.
+#define ypStringLib_UTF_8_DATA_END          (0u)
+#define ypStringLib_UTF_8_INVALID_START     (1u)
+#define ypStringLib_UTF_8_INVALID_CONT_1    (2u)
+#define ypStringLib_UTF_8_INVALID_CONT_2    (3u)
+#define ypStringLib_UTF_8_INVALID_CONT_3    (4u)
+
+// XXX Adapted from Python's STRINGLIB(utf8_decode)
+// TODO Bracket all if statements, remove all but the Return goto
+static yp_uint32_t ypStringLib_decode_frombytesC_utf_8( const yp_uint8_t **inptr, 
+        const yp_uint8_t *end, int dest_enc_code, void *dest, yp_ssize_t *out_dest_i )
 {
     yp_uint32_t ch;
     const yp_uint8_t *s = *inptr;
-    STRINGLIB_CHAR *p = dest + *outpos;
+    int dest_sizeshift = ypStringLib_ENC( dest )->sizeshift;
+    yp_uint32_t dest_max_char = ypStringLib_ENC( dest )->max_char;
+    ypStringLib_setindexfunc dest_setindex = ypStringLib_ENC( dest )->setindex;
+    yp_ssize_t dest_i = *out_dest_i;
 
     while (s < end) {
         ch = *s;
@@ -5394,13 +5412,12 @@ static yp_uint32_t ypStringLib_decode_frombytesC_utf8( const yp_uint8_t **inptr,
                characters, we try to optimize for this case.
             */
             yp_ssize_t ascii_len = ypStringLib_count_ascii_bytes( s, end );
-            yp_ASSERT( ascii_len > 0 );
-            // FIXME copy over the bytes
-            if (ch < 0x80) {
-                s++;
-                *p++ = ch;
-                continue;
-            }
+            yp_ASSERT1( ascii_len > 0 );
+            ypStringLib_elemcopy( dest_sizeshift, dest, dest_i,
+                    0/*(ascii sizeshift)*/, s, 0, ascii_len );
+            s += ascii_len;
+            dest_i += ascii_len;
+            continue;
         }
 
         if (ch < 0xE0) {
@@ -5423,13 +5440,13 @@ static yp_uint32_t ypStringLib_decode_frombytesC_utf8( const yp_uint8_t **inptr,
                 goto InvalidContinuation1;
             ch = (ch << 6) + ch2 -
                  ((0xC0 << 6) + 0x80);
-            assert ((ch > 0x007F) && (ch <= 0x07FF));
+            yp_ASSERT1 ((ch > 0x007F) && (ch <= 0x07FF));
             s += 2;
-            if (STRINGLIB_MAX_CHAR <= 0x007F ||
-                (STRINGLIB_MAX_CHAR < 0x07FF && ch > STRINGLIB_MAX_CHAR))
+            if (ch > dest_max_char)
                 /* Out-of-range */
                 goto Return;
-            *p++ = ch;
+            dest_setindex( dest, dest_i, ch );
+            dest_i += 1;
             continue;
         }
 
@@ -5473,13 +5490,13 @@ static yp_uint32_t ypStringLib_decode_frombytesC_utf8( const yp_uint8_t **inptr,
             }
             ch = (ch << 12) + (ch2 << 6) + ch3 -
                  ((0xE0 << 12) + (0x80 << 6) + 0x80);
-            assert ((ch > 0x07FF) && (ch <= 0xFFFF));
+            yp_ASSERT1 ((ch > 0x07FF) && (ch <= 0xFFFF));
             s += 3;
-            if (STRINGLIB_MAX_CHAR <= 0x07FF ||
-                (STRINGLIB_MAX_CHAR < 0xFFFF && ch > STRINGLIB_MAX_CHAR))
+            if (ch > dest_max_char)
                 /* Out-of-range */
                 goto Return;
-            *p++ = ch;
+            dest_setindex( dest, dest_i, ch );
+            dest_i += 1;
             continue;
         }
 
@@ -5530,36 +5547,35 @@ static yp_uint32_t ypStringLib_decode_frombytesC_utf8( const yp_uint8_t **inptr,
             }
             ch = (ch << 18) + (ch2 << 12) + (ch3 << 6) + ch4 -
                  ((0xF0 << 18) + (0x80 << 12) + (0x80 << 6) + 0x80);
-            assert ((ch > 0xFFFF) && (ch <= 0x10FFFF));
+            yp_ASSERT1 ((ch > 0xFFFF) && (ch <= 0x10FFFF));
             s += 4;
-            if (STRINGLIB_MAX_CHAR <= 0xFFFF ||
-                (STRINGLIB_MAX_CHAR < 0x10FFFF && ch > STRINGLIB_MAX_CHAR))
+            if (ch > dest_max_char)
                 /* Out-of-range */
                 goto Return;
-            *p++ = ch;
+            dest_setindex( dest, dest_i, ch );
+            dest_i += 1;
             continue;
         }
         goto InvalidStart;
     }
-    ch = 0;
+    ch = ypStringLib_UTF_8_DATA_END;
 Return:
     *inptr = s;
-    *outpos = p - dest;
+    *out_dest_i = dest_i;
     return ch;
 InvalidStart:
-    ch = 1;
+    ch = ypStringLib_UTF_8_INVALID_START;
     goto Return;
 InvalidContinuation1:
-    ch = 2;
+    ch = ypStringLib_UTF_8_INVALID_CONT_1;
     goto Return;
 InvalidContinuation2:
-    ch = 3;
+    ch = ypStringLib_UTF_8_INVALID_CONT_2;
     goto Return;
 InvalidContinuation3:
-    ch = 4;
+    ch = ypStringLib_UTF_8_INVALID_CONT_3;
     goto Return;
 }
-#endif
 
 
 /*************************************************************************************************
@@ -7368,6 +7384,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
     {   // ypStringLib_ENC_BYTES
         1,                                  // elemsize
         0,                                  // sizeshift
+        0xFFu,                              // max_char
         _yp_bytes_empty,                    // empty_immutable
         yp_bytearray0,                      // empty_mutable
         ypStringLib_getindex_bytes,         // getindex
