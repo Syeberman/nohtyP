@@ -4973,10 +4973,10 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 
 // Macros on ob_type_flags for string objects (bytes and str), used to index into
 // ypStringLib_encs.
-#define ypStringLib_ENC_BYTES  _ypStringLib_ENC_BYTES
-#define ypStringLib_ENC_UCS_1  _ypStringLib_ENC_UCS_1
-#define ypStringLib_ENC_UCS_2  _ypStringLib_ENC_UCS_2
-#define ypStringLib_ENC_UCS_4  _ypStringLib_ENC_UCS_4
+#define ypStringLib_ENC_BYTES       _ypStringLib_ENC_BYTES
+#define ypStringLib_ENC_LATIN_1     _ypStringLib_ENC_LATIN_1
+#define ypStringLib_ENC_UCS_2       _ypStringLib_ENC_UCS_2
+#define ypStringLib_ENC_UCS_4       _ypStringLib_ENC_UCS_4
 
 // struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
 typedef struct _ypBytesObject ypBytesObject;
@@ -4990,9 +4990,9 @@ typedef struct _ypStrObject ypStrObject;
 #define ypStringLib_SET_LEN         ypObject_SET_CACHED_LEN
 #define ypStringLib_ALLOCLEN        ypObject_ALLOCLEN
 
-// The maximum possible length of any string object (not including null terminator).  While UCS-1
+// The maximum possible length of any string object (not including null terminator).  While Latin-1
 // could technically allow four times as much data as UCS-4, for simplicity we use one maximum
-// length for all encodings.  (Consider that an element in the largest UCS-1 string could be
+// length for all encodings.  (Consider that an element in the largest Latin-1 chrarray could be
 // replaced with a UCS-4 character, thus quadrupling its size.)
 #define ypStringLib_LEN_MAX ( (yp_ssize_t) MIN( MIN( \
             yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
@@ -5010,17 +5010,19 @@ static ypBytesObject _yp_bytes_empty_struct = {
 
 // Empty strs can be represented by this, immortal object
 static ypStrObject _yp_str_empty_struct = {
-    { ypStr_CODE, 0, ypStringLib_ENC_UCS_1, ypObject_REFCNT_IMMORTAL,
+    { ypStr_CODE, 0, ypStringLib_ENC_LATIN_1, ypObject_REFCNT_IMMORTAL,
     0, 0, ypObject_HASH_INVALID, "" } };
 #define _yp_str_empty   ((ypObject *) &_yp_str_empty_struct)
 
 // Gets the ordinal at src[src_i]
 // TODO remove src_i and rename to getvalue or something
+// TODO Is there a declaration we could give this (or the definitions) to make them faster?
 typedef yp_uint32_t (*ypStringLib_getindexfunc)( void *src, yp_ssize_t src_i );
 
 // Sets dest[dest_i] to value
 // XXX dest's encoding must be able to store value
 // TODO remove dest_i and rename to setvalue or something
+// TODO Is there a declaration we could give this (or the definitions) to make them faster?
 typedef void (*ypStringLib_setindexfunc)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
 
 // XXX In general for this table, make sure you do not use type codes with the wrong
@@ -5326,7 +5328,7 @@ static ypObject *ypStringLib_join(
         return yp_MemorySizeOverflowError;
     }
     result_len = ypStringLib_LEN( s ) * (seq_len-1);
-    result_enc_code = ypStringLib_ENC_CODE( s );   // if s is empty the code is UCS-1 or BYTES
+    result_enc_code = ypStringLib_ENC_CODE( s );   // if s is empty the code is Latin-1 or BYTES
     for( i = 0; i < seq_len; i++ ) {
         x = seq->getindexX( state, i );     // borrowed
         if( ypObject_TYPE_PAIR_CODE( x ) != s_pair ) return_yp_BAD_TYPE( x );
@@ -5427,6 +5429,8 @@ static yp_uint32_t _ypStringLib_decode_utf_8( const yp_uint8_t **source, const y
     yp_ssize_t dest_len = ypStringLib_LEN( dest );
 
     while (s < end) {
+        // We're going to be decoding at least one character, so make sure there's room
+        yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - dest_len >= 1 );
         ch = *s;
 
         if (ch < 0x80) {
@@ -5436,6 +5440,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8( const yp_uint8_t **source, const y
             */
             yp_ssize_t ascii_len = ypStringLib_count_ascii_bytes( s, end );
             yp_ASSERT1( ascii_len > 0 );
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - dest_len >= ascii_len );
             ypStringLib_elemcopy( dest_sizeshift, dest_data, dest_len,
                     0/*(ascii sizeshift)*/, s, 0, ascii_len );
             s += ascii_len;
@@ -5603,6 +5608,11 @@ InvalidContinuation3:
 // Decodes the len bytes of UTF-8 at source according to errors, and returns a new string of the
 // given type.  If source is NULL it is considered as having all null bytes; len cannot be
 // negative.
+// XXX Allocation-wise, the worst-case through the code would be a completely UCS-4 string, as we'd
+// allocate len characters (len*4 bytes) for the decoding, but would only decode len/4 characters
+// XXX Runtime-wise, the worst-case would probably be a string that starts completely Latin-1 (each
+// character is a call to enc->setindex), followed by a UCS-2 then a UCS-4 character (each
+// triggering an upconvert of previously-decoded characters)
 // TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
 // decoding errors
 // TODO When resizing in this function, don't blindly accept len as the allocation length, but take
@@ -5694,7 +5704,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
             yp_decref( newS );
             return yp_NotImplementedError;
         } else {
-            // Otherwise it's Latin-1/UCS-1 as far as we can see, or there was a decoding error, so
+            // Otherwise it's Latin-1 as far as we can see, or there was a decoding error, so
             // resize and move on to the main loop
             // TODO take into account the continuation bytes we already know about
             _ypStr_grow_onextend( newS, len, 0 );
@@ -5742,6 +5752,7 @@ main_loop:
                 goto onError;*/
         }
     }
+    // TODO See how much wasted space is left here and if we should release some back to the heap
     ypStringLib_ENC( newS )->setindex( ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), 0 );
     return newS;
 }
@@ -6951,7 +6962,7 @@ static ypObject *_ypStr_new( int type, yp_ssize_t requiredLen, int alloclen_fixe
     } else {
         return ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, requiredLen+1, 0 );
     }
-    ypStringLib_ENC_CODE( newS ) = ypStringLib_ENC_UCS_1;
+    ypStringLib_ENC_CODE( newS ) = ypStringLib_ENC_LATIN_1;
     return newS;
 }
 
@@ -7564,7 +7575,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         _ypBytes_grow_onextend,             // grow_onextend
         bytearray_clear                     // clear
     },
-    {   // ypStringLib_ENC_UCS_1
+    {   // ypStringLib_ENC_LATIN_1
         0
     },
     {   // ypStringLib_ENC_UCS_2
