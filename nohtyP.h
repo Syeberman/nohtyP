@@ -1849,7 +1849,7 @@ struct _ypStrObject {
 #define _ypObject_LEN_INVALID       ((yp_ssize_t) -1)
 // Macros on ob_type_flags for string objects (bytes and str)
 #define _ypStringLib_ENC_BYTES      (0u)
-#define _ypStringLib_ENC_UCS_1      (1u)
+#define _ypStringLib_ENC_LATIN_1    (1u)
 #define _ypStringLib_ENC_UCS_2      (2u)
 #define _ypStringLib_ENC_UCS_4      (3u)
 
@@ -1875,7 +1875,7 @@ struct _ypStrObject {
 #define yp_IMMORTAL_STR_LATIN_1( name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypStrObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypStr_CODE, _ypStringLib_ENC_UCS_1, \
+        _ypStr_CODE, _ypStringLib_ENC_LATIN_1, \
         (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE
