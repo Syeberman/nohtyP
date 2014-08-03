@@ -341,6 +341,11 @@ yp_func( c_ypObject_p, "yp_str_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_
 yp_func( c_ypObject_p, "yp_chrarray_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
             (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 
+# ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
+yp_func( c_ypObject_p, "yp_str_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
+# ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
+yp_func( c_ypObject_p, "yp_chrarray_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
+
 # ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors );
 yp_func( c_ypObject_p, "yp_str3", ((c_ypObject_p, "object"),
             (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
@@ -1666,8 +1671,8 @@ class yp_str( ypObject ):
             if object is _yp_arg_missing: return _yp_str0( )
             if isinstance( object, ypObject ): return object._yp_str( )
             if isinstance( object, str ):
-                encoded = object.encode( "utf-8" )
-                return _yp_str_frombytesC4( encoded, len( encoded ), yp_s_utf_8, yp_s_strict )
+                encoded = object.encode( )
+                return _yp_str_frombytesC2( encoded, len( encoded ) )
             raise TypeError( "expected ypObject or str in yp_str" )
         else:
             return _yp_str3( object, encoding, errors )
@@ -1693,7 +1698,7 @@ class yp_str( ypObject ):
         #    assert self is _yp_str_empty, "an empty str should be _yp_str_empty"
 
     # Just as yp_bool.__bool__ must return a bool, so to must this return a str
-    def __str__( self ): return bytes( self.encode( ) ).decode( )
+    def __str__( self ): return self.encode( )._asbytes( ).decode( )
     # FIXME When nohtyP supports repr, replace this faked-out version
     def _yp_str( self ): return self
     def _yp_repr( self ): return repr( str( self ) )
