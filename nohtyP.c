@@ -7661,7 +7661,7 @@ ypObject *yp_chrC( yp_int_t i ) {
     newS = _ypStr_new( ypStr_CODE, 1, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newS ) ) return newS;
     yp_ASSERT( ypStr_DATA( newS ) == ypStr_INLINE_DATA( newS ), "yp_chrC didn't allocate inline!" );
-    ypStr_DATA( newS )[0] = (yp_uint8_t) (i && 0xFFu);
+    ypStr_DATA( newS )[0] = (yp_uint8_t) (i & 0xFFu);
     ypStr_DATA( newS )[1] = '\0';
     ypStr_SET_LEN( newS, 1 );
     return newS;
