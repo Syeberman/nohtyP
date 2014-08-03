@@ -5766,7 +5766,7 @@ main_loop:
 static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len );
 // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed );
-ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *source, ypObject *errors )
+static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *source )
 {
     yp_ssize_t   const source_len = ypStringLib_LEN( source );
     yp_uint8_t * const source_data = ypStringLib_DATA( source );
@@ -5776,7 +5776,6 @@ ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *source, yp
     yp_uint8_t *dest_data;
     yp_uint8_t *d;  // moving dest_data pointer
 
-    yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypBytes_CODE, "incorrect bytes type" );
     yp_ASSERT( ypStringLib_ENC_CODE( source ) == ypStringLib_ENC_LATIN_1, "_ypStringLib_encode_utf_8_from_latin_1 called on wrong str encoding" );
     yp_ASSERT( source_len > 0, "empty-string case should be handled before _ypStringLib_encode_utf_8_from_latin_1" );
 
@@ -5844,9 +5843,21 @@ ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *source, yp
     return dest;    
 }
 
+static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
+{
+    yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypBytes_CODE, "incorrect bytes type" );
 
+    if( ypStringLib_LEN( source ) < 1 ) {
+        if( type == ypBytes_CODE ) return _yp_bytes_empty;
+        return yp_bytearray0( );
+    }
 
-
+    if( ypStringLib_ENC_CODE( source ) == ypStringLib_ENC_LATIN_1 ) {
+        return _ypStringLib_encode_utf_8_from_latin_1( type, source );
+    } else {
+        return yp_NotImplementedError;
+    }
+}
 
 
 /*************************************************************************************************
@@ -5874,16 +5885,33 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
     memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src)+1 );
 
 // Gets ordinal at src[src_i]
-yp_uint32_t ypStringLib_getindex_bytes( void *src, yp_ssize_t src_i ) {
+yp_uint32_t ypStringLib_getindex_1byte( void *src, yp_ssize_t src_i ) {
     yp_ASSERT( src_i >= 0, "indicies must be >=0" );
     return ((yp_uint8_t *)src)[src_i];
 }
+yp_uint32_t ypStringLib_getindex_2bytes( void *src, yp_ssize_t src_i ) {
+    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
+    return ((yp_uint16_t *)src)[src_i];
+}
+yp_uint32_t ypStringLib_getindex_4bytes( void *src, yp_ssize_t src_i ) {
+    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
+    return ((yp_uint32_t *)src)[src_i];
+}
 
 // Sets dest[dest_i] to value
-void ypStringLib_setindex_bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+void ypStringLib_setindex_1byte( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
     yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
     yp_ASSERT( value <= 0xFFu, "value too large for a byte" );
     ((yp_uint8_t *)dest)[dest_i] = (yp_uint8_t) (value & 0xFFu);
+}
+void ypStringLib_setindex_2bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
+    yp_ASSERT( value <= 0xFFFFu, "value too large for a byte" );
+    ((yp_uint16_t *)dest)[dest_i] = (yp_uint16_t) (value & 0xFFFFu);
+}
+void ypStringLib_setindex_4bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
+    ((yp_uint32_t *)dest)[dest_i] = value;
 }
 
 // Return a new bytes/bytearray object that can fit the given requiredLen plus the null terminator.
@@ -6931,7 +6959,9 @@ static ypObject *_ypBytes_encode( int type,
         ypObject *source, ypObject *encoding, ypObject *errors )
 {
     if( ypObject_TYPE_PAIR_CODE( source ) != ypStr_CODE ) return_yp_BAD_TYPE( source );
-    return yp_NotImplementedError;
+    // XXX Not handling errors in yp_eq yet because this is just temporary
+    if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
+    return ypStringLib_encode_utf_8( type, source, errors );
 }
 ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors ) {
     return _ypBytes_encode( ypBytes_CODE, source, encoding, errors );
@@ -6944,8 +6974,9 @@ ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors ) {
             s, encoding, errors );
 }
 ypObject *yp_encode( ypObject *s ) {
-    return _ypBytes_encode( ypObject_IS_MUTABLE( s ) ? ypByteArray_CODE : ypBytes_CODE,
-            s, yp_s_utf_8, yp_s_strict );
+    if( ypObject_TYPE_PAIR_CODE( s ) != ypStr_CODE ) return_yp_BAD_TYPE( s );
+    return ypStringLib_encode_utf_8( ypObject_IS_MUTABLE( s ) ? ypByteArray_CODE : ypBytes_CODE,
+            s, yp_s_strict );
 }
 
 static ypObject *_ypBytes( int type, ypObject *source )
@@ -7050,9 +7081,9 @@ static ypObject *_ypStr_new( int type, yp_ssize_t requiredLen, int alloclen_fixe
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
     yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
     if( alloclen_fixed && type == ypStr_CODE ) {
-        return ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, requiredLen+1 );
+        newS = ypMem_MALLOC_CONTAINER_INLINE( ypStrObject, ypStr_CODE, requiredLen+1 );
     } else {
-        return ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, requiredLen+1, 0 );
+        newS = ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, requiredLen+1, 0 );
     }
     ypStringLib_ENC_CODE( newS ) = ypStringLib_ENC_LATIN_1;
     return newS;
@@ -7542,7 +7573,8 @@ ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t
 static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors )
 {
-    if( encoding != yp_s_utf_8 ) return yp_NotImplementedError;
+    // XXX Not handling errors in yp_eq yet because this is just temporary
+    if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
 
     // Do not call ypStringLib_decode_frombytesC_* with a negative len; instead, do strlen here
     if( len < 0 ) {
@@ -7560,17 +7592,24 @@ ypObject *yp_chrarray_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
     return _ypStr_frombytes( ypChrArray_CODE, source, len, encoding, errors );
 }
 ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
-    return _ypStr_frombytes( ypStr_CODE, source, len, yp_s_utf_8, yp_s_strict );
+    if( len < 0 ) { // do not call ypStringLib_decode_frombytesC_* with negative len
+        len = (source == NULL) ? 0 : strlen( (const char *) source );
+    }
+    return ypStringLib_decode_frombytesC_utf_8( ypStr_CODE, source, len, yp_s_strict );
 }
 ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
-    return _ypStr_frombytes( ypChrArray_CODE, source, len, yp_s_utf_8, yp_s_strict );
+    if( len < 0 ) { // do not call ypStringLib_decode_frombytesC_* with negative len
+        len = (source == NULL) ? 0 : strlen( (const char *) source );
+    }
+    return ypStringLib_decode_frombytesC_utf_8( ypChrArray_CODE, source, len, yp_s_strict );
 }
 
 static ypObject *_ypStr_decode( int type,
         ypObject *source, ypObject *encoding, ypObject *errors )
 {
     if( ypObject_TYPE_PAIR_CODE( source ) != ypBytes_CODE ) return_yp_BAD_TYPE( source );
-    if( encoding != yp_s_utf_8 ) return yp_NotImplementedError;
+    // XXX Not handling errors in yp_eq yet because this is just temporary
+    if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
     return ypStringLib_decode_frombytesC_utf_8( type, 
             ypBytes_DATA( source ), ypBytes_LEN( source ), errors );
 }
@@ -7585,8 +7624,10 @@ ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors ) {
             b, encoding, errors );
 }
 ypObject *yp_decode( ypObject *b ) {
-    return _ypStr_decode( ypObject_IS_MUTABLE( b ) ? ypChrArray_CODE : ypStr_CODE,
-            b, yp_s_utf_8, yp_s_strict );
+    if( ypObject_TYPE_PAIR_CODE( b ) != ypBytes_CODE ) return_yp_BAD_TYPE( b );
+    return ypStringLib_decode_frombytesC_utf_8( 
+            ypObject_IS_MUTABLE( b ) ? ypChrArray_CODE : ypStr_CODE,
+            ypBytes_DATA( b ), ypBytes_LEN( b ), yp_s_strict );
 }
 
 static ypObject *_ypStr( int type, ypObject *object )
@@ -7660,15 +7701,25 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         0xFFu,                              // max_char
         _yp_bytes_empty,                    // empty_immutable
         yp_bytearray0,                      // empty_mutable
-        ypStringLib_getindex_bytes,         // getindex
-        ypStringLib_setindex_bytes,         // setindex
+        ypStringLib_getindex_1byte,         // getindex
+        ypStringLib_setindex_1byte,         // setindex
         _ypBytes_new,                       // new
         _ypBytes_copy,                      // copy
         _ypBytes_grow_onextend,             // grow_onextend
         bytearray_clear                     // clear
     },
     {   // ypStringLib_ENC_LATIN_1
-        0
+        1,                                  // elemsize
+        0,                                  // sizeshift
+        0xFFu,                              // max_char
+        _yp_str_empty,                      // empty_immutable
+        yp_chrarray0,                       // empty_mutable
+        ypStringLib_getindex_1byte,         // getindex
+        ypStringLib_setindex_1byte,         // setindex
+        _ypStr_new,                         // new
+        _ypStr_copy,                        // copy
+        NULL, /*_ypStr_grow_onextend,*/     // grow_onextend
+        NULL, /*chrarray_clear*/            // clear
     },
     {   // ypStringLib_ENC_UCS_2
         0
