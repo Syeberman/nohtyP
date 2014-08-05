@@ -106,8 +106,6 @@ class BaseBytesTest:
 
     def test_constructor_type_errors(self):
         self.assertRaises(TypeError, self.type2test, 0.0)
-        class C:
-            pass
         self.assertRaises(TypeError, self.type2test, ["0"])
         self.assertRaises(TypeError, self.type2test, [0.0])
         self.assertRaises(TypeError, self.type2test, [None])
@@ -212,7 +210,7 @@ class BaseBytesTest:
     def test_extended_getslice(self):
         # Sample just a few random indicies for each of start, stop, and step
         self.check_extended_getslice(lambda x: random.sample(x,3))
-    
+
     @yp_test.support.requires_resource('cpu')
     def test_extended_getslice_cpu(self):
         # Check all indicies
@@ -315,17 +313,35 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test.fromhex, '\x00')
         self.assertRaises(ValueError, self.type2test.fromhex, '12   \x00   34')
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_join(self):
-        self.assertEqual(self.type2test(b"").join([]), b"")
-        self.assertEqual(self.type2test(b"").join([b""]), b"")
+        # TODO Add these back to Python
+        self.assertEqual(self.type2test(b"").join(yp_list([])), b"")
+        self.assertEqual(self.type2test(b"").join(yp_list([b""])), b"")
         for lst in [[b"abc"], [b"a", b"bc"], [b"ab", b"c"], [b"a", b"b", b"c"]]:
-            lst = list(map(self.type2test, lst))
+            lst = yp_list(map(self.type2test, lst))
             self.assertEqual(self.type2test(b"").join(lst), b"abc")
-            self.assertEqual(self.type2test(b"").join(tuple(lst)), b"abc")
-            self.assertEqual(self.type2test(b"").join(iter(lst)), b"abc")
-        self.assertEqual(self.type2test(b".").join([b"ab", b"cd"]), b"ab.cd")
-        # XXX more...
+            self.assertEqual(self.type2test(b"").join(yp_tuple(lst)), b"abc")
+            self.assertEqual(self.type2test(b"").join(yp_iter(lst)), b"abc")
+
+        self.assertEqual(self.type2test(b".").join(yp_list([])), b"")
+        self.assertEqual(self.type2test(b".").join(yp_list([b"ab"])), b"ab")
+        self.assertEqual(self.type2test(b".").join(yp_list([b"ab", b"cd"])), b"ab.cd")
+        self.assertEqual(self.type2test(b".").join(yp_list([b"ab", b"cd", b"ef"])), b"ab.cd.ef")
+
+        with self.assertRaises(TypeError):
+            self.type2test(b"").join(yp_list(["abc"]))
+
+    def test_join_sametype(self):
+        # TODO Add these back to Python
+        self.assertEqual(self.type2test(b"").join(self.type2test(b"")), b"")
+        self.assertEqual(self.type2test(b"").join(self.type2test(b"a")), b"a")
+        self.assertEqual(self.type2test(b"").join(self.type2test(b"ab")), b"ab")
+        self.assertEqual(self.type2test(b"").join(self.type2test(b"abc")), b"abc")
+        self.assertEqual(self.type2test(b".").join(self.type2test(b"")), b"")
+        self.assertEqual(self.type2test(b".").join(self.type2test(b"a")), b"a")
+        self.assertEqual(self.type2test(b".").join(self.type2test(b"ab")), b"a.b")
+        self.assertEqual(self.type2test(b".").join(self.type2test(b"abc")), b"a.b.c")
+        self.assertEqual(self.type2test(b"..").join(self.type2test(b"abc")), b"a..b..c")
 
     def test_count(self):
         b = self.type2test(b'mississippi')
@@ -1002,7 +1018,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
     def test_extended_set_del_slice(self):
         # Sample just a few random indicies for each of start, stop, and step
         self.check_extended_set_del_slice(lambda x: random.sample(x,3))
-    
+
     @yp_test.support.requires_resource('cpu')
     def test_extended_set_del_slice_cpu(self):
         # Check all indicies
@@ -1157,7 +1173,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b.insert(0, Indexable(ord('A')))
         self.assertEqual(b, b'A')
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO: Implement translate")
     def test_copied(self):
         # Issue 4348.  Make sure that operations that don't mutate the array
         # copy the bytes.
@@ -1306,7 +1322,7 @@ class AssortedBytesTest(yp_unittest.TestCase):
             self.assertRaises(SyntaxError, eval,
                               'b"%s"' % chr(c))
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO: Implement translate")
     def test_translate(self):
         b = yp_bytes(b'hello')
         ba = yp_bytearray(b)
@@ -1327,17 +1343,17 @@ class AssortedBytesTest(yp_unittest.TestCase):
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_split_bytearray(self):
-        self.assertEqual(b'a b'.split(b' '), [b'a', b'b'])
+        self.assertEqual(yp_bytes(b'a b').split(b' '), [b'a', b'b'])
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rsplit_bytearray(self):
-        self.assertEqual(b'a b'.rsplit(b' '), [b'a', b'b'])
+        self.assertEqual(yp_bytes(b'a b').rsplit(b' '), [b'a', b'b'])
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_return_self(self):
         # bytearray.replace must always return a new bytearray
         b = yp_bytearray()
-        self.assertFalse(b.replace(b'', b'') is b)
+        self.assertIsNot(b.replace(b'', b''), b)
 
     def test_compare(self):
         if sys.flags.bytes_warning:
@@ -1449,7 +1465,7 @@ class SubclassTest:
         # test repeat
         self.assertTrue(a*5 == _a*5)
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("Not applicable to nohtyP")
     def test_join(self):
         # Make sure join returns a NEW object for single item sequences
         # involving a subclass.
