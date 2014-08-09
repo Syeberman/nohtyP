@@ -1838,6 +1838,7 @@ struct _ypBytesObject {
 };
 struct _ypStrObject {
     _ypObject_HEAD
+    ypObject *utf_8;
     _yp_INLINE_DATA( yp_uint8_t );
 };
 
@@ -1876,7 +1877,7 @@ struct _ypStrObject {
     static const char _ ## name ## _data[] = value; \
     static struct _ypStrObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
         _ypStr_CODE, _ypStringLib_ENC_LATIN_1, \
-        (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
+        (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ), NULL }; \
     ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 

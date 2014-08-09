@@ -1056,16 +1056,16 @@ yp_STATIC_ASSERT( yp_sizeof( _ypMem_starting_refcnt ) == yp_sizeof_member( ypObj
 // When calculating the number of required bytes, there is protection at higher levels to ensure
 // the multiplication never overflows.  However, when calculating extra (or required+extra) bytes,
 // if the multiplication overflows we clamp to yp_SSIZE_T_MAX.
-static yp_ssize_t _ypMem_calc_extra_size( yp_ssize_t alloclen, yp_ssize_t sizeof_elems ) {
+static yp_ssize_t _ypMem_calc_extra_size( yp_ssize_t alloclen, yp_ssize_t elemsize ) {
     yp_ASSERT( alloclen >= 0, "alloclen cannot be negative" );
-    yp_ASSERT( sizeof_elems > 0, "sizeof_elems cannot be <=0" );
+    yp_ASSERT( elemsize > 0, "elemsize cannot be <=0" );
     // If the multiplication will overflow, return the maximum size
-    if( alloclen > yp_SSIZE_T_MAX / sizeof_elems ) return yp_SSIZE_T_MAX;
-    return alloclen * sizeof_elems;
+    if( alloclen > yp_SSIZE_T_MAX / elemsize ) return yp_SSIZE_T_MAX;
+    return alloclen * elemsize;
 }
 
 // Returns a malloc'd buffer for fixed, non-container objects, or exception on failure
-static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
+static ypObject *_ypMem_malloc_fixed( int type, yp_ssize_t sizeof_obStruct )
 {
     yp_ssize_t size;
     ypObject *ob = (ypObject *) yp_malloc( &size, sizeof_obStruct );
@@ -1079,29 +1079,29 @@ static ypObject *_ypMem_malloc_fixed( yp_ssize_t sizeof_obStruct, int type )
     yp_DEBUG( "MALLOC_FIXED: type %d 0x%08X", type, ob );
     return ob;
 }
-#define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( yp_sizeof( obStruct ), (type) )
+#define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( (type), yp_sizeof( obStruct ) )
 
 // Returns a malloc'd buffer for a container object holding alloclen elements in-line, or exception
 // on failure.  The container can neither grow nor shrink after allocation.  ob_inline_data in
 // obStruct is used to determine the element size and ob_data; ob_len is set to zero.  alloclen
-// cannot be negative and offsetof_inline+(alloclen*sizeof_elems) cannot overflow; ob_alloclen may
+// cannot be negative and offsetof_inline+(alloclen*elemsize) cannot overflow; ob_alloclen may
 // be larger than requested.
 // XXX We require that each type knows and checks for their maximum length to avoid overflow here
 static ypObject *_ypMem_malloc_container_inline(
-        yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems, int type, yp_ssize_t alloclen )
+        int type, yp_ssize_t alloclen, yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
 {
     yp_ssize_t size;
     ypObject *ob;
 
     yp_ASSERT( alloclen >= 0, "alloclen cannot be negative" );
     yp_ASSERT( alloclen <= ypObject_LEN_MAX, "alloclen cannot be larger than maximum" );
-    yp_ASSERT( alloclen <= (yp_SSIZE_T_MAX-offsetof_inline)/sizeof_elems, "yp_malloc size cannot overflow" );
+    yp_ASSERT( alloclen <= (yp_SSIZE_T_MAX-offsetof_inline)/elemsize, "yp_malloc size cannot overflow" );
 
     // Allocate memory, then update alloclen based on actual size of buffer allocated
-    size = offsetof_inline + (alloclen*sizeof_elems);
+    size = offsetof_inline + (alloclen*elemsize);
     ob = (ypObject *) yp_malloc( &size, size );
     if( ob == NULL ) return yp_MemoryError;
-    alloclen = (size - offsetof_inline) / sizeof_elems; // rounds down
+    alloclen = (size - offsetof_inline) / elemsize; // rounds down
     if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
 
     ypObject_SET_ALLOCLEN( ob, alloclen );
@@ -1113,9 +1113,13 @@ static ypObject *_ypMem_malloc_container_inline(
     yp_DEBUG( "MALLOC_CONTAINER_INLINE: type %d 0x%08X alloclen %d", type, ob, alloclen );
     return ob;
 }
+#define ypMem_MALLOC_CONTAINER_INLINE4( obStruct, type, alloclen, elemsize ) \
+    _ypMem_malloc_container_inline( (type), (alloclen), \
+            yp_offsetof( obStruct, ob_inline_data ), \
+            (elemsize) )
 #define ypMem_MALLOC_CONTAINER_INLINE( obStruct, type, alloclen ) \
-    _ypMem_malloc_container_inline( yp_offsetof( obStruct, ob_inline_data ), \
-            yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (alloclen) )
+    ypMem_MALLOC_CONTAINER_INLINE4( obStruct, (type), (alloclen), \
+            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // TODO Make this configurable via yp_initialize
 // XXX 64-bit PyDictObject is 128 bytes...we are larger!
@@ -1131,12 +1135,12 @@ static yp_ssize_t _ypMem_ideal_size = _ypMem_ideal_size_DEFAULT;
 // Returns a malloc'd buffer for a container that may grow or shrink in the future, or exception on
 // failure.  A fixed amount of memory is allocated in-line, as per _ypMem_ideal_size.  If this fits
 // required elements, it is used, otherwise a separate buffer of required+extra elements is
-// allocated.  required and extra cannot be negative and required*sizeof_elems cannot overflow;
+// allocated.  required and extra cannot be negative and required*elemsize cannot overflow;
 // ob_alloclen may be larger than requested.
 // XXX We require that each type knows and checks for their maximum length to avoid overflow here
 static ypObject *_ypMem_malloc_container_variable(
-        yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems, int type,
-        yp_ssize_t required, yp_ssize_t extra )
+        int type, yp_ssize_t required, yp_ssize_t extra,
+        yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
 {
     yp_ssize_t size;
     ypObject *ob;
@@ -1145,23 +1149,23 @@ static ypObject *_ypMem_malloc_container_variable(
     yp_ASSERT( required >= 0, "required cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
     yp_ASSERT( required <= ypObject_LEN_MAX, "required cannot be larger than maximum" );
-    yp_ASSERT( required <= yp_SSIZE_T_MAX/sizeof_elems, "required yp_malloc size cannot overflow" );
+    yp_ASSERT( required <= yp_SSIZE_T_MAX/elemsize, "required yp_malloc size cannot overflow" );
     if( extra > ypObject_LEN_MAX - required ) extra = ypObject_LEN_MAX - required;
 
     // Allocate object memory, update alloclen based on actual size of buffer allocated, then see
     // if the data can fit inline or if it needs a separate buffer
     ob = (ypObject *) yp_malloc( &size, MAX( offsetof_inline, _ypMem_ideal_size ) );
     if( ob == NULL ) return yp_MemoryError;
-    alloclen = (size - offsetof_inline) / sizeof_elems; // rounds down
+    alloclen = (size - offsetof_inline) / elemsize; // rounds down
     if( required <= alloclen ) { // a valid check even if alloclen>max, because required<=max
         ob->ob_data = ((yp_uint8_t *)ob) + offsetof_inline;
     } else {
-        ob->ob_data = yp_malloc( &size, _ypMem_calc_extra_size( required+extra, sizeof_elems ) );
+        ob->ob_data = yp_malloc( &size, _ypMem_calc_extra_size( required+extra, elemsize ) );
         if( ob->ob_data == NULL ) {
             yp_free( ob );
             return yp_MemoryError;
         }
-        alloclen = size / sizeof_elems; // rounds down
+        alloclen = size / elemsize; // rounds down
     }
     if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
 
@@ -1173,21 +1177,26 @@ static ypObject *_ypMem_malloc_container_variable(
     yp_DEBUG( "MALLOC_CONTAINER_VARIABLE: type %d 0x%08X alloclen %d", type, ob, alloclen );
     return ob;
 }
+#define ypMem_MALLOC_CONTAINER_VARIABLE5( obStruct, type, required, extra, elemsize ) \
+    _ypMem_malloc_container_variable( (type), (required), (extra), \
+            yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
 #define ypMem_MALLOC_CONTAINER_VARIABLE( obStruct, type, required, extra ) \
-    _ypMem_malloc_container_variable( yp_offsetof( obStruct, ob_inline_data ), \
-            yp_sizeof_member( obStruct, ob_inline_data[0] ), (type), (required), (extra) )
+    ypMem_MALLOC_CONTAINER_VARIABLE5( obStruct, (type), (required), (extra), \
+            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Returns the allocated length of the inline data buffer for the given object, which must have
 // been allocated with ypMem_MALLOC_CONTAINER_VARIABLE.
 // TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
 static yp_ssize_t _ypMem_inlinelen_container_variable(
-        yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems ) {
-    yp_ssize_t inlinelen = (_ypMem_ideal_size-offsetof_inline) / sizeof_elems;
+        yp_ssize_t offsetof_inline, yp_ssize_t elemsize ) {
+    yp_ssize_t inlinelen = (_ypMem_ideal_size-offsetof_inline) / elemsize;
     if( inlinelen < 0 ) return 0;
     return inlinelen;
 }
+#define ypMem_INLINELEN_CONTAINER_VARIABLE3( ob, obStruct, elemsize ) \
+    _ypMem_inlinelen_container_variable( yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
 #define ypMem_INLINELEN_CONTAINER_VARIABLE( ob, obStruct ) \
-    _ypMem_inlinelen_container_variable( yp_offsetof( obStruct, ob_inline_data ), \
+    ypMem_INLINELEN_CONTAINER_VARIABLE3( (ob), obStruct, \
             yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Resizes ob_data, the variable-portion of ob, and returns the previous value of ob_data
@@ -1201,13 +1210,13 @@ static yp_ssize_t _ypMem_inlinelen_container_variable(
 // Required is the minimum ob_alloclen required; if required can fit inline, the inline buffer is
 // used.  extra is a hint as to how much the buffer should be over-allocated, which may be ignored.
 // This function will always resize the data, so first check to see if a resize is necessary.
-// required and extra cannot be negative and required*sizeof_elems cannot overflow; ob_alloclen
+// required and extra cannot be negative and required*elemsize cannot overflow; ob_alloclen
 // may be larger than requested.  Does not update ob_len.
 // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
 // XXX We require that each type knows and checks for their maximum length to avoid overflow here
 static void *_ypMem_realloc_container_variable(
-        ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems,
-        yp_ssize_t required, yp_ssize_t extra )
+        ypObject *ob, yp_ssize_t required, yp_ssize_t extra,
+        yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
 {
     void *newptr;
     void *oldptr;
@@ -1215,12 +1224,12 @@ static void *_ypMem_realloc_container_variable(
     yp_ssize_t extra_size;
     yp_ssize_t alloclen;
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
-    yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, sizeof_elems );
+    yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, elemsize );
 
     yp_ASSERT( required >= 0, "required cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
     yp_ASSERT( required <= ypObject_LEN_MAX, "required cannot be larger than maximum" );
-    yp_ASSERT( required <= yp_SSIZE_T_MAX/sizeof_elems, "required yp_malloc size cannot overflow" );
+    yp_ASSERT( required <= yp_SSIZE_T_MAX/elemsize, "required yp_malloc size cannot overflow" );
     if( extra > ypObject_LEN_MAX - required ) extra = ypObject_LEN_MAX - required;
 
     // If the minimum required allocation can fit inline, then prefer that over a separate buffer
@@ -1234,11 +1243,11 @@ static void *_ypMem_realloc_container_variable(
 
     // If the data is currently inline, it must be moved out into a separate buffer
     if( ob->ob_data == inlineptr ) {
-        newptr = yp_malloc( &size, _ypMem_calc_extra_size( required+extra, sizeof_elems ) );
+        newptr = yp_malloc( &size, _ypMem_calc_extra_size( required+extra, elemsize ) );
         if( newptr == NULL ) return NULL;
         oldptr = ob->ob_data;   // can't possibly equal newptr
         ob->ob_data = newptr;
-        alloclen = size / sizeof_elems; // rounds down
+        alloclen = size / elemsize; // rounds down
         if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
         ypObject_SET_ALLOCLEN( ob, alloclen );
         yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (from inline): 0x%08X alloclen %d", ob, alloclen );
@@ -1246,42 +1255,45 @@ static void *_ypMem_realloc_container_variable(
     }
 
     // Otherwise, let yp_malloc_resize determine if we can expand in-place or need to memcpy
-    extra_size = _ypMem_calc_extra_size( extra, sizeof_elems );
-    newptr = yp_malloc_resize( &size, ob->ob_data, required * sizeof_elems, extra_size );
+    extra_size = _ypMem_calc_extra_size( extra, elemsize );
+    newptr = yp_malloc_resize( &size, ob->ob_data, required * elemsize, extra_size );
     if( newptr == NULL ) return NULL;
     oldptr = ob->ob_data;       // might equal newptr
     ob->ob_data = newptr;
-    alloclen = size / sizeof_elems; // rounds down
+    alloclen = size / elemsize; // rounds down
     if( alloclen > ypObject_LEN_MAX ) alloclen = ypObject_LEN_MAX;
     ypObject_SET_ALLOCLEN( ob, alloclen );
     yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (malloc_resize): 0x%08X alloclen %d", ob, alloclen );
     return oldptr;
 }
+#define ypMem_REALLOC_CONTAINER_VARIABLE5( ob, obStruct, required, extra, elemsize ) \
+    _ypMem_realloc_container_variable( (ob), (required), (extra), \
+            yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
 #define ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, required, extra ) \
-    _ypMem_realloc_container_variable( ob, yp_offsetof( obStruct, ob_inline_data ), \
-            yp_sizeof_member( obStruct, ob_inline_data[0] ), (required), (extra) )
+    ypMem_REALLOC_CONTAINER_VARIABLE5( (ob), obStruct, (required), (extra), \
+            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Called after a successful ypMem_REALLOC_CONTAINER_VARIABLE to free the previous value of ob_data
 // ("oldptr").  If ob_data was resized in-place, or if oldptr is the inline buffer, this is a
 // no-op.  Always succeeds.
 // TODO Should we allow the oldptr==ob_data case?
 static void _ypMem_realloc_container_free_oldptr(
-        ypObject *ob, yp_ssize_t offsetof_inline, void *oldptr )
+        ypObject *ob, void *oldptr, yp_ssize_t offsetof_inline )
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     yp_DEBUG( "REALLOC_CONTAINER_FREE_OLDPTR: 0x%08X", ob );
     if( oldptr != ob->ob_data && oldptr != inlineptr ) yp_free( oldptr );
 }
 #define ypMem_REALLOC_CONTAINER_FREE_OLDPTR( ob, obStruct, oldptr ) \
-    _ypMem_realloc_container_free_oldptr( ob, yp_offsetof( obStruct, ob_inline_data ), oldptr )
+    _ypMem_realloc_container_free_oldptr( (ob), oldptr, yp_offsetof( obStruct, ob_inline_data ) )
 
 // Resets ob_data to the inline buffer and frees the separate buffer (if there is one).  Any
 // contained objects must have already been discarded; no memory is copied.  Always succeeds.
 static void _ypMem_realloc_container_variable_clear(
-        ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t sizeof_elems )
+        ypObject *ob, yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
-    yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, sizeof_elems );
+    yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, elemsize );
 
     // Free any separately-allocated buffer
     if( ob->ob_data != inlineptr ) {
@@ -1291,8 +1303,11 @@ static void _ypMem_realloc_container_variable_clear(
     }
     yp_DEBUG( "REALLOC_CONTAINER_VARIABLE_CLEAR: 0x%08X alloclen %d", ob, ypObject_ALLOCLEN( ob ) );
 }
+#define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR3( ob, obStruct, elemsize ) \
+    _ypMem_realloc_container_variable_clear( (ob), \
+            yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
 #define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( ob, obStruct ) \
-    _ypMem_realloc_container_variable_clear( ob, yp_offsetof( obStruct, ob_inline_data ), \
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR3( (ob), obStruct, \
             yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Frees an object allocated with ypMem_MALLOC_FIXED
@@ -5012,7 +5027,7 @@ static ypBytesObject _yp_bytes_empty_struct = {
 // Empty strs can be represented by this, immortal object
 static ypStrObject _yp_str_empty_struct = {
     { ypStr_CODE, 0, ypStringLib_ENC_LATIN_1, ypObject_REFCNT_IMMORTAL,
-    0, 0, ypObject_HASH_INVALID, "" } };
+    0, 0, ypObject_HASH_INVALID, "" }, _yp_bytes_empty };
 #define _yp_str_empty   ((ypObject *) &_yp_str_empty_struct)
 
 // Gets the ordinal at src[src_i]
@@ -5067,6 +5082,36 @@ static ypStringLib_encinfo ypStringLib_encs[4];
 
 
 // Getters, setters, and copiers for our three internal encodings
+
+// Gets ordinal at src[src_i]
+static yp_uint32_t ypStringLib_getindex_1byte( void *src, yp_ssize_t src_i ) {
+    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
+    return ((yp_uint8_t *)src)[src_i];
+}
+static yp_uint32_t ypStringLib_getindex_2bytes( void *src, yp_ssize_t src_i ) {
+    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
+    return ((yp_uint16_t *)src)[src_i];
+}
+static yp_uint32_t ypStringLib_getindex_4bytes( void *src, yp_ssize_t src_i ) {
+    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
+    return ((yp_uint32_t *)src)[src_i];
+}
+
+// Sets dest[dest_i] to value
+static void ypStringLib_setindex_1byte( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
+    yp_ASSERT( value <= 0xFFu, "value too large for a byte" );
+    ((yp_uint8_t *)dest)[dest_i] = (yp_uint8_t) (value & 0xFFu);
+}
+static void ypStringLib_setindex_2bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
+    yp_ASSERT( value <= 0xFFFFu, "value too large for a byte" );
+    ((yp_uint16_t *)dest)[dest_i] = (yp_uint16_t) (value & 0xFFFFu);
+}
+static void ypStringLib_setindex_4bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
+    ((yp_uint32_t *)dest)[dest_i] = value;
+}
 
 // A version of ypStringLib_elemcopy that copies from UCS-2 to UCS-4
 // TODO Write multiple elements at once and, if possible, read in multiples too
@@ -5123,7 +5168,7 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
                 ((const yp_uint8_t *) src) + (src_i << dest_sizeshift),
                 len << dest_sizeshift );
     } else if( dest_sizeshift == 2 ) {  // UCS-4
-        // If src were sizeshift 2, then we'd have hit the memcpy case
+        // If src was also sizeshift 2, then we'd have hit the memcpy case
         if( src_sizeshift == 1 ) {
             ypStringLib_elemcopy_4from2( dest, dest_i, src, src_i, len );
         } else {
@@ -5131,7 +5176,7 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
             ypStringLib_elemcopy_4from1( dest, dest_i, src, src_i, len );
         }
     } else {                            // UCS-2
-        // If dest were sizeshift 0, then src would be too, and we'd have hit the memcpy case
+        // If dest was sizeshift 0, then src would be too, and we'd have hit the memcpy case
         yp_ASSERT( dest_sizeshift == 1, "unexpected dest_sizeshift" );
         yp_ASSERT( src_sizeshift == 0, "unexpected src_sizeshift" );
         ypStringLib_elemcopy_2from1( dest, dest_i, src, src_i, len );
@@ -5865,6 +5910,8 @@ static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject 
  *************************************************************************************************/
 
 // ypBytesObject is declared in the StringLib section
+// XXX Since bytes are likely to be used to store arbitrary structures, make sure our alignment is
+// compatible will all data types
 yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
 
 #define ypBytes_DATA( b )           ( (yp_uint8_t *) ypStringLib_DATA( b ) )
@@ -5883,36 +5930,6 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 // move.  Recall that memmove handles overlap.  Also adjusts null terminator.
 #define ypBytes_ELEMMOVE( b, dest, src ) \
     memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src)+1 );
-
-// Gets ordinal at src[src_i]
-yp_uint32_t ypStringLib_getindex_1byte( void *src, yp_ssize_t src_i ) {
-    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
-    return ((yp_uint8_t *)src)[src_i];
-}
-yp_uint32_t ypStringLib_getindex_2bytes( void *src, yp_ssize_t src_i ) {
-    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
-    return ((yp_uint16_t *)src)[src_i];
-}
-yp_uint32_t ypStringLib_getindex_4bytes( void *src, yp_ssize_t src_i ) {
-    yp_ASSERT( src_i >= 0, "indicies must be >=0" );
-    return ((yp_uint32_t *)src)[src_i];
-}
-
-// Sets dest[dest_i] to value
-void ypStringLib_setindex_1byte( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
-    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
-    yp_ASSERT( value <= 0xFFu, "value too large for a byte" );
-    ((yp_uint8_t *)dest)[dest_i] = (yp_uint8_t) (value & 0xFFu);
-}
-void ypStringLib_setindex_2bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
-    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
-    yp_ASSERT( value <= 0xFFFFu, "value too large for a byte" );
-    ((yp_uint16_t *)dest)[dest_i] = (yp_uint16_t) (value & 0xFFFFu);
-}
-void ypStringLib_setindex_4bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
-    yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
-    ((yp_uint32_t *)dest)[dest_i] = value;
-}
 
 // Return a new bytes/bytearray object that can fit the given requiredLen plus the null terminator.
 // If type is immutable and alloclen_fixed is true (indicating the object will never grow), the
@@ -7053,7 +7070,9 @@ ypObject *yp_bytearray0( void ) {
 // TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
 
 // ypStrObject is declared in the StringLib section
-yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_str_inline_data );
+// XXX bytes' data is aligned for yp_MAX_ALIGNMENT because it may be used to store structures, but
+// we know str will only ever store Latin-1, UCS-2, or UCS-4 data
+yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % 4 == 0, alignof_str_inline_data );
 
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
 
@@ -7061,6 +7080,7 @@ yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % yp_MAX_ALIGNMENT 
 #define ypStr_LEN               ypStringLib_LEN
 #define ypStr_SET_LEN           ypStringLib_SET_LEN
 #define ypStr_ALLOCLEN          ypStringLib_ALLOCLEN
+#define ypStr_CACHED_UTF_8( s ) ( ((ypStrObject *)s)->utf_8 )  // NULL if no cached bytes obj
 #define ypStr_INLINE_DATA( s )  ( ((ypStrObject *)s)->ob_inline_data )
 
 #define ypStr_LEN_MAX ypStringLib_LEN_MAX
@@ -7086,6 +7106,7 @@ static ypObject *_ypStr_new( int type, yp_ssize_t requiredLen, int alloclen_fixe
         newS = ypMem_MALLOC_CONTAINER_VARIABLE( ypStrObject, type, requiredLen+1, 0 );
     }
     ypStringLib_ENC_CODE( newS ) = ypStringLib_ENC_LATIN_1;
+    ypStr_CACHED_UTF_8( newS ) = NULL;
     return newS;
 }
 
