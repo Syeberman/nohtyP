@@ -216,7 +216,6 @@ class BaseBytesTest:
         # Check all indicies
         self.check_extended_getslice(lambda x: x)
 
-    @yp_unittest.skip("TODO Implement encoding in nohtyP")
     def test_encoding(self):
         sample = "Hello world\n\u1234\u5678\u9abc"
         for enc in ("utf-8", "utf-16"):
@@ -226,7 +225,6 @@ class BaseBytesTest:
         b = self.type2test(sample, "latin-1", "ignore")
         self.assertEqual(b, self.type2test(sample[:-3], "utf-8"))
 
-    @yp_unittest.skip("TODO Implement encoding in nohtyP")
     def test_decode(self):
         sample = "Hello world\n\u1234\u5678\u9abc\def0\def0"
         for enc in ("utf-8", "utf-16"):
