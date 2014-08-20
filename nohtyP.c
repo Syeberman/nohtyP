@@ -372,9 +372,9 @@ static ypTypeObject *ypTypeTable[255];
 #define ypRange_CODE                ( 26u)
 // no mutable ypRange type          ( 27u)
 
-yp_STATIC_ASSERT( _ypInt_CODE == ypInt_CODE, ypInt_CODE );
-yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE );
-yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
+yp_STATIC_ASSERT( _ypInt_CODE == ypInt_CODE, ypInt_CODE_matches );
+yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE_matches );
+yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE_matches );
 
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
@@ -5018,6 +5018,10 @@ typedef struct _ypStrObject ypStrObject;
 // Maximum code point of Unicode 6.0: 0x10FFFF (1,114,111)
 #define ypStringLib_MAX_UNICODE     (0x10FFFFu)
 
+// Macros to work with surrogates
+// XXX Adapted from Python's unicodeobject.h
+#define ypStringLib_IS_SURROGATE(ch)    (0xD800 <= (ch) && (ch) <= 0xDFFF)
+
 // Empty bytes can be represented by this, immortal object
 static ypBytesObject _yp_bytes_empty_struct = {
     { ypBytes_CODE, 0, ypStringLib_ENC_BYTES, ypObject_REFCNT_IMMORTAL,
@@ -5840,17 +5844,21 @@ main_loop:
         ch = _ypStringLib_decode_utf_8( &source, end, newS );
         if( ch > 0xFFu ) {
             // This will up-convert and resize to the required length
-            result = _ypStr_grow_onextend( newS, len, 0,
-                    ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2 );
+            int newEnc = ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2;
+            result = _ypStr_grow_onextend( newS, len, 0, newEnc );
             if( yp_isexceptionC( result ) ) {
                 yp_decref( newS );
                 return result;
             }
+            // Don't forget to write the character that didn't previously fit
+            ypStringLib_encs[newEnc].setindex( 
+                ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), ch );
+            ypStringLib_SET_LEN( newS, ypStringLib_LEN( newS ) + 1 );
         } else {
             startinpos = source - starts;
             switch( ch ) {
                 case ypStringLib_UTF_8_DATA_END:
-                    if( source >= end ) break;
+                    if( source >= end ) goto main_loop_end;
                     errmsg = "unexpected end of data";
                     endinpos = end - starts;
                     break;
@@ -5880,11 +5888,17 @@ main_loop:
                 goto onError;*/
         }
     }
+main_loop_end:
+
     // TODO See how much wasted space is left here and if we should release some back to the heap
     ypStringLib_ENC( newS )->setindex( ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), 0 );
     return newS;
 }
 
+// XXX Allocation-wise, the worst-case through the code is a string that starts with a latin-1
+// character, causing us to allocate len*2 bytes, then containing only ascii, wasting just a byte
+// under half the buffer
+// XXX Runtime-wise, the worst-case is probably a string with completely latin-1 characters
 static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len );
 // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed );
@@ -5947,20 +5961,79 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
             yp_ASSERT1( ascii_len > 0 );
             yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= ascii_len );
             memcpy( d, s, ascii_len );
-            s += ascii_len;
             d += ascii_len;
+            s += ascii_len;
 
         } else {
             yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 2 );
-            *d = (yp_uint8_t)(0xc0u | (ch >> 6));
-            *d = (yp_uint8_t)(0x80u | (ch & 0x3fu));
+            *d++ = (yp_uint8_t)(0xc0u | (ch >> 6));
+            *d++ = (yp_uint8_t)(0x80u | (ch & 0x3fu));
             s += 1;
-            d += 2;
         }
     }
 
     // Null-terminate, update length, and return
-    d = 0;
+    *d = 0;
+    ypStringLib_SET_LEN( dest, d-dest_data );
+    return dest;
+}
+
+static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
+{   
+    yp_ssize_t const source_len = ypStringLib_LEN( source );
+    void * const source_data = ypStringLib_DATA( source );
+    int source_enc = ypStringLib_ENC_CODE( source );
+    ypStringLib_getindexfunc getindex = ypStringLib_ENC( source )->getindex;
+    yp_ssize_t maxCharSize;
+    yp_ssize_t i;   // index into source_data
+    ypObject *dest;
+    yp_uint8_t *dest_data;
+    yp_uint8_t *d;  // moving dest_data pointer
+
+    yp_ASSERT( source_enc != ypStringLib_ENC_LATIN_1, "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings" );
+    maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 2 : 4;
+
+    dest = _ypBytes_new( type, source_len*maxCharSize, /*alloclen_fixed=*/FALSE );
+    if( yp_isexceptionC( dest ) ) return dest;
+    d = dest_data = ypStringLib_DATA( dest );
+
+    for( i = 0; i < source_len; i++ ) {
+        yp_uint32_t ch = getindex( source_data, i );
+
+        if( ch < 0x80u ) {
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 1 );
+            *d++ = (yp_uint8_t)ch;
+
+        } else if( ch < 0x0800u ) {
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 2 );
+            *d++ = (yp_uint8_t)(0xc0u |  (ch >> 6));
+            *d++ = (yp_uint8_t)(0x80u | ( ch       & 0x3fu));
+
+        } else if( ypStringLib_IS_SURROGATE( ch ) ) {
+            // TODO Handle decoding errors
+            // TODO If error handling is the most complicated part of this function, perhaps we
+            // should have three versions, and UCS-2 and -4 just call the common error handler
+            yp_decref( dest );
+            return yp_NotImplementedError;
+
+        } else if( ch < 0x10000u ) { 
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 3 );
+            *d++ = (yp_uint8_t)(0xe0u |  (ch >> 12));
+            *d++ = (yp_uint8_t)(0x80u | ((ch >> 6) & 0x3fu));
+            *d++ = (yp_uint8_t)(0x80u | ( ch       & 0x3fu));
+        
+        } else {
+            yp_ASSERT1( ch <= ypStringLib_MAX_UNICODE );
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 4 );
+            *d++ = (yp_uint8_t)(0xf0u |  (ch >> 18));
+            *d++ = (yp_uint8_t)(0x80u | ((ch >> 12) & 0x3fu));
+            *d++ = (yp_uint8_t)(0x80u | ((ch >> 6)  & 0x3fu));
+            *d++ = (yp_uint8_t)(0x80u | ( ch        & 0x3fu));
+        }
+    }
+
+    // Null-terminate, update length, and return
+    *d = 0;
     ypStringLib_SET_LEN( dest, d-dest_data );
     return dest;
 }
@@ -5977,7 +6050,7 @@ static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject 
     if( ypStringLib_ENC_CODE( source ) == ypStringLib_ENC_LATIN_1 ) {
         return _ypStringLib_encode_utf_8_from_latin_1( type, source );
     } else {
-        return yp_NotImplementedError;
+        return _ypStringLib_encode_utf_8( type, source, errors );
     }
 }
 
@@ -7227,14 +7300,16 @@ static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_s
     void *oldptr;
 
     yp_ASSERT( requiredLen >= ypStr_LEN( s ), "requiredLen cannot be <len(s)" );
-    yp_ASSERT( requiredLen >= ypStr_ALLOCLEN( s )-1, "_ypStr_grow_onextend called unnecessarily" );
+    yp_ASSERT( requiredLen >= ypStr_ALLOCLEN( s )-1 || newEnc_code > oldEnc->code, "_ypStr_grow_onextend called unnecessarily" );
     yp_ASSERT( requiredLen <= ypStr_LEN_MAX, "requiredLen cannot be >max" );
     yp_ASSERT( newEnc_code >= oldEnc->code, "can't 'grow' to a smaller encoding" );
+
+    // TODO If we're doing a strict upconvert, it may not be necessary to realloc
 
     // ypMem_REALLOC sets alloclen, but does not require it to be correct on input.  If it did,
     // we'd need to adjust it to the new encoding first.
     // FIXME I believe this can allocate something larger than ypStr_LEN_MAX, which means we
-    // always have to check both alloclen and len_max (here and elsewhere).
+    // always have to check both alloclen and len_max (here and elsewhere)
     oldptr = ypMem_REALLOC_CONTAINER_VARIABLE5( s, ypStrObject, requiredLen+1, extra,
             newEnc->elemsize );
     if( oldptr == NULL ) return yp_MemoryError;
@@ -7251,6 +7326,7 @@ static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_s
                 oldEnc->sizeshift, oldptr, 0, ypStr_LEN( s ) );
         ypMem_REALLOC_CONTAINER_FREE_OLDPTR( s, ypStrObject, oldptr );
     }
+    ypStringLib_ENC_CODE( s ) = newEnc_code;
     return yp_None;
 }
 
@@ -7835,16 +7911,16 @@ ypObject *yp_chrC( yp_int_t i ) {
 // Immortal constants
 
 yp_IMMORTAL_STR_LATIN_1( yp_s_ascii,     "ascii" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_latin_1,   "latin_1" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_8,     "utf_8" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16,    "utf_16" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16_be, "utf_16_be" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16_le, "utf_16_le" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32,    "utf_32" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32_be, "utf_32_be" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32_le, "utf_32_le" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_ucs_2,     "ucs_2" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_ucs_4,     "ucs_4" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_latin_1,   "latin-1" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_8,     "utf-8" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16,    "utf-16" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16be,  "utf-16be" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16le,  "utf-16le" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32,    "utf-32" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32be,  "utf-32be" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32le,  "utf-32le" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_ucs_2,     "ucs-2" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_ucs_4,     "ucs-4" );
 
 yp_IMMORTAL_STR_LATIN_1( yp_s_strict,    "strict" );
 yp_IMMORTAL_STR_LATIN_1( yp_s_ignore,    "ignore" );
