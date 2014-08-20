@@ -1683,8 +1683,8 @@ class yp_str( ypObject ):
         # errcheck disabled for _yp_asencodedCX, so do it here
         _yp_asencodedCX( self, encoded, size, encoding )._yp_errcheck( )
         # _yp_asencodedCX should return one of yp_s_latin_1, yp_s_ucs_2, or yp_s_ucs_4
-        enc_type = _yp_str_enc2type[encoding[0].value]
-        return cast( encoded.contents, enc_type ), size[0], encoding[0]
+        enc_type, enc_elemsize = _yp_str_enc2type[encoding[0].value]
+        return cast( encoded.contents, enc_type ), size[0]//enc_elemsize, encoding[0]
     def _yp_errcheck( self ):
         super( )._yp_errcheck( )
         encoded, size, encoding = self._get_encoded_size_encoding( )
@@ -1719,8 +1719,10 @@ c_ypObject_p_value( "yp_s_utf_8" )
 c_ypObject_p_value( "yp_s_ucs_2" )
 c_ypObject_p_value( "yp_s_ucs_4" )
 c_ypObject_p_value( "yp_s_strict" )
-_yp_str_enc2type = {yp_s_latin_1.value: POINTER( c_uint8 ), yp_s_ucs_2.value: POINTER( c_uint16 ), 
-        yp_s_ucs_2.value: POINTER( c_uint32 )}
+_yp_str_enc2type = {
+        yp_s_latin_1.value: (POINTER( c_uint8 ),  1),
+        yp_s_ucs_2.value:   (POINTER( c_uint16 ), 2),
+        yp_s_ucs_4.value:   (POINTER( c_uint32 ), 4)}
 _yp_str_empty = yp_str( )
 yp_s_None = yp_str( "None" )
 yp_s_True = yp_str( "True" )

@@ -914,16 +914,16 @@ ypAPI void yp_updateNV( ypObject **mapping, int n, va_list args );
 
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC4 et al.
 ypAPI ypObject * const yp_s_ascii;      // "ascii"
-ypAPI ypObject * const yp_s_latin_1;    // "latin_1"
-ypAPI ypObject * const yp_s_utf_8;      // "utf_8"
-ypAPI ypObject * const yp_s_utf_16;     // "utf_16"
-ypAPI ypObject * const yp_s_utf_16_be;  // "utf_16_be"
-ypAPI ypObject * const yp_s_utf_16_le;  // "utf_16_le"
-ypAPI ypObject * const yp_s_utf_32;     // "utf_32"
-ypAPI ypObject * const yp_s_utf_32_be;  // "utf_32_be"
-ypAPI ypObject * const yp_s_utf_32_le;  // "utf_32_le"
-ypAPI ypObject * const yp_s_ucs_2;      // "ucs_2"
-ypAPI ypObject * const yp_s_ucs_4;      // "ucs_4"
+ypAPI ypObject * const yp_s_latin_1;    // "latin-1"
+ypAPI ypObject * const yp_s_utf_8;      // "utf-8"
+ypAPI ypObject * const yp_s_utf_16;     // "utf-16"
+ypAPI ypObject * const yp_s_utf_16be;   // "utf-16be"
+ypAPI ypObject * const yp_s_utf_16le;   // "utf-16le"
+ypAPI ypObject * const yp_s_utf_32;     // "utf-32"
+ypAPI ypObject * const yp_s_utf_32be;   // "utf-32be"
+ypAPI ypObject * const yp_s_utf_32le;   // "utf-32le"
+ypAPI ypObject * const yp_s_ucs_2;      // "ucs-2"
+ypAPI ypObject * const yp_s_ucs_4;      // "ucs-4"
 
 // Immortal strs representing common string decode error handling schemes, for convience with
 // yp_str_frombytesC4 et al.
