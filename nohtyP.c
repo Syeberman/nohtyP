@@ -4976,6 +4976,58 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 
 
 /*************************************************************************************************
+ * Codec registry and base classes
+ *************************************************************************************************/
+// XXX Patterned after the codecs module in Python
+// XXX This will be exposed in nohtyP.h someday
+
+// TODO codecs.register to register functions for encode/decode
+// ...also codecs.lookup
+
+// TODO Python does maintain a distinction between text encodings and all others; do the same
+// TODO A macro in nohtyP.h to get/set from a struct with struct_size ensuring compatibility
+// TODO yp_codecs_encode and yp_codecs_decode, which works for any arbitrary obj->obj encoding
+
+#if 0
+typedef struct {
+    yp_ssize_t struct_size;     // Set to sizeof( yp_codecs_error_handler_params )
+    ypObject *exc;      // UnicodeEncodeError, UnicodeDecodeError, or UnicodeTranslateError
+    ypObject *encoding;
+    void *reason;       // keep null currently; obj or data depends on how yp_raise will be implemented
+    ypObject *object;   // or use a pointer to the data?
+    yp_ssize_t start;   // start of bad data
+    yp_ssize_t end;     // end of bad data
+} yp_codecs_error_handler_params;
+typedef struct {
+    yp_ssize_t struct_size;     // Set to sizeof( yp_codecs_error_handler_result )
+    yp_ssize_t position;        // position at which to continue
+    struct {
+        int type;   // identifies byte buffer vs unichr buffer vs object
+        union {
+            ypObject *obj;  // any old object
+            struct {
+                yp_ssize_t len;
+                yp_uint8_t data[TODO]; // FIXME ensure fills available space of union
+            } bytesC;
+            struct {
+                yp_ssize_t len;
+                yp_uint32_t data[TODO]; // a small array of code points always in UCS-4
+            } strC;
+    } replacement;  // so, can either be an object, or an in-line, small array of data
+} yp_codecs_error_handler_result;
+typedef ypObject *(*yp_codecs_error_handler_func)( const yp_codecs_error_handler_params *params,
+        yp_codecs_error_handler_result *result )
+{
+}
+
+#endif
+
+// TODO registered encoders/decoders can take a ypObject *typehint that identifies a particular
+// type for the return value, if possible, otherwise it's ignored and a "standard" type is returned
+// (this way, utf-8 can return a bytearray as required by yp_bytearray3)
+
+
+/*************************************************************************************************
  * String manipulation library (for bytes and str)
  *************************************************************************************************/
 
@@ -5851,7 +5903,7 @@ main_loop:
                 return result;
             }
             // Don't forget to write the character that didn't previously fit
-            ypStringLib_encs[newEnc].setindex( 
+            ypStringLib_encs[newEnc].setindex(
                 ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), ch );
             ypStringLib_SET_LEN( newS, ypStringLib_LEN( newS ) + 1 );
         } else {
@@ -5979,7 +6031,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
 }
 
 static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
-{   
+{
     yp_ssize_t const source_len = ypStringLib_LEN( source );
     void * const source_data = ypStringLib_DATA( source );
     int source_enc = ypStringLib_ENC_CODE( source );
@@ -6016,12 +6068,12 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
             yp_decref( dest );
             return yp_NotImplementedError;
 
-        } else if( ch < 0x10000u ) { 
+        } else if( ch < 0x10000u ) {
             yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 3 );
             *d++ = (yp_uint8_t)(0xe0u |  (ch >> 12));
             *d++ = (yp_uint8_t)(0x80u | ((ch >> 6) & 0x3fu));
             *d++ = (yp_uint8_t)(0x80u | ( ch       & 0x3fu));
-        
+
         } else {
             yp_ASSERT1( ch <= ypStringLib_MAX_UNICODE );
             yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 4 );
@@ -6038,6 +6090,8 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     return dest;
 }
 
+// FIXME This code is actually pretty simple.  Rethink the idea of keeping a utf_8 object
+// associated with str objects.  If we remove it, we can use common new/copy/grow between str/bytes
 static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
 {
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypBytes_CODE, "incorrect bytes type" );
@@ -7128,10 +7182,14 @@ ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
 static ypObject *_ypBytes_encode( int type,
         ypObject *source, ypObject *encoding, ypObject *errors )
 {
+    ypObject *result;
     if( ypObject_TYPE_PAIR_CODE( source ) != ypStr_CODE ) return_yp_BAD_TYPE( source );
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
-    return ypStringLib_encode_utf_8( type, source, errors );
+    // TODO Python limits this to codecs that identify themselves as text encodings: do the same
+    result = ypStringLib_encode_utf_8( type, source, errors );
+    yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    return result;
 }
 ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors ) {
     return _ypBytes_encode( ypBytes_CODE, source, encoding, errors );
@@ -7808,6 +7866,7 @@ ypObject *yp_asencodedCX( ypObject *s, const yp_uint8_t * *encoded, yp_ssize_t *
 static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors )
 {
+    ypObject *result;
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
 
@@ -7816,7 +7875,10 @@ static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_
         len = (source == NULL) ? 0 : strlen( (const char *) source );
     }
 
-    return ypStringLib_decode_frombytesC_utf_8( type, source, len, errors );
+    // TODO Python limits this to codecs that identify themselves as text encodings: do the same
+    result = ypStringLib_decode_frombytesC_utf_8( type, source, len, errors );
+    yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    return result;
 }
 ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
         ypObject *encoding, ypObject *errors ) {
@@ -7842,11 +7904,15 @@ ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
 static ypObject *_ypStr_decode( int type,
         ypObject *source, ypObject *encoding, ypObject *errors )
 {
+    ypObject *result;
     if( ypObject_TYPE_PAIR_CODE( source ) != ypBytes_CODE ) return_yp_BAD_TYPE( source );
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
-    return ypStringLib_decode_frombytesC_utf_8( type,
+    // TODO Python limits this to codecs that identify themselves as text encodings: do the same
+    result = ypStringLib_decode_frombytesC_utf_8( type,
             ypBytes_DATA( source ), ypBytes_LEN( source ), errors );
+    yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    return result;
 }
 ypObject *yp_str3( ypObject *source, ypObject *encoding, ypObject *errors ) {
     return _ypStr_decode( ypStr_CODE, source, encoding, errors );
