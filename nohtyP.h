@@ -103,7 +103,7 @@ extern "C" {
 // Must be called once before any other function; subsequent calls are a no-op.  If a fatal error
 // occurs abort() is called.  kwparams can be NULL to accept all defaults; further documentation
 // on these parameters can be found below.
-typedef struct _yp_initialize_kwparams yp_initialize_kwparams;
+typedef struct _yp_initialize_kwparams_t yp_initialize_kwparams_t;
 ypAPI void yp_initialize( const yp_initialize_kwparams *kwparams );
 
 
@@ -925,11 +925,15 @@ ypAPI ypObject * const yp_s_utf_32le;   // "utf-32le"
 ypAPI ypObject * const yp_s_ucs_2;      // "ucs-2"
 ypAPI ypObject * const yp_s_ucs_4;      // "ucs-4"
 
-// Immortal strs representing common string decode error handling schemes, for convience with
+// Immortal strs representing common string encoding error-handling schemes, for convience with
 // yp_str_frombytesC4 et al.
-ypAPI ypObject * const yp_s_strict;    // "strict"
-ypAPI ypObject * const yp_s_ignore;    // "ignore"
-ypAPI ypObject * const yp_s_replace;   // "replace"
+ypAPI ypObject * const yp_s_strict;             // "strict"
+ypAPI ypObject * const yp_s_replace;            // "replace"
+ypAPI ypObject * const yp_s_ignore;             // "ignore"
+ypAPI ypObject * const yp_s_xmlcharrefreplace;  // "xmlcharrefreplace"
+ypAPI ypObject * const yp_s_backslashreplace;   // "backslashreplace"
+ypAPI ypObject * const yp_s_surrogateescape;    // "surrogateescape"
+ypAPI ypObject * const yp_s_surrogatepass;      // "surrogatepass"
 
 // Returns the immortal yp_True if all characters in s are alphanumeric and there is at least one
 // character, otherwise yp_False.  A character is alphanumeric if one of the following returns
@@ -1510,7 +1514,7 @@ ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssi
  */
 
 // Defines an immortal int constant at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const".  value is a C integer literal.  To be used as:
+// which is of type "ypObject * const".  value is a (constant) yp_int_t.  To be used as:
 //      yp_IMMORTAL_INT( name, value );
 
 // Defines an immortal bytes constant at compile-time, which can be accessed by the variable name,
@@ -1592,9 +1596,8 @@ ypAPI int yp_isexceptionCN( ypObject *x, int n, ... );
 // yp_initialize accepts a number of parameters to customize nohtyP behaviour.
 // XXX Offsets will not change between versions: members from this struct will never be deleted,
 // only deprecated.
-typedef struct _yp_initialize_kwparams {
-    // Set to sizeof( yp_initialize_kwparams ).
-    yp_ssize_t struct_size;
+typedef struct _yp_initialize_kwparams_t {
+    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_initialize_kwparams ) on allocation
 
     // yp_malloc, yp_malloc_resize, and yp_free allow you to specify custom memory allocation APIs.
     // It is recommended to set these to NULL to use nohtyP's internal defaults.  Any functions you
@@ -1630,7 +1633,7 @@ typedef struct _yp_initialize_kwparams {
     // XXX Use this option carefully, and profile to ensure it actually provides a benefit!
     int everything_immortal;
 
-} yp_initialize_kwparams;
+} yp_initialize_kwparams_t;
 
 
 /*

@@ -4979,48 +4979,106 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
  * Codec registry and base classes
  *************************************************************************************************/
 // XXX Patterned after the codecs module in Python
-// XXX This will be exposed in nohtyP.h someday
+// XXX This will be exposed in nohtyP.h someday; review and improve before you do
 
 // TODO codecs.register to register functions for encode/decode
 // ...also codecs.lookup
 
 // TODO Python does maintain a distinction between text encodings and all others; do the same
-// TODO A macro in nohtyP.h to get/set from a struct with struct_size ensuring compatibility
+// TODO A macro in nohtyP.h to get/set from a struct with sizeof_struct ensuring compatibility
 // TODO yp_codecs_encode and yp_codecs_decode, which works for any arbitrary obj->obj encoding
 
-#if 0
+
 typedef struct {
-    yp_ssize_t struct_size;     // Set to sizeof( yp_codecs_error_handler_params )
-    ypObject *exc;      // UnicodeEncodeError, UnicodeDecodeError, or UnicodeTranslateError
-    ypObject *encoding;
-    void *reason;       // keep null currently; obj or data depends on how yp_raise will be implemented
-    ypObject *object;   // or use a pointer to the data?
-    yp_ssize_t start;   // start of bad data
-    yp_ssize_t end;     // end of bad data
-} yp_codecs_error_handler_params;
+    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_codecs_error_handler_params ) on allocation
+
+    // Details of the error.  All references and pointers are borrowed and should not be replaced.
+    ypObject *exc;          // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
+    ypObject *encoding;     // The name of the encoding that raised the error
+    struct {                // A to-be-formatted string+args describing the specific codec error
+        const yp_uint8_t *format;   // ASCII-encoded printf-style format string
+        va_list args;               // printf-style format arguments
+    } reason;
+    struct {                // The object/data the codec was attempting to encode/decode
+        ypObject *object;       // The source object; NULL if working strictly from raw data
+                                // XXX For example, yp_str_frombytesC4 will set this to NULL
+        struct {                // The source data; ptr and/or type may be NULL iff object isn't
+            const void *ptr;        // Pointer to the source data
+            ypObject *type;         // An indication of the type of data pointed to:
+                                    //  - str-like: set to encoding name as per yp_asencodedCX
+                                    //  - bytes-like: set to yp_type_bytes
+                                    //  - other codecs may set this to other objects
+        } data;
+    } source;
+    yp_ssize_t start;       // The first index of invalid data in source
+    yp_ssize_t end;         // The index after the last invalid data in source
+
+    // FIXME: review below, and ensure sized efficiently (no padding)
+    // In-place buffers to return data without creating objects
+    union {
+        struct {
+            yp_ssize_t len;
+            yp_uint8_t data[TODO]; // FIXME ensure fills available space of union
+        } bytes;
+        struct {
+            yp_ssize_t len;
+            yp_uint32_t data[TODO]; // a small array of code points always in UCS-4
+        } str; 
+    } dest_buff;    // TODO rename
+} yp_codecs_error_handler_params_t;
 typedef struct {
-    yp_ssize_t struct_size;     // Set to sizeof( yp_codecs_error_handler_result )
+    yp_ssize_t sizeof_struct;     // Set to sizeof( yp_codecs_error_handler_result )
     yp_ssize_t position;        // position at which to continue
     struct {
         int type;   // identifies byte buffer vs unichr buffer vs object
-        union {
-            ypObject *obj;  // any old object
-            struct {
-                yp_ssize_t len;
-                yp_uint8_t data[TODO]; // FIXME ensure fills available space of union
-            } bytesC;
-            struct {
-                yp_ssize_t len;
-                yp_uint32_t data[TODO]; // a small array of code points always in UCS-4
-            } strC;
     } replacement;  // so, can either be an object, or an in-line, small array of data
-} yp_codecs_error_handler_result;
-typedef ypObject *(*yp_codecs_error_handler_func)( const yp_codecs_error_handler_params *params,
+} yp_codecs_error_handler_result_t;
+
+// Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
+// set *replacement to the object that replaces the bad data, and *new_position to the index at
+// which to restart encoding/decoding.
+// XXX There are two special values for *replacement.  If blah-bytes-blah, params->dest_buff.bytes
+// is used as if it were a bytes object.  If blah-str-blah, params->dest_buff.str is used as if it
+// were a str object.  This avoids having to create temporary objects for small amounts of data.
+typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params *params,
+        ypObject **replacement, yp_ssize_t **new_position );
+
+
+// Dict mapping error handler names to their functions.  Initialized in _yp_codecs_initialize.
+// TODO Can we statically-allocate this dict?  Perhaps the standard error handlers can fit in the
+// inline array, and if it grows past that then we allocate on the heap.  Yes we can, 
+static ypObject *_yp_codecs_name2error = NULL;
+
+// Registers error_handler under the given name, and returns the immortal yp_None.  This handler
+// will be called on codec errors when name is specified as the errors parameter (see yp_encode3
+// for an example).  Returns an exception on error.
+static ypObject *yp_codecs_register_error(
+        ypObject *name, yp_codecs_error_handler_func_t error_handler )
+{
+}
+
+// Returns the error handler previously registered under the given name.  Raises yp_LookupError
+// if the handler cannot be found.  Sets *exc and returns yp_codecs_strict_errors on error.
+static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **exc )
+{
+}
+
+static ypObject *yp_codecs_strict_errors( const yp_codecs_error_handler_params *params,
         yp_codecs_error_handler_result *result )
 {
 }
 
-#endif
+
+// Allocating these as immortal ints saves a _little_ bit off the heap, and doesn't cost anything
+yp_IMMORTAL_INT( _yp_codecs_i_strict_errors, (yp_int_t) yp_codecs_strict_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_replace_errors, (yp_int_t) yp_codecs_replace_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_ignore_errors, (yp_int_t) yp_codecs_ignore_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_xmlcharrefreplace_errors, (yp_int_t) yp_codecs_xmlcharrefreplace_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_backslashreplace_errors, (yp_int_t) yp_codecs_backslashreplace_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_surrogateescape_errors, (yp_int_t) yp_codecs_surrogateescape_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_surrogatepass_errors, (yp_int_t) yp_codecs_surrogatepass_errors );
+
+
 
 // TODO registered encoders/decoders can take a ypObject *typehint that identifies a particular
 // type for the return value, if possible, otherwise it's ignored and a "standard" type is returned
@@ -13105,13 +13163,13 @@ static const yp_initialize_kwparams _default_initialize = {
     /*everything_immortal=*/FALSE
 };
 
-// Helpful macro, for use only by yp_initialize, to retrieve a parameter from kwparams.  Returns
-// the default value if kwparams is too small to hold the parameter, or if the expression
-// "kwparams->key default_cond" (ie "kwparams->yp_malloc ==NULL") evaluates to true.
+// Helpful macro, for use only by yp_initialize and friends, to retrieve a parameter from
+// kwparams.  Returns the default value if kwparams is too small to hold the parameter, or if
+// the expression "kwparams->key default_cond" (ie "kwparams->yp_malloc ==NULL") evaluates to true.
 #define _yp_INIT_PARAM_END( key ) \
     (yp_offsetof( yp_initialize_kwparams, key ) + yp_sizeof_member( yp_initialize_kwparams, key ))
 #define yp_INIT_PARAM2( key, default_cond ) \
-    ( kwparams->struct_size < _yp_INIT_PARAM_END( key ) ? \
+    ( kwparams->sizeof_struct < _yp_INIT_PARAM_END( key ) ? \
         _default_initialize.key \
       : kwparams->key default_cond ? \
         _default_initialize.key \
@@ -13119,25 +13177,17 @@ static const yp_initialize_kwparams _default_initialize = {
         kwparams->key \
     )
 #define yp_INIT_PARAM1( key ) \
-    ( kwparams->struct_size < _yp_INIT_PARAM_END( key ) ? \
+    ( kwparams->sizeof_struct < _yp_INIT_PARAM_END( key ) ? \
         _default_initialize.key \
       : /*else*/ \
         kwparams->key \
     )
 
-void yp_initialize( const yp_initialize_kwparams *kwparams )
+// Called *exactly* *once* by yp_initialize to set up memory management.  Further, setting
+// yp_malloc here helps ensure that yp_initialize is called before anything else in the library
+// (because otherwise all mallocs result in yp_MemoryError).
+static void _ypMem_initialize( const yp_initialize_kwparams *kwparams )
 {
-    static int initialized = FALSE;
-
-    // yp_initialize can only be called once
-    if( initialized ) {
-        yp_DEBUG0( "yp_initialize called multiple times; only first call is honoured" );
-        return;
-    }
-    initialized = TRUE;
-
-    if( kwparams == NULL ) kwparams = &_default_initialize;
-
     yp_malloc           = yp_INIT_PARAM2( yp_malloc,         ==NULL );
     yp_malloc_resize    = yp_INIT_PARAM2( yp_malloc_resize,  ==NULL );
     yp_free             = yp_INIT_PARAM2( yp_free,           ==NULL );
@@ -13161,5 +13211,44 @@ void yp_initialize( const yp_initialize_kwparams *kwparams )
     // is wasted until then, which is why the value should be small.  (Actually, not all objects
     // will be this size, as int/float, when they become small objects, will only allocate a
     // fraction of this.)
+}
+
+// Called *exactly* *once* by yp_initialize to set up the codecs module
+static void _yp_codecs_initialize( const yp_initialize_kwparams *kwparams )
+{
+    ypObject *exc = yp_None;
+
+    // Initialize the error-handler registry
+    _yp_codecs_name2error = yp_dictK( 0 );
+    yp_setitemE( _yp_codecs_name2error, yp_s_strict, _yp_codecs_i_strict_errors, &exc );
+    yp_setitemE( _yp_codecs_name2error, yp_s_replace, _yp_codecs_i_replace_errors, &exc );
+    yp_setitemE( _yp_codecs_name2error, yp_s_ignore, _yp_codecs_i_ignore_errors, &exc );
+    yp_setitemE( _yp_codecs_name2error, yp_s_xmlcharrefreplace, _yp_codecs_i_xmlcharrefreplace_errors, &exc );
+    yp_setitemE( _yp_codecs_name2error, yp_s_backslashreplace, _yp_codecs_i_backslashreplace_errors, &exc );
+    yp_setitemE( _yp_codecs_name2error, yp_s_surrogateescape, _yp_codecs_i_surrogateescape_errors, &exc );
+    yp_setitemE( _yp_codecs_name2error, yp_s_surrogatepass, _yp_codecs_i_surrogatepass_errors, &exc );
+
+    // In release builds, just ignore errors: downstream code will fail gracefully if there are
+    // errors here
+    yp_ASSERT( !yp_isexceptionC( exc ), "_yp_codecs_initialize failed unexpectedly" );
+}
+
+void yp_initialize( const yp_initialize_kwparams *kwparams )
+{
+    static int initialized = FALSE;
+
+    // yp_initialize can only be called once
+    if( initialized ) {
+        yp_DEBUG0( "yp_initialize called multiple times; only first call is honoured" );
+        return;
+    }
+    initialized = TRUE;
+
+    // The caller can pass NULL if it just wants the defaults
+    if( kwparams == NULL ) kwparams = &_default_initialize;
+
+    // Now initialize the modules one-by-one
+    _ypMem_initialize( kwparams );
+    _yp_codecs_initialize( kwparams );
 }
 
