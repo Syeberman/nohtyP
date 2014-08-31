@@ -104,7 +104,7 @@ extern "C" {
 // occurs abort() is called.  kwparams can be NULL to accept all defaults; further documentation
 // on these parameters can be found below.
 typedef struct _yp_initialize_kwparams_t yp_initialize_kwparams_t;
-ypAPI void yp_initialize( const yp_initialize_kwparams *kwparams );
+ypAPI void yp_initialize( const yp_initialize_kwparams_t *kwparams );
 
 
 /*
@@ -1597,7 +1597,7 @@ ypAPI int yp_isexceptionCN( ypObject *x, int n, ... );
 // XXX Offsets will not change between versions: members from this struct will never be deleted,
 // only deprecated.
 typedef struct _yp_initialize_kwparams_t {
-    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_initialize_kwparams ) on allocation
+    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_initialize_kwparams_t ) on allocation
 
     // yp_malloc, yp_malloc_resize, and yp_free allow you to specify custom memory allocation APIs.
     // It is recommended to set these to NULL to use nohtyP's internal defaults.  Any functions you
