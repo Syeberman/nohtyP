@@ -102,6 +102,9 @@ class ApiVisitor( c_ast.NodeVisitor ):
 #   - every (with exceptions) N or K has a NV or KV
 #   - every N or K has a variant that takes a ypObject* in its place
 #   - exc is always ypObject ** and used in C, F, L, and E
+#   - E functions match their originals, except:
+#       - first arg is ypObject*, not ypObject**
+#       - ypObject** exc is append to arg list, unless orig returns ypObject* (ie yp_popE)
 #   - all X functions return a ypObject *
 #   - the count equals the actual arg count (minus exc)
 #   - C is used iff it contains a C type (an int?)

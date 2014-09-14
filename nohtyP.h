@@ -1863,27 +1863,37 @@ struct _ypStrObject {
 #define _ypStr_CODE                 ( 18u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
+// FIXME check that documentation makes clear that, as local variables, it's all the same obj under
 #define _yp_IMMORTAL_HEAD_INIT( type, type_flags, data, len ) \
     { type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, \
       len, _ypObject_LEN_INVALID, _ypObject_HASH_INVALID, data }
-#define yp_IMMORTAL_INT( name, value ) \
+#define _yp_NOQUAL  // Used in place of static or extern for qual
+#define _yp_IMMORTAL_INT( qual, name, value ) \
     static struct _ypIntObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
         _ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID ), (value) }; \
-    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-#define yp_IMMORTAL_BYTES( name, value ) \
+    qual ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+#define _yp_IMMORTAL_BYTES( qual, name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
         _ypBytes_CODE, _ypStringLib_ENC_BYTES, \
         (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
-    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-#define yp_IMMORTAL_STR_LATIN_1( name, value ) \
+    qual ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+#define _yp_IMMORTAL_STR_LATIN_1( qual, name, value ) \
     static const char _ ## name ## _data[] = value; \
     static struct _ypStrObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
         _ypStr_CODE, _ypStringLib_ENC_LATIN_1, \
         (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ), NULL }; \
-    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+    qual ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
+#define yp_IMMORTAL_INT( name, value )          _yp_IMMORTAL_INT( _yp_NOQUAL, name, value )
+#define yp_IMMORTAL_BYTES( name, value )        _yp_IMMORTAL_BYTES( _yp_NOQUAL, name, value )
+#define yp_IMMORTAL_STR_LATIN_1( name, value )  _yp_IMMORTAL_STR_LATIN_1( _yp_NOQUAL, name, value )
+
+// TODO document above
+#define yp_IMMORTAL_INT_static( name, value )          _yp_IMMORTAL_INT( static, name, value )
+#define yp_IMMORTAL_BYTES_static( name, value )        _yp_IMMORTAL_BYTES( static, name, value )
+#define yp_IMMORTAL_STR_LATIN_1_static( name, value )  _yp_IMMORTAL_STR_LATIN_1( static, name, value )
 
 #ifdef yp_FUTURE
 // The implementation of yp_IF is considered "internal"; see above for documentation

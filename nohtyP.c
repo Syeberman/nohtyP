@@ -690,7 +690,16 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
     return x;
 }
 
-// TODO Make this configurable via yp_initialize
+
+// Maximum code point of Unicode 6.0: 0x10FFFF (1,114,111)
+#define ypStringLib_MAX_UNICODE     (0x10FFFFu)
+
+// Macros to work with surrogates
+// XXX Adapted from Python's unicodeobject.h
+#define ypStringLib_IS_SURROGATE(ch)    (0xD800 <= (ch) && (ch) <= 0xDFFF)
+
+
+// TODO Make this configurable via yp_initialize, and/or dynamically
 static int _yp_recursion_limit = 1000;
 
 
@@ -4980,193 +4989,6 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 
 
 /*************************************************************************************************
- * Codec registry and base classes
- *************************************************************************************************/
-// XXX Patterned after the codecs module in Python
-// XXX This will be exposed in nohtyP.h someday; review and improve before you do
-
-// TODO codecs.register to register functions for encode/decode ...also codecs.lookup
-
-// TODO Python does maintain a distinction between text encodings and all others; do the same
-// TODO A macro in nohtyP.h to get/set from a struct with sizeof_struct ensuring compatibility
-// TODO yp_codecs_encode and yp_codecs_decode, which works for any arbitrary obj->obj encoding
-// TODO In general, everything below is geared for Unicode; make it flexible enough for anything
-
-#define yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN   (4)     // TODO make this large enough for standard replacements
-#define yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN (16)    // TODO ensure it's 4*str len
-typedef struct {
-    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
-
-    // Details of the error.  All references and pointers are borrowed and should not be replaced.
-    // TODO Python's error handlers are flexible enough to take any exception object containing
-    // any data.  Make sure this, while optimized for Unicode, can do the same.
-    ypObject *exc;          // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
-    ypObject *encoding;     // The name of the encoding that raised the error
-    struct {                // A to-be-formatted string+args describing the specific codec error
-        const yp_uint8_t *format;   // ASCII-encoded printf-style format string
-        va_list args;               // printf-style format arguments
-    } reason;
-    struct {                // The object/data the codec was attempting to encode/decode
-        ypObject *object;       // The source object; NULL if working strictly from raw data
-                                // XXX For example, yp_str_frombytesC4 will set this to NULL
-        struct {                // The source data; ptr and/or type may be NULL iff object isn't
-            const void *ptr;        // Pointer to the source data
-            ypObject *type;         // An indication of the type of data pointed to:
-                                    //  - str-like: set to encoding name as per yp_asencodedCX
-                                    //  - bytes-like: set to yp_type_bytes
-                                    //  - other codecs may set this to other objects
-        } data;
-    } source;
-    yp_ssize_t start;       // The first index of invalid data in source
-    yp_ssize_t end;         // The index after the last invalid data in source
-    yp_int_t _future;       // TODO good idea to future-proof here?
-
-    // FIXME: review below, and ensure sized efficiently (no padding)
-    // In-place buffers to return data without creating objects
-    union {
-        struct {
-            yp_ssize_t len;
-            yp_uint8_t data[yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN]; // FIXME ensure fills available space of union
-        } bytes;
-        struct {
-            yp_ssize_t len;
-            yp_uint32_t data[yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN]; // a small array of code points always in UCS-4
-        } str; 
-    } dest_buff;    // TODO rename
-} yp_codecs_error_handler_params_t;
-
-// Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
-// set *replacement to the object that replaces the bad data, and *new_position to the index at
-// which to restart encoding/decoding.
-// XXX There are two special values for *replacement.  If blah-bytes-blah, params->dest_buff.bytes
-// is used as if it were a bytes object.  If blah-str-blah, params->dest_buff.str is used as if it
-// were a str object.  This avoids having to create temporary objects for small amounts of data.
-typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
-
-// Special objects returned by error handlers to signal to use params->dest_buff to retrieve data
-// XXX We don't have a generic "object" type just yet, otherwise this would use it
-// FIXME The length of replacements is all variable...perhaps we should only deal in objects!
-yp_IMMORTAL_INVALIDATED( yp_codecs_replacement_is_bytes_buffer );
-yp_IMMORTAL_INVALIDATED( yp_codecs_replacement_is_str_buffer );
-
-// Dict mapping error handler names to their functions.  Initialized in _yp_codecs_initialize.
-// TODO Can we statically-allocate this dict?  Perhaps the standard error handlers can fit in the
-// inline array, and if it grows past that then we allocate on the heap.
-static ypObject *_yp_codecs_name2error = NULL;
-
-// FIXME move to nohtyP.h
-ypAPI void yp_setitemE( ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc );
-
-// Registers error_handler under the given name, and returns the immortal yp_None.  This handler
-// will be called on codec errors when name is specified as the errors parameter (see yp_encode3
-// for an example).  Returns an exception on error.
-static ypObject *yp_codecs_register_error(
-        ypObject *name, yp_codecs_error_handler_func_t error_handler )
-{
-    ypObject *exc = yp_None;
-    // FIXME Normalize the name
-    ypObject *result = yp_intC( (yp_int_t) error_handler );
-    yp_setitemE( _yp_codecs_name2error, name, result, &exc );
-    yp_decref( result );
-    return exc;     // on success or exception
-}
-
-// Returns the error handler previously registered under the given name.  Raises yp_LookupError
-// if the handler cannot be found.  Sets *exc and returns yp_codecs_strict_errors on error.
-static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
-static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc )
-{
-    // FIXME Normalize the name
-    ypObject *exc = yp_None;
-    ypObject *result = yp_getitem( _yp_codecs_name2error, name );   // new ref
-    yp_codecs_error_handler_func_t error_handler = 
-        (yp_codecs_error_handler_func_t) yp_asssizeC( result, &exc );
-    yp_decref( result );
-    if( yp_isexceptionC( exc ) ) {
-        *_exc = exc;
-        return yp_codecs_strict_errors;
-    }
-    return error_handler;
-}
-
-static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position )
-{
-    if( yp_isexceptionC( params->exc ) ) {
-        *replacement = params->exc;
-    } else {
-        *replacement = yp_TypeError;
-    }
-    *new_position = yp_SSIZE_T_MAX;
-}
-
-static void yp_codecs_replace_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position )
-{
-    *replacement = yp_NotImplementedError;
-    *new_position = yp_SSIZE_T_MAX;
-}
-
-static void yp_codecs_ignore_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position )
-{
-    // Yes, PyCodec_IgnoreErrors always returns an empty str
-    if( yp_isexceptionC2( params->exc, yp_UnicodeError ) ) {
-        *replacement = yp_str0( );
-        *new_position = params->end;
-    } else {
-        // TODO Can we make this a bit more flexible, by returning an empty instance of the 
-        // (hinted) result type?
-        *replacement = yp_TypeError;
-        *new_position = yp_SSIZE_T_MAX;
-    }
-}
-
-static void yp_codecs_xmlcharrefreplace_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position )
-{
-    *replacement = yp_NotImplementedError;
-    *new_position = yp_SSIZE_T_MAX;
-}
-
-static void yp_codecs_backslashreplace_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position )
-{
-    *replacement = yp_NotImplementedError;
-    *new_position = yp_SSIZE_T_MAX;
-}
-
-static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position )
-{
-    *replacement = yp_NotImplementedError;
-    *new_position = yp_SSIZE_T_MAX;
-}
-
-static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position )
-{
-    *replacement = yp_NotImplementedError;
-    *new_position = yp_SSIZE_T_MAX;
-}
-
-// Allocating these as immortal ints saves a _little_ bit off the heap, and doesn't cost anything
-yp_IMMORTAL_INT( _yp_codecs_i_strict_errors, (yp_int_t) yp_codecs_strict_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_replace_errors, (yp_int_t) yp_codecs_replace_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_ignore_errors, (yp_int_t) yp_codecs_ignore_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_xmlcharrefreplace_errors, (yp_int_t) yp_codecs_xmlcharrefreplace_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_backslashreplace_errors, (yp_int_t) yp_codecs_backslashreplace_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_surrogateescape_errors, (yp_int_t) yp_codecs_surrogateescape_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_surrogatepass_errors, (yp_int_t) yp_codecs_surrogatepass_errors );
-
-// TODO registered encoders/decoders can take a ypObject *typehint that identifies a particular
-// type for the return value, if possible, otherwise it's ignored and a "standard" type is returned
-// (this way, utf-8 can return a bytearray as required by yp_bytearray3)
-
-
-/*************************************************************************************************
  * String manipulation library (for bytes and str)
  *************************************************************************************************/
 
@@ -5205,13 +5027,6 @@ typedef struct _ypStrObject ypStrObject;
             yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
             (yp_SSIZE_T_MAX-yp_sizeof( ypStrObject )) / 4 /* /4 for elemsize of UCS-4 */ ), \
             ypObject_LEN_MAX ) - 1 /* -1 for null terminator */ )
-
-// Maximum code point of Unicode 6.0: 0x10FFFF (1,114,111)
-#define ypStringLib_MAX_UNICODE     (0x10FFFFu)
-
-// Macros to work with surrogates
-// XXX Adapted from Python's unicodeobject.h
-#define ypStringLib_IS_SURROGATE(ch)    (0xD800 <= (ch) && (ch) <= 0xDFFF)
 
 // Empty bytes can be represented by this, immortal object
 static ypBytesObject _yp_bytes_empty_struct = {
@@ -6246,6 +6061,366 @@ static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject 
         return _ypStringLib_encode_utf_8( type, source, errors );
     }
 }
+
+
+/*************************************************************************************************
+ * Codec registry and base classes
+ *************************************************************************************************/
+// XXX Patterned after the codecs module in Python
+// XXX This will be exposed in nohtyP.h someday; review and improve before you do
+
+// TODO codecs.register to register functions for encode/decode ...also codecs.lookup
+
+// TODO Python does maintain a distinction between text encodings and all others; do the same
+// TODO A macro in nohtyP.h to get/set from a struct with sizeof_struct ensuring compatibility
+// TODO yp_codecs_encode and yp_codecs_decode, which works for any arbitrary obj->obj encoding
+// TODO In general, everything below is geared for Unicode; make it flexible enough for anything
+
+#define yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN   (4)     // TODO make this large enough for standard replacements
+#define yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN (16)    // TODO ensure it's 4*str len
+typedef struct {
+    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
+
+    // Details of the error.  All references and pointers are borrowed and should not be replaced.
+    // TODO Python's error handlers are flexible enough to take any exception object containing
+    // any data.  Make sure this, while optimized for Unicode, can do the same.
+    ypObject *exc;          // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
+    ypObject *encoding;     // The name of the encoding that raised the error (unaliased)
+    struct {                // A to-be-formatted string+args describing the specific codec error
+        const yp_uint8_t *format;   // ASCII-encoded printf-style format string
+        va_list args;               // printf-style format arguments
+    } reason;
+    struct {                // The object/data the codec was attempting to encode/decode
+        ypObject *object;       // The source object; NULL if working strictly from raw data
+                                // XXX For example, yp_str_frombytesC4 will set this to NULL
+        struct {                // The source data; ptr and/or type may be NULL iff object isn't
+            const void *ptr;        // Pointer to the source data
+            ypObject *type;         // An indication of the type of data pointed to:
+                                    //  - str-like: set to encoding name as per yp_asencodedCX
+                                    //  - bytes-like: set to yp_type_bytes
+                                    //  - other codecs may set this to other objects
+        } data;
+    } source;
+    yp_ssize_t start;       // The first index of invalid data in source
+    yp_ssize_t end;         // The index after the last invalid data in source
+    yp_int_t _future;       // TODO good idea to future-proof here?
+
+    // FIXME: review below, and ensure sized efficiently (no padding)
+    // In-place buffers to return data without creating objects
+    union {
+        struct {
+            yp_ssize_t len;
+            yp_uint8_t data[yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN]; // FIXME ensure fills available space of union
+        } bytes;
+        struct {
+            yp_ssize_t len;
+            yp_uint32_t data[yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN]; // a small array of code points always in UCS-4
+        } str; 
+    } dest_buff;    // TODO rename
+} yp_codecs_error_handler_params_t;
+
+// Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
+// set *replacement to the object that replaces the bad data, and *new_position to the index at
+// which to restart encoding/decoding.
+// XXX There are two special values for *replacement.  If yp_codecs_replacement_is_bytes_buffer, 
+// params->dest_buff.bytes is used as if it were a bytes object.  If 
+// yp_codecs_replacement_is_str_buffer, params->dest_buff.str is used as if it were a str object.  
+// This avoids having to create temporary objects for small amounts of data.
+// TODO returning (replacement, new_position) is strictly a Unicode thing: generalize
+typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+
+// Special objects returned by error handlers to signal to use params->dest_buff to retrieve data
+// XXX We don't have a generic "object" type just yet, otherwise this would use it
+// FIXME The length of replacements is all variable...perhaps we should only deal in objects!
+yp_IMMORTAL_INVALIDATED( yp_codecs_replacement_is_bytes_buffer );
+yp_IMMORTAL_INVALIDATED( yp_codecs_replacement_is_str_buffer );
+
+// Set used to intern strings, particularly encoding names like yp_s_utf_8.  Initialized in
+// _yp_codecs_initialize.
+static ypObject *_yp_codecs_interned = NULL;
+
+// Dict mapping normalized aliases to their "official" names.  Initialized in _yp_codecs_initialize
+// TODO Can we statically-allocate this dict?
+static ypObject *_yp_codecs_alias2name = NULL;
+
+// All names and their aliases are lowercased, and ' ' and '_' are converted to '-'
+// XXX name must be a str/chrarray
+// XXX Check for the yp_s_utf_8 fast-path before calling this function
+// XXX Python is inconsistent with how it normalizes encoding names:
+//  - encodings/__init__.py: runs of non-alpha (except '.') to '_', leading/trailing '_' removed
+//      ...but this is only for codecs under encodings package
+//  - unicodeobject.c: to lower, '_' becomes '-', latin-1 names only
+//  - textio.c: encodefuncs array uses "utf-8", etc
+//  - codecs.c: to lower, ' ' becomes '_', latin-1 names only
+//  - encodings/aliases.py: aliases are "utf_8", etc
+// Choosing "utf-8", with underscores and spaces turned to hyphens
+static ypObject *_yp_codecs_normalize_encoding_name( ypObject *name )
+{
+    yp_uint8_t *data;
+    yp_ssize_t len;
+    yp_ssize_t i;
+    ypObject *norm;
+    yp_uint8_t norm_data;
+
+    // Only latin-1 names are accepted
+    if( ypStringLib_ENC_CODE( name ) != ypStringLib_ENC_LATIN_1 ) return yp_ValueError;
+    
+    // name may already be normalized, in which case: do nothing
+    data = ypStringLib_DATA( name );
+    len = ypStringLib_LEN( name );
+    for( i = 0; i < len; i++ ) {
+        if( yp_ISUPPER( data[i] ) ) goto convert;
+        if( data[i] == ' ' || data[i] == '_' ) goto convert;
+        // TODO Should we deny non-printable characters, '\t', etc?
+    }
+    return yp_incref( name );
+
+    // OK, there's characters to convert, starting at i: create a new string to return
+convert:
+    norm = _ypStr_new_latin_1( ypStr_CODE, len, /*alloclen_fixed=*/TRUE );
+    if( yp_isexceptionC( norm ) ) return norm;
+    norm_data = ypStringLib_DATA( norm );
+    memcpy( norm_data, data, i );
+    for( /*i already set*/; i < len; i++ ) {
+        yp_uint8_t ch = yp_TOLOWER( data[i] );
+        if( ch == ' ' || ch = '_' ) {
+            norm_data[i] = '-';
+        } else {
+            norm_data[i] = ch;
+        }
+    }
+    return norm;
+}
+
+static ypObject *_yp_codecs_register_alias_norm( ypObject *alias_norm, ypObject *name_norm )
+{
+    ypObject *result;
+
+    // We hard-code shortcuts to utf-8 encoders/decoders all over, so don't pretend the user can
+    // redirect utf-8 to a new alias
+    result = yp_eq( alias_norm, yp_s_utf_8 );
+    if( result != yp_False ) {
+        if( yp_isexceptionC( result ) ) return result;
+        return yp_ValueError;
+    }
+
+    // XXX 'E' versions of functions that return ypObject* do not have ypObject** exc
+    ypObject *name_intern = yp_pushinternE( _yp_codecs_interned, name_norm );  // new ref
+    if( yp_isexceptionC( name_intern ) ) return name_intern;
+
+    result = yp_setitemE( _yp_codecs_alias2name, alias_norm, name_intern );
+    yp_decref( name_intern );
+    return result;
+}
+
+// Registers the alias as an alternate name for the encoding and returns the immortal yp_None.
+// Both alias and name are normalized before being registered (lowercased, ' ' and '_' converted 
+// to '-').  Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there
+// is no other protection against using encoding names as aliases.  Returns an exception on error.
+// TODO Rename "name" to "encoding", at least in the API
+static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *name )
+{
+    ypObject *result;
+    ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias ); // new ref
+    ypObject *name_norm = _yp_codecs_normalize_encoding_name( name );   // new ref
+    if( yp_isexceptionC( alias_norm ) ) {
+        result = alias_norm;
+    } else if( yp_isexceptionC( name_norm ) ) {
+        result = name_norm;
+    } else {
+        result = _yp_codecs_register_alias_norm( alias_norm, name_norm );
+    }
+    yp_decrefN( 2, name_norm, alias_norm );
+    return result;
+}
+
+// Returns a new reference to the normalized, unaliased encoding name.
+// XXX The standard encoding names, particularly "utf-8", "latin-1", and "ascii", are always
+// returned as their interned objects (ie yp_s_utf_8), by virtue of the fact that:
+//  - _yp_codecs_alias2name values are interned
+//  - we intern the standard encoding names in _yp_codecs_initialize, which also registers them as
+//  aliases of themselves
+//  - we don't allow aliases to be deleted, only modified
+// FIXME What are we really saving by doing the above?  What if we just had a mapping for
+// standard-names to enum values and looked them up there?
+// TODO I believe this alias stuff is actually part of the encodings module; consider how pedantic
+// we want to be before releasing this API
+static ypObject *yp_codecs_lookup_alias( ypObject *alias ) 
+{
+    ypObject *name;
+    ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias ); // new ref
+    if( yp_isexceptionC( alias_norm ) ) return alias_norm;
+    name = yp_getitem( _yp_codecs_alias2name, alias_norm );
+    yp_decref( alias_norm );
+    return name;    // ...or exception
+}
+
+// TODO _yp_codecs_name2info
+
+// TODO deny replacing utf_8 codec with anything else
+
+static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **_exc )
+{
+    // FIXME Normalize the name
+    ypObject *exc = yp_None;
+
+    // As our default encoding, utf-8 gets a fast-path
+    if( encoding == yp_s_utf_8 ) return yp_codecs_codec_info_utf_8;
+}
+
+
+// Dict mapping error handler names to their functions.  Initialized in _yp_codecs_initialize.
+// TODO Can we statically-allocate this dict?  Perhaps the standard error handlers can fit in the
+// inline array, and if it grows past that then we allocate on the heap.
+static ypObject *_yp_codecs_name2error = NULL;
+
+// FIXME move to nohtyP.h
+ypAPI void yp_setitemE( ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc );
+
+// Registers error_handler under the given name, and returns the immortal yp_None.  This handler
+// will be called on codec errors when name is specified as the errors parameter (see yp_encode3
+// for an example).  Returns an exception on error.
+static ypObject *yp_codecs_register_error(
+        ypObject *name, yp_codecs_error_handler_func_t error_handler )
+{
+    ypObject *exc = yp_None;
+    // FIXME Normalize the name
+    ypObject *result = yp_intC( (yp_int_t) error_handler );
+    yp_setitemE( _yp_codecs_name2error, name, result, &exc );
+    yp_decref( result );
+    return exc;     // on success or exception
+}
+
+// Returns the error handler previously registered under the given name.  Raises yp_LookupError
+// if the handler cannot be found.  Sets *exc and returns yp_codecs_strict_errors on error.
+static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc )
+{
+    // FIXME Normalize the name
+    ypObject *exc = yp_None;
+    ypObject *result = yp_getitem( _yp_codecs_name2error, name );   // new ref
+    yp_codecs_error_handler_func_t error_handler = 
+        (yp_codecs_error_handler_func_t) yp_asssizeC( result, &exc );
+    yp_decref( result );
+    if( yp_isexceptionC( exc ) ) {
+        *_exc = exc;
+        return yp_codecs_strict_errors;
+    }
+    return error_handler;
+}
+
+static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position )
+{
+    if( yp_isexceptionC( params->exc ) ) {
+        *replacement = params->exc;
+    } else {
+        *replacement = yp_TypeError;
+    }
+    *new_position = yp_SSIZE_T_MAX;
+}
+
+static void yp_codecs_replace_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position )
+{
+    *replacement = yp_NotImplementedError;
+    *new_position = yp_SSIZE_T_MAX;
+}
+
+static void yp_codecs_ignore_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position )
+{
+    if( yp_isexceptionC2( params->exc, yp_UnicodeError ) ) {
+        *replacement = _yp_str_empty;
+        *new_position = params->end;
+    } else {
+        // TODO Can we make this a bit more flexible, by returning an empty instance of the 
+        // (hinted) result type?
+        *replacement = yp_TypeError;
+        *new_position = yp_SSIZE_T_MAX;
+    }
+}
+
+static void yp_codecs_xmlcharrefreplace_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position )
+{
+    *replacement = yp_NotImplementedError;
+    *new_position = yp_SSIZE_T_MAX;
+}
+
+static void yp_codecs_backslashreplace_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position )
+{
+    *replacement = yp_NotImplementedError;
+    *new_position = yp_SSIZE_T_MAX;
+}
+
+static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position )
+{
+    *replacement = yp_NotImplementedError;
+    *new_position = yp_SSIZE_T_MAX;
+}
+
+static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position )
+{
+    *replacement = yp_NotImplementedError;
+    *new_position = yp_SSIZE_T_MAX;
+}
+
+
+// Allocating these as immortals saves a _little_ bit off the heap, and doesn't cost anything
+#if 0 // FIXME use, or remove
+// ascii
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "646" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "ansi_x3.4_1968" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "ansi_x3_4_1968" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "ansi_x3.4_1986" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "cp367" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "csascii" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "ibm367" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "iso646_us" );
+    // TODO more aliases from here on down
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_us_ascii,     "us-ascii" );
+// latin-1
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_iso_8859_1,   "iso-8859-1" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_iso8859_1,    "iso8859-1" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_8859,         "8859" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_cp819,        "cp819" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_latin,        "latin" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_latin1,       "latin1" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_l1,           "l1" );
+// utf-8
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_u8,           "u8" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf,          "utf" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf8,         "utf8" );
+// utf-16, etc
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf_16_le,    "utf-16-le" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf_16_be,    "utf-16-be" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_u16,          "u16" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf16,        "utf16" );
+// utf-32, etc
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf_32_le,    "utf-32-le" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf_32_be,    "utf-32-be" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_u32,          "u32" );
+    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf32,        "utf32" );
+// ucs-2
+// ucs-4
+yp_IMMORTAL_INT( _yp_codecs_i_strict_errors, (yp_int_t) yp_codecs_strict_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_replace_errors, (yp_int_t) yp_codecs_replace_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_ignore_errors, (yp_int_t) yp_codecs_ignore_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_xmlcharrefreplace_errors, (yp_int_t) yp_codecs_xmlcharrefreplace_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_backslashreplace_errors, (yp_int_t) yp_codecs_backslashreplace_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_surrogateescape_errors, (yp_int_t) yp_codecs_surrogateescape_errors );
+yp_IMMORTAL_INT( _yp_codecs_i_surrogatepass_errors, (yp_int_t) yp_codecs_surrogatepass_errors );
+#endif
+
+// TODO registered encoders/decoders can take a ypObject *typehint that identifies a particular
+// type for the return value, if possible, otherwise it's ignored and a "standard" type is returned
+// (this way, utf-8 can return a bytearray as required by yp_bytearray3)
 
 
 /*************************************************************************************************
@@ -13297,24 +13472,68 @@ static void _ypMem_initialize( const yp_initialize_kwparams_t *kwparams )
     // fraction of this.)
 }
 
-// Called *exactly* *once* by yp_initialize to set up the codecs module
+// Called *exactly* *once* by yp_initialize to set up the codecs module.  Errors are largely
+// ignored: calling code will fail gracefully later on.
 static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
 {
     ypObject *exc = yp_None;
 
-    // Initialize the error-handler registry
-    _yp_codecs_name2error = yp_dictK( 0 );
-    yp_setitemE( _yp_codecs_name2error, yp_s_strict, _yp_codecs_i_strict_errors, &exc );
-    yp_setitemE( _yp_codecs_name2error, yp_s_replace, _yp_codecs_i_replace_errors, &exc );
-    yp_setitemE( _yp_codecs_name2error, yp_s_ignore, _yp_codecs_i_ignore_errors, &exc );
-    yp_setitemE( _yp_codecs_name2error, yp_s_xmlcharrefreplace, _yp_codecs_i_xmlcharrefreplace_errors, &exc );
-    yp_setitemE( _yp_codecs_name2error, yp_s_backslashreplace, _yp_codecs_i_backslashreplace_errors, &exc );
-    yp_setitemE( _yp_codecs_name2error, yp_s_surrogateescape, _yp_codecs_i_surrogateescape_errors, &exc );
-    yp_setitemE( _yp_codecs_name2error, yp_s_surrogatepass, _yp_codecs_i_surrogatepass_errors, &exc );
+    // The set of interned strings
+    // TODO This would be easier to maintain with a "yp_N" macro to count args
+    _yp_codecs_interned = yp_setN( 11,
+            yp_s_ascii,     yp_s_latin_1,
+            yp_s_utf_8,
+            yp_s_utf_16,    yp_s_utf_16be,      yp_s_utf_16le,
+            yp_s_utf_32,    yp_s_utf_32be,      yp_s_utf_32le,
+            yp_s_ucs_2,     yp_s_ucs_4
+            );
 
-    // In release builds, just ignore errors: downstream code will fail gracefully if there are
-    // errors here
-    yp_ASSERT( !yp_isexceptionC( exc ), "_yp_codecs_initialize failed unexpectedly" );
+    // Codec aliases.  All names (ie dict values) must be interned in _yp_codecs_interned.
+    // Further, the built-in codec names should be listed as aliases of themselves, to ensure
+    // that yp_codecs_lookup_alias always returns the interned version.
+    // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
+    // (yp_dict_fromlenhint?)
+    _yp_codecs_alias2name = yp_dictK( );
+#define yp_codecs_init_ADD_ALIAS( alias, name ) \
+    {   yp_IMMORTAL_STR_LATIN_1( _alias_obj, alias ); \
+        yp_setitemE( _yp_codecs_alias2name, _alias_obj, (name), &exc ); \
+    }
+    yp_setitemE( _yp_codecs_alias2name, yp_s_ascii, yp_s_ascii, &exc )
+    yp_codecs_init_ADD_ALIAS( "646",            yp_s_ascii );
+    yp_codecs_init_ADD_ALIAS( "ansi_x3.4_1968", yp_s_ascii );
+    yp_codecs_init_ADD_ALIAS( "ansi_x3_4_1968", yp_s_ascii );
+    yp_codecs_init_ADD_ALIAS( "ansi_x3.4_1986", yp_s_ascii );
+    yp_codecs_init_ADD_ALIAS( "cp367",          yp_s_ascii );
+    yp_codecs_init_ADD_ALIAS( "csascii",        yp_s_ascii );
+    yp_codecs_init_ADD_ALIAS( "ibm367",         yp_s_ascii );
+    yp_codecs_init_ADD_ALIAS( "iso646_us",      yp_s_ascii );
+    // TODO More ascii and other aliases below
+    yp_setitemE( _yp_codecs_alias2name, yp_s_latin_1, yp_s_latin_1, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_8, yp_s_utf_8, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_16, yp_s_utf_16, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_16be, yp_s_utf_16be, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_16le, yp_s_utf_16le, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_32, yp_s_utf_32, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_32be, yp_s_utf_32be, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_32le, yp_s_utf_32le, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_ucs_2, yp_s_ucs_2, &exc )
+    yp_setitemE( _yp_codecs_alias2name, yp_s_ucs_4, yp_s_ucs_4, &exc )
+
+    // The error-handler registry
+    // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
+    // (yp_dict_fromlenhint?)
+    _yp_codecs_name2error = yp_dictK( );
+#define yp_codecs_init_ADD_ERROR( name, func ) \
+    {   yp_IMMORTAL_INT( _func_obj, (yp_int_t) (func) ); \
+        yp_setitemE( _yp_codecs_name2error, (name), _func_obj, &exc ); \
+    }
+    yp_codecs_init_ADD_ERROR( yp_s_strict,            yp_codecs_strict_errors );
+    yp_codecs_init_ADD_ERROR( yp_s_replace,           yp_codecs_replace_errors );
+    yp_codecs_init_ADD_ERROR( yp_s_ignore,            yp_codecs_ignore_errors );
+    yp_codecs_init_ADD_ERROR( yp_s_xmlcharrefreplace, yp_codecs_xmlcharrefreplace_errors );
+    yp_codecs_init_ADD_ERROR( yp_s_backslashreplace,  yp_codecs_backslashreplace_errors );
+    yp_codecs_init_ADD_ERROR( yp_s_surrogateescape,   yp_codecs_surrogateescape_errors );
+    yp_codecs_init_ADD_ERROR( yp_s_surrogatepass,     yp_codecs_surrogatepass_errors );
 }
 
 void yp_initialize( const yp_initialize_kwparams_t *kwparams )
