@@ -5040,31 +5040,31 @@ static ypStrObject _yp_str_empty_struct = {
     0, 0, ypObject_HASH_INVALID, "" }, _yp_bytes_empty };
 #define _yp_str_empty   ((ypObject *) &_yp_str_empty_struct)
 
-// Gets the ordinal at src[src_i]
+// Gets the ordinal at src[src_i].  src_i must be in range(len): no bounds checking is performed.
 // TODO remove src_i and rename to getvalue or something
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
-typedef yp_uint32_t (*ypStringLib_getindexfunc)( void *src, yp_ssize_t src_i );
+typedef yp_uint32_t (*ypStringLib_getindexXfunc)( const void *src, yp_ssize_t src_i );
 
-// Sets dest[dest_i] to value
+// Sets dest[dest_i] to value.  dest_i must be in range(alloclen): no bounds checking is performed.
 // XXX dest's encoding must be able to store value
 // TODO remove dest_i and rename to setvalue or something
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
-typedef void (*ypStringLib_setindexfunc)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
+typedef void (*ypStringLib_setindexXfunc)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
 
 // XXX In general for this table, make sure you do not use type codes with the wrong
 // ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
 // TODO The more functions we can remove from this table, the better for the optimizer (true?)
 typedef struct {
-    int sizeshift;                      // len<<sizeshift gives the size in bytes
-    yp_ssize_t elemsize;                // The size (in bytes) of one character in this encoding
-    yp_uint32_t max_char;               // Largest character value that encoding can store
-                                        // (may be larger than ypStringLib_MAX_UNICODE)
-    int code;                           // The ypStringLib_ENC_* value of the encoding
-    ypObject *name;                     // Immortal str of the encoding name (ie yp_s_latin_1)
-    ypObject *empty_immutable;          // The immortal, empty immutable for this type
-    ypObject *(*empty_mutable)( void ); // Returns a new, empty mutable version of this type
-    ypStringLib_getindexfunc getindex;  // Gets the ordinal at src[src_i]
-    ypStringLib_setindexfunc setindex;  // Sets dest[dest_i] to value
+    int sizeshift;                          // len<<sizeshift gives the size in bytes
+    yp_ssize_t elemsize;                    // The size (in bytes) of one character
+    yp_uint32_t max_char;                   // Largest character value that encoding can store
+                                            //  (may be larger than ypStringLib_MAX_UNICODE)
+    int code;                               // The ypStringLib_ENC_* value of the encoding
+    ypObject *name;                         // Immortal str of the encoding name (ie yp_s_latin_1)
+    ypObject *empty_immutable;              // The immortal, empty immutable for this type
+    ypObject *(*empty_mutable)( void );     // Returns a new, empty mutable version of this type
+    ypStringLib_getindexXfunc getindexX;    // Gets the ordinal at src[src_i]
+    ypStringLib_setindexXfunc setindexX;    // Sets dest[dest_i] to value
 
     // Returns a new type-object with the given requiredLen, plus the null terminator, for this
     // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will
@@ -5097,31 +5097,31 @@ static ypStringLib_encinfo ypStringLib_encs[4];
 // Getters, setters, and copiers for our three internal encodings
 
 // Gets ordinal at src[src_i]
-static yp_uint32_t ypStringLib_getindex_1byte( void *src, yp_ssize_t src_i ) {
+static yp_uint32_t ypStringLib_getindexX_1byte( const void *src, yp_ssize_t src_i ) {
     yp_ASSERT( src_i >= 0, "indicies must be >=0" );
     return ((yp_uint8_t *)src)[src_i];
 }
-static yp_uint32_t ypStringLib_getindex_2bytes( void *src, yp_ssize_t src_i ) {
+static yp_uint32_t ypStringLib_getindexX_2bytes( const void *src, yp_ssize_t src_i ) {
     yp_ASSERT( src_i >= 0, "indicies must be >=0" );
     return ((yp_uint16_t *)src)[src_i];
 }
-static yp_uint32_t ypStringLib_getindex_4bytes( void *src, yp_ssize_t src_i ) {
+static yp_uint32_t ypStringLib_getindexX_4bytes( const void *src, yp_ssize_t src_i ) {
     yp_ASSERT( src_i >= 0, "indicies must be >=0" );
     return ((yp_uint32_t *)src)[src_i];
 }
 
 // Sets dest[dest_i] to value
-static void ypStringLib_setindex_1byte( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+static void ypStringLib_setindexX_1byte( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
     yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
     yp_ASSERT( value <= 0xFFu, "value too large for a byte" );
     ((yp_uint8_t *)dest)[dest_i] = (yp_uint8_t) (value & 0xFFu);
 }
-static void ypStringLib_setindex_2bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+static void ypStringLib_setindexX_2bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
     yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
     yp_ASSERT( value <= 0xFFFFu, "value too large for a byte" );
     ((yp_uint16_t *)dest)[dest_i] = (yp_uint16_t) (value & 0xFFFFu);
 }
-static void ypStringLib_setindex_4bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+static void ypStringLib_setindexX_4bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
     yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
     ((yp_uint32_t *)dest)[dest_i] = value;
 }
@@ -5282,7 +5282,7 @@ static ypObject *ypStringLib_repeat( ypObject *s, yp_ssize_t factor )
 
     memcpy( ypStringLib_DATA( newS ), ypStringLib_DATA( s ), s_len << s_enc->sizeshift );
     _ypSequence_repeat_memcpy( ypStringLib_DATA( newS ), factor, s_len << s_enc->sizeshift );
-    s_enc->setindex( ypStringLib_DATA( newS ), newLen, 0 );
+    s_enc->setindexX( ypStringLib_DATA( newS ), newLen, 0 );
     ypStringLib_SET_LEN( newS, newLen );
     return newS;
 }
@@ -5306,7 +5306,7 @@ static ypObject *ypStringLib_irepeat( ypObject *s, yp_ssize_t factor )
     }
 
     _ypSequence_repeat_memcpy( ypStringLib_DATA( s ), factor, s_len << s_enc->sizeshift );
-    s_enc->setindex( ypStringLib_DATA( s ), newLen, 0 );
+    s_enc->setindexX( ypStringLib_DATA( s ), newLen, 0 );
     ypStringLib_SET_LEN( s, newLen );
     return yp_None;
 }
@@ -5357,9 +5357,9 @@ static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
             ypStringLib_ENC( s )->sizeshift, ypStringLib_DATA( s ), 0, s_len );
     _ypSequence_repeat_memcpy( result_data, x_len-1, (s_len+1) << result_enc->sizeshift );
     for( i = 0; i < x_len; i++ ) {
-        result_enc->setindex( result_data, i*(s_len+1), x_enc->getindex( x_data, i ) );
+        result_enc->setindexX( result_data, i*(s_len+1), x_enc->getindexX( x_data, i ) );
     }
-    result_enc->setindex( result_data, result_len, 0 );
+    result_enc->setindexX( result_data, result_len, 0 );
     ypStringLib_SET_LEN( result, result_len );
     return result;
 }
@@ -5407,7 +5407,7 @@ static void _ypStringLib_join_elemcopy( ypObject *result,
     }
 
     // Null-terminate and update the length
-    result_enc->setindex( result_data, result_len, 0 );
+    result_enc->setindexX( result_data, result_len, 0 );
     ypStringLib_SET_LEN( result, result_len );
 }
 
@@ -5543,7 +5543,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8( const yp_uint8_t **source, const y
     const yp_uint8_t *s = *source;
     int dest_sizeshift = ypStringLib_ENC( dest )->sizeshift;
     yp_uint32_t dest_max_char = ypStringLib_ENC( dest )->max_char;
-    ypStringLib_setindexfunc dest_setindex = ypStringLib_ENC( dest )->setindex;
+    ypStringLib_setindexXfunc dest_setindexX = ypStringLib_ENC( dest )->setindexX;
     void *dest_data = ypStringLib_DATA( dest );
     yp_ssize_t dest_len = ypStringLib_LEN( dest );
 
@@ -5592,7 +5592,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8( const yp_uint8_t **source, const y
             if (ch > dest_max_char)
                 /* Out-of-range */
                 goto Return;
-            dest_setindex( dest_data, dest_len, ch );
+            dest_setindexX( dest_data, dest_len, ch );
             dest_len += 1;
             continue;
         }
@@ -5642,7 +5642,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8( const yp_uint8_t **source, const y
             if (ch > dest_max_char)
                 /* Out-of-range */
                 goto Return;
-            dest_setindex( dest_data, dest_len, ch );
+            dest_setindexX( dest_data, dest_len, ch );
             dest_len += 1;
             continue;
         }
@@ -5699,7 +5699,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8( const yp_uint8_t **source, const y
             if (ch > dest_max_char)
                 /* Out-of-range */
                 goto Return;
-            dest_setindex( dest_data, dest_len, ch );
+            dest_setindexX( dest_data, dest_len, ch );
             dest_len += 1;
             continue;
         }
@@ -5732,7 +5732,7 @@ InvalidContinuation3:
 // FIXME This is TERRIBLE, because if a string has more than a couple UCS-4 characters, it's
 // probably *mostly* UCS-4 characters
 // XXX Runtime-wise, the worst-case would probably be a string that starts completely Latin-1 (each
-// character is a call to enc->setindex), followed by a UCS-2 then a UCS-4 character (each
+// character is a call to enc->setindexX), followed by a UCS-2 then a UCS-4 character (each
 // triggering an upconvert of previously-decoded characters)
 // TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
 // decoding errors
@@ -5857,7 +5857,7 @@ main_loop:
                 return result;
             }
             // Don't forget to write the character that didn't previously fit
-            ypStringLib_encs[newEnc].setindex(
+            ypStringLib_encs[newEnc].setindexX(
                 ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), ch );
             ypStringLib_SET_LEN( newS, ypStringLib_LEN( newS ) + 1 );
         } else {
@@ -5897,7 +5897,7 @@ main_loop:
 main_loop_end:
 
     // TODO See how much wasted space is left here and if we should release some back to the heap
-    ypStringLib_ENC( newS )->setindex( ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), 0 );
+    ypStringLib_ENC( newS )->setindexX( ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), 0 );
     return newS;
 }
 
@@ -5906,7 +5906,6 @@ main_loop_end:
 // under half the buffer
 // XXX Runtime-wise, the worst-case is probably a string with completely latin-1 characters
 static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len );
-// FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *source )
 {
@@ -5939,6 +5938,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
         // twice the required memory here
         // TODO Take into account that we already know the first leading_ascii bytes don't
         // contain continuation bytes
+        // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
         dest = _ypBytes_new( type, source_len*2, /*alloclen_fixed=*/FALSE );
         if( yp_isexceptionC( dest ) ) return dest;
         dest_data = ypStringLib_DATA( dest );
@@ -5948,6 +5948,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
 
     // If it doesn't start with any ASCII...well...not much we can do
     } else {
+        // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
         dest = _ypBytes_new( type, source_len*2, /*alloclen_fixed=*/FALSE );
         if( yp_isexceptionC( dest ) ) return dest;
         s = source_data;
@@ -5989,7 +5990,7 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     yp_ssize_t const source_len = ypStringLib_LEN( source );
     void * const source_data = ypStringLib_DATA( source );
     int source_enc = ypStringLib_ENC_CODE( source );
-    ypStringLib_getindexfunc getindex = ypStringLib_ENC( source )->getindex;
+    ypStringLib_getindexXfunc getindexX = ypStringLib_ENC( source )->getindexX;
     yp_ssize_t maxCharSize;
     yp_ssize_t i;   // index into source_data
     ypObject *dest;
@@ -5999,12 +6000,13 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     yp_ASSERT( source_enc != ypStringLib_ENC_LATIN_1, "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings" );
     maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 2 : 4;
 
+    // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
     dest = _ypBytes_new( type, source_len*maxCharSize, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( dest ) ) return dest;
     d = dest_data = ypStringLib_DATA( dest );
 
     for( i = 0; i < source_len; i++ ) {
-        yp_uint32_t ch = getindex( source_data, i );
+        yp_uint32_t ch = getindexX( source_data, i );
 
         if( ch < 0x80u ) {
             yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 1 );
@@ -6085,7 +6087,7 @@ typedef struct {
     // TODO Python's error handlers are flexible enough to take any exception object containing
     // any data.  Make sure this, while optimized for Unicode, can do the same.
     ypObject *exc;          // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
-    ypObject *encoding;     // The name of the encoding that raised the error (unaliased)
+    ypObject *encoding;     // The unaliased name of the encoding that raised the error
     struct {                // A to-be-formatted string+args describing the specific codec error
         const yp_uint8_t *format;   // ASCII-encoded printf-style format string
         va_list args;               // printf-style format arguments
@@ -6094,17 +6096,18 @@ typedef struct {
         ypObject *object;       // The source object; NULL if working strictly from raw data
                                 // XXX For example, yp_str_frombytesC4 will set this to NULL
         struct {                // The source data; ptr and/or type may be NULL iff object isn't
-            const void *ptr;        // Pointer to the source data
             ypObject *type;         // An indication of the type of data pointed to:
                                     //  - str-like: set to encoding name as per yp_asencodedCX
                                     //  - bytes-like: set to yp_type_bytes
                                     //  - other codecs may set this to other objects
+            const void *ptr;        // Pointer to the source data
+            yp_ssize_t len;         // Length of source data
         } data;
     } source;
     yp_ssize_t start;       // The first index of invalid data in source
     yp_ssize_t end;         // The index after the last invalid data in source
-    yp_int_t _future;       // TODO good idea to future-proof here?
 
+#if 0 // FIXME useful?
     // FIXME: review below, and ensure sized efficiently (no padding)
     // In-place buffers to return data without creating objects
     union {
@@ -6115,32 +6118,47 @@ typedef struct {
         struct {
             yp_ssize_t len;
             yp_uint32_t data[yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN]; // a small array of code points always in UCS-4
-        } str; 
+        } str;
     } dest_buff;    // TODO rename
+#endif
 } yp_codecs_error_handler_params_t;
+
+
+static ypStringLib_getindexXfunc _yp_codecs_strenc2getindexX( ypObject *encoding )
+{
+    if( encoding == yp_s_latin_1 ) return ypStringLib_getindexX_1byte;
+    if( encoding == yp_s_ucs_2 )   return ypStringLib_getindexX_2bytes;
+    if( encoding == yp_s_ucs_4 )   return ypStringLib_getindexX_4bytes;
+    // params->source.data.type must be one of the exact objects above, as per yp_asencodedCX
+    return NULL;
+}
+
 
 // Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
 // set *replacement to the object that replaces the bad data, and *new_position to the index at
 // which to restart encoding/decoding.
-// XXX There are two special values for *replacement.  If yp_codecs_replacement_is_bytes_buffer, 
-// params->dest_buff.bytes is used as if it were a bytes object.  If 
-// yp_codecs_replacement_is_str_buffer, params->dest_buff.str is used as if it were a str object.  
+// XXX There are two special values for *replacement.  If yp_codecs_replacement_is_bytes_buffer,
+// params->dest_buff.bytes is used as if it were a bytes object.  If
+// yp_codecs_replacement_is_str_buffer, params->dest_buff.str is used as if it were a str object.
 // This avoids having to create temporary objects for small amounts of data.
 // TODO returning (replacement, new_position) is strictly a Unicode thing: generalize
 typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position );
 
+#if 0 // FIXME useful?
 // Special objects returned by error handlers to signal to use params->dest_buff to retrieve data
 // XXX We don't have a generic "object" type just yet, otherwise this would use it
 // FIXME The length of replacements is all variable...perhaps we should only deal in objects!
 yp_IMMORTAL_INVALIDATED( yp_codecs_replacement_is_bytes_buffer );
 yp_IMMORTAL_INVALIDATED( yp_codecs_replacement_is_str_buffer );
+#endif
 
-// Set used to intern strings, particularly encoding names like yp_s_utf_8.  Initialized in
-// _yp_codecs_initialize.
-static ypObject *_yp_codecs_interned = NULL;
+// Set containing the standard encodings like yp_s_utf_8.  Instead of a series of yp_eq calls,
+// yp_set_getintern is used to return one of these objects, which is then compared by identity
+// (i.e. ptr value).  Initialized in _yp_codecs_initialize.
+static ypObject *_yp_codecs_standard = NULL;
 
-// Dict mapping normalized aliases to their "official" names.  Initialized in _yp_codecs_initialize
+// Dict mapping normalized aliases to "official" names.  Initialized in _yp_codecs_initialize.
 // TODO Can we statically-allocate this dict?
 static ypObject *_yp_codecs_alias2name = NULL;
 
@@ -6161,11 +6179,11 @@ static ypObject *_yp_codecs_normalize_encoding_name( ypObject *name )
     yp_ssize_t len;
     yp_ssize_t i;
     ypObject *norm;
-    yp_uint8_t norm_data;
+    yp_uint8_t *norm_data;
 
     // Only latin-1 names are accepted
     if( ypStringLib_ENC_CODE( name ) != ypStringLib_ENC_LATIN_1 ) return yp_ValueError;
-    
+
     // name may already be normalized, in which case: do nothing
     data = ypStringLib_DATA( name );
     len = ypStringLib_LEN( name );
@@ -6184,7 +6202,7 @@ convert:
     memcpy( norm_data, data, i );
     for( /*i already set*/; i < len; i++ ) {
         yp_uint8_t ch = yp_TOLOWER( data[i] );
-        if( ch == ' ' || ch = '_' ) {
+        if( ch == ' ' || ch == '_' ) {
             norm_data[i] = '-';
         } else {
             norm_data[i] = ch;
@@ -6193,29 +6211,26 @@ convert:
     return norm;
 }
 
+// FIXME Move these to nohtyP.h...eventually
+ypAPI void yp_setitemE( ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc );
+static ypObject *yp_set_getintern( ypObject *set, ypObject *x );
+
 static ypObject *_yp_codecs_register_alias_norm( ypObject *alias_norm, ypObject *name_norm )
 {
-    ypObject *result;
-
     // We hard-code shortcuts to utf-8 encoders/decoders all over, so don't pretend the user can
     // redirect utf-8 to a new alias
-    result = yp_eq( alias_norm, yp_s_utf_8 );
+    ypObject *exc = yp_None;
+    ypObject *result = yp_eq( alias_norm, yp_s_utf_8 );
     if( result != yp_False ) {
         if( yp_isexceptionC( result ) ) return result;
         return yp_ValueError;
     }
-
-    // XXX 'E' versions of functions that return ypObject* do not have ypObject** exc
-    ypObject *name_intern = yp_pushinternE( _yp_codecs_interned, name_norm );  // new ref
-    if( yp_isexceptionC( name_intern ) ) return name_intern;
-
-    result = yp_setitemE( _yp_codecs_alias2name, alias_norm, name_intern );
-    yp_decref( name_intern );
-    return result;
+    yp_setitemE( _yp_codecs_alias2name, alias_norm, name_norm, &exc );
+    return exc;
 }
 
 // Registers the alias as an alternate name for the encoding and returns the immortal yp_None.
-// Both alias and name are normalized before being registered (lowercased, ' ' and '_' converted 
+// Both alias and name are normalized before being registered (lowercased, ' ' and '_' converted
 // to '-').  Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there
 // is no other protection against using encoding names as aliases.  Returns an exception on error.
 // TODO Rename "name" to "encoding", at least in the API
@@ -6236,30 +6251,22 @@ static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *name )
 }
 
 // Returns a new reference to the normalized, unaliased encoding name.
-// XXX The standard encoding names, particularly "utf-8", "latin-1", and "ascii", are always
-// returned as their interned objects (ie yp_s_utf_8), by virtue of the fact that:
-//  - _yp_codecs_alias2name values are interned
-//  - we intern the standard encoding names in _yp_codecs_initialize, which also registers them as
-//  aliases of themselves
-//  - we don't allow aliases to be deleted, only modified
-// FIXME What are we really saving by doing the above?  What if we just had a mapping for
-// standard-names to enum values and looked them up there?
 // TODO I believe this alias stuff is actually part of the encodings module; consider how pedantic
 // we want to be before releasing this API
-static ypObject *yp_codecs_lookup_alias( ypObject *alias ) 
+static ypObject *yp_codecs_lookup_alias( ypObject *alias )
 {
     ypObject *name;
     ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias ); // new ref
     if( yp_isexceptionC( alias_norm ) ) return alias_norm;
     name = yp_getitem( _yp_codecs_alias2name, alias_norm );
     yp_decref( alias_norm );
-    return name;    // ...or exception
+    return name;
 }
 
 // TODO _yp_codecs_name2info
 
 // TODO deny replacing utf_8 codec with anything else
-
+#if 0
 static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **_exc )
 {
     // FIXME Normalize the name
@@ -6268,15 +6275,12 @@ static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **
     // As our default encoding, utf-8 gets a fast-path
     if( encoding == yp_s_utf_8 ) return yp_codecs_codec_info_utf_8;
 }
-
+#endif
 
 // Dict mapping error handler names to their functions.  Initialized in _yp_codecs_initialize.
 // TODO Can we statically-allocate this dict?  Perhaps the standard error handlers can fit in the
 // inline array, and if it grows past that then we allocate on the heap.
 static ypObject *_yp_codecs_name2error = NULL;
-
-// FIXME move to nohtyP.h
-ypAPI void yp_setitemE( ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc );
 
 // Registers error_handler under the given name, and returns the immortal yp_None.  This handler
 // will be called on codec errors when name is specified as the errors parameter (see yp_encode3
@@ -6301,7 +6305,7 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, y
     // FIXME Normalize the name
     ypObject *exc = yp_None;
     ypObject *result = yp_getitem( _yp_codecs_name2error, name );   // new ref
-    yp_codecs_error_handler_func_t error_handler = 
+    yp_codecs_error_handler_func_t error_handler =
         (yp_codecs_error_handler_func_t) yp_asssizeC( result, &exc );
     yp_decref( result );
     if( yp_isexceptionC( exc ) ) {
@@ -6336,7 +6340,7 @@ static void yp_codecs_ignore_errors( yp_codecs_error_handler_params_t *params,
         *replacement = _yp_str_empty;
         *new_position = params->end;
     } else {
-        // TODO Can we make this a bit more flexible, by returning an empty instance of the 
+        // TODO Can we make this a bit more flexible, by returning an empty instance of the
         // (hinted) result type?
         *replacement = yp_TypeError;
         *new_position = yp_SSIZE_T_MAX;
@@ -6364,13 +6368,92 @@ static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *
     *new_position = yp_SSIZE_T_MAX;
 }
 
+static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
+        yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
+{
+    ypStringLib_getindexXfunc getindexX;
+    ypObject *replacement;
+    yp_uint8_t *outp;
+    yp_ssize_t i;
+
+    getindexX = _yp_codecs_strenc2getindexX( params->source.data.type );
+    if( getindexX == NULL ) return yp_SystemError;  // shouldn't occur
+
+    if( encoding == yp_s_utf_8 ) {
+        yp_ssize_t badLen = params->end - params->start;
+        if( badLen > ypStringLib_LEN_MAX / 3 ) return yp_MemorySizeOverflowError;
+        replacement = _ypBytes_new( ypBytes_CODE, 3*badLen, /*alloclen_fixed=*/TRUE );
+        if( yp_isexceptionC( replacement ) ) return replacement;
+
+        outp = (yp_uint8_t *) ypStringLib_DATA( replacement );
+        for( i = params->start; i < params->end; i++ ) {
+            yp_int_t ch = getindexX( params->source.data.ptr, i );
+            if( !ypStringLib_IS_SURROGATE( ch ) ) {
+                yp_decref( replacement );
+                return params->exc; // not a surrogate: raise original error
+            }
+            *outp++ = (yp_uint8_t)(0xe0u | (ch >> 12));
+            *outp++ = (yp_uint8_t)(0x80u | ((ch >> 6) & 0x3fu));
+            *outp++ = (yp_uint8_t)(0x80u | (ch & 0x3fu));
+        }
+        ypStringLib_SET_LEN( replacement, 3*badLen );
+        return replacement;
+
+    } else {
+        yp_ASSERT( !yp_isexceptionC( encoding ), "yp_set_getintern exceptions should be caught in yp_codecs_surrogatepass_errors" );
+        return params->exc;     // unsupported standard encoding: raise original error
+    }
+}
+static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
+        yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
+{
+    // Of course, our source must be a bytes object
+    if( params->source.data.type != yp_type_bytes ) return yp_TypeError;
+
+    if( encoding == yp_s_utf_8 ) {
+        // TODO
+        return yp_NotImplementedError;
+
+    } else {
+        yp_ASSERT( !yp_isexceptionC( encoding ), "yp_set_getintern exceptions should be caught in yp_codecs_surrogatepass_errors" );
+        return params->exc;     // unsupported standard encoding: raise original error
+    }
+}
 static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position )
 {
-    *replacement = yp_NotImplementedError;
-    *new_position = yp_SSIZE_T_MAX;
-}
+    ypObject *encoding;
 
+    if( params->source.data.ptr == NULL || params->source.data.type == NULL ) {
+        *replacement = yp_ValueError;
+        goto exit;
+    }
+    // TODO Get the getindexX function here for the data
+
+    encoding = yp_set_getintern( _yp_codecs_standard, params->encoding ); // new ref
+    if( yp_isexceptionC( encoding ) ) {
+        if( yp_isexceptionC2( encoding, yp_KeyError ) ) {
+            *replacement = params->exc; // completely-unknown encoding: raise original error
+        } else {
+            *replacement = encoding;    // unexpected error in yp_set_getintern
+        }
+        goto exit;
+    }
+
+    if( yp_isexceptionC2( params->exc, yp_UnicodeEncodeError ) ) {
+        *replacement = _yp_codecs_surrogatepass_errors_onencode( encoding, params, new_position );
+    } else if( yp_isexceptionC2( params->exc, yp_UnicodeDecodeError ) ) {
+        *replacement = _yp_codecs_surrogatepass_errors_ondecode( encoding, params, new_position );
+    } else {
+        *replacement = yp_TypeError;    // unhandled encoding exception
+    }
+    yp_decref( encoding );
+
+exit:
+    if( yp_isexceptionC( *replacement ) ) {
+        *new_position = yp_SSIZE_T_MAX;
+    }
+}
 
 // Allocating these as immortals saves a _little_ bit off the heap, and doesn't cost anything
 #if 0 // FIXME use, or remove
@@ -6453,7 +6536,7 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 // If type is immutable and alloclen_fixed is true (indicating the object will never grow), the
 // data is placed inline with one allocation.
 // XXX Remember to add the null terminator
-// XXX Check for the _yp_bytes_empty case first
+// XXX Check for the _yp_bytes_empty, negative len, and >max len cases first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed )
@@ -7766,7 +7849,7 @@ static ypObject *str_getindex( ypObject *s, yp_ssize_t i, ypObject *defval )
         if( defval == NULL ) return yp_IndexError;
         return yp_incref( defval );
     }
-    return yp_chrC( ypStringLib_ENC( s )->getindex( ypStr_DATA( s ), i ) );
+    return yp_chrC( ypStringLib_ENC( s )->getindexX( ypStr_DATA( s ), i ) );
 }
 
 static ypObject *str_len( ypObject *s, yp_ssize_t *len )
@@ -8282,8 +8365,8 @@ ypObject *yp_chrC( yp_int_t i ) {
     yp_ASSERT( ypStr_DATA( newS ) == ypStr_INLINE_DATA( newS ), "yp_chrC didn't allocate inline!" );
     newEnc = &(ypStringLib_encs[newEnc_code]);
     // Recall we've already checked that i isn't outside of a 32-bit range (MAX_UNICODE)
-    newEnc->setindex( ypStr_DATA( newS ), 0, (yp_uint32_t) i );
-    newEnc->setindex( ypStr_DATA( newS ), 1, 0 );
+    newEnc->setindexX( ypStr_DATA( newS ), 0, (yp_uint32_t) i );
+    newEnc->setindexX( ypStr_DATA( newS ), 1, 0 );
     ypStr_SET_LEN( newS, 1 );
     return newS;
 }
@@ -8328,8 +8411,8 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         NULL,                               // name
         _yp_bytes_empty,                    // empty_immutable
         yp_bytearray0,                      // empty_mutable
-        ypStringLib_getindex_1byte,         // getindex
-        ypStringLib_setindex_1byte,         // setindex
+        ypStringLib_getindexX_1byte,        // getindexX
+        ypStringLib_setindexX_1byte,        // setindexX
         _ypBytes_new,                       // new
         _ypBytes_copy,                      // copy
         _ypBytes_grow_onextend,             // grow_onextend
@@ -8343,8 +8426,8 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         (ypObject *)&_yp_s_latin_1_struct,  // name
         _yp_str_empty,                      // empty_immutable
         yp_chrarray0,                       // empty_mutable
-        ypStringLib_getindex_1byte,         // getindex
-        ypStringLib_setindex_1byte,         // setindex
+        ypStringLib_getindexX_1byte,        // getindexX
+        ypStringLib_setindexX_1byte,        // setindexX
         _ypStr_new_latin_1,                 // new
         _ypStr_copy,                        // copy
         _ypStr_grow_onextend,               // grow_onextend
@@ -8358,8 +8441,8 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         (ypObject *)&_yp_s_ucs_2_struct,    // name
         _yp_str_empty,                      // empty_immutable
         yp_chrarray0,                       // empty_mutable
-        ypStringLib_getindex_2bytes,        // getindex
-        ypStringLib_setindex_2bytes,        // setindex
+        ypStringLib_getindexX_2bytes,       // getindexX
+        ypStringLib_setindexX_2bytes,       // setindexX
         _ypStr_new_ucs_2,                   // new
         _ypStr_copy,                        // copy
         _ypStr_grow_onextend,               // grow_onextend
@@ -8373,8 +8456,8 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         (ypObject *)&_yp_s_ucs_4_struct,    // name
         _yp_str_empty,                      // empty_immutable
         yp_chrarray0,                       // empty_mutable
-        ypStringLib_getindex_4bytes,        // getindex
-        ypStringLib_setindex_4bytes,        // setindex
+        ypStringLib_getindexX_4bytes,       // getindexX
+        ypStringLib_setindexX_4bytes,       // setindexX
         _ypStr_new_ucs_4,                   // new
         _ypStr_copy,                        // copy
         _ypStr_grow_onextend,               // grow_onextend
@@ -11138,6 +11221,22 @@ void yp_set_add( ypObject **set, ypObject *x )
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( set, result );
 }
 
+// TODO Calling it yp_set_* implies it only works for sets, so do we need a yp_frozenset_*?  If we
+// do, we're dooming people to check the type of the object to find out which function they can
+// use...but then what else should we call this?  Do we jump right to yp_getintern?
+static ypObject *yp_set_getintern( ypObject *set, ypObject *x )
+{
+    yp_hash_t hash;
+    ypObject *result = yp_None;
+    ypSet_KeyEntry *loc;
+
+    hash = yp_currenthashC( x, &result );
+    if( yp_isexceptionC( result ) ) return result;
+    result = _ypSet_lookkey( set, x, hash, &loc );
+    if( yp_isexceptionC( result ) ) return result;
+    if( !ypSet_ENTRY_USED( loc ) ) return yp_KeyError;
+    return yp_incref( loc->se_key );
+}
 
 // Constructors
 
@@ -13121,6 +13220,10 @@ void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x ) {
     _yp_INPLACE1( mapping, tp_setitem, (*mapping, key, x) );
 }
 
+void yp_setitemE( ypObject *mapping, ypObject *key, ypObject *x, ypObject **exc ) {
+    _yp_REDIRECT_EXC1( mapping, tp_setitem, (mapping, key, x), exc );
+}
+
 void yp_delitem( ypObject **mapping, ypObject *key ) {
     _yp_INPLACE1( mapping, tp_delitem, (*mapping, key) );
 }
@@ -13478,9 +13581,9 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
 {
     ypObject *exc = yp_None;
 
-    // The set of interned strings
+    // The set of standard encodings
     // TODO This would be easier to maintain with a "yp_N" macro to count args
-    _yp_codecs_interned = yp_setN( 11,
+    _yp_codecs_standard = yp_setN( 11,
             yp_s_ascii,     yp_s_latin_1,
             yp_s_utf_8,
             yp_s_utf_16,    yp_s_utf_16be,      yp_s_utf_16le,
@@ -13488,17 +13591,14 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
             yp_s_ucs_2,     yp_s_ucs_4
             );
 
-    // Codec aliases.  All names (ie dict values) must be interned in _yp_codecs_interned.
-    // Further, the built-in codec names should be listed as aliases of themselves, to ensure
-    // that yp_codecs_lookup_alias always returns the interned version.
+    // Codec aliases
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
     // (yp_dict_fromlenhint?)
-    _yp_codecs_alias2name = yp_dictK( );
+    _yp_codecs_alias2name = yp_dictK( 0 );
 #define yp_codecs_init_ADD_ALIAS( alias, name ) \
     {   yp_IMMORTAL_STR_LATIN_1( _alias_obj, alias ); \
         yp_setitemE( _yp_codecs_alias2name, _alias_obj, (name), &exc ); \
     }
-    yp_setitemE( _yp_codecs_alias2name, yp_s_ascii, yp_s_ascii, &exc )
     yp_codecs_init_ADD_ALIAS( "646",            yp_s_ascii );
     yp_codecs_init_ADD_ALIAS( "ansi_x3.4_1968", yp_s_ascii );
     yp_codecs_init_ADD_ALIAS( "ansi_x3_4_1968", yp_s_ascii );
@@ -13508,21 +13608,21 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     yp_codecs_init_ADD_ALIAS( "ibm367",         yp_s_ascii );
     yp_codecs_init_ADD_ALIAS( "iso646_us",      yp_s_ascii );
     // TODO More ascii and other aliases below
-    yp_setitemE( _yp_codecs_alias2name, yp_s_latin_1, yp_s_latin_1, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_8, yp_s_utf_8, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_16, yp_s_utf_16, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_16be, yp_s_utf_16be, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_16le, yp_s_utf_16le, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_32, yp_s_utf_32, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_32be, yp_s_utf_32be, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_utf_32le, yp_s_utf_32le, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_ucs_2, yp_s_ucs_2, &exc )
-    yp_setitemE( _yp_codecs_alias2name, yp_s_ucs_4, yp_s_ucs_4, &exc )
+    // yp_s_latin_1
+    // yp_s_utf_8
+    // yp_s_utf_16
+    // yp_s_utf_16be
+    // yp_s_utf_16le
+    // yp_s_utf_32
+    // yp_s_utf_32be
+    // yp_s_utf_32le
+    // yp_s_ucs_2
+    // yp_s_ucs_4
 
     // The error-handler registry
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
     // (yp_dict_fromlenhint?)
-    _yp_codecs_name2error = yp_dictK( );
+    _yp_codecs_name2error = yp_dictK( 0 );
 #define yp_codecs_init_ADD_ERROR( name, func ) \
     {   yp_IMMORTAL_INT( _func_obj, (yp_int_t) (func) ); \
         yp_setitemE( _yp_codecs_name2error, (name), _func_obj, &exc ); \
