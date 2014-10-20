@@ -1671,8 +1671,9 @@ class yp_str( ypObject ):
             if object is _yp_arg_missing: return _yp_str0( )
             if isinstance( object, ypObject ): return object._yp_str( )
             if isinstance( object, str ):
-                encoded = object.encode( )
-                return _yp_str_frombytesC2( encoded, len( encoded ) )
+                encoded = object.encode( "utf-8", "surrogatepass" )
+                return _yp_str_frombytesC4( encoded, len( encoded ), 
+                    yp_s_utf_8, yp_s_surrogatepass )
             raise TypeError( "expected ypObject or str in yp_str" )
         else:
             return _yp_str3( object, encoding, errors )
@@ -1719,6 +1720,12 @@ c_ypObject_p_value( "yp_s_utf_8" )
 c_ypObject_p_value( "yp_s_ucs_2" )
 c_ypObject_p_value( "yp_s_ucs_4" )
 c_ypObject_p_value( "yp_s_strict" )
+c_ypObject_p_value( "yp_s_replace" )
+c_ypObject_p_value( "yp_s_ignore" )
+c_ypObject_p_value( "yp_s_xmlcharrefreplace" )
+c_ypObject_p_value( "yp_s_backslashreplace" )
+c_ypObject_p_value( "yp_s_surrogateescape" )
+c_ypObject_p_value( "yp_s_surrogatepass" )
 _yp_str_enc2type = {
         yp_s_latin_1.value: (POINTER( c_uint8 ),  1),
         yp_s_ucs_2.value:   (POINTER( c_uint16 ), 2),

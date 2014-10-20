@@ -7,6 +7,7 @@
 
 // TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
 // yp_sys_minint, or yp_sys_maxsize
+// TODO Audit the use of leading underscore and ensure consistency
 
 #include "nohtyP.h"
 #include <stdlib.h>
@@ -1235,7 +1236,7 @@ static void *_ypMem_realloc_container_variable(
     void *oldptr;
     yp_ssize_t size;
     yp_ssize_t extra_size;
-    yp_ssize_t alloclen;
+    yp_ssize_t alloclen; 
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, elemsize );
 
@@ -4989,6 +4990,109 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 
 
 /*************************************************************************************************
+ * In-development API for Codec registry and base classes
+ *************************************************************************************************/
+// XXX Patterned after the codecs module in Python
+// XXX This will be exposed in nohtyP.h someday; review and improve before you do
+// TODO In general, everything below is geared for Unicode; make it flexible enough for anything
+
+#define yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN   (4)     // TODO make this large enough for standard replacements
+#define yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN (16)    // TODO ensure it's 4*str len
+typedef struct _yp_codecs_error_handler_params_t {
+    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
+
+    // Details of the error.  All references and pointers are borrowed and should not be replaced.
+    // TODO Python's error handlers are flexible enough to take any exception object containing
+    // any data.  Make sure this, while optimized for Unicode, can do the same.
+    ypObject *exc;          // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
+    ypObject *encoding;     // The unaliased name of the encoding that raised the error
+    struct {                // A to-be-formatted string+args describing the specific codec error
+        const yp_uint8_t *format;   // ASCII-encoded printf-style format string
+        va_list args;               // printf-style format arguments
+    } reason;
+    struct {                // The object/data the codec was attempting to encode/decode
+        ypObject *object;       // The source object; NULL if working strictly from raw data
+                                // XXX For example, yp_str_frombytesC4 will set this to NULL
+        // TODO if ptr is NULL, populate it from object from _within_ the handler (and make an easy
+        // function to do this)
+        struct {                // The source data; ptr and/or type may be NULL iff object isn't
+            ypObject *type;         // An indication of the type of data pointed to:
+                                    //  - str-like: set to encoding name as per yp_asencodedCX
+                                    //  - bytes-like: set to yp_type_bytes
+                                    //  - other codecs may set this to other objects
+            const void *ptr;        // Pointer to the source data
+            yp_ssize_t len;         // Length of source data
+        } data;
+    } source;
+    yp_ssize_t start;       // The first index of invalid data in source
+    yp_ssize_t end;         // The index after the last invalid data in source
+
+#if 0 // FIXME useful?
+    // FIXME: review below, and ensure sized efficiently (no padding)
+    // In-place buffers to return data without creating objects
+    union {
+        struct {
+            yp_ssize_t len;
+            yp_uint8_t data[yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN]; // FIXME ensure fills available space of union
+        } bytes;
+        struct {
+            yp_ssize_t len;
+            yp_uint32_t data[yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN]; // a small array of code points always in UCS-4
+        } str;
+    } dest_buff;    // TODO rename
+#endif
+} yp_codecs_error_handler_params_t;
+
+// Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
+// set *replacement to the object that replaces the bad data, and *new_position to the index at
+// which to restart encoding/decoding.
+// XXX There are two special values for *replacement.  If yp_codecs_replacement_is_bytes_buffer,
+// params->dest_buff.bytes is used as if it were a bytes object.  If
+// yp_codecs_replacement_is_str_buffer, params->dest_buff.str is used as if it were a str object.
+// This avoids having to create temporary objects for small amounts of data.
+// TODO returning (replacement, new_position) is strictly a Unicode thing: generalize
+typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+
+// Registers the alias as an alternate name for the encoding and returns the immortal yp_None.
+// Both alias and name are normalized before being registered (lowercased, ' ' and '_' converted
+// to '-').  Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there
+// is no other protection against using encoding names as aliases.  Returns an exception on error.
+// TODO Rename "name" to "encoding", at least in the API
+static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *name );
+
+// Returns a new reference to the normalized, unaliased encoding name.
+// TODO I believe this alias stuff is actually part of the encodings module; consider how pedantic
+// we want to be before releasing this API
+static ypObject *yp_codecs_lookup_alias( ypObject *alias );
+
+// Registers error_handler under the given name, and returns the immortal yp_None.  This handler
+// will be called on codec errors when name is specified as the errors parameter (see yp_encode3
+// for an example).  Returns an exception on error.
+static ypObject *yp_codecs_register_error(
+        ypObject *name, yp_codecs_error_handler_func_t error_handler );
+
+// Returns the error handler previously registered under the given name.  Raises yp_LookupError
+// if the handler cannot be found.  Sets *exc and returns yp_codecs_strict_errors on error.
+static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc );
+
+static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+static void yp_codecs_replace_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+static void yp_codecs_ignore_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+static void yp_codecs_xmlcharrefreplace_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+static void yp_codecs_backslashreplace_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
+static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
+        yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position );
+
+
+/*************************************************************************************************
  * String manipulation library (for bytes and str)
  *************************************************************************************************/
 
@@ -5470,6 +5574,97 @@ static ypObject *ypStringLib_join(
 }
 
 
+// Unicode encoding/decoding support functions
+
+// TODO ypStringLib_encode_call_errorhandler
+
+// future_growth is an upper-bound estimate of the number of additional characters, not including 
+// the replacement text, that are expected to be added to decoded, 
+// XXX Adapted from Python's unicode_decode_call_errorhandler_writer
+static ypObject *ypStringLib_decode_call_errorhandler(
+    ypObject *errors, yp_codecs_error_handler_func_t *errorHandler,
+    ypObject *encoding, const char *reason,
+    const yp_uint8_t *input, const yp_uint8_t *inend,
+    yp_ssize_t startinpos, yp_ssize_t endinpos, 
+    const char **inptr )
+{
+    ypObject *exc = yp_None;
+    yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
+    ypObject *repunicode = yp_None;
+    yp_ssize_t insize = inend - input;  // TODO overflow? 
+    yp_ssize_t newpos;
+
+    // The caller stores errorHandler for us between calls to avoid multiple lookups
+    // XXX yp_codecs_lookup_errorE returns yp_codecs_strict_errors on error, so we will continue to
+    // fail if lookup errors are ignored
+    if( *errorHandler == NULL ) {
+        *errorHandler = yp_codecs_lookup_errorE( errors, &exc );
+        if( yp_isexceptionC( exc ) ) return exc;
+    }
+
+    params.exc = yp_UnicodeDecodeError;
+    params.encoding = encoding;
+    // TODO pass the reason along
+    // TODO pass the object along, if appropriate
+    params.source.data.type = yp_type_bytes;
+    params.source.data.ptr = input;
+    params.source.data.len = insize; 
+    params.start = startinpos;
+    params.end = endinpos;
+
+    (*errorHandler)( &params, &repunicode, &newpos );   // repunicode is new ref
+    if( ypObject_TYPE_PAIR_CODE( repunicode ) != ypStr_CODE ) {
+        ypObject *typeErr = yp_BAD_TYPE( repunicode );
+        yp_decref( repunicode );
+        return typeErr;
+    }
+
+    // XXX Python allows the bytes variable in the exception to be modified and replaced here, but
+    // this isn't documented and I'm assuming it's a deprecated feature
+
+    if( newpos < 0 ) newpos = insize+newpos;
+    if( newpos < 0 || newpos > insize ) {
+        yp_decref( repunicode );
+        return yp_IndexError;   // "position %zd from error handler out of bounds"
+    }
+
+    return repunicode;
+}
+
+// future_growth is an upper-bound estimate of the number of additional characters, not including 
+// the replacement text, that are expected to be added to decoded.  After appending, decoded will
+// have at least future_growth space available.
+static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra,
+        int enc_code );
+static ypObject *ypStringLib_decode_append_replacement(
+    ypObject *decoded, ypObject *repunicode, yp_ssize_t future_growth )
+{
+    yp_ssize_t requiredLen;
+    ypObject *result;
+
+    yp_ASSERT( ypObject_TYPE_PAIR_CODE( repunicode ) == ypStr_CODE, "repunicode must be a string" );
+    yp_ASSERT( future_growth >= 0, "future_growth can't be negative" );
+    // FIXME check for overflow
+    requiredLen = ypStringLib_LEN( decoded ) + ypStringLib_LEN( repunicode ) + future_growth;
+    if( ypStringLib_ALLOCLEN( decoded ) < requiredLen ||
+        ypStringLib_ENC( decoded ) < ypStringLib_ENC( repunicode ) )
+    {
+        result = _ypStr_grow_onextend( decoded, requiredLen, 0, 
+            ypStringLib_ENC_CODE( repunicode ) );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+
+    ypStringLib_elemcopy( 
+        ypStringLib_ENC( decoded )->sizeshift, ypStringLib_DATA( decoded ), 
+            ypStringLib_LEN( decoded ),
+        ypStringLib_ENC( repunicode )->sizeshift, ypStringLib_DATA( repunicode ), 
+            ypStringLib_LEN( repunicode ),
+        ypStringLib_LEN( repunicode )
+    );
+    return yp_None;
+}
+
+
 // UTF-8 encoding and decoding functions
 
 // Returns the number of consecutive ascii bytes starting at start.  Valid for ascii, latin-1, and
@@ -5742,8 +5937,6 @@ InvalidContinuation3:
 // FIXME Completely ignoring errors at the moment
 // FIXME To call _ypStr_new_latin_1, you must first check ypStringLib_LEN_MAX!
 static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed );
-static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra,
-        int enc_code );
 static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
         const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
 {
@@ -5757,7 +5950,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
     yp_ssize_t startinpos;
     yp_ssize_t endinpos;
     const yp_uint8_t *errmsg = "";
-    //ypObject *errorHandler = NULL;
+    yp_codecs_error_handler_func_t errorHandler = NULL;
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
     yp_ASSERT( len >= 0, "negative len not allowed (do strlen before ypStringLib_decode_frombytesC_*)" );
 
@@ -5861,6 +6054,7 @@ main_loop:
                 ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), ch );
             ypStringLib_SET_LEN( newS, ypStringLib_LEN( newS ) + 1 );
         } else {
+            ypObject *repunicode;
             startinpos = source - starts;
             switch( ch ) {
                 case ypStringLib_UTF_8_DATA_END:
@@ -5884,14 +6078,22 @@ main_loop:
                     yp_decref( newS );
                     return yp_SystemError;
             }
-            yp_decref( newS );
-            return yp_NotImplementedError;
-            /*if (unicode_decode_call_errorhandler_writer(
-                    errors, &errorHandler,
-                    "utf-8", errmsg,
-                    &starts, &end, &startinpos, &endinpos, &exc, &source,
-                    &writer))
-                goto onError;*/
+            repunicode = ypStringLib_decode_call_errorhandler(  // new ref
+                errors, &errorHandler, yp_s_utf_8, errmsg,
+                starts, end, startinpos, endinpos, &source );
+            if( yp_isexceptionC( repunicode ) ) {
+                yp_decref( newS );
+                return repunicode;
+            }
+            // We can now update our expectation of how many more characters will be added: it's the
+            // number of byes left to decode (remembering source was modified above).
+            result = ypStringLib_decode_append_replacement(
+                newS, repunicode, end - source );
+            yp_decref( repunicode );
+            if( yp_isexceptionC( result ) ) {
+                yp_decref( newS );
+                return result;
+            }
         }
     }
 main_loop_end:
@@ -6069,7 +6271,6 @@ static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject 
  * Codec registry and base classes
  *************************************************************************************************/
 // XXX Patterned after the codecs module in Python
-// XXX This will be exposed in nohtyP.h someday; review and improve before you do
 
 // TODO codecs.register to register functions for encode/decode ...also codecs.lookup
 
@@ -6077,52 +6278,6 @@ static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject 
 // TODO A macro in nohtyP.h to get/set from a struct with sizeof_struct ensuring compatibility
 // TODO yp_codecs_encode and yp_codecs_decode, which works for any arbitrary obj->obj encoding
 // TODO In general, everything below is geared for Unicode; make it flexible enough for anything
-
-#define yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN   (4)     // TODO make this large enough for standard replacements
-#define yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN (16)    // TODO ensure it's 4*str len
-typedef struct {
-    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
-
-    // Details of the error.  All references and pointers are borrowed and should not be replaced.
-    // TODO Python's error handlers are flexible enough to take any exception object containing
-    // any data.  Make sure this, while optimized for Unicode, can do the same.
-    ypObject *exc;          // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
-    ypObject *encoding;     // The unaliased name of the encoding that raised the error
-    struct {                // A to-be-formatted string+args describing the specific codec error
-        const yp_uint8_t *format;   // ASCII-encoded printf-style format string
-        va_list args;               // printf-style format arguments
-    } reason;
-    struct {                // The object/data the codec was attempting to encode/decode
-        ypObject *object;       // The source object; NULL if working strictly from raw data
-                                // XXX For example, yp_str_frombytesC4 will set this to NULL
-        struct {                // The source data; ptr and/or type may be NULL iff object isn't
-            ypObject *type;         // An indication of the type of data pointed to:
-                                    //  - str-like: set to encoding name as per yp_asencodedCX
-                                    //  - bytes-like: set to yp_type_bytes
-                                    //  - other codecs may set this to other objects
-            const void *ptr;        // Pointer to the source data
-            yp_ssize_t len;         // Length of source data
-        } data;
-    } source;
-    yp_ssize_t start;       // The first index of invalid data in source
-    yp_ssize_t end;         // The index after the last invalid data in source
-
-#if 0 // FIXME useful?
-    // FIXME: review below, and ensure sized efficiently (no padding)
-    // In-place buffers to return data without creating objects
-    union {
-        struct {
-            yp_ssize_t len;
-            yp_uint8_t data[yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN]; // FIXME ensure fills available space of union
-        } bytes;
-        struct {
-            yp_ssize_t len;
-            yp_uint32_t data[yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN]; // a small array of code points always in UCS-4
-        } str;
-    } dest_buff;    // TODO rename
-#endif
-} yp_codecs_error_handler_params_t;
-
 
 static ypStringLib_getindexXfunc _yp_codecs_strenc2getindexX( ypObject *encoding )
 {
@@ -6133,17 +6288,6 @@ static ypStringLib_getindexXfunc _yp_codecs_strenc2getindexX( ypObject *encoding
     return NULL;
 }
 
-
-// Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
-// set *replacement to the object that replaces the bad data, and *new_position to the index at
-// which to restart encoding/decoding.
-// XXX There are two special values for *replacement.  If yp_codecs_replacement_is_bytes_buffer,
-// params->dest_buff.bytes is used as if it were a bytes object.  If
-// yp_codecs_replacement_is_str_buffer, params->dest_buff.str is used as if it were a str object.
-// This avoids having to create temporary objects for small amounts of data.
-// TODO returning (replacement, new_position) is strictly a Unicode thing: generalize
-typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
 
 #if 0 // FIXME useful?
 // Special objects returned by error handlers to signal to use params->dest_buff to retrieve data
@@ -6229,11 +6373,6 @@ static ypObject *_yp_codecs_register_alias_norm( ypObject *alias_norm, ypObject 
     return exc;
 }
 
-// Registers the alias as an alternate name for the encoding and returns the immortal yp_None.
-// Both alias and name are normalized before being registered (lowercased, ' ' and '_' converted
-// to '-').  Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there
-// is no other protection against using encoding names as aliases.  Returns an exception on error.
-// TODO Rename "name" to "encoding", at least in the API
 static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *name )
 {
     ypObject *result;
@@ -6250,9 +6389,6 @@ static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *name )
     return result;
 }
 
-// Returns a new reference to the normalized, unaliased encoding name.
-// TODO I believe this alias stuff is actually part of the encodings module; consider how pedantic
-// we want to be before releasing this API
 static ypObject *yp_codecs_lookup_alias( ypObject *alias )
 {
     ypObject *name;
@@ -6282,9 +6418,6 @@ static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **
 // inline array, and if it grows past that then we allocate on the heap.
 static ypObject *_yp_codecs_name2error = NULL;
 
-// Registers error_handler under the given name, and returns the immortal yp_None.  This handler
-// will be called on codec errors when name is specified as the errors parameter (see yp_encode3
-// for an example).  Returns an exception on error.
 static ypObject *yp_codecs_register_error(
         ypObject *name, yp_codecs_error_handler_func_t error_handler )
 {
@@ -6296,10 +6429,6 @@ static ypObject *yp_codecs_register_error(
     return exc;     // on success or exception
 }
 
-// Returns the error handler previously registered under the given name.  Raises yp_LookupError
-// if the handler cannot be found.  Sets *exc and returns yp_codecs_strict_errors on error.
-static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
 static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc )
 {
     // FIXME Normalize the name
@@ -6368,6 +6497,7 @@ static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *
     *new_position = yp_SSIZE_T_MAX;
 }
 
+// XXX Adapted from PyCodec_SurrogatePassErrors
 static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
         yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
 {
@@ -6404,6 +6534,7 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
         return params->exc;     // unsupported standard encoding: raise original error
     }
 }
+// XXX Adapted from PyCodec_SurrogatePassErrors
 static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
 {
@@ -6426,7 +6557,7 @@ static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *pa
 
     if( params->source.data.ptr == NULL || params->source.data.type == NULL ) {
         *replacement = yp_ValueError;
-        goto exit;
+        goto onerror;
     }
     // TODO Get the getindexX function here for the data
 
@@ -6437,7 +6568,7 @@ static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *pa
         } else {
             *replacement = encoding;    // unexpected error in yp_set_getintern
         }
-        goto exit;
+        goto onerror;
     }
 
     if( yp_isexceptionC2( params->exc, yp_UnicodeEncodeError ) ) {
@@ -6448,11 +6579,12 @@ static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *pa
         *replacement = yp_TypeError;    // unhandled encoding exception
     }
     yp_decref( encoding );
+    if( yp_isexceptionC( *replacement ) ) goto onerror;
+    return;
 
-exit:
-    if( yp_isexceptionC( *replacement ) ) {
-        *new_position = yp_SSIZE_T_MAX;
-    }
+onerror:
+    *new_position = yp_SSIZE_T_MAX;
+    return;
 }
 
 // Allocating these as immortals saves a _little_ bit off the heap, and doesn't cost anything
