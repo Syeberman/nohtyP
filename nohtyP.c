@@ -6506,6 +6506,7 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
     yp_uint8_t *outp;
     yp_ssize_t i;
 
+    // FIXME yp_TypeError if the source isn't the type we expect
     getindexX = _yp_codecs_strenc2getindexX( params->source.data.type );
     if( getindexX == NULL ) return yp_SystemError;  // shouldn't occur
 
@@ -6535,15 +6536,48 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
     }
 }
 // XXX Adapted from PyCodec_SurrogatePassErrors
+// TODO Review this function...
+static ypObject *_ypStr_new_ucs_2( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
 {
+    ypObject *replacement;
+    yp_uint8_t *inp;
+    yp_uint16_t *outp;
+    yp_ssize_t i;
+    yp_uint16_t ch;
+
     // Of course, our source must be a bytes object
     if( params->source.data.type != yp_type_bytes ) return yp_TypeError;
 
     if( encoding == yp_s_utf_8 ) {
-        // TODO
-        return yp_NotImplementedError;
+        // Python does this differently: it decodes only one character at a time, and it potentially
+        // consumes past params->end
+        // TODO The equivalent Python code assumes null-termination of source, or it might overflow
+        yp_ssize_t badLen = params->end - params->start;
+        // All surrogates take 3 bytes in utf-8 , so if it's not mod 3 something isn't a surrogate
+        if( badLen % 3 != 0 ) return params->exc;
+        if( ypStringLib_LEN_MAX > badLen / 3 ) return yp_MemorySizeOverflowError;
+        // All surrogates are represented in ucs-2
+        replacement = _ypStr_new_ucs_2( ypStr_CODE, badLen/3, /*alloclen_fixed=*/TRUE );
+        if( yp_isexceptionC( replacement ) ) return replacement;
+
+        inp = ((yp_uint8_t *) params->source.data.ptr) + params->start;
+        outp = (yp_uint16_t *) ypStringLib_DATA( replacement );
+        for( i = 0; i < badLen; i+=3 ) {
+            if( (inp[0] & 0xf0u) != 0xe0u || (inp[1] & 0xc0u) != 0x80u || (inp[2] & 0xc0u) != 0x80u ) {
+                yp_decref( replacement );
+                return params->exc; // not a surrogate: raise original error
+            }
+            ch = ((inp[0] & 0x0fu) << 12) + ((inp[1] & 0x3fu) << 6) + (inp[2] & 0x3fu);
+            if( !ypStringLib_IS_SURROGATE( ch ) ) {
+                yp_decref( replacement );
+                return params->exc; // not a surrogate: raise original error
+            }
+            *outp++ = ch;
+        }
+        ypStringLib_SET_LEN( replacement, badLen/3 );
+        return replacement;
 
     } else {
         yp_ASSERT( !yp_isexceptionC( encoding ), "yp_set_getintern exceptions should be caught in yp_codecs_surrogatepass_errors" );
