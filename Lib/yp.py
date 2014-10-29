@@ -1425,7 +1425,12 @@ class yp_BaseException( ypObject ):
         """Raises the appropriate Python exception"""
         super( )._yp_errcheck( )
         name, pyExc = _ypExc2py[self.value]
-        raise pyExc( name )
+        if issubclass( pyExc, UnicodeEncodeError ):
+            raise pyExc( "<null>", "", 0, 0, name )
+        elif issubclass( pyExc, UnicodeDecodeError ):
+            raise pyExc( "<null>", b"", 0, 0, name )
+        else:
+            raise pyExc( name )
 
 @pytype( yp_type_NoneType, type( None ) )
 class yp_NoneType( ypObject ):
