@@ -5046,6 +5046,7 @@ typedef struct _yp_codecs_error_handler_params_t {
 // Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
 // set *replacement to the object that replaces the bad data, and *new_position to the index at
 // which to restart encoding/decoding.
+// XXX It's possible for *new_position to be less than or even greater than params->end on output
 // XXX There are two special values for *replacement.  If yp_codecs_replacement_is_bytes_buffer,
 // params->dest_buff.bytes is used as if it were a bytes object.  If
 // yp_codecs_replacement_is_str_buffer, params->dest_buff.str is used as if it were a str object.
@@ -5592,7 +5593,7 @@ static ypObject *ypStringLib_decode_call_errorhandler(
     yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
     ypObject *repunicode = yp_None;
     yp_ssize_t insize = inend - input;  // TODO overflow? 
-    yp_ssize_t newpos;
+    yp_ssize_t newpos = yp_SSIZE_T_MAX; // in case errorhandler forgets to set
 
     // The caller stores errorHandler for us between calls to avoid multiple lookups
     // XXX yp_codecs_lookup_errorE returns yp_codecs_strict_errors on error, so we will continue to
@@ -5627,6 +5628,7 @@ static ypObject *ypStringLib_decode_call_errorhandler(
         yp_decref( repunicode );
         return yp_IndexError;   // "position %zd from error handler out of bounds"
     }
+    *inptr = input + newpos;
 
     return repunicode;
 }
@@ -5636,20 +5638,22 @@ static ypObject *ypStringLib_decode_call_errorhandler(
 // have at least future_growth space available.
 static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra,
         int enc_code );
-static ypObject *ypStringLib_decode_append_replacement(
+static ypObject *ypStringLib_decode_concat_replacement(
     ypObject *decoded, ypObject *repunicode, yp_ssize_t future_growth )
 {
-    yp_ssize_t requiredLen;
+    yp_ssize_t newLen;
+    yp_ssize_t newAlloclen;
     ypObject *result;
 
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( repunicode ) == ypStr_CODE, "repunicode must be a string" );
     yp_ASSERT( future_growth >= 0, "future_growth can't be negative" );
     // FIXME check for overflow
-    requiredLen = ypStringLib_LEN( decoded ) + ypStringLib_LEN( repunicode ) + future_growth;
-    if( ypStringLib_ALLOCLEN( decoded ) < requiredLen ||
+    newLen = ypStringLib_LEN( decoded ) + ypStringLib_LEN( repunicode );
+    newAlloclen = newLen + future_growth;
+    if( ypStringLib_ALLOCLEN( decoded ) < newAlloclen ||
         ypStringLib_ENC( decoded ) < ypStringLib_ENC( repunicode ) )
     {
-        result = _ypStr_grow_onextend( decoded, requiredLen, 0, 
+        result = _ypStr_grow_onextend( decoded, newAlloclen, 0,
             ypStringLib_ENC_CODE( repunicode ) );
         if( yp_isexceptionC( result ) ) return result;
     }
@@ -5658,9 +5662,10 @@ static ypObject *ypStringLib_decode_append_replacement(
         ypStringLib_ENC( decoded )->sizeshift, ypStringLib_DATA( decoded ), 
             ypStringLib_LEN( decoded ),
         ypStringLib_ENC( repunicode )->sizeshift, ypStringLib_DATA( repunicode ), 
-            ypStringLib_LEN( repunicode ),
+            0,
         ypStringLib_LEN( repunicode )
     );
+    ypStringLib_SET_LEN( decoded, newLen );
     return yp_None;
 }
 
@@ -6087,7 +6092,7 @@ main_loop:
             }
             // We can now update our expectation of how many more characters will be added: it's the
             // number of byes left to decode (remembering source was modified above).
-            result = ypStringLib_decode_append_replacement(
+            result = ypStringLib_decode_concat_replacement(
                 newS, repunicode, end - source );
             yp_decref( repunicode );
             if( yp_isexceptionC( result ) ) {
@@ -6490,6 +6495,15 @@ static void yp_codecs_backslashreplace_errors( yp_codecs_error_handler_params_t 
     *new_position = yp_SSIZE_T_MAX;
 }
 
+// Returns true if the three bytes at x _could_ be an encoded surrogate
+#define _yp_codecs_UTF8_SURROGATE_PRECHECK( x ) \
+     ( ((x)[0] & 0xf0u) == 0xe0u && ((x)[1] & 0xc0u) == 0x80u && ((x)[2] & 0xc0u) == 0x80u )
+// Decodes the characters using the three bytes at x; must have passed PRECHECK; resulting character
+// may not actually be a surrogate
+#define _yp_codecs_UTF8_SURROGATE_DECODE( x ) \
+     ( (((x)[0] & 0x0fu) << 12) + (((x)[1] & 0x3fu) << 6) + ((x)[2] & 0x3fu) )
+
+// TODO It'd be nice to share code with surrogatepass...
 static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position )
 {
@@ -6511,23 +6525,31 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
     if( getindexX == NULL ) return yp_SystemError;  // shouldn't occur
 
     if( encoding == yp_s_utf_8 ) {
-        yp_ssize_t badLen = params->end - params->start;
+        yp_ssize_t badEnd;      // index of end of surrogates to replace from source
+        yp_ssize_t badLen = 0;  // number of surrogate characters to replace
+        for( i = params->start; i < params->source.data.len; i++ ) {
+            yp_int_t ch = getindexX( params->source.data.ptr, i );
+            if( !ypStringLib_IS_SURROGATE( ch ) ) break;
+            badLen += 1;
+        }
+        if( badLen < 1 ) return params->exc; // not a surrogate: raise original error
+
         if( badLen > ypStringLib_LEN_MAX / 3 ) return yp_MemorySizeOverflowError;
         replacement = _ypBytes_new( ypBytes_CODE, 3*badLen, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( replacement ) ) return replacement;
 
+        badEnd = params->start + badLen;
         outp = (yp_uint8_t *) ypStringLib_DATA( replacement );
-        for( i = params->start; i < params->end; i++ ) {
+        for( i = params->start; i < badEnd; i++ ) {
             yp_int_t ch = getindexX( params->source.data.ptr, i );
-            if( !ypStringLib_IS_SURROGATE( ch ) ) {
-                yp_decref( replacement );
-                return params->exc; // not a surrogate: raise original error
-            }
+            yp_ASSERT( ypStringLib_IS_SURROGATE( ch ), "problem in loop above" ); // paranoia
             *outp++ = (yp_uint8_t)(0xe0u | (ch >> 12));
             *outp++ = (yp_uint8_t)(0x80u | ((ch >> 6) & 0x3fu));
             *outp++ = (yp_uint8_t)(0x80u | (ch & 0x3fu));
         }
+        *outp = 0;  // null-terminate
         ypStringLib_SET_LEN( replacement, 3*badLen );
+        *new_position = badEnd;
         return replacement;
 
     } else {
@@ -6538,45 +6560,48 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
 // XXX Adapted from PyCodec_SurrogatePassErrors
 // TODO Review this function...
 static ypObject *_ypStr_new_ucs_2( int type, yp_ssize_t requiredLen, int alloclen_fixed );
+static ypObject *_ypStr_push_from_uint32C( ypObject *s, yp_uint32_t x, yp_ssize_t growhint );
 static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
 {
     ypObject *replacement;
-    yp_uint8_t *inp;
+    yp_uint8_t *source_data;
     yp_uint16_t *outp;
     yp_ssize_t i;
     yp_uint16_t ch;
 
     // Of course, our source must be a bytes object
     if( params->source.data.type != yp_type_bytes ) return yp_TypeError;
+    source_data = (yp_uint8_t *) params->source.data.ptr;
 
     if( encoding == yp_s_utf_8 ) {
-        // Python does this differently: it decodes only one character at a time, and it potentially
-        // consumes past params->end
         // TODO The equivalent Python code assumes null-termination of source, or it might overflow
-        yp_ssize_t badLen = params->end - params->start;
-        // All surrogates take 3 bytes in utf-8 , so if it's not mod 3 something isn't a surrogate
-        if( badLen % 3 != 0 ) return params->exc;
-        if( ypStringLib_LEN_MAX > badLen / 3 ) return yp_MemorySizeOverflowError;
+        yp_ssize_t badEnd;      // index of end of surrogates to replace from source
+        yp_ssize_t repLen = 0;  // number of surrogate characters (once decoded) to replace
+        for( i = params->start; params->source.data.len - i >= 3; i += 3 ) {
+            if( !_yp_codecs_UTF8_SURROGATE_PRECHECK( source_data + i ) ) break;
+            ch = _yp_codecs_UTF8_SURROGATE_DECODE( source_data + i );
+            if( !ypStringLib_IS_SURROGATE( ch ) ) break;
+            repLen += 1;
+        }
+        if( repLen < 1 ) return params->exc; // not a surrogate: raise original error
+
         // All surrogates are represented in ucs-2
-        replacement = _ypStr_new_ucs_2( ypStr_CODE, badLen/3, /*alloclen_fixed=*/TRUE );
+        if( repLen > ypStringLib_LEN_MAX ) return yp_MemorySizeOverflowError;
+        replacement = _ypStr_new_ucs_2( ypStr_CODE, repLen, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( replacement ) ) return replacement;
 
-        inp = ((yp_uint8_t *) params->source.data.ptr) + params->start;
+        badEnd = params->start + (repLen * 3);
         outp = (yp_uint16_t *) ypStringLib_DATA( replacement );
-        for( i = 0; i < badLen; i+=3 ) {
-            if( (inp[0] & 0xf0u) != 0xe0u || (inp[1] & 0xc0u) != 0x80u || (inp[2] & 0xc0u) != 0x80u ) {
-                yp_decref( replacement );
-                return params->exc; // not a surrogate: raise original error
-            }
-            ch = ((inp[0] & 0x0fu) << 12) + ((inp[1] & 0x3fu) << 6) + (inp[2] & 0x3fu);
-            if( !ypStringLib_IS_SURROGATE( ch ) ) {
-                yp_decref( replacement );
-                return params->exc; // not a surrogate: raise original error
-            }
+        for( i = params->start; i < badEnd; i += 3 ) {
+            yp_ASSERT( _yp_codecs_UTF8_SURROGATE_PRECHECK( source_data + i ), "problem in loop above" ); // paranoia
+            ch = _yp_codecs_UTF8_SURROGATE_DECODE( source_data + i );
+            yp_ASSERT( ypStringLib_IS_SURROGATE( ch ), "problem in loop above" ); // more paranoia
             *outp++ = ch;
         }
-        ypStringLib_SET_LEN( replacement, badLen/3 );
+        *outp = 0;  // null-terminate
+        ypStringLib_SET_LEN( replacement, repLen );
+        *new_position = badEnd;
         return replacement;
 
     } else {
@@ -7222,6 +7247,7 @@ static ypObject *bytes_len( ypObject *b, yp_ssize_t *len )
     return yp_None;
 }
 
+// TODO Instead of piggy-backing on insert, implement directly (makes some checks unnecessary)
 static ypObject *bytearray_push( ypObject *b, ypObject *x )
 {
     return bytearray_insert( b, yp_SLICE_USELEN, x );
@@ -7949,6 +7975,64 @@ static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_s
     }
     ypStringLib_ENC_CODE( s ) = newEnc_code;
     return yp_None;
+}
+
+#if 0 // TODO Complete
+// growhint is the number of additional items, not including x, that are expected to be added to
+// the str
+static ypObject *_ypStr_push_from_uint32C( ypObject *s, yp_uint32_t x, yp_ssize_t growhint )
+{
+    ypStringLib_encinfo *enc = ypStringLib_ENC( s );
+
+    // TODO need the encoding to grow to to hold x
+    FIXME_right_here( foo );
+    
+    ypObject *result;
+    if( ypStr_LEN( s ) > ypStr_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
+    if( ypStr_ALLOCLEN( s ) < ypStr_LEN( s )+1 ) {
+        if( growhint < 0 ) growhint = 0;
+        result = _ypStr_grow_onextend( s, ypStr_LEN( s )+1, growhint );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+    ypStr_ARRAY( s )[ypStr_LEN( s )] = x;
+    ypStr_SET_LEN( s, ypStr_LEN( s ) + 1 );
+    return yp_None;
+}
+#endif
+
+// As yp_asuint32C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
+static yp_uint32_t _ypStr_asuint32C( ypObject *x, ypObject **exc ) {
+    yp_int_t asint;
+    yp_uint32_t retval;
+
+    if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x );
+    asint = yp_asintC( x, exc );
+    retval = (yp_uint32_t) (asint & 0xFFFFFFFFu);
+    if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_ValueError );
+    return retval;
+}
+
+// If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
+// x is a fellow str, set *x_data and *x_len.  Otherwise, returns an exception.
+static ypObject *_ypStr_coerce_intorstr( ypObject *x, void **x_data, yp_ssize_t *x_len,
+        yp_uint32_t *storage )
+{
+    ypObject *exc = yp_None;
+    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+
+    if( x_pair == ypBool_CODE || x_pair == ypInt_CODE ) {
+        *storage = _ypStr_asuint32C( x, &exc );
+        if( yp_isexceptionC( exc ) ) return exc;
+        *x_data = storage;
+        *x_len = 1;
+        return yp_None;
+    } else if( x_pair == ypStr_CODE ) {
+        *x_data = ypStr_DATA( x );
+        *x_len = ypStr_LEN( x );
+        return yp_None;
+    } else {
+        return_yp_BAD_TYPE( x );
+    }
 }
 
 static ypObject *str_unfrozen_copy( ypObject *s ) {
