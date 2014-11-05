@@ -444,6 +444,9 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE );
         *name ## _objproc \
     } };
 DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for use in methods the type doesn't support
+// TODO A yp_ImmutableTypeError, subexception of yp_TypeError, for methods that are supported only
+// by the mutable version.  Then, add a debug yp_initialize assert to ensure all type tables uses
+// this appropriately.
 DEFINE_GENERIC_METHODS( TypeError, yp_TypeError );
 DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for use by Invalidated objects
 DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for use by exception objects; returns "self"
@@ -8889,6 +8892,9 @@ static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
     yp_ssize_t i;
     ypObject *other_value;
     ypObject *result;
+
+    // TODO If mp is empty, then we can clear mp, use other's keyset, and memcpy the array of
+    // values.
 
     for( i = 0; valuesleft > 0; i++ ) {
         other_value = ypDict_VALUES( other )[i];
