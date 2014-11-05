@@ -5578,9 +5578,89 @@ static ypObject *ypStringLib_join(
 // Unicode encoding/decoding support functions
 
 // TODO ypStringLib_encode_call_errorhandler
+// XXX Adapted from Python's unicode_encode_call_errorhandler
+static ypObject *ypStringLib_encode_call_errorhandler(
+    ypObject *errors, yp_codecs_error_handler_func_t *errorHandler,
+    ypObject *encoding, const char *reason,
+    ypObject *unicode,
+    yp_ssize_t startinpos, yp_ssize_t endinpos, 
+    yp_ssize_t *newpos )
+{
+    ypObject *exc = yp_None;
+    yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
+    ypObject *replacement;
+    yp_ssize_t insize = ypStringLib_LEN( unicode );
 
-// future_growth is an upper-bound estimate of the number of additional characters, not including 
-// the replacement text, that are expected to be added to decoded, 
+    // The caller stores errorHandler for us between calls to avoid multiple lookups
+    // XXX yp_codecs_lookup_errorE returns yp_codecs_strict_errors on error, so we will continue to
+    // fail if lookup errors are ignored
+    if( *errorHandler == NULL ) {
+        *errorHandler = yp_codecs_lookup_errorE( errors, &exc );
+        if( yp_isexceptionC( exc ) ) return exc;
+    }
+
+    params.exc = yp_UnicodeEncodeError;
+    params.encoding = encoding;
+    // TODO pass the reason along
+    params.source.object = unicode;
+    params.start = startinpos;
+    params.end = endinpos;
+
+    replacement = yp_SystemError;   // raised if errorHandler doesn't set replacement
+    *newpos = yp_SSIZE_T_MAX;       // in case errorhandler forgets to set
+    (*errorHandler)( &params, &replacement, newpos );   // replacement is new ref
+    if( ypObject_TYPE_PAIR_CODE( replacement ) != ypBytes_CODE ) {
+        ypObject *typeErr = yp_BAD_TYPE( replacement );
+        yp_decref( replacement );
+        return typeErr;
+    }
+
+    // XXX Python allows the bytes variable in the exception to be modified and replaced here, but
+    // this isn't documented and I'm assuming it's a deprecated feature
+
+    if( *newpos < 0 ) *newpos = insize+(*newpos);
+    if( newpos < 0 || *newpos > insize ) {
+        yp_decref( replacement );
+        return yp_IndexError;   // "position %zd from error handler out of bounds"
+    }
+
+    return replacement;
+}
+
+// future_growth is an upper-bound estimate of the number of additional bytes, not including 
+// the replacement text, that are expected to be added to encoded.  After appending, encoded will
+// have at least future_growth space available.
+static ypObject *_ypBytes_grow_onextend( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra,
+        int enc_code );
+static ypObject *ypStringLib_encode_concat_replacement(
+    ypObject *encoded, ypObject *replacement, yp_ssize_t future_growth )
+{
+    yp_ssize_t newLen;
+    yp_ssize_t newAlloclen;
+    ypObject *result;
+    yp_uint8_t *encoded_data;
+
+    yp_ASSERT( ypObject_TYPE_PAIR_CODE( replacement ) == ypBytes_CODE, "replacement must be a bytes" );
+    yp_ASSERT( future_growth >= 0, "future_growth can't be negative" );
+
+    if( ypStringLib_LEN( replacement ) > ypStringLib_LEN_MAX - ypStringLib_LEN( encoded ) ) {
+        return yp_MemorySizeOverflowError;
+    }
+    newLen = ypStringLib_LEN( encoded ) + ypStringLib_LEN( replacement );
+    if( future_growth > ypStringLib_LEN_MAX - newLen ) return yp_MemorySizeOverflowError;
+    newAlloclen = newLen + future_growth;
+    if( ypStringLib_ALLOCLEN( encoded ) < newAlloclen ) {
+        result = _ypBytes_grow_onextend( encoded, newAlloclen, 0, ypStringLib_ENC_BYTES );
+        if( yp_isexceptionC( result ) ) return result;
+    }
+
+    encoded_data = (yp_uint8_t *) ypStringLib_DATA( encoded );
+    memcpy( encoded_data + ypStringLib_LEN( encoded ), ypStringLib_DATA( replacement ), 
+        ypStringLib_LEN( replacement ) );
+    ypStringLib_SET_LEN( encoded, newLen );
+    return yp_None;
+}
+
 // XXX Adapted from Python's unicode_decode_call_errorhandler_writer
 static ypObject *ypStringLib_decode_call_errorhandler(
     ypObject *errors, yp_codecs_error_handler_func_t *errorHandler,
@@ -5591,9 +5671,9 @@ static ypObject *ypStringLib_decode_call_errorhandler(
 {
     ypObject *exc = yp_None;
     yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
-    ypObject *repunicode = yp_None;
+    ypObject *repunicode;
+    yp_ssize_t newpos;
     yp_ssize_t insize = inend - input;  // TODO overflow? 
-    yp_ssize_t newpos = yp_SSIZE_T_MAX; // in case errorhandler forgets to set
 
     // The caller stores errorHandler for us between calls to avoid multiple lookups
     // XXX yp_codecs_lookup_errorE returns yp_codecs_strict_errors on error, so we will continue to
@@ -5613,6 +5693,8 @@ static ypObject *ypStringLib_decode_call_errorhandler(
     params.start = startinpos;
     params.end = endinpos;
 
+    repunicode = yp_SystemError;    // raised if errorHandler doesn't set repunicode
+    newpos = yp_SSIZE_T_MAX;        // in case errorhandler forgets to set
     (*errorHandler)( &params, &repunicode, &newpos );   // repunicode is new ref
     if( ypObject_TYPE_PAIR_CODE( repunicode ) != ypStr_CODE ) {
         ypObject *typeErr = yp_BAD_TYPE( repunicode );
@@ -5647,8 +5729,12 @@ static ypObject *ypStringLib_decode_concat_replacement(
 
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( repunicode ) == ypStr_CODE, "repunicode must be a string" );
     yp_ASSERT( future_growth >= 0, "future_growth can't be negative" );
-    // FIXME check for overflow
+
+    if( ypStringLib_LEN( repunicode ) > ypStringLib_LEN_MAX - ypStringLib_LEN( decoded ) ) {
+        return yp_MemorySizeOverflowError;
+    }
     newLen = ypStringLib_LEN( decoded ) + ypStringLib_LEN( repunicode );
+    if( future_growth > ypStringLib_LEN_MAX - newLen ) return yp_MemorySizeOverflowError;
     newAlloclen = newLen + future_growth;
     if( ypStringLib_ALLOCLEN( decoded ) < newAlloclen ||
         ypStringLib_ENC( decoded ) < ypStringLib_ENC( repunicode ) )
@@ -6203,6 +6289,8 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     ypObject *dest;
     yp_uint8_t *dest_data;
     yp_uint8_t *d;  // moving dest_data pointer
+    yp_codecs_error_handler_func_t errorHandler = NULL;
+    ypObject *result;
 
     yp_ASSERT( source_enc != ypStringLib_ENC_LATIN_1, "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings" );
     maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 2 : 4;
@@ -6225,11 +6313,19 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
             *d++ = (yp_uint8_t)(0x80u | ( ch       & 0x3fu));
 
         } else if( ypStringLib_IS_SURROGATE( ch ) ) {
-            // TODO Handle decoding errors
-            // TODO If error handling is the most complicated part of this function, perhaps we
-            // should have three versions, and UCS-2 and -4 just call the common error handler
-            yp_decref( dest );
-            return yp_NotImplementedError;
+            // TODO Reason
+            ypObject *replacement = ypStringLib_encode_call_errorhandler(
+                errors, &errorHandler, yp_s_utf_8, NULL, source, i, i+1, &i );
+            if( yp_isexceptionC( replacement ) ) {
+                yp_decref( dest );
+                return replacement;
+            }
+            result = ypStringLib_encode_concat_replacement(
+                dest, replacement, (source_len - i) * maxCharSize );
+            if( yp_isexceptionC( result ) ) {
+                yp_decref( dest );
+                return result;
+            }
 
         } else if( ch < 0x10000u ) {
             yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 3 );
