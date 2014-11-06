@@ -36,274 +36,266 @@ using System.Diagnostics;
 // TODO ... or maybe nohtyP.CSharp?
 namespace nohtyP.cs
 {
-    public class yp_int : yp_object
+    public static class yp
     {
-        public yp_int( long value=0 ) :
-            base( _raw.yp_intC( value ) ) { }
-        public yp_int( yp_object x, long @base ) :
-            base( _raw.yp_int_baseC( x.self, @base ) ) { }
-        public yp_int( yp_object x ) :
-            base( _raw.yp_int( x.self ) ) { }
-
-#if NOTDEFINED
-        // TODO Allow casts between yp_object and specific types?
-        public static explicit operator yp_int( yp_object x ) {
-            if( yp_type( x.self ) != yp_type_int ) throw new ArgumentException; // TODO yp_TypeError?
-            return yp_int( x.self );
+        // TODO Make a yp_NoneType0() (or just yp_NoneType())
+        private static ypObject_p _NoneType() {
+            // A hacky way to grab a reference to None...
+            UIntPtr state; IntPtr size;
+            return _dll.yp_iter_stateCX( _dll.yp_tupleN( 0 ), out state, out size );
         }
-#endif
-    }
+        public static readonly @object None = new @object( _NoneType() );
 
-    public class yp_intstore : yp_object
-    {
-        public yp_intstore( long value=0 ) :
-            base( _raw.yp_intstoreC( value ) ) { }
-        public yp_intstore( yp_object x, long @base ) :
-            base( _raw.yp_intstore_baseC( x.self, @base ) ) { }
-        public yp_intstore( yp_object x ) :
-            base( _raw.yp_intstore( x.self ) ) { }
-    }
+        public static @object @int( long value=0 ) {
+            return new @object( _dll.yp_intC( value ) );
+        }
+        public static @object @int( @object x, long @base ) {
+            return new @object( _dll.yp_int_baseC( x.self, @base ) ); 
+        }
+        public static @object @int( @object x ) {
+            return new @object( _dll.yp_int( x.self ) ); 
+        }
 
-    public class yp_float : yp_object
-    {
-        public yp_float( double value=0.0 ) :
-            base( _raw.yp_floatCF( value ) ) { }
-        public yp_float( yp_object x ) :
-            base( _raw.yp_float( x.self ) ) { }
-    }
+        public static @object intstore( long value=0 ) {
+            return new @object( _dll.yp_intstoreC( value ) ); 
+        }
+        public static @object intstore( @object x, long @base ) {
+            return new @object( _dll.yp_intstore_baseC( x.self, @base ) ); 
+        }
+        public static @object intstore( @object x ) {
+            return new @object( _dll.yp_intstore( x.self ) ); 
+        }
 
-    public class yp_floatstore : yp_object
-    {
-        public yp_floatstore( double value=0.0 ) :
-            base( _raw.yp_floatstoreCF( value ) ) { }
-        public yp_floatstore( yp_object x ) :
-            base( _raw.yp_floatstore( x.self ) ) { }
-    }
+        public static @object @float( double value=0.0 ) {
+            return new @object( _dll.yp_floatCF( value ) ); 
+        }
+        public static @object @float( @object x ) {
+            return new @object( _dll.yp_float( x.self ) ); 
+        }
+            
+        public static @object floatstore( double value=0.0 ) {
+            return new @object( _dll.yp_floatstoreCF( value ) ); 
+        }
+        public static @object floatstore( @object x ) {
+            return new @object( _dll.yp_floatstore( x.self ) ); 
+        }
 
-    public class yp_bool : yp_object // TODO yp_int, to mimic Python?
-    {
-        protected yp_bool( ypObject_p self ) :
-            base( self ) { }
-        // TODO seems silly to construct a new object when we already have True/False
-        public yp_bool( bool value=false ) :
-            base( value ? True.self : False.self ) { }
-        public yp_bool( yp_object x ) :
-            base( _raw.yp_bool( x.self ) ) { }
-
-        // TODO implement yp_bool0?
-        public static readonly yp_bool False = new yp_bool( yp_object.None );
-        public static readonly yp_bool True = new yp_bool( _raw.yp_not( False.self ) );
-    }
-
-    public class yp_iter : yp_object
-    {
-        public yp_iter( yp_object x ) :
-            base( _raw.yp_iter( x.self ) ) { }
+        public static @object iter( @object x ) {
+            return new @object( _dll.yp_iter( x.self ) ); 
+        }
         // TODO yp_generatorCN, etc, supporting a callback
-    }
 
-    public class yp_range : yp_object
-    {
-        public yp_range( long start, long stop, long step=1 ) :
-            base( _raw.yp_rangeC3( start, stop, step ) ) { }
-        public yp_range( long stop ) :
-            base( _raw.yp_rangeC( stop ) ) { }
-    }
-
-    public class yp_bytes : yp_object
-    {
-        public yp_bytes( long source ) :
-            base( _raw.yp_bytesC( null, (yp_ssize_t) source ) ) { }
-        public yp_bytes( byte[] source ) :
-            base( _raw.yp_bytesC( source, (yp_ssize_t) source.Length ) ) { }
-        public yp_bytes( yp_object source, yp_object encoding, yp_object errors ) :
-            base( _raw.yp_bytes3( source.self, encoding.self, errors.self ) ) { }
-        public yp_bytes( yp_object source, yp_object encoding ) :
-            this( source, encoding, yp_str.s_strict ) { }
-        public yp_bytes( yp_object source ) :
-            base( _raw.yp_bytes( source.self ) ) { }
-        public yp_bytes() :
-            base( _raw.yp_bytes0() ) { }
-    }
-
-    public class yp_bytearray : yp_object
-    {
-        public yp_bytearray( long source ) :
-            base( _raw.yp_bytearrayC( null, (yp_ssize_t) source ) ) { }
-        public yp_bytearray( byte[] source ) :
-            base( _raw.yp_bytearrayC( source, (yp_ssize_t) source.Length ) ) { }
-        public yp_bytearray( yp_object source, yp_object encoding, yp_object errors ) :
-            base( _raw.yp_bytearray3( source.self, encoding.self, errors.self ) ) { }
-        public yp_bytearray( yp_object source, yp_object encoding ) :
-            this( source, encoding, yp_str.s_strict ) { }
-        public yp_bytearray( yp_object source ) :
-            base( _raw.yp_bytearray( source.self ) ) { }
-        public yp_bytearray() :
-            base( _raw.yp_bytearray0() ) { }
-    }
-
-    public class yp_str : yp_object
-    {
-        public yp_str( string source ) :
-            base( yp_str_fromstring( source ) ) { }
-        // TODO default values? Perhaps just for errors
-        public yp_str( byte[] source, yp_object encoding, yp_object errors ) :
-            base( _raw.yp_str_frombytesC4( source, (yp_ssize_t) source.Length, 
-                encoding.self, errors.self ) ) { }
-        public yp_str( yp_object @object, yp_object encoding, yp_object errors ) :
-            base( _raw.yp_str3( @object.self, encoding.self, errors.self ) ) { }
-        public yp_str( yp_object @object, yp_object encoding ) :
-            this( @object, encoding, yp_str.s_strict ) { }
-        public yp_str( yp_object @object ) :
-            base( _raw.yp_str( @object.self ) ) { }
-        public yp_str() :
-            base( _raw.yp_str0() ) { }
-
-        private static ypObject_p yp_str_fromstring( string source ) {
-            var encoded = Encoding.UTF8.GetBytes( source );
-            return _raw.yp_str_frombytesC2( encoded, (yp_ssize_t) encoded.Length );
+        public static @object range( long start, long stop, long step=1 ) {
+            return new @object( _dll.yp_rangeC3( start, stop, step ) ); 
+        }
+        public static @object range( long stop ) {
+            return new @object( _dll.yp_rangeC( stop ) ); 
         }
 
-        public static readonly yp_str s_strict = null;
-#if NOTDEFINED
-        // TODO It'd be nice if we could refer to the interned yp_s_ascii et al
-        public static readonly yp_str s_ascii = new yp_str( "ascii" );
-        public static readonly yp_str s_latin_1 = new yp_str( "latin_1" );
-        public static readonly yp_str s_utf_32 = new yp_str( "utf_32" );
-        public static readonly yp_str s_utf_32_be = new yp_str( "utf_32_be" );
-        public static readonly yp_str s_utf_32_le = new yp_str( "utf_32_le" );
-        public static readonly yp_str s_utf_16 = new yp_str( "utf_16" );
-        public static readonly yp_str s_utf_16_be = new yp_str( "utf_16_be" );
-        public static readonly yp_str s_utf_16_le = new yp_str( "utf_16_le" );
-        public static readonly yp_str s_utf_8 = new yp_str( "utf_8" );
-
-        public static readonly yp_str s_strict = new yp_str( "strict" );
-        public static readonly yp_str s_ignore = new yp_str( "ignore" );
-        public static readonly yp_str s_replace = new yp_str( "replace" );
-#endif
-    }
-
-    public class yp_chrarray : yp_object
-    {
-        public yp_chrarray( string source ) :
-            base( yp_chrarray_fromstring( source ) ) { }
-        // TODO default values? Perhaps just for errors
-        public yp_chrarray( byte[] source, yp_object encoding, yp_object errors ) :
-            base( _raw.yp_chrarray_frombytesC4( source, (yp_ssize_t) source.Length,
-                encoding.self, errors.self ) ) { }
-        public yp_chrarray( yp_object @object, yp_object encoding, yp_object errors ) :
-            base( _raw.yp_chrarray3( @object.self, encoding.self, errors.self ) ) { }
-        public yp_chrarray( yp_object @object, yp_object encoding ) :
-            this( @object, encoding, yp_str.s_strict ) { }
-        public yp_chrarray( yp_object @object ) :
-            base( _raw.yp_chrarray( @object.self ) ) { }
-        public yp_chrarray() :
-            base( _raw.yp_chrarray0() ) { }
-
-        private static ypObject_p yp_chrarray_fromstring( string source ) {
-            var encoded = Encoding.UTF8.GetBytes( source );
-            return _raw.yp_str_frombytesC2( encoded, (yp_ssize_t) encoded.Length );
+        public static @object bytes( long source ) {
+            return new @object( _dll.yp_bytesC( null, (yp_ssize_t) source ) ); 
         }
-    }
+        public static @object bytes( byte[] source ) {
+            return new @object( _dll.yp_bytesC( source, (yp_ssize_t) source.Length ) ); 
+        }
+        public static @object bytes( @object source, @object encoding, @object errors ) {
+            return new @object( _dll.yp_bytes3( source.self, encoding.self, errors.self ) ); 
+        }
+        public static @object bytes( @object source, @object encoding ) {
+            return bytes( source, encoding, s_strict ); 
+        }
+        public static @object bytes( @object source ) {
+            return new @object( _dll.yp_bytes( source.self ) ); 
+        }
+        public static @object bytes() {
+            return new @object( _dll.yp_bytes0() ); 
+        }
 
-    public class yp_tuple : yp_object
-    {
-        public yp_tuple( IList<yp_object> objects ) :
-            base( yp_tuple_fromIList( objects ) ) { }
-        public yp_tuple( yp_object iterable ) :
-            base( _raw.yp_tuple( iterable.self ) ) { }
-        public yp_tuple() :
-            base( _raw.yp_tupleN( 0 ) ) { }
+        public static @object bytearray( long source ) {
+            return new @object( _dll.yp_bytearrayC( null, (yp_ssize_t) source ) ); 
+        }
+        public static @object bytearray( byte[] source ) {
+            return new @object( _dll.yp_bytearrayC( source, (yp_ssize_t) source.Length ) ); 
+        }
+        public static @object bytearray( @object source, @object encoding, @object errors ) {
+            return new @object( _dll.yp_bytearray3( source.self, encoding.self, errors.self ) ); 
+        }
+        public static @object bytearray( @object source, @object encoding ) {
+            return bytearray( source, encoding, s_strict ); 
+        }
+        public static @object bytearray( @object source ) {
+            return new @object( _dll.yp_bytearray( source.self ) ); 
+        }
+        public static @object bytearray() {
+            return new @object( _dll.yp_bytearray0() ); 
+        }
+
+        private static ypObject_p _str( string source ) {
+            var encoded = Encoding.UTF8.GetBytes( source );
+            return _dll.yp_str_frombytesC2( encoded, (yp_ssize_t) encoded.Length );
+        }
+        public static @object str( string source ) {
+            return new @object( _str( source ) ); 
+        }
+        // TODO default values? Perhaps just for errors
+        public static @object str( byte[] source, @object encoding, @object errors ) {
+            return new @object( _dll.yp_str_frombytesC4( source, (yp_ssize_t) source.Length,
+                encoding.self, errors.self ) ); 
+        }
+        public static @object str( @object @object, @object encoding, @object errors ) {
+            return new @object( _dll.yp_str3( @object.self, encoding.self, errors.self ) ); 
+        }
+        public static @object str( @object @object, @object encoding ) {
+            return str( @object, encoding, s_strict ); 
+        }
+        public static @object str( @object @object ) {
+            return new @object( _dll.yp_str( @object.self ) ); 
+        }
+        public static @object str() {
+            return new @object( _dll.yp_str0() ); 
+        }
+
+        public static @object chr( long i ) {
+            return new @object( _dll.yp_chrC( i ) );
+        }
+
+        private static ypObject_p _chrarray( string source ) {
+            var encoded = Encoding.UTF8.GetBytes( source );
+            return _dll.yp_str_frombytesC2( encoded, (yp_ssize_t) encoded.Length );
+        }
+        public static @object chrarray( string source ) {
+            return new @object( _chrarray( source ) ); 
+        }
+        // TODO default values? Perhaps just for errors
+        public static @object chrarray( byte[] source, @object encoding, @object errors ) {
+            return new @object( _dll.yp_chrarray_frombytesC4( source, (yp_ssize_t) source.Length,
+                encoding.self, errors.self ) ); 
+        }
+        public static @object chrarray( @object @object, @object encoding, @object errors ) {
+            return new @object( _dll.yp_chrarray3( @object.self, encoding.self, errors.self ) ); 
+        }
+        public static @object chrarray( @object @object, @object encoding ) {
+            return chrarray( @object, encoding, s_strict ); 
+        }
+        public static @object chrarray( @object @object ) {
+            return new @object( _dll.yp_chrarray( @object.self ) ); 
+        }
+        public static @object chrarray() {
+            return new @object( _dll.yp_chrarray0() ); 
+        }
 
         // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
-        private static ypObject_p yp_tuple_fromIList( IList<yp_object> objects ) {
-            var result = yp_list.yp_list_fromIList( objects );
-            _raw.yp_freeze( ref result );   // convert to tuple
+        private static ypObject_p _tuple( IList<@object> objects ) {
+            var result = _list( objects );
+            _dll.yp_freeze( ref result );   // convert to tuple
             return result;  // or exception on error
         }
-    }
-
-    public class yp_list : yp_object
-    {
-        public yp_list( IList<yp_object> objects ) :
-            base( yp_list_fromIList( objects ) ) { }
-        public yp_list( yp_object iterable ) :
-            base( _raw.yp_list( iterable.self ) ) { }
-        public yp_list() :
-            base( _raw.yp_listN( 0 ) ) { }
+        public static @object tuple( IList<@object> objects ) {
+            return new @object( _tuple( objects ) ); 
+        }
+        public static @object tuple( @object iterable ) {
+            return new @object( _dll.yp_tuple( iterable.self ) ); 
+        }
+        public static @object tuple() {
+            return new @object( _dll.yp_tupleN( 0 ) ); 
+        }
 
         // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
-        internal static ypObject_p yp_list_fromIList( IList<yp_object> objects ) 
+        private static ypObject_p _list( IList<@object> objects )
         {
             // Pre-allocate a list of the required size, then add the items.  If Count lies we
             // will get an exception.  C# lists max-out at 2^32 elements.
             int count = objects.Count;
-            var result = _raw.yp_list_repeatCN( (yp_ssize_t) count, 1, yp.None.self );
+            var result = _dll.yp_list_repeatCN( (yp_ssize_t) count, 1, yp.None.self );
             for( int i = 0; i < count; i += 1 ) {
-                _raw.yp_setindexC( ref result, (yp_ssize_t) i, objects[i].self );
+                _dll.yp_setindexC( ref result, (yp_ssize_t) i, objects[i].self );
             }
             return result;  // or exception on error
         }
-    }
-
-    public static class yp
-    {
-        // TODO make a NoneType
-        // TODO In general throughout this...should we always use generic yp_object, or use a
-        // more-specific type when we know the result will be that type?
-        public static readonly yp_object None = null;
-        public static readonly yp_object False = yp_bool.False;
-        public static readonly yp_object True = yp_bool.True;
-
-        // TODO or return a yp_str type?
-        public static yp_object chr( long i ) {
-            return new yp_object( _raw.yp_chrC( i ) );
+        public static @object list( IList<@object> objects ) {
+            return new @object( _list( objects ) ); 
         }
-        // TODO or return yp_list type?
-        public static yp_object sorted( yp_object iterable, Func<yp_object, yp_object> key=null, bool reverse=false ) {
+        public static @object list( @object iterable ) {
+            return new @object( _dll.yp_list( iterable.self ) ); 
+        }
+        public static @object list() {
+            return new @object( _dll.yp_listN( 0 ) ); 
+        }
+
+        public static @object sorted( @object iterable, Func<@object, @object> key=null, bool reverse=false ) {
             return yp.sorted( iterable, key, yp.@bool( reverse ) );
         }
-        public static yp_object sorted( yp_object iterable, Func<yp_object, yp_object> key=null, yp_object reverse=null ) {
+        public static @object sorted( @object iterable, Func<@object, @object> key=null, @object reverse=null ) {
+            // FIXME This could be a good way to implement default @object values...but then
+            // we hide possible null exceptions (if that's even important)
             if( reverse == null ) reverse = yp.False;
-            return new yp_object( _raw.yp_sorted3( iterable.self, UIntPtr.Zero, reverse.self ) );
+            return new @object( _dll.yp_sorted3( iterable.self, UIntPtr.Zero, reverse.self ) );
         }
 
-        // TODO Here's that '@' character...is "yp.@bool" a good idea?
-        public static yp_object @bool( bool value=false ) {
+
+        // TODO implement yp_bool0?
+        public static readonly @object False = new @object( _dll.yp_bool( None.self ) );
+        public static readonly @object True = new @object( _dll.yp_not( False.self ) );
+
+        public static @object @bool( bool value=false ) {
             return value ? yp.True : yp.False;
         }
-
-        // TODO the other strings
-        public static readonly yp_str s_strict = yp_str.s_strict;
-    }
-
-    // TODO Because the objects can be frozen underneath, it's misleading that in C# we'll have
-    // a yp_list object, say, but underneath it's been frozen and is now a tuple.  Can we
-    // transmute in C#, or should we dispense with C# subclasses and only use yp_object?
-    public class yp_object
-    {
-        internal readonly ypObject_p self;
-
-        // Steals the reference to self
-        internal yp_object( ypObject_p self )
-        {
-            this.self = self;
+        public static @object @bool( @object x ) {
+            return new @object( _dll.yp_bool( x.self ) ); 
         }
 
-        ~yp_object()
-        {
-            _raw.yp_decref( self );
-        }
 
-        // TODO make a NoneType, move there?
-        // TODO need a constructor that returns None...
-        public static readonly yp_object None;
+        public static readonly @object s_strict = null;
+#if NOTDEFINED
+        // TODO It'd be nice if we could refer to the interned yp_s_ascii et al
+        public static readonly @object s_ascii = str( "ascii" );
+        public static readonly @object s_latin_1 = str( "latin_1" );
+        public static readonly @object s_utf_32 = str( "utf_32" );
+        public static readonly @object s_utf_32_be = str( "utf_32_be" );
+        public static readonly @object s_utf_32_le = str( "utf_32_le" );
+        public static readonly @object s_utf_16 = str( "utf_16" );
+        public static readonly @object s_utf_16_be = str( "utf_16_be" );
+        public static readonly @object s_utf_16_le = str( "utf_16_le" );
+        public static readonly @object s_utf_8 = str( "utf_8" );
+
+        public static readonly @object s_strict = str( "strict" );
+        public static readonly @object s_ignore = str( "ignore" );
+        public static readonly @object s_replace = str( "replace" );
+#endif
+
+
+        // TODO Because the objects can be frozen underneath, it's misleading that in C# we'll have
+        // a yp_list object, say, but underneath it's been frozen and is now a tuple.  Can we
+        // transmute in C#, or should we dispense with C# subclasses and only use @object?
+        public class @object
+        {
+            internal readonly ypObject_p self;
+
+            // Steals the reference to self
+            internal @object( ypObject_p self )
+            {
+                this.self = self;
+            }
+
+            ~@object()
+            {
+                _dll.yp_decref( self );
+            }
+
+#if NOTDEFINED
+        // TODO Allow casts between @object and specific types?
+        public static explicit operator yp_int( @object x ) {
+            if( yp_type( x.self ) != yp_type_int ) throw new ArgumentException; // TODO yp_TypeError?
+            return yp_int( x.self );
+        }
+#endif
+        }
     }
 
     /// <summary>
     /// Imports from nohtyP.dll
     /// </summary>
-    internal unsafe static class _raw {
+    internal unsafe static class _dll {
 
         // TODO Remove unused functions/types/etc from this class
 
@@ -553,7 +545,7 @@ namespace nohtyP.cs
         internal static extern yp_ssize_t yp_iter_lenhintC( ypObject_p iterator, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_iter_stateCX( ypObject_p iterator, void** state, yp_ssize_t* size );
+        internal static extern ypObject_p yp_iter_stateCX( ypObject_p iterator, out UIntPtr state, out yp_ssize_t size );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_close( ref ypObject_p iterator );
@@ -1149,16 +1141,16 @@ namespace nohtyP.cs
 
         static void Main()
         {
-            var objects = new yp_object[] {
-                new yp_int( 25 ),
-                new yp_intstore( 300 ),
-                new yp_float( 44.444 ),
-                new yp_floatstore( 99393.9399393 ),
-                new yp_iter( new yp_range( 5 ) ),
-                new yp_range( 6, 666, 6 ),
-                new yp_bytes( Encoding.ASCII.GetBytes( "abcd" ) ),
-                new yp_bytearray( Encoding.ASCII.GetBytes( "ZYXW" ) ),
-                //new yp_str( "hey hey mamma" )
+            var objects = new yp.@object[] {
+                yp.@int( 25 ),
+                yp.intstore( 300 ),
+                yp.@float( 44.444 ),
+                yp.floatstore( 99393.9399393 ),
+                yp.iter( yp.range( 5 ) ),
+                yp.range( 6, 666, 6 ),
+                yp.bytes( Encoding.ASCII.GetBytes( "abcd" ) ),
+                yp.bytearray( Encoding.ASCII.GetBytes( "ZYXW" ) ),
+                //yp.str( "hey hey mamma" )
                 //chrarray, tuple, list, yp.chr, yp.sorted, yp.@bool
             };
             foreach( var @object in objects ) {
