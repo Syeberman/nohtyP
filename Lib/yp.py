@@ -1681,6 +1681,9 @@ class yp_str( ypObject ):
                     yp_s_utf_8, yp_s_surrogatepass )
             raise TypeError( "expected ypObject or str in yp_str" )
         else:
+            if object is _yp_arg_missing: object = _yp_bytes_empty
+            if encoding is _yp_arg_missing: encoding = yp_s_utf_8
+            if errors is _yp_arg_missing: errors = yp_s_strict
             return _yp_str3( object, encoding, errors )
     def _get_encoded_size_encoding( self ):
         encoded = c_char_pp( c_char_p( ) )
