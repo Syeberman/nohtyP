@@ -5603,6 +5603,10 @@ static ypObject *ypStringLib_encode_call_errorhandler(
     params.encoding = encoding;
     // TODO pass the reason along
     params.source.object = unicode;
+    // TODO We should just give the unicode object...I'm not sure str support for
+    // params.source.data makes sense
+    yp_asencodedCX( unicode, &((yp_uint8_t *) params.source.data.ptr), 
+        &(params.source.data.len), &(params.source.data.type) );
     params.start = startinpos;
     params.end = endinpos;
 
@@ -5635,6 +5639,8 @@ static ypObject *_ypBytes_grow_onextend( ypObject *b, yp_ssize_t requiredLen, yp
 static ypObject *ypStringLib_encode_concat_replacement(
     ypObject *encoded, ypObject *replacement, yp_ssize_t future_growth )
 {
+    yp_ssize_t encoded_len;
+    yp_ssize_t replacement_len;
     yp_ssize_t newLen;
     yp_ssize_t newAlloclen;
     ypObject *result;
@@ -5643,10 +5649,12 @@ static ypObject *ypStringLib_encode_concat_replacement(
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( replacement ) == ypBytes_CODE, "replacement must be a bytes" );
     yp_ASSERT( future_growth >= 0, "future_growth can't be negative" );
 
-    if( ypStringLib_LEN( replacement ) > ypStringLib_LEN_MAX - ypStringLib_LEN( encoded ) ) {
+    encoded_len = ypStringLib_LEN( encoded );
+    replacement_len = ypStringLib_LEN( replacement );
+    if( replacement_len > ypStringLib_LEN_MAX - encoded_len ) {
         return yp_MemorySizeOverflowError;
     }
-    newLen = ypStringLib_LEN( encoded ) + ypStringLib_LEN( replacement );
+    newLen = encoded_len + replacement_len;
     if( future_growth > ypStringLib_LEN_MAX - newLen ) return yp_MemorySizeOverflowError;
     newAlloclen = newLen + future_growth;
     if( ypStringLib_ALLOCLEN( encoded ) < newAlloclen ) {
@@ -5655,8 +5663,8 @@ static ypObject *ypStringLib_encode_concat_replacement(
     }
 
     encoded_data = (yp_uint8_t *) ypStringLib_DATA( encoded );
-    memcpy( encoded_data + ypStringLib_LEN( encoded ), ypStringLib_DATA( replacement ), 
-        ypStringLib_LEN( replacement ) );
+    memcpy( encoded_data + encoded_len, ypStringLib_DATA( replacement ), 
+        replacement_len );
     ypStringLib_SET_LEN( encoded, newLen );
     return yp_None;
 }
@@ -6145,6 +6153,8 @@ main_loop:
                 ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), ch );
             ypStringLib_SET_LEN( newS, ypStringLib_LEN( newS ) + 1 );
         } else {
+            // TODO Test surrogate characters in the start, end, and middle of string, both on
+            // encode and decode, and multiple contiguous and non-contiguous surrogates
             ypObject *repunicode;
             startinpos = source - starts;
             switch( ch ) {
@@ -6313,6 +6323,8 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
             *d++ = (yp_uint8_t)(0x80u | ( ch       & 0x3fu));
 
         } else if( ypStringLib_IS_SURROGATE( ch ) ) {
+            // TODO We could refactor this like on decode: the function returns the surrogate
+            // and we call the errorhandler at a higher level...
             // TODO Reason
             ypObject *replacement = ypStringLib_encode_call_errorhandler(
                 errors, &errorHandler, yp_s_utf_8, NULL, source, i, i+1, &i );
@@ -6320,6 +6332,11 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
                 yp_decref( dest );
                 return replacement;
             }
+
+            // We can now update our expectation of how many more bytes will be added: it's the
+            // number of characters left to encode (remembering i was modified above).  Remember
+            // ypStringLib_encode_concat_replacement needs dest's len set appropriately.
+            ypStringLib_SET_LEN( dest, d - dest_data );
             result = ypStringLib_encode_concat_replacement(
                 dest, replacement, (source_len - i) * maxCharSize );
             if( yp_isexceptionC( result ) ) {
@@ -6327,6 +6344,9 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
                 return result;
             }
 
+            // Now that we've concatenated replacement onto dest, update our pointer into dest
+            d = dest_data + ypStringLib_LEN( dest );
+            
         } else if( ch < 0x10000u ) {
             yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 3 );
             *d++ = (yp_uint8_t)(0xe0u |  (ch >> 12));
