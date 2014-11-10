@@ -232,6 +232,89 @@ namespace nohtyP.cs
             return new @object( _dll.yp_sorted3( iterable.self, UIntPtr.Zero, reverse.self ) );
         }
 
+        // TODO Expose yp_setN et al as a C# method that accepts variable arguments?  Python doesn't do
+        // this, but it can simplify yp.set(yp.tuple(...)) into just yp.setN(...)
+
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        private static ypObject_p _frozenset( IEnumerable<@object> objects )
+        {
+            var result = _set( objects );
+            _dll.yp_freeze( ref result );   // convert to frozenset
+            return result;  // or exception on error
+        }
+        public static @object frozenset( IEnumerable<@object> objects ) {
+            return new @object( _frozenset( objects ) );
+        }
+        public static @object frozenset( @object iterable ) {
+            return new @object( _dll.yp_frozenset( iterable.self ) );
+        }
+        public static @object frozenset() {
+            return new @object( _dll.yp_frozensetN( 0 ) );
+        }
+
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        // TODO Really do need a good lenhint...or a "yp_set_fromlenhint" function
+        private static ypObject_p _set( IEnumerable<@object> objects )
+        {
+            // TODO We should immediately wrap this (and others) in @object to take advantage of 
+            // auto-decref on exception
+            var result = _dll.yp_setN( 0 );
+            foreach( var item in objects ) {
+                _dll.yp_set_add( ref result, item.self );
+            }
+            return result;  // or exception on error
+        }
+        public static @object set( IEnumerable<@object> objects ) {
+            return new @object( _set( objects ) );
+        }
+        public static @object set( @object iterable ) {
+            return new @object( _dll.yp_set( iterable.self ) );
+        }
+        public static @object set() {
+            return new @object( _dll.yp_setN( 0 ) );
+        }
+
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        private static ypObject_p _frozendict( IEnumerable<IList<@object>> objects )
+        {
+            var result = _dict( objects );
+            _dll.yp_freeze( ref result );   // convert to frozendict
+            return result;  // or exception on error
+        }
+        public static @object frozendict( IEnumerable<IList<@object>> objects ) {
+            return new @object( _frozendict( objects ) );
+        }
+        public static @object frozendict( @object iterable ) {
+            return new @object( _dll.yp_frozendict( iterable.self ) );
+        }
+        public static @object frozendict() {
+            return new @object( _dll.yp_frozendictK( 0 ) );
+        }
+
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        // TODO Another version that takes IEnumerable<@object>, where the @objects are supposedly
+        // already 2-tuples or similar
+        private static ypObject_p _dict( IEnumerable<IList<@object>> objects )
+        {
+            // TODO We should immediately wrap this (and others) in @object to take advantage of 
+            // auto-decref on exception
+            var result = _dll.yp_dictK( 0 );
+            foreach( var item in objects ) {
+                if( item.Count != 2 ) throw new IndexOutOfRangeException(); // FIXME yp_ValueError
+                _dll.yp_setitem( ref result, item[0].self, item[1].self );
+            }
+            return result;  // or exception on error
+        }
+        public static @object dict( IEnumerable<IList<@object>> objects ) {
+            return new @object( _dict( objects ) );
+        }
+        public static @object dict( @object iterable ) {
+            return new @object( _dll.yp_dict( iterable.self ) );
+        }
+        public static @object dict() {
+            return new @object( _dll.yp_dictK( 0 ) );
+        }
+
 
         // TODO implement yp_bool0?
         public static readonly @object False = new @object( _dll.yp_bool( None.self ) );
@@ -1151,7 +1234,16 @@ namespace nohtyP.cs
                 yp.bytes( Encoding.ASCII.GetBytes( "abcd" ) ),
                 yp.bytearray( Encoding.ASCII.GetBytes( "ZYXW" ) ),
                 //yp.str( "hey hey mamma" )
-                //chrarray, tuple, list, yp.chr, yp.sorted, yp.@bool
+                //yp.chrarray, yp.chr
+                yp.tuple( new[] {yp.None, yp.False, yp.@int()} ),
+                yp.list( new[] {yp.None, yp.True, yp.@float()} ),
+                //yp.sorted
+                yp.frozenset( yp.range( 16 ) ),
+                yp.set( yp.bytes( Encoding.ASCII.GetBytes( "aaaaaaaaa" ) ) ),
+                // TODO This form of calling kinda sucks...but that _is_ C# array syntax
+                yp.frozendict( new [] {new [] {yp.range( 6 ), yp.bytes( 52 )}} ),
+                yp.dict( new [] {new [] {yp.@int(), yp.intstore( 52 )}} ),
+                //yp.@bool
             };
             foreach( var @object in objects ) {
                 Console.WriteLine( @object );

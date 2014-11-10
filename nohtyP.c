@@ -7,6 +7,10 @@
 
 // TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
 // yp_sys_minint, or yp_sys_maxsize
+// TODO Implement array datatype (I don't think struct is needed though)
+// TODO Similarly to array, implement an "intset" datatype that stores ints as bitmasks; use the
+// same typecodes as array/struct.  i.e. storing 63 sets bit 1u<<63.  Like array, don't have to
+// interoperate with two different typecodes, but do have to work with generic Python containers
 
 #include "nohtyP.h"
 #include <stdlib.h>
