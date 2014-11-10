@@ -34,7 +34,7 @@ using System.Diagnostics;
 // consistency with the original
 
 // TODO ... or maybe nohtyP.CSharp?
-namespace nohtyP.cs
+namespace nohtyP
 {
     public static class yp
     {
@@ -108,7 +108,7 @@ namespace nohtyP.cs
             return new @object( _dll.yp_bytes( source.self ) ); 
         }
         public static @object bytes() {
-            return new @object( _dll.yp_bytes0() ); 
+            return new @object( _dll.yp_bytesC( null, (yp_ssize_t) 0 ) ); // TODO yp_bytes0
         }
 
         public static @object bytearray( long source ) {
@@ -127,7 +127,7 @@ namespace nohtyP.cs
             return new @object( _dll.yp_bytearray( source.self ) ); 
         }
         public static @object bytearray() {
-            return new @object( _dll.yp_bytearray0() ); 
+            return new @object( _dll.yp_bytearrayC( null, (yp_ssize_t) 0 ) ); // TODO yp_bytearray0
         }
 
         private static ypObject_p _str( string source ) {
@@ -1222,32 +1222,9 @@ namespace nohtyP.cs
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_itemarrayCX( ypObject_p seq, ref ypObject_p* array, yp_ssize_t* len );
 
+        // FIXME Remove
         static void Main()
         {
-            var objects = new yp.@object[] {
-                yp.@int( 25 ),
-                yp.intstore( 300 ),
-                yp.@float( 44.444 ),
-                yp.floatstore( 99393.9399393 ),
-                yp.iter( yp.range( 5 ) ),
-                yp.range( 6, 666, 6 ),
-                yp.bytes( Encoding.ASCII.GetBytes( "abcd" ) ),
-                yp.bytearray( Encoding.ASCII.GetBytes( "ZYXW" ) ),
-                //yp.str( "hey hey mamma" )
-                //yp.chrarray, yp.chr
-                yp.tuple( new[] {yp.None, yp.False, yp.@int()} ),
-                yp.list( new[] {yp.None, yp.True, yp.@float()} ),
-                //yp.sorted
-                yp.frozenset( yp.range( 16 ) ),
-                yp.set( yp.bytes( Encoding.ASCII.GetBytes( "aaaaaaaaa" ) ) ),
-                // TODO This form of calling kinda sucks...but that _is_ C# array syntax
-                yp.frozendict( new [] {new [] {yp.range( 6 ), yp.bytes( 52 )}} ),
-                yp.dict( new [] {new [] {yp.@int(), yp.intstore( 52 )}} ),
-                //yp.@bool
-            };
-            foreach( var @object in objects ) {
-                Console.WriteLine( @object );
-            }
             Console.WriteLine( "Press a key..." );
             Console.ReadKey( true );
         }
