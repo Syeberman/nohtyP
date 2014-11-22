@@ -8,6 +8,9 @@
 // TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
 // yp_sys_minint, or yp_sys_maxsize
 // TODO Audit the use of leading underscore and ensure consistency
+// TODO A flag on (immutable) objects to verify the stored hash.  Flag is set when internal pointers
+// are returned (think yp_asencodedCX), then verified/cleared when yp_hash/currenthash is called
+// again.  Provides a safeguard against this internal data being modified.
 
 #include "nohtyP.h"
 #include <stdlib.h>
@@ -5358,6 +5361,57 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
         yp_ASSERT( dest_sizeshift == 1, "unexpected dest_sizeshift" );
         yp_ASSERT( src_sizeshift == 0, "unexpected src_sizeshift" );
         ypStringLib_elemcopy_2from1( dest, dest_i, src, src_i, len );
+    }
+}
+
+
+// Returns the ypStringLib_ENC_* that _should_ be used for the given UCS-2-encoded string
+// XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
+# define ypStringLib_CHECKENC_1FROM2_MASK 0xFF00FF00FF00FF00ULL
+yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_CHECKENC_1FROM2_MASK) == ypStringLib_CHECKENC_1FROM2_MASK, checkenc_1from2_mask_matches_type );
+static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
+{
+    const yp_uint8_t *p = data;
+    const yp_uint8_t *end = p + (len * 2);
+    const yp_uint8_t *aligned_end = yp_ALIGN_DOWN( end, yp_sizeof( _yp_uint_t ) );
+    yp_ASSERT( yp_IS_ALIGNED( data, 2 ), "unexpected alignment for ucs-2 data" );
+    yp_ASSERT( len >= 0, "negative length" );
+
+    // If we don't contain an aligned _yp_uint_t, jump to the end
+    if( aligned_end - p < yp_sizeof( _yp_uint_t ) ) goto final_loop;
+
+    // Read the first few bytes until we're aligned
+    while( !yp_IS_ALIGNED( p, yp_sizeof( _yp_uint_t ) ) ) {
+        if( ((yp_uint16_t) *p) & 0xFF00u ) return ypStringLib_ENC_UCS_2;
+        p += 2;
+    }
+
+    // Now read as many aligned ints as we can
+    while( p < aligned_end ) {
+        _yp_uint_t value = *((_yp_uint_t *) p);
+        if( value & ypStringLib_CHECKENC_1FROM2_MASK ) return ypStringLib_ENC_UCS_2;
+        p += yp_sizeof( _yp_uint_t );
+    }
+
+    // Now read the final, unaligned bytes
+final_loop:
+    while( p < end ) {
+        if( ((yp_uint16_t) *p) & 0xFF00u ) return ypStringLib_ENC_UCS_2;
+        p += 2;
+    }
+    return ypStringLib_ENC_LATIN_1;
+}
+
+static int ypStringLib_checkenc( int enc, const void *data, yp_ssize_t len )
+{
+    yp_ASSERT( len >= 0, "negative length" );
+    if( enc == ypStringLib_ENC_LATIN_1 ) {
+        return ypStringLib_ENC_LATIN_1;
+    } else if( enc == ypStringLib_ENC_UCS_2 ) {
+        return ypStringLib_checkenc_ucs_2( data, len );
+    } else {
+        yp_ASSERT( enc == ypStringLib_ENC_UCS_4 );
+        yp_ASSERT( FALSE, "TODO implement this" );
     }
 }
 
