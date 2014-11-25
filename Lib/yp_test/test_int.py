@@ -83,14 +83,6 @@ class IntTestCases(yp_unittest.TestCase):
         x = -1-yp_sys_maxint
         self.assertEqual(x >> 1, x//2)
 
-        self.assertRaises(ValueError, yp_int, '123\0')
-        self.assertRaises(ValueError, yp_int, '53', 40)
-
-        # SF bug 1545497: embedded NULs were not detected with
-        # explicit base
-        self.assertRaises(ValueError, yp_int, '123\0', 10)
-        self.assertRaises(ValueError, yp_int, '123\x00 245', 20)
-
         #x = yp_int('1' * 600)
         #self.assertIsInstance(x, yp_int)
         self.assertRaises(OverflowError, yp_int, '1' * 600)
@@ -545,32 +537,7 @@ class IntTestCases(yp_unittest.TestCase):
             def __int__(self):
                 return 42
 
-        class Foo1(object):
-            def __int__(self):
-                return 42
-
-        class Foo2(yp_int):
-            def __int__(self):
-                return 42
-
-        class Foo3(yp_int):
-            def __int__(self):
-                return self
-
-        class Foo4(yp_int):
-            def __int__(self):
-                return 42
-
-        class Foo5(yp_int):
-            def __int__(self):
-                return 42.
-
-        self.assertEqual(yp_int(Foo0()), 42)
-        self.assertEqual(yp_int(Foo1()), 42)
-        self.assertEqual(yp_int(Foo2()), 42)
-        self.assertEqual(yp_int(Foo3()), 0)
-        self.assertEqual(yp_int(Foo4()), 42)
-        self.assertRaises(TypeError, yp_int, Foo5())
+        self.assertEqual(int(Foo0()), 42)
 
         class Classic:
             pass
@@ -633,16 +600,38 @@ class IntTestCases(yp_unittest.TestCase):
                 with self.assertRaises(TypeError):
                     yp_int(TruncReturnsBadInt())
 
-    @yp_unittest.skip("Not applicable to nohtyP")
     def test_error_message(self):
-        testlist = ('\xbd', '123\xbd', '  123 456  ')
-        for s in testlist:
-            try:
-                yp_int(s)
-            except ValueError as e:
-                self.assertIn(s.strip(), e.args[0])
-            else:
-                self.fail("Expected yp_int(%r) to raise a ValueError", s)
+        def check(s, base=None):
+            with self.assertRaises(ValueError,
+                                   msg="int(%r, %r)" % (s, base)) as cm:
+                if base is None:
+                    int(s)
+                else:
+                    int(s, base)
+            self.assertEqual(cm.exception.args[0],
+                "invalid literal for int() with base %d: %r" %
+                (10 if base is None else base, s))
+
+        check('\xbd')
+        check('123\xbd')
+        check('  123 456  ')
+
+        check('123\x00')
+        # SF bug 1545497: embedded NULs were not detected with explicit base
+        check('123\x00', 10)
+        check('123\x00 245', 20)
+        check('123\x00 245', 16)
+        check('123\x00245', 20)
+        check('123\x00245', 16)
+        # byte string with embedded NUL
+        check(b'123\x00')
+        check(b'123\x00', 10)
+        # non-UTF-8 byte string
+        check(b'123\xbd')
+        check(b'123\xbd', 10)
+        # lone surrogate in Unicode string
+        check('123\ud800')
+        check('123\ud800', 10)
 
 def test_main():
     support.run_unittest(IntTestCases)

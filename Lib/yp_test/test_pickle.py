@@ -84,13 +84,17 @@ class PyPicklerUnpicklerObjectTests(AbstractPicklerUnpicklerObjectTests):
 
 
 class PyDispatchTableTests(AbstractDispatchTableTests):
+
     pickler_class = pickle._Pickler
+
     def get_dispatch_table(self):
         return pickle.dispatch_table.copy()
 
 
 class PyChainDispatchTableTests(AbstractDispatchTableTests):
+
     pickler_class = pickle._Pickler
+
     def get_dispatch_table(self):
         return collections.ChainMap({}, pickle.dispatch_table)
 
@@ -115,6 +119,15 @@ if has_c_implementation:
     class CPicklerUnpicklerObjectTests(AbstractPicklerUnpicklerObjectTests):
         pickler_class = _pickle.Pickler
         unpickler_class = _pickle.Unpickler
+
+        def test_issue18339(self):
+            unpickler = self.unpickler_class(io.BytesIO())
+            with self.assertRaises(TypeError):
+                unpickler.memo = object
+            # used to cause a segfault
+            with self.assertRaises(ValueError):
+                unpickler.memo = {-1: None}
+            unpickler.memo = {1: None}
 
     class CDispatchTableTests(AbstractDispatchTableTests):
         pickler_class = pickle.Pickler
