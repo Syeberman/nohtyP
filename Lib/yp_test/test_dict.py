@@ -45,6 +45,9 @@ class DictTest(unittest.TestCase):
         self.assertEqual(set(d.keys()), set())
         d = {'a': 1, 'b': 2}
         k = d.keys()
+        self.assertEqual(set(k), {'a', 'b'})
+        self.assertIn('a', k)
+        self.assertIn('b', k)
         self.assertIn('a', d)
         self.assertIn('b', d)
         self.assertRaises(TypeError, d.keys, None)
@@ -902,6 +905,35 @@ class DictTest(unittest.TestCase):
         f.__dict__[1] = 1
         f.a = 'a'
         self.assertEqual(f.__dict__, {1:1, 'a':'a'})
+
+    def check_reentrant_insertion(self, mutate):
+        # This object will trigger mutation of the dict when replaced
+        # by another value.  Note this relies on refcounting: the test
+        # won't achieve its purpose on fully-GCed Python implementations.
+        class Mutating:
+            def __del__(self):
+                mutate(d)
+
+        d = {k: Mutating() for k in 'abcdefghijklmnopqr'}
+        for k in list(d):
+            d[k] = k
+
+    def test_reentrant_insertion(self):
+        # Reentrant insertion shouldn't crash (see issue #22653)
+        def mutate(d):
+            d['b'] = 5
+        self.check_reentrant_insertion(mutate)
+
+        def mutate(d):
+            d.update(self.__dict__)
+            d.clear()
+        self.check_reentrant_insertion(mutate)
+
+        def mutate(d):
+            while d:
+                d.popitem()
+        self.check_reentrant_insertion(mutate)
+
 
 from test import mapping_tests
 

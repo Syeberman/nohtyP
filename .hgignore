@@ -1,23 +1,42 @@
 # Compiled source
+\.asm$
 \.com$
 \.class$
 \.dll$
 \.exe$
+\.exp$
+\.idb$
+\.ilk$
+\.lastbuildstate$
+\.lib$
+\.map$
 \.o$
+\.obj$
 \.so$
+\.pdb$
 \.pyc$
 \.pyo$
+\.tlog$
+^Build/.*/Debug/
+^Build/.*/Release/
+^Build/native/
+^Build/.*_debug/
+^Build/.*_release/
 /__pycache__/
 
+# Local SCons files
+\.sconsign.dblite$
+\.mscommon.log$
+\.sconscript.log$
+^Build/site-tools.py$
+
 # Local Visual Studio files
+\.ipch$
 \.vcxproj.user$
 \.sdf$
 \.suo$
 \.opensdf$
-/Debug/
-/Release/
 /ipch/
-
 
 # OS generated files
 \.DS_Store$
@@ -26,7 +45,7 @@
 /ehthumbs.db$
 /Thumbs.db$
 
-
 # Temporary files
 \.tmp$
+
 
