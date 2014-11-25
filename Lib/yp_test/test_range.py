@@ -342,7 +342,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertRaises(TypeError, yp_range, IN())
 
         # Test use of user-defined classes in slice indices.
-        self.assertEqual(list(yp_range(10)[:I(5)]), list(yp_range(5)))
+        self.assertEqual(yp_range(10)[:I(5)], yp_range(5))
 
         with self.assertRaises(RuntimeError):
             yp_range(0, 10)[:IX()]
@@ -392,9 +392,10 @@ class RangeTest(yp_unittest.TestCase):
                      (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
         for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
             for t in testcases:
-                r = yp_range(*t)
-                self.assertEqual(list(pickle.loads(pickle.dumps(r, proto))),
-                                 list(r))
+                with self.subTest(proto=proto, test=t):
+                    r = yp_range(*t)
+                    self.assertEqual(list(pickle.loads(pickle.dumps(r, proto))),
+                                     list(r))
 
     @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_iterator_pickling(self):
@@ -418,6 +419,30 @@ class RangeTest(yp_unittest.TestCase):
                 d = pickle.dumps(it)
                 it = pickle.loads(d)
                 self.assertEqual(list(it), data[1:])
+
+    def test_exhausted_iterator_pickling(self):
+        r = yp_range(2**65, 2**65+2)
+        i = yp_iter(r)
+        while True:
+            r = next(i)
+            if r == 2**65+1:
+                break
+        d = pickle.dumps(i)
+        i2 = pickle.loads(d)
+        self.assertEqual(yp_list(i), [])
+        self.assertEqual(yp_list(i2), [])
+
+    def test_large_exhausted_iterator_pickling(self):
+        r = yp_range(20)
+        i = yp_iter(r)
+        while True:
+            r = next(i)
+            if r == 19:
+                break
+        d = pickle.dumps(i)
+        i2 = pickle.loads(d)
+        self.assertEqual(yp_list(i), [])
+        self.assertEqual(yp_list(i2), [])
 
     def test_odd_bug(self):
         # This used to raise a "SystemError: NULL result without error"
