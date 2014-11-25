@@ -5146,6 +5146,9 @@ typedef struct _ypStrObject ypStrObject;
         yp_ASSERT( \
             ypStringLib_ENC( s )->getindexX( s, ypStringLib_LEN( s ) ) == 0, \
             "bytes/str not internally null-terminated" ); \
+        yp_ASSERT( \
+            ypStringLib_ALLOCLEN( s ) >= ypStringLib_LEN( s ), \
+            "alloclen too small for the elements it contains" ); \
     } while( 0 )
 
 // Empty bytes can be represented by this, immortal object
@@ -6973,7 +6976,6 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 // The maximum possible length of a bytes (not including null terminator)
 #define ypBytes_LEN_MAX ypStringLib_LEN_MAX
 
-// TODO Use
 #define ypBytes_ASSERT_INVARIANTS( b ) \
     do {yp_ASSERT( ypStringLib_ENC_CODE( b ) == ypStringLib_ENC_BYTES, "bad StrLib_ENC for bytes" ); \
         ypStringLib_ASSERT_INVARIANTS( b ); \
@@ -7159,6 +7161,7 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
         result = _ypBytes_extend_from_iter( b, &mi, &mi_state );
         ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0'; // up to us to add null-terminator
         yp_decref( mi );
+        ypBytes_ASSERT_INVARIANTS( result );
         return result;
     }
 }
@@ -7191,6 +7194,7 @@ static ypObject *_ypBytes_setslice_grow( ypObject *b, yp_ssize_t start, yp_ssize
         ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
     }
     ypBytes_SET_LEN( b, newLen );
+    ypBytes_ASSERT_INVARIANTS( b );
     return yp_None;
 }
 
@@ -7231,6 +7235,7 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
             ypBytes_DATA( b )[ypSlice_INDEX( start, step, i )] = ypBytes_DATA( x )[i];
         }
     }
+    ypBytes_ASSERT_INVARIANTS( b );
     return yp_None;
 }
 
@@ -7333,6 +7338,7 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
     ypBytes_DATA( newB )[newLen] = '\0';
     ypBytes_SET_LEN( newB, newLen );
+    ypBytes_ASSERT_INVARIANTS( newB );
     return newB;
 }
 
@@ -7401,6 +7407,7 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     }
     ypBytes_DATA( newB )[newLen] = '\0';
     ypBytes_SET_LEN( newB, newLen );
+    ypBytes_ASSERT_INVARIANTS( newB );
     return newB;
 }
 
@@ -7437,6 +7444,7 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     _ypSlice_delslice_memmove( ypBytes_DATA( b ), ypBytes_LEN( b )+1, 1,
             start, stop, step, slicelength );
     ypBytes_SET_LEN( b, ypBytes_LEN( b ) - slicelength );
+    ypBytes_ASSERT_INVARIANTS( b );
     return yp_None;
 }
 
@@ -7465,6 +7473,7 @@ static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
     result = _ypBytes_setslice_grow( b, i, i, 1, 0 );
     if( yp_isexceptionC( result ) ) return result;
     ypBytes_DATA( b )[i] = x_asbyte;
+    ypBytes_ASSERT_INVARIANTS( b );
     return yp_None;
 }
 
@@ -7479,6 +7488,7 @@ static ypObject *bytearray_popindex( ypObject *b, yp_ssize_t i )
     result = yp_intC( ypBytes_DATA( b )[i] );
     ypBytes_ELEMMOVE( b, i, i+1 );
     ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
+    ypBytes_ASSERT_INVARIANTS( b );
     return result;
 }
 
@@ -7494,6 +7504,7 @@ static ypObject *bytearray_reverse( ypObject *b )
         lo += 1;
         hi -= 1;
     }
+    ypBytes_ASSERT_INVARIANTS( b );
     return yp_None;
 }
 
@@ -7527,6 +7538,7 @@ static ypObject *bytearray_clear( ypObject *b )
     yp_ASSERT( ypBytes_DATA( b ) == ypBytes_INLINE_DATA( b ), "bytearray_clear didn't allocate inline!" );
     ypBytes_DATA( b )[0] = '\0';
     ypBytes_SET_LEN( b, 0 );
+    ypBytes_ASSERT_INVARIANTS( b );
     return yp_None;
 }
 
@@ -7538,6 +7550,7 @@ static ypObject *bytearray_pop( ypObject *b )
     result = yp_intC( ypBytes_DATA( b )[ypBytes_LEN( b )-1] );
     ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
     ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0';
+    ypBytes_ASSERT_INVARIANTS( b );
     return result;
 }
 
@@ -7559,6 +7572,7 @@ static ypObject *bytearray_remove( ypObject *b, ypObject *x, ypObject *onmissing
         ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
         return yp_None;
     }
+    ypBytes_ASSERT_INVARIANTS( b );
     if( onmissing == NULL ) return yp_ValueError;
     return onmissing;
 }
@@ -8025,6 +8039,7 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
         ypBytes_DATA( b )[len] = '\0';
     }
     ypBytes_SET_LEN( b, len );
+    ypBytes_ASSERT_INVARIANTS( b );
     return b;
 }
 ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len ) {
@@ -8044,6 +8059,7 @@ static ypObject *_ypBytes_encode( int type,
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_encode_utf_8( type, source, errors );
     yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    ypBytes_ASSERT_INVARIANTS( result );
     return result;
 }
 ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors ) {
@@ -8108,6 +8124,7 @@ static ypObject *_ypBytes( int type, ypObject *source )
             yp_decref( newB );
             return result;
         }
+        ypBytes_ASSERT_INVARIANTS( newB );
         return newB;
     }
 }
@@ -8119,12 +8136,14 @@ ypObject *yp_bytearray( ypObject *source ) {
 }
 
 ypObject *yp_bytes0( void ) {
+    ypBytes_ASSERT_INVARIANTS( _yp_bytes_empty );
     return _yp_bytes_empty;
 }
 ypObject *yp_bytearray0( void ) {
     ypObject *newB = _ypBytes_new( ypByteArray_CODE, 0, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newB ) ) return newB;
     ypBytes_DATA( newB )[0] = '\0';
+    ypBytes_ASSERT_INVARIANTS( newB );
     return newB;
 }
 
@@ -8151,7 +8170,6 @@ yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % 4 == 0, alignof_s
 
 #define ypStr_LEN_MAX ypStringLib_LEN_MAX
 
-// TODO Use
 #define ypStr_ASSERT_INVARIANTS( s ) \
     do {yp_ASSERT( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_BYTES, "bad StrLib_ENC for str" ); \
         ypStringLib_ASSERT_INVARIANTS( s ); \
@@ -8205,6 +8223,7 @@ static ypObject *_ypStr_copy( int type, ypObject *s, int alloclen_fixed )
     if( yp_isexceptionC( copy ) ) return copy;
     memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), (ypStr_LEN( s )+1) << s_enc->sizeshift );
     ypStr_SET_LEN( copy, ypStr_LEN( s ) );
+    ypStr_ASSERT_INVARIANTS( copy );
     return copy;
 }
 
@@ -8362,6 +8381,7 @@ static ypObject *str_concat( ypObject *s, ypObject *x )
     ypStringLib_elemcopy( newEnc->sizeshift, ypStr_DATA( newS ), ypStr_LEN( s ),
             ypStringLib_ENC( x )->sizeshift, ypStr_DATA( x ), 0, ypStr_LEN( x )+1/*+null*/ );
     ypStr_SET_LEN( newS, newLen );
+    ypStr_ASSERT_INVARIANTS( newS );
     return newS;
 }
 
@@ -8757,6 +8777,7 @@ static ypObject *_yp_asencodedCX( ypObject *s, const yp_uint8_t * *encoded, yp_s
         ypObject * *encoding )
 {
     if( ypObject_TYPE_PAIR_CODE( s ) != ypStr_CODE ) return_yp_BAD_TYPE( s );
+    ypStr_ASSERT_INVARIANTS( s );
     *encoded = ypStr_DATA( s );
     if( size == NULL ) {
         // FIXME Support UCS-2 and -4 here
@@ -8797,6 +8818,7 @@ static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_decode_frombytesC_utf_8( type, source, len, errors );
     yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    ypStr_ASSERT_INVARIANTS( result );
     return result;
 }
 ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
@@ -8831,6 +8853,7 @@ static ypObject *_ypStr_decode( int type,
     result = ypStringLib_decode_frombytesC_utf_8( type,
             ypBytes_DATA( source ), ypBytes_LEN( source ), errors );
     yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    ypStr_ASSERT_INVARIANTS( result );
     return result;
 }
 ypObject *yp_str3( ypObject *source, ypObject *encoding, ypObject *errors ) {
@@ -8862,12 +8885,14 @@ ypObject *yp_chrarray( ypObject *object ) {
 }
 
 ypObject *yp_str0( void ) {
+    ypStr_ASSERT_INVARIANTS( _yp_str_empty );
     return _yp_str_empty;
 }
 ypObject *yp_chrarray0( void ) {
     ypObject *newS = _ypStr_new_latin_1( ypChrArray_CODE, 0, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newS ) ) return newS;
     ((yp_uint8_t *) ypStr_DATA( newS ))[0] = 0;
+    ypStr_ASSERT_INVARIANTS( newS );
     return newS;
 }
 
@@ -8890,6 +8915,7 @@ ypObject *yp_chrC( yp_int_t i ) {
     newEnc->setindexX( ypStr_DATA( newS ), 0, (yp_uint32_t) i );
     newEnc->setindexX( ypStr_DATA( newS ), 1, 0 );
     ypStr_SET_LEN( newS, 1 );
+    ypStr_ASSERT_INVARIANTS( newS );
     return newS;
 }
 
@@ -9158,6 +9184,7 @@ ypObject *yp_join( ypObject *s, ypObject *iterable ) {
         ypQuickSeq_tuple_close( &state );
         yp_decref( temptuple );
     }
+    ypStringLib_ASSERT_INVARIANTS( result );
     return result;
 }
 
@@ -9171,6 +9198,7 @@ ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
     ypQuickSeq_new_fromvar( &state, n, args );
     result = ypStringLib_join( s, &ypQuickSeq_var_methods, &state );
     ypQuickSeq_var_close( &state );
+    ypStringLib_ASSERT_INVARIANTS( result );
     return result;
 }
 
