@@ -38,13 +38,11 @@ namespace nohtyP
 {
     public static class yp
     {
-        // TODO Make a yp_NoneType0() (or just yp_NoneType())
-        private static ypObject_p _NoneType() {
-            // A hacky way to grab a reference to None...
-            UIntPtr state; IntPtr size;
-            return _dll.yp_iter_stateCX( _dll.yp_tupleN( 0 ), out state, out size );
+        public static unsafe void initialize() {
+            _dll.yp_initialize( null );
         }
-        public static readonly @object None = new @object( _NoneType() );
+
+        public static readonly @object None = new @object( _dll.yp_None );
 
         public static @object @int( long value=0 ) {
             return new @object( _dll.yp_intC( value ) );
@@ -317,8 +315,8 @@ namespace nohtyP
 
 
         // TODO implement yp_bool0?
-        public static readonly @object False = new @object( _dll.yp_bool( None.self ) );
-        public static readonly @object True = new @object( _dll.yp_not( False.self ) );
+        public static readonly @object False = new @object( _dll.yp_False );
+        public static readonly @object True = new @object( _dll.yp_True );
 
         public static @object @bool( bool value=false ) {
             return value ? yp.True : yp.False;
@@ -328,23 +326,19 @@ namespace nohtyP
         }
 
 
-        public static readonly @object s_strict = null;
-#if NOTDEFINED
-        // TODO It'd be nice if we could refer to the interned yp_s_ascii et al
-        public static readonly @object s_ascii = str( "ascii" );
-        public static readonly @object s_latin_1 = str( "latin_1" );
-        public static readonly @object s_utf_32 = str( "utf_32" );
-        public static readonly @object s_utf_32_be = str( "utf_32_be" );
-        public static readonly @object s_utf_32_le = str( "utf_32_le" );
-        public static readonly @object s_utf_16 = str( "utf_16" );
-        public static readonly @object s_utf_16_be = str( "utf_16_be" );
-        public static readonly @object s_utf_16_le = str( "utf_16_le" );
-        public static readonly @object s_utf_8 = str( "utf_8" );
+        public static readonly @object s_ascii = new @object( _dll.yp_s_ascii );
+        public static readonly @object s_latin_1 = new @object( _dll.yp_s_latin_1 );
+        public static readonly @object s_utf_32 = new @object( _dll.yp_s_utf_32 );
+        public static readonly @object s_utf_32_be = new @object( _dll.yp_s_utf_32_be );
+        public static readonly @object s_utf_32_le = new @object( _dll.yp_s_utf_32_le );
+        public static readonly @object s_utf_16 = new @object( _dll.yp_s_utf_16 );
+        public static readonly @object s_utf_16_be = new @object( _dll.yp_s_utf_16_be );
+        public static readonly @object s_utf_16_le = new @object( _dll.yp_s_utf_16_le );
+        public static readonly @object s_utf_8 = new @object( _dll.yp_s_utf_8 );
 
-        public static readonly @object s_strict = str( "strict" );
-        public static readonly @object s_ignore = str( "ignore" );
-        public static readonly @object s_replace = str( "replace" );
-#endif
+        public static readonly @object s_strict = new @object( _dll.yp_s_strict );
+        public static readonly @object s_ignore = new @object( _dll.yp_s_ignore );
+        public static readonly @object s_replace = new @object( _dll.yp_s_replace );
 
 
         // TODO Because the objects can be frozen underneath, it's misleading that in C# we'll have
@@ -355,13 +349,11 @@ namespace nohtyP
             internal readonly ypObject_p self;
 
             // Steals the reference to self
-            internal @object( ypObject_p self )
-            {
+            internal @object( ypObject_p self ) {
                 this.self = self;
             }
 
-            ~@object()
-            {
+            ~@object() {
                 _dll.yp_decref( self );
             }
 
@@ -385,6 +377,26 @@ namespace nohtyP
         internal const string DLL_NAME = "nohtyP.dll";
         internal const CallingConvention CALLCONV = CallingConvention.Cdecl;
 
+
+        [DllImport( "kernel32.dll" )]
+        private static extern UIntPtr LoadLibrary( string dllToLoad );
+        [DllImport( "kernel32.dll" )]
+        private static extern UIntPtr GetProcAddress( UIntPtr hModule, string procedureName );
+        [DllImport( "kernel32.dll" )]
+        private static extern bool FreeLibrary( UIntPtr hModule );
+        // XXX Why isn't this available directly in C#?
+        private static UIntPtr DllImportData( string name ) {
+            UIntPtr library = LoadLibrary( DLL_NAME ); // FIXME free this
+            // FIXME pick a better exception
+            if( library == UIntPtr.Zero ) throw new ArgumentNullException();
+            var data = GetProcAddress( library, name );
+            FreeLibrary( library ); // ignore errors
+            // FIXME pick a better exception
+            if( data == UIntPtr.Zero ) throw new ArgumentNullException();
+            return data;
+        }
+
+
 #pragma warning disable 169     // "field not used"
         internal struct yp_initialize_kwparams
         {
@@ -399,8 +411,7 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_initialize( yp_initialize_kwparams* kwparams );
 
-        //[DllImport("nohtyP.dll")]
-        //internal static extern ypObject_p yp_None;
+        internal static ypObject_p yp_None = DllImportData( "yp_None" );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_incref( ypObject_p x );
@@ -558,10 +569,8 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_dict( ypObject_p x );
 
-        //[DllImport("nohtyP.dll")]
-        //internal static extern ypObject_p yp_True;
-        //[DllImport("nohtyP.dll")]
-        //internal static extern ypObject_p yp_False;
+        internal static ypObject_p yp_True = DllImportData( "yp_True" );
+        internal static ypObject_p yp_False = DllImportData( "yp_False" );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_bool( ypObject_p x );
@@ -783,8 +792,8 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_sort( ref ypObject_p sequence );
 
-        //internal static const yp_ssize_t yp_SLICE_DEFAULT = System.UIntPtr.MinValue;
-        //internal static const yp_ssize_t yp_SLICE_USELEN = System.UIntPtr.MaxValue;
+        //internal static const yp_ssize_t yp_SLICE_DEFAULT = yp_ssize_t.MinValue;
+        //internal static const yp_ssize_t yp_SLICE_USELEN = yp_ssize_t.MaxValue;
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_isdisjoint( ypObject_p set, ypObject_p x );
@@ -852,34 +861,19 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_updateK( ref ypObject_p mapping, int n, params ypObject_p[] args );
 
-#if NOTDEFINED
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_ascii;     // "ascii"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_latin_1;   // "latin_1"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_utf_32;    // "utf_32"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_utf_32_be; // "utf_32_be"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_utf_32_le; // "utf_32_le"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_utf_16;    // "utf_16"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_utf_16_be; // "utf_16_be"
-        [DllImport("nohtyP.dll")]
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_utf_16_le; // "utf_16_le"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_utf_8;     // "utf_8"
+        internal static ypObject_p yp_s_ascii = DllImportData( "yp_s_ascii" );
+        internal static ypObject_p yp_s_latin_1 = DllImportData( "yp_s_latin_1" );
+        internal static ypObject_p yp_s_utf_32 = DllImportData( "yp_s_utf_32" );
+        internal static ypObject_p yp_s_utf_32_be = DllImportData( "yp_s_utf_32_be" );
+        internal static ypObject_p yp_s_utf_32_le = DllImportData( "yp_s_utf_32_le" );
+        internal static ypObject_p yp_s_utf_16 = DllImportData( "yp_s_utf_16" );
+        internal static ypObject_p yp_s_utf_16_be = DllImportData( "yp_s_utf_16_be" );
+        internal static ypObject_p yp_s_utf_16_le = DllImportData( "yp_s_utf_16_le" );
+        internal static ypObject_p yp_s_utf_8 = DllImportData( "yp_s_utf_8" );
 
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_strict;    // "strict"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_ignore;    // "ignore"
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_s_replace;   // "replace"
-#endif
+        internal static ypObject_p yp_s_strict = DllImportData( "yp_s_strict" );
+        internal static ypObject_p yp_s_ignore = DllImportData( "yp_s_ignore" );
+        internal static ypObject_p yp_s_replace = DllImportData( "yp_s_replace" );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_add( ypObject_p x, ypObject_p y );
@@ -1038,21 +1032,13 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern yp_int_t yp_int_bit_lengthC( ypObject_p x, ref ypObject_p exc );
 
-#if NOTEDEFINED
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_sys_maxint;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_sys_minint;
+        internal static ypObject_p yp_sys_maxint = DllImportData( "yp_sys_maxint" );
+        internal static ypObject_p yp_sys_minint = DllImportData( "yp_sys_minint" );
 
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_i_neg_one;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_i_zero;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_i_one;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_i_two;
-#endif
+        internal static ypObject_p yp_i_neg_one = DllImportData( "yp_i_neg_one");
+        internal static ypObject_p yp_i_zero = DllImportData( "yp_i_zero" );
+        internal static ypObject_p yp_i_one = DllImportData( "yp_i_one" );
+        internal static ypObject_p yp_i_two = DllImportData( "yp_i_two" );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_freeze( ref ypObject_p x );
@@ -1087,124 +1073,65 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_type( ypObject_p @object );
 
-#if NOTDEFINED
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_invalidated;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_exception;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_type;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_NoneType;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_bool;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_int;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_intstore;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_float;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_floatstore;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_iter;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_bytes;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_bytearray;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_str;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_chrarray;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_tuple;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_list;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_frozenset;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_set;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_frozendict;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_dict;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_type_range;
+        internal static ypObject_p yp_type_invalidated = DllImportData( "yp_type_invalidated" );
+        internal static ypObject_p yp_type_exception = DllImportData( "yp_type_exception" );
+        internal static ypObject_p yp_type_type = DllImportData( "yp_type_type" );
+        internal static ypObject_p yp_type_NoneType = DllImportData( "yp_type_NoneType" );
+        internal static ypObject_p yp_type_bool = DllImportData( "yp_type_bool" );
+        internal static ypObject_p yp_type_int = DllImportData( "yp_type_int" );
+        internal static ypObject_p yp_type_intstore = DllImportData( "yp_type_intstore" );
+        internal static ypObject_p yp_type_float = DllImportData( "yp_type_float" );
+        internal static ypObject_p yp_type_floatstore = DllImportData( "yp_type_floatstore" );
+        internal static ypObject_p yp_type_iter = DllImportData( "yp_type_iter" );
+        internal static ypObject_p yp_type_bytes = DllImportData( "yp_type_bytes" );
+        internal static ypObject_p yp_type_bytearray = DllImportData( "yp_type_bytearray" );
+        internal static ypObject_p yp_type_str = DllImportData( "yp_type_str" );
+        internal static ypObject_p yp_type_chrarray = DllImportData( "yp_type_chrarray" );
+        internal static ypObject_p yp_type_tuple = DllImportData( "yp_type_tuple" );
+        internal static ypObject_p yp_type_list = DllImportData( "yp_type_list" );
+        internal static ypObject_p yp_type_frozenset = DllImportData( "yp_type_frozenset" );
+        internal static ypObject_p yp_type_set = DllImportData( "yp_type_set" );
+        internal static ypObject_p yp_type_frozendict = DllImportData( "yp_type_frozendict" );
+        internal static ypObject_p yp_type_dict = DllImportData( "yp_type_dict" );
+        internal static ypObject_p yp_type_range = DllImportData( "yp_type_range" );
 
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_BaseException;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_Exception;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_StopIteration;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_GeneratorExit;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_ArithmeticError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_LookupError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_AssertionError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_AttributeError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_EOFError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_FloatingPointError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_OSError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_ImportError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_IndexError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_KeyError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_KeyboardInterrupt;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_MemoryError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_NameError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_OverflowError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_RuntimeError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_NotImplementedError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_ReferenceError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_SystemError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_SystemExit;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_TypeError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_UnboundLocalError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_UnicodeError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_UnicodeEncodeError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_UnicodeDecodeError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_UnicodeTranslateError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_ValueError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_ZeroDivisionError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_BufferError;
+        internal static ypObject_p yp_BaseException = DllImportData( "yp_BaseException" );
+        internal static ypObject_p yp_Exception = DllImportData( "yp_Exception" );
+        internal static ypObject_p yp_StopIteration = DllImportData( "yp_StopIteration" );
+        internal static ypObject_p yp_GeneratorExit = DllImportData( "yp_GeneratorExit" );
+        internal static ypObject_p yp_ArithmeticError = DllImportData( "yp_ArithmeticError" );
+        internal static ypObject_p yp_LookupError = DllImportData( "yp_LookupError" );
+        internal static ypObject_p yp_AssertionError = DllImportData( "yp_AssertionError" );
+        internal static ypObject_p yp_AttributeError = DllImportData( "yp_AttributeError" );
+        internal static ypObject_p yp_EOFError = DllImportData( "yp_EOFError" );
+        internal static ypObject_p yp_FloatingPointError = DllImportData( "yp_FloatingPointError" );
+        internal static ypObject_p yp_OSError = DllImportData( "yp_OSError" );
+        internal static ypObject_p yp_ImportError = DllImportData( "yp_ImportError" );
+        internal static ypObject_p yp_IndexError = DllImportData( "yp_IndexError" );
+        internal static ypObject_p yp_KeyError = DllImportData( "yp_KeyError" );
+        internal static ypObject_p yp_KeyboardInterrupt = DllImportData( "yp_KeyboardInterrupt" );
+        internal static ypObject_p yp_MemoryError = DllImportData( "yp_MemoryError" );
+        internal static ypObject_p yp_NameError = DllImportData( "yp_NameError" );
+        internal static ypObject_p yp_OverflowError = DllImportData( "yp_OverflowError" );
+        internal static ypObject_p yp_RuntimeError = DllImportData( "yp_RuntimeError" );
+        internal static ypObject_p yp_NotImplementedError = DllImportData( "yp_NotImplementedError" );
+        internal static ypObject_p yp_ReferenceError = DllImportData( "yp_ReferenceError" );
+        internal static ypObject_p yp_SystemError = DllImportData( "yp_SystemError" );
+        internal static ypObject_p yp_SystemExit = DllImportData( "yp_SystemExit" );
+        internal static ypObject_p yp_TypeError = DllImportData( "yp_TypeError" );
+        internal static ypObject_p yp_UnboundLocalError = DllImportData( "yp_UnboundLocalError" );
+        internal static ypObject_p yp_UnicodeError = DllImportData( "yp_UnicodeError" );
+        internal static ypObject_p yp_UnicodeEncodeError = DllImportData( "yp_UnicodeEncodeError" );
+        internal static ypObject_p yp_UnicodeDecodeError = DllImportData( "yp_UnicodeDecodeError" );
+        internal static ypObject_p yp_UnicodeTranslateError = DllImportData( "yp_UnicodeTranslateError" );
+        internal static ypObject_p yp_ValueError = DllImportData( "yp_ValueError" );
+        internal static ypObject_p yp_ZeroDivisionError = DllImportData( "yp_ZeroDivisionError" );
+        internal static ypObject_p yp_BufferError = DllImportData( "yp_BufferError" );
 
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_MethodError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_MemorySizeOverflowError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_SystemLimitationError;
-        [DllImport("nohtyP.dll")]
-        internal static extern ypObject_p yp_InvalidatedError;
-#endif
+        internal static ypObject_p yp_MethodError = DllImportData( "yp_MethodError" );
+        internal static ypObject_p yp_MemorySizeOverflowError = DllImportData( "yp_MemorySizeOverflowError" );
+        internal static ypObject_p yp_SystemLimitationError = DllImportData( "yp_SystemLimitationError" );
+        internal static ypObject_p yp_InvalidatedError = DllImportData( "yp_InvalidatedError" );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern int yp_isexceptionC2( ypObject_p x, ypObject_p exc );
@@ -1223,7 +1150,7 @@ namespace nohtyP
         internal static extern ypObject_p yp_itemarrayCX( ypObject_p seq, ref ypObject_p* array, yp_ssize_t* len );
 
         // FIXME Remove
-        static void Main()
+        public static void Main()
         {
             Console.WriteLine( "Press a key..." );
             Console.ReadKey( true );

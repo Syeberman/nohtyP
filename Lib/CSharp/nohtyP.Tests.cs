@@ -6,6 +6,12 @@ namespace nohtyP
     [TestFixture]
     public class Tests
     {
+        [TestFixtureSetUp]
+        public void TestFixtureSetUp()
+        {
+            yp.initialize();
+        }
+
         [Test]
         public void Constructors()
         {
