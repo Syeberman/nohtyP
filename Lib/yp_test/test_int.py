@@ -600,6 +600,7 @@ class IntTestCases(yp_unittest.TestCase):
                 with self.assertRaises(TypeError):
                     yp_int(TruncReturnsBadInt())
 
+    @yp_unittest.skip("TODO Support error messages in nohtyP")
     def test_error_message(self):
         def check(s, base=None):
             with self.assertRaises(ValueError,

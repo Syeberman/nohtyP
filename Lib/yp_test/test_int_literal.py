@@ -3,10 +3,10 @@
 This is complex because of changes due to PEP 237.
 """
 
-import unittest
-from test import support
+from yp_test import yp_unittest
+from yp_test import support
 
-class TestHexOctBin(unittest.TestCase):
+class TestHexOctBin(yp_unittest.TestCase):
 
     def test_hex_baseline(self):
         # A few upper/lowercase tests

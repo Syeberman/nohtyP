@@ -679,7 +679,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         myset >= myobj
         self.assertTrue(myobj.le_called)
 
-    @unittest.skipUnless(hasattr(set, "test_c_api"),
+    @yp_unittest.skipUnless(hasattr(set, "test_c_api"),
                          'C API test only available in a debug build')
     def test_c_api(self):
         self.assertEqual(yp_set().test_c_api(), True)

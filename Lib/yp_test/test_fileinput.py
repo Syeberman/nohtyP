@@ -25,7 +25,7 @@ from fileinput import FileInput, hook_encoded
 
 from yp_test.support import verbose, TESTFN, run_unittest, check_warnings
 from yp_test.support import unlink as safe_unlink
-from yp_unittest import mock
+from yp_test.yp_unittest import mock
 
 
 # The fileinput module has 2 interfaces: the FileInput class which does
@@ -894,4 +894,4 @@ class Test_hook_encoded(yp_unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

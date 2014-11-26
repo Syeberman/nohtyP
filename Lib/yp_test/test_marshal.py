@@ -342,7 +342,7 @@ def CollectObjectIDs(ids, obj):
             CollectObjectIDs(ids, v)
     return len(ids)
 
-class InstancingTestCase(unittest.TestCase, HelperMixin):
+class InstancingTestCase(yp_unittest.TestCase, HelperMixin):
     intobj = 123321
     floatobj = 1.2345
     strobj = "abcde"*3
@@ -405,7 +405,7 @@ class InstancingTestCase(unittest.TestCase, HelperMixin):
         l.append(l)
         self.helper3(l, recursive=True)
 
-class CompatibilityTestCase(unittest.TestCase):
+class CompatibilityTestCase(yp_unittest.TestCase):
     def _test(self, version):
         with open(__file__, "rb") as f:
             code = f.read()
