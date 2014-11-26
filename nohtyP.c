@@ -5137,6 +5137,7 @@ typedef struct _ypStrObject ypStrObject;
             ypObject_LEN_MAX ) - 1 /* -1 for null terminator */ )
 
 // Debug-only macro to verify that bytes/str instances are stored as we expect
+// TODO Check that alloclen is big enough?  (But handle immortals like yp_s_utf_8.)
 #define ypStringLib_ASSERT_INVARIANTS( s ) \
     do {yp_ASSERT( \
             ypStringLib_ENC_CODE( s ) == ypStringLib_ENC_BYTES || \
@@ -5144,11 +5145,8 @@ typedef struct _ypStrObject ypStrObject;
                 ypStringLib_DATA( s ), ypStringLib_LEN( s ) ) == ypStringLib_ENC_CODE( s ), \
             "str not stored in smallest representation" ); \
         yp_ASSERT( \
-            ypStringLib_ENC( s )->getindexX( s, ypStringLib_LEN( s ) ) == 0, \
+            ypStringLib_ENC( s )->getindexX( ypStringLib_DATA( s ), ypStringLib_LEN( s ) ) == 0, \
             "bytes/str not internally null-terminated" ); \
-        yp_ASSERT( \
-            ypStringLib_ALLOCLEN( s ) >= ypStringLib_LEN( s ), \
-            "alloclen too small for the elements it contains" ); \
     } while( 0 )
 
 // Empty bytes can be represented by this, immortal object

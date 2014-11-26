@@ -700,7 +700,7 @@ class BaseTest:
         self.checkraises(TypeError, 'hello', 'replace', 'h', 42)
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
-    @unittest.skipIf(sys.maxsize > (1 << 32) or struct.calcsize('P') != 4,
+    @yp_unittest.skipIf(sys.maxsize > (1 << 32) or struct.calcsize('P') != 4,
                      'only applies to 32-bit platforms')
     def test_replace_overflow(self):
         # Check for overflow checking on 32 bit machines

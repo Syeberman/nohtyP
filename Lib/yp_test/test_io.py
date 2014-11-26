@@ -35,7 +35,7 @@ import warnings
 import weakref
 from collections import deque, UserList
 from itertools import cycle, count
-from test import support
+from yp_test import support
 from yp_test.script_helper import assert_python_ok
 
 import codecs
@@ -709,7 +709,7 @@ class CommonBufferedTests:
 
         self.assertEqual(42, bufio.fileno())
 
-    @unittest.skip('test having existential crisis')
+    @yp_unittest.skip('test having existential crisis')
     def test_no_fileno(self):
         # XXX will we always have fileno() function? If so, kill
         # this test. Else, write it.

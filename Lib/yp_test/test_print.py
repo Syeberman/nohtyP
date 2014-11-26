@@ -41,7 +41,7 @@ class ClassWith__str__:
 
 
 @yp_unittest.skip( "TODO: convert to yp.py" )
-class TestPrint(unittest.TestCase):
+class TestPrint(yp_unittest.TestCase):
     """Test correct operation of the print function."""
 
     def check(self, expected, args,
