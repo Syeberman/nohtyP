@@ -229,6 +229,7 @@ class BaseBytesTest:
         # Check all indicies
         self.check_extended_getslice(lambda x: x)
 
+    @yp_unittest.skip("TODO Implement utf-16, etc in nohtyP")
     def test_encoding(self):
         sample = "Hello world\n\u1234\u5678\u9abc"
         for enc in ("utf-8", "utf-16"):
@@ -238,6 +239,14 @@ class BaseBytesTest:
         b = self.type2test(sample, "latin-1", "ignore")
         self.assertEqual(b, self.type2test(sample[:-3], "utf-8"))
 
+    # TODO remove once nohtyP supports utf-16, etc
+    def test_encoding_utf_8(self):
+        sample = "Hello world\n\u1234\u5678\u9abc"
+        for enc in ("utf-8", ):
+            b = self.type2test(sample, enc)
+            self.assertEqual(b, self.type2test(sample.encode(enc)))
+
+    @yp_unittest.skip("TODO Implement utf-16, etc in nohtyP")
     def test_decode(self):
         sample = "Hello world\n\u1234\u5678\u9abc\def0\def0"
         for enc in ("utf-8", "utf-16"):
@@ -249,6 +258,15 @@ class BaseBytesTest:
         self.assertEqual(b.decode("utf-8", "ignore"), "Hello world\n")
         self.assertEqual(b.decode(errors="ignore", encoding="utf-8"),
                          "Hello world\n")
+        # Default encoding is utf-8
+        self.assertEqual(self.type2test(b'\xe2\x98\x83').decode(), '\u2603')
+
+    # TODO remove once nohtyP supports utf-16, etc
+    def test_decode_utf_8(self):
+        sample = "Hello world\n\u1234\u5678\u9abc\def0\def0"
+        for enc in ("utf-8", ):
+            b = self.type2test(sample, enc)
+            self.assertEqual(b.decode(enc), sample)
         # Default encoding is utf-8
         self.assertEqual(self.type2test(b'\xe2\x98\x83').decode(), '\u2603')
 
