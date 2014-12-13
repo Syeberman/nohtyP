@@ -5378,6 +5378,7 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
 }
 
 
+// FIXME assumes little-endian
 # define ypStringLib_CHECKENC_1FROM2_MASK 0xFF00FF00FF00FF00ULL
 yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_CHECKENC_1FROM2_MASK) == ypStringLib_CHECKENC_1FROM2_MASK, checkenc_1from2_mask_matches_type );
 // Returns the ypStringLib_ENC_* that _should_ be used for the given UCS-2-encoded string
@@ -5396,7 +5397,8 @@ static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
 
     // Read the first few elements until we're aligned
     while( !yp_IS_ALIGNED( p, yp_sizeof( _yp_uint_t ) ) ) {
-        if( ((yp_uint16_t) *p) & mask ) return ypStringLib_ENC_UCS_2;
+        yp_uint16_t value = *((yp_uint16_t *) p);
+        if( value & mask ) return ypStringLib_ENC_UCS_2;
         p += 2;
     }
 
@@ -5410,12 +5412,14 @@ static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
     // Now read the final, unaligned elements
 final_loop:
     while( p < end ) {
-        if( ((yp_uint16_t) *p) & mask ) return ypStringLib_ENC_UCS_2;
+        yp_uint16_t value = *((yp_uint16_t *) p);
+        if( value & mask ) return ypStringLib_ENC_UCS_2;
         p += 2;
     }
     return ypStringLib_ENC_LATIN_1;
 }
 
+// FIXME assumes little-endian
 # define ypStringLib_CHECKENC_1FROM4_MASK 0xFFFFFF00FFFFFF00ULL
 yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_CHECKENC_1FROM4_MASK) == ypStringLib_CHECKENC_1FROM4_MASK, checkenc_1from4_mask_matches_type );
 # define ypStringLib_CHECKENC_2FROM4_MASK 0xFFFF0000FFFF0000ULL
@@ -5431,7 +5435,8 @@ static int _ypStringLib_checkenc_ucs_4( _yp_uint_t mask,
 
     // Read the first few elements until we're aligned
     while( !yp_IS_ALIGNED( *p, yp_sizeof( _yp_uint_t ) ) ) {
-        if( ((yp_uint32_t) **p) & mask ) return FALSE;
+        yp_uint32_t value = *((yp_uint32_t *) *p);
+        if( value & mask ) return FALSE;
         *p += 4;
     }
 
@@ -5445,7 +5450,8 @@ static int _ypStringLib_checkenc_ucs_4( _yp_uint_t mask,
     // Now read the final, unaligned elements
 final_loop:
     while( *p < end ) {
-        if( ((yp_uint32_t) **p) & mask ) return FALSE;
+        yp_uint32_t value = *((yp_uint32_t *) *p);
+        if( value & mask ) return FALSE;
         *p += 4;
     }
     return TRUE;
@@ -7159,7 +7165,7 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
         result = _ypBytes_extend_from_iter( b, &mi, &mi_state );
         ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0'; // up to us to add null-terminator
         yp_decref( mi );
-        ypBytes_ASSERT_INVARIANTS( result );
+        ypBytes_ASSERT_INVARIANTS( b );
         return result;
     }
 }

@@ -90,7 +90,8 @@ class BaseTest:
         args = self.fixtype(args)
         with self.assertRaises(exc) as cm:
             getattr(obj, methodname)(*args)
-        self.assertNotEqual(str(cm.exception), '')
+        # Not applicable to nohtyP
+        #self.assertNotEqual(str(cm.exception), '')
 
     # call obj.method(*args) without any checks
     def checkcall(self, obj, methodname, *args):

@@ -169,8 +169,10 @@ yp_func( c_void, "yp_decref", ((c_ypObject_p, "x"), ), errcheck=False )
 yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_freeze( ypObject **x );
+yp_func( c_void, "yp_freeze", ((c_ypObject_pp, "x"), ) )
 
 # void yp_deepfreeze( ypObject **x );
+yp_func( c_void, "yp_deepfreeze", ((c_ypObject_pp, "x"), ) )
 
 # ypObject *yp_unfrozen_copy( ypObject *x );
 yp_func( c_ypObject_p, "yp_unfrozen_copy", ((c_ypObject_p, "x"), ) )
@@ -1666,6 +1668,9 @@ class yp_bytearray( _ypBytes ):
         if isinstance( factor, float ): raise TypeError
         _yp_irepeatC( self, factor )
         return self
+    # XXX nohtyP will return a chrarray if asked to decode a bytearray, but Python expects str
+    def decode( self, encoding="utf-8", errors="strict" ):
+        return _yp_str3( self, encoding, errors )
 
 # FIXME When nohtyP has types that have string representations, update this
 # FIXME Just generally move more of this logic into nohtyP, when available
