@@ -9190,6 +9190,7 @@ ypObject *yp_join( ypObject *s, ypObject *iterable ) {
         ypQuickSeq_tuple_close( &state );
         yp_decref( temptuple );
     }
+    if( yp_isexceptionC( result ) ) return result;
     ypStringLib_ASSERT_INVARIANTS( result );
     return result;
 }
