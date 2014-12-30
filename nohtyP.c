@@ -8064,7 +8064,8 @@ static ypObject *_ypBytes_encode( int type,
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_encode_utf_8( type, source, errors );
-    yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    if( yp_isexceptionC( result ) ) return result;
+    yp_ASSERT( ypObject_TYPE_CODE( result ) == type, "text encoding didn't return correct type" );
     ypBytes_ASSERT_INVARIANTS( result );
     return result;
 }
@@ -8823,7 +8824,8 @@ static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_
 
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_decode_frombytesC_utf_8( type, source, len, errors );
-    yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    if( yp_isexceptionC( result ) ) return result;
+    yp_ASSERT( ypObject_TYPE_CODE( result ) == type, "text encoding didn't return correct type" );
     ypStr_ASSERT_INVARIANTS( result );
     return result;
 }
@@ -8858,7 +8860,8 @@ static ypObject *_ypStr_decode( int type,
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_decode_frombytesC_utf_8( type,
             ypBytes_DATA( source ), ypBytes_LEN( source ), errors );
-    yp_ASSERT( ypObject_TYPE_CODE( result ) == type || yp_isexceptionC( result ), "text encoding didn't return correct type" );
+    if( yp_isexceptionC( result ) ) return result;
+    yp_ASSERT( ypObject_TYPE_CODE( result ) == type, "text encoding didn't return correct type" );
     ypStr_ASSERT_INVARIANTS( result );
     return result;
 }
@@ -9205,6 +9208,7 @@ ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
     ypQuickSeq_new_fromvar( &state, n, args );
     result = ypStringLib_join( s, &ypQuickSeq_var_methods, &state );
     ypQuickSeq_var_close( &state );
+    if( yp_isexceptionC( result ) ) return result;
     ypStringLib_ASSERT_INVARIANTS( result );
     return result;
 }
