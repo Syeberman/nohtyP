@@ -5253,8 +5253,8 @@ static void ypStringLib_setindexX_4bytes( void *dest, yp_ssize_t dest_i, yp_uint
 static void ypStringLib_upconvert_4from2( void *_data, yp_ssize_t len )
 {
     // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint32_t *dest = ((yp_uint32_t *) _data) + len;
-    const yp_uint16_t *src = ((yp_uint16_t *) _data) + len;
+    yp_uint32_t *dest = ((yp_uint32_t *) _data) + len-1;
+    const yp_uint16_t *src = ((yp_uint16_t *) _data) + len-1;
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
         dest--; src--;
@@ -5266,8 +5266,8 @@ static void ypStringLib_upconvert_4from2( void *_data, yp_ssize_t len )
 static void ypStringLib_upconvert_4from1( void *_data, yp_ssize_t len )
 {
     // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint32_t *dest = ((yp_uint32_t *) _data) + len;
-    const yp_uint8_t *src = ((yp_uint8_t *) _data) + len;
+    yp_uint32_t *dest = ((yp_uint32_t *) _data) + len-1;
+    const yp_uint8_t *src = ((yp_uint8_t *) _data) + len-1;
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
         dest--; src--;
@@ -5279,8 +5279,8 @@ static void ypStringLib_upconvert_4from1( void *_data, yp_ssize_t len )
 static void ypStringLib_upconvert_2from1( void *_data, yp_ssize_t len )
 {
     // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint16_t *dest = ((yp_uint16_t *) _data) + len;
-    const yp_uint8_t *src = ((yp_uint8_t *) _data) + len;
+    yp_uint16_t *dest = ((yp_uint16_t *) _data) + len-1;
+    const yp_uint8_t *src = ((yp_uint8_t *) _data) + len-1;
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
         dest--; src--;
@@ -6241,6 +6241,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
         if( yp_isexceptionC( newS ) ) return newS;
         memcpy( ypStringLib_DATA( newS ), source, leading_ascii );
         ypStringLib_SET_LEN( newS, leading_ascii );
+        source += leading_ascii;
 
     // If it doesn't start with any ASCII, then before we allocate a separate buffer to hold the
     // data, run the first few bytes through _ypStringLib_decode_utf_8 using the inline buffer, to
@@ -6281,6 +6282,7 @@ main_loop:
         ch = _ypStringLib_decode_utf_8( &source, end, newS );
         if( ch > 0xFFu ) {
             // This will up-convert and resize to the required length
+            // TODO We can update the maximum expected length, like we do below
             int newEnc = ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2;
             result = _ypStr_grow_onextend( newS, len, 0, newEnc );
             if( yp_isexceptionC( result ) ) {
