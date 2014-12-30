@@ -81,7 +81,7 @@ class BaseBytesTest:
         #self.assertRaises(IndexError, lambda: b[-10**100])
 
     def test_from_list(self):
-        ints = yp_list(range(256))
+        ints = yp_list(yp_range(256))
         b = self.type2test(i for i in ints)
         self.assertEqual(yp_len(b), 256)
         self.assertEqual(yp_list(b), ints)
@@ -141,7 +141,7 @@ class BaseBytesTest:
         try:
             # Should either pass or raise an error (e.g. on debug builds with
             # additional malloc() overhead), but shouldn't crash.
-            bytearray(size - 4)
+            yp_bytearray(size - 4)
         except (OverflowError, MemoryError):
             pass
 
@@ -211,7 +211,7 @@ class BaseBytesTest:
 
     def check_extended_getslice(self, sample):
         # Test extended slicing by comparing with list slicing.
-        L = list(range(255))
+        L = yp_list(yp_range(255))
         b = self.type2test(L)
         indices = (0, None, 1, 3, 19, 100, -1, -2, -31, -100)
         for start in sample(indices):
@@ -349,8 +349,8 @@ class BaseBytesTest:
         for lst in [[b"abc"], [b"a", b"bc"], [b"ab", b"c"], [b"a", b"b", b"c"]]:
             lst = yp_list(map(self.type2test, lst))
             self.assertEqual(self.type2test(b"").join(lst), b"abc")
-            self.assertEqual(self.type2test(b"").join(tuple(lst)), b"abc")
-            self.assertEqual(self.type2test(b"").join(iter(lst)), b"abc")
+            self.assertEqual(self.type2test(b"").join(yp_tuple(lst)), b"abc")
+            self.assertEqual(self.type2test(b"").join(yp_iter(lst)), b"abc")
 
         # FIXME
         self.assertEqual(self.type2test(b".").join(yp_list([])), b"")
@@ -360,10 +360,11 @@ class BaseBytesTest:
 
         dot_join = self.type2test(b".:").join
         self.assertEqual(dot_join([b"ab", b"cd"]), b"ab.:cd")
-        self.assertEqual(dot_join([memoryview(b"ab"), b"cd"]), b"ab.:cd")
-        self.assertEqual(dot_join([b"ab", memoryview(b"cd")]), b"ab.:cd")
-        self.assertEqual(dot_join([bytearray(b"ab"), b"cd"]), b"ab.:cd")
-        self.assertEqual(dot_join([b"ab", bytearray(b"cd")]), b"ab.:cd")
+        # XXX memoryview not applicable in nohtyP
+        #self.assertEqual(dot_join([memoryview(b"ab"), b"cd"]), b"ab.:cd")
+        #self.assertEqual(dot_join([b"ab", memoryview(b"cd")]), b"ab.:cd")
+        self.assertEqual(dot_join([yp_bytearray(b"ab"), b"cd"]), b"ab.:cd")
+        self.assertEqual(dot_join([b"ab", yp_bytearray(b"cd")]), b"ab.:cd")
         # Stress it with many items
         seq = [b"abc"] * 1000
         expected = b"abc" + b".:abc" * 999
@@ -724,7 +725,7 @@ class BaseBytesTest:
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_ord(self):
         b = self.type2test(b'\0A\x7f\x80\xff')
-        self.assertEqual([ord(b[i:i+1]) for i in range(len(b))],
+        self.assertEqual([yp_ord(b[i:i+1]) for i in yp_range(yp_len(b))],
                          [0, 65, 127, 128, 255])
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
@@ -985,17 +986,17 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
             pass
 
     def test_delitem(self):
-        b = yp_bytearray(range(10))
+        b = yp_bytearray(yp_range(10))
         del b[0]
-        self.assertEqual(b, yp_bytearray(range(1, 10)))
+        self.assertEqual(b, yp_bytearray(yp_range(1, 10)))
         del b[-1]
-        self.assertEqual(b, yp_bytearray(range(1, 9)))
+        self.assertEqual(b, yp_bytearray(yp_range(1, 9)))
         del b[4]
         self.assertEqual(b, yp_bytearray([1, 2, 3, 4, 6, 7, 8]))
 
     def test_setslice(self):
-        b = yp_bytearray(range(10))
-        self.assertEqual(yp_list(b), yp_list(range(10)))
+        b = yp_bytearray(yp_range(10))
+        self.assertEqual(yp_list(b), yp_list(yp_range(10)))
 
         b[0:5] = yp_bytearray([1, 1, 1, 1, 1])
         self.assertEqual(b, yp_bytearray([1, 1, 1, 1, 1, 5, 6, 7, 8, 9]))
@@ -1004,13 +1005,13 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertEqual(b, yp_bytearray([5, 6, 7, 8, 9]))
 
         b[0:0] = yp_bytearray([0, 1, 2, 3, 4])
-        self.assertEqual(b, yp_bytearray(range(10)))
+        self.assertEqual(b, yp_bytearray(yp_range(10)))
 
         b[-7:-3] = yp_bytearray([100, 101])
         self.assertEqual(b, yp_bytearray([0, 1, 2, 100, 101, 7, 8, 9]))
 
         b[3:5] = [3, 4, 5, 6]
-        self.assertEqual(b, yp_bytearray(range(10)))
+        self.assertEqual(b, yp_bytearray(yp_range(10)))
 
         b[3:0] = [42, 42, 42]
         self.assertEqual(b, yp_bytearray([0, 1, 2, 42, 42, 42, 3, 4, 5, 6, 7, 8, 9]))
@@ -1038,7 +1039,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
     def test_setslice_large_growth(self):
         # Tests that _ypBytes_setslice_grow properly handles when a new buffer is allocated
-        b1 = yp_bytes(range(255))*5
+        b1 = yp_bytes(yp_range(255))*5
         b2 = yp_bytes((0x80, 0x80))
         b = yp_bytearray(b2*2)  # data should be inline
         b[2:2] = b1             # data should have moved out
@@ -1046,21 +1047,21 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
     def test_setslice_extend(self):
         # Exercise the resizing logic (see issue #19087)
-        b = bytearray(range(100))
-        self.assertEqual(list(b), list(range(100)))
+        b = yp_bytearray(yp_range(100))
+        self.assertEqual(yp_list(b), yp_list(yp_range(100)))
         del b[:10]
-        self.assertEqual(list(b), list(range(10, 100)))
-        b.extend(range(100, 110))
-        self.assertEqual(list(b), list(range(10, 110)))
+        self.assertEqual(yp_list(b), yp_list(yp_range(10, 100)))
+        b.extend(yp_range(100, 110))
+        self.assertEqual(yp_list(b), yp_list(yp_range(10, 110)))
 
-    def test_extended_set_del_slice(self):
+    def check_extended_set_del_slice(self, sample):
         # XXX ctypes truncates large ints, making them look valid in nohtyP tests
         indices = (0, None, 1, 3, 19, 300, -1, -2, -31, -300)
         for start in sample(indices):
             for stop in sample(indices):
                 # Skip invalid step 0
                 for step in sample(indices[1:]):
-                    L = list(range(255))
+                    L = yp_list(yp_range(255))
                     b = yp_bytearray(L)
                     # Make sure we have a slice of exactly the right length,
                     # but with different data.
@@ -1086,9 +1087,9 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
     def test_setslice_trap(self):
         # This test verifies that we correctly handle assigning self
         # to a slice of self (the old Lambert Meertens trap).
-        b = yp_bytearray(range(256))
+        b = yp_bytearray(yp_range(256))
         b[8:] = b
-        self.assertEqual(b, yp_bytearray(list(range(8)) + list(range(256))))
+        self.assertEqual(b, yp_bytearray(yp_list(yp_range(8)) + yp_list(yp_range(256))))
 
     def test_iconcat(self):
         b = yp_bytearray(b"abc")
@@ -1134,7 +1135,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         alloc = b.__alloc__()
         self.assertTrue(alloc >= 0)
         seq = [alloc]
-        for i in range(100):
+        for i in yp_range(100):
             b += yp_bytes(b"x")
             alloc = b.__alloc__()
             self.assertGreaterEqual(alloc, yp_len(b))
@@ -1154,11 +1155,11 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertEqual(a, orig * 50)
         self.assertEqual(a[-5:], orig)
         a = yp_bytearray(b'')
-        a.extend(iter(map(yp_int, orig * 50)))
+        a.extend(yp_iter(map(yp_int, orig * 50)))
         self.assertEqual(a, orig * 50)
         self.assertEqual(a[-5:], orig)
         a = yp_bytearray(b'')
-        a.extend(list(map(yp_int, orig * 50)))
+        a.extend(yp_list(map(yp_int, orig * 50)))
         self.assertEqual(a, orig * 50)
         self.assertEqual(a[-5:], orig)
         a = yp_bytearray(b'')
@@ -1171,7 +1172,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
     def test_extend_large_growth(self):
         # Tests that _ypBytes_extend_from_bytes properly handles when a new buffer is allocated
-        b1 = yp_bytes(range(255))*5
+        b1 = yp_bytes(yp_range(255))*5
         b2 = yp_bytes((0x80, 0x80))
         b = yp_bytearray(b2)    # data should be inline
         b.extend(b1)            # data should have moved out
@@ -1239,7 +1240,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b = yp_bytearray(b'abc')
         self.assertFalse(b is b.replace(b'abc', b'cde', 0))
 
-        t = yp_bytearray([i for i in range(256)])
+        t = yp_bytearray([i for i in yp_range(256)])
         x = yp_bytearray(b'')
         self.assertFalse(x is x.translate(t))
 
@@ -1377,15 +1378,15 @@ class AssortedBytesTest(yp_unittest.TestCase):
         ]
         for b, s in tests:
             self.assertEqual(b, yp_bytearray(s, 'latin-1'))
-        for c in range(128, 256):
+        for c in yp_range(128, 256):
             self.assertRaises(SyntaxError, eval,
-                              'b"%s"' % chr(c))
+                              'b"%s"' % yp_chr(c))
 
     @yp_unittest.skip("TODO: Implement translate")
     def test_translate(self):
         b = yp_bytes(b'hello')
         ba = yp_bytearray(b)
-        rosetta = yp_bytearray(range(0, 256))
+        rosetta = yp_bytearray(yp_range(0, 256))
         rosetta[ord('o')] = ord('e')
         c = b.translate(rosetta, b'l')
         self.assertEqual(b, b'hello')
