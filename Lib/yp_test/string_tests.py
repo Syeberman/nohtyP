@@ -752,6 +752,7 @@ class CommonTest(BaseTest):
 
         self.checkraises(TypeError, 'hello', 'capitalize', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_additional_split(self):
         self.checkequal(['this', 'is', 'the', 'split', 'function'],
             'this is the split function', 'split')
@@ -1085,6 +1086,7 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'hello', 'endswith', (42,))
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test___contains__(self):
         self.checkequal(True, '', '__contains__', '')
         self.checkequal(True, 'abc', '__contains__', '')
@@ -1369,6 +1371,7 @@ class MixinStrUnicodeUserStringTest:
 class MixinStrUnicodeTest:
     # Additional tests that only work with str and unicode.
 
+    @yp_unittest.skip("TODO Not applicable to nohtyP")
     def test_bug1001011(self):
         # Make sure join returns a NEW object for single item sequences
         # involving a subclass.
