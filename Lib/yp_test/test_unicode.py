@@ -1373,8 +1373,9 @@ class UnicodeTest(string_tests.CommonTest,
         # The errors argument defaults to strict.
         self.assertRaises(UnicodeDecodeError, yp_str, utf8_cent, encoding='ascii')
 
+    @yp_unittest.skip("TODO Implement more codecs in nohtyP")
     def test_codecs_utf7(self):
-        utfTests = [
+        utfTests = ((yp_str(x), yp_bytes(y)) for (x, y) in [
             ('A\u2262\u0391.', b'A+ImIDkQ.'),             # RFC2152 example
             ('Hi Mom -\u263a-!', b'Hi Mom -+Jjo--!'),     # RFC2152 example
             ('\u65E5\u672C\u8A9E', b'+ZeVnLIqe-'),        # RFC2152 example
@@ -1389,7 +1390,7 @@ class UnicodeTest(string_tests.CommonTest,
             (r'++--', b'+-+---'),
             ('\U000abcde', b'+2m/c3g-'),                  # surrogate pairs
             ('/', b'/'),
-        ]
+        ])
 
         for (x, y) in utfTests:
             self.assertEqual(x.encode('utf-7'), y)
@@ -1830,10 +1831,12 @@ class UnicodeTest(string_tests.CommonTest,
             self.assertCorrectUTF8Decoding(self.to_bytestring(seq), res,
                                            'invalid continuation byte')
 
+    @yp_unittest.skip("TODO Implement more codecs in nohtyP")
     def test_codecs_idna(self):
         # Test whether trailing dot is preserved
         self.assertEqual("www.python.org.".encode("idna"), b"www.python.org.")
 
+    @yp_unittest.skip("TODO Implement more codecs in nohtyP")
     def test_codecs_errors(self):
         # Error handling (encoding)
         self.assertRaises(UnicodeError, 'Andr\202 x'.encode, 'ascii')
@@ -1871,6 +1874,7 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertRaises(UnicodeError, complex, "\ud800")
         self.assertRaises(UnicodeError, complex, "\udf00")
 
+    @yp_unittest.skip("TODO Implement more codecs in nohtyP")
     def test_codecs(self):
         # Encoding
         self.assertEqual(yp_str('hello').encode('ascii'), b'hello')
@@ -1919,13 +1923,45 @@ class UnicodeTest(string_tests.CommonTest,
                              'unicode_escape', 'unicode_internal'):
                 self.assertEqual(yp_str(u.encode(encoding),encoding), u)
 
+    @support.requires_resource('cpu')
+    def test_codecs_all_code_points(self):
         # UTF-8 must be roundtrip safe for all code points
         # (except surrogates, which are forbidden).
-        u = yp_str('').join(map(yp_chr, yp_list(yp_range(0, 0xd800)) +
-                                        yp_list(yp_range(0xe000, 0x110000))))
+        # FIXME This optimization can be contributed back to Python
+        u  = yp_str('').join(yp_chr(x) for x in range(0, 0xd800))
+        u += yp_str('').join(yp_chr(x) for x in range(0xe000, 0x110000))
         for encoding in ('utf-8',):
             self.assertEqual(yp_str(u.encode(encoding),encoding), u)
 
+    # TODO remove once nohtyP supports utf-16, etc
+    def test_codecs_only_utf8(self):
+        # Encoding
+        self.assertEqual(yp_str('hello').encode('utf-8'), b'hello')
+        self.assertEqual(yp_str('hello').encode('utf-8'), b'hello')
+
+        # Default encoding is utf-8
+        self.assertEqual(yp_str('\u2603').encode(), b'\xe2\x98\x83')
+
+        # Roundtrip safety for BMP (just the first 1024 chars)
+        for c in range(1024):
+            u = chr(c)
+            for encoding in ('utf-8', ):
+                with warnings.catch_warnings():
+                    # unicode-internal has been deprecated
+                    warnings.simplefilter("ignore", DeprecationWarning)
+
+                    self.assertEqual(yp_str(u.encode(encoding),encoding), u)
+
+        # Roundtrip safety for non-BMP (just a few chars)
+        with warnings.catch_warnings():
+            # unicode-internal has been deprecated
+            warnings.simplefilter("ignore", DeprecationWarning)
+
+            u = yp_str('\U00010001\U00020002\U00030003\U00040004\U00050005')
+            for encoding in ('utf-8', ):
+                self.assertEqual(yp_str(u.encode(encoding),encoding), u)
+
+    @yp_unittest.skip("TODO Implement more codecs in nohtyP")
     def test_codecs_charmap(self):
         # 0-127
         s = yp_bytes(range(128))
@@ -2517,14 +2553,14 @@ class UnicodeTest(string_tests.CommonTest,
     def test_compare(self):
         # Issue #17615
         N = 10
-        ascii = 'a' * N
-        ascii2 = 'z' * N
-        latin = '\x80' * N
-        latin2 = '\xff' * N
-        bmp = '\u0100' * N
-        bmp2 = '\uffff' * N
-        astral = '\U00100000' * N
-        astral2 = '\U0010ffff' * N
+        ascii = yp_str('a') * N
+        ascii2 = yp_str('z') * N
+        latin = yp_str('\x80') * N
+        latin2 = yp_str('\xff') * N
+        bmp = yp_str('\u0100') * N
+        bmp2 = yp_str('\uffff') * N
+        astral = yp_str('\U00100000') * N
+        astral2 = yp_str('\U0010ffff') * N
         strings = (
             ascii, ascii2,
             latin, latin2,
