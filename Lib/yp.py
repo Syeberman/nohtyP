@@ -366,6 +366,7 @@ yp_func( c_ypObject_p, "yp_str0", () )
 yp_func( c_ypObject_p, "yp_chrarray0", () )
 
 # ypObject *yp_chrC( yp_int_t i );
+yp_func( c_ypObject_p, "yp_chrC", ((c_yp_int_t, "i"), ) )
 
 # ypObject *yp_tupleN( int n, ... );
 yp_func( c_ypObject_p, "yp_tupleN", (c_multiN_ypObject_p, ) )
@@ -1752,6 +1753,9 @@ def yp_repr( object ):
     """Returns repr( object ) of a ypObject as a yp_str"""
     if not isinstance( object, ypObject ): raise TypeError( "expected ypObject in yp_repr" )
     return object._yp_repr( )
+
+def yp_chr( i ):
+    return _yp_chrC( i )
 
 class _ypTuple( ypObject ):
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
