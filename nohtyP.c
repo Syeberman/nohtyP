@@ -8392,6 +8392,8 @@ static ypObject *str_concat( ypObject *s, ypObject *x )
     return newS;
 }
 
+#define str_repeat ypStringLib_repeat
+
 static ypObject *str_getindex( ypObject *s, yp_ssize_t i, ypObject *defval )
 {
     if( !ypSequence_AdjustIndexC( ypStr_LEN( s ), &i ) ) {
@@ -8612,7 +8614,7 @@ static ypObject *str_dealloc( ypObject *s ) {
 
 static ypSequenceMethods ypStr_as_sequence = {
     str_concat,                     // tp_concat
-    MethodError_objssizeproc,       // tp_repeat
+    str_repeat,                     // tp_repeat
     str_getindex,                   // tp_getindex
     MethodError_objsliceproc,       // tp_getslice
     MethodError_findfunc,           // tp_find

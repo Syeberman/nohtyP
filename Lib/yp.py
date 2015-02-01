@@ -1602,7 +1602,12 @@ class yp_float( ypObject ):
 
 class _ypBytes( ypObject ):
     def __new__( cls, source=0, encoding=None, errors=None ):
+        # TODO Seem to be missing yp_str, yp_bytes, etc
         if isinstance( source, str ):
+            # TODO Replace this faked-out version with nohtyP's
+            if errors == "replace":
+                pyBytes = bytes( source, encoding, errors )
+                return cls._ypBytes_constructorC( pyBytes, len( pyBytes ) )
             return cls._ypBytes_constructor3( source, encoding, errors )
         elif isinstance( source, (int, yp_int) ):
             return cls._ypBytes_constructor( source )
@@ -1649,6 +1654,11 @@ class yp_bytes( _ypBytes ):
         # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if size < 1 and "_yp_bytes_empty" in globals( ):
         #    assert self is _yp_bytes_empty, "an empty bytes should be _yp_bytes_empty"
+    def decode( self, encoding="utf-8", errors="strict" ):
+        # TODO Replace this faked-out version with nohtyP's
+        if errors == "replace":
+            return yp_str( self._asbytes( ).decode( encoding, errors ) )
+        return _yp_str3( self, encoding, errors )
 _yp_bytes_empty = yp_bytes( )
 
 @pytype( yp_type_bytearray, bytearray )
@@ -1671,7 +1681,13 @@ class yp_bytearray( _ypBytes ):
         return self
     # XXX nohtyP will return a chrarray if asked to decode a bytearray, but Python expects str
     def decode( self, encoding="utf-8", errors="strict" ):
+        # TODO Replace this faked-out version with nohtyP's
+        if errors == "replace":
+            return yp_str( self._asbytes( ).decode( encoding, errors ) )
         return _yp_str3( self, encoding, errors )
+
+# TODO Generally, need to adjust constructors and functions to only accept exact, specific types 
+# from Python
 
 # FIXME When nohtyP has types that have string representations, update this
 # FIXME Just generally move more of this logic into nohtyP, when available
@@ -1690,6 +1706,11 @@ class yp_str( ypObject ):
             if object is _yp_arg_missing: object = _yp_bytes_empty
             if encoding is _yp_arg_missing: encoding = yp_s_utf_8
             if errors is _yp_arg_missing: errors = yp_s_strict
+            if not isinstance( object, (yp_bytes, yp_bytearray) ):
+                raise TypeError( "expected yp_bytes or yp_bytearray in yp_str (decoding)")
+            # TODO Replace this faked-out version with nohtyP's
+            if errors == "replace":
+                return cls( str( object._asbytes(), encoding, errors ) )
             return _yp_str3( object, encoding, errors )
     def _get_encoded_size_encoding( self ):
         encoded = c_char_pp( c_char_p( ) )
@@ -1712,7 +1733,7 @@ class yp_str( ypObject ):
         #if size < 1 and "_yp_str_empty" in globals( ):
         #    assert self is _yp_str_empty, "an empty str should be _yp_str_empty"
 
-    # Just as yp_bool.__bool__ must return a bool, so to must this return a str
+    # Just as yp_bool.__bool__ must return a bool, so too must this return a str
     def __str__( self ): return self.encode( )._asbytes( ).decode( )
     # FIXME When nohtyP supports repr, replace this faked-out version
     def _yp_str( self ): return self
@@ -1727,6 +1748,12 @@ class yp_str( ypObject ):
     def __rmul__( self, factor ):
         if isinstance( factor, float ): raise TypeError
         return _yp_repeatC( self, factor )
+
+    # TODO Use nohtyP's versions when supported, not these faked-out versions
+    def replace( self, old, new, count=-1 ):
+        return yp_str( str( self ).replace( old, new, count ) )
+    def split( self, sep=None, maxsplit=-1 ):
+        return yp_list( str( self ).split( sep, maxsplit ) )
 
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
