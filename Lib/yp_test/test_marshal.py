@@ -426,7 +426,7 @@ class CompatibilityTestCase(yp_unittest.TestCase):
     def test3To3(self):
         self._test(3)
 
-class InterningTestCase(unittest.TestCase, HelperMixin):
+class InterningTestCase(yp_unittest.TestCase, HelperMixin):
     strobj = "this is an interned string"
     strobj = sys.intern(strobj)
 

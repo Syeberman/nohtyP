@@ -7,7 +7,7 @@ from yp_test import yp_unittest
 import warnings
 import encodings
 
-from test import support
+from yp_test import support
 
 if sys.platform == 'win32':
     VISTA_OR_LATER = (sys.getwindowsversion().major >= 6)

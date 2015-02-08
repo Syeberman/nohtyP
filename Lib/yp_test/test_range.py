@@ -420,6 +420,7 @@ class RangeTest(yp_unittest.TestCase):
                 it = pickle.loads(d)
                 self.assertEqual(list(it), data[1:])
 
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_exhausted_iterator_pickling(self):
         r = yp_range(2**65, 2**65+2)
         i = yp_iter(r)
@@ -432,6 +433,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(yp_list(i), [])
         self.assertEqual(yp_list(i2), [])
 
+    @yp_unittest.skip("TODO: Implement nohtyP pickling")
     def test_large_exhausted_iterator_pickling(self):
         r = yp_range(20)
         i = yp_iter(r)
