@@ -14,6 +14,7 @@ import yp as _yp
 def _checkFornohtyP(*objs):
     for obj in objs:
         if isinstance(obj, _yp.ypObject): return
+        if isinstance(obj, type) and issubclass(obj, _yp.ypObject): return
     raise TypeError("expected at least one ypObject in assertion")
 
 @_contextlib.contextmanager
