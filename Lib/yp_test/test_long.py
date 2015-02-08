@@ -144,12 +144,12 @@ class LongTest(yp_unittest.TestCase):
     # The sign of the number is also random.
 
     def getran(self, ndigits):
-        self.assertGreater(ndigits, 0)
+        self.assertGreater(ndigits, yp_int(0))
         nbits_hi = ndigits * SHIFT
         nbits_lo = nbits_hi - SHIFT + 1
         answer = 0
         nbits = 0
-        r = int(random.random() * (SHIFT * 2)) | 1  # force 1 bits to start
+        r = yp_int(random.random() * (SHIFT * 2)) | 1  # force 1 bits to start
         while nbits < nbits_lo:
             bits = (r >> 1) + 1
             bits = min(bits, nbits_hi - nbits)
@@ -158,7 +158,7 @@ class LongTest(yp_unittest.TestCase):
             answer = answer << bits
             if r & 1:
                 answer = answer | ((1 << bits) - 1)
-            r = int(random.random() * (SHIFT * 2))
+            r = yp_int(random.random() * (SHIFT * 2))
         self.assertTrue(nbits_lo <= nbits <= nbits_hi)
         if random.random() < 0.5:
             answer = -answer
@@ -1322,6 +1322,7 @@ class LongTest(yp_unittest.TestCase):
         for n in map(yp_int, integers):
             self.assertEqual(n, 0)
 
+    @yp_unittest.skip("TODO Implement bool-as-number in nohtyP")
     def test_shift_bool(self):
         # Issue #21422: ensure that bool << int and bool >> int return int
         for value in (True, False):
