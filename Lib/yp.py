@@ -1706,11 +1706,11 @@ class yp_str( ypObject ):
             if object is _yp_arg_missing: object = _yp_bytes_empty
             if encoding is _yp_arg_missing: encoding = yp_s_utf_8
             if errors is _yp_arg_missing: errors = yp_s_strict
-            if not isinstance( object, (yp_bytes, yp_bytearray) ):
+            if not isinstance( object, (bytes, bytearray, yp_bytes, yp_bytearray) ):
                 raise TypeError( "expected yp_bytes or yp_bytearray in yp_str (decoding)")
             # TODO Replace this faked-out version with nohtyP's
             if errors == "replace":
-                return cls( str( object._asbytes(), encoding, errors ) )
+                return cls( str( object, encoding, errors ) )
             return _yp_str3( object, encoding, errors )
     def _get_encoded_size_encoding( self ):
         encoded = c_char_pp( c_char_p( ) )
@@ -1735,9 +1735,9 @@ class yp_str( ypObject ):
 
     # Just as yp_bool.__bool__ must return a bool, so too must this return a str
     def __str__( self ): return self.encode( )._asbytes( ).decode( )
-    # FIXME When nohtyP supports repr, replace this faked-out version
     def _yp_str( self ): return self
-    def _yp_repr( self ): return repr( str( self ) )
+    # FIXME When nohtyP supports repr, replace this faked-out version
+    def _yp_repr( self ): return yp_str( repr( str( self ) ) )
 
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
@@ -1751,8 +1751,11 @@ class yp_str( ypObject ):
 
     # TODO Use nohtyP's versions when supported, not these faked-out versions
     def replace( self, old, new, count=-1 ):
+        if isinstance( old, yp_str ): old = str( old )
+        if isinstance( new, yp_str ): new = str( new )
         return yp_str( str( self ).replace( old, new, count ) )
     def split( self, sep=None, maxsplit=-1 ):
+        if isinstance( sep, yp_str ): sep = str( sep )
         return yp_list( str( self ).split( sep, maxsplit ) )
 
 c_ypObject_p_value( "yp_s_ascii" )
@@ -1778,6 +1781,7 @@ yp_s_False = yp_str( "False" )
 
 def yp_repr( object ):
     """Returns repr( object ) of a ypObject as a yp_str"""
+    if isinstance( object, str ): object = yp_str( object )
     if not isinstance( object, ypObject ): raise TypeError( "expected ypObject in yp_repr" )
     return object._yp_repr( )
 

@@ -5499,7 +5499,7 @@ static ypObject *ypStringLib_repeat( ypObject *s, yp_ssize_t factor )
     yp_ssize_t newLen;
     ypObject *newS;
 
-    if( ypObject_IS_MUTABLE( s ) ) {
+    if( !ypObject_IS_MUTABLE( s ) ) {
         if( s_len < 1 || factor < 1 ) return s_enc->empty_immutable;
         // If the result will be an exact copy, since we're immutable just return self
         if( factor == 1 ) return yp_incref( s );
