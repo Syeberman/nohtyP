@@ -45,7 +45,7 @@ def skip_unless_internalhash(test):
     """Skip decorator for tests that depend on SipHash24 or FNV"""
     ok = sys.hash_info.algorithm in {"fnv", "siphash24"}
     msg = "Requires SipHash24 or FNV"
-    return test if ok else unittest.skip(msg)(test)
+    return test if ok else yp_unittest.skip(msg)(test)
 
 
 @yp_unittest.skip( "TODO: convert to yp.py" )
@@ -334,7 +334,7 @@ class DatetimeTimeTests(DatetimeTests, yp_unittest.TestCase):
     repr_ = repr(datetime.time(0))
 
 
-class HashDistributionTestCase(unittest.TestCase):
+class HashDistributionTestCase(yp_unittest.TestCase):
 
     def test_hash_distribution(self):
         # check for hash collision
