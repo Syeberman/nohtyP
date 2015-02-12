@@ -334,6 +334,7 @@ class DatetimeTimeTests(DatetimeTests, yp_unittest.TestCase):
     repr_ = repr(datetime.time(0))
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class HashDistributionTestCase(yp_unittest.TestCase):
 
     def test_hash_distribution(self):

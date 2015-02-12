@@ -46,7 +46,12 @@ from yp_test import yp_unittest
 from yp_test import support
 from itertools import repeat
 from collections import deque
-from operator import length_hint
+from operator import length_hint as _length_hint
+
+def length_hint(obj, default=0):
+    """Returns a yp_int instead of int, and ensures obj is from nohtyP"""
+    assert isinstance(obj, ypObject)
+    return yp_int(_length_hint(obj, default))
 
 # Extra assurance that we're not accidentally testing Python's data types
 def iter( *args, **kwargs ): raise NotImplementedError( "convert script to yp_iter here" )
@@ -175,6 +180,7 @@ class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
     def setUp(self):
         self.it = yp_iter(yp_list(yp_range(n)))
 
+    @yp_unittest.skip( "TODO: Support mutation in nohtyP same as Python?" )
     def test_mutation(self):
         d = yp_list(yp_range(n))
         it = yp_iter(d)
@@ -189,11 +195,26 @@ class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
         d.extend(yp_range(20))
         self.assertEqual(length_hint(it), 0)
 
+    def test_nohtyP_mutation(self):
+        d = yp_list(yp_range(n))
+        it = yp_iter(d)
+        next(it)
+        next(it)
+        self.assertEqual(length_hint(it), n - 2)
+        d.append(n)
+        self.assertEqual(length_hint(it), n - 2)  # ignore append
+        d[1:] = []
+        self.assertEqual(length_hint(it), n - 2)  # ignore clear
+        self.assertEqual(yp_list(it), [])
+        d.extend(yp_range(20))
+        self.assertEqual(length_hint(it), 0)
+
 class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = yp_reversed(yp_list(yp_range(n)))
 
+    @yp_unittest.skip( "TODO: Support mutation in nohtyP same as Python?" )
     def test_mutation(self):
         d = yp_list(yp_range(n))
         it = yp_reversed(d)
@@ -204,6 +225,20 @@ class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
         self.assertEqual(length_hint(it), n - 2)  # ignore append
         d[1:] = []
         self.assertEqual(length_hint(it), 0)
+        self.assertEqual(yp_list(it), [])  # confirm invariant
+        d.extend(yp_range(20))
+        self.assertEqual(length_hint(it), 0)
+
+    def test_nohtyP_mutation(self):
+        d = yp_list(yp_range(n))
+        it = yp_reversed(d)
+        next(it)
+        next(it)
+        self.assertEqual(length_hint(it), n - 2)
+        d.append(n)
+        self.assertEqual(length_hint(it), n - 2)  # ignore append
+        d[1:] = []
+        self.assertEqual(length_hint(it), n - 2)  # ignore clear
         self.assertEqual(yp_list(it), [])  # confirm invariant
         d.extend(yp_range(20))
         self.assertEqual(length_hint(it), 0)

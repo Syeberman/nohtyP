@@ -9,6 +9,12 @@ import encodings
 
 from yp_test import support
 
+# Extra assurance that we're not accidentally testing Python's types...unless we mean to
+_str = str
+def bytes( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytes here" )
+def bytearray( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytearray here" )
+def str( *args, **kwargs ): raise NotImplementedError( "convert script to yp_str here" )
+
 if sys.platform == 'win32':
     VISTA_OR_LATER = (sys.getwindowsversion().major >= 6)
 else:
@@ -1027,7 +1033,7 @@ class UTF8SigTest(UTF8Test, yp_unittest.TestCase):
 
     def test_bug1601501(self):
         # SF bug #1601501: check that the codec works with a buffer
-        self.assertEqual(str(b"\xef\xbb\xbf", "utf-8-sig"), "")
+        self.assertEqual(yp_str(b"\xef\xbb\xbf", "utf-8-sig"), "")
 
     def test_bom(self):
         d = codecs.getincrementaldecoder("utf-8-sig")()
@@ -1256,8 +1262,8 @@ class PunycodeTest(yp_unittest.TestCase):
             # lower is also insufficient, since some of the input characters
             # are upper case.
             self.assertEqual(
-                str(uni.encode("punycode"), "ascii").lower(),
-                str(puny, "ascii").lower()
+                yp_str(uni.encode("punycode"), "ascii").lower(),
+                yp_str(puny, "ascii").lower()
             )
 
     def test_decode(self):
@@ -1504,23 +1510,23 @@ class NameprepTest(yp_unittest.TestCase):
                 # Skipped
                 continue
             # The Unicode strings are given in UTF-8
-            orig = str(orig, "utf-8", "surrogatepass")
+            orig = yp_str(orig, "utf-8", "surrogatepass")
             if prepped is None:
                 # Input contains prohibited characters
                 self.assertRaises(UnicodeError, nameprep, orig)
             else:
-                prepped = str(prepped, "utf-8", "surrogatepass")
+                prepped = yp_str(prepped, "utf-8", "surrogatepass")
                 try:
                     self.assertEqual(nameprep(orig), prepped)
                 except Exception as e:
-                    raise support.TestFailed("Test 3.%d: %s" % (pos+1, str(e)))
+                    raise support.TestFailed("Test 3.%d: %s" % (pos+1, yp_str(e)))
 
 class IDNACodecTest(yp_unittest.TestCase):
     def test_builtin_decode(self):
-        self.assertEqual(str(b"python.org", "idna"), "python.org")
-        self.assertEqual(str(b"python.org.", "idna"), "python.org.")
-        self.assertEqual(str(b"xn--pythn-mua.org", "idna"), "pyth\xf6n.org")
-        self.assertEqual(str(b"xn--pythn-mua.org.", "idna"), "pyth\xf6n.org.")
+        self.assertEqual(yp_str(b"python.org", "idna"), "python.org")
+        self.assertEqual(yp_str(b"python.org.", "idna"), "python.org.")
+        self.assertEqual(yp_str(b"xn--pythn-mua.org", "idna"), "pyth\xf6n.org")
+        self.assertEqual(yp_str(b"xn--pythn-mua.org.", "idna"), "pyth\xf6n.org.")
 
     def test_builtin_encode(self):
         self.assertEqual("python.org".encode("idna"), b"python.org")
@@ -2232,7 +2238,7 @@ class UnicodeEscapeTest(yp_unittest.TestCase):
         check(b"[\\\n]", "[]")
         check(br'[\"]', '["]')
         check(br"[\']", "[']")
-        check(br"[\\]", r"[\]")
+        check(br"[\\]", "[\\]")
         check(br"[\a]", "[\x07]")
         check(br"[\b]", "[\x08]")
         check(br"[\t]", "[\x09]")
@@ -2601,7 +2607,7 @@ class ExceptionChainingTest(yp_unittest.TestCase):
         # We also make sure we use a truly unique id for the custom codec
         # to avoid issues with the codec cache when running these tests
         # multiple times (e.g. when hunting for refleaks)
-        unique_id = repr(self) + str(id(self))
+        unique_id = repr(self) + yp_str(id(self))
         self.codec_name = encodings.normalize_encoding(unique_id).lower()
 
         # We store the object to raise on the instance because of a bad
