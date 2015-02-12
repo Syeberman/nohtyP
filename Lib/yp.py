@@ -1530,13 +1530,7 @@ class yp_iter( ypObject ):
         if isinstance( object, ypObject ): return _yp_iter( object )
         if isinstance( object, (_setlike_dictview, _values_dictview) ): return iter( object )
 
-        lenhint = NotImplemented
-        try: lenhint = len( object )
-        except TypeError:
-            if hasattr( object, "__length_hint__" ):
-                try: lenhint = int( object.__length_hint__( ) )
-                except TypeError: pass
-        if lenhint == NotImplemented: lenhint = 0 # if all else fails...
+        lenhint = operator.length_hint( object )
         self = super( ).__new__( cls )
         self._pyiter = iter( object )
         self._pycallback = c_yp_generator_func_t( self._pygenerator_func )

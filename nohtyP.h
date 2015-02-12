@@ -502,6 +502,7 @@ ypAPI ypObject *yp_throw( ypObject **iterator, ypObject *exc );
 // on the underlying type: most containers know their lengths exactly, but some generators may not.
 // A hint of zero could mean that the iterator is exhausted, that the length is unknown, or that
 // the iterator will yield infinite values.  Returns zero and sets *exc on error.
+// TODO Python now has operator.length_hint that accepts a default=0 value to return
 ypAPI yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 
 // Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the

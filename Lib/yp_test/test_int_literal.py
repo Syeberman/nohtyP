@@ -6,6 +6,7 @@ This is complex because of changes due to PEP 237.
 from yp_test import yp_unittest
 from yp_test import support
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestHexOctBin(yp_unittest.TestCase):
 
     def test_hex_baseline(self):
