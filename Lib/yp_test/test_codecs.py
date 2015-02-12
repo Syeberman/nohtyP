@@ -1,3 +1,4 @@
+from yp import *
 import codecs
 import contextlib
 import io
@@ -86,6 +87,7 @@ class MixInCheckStateHandling:
             part2 = d.encode(u[i:], True)
             self.assertEqual(s, part1+part2)
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class ReadTest(MixInCheckStateHandling):
     def check_partial(self, input, partialresults):
         # get a StreamReader for the encoding and feed the bytestring version
@@ -383,6 +385,7 @@ class ReadTest(MixInCheckStateHandling):
             self.assertEqual(test_sequence.decode(self.encoding, "replace"),
                              before + self.ill_formed_sequence_replace + after)
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF32Test(ReadTest, yp_unittest.TestCase):
     encoding = "utf-32"
     if sys.byteorder == 'little':
@@ -478,6 +481,7 @@ class UTF32Test(ReadTest, yp_unittest.TestCase):
         self.assertEqual('\U00010000' * 1024,
                          codecs.utf_32_decode(encoded_be)[0])
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF32LETest(ReadTest, yp_unittest.TestCase):
     encoding = "utf-32-le"
     ill_formed_sequence = b"\x80\xdc\x00\x00"
@@ -523,6 +527,7 @@ class UTF32LETest(ReadTest, yp_unittest.TestCase):
         self.assertEqual('\U00010000' * 1024,
                          codecs.utf_32_le_decode(encoded)[0])
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF32BETest(ReadTest, yp_unittest.TestCase):
     encoding = "utf-32-be"
     ill_formed_sequence = b"\x00\x00\xdc\x80"
@@ -569,6 +574,7 @@ class UTF32BETest(ReadTest, yp_unittest.TestCase):
                          codecs.utf_32_be_decode(encoded)[0])
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF16Test(ReadTest, yp_unittest.TestCase):
     encoding = "utf-16"
     if sys.byteorder == 'little':
@@ -655,6 +661,7 @@ class UTF16Test(ReadTest, yp_unittest.TestCase):
         with reader:
             self.assertEqual(reader.read(), s1)
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF16LETest(ReadTest, yp_unittest.TestCase):
     encoding = "utf-16-le"
     ill_formed_sequence = b"\x80\xdc"
@@ -699,6 +706,7 @@ class UTF16LETest(ReadTest, yp_unittest.TestCase):
         self.assertEqual(b'\x00\xd8\x03\xde'.decode(self.encoding),
                          "\U00010203")
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF16BETest(ReadTest, yp_unittest.TestCase):
     encoding = "utf-16-be"
     ill_formed_sequence = b"\xdc\x80"
@@ -799,6 +807,7 @@ class UTF8Test(ReadTest, yp_unittest.TestCase):
 
 @yp_unittest.skipUnless(sys.platform == 'win32',
                      'cp65001 is a Windows-only codec')
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class CP65001Test(ReadTest, yp_unittest.TestCase):
     encoding = "cp65001"
 
@@ -901,6 +910,7 @@ class CP65001Test(ReadTest, yp_unittest.TestCase):
                       "support partial decoder yet")
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF7Test(ReadTest, yp_unittest.TestCase):
     encoding = "utf-7"
 
@@ -976,6 +986,7 @@ class UTF7Test(ReadTest, yp_unittest.TestCase):
     test_lone_surrogates = None
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF16ExTest(yp_unittest.TestCase):
 
     def test_errors(self):
@@ -984,6 +995,7 @@ class UTF16ExTest(yp_unittest.TestCase):
     def test_bad_args(self):
         self.assertRaises(TypeError, codecs.utf_16_ex_decode)
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class ReadBufferTest(yp_unittest.TestCase):
 
     def test_array(self):
@@ -1000,6 +1012,7 @@ class ReadBufferTest(yp_unittest.TestCase):
         self.assertRaises(TypeError, codecs.readbuffer_encode)
         self.assertRaises(TypeError, codecs.readbuffer_encode, 42)
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UTF8SigTest(UTF8Test, yp_unittest.TestCase):
     encoding = "utf-8-sig"
 
@@ -1033,7 +1046,7 @@ class UTF8SigTest(UTF8Test, yp_unittest.TestCase):
 
     def test_bug1601501(self):
         # SF bug #1601501: check that the codec works with a buffer
-        self.assertEqual(yp_str(b"\xef\xbb\xbf", "utf-8-sig"), "")
+        self.assertEqual(str(b"\xef\xbb\xbf", "utf-8-sig"), "")
 
     def test_bom(self):
         d = codecs.getincrementaldecoder("utf-8-sig")()
@@ -1084,6 +1097,7 @@ class UTF8SigTest(UTF8Test, yp_unittest.TestCase):
             got = ostream.getvalue()
             self.assertEqual(got, unistring)
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class EscapeDecodeTest(yp_unittest.TestCase):
     def test_empty(self):
         self.assertEqual(codecs.escape_decode(b""), (b"", 0))
@@ -1136,6 +1150,7 @@ class EscapeDecodeTest(yp_unittest.TestCase):
         self.assertEqual(decode(br"[\x0]\x0", "ignore"), (b"[]", 8))
         self.assertEqual(decode(br"[\x0]\x0", "replace"), (b"[?]?", 8))
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class RecodingTest(yp_unittest.TestCase):
     def test_recoding(self):
         f = io.BytesIO()
@@ -1253,6 +1268,7 @@ for i in punycode_testcases:
     if len(i)!=2:
         print(repr(i))
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class PunycodeTest(yp_unittest.TestCase):
     def test_encode(self):
         for uni, puny in punycode_testcases:
@@ -1262,8 +1278,8 @@ class PunycodeTest(yp_unittest.TestCase):
             # lower is also insufficient, since some of the input characters
             # are upper case.
             self.assertEqual(
-                yp_str(uni.encode("punycode"), "ascii").lower(),
-                yp_str(puny, "ascii").lower()
+                str(uni.encode("punycode"), "ascii").lower(),
+                str(puny, "ascii").lower()
             )
 
     def test_decode(self):
@@ -1272,6 +1288,7 @@ class PunycodeTest(yp_unittest.TestCase):
             puny = puny.decode("ascii").encode("ascii")
             self.assertEqual(uni, puny.decode("punycode"))
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UnicodeInternalTest(yp_unittest.TestCase):
     @yp_unittest.skipUnless(SIZEOF_WCHAR_T == 4, 'specific to 32-bit wchar_t')
     def test_bug1251300(self):
@@ -1502,6 +1519,7 @@ nameprep_tests = [
     ]
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class NameprepTest(yp_unittest.TestCase):
     def test_nameprep(self):
         from encodings.idna import nameprep
@@ -1510,23 +1528,24 @@ class NameprepTest(yp_unittest.TestCase):
                 # Skipped
                 continue
             # The Unicode strings are given in UTF-8
-            orig = yp_str(orig, "utf-8", "surrogatepass")
+            orig = str(orig, "utf-8", "surrogatepass")
             if prepped is None:
                 # Input contains prohibited characters
                 self.assertRaises(UnicodeError, nameprep, orig)
             else:
-                prepped = yp_str(prepped, "utf-8", "surrogatepass")
+                prepped = str(prepped, "utf-8", "surrogatepass")
                 try:
                     self.assertEqual(nameprep(orig), prepped)
                 except Exception as e:
-                    raise support.TestFailed("Test 3.%d: %s" % (pos+1, yp_str(e)))
+                    raise support.TestFailed("Test 3.%d: %s" % (pos+1, str(e)))
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class IDNACodecTest(yp_unittest.TestCase):
     def test_builtin_decode(self):
-        self.assertEqual(yp_str(b"python.org", "idna"), "python.org")
-        self.assertEqual(yp_str(b"python.org.", "idna"), "python.org.")
-        self.assertEqual(yp_str(b"xn--pythn-mua.org", "idna"), "pyth\xf6n.org")
-        self.assertEqual(yp_str(b"xn--pythn-mua.org.", "idna"), "pyth\xf6n.org.")
+        self.assertEqual(str(b"python.org", "idna"), "python.org")
+        self.assertEqual(str(b"python.org.", "idna"), "python.org.")
+        self.assertEqual(str(b"xn--pythn-mua.org", "idna"), "pyth\xf6n.org")
+        self.assertEqual(str(b"xn--pythn-mua.org.", "idna"), "pyth\xf6n.org.")
 
     def test_builtin_encode(self):
         self.assertEqual("python.org".encode("idna"), b"python.org")
@@ -1597,6 +1616,7 @@ class IDNACodecTest(yp_unittest.TestCase):
         self.assertEqual(encoder.encode("ample.org."), b"xn--xample-9ta.org.")
         self.assertEqual(encoder.encode("", True), b"")
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class CodecsModuleTest(yp_unittest.TestCase):
 
     def test_decode(self):
@@ -1652,6 +1672,7 @@ class CodecsModuleTest(yp_unittest.TestCase):
         c = codecs.lookup('ASCII')
         self.assertEqual(c.name, 'ascii')
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class StreamReaderTest(yp_unittest.TestCase):
 
     def setUp(self):
@@ -1662,6 +1683,7 @@ class StreamReaderTest(yp_unittest.TestCase):
         f = self.reader(self.stream)
         self.assertEqual(f.readlines(), ['\ud55c\n', '\uae00'])
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class EncodedFileTest(yp_unittest.TestCase):
 
     def test_basic(self):
@@ -1793,6 +1815,7 @@ broken_incremental_coders = broken_unicode_with_streams + [
     "idna",
 ]
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class BasicUnicodeTest(yp_unittest.TestCase, MixInCheckStateHandling):
     def test_basics(self):
         s = "abc123"  # all codecs should be able to encode these
@@ -1955,6 +1978,7 @@ class BasicUnicodeTest(yp_unittest.TestCase, MixInCheckStateHandling):
                 self.check_state_handling_decode(encoding, u, u.encode(encoding))
                 self.check_state_handling_encode(encoding, u, u.encode(encoding))
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class CharmapTest(yp_unittest.TestCase):
     def test_decode_with_string_map(self):
         self.assertEqual(
@@ -2150,6 +2174,7 @@ class CharmapTest(yp_unittest.TestCase):
         )
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class WithStmtTest(yp_unittest.TestCase):
     def test_encodedfile(self):
         f = io.BytesIO(b"\xc3\xbc")
@@ -2163,6 +2188,7 @@ class WithStmtTest(yp_unittest.TestCase):
                                        info.streamwriter, 'strict') as srw:
             self.assertEqual(srw.read(), "\xfc")
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class TypesTest(yp_unittest.TestCase):
     def test_decode_unicode(self):
         # Most decoders don't accept unicode input
@@ -2200,6 +2226,7 @@ class TypesTest(yp_unittest.TestCase):
         self.assertEqual(codecs.raw_unicode_escape_decode(r"\U00110000", "replace"), ("\ufffd", 10))
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class UnicodeEscapeTest(yp_unittest.TestCase):
     def test_empty(self):
         self.assertEqual(codecs.unicode_escape_encode(""), (b"", 0))
@@ -2278,6 +2305,7 @@ class UnicodeEscapeTest(yp_unittest.TestCase):
         self.assertEqual(decode(br"\U00110000", "replace"), ("\ufffd", 10))
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class RawUnicodeEscapeTest(yp_unittest.TestCase):
     def test_empty(self):
         self.assertEqual(codecs.raw_unicode_escape_encode(""), (b"", 0))
@@ -2328,6 +2356,7 @@ class RawUnicodeEscapeTest(yp_unittest.TestCase):
         self.assertEqual(decode(br"\U00110000", "replace"), ("\ufffd", 10))
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class SurrogateEscapeTest(yp_unittest.TestCase):
 
     def test_utf8(self):
@@ -2362,6 +2391,7 @@ class SurrogateEscapeTest(yp_unittest.TestCase):
                          b"\xe4\xeb\xef\xf6\xfc")
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class BomTest(yp_unittest.TestCase):
     def test_seek0(self):
         data = "1234567890"
@@ -2449,6 +2479,7 @@ else:
     bytes_transform_encodings.append("bz2_codec")
     transform_aliases["bz2_codec"] = ["bz2"]
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class TransformCodecTest(yp_unittest.TestCase):
 
     def test_basics(self):
@@ -2596,6 +2627,7 @@ except ImportError:
         pass
 
 
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class ExceptionChainingTest(yp_unittest.TestCase):
 
     def setUp(self):
@@ -2607,7 +2639,7 @@ class ExceptionChainingTest(yp_unittest.TestCase):
         # We also make sure we use a truly unique id for the custom codec
         # to avoid issues with the codec cache when running these tests
         # multiple times (e.g. when hunting for refleaks)
-        unique_id = repr(self) + yp_str(id(self))
+        unique_id = repr(self) + str(id(self))
         self.codec_name = encodings.normalize_encoding(unique_id).lower()
 
         # We store the object to raise on the instance because of a bad
@@ -2760,6 +2792,7 @@ class ExceptionChainingTest(yp_unittest.TestCase):
 
 @yp_unittest.skipUnless(sys.platform == 'win32',
                      'code pages are specific to Windows')
+@yp_unittest.skip( "TODO: convert to yp.py" )
 class CodePageTest(yp_unittest.TestCase):
     # CP_UTF8 is already tested by CP65001Test
     CP_UTF8 = 65001
