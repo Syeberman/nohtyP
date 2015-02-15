@@ -11,6 +11,10 @@
 // TODO A flag on (immutable) objects to verify the stored hash.  Flag is set when internal pointers
 // are returned (think yp_asencodedCX), then verified/cleared when yp_hash/currenthash is called
 // again.  Provides a safeguard against this internal data being modified.
+// TODO Implement array datatype (I don't think struct is needed though)
+// TODO Similarly to array, implement an "intset" datatype that stores ints as bitmasks; use the
+// same typecodes as array/struct.  i.e. storing 63 sets bit 1u<<63.  Like array, don't have to
+// interoperate with two different typecodes, but do have to work with generic Python containers
 
 #include "nohtyP.h"
 #include <stdlib.h>
@@ -455,6 +459,9 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE_matches );
         *name ## _objproc \
     } };
 DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for use in methods the type doesn't support
+// TODO A yp_ImmutableTypeError, subexception of yp_TypeError, for methods that are supported only
+// by the mutable version.  Then, add a debug yp_initialize assert to ensure all type tables uses
+// this appropriately.
 DEFINE_GENERIC_METHODS( TypeError, yp_TypeError );
 DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for use by Invalidated objects
 DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for use by exception objects; returns "self"
@@ -1239,7 +1246,7 @@ static void *_ypMem_realloc_container_variable(
     void *oldptr;
     yp_ssize_t size;
     yp_ssize_t extra_size;
-    yp_ssize_t alloclen; 
+    yp_ssize_t alloclen;
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, elemsize );
 
@@ -4384,13 +4391,13 @@ yp_hash_t yp_ashashC( ypObject *x, ypObject **exc ) {
 #endif
 
 // TODO Make this a public API?
-// Similar to yp_int and yp_asintC, but raises yp_ArithmeticError rather than truncating a float
+// Similar to yp_int and yp_asintC, but raises yp_ArithmeticError rather than truncating a float 
 // toward zero.  An important property is that yp_int_exact(x) will equal x.
 // XXX Inspired by Python's Decimal.to_integral_exact; yp_ArithmeticError may be replaced with a
 // more-specific sub-exception in the future
 // ypObject *yp_int_exact( ypObject *x );
 static yp_int_t yp_asint_exactLF( yp_float_t x, ypObject **exc );
-static yp_int_t yp_asint_exactC( ypObject *x, ypObject **exc )
+static yp_int_t yp_asint_exactC( ypObject *x, ypObject **exc ) 
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
 
@@ -8555,7 +8562,6 @@ static ypObject *str_le( ypObject *s, ypObject *x ) {
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     if( ypStringLib_ENC_CODE( x ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) <= 0 );
-
 }
 static ypObject *str_ge( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_True;
@@ -9251,7 +9257,6 @@ typedef struct {
     ypObject_HEAD
     yp_INLINE_DATA( ypObject * );
 } ypTupleObject;
-
 #define ypTuple_ARRAY( sq )         ( (ypObject **) ((ypObject *)sq)->ob_data )
 #define ypTuple_LEN                 ypObject_CACHED_LEN
 #define ypTuple_SET_LEN             ypObject_SET_CACHED_LEN
@@ -12204,6 +12209,9 @@ static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
     ypObject *other_value;
     ypObject *result;
 
+    // TODO If mp is empty, then we can clear mp, use other's keyset, and memcpy the array of
+    // values.
+
     for( i = 0; valuesleft > 0; i++ ) {
         other_value = ypDict_VALUES( other )[i];
         if( other_value == NULL ) continue;
@@ -12557,7 +12565,7 @@ static ypObject *dict_updateK( ypObject *mp, int n, va_list args )
     ypObject *value;
 
     while( n > 0 ) {
-        key = va_arg( args, ypObject * );   // borrowed
+        key = va_arg( args, ypObject * ); // borrowed
         value = va_arg( args, ypObject * ); // borrowed
         n -= 1;
         result = _ypDict_push( mp, key, value, 1, &spaceleft, n );
@@ -13082,7 +13090,7 @@ static ypRangeObject _yp_range_empty_struct = {
 
 // Determines the index in r for the given object x, or -1 if it isn't in the range
 // XXX If using *index as an actual index, ensure it doesn't overflow yp_ssize_t
-static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_ssize_t *index )
+static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_ssize_t *index ) 
 {
     ypObject *exc = yp_None;
     yp_int_t r_end;
@@ -13163,7 +13171,7 @@ static ypObject *range_getslice( ypObject *r, yp_ssize_t start, yp_ssize_t stop,
 
     result = ypSlice_AdjustIndicesC( ypRange_LEN( r ), &start, &stop, &step, &newR_len );
     if( yp_isexceptionC( result ) ) return result;
-
+    
     if( newR_len < 1 ) return _yp_range_empty;
     newR = ypMem_MALLOC_FIXED( ypRangeObject, ypRange_CODE );
     if( yp_isexceptionC( newR ) ) return newR;
