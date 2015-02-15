@@ -502,7 +502,6 @@ ypAPI ypObject *yp_throw( ypObject **iterator, ypObject *exc );
 // on the underlying type: most containers know their lengths exactly, but some generators may not.
 // A hint of zero could mean that the iterator is exhausted, that the length is unknown, or that
 // the iterator will yield infinite values.  Returns zero and sets *exc on error.
-// TODO Python now has operator.length_hint that accepts a default=0 value to return
 ypAPI yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
 
 // Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
@@ -1121,9 +1120,6 @@ ypAPI ypObject *yp_decode( ypObject *b );
 // Returns a new reference to the result of the string formatting operation.  s can contain literal
 // text or replacement fields delimited by braces ("{" and "}").  Each replacement field contains
 // the numeric index of a positional argument.
-// TODO No need to make a tuple.  Assume that most format args are in order.  Do a va_copy of args,
-// and a va_arg to advance to proper index; if index is lower than previously, then va_end/va_copy
-// from original args to restart index.
 ypAPI ypObject *yp_formatN( ypObject *s, int n, ... );
 ypAPI ypObject *yp_formatNV( ypObject *s, int n, va_list args );
 
@@ -1511,14 +1507,14 @@ ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssi
 
 
 /*
- * Immortal "Constructors"
+ * Immortal "Constructor" Macros
  */
 
-// Defines an immortal int constant at compile-time, which can be accessed by the variable name,
+// Defines an immortal int object at compile-time, which can be accessed by the variable name,
 // which is of type "ypObject * const".  value is a (constant) yp_int_t.  To be used as:
 //      yp_IMMORTAL_INT( name, value );
 
-// Defines an immortal bytes constant at compile-time, which can be accessed by the variable name,
+// Defines an immortal bytes object at compile-time, which can be accessed by the variable name,
 // which is of type "ypObject * const".  value is a C string literal that can contain null bytes.
 // The length is calculated while compiling; the hash will be calculated the first time it is
 // accessed.  To be used as:
@@ -1527,8 +1523,18 @@ ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssi
 // Defines an immortal str constant at compile-time, which can be accessed by the variable name,
 // which is of type "ypObject * const".  value is a latin-1 encoded C string literal that can
 // contain null characters.  The length is calculated while compiling; the hash will be calculated
-// the first time it is accessed.  Note that latin-1 is compatible with an ascii-encoded value.
+// the first time it is accessed.  Note that this also accepts an ascii-encoded C string literal,
+// as latin-1 is a superset of ascii.
 //      yp_IMMORTAL_STR_LATIN_1( name, value );
+
+// The default immortal "constructor" macros declare variables as "ypObject * const".  This means
+// imortals defined outside of a function will be extern.  It also means you should *not* 
+// use these macros in a function, as the variable will be deallocated when the function returns, 
+// and immortals should never be deallocated.  The following macros work as above, except the 
+// variables are declared as "static ypObject * const".
+//      yp_IMMORTAL_INT_static( name, value );
+//      yp_IMMORTAL_BYTES_static( name, value );
+//      yp_IMMORTAL_STR_LATIN_1_static( name, value );
 
 
 /*
@@ -1796,9 +1802,6 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 //  a.startswith( b, 2, 7 ) --> yp4( a,startswith4, b, 2, 7 )   --> yp_startswith4( a, b, 2, 7 )
 #endif
 
-// TODO A macro to get exception info as a string, include file/line info of the place the macro is
-// checked
-
 
 /*
  * Internals  XXX Do not use directly!
@@ -1806,11 +1809,6 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts repurpose ob_alloclen to hold a search finger for popitem
-// TODO what do we gain by caching the hash?  We already jump through hoops to use the hash
-// stored in the hash table where possible.
-// TODO Is there a way to reduce the size of type+refcnt+len+alloclen to 64 bits, without hitting
-// potential performance issues?
-// TODO Do like Python and have just type+refcnt for non-containers
 typedef yp_int32_t _yp_ob_len_t;
 struct _ypObject {
     yp_uint16_t     ob_type;        // type code
@@ -1864,7 +1862,6 @@ struct _ypStrObject {
 #define _ypStr_CODE                 ( 18u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-// FIXME check that documentation makes clear that, as local variables, it's all the same obj under
 #define _yp_IMMORTAL_HEAD_INIT( type, type_flags, data, len ) \
     { type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, \
       len, _ypObject_LEN_INVALID, _ypObject_HASH_INVALID, data }
@@ -1891,7 +1888,6 @@ struct _ypStrObject {
 #define yp_IMMORTAL_BYTES( name, value )        _yp_IMMORTAL_BYTES( _yp_NOQUAL, name, value )
 #define yp_IMMORTAL_STR_LATIN_1( name, value )  _yp_IMMORTAL_STR_LATIN_1( _yp_NOQUAL, name, value )
 
-// TODO document above
 #define yp_IMMORTAL_INT_static( name, value )          _yp_IMMORTAL_INT( static, name, value )
 #define yp_IMMORTAL_BYTES_static( name, value )        _yp_IMMORTAL_BYTES( static, name, value )
 #define yp_IMMORTAL_STR_LATIN_1_static( name, value )  _yp_IMMORTAL_STR_LATIN_1( static, name, value )
