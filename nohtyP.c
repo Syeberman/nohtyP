@@ -15,6 +15,12 @@
 // TODO Similarly to array, implement an "intset" datatype that stores ints as bitmasks; use the
 // same typecodes as array/struct.  i.e. storing 63 sets bit 1u<<63.  Like array, don't have to
 // interoperate with two different typecodes, but do have to work with generic Python containers
+// TODO what do we gain by caching the hash?  We already jump through hoops to use the hash
+// stored in the hash table where possible.
+// TODO Is there a way to reduce the size of type+refcnt+len+alloclen to 64 bits, without hitting
+// potential performance issues?
+// TODO Do like Python and have just type+refcnt for non-containers
+// TODO Python now has operator.length_hint that accepts a default=0 value to return
 
 #include "nohtyP.h"
 #include <stdlib.h>
@@ -2699,6 +2705,9 @@ static ypTypeObject ypInvalidated_Type = {
 /*************************************************************************************************
  * Exceptions
  *************************************************************************************************/
+
+// TODO A nohtyP.h macro to get exception info as a string, include file/line info of the place 
+// the macro is checked.  Something to make reporting exceptions easier for the user of nohtyP.
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 typedef struct {
