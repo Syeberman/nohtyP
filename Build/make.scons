@@ -1,4 +1,4 @@
-import os, os.path, itertools, traceback
+import os, os.path, itertools, traceback, platform
 import SCons.Errors
 
 # FIXME support scons -h for build options
@@ -93,15 +93,16 @@ compiler_names = ("msvs_120", "gcc_48", "msvs_110", "msvs_100", "msvs_90")
 oses = ("win32", )
 archs = ("amd64", "x86")
 # TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
-# lint agains the compiler's headers
+# lint against the compiler's headers
 configurations = ("release", "debug")
 
 native_os = rootEnv["PLATFORM"]
-# TODO HOST_ARCH not supported outside of Windows
-if rootEnv["HOST_ARCH"] == "x86_64":
+# TODO rootEnv["HOST_ARCH"]not supported outside of Windows
+host_arch = rootEnv["HOST_ARCH"] or platform.machine()
+if host_arch == "x86_64":
     native_archs = ("amd64", "x86")
 else:
-    native_archs = (rootEnv["HOST_ARCH"], )
+    native_archs = (host_arch, )
 
 # The native targets ("debug", "release", etc) should each copy files from a single variant
 nativeTargetsToCreate = set( ("release", "debug") )
