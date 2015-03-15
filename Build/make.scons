@@ -37,7 +37,7 @@ def nohtyP_yp_test( env, sharedLib ):
 # TODO Hidden on Windows
 sconscriptLog = open( "Build/.sconscript.log", "w" )
 mscommonLog_path = "Build/.mscommon.log"
-os.remove( mscommonLog_path )
+with open( mscommonLog_path, "w" ): pass    # clears the file
 os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath( mscommonLog_path )
 
 # Command-line build variables
