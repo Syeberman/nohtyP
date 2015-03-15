@@ -52,8 +52,11 @@ if vars_unknown: Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
 
 # Require that construction variable names exist at expansion, then add those allowed to be empty
 AllowSubstExceptions( )
-rootEnv.Replace( CPPFLAGS=[], SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", LIBPATH=[], PCH="",
-        WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="" )
+rootEnv.Replace( CPPFLAGS=[], SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", 
+        LIBPATH=[], PCH="",
+        WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="",
+        RPATH=[],
+        )
 
 # Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory
 rootEnv.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
