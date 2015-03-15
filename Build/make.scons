@@ -90,7 +90,7 @@ rootEnv["SITE_TOOLS"] = siteToolsFunction # a function so Clone doesn't deepcopy
 # "native" (ie the default target)
 # TODO Allow the user to specify what the "native" target should be
 compiler_names = ("msvs_120", "gcc_48", "msvs_110", "msvs_100", "msvs_90")
-oses = ("win32", )
+oses = ("win32", "posix")
 archs = ("amd64", "x86")
 # TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
 # lint against the compiler's headers
