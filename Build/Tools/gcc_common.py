@@ -120,7 +120,7 @@ def _updateCcEmitters( env ):
 def _linkEmitter( target, source, env ):
     t_base, t_ext = os.path.splitext( target[0].path )
     # TODO Remove these asserts once we've gotten this right
-    assert t_ext in (".dll", ".exe")
+    assert t_ext in (".dll", ".exe", ".so", ".", ""), target[0].path
     for ext in (".map", ): env.Clean( target[0], t_base+ext )
     return target, source
 def _updateLinkEmitters( env, version ):
