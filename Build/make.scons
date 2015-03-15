@@ -36,7 +36,9 @@ def nohtyP_yp_test( env, sharedLib ):
 # Logs for SCons- and script-related warnings that can usually be ignored
 # TODO Hidden on Windows
 sconscriptLog = open( "Build/.sconscript.log", "w" )
-os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath( "Build/.mscommon.log" )
+mscommonLog_path = "Build/.mscommon.log"
+os.remove( mscommonLog_path )
+os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath( mscommonLog_path )
 
 # Command-line build variables
 vars = Variables( None )
