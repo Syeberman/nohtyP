@@ -111,13 +111,25 @@ nativeTargetsToCreate = set( ("release", "debug") )
 python_min33 = Tool( "python_min33", toolpath=["Build/Tools", ] )
 pclint = Tool( "pclint", toolpath=["Build/Tools", ] )
 
+sconscriptLog.write( """
+Native OS: {native_os}
+Host Arch: {host_arch}
+Native Arches: {native_archs}
+""".format( **locals() )
+)
+
 for compiler_name in compiler_names:
     compiler = Tool( compiler_name, toolpath=["Build/Tools", ] )
-    if not compiler.exists( rootEnv ): continue
+    if not compiler.exists( rootEnv ): 
+        sconscriptLog.write( "\nCompiler doesn't exist: {}\n".format( compiler_name ) )
+        continue
 
     for targ_os, targ_arch, configuration in itertools.product( oses, archs, configurations ):
         # TODO Support cross-compiling OSes, if possible
         if targ_os != native_os: continue
+
+        sconscriptLog.write( 
+            "\n{compiler_name} {targ_os} {targ_arch} {configuration}\n".format( **locals() ) )
 
         # Maintain a separate directory for intermediate and target files, but don't copy files
         variantEnv = rootEnv.Clone( COMPILER=compiler,
