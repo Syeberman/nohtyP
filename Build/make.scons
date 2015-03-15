@@ -67,6 +67,10 @@ rootEnv["ENV"]["COMSPEC"] = "cmd.exe"
 # TODO Scripts to update version numbers in source, build scripts, etc
 rootEnv.Replace( NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0 )
 
+# TODO These Scons environment variables should be cross-platform, not Windows-only
+if not rootEnv["HOST_OS"]: rootEnv["HOST_OS"] = rootEnv["PLATFORM"]
+if not rootEnv["HOST_ARCH"]: rootEnv["HOST_ARCH"] = platform.machine()
+
 
 # Site-specific tool configuration.  For some tools, this caches the results of lengthy
 # auto-detection; for other tools that don't have version-dependent auto-detect, this allows the
@@ -96,13 +100,11 @@ archs = ("amd64", "x86")
 # lint against the compiler's headers
 configurations = ("release", "debug")
 
-native_os = rootEnv["PLATFORM"]
-# TODO rootEnv["HOST_ARCH"]not supported outside of Windows
-host_arch = rootEnv["HOST_ARCH"] or platform.machine()
-if host_arch == "x86_64":
+native_os = rootEnv["HOST_OS"]
+if rootEnv["HOST_ARCH"] == "x86_64":
     native_archs = ("amd64", "x86")
 else:
-    native_archs = (host_arch, )
+    native_archs = (rootEnv["HOST_ARCH"], )
 
 # The native targets ("debug", "release", etc) should each copy files from a single variant
 nativeTargetsToCreate = set( ("release", "debug") )
@@ -113,7 +115,6 @@ pclint = Tool( "pclint", toolpath=["Build/Tools", ] )
 
 sconscriptLog.write( """
 Native OS: {native_os}
-Host Arch: {host_arch}
 Native Arches: {native_archs}
 """.format( **locals() )
 )
