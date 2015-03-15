@@ -105,7 +105,7 @@ def _ccEmitter( target, source, env, parent_emitter ):
     target, source = parent_emitter( target, source, env )
     # TODO Remove these asserts once we've gotten this right
     assert len( source ) == 1, source
-    assert os.path.splitext( target[0].path )[1] == ".o", target[0].path
+    assert os.path.splitext( target[0].path )[1] in (".o", ".os"), target[0].path
     s_base = os.path.splitext( source[0].path )[0]
     for ext in (".i", ".s"): env.Clean( target[0], s_base+ext )
     return target, source
