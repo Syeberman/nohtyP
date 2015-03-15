@@ -156,7 +156,7 @@ def ApplyGCCOptions( env, version ):
     if env["CONFIGURATION"] == "debug":
         addCcFlags(
                 # Disable (non-debuggable) optimizations
-                "-Og" if version > 4.8 else "-O0",
+                "-Og" if version >= 4.8 else "-O0",
                 # Runtime checks: int overflow, stack overflow,
                 "-ftrapv", "-fstack-check",
                 # Runtime check: buffer overflow (needs -fmudflap to linker)
@@ -197,7 +197,7 @@ def ApplyGCCOptions( env, version ):
     if env["CONFIGURATION"] == "debug":
         addLinkFlags(
                 # Disable (non-debuggable) optimizations
-                "-Og" if version > 4.8 else "-O0",
+                "-Og" if version >= 4.8 else "-O0",
                 # Runtime check: buffer overflow (needs -fmudflap* to compiler)
                 # TODO Not supported on MinGW/Windows, apparently
                 #"-fmudflap",
