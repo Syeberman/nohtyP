@@ -65,7 +65,7 @@
 #define _yp_ASSERT( s_file, s_line, expr, ... ) \
     do { \
         if( !(expr) ) { \
-            (void) _flushall( ); \
+            (void) fflush( NULL ); \
             fprintf( stderr, "%s", "\n  File " s_file ", line " s_line "\n    " #expr "\n" ); \
             fprintf( stderr, "yp_ASSERT: " __VA_ARGS__ ); \
             fprintf( stderr, "\n" ); \
@@ -90,8 +90,8 @@ static void yp_breakonerr( ypObject *err ) {
 #endif
 
 #if yp_DEBUG_LEVEL >= 10
-#define yp_DEBUG0( fmt ) do { (void) _flushall( ); fprintf( stderr, fmt "\n" ); (void) _flushall( ); } while( 0 )
-#define yp_DEBUG( fmt, ... ) do { (void) _flushall( ); fprintf( stderr, fmt "\n", __VA_ARGS__ ); (void) _flushall( ); } while( 0 )
+#define yp_DEBUG0( fmt ) do { (void) fflush( NULL ); fprintf( stderr, fmt "\n" ); (void) fflush( NULL ); } while( 0 )
+#define yp_DEBUG( fmt, ... ) do { (void) fflush( NULL ); fprintf( stderr, fmt "\n", __VA_ARGS__ ); (void) fflush( NULL ); } while( 0 )
 #else
 #define yp_DEBUG0( fmt )
 #define yp_DEBUG( fmt, ... )
