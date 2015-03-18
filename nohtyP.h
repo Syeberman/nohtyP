@@ -86,13 +86,18 @@ extern "C" {
 // required.  To link to nohtyP dynamically, first build nohtyP.c as a shared library with
 // yp_ENABLE_SHARED and yp_BUILD_CORE, then include nohtyP.h with yp_ENABLE_SHARED.
 #ifdef yp_ENABLE_SHARED
-#ifdef yp_BUILD_CORE
-#define ypAPI extern __declspec( dllexport )
-#else
-#define ypAPI extern __declspec( dllimport )
+    #if defined( _WIN32 )
+        #ifdef yp_BUILD_CORE
+            #define ypAPI extern __declspec( dllexport )
+        #else
+            #define ypAPI extern __declspec( dllimport )
+        #endif
+    #elif defined( __GNUC__ ) &&  __GNUC__ >= 4
+        #define ypAPI extern __attribute__(( visibility( "default" ) ))
+    #endif
 #endif
-#else
-#define ypAPI extern
+#ifndef ypAPI
+    #define ypAPI extern
 #endif
 
 
