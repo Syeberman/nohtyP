@@ -145,6 +145,8 @@ def ApplyGCCOptions( env, version ):
             # Disable some warnings
             # TODO maybe-uninitialized would be good during analyze
             "-Wno-unused", "-Wno-pointer-sign", "-Wno-maybe-uninitialized",
+            # For shared libraries, only expose functions explicitly marked ypAPI
+            "-fvisibility=hidden" if version >= 4.0 else "", 
             # Debugging information
             "-g3",
             # TODO Is there an /sdl or /GS equivalent for gcc?
