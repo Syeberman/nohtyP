@@ -9,15 +9,20 @@ import SCons.Warnings
 _platform_name = SCons.Platform.Platform( ).name
 if _platform_name in ("win32", "cygwin"):
     # Try some known, and unknown-but-logical, default locations for Python
-    _python_path_globs = (
-            "C:\\Python*\\",
-            "C:\\Program Files\\Python*",
-            "C:\\Program Files (x86)\\Python*",
-            )
-    _python_paths_found = [
-            pyDir for pattern in _python_path_globs for pyDir in glob.iglob( pattern ) ]
+    _python_dir_globs = (
+        "C:\\Python*",
+        "C:\\Program Files\\Python*",
+        "C:\\Program Files (x86)\\Python*",
+        )
+    _python_exe_globs = (
+        "python.exe",
+        )
 else:
-    _python_paths_found = []   # rely on the environment's path for now
+    _python_dir_globs = ()  # rely on the environment's path for now
+    _python_exe_globs = (
+        "python[0-9].[0-9]",
+        "python",
+        )
 
 
 def _arch2maxsize( targ_arch ):
@@ -56,17 +61,21 @@ def _test_python( python, targ_hexversions, targ_arch ):
 def _find( env, targ_hexversions ):
     """Find a python executable that can run our target's arch, returning the path or None.
     Picks the executable with the largest hexversion contained in targ_hexversions."""
-    pyDirs = list( os.environ.get( "PATH", "" ).split( os.pathsep ) )
-    pyDirs.extend( _python_paths_found )
-    pythons = []
-    for pyDir in pyDirs:
-        python = os.path.join( pyDir, "python" )
+    dir_globs = list( os.environ.get( "PATH", "" ).split( os.pathsep ) )
+    dir_globs.extend( _python_dir_globs )
+
+    python_globs = (os.path.join( dir, exe ) for exe in _python_exe_globs for dir in dir_globs)
+    pythons = (python for pattern in python_globs for python in glob.iglob( pattern ))
+
+    versions = []
+    for python in pythons:
         python_hexversion = _test_python( python, targ_hexversions, env["TARGET_ARCH"] )
         if python_hexversion is None: continue
-        pythons.append( (python_hexversion, python) )
-    if not pythons: return None
-    pythons.sort( )         # sort by hexversion
-    return pythons[-1][1]   # return the python path with the largest hexversion
+        versions.append( (python_hexversion, python) )
+
+    if not versions: return None
+    versions.sort( )         # sort by hexversion
+    return versions[-1][1]   # return the python path with the largest hexversion
 
 def DefinePythonToolFunctions( hexversions, tool_name ):
     """Returns (generate, exists), suitable for use as the SCons tool module functions.  
