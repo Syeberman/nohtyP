@@ -86,15 +86,18 @@ def _test_gcc( gcc, re_dumpversion, targ_os, targ_arch ):
     return gcc_cache[targ_arch]
 
 # TODO This, or something like it, should be in SCons
-def _find( env, re_dumpversion ):
+def _find( env, major, minor, re_dumpversion ):
     """Find a gcc executable that can build our target OS and arch, returning the path or None."""
     if env["TARGET_OS"] != env["HOST_OS"]: raise SCons.Errors.StopError( "not yet supporting cross-OS compile in GCC" )
     binDirs = list( os.environ.get( "PATH", "" ).split( os.pathsep ) )
     binDirs.extend( _gcc_paths_found )
+    staticExeName = "gcc-%d.%d" % (major, minor)
+    dynamicExeName = "gcc"
     for binDir in binDirs:
-        gcc = os.path.join( binDir, "gcc" )
-        supported = _test_gcc( gcc, re_dumpversion, env["TARGET_OS"], env["TARGET_ARCH"] )
-        if supported: return gcc
+        for exeName in (staticExeName, dynamicExeName):
+            gcc = os.path.join( binDir, exeName )
+            supported = _test_gcc( gcc, re_dumpversion, env["TARGET_OS"], env["TARGET_ARCH"] )
+            if supported: return gcc
     return None
 
 
@@ -228,7 +231,7 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
         # If site-tools.py came up empty, find a gcc that supports our target, then update 
         # site-tools.py
         if not gcc_path:
-            gcc_path = _find( env, re_dumpversion )
+            gcc_path = _find( env, major, minor, re_dumpversion )
             if not gcc_path:
                 raise SCons.Errors.StopError( "gcc %s.%s (%r) detection failed" % (major, minor, env["TARGET_ARCH"]) )
             siteTools_dict[gcc_siteName] = gcc_path
