@@ -238,11 +238,13 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
             with open( siteTools_name, "a" ) as outfile:
                 outfile.write( "%s = %r\n\n" % (gcc_siteName, gcc_path) )
 
-        # The tool (ie mingw) may helpfully try to autodetect and prepend to path...so make sure we
+        # The tool (ie mingw) may helpfully prepend to path and other variables...so make sure we
         # prepend *our* path after the tool does its thing
         # TODO Update SCons to skip autodetection when requested
         for tool in _tools: tool.generate( env )
         env.PrependENVPath( "PATH", os.path.dirname( gcc_path ) )
+        env["CC"] = os.path.basename( gcc_path )
+        del env["CXX"]  # TODO provide proper path when we need it
         if not env.WhereIs( "$CC" ):
             raise SCons.Errors.StopError( "gcc %s.%s (%r) configuration failed" % (major, minor, env["TARGET_ARCH"]) )
         def check_version( env, output ):
