@@ -93,8 +93,8 @@ def _find( env, major, minor, re_dumpversion ):
     binDirs.extend( _gcc_paths_found )
     staticExeName = "gcc-%d.%d" % (major, minor)
     dynamicExeName = "gcc"
-    for binDir in binDirs:
-        for exeName in (staticExeName, dynamicExeName):
+    for exeName in (staticExeName, dynamicExeName):
+        for binDir in binDirs:
             gcc = os.path.join( binDir, exeName )
             supported = _test_gcc( gcc, re_dumpversion, env["TARGET_OS"], env["TARGET_ARCH"] )
             if supported: return gcc
