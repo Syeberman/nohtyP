@@ -24,8 +24,10 @@ def nohtyP_SharedLibrary( env ):
     return env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
 
 def nohtyP_yp_test( env, sharedLib ):
+    sharedLibDir = Flatten( sharedLib )[0].get_dir( )
     env.PrependENVPath( "PYTHONPATH", "#/Lib" )
-    env.PrependENVPath( "PATH", Flatten( sharedLib )[0].get_dir( ) )
+    env.PrependENVPath( "PATH", sharedLibDir ) # Windows
+    env.PrependENVPath( "LD_LIBRARY_PATH", sharedLibDir ) # Linux
     scripts = ("#/Lib/yp.py", Glob("#/Lib/yp_test/*.py"), Glob("#/Lib/yp_test/*.txt"))
     testLog = env.Command( "$VTOP/yp_test.log", (sharedLib, scripts),
             "$PYTHON -m yp_test -v > $TARGET" )
