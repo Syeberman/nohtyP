@@ -12,7 +12,12 @@ from ctypes import *
 from ctypes import _SimpleCData
 import sys, weakref, operator, pickle, reprlib
 
-ypdll = cdll.nohtyP
+try:
+    # Ideally this would work everywhere
+    ypdll = cdll.nohtyP
+except OSError:
+    # Perhaps we're on Linux?
+    ypdll = CDLL( "libnohtyP.so" )
 
 # From the ctypes documentation...
 c_IN = 1
