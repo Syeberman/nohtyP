@@ -149,7 +149,7 @@ def ApplyGCCOptions( env, version ):
             # Disable some warnings
             # TODO maybe-uninitialized would be good during analyze
             "-Wno-unused", "-Wno-pointer-sign", 
-            "-Wno-maybe-uninitialized" if version >= 4.8 else "",
+            "-Wno-maybe-uninitialized" if version >= 4.8 else "-Wno-uninitialized",
             # For shared libraries, only expose functions explicitly marked ypAPI
             "-fvisibility=hidden" if version >= 4.0 else "",
             # Debugging information
