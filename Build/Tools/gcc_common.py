@@ -144,12 +144,14 @@ def ApplyGCCOptions( env, version ):
             "-Werror", "-Wall", "-Wsign-compare", "-Wundef", "-Wstrict-prototypes",
             "-Wmissing-prototypes", "-Wmissing-declarations", "-Wold-style-declaration",
             "-Wold-style-definition", "-Wmissing-parameter-type",
-            "-Wshadow",
+            # Before 4.8, -Wshadow warned if a declaration shadowed a function (index, div)
+            "-Wshadow" if version >= 4.8 else "",
             # Disable some warnings
             # TODO maybe-uninitialized would be good during analyze
-            "-Wno-unused", "-Wno-pointer-sign", "-Wno-maybe-uninitialized",
+            "-Wno-unused", "-Wno-pointer-sign", 
+            "-Wno-maybe-uninitialized" if version >= 4.8 else "",
             # For shared libraries, only expose functions explicitly marked ypAPI
-            "-fvisibility=hidden" if version >= 4.0 else "", 
+            "-fvisibility=hidden" if version >= 4.0 else "",
             # Debugging information
             "-g3",
             # TODO Is there an /sdl or /GS equivalent for gcc?
