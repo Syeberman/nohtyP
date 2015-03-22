@@ -76,6 +76,14 @@ rootEnv.Replace( NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0 )
 if not rootEnv["HOST_OS"]: rootEnv["HOST_OS"] = rootEnv["PLATFORM"]
 if not rootEnv["HOST_ARCH"]: rootEnv["HOST_ARCH"] = platform.machine()
 
+# Don't create empty aliases: ensures targets like "test" will fail if Python 3 isn't available
+_SCons_Alias = Alias
+def Alias( alias, targets=(), action=() ):
+    targets = Flatten( targets )
+    action = Flatten( action )
+    if not targets and not action: return alias
+    return _SCons_Alias( alias, targets, action )
+
 
 # Site-specific tool configuration.  For some tools, this caches the results of lengthy
 # auto-detection; for other tools that don't have version-dependent auto-detect, this allows the
@@ -193,5 +201,5 @@ for compiler_name in compiler_names:
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to 
 # build just the native targets
 if GetOption( "clean" ): Default( "#Build" )
-else: Default( Alias( "native" ) )
+else: Default( "native" )
 
