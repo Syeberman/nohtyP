@@ -114,8 +114,8 @@ else:
 # The native targets ("debug", "release", etc) should each copy files from a single variant
 nativeTargetsToCreate = set( ("release", "debug") )
 
-# yp_test requires at least Python 3.3; we don't care which PC-Lint version is used
-python_min33 = Tool( "python_min33", toolpath=["Build/Tools", ] )
+# yp_test requires at least Python 3.4; we don't care which PC-Lint version is used
+python_min34 = Tool( "python_min34", toolpath=["Build/Tools", ] )
 pclint = Tool( "pclint", toolpath=["Build/Tools", ] )
 
 sconscriptLog.write( """
@@ -162,7 +162,7 @@ for compiler_name in compiler_names:
             # of Python exists that can run against the target architecture.  Include sharedLib
             # in testTargets so that "testrelease" will pull them into the native directory.
             try: testTargets.extend( (
-                    nohtyP_yp_test( variantEnv.Clone( tools=[python_min33, ] ), sharedLib ),
+                    nohtyP_yp_test( variantEnv.Clone( tools=[python_min34, ] ), sharedLib ),
                     sharedLib ) )
             except (SCons.Errors.UserError, SCons.Errors.StopError):
                 traceback.print_exc( file=sconscriptLog )
