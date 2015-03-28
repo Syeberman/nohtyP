@@ -679,10 +679,10 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         myset >= myobj
         self.assertTrue(myobj.le_called)
 
-    # C API test only available in a debug build
-    if hasattr(yp_set, "test_c_api"):
-        def test_c_api(self):
-            self.assertEqual(yp_set().test_c_api(), True)
+    @yp_unittest.skipUnless(hasattr(set, "test_c_api"),
+                         'C API test only available in a debug build')
+    def test_c_api(self):
+        self.assertEqual(yp_set().test_c_api(), True)
 
 class SetSubclass(yp_set):
     pass
@@ -911,8 +911,6 @@ class TestBasicOps:
         for v in self.set:
             self.assertIn(v, self.values)
         setiter = iter(self.set)
-        # note: __length_hint__ is an internal undocumented API,
-        # don't rely on it in your own programs
         self.assertEqual(setiter.__length_hint__(), yp_len(self.set))
 
     @yp_unittest.skip("TODO: Implement nohtyP pickling")

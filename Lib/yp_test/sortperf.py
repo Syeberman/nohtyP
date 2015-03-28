@@ -23,7 +23,7 @@ def randfloats(n):
     fn = os.path.join(td, "rr%06d" % n)
     try:
         fp = open(fn, "rb")
-    except IOError:
+    except OSError:
         r = random.random
         result = [r() for i in range(n)]
         try:
@@ -36,9 +36,9 @@ def randfloats(n):
                 if fp:
                     try:
                         os.unlink(fn)
-                    except os.error:
+                    except OSError:
                         pass
-        except IOError as msg:
+        except OSError as msg:
             print("can't write", fn, ":", msg)
     else:
         result = marshal.load(fp)
