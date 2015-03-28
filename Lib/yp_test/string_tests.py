@@ -1,5 +1,5 @@
 """
-Common tests shared by test_str, test_unicode, test_userstring and test_string.
+Common tests shared by test_unicode, test_userstring and test_string.
 """
 
 from yp import *
@@ -7,7 +7,6 @@ from yp_test import yp_unittest
 import string, sys, struct
 from yp_test import support
 from collections import UserList
-import _testcapi
 
 # Extra assurance that we're not accidentally testing Python's types...unless we mean to
 _str = str
@@ -89,11 +88,10 @@ class BaseTest:
     def checkraises(self, exc, obj, methodname, *args):
         obj = self.fixtype(obj)
         args = self.fixtype(args)
-        self.assertRaises(
-            exc,
-            getattr(obj, methodname),
-            *args
-        )
+        with self.assertRaises(exc) as cm:
+            getattr(obj, methodname)(*args)
+        # Not applicable to nohtyP
+        #self.assertNotEqual(str(cm.exception), '')
 
     # call obj.method(*args) without any checks
     def checkcall(self, obj, methodname, *args):
@@ -167,6 +165,7 @@ class BaseTest:
                     self.assertEqual(rem, 0, '%s != 0 for %s' % (rem, i))
                     self.assertEqual(r1, r2, '%s != %s for %s' % (r1, r2, i))
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_find(self):
         self.checkequal(0, 'abcdefghiabc', 'find', 'abc')
         self.checkequal(9, 'abcdefghiabc', 'find', 'abc', 1)
@@ -203,6 +202,7 @@ class BaseTest:
         #self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
    
     @support.requires_resource('cpu')
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_find_combinations(self):
         # For a variety of combinations,
         #    verify that str.find() matches __contains__
@@ -228,6 +228,7 @@ class BaseTest:
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rfind(self):
         self.checkequal(9,  'abcdefghiabc', 'rfind', 'abc')
         self.checkequal(12, 'abcdefghiabc', 'rfind', '')
@@ -253,6 +254,7 @@ class BaseTest:
             self.checkraises(TypeError, 'hello', 'rfind', 42)
 
     @support.requires_resource('cpu')
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rfind_combinations(self):
         # For a variety of combinations,
         #    verify that str.rfind() matches __contains__
@@ -278,6 +280,7 @@ class BaseTest:
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rfind_issues(self):
         # issue 7458
         # XXX Not applicable to nohtyP: ints don't go up that high
@@ -286,6 +289,7 @@ class BaseTest:
         # issue #15534
         self.checkequal(0, '<......\u043c...', "rfind", "<")
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_index(self):
         self.checkequal(0, 'abcdefghiabc', 'index', '')
         self.checkequal(3, 'abcdefghiabc', 'index', 'def')
@@ -311,6 +315,7 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'index', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rindex(self):
         self.checkequal(12, 'abcdefghiabc', 'rindex', '')
         self.checkequal(3,  'abcdefghiabc', 'rindex', 'def')
@@ -351,13 +356,26 @@ class BaseTest:
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_expandtabs(self):
-        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs')
-        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs', 8)
-        self.checkequal('abc\rab  def\ng   hi', 'abc\rab\tdef\ng\thi', 'expandtabs', 4)
-        self.checkequal('abc\r\nab  def\ng   hi', 'abc\r\nab\tdef\ng\thi', 'expandtabs', 4)
-        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs')
-        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs', 8)
-        self.checkequal('abc\r\nab\r\ndef\ng\r\nhi', 'abc\r\nab\r\ndef\ng\r\nhi', 'expandtabs', 4)
+        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi',
+                        'expandtabs')
+        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi',
+                        'expandtabs', 8)
+        self.checkequal('abc\rab  def\ng   hi', 'abc\rab\tdef\ng\thi',
+                        'expandtabs', 4)
+        self.checkequal('abc\r\nab      def\ng       hi', 'abc\r\nab\tdef\ng\thi',
+                        'expandtabs')
+        self.checkequal('abc\r\nab      def\ng       hi', 'abc\r\nab\tdef\ng\thi',
+                        'expandtabs', 8)
+        self.checkequal('abc\r\nab  def\ng   hi', 'abc\r\nab\tdef\ng\thi',
+                        'expandtabs', 4)
+        self.checkequal('abc\r\nab\r\ndef\ng\r\nhi', 'abc\r\nab\r\ndef\ng\r\nhi',
+                        'expandtabs', 4)
+        # check keyword args
+        self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi',
+                        'expandtabs', tabsize=8)
+        self.checkequal('abc\rab  def\ng   hi', 'abc\rab\tdef\ng\thi',
+                        'expandtabs', tabsize=4)
+
         self.checkequal('  a\n b', ' \ta\n\tb', 'expandtabs', 1)
 
         self.checkraises(TypeError, 'hello', 'expandtabs', 42, 42)
@@ -690,10 +708,10 @@ class BaseTest:
         self.checkraises(TypeError, 'hello', 'replace', 'h', 42)
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skipIf(sys.maxsize > (1 << 32) or struct.calcsize('P') != 4,
+                     'only applies to 32-bit platforms')
     def test_replace_overflow(self):
         # Check for overflow checking on 32 bit machines
-        if sys.maxsize != 2147483647 or struct.calcsize("P") > 4:
-            return
         A2_16 = "A" * (2**16)
         self.checkraises(OverflowError, A2_16, "replace", "", A2_16)
         self.checkraises(OverflowError, A2_16, "replace", "A", A2_16)
@@ -713,7 +731,7 @@ class CommonTest(BaseTest):
         for c in a:
             b += c
             hash(b)
-        self.assertEqual(hash(a), hash(b))
+        self.assertEqual(yp_hash(a), yp_hash(b))
 
     def test_capitalize(self):
         self.checkequal(' hello ', ' hello ', 'capitalize')
@@ -741,6 +759,7 @@ class CommonTest(BaseTest):
 
         self.checkraises(TypeError, 'hello', 'capitalize', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_additional_split(self):
         self.checkequal(['this', 'is', 'the', 'split', 'function'],
             'this is the split function', 'split')
@@ -806,6 +825,7 @@ class CommonTest(BaseTest):
         # mixed use of str and unicode
         self.checkequal(['a b', 'c', 'd'], 'a b c d', 'rsplit', ' ', 2)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_strip(self):
         self.checkequal('hello', '   hello   ', 'strip')
         self.checkequal('hello   ', '   hello   ', 'lstrip')
@@ -828,6 +848,7 @@ class CommonTest(BaseTest):
         self.checkraises(TypeError, 'hello', 'lstrip', 42, 42)
         self.checkraises(TypeError, 'hello', 'rstrip', 42, 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_ljust(self):
         self.checkequal('abc       ', 'abc', 'ljust', 10)
         self.checkequal('abc   ', 'abc', 'ljust', 6)
@@ -836,6 +857,7 @@ class CommonTest(BaseTest):
         self.checkequal('abc*******', 'abc', 'ljust', 10, '*')
         self.checkraises(TypeError, 'abc', 'ljust')
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rjust(self):
         self.checkequal('       abc', 'abc', 'rjust', 10)
         self.checkequal('   abc', 'abc', 'rjust', 6)
@@ -844,6 +866,7 @@ class CommonTest(BaseTest):
         self.checkequal('*******abc', 'abc', 'rjust', 10, '*')
         self.checkraises(TypeError, 'abc', 'rjust')
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_center(self):
         self.checkequal('   abc    ', 'abc', 'center', 10)
         self.checkequal(' abc  ', 'abc', 'center', 6)
@@ -852,11 +875,13 @@ class CommonTest(BaseTest):
         self.checkequal('***abc****', 'abc', 'center', 10, '*')
         self.checkraises(TypeError, 'abc', 'center')
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_swapcase(self):
         self.checkequal('hEllO CoMPuTErS', 'HeLLo cOmpUteRs', 'swapcase')
 
         self.checkraises(TypeError, 'hello', 'swapcase', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_zfill(self):
         self.checkequal('123', '123', 'zfill', 2)
         self.checkequal('123', '123', 'zfill', 3)
@@ -878,6 +903,7 @@ class MixinStrUnicodeUserStringTest:
     # stringlike objects, i.e. str, unicode, UserString
     # (but not the string module)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_islower(self):
         self.checkequal(False, '', 'islower')
         self.checkequal(True, 'a', 'islower')
@@ -888,6 +914,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(True, 'abc\n', 'islower')
         self.checkraises(TypeError, 'abc', 'islower', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_isupper(self):
         self.checkequal(False, '', 'isupper')
         self.checkequal(False, 'a', 'isupper')
@@ -898,6 +925,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(True, 'ABC\n', 'isupper')
         self.checkraises(TypeError, 'abc', 'isupper', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_istitle(self):
         self.checkequal(False, '', 'istitle')
         self.checkequal(False, 'a', 'istitle')
@@ -912,6 +940,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(False, 'NOT', 'istitle')
         self.checkraises(TypeError, 'abc', 'istitle', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_isspace(self):
         self.checkequal(False, '', 'isspace')
         self.checkequal(False, 'a', 'isspace')
@@ -923,6 +952,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(False, ' \t\r\na', 'isspace')
         self.checkraises(TypeError, 'abc', 'isspace', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_isalpha(self):
         self.checkequal(False, '', 'isalpha')
         self.checkequal(True, 'a', 'isalpha')
@@ -933,6 +963,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(False, 'abc\n', 'isalpha')
         self.checkraises(TypeError, 'abc', 'isalpha', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_isalnum(self):
         self.checkequal(False, '', 'isalnum')
         self.checkequal(True, 'a', 'isalnum')
@@ -944,6 +975,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(False, 'abc\n', 'isalnum')
         self.checkraises(TypeError, 'abc', 'isalnum', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_isdigit(self):
         self.checkequal(False, '', 'isdigit')
         self.checkequal(False, 'a', 'isdigit')
@@ -953,6 +985,7 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'abc', 'isdigit', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_title(self):
         self.checkequal(' Hello ', ' hello ', 'title')
         self.checkequal('Hello ', 'hello ', 'title')
@@ -962,6 +995,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal('Getint', "getInt", 'title')
         self.checkraises(TypeError, 'hello', 'title', 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_splitlines(self):
         self.checkequal(['abc', 'def', '', 'ghi'], "abc\ndef\n\rghi", 'splitlines')
         self.checkequal(['abc', 'def', '', 'ghi'], "abc\ndef\n\r\nghi", 'splitlines')
@@ -980,6 +1014,8 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'abc', 'splitlines', 42, 42)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_startswith(self):
         self.checkequal(True, 'hello', 'startswith', 'he')
         self.checkequal(True, 'hello', 'startswith', 'hello')
@@ -1025,6 +1061,7 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'hello', 'startswith', (42,))
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_endswith(self):
         self.checkequal(True, 'hello', 'endswith', 'lo')
         self.checkequal(False, 'hello', 'endswith', 'he')
@@ -1074,6 +1111,7 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'hello', 'endswith', (42,))
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test___contains__(self):
         self.checkequal(True, '', '__contains__', '')
         self.checkequal(True, 'abc', '__contains__', '')
@@ -1085,6 +1123,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(False, 'asd', '__contains__', 'asdf')
         self.checkequal(False, '', '__contains__', 'asdf')
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_subscript(self):
         self.checkequal('a', 'abc', '__getitem__', 0)
         self.checkequal('c', 'abc', '__getitem__', -1)
@@ -1096,6 +1135,7 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'abc', '__getitem__', 'def')
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_slice(self):
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 1000))
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 3))
@@ -1109,6 +1149,7 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'abc', '__getitem__', 'def')
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_extended_getslice(self):
         # Test extended slicing by comparing with list slicing.
         s = string.ascii_letters + string.digits
@@ -1122,12 +1163,12 @@ class MixinStrUnicodeUserStringTest:
                                     slice(start, stop, step))
 
     def test_mul(self):
-        self.checkequal('', 'abc', '__mul__', -1)
-        self.checkequal('', 'abc', '__mul__', 0)
-        self.checkequal('abc', 'abc', '__mul__', 1)
-        self.checkequal('abcabcabc', 'abc', '__mul__', 3)
-        self.checkraises(TypeError, 'abc', '__mul__')
-        self.checkraises(TypeError, 'abc', '__mul__', '')
+        self.checkequal(yp_str(''), yp_str('abc'), '__mul__', -1)
+        self.checkequal(yp_str(''), yp_str('abc'), '__mul__', 0)
+        self.checkequal(yp_str('abc'), yp_str('abc'), '__mul__', 1)
+        self.checkequal(yp_str('abcabcabc'), yp_str('abc'), '__mul__', 3)
+        self.checkraises(TypeError, yp_str('abc'), '__mul__')
+        self.checkraises(TypeError, yp_str('abc'), '__mul__', yp_str(''))
         # XXX: on a 64-bit system, this doesn't raise an overflow error,
         # but either raises a MemoryError, or succeeds (if you have 54TiB)
         #self.checkraises(OverflowError, 10000*'abc', '__mul__', 2000000000)
@@ -1135,8 +1176,7 @@ class MixinStrUnicodeUserStringTest:
     def test_join(self):
         # join now works with any sequence type
         # moved here, because the argument order is
-        # different in string.join (see the test in
-        # test.test_string.StringTest.test_join)
+        # different in string.join
         self.checkequal('a b c d', ' ', 'join', ['a', 'b', 'c', 'd'])
         self.checkequal('abcd', '', 'join', ('a', 'b', 'c', 'd'))
         self.checkequal('bd', '', 'join', ('', 'b', '', 'd'))
@@ -1156,6 +1196,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal('a b c', ' ', 'join', BadSeq2())
 
         self.checkraises(TypeError, ' ', 'join')
+        self.checkraises(TypeError, ' ', 'join', None)
         self.checkraises(TypeError, ' ', 'join', 7)
         self.checkraises(TypeError, ' ', 'join', [1, 2, yp_bytes()])
         try:
@@ -1163,8 +1204,10 @@ class MixinStrUnicodeUserStringTest:
                 yield 4 + ""
             self.fixtype(' ').join(f())
         except TypeError as e:
-            if '+' not in _str(e):
-                self.fail('join() ate exception message')
+            pass
+            # TODO Support exception messages in nohtyP
+            #if '+' not in _str(e):
+            #    self.fail('join() ate exception message')
         else:
             self.fail('exception not raised')
 
@@ -1194,7 +1237,8 @@ class MixinStrUnicodeUserStringTest:
         self.checkraises(TypeError, 'abc', '__mod__')
         self.checkraises(TypeError, '%(foo)s', '__mod__', 42)
         self.checkraises(TypeError, '%s%s', '__mod__', (42,))
-        self.checkraises(TypeError, '%c', '__mod__', (None,))
+        with self.assertWarns(DeprecationWarning):
+            self.checkraises(TypeError, '%c', '__mod__', (None,))
         self.checkraises(ValueError, '%(foo', '__mod__', {})
         self.checkraises(TypeError, '%(foo)s %(bar)s', '__mod__', ('foo', 42))
         self.checkraises(TypeError, '%d', '__mod__', "42") # not numeric
@@ -1213,20 +1257,30 @@ class MixinStrUnicodeUserStringTest:
         # Outrageously large width or precision should raise ValueError.
         self.checkraises(ValueError, '%%%df' % (2**64), '__mod__', (3.2))
         self.checkraises(ValueError, '%%.%df' % (2**64), '__mod__', (3.2))
-
         self.checkraises(OverflowError, '%*s', '__mod__',
-                         (_testcapi.PY_SSIZE_T_MAX + 1, ''))
+                         (sys.maxsize + 1, ''))
         self.checkraises(OverflowError, '%.*f', '__mod__',
-                         (_testcapi.INT_MAX + 1, 1. / 7))
-        # Issue 15989
-        self.checkraises(OverflowError, '%*s', '__mod__',
-                         (1 << (_testcapi.PY_SSIZE_T_MAX.bit_length() + 1), ''))
-        self.checkraises(OverflowError, '%.*f', '__mod__',
-                         (_testcapi.UINT_MAX + 1, 1. / 7))
+                         (sys.maxsize + 1, 1. / 7))
 
         class X(object): pass
         self.checkraises(TypeError, 'abc', '__mod__', X())
 
+    @support.cpython_only
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
+    def test_formatting_c_limits(self):
+        from _testcapi import PY_SSIZE_T_MAX, INT_MAX, UINT_MAX
+        SIZE_MAX = (1 << (PY_SSIZE_T_MAX.bit_length() + 1)) - 1
+        self.checkraises(OverflowError, '%*s', '__mod__',
+                         (PY_SSIZE_T_MAX + 1, ''))
+        self.checkraises(OverflowError, '%.*f', '__mod__',
+                         (INT_MAX + 1, 1. / 7))
+        # Issue 15989
+        self.checkraises(OverflowError, '%*s', '__mod__',
+                         (SIZE_MAX + 1, ''))
+        self.checkraises(OverflowError, '%.*f', '__mod__',
+                         (UINT_MAX + 1, 1. / 7))
+
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_floatformatting(self):
         # float formatting
         for prec in range(100):
@@ -1236,6 +1290,7 @@ class MixinStrUnicodeUserStringTest:
                 value = value * 3.14159265359 / 3.0 * 10.0
                 self.checkcall(format, "__mod__", value)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_inplace_rewrites(self):
         # Check that strings don't copy and modify cached single-character strings
         self.checkequal('a', 'A', 'lower')
@@ -1255,6 +1310,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal('A', 'a', 'title')
         self.checkequal(True, 'a', 'islower')
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_partition(self):
 
         self.checkequal(('this is the par', 'ti', 'tion method'),
@@ -1270,6 +1326,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkraises(ValueError, S, 'partition', '')
         self.checkraises(TypeError, S, 'partition', None)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_rpartition(self):
 
         self.checkequal(('this is the rparti', 'ti', 'on method'),
@@ -1285,6 +1342,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkraises(ValueError, S, 'rpartition', '')
         self.checkraises(TypeError, S, 'rpartition', None)
 
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_none_arguments(self):
         # issue 11828
         s = 'hello'
@@ -1323,6 +1381,7 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(True, s, 'startswith', 'h', None, -2)
         self.checkequal(False, s, 'startswith', 'x', None, None)
 
+    @yp_unittest.skip("TODO Not applicable to nohtyP")
     def test_find_etc_raise_correct_error_messages(self):
         # issue 11828
         s = 'hello'
@@ -1349,6 +1408,7 @@ class MixinStrUnicodeUserStringTest:
 class MixinStrUnicodeTest:
     # Additional tests that only work with str and unicode.
 
+    @yp_unittest.skip("TODO Not applicable to nohtyP")
     def test_bug1001011(self):
         # Make sure join returns a NEW object for single item sequences
         # involving a subclass.
