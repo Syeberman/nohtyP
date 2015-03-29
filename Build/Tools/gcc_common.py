@@ -17,10 +17,13 @@ if _platform_name in ("win32", "cygwin"):
 
     # Try some known, and unknown-but-logical, default locations for mingw
     _mingw_path_globs = (
+            # MinGW-w64 (http://sourceforge.net/projects/mingw-w64/)
+            "C:\\Program Files\\mingw-w64\\*\\*\\bin",
+            "C:\\Program Files (x86)\\mingw-w64\\*\\*\\bin",
             # MinGW-builds (http://sourceforge.net/projects/mingwbuilds/)
-            "C:\\Program Files\\mingw-builds\\*\*\\bin",
+            "C:\\Program Files\\mingw-builds\\*\\*\\bin",
                                         # C:\Program Files\mingw-builds\x64-4.8.1-win32-seh-rev5\mingw64
-            "C:\\Program Files (x86)\\mingw-builds\\*\*\\bin",
+            "C:\\Program Files (x86)\\mingw-builds\\*\\*\\bin",
             # Win-builds (http://win-builds.org/)
             "C:\\win-builds-*\\bin",    # C:\win-builds-32, C:\win-builds-64, C:\win-builds-64-1.3
             "C:\\win-builds-*\\*\\bin", # C:\win-builds-64\1.3
