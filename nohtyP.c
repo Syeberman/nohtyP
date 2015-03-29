@@ -1429,7 +1429,7 @@ void yp_decrefN( int n, ... )
 typedef union {
     struct {            // State for ypQuickIter_var_*
         yp_ssize_t n;       // Number of variable arguments remaining
-        va_list args;       // Current state of variable arguments ("borrowed")
+        va_list *args;      // Current state of variable arguments ("borrowed")
     } var;
     struct {            // State for ypQuickIter_tuple_*
         yp_ssize_t i;       // Index of next value to yield
@@ -1491,9 +1491,9 @@ static const ypQuickIter_methods ypQuickIter_var_methods = {
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
-// ypQuickIter_var_methods as the method table.  args is borrowed by state and must not be closed
+// ypQuickIter_var_methods as the method table.  *args is borrowed by state and must not be closed
 // until methods->close is called.
-static void ypQuickIter_new_fromvar( ypQuickIter_state *state, int n, va_list args ) {
+static void ypQuickIter_new_fromvar( ypQuickIter_state *state, int n, va_list *args ) {
     state->var.n = n;
     state->var.args = args;
 }
@@ -1605,7 +1605,7 @@ typedef union {
         yp_ssize_t i;           // Current index
         ypObject *x;            // Object at index i (borrowed) (invalid if len<1)
         va_list args;           // Current state of variable arguments ("owned")
-        va_list orig_args;      // The starting point for args ("borrowed")
+        va_list *orig_args;     // The starting point for args ("borrowed")
     } var;
     ypObject *obj;      // State for ypQuickSeq_tuple_*, etc (borrowed)
     // TODO bytes, str, other seq objs could all have their own state here
@@ -1644,7 +1644,7 @@ static ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i
     // then we've already returned NULL before reaching this code.
     if( i < state->var.i ) {
         va_end( state->var.args );
-        va_copy( state->var.args, state->var.orig_args );
+        va_copy( state->var.args, *state->var.orig_args );
         state->var.i = 0;
         state->var.x = va_arg( state->var.args, ypObject * );
     }
@@ -1676,12 +1676,12 @@ static const ypQuickSeq_methods ypQuickSeq_var_methods = {
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
-// ypQuickSeq_var_methods as the method table.  args is borrowed by state and must not be closed
+// ypQuickSeq_var_methods as the method table.  *args is borrowed by state and must not be closed
 // until methods->close is called.
-static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list args ) {
+static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list *args ) {
     state->var.len = MAX( n, 0 );
     state->var.orig_args = args;        // "borrowed"
-    va_copy( state->var.args, args );   // "owned"
+    va_copy( state->var.args, *args );  // "owned"
     state->var.i = 0;
     // state->var.x is invalid if n<1
     if( n > 0 ) {
@@ -5671,7 +5671,7 @@ static ypObject *ypStringLib_join(
         ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
 {
     ypObject *exc = yp_None;
-    int s_pair = ypObject_TYPE_PAIR_CODE( s );
+    unsigned s_pair = ypObject_TYPE_PAIR_CODE( s );
     yp_ssize_t seq_len;
     yp_ssize_t i;
     ypObject *x;
@@ -5757,7 +5757,7 @@ static ypObject *ypStringLib_encode_call_errorhandler(
     params.source.object = unicode;
     // TODO We should just give the unicode object...I'm not sure str support for
     // params.source.data makes sense
-    yp_asencodedCX( unicode, &((yp_uint8_t *) params.source.data.ptr), 
+    yp_asencodedCX( unicode, (const yp_uint8_t **) (&params.source.data.ptr), 
         &(params.source.data.len), &(params.source.data.type) );
     params.start = startinpos;
     params.end = endinpos;
@@ -5827,7 +5827,7 @@ static ypObject *ypStringLib_decode_call_errorhandler(
     ypObject *encoding, const char *reason,
     const yp_uint8_t *input, const yp_uint8_t *inend,
     yp_ssize_t startinpos, yp_ssize_t endinpos, 
-    const char **inptr )
+    const yp_uint8_t **inptr )
 {
     ypObject *exc = yp_None;
     yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
@@ -6709,7 +6709,7 @@ static ypObject *yp_codecs_register_error(
 {
     ypObject *exc = yp_None;
     // FIXME Normalize the name
-    ypObject *result = yp_intC( (yp_int_t) error_handler );
+    ypObject *result = yp_intC( (yp_ssize_t) error_handler );
     yp_setitemE( _yp_codecs_name2error, name, result, &exc );
     yp_decref( result );
     return exc;     // on success or exception
@@ -9188,7 +9188,7 @@ ypObject *yp_strip( ypObject *s ) {
 }
 
 ypObject *yp_join( ypObject *s, ypObject *iterable ) {
-    ypQuickSeq_methods *methods;
+    const ypQuickSeq_methods *methods;
     ypQuickSeq_state state;
     ypObject *result;
 
@@ -9222,7 +9222,7 @@ ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
     ypQuickSeq_state state;
     ypObject *result;
     if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
-    ypQuickSeq_new_fromvar( &state, n, args );
+    ypQuickSeq_new_fromvar( &state, n, &args );
     result = ypStringLib_join( s, &ypQuickSeq_var_methods, &state );
     ypQuickSeq_var_close( &state );
     if( yp_isexceptionC( result ) ) return result;
@@ -14159,8 +14159,6 @@ static void _ypMem_initialize( const yp_initialize_kwparams_t *kwparams )
 // ignored: calling code will fail gracefully later on.
 static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
 {
-    ypObject *exc = yp_None;
-
     // The set of standard encodings
     // TODO This would be easier to maintain with a "yp_N" macro to count args
     _yp_codecs_standard = yp_setN( 11,
@@ -14176,9 +14174,10 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     // (yp_dict_fromlenhint?)
     _yp_codecs_alias2name = yp_dictK( 0 );
 #define yp_codecs_init_ADD_ALIAS( alias, name ) \
-    {   yp_IMMORTAL_STR_LATIN_1( _alias_obj, alias ); \
-        yp_setitemE( _yp_codecs_alias2name, _alias_obj, (name), &exc ); \
-    }
+    do { \
+        yp_IMMORTAL_STR_LATIN_1( _alias_obj, alias ); \
+        yp_setitem( &_yp_codecs_alias2name, _alias_obj, (name) ); \
+    } while( 0 )
     yp_codecs_init_ADD_ALIAS( "646",            yp_s_ascii );
     yp_codecs_init_ADD_ALIAS( "ansi_x3.4_1968", yp_s_ascii );
     yp_codecs_init_ADD_ALIAS( "ansi_x3_4_1968", yp_s_ascii );
@@ -14200,13 +14199,13 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     // yp_s_ucs_4
 
     // The error-handler registry
+    // XXX Oddly, gcc 4.8 doesn't like us creating immortal ints from function pointers 
+    // ("initializer element is not computable at load time")
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
     // (yp_dict_fromlenhint?)
     _yp_codecs_name2error = yp_dictK( 0 );
 #define yp_codecs_init_ADD_ERROR( name, func ) \
-    {   yp_IMMORTAL_INT( _func_obj, (yp_int_t) (func) ); \
-        yp_setitemE( _yp_codecs_name2error, (name), _func_obj, &exc ); \
-    }
+        yp_o2i_setitemC( &_yp_codecs_name2error, (name), (yp_ssize_t) (func) )
     yp_codecs_init_ADD_ERROR( yp_s_strict,            yp_codecs_strict_errors );
     yp_codecs_init_ADD_ERROR( yp_s_replace,           yp_codecs_replace_errors );
     yp_codecs_init_ADD_ERROR( yp_s_ignore,            yp_codecs_ignore_errors );
