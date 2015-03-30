@@ -716,10 +716,11 @@ class UnicodeTest(string_tests.CommonTest,
                          '\U0010FFFFx\U0010FFFF\U0010FFFF')
 
     @yp_unittest.skipUnless(sys.maxsize == 2**31 - 1, "requires 32-bit system")
+    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     @support.cpython_only
     def test_case_operation_overflow(self):
         # Issue #22643
-        self.assertRaises(OverflowError, ("ü"*(2**32//12 + 1)).upper)
+        self.assertRaises(OverflowError, (yp_str("ü")*(2**32//12 + 1)).upper)
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_contains(self):
