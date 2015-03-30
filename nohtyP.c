@@ -6185,8 +6185,8 @@ InvalidContinuation3:
 // TODO When resizing in this function, don't blindly accept len as the allocation length, but take
 // newS_len + remaining_len.  In other words, take advantage of knowing how many continuation
 // characters we consumed in getting newS to where it is.
-// FIXME Completely ignoring errors at the moment
 // FIXME To call _ypStr_new_latin_1, you must first check ypStringLib_LEN_MAX!
+// FIXME This could use a rewrite
 static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
         const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
@@ -6275,12 +6275,18 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
         ch = _ypStringLib_decode_utf_8( &source, fake_end, newS );
         if( ch > 0xFFu ) {
             // This will up-convert _and_ resize to the required length
-            result = _ypStr_grow_onextend( newS, len, 0,
-                    ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2 );
+            // TODO If ch<0x10000, we could still use the inline buffer to see if there are 4-byte
+            // characters in the string
+            int newEnc = ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2;
+            result = _ypStr_grow_onextend( newS, len, 0, newEnc );
             if( yp_isexceptionC( result ) ) {
                 yp_decref( newS );
                 return result;
             }
+            // Don't forget to write the character that didn't previously fit
+            ypStringLib_encs[newEnc].setindexX(
+                    ypStringLib_DATA(newS), ypStringLib_LEN(newS), ch);
+            ypStringLib_SET_LEN(newS, ypStringLib_LEN(newS) + 1);
         } else {
             // Otherwise it's Latin-1 as far as we can see, or there was a decoding error, so
             // resize and move on to the main loop
@@ -6464,7 +6470,7 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
 
     ypStringLib_ASSERT_INVARIANTS( source );
     yp_ASSERT( source_enc != ypStringLib_ENC_LATIN_1, "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings" );
-    maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 2 : 4;
+    maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 3 : 4;
 
     // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
     dest = _ypBytes_new( type, source_len*maxCharSize, /*alloclen_fixed=*/FALSE );
