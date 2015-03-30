@@ -46,7 +46,7 @@ os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath( mscommonLog_path )
 vars = Variables( None )
 
 # Generic build environment applicable to all compilers/targets and used internally by SCons
-rootEnv = DefaultEnvironment( tools=[], variables=vars )
+rootEnv = DefaultEnvironment( tools=[], variables=vars, SCONSCRIPT_LOG=sconscriptLog )
 
 # Require that only known command-line variables are used
 vars_unknown = vars.UnknownVariables( )
