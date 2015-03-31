@@ -1429,7 +1429,7 @@ void yp_decrefN( int n, ... )
 typedef union {
     struct {            // State for ypQuickIter_var_*
         yp_ssize_t n;       // Number of variable arguments remaining
-        va_list *args;      // Current state of variable arguments ("borrowed")
+        va_list args;       // Current state of variable arguments ("owned")
     } var;
     struct {            // State for ypQuickIter_tuple_*
         yp_ssize_t i;       // Index of next value to yield
@@ -1480,7 +1480,7 @@ static yp_ssize_t ypQuickIter_var_lenhint( ypQuickIter_state *state, int *isexac
 }
 
 static void ypQuickIter_var_close( ypQuickIter_state *state ) {
-    // No-op.  We don't call va_end because it's a "borrowed" reference.
+    va_end( state->var.args );
 }
 
 static const ypQuickIter_methods ypQuickIter_var_methods = {
@@ -1491,11 +1491,10 @@ static const ypQuickIter_methods ypQuickIter_var_methods = {
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
-// ypQuickIter_var_methods as the method table.  *args is borrowed by state and must not be closed
-// until methods->close is called.
-static void ypQuickIter_new_fromvar( ypQuickIter_state *state, int n, va_list *args ) {
+// ypQuickIter_var_methods as the method table.  The QuickIter is only valid so long as args is.
+static void ypQuickIter_new_fromvar( ypQuickIter_state *state, int n, va_list args ) {
     state->var.n = n;
-    state->var.args = args;
+    va_copy( state->var.args, args );
 }
 
 
@@ -1605,7 +1604,7 @@ typedef union {
         yp_ssize_t i;           // Current index
         ypObject *x;            // Object at index i (borrowed) (invalid if len<1)
         va_list args;           // Current state of variable arguments ("owned")
-        va_list *orig_args;     // The starting point for args ("borrowed")
+        va_list orig_args;      // The starting point for args ("owned")
     } var;
     ypObject *obj;      // State for ypQuickSeq_tuple_*, etc (borrowed)
     // TODO bytes, str, other seq objs could all have their own state here
@@ -1644,7 +1643,7 @@ static ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i
     // then we've already returned NULL before reaching this code.
     if( i < state->var.i ) {
         va_end( state->var.args );
-        va_copy( state->var.args, *state->var.orig_args );
+        va_copy( state->var.args, state->var.orig_args );
         state->var.i = 0;
         state->var.x = va_arg( state->var.args, ypObject * );
     }
@@ -1666,6 +1665,7 @@ static yp_ssize_t ypQuickSeq_var_len( ypQuickSeq_state *state, ypObject **exc ) 
 
 static void ypQuickSeq_var_close( ypQuickSeq_state *state ) {
     va_end( state->var.args );
+    va_end( state->var.orig_args );
 }
 
 static const ypQuickSeq_methods ypQuickSeq_var_methods = {
@@ -1676,12 +1676,11 @@ static const ypQuickSeq_methods ypQuickSeq_var_methods = {
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
-// ypQuickSeq_var_methods as the method table.  *args is borrowed by state and must not be closed
-// until methods->close is called.
-static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list *args ) {
+// ypQuickSeq_var_methods as the method table.  The QuickIter is only valid so long as args is.
+static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list args ) {
     state->var.len = MAX( n, 0 );
-    state->var.orig_args = args;        // "borrowed"
-    va_copy( state->var.args, *args );  // "owned"
+    va_copy( state->var.orig_args, args );  // "owned"
+    va_copy( state->var.args, args );       // "owned"
     state->var.i = 0;
     // state->var.x is invalid if n<1
     if( n > 0 ) {
@@ -9228,7 +9227,7 @@ ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
     ypQuickSeq_state state;
     ypObject *result;
     if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
-    ypQuickSeq_new_fromvar( &state, n, &args );
+    ypQuickSeq_new_fromvar( &state, n, args );
     result = ypStringLib_join( s, &ypQuickSeq_var_methods, &state );
     ypQuickSeq_var_close( &state );
     if( yp_isexceptionC( result ) ) return result;
