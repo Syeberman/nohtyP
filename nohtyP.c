@@ -615,7 +615,7 @@ yp_STATIC_ASSERT( yp_sizeof( _yp_uint_t ) == yp_sizeof( yp_int_t ), sizeof_yp_ui
 // Return the hash of the given int; always succeeds
 static yp_hash_t yp_HashInt( yp_int_t v )
 {
-    // FIXME int is larger than hash on 32-bit systems, so this truncates data, which we don't
+    // TODO int is larger than hash on 32-bit systems, so this truncates data, which we don't
     // want; better is to adapt the long_hash algorithm to this datatype
     yp_hash_t hash = (yp_hash_t) v;
     if( hash == ypObject_HASH_INVALID ) hash -= 1;
@@ -1413,7 +1413,8 @@ void yp_decrefN( int n, ... )
  * ypQuickIter: iterator-like abstraction over va_lists of ypObject*s and iterables
  * XXX Internal use only!
  *************************************************************************************************/
-// FIXME I'm having second thoughts about the utility of this API.  It really comes down to how
+
+// TODO I'm having second thoughts about the utility of this API.  It really comes down to how
 // much benefit we have sharing the va_list code with the iterable code...and last time there
 // wasn't that much benefit.  ypQuickSeq might be a better choice.
 // TODO Inspect all uses of va_arg, yp_miniiter_next, and yp_next below and see if we can
@@ -1559,8 +1560,7 @@ static ypObject *ypQuickIter_new_fromiterable(
         const ypQuickIter_methods **methods, ypQuickIter_state *state, ypObject *iterable )
 {
     // We special-case tuples because we can return borrowed references directly
-    if( FALSE && ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
-        // FIXME enable this special-case after general case tested (remove FALSE above)
+    if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         *methods = &ypQuickIter_tuple_methods;
         ypQuickIter_new_fromtuple( state, iterable );
         return yp_None;
@@ -1676,7 +1676,7 @@ static const ypQuickSeq_methods ypQuickSeq_var_methods = {
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
-// ypQuickSeq_var_methods as the method table.  The QuickIter is only valid so long as args is.
+// ypQuickSeq_var_methods as the method table.  The QuickSeq is only valid so long as args is.
 static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list args ) {
     state->var.len = MAX( n, 0 );
     va_copy( state->var.orig_args, args );  // "owned"
@@ -2239,7 +2239,7 @@ static ypObject *_ypSequence_miniiter_lenh( ypObject *x, yp_uint64_t *_state, yp
 //  WAIT! I can't do that, because that won't freeze the original and others might be referencing
 //  the original so won't see it as frozen now.
 //  SO! Still freeze the original, but then also replace it with the zero-version
-// FIXME rethink what we do generically in this function, and what we delegate to tp_freeze, and
+// TODO rethink what we do generically in this function, and what we delegate to tp_freeze, and
 // also when we call tp_freeze
 static ypObject *_yp_freeze( ypObject *x )
 {
@@ -4938,11 +4938,12 @@ static void _ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssi
 // Used by tp_repeat et al to perform the necessary memcpy's.  data must be allocated to hold
 // factor*n_size objects, the bytes to repeat must be in the first n_size bytes of data, and the
 // rest of data must not contain any references (they will be overwritten).  Cannot fail.
-// FIXME change to ssize_t?
-static void _ypSequence_repeat_memcpy( void *_data, size_t factor, size_t n_size )
+// XXX Handle the "empty" case (factor<1 or n_size<1) before calling this function
+static void _ypSequence_repeat_memcpy( void *_data, yp_ssize_t factor, yp_ssize_t n_size )
 {
     yp_uint8_t *data = (yp_uint8_t *) _data;
-    size_t copied; // the number of times [:n_size] has been repeated (starts at 1, of course)
+    yp_ssize_t copied; // the number of times [:n_size] has been repeated (starts at 1, of course)
+    yp_ASSERT( factor > 0 && n_size > 0, "factor or n_size less than one" );
     yp_ASSERT( factor <= SIZE_MAX/2 && factor <= yp_SSIZE_T_MAX, "factor too large" );
     yp_ASSERT( factor <= yp_SSIZE_T_MAX / n_size, "factor*n_size too large" );
     for( copied = 1; copied*2 < factor; copied *= 2 ) {
@@ -5010,12 +5011,11 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 /*************************************************************************************************
  * In-development API for Codec registry and base classes
  *************************************************************************************************/
+
 // XXX Patterned after the codecs module in Python
 // XXX This will be exposed in nohtyP.h someday; review and improve before you do
 // TODO In general, everything below is geared for Unicode; make it flexible enough for anything
 
-#define yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN   (4)     // TODO make this large enough for standard replacements
-#define yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN (16)    // TODO ensure it's 4*str len
 typedef struct _yp_codecs_error_handler_params_t {
     yp_ssize_t sizeof_struct;   // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
 
@@ -5044,21 +5044,6 @@ typedef struct _yp_codecs_error_handler_params_t {
     } source;
     yp_ssize_t start;       // The first index of invalid data in source
     yp_ssize_t end;         // The index after the last invalid data in source
-
-#if 0 // FIXME useful?
-    // FIXME: review below, and ensure sized efficiently (no padding)
-    // In-place buffers to return data without creating objects
-    union {
-        struct {
-            yp_ssize_t len;
-            yp_uint8_t data[yp_codecs_REPLACEMENT_BYTES_BUFFER_ALLOCLEN]; // FIXME ensure fills available space of union
-        } bytes;
-        struct {
-            yp_ssize_t len;
-            yp_uint32_t data[yp_codecs_REPLACEMENT_STR_BUFFER_ALLOCLEN]; // a small array of code points always in UCS-4
-        } str;
-    } dest_buff;    // TODO rename
-#endif
 } yp_codecs_error_handler_params_t;
 
 // Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
@@ -6174,7 +6159,7 @@ InvalidContinuation3:
 // negative.
 // XXX Allocation-wise, the worst-case through the code would be a completely UCS-4 string, as we'd
 // allocate len characters (len*4 bytes) for the decoding, but would only decode len/4 characters
-// FIXME This is TERRIBLE, because if a string has more than a couple UCS-4 characters, it's
+// TODO This is TERRIBLE, because if a string has more than a couple UCS-4 characters, it's
 // probably *mostly* UCS-4 characters
 // XXX Runtime-wise, the worst-case would probably be a string that starts completely Latin-1 (each
 // character is a call to enc->setindexX), followed by a UCS-2 then a UCS-4 character (each
@@ -6453,6 +6438,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
     return dest;
 }
 
+// FIXME Consider allocation and runtime
 static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
 {
     yp_ssize_t const source_len = ypStringLib_LEN( source );
@@ -6577,14 +6563,6 @@ static ypStringLib_getindexXfunc _yp_codecs_strenc2getindexX( ypObject *encoding
 }
 
 
-#if 0 // FIXME useful?
-// Special objects returned by error handlers to signal to use params->dest_buff to retrieve data
-// XXX We don't have a generic "object" type just yet, otherwise this would use it
-// FIXME The length of replacements is all variable...perhaps we should only deal in objects!
-yp_IMMORTAL_INVALIDATED( yp_codecs_replacement_is_bytes_buffer );
-yp_IMMORTAL_INVALIDATED( yp_codecs_replacement_is_str_buffer );
-#endif
-
 // Set containing the standard encodings like yp_s_utf_8.  Instead of a series of yp_eq calls,
 // yp_set_getintern is used to return one of these objects, which is then compared by identity
 // (i.e. ptr value).  Initialized in _yp_codecs_initialize.
@@ -6646,7 +6624,7 @@ convert:
     return norm;
 }
 
-// FIXME Move these to nohtyP.h...eventually
+// TODO Move these to nohtyP.h...eventually
 ypAPI void yp_setitemE( ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc );
 static ypObject *yp_set_getintern( ypObject *set, ypObject *x );
 
@@ -6692,17 +6670,8 @@ static ypObject *yp_codecs_lookup_alias( ypObject *alias )
 
 // TODO _yp_codecs_name2info
 
-// TODO deny replacing utf_8 codec with anything else
-#if 0
-static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **_exc )
-{
-    // FIXME Normalize the name
-    ypObject *exc = yp_None;
-
-    // As our default encoding, utf-8 gets a fast-path
-    if( encoding == yp_s_utf_8 ) return yp_codecs_codec_info_utf_8;
-}
-#endif
+// TODO deny replacing utf_8 codec with anything else, and give it a fast-path in the code
+// TODO static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **_exc )
 
 // Dict mapping error handler names to their functions.  Initialized in _yp_codecs_initialize.
 // TODO Can we statically-allocate this dict?  Perhaps the standard error handlers can fit in the
@@ -6847,7 +6816,6 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
 // XXX Adapted from PyCodec_SurrogatePassErrors
 // TODO Review this function...
 static ypObject *_ypStr_new_ucs_2( int type, yp_ssize_t requiredLen, int alloclen_fixed );
-static ypObject *_ypStr_push_from_uint32C( ypObject *s, yp_uint32_t x, yp_ssize_t growhint );
 static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
 {
@@ -6933,52 +6901,6 @@ onerror:
     *new_position = yp_SSIZE_T_MAX;
     return;
 }
-
-// Allocating these as immortals saves a _little_ bit off the heap, and doesn't cost anything
-#if 0 // FIXME use, or remove
-// ascii
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "646" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "ansi_x3.4_1968" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "ansi_x3_4_1968" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "ansi_x3.4_1986" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "cp367" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "csascii" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "ibm367" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_646,          "iso646_us" );
-    // TODO more aliases from here on down
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_us_ascii,     "us-ascii" );
-// latin-1
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_iso_8859_1,   "iso-8859-1" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_iso8859_1,    "iso8859-1" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_8859,         "8859" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_cp819,        "cp819" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_latin,        "latin" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_latin1,       "latin1" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_l1,           "l1" );
-// utf-8
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_u8,           "u8" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf,          "utf" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf8,         "utf8" );
-// utf-16, etc
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf_16_le,    "utf-16-le" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf_16_be,    "utf-16-be" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_u16,          "u16" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf16,        "utf16" );
-// utf-32, etc
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf_32_le,    "utf-32-le" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf_32_be,    "utf-32-be" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_u32,          "u32" );
-    yp_IMMORTAL_STR_LATIN_1( _yp_codecs_s_utf32,        "utf32" );
-// ucs-2
-// ucs-4
-yp_IMMORTAL_INT( _yp_codecs_i_strict_errors, (yp_int_t) yp_codecs_strict_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_replace_errors, (yp_int_t) yp_codecs_replace_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_ignore_errors, (yp_int_t) yp_codecs_ignore_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_xmlcharrefreplace_errors, (yp_int_t) yp_codecs_xmlcharrefreplace_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_backslashreplace_errors, (yp_int_t) yp_codecs_backslashreplace_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_surrogateescape_errors, (yp_int_t) yp_codecs_surrogateescape_errors );
-yp_IMMORTAL_INT( _yp_codecs_i_surrogatepass_errors, (yp_int_t) yp_codecs_surrogatepass_errors );
-#endif
 
 // TODO registered encoders/decoders can take a ypObject *typehint that identifies a particular
 // type for the return value, if possible, otherwise it's ignored and a "standard" type is returned
@@ -8296,29 +8218,6 @@ static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_s
     return yp_None;
 }
 
-#if 0 // TODO Complete
-// growhint is the number of additional items, not including x, that are expected to be added to
-// the str
-static ypObject *_ypStr_push_from_uint32C( ypObject *s, yp_uint32_t x, yp_ssize_t growhint )
-{
-    ypStringLib_encinfo *enc = ypStringLib_ENC( s );
-
-    // TODO need the encoding to grow to to hold x
-    FIXME_right_here( foo );
-    
-    ypObject *result;
-    if( ypStr_LEN( s ) > ypStr_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
-    if( ypStr_ALLOCLEN( s ) < ypStr_LEN( s )+1 ) {
-        if( growhint < 0 ) growhint = 0;
-        result = _ypStr_grow_onextend( s, ypStr_LEN( s )+1, growhint );
-        if( yp_isexceptionC( result ) ) return result;
-    }
-    ypStr_ARRAY( s )[ypStr_LEN( s )] = x;
-    ypStr_SET_LEN( s, ypStr_LEN( s ) + 1 );
-    return yp_None;
-}
-#endif
-
 // As yp_asuint32C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
 static yp_uint32_t _ypStr_asuint32C( ypObject *x, ypObject **exc ) {
     yp_int_t asint;
@@ -9353,7 +9252,7 @@ static ypObject *_ypTuple_deepcopy( int type, ypObject *x, visitfunc copy_visito
 // to hold factor*n objects, the objects to repeat must be in the first n elements of the array,
 // and the rest of the array must not contain any references (they will be overwritten).  Further,
 // factor and n must both be greater than zero.  Cannot fail.
-//
+// XXX Handle the "empty" case (factor<1 or n<1) before calling this function
 #define _ypTuple_repeat_memcpy( sq, factor, n ) \
     _ypSequence_repeat_memcpy( ypTuple_ARRAY( sq ), (factor), (n)*sizeof( ypObject * ) )
 
