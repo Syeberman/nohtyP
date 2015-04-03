@@ -717,7 +717,7 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
 
 
 // TODO Make this configurable via yp_initialize, and/or dynamically
-static int _yp_recursion_limit = 1000;
+static yp_ssize_t _yp_recursion_limit = 1000;
 
 
 /*************************************************************************************************
@@ -2563,7 +2563,7 @@ yp_STATIC_ASSERT( ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one );
 extern ypObject * const yp_RecursionLimitError;
 static ypObject *_yp_hash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
 {
-    int *recursion_depth = (int *) _memo;
+    yp_ssize_t recursion_depth = (yp_ssize_t) _memo;
     ypObject *result;
 
     // Check type, cached hash, and recursion depth first
@@ -2572,27 +2572,26 @@ static ypObject *_yp_hash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
         *hash = ypObject_CACHED_HASH( x );
         return yp_None;
     }
-    if( *recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
+    yp_ASSERT( recursion_depth >= 0, "recursion_depth can't be negative" );
+    if( recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
 
-    *recursion_depth += 1;
-    result = ypObject_TYPE( x )->tp_currenthash( x, _yp_hash_visitor, _memo, hash );
-    *recursion_depth -= 1;
+    result = ypObject_TYPE( x )->tp_currenthash( 
+        x, _yp_hash_visitor, (void *) (recursion_depth+1), hash );
     if( yp_isexceptionC( result ) ) return result;
     ypObject_CACHED_HASH( x ) = *hash;
     return yp_None;
 }
 yp_hash_t yp_hashC( ypObject *x, ypObject **exc )
 {
-    int recursion_depth = 0;
     yp_hash_t hash;
-    ypObject *result = _yp_hash_visitor( x, &recursion_depth, &hash );
+    ypObject *result = _yp_hash_visitor( x, (void *) 0, &hash );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
     return hash;
 }
 
 static ypObject *_yp_cachedhash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
 {
-    int *recursion_depth = (int *) _memo;
+    yp_ssize_t recursion_depth = (yp_ssize_t) _memo;
     ypObject *result;
 
     // Check cached hash, and recursion depth first
@@ -2600,20 +2599,19 @@ static ypObject *_yp_cachedhash_visitor( ypObject *x, void *_memo, yp_hash_t *ha
         *hash = ypObject_CACHED_HASH( x );
         return yp_None;
     }
-    if( *recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
+    yp_ASSERT( recursion_depth >= 0, "recursion_depth can't be negative" );
+    if( recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
 
-    *recursion_depth += 1;
-    result = ypObject_TYPE( x )->tp_currenthash( x, _yp_cachedhash_visitor, _memo, hash );
-    *recursion_depth -= 1;
+    result = ypObject_TYPE( x )->tp_currenthash( 
+        x, _yp_cachedhash_visitor, (void *) (recursion_depth+1), hash );
     // XXX We can't record the cached hash here: consider that yp_hash on a tuple with mutable
     // objects cannot succeed, but we (ie yp_currenthash) _can_
     return result;
 }
 yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc )
 {
-    int recursion_depth = 0;
     yp_hash_t hash;
-    ypObject *result = _yp_cachedhash_visitor( x, &recursion_depth, &hash );
+    ypObject *result = _yp_cachedhash_visitor( x, (void *) 0, &hash );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( ypObject_HASH_INVALID, exc, result );
     return hash;
 }
@@ -9813,7 +9811,7 @@ _ypTuple_RELATIVE_CMP_FUNCTION( ge, >= );
 _ypTuple_RELATIVE_CMP_FUNCTION( gt, > );
 
 // Returns yp_True if the two tuples/lists are equal.  Size is a quick way to check equality.
-// FIXME comparison functions can recurse, just like currenthash...fix!
+// TODO comparison functions can recurse, just like currenthash...fix!
 static ypObject *tuple_eq( ypObject *sq, ypObject *x )
 {
     yp_ssize_t sq_len = ypTuple_LEN( sq );
@@ -11239,7 +11237,7 @@ static ypObject *frozenset_le( ypObject *so, ypObject *x )
     return _ypSet_issubset( so, x );
 }
 
-// FIXME comparison functions can recurse, just like currenthash...fix!
+// TODO comparison functions can recurse, just like currenthash...fix!
 static ypObject *frozenset_eq( ypObject *so, ypObject *x )
 {
     if( so == x ) return yp_True;
@@ -12234,7 +12232,7 @@ static ypObject *frozendict_bool( ypObject *mp ) {
     return ypBool_FROM_C( ypDict_LEN( mp ) );
 }
 
-// FIXME comparison functions can recurse, just like currenthash...fix!
+// TODO comparison functions can recurse, just like currenthash...fix!
 static ypObject *frozendict_eq( ypObject *mp, ypObject *x )
 {
     yp_ssize_t valuesleft;
