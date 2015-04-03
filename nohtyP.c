@@ -5385,7 +5385,6 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
 }
 
 
-// FIXME assumes little-endian
 # define ypStringLib_CHECKENC_1FROM2_MASK 0xFF00FF00FF00FF00ULL
 yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_CHECKENC_1FROM2_MASK) == ypStringLib_CHECKENC_1FROM2_MASK, checkenc_1from2_mask_matches_type );
 // Returns the ypStringLib_ENC_* that _should_ be used for the given UCS-2-encoded string
@@ -5396,6 +5395,7 @@ static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
     const yp_uint8_t *p = data;
     const yp_uint8_t *end = p + (len * 2);
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN( end, yp_sizeof( _yp_uint_t ) );
+    yp_ASSERT( (*(yp_uint8_t *) &mask) == 0, "ypStringLib_checkenc_ucs_2 doesn't support big-endian yet" );
     yp_ASSERT( yp_IS_ALIGNED( data, 2 ), "unexpected alignment for ucs-2 data" );
     yp_ASSERT( len >= 0, "negative length" );
 
@@ -5426,7 +5426,6 @@ final_loop:
     return ypStringLib_ENC_LATIN_1;
 }
 
-// FIXME assumes little-endian
 # define ypStringLib_CHECKENC_1FROM4_MASK 0xFFFFFF00FFFFFF00ULL
 yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_CHECKENC_1FROM4_MASK) == ypStringLib_CHECKENC_1FROM4_MASK, checkenc_1from4_mask_matches_type );
 # define ypStringLib_CHECKENC_2FROM4_MASK 0xFFFF0000FFFF0000ULL
@@ -5436,6 +5435,7 @@ static int _ypStringLib_checkenc_ucs_4( _yp_uint_t mask,
     const yp_uint8_t **p, const yp_uint8_t *end )
 {
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN( end, yp_sizeof( _yp_uint_t ) );
+    yp_ASSERT( (*(yp_uint8_t *) &mask) == 0, "ypStringLib_checkenc_ucs_4 doesn't support big-endian yet" );
 
     // If we don't contain an aligned _yp_uint_t, jump to the end
     if( aligned_end - *p < yp_sizeof( _yp_uint_t ) ) goto final_loop;
