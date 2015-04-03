@@ -4912,7 +4912,7 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
 
 // Using the given _adjusted_ values, in-place converts the given start/stop/step values to the
 // inverse slice, where *step=-(*step).  slicelength must be >0 (slicelength==0 is a no-op).
-// Adapted from Python's list_ass_subscript
+// XXX Adapted from Python's list_ass_subscript
 static void _ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step,
         yp_ssize_t slicelength )
 {
@@ -5127,16 +5127,26 @@ typedef struct _ypStrObject ypStrObject;
 // could technically allow four times as much data as UCS-4, for simplicity we use one maximum
 // length for all encodings.  (Consider that an element in the largest Latin-1 chrarray could be
 // replaced with a UCS-4 character, thus quadrupling its size.)
-// FIXME Ensure the code below is not neglecting this value!
 #define ypStringLib_LEN_MAX ( (yp_ssize_t) MIN( MIN( \
             yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
             (yp_SSIZE_T_MAX-yp_sizeof( ypStrObject )) / 4 /* /4 for elemsize of UCS-4 */ ), \
             ypObject_LEN_MAX ) - 1 /* -1 for null terminator */ )
 
 // Debug-only macro to verify that bytes/str instances are stored as we expect
-// TODO Check that alloclen is big enough?  (But handle immortals like yp_s_utf_8.)
 #define ypStringLib_ASSERT_INVARIANTS( s ) \
     do {yp_ASSERT( \
+            ypStringLib_ALLOCLEN( s ) < 0 /*immortals have an invalid alloclen*/ || \
+            ypStringLib_ALLOCLEN( s ) <= ypStringLib_LEN_MAX, \
+            "bytes/str alloclen larger than LEN_MAX" ); \
+        yp_ASSERT( \
+            ypStringLib_LEN( s ) >= 0 && \
+            ypStringLib_LEN( s ) <= ypStringLib_LEN_MAX - 1 /*null terminator*/, \
+            "bytes/str len (plus null terminator) not in range(1, LEN_MAX+1)" ); \
+        yp_ASSERT( \
+            ypStringLib_ALLOCLEN( s ) < 0 /*immortals have an invalid alloclen*/ || \
+            ypStringLib_LEN( s ) <= ypStringLib_ALLOCLEN( s ) - 1 /*null terminator*/, \
+            "bytes/str len (plus null terminator) larger than alloclen" ); \
+        yp_ASSERT( \
             ypStringLib_ENC_CODE( s ) == ypStringLib_ENC_BYTES || \
             ypStringLib_checkenc( ypStringLib_ENC_CODE( s ), \
                 ypStringLib_DATA( s ), ypStringLib_LEN( s ) ) == ypStringLib_ENC_CODE( s ), \
@@ -5149,13 +5159,13 @@ typedef struct _ypStrObject ypStrObject;
 // Empty bytes can be represented by this, immortal object
 static ypBytesObject _yp_bytes_empty_struct = {
     { ypBytes_CODE, 0, ypStringLib_ENC_BYTES, ypObject_REFCNT_IMMORTAL,
-    0, 0, ypObject_HASH_INVALID, "" } };
+    0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, "" } };
 #define _yp_bytes_empty     ((ypObject *) &_yp_bytes_empty_struct)
 
 // Empty strs can be represented by this, immortal object
 static ypStrObject _yp_str_empty_struct = {
     { ypStr_CODE, 0, ypStringLib_ENC_LATIN_1, ypObject_REFCNT_IMMORTAL,
-    0, 0, ypObject_HASH_INVALID, "" }, _yp_bytes_empty };
+    0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, "" }, _yp_bytes_empty };
 #define _yp_str_empty   ((ypObject *) &_yp_str_empty_struct)
 
 // Gets the ordinal at src[src_i].  src_i must be in range(len): no bounds checking is performed.
