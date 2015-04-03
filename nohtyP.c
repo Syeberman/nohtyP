@@ -4941,8 +4941,7 @@ static void _ypSequence_repeat_memcpy( void *_data, yp_ssize_t factor, yp_ssize_
 {
     yp_uint8_t *data = (yp_uint8_t *) _data;
     yp_ssize_t copied; // the number of times [:n_size] has been repeated (starts at 1, of course)
-    yp_ASSERT( factor > 0 && n_size > 0, "factor or n_size less than one" );
-    yp_ASSERT( factor <= SIZE_MAX/2 && factor <= yp_SSIZE_T_MAX, "factor too large" );
+    yp_ASSERT( factor > 0 && n_size > 0, "factor and n_size must both be strictly positive" );
     yp_ASSERT( factor <= yp_SSIZE_T_MAX / n_size, "factor*n_size too large" );
     for( copied = 1; copied*2 < factor; copied *= 2 ) {
         memcpy( data+(n_size*copied), data+0, n_size*copied );
