@@ -1,7 +1,7 @@
 /*
  * nohtyP.c - A Python-like API for C, in one .c and one .h
  *      http://bitbucket.org/Syeberman/nohtyp   [v0.1.0 $Change$]
- *      Copyright (c) 2001-2013 Python Software Foundation; All Rights Reserved
+ *      Copyright (c) 2001-2015 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  */
 
@@ -6397,7 +6397,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
         // twice the required memory here
         // TODO Take into account that we already know the first leading_ascii bytes don't
         // contain continuation bytes
-        // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
+        if( source_len > ypStringLib_LEN_MAX / 2 ) return yp_MemorySizeOverflowError;
         dest = _ypBytes_new( type, source_len*2, /*alloclen_fixed=*/FALSE );
         if( yp_isexceptionC( dest ) ) return dest;
         dest_data = ypStringLib_DATA( dest );
@@ -6407,7 +6407,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
 
     // If it doesn't start with any ASCII...well...not much we can do
     } else {
-        // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
+        if( source_len > ypStringLib_LEN_MAX / 2 ) return yp_MemorySizeOverflowError;
         dest = _ypBytes_new( type, source_len*2, /*alloclen_fixed=*/FALSE );
         if( yp_isexceptionC( dest ) ) return dest;
         s = source_data;
@@ -6464,7 +6464,7 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     yp_ASSERT( source_enc != ypStringLib_ENC_LATIN_1, "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings" );
     maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 3 : 4;
 
-    // FIXME _ypBytes_new requires checking ypStringLib_LEN_MAX first
+    if( source_len > ypStringLib_LEN_MAX / maxCharSize ) return yp_MemorySizeOverflowError;
     dest = _ypBytes_new( type, source_len*maxCharSize, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( dest ) ) return dest;
     d = dest_data = ypStringLib_DATA( dest );
@@ -8147,7 +8147,7 @@ static ypObject *_ypStr_new5( int type, yp_ssize_t requiredLen, int alloclen_fix
     ypObject *newS;
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
-    yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
+    yp_ASSERT( requiredLen <= ypStr_LEN_MAX, "requiredLen cannot be >max" );
     if( alloclen_fixed && type == ypStr_CODE ) {
         newS = ypMem_MALLOC_CONTAINER_INLINE4( ypStrObject, ypStr_CODE, requiredLen+1, elemsize );
     } else {
