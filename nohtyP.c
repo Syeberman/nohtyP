@@ -21,6 +21,9 @@
 // potential performance issues?
 // TODO Do like Python and have just type+refcnt for non-containers
 // TODO Python now has operator.length_hint that accepts a default=0 value to return
+// TODO Move all the in-line overflow checks into macros/functions that use platform-efficient
+// versions as appropriate (like https://gcc.gnu.org/onlinedocs/gcc/Integer-Overflow-Builtins.html).
+
 
 #include "nohtyP.h"
 #include <stdlib.h>
@@ -5181,6 +5184,7 @@ typedef void (*ypStringLib_setindexXfunc)( void *dest, yp_ssize_t dest_i, yp_uin
 
 // XXX In general for this table, make sure you do not use type codes with the wrong
 // ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
+// XXX Also ensure that any lengths are in range(ypStringLib_LEN_MAX+1).
 // TODO The more functions we can remove from this table, the better for the optimizer (true?)
 typedef struct {
     int sizeshift;                          // len<<sizeshift gives the size in bytes
@@ -6163,7 +6167,7 @@ InvalidContinuation3:
 
 // Decodes the len bytes of UTF-8 at source according to errors, and returns a new string of the
 // given type.  If source is NULL it is considered as having all null bytes; len cannot be
-// negative.
+// negative or greater than ypStringLib_LEN_MAX.
 // XXX Allocation-wise, the worst-case through the code would be a completely UCS-4 string, as we'd
 // allocate len characters (len*4 bytes) for the decoding, but would only decode len/4 characters
 // TODO This is TERRIBLE, because if a string has more than a couple UCS-4 characters, it's
@@ -6176,7 +6180,6 @@ InvalidContinuation3:
 // TODO When resizing in this function, don't blindly accept len as the allocation length, but take
 // newS_len + remaining_len.  In other words, take advantage of knowing how many continuation
 // characters we consumed in getting newS to where it is.
-// FIXME To call _ypStr_new_latin_1, you must first check ypStringLib_LEN_MAX!
 // FIXME This could use a rewrite
 static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
@@ -6194,7 +6197,8 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
     const yp_uint8_t *errmsg = "";
     yp_codecs_error_handler_func_t errorHandler = NULL;
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
-    yp_ASSERT( len >= 0, "negative len not allowed (do strlen before ypStringLib_decode_frombytesC_*)" );
+    yp_ASSERT( len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before ypStringLib_decode_frombytesC_*)" );
+    yp_ASSERT( len <= ypStringLib_LEN_MAX, "can't decode more than ypStringLib_LEN_MAX bytes" );
 
     // Handle the empty-string and string-of-nulls cases first
     if( len < 1 ) {
@@ -6944,6 +6948,26 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 // move.  Recall that memmove handles overlap.  Also adjusts null terminator.
 #define ypBytes_ELEMMOVE( b, dest, src ) \
     memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src)+1 );
+
+// When byte arrays are accepted from C, a negative len indicates that strlen( source ) should be
+// used as the length.  This function updates *len accordingly.  Returns false if the final value
+// of *len would be larger than ypBytes_LEN_MAX, in which case *len is undefined and 
+// yp_MemorySizeOverflowError should probably be returned.
+static int ypBytes_adjust_lenC( const yp_uint8_t *source, yp_ssize_t *len )
+{
+    if( *len < 0 ) {
+        if( source == NULL ) {
+            *len = 0;
+        } else {
+            size_t ulen = strlen( (const char *) source );
+            if( ulen > ypBytes_LEN_MAX ) return FALSE;
+            *len = (yp_ssize_t) ulen;
+        }
+    } else if( *len > ypBytes_LEN_MAX ) {
+        return FALSE;
+    }
+    return TRUE;
+}
 
 // Return a new bytes/bytearray object that can fit the given requiredLen plus the null terminator.
 // If type is immutable and alloclen_fixed is true (indicating the object will never grow), the
@@ -7973,17 +7997,11 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
 {
     ypObject *b;
 
-    // Allocate an object of the appropriate size
-    if( source == NULL ) {
-        if( len < 0 ) len = 0;
-    } else {
-        if( len < 0 ) len = strlen( (const char *) source );
-    }
+    if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     if( len < 1 ) {
         if( type == ypBytes_CODE ) return _yp_bytes_empty;
         return yp_bytearray0( );
     }
-    if( len > ypBytes_LEN_MAX ) return yp_MemorySizeOverflowError;
     b = _ypBytes_new( type, len, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( b ) ) return b;
 
@@ -8745,12 +8763,8 @@ static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
 
-    // Do not call ypStringLib_decode_frombytesC_* with a negative len; instead, do strlen here
-    if( len < 0 ) {
-        len = (source == NULL) ? 0 : strlen( (const char *) source );
-    }
-
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
+    if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     result = ypStringLib_decode_frombytesC_utf_8( type, source, len, errors );
     if( yp_isexceptionC( result ) ) return result;
     yp_ASSERT( ypObject_TYPE_CODE( result ) == type, "text encoding didn't return correct type" );
@@ -8766,15 +8780,11 @@ ypObject *yp_chrarray_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
     return _ypStr_frombytes( ypChrArray_CODE, source, len, encoding, errors );
 }
 ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
-    if( len < 0 ) { // do not call ypStringLib_decode_frombytesC_* with negative len
-        len = (source == NULL) ? 0 : strlen( (const char *) source );
-    }
+    if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     return ypStringLib_decode_frombytesC_utf_8( ypStr_CODE, source, len, yp_s_strict );
 }
 ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
-    if( len < 0 ) { // do not call ypStringLib_decode_frombytesC_* with negative len
-        len = (source == NULL) ? 0 : strlen( (const char *) source );
-    }
+    if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     return ypStringLib_decode_frombytesC_utf_8( ypChrArray_CODE, source, len, yp_s_strict );
 }
 
