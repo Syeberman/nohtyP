@@ -6533,8 +6533,8 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     return dest;
 }
 
-// FIXME This code is actually pretty simple.  Rethink the idea of keeping a utf_8 object
-// associated with str objects.  If we remove it, we can use common new/copy/grow between str/bytes
+// TODO This code is actually pretty simple.  Rethink the idea of keeping a utf_8 object
+// associated with str objects.  If we remove it, we can use common new/copy/grow between str/bytes.
 static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
 {
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypBytes_CODE, "incorrect bytes type" );
@@ -6693,7 +6693,6 @@ static ypObject *yp_codecs_register_error(
         ypObject *name, yp_codecs_error_handler_func_t error_handler )
 {
     ypObject *exc = yp_None;
-    // FIXME Normalize the name
     ypObject *result = yp_intC( (yp_ssize_t) error_handler );
     yp_setitemE( _yp_codecs_name2error, name, result, &exc );
     yp_decref( result );
@@ -6702,7 +6701,6 @@ static ypObject *yp_codecs_register_error(
 
 static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc )
 {
-    // FIXME Normalize the name
     ypObject *exc = yp_None;
     ypObject *result = yp_getitem( _yp_codecs_name2error, name );   // new ref
     yp_codecs_error_handler_func_t error_handler =
@@ -6786,9 +6784,8 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
     yp_uint8_t *outp;
     yp_ssize_t i;
 
-    // FIXME yp_TypeError if the source isn't the type we expect
     getindexX = _yp_codecs_strenc2getindexX( params->source.data.type );
-    if( getindexX == NULL ) return yp_SystemError;  // shouldn't occur
+    if( getindexX == NULL ) return yp_TypeError;  // params->source.data.type not a string type
 
     if( encoding == yp_s_utf_8 ) {
         yp_ssize_t badEnd;      // index of end of surrogates to replace from source
@@ -8488,7 +8485,7 @@ static int _ypStr_relative_cmp( ypObject *s, ypObject *x ) {
 static ypObject *str_lt( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
-    // FIXME relative comps for ucs-2 and -4
+    // TODO relative comps for ucs-2 and -4
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     if( ypStringLib_ENC_CODE( x ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) < 0 );
@@ -8496,7 +8493,7 @@ static ypObject *str_lt( ypObject *s, ypObject *x ) {
 static ypObject *str_le( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
-    // FIXME relative comps for ucs-2 and -4
+    // TODO relative comps for ucs-2 and -4
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     if( ypStringLib_ENC_CODE( x ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) <= 0 );
@@ -8504,7 +8501,7 @@ static ypObject *str_le( ypObject *s, ypObject *x ) {
 static ypObject *str_ge( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
-    // FIXME relative comps for ucs-2 and -4
+    // TODO relative comps for ucs-2 and -4
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     if( ypStringLib_ENC_CODE( x ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) >= 0 );
@@ -8512,7 +8509,7 @@ static ypObject *str_ge( ypObject *s, ypObject *x ) {
 static ypObject *str_gt( ypObject *s, ypObject *x ) {
     if( s == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
-    // FIXME relative comps for ucs-2 and -4
+    // TODO relative comps for ucs-2 and -4
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     if( ypStringLib_ENC_CODE( x ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) > 0 );
@@ -8541,7 +8538,7 @@ static ypObject *str_ne( ypObject *s, ypObject *x ) {
 }
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
-// FIXME bring this in-line with Python's string hashing; it's currently using bytes hashing
+// TODO bring this in-line with Python's string hashing; it's currently using bytes hashing
 static ypObject *str_currenthash( ypObject *s,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
@@ -8733,7 +8730,7 @@ static ypObject *_yp_asencodedCX( ypObject *s, const yp_uint8_t * *encoded, yp_s
     ypStr_ASSERT_INVARIANTS( s );
     *encoded = ypStr_DATA( s );
     if( size == NULL ) {
-        // FIXME Support UCS-2 and -4 here
+        // TODO Support UCS-2 and -4 here
         if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
         if( (yp_ssize_t) strlen( *encoded ) != ypStr_LEN( s ) ) return yp_TypeError;
     } else {
@@ -9122,7 +9119,7 @@ ypObject *yp_join( ypObject *s, ypObject *iterable ) {
         result = ypStringLib_join( s, methods, &state );
         methods->close( &state );
     } else {
-        // FIXME It would be better to handle this without creating a temporary tuple at all,
+        // TODO It would be better to handle this without creating a temporary tuple at all,
         // so create a ypStringLib_join_from_iter instead
         ypObject *temptuple = yp_tuple( iterable );
         if( yp_isexceptionC( temptuple ) ) return temptuple;
