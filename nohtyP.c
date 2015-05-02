@@ -5961,9 +5961,9 @@ final_loop:
 /* 10xxxxxx */
 #define ypStringLib_IS_CONTINUATION_BYTE(ch) ((ch) >= 0x80 && (ch) < 0xC0)
 
-// _ypStringLib_decode_utf_8 either returns one of these values, or the out-of-range character
-// (>0xFF) that was decoded but not written.  The invalid continuation values (1, 2, and 3)
-// are chosen so that the value gives the number of bytes that must be skipped.
+// _ypStringLib_decode_utf_8_inner_loop either returns one of these values, or the out-of-range 
+// character (>0xFF) that was decoded but not written.  The invalid continuation values (1, 2, and
+// 3) are chosen so that the value gives the number of bytes that must be skipped.
 #define ypStringLib_UTF_8_DATA_END          (0u)
 #define ypStringLib_UTF_8_INVALID_CONT_1    (1u)
 #define ypStringLib_UTF_8_INVALID_CONT_2    (2u)
@@ -5977,8 +5977,8 @@ final_loop:
 // it will be up to the caller to reallocate dest and append the character.
 // XXX Adapted from Python's STRINGLIB(utf8_decode)
 // TODO Bracket all if statements, remove all but the Return goto
-static yp_uint32_t _ypStringLib_decode_utf_8( const yp_uint8_t **source, const yp_uint8_t *end,
-        ypObject *dest )
+static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
+    const yp_uint8_t **source, const yp_uint8_t *end )
 {
     yp_uint32_t ch;
     const yp_uint8_t *s = *source;
@@ -6165,159 +6165,56 @@ InvalidContinuation3:
     goto Return;
 }
 
-// Decodes the len bytes of UTF-8 at source according to errors, and returns a new string of the
-// given type.  If source is NULL it is considered as having all null bytes; len cannot be
-// negative or greater than ypStringLib_LEN_MAX.
-// XXX Allocation-wise, the worst-case through the code would be a completely UCS-4 string, as we'd
-// allocate len characters (len*4 bytes) for the decoding, but would only decode len/4 characters
-// TODO This is TERRIBLE, because if a string has more than a couple UCS-4 characters, it's
-// probably *mostly* UCS-4 characters
-// XXX Runtime-wise, the worst-case would probably be a string that starts completely Latin-1 (each
-// character is a call to enc->setindexX), followed by a UCS-2 then a UCS-4 character (each
-// triggering an upconvert of previously-decoded characters)
-// TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
-// decoding errors
-// TODO When resizing in this function, don't blindly accept len as the allocation length, but take
-// newS_len + remaining_len.  In other words, take advantage of knowing how many continuation
-// characters we consumed in getting newS to where it is.
-// FIXME This could use a rewrite
-static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed );
-static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
+// Called when _ypStringLib_decode_utf_8_inner_loop can't fit the decoded character ch in the 
+// current encoding.  This will up-convert dest to an encoding that can fit ch, then append ch.  
+// dest will have space for requiredLen characters plus the null terminator (make sure this
+// includes room for ch).
+static ypObject *_ypStringLib_decode_utf_8_grow_encoding( ypObject *dest, yp_uint32_t ch,
+    yp_ssize_t requiredLen )
 {
-    const yp_uint8_t *starts = source;
-    const yp_uint8_t *end = source + len;
-    yp_ssize_t leading_ascii;
-    ypObject *newS;
-    const yp_uint8_t *fake_end;
+    int newEnc;
     ypObject *result;
-    yp_uint32_t ch;
-    yp_ssize_t startinpos;
-    yp_ssize_t endinpos;
-    const yp_uint8_t *errmsg = "";
+    yp_ASSERT( ch > 0xFFu, "only call when _ypStringLib_decode_utf_8_inner_loop can't fit the decoded character" );
+    yp_ASSERT( requiredLen - ypStringLib_LEN( dest ) > 0, "not enough room given to write ch" );
+
+    newEnc = ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2;
+    yp_ASSERT( newEnc > ypStringLib_ENC_CODE( dest ), "function called without actually needing to grow the encoding" );
+    result = _ypStr_grow_onextend( dest, requiredLen, 0, newEnc );
+    if( yp_isexceptionC( result ) ) return result;
+
+    ypStringLib_encs[newEnc].setindexX(
+            ypStringLib_DATA( dest ), ypStringLib_LEN( dest ), ch );
+    ypStringLib_SET_LEN( dest, ypStringLib_LEN( dest ) + 1 );
+    return yp_None;
+}
+
+static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest, 
+    const yp_uint8_t *starts, const yp_uint8_t *source, const yp_uint8_t *end, ypObject *errors )
+{
+    ypObject *result;
     yp_codecs_error_handler_func_t errorHandler = NULL;
-    yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
-    yp_ASSERT( len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before ypStringLib_decode_frombytesC_*)" );
-    yp_ASSERT( len <= ypStringLib_LEN_MAX, "can't decode more than ypStringLib_LEN_MAX bytes" );
 
-    // Handle the empty-string and string-of-nulls cases first
-    if( len < 1 ) {
-        if( type == ypStr_CODE ) return _yp_str_empty;
-        return yp_chrarray0( );
-    } else if( source == NULL ) {
-        newS = _ypStr_new_latin_1( type, len, /*alloclen_fixed=*/TRUE );
-        if( yp_isexceptionC( newS ) ) return newS;
-        memset( ypStringLib_DATA( newS ), 0, len+1 /*+1 for extra null terminator*/ );
-        ypStringLib_SET_LEN( newS, len );
-        ypStringLib_ASSERT_INVARIANTS( newS );
-        return newS;
-    }
-
-    // We optimize for UTF-8 data that is completely, or almost-completely, ASCII, since ASCII is
-    // equivalent to the first 128 ordinals in Unicode
-    if( source[0] < 0x80u ) {
-        // Handle single-char strings separately so we can take advantage of yp_chrC efficiencies
-        if( len == 1 ) {
-            if( type == ypStr_CODE ) return yp_chrC( source[0] );
-            newS = _ypStr_new_latin_1( ypChrArray_CODE, 1, /*alloclen_fixed=*/FALSE );
-            if( yp_isexceptionC( newS ) ) return newS;
-            ((yp_uint8_t *) ypStringLib_DATA( newS ))[0] = source[0];
-            ((yp_uint8_t *) ypStringLib_DATA( newS ))[1] = 0;
-            ypStringLib_SET_LEN( newS, 1 );
-            ypStringLib_ASSERT_INVARIANTS( newS );
-            return newS;
-        }
-
-        // If the string is entirely ASCII characters, we can memcpy and possibly allocate in-line
-        leading_ascii = ypStringLib_count_ascii_bytes( source, end );
-        yp_ASSERT1( leading_ascii > 0 );
-        if( leading_ascii == len ) {
-            // TODO When we have an associated UTF-8 bytes object, we can share the ASCII buffer
-            newS = _ypStr_new_latin_1( type, len, /*alloclen_fixed=*/TRUE );
-            if( yp_isexceptionC( newS ) ) return newS;
-            memcpy( ypStringLib_DATA( newS ), source, len );
-            ((yp_uint8_t *) ypStringLib_DATA( newS ))[len] = 0;
-            ypStringLib_SET_LEN( newS, len );
-            ypStringLib_ASSERT_INVARIANTS( newS );
-            return newS;
-        }
-
-        // Otherwise, it's not entirely ASCII, but we know it starts that way, so copy over the
-        // part we know and move on to the main loop
-        // XXX Worst case: If source contains mostly 0x80-0xFF characters then we are allocating
-        // twice the required memory here
-        // TODO Take into account that we already know the first leading_ascii bytes don't
-        // contain continuation bytes
-        newS = _ypStr_new_latin_1( type, len, /*alloclen_fixed=*/FALSE );
-        if( yp_isexceptionC( newS ) ) return newS;
-        memcpy( ypStringLib_DATA( newS ), source, leading_ascii );
-        ypStringLib_SET_LEN( newS, leading_ascii );
-        source += leading_ascii;
-
-    // If it doesn't start with any ASCII, then before we allocate a separate buffer to hold the
-    // data, run the first few bytes through _ypStringLib_decode_utf_8 using the inline buffer, to
-    // see if we can tell what element size we _should_ be using
-    // TODO Contribute this optimization back to Python?
-    } else {
-        newS = _ypStr_new_latin_1( type, 0, /*alloclen_fixed=*/FALSE );
-        if( yp_isexceptionC( newS ) ) return newS;
-        yp_ASSERT( ypStringLib_ALLOCLEN( newS ) > 0+1, "str inlinelen should fit at least one character" );
-
-        // Shortcut: if the inline array can fit all decoded characters anyway, jump to main loop
-        if( len <= ypStringLib_ALLOCLEN( newS )-1 /*-1 for terminator*/ ) goto main_loop;
-
-        fake_end = source + ypStringLib_ALLOCLEN( newS );
-        ch = _ypStringLib_decode_utf_8( &source, fake_end, newS );
-        if( ch > 0xFFu ) {
-            // This will up-convert _and_ resize to the required length
-            // TODO If ch<0x10000, we could still use the inline buffer to see if there are 4-byte
-            // characters in the string
-            int newEnc = ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2;
-            result = _ypStr_grow_onextend( newS, len, 0, newEnc );
-            if( yp_isexceptionC( result ) ) {
-                yp_decref( newS );
-                return result;
-            }
-            // Don't forget to write the character that didn't previously fit
-            ypStringLib_encs[newEnc].setindexX(
-                    ypStringLib_DATA(newS), ypStringLib_LEN(newS), ch);
-            ypStringLib_SET_LEN(newS, ypStringLib_LEN(newS) + 1);
-        } else {
-            // Otherwise it's Latin-1 as far as we can see, or there was a decoding error, so
-            // resize and move on to the main loop
-            // TODO take into account the continuation bytes we already know about
-            result = _ypStr_grow_onextend( newS, len, 0, ypStringLib_ENC_LATIN_1 );
-            if( yp_isexceptionC( result ) ) {
-                yp_decref( newS );
-                return result;
-            }
-        }
-    }
-
-main_loop:
     while( 1 ) {
-        ch = _ypStringLib_decode_utf_8( &source, end, newS );
+        yp_uint32_t ch = _ypStringLib_decode_utf_8_inner_loop( dest, &source, end );
+
         if( ch > 0xFFu ) {
-            // This will up-convert and resize to the required length
-            // TODO We can update the maximum expected length, like we do below
-            int newEnc = ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2;
-            result = _ypStr_grow_onextend( newS, len, 0, newEnc );
-            if( yp_isexceptionC( result ) ) {
-                yp_decref( newS );
-                return result;
-            }
-            // Don't forget to write the character that didn't previously fit
-            ypStringLib_encs[newEnc].setindexX(
-                ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), ch );
-            ypStringLib_SET_LEN( newS, ypStringLib_LEN( newS ) + 1 );
+            // We can now update our expectation of how many more characters will be added: it's the
+            // number of byes left to decode (remembering source was modified above).
+            // XXX This can't overflow because dest_alloclen should be smaller than currently
+            yp_ssize_t dest_requiredLen = ypStringLib_LEN( dest ) + (end - source) + 1;
+            result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
+            if( yp_isexceptionC( result ) ) return result;
+        
         } else {
             // TODO Test surrogate characters in the start, end, and middle of string, both on
             // encode and decode, and multiple contiguous and non-contiguous surrogates
             ypObject *repunicode;
-            startinpos = source - starts;
+            const yp_uint8_t *errmsg;
+            yp_ssize_t endinpos;
+            yp_ssize_t startinpos = source - starts;
             switch( ch ) {
                 case ypStringLib_UTF_8_DATA_END:
-                    if( source >= end ) goto main_loop_end;
+                    if( source >= end ) goto inner_loop_end;
                     errmsg = "unexpected end of data";
                     endinpos = end - starts;
                     break;
@@ -6334,33 +6231,182 @@ main_loop:
                     endinpos = startinpos + ch;
                     break;
                 default:
-                    yp_decref( newS );
                     return yp_SystemError;
             }
+
             repunicode = ypStringLib_decode_call_errorhandler(  // new ref
                 errors, &errorHandler, yp_s_utf_8, errmsg,
                 starts, end, startinpos, endinpos, &source );
-            if( yp_isexceptionC( repunicode ) ) {
-                yp_decref( newS );
-                return repunicode;
-            }
+            if( yp_isexceptionC( repunicode ) ) return repunicode;
+
             // We can now update our expectation of how many more characters will be added: it's the
             // number of byes left to decode (remembering source was modified above).
             result = ypStringLib_decode_concat_replacement(
-                newS, repunicode, end - source );
+                dest, repunicode, end - source );
             yp_decref( repunicode );
-            if( yp_isexceptionC( result ) ) {
-                yp_decref( newS );
-                return result;
-            }
+            if( yp_isexceptionC( result ) ) return result;
         }
     }
-main_loop_end:
 
+inner_loop_end:
     // TODO See how much wasted space is left here and if we should release some back to the heap
-    ypStringLib_ENC( newS )->setindexX( ypStringLib_DATA( newS ), ypStringLib_LEN( newS ), 0 );
-    ypStringLib_ASSERT_INVARIANTS( newS );   
+    ypStringLib_ENC( dest )->setindexX( ypStringLib_DATA( dest ), ypStringLib_LEN( dest ), 0 );
+    ypStringLib_ASSERT_INVARIANTS( dest );   
+    return yp_None;
+}
+
+
+// Called on a null source.  Returns a (null-terminated) string of null characters of the given
+// length.
+static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed );
+static ypObject *_ypStringLib_decode_utf_8_onnull( int type, yp_ssize_t len ) 
+{
+    ypObject *newS = _ypStr_new_latin_1( type, len, /*alloclen_fixed=*/TRUE );
+    if( yp_isexceptionC( newS ) ) return newS;
+    memset( ypStringLib_DATA( newS ), 0, len+1 /*+1 for extra null terminator*/ );
+    ypStringLib_SET_LEN( newS, len );
+    ypStringLib_ASSERT_INVARIANTS( newS );
     return newS;
+}
+
+// Called when source starts with at least one ascii character.  Returns the decoded string object.
+static ypObject *_yp_chrC( int type, yp_int_t i );
+static ypObject *_ypStringLib_decode_utf_8_ascii_start( int type,
+        const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
+{
+    const yp_uint8_t *starts = source;
+    const yp_uint8_t *end = source + len;
+    yp_ssize_t leading_ascii;
+    ypObject *dest;
+    ypObject *result;
+    yp_ASSERT( len > 0, "zero-length strings should be handled before this function" );
+    yp_ASSERT( source[0] < 0x80u, "call this only on strings that start with ascii characters" );
+
+    // Handle single-char strings separately so we can take advantage of yp_chrC efficiencies
+    if( len == 1 ) {
+        return _yp_chrC( type, source[0] );
+    }
+
+    // If the string is entirely ASCII characters, we can memcpy and possibly allocate in-line
+    leading_ascii = ypStringLib_count_ascii_bytes( source, end );
+    yp_ASSERT( leading_ascii > 0 && leading_ascii <= len, "unexpected output from ypStringLib_count_ascii_bytes" );
+    if( leading_ascii == len ) {
+        // TODO When we have an associated UTF-8 bytes object, we can share the ASCII buffer
+        dest = _ypStr_new_latin_1( type, len, /*alloclen_fixed=*/TRUE );
+        if( yp_isexceptionC( dest ) ) return dest;
+        memcpy( ypStringLib_DATA( dest ), source, len );
+        ((yp_uint8_t *) ypStringLib_DATA( dest ))[len] = 0;
+        ypStringLib_SET_LEN( dest, len );
+        ypStringLib_ASSERT_INVARIANTS( dest );
+        return dest;
+    }
+
+    // Otherwise, it's not entirely ASCII, but we know it starts that way, so copy over the
+    // part we know and move on to the main loop
+    // XXX Worst case: If source contains mostly 0x80-0xFF characters then we are allocating
+    // twice the required memory here
+    dest = _ypStr_new_latin_1( type, len, /*alloclen_fixed=*/FALSE );
+    if( yp_isexceptionC( dest ) ) return dest;
+    memcpy( ypStringLib_DATA( dest ), source, leading_ascii );
+    ypStringLib_SET_LEN( dest, leading_ascii );
+    source += leading_ascii;
+
+    result = _ypStringLib_decode_utf_8_outer_loop( dest, starts, source, end, errors );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( dest );
+        return result;
+    }
+    return dest;
+}
+
+// Called by ypStringLib_decode_frombytesC_utf_8 in the general case.  Returns the decoded string
+// object.
+static ypObject *_ypStringLib_decode_utf_8( int type,
+        const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
+{
+    const yp_uint8_t *starts = source;
+    const yp_uint8_t *end = source + len;
+    const yp_uint8_t *fake_end;
+    ypObject *dest;
+    yp_uint32_t ch;
+    yp_ssize_t dest_requiredLen;
+    ypObject *result;
+    yp_ASSERT( len > 0, "zero-length strings should be handled before this function" );
+
+    // If it doesn't start with any ASCII, then before we allocate a separate buffer to hold the
+    // data, run the first few bytes through _ypStringLib_decode_utf_8_inner_loop using the
+    // inline buffer, to see if we can tell what element size we _should_ be using
+    // TODO Contribute this optimization back to Python?
+
+    dest = _ypStr_new_latin_1( type, 0, /*alloclen_fixed=*/FALSE );
+    if( yp_isexceptionC( dest ) ) return dest;
+    yp_ASSERT( ypStringLib_ALLOCLEN( dest ) > 0+1, "str inlinelen should fit at least one character" );
+
+    // Shortcut: if the inline array can fit all decoded characters anyway, jump to outer loop
+    if( len <= ypStringLib_ALLOCLEN( dest )-1 /*-1 for terminator*/ ) goto outer_loop;
+
+    fake_end = source + ypStringLib_ALLOCLEN( dest );
+    ch = _ypStringLib_decode_utf_8_inner_loop( dest, &source, fake_end );
+
+    // XXX This can't overflow because dest_alloclen should be smaller than currently
+    dest_requiredLen = ypStringLib_LEN( dest ) + (end - source) + 1;
+    if( ch > 0xFFu ) {
+        // TODO If ch<0x10000, we could still use the inline buffer to see if there are 4-byte
+        // characters in the string
+        result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
+    } else {
+        // Otherwise it's Latin-1 as far as we can see, or there was a decoding error, so
+        // resize and move on to the main loop
+        // XXX I don't think we an avoid resizing on decoding errors, because we don't know if
+        // the error occured as a result of an encoded character truncated by fake_end
+        result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_LATIN_1 );
+    }
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( dest );
+        return result;
+    }
+
+outer_loop:
+    result = _ypStringLib_decode_utf_8_outer_loop( dest, starts, source, end, errors );
+    if( yp_isexceptionC( result ) ) {
+        yp_decref( dest );
+        return result;
+    }
+    return dest;
+}
+
+// Decodes the len bytes of UTF-8 at source according to errors, and returns a new string of the
+// given type.  If source is NULL it is considered as having all null bytes; len cannot be
+// negative or greater than ypStringLib_LEN_MAX.
+// XXX Allocation-wise, the worst-case through the code would be a completely UCS-4 string, as we'd
+// allocate len characters (len*4 bytes) for the decoding, but would only decode len/4 characters
+// TODO This is TERRIBLE, because if a string has more than a couple UCS-4 characters, it's
+// probably *mostly* UCS-4 characters
+// XXX Runtime-wise, the worst-case would probably be a string that starts completely Latin-1 (each
+// character is a call to enc->setindexX), followed by a UCS-2 then a UCS-4 character (each
+// triggering an upconvert of previously-decoded characters)
+// TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
+// decoding errors
+static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
+        const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
+{
+    yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
+    yp_ASSERT( len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before ypStringLib_decode_frombytesC_*)" );
+    yp_ASSERT( len <= ypStringLib_LEN_MAX, "can't decode more than ypStringLib_LEN_MAX bytes" );
+
+    // Handle the empty-string and string-of-nulls cases first
+    if( len < 1 ) {
+        if( type == ypStr_CODE ) return _yp_str_empty;
+        return yp_chrarray0( );
+    } else if( source == NULL ) {
+        return _ypStringLib_decode_utf_8_onnull( type, len );
+    } else if( source[0] < 0x80u ) {
+        // We optimize for UTF-8 data that is completely, or at least starts with, ASCII: since 
+        // ASCII is equivalent to the first 128 ordinals in Unicode, we can memcpy
+        return _ypStringLib_decode_utf_8_ascii_start( type, source, len, errors );
+    } else {
+        return _ypStringLib_decode_utf_8( type, source, len, errors );
+    }
 }
 
 // XXX Allocation-wise, the worst-case through the code is a string that starts with a latin-1
@@ -8840,8 +8886,8 @@ ypObject *yp_chrarray0( void ) {
     return newS;
 }
 
-// TODO Statically-allocate the first 256 characters?
-ypObject *yp_chrC( yp_int_t i ) {
+// TODO Statically-allocate the first 256 characters for ypStr_CODE only?
+static ypObject *_yp_chrC( int type, yp_int_t i ) {
     int newEnc_code;
     ypObject *newS;
     ypStringLib_encinfo *newEnc;
@@ -8851,16 +8897,20 @@ ypObject *yp_chrC( yp_int_t i ) {
                   i > 0xFFu   ? ypStringLib_ENC_UCS_2 :
                   ypStringLib_ENC_LATIN_1;
 
-    newS = _ypStr_new( ypStr_CODE, 1, /*alloclen_fixed=*/TRUE, newEnc_code );
+    newS = _ypStr_new( type, 1, /*alloclen_fixed=*/TRUE, newEnc_code );
     if( yp_isexceptionC( newS ) ) return newS;
     yp_ASSERT( ypStr_DATA( newS ) == ypStr_INLINE_DATA( newS ), "yp_chrC didn't allocate inline!" );
-    newEnc = &(ypStringLib_encs[newEnc_code]);
+
     // Recall we've already checked that i isn't outside of a 32-bit range (MAX_UNICODE)
+    newEnc = &(ypStringLib_encs[newEnc_code]);
     newEnc->setindexX( ypStr_DATA( newS ), 0, (yp_uint32_t) i );
     newEnc->setindexX( ypStr_DATA( newS ), 1, 0 );
     ypStr_SET_LEN( newS, 1 );
     ypStr_ASSERT_INVARIANTS( newS );
     return newS;
+}
+ypObject *yp_chrC( yp_int_t i ) {
+    return _yp_chrC( ypStr_CODE, i );
 }
 
 // Immortal constants
