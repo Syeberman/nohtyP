@@ -5130,6 +5130,8 @@ typedef struct _ypStrObject ypStrObject;
 // could technically allow four times as much data as UCS-4, for simplicity we use one maximum
 // length for all encodings.  (Consider that an element in the largest Latin-1 chrarray could be
 // replaced with a UCS-4 character, thus quadrupling its size.)
+// TODO On the flip side, this means it's possible to create a string that, when encoded, cannot
+// fit in a bytes object, as it'll be larger than LEN_MAX.  Seems the lesser of two evils, but...
 #define ypStringLib_LEN_MAX ( (yp_ssize_t) MIN( MIN( \
             yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
             (yp_SSIZE_T_MAX-yp_sizeof( ypStrObject )) / 4 /* /4 for elemsize of UCS-4 */ ), \
@@ -6387,6 +6389,9 @@ outer_loop:
 // triggering an upconvert of previously-decoded characters)
 // TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
 // decoding errors
+// TODO Consider the above worst-case runtime case.  Perhaps there is a quick way to scan the bytes
+// to see what the largest possible required encoding is, then we can allocate exactly.  Although,
+// it might just be cheaper to trim the excess memory at the end.
 static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
         const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
 {
@@ -6412,7 +6417,8 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
 // XXX Allocation-wise, the worst-case through the code is a string that starts with a latin-1
 // character, causing us to allocate len*2 bytes, then containing only ascii, wasting just a byte
 // under half the buffer
-// XXX Runtime-wise, the worst-case is probably a string with completely latin-1 characters
+// XXX Runtime-wise, the worst-case is a string with completely latin-1 characters
+// XXX There's no possibility of an error handler being called, so we can use alloclen_fixed=TRUE
 static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len );
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *source )
@@ -6422,6 +6428,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
     yp_uint8_t * const source_end = source_data + source_len;
     yp_uint8_t *s;  // moving source_data pointer
     ypObject *dest;
+    yp_ssize_t dest_alloclen;
     yp_uint8_t *dest_data;
     yp_uint8_t *d;  // moving dest_data pointer
 
@@ -6431,11 +6438,12 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
 
     // We optimize for UTF-8 data that is completely, or almost-completely, ASCII, since ASCII is
     // equivalent to the first 128 ordinals in Unicode
+    // TODO If we ever keep immortal len-1 bytes objects around, use them here if source_len==1
     if( source_data[0] < 0x80u ) {
-        // TODO If we ever keep immortal len-1 bytes objects around, use them here if source_len==1
         // If the string is entirely ASCII characters, we can memcpy and possibly allocate in-line
         yp_ssize_t leading_ascii = ypStringLib_count_ascii_bytes( source_data, source_end );
-        yp_ASSERT1( leading_ascii > 0 );
+        yp_ASSERT1( leading_ascii > 0 && leading_ascii <= ypStringLib_LEN_MAX );
+        yp_ASSERT1( leading_ascii <= source_len );
         if( leading_ascii == source_len ) {
             // TODO When we have an associated UTF-8 bytes object, we can share the ASCII buffer
             return _ypBytesC( type, source_data, source_len /*alloclen_fixed=TRUE*/ );
@@ -6443,12 +6451,13 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
 
         // Otherwise, it's not entirely ASCII, but we know it starts that way, so copy over the
         // part we know and move on to the main loop
-        // XXX Worst case: If source contains mostly 0x80-0xFF characters then we are allocating
-        // twice the required memory here
-        // TODO Take into account that we already know the first leading_ascii bytes don't
-        // contain continuation bytes
-        if( source_len > ypStringLib_LEN_MAX / 2 ) return yp_MemorySizeOverflowError;
-        dest = _ypBytes_new( type, source_len*2, /*alloclen_fixed=*/FALSE );
+        // XXX We know that the first leading_ascii characters only need one byte, but the remaining
+        // might need up to two
+        if( source_len - leading_ascii > (ypStringLib_LEN_MAX - leading_ascii) / 2 ) {
+            return yp_MemorySizeOverflowError;
+        }
+        dest_alloclen = leading_ascii + (source_len - leading_ascii)*2;
+        dest = _ypBytes_new( type, dest_alloclen, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( dest ) ) return dest;
         dest_data = ypStringLib_DATA( dest );
         memcpy( dest_data, source_data, leading_ascii );
@@ -6458,7 +6467,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
     // If it doesn't start with any ASCII...well...not much we can do
     } else {
         if( source_len > ypStringLib_LEN_MAX / 2 ) return yp_MemorySizeOverflowError;
-        dest = _ypBytes_new( type, source_len*2, /*alloclen_fixed=*/FALSE );
+        dest = _ypBytes_new( type, source_len*2, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( dest ) ) return dest;
         s = source_data;
         d = dest_data = ypStringLib_DATA( dest );
@@ -6489,13 +6498,19 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
     }
 
     // Null-terminate, update length, and return
+    // TODO Trim excess memory here (certainly if it can be done in-place)
     *d = 0;
     ypStringLib_SET_LEN( dest, d-dest_data );
     ypStringLib_ASSERT_INVARIANTS( dest );
     return dest;
 }
 
-// FIXME Consider allocation and runtime
+// XXX Allocation-wise, the worst case through the code is a string that contains just one ucs-4
+// character, causing us to allocate len*4 bytes, then containing only ascii, wasting just about
+// three quarters of the buffer
+// XXX Runtime-wise, it's all pretty similar, but a completely ucs-4 string is the worst-worst
+// XXX We can't use alloclen_fixed=TRUE here, because the error handler might need to resize
+// TODO However, trimming the buffer might be a good idea
 static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
 {
     yp_ssize_t const source_len = ypStringLib_LEN( source );
@@ -8039,8 +8054,8 @@ ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *le
 static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
 {
     ypObject *b;
+    yp_ASSERT( len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before _ypBytesC*)" );
 
-    if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     if( len < 1 ) {
         if( type == ypBytes_CODE ) return _yp_bytes_empty;
         return yp_bytearray0( );
@@ -8060,9 +8075,11 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
     return b;
 }
 ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len ) {
+    if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     return _ypBytesC( ypBytes_CODE, source, len );
 }
 ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
+    if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     return _ypBytesC( ypByteArray_CODE, source, len );
 }
 
