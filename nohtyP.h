@@ -62,7 +62,7 @@
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
  *  V - A version of "N" or "K" that accepts a va_list in place of ...
- *  E - Errors modifying an object do not discard the object (instead, errors set *exc)
+ *  E - Errors modifying an object do not discard the object: instead, errors set *exc
  *  D - Discard after use (ie yp_IFd)
  *  X - Direct access to internal memory or borrowed objects; tread carefully!
  *  # (number) - A function with # inputs that otherwise shares the same name as another function
@@ -189,8 +189,8 @@ typedef yp_int64_t      yp_int_t;
 #define yp_INT_T_MIN LLONG_MIN
 typedef yp_float64_t    yp_float_t;
 
-// The signature of a function that can be wrapped up in a generator, called by yp_send and
-// similar functions.  self is the iterator object; use yp_iter_stateCX to retrieve any state
+// The signature of a function that can be wrapped up in a generator.  Called by yp_send, yp_throw,
+// and similar functions.  self is the iterator object; use yp_iter_stateCX to retrieve any state
 // variables.  value is the object that is sent into the function by yp_send; it may also be
 // yp_GeneratorExit if yp_close is called, or another exception.  The return value must be a new
 // reference, yp_StopIteration if the generator is exhausted, or another exception.  The generator
@@ -486,13 +486,15 @@ ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 // being iterated over.
 
 // "Sends" a value into *iterator and returns a new reference to the next yielded value, or an
-// exception.  The value may be ignored by the iterator.  If value is an exception this behaves
-// like yp_throw.  When the iterator is exhausted, *iterator is closed and yp_StopIteration is
-// returned; on any other error, *iterator is closed, discarded, and set to an exception, _and_ an
-// exception is returned.
+// exception.  The value may be ignored by the iterator.  value _can_ be an exception: it is left
+// to the iterator to decide how to behave in this case.  When the iterator is exhausted, *iterator
+// is closed and yp_StopIteration is returned; on any other error, *iterator is closed, discarded, 
+// and set to an exception, _and_ an exception is returned.
+// FIXME Keep yp_send strictly for values and yp_throw for exceptions, even though the underlying
+// tp_send ends up taking both.
 ypAPI ypObject *yp_send( ypObject **iterator, ypObject *value );
 
-// Equivalent to yp_send( iterator, yp_None ).
+// Equivalent to yp_send( iterator, yp_None ).  Typically used on iterators that ignore the value.
 ypAPI ypObject *yp_next( ypObject **iterator );
 
 // Similar to yp_next, but when the iterator is exhausted, *iterator is closed and a new reference
@@ -500,7 +502,7 @@ ypAPI ypObject *yp_next( ypObject **iterator );
 // an error as per yp_send (including possibly discarding *iterator).
 ypAPI ypObject *yp_next2( ypObject **iterator, ypObject *defval );
 
-// Similar to yp_send, but exc _must_ be an exception.
+// Similar to yp_send( iterator, exc ), but exc _must_ be an exception.
 ypAPI ypObject *yp_throw( ypObject **iterator, ypObject *exc );
 
 // Returns a hint as to how many items are left to be yielded.  The accuracy of this hint depends
@@ -910,6 +912,8 @@ ypAPI void yp_updateNV( ypObject **mapping, int n, va_list args );
  * Bytes & String Operations
  */
 
+// FIXME review
+
 // Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return
 // immutable ints for these types, and will only accept ints for yp_setindexC.  The individual
 // elements of strs and chrarrays are single-character (immutable) strs.
@@ -1118,6 +1122,8 @@ ypAPI ypObject *yp_decode( ypObject *b );
 /*
  * Bytes & String Formatting Operations
  */
+
+// FIXME review
 
 // The syntax of format strings can be found in Python's documentation:
 //  https://docs.python.org/3/library/string.html#format-string-syntax
@@ -1529,12 +1535,12 @@ ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssi
 // which is of type "ypObject * const".  value is a latin-1 encoded C string literal that can
 // contain null characters.  The length is calculated while compiling; the hash will be calculated
 // the first time it is accessed.  Note that this also accepts an ascii-encoded C string literal,
-// as latin-1 is a superset of ascii.
+// as ascii is a subset of latin-1.
 //      yp_IMMORTAL_STR_LATIN_1( name, value );
 
 // The default immortal "constructor" macros declare variables as "ypObject * const".  This means
 // imortals defined outside of a function will be extern.  It also means you should *not* 
-// use these macros in a function, as the variable will be deallocated when the function returns, 
+// use these macros in a function, as the variable will be "deallocated" when the function returns, 
 // and immortals should never be deallocated.  The following macros work as above, except the 
 // variables are declared as "static ypObject * const".
 //      yp_IMMORTAL_INT_static( name, value );
@@ -1797,7 +1803,7 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 // calls.  Best explained with examples:
 //  a.append( b )           --> yp( a,append, b )               --> yp_append( a, b )
 //  a + b                   --> yp( a, add, b )                 --> yp_add( a, b )
-// For methods that take no arguments, use yp1 (the '1' counts the object, but not the method):
+// For methods that take no arguments, use yp1 (the '1' counts the object a, but not the method):
 //  a.isspace( )            --> yp1( a,isspace )                --> yp_isspace( a )
 // If variadic macros are supported by your compiler, yp can take multiple arguments:
 //  a.setdefault( b, c )    --> yp( &a,setdefault, b, c )       --> yp_setdefault( &a, b, c )

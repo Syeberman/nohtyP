@@ -1548,7 +1548,7 @@ class yp_iter( ypObject ):
 def _yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
-    # FIXME convert other Python types to nohtyP types, or throw error if they aren't already
+    # TODO As elsewhere, be strict here an only accept nohtyP types (make conversions explicit in tests)
     if isinstance( iterable, c_ypObject_p ): return iterable
     if isinstance( iterable, str ): return yp_str( iterable )
     return yp_iter( iterable )

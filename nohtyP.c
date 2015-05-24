@@ -1421,6 +1421,7 @@ void yp_decrefN( int n, ... )
  * ypQuickIter: iterator-like abstraction over va_lists of ypObject*s and iterables
  * XXX Internal use only!
  *************************************************************************************************/
+// FIXME review
 
 // TODO I'm having second thoughts about the utility of this API.  It really comes down to how
 // much benefit we have sharing the va_list code with the iterable code...and last time there
@@ -1592,6 +1593,7 @@ static ypObject *ypQuickIter_new_fromiterable(
  * ypQuickSeq: sequence-like abstraction over va_lists of ypObject*s and iterables
  * XXX Internal use only!
  *************************************************************************************************/
+// FIXME review
 
 // This API exists to reduce duplication of code where variants of a method accept va_lists of
 // ypObject*s, or a general-purpose sequence.  This code intends to be a light-weight abstraction
@@ -5016,6 +5018,7 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 /*************************************************************************************************
  * In-development API for Codec registry and base classes
  *************************************************************************************************/
+// FIXME review
 
 // XXX Patterned after the codecs module in Python
 // XXX This will be exposed in nohtyP.h someday; review and improve before you do
@@ -5104,6 +5107,7 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
 /*************************************************************************************************
  * String manipulation library (for bytes and str)
  *************************************************************************************************/
+// FIXME review
 
 // The prefix ypStringLib_* is used for bytes and str, while ypStr_* is strictly the str type
 
@@ -6623,6 +6627,7 @@ static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject 
  * Codec registry and base classes
  *************************************************************************************************/
 // XXX Patterned after the codecs module in Python
+// FIXME review
 
 // TODO codecs.register to register functions for encode/decode ...also codecs.lookup
 
@@ -6997,7 +7002,7 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 #define ypBytes_ALLOCLEN            ypStringLib_ALLOCLEN
 #define ypBytes_INLINE_DATA( b )    ( ((ypBytesObject *)b)->ob_inline_data )
 
-// The maximum possible alloclen and len of a bytes (not including null terminator)
+// The maximum possible alloclen and len of a bytes
 #define ypBytes_ALLOCLEN_MAX    ypStringLib_ALLOCLEN_MAX
 #define ypBytes_LEN_MAX         ypStringLib_LEN_MAX
 
@@ -7763,7 +7768,8 @@ static ypObject *bytes_expandtabs( ypObject *b, yp_ssize_t tabsize ) {
 }
 
 static ypObject *bytes_replace( ypObject *b, ypObject *oldsub, ypObject *newsub,
-        yp_ssize_t count ) {
+        yp_ssize_t count )
+{
     if( ypObject_TYPE_PAIR_CODE( oldsub ) != ypBytes_CODE ) return_yp_BAD_TYPE( oldsub );
     if( ypObject_TYPE_PAIR_CODE( newsub ) != ypBytes_CODE ) return_yp_BAD_TYPE( newsub );
     if( (ypBytes_LEN( oldsub ) < 1 && ypBytes_LEN( newsub ) < 1) || count == 0 ) {
@@ -8067,6 +8073,7 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
     yp_ASSERT( len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before _ypBytesC*)" );
 
     if( len < 1 ) {
+        // TODO This pattern of code should be a ypBytes0 (everywhere, for all types)
         if( type == ypBytes_CODE ) return _yp_bytes_empty;
         return yp_bytearray0( );
     }
@@ -8098,8 +8105,10 @@ static ypObject *_ypBytes_encode( int type,
 {
     ypObject *result;
     if( ypObject_TYPE_PAIR_CODE( source ) != ypStr_CODE ) return_yp_BAD_TYPE( source );
+
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
+
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_encode_utf_8( type, source, errors );
     if( yp_isexceptionC( result ) ) return result;
@@ -8374,7 +8383,6 @@ static ypObject *str_bool( ypObject *s ) {
 }
 
 // Called when concatenating with an empty object: can simply make a copy (ensuring proper type)
-// TODO Add checkers in yp.py to ensure alloclen, enc_code is all proper
 static ypObject *_str_concat_copy( int type, ypObject *s )
 {
     if( type == ypStr_CODE ) return str_frozen_copy( s );
@@ -8831,8 +8839,10 @@ static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_
         ypObject *encoding, ypObject *errors )
 {
     ypObject *result;
+
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
+
 
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
@@ -8864,8 +8874,10 @@ static ypObject *_ypStr_decode( int type,
 {
     ypObject *result;
     if( ypObject_TYPE_PAIR_CODE( source ) != ypBytes_CODE ) return_yp_BAD_TYPE( source );
+
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
+
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_decode_frombytesC_utf_8( type,
             ypBytes_DATA( source ), ypBytes_LEN( source ), errors );
@@ -9036,6 +9048,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
 };
 
 // Assume these are most-likely to be run against str/chrarrays, so put that check first
+// TODO Rethink where we split off to a type-specific function, and where we call a generic ypStringLib
 #define _ypStringLib_REDIRECT1( ob, meth, args ) \
     do {int ob_pair = ypObject_TYPE_PAIR_CODE( ob ); \
         if( ob_pair == ypStr_CODE ) return str_ ## meth args; \
@@ -9217,6 +9230,7 @@ ypObject *yp_joinN( ypObject *s, int n, ... ) {
 ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
     ypQuickSeq_state state;
     ypObject *result;
+
     if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
     ypQuickSeq_new_fromvar( &state, n, args );
     result = ypStringLib_join( s, &ypQuickSeq_var_methods, &state );
@@ -10218,7 +10232,8 @@ static ypObject *ypQuickIter_tuple_nextX( ypQuickIter_state *state ) {
 }
 
 static ypObject *ypQuickIter_tuple_next( ypQuickIter_state *state ) {
-    return yp_incref( ypQuickIter_tuple_nextX( state ) );
+    ypObject *x = ypQuickIter_tuple_nextX( state );
+    return x == NULL ? NULL : yp_incref( x );
 }
 
 static yp_ssize_t ypQuickIter_tuple_lenhint( ypQuickIter_state *state, int *isexact,
@@ -10258,7 +10273,8 @@ static ypObject *ypQuickSeq_tuple_getindexX( ypQuickSeq_state *state, yp_ssize_t
 }
 
 static ypObject *ypQuickSeq_tuple_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
-    return yp_incref( ypQuickSeq_tuple_getindexX( state, i ) );
+    ypObject *x = ypQuickSeq_tuple_getindexX( state, i );
+    return x == NULL ? NULL : yp_incref( x );
 }
 
 static yp_ssize_t ypQuickSeq_tuple_len( ypQuickSeq_state *state, ypObject **exc ) {
@@ -14165,6 +14181,7 @@ static void _ypMem_initialize( const yp_initialize_kwparams_t *kwparams )
 
 // Called *exactly* *once* by yp_initialize to set up the codecs module.  Errors are largely
 // ignored: calling code will fail gracefully later on.
+// TODO Instead, fail with an ASSERT on any exceptions
 static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
 {
     // The set of standard encodings
