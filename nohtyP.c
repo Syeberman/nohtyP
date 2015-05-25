@@ -1479,7 +1479,8 @@ static ypObject *ypQuickIter_var_nextX( ypQuickIter_state *state ) {
 }
 
 static ypObject *ypQuickIter_var_next( ypQuickIter_state *state ) {
-    return yp_incref( ypQuickIter_var_nextX( state ) );
+    ypObject *x = ypQuickIter_var_nextX( state );
+    return x == NULL ? NULL : yp_incref( x );
 }
 
 static yp_ssize_t ypQuickIter_var_lenhint( ypQuickIter_state *state, int *isexact, ypObject **exc )
@@ -1666,7 +1667,8 @@ static ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i
 }
 
 static ypObject *ypQuickSeq_var_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
-    return yp_incref( ypQuickSeq_var_getindexX( state, i ) );
+    ypObject *x = ypQuickSeq_var_getindexX( state, i );
+    return x == NULL ? NULL : yp_incref( x );
 }
 
 static yp_ssize_t ypQuickSeq_var_len( ypQuickSeq_state *state, ypObject **exc ) {
