@@ -1393,6 +1393,14 @@ void yp_increfN( int n, ... )
 // Once _yp_recursion_limit is hit, the object is added to the linked list and only freed once the
 // recursion depth is zero; ob_hash is abused to point to the next object (it shouldn't be used by
 // an object with no references).
+// TODO A version of decref that returns exceptions.  Objects that could fail deallocation need to
+// ensure they are in a consistent state when returning...perhaps the deallocation can be attempted
+// again and it will skip over the part that failed?  Still need yp_decref to squelch errors, but
+// an ASSERT on error is not enough: in testing, an exception would have to be raised in a debug
+// build for anybody to notice.  Instead, certain types (i.e. file) would need to require that
+// the exception-returning version is used.  If tp_dealloc took a ypObject**exc that yp_decref set
+// to NULL but yp_decrefE didn't, then file could ASSERT on the NULL and the user would know to use
+// the exception-returning version.
 void yp_decref( ypObject *x )
 {
     if( ypObject_REFCNT( x ) >= ypObject_REFCNT_IMMORTAL ) return; // no-op
@@ -1418,16 +1426,15 @@ void yp_decrefN( int n, ... )
 
 
 /*************************************************************************************************
- * ypQuickIter: iterator-like abstraction over va_lists of ypObject*s and iterables
+ * ypQuickIter: iterator-like abstraction over va_lists of ypObject*s, and iterables
  * XXX Internal use only!
  *************************************************************************************************/
-// FIXME review
 
-// TODO I'm having second thoughts about the utility of this API.  It really comes down to how
-// much benefit we have sharing the va_list code with the iterable code...and last time there
-// wasn't that much benefit.  ypQuickSeq might be a better choice.
-// TODO Inspect all uses of va_arg, yp_miniiter_next, and yp_next below and see if we can
-// consolidate or simplify some code by using this API
+// TODO I'm having second thoughts about the utility of this API.  This isn't even used below!
+// It really comes down to how much benefit we have sharing the va_list code with the iterable 
+// code...and last time there wasn't that much benefit.  ypQuickSeq might be a better choice.
+// TODO Regardless, inspect all uses of va_arg, yp_miniiter_next, and yp_next below and see if we
+// can consolidate or simplify some code by using this API
 
 // This API exists to reduce duplication of code where variants of a method accept va_lists of
 // ypObject*s, or a general-purpose iterable.  This code intends to be a light-weight abstraction
@@ -1457,14 +1464,16 @@ typedef union {
 // these method tables, which is used to manipulate the associated ypQuickIter_state.
 typedef struct {
     // Returns a *borrowed* reference to the next yielded value, or an exception.  If the
-    // iterator is exhausted, returns NULL.  The borrowed reference is only valid until a new value
+    // iterator is exhausted, returns NULL.  The borrowed reference becomes invalid when a new value
     // is yielded or close is called.
     ypObject *(*nextX)( ypQuickIter_state *state );
-    // Similar to nextX, but returns a new reference that will remain valid (until decref).
+    // Similar to nextX, but returns a new reference (that will remain valid until decref'ed).
     ypObject *(*next)( ypQuickIter_state *state );
     // Returns the number of items left to be yielded.  Sets *isexact to true if this is an exact
     // value, or false if this is an estimate.  On error, sets *exc, returns zero, and *isexact is
     // undefined.
+    // TODO Do like Python, and instead of *isexact accept a default hint that is returned?
+    // There's also the idea of a ypObject_MIN_LENHINT...
     yp_ssize_t (*lenhint)( ypQuickIter_state *state, int *isexact, ypObject **exc );
     // Closes the ypQuickIter.  Any further operations on state will be undefined.
     // TODO If any of these close methods raise errors, we'll need to return them
@@ -1544,8 +1553,6 @@ static yp_ssize_t ypQuickIter_mi_lenhint( ypQuickIter_state *state, int *isexact
         *isexact = TRUE;
         return state->mi.len;
     } else {
-        // TODO Instead do lenhint = MAX( lenhint, ypObject_MIN_LENHINT ) or something (here
-        // and elsewhere) to ensure we at least pre-allocate a little on resize.
         *isexact = FALSE;
         return yp_miniiter_lenhintC( state->mi.iter, &(state->mi.state), exc );
     }
@@ -1594,18 +1601,17 @@ static ypObject *ypQuickIter_new_fromiterable(
  * ypQuickSeq: sequence-like abstraction over va_lists of ypObject*s and iterables
  * XXX Internal use only!
  *************************************************************************************************/
-// FIXME review
 
 // This API exists to reduce duplication of code where variants of a method accept va_lists of
 // ypObject*s, or a general-purpose sequence.  This code intends to be a light-weight abstraction
 // over all of these, but particularly efficient for va_lists accessed by increasing index.  That
-// last point is important: using a lower index than previously will incur a performance hit, as
+// last point is important: using a lower index than previously may incur a performance hit, as
 // the va_list will need to be va_end'ed, then va_copy'ed from the original, to get back to
-// index 0.  If you need random access to the va_list, first convert it to a tuple.
+// index 0.  If you need random access to the va_list, consider first converting to a tuple.
 //
 // Additionally, this API can be used in places where an iterable would normally be converted into
 // a tuple.  Similar to va_lists, set and dict can "index" their elements in increasing order, but
-// will incur a performance hit to get back to index 0.
+// will incur a performance hit if acccessed out-of-order.
 //
 // Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
 
@@ -1631,12 +1637,12 @@ typedef union {
 // these method tables, which is used to manipulate the associated ypQuickIter_state.
 typedef struct {
     // Returns a *borrowed* reference to the object at index i, or an exception.  If the index is
-    // out-of-range, returns NULL; negative indicies are not allowed.  The borrowed reference is
-    // only valid until a new value is retrieved or close is called.
+    // out-of-range, returns NULL; negative indicies are not allowed.  The borrowed reference
+    // becomes invalid when a new value is retrieved or close is called.
     ypObject *(*getindexX)( ypQuickSeq_state *state, yp_ssize_t i );
-    // Similar to getindexX, but returns a new reference that will remain valid (until decref).
+    // Similar to getindexX, but returns a new reference (that will remain valid until decref'ed).
     ypObject *(*getindex)( ypQuickSeq_state *state, yp_ssize_t i );
-    // Returns the total number of elements in the ypQuickSeq.  On error, sets *exc and retuns
+    // Returns the total number of elements in the ypQuickSeq.  On error, sets *exc and returns
     // zero.
     yp_ssize_t (*len)( ypQuickSeq_state *state, ypObject **exc );
     // Closes the ypQuickSeq.  Any further operations on state will be undefined.
@@ -5023,13 +5029,15 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 // FIXME review
 
 // XXX Patterned after the codecs module in Python
-// XXX This will be exposed in nohtyP.h someday; review and improve before you do
-// TODO In general, everything below is geared for Unicode; make it flexible enough for anything
+// XXX This will eventually be exposed in nohtyP.h; review and improve before this happens
+// TODO In general, everything below is geared for Unicode; make it flexible enough for any type of
+// codec, as Python does
 
 typedef struct _yp_codecs_error_handler_params_t {
     yp_ssize_t sizeof_struct;   // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
 
-    // Details of the error.  All references and pointers are borrowed and should not be replaced.
+    // Details of the error.  All references, va_lists, and pointers are borrowed and should not be
+    // replaced.
     // TODO Python's error handlers are flexible enough to take any exception object containing
     // any data.  Make sure this, while optimized for Unicode, can do the same.
     ypObject *exc;          // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
@@ -5041,8 +5049,7 @@ typedef struct _yp_codecs_error_handler_params_t {
     struct {                // The object/data the codec was attempting to encode/decode
         ypObject *object;       // The source object; NULL if working strictly from raw data
                                 // XXX For example, yp_str_frombytesC4 will set this to NULL
-        // TODO if ptr is NULL, populate it from object from _within_ the handler (and make an easy
-        // function to do this)
+        // TODO Function to return ptr or, if it's NULL, a pointer to the data from within object
         struct {                // The source data; ptr and/or type may be NULL iff object isn't
             ypObject *type;         // An indication of the type of data pointed to:
                                     //  - str-like: set to encoding name as per yp_asencodedCX
@@ -5060,20 +5067,15 @@ typedef struct _yp_codecs_error_handler_params_t {
 // set *replacement to the object that replaces the bad data, and *new_position to the index at
 // which to restart encoding/decoding.
 // XXX It's possible for *new_position to be less than or even greater than params->end on output
-// XXX There are two special values for *replacement.  If yp_codecs_replacement_is_bytes_buffer,
-// params->dest_buff.bytes is used as if it were a bytes object.  If
-// yp_codecs_replacement_is_str_buffer, params->dest_buff.str is used as if it were a str object.
-// This avoids having to create temporary objects for small amounts of data.
 // TODO returning (replacement, new_position) is strictly a Unicode thing: generalize
 typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position );
 
 // Registers the alias as an alternate name for the encoding and returns the immortal yp_None.
-// Both alias and name are normalized before being registered (lowercased, ' ' and '_' converted
+// Both alias and encoding are normalized before being registered (lowercased, ' ' and '_' converted
 // to '-').  Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there
 // is no other protection against using encoding names as aliases.  Returns an exception on error.
-// TODO Rename "name" to "encoding", at least in the API
-static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *name );
+static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *encoding );
 
 // Returns a new reference to the normalized, unaliased encoding name.
 // TODO I believe this alias stuff is actually part of the encodings module; consider how pedantic
@@ -5088,7 +5090,7 @@ static ypObject *yp_codecs_register_error(
 
 // Returns the error handler previously registered under the given name.  Raises yp_LookupError
 // if the handler cannot be found.  Sets *exc and returns yp_codecs_strict_errors on error.
-static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc );
+static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **exc );
 
 static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position );
@@ -6655,10 +6657,10 @@ static ypObject *_yp_codecs_standard = NULL;
 
 // Dict mapping normalized aliases to "official" names.  Initialized in _yp_codecs_initialize.
 // TODO Can we statically-allocate this dict?
-static ypObject *_yp_codecs_alias2name = NULL;
+static ypObject *_yp_codecs_alias2encoding = NULL;
 
-// All names and their aliases are lowercased, and ' ' and '_' are converted to '-'
-// XXX name must be a str/chrarray
+// All encoding names and their aliases are lowercased, and ' ' and '_' are converted to '-'
+// XXX encoding must be a str/chrarray
 // XXX Check for the yp_s_utf_8 fast-path before calling this function
 // XXX Python is inconsistent with how it normalizes encoding names:
 //  - encodings/__init__.py: runs of non-alpha (except '.') to '_', leading/trailing '_' removed
@@ -6668,7 +6670,7 @@ static ypObject *_yp_codecs_alias2name = NULL;
 //  - codecs.c: to lower, ' ' becomes '_', latin-1 names only
 //  - encodings/aliases.py: aliases are "utf_8", etc
 // Choosing "utf-8", with underscores and spaces turned to hyphens
-static ypObject *_yp_codecs_normalize_encoding_name( ypObject *name )
+static ypObject *_yp_codecs_normalize_encoding_name( ypObject *encoding )
 {
     yp_uint8_t *data;
     yp_ssize_t len;
@@ -6677,17 +6679,17 @@ static ypObject *_yp_codecs_normalize_encoding_name( ypObject *name )
     yp_uint8_t *norm_data;
 
     // Only latin-1 names are accepted
-    if( ypStringLib_ENC_CODE( name ) != ypStringLib_ENC_LATIN_1 ) return yp_ValueError;
+    if( ypStringLib_ENC_CODE( encoding ) != ypStringLib_ENC_LATIN_1 ) return yp_ValueError;
 
-    // name may already be normalized, in which case: do nothing
-    data = ypStringLib_DATA( name );
-    len = ypStringLib_LEN( name );
+    // encoding may already be normalized, in which case: do nothing
+    data = ypStringLib_DATA( encoding );
+    len = ypStringLib_LEN( encoding );
     for( i = 0; i < len; i++ ) {
         if( yp_ISUPPER( data[i] ) ) goto convert;
         if( data[i] == ' ' || data[i] == '_' ) goto convert;
         // TODO Should we deny non-printable characters, '\t', etc?
     }
-    return yp_incref( name );
+    return yp_incref( encoding );
 
     // OK, there's characters to convert, starting at i: create a new string to return
 convert:
@@ -6713,7 +6715,7 @@ convert:
 ypAPI void yp_setitemE( ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc );
 static ypObject *yp_set_getintern( ypObject *set, ypObject *x );
 
-static ypObject *_yp_codecs_register_alias_norm( ypObject *alias_norm, ypObject *name_norm )
+static ypObject *_yp_codecs_register_alias_norm( ypObject *alias_norm, ypObject *encoding_norm )
 {
     // We hard-code shortcuts to utf-8 encoders/decoders all over, so don't pretend the user can
     // redirect utf-8 to a new alias
@@ -6723,37 +6725,37 @@ static ypObject *_yp_codecs_register_alias_norm( ypObject *alias_norm, ypObject 
         if( yp_isexceptionC( result ) ) return result;
         return yp_ValueError;
     }
-    yp_setitemE( _yp_codecs_alias2name, alias_norm, name_norm, &exc );
+    yp_setitemE( _yp_codecs_alias2encoding, alias_norm, encoding_norm, &exc );
     return exc;
 }
 
-static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *name )
+static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *encoding )
 {
     ypObject *result;
     ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias ); // new ref
-    ypObject *name_norm = _yp_codecs_normalize_encoding_name( name );   // new ref
+    ypObject *encoding_norm = _yp_codecs_normalize_encoding_name( encoding );   // new ref
     if( yp_isexceptionC( alias_norm ) ) {
         result = alias_norm;
-    } else if( yp_isexceptionC( name_norm ) ) {
-        result = name_norm;
+    } else if( yp_isexceptionC( encoding_norm ) ) {
+        result = encoding_norm;
     } else {
-        result = _yp_codecs_register_alias_norm( alias_norm, name_norm );
+        result = _yp_codecs_register_alias_norm( alias_norm, encoding_norm );
     }
-    yp_decrefN( 2, name_norm, alias_norm );
+    yp_decrefN( 2, encoding_norm, alias_norm );
     return result;
 }
 
 static ypObject *yp_codecs_lookup_alias( ypObject *alias )
 {
-    ypObject *name;
+    ypObject *encoding;
     ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias ); // new ref
     if( yp_isexceptionC( alias_norm ) ) return alias_norm;
-    name = yp_getitem( _yp_codecs_alias2name, alias_norm );
+    encoding = yp_getitem( _yp_codecs_alias2encoding, alias_norm );
     yp_decref( alias_norm );
-    return name;
+    return encoding;
 }
 
-// TODO _yp_codecs_name2info
+// TODO _yp_codecs_encoding2info
 
 // TODO deny replacing utf_8 codec with anything else, and give it a fast-path in the code
 // TODO static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **_exc )
@@ -6761,14 +6763,14 @@ static ypObject *yp_codecs_lookup_alias( ypObject *alias )
 // Dict mapping error handler names to their functions.  Initialized in _yp_codecs_initialize.
 // TODO Can we statically-allocate this dict?  Perhaps the standard error handlers can fit in the
 // inline array, and if it grows past that then we allocate on the heap.
-static ypObject *_yp_codecs_name2error = NULL;
+static ypObject *_yp_codecs_errors2handler = NULL;
 
 static ypObject *yp_codecs_register_error(
         ypObject *name, yp_codecs_error_handler_func_t error_handler )
 {
     ypObject *exc = yp_None;
     ypObject *result = yp_intC( (yp_ssize_t) error_handler );
-    yp_setitemE( _yp_codecs_name2error, name, result, &exc );
+    yp_setitemE( _yp_codecs_errors2handler, name, result, &exc );
     yp_decref( result );
     return exc;     // on success or exception
 }
@@ -6776,7 +6778,7 @@ static ypObject *yp_codecs_register_error(
 static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc )
 {
     ypObject *exc = yp_None;
-    ypObject *result = yp_getitem( _yp_codecs_name2error, name );   // new ref
+    ypObject *result = yp_getitem( _yp_codecs_errors2handler, name );   // new ref
     yp_codecs_error_handler_func_t error_handler =
         (yp_codecs_error_handler_func_t) yp_asssizeC( result, &exc );
     yp_decref( result );
@@ -14199,11 +14201,11 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     // Codec aliases
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
     // (yp_dict_fromlenhint?)
-    _yp_codecs_alias2name = yp_dictK( 0 );
+    _yp_codecs_alias2encoding = yp_dictK( 0 );
 #define yp_codecs_init_ADD_ALIAS( alias, name ) \
     do { \
         yp_IMMORTAL_STR_LATIN_1( _alias_obj, alias ); \
-        yp_setitem( &_yp_codecs_alias2name, _alias_obj, (name) ); \
+        yp_setitem( &_yp_codecs_alias2encoding, _alias_obj, (name) ); \
     } while( 0 )
     yp_codecs_init_ADD_ALIAS( "646",            yp_s_ascii );
     yp_codecs_init_ADD_ALIAS( "ansi_x3.4_1968", yp_s_ascii );
@@ -14230,9 +14232,9 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     // ("initializer element is not computable at load time")
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
     // (yp_dict_fromlenhint?)
-    _yp_codecs_name2error = yp_dictK( 0 );
+    _yp_codecs_errors2handler = yp_dictK( 0 );
 #define yp_codecs_init_ADD_ERROR( name, func ) \
-        yp_o2i_setitemC( &_yp_codecs_name2error, (name), (yp_ssize_t) (func) )
+        yp_o2i_setitemC( &_yp_codecs_errors2handler, (name), (yp_ssize_t) (func) )
     yp_codecs_init_ADD_ERROR( yp_s_strict,            yp_codecs_strict_errors );
     yp_codecs_init_ADD_ERROR( yp_s_replace,           yp_codecs_replace_errors );
     yp_codecs_init_ADD_ERROR( yp_s_ignore,            yp_codecs_ignore_errors );
