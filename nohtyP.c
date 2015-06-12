@@ -5026,10 +5026,9 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 /*************************************************************************************************
  * In-development API for Codec registry and base classes
  *************************************************************************************************/
-// FIXME review
 
 // XXX Patterned after the codecs module in Python
-// XXX This will eventually be exposed in nohtyP.h; review and improve before this happens
+// TODO This will eventually be exposed in nohtyP.h; review and improve before this happens
 // TODO In general, everything below is geared for Unicode; make it flexible enough for any type of
 // codec, as Python does
 
@@ -5063,7 +5062,7 @@ typedef struct _yp_codecs_error_handler_params_t {
     yp_ssize_t end;         // The index after the last invalid data in source
 } yp_codecs_error_handler_params_t;
 
-// Error handler.  Either raise params->exc or a different error via *replacement.  Otherwise,
+// Error handler.  Either raise params->exc, or a different error, via *replacement.  Otherwise,
 // set *replacement to the object that replaces the bad data, and *new_position to the index at
 // which to restart encoding/decoding.
 // XXX It's possible for *new_position to be less than or even greater than params->end on output
@@ -5088,24 +5087,10 @@ static ypObject *yp_codecs_lookup_alias( ypObject *alias );
 static ypObject *yp_codecs_register_error(
         ypObject *name, yp_codecs_error_handler_func_t error_handler );
 
-// Returns the error handler previously registered under the given name.  Raises yp_LookupError
-// if the handler cannot be found.  Sets *exc and returns yp_codecs_strict_errors on error.
+// Returns the error_handler associated with the given name.  Raises yp_LookupError if the handler
+// cannot be found.  Sets *exc and returns the built-in "strict" handler on error (which may not
+// be the _registered_ "strict" handler.)
 static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **exc );
-
-static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
-static void yp_codecs_replace_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
-static void yp_codecs_ignore_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
-static void yp_codecs_xmlcharrefreplace_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
-static void yp_codecs_backslashreplace_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
-static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *params,
-        ypObject **replacement, yp_ssize_t *new_position );
-static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
-        yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position );
 
 
 /*************************************************************************************************
@@ -5143,8 +5128,8 @@ typedef struct _ypStrObject ypStrObject;
 // allow four times as much data as UCS-4, for simplicity we use one maximum length for all 
 // encodings.  (Consider that an element in the largest Latin-1 chrarray could be replaced with a 
 // UCS-4 character, thus quadrupling its size.)
-// TODO On the flip side, this means it's possible to create a string that, when encoded, cannot
-// fit in a bytes object, as it'll be larger than LEN_MAX.  Seems the lesser of two evils, but...
+// XXX On the flip side, this means it's possible to create a string that, when encoded, cannot
+// fit in a bytes object, as it'll be larger than LEN_MAX.
 #define ypStringLib_ALLOCLEN_MAX ( (yp_ssize_t) MIN( MIN( \
             yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
             (yp_SSIZE_T_MAX-yp_sizeof( ypStrObject )) / 4 /* /4 for elemsize of UCS-4 */ ), \
@@ -5188,13 +5173,11 @@ static ypStrObject _yp_str_empty_struct = {
 #define _yp_str_empty   ((ypObject *) &_yp_str_empty_struct)
 
 // Gets the ordinal at src[src_i].  src_i must be in range(len): no bounds checking is performed.
-// TODO remove src_i and rename to getvalue or something
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
 typedef yp_uint32_t (*ypStringLib_getindexXfunc)( const void *src, yp_ssize_t src_i );
 
 // Sets dest[dest_i] to value.  dest_i must be in range(alloclen): no bounds checking is performed.
 // XXX dest's encoding must be able to store value
-// TODO remove dest_i and rename to setvalue or something
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
 typedef void (*ypStringLib_setindexXfunc)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
 
@@ -6139,6 +6122,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             } else if (ch == 0xF4 && ch2 >= 0x90) {
                 /* invalid sequence
                    \xF4\x90\x80\80- -- 110000- overflow */
+                // This is the ypStringLib_MAX_UNICODE case
                 goto InvalidContinuation1;
             }
             if (!ypStringLib_IS_CONTINUATION_BYTE(ch3)) {
@@ -6630,11 +6614,9 @@ static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject 
 /*************************************************************************************************
  * Codec registry and base classes
  *************************************************************************************************/
+
 // XXX Patterned after the codecs module in Python
-// FIXME review
-
 // TODO codecs.register to register functions for encode/decode ...also codecs.lookup
-
 // TODO Python does maintain a distinction between text encodings and all others; do the same
 // TODO A macro in nohtyP.h to get/set from a struct with sizeof_struct ensuring compatibility
 // TODO yp_codecs_encode and yp_codecs_decode, which works for any arbitrary obj->obj encoding
@@ -6649,22 +6631,20 @@ static ypStringLib_getindexXfunc _yp_codecs_strenc2getindexX( ypObject *encoding
     return NULL;
 }
 
-
 // Set containing the standard encodings like yp_s_utf_8.  Instead of a series of yp_eq calls,
 // yp_set_getintern is used to return one of these objects, which is then compared by identity
 // (i.e. ptr value).  Initialized in _yp_codecs_initialize.
 static ypObject *_yp_codecs_standard = NULL;
 
 // Dict mapping normalized aliases to "official" names.  Initialized in _yp_codecs_initialize.
-// TODO Can we statically-allocate this dict?
+// TODO Can we statically-allocate this dict?  Perhaps the standard aliases can fit in the
+// inline array, and if it grows past that then we allocate on the heap.
 static ypObject *_yp_codecs_alias2encoding = NULL;
 
 // All encoding names and their aliases are lowercased, and ' ' and '_' are converted to '-'
 // XXX encoding must be a str/chrarray
-// XXX Check for the yp_s_utf_8 fast-path before calling this function
 // XXX Python is inconsistent with how it normalizes encoding names:
 //  - encodings/__init__.py: runs of non-alpha (except '.') to '_', leading/trailing '_' removed
-//      ...but this is only for codecs under encodings package
 //  - unicodeobject.c: to lower, '_' becomes '-', latin-1 names only
 //  - textio.c: encodefuncs array uses "utf-8", etc
 //  - codecs.c: to lower, ' ' becomes '_', latin-1 names only
@@ -6755,10 +6735,16 @@ static ypObject *yp_codecs_lookup_alias( ypObject *alias )
     return encoding;
 }
 
-// TODO _yp_codecs_encoding2info
 
+// TODO _yp_codecs_encoding2info
+// TODO Can we statically-allocate this dict?  Perhaps the standard encodings can fit in the
+// inline array, and if it grows past that then we allocate on the heap.
+// TODO static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **exc )
 // TODO deny replacing utf_8 codec with anything else, and give it a fast-path in the code
-// TODO static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **_exc )
+// TODO Registered encoders/decoders should take a ypObject*typehint that identifies a particular
+// type for the return value, if possible, otherwise it's ignored and a "standard" type is returned
+// (this way, utf-8 can return a bytearray as required by yp_bytearray3)
+
 
 // Dict mapping error handler names to their functions.  Initialized in _yp_codecs_initialize.
 // TODO Can we statically-allocate this dict?  Perhaps the standard error handlers can fit in the
@@ -6775,6 +6761,8 @@ static ypObject *yp_codecs_register_error(
     return exc;     // on success or exception
 }
 
+static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
+        ypObject **replacement, yp_ssize_t *new_position );
 static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc )
 {
     ypObject *exc = yp_None;
@@ -6835,11 +6823,13 @@ static void yp_codecs_backslashreplace_errors( yp_codecs_error_handler_params_t 
     *new_position = yp_SSIZE_T_MAX;
 }
 
-// Returns true if the three bytes at x _could_ be an encoded surrogate
+// Returns true if the three bytes at x _could_ be a utf-8 encoded surrogate, or false if it 
+// definitely is not
+// XXX x must contain at least three bytes
 #define _yp_codecs_UTF8_SURROGATE_PRECHECK( x ) \
      ( ((x)[0] & 0xf0u) == 0xe0u && ((x)[1] & 0xc0u) == 0x80u && ((x)[2] & 0xc0u) == 0x80u )
-// Decodes the characters using the three bytes at x; must have passed PRECHECK; resulting character
-// may not actually be a surrogate
+// Decodes the utf-8 characters using the three bytes at x; PRECHECK must have returned true; the 
+// resulting character may not actually be a surrogate
 #define _yp_codecs_UTF8_SURROGATE_DECODE( x ) \
      ( (((x)[0] & 0x0fu) << 12) + (((x)[1] & 0x3fu) << 6) + ((x)[2] & 0x3fu) )
 
@@ -6866,6 +6856,9 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
     if( encoding == yp_s_utf_8 ) {
         yp_ssize_t badEnd;      // index of end of surrogates to replace from source
         yp_ssize_t badLen = 0;  // number of surrogate characters to replace
+
+        // Count the number of consecutive surrogates.  Stop at the first non-surrogate, or at the
+        // end of the buffer.
         for( i = params->start; i < params->source.data.len; i++ ) {
             yp_int_t ch = getindexX( params->source.data.ptr, i );
             if( !ypStringLib_IS_SURROGATE( ch ) ) break;
@@ -6882,6 +6875,8 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
         for( i = params->start; i < badEnd; i++ ) {
             yp_int_t ch = getindexX( params->source.data.ptr, i );
             yp_ASSERT( ypStringLib_IS_SURROGATE( ch ), "problem in loop above" ); // paranoia
+            // TODO This bit of code is repeated: what about shared macros to detect/encode/decode
+            // the individual types of characters in a utf-8 string?
             *outp++ = (yp_uint8_t)(0xe0u | (ch >> 12));
             *outp++ = (yp_uint8_t)(0x80u | ((ch >> 6) & 0x3fu));
             *outp++ = (yp_uint8_t)(0x80u | (ch & 0x3fu));
@@ -6898,7 +6893,6 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
     }
 }
 // XXX Adapted from PyCodec_SurrogatePassErrors
-// TODO Review this function...
 static ypObject *_ypStr_new_ucs_2( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
@@ -6917,6 +6911,9 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         // TODO The equivalent Python code assumes null-termination of source, or it might overflow
         yp_ssize_t badEnd;      // index of end of surrogates to replace from source
         yp_ssize_t repLen = 0;  // number of surrogate characters (once decoded) to replace
+
+        // Count the number of consecutive surrogates.  Stop at the first non-surrogate, or at the
+        // end of the buffer.  All surrogates are 3 bytes long.
         for( i = params->start; params->source.data.len - i >= 3; i += 3 ) {
             if( !_yp_codecs_UTF8_SURROGATE_PRECHECK( source_data + i ) ) break;
             ch = _yp_codecs_UTF8_SURROGATE_DECODE( source_data + i );
@@ -6926,6 +6923,7 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         if( repLen < 1 ) return params->exc; // not a surrogate: raise original error
 
         // All surrogates are represented in ucs-2
+        // TODO This check will never fail, so long as source.data.len<ypStringLib_LEN_MAX
         if( repLen > ypStringLib_LEN_MAX ) return yp_MemorySizeOverflowError;
         replacement = _ypStr_new_ucs_2( ypStr_CODE, repLen, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( replacement ) ) return replacement;
@@ -6985,10 +6983,6 @@ onerror:
     *new_position = yp_SSIZE_T_MAX;
     return;
 }
-
-// TODO registered encoders/decoders can take a ypObject *typehint that identifies a particular
-// type for the return value, if possible, otherwise it's ignored and a "standard" type is returned
-// (this way, utf-8 can return a bytearray as required by yp_bytearray3)
 
 
 /*************************************************************************************************
