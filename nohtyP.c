@@ -5096,14 +5096,14 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, y
 /*************************************************************************************************
  * String manipulation library (for bytes and str)
  *************************************************************************************************/
-// FIXME review
 
 // The prefix ypStringLib_* is used for bytes and str, while ypStr_* is strictly the str type
 
 // All ypStringLib-supporting types must:
-//  - set ob_type_flags appropriately
-//  - use ob_data, ob_len, and ob_alloclen appropriately
-// TODO define "appropriately" above
+//  - Set ob_type_flags to one of the ypStringLib_ENC_* values as appropriate
+//  - Always use ob_data, ob_len, and ob_alloclen as the pointer, length, and allocated length
+//      - ob_data[ob_len] must be the null character appropriate for ob_data's encoding
+//      - ob_len < ob_alloclen <= ypStringLib_ALLOCLEN_MAX (except for immortals where alloclen<0)
 
 // Macros on ob_type_flags for string objects (bytes and str), used to index into
 // ypStringLib_encs.
@@ -5135,6 +5135,10 @@ typedef struct _ypStrObject ypStrObject;
             (yp_SSIZE_T_MAX-yp_sizeof( ypStrObject )) / 4 /* /4 for elemsize of UCS-4 */ ), \
             ypObject_LEN_MAX ) )
 #define ypStringLib_LEN_MAX (ypStringLib_ALLOCLEN_MAX - 1 /* for null terminator */)
+
+// Returns true if ob is one of the types supported by ypStringLib
+#define ypStringLib_TYPE_CHECK( ob ) \
+    (ypObject_TYPE_PAIR_CODE( ob ) == ypStr_CODE || ypObject_TYPE_PAIR_CODE( ob ) == ypBytes_CODE)
 
 // Debug-only macro to verify that bytes/str instances are stored as we expect
 #define ypStringLib_ASSERT_INVARIANTS( s ) \
@@ -5183,8 +5187,9 @@ typedef void (*ypStringLib_setindexXfunc)( void *dest, yp_ssize_t dest_i, yp_uin
 
 // XXX In general for this table, make sure you do not use type codes with the wrong
 // ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
-// XXX Also ensure that any lengths are in range(ypStringLib_LEN_MAX+1).
-// TODO The more functions we can remove from this table, the better for the optimizer (true?)
+// TODO Some of these point to generic functions that handle multiple encodings...at that point
+// they might as well be statically-linked.  Alternatively, those generic functions could be
+// specialized.  Review these functions and find the right balance between the two schemes.
 typedef struct {
     int sizeshift;                          // len<<sizeshift gives the size in bytes
     yp_ssize_t elemsize;                    // The size (in bytes) of one character
@@ -5201,20 +5206,20 @@ typedef struct {
     // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will
     // never grow), the data is placed inline with one allocation.
     // XXX Remember to add the null terminator
-    // XXX Check for the empty_immutable case first: new will _always_ allocate
+    // XXX Check for the empty_immutable case first: this function will _always_ allocate
     // TODO Put protection in place to detect when INLINE objects attempt to be resized
-    // TODO Over-allocate to avoid future resizings
     ypObject *(*new)( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 
     // Returns a new copy of s of the given type.  If type is immutable and alloclen_fixed is true
     // (indicating the object will never grow), the data is placed inline with one allocation.
-    // XXX Check for lazy shallow copies first: copy will _always_ allocate
+    // XXX Check for lazy copies first: this function will _always_ allocate
     // XXX Similarly, check for the empty_immutable case first
     ypObject *(*copy)( int type, ypObject *s, int alloclen_fixed );
 
-    // Called on push/append, extend, or irepeat to increase the alloclen and/or elemsize of s to
-    // fit requiredLen (plus null terminator).  Does not update ypStringLib_LEN and does not
-    // null-terminate.  enc_code must be the same or larger as currently.
+    // Called on push/append, extend, irepeat, and similar functions to increase the alloclen 
+    // and/or elemsize of s to fit requiredLen (plus null terminator).  enc_code must be the same 
+    // or larger as currently.
+    // XXX Does not update ypStringLib_LEN and does not null-terminate
     // TODO if memory error is the only possible error, consider returning boolean
     ypObject *(*grow_onextend)( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra,
             int enc_code );
@@ -5257,7 +5262,6 @@ static void ypStringLib_setindexX_4bytes( void *dest, yp_ssize_t dest_i, yp_uint
     ((yp_uint32_t *)dest)[dest_i] = value;
 }
 
-
 // A version of ypStringLib_upconvert that copies from UCS-2 to UCS-4
 // TODO Write multiple elements at once and, if possible, read in multiples too
 static void ypStringLib_upconvert_4from2( void *_data, yp_ssize_t len )
@@ -5297,7 +5301,8 @@ static void ypStringLib_upconvert_2from1( void *_data, yp_ssize_t len )
     }
 }
 
-// Converts the len characters at data to a larger encoding.  new_sizeshift must be >old_sizeshift.
+// Converts the len characters at data to a larger encoding
+// XXX new_sizeshift must be larger than old_sizeshift
 static void ypStringLib_upconvert( int new_sizeshift,
         int old_sizeshift, void *data, yp_ssize_t len )
 {
@@ -5361,6 +5366,7 @@ static void ypStringLib_elemcopy_2from1( void *_dest, yp_ssize_t dest_i,
 
 // Copies len elements from src starting at src_i, and places them at dest starting at dest_i.
 // dest_sizeshift must be >=src_sizeshift.
+// XXX dest and src cannot overlap.
 static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t dest_i,
         int src_sizeshift, const void *src, yp_ssize_t src_i, yp_ssize_t len )
 {
@@ -5388,13 +5394,13 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
 }
 
 
-# define ypStringLib_CHECKENC_1FROM2_MASK 0xFF00FF00FF00FF00ULL
-yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_CHECKENC_1FROM2_MASK) == ypStringLib_CHECKENC_1FROM2_MASK, checkenc_1from2_mask_matches_type );
+# define ypStringLib_TYPE_CHECKENC_1FROM2_MASK 0xFF00FF00FF00FF00ULL
+yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_TYPE_CHECKENC_1FROM2_MASK) == ypStringLib_TYPE_CHECKENC_1FROM2_MASK, checkenc_1from2_mask_matches_type );
 // Returns the ypStringLib_ENC_* that _should_ be used for the given UCS-2-encoded string
 // XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
 static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
 {
-    const _yp_uint_t mask = ypStringLib_CHECKENC_1FROM2_MASK;
+    const _yp_uint_t mask = ypStringLib_TYPE_CHECKENC_1FROM2_MASK;
     const yp_uint8_t *p = data;
     const yp_uint8_t *end = p + (len * 2);
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN( end, yp_sizeof( _yp_uint_t ) );
@@ -5408,6 +5414,7 @@ static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
     // Read the first few elements until we're aligned
     while( !yp_IS_ALIGNED( p, yp_sizeof( _yp_uint_t ) ) ) {
         yp_uint16_t value = *((yp_uint16_t *) p);
+        // TODO This won't work on big-endian: will need a mask (for uint) and smallmask (uint16)
         if( value & mask ) return ypStringLib_ENC_UCS_2;
         p += 2;
     }
@@ -5429,11 +5436,12 @@ final_loop:
     return ypStringLib_ENC_LATIN_1;
 }
 
-# define ypStringLib_CHECKENC_1FROM4_MASK 0xFFFFFF00FFFFFF00ULL
-yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_CHECKENC_1FROM4_MASK) == ypStringLib_CHECKENC_1FROM4_MASK, checkenc_1from4_mask_matches_type );
-# define ypStringLib_CHECKENC_2FROM4_MASK 0xFFFF0000FFFF0000ULL
-yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_CHECKENC_2FROM4_MASK) == ypStringLib_CHECKENC_2FROM4_MASK, checkenc_2from4_mask_matches_type );
-// Returns true if the UCS-4 string can be encoded in the encoding matching mask
+# define ypStringLib_TYPE_CHECKENC_1FROM4_MASK 0xFFFFFF00FFFFFF00ULL
+yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_TYPE_CHECKENC_1FROM4_MASK) == ypStringLib_TYPE_CHECKENC_1FROM4_MASK, checkenc_1from4_mask_matches_type );
+# define ypStringLib_TYPE_CHECKENC_2FROM4_MASK 0xFFFF0000FFFF0000ULL
+yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_TYPE_CHECKENC_2FROM4_MASK) == ypStringLib_TYPE_CHECKENC_2FROM4_MASK, checkenc_2from4_mask_matches_type );
+// Returns true if the UCS-4 string can be encoded in the encoding matching mask.  *p will point
+// to the location that failed the check, or to *end on success.
 static int _ypStringLib_checkenc_ucs_4( _yp_uint_t mask, 
     const yp_uint8_t **p, const yp_uint8_t *end )
 {
@@ -5446,6 +5454,7 @@ static int _ypStringLib_checkenc_ucs_4( _yp_uint_t mask,
     // Read the first few elements until we're aligned
     while( !yp_IS_ALIGNED( *p, yp_sizeof( _yp_uint_t ) ) ) {
         yp_uint32_t value = *((yp_uint32_t *) *p);
+        // TODO This won't work on big-endian: will need a mask (for uint) and smallmask (uint16)
         if( value & mask ) return FALSE;
         *p += 4;
     }
@@ -5477,10 +5486,10 @@ static int ypStringLib_checkenc_ucs_4( const void *data, yp_ssize_t len )
 
     // If the 1FROM4 mask fails in the middle of the string, we can resume from that point
     // because we know 2FROM4 will match the first half anyway.
-    if( _ypStringLib_checkenc_ucs_4( ypStringLib_CHECKENC_1FROM4_MASK, &p, end ) ) {
+    if( _ypStringLib_checkenc_ucs_4( ypStringLib_TYPE_CHECKENC_1FROM4_MASK, &p, end ) ) {
         return ypStringLib_ENC_LATIN_1;
     }
-    if( _ypStringLib_checkenc_ucs_4( ypStringLib_CHECKENC_2FROM4_MASK, &p, end ) ) {
+    if( _ypStringLib_checkenc_ucs_4( ypStringLib_TYPE_CHECKENC_2FROM4_MASK, &p, end ) ) {
         return ypStringLib_ENC_UCS_2;
     }
     return ypStringLib_ENC_UCS_4;
@@ -5613,7 +5622,8 @@ static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
 }
 
 // Performs the necessary elemcopy's on behalf of ypStringLib_join, null-terminates, and updates
-// result's length.  Assumes adequate space has already been allocated.
+// result's length.  Assumes adequate space has already been allocated, and that type checking on
+// seq's elements has already been performed.
 static void _ypStringLib_join_elemcopy( ypObject *result,
         ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
 {
@@ -5623,11 +5633,14 @@ static void _ypStringLib_join_elemcopy( ypObject *result,
     yp_ssize_t result_len = 0;
     yp_ssize_t s_len = ypStringLib_LEN( s );
     yp_ssize_t i;
+
     if( s_len < 1 ) {
         // The separator is empty, so we just concatenate seq's elements
         for( i = 0; /*stop at NULL*/; i++ ) {
             ypObject *x = seq->getindexX( state, i );   // borrowed
             if( x == NULL ) break;
+            yp_ASSERT( ypStringLib_TYPE_CHECK( x ), "ypStringLib_join didn't perform type checking" );
+            ypStringLib_ASSERT_INVARIANTS( x );
             ypStringLib_elemcopy( result_sizeshift, result_data, result_len,
                     ypStringLib_ENC( x )->sizeshift, ypStringLib_DATA( x ), 0,
                     ypStringLib_LEN( x ) );
@@ -5642,6 +5655,7 @@ static void _ypStringLib_join_elemcopy( ypObject *result,
         ypObject *x = seq->getindexX( state, 0 );   // borrowed
         yp_ASSERT( x != NULL, "_ypStringLib_join_elemcopy passed an empty seq" );
         for( i = 1; /*stop at NULL*/; i++ ) {
+            yp_ASSERT( ypStringLib_TYPE_CHECK( x ), "ypStringLib_join didn't perform type checking" );
             ypStringLib_elemcopy( result_sizeshift, result_data, result_len,
                     ypStringLib_ENC( x )->sizeshift, ypStringLib_DATA( x ), 0,
                     ypStringLib_LEN( x ) );
@@ -5664,6 +5678,7 @@ static void _ypStringLib_join_elemcopy( ypObject *result,
 static ypObject *ypStringLib_join(
         ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
 {
+    // TODO Here and everywhere, we could instead set exc to NULL, then return if non-NULL
     ypObject *exc = yp_None;
     unsigned s_pair = ypObject_TYPE_PAIR_CODE( s );
     yp_ssize_t seq_len;
@@ -5723,42 +5738,37 @@ static ypObject *ypStringLib_join(
 
 // Unicode encoding/decoding support functions
 
-// TODO ypStringLib_encode_call_errorhandler
+// Calls the error handler with appropriate arguments, sets *newPos to the (adjusted) index at
+// which encoding should continue, and returns the replacement that should be concatenated onto the
+// encoded bytes (using ypStringLib_encode_concat_replacement, perhaps).  Returns exception on
+// error (*newPos will be undefined).
 // XXX Adapted from Python's unicode_encode_call_errorhandler
 static ypObject *ypStringLib_encode_call_errorhandler(
-    ypObject *errors, yp_codecs_error_handler_func_t *errorHandler,
-    ypObject *encoding, const char *reason,
-    ypObject *unicode,
-    yp_ssize_t startinpos, yp_ssize_t endinpos, 
-    yp_ssize_t *newpos )
+    yp_codecs_error_handler_func_t errorHandler, const char *reason,
+    ypObject *encoding, ypObject *source,
+    yp_ssize_t errStart, yp_ssize_t errEnd, 
+    yp_ssize_t *newPos )
 {
     ypObject *exc = yp_None;
     yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
     ypObject *replacement;
-    yp_ssize_t insize = ypStringLib_LEN( unicode );
-
-    // The caller stores errorHandler for us between calls to avoid multiple lookups
-    // XXX yp_codecs_lookup_errorE returns yp_codecs_strict_errors on error, so we will continue to
-    // fail if lookup errors are ignored
-    if( *errorHandler == NULL ) {
-        *errorHandler = yp_codecs_lookup_errorE( errors, &exc );
-        if( yp_isexceptionC( exc ) ) return exc;
-    }
+    yp_ssize_t source_len = ypStringLib_LEN( source );
 
     params.exc = yp_UnicodeEncodeError;
     params.encoding = encoding;
     // TODO pass the reason along
-    params.source.object = unicode;
-    // TODO We should just give the unicode object...I'm not sure str support for
+    params.source.object = source;
+    // TODO We should just give the source object...I'm not sure str support for
     // params.source.data makes sense
-    yp_asencodedCX( unicode, (const yp_uint8_t **) (&params.source.data.ptr), 
-        &(params.source.data.len), &(params.source.data.type) );
-    params.start = startinpos;
-    params.end = endinpos;
+    params.source.data.type = ypStringLib_ENC( source )->name;
+    params.source.data.len = source_len;
+    params.source.data.ptr = ypStringLib_DATA( source );
+    params.start = errStart;
+    params.end = errEnd;
 
-    replacement = yp_SystemError;   // raised if errorHandler doesn't set replacement
-    *newpos = yp_SSIZE_T_MAX;       // in case errorhandler forgets to set
-    (*errorHandler)( &params, &replacement, newpos );   // replacement is new ref
+    replacement = yp_SystemError;   // in case errorhandler forgets to modify replacement
+    *newPos = yp_SSIZE_T_MAX;       // ... ditto, for newPos
+    errorHandler( &params, &replacement, newPos );   // replacement is a new ref on output
     if( ypObject_TYPE_PAIR_CODE( replacement ) != ypBytes_CODE ) {
         ypObject *typeErr = yp_BAD_TYPE( replacement );
         yp_decref( replacement );
@@ -5768,8 +5778,8 @@ static ypObject *ypStringLib_encode_call_errorhandler(
     // XXX Python allows the bytes variable in the exception to be modified and replaced here, but
     // this isn't documented and I'm assuming it's a deprecated feature
 
-    if( *newpos < 0 ) *newpos = insize+(*newpos);
-    if( newpos < 0 || *newpos > insize ) {
+    if( *newPos < 0 ) *newPos = source_len+(*newPos);
+    if( newPos < 0 || *newPos > source_len ) {
         yp_decref( replacement );
         return yp_IndexError;   // "position %zd from error handler out of bounds"
     }
@@ -5779,7 +5789,7 @@ static ypObject *ypStringLib_encode_call_errorhandler(
 
 // future_growth is an upper-bound estimate of the number of additional bytes, not including 
 // the replacement text, that are expected to be added to encoded.  After appending, encoded will
-// have at least future_growth space available.
+// have at least future_growth space available.  Does not null-terminate encoded.
 static ypObject *_ypBytes_grow_onextend( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra,
         int enc_code );
 static ypObject *ypStringLib_encode_concat_replacement(
@@ -5801,7 +5811,9 @@ static ypObject *ypStringLib_encode_concat_replacement(
         return yp_MemorySizeOverflowError;
     }
     newLen = encoded_len + replacement_len;
-    if( future_growth > ypStringLib_LEN_MAX - newLen ) return yp_MemorySizeOverflowError;
+    if( future_growth > ypStringLib_LEN_MAX - newLen ) {
+        return yp_MemorySizeOverflowError;
+    }
     newAlloclen = newLen + future_growth;
     if( ypStringLib_ALLOCLEN( encoded ) < newAlloclen ) {
         result = _ypBytes_grow_onextend( encoded, newAlloclen, 0, ypStringLib_ENC_BYTES );
@@ -5809,101 +5821,94 @@ static ypObject *ypStringLib_encode_concat_replacement(
     }
 
     encoded_data = (yp_uint8_t *) ypStringLib_DATA( encoded );
-    memcpy( encoded_data + encoded_len, ypStringLib_DATA( replacement ), 
-        replacement_len );
+    memcpy( encoded_data + encoded_len, ypStringLib_DATA( replacement ), replacement_len );
     ypStringLib_SET_LEN( encoded, newLen );
     return yp_None;
 }
 
+// Calls the error handler with appropriate arguments, sets *newPos to the (adjusted) index at
+// which decoding should continue, and returns the replacement that should be concatenated onto the
+// decoded string (using ypStringLib_decode_concat_replacement, perhaps).  Returns exception on
+// error (*newPos will be undefined).
 // XXX Adapted from Python's unicode_decode_call_errorhandler_writer
 static ypObject *ypStringLib_decode_call_errorhandler(
-    ypObject *errors, yp_codecs_error_handler_func_t *errorHandler,
-    ypObject *encoding, const char *reason,
-    const yp_uint8_t *input, const yp_uint8_t *inend,
-    yp_ssize_t startinpos, yp_ssize_t endinpos, 
-    const yp_uint8_t **inptr )
+    yp_codecs_error_handler_func_t errorHandler, const char *reason,
+    ypObject *encoding, const yp_uint8_t *source, yp_ssize_t source_len,
+    yp_ssize_t errStart, yp_ssize_t errEnd, 
+    yp_ssize_t *newPos )
 {
     ypObject *exc = yp_None;
     yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
-    ypObject *repunicode;
-    yp_ssize_t newpos;
-    yp_ssize_t insize = inend - input;  // TODO overflow? 
-
-    // The caller stores errorHandler for us between calls to avoid multiple lookups
-    // XXX yp_codecs_lookup_errorE returns yp_codecs_strict_errors on error, so we will continue to
-    // fail if lookup errors are ignored
-    if( *errorHandler == NULL ) {
-        *errorHandler = yp_codecs_lookup_errorE( errors, &exc );
-        if( yp_isexceptionC( exc ) ) return exc;
-    }
+    ypObject *replacement;
 
     params.exc = yp_UnicodeDecodeError;
     params.encoding = encoding;
     // TODO pass the reason along
-    // TODO pass the object along, if appropriate
+    // TODO pass the object along, if appropriate?
     params.source.data.type = yp_type_bytes;
-    params.source.data.ptr = input;
-    params.source.data.len = insize; 
-    params.start = startinpos;
-    params.end = endinpos;
+    params.source.data.ptr = source;
+    params.source.data.len = source_len; 
+    params.start = errStart;
+    params.end = errEnd;
 
-    repunicode = yp_SystemError;    // raised if errorHandler doesn't set repunicode
-    newpos = yp_SSIZE_T_MAX;        // in case errorhandler forgets to set
-    (*errorHandler)( &params, &repunicode, &newpos );   // repunicode is new ref
-    if( ypObject_TYPE_PAIR_CODE( repunicode ) != ypStr_CODE ) {
-        ypObject *typeErr = yp_BAD_TYPE( repunicode );
-        yp_decref( repunicode );
+    replacement = yp_SystemError;   // in case errorhandler forgets to modify replacement
+    *newPos = yp_SSIZE_T_MAX;       // ...ditto, for newPos
+    errorHandler( &params, &replacement, newPos );   // replacement is new ref on output
+    if( ypObject_TYPE_PAIR_CODE( replacement ) != ypStr_CODE ) {
+        ypObject *typeErr = yp_BAD_TYPE( replacement );
+        yp_decref( replacement );
         return typeErr;
     }
 
     // XXX Python allows the bytes variable in the exception to be modified and replaced here, but
     // this isn't documented and I'm assuming it's a deprecated feature
 
-    if( newpos < 0 ) newpos = insize+newpos;
-    if( newpos < 0 || newpos > insize ) {
-        yp_decref( repunicode );
+    if( *newPos < 0 ) *newPos = source_len+(*newPos);
+    if( newPos < 0 || *newPos > source_len ) {
+        yp_decref( replacement );
         return yp_IndexError;   // "position %zd from error handler out of bounds"
     }
-    *inptr = input + newpos;
 
-    return repunicode;
+    return replacement;
 }
 
 // future_growth is an upper-bound estimate of the number of additional characters, not including 
 // the replacement text, that are expected to be added to decoded.  After appending, decoded will
-// have at least future_growth space available.
+// have at least future_growth space available.  Does not null-terminate decoded.
 static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra,
         int enc_code );
 static ypObject *ypStringLib_decode_concat_replacement(
-    ypObject *decoded, ypObject *repunicode, yp_ssize_t future_growth )
+    ypObject *decoded, ypObject *replacement, yp_ssize_t future_growth )
 {
     yp_ssize_t newLen;
     yp_ssize_t newAlloclen;
     ypObject *result;
 
-    yp_ASSERT( ypObject_TYPE_PAIR_CODE( repunicode ) == ypStr_CODE, "repunicode must be a string" );
+    yp_ASSERT( ypObject_TYPE_PAIR_CODE( replacement ) == ypStr_CODE, "replacement must be a string" );
     yp_ASSERT( future_growth >= 0, "future_growth can't be negative" );
 
-    if( ypStringLib_LEN( repunicode ) > ypStringLib_LEN_MAX - ypStringLib_LEN( decoded ) ) {
+    if( ypStringLib_LEN( replacement ) > ypStringLib_LEN_MAX - ypStringLib_LEN( decoded ) ) {
         return yp_MemorySizeOverflowError;
     }
-    newLen = ypStringLib_LEN( decoded ) + ypStringLib_LEN( repunicode );
-    if( future_growth > ypStringLib_LEN_MAX - newLen ) return yp_MemorySizeOverflowError;
+    newLen = ypStringLib_LEN( decoded ) + ypStringLib_LEN( replacement );
+    if( future_growth > ypStringLib_LEN_MAX - newLen ) {
+        return yp_MemorySizeOverflowError;
+    }
     newAlloclen = newLen + future_growth;
     if( ypStringLib_ALLOCLEN( decoded ) < newAlloclen ||
-        ypStringLib_ENC( decoded ) < ypStringLib_ENC( repunicode ) )
+        ypStringLib_ENC( decoded ) < ypStringLib_ENC( replacement ) )
     {
         result = _ypStr_grow_onextend( decoded, newAlloclen, 0,
-            ypStringLib_ENC_CODE( repunicode ) );
+            ypStringLib_ENC_CODE( replacement ) );
         if( yp_isexceptionC( result ) ) return result;
     }
 
     ypStringLib_elemcopy( 
         ypStringLib_ENC( decoded )->sizeshift, ypStringLib_DATA( decoded ), 
             ypStringLib_LEN( decoded ),
-        ypStringLib_ENC( repunicode )->sizeshift, ypStringLib_DATA( repunicode ), 
+        ypStringLib_ENC( replacement )->sizeshift, ypStringLib_DATA( replacement ), 
             0,
-        ypStringLib_LEN( repunicode )
+        ypStringLib_LEN( replacement )
     );
     ypStringLib_SET_LEN( decoded, newLen );
     return yp_None;
@@ -5911,6 +5916,7 @@ static ypObject *ypStringLib_decode_concat_replacement(
 
 
 // UTF-8 encoding and decoding functions
+// FIXME Review remaining StringLib functions
 
 // Returns the number of consecutive ascii bytes starting at start.  Valid for ascii, latin-1, and
 // utf-8 encodings.
@@ -6208,19 +6214,20 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
         } else {
             // TODO Test surrogate characters in the start, end, and middle of string, both on
             // encode and decode, and multiple contiguous and non-contiguous surrogates
-            ypObject *repunicode;
+            ypObject *replacement;
+            yp_ssize_t newPos;
             const yp_uint8_t *errmsg;
-            yp_ssize_t endinpos;
-            yp_ssize_t startinpos = source - starts;
+            yp_ssize_t errEnd;
+            yp_ssize_t errStart = source - starts;
             switch( ch ) {
                 case ypStringLib_UTF_8_DATA_END:
                     if( source >= end ) goto inner_loop_end;
                     errmsg = "unexpected end of data";
-                    endinpos = end - starts;
+                    errEnd = end - starts;
                     break;
                 case ypStringLib_UTF_8_INVALID_START:
                     errmsg = "invalid start byte";
-                    endinpos = startinpos + 1;
+                    errEnd = errStart + 1;
                     break;
                 case ypStringLib_UTF_8_INVALID_CONT_1:
                 case ypStringLib_UTF_8_INVALID_CONT_2:
@@ -6228,22 +6235,29 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
                     // These constants are chosen so that their value is the amount of characters
                     // to advance
                     errmsg = "invalid continuation byte";
-                    endinpos = startinpos + ch;
+                    errEnd = errStart + ch;
                     break;
                 default:
                     return yp_SystemError;
             }
 
-            repunicode = ypStringLib_decode_call_errorhandler(  // new ref
-                errors, &errorHandler, yp_s_utf_8, errmsg,
-                starts, end, startinpos, endinpos, &source );
-            if( yp_isexceptionC( repunicode ) ) return repunicode;
+            if( errorHandler == NULL ) {
+                ypObject *exc = yp_None;
+                errorHandler = yp_codecs_lookup_errorE( errors, &exc );
+                if( yp_isexceptionC( exc ) ) return exc;
+            }
+
+            replacement = ypStringLib_decode_call_errorhandler(  // new ref
+                errorHandler, errmsg, yp_s_utf_8, starts, end - starts,
+                errStart, errEnd, &newPos );
+            if( yp_isexceptionC( replacement ) ) return replacement;
+            source = starts + newPos;
 
             // We can now update our expectation of how many more characters will be added: it's the
             // number of byes left to decode (remembering source was modified above).
             result = ypStringLib_decode_concat_replacement(
-                dest, repunicode, end - source );
-            yp_decref( repunicode );
+                dest, replacement, end - source );
+            yp_decref( replacement );
             if( yp_isexceptionC( result ) ) return result;
         }
     }
@@ -6547,9 +6561,15 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
         } else if( ypStringLib_IS_SURROGATE( ch ) ) {
             // TODO We could refactor this like on decode: the function returns the surrogate
             // and we call the errorhandler at a higher level...
+            if( errorHandler == NULL ) {
+                ypObject *exc = yp_None;
+                errorHandler = yp_codecs_lookup_errorE( errors, &exc );
+                if( yp_isexceptionC( exc ) ) return exc;
+            }
+
             // TODO Reason
             ypObject *replacement = ypStringLib_encode_call_errorhandler(
-                errors, &errorHandler, yp_s_utf_8, NULL, source, i, i+1, &i );
+                errorHandler, NULL, yp_s_utf_8, source, i, i+1, &i );
             if( yp_isexceptionC( replacement ) ) {
                 yp_decref( dest );
                 return replacement;
@@ -8819,8 +8839,8 @@ static ypObject *_yp_asencodedCX( ypObject *s, const yp_uint8_t * *encoded, yp_s
     *encoding = ypStringLib_ENC( s )->name;
     return yp_None;
 }
-ypObject *yp_asencodedCX( ypObject *s, const yp_uint8_t * *encoded, yp_ssize_t *size,
-        ypObject * *encoding )
+ypObject *yp_asencodedCX( ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size,
+        ypObject **encoding )
 {
     ypObject *result = _yp_asencodedCX( s, encoded, size, encoding );
     if( yp_isexceptionC( result ) ) {
@@ -9053,10 +9073,6 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         if( ob_pair == ypBytes_CODE ) return bytes_ ## meth args; \
         return_yp_BAD_TYPE( ob ); } while( 0 )
 
-// Returns true if ob is one of the types supported by ypStringLib
-#define _ypStringLib_CHECK( ob ) \
-    (ypObject_TYPE_PAIR_CODE( ob ) == ypStr_CODE || ypObject_TYPE_PAIR_CODE( ob ) == ypBytes_CODE)
-
 
 ypObject *yp_isalnum( ypObject *s ) {
     _ypStringLib_REDIRECT1( s, isalnum, (s) );
@@ -9199,8 +9215,8 @@ ypObject *yp_join( ypObject *s, ypObject *iterable ) {
     ypQuickSeq_state state;
     ypObject *result;
 
-    if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
-    if( _ypStringLib_CHECK( iterable ) ) {
+    if( !ypStringLib_TYPE_CHECK( s ) ) return_yp_BAD_TYPE( s );
+    if( ypStringLib_TYPE_CHECK( iterable ) ) {
         return ypStringLib_join_from_string( s, iterable );
     }
 
@@ -9229,7 +9245,7 @@ ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
     ypQuickSeq_state state;
     ypObject *result;
 
-    if( !_ypStringLib_CHECK( s ) ) return_yp_BAD_TYPE( s );
+    if( !ypStringLib_TYPE_CHECK( s ) ) return_yp_BAD_TYPE( s );
     ypQuickSeq_new_fromvar( &state, n, args );
     result = ypStringLib_join( s, &ypQuickSeq_var_methods, &state );
     ypQuickSeq_var_close( &state );
