@@ -6535,6 +6535,7 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     yp_uint8_t *dest_data;
     yp_uint8_t *d;  // moving dest_data pointer
     yp_codecs_error_handler_func_t errorHandler = NULL;
+    ypObject *replacement;
     ypObject *result;
 
     ypStringLib_ASSERT_INVARIANTS( source );
@@ -6568,7 +6569,7 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
             }
 
             // TODO Reason
-            ypObject *replacement = ypStringLib_encode_call_errorhandler(
+            replacement = ypStringLib_encode_call_errorhandler(
                 errorHandler, NULL, yp_s_utf_8, source, i, i+1, &i );
             if( yp_isexceptionC( replacement ) ) {
                 yp_decref( dest );
