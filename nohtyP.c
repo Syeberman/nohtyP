@@ -5916,11 +5916,9 @@ static ypObject *ypStringLib_decode_concat_replacement(
 
 
 // UTF-8 encoding and decoding functions
-// FIXME Review remaining StringLib functions
 
 // Returns the number of consecutive ascii bytes starting at start.  Valid for ascii, latin-1, and
 // utf-8 encodings.
-// XXX Consider checking that start[0]<0x80 before calling
 // XXX Adapted from Python's ascii_decode
 # define ypStringLib_ASCII_CHAR_MASK 0x8080808080808080ULL
 yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_ASCII_CHAR_MASK) == ypStringLib_ASCII_CHAR_MASK, ascii_mask_matches_type );
@@ -5929,25 +5927,18 @@ static yp_ssize_t ypStringLib_count_ascii_bytes( const yp_uint8_t *start, const 
     const yp_uint8_t *p = start;
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof( _yp_uint_t ));
 
-    /* Fast path for runs of ASCII characters. Given that common UTF-8
-        input will consist of an overwhelming majority of ASCII
-        characters, we try to optimize for this case by checking
-        as many characters as we can.
-        First, check if we can do an aligned read, as most CPUs have
-        a penalty for unaligned reads.
-    */
-
     // If we don't contain an aligned _yp_uint_t, jump to the end
     if( aligned_end - start < yp_sizeof( _yp_uint_t ) ) goto final_loop;
 
-    // Read the first few bytes until we're aligned
+    // Read the first few bytes until we're aligned.  We can return early because we're reading
+    // byte-by-byte.
     while( !yp_IS_ALIGNED( p, yp_sizeof( _yp_uint_t ) ) ) {
         if( ((yp_uint8_t) *p) & 0x80 ) return p - start;
         ++p;
     }
 
     // Now read as many aligned ints as we can.  Remember that even though the CHAR_MASK test may
-    // fail, there may still be a few ascii bytes
+    // fail, there may still be a few ascii bytes, so we still need to jump to the end.
     while( p < aligned_end ) {
         _yp_uint_t value = *((_yp_uint_t *) p);
         if( value & ypStringLib_ASCII_CHAR_MASK ) break;
@@ -5963,25 +5954,26 @@ final_loop:
     return p - start;
 }
 
-/* 10xxxxxx */
-#define ypStringLib_IS_CONTINUATION_BYTE(ch) ((ch) >= 0x80 && (ch) < 0xC0)
+// Returns true iff the byte is a valid utf-8 continuation character (i.e. 10xxxxxx)
+#define ypStringLib_UTF_8_IS_CONTINUATION( ch ) ((ch) >= 0x80 && (ch) < 0xC0)
 
 // _ypStringLib_decode_utf_8_inner_loop either returns one of these values, or the out-of-range 
-// character (>0xFF) that was decoded but not written.  The invalid continuation values (1, 2, and
+// character (>0xFF) that was decoded but not written.  The "invalid continuation" values (1, 2, and
 // 3) are chosen so that the value gives the number of bytes that must be skipped.
-#define ypStringLib_UTF_8_DATA_END          (0u)
+#define ypStringLib_UTF_8_DATA_END          (0u)    // aka success
 #define ypStringLib_UTF_8_INVALID_CONT_1    (1u)
 #define ypStringLib_UTF_8_INVALID_CONT_2    (2u)
 #define ypStringLib_UTF_8_INVALID_CONT_3    (3u)
 #define ypStringLib_UTF_8_INVALID_START     (4u)
+#define ypStringLib_UTF_8_INVALID_END       (5u)    // *unexpected* end of data
 
 // Appends the decoded bytes to dest, updating its length.  If a decoding error occurs, *source
 // will point to the start of the invalid sequence of bytes, and one of the above error codes will
 // be returned.  If a character is decoded that is too large to fit in dest's encoding, *source
 // will point to the end of the (valid) sequence of bytes, the character will be returned, and
-// it will be up to the caller to reallocate dest and append the character.
+// it will be up to the caller to reallocate dest *and* append the character.
+// XXX Don't forget to append the valid-but-too-large character to dest!
 // XXX Adapted from Python's STRINGLIB(utf8_decode)
-// TODO Bracket all if statements, remove all but the Return goto
 static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
     const yp_uint8_t **source, const yp_uint8_t *end )
 {
@@ -6020,24 +6012,28 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
                 /* invalid sequence
                 \x80-\xBF -- continuation byte
                 \xC0-\xC1 -- fake 0000-007F */
-                goto InvalidStart;
+                ch = ypStringLib_UTF_8_INVALID_START;
+                goto Return;
             }
             if (end - s < 2) {
                 /* unexpected end of data: the caller will decide whether
                    it's an error or not */
-                break;
+                ch = ypStringLib_UTF_8_INVALID_END;
+                goto Return;
             }
             ch2 = s[1];
-            if (!ypStringLib_IS_CONTINUATION_BYTE(ch2))
-                /* invalid continuation byte */
-                goto InvalidContinuation1;
+            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2)) {
+                ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                goto Return;
+            }
             ch = (ch << 6) + ch2 -
                  ((0xC0 << 6) + 0x80);
             yp_ASSERT1 ((ch > 0x007F) && (ch <= 0x07FF));
             s += 2;
-            if (ch > dest_max_char)
+            if (ch > dest_max_char) {
                 /* Out-of-range */
                 goto Return;
+            }
             dest_setindexX( dest_data, dest_len, ch );
             dest_len += 1;
             continue;
@@ -6049,45 +6045,54 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             if (end - s < 3) {
                 /* unexpected end of data: the caller will decide whether
                    it's an error or not */
-                if (end - s < 2)
-                    break;
+                if (end - s < 2) {
+                    ch = ypStringLib_UTF_8_INVALID_END;
+                    goto Return;
+                }
                 ch2 = s[1];
-                if (!ypStringLib_IS_CONTINUATION_BYTE(ch2) ||
-                    (ch2 < 0xA0 ? ch == 0xE0 : ch == 0xED))
+                if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2) ||
+                    (ch2 < 0xA0 ? ch == 0xE0 : ch == 0xED)) {
                     /* for clarification see comments below */
-                    goto InvalidContinuation1;
-                break;
+                    ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                    goto Return;
+                }
+                ch = ypStringLib_UTF_8_INVALID_END;
+                goto Return;
             }
             ch2 = s[1];
             ch3 = s[2];
-            if (!ypStringLib_IS_CONTINUATION_BYTE(ch2)) {
-                /* invalid continuation byte */
-                goto InvalidContinuation1;
+            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2)) {
+                ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                goto Return;
             }
             if (ch == 0xE0) {
-                if (ch2 < 0xA0)
+                if (ch2 < 0xA0) {
                     /* invalid sequence
                        \xE0\x80\x80-\xE0\x9F\xBF -- fake 0000-0800 */
-                    goto InvalidContinuation1;
+                    ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                    goto Return;
+                }
             } else if (ch == 0xED && ch2 >= 0xA0) {
                 /* Decoding UTF-8 sequences in range \xED\xA0\x80-\xED\xBF\xBF
                    will result in surrogates in range D800-DFFF. Surrogates are
                    not valid UTF-8 so they are rejected.
                    See http://www.unicode.org/versions/Unicode5.2.0/ch03.pdf
                    (table 3-7) and http://www.rfc-editor.org/rfc/rfc3629.txt */
-                goto InvalidContinuation1;
+                ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                goto Return;
             }
-            if (!ypStringLib_IS_CONTINUATION_BYTE(ch3)) {
-                /* invalid continuation byte */
-                goto InvalidContinuation2;
+            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch3)) {
+                ch = ypStringLib_UTF_8_INVALID_CONT_2;
+                goto Return;
             }
             ch = (ch << 12) + (ch2 << 6) + ch3 -
                  ((0xE0 << 12) + (0x80 << 6) + 0x80);
             yp_ASSERT1 ((ch > 0x07FF) && (ch <= 0xFFFF));
             s += 3;
-            if (ch > dest_max_char)
+            if (ch > dest_max_char) {
                 /* Out-of-range */
                 goto Return;
+            }
             dest_setindexX( dest_data, dest_len, ch );
             dest_len += 1;
             continue;
@@ -6099,76 +6104,82 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             if (end - s < 4) {
                 /* unexpected end of data: the caller will decide whether
                    it's an error or not */
-                if (end - s < 2)
-                    break;
+                if (end - s < 2) {
+                    ch = ypStringLib_UTF_8_INVALID_END;
+                    goto Return;
+                }
                 ch2 = s[1];
-                if (!ypStringLib_IS_CONTINUATION_BYTE(ch2) ||
-                    (ch2 < 0x90 ? ch == 0xF0 : ch == 0xF4))
+                if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2) ||
+                    (ch2 < 0x90 ? ch == 0xF0 : ch == 0xF4)) {
                     /* for clarification see comments below */
-                    goto InvalidContinuation1;
-                if (end - s < 3)
-                    break;
+                    ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                    goto Return;
+                }
+                if (end - s < 3) {
+                    ch = ypStringLib_UTF_8_INVALID_END;
+                    goto Return;
+                }
                 ch3 = s[2];
-                if (!ypStringLib_IS_CONTINUATION_BYTE(ch3))
-                    goto InvalidContinuation2;
-                break;
+                if (!ypStringLib_UTF_8_IS_CONTINUATION(ch3)) {
+                    ch = ypStringLib_UTF_8_INVALID_CONT_2;
+                    goto Return;
+                }
+                ch = ypStringLib_UTF_8_INVALID_END;
+                goto Return;
             }
             ch2 = s[1];
             ch3 = s[2];
             ch4 = s[3];
-            if (!ypStringLib_IS_CONTINUATION_BYTE(ch2)) {
-                /* invalid continuation byte */
-                goto InvalidContinuation1;
+            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2)) {
+                ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                goto Return;
             }
             if (ch == 0xF0) {
-                if (ch2 < 0x90)
+                if (ch2 < 0x90) {
                     /* invalid sequence
                        \xF0\x80\x80\x80-\xF0\x8F\xBF\xBF -- fake 0000-FFFF */
-                    goto InvalidContinuation1;
+                    ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                    goto Return;
+                }
             } else if (ch == 0xF4 && ch2 >= 0x90) {
                 /* invalid sequence
                    \xF4\x90\x80\80- -- 110000- overflow */
                 // This is the ypStringLib_MAX_UNICODE case
-                goto InvalidContinuation1;
+                ch = ypStringLib_UTF_8_INVALID_CONT_1;
+                goto Return;
             }
-            if (!ypStringLib_IS_CONTINUATION_BYTE(ch3)) {
-                /* invalid continuation byte */
-                goto InvalidContinuation2;
+            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch3)) {
+                ch = ypStringLib_UTF_8_INVALID_CONT_2;
+                goto Return;
             }
-            if (!ypStringLib_IS_CONTINUATION_BYTE(ch4)) {
-                /* invalid continuation byte */
-                goto InvalidContinuation3;
+            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch4)) {
+                ch = ypStringLib_UTF_8_INVALID_CONT_3;
+                goto Return;
             }
             ch = (ch << 18) + (ch2 << 12) + (ch3 << 6) + ch4 -
                  ((0xF0 << 18) + (0x80 << 12) + (0x80 << 6) + 0x80);
             yp_ASSERT1 ((ch > 0xFFFF) && (ch <= 0x10FFFF));
             s += 4;
-            if (ch > dest_max_char)
+            if (ch > dest_max_char) {
                 /* Out-of-range */
                 goto Return;
+            }
             dest_setindexX( dest_data, dest_len, ch );
             dest_len += 1;
             continue;
         }
-        goto InvalidStart;
+
+        ch = ypStringLib_UTF_8_INVALID_START;
+        goto Return;
     }
+
+    // No more characters: we've decoded everything
     ch = ypStringLib_UTF_8_DATA_END;
+
 Return:
     *source = s;
     ypStringLib_SET_LEN( dest, dest_len );
     return ch;
-InvalidStart:
-    ch = ypStringLib_UTF_8_INVALID_START;
-    goto Return;
-InvalidContinuation1:
-    ch = ypStringLib_UTF_8_INVALID_CONT_1;
-    goto Return;
-InvalidContinuation2:
-    ch = ypStringLib_UTF_8_INVALID_CONT_2;
-    goto Return;
-InvalidContinuation3:
-    ch = ypStringLib_UTF_8_INVALID_CONT_3;
-    goto Return;
 }
 
 // Called when _ypStringLib_decode_utf_8_inner_loop can't fit the decoded character ch in the 
@@ -6203,8 +6214,18 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
     while( 1 ) {
         yp_uint32_t ch = _ypStringLib_decode_utf_8_inner_loop( dest, &source, end );
 
-        if( ch > 0xFFu ) {
-            // We can now update our expectation of how many more characters will be added: it's the
+        if( ch == ypStringLib_UTF_8_DATA_END ) {
+            // That's it, everything's decoded.  Null-terminate the object and return.
+            yp_ASSERT( source == end, "_ypStringLib_decode_utf_8_inner_loop didn't end at the end...?" );
+            // TODO See how much wasted space is left here and if we should release some back to the heap
+            ypStringLib_ENC( dest )->setindexX(
+                ypStringLib_DATA( dest ), ypStringLib_LEN( dest ), 0 );
+            ypStringLib_ASSERT_INVARIANTS( dest );   
+            return yp_None;
+
+        } else if( ch > 0xFFu ) {
+            // We successfully decoded a character, but it doesn't fit in dest's current encoding.
+            // Update our expectation of how many more characters will be added: it's the
             // number of byes left to decode (remembering source was modified above).
             // XXX This can't overflow because dest_alloclen should be smaller than currently
             yp_ssize_t dest_requiredLen = ypStringLib_LEN( dest ) + (end - source) + 1;
@@ -6212,6 +6233,7 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
             if( yp_isexceptionC( result ) ) return result;
         
         } else {
+            // We've hit a decoding error: call the error handler
             // TODO Test surrogate characters in the start, end, and middle of string, both on
             // encode and decode, and multiple contiguous and non-contiguous surrogates
             ypObject *replacement;
@@ -6220,8 +6242,7 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
             yp_ssize_t errEnd;
             yp_ssize_t errStart = source - starts;
             switch( ch ) {
-                case ypStringLib_UTF_8_DATA_END:
-                    if( source >= end ) goto inner_loop_end;
+                case ypStringLib_UTF_8_INVALID_END:
                     errmsg = "unexpected end of data";
                     errEnd = end - starts;
                     break;
@@ -6261,15 +6282,10 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
             if( yp_isexceptionC( result ) ) return result;
         }
     }
-
-inner_loop_end:
-    // TODO See how much wasted space is left here and if we should release some back to the heap
-    ypStringLib_ENC( dest )->setindexX( ypStringLib_DATA( dest ), ypStringLib_LEN( dest ), 0 );
-    ypStringLib_ASSERT_INVARIANTS( dest );   
-    return yp_None;
 }
 
 
+// FIXME Review remaining StringLib functions
 // Called on a null source.  Returns a (null-terminated) string of null characters of the given
 // length.
 static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed );
