@@ -714,6 +714,13 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
 // Maximum code point of Unicode 6.0: 0x10FFFF (1,114,111)
 #define ypStringLib_MAX_UNICODE     (0x10FFFFu)
 
+/* This Unicode character will be used as replacement character during
+   decoding if the errors argument is set to "replace". Note: the
+   Unicode character U+FFFD is the official REPLACEMENT CHARACTER in
+   Unicode 3.0. */
+#define ypStringLib_UNICODE_REPLACEMENT_CHARACTER (0xFFFDu)
+
+
 // Macros to work with surrogates
 // XXX Adapted from Python's unicodeobject.h
 #define ypStringLib_IS_SURROGATE(ch)    (0xD800 <= (ch) && (ch) <= 0xDFFF)
@@ -5302,6 +5309,7 @@ static void ypStringLib_upconvert_2from1( void *_data, yp_ssize_t len )
 }
 
 // Converts the len characters at data to a larger encoding
+// XXX There must be enough room in data to fit the larger characters
 // XXX new_sizeshift must be larger than old_sizeshift
 static void ypStringLib_upconvert( int new_sizeshift,
         int old_sizeshift, void *data, yp_ssize_t len )
@@ -5480,7 +5488,7 @@ final_loop:
 static int ypStringLib_checkenc_ucs_4( const void *data, yp_ssize_t len )
 {
     const yp_uint8_t *p = data;
-    const yp_uint8_t *end = p + (len * 2);
+    const yp_uint8_t *end = p + (len * 4);
     yp_ASSERT( yp_IS_ALIGNED( data, 4 ), "unexpected alignment for ucs-4 data" );
     yp_ASSERT( len >= 0, "negative length" );
 
@@ -5958,8 +5966,8 @@ final_loop:
 #define ypStringLib_UTF_8_IS_CONTINUATION( ch ) ((ch) >= 0x80 && (ch) < 0xC0)
 
 // _ypStringLib_decode_utf_8_inner_loop either returns one of these values, or the out-of-range 
-// character (>0xFF) that was decoded but not written.  The "invalid continuation" values (1, 2, and
-// 3) are chosen so that the value gives the number of bytes that must be skipped.
+// character (>0xFF) that was decoded (but not written to dest).  The "invalid continuation" values
+// (1, 2, and 3) are chosen so that the value gives the number of bytes that must be skipped.
 #define ypStringLib_UTF_8_DATA_END          (0u)    // aka success
 #define ypStringLib_UTF_8_INVALID_CONT_1    (1u)
 #define ypStringLib_UTF_8_INVALID_CONT_2    (2u)
@@ -6329,7 +6337,7 @@ static ypObject *_ypStringLib_decode_utf_8_ascii_start( int type,
         ypStringLib_SET_LEN( dest, len );
         ypStringLib_ASSERT_INVARIANTS( dest );
         return dest;
-    }
+    } 
 
     // Otherwise, it's not entirely ASCII, but we know it starts that way, so copy over the
     // part we know and move on to the main loop
@@ -6349,14 +6357,50 @@ static ypObject *_ypStringLib_decode_utf_8_ascii_start( int type,
     return dest;
 }
 
+// FIXME document, review!
+static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck( 
+    ypObject *dest, const yp_uint8_t **source )
+{
+    yp_ssize_t dest_maxinline = ypStringLib_ALLOCLEN( dest ) - 1 /*-1 for terminator*/;
+    const yp_uint8_t *fake_end = (*source) + dest_maxinline;
+    yp_uint32_t ch;
+    void *dest_data;
+    yp_ssize_t dest_len;
+
+    yp_ASSERT( dest_maxinline > 0, "str's inline buffer should fit at least one character" );
+    ch = _ypStringLib_decode_utf_8_inner_loop( dest, source, fake_end );
+
+    // If inner_loop hit an error, or decoded a utf-4 character, we've done all we can
+    if( ch <= 0xFFu || ch >= 0x10000u ) return ch;
+
+    // If we don't have enough room to upconvert, write ch, then write at least one more
+    // character, then we've also done all we can
+    dest_maxinline = (ypStringLib_ALLOCLEN( dest )/2) - 1;
+    dest_len = ypStringLib_LEN( dest );
+    // -1 for ch, then -1 to make sure we can detect at least one more character
+    if( dest_maxinline-2 < dest_len ) {
+        yp_ASSERT1(0); // FIXME remove
+        return ch;
+    }
+
+    dest_data = ypStringLib_DATA( dest );
+    ypStringLib_upconvert_2from1( dest_data, dest_len );
+    ((yp_uint16_t *)dest_data)[dest_len++] = ch;
+    ypStringLib_SET_LEN( dest, dest_len );
+    ypStringLib_ENC_CODE( dest ) = ypStringLib_ENC_UCS_2;
+    
+    // Recall that source was modified above
+    fake_end = (*source) + (dest_maxinline - dest_len);
+    return _ypStringLib_decode_utf_8_inner_loop( dest, source, fake_end );
+}
+
 // Called by ypStringLib_decode_frombytesC_utf_8 in the general case.  Returns the decoded string
 // object.
 static ypObject *_ypStringLib_decode_utf_8( int type,
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
+    const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
 {
     const yp_uint8_t *starts = source;
     const yp_uint8_t *end = source + len;
-    const yp_uint8_t *fake_end;
     ypObject *dest;
     yp_uint32_t ch;
     yp_ssize_t dest_requiredLen;
@@ -6368,28 +6412,25 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
     // inline buffer, to see if we can tell what element size we _should_ be using
     // TODO Contribute this optimization back to Python?
 
-    dest = _ypStr_new_latin_1( type, 0, /*alloclen_fixed=*/FALSE );
+    dest = _ypStr_new_latin_1( type, 0, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( dest ) ) return dest;
-    yp_ASSERT( ypStringLib_ALLOCLEN( dest ) > 0+1, "str inlinelen should fit at least one character" );
 
     // Shortcut: if the inline array can fit all decoded characters anyway, jump to outer loop
-    if( len <= ypStringLib_ALLOCLEN( dest )-1 /*-1 for terminator*/ ) goto outer_loop;
+    if( len <= ypStringLib_ALLOCLEN( dest )-1 /*-1 for terminator*/ ) {
+        goto outer_loop;
+    }
 
-    fake_end = source + ypStringLib_ALLOCLEN( dest );
-    ch = _ypStringLib_decode_utf_8_inner_loop( dest, &source, fake_end );
+    ch = _ypStringLib_decode_utf_8_inline_precheck( dest, &source );
 
-    // XXX This can't overflow because dest_alloclen should be smaller than currently
+    // XXX This can't overflow because dest_requiredLen should be <= dest_alloclen
     dest_requiredLen = ypStringLib_LEN( dest ) + (end - source) + 1;
     if( ch > 0xFFu ) {
-        // TODO If ch<0x10000, we could still use the inline buffer to see if there are 4-byte
-        // characters in the string
+        // Success!  We've can start off appropriately up-converted.
         result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
     } else {
-        // Otherwise it's Latin-1 as far as we can see, or there was a decoding error, so
-        // resize and move on to the main loop
-        // XXX I don't think we an avoid resizing on decoding errors, because we don't know if
-        // the error occured as a result of an encoded character truncated by fake_end
-        result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_LATIN_1 );
+        // We've reached the end of what we can decode into the inline buffer, or there was a
+        // decoding error.  Either way, resize and move on to outer_loop.
+        result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
     }
     if( yp_isexceptionC( result ) ) {
         yp_decref( dest );
@@ -6825,11 +6866,40 @@ static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
     *new_position = yp_SSIZE_T_MAX;
 }
 
+yp_IMMORTAL_STR_LATIN_1( yp_codecs_replace_errors_onencode, "?" );
+static ypObject *yp_codecs_replace_errors_ondecode = NULL;  // TODO Make immortal (yp_IMMORTAL_STR_UCS_2)
 static void yp_codecs_replace_errors( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position )
 {
-    *replacement = yp_NotImplementedError;
-    *new_position = yp_SSIZE_T_MAX;
+    if( yp_isexceptionC2( params->exc, yp_UnicodeEncodeError ) ) {
+        yp_ssize_t replacement_len = params->end - params->start;
+        *replacement = yp_repeatC( yp_codecs_replace_errors_ondecode, replacement_len );
+        if( yp_isexceptionC( *replacement ) ) {
+            *new_position = yp_SSIZE_T_MAX;
+        } else {
+            *new_position = params->end;
+        }
+        return;
+
+    } else if( yp_isexceptionC2( params->exc, yp_UnicodeDecodeError ) ) {
+        if( yp_codecs_replace_errors_ondecode == NULL ) {
+            ypObject *result = yp_chrC( ypStringLib_UNICODE_REPLACEMENT_CHARACTER ); // new ref
+            if( yp_isexceptionC( result ) ) {
+                *replacement = result;
+                *new_position = yp_SSIZE_T_MAX;
+                return;
+            }
+            yp_codecs_replace_errors_ondecode = result; // stolen ref
+        }
+        *replacement = yp_incref( yp_codecs_replace_errors_ondecode );
+        *new_position = params->end;
+        return;
+    
+    } else {
+        *replacement = yp_TypeError;    // unhandled encoding exception
+        *new_position = yp_SSIZE_T_MAX;
+        return;
+    }
 }
 
 static void yp_codecs_ignore_errors( yp_codecs_error_handler_params_t *params,

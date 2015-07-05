@@ -1639,6 +1639,60 @@ class UnicodeTest(string_tests.CommonTest,
             self.assertEqual(seq.decode('utf-8', 'ignore'),
                              res.replace('\uFFFD', ''))
 
+    def test_utf8_decode_nohtyp_precheck(self):
+        """nohtyP uses the str's inline buffer to decode "the first few" bytes to determine what
+        encoding should be used for the string (i.e. latin-1, ucs-2, or ucs-4).  The intention is
+        to save having to immediately reallocate the buffer in order to upconvert to the correct
+        encoding.  However, this is not performed if:
+            - the bytes start with ascii (ascii-as-utf-8 is heavily optimized)
+            - (similar if the bytes are empty or null)
+            - if the decoded string is expected to fit in the inline buffer anyway
+        """
+        empty  = (b"", "")
+        latin1 = (b"\xc2\x80", "\x80")
+        ucs2   = (b"\xc4\x80", "\u0100" )
+        ucs4   = (b"\xf0\x90\x80\x80", "\U00010000" )
+        error  = (b"\xff", "\ufffd")
+        sequences = (
+            (b"".join( (a[0], b[0], c[0], d[0]) ), "".join( (a[1], b[1], c[1], d[1]) ))
+            for a in (empty, latin1)
+                for b in (empty, ucs2)
+                    for c in (empty, ucs4)
+                        for d in (empty, error)
+            # The above should generate the following test cases:
+            # ""
+            # error
+            # ucs-4
+            # ucs-4, then error
+            # ucs-2
+            # ucs-2, then error
+            # ucs-2, then ucs-4
+            # ucs-2, then ucs-4, then error
+            # latin-1
+            # latin-1, then error
+            # latin-1, then ucs-4
+            # latin-1, then ucs-4, then error
+            # latin-1, then ucs-2
+            # latin-1, then ucs-2, then error
+            # latin-1, then ucs-2, then ucs-4
+            # latin-1, then ucs-2, then ucs-4, then error
+        )
+
+        for seq, result in sequences:
+            # Pad the test data so we don't take the len(seq)<inlinelen shortcut
+            seq = yp_bytes( seq + b"a"*1024 )
+            result = yp_str( result + "a"*1024 )
+            self.assertEqual( seq.decode( errors="replace" ), result )
+
+        # FIXME finish this test
+        # Check with a valid surr pair that gets truncated by fake_end
+        
+        # Test with a ucs-2 char where fake_end-after-upconvert doesn't fit 
+        #   - source past new fake_end (all boundaries)
+        #   - no room for ch
+        #   - no room for next character
+
+
     def to_bytestring(self, seq):
         return yp_bytes(yp_int(c, 16) for c in seq.split())
 

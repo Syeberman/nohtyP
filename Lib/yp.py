@@ -1603,10 +1603,6 @@ class _ypBytes( ypObject ):
     def __new__( cls, source=0, encoding=None, errors=None ):
         # TODO Seem to be missing yp_str, yp_bytes, etc
         if isinstance( source, str ):
-            # TODO Replace this faked-out version with nohtyP's
-            if errors == "replace":
-                pyBytes = bytes( source, encoding, errors )
-                return cls._ypBytes_constructorC( pyBytes, len( pyBytes ) )
             return cls._ypBytes_constructor3( source, encoding, errors )
         elif isinstance( source, (int, yp_int) ):
             return cls._ypBytes_constructor( source )
@@ -1654,9 +1650,6 @@ class yp_bytes( _ypBytes ):
         #if size < 1 and "_yp_bytes_empty" in globals( ):
         #    assert self is _yp_bytes_empty, "an empty bytes should be _yp_bytes_empty"
     def decode( self, encoding="utf-8", errors="strict" ):
-        # TODO Replace this faked-out version with nohtyP's
-        if errors == "replace":
-            return yp_str( self._asbytes( ).decode( encoding, errors ) )
         return _yp_str3( self, encoding, errors )
 _yp_bytes_empty = yp_bytes( )
 
@@ -1680,9 +1673,6 @@ class yp_bytearray( _ypBytes ):
         return self
     # XXX nohtyP will return a chrarray if asked to decode a bytearray, but Python expects str
     def decode( self, encoding="utf-8", errors="strict" ):
-        # TODO Replace this faked-out version with nohtyP's
-        if errors == "replace":
-            return yp_str( self._asbytes( ).decode( encoding, errors ) )
         return _yp_str3( self, encoding, errors )
 
 # TODO Generally, need to adjust constructors and functions to only accept exact, specific types 
@@ -1707,9 +1697,6 @@ class yp_str( ypObject ):
             if errors is _yp_arg_missing: errors = yp_s_strict
             if not isinstance( object, (bytes, bytearray, yp_bytes, yp_bytearray) ):
                 raise TypeError( "expected yp_bytes or yp_bytearray in yp_str (decoding)")
-            # TODO Replace this faked-out version with nohtyP's
-            if errors == "replace":
-                return cls( str( object, encoding, errors ) )
             return _yp_str3( object, encoding, errors )
     def _get_encoded_size_encoding( self ):
         encoded = c_char_pp( c_char_p( ) )
