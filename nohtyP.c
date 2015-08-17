@@ -1164,9 +1164,9 @@ static ypObject *_ypMem_malloc_container_inline(
 // TODO 64-bit PyDictObject is 128 bytes...we are larger!
 // TODO Static asserts to ensure that certain-sized objects fit with one allocation, then optimize
 #if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
-#define _ypMem_ideal_size_DEFAULT (128)
+#define _ypMem_ideal_size_DEFAULT ((yp_ssize_t) 128)
 #else
-#define _ypMem_ideal_size_DEFAULT (256)
+#define _ypMem_ideal_size_DEFAULT ((yp_ssize_t) 256)
 #endif
 static yp_ssize_t _ypMem_ideal_size = _ypMem_ideal_size_DEFAULT;
 
@@ -6371,15 +6371,16 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     ch = _ypStringLib_decode_utf_8_inner_loop( dest, source, fake_end );
 
     // If inner_loop hit an error, or decoded a utf-4 character, we've done all we can
-    if( ch <= 0xFFu || ch >= 0x10000u ) return ch;
+    if( ch <= 0xFFu || ch >= 0x10000u ) {
+        return ch;
+    }
 
-    // If we don't have enough room to upconvert, write ch, then write at least one more
-    // character, then we've also done all we can
+    // To do anything useful, we need room to upconvert, write ch, then write at least one more
+    // character.  If we can't, we bail.
     dest_maxinline = (ypStringLib_ALLOCLEN( dest )/2) - 1;
     dest_len = ypStringLib_LEN( dest );
     // -1 for ch, then -1 to make sure we can detect at least one more character
     if( dest_maxinline-2 < dest_len ) {
-        yp_ASSERT1(0); // FIXME remove
         return ch;
     }
 
@@ -6428,6 +6429,7 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
         // Success!  We've can start off appropriately up-converted.
         result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
     } else {
+        // FIXME I believe there's a bug here, and we should only call grow if alloclen too small
         // We've reached the end of what we can decode into the inline buffer, or there was a
         // decoding error.  Either way, resize and move on to outer_loop.
         result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
@@ -10572,7 +10574,7 @@ typedef struct {
 #define ypSet_PERTURB_SHIFT (5)
 
 // This tests that, by default, the inline data is enough to hold ypSet_ALLOCLEN_MIN elements
-#define ypSet_ALLOCLEN_MIN (8)
+#define ypSet_ALLOCLEN_MIN ((yp_ssize_t) 8)
 yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-yp_offsetof( ypSetObject, ob_inline_data )) / yp_sizeof( ypSet_KeyEntry ) >= ypSet_ALLOCLEN_MIN, ypSet_minsize_inline );
 
 // The threshold at which we resize the set, expressed as a fraction of alloclen (ie 2/3)

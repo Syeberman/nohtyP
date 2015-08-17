@@ -395,7 +395,7 @@ class UnicodeTest(string_tests.CommonTest,
                 s2 = yp_str('\udb00\udfff')
                 test_lecmp(s, s2)
 
-            # FIXME Python has an indentation bug here, contribute back
+            # TODO Python has an indentation bug here, contribute back
             test_fixup(yp_str('\ue000'))
             test_fixup(yp_str('\uff61'))
 
@@ -1648,13 +1648,14 @@ class UnicodeTest(string_tests.CommonTest,
             - (similar if the bytes are empty or null)
             - if the decoded string is expected to fit in the inline buffer anyway
         """
-        empty  = (b"", "")
-        latin1 = (b"\xc2\x80", "\x80")
-        ucs2   = (b"\xc4\x80", "\u0100" )
-        ucs4   = (b"\xf0\x90\x80\x80", "\U00010000" )
-        error  = (b"\xff", "\ufffd")
+        empty  = (yp_bytes(b""), yp_str(""))
+        latin1 = (yp_bytes(b"\xc2\x80"), yp_str("\x80"))
+        ucs2   = (yp_bytes(b"\xc4\x80"), yp_str("\u0100" ))
+        # FIXME also a 3-byte ucs2 sample
+        ucs4   = (yp_bytes(b"\xf0\x90\x80\x80"), yp_str("\U00010000" ))
+        error  = (yp_bytes(b"\xff"), yp_str("\ufffd"))
         sequences = (
-            (b"".join( (a[0], b[0], c[0], d[0]) ), "".join( (a[1], b[1], c[1], d[1]) ))
+            (empty[0].join( (a[0], b[0], c[0], d[0]) ), empty[1].join( (a[1], b[1], c[1], d[1]) ))
             for a in (empty, latin1)
                 for b in (empty, ucs2)
                     for c in (empty, ucs4)
@@ -1678,15 +1679,30 @@ class UnicodeTest(string_tests.CommonTest,
             # latin-1, then ucs-2, then ucs-4, then error
         )
 
+        padBytes = yp_bytes( b"a"*1024 )
+        padStr = yp_str( "a"*1024 )
         for seq, result in sequences:
             # Pad the test data so we don't take the len(seq)<inlinelen shortcut
-            seq = yp_bytes( seq + b"a"*1024 )
-            result = yp_str( result + "a"*1024 )
+            seq += padBytes
+            result += padStr
             self.assertEqual( seq.decode( errors="replace" ), result )
 
-        # FIXME finish this test
         # Check with a valid surr pair that gets truncated by fake_end
+        padBytes = yp_bytes( b"a" )
+        padStr = yp_str( "a" )
+        for surrBytes, surrChar in (latin1, ucs2, ucs4):
+            for pad_len in range( 512 ):
+                # We must start with a valid non-ascii character.  Then add a byte each time to push
+                # the surrogate pair towards and over the inlinelen boundary.
+                seq    = latin1[0] + (padBytes * pad_len) + surrBytes
+                result = latin1[1] + (padStr   * pad_len) + surrChar
+                self.assertEqual( seq.decode(), result )
         
+        # FIXME A string of all ucs4, with len in range( 512 ) (as above) so that it just-crosses
+        # inlinelen.  I believe (on debug) it will fail in _ypStr_grow_onextend because of
+        # unnecessary resize.
+
+        # FIXME finish this test
         # Test with a ucs-2 char where fake_end-after-upconvert doesn't fit 
         #   - source past new fake_end (all boundaries)
         #   - no room for ch
@@ -2010,7 +2026,7 @@ class UnicodeTest(string_tests.CommonTest,
     def test_codecs_all_code_points(self):
         # UTF-8 must be roundtrip safe for all code points
         # (except surrogates, which are forbidden).
-        # FIXME This optimization can be contributed back to Python
+        # TODO This optimization can be contributed back to Python
         u  = yp_str('').join(yp_chr(x) for x in range(0, 0xd800))
         u += yp_str('').join(yp_chr(x) for x in range(0xe000, 0x110000))
         for encoding in ('utf-8',):
