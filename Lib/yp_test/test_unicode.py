@@ -1650,14 +1650,14 @@ class UnicodeTest(string_tests.CommonTest,
         """
         empty  = (yp_bytes(b""), yp_str(""))
         latin1 = (yp_bytes(b"\xc2\x80"), yp_str("\x80"))
-        ucs2   = (yp_bytes(b"\xc4\x80"), yp_str("\u0100" ))
-        # FIXME also a 3-byte ucs2 sample
+        ucs2_2 = (yp_bytes(b"\xc4\x80"), yp_str("\u0100"))
+        ucs2_3 = (yp_bytes(b'\xe0\xa0\x80'), yp_str("\u0800"))
         ucs4   = (yp_bytes(b"\xf0\x90\x80\x80"), yp_str("\U00010000" ))
         error  = (yp_bytes(b"\xff"), yp_str("\ufffd"))
         sequences = (
             (empty[0].join( (a[0], b[0], c[0], d[0]) ), empty[1].join( (a[1], b[1], c[1], d[1]) ))
             for a in (empty, latin1)
-                for b in (empty, ucs2)
+                for b in (empty, ucs2_2, ucs2_3)
                     for c in (empty, ucs4)
                         for d in (empty, error)
             # The above should generate the following test cases:
@@ -1687,11 +1687,16 @@ class UnicodeTest(string_tests.CommonTest,
             result += padStr
             self.assertEqual( seq.decode( errors="replace" ), result )
 
+        # The maximum (latin-1) length of test strings that we will generate to test the inlinelen
+        # (i.e. fake_end) boundary.  Since we can't be sure exactly where this boundary is, we
+        # test a range of values in order to slowly push our test data towards and over.
+        inlinelen_test_max = 512
+
         # Check with a valid surr pair that gets truncated by fake_end
         padBytes = yp_bytes( b"a" )
         padStr = yp_str( "a" )
-        for surrBytes, surrChar in (latin1, ucs2, ucs4):
-            for pad_len in range( 512 ):
+        for surrBytes, surrChar in (latin1, ucs2_2, ucs2_3, ucs4):
+            for pad_len in range( inlinelen_test_max ):
                 # We must start with a valid non-ascii character.  Then add a byte each time to push
                 # the surrogate pair towards and over the inlinelen boundary.
                 seq    = latin1[0] + (padBytes * pad_len) + surrBytes
@@ -1701,6 +1706,11 @@ class UnicodeTest(string_tests.CommonTest,
         # FIXME A string of all ucs4, with len in range( 512 ) (as above) so that it just-crosses
         # inlinelen.  I believe (on debug) it will fail in _ypStr_grow_onextend because of
         # unnecessary resize.
+        for surrBytes, surrChar in (latin1, ucs2_2, ucs2_3, ucs4):
+            for pad_len in range( inlinelen_test_max ): # FIXME can I use a smaller, per-encoding maximum?
+                seq    = surrBytes * pad_len
+                result = surrChar  * pad_len
+                self.assertEqual( seq.decode(), result )
 
         # FIXME finish this test
         # Test with a ucs-2 char where fake_end-after-upconvert doesn't fit 

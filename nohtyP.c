@@ -6430,6 +6430,13 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
         result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
     } else {
         // FIXME I believe there's a bug here, and we should only call grow if alloclen too small
+        // FIXME Which brings up another point: we _could_ keep adjusting fake_end until we really,
+        // really can't fit any more characters in.  I don't think this is advantageous.  In
+        // general, strings will be "all" latin-1, or "all" ucs-2, or "all" ucs-4.  Really, we only
+        // need to read the first few characters to make a decision.  We are doing more just because
+        // we can (although perhaps we should rethink that as well and put a max on it), but
+        // continuing to adjust fake_end would provide diminishing returns.
+
         // We've reached the end of what we can decode into the inline buffer, or there was a
         // decoding error.  Either way, resize and move on to outer_loop.
         result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
