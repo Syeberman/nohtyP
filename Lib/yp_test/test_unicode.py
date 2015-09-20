@@ -1703,11 +1703,8 @@ class UnicodeTest(string_tests.CommonTest,
                 result = latin1[1] + (padStr   * pad_len) + surrChar
                 self.assertEqual( seq.decode(), result )
         
-        # FIXME A string of all ucs4, with len in range( 512 ) (as above) so that it just-crosses
-        # inlinelen.  I believe (on debug) it will fail in _ypStr_grow_onextend because of
-        # unnecessary resize.
         for surrBytes, surrChar in (latin1, ucs2_2, ucs2_3, ucs4):
-            for pad_len in range( inlinelen_test_max ): # FIXME can I use a smaller, per-encoding maximum?
+            for pad_len in range( inlinelen_test_max ):
                 seq    = surrBytes * pad_len
                 result = surrChar  * pad_len
                 self.assertEqual( seq.decode(), result )

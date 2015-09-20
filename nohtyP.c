@@ -5130,6 +5130,7 @@ typedef struct _ypStrObject ypStrObject;
 #define ypStringLib_LEN             ypObject_CACHED_LEN
 #define ypStringLib_SET_LEN         ypObject_SET_CACHED_LEN
 #define ypStringLib_ALLOCLEN        ypObject_ALLOCLEN
+#define ypStringLib_SET_ALLOCLEN    ypObject_SET_ALLOCLEN
 
 // The maximum possible alloclen and length of any string object.  While Latin-1 could technically 
 // allow four times as much data as UCS-4, for simplicity we use one maximum length for all 
@@ -6236,7 +6237,7 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
             // Update our expectation of how many more characters will be added: it's the
             // number of byes left to decode (remembering source was modified above).
             // XXX This can't overflow because dest_alloclen should be smaller than currently
-            yp_ssize_t dest_requiredLen = ypStringLib_LEN( dest ) + (end - source) + 1;
+            yp_ssize_t dest_requiredLen = ypStringLib_LEN( dest ) + 1 /*for ch*/ + (end - source);
             result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
             if( yp_isexceptionC( result ) ) return result;
         
@@ -6362,6 +6363,10 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     ypObject *dest, const yp_uint8_t **source )
 {
     yp_ssize_t dest_maxinline = ypStringLib_ALLOCLEN( dest ) - 1 /*-1 for terminator*/;
+    // TODO Does it really make sense to use the entire inline buffer for the precheck?  Aren't
+    // strings "usually" entirely latin-1, or ucs-2, or ucs-4?  Isn't it enough just to check the
+    // first, I dunno, 16 characters?  Doing this won't save on allocations, but it *will* save
+    // on the memcpy required to move to a separate buffer.
     const yp_uint8_t *fake_end = (*source) + dest_maxinline;
     yp_uint32_t ch;
     void *dest_data;
@@ -6384,13 +6389,17 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
         return ch;
     }
 
+    // Convert to ucs-2, and don't forget to write ch!
+    // FIXME Anything else we have to modify here?
     dest_data = ypStringLib_DATA( dest );
     ypStringLib_upconvert_2from1( dest_data, dest_len );
-    ((yp_uint16_t *)dest_data)[dest_len++] = ch;
+    ((yp_uint16_t *)dest_data)[dest_len] = ch;
+    dest_len += 1;
     ypStringLib_SET_LEN( dest, dest_len );
     ypStringLib_ENC_CODE( dest ) = ypStringLib_ENC_UCS_2;
+    ypStringLib_SET_ALLOCLEN( dest, ypStringLib_ALLOCLEN( dest )/2 );
     
-    // Recall that source was modified above
+    // We are at least ucs-2: see if we are actually ucs-4.  Recall that source was modified above.
     fake_end = (*source) + (dest_maxinline - dest_len);
     return _ypStringLib_decode_utf_8_inner_loop( dest, source, fake_end );
 }
@@ -6406,7 +6415,7 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
     yp_uint32_t ch;
     yp_ssize_t dest_requiredLen;
     ypObject *result;
-    yp_ASSERT( len > 0, "zero-length strings should be handled before this function" );
+    yp_ASSERT( len > 0, "zero-length strings should be handled before _ypStringLib_decode_utf_8" );
 
     // If it doesn't start with any ASCII, then before we allocate a separate buffer to hold the
     // data, run the first few bytes through _ypStringLib_decode_utf_8_inner_loop using the
@@ -6423,27 +6432,32 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
 
     ch = _ypStringLib_decode_utf_8_inline_precheck( dest, &source );
 
-    // XXX This can't overflow because dest_requiredLen should be <= dest_alloclen
-    dest_requiredLen = ypStringLib_LEN( dest ) + (end - source) + 1;
     if( ch > 0xFFu ) {
         // Success!  We've can start off appropriately up-converted.
+        // XXX This can't overflow because dest_requiredLen should be <= dest_alloclen
+        dest_requiredLen = ypStringLib_LEN( dest ) + 1 /*for ch*/ + (end - source);
         result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
-    } else {
-        // FIXME I believe there's a bug here, and we should only call grow if alloclen too small
-        // FIXME Which brings up another point: we _could_ keep adjusting fake_end until we really,
-        // really can't fit any more characters in.  I don't think this is advantageous.  In
-        // general, strings will be "all" latin-1, or "all" ucs-2, or "all" ucs-4.  Really, we only
-        // need to read the first few characters to make a decision.  We are doing more just because
-        // we can (although perhaps we should rethink that as well and put a max on it), but
-        // continuing to adjust fake_end would provide diminishing returns.
+        if( yp_isexceptionC( result ) ) {
+            yp_decref( dest );
+            return result;
+        }
 
+    } else {
         // We've reached the end of what we can decode into the inline buffer, or there was a
         // decoding error.  Either way, resize and move on to outer_loop.
-        result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
-    }
-    if( yp_isexceptionC( result ) ) {
-        yp_decref( dest );
-        return result;
+        // XXX That's actually a lie: we've reached fake_end, but it's possible we haven't decoded
+        // as many characters as we estimated and there's still room in the inline buffer.  We 
+        // _could_ keep adjusting fake_end until there's no more room, but I don't think this is 
+        // advantageous.  Don't the first few characters usually determine the encoding?
+        // XXX This can't overflow because dest_requiredLen should be <= dest_alloclen
+        dest_requiredLen = ypStringLib_LEN( dest ) /*ch isn't a char*/ + (end - source);
+        if( dest_requiredLen > ypStringLib_ALLOCLEN( dest )-1 ) {
+            result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
+            if( yp_isexceptionC( result ) ) {
+                yp_decref( dest );
+                return result;
+            }
+        }
     }
 
 outer_loop:
@@ -8409,7 +8423,7 @@ static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_s
     void *oldptr;
 
     yp_ASSERT( requiredLen >= ypStr_LEN( s ), "requiredLen cannot be <len(s)" );
-    yp_ASSERT( requiredLen >= ypStr_ALLOCLEN( s )-1 || newEnc_code > oldEnc->code, "_ypStr_grow_onextend called unnecessarily" );
+    yp_ASSERT( requiredLen > ypStr_ALLOCLEN( s )-1 || newEnc_code > oldEnc->code, "_ypStr_grow_onextend called unnecessarily" );
     yp_ASSERT( requiredLen <= ypStr_LEN_MAX, "requiredLen cannot be >max" );
     yp_ASSERT( newEnc_code >= oldEnc->code, "can't 'grow' to a smaller encoding" );
 
