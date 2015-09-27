@@ -1679,42 +1679,60 @@ class UnicodeTest(string_tests.CommonTest,
             # latin-1, then ucs-2, then ucs-4, then error
         )
 
-        padBytes = yp_bytes( b"a"*1024 )
-        padStr = yp_str( "a"*1024 )
-        for seq, result in sequences:
-            # Pad the test data so we don't take the len(seq)<inlinelen shortcut
-            seq += padBytes
-            result += padStr
-            self.assertEqual( seq.decode( errors="replace" ), result )
-
         # The maximum (latin-1) length of test strings that we will generate to test the inlinelen
         # (i.e. fake_end) boundary.  Since we can't be sure exactly where this boundary is, we
         # test a range of values in order to slowly push our test data towards and over.
-        inlinelen_test_max = 512
+        inlinelen_test_end = 1024+1
 
-        # Check with a valid surr pair that gets truncated by fake_end
-        padBytes = yp_bytes( b"a" )
-        padStr = yp_str( "a" )
+        # These must be ascii byte/chars so that 1 byte is 1 character and is represented in the
+        # smallest internal string encoding
+        padBytes_1 = yp_bytes( b"a" )
+        padStr_1 = yp_str( "a" )
+        padBytes = tuple( padBytes_1 * i for i in range( inlinelen_test_end ) )
+        padStr   = tuple( padStr_1   * i for i in range( inlinelen_test_end ) )
+
+        # Verifies the precheck works in the usual cases.  We have to pad the test data so we 
+        # don't take the len(seq)<inlinelen shortcut, but otherwise we're ensuring the decoding
+        # is working just as if the precheck wasn't there.
+        for seq, result in sequences:
+            seq    += padBytes[-1]
+            result += padStr[-1]
+            self.assertEqual( seq.decode( errors="replace" ), result )
+
+        # Check with a valid surr pair that gets truncated by fake_end.  We don't care if the
+        # shortcut is taken in early iterations.
         for surrBytes, surrChar in (latin1, ucs2_2, ucs2_3, ucs4):
-            for pad_len in range( inlinelen_test_max ):
+            for pad_len in range( inlinelen_test_end ):
                 # We must start with a valid non-ascii character.  Then add a byte each time to push
                 # the surrogate pair towards and over the inlinelen boundary.
-                seq    = latin1[0] + (padBytes * pad_len) + surrBytes
-                result = latin1[1] + (padStr   * pad_len) + surrChar
+                seq    = padBytes[0].join( (latin1[0], padBytes[pad_len], surrBytes) )
+                result = padStr[0].join(   (latin1[1], padStr[pad_len],   surrChar)  )
                 self.assertEqual( seq.decode(), result )
         
+        # Debug builds check for unnecessary string resizes.  There was a bug in precheck that
+        # resized the string when there was plenty of room left (i.e. the first estimate assumed
+        # each byte was a char, but by the time the precheck was finished it determined most
+        # characters were two or three bytes, and it had room inline even if rest were one byte).
+        # Again, we don't care if the shortcut is taken.
         for surrBytes, surrChar in (latin1, ucs2_2, ucs2_3, ucs4):
-            for pad_len in range( inlinelen_test_max ):
+            for pad_len in range( inlinelen_test_end ):
                 seq    = surrBytes * pad_len
                 result = surrChar  * pad_len
                 self.assertEqual( seq.decode(), result )
 
-        # FIXME finish this test
-        # Test with a ucs-2 char where fake_end-after-upconvert doesn't fit 
-        #   - source past new fake_end (all boundaries)
-        #   - no room for ch
-        #   - no room for next character
-
+        # If a ucs-2 character is detected before a ucs-4, the precheck attempts to up-convert the
+        # decoded data in-place (i.e. in the inline buffer).  However, it first needs to check
+        # that there is room to perform this upconversion; this is tested here.  A bug in this
+        # code would manifest as an out-of-bounds error (i.e. memory corruption).
+        for surrBytes, surrChar in (ucs2_2, ucs2_3):
+            for pad_len in range( inlinelen_test_end ):
+                # We must start with a valid non-ascii character.  Then add a byte each time to push
+                # the ucs-2 surrogate pair towards and over the midway point, such that upconverting
+                # the inline buffer in-place is not possible or not beneficial.  We also need to pad
+                # the end to ensure the len(seq)<inlinelen shortcut is not taken.
+                seq    = padBytes[0].join( (latin1[0], padBytes[pad_len], surrBytes, padBytes[-1]) )
+                result = padStr[0].join(   (latin1[1], padStr[pad_len],   surrChar,  padStr[-1])   )
+                self.assertEqual( seq.decode(), result )
 
     def to_bytestring(self, seq):
         return yp_bytes(yp_int(c, 16) for c in seq.split())

@@ -6294,7 +6294,6 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
 }
 
 
-// FIXME Review remaining StringLib functions
 // Called on a null source.  Returns a (null-terminated) string of null characters of the given
 // length.
 static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed );
@@ -6367,6 +6366,9 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     // strings "usually" entirely latin-1, or ucs-2, or ucs-4?  Isn't it enough just to check the
     // first, I dunno, 16 characters?  Doing this won't save on allocations, but it *will* save
     // on the memcpy required to move to a separate buffer.
+    // ...But wait, consider an HTML page.  It's going to start with a bunch of ASCII, then
+    // anything ucs-2 or ucs-4 will be in the middle.  What use cases am I optimizing for: 
+    // converting a whole document, or small strings one-at-a-time?
     const yp_uint8_t *fake_end = (*source) + dest_maxinline;
     yp_uint32_t ch;
     void *dest_data;
@@ -6469,6 +6471,7 @@ outer_loop:
     return dest;
 }
 
+// FIXME Review remaining StringLib functions
 // Decodes the len bytes of UTF-8 at source according to errors, and returns a new string of the
 // given type.  If source is NULL it is considered as having all null bytes; len cannot be
 // negative or greater than ypStringLib_LEN_MAX.
