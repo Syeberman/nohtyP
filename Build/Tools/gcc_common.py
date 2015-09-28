@@ -8,8 +8,6 @@ import SCons.Warnings
 
 # TODO Add at least 3.4.6 (2006), 4.2.4 (2007+), 4.4.7 (2009+), 4.6.4 (2011+)
 
-_devnul = open( os.devnull, "w" )
-
 # Without a toolpath argument these will find SCons' tool modules
 _platform_name = SCons.Platform.Platform( ).name
 if _platform_name in ("win32", "cygwin"):
@@ -17,10 +15,13 @@ if _platform_name in ("win32", "cygwin"):
 
     # Try some known, and unknown-but-logical, default locations for mingw
     _mingw_path_globs = (
+            # MinGW-w64 (http://sourceforge.net/projects/mingw-w64/)
+            "C:\\Program Files\\mingw-w64\\*\\*\\bin",
+            "C:\\Program Files (x86)\\mingw-w64\\*\\*\\bin",
             # MinGW-builds (http://sourceforge.net/projects/mingwbuilds/)
-            "C:\\Program Files\\mingw-builds\\*\*\\bin",
+            "C:\\Program Files\\mingw-builds\\*\\*\\bin",
                                         # C:\Program Files\mingw-builds\x64-4.8.1-win32-seh-rev5\mingw64
-            "C:\\Program Files (x86)\\mingw-builds\\*\*\\bin",
+            "C:\\Program Files (x86)\\mingw-builds\\*\\*\\bin",
             # Win-builds (http://win-builds.org/)
             "C:\\win-builds-*\\bin",    # C:\win-builds-32, C:\win-builds-64, C:\win-builds-64-1.3
             "C:\\win-builds-*\\*\\bin", # C:\win-builds-64\1.3
@@ -46,7 +47,7 @@ def _archOptions( targ_os, targ_arch ):
 
 _test_gcc_cache = {}
 _test_gcc_temp_dir = None
-def _test_gcc( gcc, re_dumpversion, targ_os, targ_arch ):
+def _test_gcc( gcc, re_dumpversion, targ_os, targ_arch, sconscriptLog ):
     """Tests if the given gcc matches the version, and supports the target OS and arch.  Caches
     results for speed."""
     # Get this first so we can fail quickly on new architectures
@@ -80,8 +81,14 @@ def _test_gcc( gcc, re_dumpversion, targ_os, targ_arch ):
     # Test to see if gcc supports the target
     env = dict( os.environ )
     env["PATH"] = os.path.dirname( gcc ) + os.pathsep + env.get( "PATH", "" )
-    gcc_result = subprocess.call( [gcc, "test.c"]+list( archOpts ),
-            cwd=_test_gcc_temp_dir, stdout=_devnul, stderr=_devnul, env=env )
+    gcc_args = [gcc, "test.c"] + list( archOpts )
+    sconscriptLog.write( "Testing %r for architecture support\n" )
+    sconscriptLog.write( "%r\n" % (gcc_args, ) )
+    sconscriptLog.flush()
+    gcc_result = subprocess.call( gcc_args,
+            cwd=_test_gcc_temp_dir, stdout=sconscriptLog, stderr=sconscriptLog, env=env )
+    sconscriptLog.flush()
+    sconscriptLog.write( "gcc returned %r\n" % gcc_result )
     gcc_cache[targ_arch] = (gcc_result == 0) # gcc returns non-zero on error
     return gcc_cache[targ_arch]
 
@@ -96,7 +103,8 @@ def _find( env, major, minor, re_dumpversion ):
     for exeName in (staticExeName, dynamicExeName):
         for binDir in binDirs:
             gcc = os.path.join( binDir, exeName )
-            supported = _test_gcc( gcc, re_dumpversion, env["TARGET_OS"], env["TARGET_ARCH"] )
+            supported = _test_gcc( gcc, re_dumpversion, env["TARGET_OS"], env["TARGET_ARCH"],
+                    env["SCONSCRIPT_LOG"] )
             if supported: return gcc
     return None
 
@@ -172,8 +180,11 @@ def ApplyGCCOptions( env, version ):
                 )
     else:
         addCcFlags(
-                # Optimize: for speed, whole program (needs -flto to linker)
-                "-O3", "-flto",
+                # Optimize for speed
+                "-O3", 
+                # Optimize whole program (needs -flto to linker): conflicts with -g
+                # https://gcc.gnu.org/onlinedocs/gcc-4.9.0/gcc/Optimize-Options.html
+                #"-flto",
                 )
     # Disable frame-pointer omission (ie frame pointers will be available on all builds)
     # XXX Must come after any other optimization compiler options
@@ -211,8 +222,10 @@ def ApplyGCCOptions( env, version ):
                 )
     else:
         addLinkFlags(
-                # Optimize: for speed, whole program (needs -flto to compiler)
-                "-O3", "-flto",
+                # Optimize for speed
+                "-O3", 
+                # Optimize whole program (needs -flto to compiler): see above
+                #"-flto",
                 )
     # Ensure SCons knows to clean .map, etc
     _updateLinkEmitters( env, version )
