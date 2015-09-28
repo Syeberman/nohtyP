@@ -1767,17 +1767,19 @@ static ypObject *_ypSequence_miniiter_rev( ypObject *x, yp_uint64_t *state ) {
     return yp_incref( x );
 }
 
-// XXX Will change *state even if getindex returns an exception, which could in theory wrap-around
-// to a valid index...in theory
 static ypObject *_ypSequence_miniiter_next( ypObject *x, yp_uint64_t *_state ) {
     yp_int64_t *state = (yp_int64_t *) _state;
-    ypObject *result;
-    if( *state >= 0 ) { // we are counting up from the first element
-        result = yp_getindexC( x, (*state)++ );
-    } else {            // we are counting down from the last element
-        result = yp_getindexC( x, (*state)-- );
+    ypObject *result = yp_getindexC( x, (yp_ssize_t) *state );
+    if( yp_isexceptionC( result ) ) {
+        return yp_isexceptionC2( result, yp_IndexError ) ? yp_StopIteration : result;
     }
-    return yp_isexceptionC2( result, yp_IndexError ) ? yp_StopIteration : result;
+
+    if( *state >= 0 ) { // we are counting up from the first element
+        *state += 1;
+    } else {            // we are counting down from the last element
+        *state -= 1;
+    }
+    return result;
 }
 
 // XXX Note that yp_miniiter_lenhintC checks for negative hints and returns zero instead
@@ -2449,6 +2451,22 @@ int yp_isexceptionCN( ypObject *x, int n, ... )
     va_end( args );
     return 0;
 }
+
+// TODO Consider this:
+//  switch( yp_switchexceptionCN( x, 2, yp_StopIteration, yp_ValueError ) ) {
+//      case 0: // yp_StopIteration
+//          break;
+//      case 1: // yp_ValueError
+//          break;
+//      case 2: // returning n means "any other exception"...i.e. the bare "except" clause of try
+//          break;
+//      default: // *any* other value means no exception...i.e. the "else" clause of try
+//          break;
+//  }
+// Even get fancy and do:
+//  #define yp_SWITCH_EXCEPTION( x, n, ... ) switch( yp_switchexceptionCN( x, n, ... ) )
+// Then, even fancier, a form of yp_ELSE_EXCEPT (et al) like yp_ELSE_SWITCH_EXCEPT
+//ypAPI int yp_switchexceptionCN( ypObject *x, int n, ... );
 
 
 /*************************************************************************************************

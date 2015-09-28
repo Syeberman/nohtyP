@@ -54,7 +54,8 @@ if vars_unknown: Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
 
 # Require that construction variable names exist at expansion, then add those allowed to be empty
 AllowSubstExceptions( )
-rootEnv.Replace( CPPFLAGS=[], SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", 
+rootEnv.Replace( CPPFLAGS=[], SHCCCOMSTR="", SHLINKCOMSTR="", 
+        SHLIBVERSION="", SHLIBNOVERSIONSYMLINKS="",
         LIBPATH=[], PCH="",
         WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="",
         RPATH=[],
@@ -106,7 +107,7 @@ rootEnv["SITE_TOOLS"] = siteToolsFunction # a function so Clone doesn't deepcopy
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
 # "native" (ie the default target)
 # TODO Allow the user to specify what the "native" target should be
-compiler_names = ("msvs_120", "gcc_48", "msvs_110", "gcc_46", "msvs_100", "msvs_90")
+compiler_names = ("msvs_140", "msvs_120", "gcc_48", "msvs_110", "gcc_46", "msvs_100", "msvs_90")
 oses = ("win32", "posix")
 archs = ("amd64", "x86")
 # TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
