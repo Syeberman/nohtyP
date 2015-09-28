@@ -46,7 +46,7 @@ os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath( mscommonLog_path )
 vars = Variables( None )
 
 # Generic build environment applicable to all compilers/targets and used internally by SCons
-rootEnv = DefaultEnvironment( tools=[], variables=vars )
+rootEnv = DefaultEnvironment( tools=[], variables=vars, SCONSCRIPT_LOG=sconscriptLog )
 
 # Require that only known command-line variables are used
 vars_unknown = vars.UnknownVariables( )
@@ -112,7 +112,7 @@ oses = ("win32", "posix")
 archs = ("amd64", "x86")
 # TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
 # lint against the compiler's headers
-configurations = ("release", "debug")
+configurations = ("debug", "release")
 
 native_os = rootEnv["HOST_OS"]
 if rootEnv["HOST_ARCH"] == "x86_64":
@@ -121,7 +121,7 @@ else:
     native_archs = (rootEnv["HOST_ARCH"], )
 
 # The native targets ("debug", "release", etc) should each copy files from a single variant
-nativeTargetsToCreate = set( ("release", "debug") )
+nativeTargetsToCreate = set( ("debug", "release") )
 
 # yp_test requires at least Python 3.4; we don't care which PC-Lint version is used
 python_min34 = Tool( "python_min34", toolpath=["Build/Tools", ] )

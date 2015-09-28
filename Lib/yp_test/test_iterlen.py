@@ -46,7 +46,12 @@ from yp_test import yp_unittest
 from yp_test import support
 from itertools import repeat
 from collections import deque
-from yp import _yp_lenC, _yp_iter_lenhintC
+from operator import length_hint as _length_hint
+
+def length_hint(obj, default=0):
+    """Returns a yp_int instead of int, and ensures obj is from nohtyP"""
+    assert isinstance(obj, ypObject)
+    return yp_int(_length_hint(obj, default))
 
 # Extra assurance that we're not accidentally testing Python's data types
 def iter( *args, **kwargs ): raise NotImplementedError( "convert script to yp_iter here" )
@@ -65,27 +70,17 @@ def reversed( *args, **kwargs ): raise NotImplementedError( "convert script to y
 
 n = 10
 
-def yp_len(obj):
-    if not isinstance(obj, ypObject): 
-        raise TypeError("expected ypObject in yp_len")
-    try:
-        return yp_int(len(obj))
-    except TypeError:
-        try:
-            return yp_int(_yp_iter_lenhintC(obj, yp_None))
-        except AttributeError:
-            raise TypeError
 
 class TestInvariantWithoutMutations:
 
     def test_invariant(self):
         it = self.it
         for i in yp_reversed(yp_range(1, n+1)):
-            self.assertEqual(yp_len(it), i)
+            self.assertEqual(length_hint(it), i)
             next(it)
-        self.assertEqual(yp_len(it), 0)
+        self.assertEqual(length_hint(it), 0)
         self.assertRaises(StopIteration, next, it)
-        self.assertEqual(yp_len(it), 0)
+        self.assertEqual(length_hint(it), 0)
 
 class TestTemporarilyImmutable(TestInvariantWithoutMutations):
 
@@ -94,12 +89,12 @@ class TestTemporarilyImmutable(TestInvariantWithoutMutations):
         # length immutability  during iteration
 
         it = self.it
-        self.assertEqual(yp_len(it), n)
+        self.assertEqual(length_hint(it), n)
         next(it)
-        self.assertEqual(yp_len(it), n-1)
+        self.assertEqual(length_hint(it), n-1)
         self.mutate()
         self.assertRaises(RuntimeError, next, it)
-        self.assertEqual(yp_len(it), 0)
+        self.assertEqual(length_hint(it), 0)
 
 ## ------- Concrete Type Tests -------
 
@@ -108,10 +103,6 @@ class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = repeat(None, n)
-
-    def test_no_len_for_infinite_repeat(self):
-        # The repeat() object can also be infinite
-        self.assertRaises(TypeError, yp_len, repeat(None))
 
 class TestXrange(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
@@ -189,59 +180,95 @@ class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
     def setUp(self):
         self.it = yp_iter(yp_list(yp_range(n)))
 
+    @yp_unittest.skip( "TODO: Support mutation in nohtyP same as Python?" )
     def test_mutation(self):
         d = yp_list(yp_range(n))
         it = yp_iter(d)
         next(it)
         next(it)
-        self.assertEqual(yp_len(it), n-2)
+        self.assertEqual(length_hint(it), n - 2)
         d.append(n)
-        #self.assertEqual(yp_len(it), n-1)  # grow with append
-        self.assertEqual(yp_len(it), n-2)  # XXX nohtyP's hints don't change
+        self.assertEqual(length_hint(it), n - 1)  # grow with append
         d[1:] = []
-        #self.assertEqual(yp_len(it), 0)
-        self.assertEqual(yp_len(it), n-2)  # XXX nohtyP's hints don't change
+        self.assertEqual(length_hint(it), 0)
         self.assertEqual(yp_list(it), [])
         d.extend(yp_range(20))
-        self.assertEqual(yp_len(it), 0)
+        self.assertEqual(length_hint(it), 0)
+
+    def test_nohtyP_mutation(self):
+        d = yp_list(yp_range(n))
+        it = yp_iter(d)
+        next(it)
+        next(it)
+        self.assertEqual(length_hint(it), n - 2)
+        d.append(n)
+        self.assertEqual(length_hint(it), n - 2)  # ignore append
+        d[1:] = []
+        self.assertEqual(length_hint(it), n - 2)  # ignore clear
+        self.assertEqual(yp_list(it), [])
+        d.extend(yp_range(20))
+        self.assertEqual(length_hint(it), 0)
 
 class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
         self.it = yp_reversed(yp_list(yp_range(n)))
 
+    @yp_unittest.skip( "TODO: Support mutation in nohtyP same as Python?" )
     def test_mutation(self):
         d = yp_list(yp_range(n))
         it = yp_reversed(d)
         next(it)
         next(it)
-        self.assertEqual(yp_len(it), n-2)
+        self.assertEqual(length_hint(it), n - 2)
         d.append(n)
-        self.assertEqual(yp_len(it), n-2)  # ignore append
+        self.assertEqual(length_hint(it), n - 2)  # ignore append
         d[1:] = []
-        #self.assertEqual(yp_len(it), 0)
-        self.assertEqual(yp_len(it), n-2)  # XXX nohtyP's hints don't change
+        self.assertEqual(length_hint(it), 0)
         self.assertEqual(yp_list(it), [])  # confirm invariant
         d.extend(yp_range(20))
-        self.assertEqual(yp_len(it), 0)
+        self.assertEqual(length_hint(it), 0)
+
+    def test_nohtyP_mutation(self):
+        d = yp_list(yp_range(n))
+        it = yp_reversed(d)
+        next(it)
+        next(it)
+        self.assertEqual(length_hint(it), n - 2)
+        d.append(n)
+        self.assertEqual(length_hint(it), n - 2)  # ignore append
+        d[1:] = []
+        self.assertEqual(length_hint(it), n - 2)  # ignore clear
+        self.assertEqual(yp_list(it), [])  # confirm invariant
+        d.extend(yp_range(20))
+        self.assertEqual(length_hint(it), 0)
 
 ## -- Check to make sure exceptions are not suppressed by __length_hint__()
 
 
 class BadLen(object):
-    def __iter__(self): return yp_iter(yp_range(10))
+    def __iter__(self):
+        return yp_iter(yp_range(10))
+
     def __len__(self):
         raise RuntimeError('hello')
 
+
 class BadLengthHint(object):
-    def __iter__(self): return yp_iter(yp_range(10))
+    def __iter__(self):
+        return yp_iter(yp_range(10))
+
     def __length_hint__(self):
         raise RuntimeError('hello')
 
+
 class NoneLengthHint(object):
-    def __iter__(self): return yp_iter(yp_range(10))
+    def __iter__(self):
+        return yp_iter(yp_range(10))
+
     def __length_hint__(self):
-        return None
+        return NotImplemented
+
 
 class TestLengthHintExceptions(yp_unittest.TestCase):
 
