@@ -94,7 +94,8 @@ siteTools_dict = {}
 if not os.path.exists( siteTools_name ):
     with open( siteTools_name, "w" ) as outfile:
         outfile.write( "# Holds site-specific configuration options for the compilers and other tools.\n" )
-        outfile.write( "# Edit as appropriate.  Missing entries added automatically.  Rebuilt if deleted.\n\n" )
+        outfile.write( "# Edit as appropriate.  Missing entries added automatically.  Rebuilt if deleted.\n" )
+        outfile.write( "# None disables autodetection of that tool.\n\n" )
 else:
     with open( siteTools_name ) as infile:
         exec( infile.read( ), siteTools_dict )

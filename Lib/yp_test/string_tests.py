@@ -7,7 +7,7 @@ from yp_test import yp_unittest
 import string, sys, struct
 from yp_test import support
 from collections import UserList
-import _testcapi
+# import _testcapi
 
 # Extra assurance that we're not accidentally testing Python's types...unless we mean to
 _str = str

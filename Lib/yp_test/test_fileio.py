@@ -9,7 +9,7 @@ from yp_test import yp_unittest
 from array import array
 from weakref import proxy
 from functools import wraps
-import _testcapi
+# import _testcapi
 
 from yp_test.support import TESTFN, check_warnings, run_unittest, make_bad_fd
 from collections import UserList
