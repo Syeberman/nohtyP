@@ -88,7 +88,9 @@ def DefinePythonToolFunctions( hexversions, tool_name ):
         # See if site-tools.py already knows where to find this Python version
         siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
         python_siteName = "%s_%s" % (tool_name.upper( ), env["TARGET_ARCH"].upper( ))
-        python_path = siteTools_dict.get( python_siteName, None )
+        python_path = siteTools_dict.get( python_siteName, "" )
+        if python_path is None:
+            raise SCons.Errors.StopError( "%s (%r) disabled in site-tools.py" % (tool_name, env["TARGET_ARCH"]) )
 
         # If site-tools.py came up empty, find a Python that supports our target, then update 
         # site-tools.py

@@ -25,7 +25,7 @@ import fnmatch
 import logging.handlers
 import struct
 import tempfile
-import _testcapi
+# import _testcapi
 
 try:
     import _thread, threading

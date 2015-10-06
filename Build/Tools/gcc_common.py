@@ -228,7 +228,9 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
         # See if site-tools.py already knows where to find this gcc version
         siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
         gcc_siteName = "%s_%s" % (env["COMPILER"].name.upper( ), env["TARGET_ARCH"].upper( ))
-        gcc_path = siteTools_dict.get( gcc_siteName, None )
+        gcc_path = siteTools_dict.get( gcc_siteName, "" )
+        if gcc_path is None:
+            raise SCons.Errors.StopError( "gcc %s.%s (%r) disabled in site-tools.py" % (major, minor, env["TARGET_ARCH"]) )
 
         # If site-tools.py came up empty, find a gcc that supports our target, then update 
         # site-tools.py

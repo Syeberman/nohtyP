@@ -152,7 +152,10 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
         var_names = ("INCLUDE", "LIB", "LIBPATH", "PATH")
         compilerName = env["COMPILER"].name
         compilerEnv_name = "%s_%s_ENV" % (compilerName.upper( ), env["TARGET_ARCH"].upper( ))
-        compilerEnv = siteTools_dict.get( compilerEnv_name, None )
+        compilerEnv = siteTools_dict.get( compilerEnv_name, {} )
+        if compilerEnv is None:
+            raise SCons.Errors.StopError( "Visual Studio %r (%r) disabled in site-tools.py" % (supportedVersions[0], env["TARGET_ARCH"]) )
+
         if compilerEnv:
             env["MSVC_USE_SCRIPT"] = None # disable autodetection, vcvars*.bat, etc
             for var_name in var_names:

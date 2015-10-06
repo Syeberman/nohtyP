@@ -33,7 +33,7 @@ import time
 from yp_test import yp_unittest
 import warnings
 import weakref
-import _testcapi
+# import _testcapi
 from collections import deque, UserList
 from itertools import cycle, count
 from yp_test import support
