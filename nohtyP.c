@@ -6375,7 +6375,13 @@ static ypObject *_ypStringLib_decode_utf_8_ascii_start( int type,
     return dest;
 }
 
-// FIXME document, review!
+// Should only be called from  _ypStringLib_decode_utf_8.  Using only the inline buffer of dest, 
+// decode the first "few" characters in *source.  As in _ypStringLib_decode_utf_8_inner_loop, 
+// returns either an error code, or the character that could not be written to dest's inline 
+// buffer; the latter thus indicates what encoding to start with when allocating the separate 
+// buffer.  *source will point to either the error location, or the byte after the returned 
+// character; dest may be re-encoded in-place.  On input, dest must be empty and latin-1, and 
+// *source must be larger than dest's inline buffer (otherwise there's no point in the precheck).
 static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck( 
     ypObject *dest, const yp_uint8_t **source )
 {
@@ -6410,7 +6416,6 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     }
 
     // Convert to ucs-2, and don't forget to write ch!
-    // FIXME Anything else we have to modify here?
     dest_data = ypStringLib_DATA( dest );
     ypStringLib_upconvert_2from1( dest_data, dest_len );
     ((yp_uint16_t *)dest_data)[dest_len] = ch;
@@ -6436,9 +6441,10 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
     yp_ssize_t dest_requiredLen;
     ypObject *result;
     yp_ASSERT( len > 0, "zero-length strings should be handled before _ypStringLib_decode_utf_8" );
+    yp_ASSERT( len <= ypStringLib_LEN_MAX, "can't decode more than ypStringLib_LEN_MAX bytes" );
 
     // If it doesn't start with any ASCII, then before we allocate a separate buffer to hold the
-    // data, run the first few bytes through _ypStringLib_decode_utf_8_inner_loop using the
+    // data, then run the first few bytes through _ypStringLib_decode_utf_8_inner_loop using the
     // inline buffer, to see if we can tell what element size we _should_ be using
     // TODO Contribute this optimization back to Python?
 
@@ -6454,7 +6460,7 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
 
     if( ch > 0xFFu ) {
         // Success!  We've can start off appropriately up-converted.
-        // XXX This can't overflow because dest_requiredLen should be <= dest_alloclen
+        // XXX Can't overflow because we've checked len<=MAX, and len is the worst-case num of chars
         dest_requiredLen = ypStringLib_LEN( dest ) + 1 /*for ch*/ + (end - source);
         result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
         if( yp_isexceptionC( result ) ) {
@@ -6469,7 +6475,7 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
         // as many characters as we estimated and there's still room in the inline buffer.  We 
         // _could_ keep adjusting fake_end until there's no more room, but I don't think this is 
         // advantageous.  Don't the first few characters usually determine the encoding?
-        // XXX This can't overflow because dest_requiredLen should be <= dest_alloclen
+        // XXX Can't overflow because we've checked len<=MAX, and len is the worst-case num of chars
         dest_requiredLen = ypStringLib_LEN( dest ) /*ch isn't a char*/ + (end - source);
         if( dest_requiredLen > ypStringLib_ALLOCLEN( dest )-1 ) {
             result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
@@ -6489,22 +6495,19 @@ outer_loop:
     return dest;
 }
 
-// FIXME Review remaining StringLib functions
-// Decodes the len bytes of UTF-8 at source according to errors, and returns a new string of the
+// Decodes the len bytes of utf-8 at source according to errors, and returns a new string of the
 // given type.  If source is NULL it is considered as having all null bytes; len cannot be
 // negative or greater than ypStringLib_LEN_MAX.
 // XXX Allocation-wise, the worst-case through the code would be a completely UCS-4 string, as we'd
 // allocate len characters (len*4 bytes) for the decoding, but would only decode len/4 characters
 // TODO This is TERRIBLE, because if a string has more than a couple UCS-4 characters, it's
-// probably *mostly* UCS-4 characters
+// probably *mostly* UCS-4 characters.  Is there a quick way to scan the _entire_ string?  Or can
+// we just trim the excess once we reach the end?
 // XXX Runtime-wise, the worst-case would probably be a string that starts completely Latin-1 (each
 // character is a call to enc->setindexX), followed by a UCS-2 then a UCS-4 character (each
 // triggering an upconvert of previously-decoded characters)
 // TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
 // decoding errors
-// TODO Consider the above worst-case runtime case.  Perhaps there is a quick way to scan the bytes
-// to see what the largest possible required encoding is, then we can allocate exactly.  Although,
-// it might just be cheaper to trim the excess memory at the end.
 static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
         const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
 {
@@ -6520,13 +6523,14 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
         return _ypStringLib_decode_utf_8_onnull( type, len );
     } else if( source[0] < 0x80u ) {
         // We optimize for UTF-8 data that is completely, or at least starts with, ASCII: since 
-        // ASCII is equivalent to the first 128 ordinals in Unicode, we can memcpy
+        // ASCII is equivalent to the first 128 ordinals in Unicode, we can just memcpy
         return _ypStringLib_decode_utf_8_ascii_start( type, source, len, errors );
     } else {
         return _ypStringLib_decode_utf_8( type, source, len, errors );
     }
 }
 
+// FIXME Review remaining StringLib functions
 // XXX Allocation-wise, the worst-case through the code is a string that starts with a latin-1
 // character, causing us to allocate len*2 bytes, then containing only ascii, wasting just a byte
 // under half the buffer
@@ -6621,7 +6625,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
 // XXX Allocation-wise, the worst case through the code is a string that contains just one ucs-4
 // character, causing us to allocate len*4 bytes, then containing only ascii, wasting just about
 // three quarters of the buffer
-// XXX Runtime-wise, it's all pretty similar, but a completely ucs-4 string is the worst-worst
+// XXX Runtime-wise, all paths are pretty similar
 // XXX We can't use alloclen_fixed=TRUE here, because the error handler might need to resize
 // TODO However, trimming the buffer might be a good idea
 static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
@@ -6644,7 +6648,7 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 3 : 4;
 
     if( source_len > ypStringLib_LEN_MAX / maxCharSize ) return yp_MemorySizeOverflowError;
-    dest = _ypBytes_new( type, source_len*maxCharSize, /*alloclen_fixed=*/FALSE );
+    dest = _ypBytes_new( type, source_len*maxCharSize, /*alloclen_fixed=*/FALSE ); // new ref
     if( yp_isexceptionC( dest ) ) return dest;
     d = dest_data = ypStringLib_DATA( dest );
 
@@ -6666,10 +6670,13 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
             if( errorHandler == NULL ) {
                 ypObject *exc = yp_None;
                 errorHandler = yp_codecs_lookup_errorE( errors, &exc );
-                if( yp_isexceptionC( exc ) ) return exc;
+                if( yp_isexceptionC( exc ) ) {
+                    yp_decref( dest );
+                    return exc;
+                }
             }
 
-            // TODO Reason
+            // TODO Supply an error reason string
             replacement = ypStringLib_encode_call_errorhandler(
                 errorHandler, NULL, yp_s_utf_8, source, i, i+1, &i );
             if( yp_isexceptionC( replacement ) ) {

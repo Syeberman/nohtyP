@@ -912,11 +912,9 @@ ypAPI void yp_updateNV( ypObject **mapping, int n, va_list args );
  * Bytes & String Operations
  */
 
-// FIXME review
-
-// Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return
-// immutable ints for these types, and will only accept ints for yp_setindexC.  The individual
-// elements of strs and chrarrays are single-character (immutable) strs.
+// Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return ints 
+// for these types, and will only accept ints for yp_setindexC.  The individual elements of strs 
+// and chrarrays are single-character strs.
 
 // Slicing an object always returns an object of the same type, so yp_getsliceC4 on a bytearray
 // will return a bytearray, while a slice of a str is another str, and so forth.
