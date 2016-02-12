@@ -329,7 +329,7 @@ typedef struct {
     miniiter_lenhintfunc tp_miniiter_lenhint;
     objproc tp_iter;
     objproc tp_iter_reversed;
-    objobjproc tp_send;
+    objobjproc tp_send; /* called for both yp_send and yp_throw (i.e. accepts exceptions) */
 
     // Container operations
     objobjproc tp_contains;
@@ -1921,11 +1921,18 @@ static ypObject *iter_iter( ypObject *i ) {
 
 static ypObject *iter_send( ypObject *i, ypObject *value )
 {
-    // As per Python, when a generator raises an exception, it can't continue to yield values.  If
-    // iter_close fails just ignore it: result is already set to an exception.
     ypObject *result = ypIter_FUNC( i )( i, value );
+
+    // As per Python, when a generator raises an exception, it can't continue to yield values, so
+    // close it.  If iter_close fails just ignore it: result is already set to an exception.
+    // TODO Don't hide errors from iter_close; instead, use Python's "while handling this exception,
+    // another occured" style of reporting
+    if( yp_isexceptionC( result ) ) {
+        (void) iter_close( i );
+        return result;
+    }
+
     ypIter_LENHINT( i ) -= 1;
-    if( yp_isexceptionC( result ) ) (void) iter_close( i );
     return result;
 }
 
@@ -6530,7 +6537,6 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
     }
 }
 
-// FIXME Review remaining StringLib functions
 // XXX Allocation-wise, the worst-case through the code is a string that starts with a latin-1
 // character, causing us to allocate len*2 bytes, then containing only ascii, wasting just a byte
 // under half the buffer
@@ -13693,11 +13699,11 @@ ypObject *yp_iter( ypObject *x ) {
     _yp_REDIRECT1( x, tp_iter, (x) );
 }
 
-ypObject *yp_send( ypObject **iterator, ypObject *value ) {
+static ypObject *_yp_send( ypObject **iterator, ypObject *value ) {
     ypTypeObject *type = ypObject_TYPE( *iterator );
     ypObject *result = type->tp_send( *iterator, value );
     if( yp_isexceptionC( result ) ) {
-        // tp_send closes *iterator; it's up to us to not treat yp_StopIteration as an "error"
+        // tp_send closes *iterator; it's up to us to not treat yp_StopIteration as a typical error
         if( !yp_isexceptionC2( result, yp_StopIteration ) ) {
             yp_INPLACE_ERR( iterator, result );
         }
@@ -13705,14 +13711,22 @@ ypObject *yp_send( ypObject **iterator, ypObject *value ) {
     return result;
 }
 
+ypObject *yp_send( ypObject **iterator, ypObject *value ) {
+    if( yp_isexceptionC( value ) ) {
+        yp_INPLACE_ERR( iterator, value );
+        return value;
+    }
+    return _yp_send( iterator, value );
+}
+
 ypObject *yp_next( ypObject **iterator ) {
-    return yp_send( iterator, yp_None );
+    return _yp_send( iterator, yp_None );
 }
 
 ypObject *yp_next2( ypObject **iterator, ypObject *defval ) {
     ypTypeObject *type = ypObject_TYPE( *iterator );
     ypObject *result = type->tp_send( *iterator, yp_None );
-    // tp_send closes *iterator; it's up to us to return defval in place of yp_StopIteration
+    // tp_send closes *iterator; it's up to us to not treat yp_StopIteration as a typical error
     if( yp_isexceptionC2( result, yp_StopIteration ) ) {
         result = yp_incref( defval );
     }
@@ -13725,8 +13739,11 @@ ypObject *yp_next2( ypObject **iterator, ypObject *defval ) {
 }
 
 ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
-    if( !yp_isexceptionC( exc ) ) return yp_TypeError;
-    return yp_send( iterator, exc );
+    if( !yp_isexceptionC( exc ) ) {
+        yp_INPLACE_ERR( iterator, yp_TypeError );
+        return yp_TypeError;
+    }
+    return _yp_send( iterator, exc );
 }
 
 ypObject *yp_reversed( ypObject *x ) {
