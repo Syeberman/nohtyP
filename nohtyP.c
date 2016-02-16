@@ -994,7 +994,6 @@ static void _default_yp_free( void *p ) {
 #else
 // Rounds allocations up to a multiple that should be easy for most heaps without wasting space for
 // the smallest objects (ie ints); don't call with a negative size
-// TODO yp_DEBUG statements
 #define _yp_DEFAULT_MALLOC_ROUNDTO (16)
 static yp_ssize_t _default_yp_malloc_good_size( yp_ssize_t size )
 {
@@ -1008,19 +1007,25 @@ static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
 {
     yp_ASSERT( size >= 0, "size cannot be negative" );
     *actual = _default_yp_malloc_good_size( size );
-    return malloc( *actual );
+    p = malloc( *actual );
+    yp_DEBUG( "malloc: 0x%08X %d bytes", p, *actual );
+    return p;
 }
 static void *_default_yp_malloc_resize( yp_ssize_t *actual,
         void *p, yp_ssize_t size, yp_ssize_t extra )
 {
+    void *newp;
     yp_ASSERT( size >= 0, "size cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
     size = yp_USIZE_MATH( size, +, extra );
     if( size < 0 ) size = yp_SSIZE_T_MAX;   // addition overflowed; clamp to max
     *actual = _default_yp_malloc_good_size( size );
-    return malloc( *actual );
+    newp = malloc( *actual );
+    yp_DEBUG( "malloc_resize: 0x%08X %d bytes  (was 0x%08X)", newp, *actual, p );
+    return newp;
 }
 static void _default_yp_free( void *p ) {
+    yp_DEBUG( "free: 0x%08X", p );
     free( p );
 }
 #endif
