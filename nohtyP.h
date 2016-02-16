@@ -1399,7 +1399,8 @@ typedef struct _yp_initialize_kwparams {
 
     // Allocates at least size bytes of memory, setting *actual to the actual amount of memory
     // allocated, and returning the pointer to the buffer.  On error, returns NULL, and *actual is
-    // undefined.  This must succeed when size==0, and must fail (or abort) when size<0.
+    // undefined.  This must succeed when size==0; the behaviour is undefined when size<0.
+    // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
     void *(*yp_malloc)( yp_ssize_t *actual, yp_ssize_t size );
 
     // Resizes the given buffer in-place if possible, otherwise allocates a new buffer.  There are
@@ -1411,11 +1412,12 @@ typedef struct _yp_initialize_kwparams {
     //  of memory allocated to the new buffer; nohtyP will then copy the data and call yp_free(p)
     // The resized/new buffer will be at least size bytes; extra is a hint as to how much the
     // buffer should be over-allocated, which may be ignored.  This must succeed when size==0 or
-    // extra==0, and must fail (or abort) when size<0 or extra<0.
+    // extra==0; the behaviour is undefined when size<0 or extra<0.
     // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
+    // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
     void *(*yp_malloc_resize)( yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra );
 
-    // Frees memory returned by yp_malloc and yp_malloc_resize.
+    // Frees memory returned by yp_malloc and yp_malloc_resize.  May abort on error.
     void (*yp_free)( void *p );
 
     // Setting everything_immortal to true forces all allocated objects to be immortal, effectively
