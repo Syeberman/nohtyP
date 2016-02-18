@@ -134,7 +134,7 @@ class c_ypObject_pp( c_ypObject_p*1 ):
     def _yp_errcheck( self ):
         self[0]._yp_errcheck( )
     def __del__( self ):
-        # FIXME Make __del__ work during shutdown
+        # TODO Make __del__ work during shutdown
         try: _yp_decref( self[0] )
         except: pass
         try: self[0] = yp_None
@@ -1143,14 +1143,14 @@ class ypObject( c_ypObject_p ):
         return super( ).__new__( cls )
     def __init__( self, *args, **kwargs ): pass
     def __del__( self ):
-        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
+        # TODO It seems that _yp_decref and yp_None gets set to None when Python is closing:
         # "Python guarantees that globals whose name begins with a single underscore are deleted
         # from their module before other globals are deleted"
-        # FIXME Why is self.value sometimes None (ie a null pointer)?  Should never happen.
+        # TODO Why is self.value sometimes None (ie a null pointer)?  Should never happen.
         try:
             if self.value is not None: _yp_decref( self )
         except: pass
-        return # FIXME Causing a Segmentation Fault sometimes?!?!
+        return # TODO Causing a Segmentation Fault sometimes?!?!
         try: self.value = yp_None.value
         except: pass
     _pytype2yp = {}
@@ -1448,7 +1448,7 @@ class yp_NoneType( ypObject ):
     def _frompython( cls, pyobj ):
         assert pyobj is None
         return yp_None
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_s_None
     _yp_repr = _yp_str
 c_ypObject_p_value( "yp_None" )
@@ -1461,7 +1461,7 @@ class yp_bool( ypObject ):
         raise TypeError( "expected ypObject or bool in yp_bool" )
     def _as_int( self ): return yp_i_one if self.value == yp_True.value else yp_i_zero
 
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_s_True if self.value == yp_True.value else yp_s_False
     _yp_repr = _yp_str
 
@@ -1567,7 +1567,7 @@ class yp_int( ypObject ):
         else:
             return _yp_int_baseC( x, base )
     def _asint( self ): return _yp_asintC( self, yp_None )
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asint( ) ) )
     def _yp_repr( self ): return yp_str( repr( self._asint( ) ) )
     def bit_length( self ): return yp_int( _yp_int_bit_lengthC( self, yp_None ) )
@@ -1595,7 +1595,7 @@ class yp_float( ypObject ):
         if isinstance( x, float ): return _yp_floatCF( x )
         return _yp_float( x )
     def _asfloat( self ): return _yp_asfloatC( self, yp_None )
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asfloat( ) ) )
     def _yp_repr( self ): return yp_str( repr( self._asfloat( ) ) )
 
@@ -1641,12 +1641,12 @@ class yp_bytes( _ypBytes ):
     _ypBytes_constructorC = _yp_bytesC
     _ypBytes_constructor3 = _yp_bytes3
     _ypBytes_constructor = _yp_bytes
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asbytes( ) ) )
     _yp_repr = _yp_str
     def _yp_errcheck( self ):
         data, size = super( )._yp_errcheck( )
-        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if size < 1 and "_yp_bytes_empty" in globals( ):
         #    assert self is _yp_bytes_empty, "an empty bytes should be _yp_bytes_empty"
     def decode( self, encoding="utf-8", errors="strict" ):
@@ -1658,7 +1658,7 @@ class yp_bytearray( _ypBytes ):
     _ypBytes_constructorC = _yp_bytearrayC
     _ypBytes_constructor3 = _yp_bytearray3
     _ypBytes_constructor = _yp_bytearray
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( "bytearray(%r)" % self._asbytes( ) )
     _yp_repr = _yp_str
     def pop( self, i=_yp_arg_missing ):
@@ -1678,8 +1678,8 @@ class yp_bytearray( _ypBytes ):
 # TODO Generally, need to adjust constructors and functions to only accept exact, specific types 
 # from Python
 
-# FIXME When nohtyP has types that have string representations, update this
-# FIXME Just generally move more of this logic into nohtyP, when available
+# TODO When nohtyP has types that have string representations, update this
+# TODO Just generally move more of this logic into nohtyP, when available
 @pytype( yp_type_str, str )
 class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
@@ -1711,18 +1711,18 @@ class yp_str( ypObject ):
         super( )._yp_errcheck( )
         encoded, size, encoding = self._get_encoded_size_encoding( )
         if encoding is yp_s_ucs_2:
-            pass # FIXME ensure string contains at least one >0xFF character
+            pass # TODO ensure string contains at least one >0xFF character
         elif encoding is yp_s_ucs_4:
-            pass # FIXME ensure string contains at least one >0xFFFF character
+            pass # TODO ensure string contains at least one >0xFFFF character
         assert encoded[size] == 0, "missing null terminator"
-        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if size < 1 and "_yp_str_empty" in globals( ):
         #    assert self is _yp_str_empty, "an empty str should be _yp_str_empty"
 
     # Just as yp_bool.__bool__ must return a bool, so too must this return a str
     def __str__( self ): return self.encode( )._asbytes( ).decode( )
     def _yp_str( self ): return self
-    # FIXME When nohtyP supports repr, replace this faked-out version
+    # TODO When nohtyP supports repr, replace this faked-out version
     def _yp_repr( self ): return yp_str( repr( str( self ) ) )
 
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
@@ -1792,10 +1792,10 @@ class yp_tuple( _ypTuple ):
         return _yp_tuple( _yp_iterable( iterable ) )
     def _yp_errcheck( self ):
         super( )._yp_errcheck( )
-        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if len( self ) < 1 and "_yp_tuple_empty" in globals( ):
         #    assert self is _yp_tuple_empty, "an empty tuple should be _yp_tuple_empty"
-    # FIXME When nohtyP supports str/repr, replace this faked-out version
+    # TODO When nohtyP supports str/repr, replace this faked-out version
     def _yp_str( self ):
         return yp_str( "(%s)" % ", ".join( repr( x ) for x in self ) )
     _yp_repr = _yp_str
@@ -1805,7 +1805,7 @@ _yp_tuple_empty = yp_tuple( )
 class yp_list( _ypTuple ):
     def __new__( cls, iterable=_yp_tuple_empty ):
         return _yp_list( _yp_iterable( iterable ) )
-    # FIXME When nohtyP supports str/repr, replace this faked-out version
+    # TODO When nohtyP supports str/repr, replace this faked-out version
     @reprlib.recursive_repr( "[...]" )
     def _yp_str( self ):
         return yp_str( "[%s]" % ", ".join( repr( x ) for x in self ) )
@@ -1821,7 +1821,7 @@ class yp_list( _ypTuple ):
         _yp_irepeatC( self, factor )
         return self
 
-# FIXME When nohtyP supports sorting, replace this faked-out version
+# TODO When nohtyP supports sorting, replace this faked-out version
 def yp_sorted( x, *, key=None, reverse=False ):
     """Returns sorted( x ) of a ypObject as a yp_list"""
     if not isinstance( x, (ypObject, _setlike_dictview, _values_dictview) ):
@@ -1884,7 +1884,7 @@ class yp_frozenset( _ypSet ):
     _ypSet_constructor = _yp_frozenset
     def _yp_errcheck( self ):
         super( )._yp_errcheck( )
-        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if len( self ) < 1 and "_yp_frozenset_empty" in globals( ):
         #    assert self is _yp_frozenset_empty, "an empty frozenset should be _yp_frozenset_empty"
 _yp_frozenset_empty = yp_frozenset( )
@@ -1942,7 +1942,7 @@ class _values_dictview:
 class _items_dictview( _setlike_dictview ):
     _iter_func = staticmethod( _yp_iter_items )
 
-# FIXME Adapt the Python test suite to test for frozendict, adding in tests similar to those found
+# TODO Adapt the Python test suite to test for frozendict, adding in tests similar to those found
 # between list/tuple and set/frozenset (ie the singleton empty frozendict, etc)
 
 @pytype( yp_type_dict, dict )
@@ -1989,7 +1989,7 @@ class yp_range( ypObject ):
         super( )._yp_errcheck( )
         if len( self ) < 1 and "_yp_range_empty" in globals( ):
             assert self is _yp_range_empty, "an empty range should be _yp_range_empty"
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ):
         self_len = len( self )
         if self_len < 1: return yp_str( "range(0, 0)" )
@@ -2002,7 +2002,7 @@ class yp_range( ypObject ):
     _yp_repr = _yp_str
 _yp_range_empty = yp_range( 0 )
 
-# FIXME integrate this somehow with unittest
+# TODO Integrate ypExamples.c somehow with this unittest suite
 #import os
 #os.system( "ypExamples.exe" )
 

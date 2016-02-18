@@ -4,12 +4,9 @@ Author: Sye van der Veen
 Date: May 19, 2014
 """
 
-# FIXME should yp_popvalue* only return an exception...or should yp_send discard the iterator?
-#   (it's inconsistent)
-
 import sys, re, copy, collections
 
-# FIXME remove these hard-coded paths
+# TODO remove these hard-coded paths
 CppPath = "../pycparser/utils/cpp"
 CppArgs = "-I../pycparser/utils/fake_libc_include"
 sys.path.append( "../pycparser" )

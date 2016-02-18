@@ -352,7 +352,6 @@ class BaseBytesTest:
             self.assertEqual(self.type2test(b"").join(yp_tuple(lst)), b"abc")
             self.assertEqual(self.type2test(b"").join(yp_iter(lst)), b"abc")
 
-        # FIXME
         self.assertEqual(self.type2test(b".").join(yp_list([])), b"")
         self.assertEqual(self.type2test(b".").join(yp_list([b"ab"])), b"ab")
         self.assertEqual(self.type2test(b".").join(yp_list([b"ab", b"cd"])), b"ab.cd")
@@ -1479,7 +1478,7 @@ class FixedStringTest(yp_test.string_tests.BaseTest):
 
     def fixtype(self, obj):
         if isinstance(obj, str):
-            # FIXME The code that Python has here ignores type2test; report and fix
+            # TODO The code that Python has here ignores type2test; report and fix
             return self.__class__.type2test(obj.encode("utf-8"))
         return super().fixtype(obj)
 

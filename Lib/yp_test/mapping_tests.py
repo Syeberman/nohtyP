@@ -273,7 +273,7 @@ class BasicTestMappingProtocol(yp_unittest.TestCase):
 
     # no test_fromkeys or test_copy as both os.environ and selves don't support it
 
-    # FIXME This seems to be mainly testing self.reference, which is a dict, and not nohtyP's
+    # TODO This seems to be mainly testing self.reference, which is a dict, and not nohtyP's
     # yp_dict
     def test_get(self):
         d = self._empty_mapping()
@@ -541,7 +541,7 @@ class TestMappingProtocol(BasicTestMappingProtocol):
         self.assertEqual(d.pop(k, 1), v)
 
 
-# FIXME Should nohtyP's dict be tested with this class?
+# TODO Should nohtyP's dict be tested with this class?
 class TestHashMappingProtocol(TestMappingProtocol):
 
     def test_getitem(self):

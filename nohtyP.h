@@ -1123,8 +1123,6 @@ ypAPI ypObject *yp_decode( ypObject *b );
  * Bytes & String Formatting Operations
  */
 
-// FIXME review
-
 // The syntax of format strings can be found in Python's documentation:
 //  https://docs.python.org/3/library/string.html#format-string-syntax
 
