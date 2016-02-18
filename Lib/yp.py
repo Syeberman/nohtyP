@@ -134,7 +134,7 @@ class c_ypObject_pp( c_ypObject_p*1 ):
     def _yp_errcheck( self ):
         self[0]._yp_errcheck( )
     def __del__( self ):
-        # FIXME Make __del__ work during shutdown
+        # TODO Make __del__ work during shutdown
         try: _yp_decref( self[0] )
         except: pass
         try: self[0] = yp_None
@@ -174,8 +174,10 @@ yp_func( c_void, "yp_decref", ((c_ypObject_p, "x"), ), errcheck=False )
 yp_func( c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False )
 
 # void yp_freeze( ypObject **x );
+yp_func( c_void, "yp_freeze", ((c_ypObject_pp, "x"), ) )
 
 # void yp_deepfreeze( ypObject **x );
+yp_func( c_void, "yp_deepfreeze", ((c_ypObject_pp, "x"), ) )
 
 # ypObject *yp_unfrozen_copy( ypObject *x );
 yp_func( c_ypObject_p, "yp_unfrozen_copy", ((c_ypObject_p, "x"), ) )
@@ -321,7 +323,11 @@ yp_func( c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")
 yp_func( c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
 
 # ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_bytes3", ((c_ypObject_p, "source"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 # ypObject *yp_bytearray3( ypObject *source, ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_bytearray3", ((c_ypObject_p, "source"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 
 # ypObject *yp_bytes( ypObject *source );
 yp_func( c_ypObject_p, "yp_bytes", ((c_ypObject_p, "source"), ) )
@@ -329,7 +335,9 @@ yp_func( c_ypObject_p, "yp_bytes", ((c_ypObject_p, "source"), ) )
 yp_func( c_ypObject_p, "yp_bytearray", ((c_ypObject_p, "source"), ) )
 
 # ypObject *yp_bytes0( void );
+yp_func( c_ypObject_p, "yp_bytes0", () )
 # ypObject *yp_bytearray0( void );
+yp_func( c_ypObject_p, "yp_bytearray0", () )
 
 # ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
 #         ypObject *encoding, ypObject *errors );
@@ -340,16 +348,30 @@ yp_func( c_ypObject_p, "yp_str_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_
 yp_func( c_ypObject_p, "yp_chrarray_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
             (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 
+# ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
+yp_func( c_ypObject_p, "yp_str_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
+# ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
+yp_func( c_ypObject_p, "yp_chrarray_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")) )
+
 # ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_str3", ((c_ypObject_p, "object"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 # ypObject *yp_chrarray3( ypObject *object, ypObject *encoding, ypObject *errors );
+yp_func( c_ypObject_p, "yp_chrarray3", ((c_ypObject_p, "object"),
+            (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
 
 # ypObject *yp_str( ypObject *object );
+yp_func( c_ypObject_p, "yp_str", ((c_ypObject_p, "object"), ) )
 # ypObject *yp_chrarray( ypObject *object );
+yp_func( c_ypObject_p, "yp_chrarray", ((c_ypObject_p, "object"), ) )
 
 # ypObject *yp_str0( void );
+yp_func( c_ypObject_p, "yp_str0", () )
 # ypObject *yp_chrarray0( void );
+yp_func( c_ypObject_p, "yp_chrarray0", () )
 
 # ypObject *yp_chrC( yp_int_t i );
+yp_func( c_ypObject_p, "yp_chrC", ((c_yp_int_t, "i"), ) )
 
 # ypObject *yp_tupleN( int n, ... );
 yp_func( c_ypObject_p, "yp_tupleN", (c_multiN_ypObject_p, ) )
@@ -414,7 +436,7 @@ yp_func( c_yp_hash_t, "yp_hashC", ((c_ypObject_p, "x"), c_ypObject_pp_exc) )
 # ypObject *yp_send( ypObject *iterator, ypObject *value );
 
 # ypObject *yp_next( ypObject *iterator );
-yp_func( c_ypObject_p, "yp_next", ((c_ypObject_p, "iterator"), ) )
+yp_func( c_ypObject_p, "yp_next", ((c_ypObject_pp, "iterator"), ) )
 
 # ypObject *yp_next2( ypObject *iterator, ypObject *defval );
 
@@ -464,7 +486,7 @@ yp_func( c_ypObject_p, "yp_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container"
 yp_func( c_ypObject_p, "yp_not_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")) )
 
 # yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
-yp_func( c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc), 
+yp_func( c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc),
         errcheck=False )
 
 # void yp_push( ypObject **container, ypObject *x );
@@ -699,7 +721,146 @@ yp_func( c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ) )
 # ypObject *yp_s_ignore;    // "ignore"
 # ypObject *yp_s_replace;   // "replace"
 
-# XXX Additional bytes- and str-specific methods will be added in a future version
+# ypObject *yp_isalnum( ypObject *s );
+yp_func( c_ypObject_p, "yp_isalnum", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isalpha( ypObject *s );
+yp_func( c_ypObject_p, "yp_isalpha", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isdecimal( ypObject *s );
+yp_func( c_ypObject_p, "yp_isdecimal", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isdigit( ypObject *s );
+yp_func( c_ypObject_p, "yp_isdigit", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isidentifier( ypObject *s );
+yp_func( c_ypObject_p, "yp_isidentifier", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_islower( ypObject *s );
+yp_func( c_ypObject_p, "yp_islower", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isnumeric( ypObject *s );
+yp_func( c_ypObject_p, "yp_isnumeric", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isprintable( ypObject *s );
+yp_func( c_ypObject_p, "yp_isprintable", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isspace( ypObject *s );
+yp_func( c_ypObject_p, "yp_isspace", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_isupper( ypObject *s );
+yp_func( c_ypObject_p, "yp_isupper", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_startswithC4( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end );
+# ypObject *yp_startswithC( ypObject *s, ypObject *prefix );
+yp_func( c_ypObject_p, "yp_startswithC4", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix"),
+    (c_yp_ssize_t, "start"), (c_yp_ssize_t, "end")) )
+yp_func( c_ypObject_p, "yp_startswithC", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix")) )
+
+# ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end );
+# ypObject *yp_endswithC( ypObject *s, ypObject *suffix );
+yp_func( c_ypObject_p, "yp_endswithC4", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix"),
+    (c_yp_ssize_t, "start"), (c_yp_ssize_t, "end")) )
+yp_func( c_ypObject_p, "yp_endswithC", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix")) )
+
+# ypObject *yp_lower( ypObject *s );
+yp_func( c_ypObject_p, "yp_lower", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_upper( ypObject *s );
+yp_func( c_ypObject_p, "yp_upper", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_casefold( ypObject *s );
+yp_func( c_ypObject_p, "yp_casefold", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_swapcase( ypObject *s );
+yp_func( c_ypObject_p, "yp_swapcase", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_capitalize( ypObject *s );
+yp_func( c_ypObject_p, "yp_capitalize", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+# ypObject *yp_ljustC( ypObject *s, yp_ssize_t width );
+yp_func( c_ypObject_p, "yp_ljustC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
+    (c_yp_int_t, "ord_fillchar")) )
+yp_func( c_ypObject_p, "yp_ljustC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")) )
+
+# ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+# ypObject *yp_rjustC( ypObject *s, yp_ssize_t width );
+yp_func( c_ypObject_p, "yp_rjustC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
+    (c_yp_int_t, "ord_fillchar")) )
+yp_func( c_ypObject_p, "yp_rjustC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")) )
+
+# ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
+# ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
+yp_func( c_ypObject_p, "yp_centerC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
+    (c_yp_int_t, "ord_fillchar")) )
+yp_func( c_ypObject_p, "yp_centerC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")) )
+
+# ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
+yp_func( c_ypObject_p, "yp_expandtabsC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "tabsize")) )
+
+# ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count );
+# ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub );
+yp_func( c_ypObject_p, "yp_replaceC4", ((c_ypObject_p, "s"),
+    (c_ypObject_p, "oldsub"), (c_ypObject_p, "newsub"), (c_yp_ssize_t, "count")) )
+yp_func( c_ypObject_p, "yp_replace", ((c_ypObject_p, "s"),
+    (c_ypObject_p, "oldsub"), (c_ypObject_p, "newsub")) )
+
+# ypObject *yp_lstrip2( ypObject *s, ypObject *chars );
+# ypObject *yp_lstrip( ypObject *s );
+yp_func( c_ypObject_p, "yp_lstrip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")) )
+yp_func( c_ypObject_p, "yp_lstrip", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_rstrip2( ypObject *s, ypObject *chars );
+# ypObject *yp_rstrip( ypObject *s );
+yp_func( c_ypObject_p, "yp_rstrip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")) )
+yp_func( c_ypObject_p, "yp_rstrip", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_strip2( ypObject *s, ypObject *chars );
+# ypObject *yp_strip( ypObject *s );
+yp_func( c_ypObject_p, "yp_strip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")) )
+yp_func( c_ypObject_p, "yp_strip", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_join( ypObject *s, ypObject *iterable );
+yp_func( c_ypObject_p, "yp_join", ((c_ypObject_p, "s"), (c_ypObject_p, "iterable")) )
+
+# ypObject *yp_joinN( ypObject *s, int n, ... );
+# ypObject *yp_joinNV( ypObject *s, int n, va_list args );
+yp_func( c_ypObject_p, "yp_joinN", ((c_ypObject_p, "s"), c_multiN_ypObject_p) )
+
+# void yp_partition( ypObject *s, ypObject *sep,
+#        ypObject **part0, ypObject **part1, ypObject **part2 );
+
+# void yp_rpartition( ypObject *s, ypObject *sep,
+#        ypObject **part0, ypObject **part1, ypObject **part2 );
+
+# ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+# ypObject *yp_split2( ypObject *s, ypObject *sep );
+yp_func( c_ypObject_p, "yp_splitC3", ((c_ypObject_p, "s"), (c_ypObject_p, "sep"),
+    (c_yp_ssize_t, "maxsplit")) )
+yp_func( c_ypObject_p, "yp_split2", ((c_ypObject_p, "s"), (c_ypObject_p, "sep")) )
+
+# ypObject *yp_split( ypObject *s );
+yp_func( c_ypObject_p, "yp_split", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+yp_func( c_ypObject_p, "yp_rsplitC3", ((c_ypObject_p, "s"), (c_ypObject_p, "sep"),
+    (c_yp_ssize_t, "maxsplit")) )
+
+# ypObject *yp_splitlines2( ypObject *s, ypObject *keepends );
+yp_func( c_ypObject_p, "yp_splitlines2", ((c_ypObject_p, "s"), (c_ypObject_p, "keepends")) )
+
+# ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors );
+# ypObject *yp_encode( ypObject *s );
+yp_func( c_ypObject_p, "yp_encode3", ((c_ypObject_p, "s"),
+    (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
+yp_func( c_ypObject_p, "yp_encode", ((c_ypObject_p, "s"), ) )
+
+# ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors );
+# ypObject *yp_decode( ypObject *b );
+yp_func( c_ypObject_p, "yp_decode3", ((c_ypObject_p, "b"),
+    (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")) )
+yp_func( c_ypObject_p, "yp_decode", ((c_ypObject_p, "b"), ) )
 
 
 # ypObject *yp_add( ypObject *x, ypObject *y );
@@ -982,14 +1143,14 @@ class ypObject( c_ypObject_p ):
         return super( ).__new__( cls )
     def __init__( self, *args, **kwargs ): pass
     def __del__( self ):
-        # FIXME It seems that _yp_decref and yp_None gets set to None when Python is closing:
+        # TODO It seems that _yp_decref and yp_None gets set to None when Python is closing:
         # "Python guarantees that globals whose name begins with a single underscore are deleted
         # from their module before other globals are deleted"
-        # FIXME Why is self.value sometimes None (ie a null pointer)?  Should never happen.
+        # TODO Why is self.value sometimes None (ie a null pointer)?  Should never happen.
         try:
             if self.value is not None: _yp_decref( self )
         except: pass
-        return # FIXME Causing a Segmentation Fault sometimes?!?!
+        return # TODO Causing a Segmentation Fault sometimes?!?!
         try: self.value = yp_None.value
         except: pass
     _pytype2yp = {}
@@ -1036,7 +1197,7 @@ class ypObject( c_ypObject_p ):
     def __reversed__( self ): return _yp_reversed( self )
 
     def __contains__( self, x ): return _yp_contains( self, x )
-    def __len__( self ): 
+    def __len__( self ):
         # errcheck disabled for _yp_lenC, so do it here
         exc = c_ypObject_pp( yp_None )
         result = _yp_lenC( self, exc )
@@ -1047,7 +1208,7 @@ class ypObject( c_ypObject_p ):
     def pop( self ): return _yp_pop( self )
 
     def _sliceSearch( self, func2, func4, x, i, j ):
-        if i is None and j is None: 
+        if i is None and j is None:
             return yp_int( func2( self, x, yp_None ) )
         if i is None: i = 0
         if j is None: j = _yp_SLICE_USELEN
@@ -1110,6 +1271,70 @@ class ypObject( c_ypObject_p ):
         else: _yp_delitem( self, key )
     def get( self, key, defval=None ): return _yp_getdefault( self, key, defval )
     def setdefault( self, key, defval=None ): return _yp_setdefault( self, key, defval )
+
+    def isalnum( self ): return _yp_isalnum( self )
+    def isalpha( self ): return _yp_isalpha( self )
+    def isdecimal( self ): return _yp_isdecimal( self )
+    def isdigit( self ): return _yp_isdigit( self )
+    def isidentifier( self ): return _yp_isidentifier( self )
+    def islower( self ): return _yp_islower( self )
+    def isnumeric( self ): return _yp_isnumeric( self )
+    def isprintable( self ): return _yp_isprintable( self )
+    def isspace( self ): return _yp_isspace( self )
+    def isupper( self ): return _yp_isupper( self )
+    def startswith( self, prefix, start=None, end=None ):
+        return self._sliceSearch( _yp_startswithC, _yp_startswithC4, prefix, start, end )
+    def endswith( self, suffix, start=None, end=None ):
+        return self._sliceSearch( _yp_endswithC, _yp_endswithC4, suffix, start, end )
+    def lower( self ): return _yp_lower( self )
+    def upper( self ): return _yp_upper( self )
+    def casefold( self ): return _yp_casefold( self )
+    def swapcase( self ): return _yp_swapcase( self )
+    def capitalize( self ): return _yp_capitalize( self )
+    def ljust( self, width, fillchar=None ):
+        if fillchar is None: return _yp_ljustC( self, width )
+        return _yp_ljustC3( self, width, ord( fillchar ) )
+    def rjust( self, width, fillchar=None ):
+        if fillchar is None: return _yp_rjustC( self, width )
+        return _yp_rjustC3( self, width, ord( fillchar ) )
+    def center( self, width, fillchar=None ):
+        if fillchar is None: return _yp_centerC( self, width )
+        return _yp_centerC3( self, width, ord( fillchar ) )
+    def expandtabs( self, tabsize=8 ): return _yp_expandtabsC( self, tabsize )
+    def replace( self, oldsub, newsub, count=None ):
+        if count is None: return _yp_replace( self, oldsub, newsub )
+        return _yp_replaceC4( self, oldsub, newsub, count )
+    def lstrip( self, chars=_yp_arg_missing ):
+        if chars is _yp_arg_missing: return _yp_lstrip( self )
+        return _yp_lstrip2( self, chars )
+    def rstrip( self, chars=_yp_arg_missing ):
+        if chars is _yp_arg_missing: return _yp_rstrip( self )
+        return _yp_rstrip2( self, chars )
+    def strip( self, chars=_yp_arg_missing ):
+        if chars is _yp_arg_missing: return _yp_strip( self )
+        return _yp_strip2( self, chars )
+    def join( self, iterable ): return _yp_join( self, _yp_iterable( iterable ) )
+    def _split( self, func3, sep, maxsplit ):
+        if maxsplit is _yp_arg_missing:
+            if sep is _yp_arg_missing: return _yp_split( self )
+            return _yp_split2( self, sep )
+        if sep is _yp_arg_missing: sep = yp_None
+        return func3( self, sep, maxsplit )
+    def split( self, sep=_yp_arg_missing, maxsplit=_yp_arg_missing ):
+        return self._split( _yp_splitC3, sep, maxsplit )
+    def rsplit( self, sep=_yp_arg_missing, maxsplit=_yp_arg_missing ):
+        return self._split( _yp_rsplitC3, sep, maxsplit )
+    def splitlines( self, keepends=True ): return _yp_splitlines2( self, keepends )
+    def _encdec( self, func1, func3, encoding, errors ):
+        if errors is None:
+            if encoding is None: return func1( self )
+            errors = yp_s_strict
+        if encoding is None: encoding = yp_s_utf_8
+        return func3( self, encoding, errors )
+    def encode( self, encoding=None, errors=None ):
+        return self._encdec( _yp_encode, _yp_encode3, encoding, errors )
+    def decode( self, encoding=None, errors=None ):
+        return self._encdec( _yp_decode, _yp_decode3, encoding, errors )
 
     # Python requires arithmetic methods to _return_ NotImplemented
     @staticmethod
@@ -1208,7 +1433,12 @@ class yp_BaseException( ypObject ):
         """Raises the appropriate Python exception"""
         super( )._yp_errcheck( )
         name, pyExc = _ypExc2py[self.value]
-        raise pyExc( name )
+        if issubclass( pyExc, UnicodeEncodeError ):
+            raise pyExc( "<null>", "", 0, 0, name )
+        elif issubclass( pyExc, UnicodeDecodeError ):
+            raise pyExc( "<null>", b"", 0, 0, name )
+        else:
+            raise pyExc( name )
 
 @pytype( yp_type_NoneType, type( None ) )
 class yp_NoneType( ypObject ):
@@ -1218,7 +1448,7 @@ class yp_NoneType( ypObject ):
     def _frompython( cls, pyobj ):
         assert pyobj is None
         return yp_None
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_s_None
     _yp_repr = _yp_str
 c_ypObject_p_value( "yp_None" )
@@ -1231,7 +1461,7 @@ class yp_bool( ypObject ):
         raise TypeError( "expected ypObject or bool in yp_bool" )
     def _as_int( self ): return yp_i_one if self.value == yp_True.value else yp_i_zero
 
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_s_True if self.value == yp_True.value else yp_s_False
     _yp_repr = _yp_str
 
@@ -1305,13 +1535,7 @@ class yp_iter( ypObject ):
         if isinstance( object, ypObject ): return _yp_iter( object )
         if isinstance( object, (_setlike_dictview, _values_dictview) ): return iter( object )
 
-        lenhint = NotImplemented
-        try: lenhint = len( object )
-        except TypeError:
-            if hasattr( object, "__length_hint__" ):
-                try: lenhint = int( object.__length_hint__( ) )
-                except TypeError: pass
-        if lenhint == NotImplemented: lenhint = 0 # if all else fails...
+        lenhint = operator.length_hint( object )
         self = super( ).__new__( cls )
         self._pyiter = iter( object )
         self._pycallback = c_yp_generator_func_t( self._pygenerator_func )
@@ -1324,6 +1548,7 @@ class yp_iter( ypObject ):
 def _yp_iterable( iterable ):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
+    # TODO As elsewhere, be strict here an only accept nohtyP types (make conversions explicit in tests)
     if isinstance( iterable, c_ypObject_p ): return iterable
     if isinstance( iterable, str ): return yp_str( iterable )
     return yp_iter( iterable )
@@ -1342,7 +1567,7 @@ class yp_int( ypObject ):
         else:
             return _yp_int_baseC( x, base )
     def _asint( self ): return _yp_asintC( self, yp_None )
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asint( ) ) )
     def _yp_repr( self ): return yp_str( repr( self._asint( ) ) )
     def bit_length( self ): return yp_int( _yp_int_bit_lengthC( self, yp_None ) )
@@ -1370,16 +1595,15 @@ class yp_float( ypObject ):
         if isinstance( x, float ): return _yp_floatCF( x )
         return _yp_float( x )
     def _asfloat( self ): return _yp_asfloatC( self, yp_None )
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asfloat( ) ) )
     def _yp_repr( self ): return yp_str( repr( self._asfloat( ) ) )
 
-# FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
-# FIXME Just generally move more of this logic into nohtyP, when available
 class _ypBytes( ypObject ):
     def __new__( cls, source=0, encoding=None, errors=None ):
+        # TODO Seem to be missing yp_str, yp_bytes, etc
         if isinstance( source, str ):
-            raise NotImplementedError
+            return cls._ypBytes_constructor3( source, encoding, errors )
         elif isinstance( source, (int, yp_int) ):
             return cls._ypBytes_constructor( source )
         elif isinstance( source, (bytes, bytearray) ):
@@ -1415,24 +1639,26 @@ class _ypBytes( ypObject ):
 @pytype( yp_type_bytes, bytes )
 class yp_bytes( _ypBytes ):
     _ypBytes_constructorC = _yp_bytesC
+    _ypBytes_constructor3 = _yp_bytes3
     _ypBytes_constructor = _yp_bytes
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( str( self._asbytes( ) ) )
     _yp_repr = _yp_str
     def _yp_errcheck( self ):
         data, size = super( )._yp_errcheck( )
-        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if size < 1 and "_yp_bytes_empty" in globals( ):
         #    assert self is _yp_bytes_empty, "an empty bytes should be _yp_bytes_empty"
+    def decode( self, encoding="utf-8", errors="strict" ):
+        return _yp_str3( self, encoding, errors )
 _yp_bytes_empty = yp_bytes( )
 
-# FIXME When nohtyP can encode/decode Unicode directly, use it instead of Python's encode()
-# FIXME Just generally move more of this logic into nohtyP, when available
 @pytype( yp_type_bytearray, bytearray )
 class yp_bytearray( _ypBytes ):
     _ypBytes_constructorC = _yp_bytearrayC
+    _ypBytes_constructor3 = _yp_bytearray3
     _ypBytes_constructor = _yp_bytearray
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ): return yp_str( "bytearray(%r)" % self._asbytes( ) )
     _yp_repr = _yp_str
     def pop( self, i=_yp_arg_missing ):
@@ -1445,47 +1671,59 @@ class yp_bytearray( _ypBytes ):
         if isinstance( factor, float ): raise TypeError
         _yp_irepeatC( self, factor )
         return self
+    # XXX nohtyP will return a chrarray if asked to decode a bytearray, but Python expects str
+    def decode( self, encoding="utf-8", errors="strict" ):
+        return _yp_str3( self, encoding, errors )
 
-# FIXME When nohtyP has types that have string representations, update this
-# FIXME When nohtyP can decode arbitrary encodings, use that instead of str.encode
-# FIXME Just generally move more of this logic into nohtyP, when available
+# TODO Generally, need to adjust constructors and functions to only accept exact, specific types 
+# from Python
+
+# TODO When nohtyP has types that have string representations, update this
+# TODO Just generally move more of this logic into nohtyP, when available
 @pytype( yp_type_str, str )
 class yp_str( ypObject ):
     def __new__( cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing ):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
-            if object is _yp_arg_missing:
-                return _yp_str_frombytesC4( None, 0, yp_s_latin_1, yp_s_strict )
+            if object is _yp_arg_missing: return _yp_str0( )
             if isinstance( object, ypObject ): return object._yp_str( )
             if isinstance( object, str ):
-                encoded = object.encode( "latin-1" )
-                return _yp_str_frombytesC4( encoded, len( encoded ), yp_s_latin_1, yp_s_strict )
+                encoded = object.encode( "utf-8", "surrogatepass" )
+                return _yp_str_frombytesC4( encoded, len( encoded ), 
+                    yp_s_utf_8, yp_s_surrogatepass )
             raise TypeError( "expected ypObject or str in yp_str" )
         else:
-            raise NotImplementedError
+            if object is _yp_arg_missing: object = _yp_bytes_empty
+            if encoding is _yp_arg_missing: encoding = yp_s_utf_8
+            if errors is _yp_arg_missing: errors = yp_s_strict
+            if not isinstance( object, (bytes, bytearray, yp_bytes, yp_bytearray) ):
+                raise TypeError( "expected yp_bytes or yp_bytearray in yp_str (decoding)")
+            return _yp_str3( object, encoding, errors )
     def _get_encoded_size_encoding( self ):
         encoded = c_char_pp( c_char_p( ) )
         size = c_yp_ssize_t_p( c_yp_ssize_t( 0 ) )
         encoding = c_ypObject_pp( yp_None )
         # errcheck disabled for _yp_asencodedCX, so do it here
         _yp_asencodedCX( self, encoded, size, encoding )._yp_errcheck( )
-        assert encoding[0] is yp_s_latin_1
-        return cast( encoded.contents, c_void_p ), size[0], "latin-1"
+        # _yp_asencodedCX should return one of yp_s_latin_1, yp_s_ucs_2, or yp_s_ucs_4
+        enc_type, enc_elemsize = _yp_str_enc2type[encoding[0].value]
+        return cast( encoded.contents, enc_type ), size[0]//enc_elemsize, encoding[0]
     def _yp_errcheck( self ):
         super( )._yp_errcheck( )
         encoded, size, encoding = self._get_encoded_size_encoding( )
-        assert encoding == "latin-1"
-        assert string_at( encoded.value+size, 1 ) == b"\x00", "missing null terminator"
-        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        if encoding is yp_s_ucs_2:
+            pass # TODO ensure string contains at least one >0xFF character
+        elif encoding is yp_s_ucs_4:
+            pass # TODO ensure string contains at least one >0xFFFF character
+        assert encoded[size] == 0, "missing null terminator"
+        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if size < 1 and "_yp_str_empty" in globals( ):
         #    assert self is _yp_str_empty, "an empty str should be _yp_str_empty"
 
-    # Just as yp_bool.__bool__ must return a bool, so to must this return a str
-    def __str__( self ):
-        encoded, size, encoding = self._get_encoded_size_encoding( )
-        return string_at( encoded, size ).decode( encoding )
-    # FIXME When nohtyP supports repr, replace this faked-out version
+    # Just as yp_bool.__bool__ must return a bool, so too must this return a str
+    def __str__( self ): return self.encode( )._asbytes( ).decode( )
     def _yp_str( self ): return self
-    def _yp_repr( self ): return repr( str( self ) )
+    # TODO When nohtyP supports repr, replace this faked-out version
+    def _yp_repr( self ): return yp_str( repr( str( self ) ) )
 
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__( self, other ): return _yp_concat( self, other )
@@ -1497,9 +1735,31 @@ class yp_str( ypObject ):
         if isinstance( factor, float ): raise TypeError
         return _yp_repeatC( self, factor )
 
+    # TODO Use nohtyP's versions when supported, not these faked-out versions
+    def replace( self, old, new, count=-1 ):
+        if isinstance( old, yp_str ): old = str( old )
+        if isinstance( new, yp_str ): new = str( new )
+        return yp_str( str( self ).replace( old, new, count ) )
+    def split( self, sep=None, maxsplit=-1 ):
+        if isinstance( sep, yp_str ): sep = str( sep )
+        return yp_list( str( self ).split( sep, maxsplit ) )
+
 c_ypObject_p_value( "yp_s_ascii" )
 c_ypObject_p_value( "yp_s_latin_1" )
+c_ypObject_p_value( "yp_s_utf_8" )
+c_ypObject_p_value( "yp_s_ucs_2" )
+c_ypObject_p_value( "yp_s_ucs_4" )
 c_ypObject_p_value( "yp_s_strict" )
+c_ypObject_p_value( "yp_s_replace" )
+c_ypObject_p_value( "yp_s_ignore" )
+c_ypObject_p_value( "yp_s_xmlcharrefreplace" )
+c_ypObject_p_value( "yp_s_backslashreplace" )
+c_ypObject_p_value( "yp_s_surrogateescape" )
+c_ypObject_p_value( "yp_s_surrogatepass" )
+_yp_str_enc2type = {
+        yp_s_latin_1.value: (POINTER( c_uint8 ),  1),
+        yp_s_ucs_2.value:   (POINTER( c_uint16 ), 2),
+        yp_s_ucs_4.value:   (POINTER( c_uint32 ), 4)}
 _yp_str_empty = yp_str( )
 yp_s_None = yp_str( "None" )
 yp_s_True = yp_str( "True" )
@@ -1507,8 +1767,12 @@ yp_s_False = yp_str( "False" )
 
 def yp_repr( object ):
     """Returns repr( object ) of a ypObject as a yp_str"""
+    if isinstance( object, str ): object = yp_str( object )
     if not isinstance( object, ypObject ): raise TypeError( "expected ypObject in yp_repr" )
     return object._yp_repr( )
+
+def yp_chr( i ):
+    return _yp_chrC( i )
 
 class _ypTuple( ypObject ):
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
@@ -1528,10 +1792,10 @@ class yp_tuple( _ypTuple ):
         return _yp_tuple( _yp_iterable( iterable ) )
     def _yp_errcheck( self ):
         super( )._yp_errcheck( )
-        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if len( self ) < 1 and "_yp_tuple_empty" in globals( ):
         #    assert self is _yp_tuple_empty, "an empty tuple should be _yp_tuple_empty"
-    # FIXME When nohtyP supports str/repr, replace this faked-out version
+    # TODO When nohtyP supports str/repr, replace this faked-out version
     def _yp_str( self ):
         return yp_str( "(%s)" % ", ".join( repr( x ) for x in self ) )
     _yp_repr = _yp_str
@@ -1541,7 +1805,7 @@ _yp_tuple_empty = yp_tuple( )
 class yp_list( _ypTuple ):
     def __new__( cls, iterable=_yp_tuple_empty ):
         return _yp_list( _yp_iterable( iterable ) )
-    # FIXME When nohtyP supports str/repr, replace this faked-out version
+    # TODO When nohtyP supports str/repr, replace this faked-out version
     @reprlib.recursive_repr( "[...]" )
     def _yp_str( self ):
         return yp_str( "[%s]" % ", ".join( repr( x ) for x in self ) )
@@ -1557,7 +1821,7 @@ class yp_list( _ypTuple ):
         _yp_irepeatC( self, factor )
         return self
 
-# FIXME When nohtyP supports sorting, replace this faked-out version
+# TODO When nohtyP supports sorting, replace this faked-out version
 def yp_sorted( x, *, key=None, reverse=False ):
     """Returns sorted( x ) of a ypObject as a yp_list"""
     if not isinstance( x, (ypObject, _setlike_dictview, _values_dictview) ):
@@ -1620,7 +1884,7 @@ class yp_frozenset( _ypSet ):
     _ypSet_constructor = _yp_frozenset
     def _yp_errcheck( self ):
         super( )._yp_errcheck( )
-        # FIXME ...unless it's built with an empty tuple; is it worth replacing with empty?
+        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         #if len( self ) < 1 and "_yp_frozenset_empty" in globals( ):
         #    assert self is _yp_frozenset_empty, "an empty frozenset should be _yp_frozenset_empty"
 _yp_frozenset_empty = yp_frozenset( )
@@ -1678,7 +1942,7 @@ class _values_dictview:
 class _items_dictview( _setlike_dictview ):
     _iter_func = staticmethod( _yp_iter_items )
 
-# FIXME Adapt the Python test suite to test for frozendict, adding in tests similar to those found
+# TODO Adapt the Python test suite to test for frozendict, adding in tests similar to those found
 # between list/tuple and set/frozenset (ie the singleton empty frozendict, etc)
 
 @pytype( yp_type_dict, dict )
@@ -1725,7 +1989,7 @@ class yp_range( ypObject ):
         super( )._yp_errcheck( )
         if len( self ) < 1 and "_yp_range_empty" in globals( ):
             assert self is _yp_range_empty, "an empty range should be _yp_range_empty"
-    # FIXME When nohtyP has str/repr, use it instead of this faked-out version
+    # TODO When nohtyP has str/repr, use it instead of this faked-out version
     def _yp_str( self ):
         self_len = len( self )
         if self_len < 1: return yp_str( "range(0, 0)" )
@@ -1738,7 +2002,7 @@ class yp_range( ypObject ):
     _yp_repr = _yp_str
 _yp_range_empty = yp_range( 0 )
 
-# FIXME integrate this somehow with unittest
+# TODO Integrate ypExamples.c somehow with this unittest suite
 #import os
 #os.system( "ypExamples.exe" )
 

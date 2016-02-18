@@ -1,10 +1,10 @@
-"""yp_unittest.py - Wraps Python's unittest to ensure we're actually testing nohtyP
+"""yp_unittest\case.py - Wraps Python's unittest to ensure we're actually testing nohtyP
 
 Sye van der Veen
 November 5, 2013
 """
 
-from unittest import *
+from unittest.case import *
 import unittest as _unittest
 import contextlib as _contextlib
 import yp as _yp
@@ -14,6 +14,7 @@ import yp as _yp
 def _checkFornohtyP(*objs):
     for obj in objs:
         if isinstance(obj, _yp.ypObject): return
+        if isinstance(obj, type) and issubclass(obj, _yp.ypObject): return
     raise TypeError("expected at least one ypObject in assertion")
 
 @_contextlib.contextmanager

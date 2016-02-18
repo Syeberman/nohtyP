@@ -53,6 +53,7 @@ def _updateLinkEmitters( env, version ):
             LDMODULEEMITTER=[_linkEmitter, ] )
 
 
+# TODO Any new options in VS 14.0 (aka 2015) that we can take advantage of?
 def ApplyMSVSOptions( env, version ):
     """Updates env with MSVS-specific compiler options for nohtyP.  version is numeric (ie 12.0).
     """
