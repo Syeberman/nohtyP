@@ -144,26 +144,25 @@ class LongTest(yp_unittest.TestCase):
     # The sign of the number is also random.
 
     def getran(self, ndigits):
-        with self.nohtyPCheck(enabled=False):
-            self.assertTrue(ndigits > 0)
-            nbits_hi = ndigits * SHIFT
-            nbits_lo = nbits_hi - SHIFT + 1
-            answer = 0
-            nbits = 0
-            r = yp_int(random.random() * (SHIFT * 2)) | 1  # force 1 bits to start
-            while nbits < nbits_lo:
-                bits = (r >> 1) + 1
-                bits = min(bits, nbits_hi - nbits)
-                self.assertTrue(1 <= bits <= SHIFT)
-                nbits = nbits + bits
-                answer = answer << bits
-                if r & 1:
-                    answer = answer | ((1 << bits) - 1)
-                r = yp_int(random.random() * (SHIFT * 2))
-            self.assertTrue(nbits_lo <= nbits <= nbits_hi)
-            if random.random() < 0.5:
-                answer = -answer
-            return answer
+        self.assertGreater(ndigits, yp_int(0))
+        nbits_hi = ndigits * SHIFT
+        nbits_lo = nbits_hi - SHIFT + 1
+        answer = 0
+        nbits = 0
+        r = yp_int(random.random() * (SHIFT * 2)) | 1  # force 1 bits to start
+        while nbits < nbits_lo:
+            bits = (r >> 1) + 1
+            bits = min(bits, nbits_hi - nbits)
+            self.assertTrue(1 <= bits <= SHIFT)
+            nbits = nbits + bits
+            answer = answer << bits
+            if r & 1:
+                answer = answer | ((1 << bits) - 1)
+            r = yp_int(random.random() * (SHIFT * 2))
+        self.assertTrue(nbits_lo <= nbits <= nbits_hi)
+        if random.random() < 0.5:
+            answer = -answer
+        return answer
 
     # Get random long consisting of ndigits random digits (relative to base
     # BASE).  The sign bit is also random.
@@ -375,20 +374,13 @@ class LongTest(yp_unittest.TestCase):
                "".join("0123456789abcdef"[i] for i in digits)
 
     def check_format_1(self, x):
-        for base, mapper in (8, oct), (10, repr), (16, hex):
+        for base, mapper in (2, bin), (8, oct), (10, str), (10, repr), (16, hex):
             got = mapper(x)
             expected = self.slow_format(x, base)
             msg = Frm("%s returned %r but expected %r for %r",
                 mapper.__name__, got, expected, x)
             self.assertEqual(got, expected, msg)
-            self.assertEqual(yp_int(got, 0), x, Frm('yp_int("%s", 0) != %r', got, x))
-        # str() has to be checked a little differently since there's no
-        # trailing "L"
-        got = str(x)
-        expected = self.slow_format(x, 10)
-        msg = Frm("%s returned %r but expected %r for %r",
-            mapper.__name__, got, expected, x)
-        self.assertEqual(got, expected, msg)
+            self.assertEqual(yp_int(got, 0), x, Frm('int("%s", 0) != %r', got, x))
 
     @yp_unittest.skip("TODO Implement yp_str/yp_repr in nohtyP")
     def test_format(self):
@@ -614,11 +606,11 @@ class LongTest(yp_unittest.TestCase):
     def test_mixed_compares(self):
         eq = self.assertEqual
 
-        # We're mostly concerned with that mixing floats and longs does the
-        # right stuff, even when longs are too large to fit in a float.
+        # We're mostly concerned with that mixing floats and ints does the
+        # right stuff, even when ints are too large to fit in a float.
         # The safest way to check the results is to use an entirely different
         # method, which we do here via a skeletal rational class (which
-        # represents all Python ints, longs and floats exactly).
+        # represents all Python ints and floats exactly).
         class Rat:
             def __init__(self, value):
                 if isinstance(value, (_int, yp_int)):
@@ -945,8 +937,7 @@ class LongTest(yp_unittest.TestCase):
             self.check_truediv(-x, -y)
 
     def test_small_ints(self):
-        for i in range(-5, 257):
-            i = yp_int(i)
+        for i in yp_range(-5, 257):
             self.assertIs(i, i + 0)
             self.assertIs(i, i * 1)
             self.assertIs(i, i - 0)
@@ -1020,7 +1011,7 @@ class LongTest(yp_unittest.TestCase):
                 got = round(k+offset, -1)
                 expected = v+offset
                 self.assertEqual(got, expected)
-                self.assertTrue(type(got) is yp_int)
+                self.assertIs(type(got), yp_int)
 
         # larger second argument
         self.assertEqual(round(-150, -2), -200)
@@ -1059,7 +1050,7 @@ class LongTest(yp_unittest.TestCase):
             got = round(10**k + 324678, -3)
             expect = 10**k + 325000
             self.assertEqual(got, expect)
-            self.assertTrue(type(got) is yp_int)
+            self.assertIs(type(got), yp_int)
 
         # nonnegative second argument: round(x, n) should just return x
         for n in range(5):
@@ -1067,7 +1058,7 @@ class LongTest(yp_unittest.TestCase):
                 x = random.randrange(-10000, 10000)
                 got = round(x, n)
                 self.assertEqual(got, x)
-                self.assertTrue(type(got) is yp_int)
+                self.assertIs(type(got), yp_int)
         for huge_n in 2**31-1, 2**31, 2**63-1, 2**63, 2**100, 10**100:
             self.assertEqual(round(8979323, huge_n), 8979323)
 
@@ -1076,7 +1067,7 @@ class LongTest(yp_unittest.TestCase):
             x = random.randrange(-10000, 10000)
             got = round(x)
             self.assertEqual(got, x)
-            self.assertTrue(type(got) is yp_int)
+            self.assertIs(type(got), yp_int)
 
         # bad second argument
         bad_exponents = ('brian', 2.0, 0j, None)
@@ -1174,7 +1165,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertRaises(OverflowError, (256).to_bytes, 1, 'big', signed=True)
         self.assertRaises(OverflowError, (256).to_bytes, 1, 'little', signed=False)
         self.assertRaises(OverflowError, (256).to_bytes, 1, 'little', signed=True)
-        self.assertRaises(OverflowError, (-1).to_bytes, 2, 'big', signed=False),
+        self.assertRaises(OverflowError, (-1).to_bytes, 2, 'big', signed=False)
         self.assertRaises(OverflowError, (-1).to_bytes, 2, 'little', signed=False)
         self.assertEqual((0).to_bytes(0, 'big'), b'')
         self.assertEqual((1).to_bytes(5, 'big'), b'\x00\x00\x00\x00\x01')
@@ -1283,15 +1274,15 @@ class LongTest(yp_unittest.TestCase):
         class myint(yp_int):
             pass
 
-        self.assertTrue(type(myint.from_bytes(b'\x00', 'big')) is myint)
+        self.assertIs(type(myint.from_bytes(b'\x00', 'big')), myint)
         self.assertEqual(myint.from_bytes(b'\x01', 'big'), 1)
-        self.assertTrue(
-            type(myint.from_bytes(b'\x00', 'big', signed=False)) is myint)
+        self.assertIs(
+            type(myint.from_bytes(b'\x00', 'big', signed=False)), myint)
         self.assertEqual(myint.from_bytes(b'\x01', 'big', signed=False), 1)
-        self.assertTrue(type(myint.from_bytes(b'\x00', 'little')) is myint)
+        self.assertIs(type(myint.from_bytes(b'\x00', 'little')), myint)
         self.assertEqual(myint.from_bytes(b'\x01', 'little'), 1)
-        self.assertTrue(type(myint.from_bytes(
-            b'\x00', 'little', signed=False)) is myint)
+        self.assertIs(type(myint.from_bytes(
+            b'\x00', 'little', signed=False)), myint)
         self.assertEqual(myint.from_bytes(b'\x01', 'little', signed=False), 1)
         self.assertEqual(
             yp_int.from_bytes([255, 0, 0], 'big', signed=True), -65536)
@@ -1330,6 +1321,14 @@ class LongTest(yp_unittest.TestCase):
         integers = [Integer(0) for i in range(1000)]
         for n in map(yp_int, integers):
             self.assertEqual(n, 0)
+
+    @yp_unittest.skip("TODO Implement bool-as-number in nohtyP")
+    def test_shift_bool(self):
+        # Issue #21422: ensure that bool << int and bool >> int return int
+        for value in (True, False):
+            for shift in (0, 2):
+                self.assertEqual(type(value << shift), int)
+                self.assertEqual(type(value >> shift), int)
 
 
 def test_main():
