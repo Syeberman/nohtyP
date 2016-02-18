@@ -1005,6 +1005,7 @@ static yp_ssize_t _default_yp_malloc_good_size( yp_ssize_t size )
 }
 static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
 {
+    void *p;
     yp_ASSERT( size >= 0, "size cannot be negative" );
     *actual = _default_yp_malloc_good_size( size );
     p = malloc( *actual );
