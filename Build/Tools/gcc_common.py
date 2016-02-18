@@ -272,7 +272,7 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
         ApplyGCCOptions( env, numericVersion )
 
     def exists( env ):
-        return True # FIXME? _find( env, re_dumpversion )
+        return True # TODO? _find( env, re_dumpversion )
 
     return generate, exists
 

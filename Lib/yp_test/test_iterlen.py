@@ -139,7 +139,7 @@ class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
 
 # XXX Unlike cpython, but allowed by the Python docs, nohtyP dicts and sets do not raise an error
 # if mutated during iteration
-# FIXME Create tests like for list that verify this behaviour
+# TODO Create tests like for list that verify this behaviour
 
 #class TestDictKeys(TestTemporarilyImmutable, yp_unittest.TestCase):
 class TestDictKeys(TestInvariantWithoutMutations, yp_unittest.TestCase):
