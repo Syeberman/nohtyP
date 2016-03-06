@@ -1,6 +1,6 @@
 # XXX NOT a SCons tool module; instead, a library for the msvs_* tool modules
 
-import os, os.path, sys, functools
+import os, os.path, functools
 import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
@@ -96,6 +96,12 @@ def ApplyMSVSOptions( env, version ):
         addCppDefines( "_DEBUG" )
     else:
         addCppDefines( "NDEBUG" )
+
+    # CCPP is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
+    # TODO See _MSVC_OUTPUT_FLAG: the string below may not work in batch mode
+    # TODO Create PPCC, PPCFLAGS, PPCCFLAGS just like SHCC/etc, and contribute back to SCons?
+    # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
+    env['PPCCCOM'] = '${TEMPFILE("$CC /P /Fi$TARGET /c $CHANGED_SOURCES $CFLAGS $CCFLAGS $_CCCOMCOM","$CCCOMSTR")}'
 
     def addLinkFlags( *args ): env.AppendUnique( LINKFLAGS=list( args ) )
     addLinkFlags(

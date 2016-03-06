@@ -198,6 +198,12 @@ def ApplyGCCOptions( env, version ):
     else:
         addCppDefines( "NDEBUG" )
 
+    # CCPP is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
+    # TODO -save-temps above also writes the .i file
+    # TODO Create PPCC, PPCFLAGS, PPCCFLAGS just like SHCC/etc, and contribute back to SCons?
+    # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
+    env['PPCCCOM'] = '$CC -E -o $TARGET -c $CFLAGS $CCFLAGS $_CCCOMCOM $SOURCES'
+
     def addLinkFlags( *args ): env.AppendUnique( LINKFLAGS=list( args ) )
     addLinkFlags( *archOpts )
     addLinkFlags(
