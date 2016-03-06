@@ -125,8 +125,8 @@ else:
 nativeTargetsToCreate = set( ("debug", "release") )
 
 # yp_test requires at least Python 3.4; we don't care which PC-Lint version is used
-python_min34 = Tool( "python_min34", toolpath=["Build/Tools", ] )
-pclint = Tool( "pclint", toolpath=["Build/Tools", ] )
+python_min34 = Tool( "python_min34" )
+pclint = Tool( "pclint" )
 
 sconscriptLog.write( """
 Native OS: {native_os}
@@ -135,7 +135,7 @@ Native Arches: {native_archs}
 )
 
 for compiler_name in compiler_names:
-    compiler = Tool( compiler_name, toolpath=["Build/Tools", ] )
+    compiler = Tool( compiler_name )
     if not compiler.exists( rootEnv ): 
         sconscriptLog.write( "\nCompiler doesn't exist: {}\n".format( compiler_name ) )
         continue
