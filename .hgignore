@@ -28,6 +28,9 @@
 \.sconsign\.dblite$
 \.mscommon\.log$
 \.sconscript\.log$
+^Build/site_toolconfig\.py$
+
+# Old name for site_toolconfig.py
 ^Build/site-tools\.py$
 
 # Local PLY files

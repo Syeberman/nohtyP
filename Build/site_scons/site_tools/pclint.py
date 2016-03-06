@@ -64,9 +64,9 @@ def _find( env ):
 
 def generate( env ):
     # See if site-tools.py already knows where to find this PC-Lint version
-    siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
+    siteToolConfig_name, siteToolConfig_dict = env["SITE_TOOLS"]( )
     pclint_siteName = _tool_name.upper( )
-    pclint_path = siteTools_dict.get( pclint_siteName, None )
+    pclint_path = siteToolConfig_dict.get( pclint_siteName, None )
 
     # If site-tools.py came up empty, find a PC-Lint that supports our target, then update 
     # site-tools.py
@@ -74,8 +74,8 @@ def generate( env ):
         pclint_path = _find( env )
         if not pclint_path:
             raise SCons.Errors.StopError( "%s detection failed" % _tool_name )
-        siteTools_dict[pclint_siteName] = pclint_path
-        with open( siteTools_name, "a" ) as outfile:
+        siteToolConfig_dict[pclint_siteName] = pclint_path
+        with open( siteToolConfig_name, "a" ) as outfile:
             outfile.write( "%s = %r\n\n" % (pclint_siteName, pclint_path) )
 
     # Now, prepend it to the path

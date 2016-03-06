@@ -245,9 +245,9 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
         if env["CONFIGURATION"] not in ("release", "debug"): raise SCons.Errors.StopError( "GCC doesn't support the %r configuration (yet)" % env["CONFIGURATION"] )
 
         # See if site-tools.py already knows where to find this gcc version
-        siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
+        siteToolConfig_name, siteToolConfig_dict = env["SITE_TOOLS"]( )
         gcc_siteName = "%s_%s" % (env["COMPILER"].name.upper( ), env["TARGET_ARCH"].upper( ))
-        gcc_path = siteTools_dict.get( gcc_siteName, "" )
+        gcc_path = siteToolConfig_dict.get( gcc_siteName, "" )
         if gcc_path is None:
             raise SCons.Errors.StopError( "gcc %s.%s (%r) disabled in site-tools.py" % (major, minor, env["TARGET_ARCH"]) )
 
@@ -257,8 +257,8 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
             gcc_path = _find( env, major, minor, re_dumpversion )
             if not gcc_path:
                 raise SCons.Errors.StopError( "gcc %s.%s (%r) detection failed" % (major, minor, env["TARGET_ARCH"]) )
-            siteTools_dict[gcc_siteName] = gcc_path
-            with open( siteTools_name, "a" ) as outfile:
+            siteToolConfig_dict[gcc_siteName] = gcc_path
+            with open( siteToolConfig_name, "a" ) as outfile:
                 outfile.write( "%s = %r\n\n" % (gcc_siteName, gcc_path) )
 
         # The tool (ie mingw) may helpfully prepend to path and other variables...so make sure we
