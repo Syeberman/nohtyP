@@ -4,13 +4,12 @@ Author: Sye van der Veen
 Date: May 19, 2014
 """
 
-import sys, re, copy, collections
+import re, copy, collections
 
 # TODO remove these hard-coded paths
 CppPath = "../pycparser/utils/cpp"
 CppArgs = "-I../pycparser/utils/fake_libc_include"
-sys.path.append( "../pycparser" )
-from pycparser import c_parser, c_generator, c_ast, parse_file
+from pycparser import c_generator, c_ast, parse_file
 
 
 ##

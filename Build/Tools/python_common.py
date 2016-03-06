@@ -1,6 +1,6 @@
 # XXX NOT a SCons tool module; instead, a library for the python_* tool modules
 
-import os, os.path, sys, functools, subprocess, re, glob, tempfile
+import os, os.path, subprocess, glob
 import SCons.Errors
 import SCons.Platform
 import SCons.Tool
