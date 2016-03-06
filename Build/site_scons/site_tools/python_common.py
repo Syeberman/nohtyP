@@ -86,9 +86,9 @@ def DefinePythonToolFunctions( hexversions, tool_name ):
         if env["TARGET_OS"] != env["HOST_OS"]: raise SCons.Errors.StopError( "can only run Python on the native OS" )
 
         # See if site-tools.py already knows where to find this Python version
-        siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
+        siteToolConfig_name, siteToolConfig_dict = env["SITE_TOOLS"]( )
         python_siteName = "%s_%s" % (tool_name.upper( ), env["TARGET_ARCH"].upper( ))
-        python_path = siteTools_dict.get( python_siteName, "" )
+        python_path = siteToolConfig_dict.get( python_siteName, "" )
         if python_path is None:
             raise SCons.Errors.StopError( "%s (%r) disabled in site-tools.py" % (tool_name, env["TARGET_ARCH"]) )
 
@@ -98,8 +98,8 @@ def DefinePythonToolFunctions( hexversions, tool_name ):
             python_path = _find( env, hexversions )
             if not python_path:
                 raise SCons.Errors.StopError( "%s (%r) detection failed" % (tool_name, env["TARGET_ARCH"]) )
-            siteTools_dict[python_siteName] = python_path
-            with open( siteTools_name, "a" ) as outfile:
+            siteToolConfig_dict[python_siteName] = python_path
+            with open( siteToolConfig_name, "a" ) as outfile:
                 outfile.write( "%s = %r\n\n" % (python_siteName, python_path) )
 
         # Now, prepend it to the path

@@ -155,11 +155,11 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
 
         # Caching INCLUDE, LIB, etc in site-tools.py bypasses the slow vcvars*.bat calls on
         # subsequent builds
-        siteTools_name, siteTools_dict = env["SITE_TOOLS"]( )
+        siteToolConfig_name, siteToolConfig_dict = env["SITE_TOOLS"]( )
         var_names = ("INCLUDE", "LIB", "LIBPATH", "PATH")
         compilerName = env["COMPILER"].name
         compilerEnv_name = "%s_%s_ENV" % (compilerName.upper( ), env["TARGET_ARCH"].upper( ))
-        compilerEnv = siteTools_dict.get( compilerEnv_name, {} )
+        compilerEnv = siteToolConfig_dict.get( compilerEnv_name, {} )
         if compilerEnv is None:
             raise SCons.Errors.StopError( "Visual Studio %r (%r) disabled in site-tools.py" % (supportedVersions[0], env["TARGET_ARCH"]) )
 
@@ -176,10 +176,10 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
 
         # Add an entry for this compiler in site-tools.py if it doesn't already exist
         if not compilerEnv:
-            compilerEnv = siteTools_dict[compilerEnv_name] = {}
+            compilerEnv = siteToolConfig_dict[compilerEnv_name] = {}
             for var_name in var_names: 
                 compilerEnv[var_name] = env["ENV"][var_name]
-            with open( siteTools_name, "a" ) as outfile:
+            with open( siteToolConfig_name, "a" ) as outfile:
                 outfile.write( "%s = {\n" % compilerEnv_name )
                 for var_name in var_names:
                     outfile.write( "    %r: %r,\n" % (var_name, compilerEnv[var_name]) )
