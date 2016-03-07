@@ -15,17 +15,18 @@ RootEnv.Replace( NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0 )
 #   https://blogs.msdn.microsoft.com/junfeng/2005/05/19/how-do-i-mix-c-and-c-code-in-a-single-assembly/
 def nohtyP_SharedLibrary( env ):
     env.PrependUnique(
-            CPPPATH=[
-                "#",
-                ],
-            CPPDEFINES=[
-                "yp_ENABLE_SHARED",
-                "yp_BUILD_CORE",
-                "yp_DEBUG_LEVEL=%s" % ("1" if env["CONFIGURATION"] == "debug" else "0"),
-                ],
-            PDB="$VTOP/nohtyP.pdb", LIBS="",
-            )
-    return env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
+        CPPPATH=[
+            "#",
+        ],
+        CPPDEFINES=[
+            "yp_ENABLE_SHARED",
+            "yp_BUILD_CORE",
+            "yp_DEBUG_LEVEL=%s" % ("1" if env["CONFIGURATION"] == "debug" else "0"),
+        ],
+        PDB="$VTOP/nohtyP.pdb", LIBS="",
+    )
+    return (env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ), )
+
 
 def nohtyP_yp_test( env, sharedLib ):
     sharedLibDir = Flatten( sharedLib )[0].get_dir( )

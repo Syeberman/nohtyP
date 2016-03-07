@@ -18,27 +18,3 @@ def AliasIfNotEmpty( alias, targets=(), action=() ):
 
 
 
-
-
-def TODONameThis():
-    # TODO Just like createObjBuilders, this needs to be called for each tool
-    SourceFileScanner = rootEnv['BUILDERS']['Object'].source_scanner
-    rootEnv['BUILDERS']['CPreprocessed'] = SCons.Builder.Builder(
-        action = {},
-        emitter = {},
-        suffix = '$CPREPROCESSEDSUFFIX',
-        src_builder = 'CFile',
-        source_scanner = SourceFileScanner,
-        single_source = 1
-    )
-    rootEnv['BUILDERS']['CXXPreprocessed'] = SCons.Builder.Builder(
-        action = {},
-        emitter = {},
-        suffix = '$CXXPREPROCESSEDSUFFIX',
-        src_builder = 'CXXFile',
-        source_scanner = SourceFileScanner,
-        single_source = 1
-    )
-    rootEnv.SetDefault( CPREPROCESSEDSUFFIX = '.i' )
-    rootEnv.SetDefault( CXXPREPROCESSEDSUFFIX = '.ii' )
-
