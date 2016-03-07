@@ -1,0 +1,55 @@
+"""Configures the general environment used for this SCons build: separate environments are then
+cloned off this root.
+"""
+
+# TODO support scons -h for build options
+
+
+import os, platform
+from SCons.Defaults import DefaultEnvironment
+from SCons.Subst import SetAllowableExceptions as AllowSubstExceptions
+from SCons.Variables import Variables
+
+
+# Logs for SCons- and script-related warnings that can usually be ignored
+SconscriptLog = open( "Build/.sconscript.log", "w" )
+_mscommonLog_path = "Build/.mscommon.log"
+with open( _mscommonLog_path, "w" ): pass    # clears the file
+os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath( _mscommonLog_path )
+
+
+# Command-line build variables
+vars = Variables( None )
+
+
+# Generic build environment applicable to all compilers/targets and used internally by SCons
+RootEnv = DefaultEnvironment( tools=[], variables=vars, SCONSCRIPT_LOG=SconscriptLog )
+
+
+# Require that only known command-line variables are used
+vars_unknown = vars.UnknownVariables( )
+if vars_unknown: RootEnv.Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
+
+
+# Require that construction variable names exist at expansion, then add those allowed to be empty
+AllowSubstExceptions( )
+RootEnv.Replace( CPPFLAGS=[], SHCCCOMSTR="", SHLINKCOMSTR="", 
+    SHLIBVERSION="", SHLIBNOVERSIONSYMLINKS="",
+    LIBPATH=[], PCH="",
+    WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="",
+    RPATH=[],
+)
+
+# Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory
+RootEnv.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
+
+# For dependencies, first consider timestamps, then MD5 checksums
+RootEnv.Decider( "MD5-timestamp" )
+
+# Always use cmd.exe on Windows, regardless of user's shell; ignored on other platforms
+RootEnv["ENV"]["COMSPEC"] = "cmd.exe"
+
+# TODO These Scons environment variables should be cross-platform, not Windows-only
+if not RootEnv["HOST_OS"]: RootEnv["HOST_OS"] = RootEnv["PLATFORM"]
+if not RootEnv["HOST_ARCH"]: RootEnv["HOST_ARCH"] = platform.machine()
+
