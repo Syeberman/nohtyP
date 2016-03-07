@@ -186,7 +186,8 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
         ApplyMSVSOptions( env, numericVersion )
 
     def exists( env ):
-        return version is not None
+        # We rely on generate to tell us if a tool is available
+        return True
 
     return generate, exists
 

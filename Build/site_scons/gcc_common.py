@@ -275,7 +275,8 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
         ApplyGCCOptions( env, numericVersion )
 
     def exists( env ):
-        return True # TODO? _find( env, re_dumpversion )
+        # We rely on generate to tell us if a tool is available
+        return True
 
     return generate, exists
 

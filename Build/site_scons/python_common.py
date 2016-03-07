@@ -105,7 +105,8 @@ def DefinePythonToolFunctions( hexversions, tool_name ):
         env["PYTHON"] = python
 
     def exists( env ):
-        return True # TODO? _find( env, hexversions )
+        # We rely on generate to tell us if a tool is available
+        return True
 
     return generate, exists
 
