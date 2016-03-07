@@ -37,25 +37,6 @@ def nohtyP_yp_test( env, sharedLib ):
     return testLog
 
 
-# Site-specific tool configuration.  For some tools, this caches the results of lengthy
-# auto-detection; for other tools that don't have version-dependent auto-detect, this allows the
-# user to tell us where they put the other versions.
-siteToolConfig_name = os.path.abspath( "Build/site_toolconfig.py" )
-siteToolConfig_dict = {}
-if not os.path.exists( siteToolConfig_name ):
-    with open( siteToolConfig_name, "w" ) as outfile:
-        outfile.write( "# Holds site-specific configuration options for the compilers and other tools.\n" )
-        outfile.write( "# Edit as appropriate.  Missing entries added automatically.  Rebuilt if deleted.\n" )
-        outfile.write( "# None disables autodetection of that tool.\n\n" )
-else:
-    with open( siteToolConfig_name ) as infile:
-        exec( infile.read( ), siteToolConfig_dict )
-def siteToolConfigFunction( ):
-    """Returns the file name of site-tools.py, and a dictionary of current variables."""
-    return siteToolConfig_name, siteToolConfig_dict
-RootEnv["SITE_TOOLS"] = siteToolConfigFunction # a function so Clone doesn't deepcopy it
-
-
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
 # "native" (ie the default target)
 # TODO Allow the user to specify what the "native" target should be
@@ -84,6 +65,8 @@ Native OS: {native_os}
 Native Arches: {native_archs}
 """.format( **locals() )
 )
+
+# TODO support scons -h for build options
 
 for compiler_name in compiler_names:
     compiler = Tool( compiler_name )
