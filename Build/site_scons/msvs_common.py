@@ -5,6 +5,7 @@ import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
 import SCons.Warnings
+from msvs_preprocessed import generate_PreprocessedBuilder
 
 
 # Disables "MSVC_USE_SCRIPT set to False" warnings.  Unfortunately, also disables "No version of 
@@ -97,12 +98,6 @@ def ApplyMSVSOptions( env, version ):
     else:
         addCppDefines( "NDEBUG" )
 
-    # CCPP is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
-    # TODO See _MSVC_OUTPUT_FLAG: the string below may not work in batch mode
-    # TODO Create PPCC, PPCFLAGS, PPCCFLAGS just like SHCC/etc, and contribute back to SCons?
-    # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
-    env['PPCCCOM'] = '${TEMPFILE("$CC /P /Fi$TARGET /c $CHANGED_SOURCES $CFLAGS $CCFLAGS $_CCCOMCOM","$CCCOMSTR")}'
-
     def addLinkFlags( *args ): env.AppendUnique( LINKFLAGS=list( args ) )
     addLinkFlags(
             # Warnings-as-errors
@@ -134,6 +129,7 @@ def ApplyMSVSOptions( env, version ):
     if _crtRequiresManifest( version ): env["WINDOWS_EMBED_MANIFEST"] = True
     # Ensure SCons knows to clean .map, etc
     _updateLinkEmitters( env, version )
+
 
 def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
     """Returns (generate, exists), suitable for use as the SCons tool module functions."""
@@ -173,6 +169,7 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
         _msvsTool.generate( env )
         _msvcTool.generate( env )
         _mslinkTool.generate( env )
+        generate_PreprocessedBuilder( env )
         if not env.WhereIs( "$CC" ):
             raise SCons.Errors.StopError( "Visual Studio %r (%r) configuration failed" % (supportedVersions[0], env["TARGET_ARCH"]) )
 
