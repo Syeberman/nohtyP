@@ -63,20 +63,17 @@ def _find( env ):
     return pclints[-1][1]   # return the path with the largest version
 
 def generate( env ):
-    # See if site-tools.py already knows where to find this PC-Lint version
-    siteToolConfig_name, siteToolConfig_dict = env["SITE_TOOLS"]( )
+    # See if site_toolsconfig.py already knows where to find this PC-Lint version
+    toolsConfig = env["TOOLS_CONFIG"]
     pclint_siteName = _tool_name.upper( )
-    pclint_path = siteToolConfig_dict.get( pclint_siteName, None )
+    pclint_path = toolsConfig.get( pclint_siteName, None )
 
-    # If site-tools.py came up empty, find a PC-Lint that supports our target, then update 
-    # site-tools.py
+    # If site_toolsconfig.py came up empty, find a PC-Lint that supports our target, then update
     if not pclint_path:
         pclint_path = _find( env )
         if not pclint_path:
             raise SCons.Errors.StopError( "%s detection failed" % _tool_name )
-        siteToolConfig_dict[pclint_siteName] = pclint_path
-        with open( siteToolConfig_name, "a" ) as outfile:
-            outfile.write( "%s = %r\n\n" % (pclint_siteName, pclint_path) )
+        toolsConfig.update( {pclint_siteName: pclint_path} )
 
     # Now, prepend it to the path
     path, pclint = os.path.split( pclint_path )

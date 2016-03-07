@@ -2,13 +2,11 @@
 cloned off this root.
 """
 
-# TODO support scons -h for build options
-
-
 import os, platform
 from SCons.Defaults import DefaultEnvironment
 from SCons.Subst import SetAllowableExceptions as AllowSubstExceptions
 from SCons.Variables import Variables
+from tools_config import ToolsConfig
 
 
 # Logs for SCons- and script-related warnings that can usually be ignored
@@ -53,3 +51,5 @@ RootEnv["ENV"]["COMSPEC"] = "cmd.exe"
 if not RootEnv["HOST_OS"]: RootEnv["HOST_OS"] = RootEnv["PLATFORM"]
 if not RootEnv["HOST_ARCH"]: RootEnv["HOST_ARCH"] = platform.machine()
 
+# Store compiler autodetection results in a file that the developer can modify
+RootEnv["TOOLS_CONFIG"] = ToolsConfig( "Build/site_toolsconfig.py" )

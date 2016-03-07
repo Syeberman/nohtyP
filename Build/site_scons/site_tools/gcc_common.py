@@ -244,22 +244,19 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
     def generate( env ):
         if env["CONFIGURATION"] not in ("release", "debug"): raise SCons.Errors.StopError( "GCC doesn't support the %r configuration (yet)" % env["CONFIGURATION"] )
 
-        # See if site-tools.py already knows where to find this gcc version
-        siteToolConfig_name, siteToolConfig_dict = env["SITE_TOOLS"]( )
+        # See if site_toolsconfig.py already knows where to find this gcc version
+        toolsConfig = env["TOOLS_CONFIG"]
         gcc_siteName = "%s_%s" % (env["COMPILER"].name.upper( ), env["TARGET_ARCH"].upper( ))
-        gcc_path = siteToolConfig_dict.get( gcc_siteName, "" )
+        gcc_path = toolsConfig.get( gcc_siteName, "" )
         if gcc_path is None:
-            raise SCons.Errors.StopError( "gcc %s.%s (%r) disabled in site-tools.py" % (major, minor, env["TARGET_ARCH"]) )
+            raise SCons.Errors.StopError( "gcc %s.%s (%r) disabled in %s" % (major, minor, env["TARGET_ARCH"], toolsConfig.basename) )
 
-        # If site-tools.py came up empty, find a gcc that supports our target, then update 
-        # site-tools.py
+        # If site_toolsconfig.py came up empty, find a gcc that supports our target, then update
         if not gcc_path:
             gcc_path = _find( env, major, minor, re_dumpversion )
             if not gcc_path:
                 raise SCons.Errors.StopError( "gcc %s.%s (%r) detection failed" % (major, minor, env["TARGET_ARCH"]) )
-            siteToolConfig_dict[gcc_siteName] = gcc_path
-            with open( siteToolConfig_name, "a" ) as outfile:
-                outfile.write( "%s = %r\n\n" % (gcc_siteName, gcc_path) )
+            toolsConfig.update( {gcc_siteName: gcc_path} )
 
         # The tool (ie mingw) may helpfully prepend to path and other variables...so make sure we
         # prepend *our* path after the tool does its thing
@@ -274,8 +271,6 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
             output = output.strip( )
             if re_dumpversion.search( output ) is None: raise SCons.Errors.StopError( "tried finding gcc %s.%s, found %r instead" % (major, minor, output) )
         env.ParseConfig( "$CC -dumpversion", check_version )
-
-        # TODO Add an entry for this compiler in site-tools.py if it doesn't already exist?
 
         ApplyGCCOptions( env, numericVersion )
 

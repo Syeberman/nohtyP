@@ -28,10 +28,7 @@
 \.sconsign\.dblite$
 \.mscommon\.log$
 \.sconscript\.log$
-^Build/site_toolconfig\.py$
-
-# Old name for site_toolconfig.py
-^Build/site-tools\.py$
+^Build/site_toolsconfig\.py$
 
 # Local PLY files
 lextab\.py$

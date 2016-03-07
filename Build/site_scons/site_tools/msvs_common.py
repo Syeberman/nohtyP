@@ -153,37 +153,35 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
         if env["CONFIGURATION"] not in ("release", "debug"): raise SCons.Errors.StopError( "Visual Studio doesn't support the %r configuration (yet)" % env["CONFIGURATION"] )
         env["MSVC_VERSION"] = version
 
-        # Caching INCLUDE, LIB, etc in site-tools.py bypasses the slow vcvars*.bat calls on
+        # Caching INCLUDE, LIB, etc in site_toolsconfig.py bypasses the slow vcvars*.bat calls on
         # subsequent builds
-        siteToolConfig_name, siteToolConfig_dict = env["SITE_TOOLS"]( )
+        toolsConfig = env["TOOLS_CONFIG"]
         var_names = ("INCLUDE", "LIB", "LIBPATH", "PATH")
         compilerName = env["COMPILER"].name
         compilerEnv_name = "%s_%s_ENV" % (compilerName.upper( ), env["TARGET_ARCH"].upper( ))
-        compilerEnv = siteToolConfig_dict.get( compilerEnv_name, {} )
+        compilerEnv = toolsConfig.get( compilerEnv_name, {} )
         if compilerEnv is None:
-            raise SCons.Errors.StopError( "Visual Studio %r (%r) disabled in site-tools.py" % (supportedVersions[0], env["TARGET_ARCH"]) )
+            raise SCons.Errors.StopError( "Visual Studio %r (%r) disabled in %s" % (supportedVersions[0], env["TARGET_ARCH"], toolsConfig.basename) )
 
+        # If there was an entry in site_toolsconfig.py, then explicitly use that environment
         if compilerEnv:
             env["MSVC_USE_SCRIPT"] = None # disable autodetection, vcvars*.bat, etc
             for var_name in var_names:
                 env.PrependENVPath( var_name, compilerEnv[var_name], delete_existing=False )
 
+        # Configures the compiler, including possibly autodetecting the required environment
         _msvsTool.generate( env )
         _msvcTool.generate( env )
         _mslinkTool.generate( env )
         if not env.WhereIs( "$CC" ):
             raise SCons.Errors.StopError( "Visual Studio %r (%r) configuration failed" % (supportedVersions[0], env["TARGET_ARCH"]) )
 
-        # Add an entry for this compiler in site-tools.py if it doesn't already exist
+        # Add an entry for this compiler in site_toolsconfig.py if it doesn't already exist
         if not compilerEnv:
-            compilerEnv = siteToolConfig_dict[compilerEnv_name] = {}
+            compilerEnv = {}
             for var_name in var_names: 
                 compilerEnv[var_name] = env["ENV"][var_name]
-            with open( siteToolConfig_name, "a" ) as outfile:
-                outfile.write( "%s = {\n" % compilerEnv_name )
-                for var_name in var_names:
-                    outfile.write( "    %r: %r,\n" % (var_name, compilerEnv[var_name]) )
-                outfile.write( "}\n\n" )
+            toolsConfig.update( {compilerEnv_name: compilerEnv} )
 
         ApplyMSVSOptions( env, numericVersion )
 
