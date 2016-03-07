@@ -11,6 +11,8 @@ RootEnv.Replace( NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0 )
 
 
 # Adds nohtyP.dll/libnotyP.so/etc as a target in env
+# TODO Combine nohtyP.c and nohtyP.cs into a single DLL
+#   https://blogs.msdn.microsoft.com/junfeng/2005/05/19/how-do-i-mix-c-and-c-code-in-a-single-assembly/
 def nohtyP_SharedLibrary( env ):
     env.PrependUnique(
             CPPPATH=[
@@ -66,13 +68,11 @@ Native Arches: {native_archs}
 """.format( **locals() )
 )
 
+
 # TODO support scons -h for build options
 
 for compiler_name in compiler_names:
     compiler = Tool( compiler_name )
-    if not compiler.exists( RootEnv ): 
-        SconscriptLog.write( "\nCompiler doesn't exist: {}\n".format( compiler_name ) )
-        continue
 
     for targ_os, targ_arch, configuration in itertools.product( oses, archs, configurations ):
         # TODO Support cross-compiling OSes, if possible
@@ -81,7 +81,7 @@ for compiler_name in compiler_names:
         SconscriptLog.write( 
             "\n{compiler_name} {targ_os} {targ_arch} {configuration}\n".format( **locals() ) )
 
-        # Maintain a separate directory for intermediate and target files, but don't copy files
+        # Maintain a separate directory for intermediate and target files, but don't copy source
         variantEnv = RootEnv.Clone( COMPILER=compiler,
                 TARGET_OS=targ_os, TARGET_ARCH=targ_arch, CONFIGURATION=configuration )
         variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (
@@ -93,8 +93,11 @@ for compiler_name in compiler_names:
         except (SCons.Errors.UserError, SCons.Errors.StopError):
             traceback.print_exc( file=SconscriptLog )
             continue
-        #pclintEnv = compilerEnv.Clone( tools=[pclint, ] )
 
+        # These collect all the build and test targets, including:
+        #   - the C and C# builds of the nohtyP shared library
+        #   - yp_test and ypExamples results
+        #   - targets that copy the above to Build/native
         buildTargets = []
         testTargets = []
         
@@ -112,20 +115,26 @@ for compiler_name in compiler_names:
                 traceback.print_exc( file=SconscriptLog )
 
             # Pick one variant from each configuration that matches the host system, and copy it 
-            # to the Build/native directory for easy access
+            # to the Build/native directory for easy access.  nativeTargetsToCreate tracks which
+            # configurations we have yet to pick.
             if configuration in nativeTargetsToCreate:
+                nativeTargetsToCreate.remove( configuration )
                 if configuration == "release":
                     native_dest = "#Build/native"
                 else:
                     native_dest = "#Build/native/"+configuration
                 buildTargets.append( variantEnv.Install( native_dest, buildTargets ) )
                 testTargets.append( variantEnv.Install( native_dest, testTargets ) )
+
+                # Most developers only want to build or test with one variant on their host system.
+                # These aliases make this easy.
                 AliasIfNotEmpty( configuration, buildTargets )
                 AliasIfNotEmpty( "test"+configuration, testTargets )
                 AliasIfNotEmpty( "native", buildTargets )
                 AliasIfNotEmpty( "test", testTargets )
-                nativeTargetsToCreate.remove( configuration )
 
+        # These aliases exist for developers that are looking to test their changes across
+        # multiple, or specific, compilers.
         AliasIfNotEmpty( "all", buildTargets )
         AliasIfNotEmpty( "testall", testTargets )
         heirarchy = (compiler_name, targ_os, targ_arch, configuration)
@@ -134,8 +143,9 @@ for compiler_name in compiler_names:
             AliasIfNotEmpty( heirarchyName, buildTargets )
             AliasIfNotEmpty( "test"+heirarchyName, testTargets )
 
+
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to 
-# build just the native targets
+# build just the native debug and release targets
 if GetOption( "clean" ): Default( "#Build" )
 else: Default( "native" )
 

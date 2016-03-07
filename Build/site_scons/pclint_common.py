@@ -83,7 +83,8 @@ def DefinePClintToolFunctions():
         env["PCLINT"] = pclint
 
     def exists( env ):
-        return True # TODO? _find( env )
+        # We rely on generate to tell us if a tool is available
+        return True
 
     return generate, exists
 
