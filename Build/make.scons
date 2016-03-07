@@ -1,11 +1,13 @@
-import os, os.path, itertools, traceback, platform
+import os, os.path, itertools, traceback
 import SCons.Errors
-
-# TODO support scons -h for build options
 
 # Confirm that scons' top-level directory, the current directory, _is_ the project top
 if not os.path.exists( "nohtyP.c" ):
     Exit( "Run SCons from top project dir (or use make.bat, or scons -C)" )
+
+
+# TODO Scripts to update version numbers in source, build scripts, etc
+RootEnv.Replace( NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0 )
 
 
 # Adds nohtyP.dll/libnotyP.so/etc as a target in env
@@ -35,57 +37,6 @@ def nohtyP_yp_test( env, sharedLib ):
     return testLog
 
 
-# Logs for SCons- and script-related warnings that can usually be ignored
-# TODO Hidden on Windows
-sconscriptLog = open( "Build/.sconscript.log", "w" )
-mscommonLog_path = "Build/.mscommon.log"
-with open( mscommonLog_path, "w" ): pass    # clears the file
-os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath( mscommonLog_path )
-
-# Command-line build variables
-vars = Variables( None )
-
-# Generic build environment applicable to all compilers/targets and used internally by SCons
-rootEnv = DefaultEnvironment( tools=[], variables=vars, SCONSCRIPT_LOG=sconscriptLog )
-
-# Require that only known command-line variables are used
-vars_unknown = vars.UnknownVariables( )
-if vars_unknown: Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
-
-# Require that construction variable names exist at expansion, then add those allowed to be empty
-AllowSubstExceptions( )
-rootEnv.Replace( CPPFLAGS=[], SHCCCOMSTR="", SHLINKCOMSTR="", 
-        SHLIBVERSION="", SHLIBNOVERSIONSYMLINKS="",
-        LIBPATH=[], PCH="",
-        WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="",
-        RPATH=[],
-        )
-
-# Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory
-rootEnv.SConsignFile( os.path.abspath( "Build/.sconsign" ) )
-
-# For dependencies, first consider timestamps, then MD5 checksums
-rootEnv.Decider( "MD5-timestamp" )
-
-# Always use cmd.exe on Windows, regardless of user's shell; ignored on other platforms
-rootEnv["ENV"]["COMSPEC"] = "cmd.exe"
-
-# TODO Scripts to update version numbers in source, build scripts, etc
-rootEnv.Replace( NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0 )
-
-# TODO These Scons environment variables should be cross-platform, not Windows-only
-if not rootEnv["HOST_OS"]: rootEnv["HOST_OS"] = rootEnv["PLATFORM"]
-if not rootEnv["HOST_ARCH"]: rootEnv["HOST_ARCH"] = platform.machine()
-
-# Don't create empty aliases: ensures targets like "test" will fail if Python 3 isn't available
-_SCons_Alias = Alias
-def Alias( alias, targets=(), action=() ):
-    targets = Flatten( targets )
-    action = Flatten( action )
-    if not targets and not action: return alias
-    return _SCons_Alias( alias, targets, action )
-
-
 # Site-specific tool configuration.  For some tools, this caches the results of lengthy
 # auto-detection; for other tools that don't have version-dependent auto-detect, this allows the
 # user to tell us where they put the other versions.
@@ -102,7 +53,7 @@ else:
 def siteToolConfigFunction( ):
     """Returns the file name of site-tools.py, and a dictionary of current variables."""
     return siteToolConfig_name, siteToolConfig_dict
-rootEnv["SITE_TOOLS"] = siteToolConfigFunction # a function so Clone doesn't deepcopy it
+RootEnv["SITE_TOOLS"] = siteToolConfigFunction # a function so Clone doesn't deepcopy it
 
 
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
@@ -115,11 +66,11 @@ archs = ("amd64", "x86")
 # lint against the compiler's headers
 configurations = ("debug", "release")
 
-native_os = rootEnv["HOST_OS"]
-if rootEnv["HOST_ARCH"] == "x86_64":
+native_os = RootEnv["HOST_OS"]
+if RootEnv["HOST_ARCH"] == "x86_64":
     native_archs = ("amd64", "x86")
 else:
-    native_archs = (rootEnv["HOST_ARCH"], )
+    native_archs = (RootEnv["HOST_ARCH"], )
 
 # The native targets ("debug", "release", etc) should each copy files from a single variant
 nativeTargetsToCreate = set( ("debug", "release") )
@@ -128,7 +79,7 @@ nativeTargetsToCreate = set( ("debug", "release") )
 python_min34 = Tool( "python_min34" )
 pclint = Tool( "pclint" )
 
-sconscriptLog.write( """
+SconscriptLog.write( """
 Native OS: {native_os}
 Native Arches: {native_archs}
 """.format( **locals() )
@@ -136,19 +87,19 @@ Native Arches: {native_archs}
 
 for compiler_name in compiler_names:
     compiler = Tool( compiler_name )
-    if not compiler.exists( rootEnv ): 
-        sconscriptLog.write( "\nCompiler doesn't exist: {}\n".format( compiler_name ) )
+    if not compiler.exists( RootEnv ): 
+        SconscriptLog.write( "\nCompiler doesn't exist: {}\n".format( compiler_name ) )
         continue
 
     for targ_os, targ_arch, configuration in itertools.product( oses, archs, configurations ):
         # TODO Support cross-compiling OSes, if possible
         if targ_os != native_os: continue
 
-        sconscriptLog.write( 
+        SconscriptLog.write( 
             "\n{compiler_name} {targ_os} {targ_arch} {configuration}\n".format( **locals() ) )
 
         # Maintain a separate directory for intermediate and target files, but don't copy files
-        variantEnv = rootEnv.Clone( COMPILER=compiler,
+        variantEnv = RootEnv.Clone( COMPILER=compiler,
                 TARGET_OS=targ_os, TARGET_ARCH=targ_arch, CONFIGURATION=configuration )
         variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (
                 compiler_name, targ_os, targ_arch, configuration)
@@ -157,7 +108,7 @@ for compiler_name in compiler_names:
         # Skip compilers that can't be found
         try: compilerEnv = variantEnv.Clone( tools=[compiler, ] )
         except (SCons.Errors.UserError, SCons.Errors.StopError):
-            traceback.print_exc( file=sconscriptLog )
+            traceback.print_exc( file=SconscriptLog )
             continue
         #pclintEnv = compilerEnv.Clone( tools=[pclint, ] )
 
@@ -175,7 +126,7 @@ for compiler_name in compiler_names:
                     nohtyP_yp_test( variantEnv.Clone( tools=[python_min34, ] ), sharedLib ),
                     sharedLib ) )
             except (SCons.Errors.UserError, SCons.Errors.StopError):
-                traceback.print_exc( file=sconscriptLog )
+                traceback.print_exc( file=SconscriptLog )
 
             # Pick one variant from each configuration that matches the host system, and copy it 
             # to the Build/native directory for easy access
@@ -186,19 +137,19 @@ for compiler_name in compiler_names:
                     native_dest = "#Build/native/"+configuration
                 buildTargets.append( variantEnv.Install( native_dest, buildTargets ) )
                 testTargets.append( variantEnv.Install( native_dest, testTargets ) )
-                Alias( configuration, buildTargets )
-                Alias( "test"+configuration, testTargets )
-                Alias( "native", buildTargets )
-                Alias( "test", testTargets )
+                AliasIfNotEmpty( configuration, buildTargets )
+                AliasIfNotEmpty( "test"+configuration, testTargets )
+                AliasIfNotEmpty( "native", buildTargets )
+                AliasIfNotEmpty( "test", testTargets )
                 nativeTargetsToCreate.remove( configuration )
 
-        Alias( "all", buildTargets )
-        Alias( "testall", testTargets )
+        AliasIfNotEmpty( "all", buildTargets )
+        AliasIfNotEmpty( "testall", testTargets )
         heirarchy = (compiler_name, targ_os, targ_arch, configuration)
         for heirarchyDepth in range( 1, len( heirarchy ) ):
             heirarchyName = "_".join( heirarchy[:heirarchyDepth] )
-            Alias( heirarchyName, buildTargets )
-            Alias( "test"+heirarchyName, testTargets )
+            AliasIfNotEmpty( heirarchyName, buildTargets )
+            AliasIfNotEmpty( "test"+heirarchyName, testTargets )
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to 
 # build just the native targets
