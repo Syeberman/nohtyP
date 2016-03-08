@@ -31,7 +31,7 @@ if vars_unknown: RootEnv.Exit( "Unknown variables: %r" % vars_unknown.keys( ) )
 
 # Require that construction variable names exist at expansion, then add those allowed to be empty
 AllowSubstExceptions( )
-RootEnv.Replace( CPPFLAGS=[], SHCCCOMSTR="", SHLINKCOMSTR="", 
+RootEnv.Replace( CPPFLAGS=[], PPCCCOMSTR="", SHCCCOMSTR="", SHLINKCOMSTR="", 
     SHLIBVERSION="", SHLIBNOVERSIONSYMLINKS="",
     LIBPATH=[], PCH="",
     WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="",

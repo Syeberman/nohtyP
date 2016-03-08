@@ -5,6 +5,7 @@ import SCons.Errors
 import SCons.Platform
 import SCons.Tool
 import SCons.Warnings
+import cc_preprocessed
 
 # TODO Add at least 3.4.6 (2006), 4.2.4 (2007+), 4.4.7 (2009+), 4.6.4 (2011+)
 
@@ -258,10 +259,12 @@ def DefineGCCToolFunctions( numericVersion, major, minor ):
                 raise SCons.Errors.StopError( "gcc %s.%s (%r) detection failed" % (major, minor, env["TARGET_ARCH"]) )
             toolsConfig.update( {gcc_siteName: gcc_path} )
 
-        # The tool (ie mingw) may helpfully prepend to path and other variables...so make sure we
-        # prepend *our* path after the tool does its thing
         # TODO Update SCons to skip autodetection when requested
         for tool in _tools: tool.generate( env )
+        cc_preprocessed.generate_PreprocessedBuilder( env )
+
+        # The tool (ie mingw) may helpfully prepend to path and other variables...so make sure we
+        # prepend *our* path after the tool does its thing
         env.PrependENVPath( "PATH", os.path.dirname( gcc_path ) )
         env["CC"] = os.path.basename( gcc_path )
         del env["CXX"]  # TODO provide proper path when we need it

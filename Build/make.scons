@@ -25,7 +25,8 @@ def nohtyP_SharedLibrary( env ):
         ],
         PDB="$VTOP/nohtyP.pdb", LIBS="",
     )
-    return (env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ), )
+    return (env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
+        env.Preprocessed( "$VTOP/TESTING", source="$VTOP/nohtyP.c" ) )
 
 
 def nohtyP_yp_test( env, sharedLib ):
