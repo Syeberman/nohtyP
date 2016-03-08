@@ -1,8 +1,10 @@
+"""Provides a Preprocessed action for the Microsoft Visual Studio compilers.
+"""
 
 import os
 import SCons.Action
 import SCons.Util
-from preprocessed_builder import createPreprocessedBuilder
+import preprocessed_builder
 
 # XXX These are internal to SCons and may change in the future...but it's unlikely
 from SCons.Tool.msvc import CSuffixes, CXXSuffixes, msvc_batch_key
@@ -11,8 +13,10 @@ from SCons.Tool.msvc import CSuffixes, CXXSuffixes, msvc_batch_key
 
 
 def _preprocessed_emitter(target, source, env, suffix):
-    for t in target:
-        SCons.Util.adjustixes(t, "", suffix, ensure_suffix=False)
+    target = [
+        SCons.Util.adjustixes(str(t), "", suffix, ensure_suffix=False)
+        for t in target
+    ]
     return (target, source)
 
 def c_preprocessed_emitter(target, source, env):
@@ -59,7 +63,7 @@ CXXPreprocessedAction = SCons.Action.Action("$PPCXXCOM", "$PPCXXCOMSTR",
 
 
 def generate_PreprocessedBuilder(env):
-    preprocessed = createPreprocessedBuilder(env)
+    preprocessed = preprocessed_builder.createPreprocessedBuilder(env)
 
     for suffix in CSuffixes:
         preprocessed.add_action(suffix, CPreprocessedAction)
@@ -69,14 +73,11 @@ def generate_PreprocessedBuilder(env):
         preprocessed.add_action(suffix, CXXPreprocessedAction)
         preprocessed.add_emitter(suffix, cxx_preprocessed_emitter)
 
-    # CCPP is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
-    # TODO See _MSVC_OUTPUT_FLAG: the string below may not work in batch mode
-    # TODO Create PPCC, PPCFLAGS, PPCCFLAGS just like SHCC/etc, and contribute back to SCons?
-    # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
-    env['PPCCCOM'] = '${TEMPFILE("$CC /P /Fi$TARGET /c $CHANGED_SOURCES $CFLAGS $CCFLAGS $_CCCOMCOM","$CCCOMSTR")}'
 
     env['_MSVC_PP_OUTPUT_FLAG'] = msvc_pp_output_flag
 
+    # PPCC is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
+    # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
     env['PPCC']       = '$CC'
     env['PPCCFLAGS']  = SCons.Util.CLVar('$CCFLAGS')
     env['PPCFLAGS']   = SCons.Util.CLVar('$CFLAGS')

@@ -5,7 +5,7 @@ import SCons.Errors
 import SCons.Tool
 import SCons.Tool.MSCommon.vs
 import SCons.Warnings
-from msvs_preprocessed import generate_PreprocessedBuilder
+import msvs_preprocessed
 
 
 # Disables "MSVC_USE_SCRIPT set to False" warnings.  Unfortunately, also disables "No version of 
@@ -169,7 +169,7 @@ def DefineMSVSToolFunctions( numericVersion, supportedVersions ):
         _msvsTool.generate( env )
         _msvcTool.generate( env )
         _mslinkTool.generate( env )
-        generate_PreprocessedBuilder( env )
+        msvs_preprocessed.generate_PreprocessedBuilder( env )
         if not env.WhereIs( "$CC" ):
             raise SCons.Errors.StopError( "Visual Studio %r (%r) configuration failed" % (supportedVersions[0], env["TARGET_ARCH"]) )
 
