@@ -31,7 +31,7 @@ def _arch2maxsize( targ_arch ):
             "amd64": 0x7FFFFFFFFFFFFFFF,
             }
     try: opts = arch2opts[targ_arch]
-    except KeyError: SCons.Errors.StopError( "not yet supporting %r with python" % targ_arch )
+    except KeyError: raise SCons.Errors.StopError( "not yet supporting %r with python" % targ_arch )
     return opts
 
 _test_python_cache = {}
