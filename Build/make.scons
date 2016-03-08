@@ -25,8 +25,7 @@ def nohtyP_SharedLibrary( env ):
         ],
         PDB="$VTOP/nohtyP.pdb", LIBS="",
     )
-    return (env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ),
-        env.Preprocessed( "$VTOP/TESTING", source="$VTOP/nohtyP.c" ) )
+    return (env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ), )
 
 
 def nohtyP_yp_test( env, sharedLib ):
@@ -39,6 +38,20 @@ def nohtyP_yp_test( env, sharedLib ):
             "$PYTHON -m yp_test -v > $TARGET" )
     Clean( sharedLib, testLog )
     return testLog
+
+
+def nohtyP_checkapi( env ):
+    # nohtyP.h contains very few PP conditionals, so not much needs to be set up.  Preprocessed
+    # only recognizes .c (etc) files so we make a copy with that extension.
+    env.PrependUnique( CPPPATH=["#", ], PDB="", LIBS="" )
+    headerDotC = env.Command( "$VTOP/checkapi.nohtyP.h.c", "$VTOP/nohtyP.h",
+            Copy( "$TARGET", "$SOURCE" ) )
+    preprocessed = env.Preprocessed( "$VTOP/checkapi.nohtyP.h.i", source=headerDotC )
+
+    # TODO Have checkapi write directly to the file
+    checkapiLog = env.Command( "$VTOP/checkapi.log", preprocessed,
+            "$PYTHON Lib/checkapi.py $SOURCE > $TARGET" )
+    return checkapiLog
 
 
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
@@ -96,15 +109,20 @@ for compiler_name in compiler_names:
             traceback.print_exc( file=SconscriptLog )
             continue
 
-        # These collect all the build and test targets, including:
+        # These collect all the build, test, and analysis targets, including:
         #   - the C and C# builds of the nohtyP shared library
         #   - yp_test and ypExamples results
+        #   - checkapi.py, PC-lint, expanded compiler warnings
         #   - targets that copy the above to Build/native
         buildTargets = []
         testTargets = []
+        analysisTargets = []
         
         sharedLib = nohtyP_SharedLibrary( compilerEnv.Clone( ) )
         buildTargets.append( sharedLib )
+
+        checkapiLog = nohtyP_checkapi( compilerEnv.Clone( tools=[python_min34, ] ) )
+        analysisTargets.append( checkapiLog )
 
         if targ_os == native_os and targ_arch in native_archs:
             # We can only run yp_test on native OS and architectures, and only if a version
@@ -127,23 +145,28 @@ for compiler_name in compiler_names:
                     native_dest = "#Build/native/"+configuration
                 buildTargets.append( variantEnv.Install( native_dest, buildTargets ) )
                 testTargets.append( variantEnv.Install( native_dest, testTargets ) )
+                analysisTargets.append( variantEnv.Install( native_dest, analysisTargets ) )
 
                 # Most developers only want to build or test with one variant on their host system.
                 # These aliases make this easy.
                 AliasIfNotEmpty( configuration, buildTargets )
                 AliasIfNotEmpty( "test"+configuration, testTargets )
+                AliasIfNotEmpty( "analysis"+configuration, analysisTargets )
                 AliasIfNotEmpty( "native", buildTargets )
                 AliasIfNotEmpty( "test", testTargets )
+                AliasIfNotEmpty( "analysis", analysisTargets )
 
         # These aliases exist for developers that are looking to test their changes across
         # multiple, or specific, compilers.
         AliasIfNotEmpty( "all", buildTargets )
         AliasIfNotEmpty( "testall", testTargets )
+        AliasIfNotEmpty( "analysisall", analysisTargets )
         heirarchy = (compiler_name, targ_os, targ_arch, configuration)
         for heirarchyDepth in range( 1, len( heirarchy ) ):
             heirarchyName = "_".join( heirarchy[:heirarchyDepth] )
             AliasIfNotEmpty( heirarchyName, buildTargets )
             AliasIfNotEmpty( "test"+heirarchyName, testTargets )
+            AliasIfNotEmpty( "analysis"+heirarchyName, analysisTargets )
 
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to 

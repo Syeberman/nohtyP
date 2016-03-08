@@ -4,7 +4,7 @@ Author: Sye van der Veen
 Date: May 19, 2014
 """
 
-import re, copy, collections
+import sys, re, copy, collections
 
 # TODO remove these hard-coded paths
 CppPath = "../pycparser/utils/cpp"
@@ -131,16 +131,17 @@ def ReportOnVariants( header, *, print=print ):
         print( )
 
 
-def CheckApi( filename, *, print=print ):
+def CheckApi( filepath, *, print=print ):
     """Reports potential problems in nohtyP.h (and related files)."""
     # TODO improve cpp_args
-    ast = parse_file( filename, use_cpp=True, cpp_path=CppPath, cpp_args=CppArgs )
+    ast = parse_file( filepath )
     header = ApiVisitor( )
     header.visit( ast )
 
     ReportOnVariants( header, print=print )
 
 
+# TODO: Proper command line arguments, configurable output file
 if __name__ == "__main__":
-    CheckApi( "nohtyP.h" )
+    CheckApi( sys.argv[1] )
 

@@ -39,6 +39,9 @@ def msvc_pp_output_flag(target, source, env, for_signature):
     directory (where the Visual C/C++ compiler will put the .i files).
     """
 
+    # TODO /Fi is not supported on Visual Studio 9.00 (2008) and earlier
+    #   https://msdn.microsoft.com/en-us/library/8z9z0bx6(v=vs.90).aspx
+
     # Fixing MSVC_BATCH mode. Previous if did not work when MSVC_BATCH
     # was set to False. This new version should work better. Removed
     # len(source)==1 as batch mode can compile only one file
