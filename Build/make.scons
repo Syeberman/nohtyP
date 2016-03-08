@@ -44,9 +44,9 @@ def nohtyP_checkapi( env ):
     # nohtyP.h contains very few PP conditionals, so not much needs to be set up.  Preprocessed
     # only recognizes .c (etc) files so we make a copy with that extension.
     env.PrependUnique( CPPPATH=["#", ], PDB="", LIBS="" )
-    headerDotC = env.Command( "$VTOP/checkapi.nohtyP.h.c", "$VTOP/nohtyP.h",
+    headerDotC = env.Command( "$VTOP/checkapi/nohtyP_h.c", "$VTOP/nohtyP.h",
             Copy( "$TARGET", "$SOURCE" ) )
-    preprocessed = env.Preprocessed( "$VTOP/checkapi.nohtyP.h.i", source=headerDotC )
+    preprocessed = env.Preprocessed( "$VTOP/checkapi/nohtyP_h", source=headerDotC )
 
     # TODO Have checkapi write directly to the file
     checkapiLog = env.Command( "$VTOP/checkapi.log", preprocessed,
@@ -73,8 +73,8 @@ else:
 # The native targets ("debug", "release", etc) should each copy files from a single variant
 nativeTargetsToCreate = set( ("debug", "release") )
 
-# yp_test requires at least Python 3.4; we don't care which PC-Lint version is used
-python_min34 = Tool( "python_min34" )
+python_3 = Tool( "python_3" )
+python_min34 = Tool( "python_min34" )   # yp_test requires at least Python 3.4
 pclint = Tool( "pclint" )
 
 SconscriptLog.write( """
@@ -121,8 +121,10 @@ for compiler_name in compiler_names:
         sharedLib = nohtyP_SharedLibrary( compilerEnv.Clone( ) )
         buildTargets.append( sharedLib )
 
-        checkapiLog = nohtyP_checkapi( compilerEnv.Clone( tools=[python_min34, ] ) )
-        analysisTargets.append( checkapiLog )
+        try: analysisTargets.append( 
+                nohtyP_checkapi( compilerEnv.Clone( tools=[python_3, ] ) ) )
+        except (SCons.Errors.UserError, SCons.Errors.StopError):
+            traceback.print_exc( file=SconscriptLog )
 
         if targ_os == native_os and targ_arch in native_archs:
             # We can only run yp_test on native OS and architectures, and only if a version
