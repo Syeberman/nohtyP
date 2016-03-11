@@ -116,12 +116,12 @@ for compiler_name in compiler_names:
         #   - targets that copy the above to Build/native
         buildTargets = []
         testTargets = []
-        analysisTargets = []
+        analyzeTargets = []
         
         sharedLib = nohtyP_SharedLibrary( compilerEnv.Clone( ) )
         buildTargets.append( sharedLib )
 
-        try: analysisTargets.append( 
+        try: analyzeTargets.append( 
                 nohtyP_checkapi( compilerEnv.Clone( tools=[python_3, ] ) ) )
         except (SCons.Errors.UserError, SCons.Errors.StopError):
             traceback.print_exc( file=SconscriptLog )
@@ -147,28 +147,28 @@ for compiler_name in compiler_names:
                     native_dest = "#Build/native/"+configuration
                 buildTargets.append( variantEnv.Install( native_dest, buildTargets ) )
                 testTargets.append( variantEnv.Install( native_dest, testTargets ) )
-                analysisTargets.append( variantEnv.Install( native_dest, analysisTargets ) )
+                analyzeTargets.append( variantEnv.Install( native_dest, analyzeTargets ) )
 
                 # Most developers only want to build or test with one variant on their host system.
                 # These aliases make this easy.
                 AliasIfNotEmpty( configuration, buildTargets )
                 AliasIfNotEmpty( "test"+configuration, testTargets )
-                AliasIfNotEmpty( "analysis"+configuration, analysisTargets )
+                AliasIfNotEmpty( "analyze"+configuration, analyzeTargets )
                 AliasIfNotEmpty( "native", buildTargets )
                 AliasIfNotEmpty( "test", testTargets )
-                AliasIfNotEmpty( "analysis", analysisTargets )
+                AliasIfNotEmpty( "analyze", analyzeTargets )
 
         # These aliases exist for developers that are looking to test their changes across
         # multiple, or specific, compilers.
         AliasIfNotEmpty( "all", buildTargets )
         AliasIfNotEmpty( "testall", testTargets )
-        AliasIfNotEmpty( "analysisall", analysisTargets )
+        AliasIfNotEmpty( "analyzeall", analyzeTargets )
         heirarchy = (compiler_name, targ_os, targ_arch, configuration)
         for heirarchyDepth in range( 1, len( heirarchy ) ):
             heirarchyName = "_".join( heirarchy[:heirarchyDepth] )
             AliasIfNotEmpty( heirarchyName, buildTargets )
             AliasIfNotEmpty( "test"+heirarchyName, testTargets )
-            AliasIfNotEmpty( "analysis"+heirarchyName, analysisTargets )
+            AliasIfNotEmpty( "analyze"+heirarchyName, analyzeTargets )
 
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to 
