@@ -50,7 +50,8 @@ def nohtyP_checkapi( env ):
     preprocessed = env.Preprocessed( "$VTOP/checkapi/nohtyP_h", source=headerDotC )
 
     # TODO Have checkapi write directly to the file
-    checkapiLog = env.Command( "$VTOP/checkapi.log", preprocessed,
+    scripts = (Glob("#/Tools/checkapi/*.py"), )
+    checkapiLog = env.Command( "$VTOP/checkapi.log", (preprocessed, scripts),
             "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET" )
     return checkapiLog
 
