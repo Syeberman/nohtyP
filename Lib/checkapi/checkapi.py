@@ -5,11 +5,10 @@ Date: May 19, 2014
 """
 
 import sys, re, copy, collections
-
-# TODO remove these hard-coded paths
-CppPath = "../pycparser/utils/cpp"
-CppArgs = "-I../pycparser/utils/fake_libc_include"
 from pycparser import c_generator, c_ast, parse_file
+
+# TODO fake_libc_include doesn't have proper limits or defines for 32- and 64-bit systems
+# (does it matter for our purposes?)
 
 
 ##

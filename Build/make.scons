@@ -42,15 +42,16 @@ def nohtyP_yp_test( env, sharedLib ):
 
 def nohtyP_checkapi( env ):
     # nohtyP.h contains very few PP conditionals, so not much needs to be set up.  Preprocessed
-    # only recognizes .c (etc) files so we make a copy with that extension.
-    env.PrependUnique( CPPPATH=["#", ], PDB="", LIBS="" )
+    # only recognizes .c (etc) files so we make a copy with that extension.  Use dummy versions
+    # of standard headers that work well with pycparser.
+    env.PrependUnique( CPPPATH=["#", "#/Lib/checkapi/fake_libc_include"], PDB="", LIBS="" )
     headerDotC = env.Command( "$VTOP/checkapi/nohtyP_h.c", "$VTOP/nohtyP.h",
             Copy( "$TARGET", "$SOURCE" ) )
     preprocessed = env.Preprocessed( "$VTOP/checkapi/nohtyP_h", source=headerDotC )
 
     # TODO Have checkapi write directly to the file
     checkapiLog = env.Command( "$VTOP/checkapi.log", preprocessed,
-            "$PYTHON Lib/checkapi.py $SOURCE > $TARGET" )
+            "$PYTHON Lib/checkapi/checkapi.py $SOURCE > $TARGET" )
     return checkapiLog
 
 
