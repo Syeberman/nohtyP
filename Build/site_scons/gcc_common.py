@@ -24,8 +24,8 @@ if _platform_name in ("win32", "cygwin"):
                                         # C:\Program Files\mingw-builds\x64-4.8.1-win32-seh-rev5\mingw64
             "C:\\Program Files (x86)\\mingw-builds\\*\\*\\bin",
             # Win-builds (http://win-builds.org/)
-            "C:\\win-builds-*\\bin",    # C:\win-builds-32, C:\win-builds-64, C:\win-builds-64-1.3
-            "C:\\win-builds-*\\*\\bin", # C:\win-builds-64\1.3
+            "C:\\win-builds*\\bin",    # C:\win-builds-32, C:\win-builds-64, C:\win-builds-64-1.3
+            "C:\\win-builds*\\*\\bin", # C:\win-builds-64\1.3
             # Official MinGW (http://www.mingw.org/)
             "C:\\MinGW*\\bin",          # C:\MinGW, C:\MinGW0.5, C:\MinGW_0.5
             "C:\\MinGW\\*\\bin",        # C:\MinGW\0.5
