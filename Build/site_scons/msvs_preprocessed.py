@@ -19,9 +19,11 @@ def _preprocessed_emitter(target, source, env, suffix):
     ]
     return (target, source)
 
+
 def c_preprocessed_emitter(target, source, env):
     suffix = env.subst('$CPREPROCESSEDSUFFIX')
     return _preprocessed_emitter(target, source, env, suffix)
+
 
 def cxx_preprocessed_emitter(target, source, env):
     suffix = env.subst('$CXXPREPROCESSEDSUFFIX')
@@ -76,16 +78,14 @@ def generate_PreprocessedBuilder(env):
         preprocessed.add_action(suffix, CXXPreprocessedAction)
         preprocessed.add_emitter(suffix, cxx_preprocessed_emitter)
 
-
     env['_MSVC_PP_OUTPUT_FLAG'] = msvc_pp_output_flag
 
     # PPCC is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
-    env['PPCC']       = '$CC'
-    env['PPCCFLAGS']  = SCons.Util.CLVar('$CCFLAGS')
-    env['PPCFLAGS']   = SCons.Util.CLVar('$CFLAGS')
-    env['PPCCCOM']    = '${TEMPFILE("$PPCC /P $_MSVC_PP_OUTPUT_FLAG /c $CHANGED_SOURCES $PPCFLAGS $PPCCFLAGS $_CCCOMCOM","$PPCCCOMSTR")}'
-    env['PPCXX']      = '$CXX'
+    env['PPCC'] = '$CC'
+    env['PPCCFLAGS'] = SCons.Util.CLVar('$CCFLAGS')
+    env['PPCFLAGS'] = SCons.Util.CLVar('$CFLAGS')
+    env['PPCCCOM'] = '${TEMPFILE("$PPCC /P $_MSVC_PP_OUTPUT_FLAG /c $CHANGED_SOURCES $PPCFLAGS $PPCCFLAGS $_CCCOMCOM","$PPCCCOMSTR")}'
+    env['PPCXX'] = '$CXX'
     env['PPCXXFLAGS'] = SCons.Util.CLVar('$CXXFLAGS')
-    env['PPCXXCOM']   = '${TEMPFILE("$PPCXX /P $_MSVC_PP_OUTPUT_FLAG /c $CHANGED_SOURCES $PPCXXFLAGS $PPCCFLAGS $_CCCOMCOM","$PPCXXCOMSTR")}'
-
+    env['PPCXXCOM'] = '${TEMPFILE("$PPCXX /P $_MSVC_PP_OUTPUT_FLAG /c $CHANGED_SOURCES $PPCXXFLAGS $PPCCFLAGS $_CCCOMCOM","$PPCXXCOMSTR")}'
