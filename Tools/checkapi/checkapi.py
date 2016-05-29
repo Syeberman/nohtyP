@@ -4,16 +4,15 @@ Author: Sye van der Veen
 Date: May 19, 2014
 """
 
-import sys, collections
+import sys
 from parse_header import ParseHeader
+from api_warnings import CheckEllipsisFunctions
 
 # TODO fake_libc_include doesn't have proper limits or defines for 32- and 64-bit systems
 # (does it matter for our purposes?)
 
 
 # TODO Checks to implement
-#   - ellipsis preceeded by int n
-#   - ellipsis is in an N or K (va_list is NV or KV)
 #   - every (with exceptions) N or K has a NV or KV
 #   - every N or K has a variant that takes a ypObject* in its place
 #   - exc is always ypObject ** and used in C, F, L, and E
@@ -35,24 +34,31 @@ from parse_header import ParseHeader
 #   - for functions that return yp_None for success or exactly one exception type, convert to a
 #   boolean (on the assumption that it's quicker to test)
 
-def ReportOnVariants( header, *, print=print ):
+def ReportOnVariants(header, *, print=print):
     """Report the functions that belong to the same group, and which is the unadorned version."""
-    for root, funcs in sorted( header.IterFunctionRoots() ):
-        if len( funcs ) < 2: continue
-        #if not any( x.name[-1].isdigit( ) for x in funcs ): continue
-        funcs = sorted( funcs, key=lambda x: x.postfixes )
-        print( root )
-        for func in funcs: print( "    ", func )
-        print( )
+    for root, funcsIter in sorted(header.IterFunctionRoots()):
+        funcs = sorted(funcsIter, key=lambda x: x.postfixes)
+        if len(funcs) < 2:
+            continue
+        # if not any( x.name[-1].isdigit( ) for x in funcs ): continue
+        print(root)
+        for func in funcs:
+            print("    ", func)
+        print()
 
 
-def CheckApi( filepath, *, print=print ):
+def CheckApi(filepath, *, print=print):
     """Reports potential problems in nohtyP.h (and related files)."""
-    header = ParseHeader( filepath )
-    ReportOnVariants( header, print=print )
+    header = ParseHeader(filepath)
+
+    warnings = []
+    CheckEllipsisFunctions(warnings, header)
+    for warning in warnings:
+        print(warning)
+
+    ReportOnVariants(header, print=print)
 
 
 # TODO: Proper command line arguments, configurable output file
 if __name__ == "__main__":
-    CheckApi( sys.argv[1] )
-
+    CheckApi(sys.argv[1])
