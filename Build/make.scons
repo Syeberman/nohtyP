@@ -1,19 +1,22 @@
-import os, os.path, itertools, traceback
+import os
+import os.path
+import itertools
+import traceback
 import SCons.Errors
 
 # Confirm that scons' top-level directory, the current directory, _is_ the project top
-if not os.path.exists( "nohtyP.c" ):
-    Exit( "Run SCons from top project dir (or use make.bat, or scons -C)" )
+if not os.path.exists("nohtyP.c"):
+    Exit("Run SCons from top project dir (or use make.bat, or scons -C)")
 
 
 # TODO Scripts to update version numbers in source, build scripts, etc
-RootEnv.Replace( NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0 )
+RootEnv.Replace(NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0)
 
 
 # Adds nohtyP.dll/libnotyP.so/etc as a target in env
 # TODO Combine nohtyP.c and nohtyP.cs into a single DLL
 #   https://blogs.msdn.microsoft.com/junfeng/2005/05/19/how-do-i-mix-c-and-c-code-in-a-single-assembly/
-def nohtyP_SharedLibrary( env ):
+def nohtyP_SharedLibrary(env):
     env.PrependUnique(
         CPPPATH=[
             "#",
@@ -25,34 +28,34 @@ def nohtyP_SharedLibrary( env ):
         ],
         PDB="$VTOP/nohtyP.pdb", LIBS="",
     )
-    return (env.SharedLibrary( "$VTOP/nohtyP", source="$VTOP/nohtyP.c" ), )
+    return (env.SharedLibrary("$VTOP/nohtyP", source="$VTOP/nohtyP.c"), )
 
 
-def nohtyP_yp_test( env, sharedLib ):
-    sharedLibDir = Flatten( sharedLib )[0].get_dir( )
-    env.PrependENVPath( "PYTHONPATH", "#/Lib" )
-    env.PrependENVPath( "PATH", sharedLibDir ) # Windows
-    env.PrependENVPath( "LD_LIBRARY_PATH", sharedLibDir ) # Linux
+def nohtyP_yp_test(env, sharedLib):
+    sharedLibDir = Flatten(sharedLib)[0].get_dir()
+    env.PrependENVPath("PYTHONPATH", "#/Lib")
+    env.PrependENVPath("PATH", sharedLibDir)  # Windows
+    env.PrependENVPath("LD_LIBRARY_PATH", sharedLibDir)  # Linux
     scripts = ("#/Lib/yp.py", Glob("#/Lib/yp_test/*.py"), Glob("#/Lib/yp_test/*.txt"))
-    testLog = env.Command( "$VTOP/yp_test.log", (sharedLib, scripts),
-            "$PYTHON -m yp_test -v > $TARGET" )
-    Clean( sharedLib, testLog )
+    testLog = env.Command("$VTOP/yp_test.log", (sharedLib, scripts),
+                          "$PYTHON -m yp_test -v > $TARGET")
+    Clean(sharedLib, testLog)
     return testLog
 
 
-def nohtyP_checkapi( env ):
+def nohtyP_checkapi(env):
     # nohtyP.h contains very few PP conditionals, so not much needs to be set up.  Preprocessed
     # only recognizes .c (etc) files so we make a copy with that extension.  Use dummy versions
     # of standard headers that work well with pycparser.
-    env.PrependUnique( CPPPATH=["#", "#/Tools/checkapi/fake_libc_include"], PDB="", LIBS="" )
-    headerDotC = env.Command( "$VTOP/checkapi/nohtyP_h.c", "$VTOP/nohtyP.h",
-            Copy( "$TARGET", "$SOURCE" ) )
-    preprocessed = env.Preprocessed( "$VTOP/checkapi/nohtyP_h", source=headerDotC )
+    env.PrependUnique(CPPPATH=["#", "#/Tools/checkapi/fake_libc_include"], PDB="", LIBS="")
+    headerDotC = env.Command("$VTOP/checkapi/nohtyP_h.c", "$VTOP/nohtyP.h",
+                             Copy("$TARGET", "$SOURCE"))
+    preprocessed = env.Preprocessed("$VTOP/checkapi/nohtyP_h", source=headerDotC)
 
     # TODO Have checkapi write directly to the file
     scripts = (Glob("#/Tools/checkapi/*.py"), )
-    checkapiLog = env.Command( "$VTOP/checkapi.log", (preprocessed, scripts),
-            "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET" )
+    checkapiLog = env.Command("$VTOP/checkapi.log", (preprocessed, scripts),
+                              "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET")
     return checkapiLog
 
 
@@ -73,11 +76,11 @@ else:
     native_archs = (RootEnv["HOST_ARCH"], )
 
 # The native targets ("debug", "release", etc) should each copy files from a single variant
-nativeTargetsToCreate = set( ("debug", "release") )
+nativeTargetsToCreate = set(("debug", "release"))
 
-python_3 = Tool( "python_3" )
-python_min34 = Tool( "python_min34" )   # yp_test requires at least Python 3.4
-pclint = Tool( "pclint" )
+python_3 = Tool("python_3")
+python_min34 = Tool("python_min34")   # yp_test requires at least Python 3.4
+pclint = Tool("pclint")
 
 SconscriptLog.write( """
 Native OS: {native_os}
@@ -89,26 +92,28 @@ Native Arches: {native_archs}
 # TODO support scons -h for build options
 
 for compiler_name in compiler_names:
-    compiler = Tool( compiler_name )
+    compiler = Tool(compiler_name)
 
-    for targ_os, targ_arch, configuration in itertools.product( oses, archs, configurations ):
+    for targ_os, targ_arch, configuration in itertools.product(oses, archs, configurations):
         # TODO Support cross-compiling OSes, if possible
-        if targ_os != native_os: continue
+        if targ_os != native_os:
+            continue
 
-        SconscriptLog.write( 
-            "\n{compiler_name} {targ_os} {targ_arch} {configuration}\n".format( **locals() ) )
+        SconscriptLog.write(
+            "\n{compiler_name} {targ_os} {targ_arch} {configuration}\n".format(**locals()))
 
         # Maintain a separate directory for intermediate and target files, but don't copy source
-        variantEnv = RootEnv.Clone( COMPILER=compiler,
-                TARGET_OS=targ_os, TARGET_ARCH=targ_arch, CONFIGURATION=configuration )
+        variantEnv = RootEnv.Clone(COMPILER=compiler,
+                                   TARGET_OS=targ_os, TARGET_ARCH=targ_arch, CONFIGURATION=configuration)
         variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (
-                compiler_name, targ_os, targ_arch, configuration)
-        variantEnv.VariantDir( "$VTOP", "#", duplicate=False )
+            compiler_name, targ_os, targ_arch, configuration)
+        variantEnv.VariantDir("$VTOP", "#", duplicate=False)
 
         # Skip compilers that can't be found
-        try: compilerEnv = variantEnv.Clone( tools=[compiler, ] )
+        try:
+            compilerEnv = variantEnv.Clone(tools=[compiler, ])
         except (SCons.Errors.UserError, SCons.Errors.StopError):
-            traceback.print_exc( file=SconscriptLog )
+            traceback.print_exc(file=SconscriptLog)
             continue
 
         # These collect all the build, test, and analysis targets, including:
@@ -119,62 +124,65 @@ for compiler_name in compiler_names:
         buildTargets = []
         testTargets = []
         analyzeTargets = []
-        
-        sharedLib = nohtyP_SharedLibrary( compilerEnv.Clone( ) )
-        buildTargets.append( sharedLib )
 
-        try: analyzeTargets.append( 
-                nohtyP_checkapi( compilerEnv.Clone( tools=[python_3, ] ) ) )
+        sharedLib = nohtyP_SharedLibrary(compilerEnv.Clone())
+        buildTargets.append(sharedLib)
+
+        try:
+            analyzeTargets.append(
+                nohtyP_checkapi(compilerEnv.Clone(tools=[python_3, ])))
         except (SCons.Errors.UserError, SCons.Errors.StopError):
-            traceback.print_exc( file=SconscriptLog )
+            traceback.print_exc(file=SconscriptLog)
 
         if targ_os == native_os and targ_arch in native_archs:
             # We can only run yp_test on native OS and architectures, and only if a version
             # of Python exists that can run against the target architecture.  Include sharedLib
             # in testTargets so that "testrelease" will pull them into the native directory.
-            try: testTargets.extend( (
-                    nohtyP_yp_test( variantEnv.Clone( tools=[python_min34, ] ), sharedLib ),
-                    sharedLib ) )
+            try:
+                testTargets.extend((
+                    nohtyP_yp_test(variantEnv.Clone(tools=[python_min34, ]), sharedLib),
+                    sharedLib))
             except (SCons.Errors.UserError, SCons.Errors.StopError):
-                traceback.print_exc( file=SconscriptLog )
+                traceback.print_exc(file=SconscriptLog)
 
-            # Pick one variant from each configuration that matches the host system, and copy it 
+            # Pick one variant from each configuration that matches the host system, and copy it
             # to the Build/native directory for easy access.  nativeTargetsToCreate tracks which
             # configurations we have yet to pick.
             if configuration in nativeTargetsToCreate:
-                nativeTargetsToCreate.remove( configuration )
+                nativeTargetsToCreate.remove(configuration)
                 if configuration == "release":
                     native_dest = "#Build/native"
                 else:
                     native_dest = "#Build/native/"+configuration
-                buildTargets.append( variantEnv.Install( native_dest, buildTargets ) )
-                testTargets.append( variantEnv.Install( native_dest, testTargets ) )
-                analyzeTargets.append( variantEnv.Install( native_dest, analyzeTargets ) )
+                buildTargets.append(variantEnv.Install(native_dest, buildTargets))
+                testTargets.append(variantEnv.Install(native_dest, testTargets))
+                analyzeTargets.append(variantEnv.Install(native_dest, analyzeTargets))
 
                 # Most developers only want to build or test with one variant on their host system.
                 # These aliases make this easy.
-                AliasIfNotEmpty( configuration, buildTargets )
-                AliasIfNotEmpty( "test"+configuration, testTargets )
-                AliasIfNotEmpty( "analyze"+configuration, analyzeTargets )
-                AliasIfNotEmpty( "native", buildTargets )
-                AliasIfNotEmpty( "test", testTargets )
-                AliasIfNotEmpty( "analyze", analyzeTargets )
+                AliasIfNotEmpty(configuration, buildTargets)
+                AliasIfNotEmpty("test"+configuration, testTargets)
+                AliasIfNotEmpty("analyze"+configuration, analyzeTargets)
+                AliasIfNotEmpty("native", buildTargets)
+                AliasIfNotEmpty("test", testTargets)
+                AliasIfNotEmpty("analyze", analyzeTargets)
 
         # These aliases exist for developers that are looking to test their changes across
         # multiple, or specific, compilers.
-        AliasIfNotEmpty( "all", buildTargets )
-        AliasIfNotEmpty( "testall", testTargets )
-        AliasIfNotEmpty( "analyzeall", analyzeTargets )
+        AliasIfNotEmpty("all", buildTargets)
+        AliasIfNotEmpty("testall", testTargets)
+        AliasIfNotEmpty("analyzeall", analyzeTargets)
         heirarchy = (compiler_name, targ_os, targ_arch, configuration)
-        for heirarchyDepth in range( 1, len( heirarchy ) ):
-            heirarchyName = "_".join( heirarchy[:heirarchyDepth] )
-            AliasIfNotEmpty( heirarchyName, buildTargets )
-            AliasIfNotEmpty( "test"+heirarchyName, testTargets )
-            AliasIfNotEmpty( "analyze"+heirarchyName, analyzeTargets )
+        for heirarchyDepth in range(1, len(heirarchy)):
+            heirarchyName = "_".join(heirarchy[:heirarchyDepth])
+            AliasIfNotEmpty(heirarchyName, buildTargets)
+            AliasIfNotEmpty("test"+heirarchyName, testTargets)
+            AliasIfNotEmpty("analyze"+heirarchyName, analyzeTargets)
 
 
-# The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to 
+# The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to
 # build just the native debug and release targets
-if GetOption( "clean" ): Default( "#Build" )
-else: Default( "native" )
-
+if GetOption("clean"):
+    Default("#Build")
+else:
+    Default("native")

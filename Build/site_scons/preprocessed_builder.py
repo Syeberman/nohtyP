@@ -10,7 +10,7 @@ import SCons.Builder
 CPreprocessedSuffix = [".i", ".ii"]
 
 for suffix in CPreprocessedSuffix:
-    SCons.Tool.SourceFileScanner.add_scanner( suffix, SCons.Tool.CScanner )
+    SCons.Tool.SourceFileScanner.add_scanner(suffix, SCons.Tool.CScanner)
 
 
 def createPreprocessedBuilder(env):
@@ -28,18 +28,18 @@ def createPreprocessedBuilder(env):
     try:
         preprocessed = env['BUILDERS']['Preprocessed']
     except KeyError:
-        preprocessed = SCons.Builder.Builder(action = {},
-                                             emitter = {},
+        preprocessed = SCons.Builder.Builder(action={},
+                                             emitter={},
                                              #prefix = '',
                                              # TODO gcc uses different suffixes for C and C++
                                              #suffix = '$CPREPROCESSEDSUFFIX',
-                                             src_builder = ['CFile', 'CXXFile'],
-                                             source_scanner = SCons.Tool.SourceFileScanner,
-                                             single_source = 1)
+                                             src_builder=['CFile', 'CXXFile'],
+                                             source_scanner=SCons.Tool.SourceFileScanner,
+                                             single_source=1)
         env['BUILDERS']['Preprocessed'] = preprocessed
 
         # TODO msvc preprocesses both C and C++ files with a .i extension; gcc keeps them separate
-        env.SetDefault(CPREPROCESSEDSUFFIX = '.i')
-        env.SetDefault(CXXPREPROCESSEDSUFFIX = '.ii')
+        env.SetDefault(CPREPROCESSEDSUFFIX='.i')
+        env.SetDefault(CXXPREPROCESSEDSUFFIX='.ii')
 
     return preprocessed

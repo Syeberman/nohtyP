@@ -1,7 +1,14 @@
 
 # XXX This supports both PC-lint and FlexeLint by Gimpel Software
 
-import os, os.path, sys, functools, subprocess, re, glob, tempfile
+import os
+import os.path
+import sys
+import functools
+import subprocess
+import re
+import glob
+import tempfile
 import SCons.Errors
 import SCons.Platform
 import SCons.Tool
@@ -9,80 +16,91 @@ import SCons.Warnings
 
 _tool_name = __name__   # ie "pclint"
 
-_platform_name = SCons.Platform.Platform( ).name
+_platform_name = SCons.Platform.Platform().name
 if _platform_name in ("win32", "cygwin"):
     # Try some known, and unknown-but-logical, default locations for PC-lint
     _pclint_path_globs = (
-            "C:\\lint\\",
-            "C:\\Program Files\\lint",
-            "C:\\Program Files (x86)\\lint",
-            "C:\\PC-Lint\\",
-            "C:\\Program Files\\PC-Lint",
-            "C:\\Program Files (x86)\\PC-Lint",
-            )
+        "C:\\lint\\",
+        "C:\\Program Files\\lint",
+        "C:\\Program Files (x86)\\lint",
+        "C:\\PC-Lint\\",
+        "C:\\Program Files\\PC-Lint",
+        "C:\\Program Files (x86)\\PC-Lint",
+        )
     _pclint_paths_found = [
-            pclintDir for pattern in _pclint_path_globs for pclintDir in glob.iglob( pattern ) ]
+        pclintDir for pattern in _pclint_path_globs for pclintDir in glob.iglob(pattern)]
     _pclint_exename = "lint-nt"
 else:
     _pclint_paths_found = []   # rely on the environment's path for now
 
 
-_re_pclint_version = re.compile( r"Vers\. (\d+)\.(\d+)([a-z])\," )
+_re_pclint_version = re.compile(r"Vers\. (\d+)\.(\d+)([a-z])\,")
 _test_pclint_cache = {}
-def _test_pclint( pclint ):
-    """Tests if the given pclint exists, and return its version if so, or None if not.  Caches 
+
+
+def _test_pclint(pclint):
+    """Tests if the given pclint exists, and return its version if so, or None if not.  Caches
     results for speed."""
     # See if we've tested this executable before
-    try: output = _test_pclint_cache[pclint]
+    try:
+        output = _test_pclint_cache[pclint]
     except KeyError:
-        try: output = subprocess.check_output( [pclint, "+b"] )
-        except: output = ""
-        output = output.strip( )
+        try:
+            output = subprocess.check_output([pclint, "+b"])
+        except:
+            output = ""
+        output = output.strip()
         _test_pclint_cache[pclint] = output
-    
+
     # Parse the version:
     #   PC-lint for C/C++ (NT) Vers. 9.00k, Copyright Gimpel Software 1985-2013
-    match = _re_pclint_version.search( output )
-    if match is None: return None
-    return (int( match.group( 1 ) ), int( match.group( 2 ) ), match.group( 3 ) )
+    match = _re_pclint_version.search(output)
+    if match is None:
+        return None
+    return (int(match.group(1)), int(match.group(2)), match.group(3))
 
 # TODO This, or something like it, should be in SCons
-def _find( env ):
-    """Find a PC-Lint executable returning the path or None.  Picks the executable with the 
+
+
+def _find(env):
+    """Find a PC-Lint executable returning the path or None.  Picks the executable with the
     largest version number."""
-    pclintDirs = list( os.environ.get( "PATH", "" ).split( os.pathsep ) )
-    pclintDirs.extend( _pclint_paths_found )
+    pclintDirs = list(os.environ.get("PATH", "").split(os.pathsep))
+    pclintDirs.extend(_pclint_paths_found)
     pclints = []
     for pclintDir in pclintDirs:
-        pclint = os.path.join( pclintDir, _pclint_exename )
-        pclint_version = _test_pclint( pclint )
-        if pclint_version is None: continue
-        pclints.append( (pclint_version, pclint) )
-    if not pclints: return None
-    pclints.sort( )         # sort by version
+        pclint = os.path.join(pclintDir, _pclint_exename)
+        pclint_version = _test_pclint(pclint)
+        if pclint_version is None:
+            continue
+        pclints.append((pclint_version, pclint))
+    if not pclints:
+        return None
+    pclints.sort()         # sort by version
     return pclints[-1][1]   # return the path with the largest version
 
 
 def DefinePClintToolFunctions():
-    def generate( env ):
+    def generate(env):
         # See if site_toolsconfig.py already knows where to find this PC-Lint version
         toolsConfig = env["TOOLS_CONFIG"]
-        pclint_siteName = _tool_name.upper( )
-        pclint_path = toolsConfig.get( pclint_siteName, None )
+        pclint_siteName = _tool_name.upper()
+        pclint_path = toolsConfig.get(pclint_siteName, None)
 
-        # If site_toolsconfig.py came up empty, find a PC-Lint that supports our target, then update
+        # If site_toolsconfig.py came up empty, find a PC-Lint that supports our
+        # target, then update
         if not pclint_path:
-            pclint_path = _find( env )
+            pclint_path = _find(env)
             if not pclint_path:
-                raise SCons.Errors.StopError( "%s detection failed" % _tool_name )
-            toolsConfig.update( {pclint_siteName: pclint_path} )
+                raise SCons.Errors.StopError("%s detection failed" % _tool_name)
+            toolsConfig.update({pclint_siteName: pclint_path})
 
         # Now, prepend it to the path
-        path, pclint = os.path.split( pclint_path )
-        env.PrependENVPath( "PATH", path )
+        path, pclint = os.path.split(pclint_path)
+        env.PrependENVPath("PATH", path)
         env["PCLINT"] = pclint
 
-    def exists( env ):
+    def exists(env):
         # We rely on generate to tell us if a tool is available
         return True
 

@@ -36,7 +36,6 @@ def generate_PreprocessedBuilder(env):
 
     # PPCXX is the preprocessor-only mode for CXX, the C++ compiler (compare with SHCXX et al)
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
-    env['PPCXX']      = '$CXX'
+    env['PPCXX'] = '$CXX'
     env['PPCXXFLAGS'] = SCons.Util.CLVar('$CXXFLAGS')
-    env['PPCXXCOM']   = '$PPCXX -E -o $TARGET -c $PPCXXFLAGS $PPCCFLAGS $_CCCOMCOM $SOURCES'
-
+    env['PPCXXCOM'] = '$PPCXX -E -o $TARGET -c $PPCXXFLAGS $PPCCFLAGS $_CCCOMCOM $SOURCES'
