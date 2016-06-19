@@ -47,7 +47,7 @@ def nohtyP_checkapi(env):
     # nohtyP.h contains very few PP conditionals, so not much needs to be set up.  Preprocessed
     # only recognizes .c (etc) files so we make a copy with that extension.  Use dummy versions
     # of standard headers that work well with pycparser.
-    env.PrependUnique(CPPPATH=["#", "#/Tools/checkapi/fake_libc_include"], PDB="", LIBS="")
+    env.PrependUnique(CPPPATH=["#", "#/Include/fake_libc_include"], PDB="", LIBS="")
     headerDotC = env.Command("$VTOP/checkapi/nohtyP_h.c", "$VTOP/nohtyP.h",
                              Copy("$TARGET", "$SOURCE"))
     preprocessed = env.Preprocessed("$VTOP/checkapi/nohtyP_h", source=headerDotC)
