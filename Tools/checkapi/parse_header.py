@@ -6,11 +6,18 @@ Date: May 19, 2014
 
 import re
 import copy
-import collections
 from pycparser import c_generator, c_ast, parse_file
 
 re_FuncName = re.compile(r"^(?P<root>yp_([ois]2[ois]_)?([a-z_]+|(asu?int\d+)|(asfloat\d+)))"
                          "(?P<post>(CF?)?(LF?)?(NV?)?(KV?)?E?D?X?\d?)$")
+
+
+def setdefault_callable(d, key, default_callable):
+    try:
+        return d[key]
+    except KeyError:
+        default = d[key] = default_callable()
+        return default
 
 
 class RemoveDeclNameVisitor(c_ast.NodeVisitor):
@@ -87,11 +94,7 @@ class ypHeader:
 
     def AddFunction(self, function):
         self._functions.append(function)
-
-        try:
-            self._root2functions[function.rootname].append(function)
-        except KeyError:
-            self._root2functions[function.rootname] = [function, ]
+        setdefault_callable(self._root2functions, function.rootname, list).append(function)
 
     def IterFunctions(self):
         """Iterates over all parsed functions."""
