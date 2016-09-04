@@ -8,9 +8,6 @@ import re
 import copy
 from pycparser import c_generator, c_ast, parse_file
 
-re_FuncName = re.compile(r"^(?P<root>yp_([ois]2[ois]_)?([a-z_]+|(asu?int\d+)|(asfloat\d+)))"
-                         "(?P<post>(CF?)?(LF?)?(NV?)?(KV?)?E?D?X?\d?)$")
-
 
 def setdefault_callable(d, key, default_callable):
     try:
@@ -41,7 +38,7 @@ def GenerateAbstractTypeName(declnode):
 
 class ypParameter:
     @classmethod
-    def from_Decl(cls, declnode):
+    def from_Decl(cls, declnode, param_index):
         """Creates a ypParameter based on the Decl node."""
         self = cls()
         if isinstance(declnode, c_ast.EllipsisParam):
@@ -49,6 +46,18 @@ class ypParameter:
         else:
             self.name = declnode.name
             self.type = GenerateAbstractTypeName(declnode)
+
+        # If determining input/output gets too hairy we'll have to annotate the header somehow
+        if self.type == "ypObject **":
+            if param_index == 0:  # ypObject** as param 0 is "input" replaced on exception
+                self.input, self.output = True, True
+            else:
+                self.input, self.output = False, True
+        elif "**" in self.type:  # all other pointers to pointers are outputs
+            self.input, self.output = False, True
+        else:  # all other parameters are inputs
+            self.input, self.output = True, False
+
         return self
 
     def __str__(self):
@@ -56,6 +65,9 @@ class ypParameter:
 
 
 class ypFunction:
+    _re_name = re.compile(r"^(?P<root>yp_([ois]2[ois]_)?([a-z_]+|(asu?int\d+)|(asfloat\d+)))"
+                          r"(?P<post>(CF?)?(LF?)?(NV?)?(KV?)?E?D?X?(?P<post_incnt>\d?))$")
+
     @classmethod
     def from_Decl(cls, declnode):
         """Creates a ypFuncion based on the Decl node."""
@@ -66,19 +78,21 @@ class ypFunction:
         self.name = declnode.name
         self.params = []
         if len(paramsnode.params) > 1 or getattr(paramsnode.params[0], "name", "") is not None:
-            for pdeclnode in paramsnode.params:
-                self.params.append(ypParameter.from_Decl(pdeclnode))
+            for i, pdeclnode in enumerate(paramsnode.params):
+                self.params.append(ypParameter.from_Decl(pdeclnode, i))
         self.returntype = GenerateAbstractTypeName(returnnode)
         self._complete()
         return self
 
     def _complete(self):
         """Common initialization for ypFunction."""
-        namematch = re_FuncName.match(self.name)
+        namematch = ypFunction._re_name.match(self.name)
         if namematch is None:
             raise ValueError("couldn't parse function name %r" % self.name)
         self.rootname = namematch.group("root")
         self.postfixes = namematch.group("post")
+        post_incnt = namematch.group("post_incnt")
+        self.postfix_input_count = int(post_incnt) if post_incnt else None
 
     def __str__(self):
         return "%s (%s): %r" % (
