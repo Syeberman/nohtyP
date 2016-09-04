@@ -6,7 +6,7 @@ Date: May 19, 2014
 
 import sys
 from parse_header import ParseHeader
-from api_warnings import CheckEllipsisFunctions
+from api_warnings import CheckEllipsisFunctions, CheckInputCounts
 
 # TODO fake_libc_include doesn't have proper limits or defines for 32- and 64-bit systems
 # (does it matter for our purposes?)
@@ -20,7 +20,6 @@ from api_warnings import CheckEllipsisFunctions
 #       - first arg is ypObject*, not ypObject**
 #       - ypObject** exc is append to arg list, unless orig returns ypObject* (ie yp_popE)
 #   - all X functions return a ypObject *
-#   - the count equals the actual arg count (minus exc)
 #   - C is used iff it contains a C type (an int?)
 #   - F is used iff it contains a float
 #   - L doesn't use ypObject *
@@ -53,6 +52,7 @@ def CheckApi(filepath, *, print=print):
 
     warnings = []
     CheckEllipsisFunctions(warnings, header)
+    CheckInputCounts(warnings, header)
     for warning in warnings:
         print(warning)
 
