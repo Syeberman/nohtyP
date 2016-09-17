@@ -50,3 +50,35 @@ def CheckInputCounts(warnings, header):
         if postfix_input_count != input_count:
             warnings.append("input count postfix ({}) isn't correct ({}): {}".format(
                 postfix_input_count, input_count, name))
+
+
+# TODO In reverse, check for ypObject ** functions that are missing E versions
+def CheckSetExcFunctions(warnings, header):
+    for func in header.funcs:
+        if 'E' not in func.postfixes:
+            continue
+
+        name = func.name
+        pair_name = func.rootname + func.postfixes.replace('E', '')
+
+        pairs = header.name2funcs.get(pair_name)
+        if pairs is None:
+            warnings.append('E function missing non-E version: {}'.format(name))
+            continue
+
+        # TODO If the function returns a ypObject *, does it really need exc?
+        first_param = func.params[0]
+        last_param = func.params[-1]
+        if first_param.type != "ypObject *":
+            warnings.append("first parameter of E function isn't `ypObject *`: {}".format(name))
+        if last_param.type != "ypObject **" or last_param.name != "exc":
+            warnings.append("last parameter of E function isn't `ypObject **exc`: {}".format(name))
+
+        # TODO Check parameter names are the same?  But param names change...
+        for pair in pairs:
+            if pair.params[0].type != "ypObject **":
+                warnings.append("first parameter of non-E function isn't `ypObject **`: {}".format(name))
+
+            for i in range(1, len(pair.params)):
+                if pair.params[i].type != func.params[i].type:
+                    warnings.append("different types for param `{}` from non-E function: {}".format(func.params[i].name, name))
