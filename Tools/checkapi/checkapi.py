@@ -6,19 +6,15 @@ Date: May 19, 2014
 
 import sys
 from parse_header import parse_header
-from api_warnings import CheckEllipsisFunctions, CheckInputCounts
+from api_warnings import (CheckEllipsisFunctions, CheckInputCounts, CheckSetExcFunctions)
 
 # TODO fake_libc_include doesn't have proper limits or defines for 32- and 64-bit systems
 # (does it matter for our purposes?)
 
 
 # TODO Checks to implement
-#   - every (with exceptions) N or K has a NV or KV
 #   - every N or K has a variant that takes a ypObject* in its place
 #   - exc is always ypObject ** and used in C, F, L, and E
-#   - E functions match their originals, except:
-#       - first arg is ypObject*, not ypObject**
-#       - ypObject** exc is append to arg list, unless orig returns ypObject* (ie yp_popE)
 #   - all X functions return a ypObject *
 #   - C is used iff it contains a C type (an int?)
 #   - F is used iff it contains a float
@@ -53,6 +49,7 @@ def CheckApi(filepath, *, print=print):
     warnings = []
     CheckEllipsisFunctions(warnings, header)
     CheckInputCounts(warnings, header)
+    CheckSetExcFunctions(warnings, header)
     for warning in warnings:
         print(warning)
     print()
