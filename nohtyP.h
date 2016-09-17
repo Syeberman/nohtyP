@@ -487,7 +487,7 @@ ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 // being iterated over.
 
 // "Sends" a value into *iterator and returns a new reference to the next yielded value, or an
-// exception.  The value may be ignored by the iterator.  value cannot be an exception.  When the 
+// exception.  The value may be ignored by the iterator.  value cannot be an exception.  When the
 // iterator is exhausted yp_StopIteration is returned; on any other error, *iterator is discarded
 // and set to an exception, _and_ an exception is returned.
 ypAPI ypObject *yp_send( ypObject **iterator, ypObject *value );
@@ -495,8 +495,8 @@ ypAPI ypObject *yp_send( ypObject **iterator, ypObject *value );
 // Equivalent to yp_send( iterator, yp_None ).  Typically used on iterators that ignore the value.
 ypAPI ypObject *yp_next( ypObject **iterator );
 
-// Similar to yp_next, but when the iterator is exhausted a new reference to defval is returned.  
-// defval _can_ be an exception: if it is, then exhaustion is treated as an error as per yp_send 
+// Similar to yp_next, but when the iterator is exhausted a new reference to defval is returned.
+// defval _can_ be an exception: if it is, then exhaustion is treated as an error as per yp_send
 // (including possibly discarding *iterator).
 ypAPI ypObject *yp_next2( ypObject **iterator, ypObject *defval );
 
@@ -914,8 +914,8 @@ ypAPI void yp_updateNV( ypObject **mapping, int n, va_list args );
  * Bytes & String Operations
  */
 
-// Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return ints 
-// for these types, and will only accept ints for yp_setindexC.  The individual elements of strs 
+// Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return ints
+// for these types, and will only accept ints for yp_setindexC.  The individual elements of strs
 // and chrarrays are single-character strs.
 
 // Slicing an object always returns an object of the same type, so yp_getsliceC4 on a bytearray
@@ -1536,9 +1536,9 @@ ypAPI void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *key, yp_ssi
 //      yp_IMMORTAL_STR_LATIN_1( name, value );
 
 // The default immortal "constructor" macros declare variables as "ypObject * const".  This means
-// imortals defined outside of a function will be extern.  It also means you should *not* 
-// use these macros in a function, as the variable will be "deallocated" when the function returns, 
-// and immortals should never be deallocated.  The following macros work as above, except the 
+// imortals defined outside of a function will be extern.  It also means you should *not*
+// use these macros in a function, as the variable will be "deallocated" when the function returns,
+// and immortals should never be deallocated.  The following macros work as above, except the
 // variables are declared as "static ypObject * const".
 //      yp_IMMORTAL_INT_static( name, value );
 //      yp_IMMORTAL_BYTES_static( name, value );
@@ -1602,6 +1602,7 @@ ypAPI int yp_isexceptionC2( ypObject *x, ypObject *exc );
 
 // A convenience function to compare x against n possible exceptions.  Returns false if n is zero.
 ypAPI int yp_isexceptionCN( ypObject *x, int n, ... );
+ypAPI int yp_isexceptionCNV( ypObject *x, int n, va_list args );
 
 
 /*

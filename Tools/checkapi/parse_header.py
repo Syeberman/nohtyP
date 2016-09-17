@@ -4,12 +4,12 @@ Author: Sye van der Veen
 Date: May 19, 2014
 """
 
-import re
 import copy
 from pycparser import c_generator, c_ast, parse_file
+import re
 
 
-def setdefault_callable(d, key, default_callable):
+def setdefault_call(d, key, default_callable):
     try:
         return d[key]
     except KeyError:
@@ -21,6 +21,8 @@ class RemoveDeclNameVisitor(c_ast.NodeVisitor):
     def visit_TypeDecl(self, node):
         node.declname = ""
         self.generic_visit(node)
+
+
 RemoveDeclName = RemoveDeclNameVisitor().visit
 TypeNameGenerator = c_generator.CGenerator()
 
@@ -103,26 +105,14 @@ class ypHeader:
     """Holds information collected information from nohtyP.h and similar files."""
 
     def __init__(self):
-        self._functions = []
-        self._root2functions = {}
+        self.funcs = []
+        self.name2funcs = {}  # a few functions are listed twice or more
+        self.root2funcs = {}
 
-    def AddFunction(self, function):
-        self._functions.append(function)
-        setdefault_callable(self._root2functions, function.rootname, list).append(function)
-
-    def IterFunctions(self):
-        """Iterates over all parsed functions."""
-        return iter(self._functions)
-
-    def IterFunctionRoots(self):
-        """Yields 2-tuples of the function root string and an iterator over all functions with that
-        root."""
-        for root, functions in self._root2functions.items():
-            yield root, iter(functions)
-
-    def IterFunctionsWithRoot(self, root):
-        """Iterates over all functions that share the given root."""
-        return iter(self._root2functions[root])
+    def add_func(self, func):
+        self.funcs.append(func)
+        setdefault_call(self.name2funcs, func.name, list).append(func)
+        setdefault_call(self.root2funcs, func.rootname, list).append(func)
 
 
 class ApiVisitor(c_ast.NodeVisitor):
@@ -133,10 +123,10 @@ class ApiVisitor(c_ast.NodeVisitor):
 
     def visit_Decl(self, node):
         if isinstance(node.type, c_ast.FuncDecl):
-            self.header.AddFunction(ypFunction.from_Decl(node))
+            self.header.add_func(ypFunction.from_Decl(node))
 
 
-def ParseHeader(filepath):
+def parse_header(filepath):
     """Parses nohtyP.h and similar files.  The file must have alredy been preprocessed."""
     ast = parse_file(filepath)
     visitor = ApiVisitor()
