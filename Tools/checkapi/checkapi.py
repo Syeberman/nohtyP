@@ -5,7 +5,7 @@ Date: May 19, 2014
 """
 
 import sys
-from parse_header import ParseHeader
+from parse_header import parse_header
 from api_warnings import CheckEllipsisFunctions, CheckInputCounts
 
 # TODO fake_libc_include doesn't have proper limits or defines for 32- and 64-bit systems
@@ -35,11 +35,11 @@ from api_warnings import CheckEllipsisFunctions, CheckInputCounts
 
 def ReportOnVariants(header, *, print=print):
     """Report the functions that belong to the same group, and which is the unadorned version."""
-    for root, funcsIter in sorted(header.IterFunctionRoots()):
-        funcs = sorted(funcsIter, key=lambda x: x.postfixes)
+    for root, funcs in sorted(header.root2funcs.items()):
         if len(funcs) < 2:
             continue
-        # if not any( x.name[-1].isdigit( ) for x in funcs ): continue
+
+        funcs = sorted(funcs, key=lambda x: x.postfixes)
         print(root)
         for func in funcs:
             print("    ", func)
@@ -48,13 +48,15 @@ def ReportOnVariants(header, *, print=print):
 
 def CheckApi(filepath, *, print=print):
     """Reports potential problems in nohtyP.h (and related files)."""
-    header = ParseHeader(filepath)
+    header = parse_header(filepath)
 
     warnings = []
     CheckEllipsisFunctions(warnings, header)
     CheckInputCounts(warnings, header)
     for warning in warnings:
         print(warning)
+    print()
+    print()
 
     ReportOnVariants(header, print=print)
 

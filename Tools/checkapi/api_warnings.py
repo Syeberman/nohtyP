@@ -1,7 +1,7 @@
 
 
 def CheckEllipsisFunctions(warnings, header):
-    for function in header.IterFunctions():
+    for function in header.funcs:
         name = function.name
         postfixes = function.postfixes
         vararg_postfix = ("N" in postfixes or "K" in postfixes)
@@ -25,13 +25,19 @@ def CheckEllipsisFunctions(warnings, header):
         if "V" in postfixes:
             if params[-1].type != "va_list":
                 warnings.append("V used in non-va_list function{}".format(name))
+            pair_name = function.rootname + postfixes.replace("V", "")
+            if header.name2funcs.get(pair_name) is None:
+                warnings.append("NV (or KV) missing N (or K) pair: {}".format(name))
         else:
             if params[-1].type != "...":
                 warnings.append("ellipsis not used in non-V function: {}".format(name))
+            pair_name = function.rootname + postfixes.replace("N", "NV").replace("K", "KV")
+            if header.name2funcs.get(pair_name) is None:
+                warnings.append("N (or K) missing NV (or KV) pair: {}".format(name))
 
 
 def CheckInputCounts(warnings, header):
-    for function in header.IterFunctions():
+    for function in header.funcs:
         name = function.name
         postfix_input_count = function.postfix_input_count
 
@@ -44,4 +50,3 @@ def CheckInputCounts(warnings, header):
         if postfix_input_count != input_count:
             warnings.append("input count postfix ({}) isn't correct ({}): {}".format(
                 postfix_input_count, input_count, name))
-
