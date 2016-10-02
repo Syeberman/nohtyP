@@ -2909,7 +2909,7 @@ int yp_isexceptionC2( ypObject *x, ypObject *exc )
     return _yp_isexceptionC2( x, exc );
 }
 
-int _yp_isexceptionCNV( ypObject *x, int n, va_list args )
+static int _yp_isexceptionCNV( ypObject *x, int n, va_list args )
 {
     for( /*n already set*/; n > 0; n-- ) {
         if( _yp_isexceptionC2( x, va_arg( args, ypObject * ) ) ) {
