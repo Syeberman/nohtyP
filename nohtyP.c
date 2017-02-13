@@ -756,7 +756,7 @@ static yp_ssize_t _yp_recursion_limit = 1000;
 #define yp_TOUPPER(c) (_yp_ctype_toupper[c])
 
 // XXX Adapted from Python's pyctype.c and pyctype.h
-// TODO In Python, this is a table of unsigned ints, which is unnecessarily large; report and fix
+// TODO In Python, this is a table of unsigned ints, which is unnecessarily large; contribute a fix
 const yp_uint8_t _yp_ctype_table[256] = {
     0, /* 0x0 '\x00' */
     0, /* 0x1 '\x01' */
@@ -6624,7 +6624,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
                input will consist of an overwhelming majority of ASCII
                characters, we try to optimize for this case.
             */
-            // TODO Convert this optimization back to Python
+            // TODO Contribute this optimization back to Python
             yp_ssize_t ascii_len = ypStringLib_count_ascii_bytes( s, source_end );
             yp_ASSERT1( ascii_len > 0 );
             yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= ascii_len );
@@ -7092,7 +7092,8 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
     source_data = (yp_uint8_t *) params->source.data.ptr;
 
     if( encoding == yp_s_utf_8 ) {
-        // TODO The equivalent Python code assumes null-termination of source, or it might overflow
+        // TODO The equivalent Python code assumes null-termination of source, or it might overflow.
+        // Contribute a fix back to Python.
         yp_ssize_t badEnd;      // index of end of surrogates to replace from source
         yp_ssize_t repLen = 0;  // number of surrogate characters (once decoded) to replace
 
@@ -10005,7 +10006,8 @@ static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
     return yp_None;
 }
 
-// TODO Python's ins1 does an item-by-item copy rather than a memmove...inefficient? ...fix?
+// TODO Python's ins1 does an item-by-item copy rather than a memmove.  Contribute an optimization
+// back to Python.
 static ypObject *list_insert( ypObject *sq, yp_ssize_t i, ypObject *x )
 {
     ypObject *result;
@@ -12581,6 +12583,10 @@ static ypObject *frozendict_ne( ypObject *mp, ypObject *x ) {
 // TODO frozendict_currenthash, when implemented, will need to consider the currenthashes of its
 // values as well as its keys.  Just as a tuple with mutable items can't be hashed, hashing a
 // frozendict with mutable values will be an error.
+//  What about this for the hash?  hash(frozenset(x.items()))  (performance?)
+// Rejected ideas:
+//  This wouldn't work as item order is arbitrary: hash(tuple(x.items()))
+//  Calling sorted in the above would require ordering of the keys, which may not be true
 
 static ypObject *frozendict_contains( ypObject *mp, ypObject *key )
 {
