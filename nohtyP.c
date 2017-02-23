@@ -2615,6 +2615,7 @@ static ypObject *_yp_hash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
     yp_ASSERT( recursion_depth >= 0, "recursion_depth can't be negative" );
     if( recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
 
+    // TODO Contribute this generic hash caching back to Python?
     result = ypObject_TYPE( x )->tp_currenthash(
         x, _yp_hash_visitor, (void *) (recursion_depth+1), hash );
     if( yp_isexceptionC( result ) ) return result;
