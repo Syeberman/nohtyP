@@ -3249,6 +3249,7 @@ static ypTypeObject ypBool_Type = {
 // No constructors for bools; there are exactly two objects, and they are immortal
 
 // There are exactly two bool objects
+// TODO Could initialize ypObject_CACHED_HASH here
 static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, 0, NULL, 0 ), 1};
 ypObject * const yp_True = (ypObject *) &_yp_True_struct;
 static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, 0, NULL, 0 ), 0};
@@ -3479,6 +3480,11 @@ static ypObject *int_currenthash( ypObject *i,
 {
     // This must remain consistent with the other numeric types
     *hash = yp_HashInt( ypInt_VALUE( i ) );
+
+    // Since we never contain mutable objects, we can cache our hash
+    // TODO Look into where we use ypObject_IS_MUTABLE for custom behaviour and consider
+    // specializing the methods
+    if( !ypObject_IS_MUTABLE( i ) ) ypObject_CACHED_HASH( i ) = *hash;
     return yp_None;
 }
 
@@ -4550,6 +4556,7 @@ static ypObject *float_currenthash( ypObject *f,
 {
     // This must remain consistent with the other numeric types
     *hash = yp_HashDouble( ypFloat_VALUE( f ) );
+
     // Since we never contain mutable objects, we can cache our hash
     if( !ypObject_IS_MUTABLE( f ) ) ypObject_CACHED_HASH( f ) = *hash;
     return yp_None;
@@ -8048,6 +8055,7 @@ static ypObject *bytes_ne( ypObject *b, ypObject *x ) {
 static ypObject *bytes_currenthash( ypObject *b,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     *hash = yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
+
     // Since we never contain mutable objects, we can cache our hash
     if( !ypObject_IS_MUTABLE( b ) ) ypObject_CACHED_HASH( b ) = *hash;
     return yp_None;
@@ -8808,6 +8816,7 @@ static ypObject *str_currenthash( ypObject *s,
         hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     *hash = yp_HashBytes( ypStr_DATA( s ), ypStr_LEN( s ) << ypStringLib_ENC( s )->sizeshift );
+
     // Since we never contain mutable objects, we can cache our hash
     if( !ypObject_IS_MUTABLE( s ) ) ypObject_CACHED_HASH( s ) = *hash;
     return yp_None;
@@ -11389,6 +11398,9 @@ static ypObject *frozenset_currenthash( ypObject *so,
         hash = 590923713U;
     }
     *_hash = (yp_hash_t)hash;
+
+    // Since we never contain mutable objects, we can cache our hash
+    if( !ypObject_IS_MUTABLE( so ) ) ypObject_CACHED_HASH( so ) = *_hash;
     return yp_None;
 }
 
@@ -11537,11 +11549,13 @@ static ypObject *frozenset_eq( ypObject *so, ypObject *x )
     if( so == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenSet_CODE ) return yp_ComparisonNotImplemented;
     if( ypSet_LEN( so ) != ypSet_LEN( x ) ) return yp_False;
+
     // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when so!=x.
     if( ypObject_CACHED_HASH( so ) != ypObject_HASH_INVALID &&
         ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
         ypObject_CACHED_HASH( so ) != ypObject_CACHED_HASH( x ) ) return yp_False;
+
     return _ypSet_issubset( so, x );
 }
 
@@ -12548,6 +12562,7 @@ static ypObject *frozendict_eq( ypObject *mp, ypObject *x )
     if( mp == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenDict_CODE ) return yp_ComparisonNotImplemented;
     if( ypDict_LEN( mp ) != ypDict_LEN( x ) ) return yp_False;
+
     // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when mp!=x.
     if( ypObject_CACHED_HASH( mp ) != ypObject_HASH_INVALID &&
@@ -13507,6 +13522,7 @@ static ypObject *range_currenthash( ypObject *r,
         x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
     }
     *hash = (yp_hash_t)x;
+
     // Since we never contain mutable objects, we can cache our hash
     ypObject_CACHED_HASH( yp_None ) = *hash;
     return yp_None;
