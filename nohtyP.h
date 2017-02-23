@@ -1843,6 +1843,11 @@ struct _ypObject {
 // These structures are likely to change in future versions; they should only exist in-memory
 struct _ypIntObject {
     _ypObject_HEAD
+    // TODO If sizeof(yp_int_t)==sizeof(yp_hash_t), we _could_ use ob_hash instead of value, except:
+    //  - ob_hash is currently only supposed to be for immutable values
+    //  - Value -1 gets mapped to hash -2, which if cached would *change the value* of "-1"
+    //  - We could _not_ make this optimization for floats...
+    // So, this may not be a great way to reduce the size of these simpler types.
     yp_int_t value;
 };
 struct _ypBytesObject {
