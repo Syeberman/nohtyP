@@ -468,12 +468,13 @@ ypAPI ypObject *yp_gt( ypObject *x, ypObject *y );
  * Generic Object Operations
  */
 
-// Returns the hash value of x; x must be immutable.  Returns -1 and sets *exc on error.
+// Returns the hash value of x; x must be immutable and cannot contain mutable objects.  Returns -1
+// and sets *exc on error.
 ypAPI yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
 
-// Returns the _current_ hash value of x; if x is mutable, this value may change between calls.
-// Returns -1 and sets *exc on error.  Unlike Python, this can calculate the hash value of mutable
-// types.
+// Returns the _current_ hash value of x; this value may change between calls. Returns -1 and sets
+// *exc on error.  This is able to calculate the hash value of mutable objects and objects
+// containing mutable objects that would otherwise fail with yp_hashC.
 ypAPI yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
 
 
@@ -1863,6 +1864,8 @@ struct _ypStrObject {
 // Set ob_refcnt to this value for immortal objects
 #define _ypObject_REFCNT_IMMORTAL   (0x7FFFFFFFu)
 // Set ob_hash to this value for uninitialized hashes (tp_hash will be called and ob_hash updated)
+// TODO Instead, make an ob_flag to state if ob_hash is valid or invalid, then could store -1 as
+// a valid cached hash and int could use ob_hash to store the value
 #define _ypObject_HASH_INVALID      ((yp_hash_t)  -1)
 // Set ob_len or ob_alloclen to this value to signal an invalid length
 #define _ypObject_LEN_INVALID       ((yp_ssize_t) -1)
