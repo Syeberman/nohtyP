@@ -565,8 +565,8 @@ ypAPI ypObject *yp_min_key( ypObject *iterable, yp_sort_key_func_t key );
 ypAPI ypObject *yp_max( ypObject *iterable );
 ypAPI ypObject *yp_min( ypObject *iterable );
 
-// Returns a new reference to an iterator that yields the elements of seq in reverse order.
-ypAPI ypObject *yp_reversed( ypObject *seq );
+// Returns a new reference to an iterator that yields the elements of sequence in reverse order.
+ypAPI ypObject *yp_reversed( ypObject *sequence );
 
 // Returns a new reference to an iterator that aggregates elements from each of the n iterables.
 ypAPI ypObject *yp_zipN( int n, ... );
@@ -620,7 +620,7 @@ ypAPI ypObject *yp_pop( ypObject **container );
 // step k is the sequence of items with indices i, i+k, i+2*k, i+3*k and so on, stopping when j is
 // reached (but never including j); k cannot be zero.  A single index outside of
 // range(-len(s),len(s)) raises a yp_IndexError, but in a slice such an index gets clamped to the
-// bounds of the sequence.  see yp_SLICE_DEFAULT and yp_SLICE_USELEN below for more information.
+// bounds of the sequence.  See yp_SLICE_DEFAULT and yp_SLICE_USELEN below for more information.
 
 // Returns a new reference to the concatenation of sequence and x.
 ypAPI ypObject *yp_concat( ypObject *sequence, ypObject *x );
@@ -723,8 +723,8 @@ ypAPI ypObject *yp_pop( ypObject **sequence );
 // contained in *sequence.  On error, *sequence is discarded and set to an exception.
 ypAPI void yp_remove( ypObject **sequence, ypObject *x );
 
-// Removes the first item from *sequence that equals x, if one is present.  On error, *sequence
-// is discarded and set to an exception.
+// Removes the first item from *sequence that equals x.  Does _not_ raise an exception if x is not
+// contained in *sequence.  On error, *sequence is discarded and set to an exception.
 ypAPI void yp_discard( ypObject **sequence, ypObject *x );
 
 // Reverses the items of *sequence in-place.  On error, *sequence is discarded and set to an
@@ -836,8 +836,8 @@ ypAPI void yp_pushuniqueE( ypObject *set, ypObject *x, ypObject **exc );
 // *set is discarded and set to an exception.
 ypAPI void yp_remove( ypObject **set, ypObject *x );
 
-// Removes element x from *set if it is present.  On error, *set is discarded and set to an
-// exception.
+// Removes element x from *set.  Does _not_ raise an exception if x is not contained in *set.  On
+// error, *set is discarded and set to an exception.
 ypAPI void yp_discard( ypObject **set, ypObject *x );
 
 // Removes an arbitrary item from *set and returns a new reference to it.  On error, *set is
