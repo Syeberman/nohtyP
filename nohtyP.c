@@ -1611,14 +1611,14 @@ static const ypQuickIter_methods ypQuickIter_mi_methods = {
 static ypObject *ypQuickIter_new_fromiterable(
         const ypQuickIter_methods **methods, ypQuickIter_state *state, ypObject *iterable )
 {
-    // We special-case tuples because we can return borrowed references directly
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
+        // We special-case tuples because we can return borrowed references directly
         *methods = &ypQuickIter_tuple_methods;
         ypQuickIter_new_fromtuple( state, iterable );
         return yp_None;
 
-    // We may eventually special-case other types, but for now treat them as generic iterables
     } else {
+        // We may eventually special-case other types, but for now treat them as generic iterables
         ypObject *exc = yp_None;
         ypObject *mi = yp_miniiter( iterable, &(state->mi.state) );
         if( yp_isexceptionC( mi ) ) return mi;
@@ -1809,10 +1809,10 @@ static ypObject *ypQuickSeq_new_fromsequence(
     if( ypQuickSeq_new_fromsequence_builtins( methods, state, sequence ) ) {
         return yp_None;
 
-    // We may eventually special-case other types, but for now treat them as generic sequences
     } else {
+        // We may eventually special-case other types, but for now treat them as generic sequences.
         // All sequences should raise yp_IndexError for yp_SSIZE_T_MAX; all other types should
-        // raise yp_TypeError or somesuch
+        // raise yp_TypeError or somesuch.
         ypObject *result = yp_getindexC( sequence, yp_SSIZE_T_MAX );
         if( !yp_isexceptionC2( result, yp_IndexError ) ) {
             if( yp_isexceptionC( result ) ) return result;
@@ -2351,6 +2351,8 @@ static ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
     return ypObject_TYPE( x )->tp_traverse( x, _yp_deepfreeze, memo );
 }
 
+// TODO All "deep" operations may try to operate on immortals...but shouldn't all immortals be
+// immutable already anyway?
 void yp_deepfreeze( ypObject **x )
 {
     ypObject *memo = yp_setN( 0 );
@@ -2450,11 +2452,14 @@ ypObject *yp_deepcopy( ypObject *x ) {
 // tradeoff in the interests of reducing individual allocations.  Perhaps there should be a limit
 // on how large to make CONTAINER_INLINE objects, or perhaps we should try to shrink the
 // invalidated object in-place (if supported by the heap).
+// TODO Should attempting to invalidate an immortal be an error?
 void yp_invalidate( ypObject **x )
 {
     // TODO implement
 }
 
+// TODO All "deep" operations may try to operate on immortals, which should not be invalidated.
+// Should this be an exception, or should these objects be silently skipped?
 void yp_deepinvalidate( ypObject **x )
 {
     // TODO implement
@@ -2474,8 +2479,10 @@ void yp_deepinvalidate( ypObject **x )
 
 // If you know that b is either yp_True, yp_False, or an exception, use this
 // XXX b should be a variable, _not_ an expression, as it's evaluated up to three times
+// clang-format off
 #define ypBool_NOT( b ) ( (b) == yp_True ? yp_False : \
                          ((b) == yp_False ? yp_True : (b)))
+// clang-format on
 
 ypObject *yp_not( ypObject *x ) {
     ypObject *result = yp_bool( x );
@@ -2857,6 +2864,7 @@ static ypTypeObject ypException_Type = {
 #define _yp_IMMORTAL_EXCEPTION( name, super ) \
     _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, (ypObject *) &_ ## super ## _struct )
 
+// clang-format off
 _yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
   _yp_IMMORTAL_EXCEPTION( yp_SystemExit, yp_BaseException );
   _yp_IMMORTAL_EXCEPTION( yp_KeyboardInterrupt, yp_BaseException );
@@ -2914,6 +2922,7 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
         _yp_IMMORTAL_EXCEPTION( yp_UnicodeEncodeError, yp_UnicodeError );
         _yp_IMMORTAL_EXCEPTION( yp_UnicodeDecodeError, yp_UnicodeError );
         _yp_IMMORTAL_EXCEPTION( yp_UnicodeTranslateError, yp_UnicodeError );
+// clang-format on
 
 // yp_isexceptionC defined above
 
@@ -3437,8 +3446,8 @@ static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), const yp
         if( result < 0 ) goto checkforintmin;
     }
 
-    // Ensure there's only whitespace left in the string, and return the new integer
 endofdigits:
+    // Ensure there's only whitespace left in the string, and return the new integer
     while( 1 ) {
         if( *bytes == '\0' ) break;
         if( !yp_ISSPACE( *bytes ) ) return yp_ValueError;
@@ -3468,6 +3477,7 @@ static ypObject *int_unfrozen_copy( ypObject *i ) {
     return yp_intstoreC( ypInt_VALUE( i ) );
 }
 
+// FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
 static ypObject *int_frozen_copy( ypObject *i ) {
     return yp_intC( ypInt_VALUE( i ) );
 }
@@ -3476,6 +3486,7 @@ static ypObject *int_unfrozen_deepcopy( ypObject *i, visitfunc copy_visitor, voi
     return yp_intstoreC( ypInt_VALUE( i ) );
 }
 
+// FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
 static ypObject *int_frozen_deepcopy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
     return yp_intC( ypInt_VALUE( i ) );
 }
@@ -4338,6 +4349,7 @@ yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc )
 // Public constructors
 
 // This pre-allocates an array of immortal ints for yp_intC to return
+// clang-format off
 #define _ypInt_PREALLOC_START (-5)
 #define _ypInt_PREALLOC_END   (257)
 static ypIntObject _ypInt_pre_allocated[] = {
@@ -4350,7 +4362,6 @@ static ypIntObject _ypInt_pre_allocated[] = {
     _ypInt_PREALLOC( -1 ),
 
     // Allocates a range of 2, 4, etc starting at the given multiple of 2, 4, etc
-    // clang-format off
     #define _ypInt_PREALLOC002( v ) _ypInt_PREALLOC(    v ), _ypInt_PREALLOC(    (v) | 0x01 )
     #define _ypInt_PREALLOC004( v ) _ypInt_PREALLOC002( v ), _ypInt_PREALLOC002( (v) | 0x02 )
     #define _ypInt_PREALLOC008( v ) _ypInt_PREALLOC004( v ), _ypInt_PREALLOC004( (v) | 0x04 )
@@ -4359,11 +4370,11 @@ static ypIntObject _ypInt_pre_allocated[] = {
     #define _ypInt_PREALLOC064( v ) _ypInt_PREALLOC032( v ), _ypInt_PREALLOC032( (v) | 0x20 )
     #define _ypInt_PREALLOC128( v ) _ypInt_PREALLOC064( v ), _ypInt_PREALLOC064( (v) | 0x40 )
     #define _ypInt_PREALLOC256( v ) _ypInt_PREALLOC128( v ), _ypInt_PREALLOC128( (v) | 0x80 )
-    // clang-format on
     _ypInt_PREALLOC256( 0 ), // pre-allocates range( 256 )
 
     _ypInt_PREALLOC( 256 ),
 };
+// clang-format on
 
 // clang-format off
 ypObject * const yp_i_neg_one = (ypObject *) &(_ypInt_pre_allocated[-1 - _ypInt_PREALLOC_START]);
@@ -6869,8 +6880,8 @@ static ypObject *_yp_codecs_normalize_encoding_name( ypObject *encoding )
     }
     return yp_incref( encoding );
 
-    // OK, there's characters to convert, starting at i: create a new string to return
 convert:
+    // OK, there's characters to convert, starting at i: create a new string to return
     norm = _ypStr_new_latin_1( ypStr_CODE, len, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( norm ) ) return norm;
     norm_data = ypStringLib_DATA( norm );
@@ -8858,6 +8869,8 @@ static ypObject *str_currenthash( ypObject *s,
     return yp_None;
 }
 
+#define chrarray_clear NULL
+
 static ypObject *str_dealloc( ypObject *s ) {
     ypMem_FREE_CONTAINER( s, ypStrObject );
     return yp_None;
@@ -9161,9 +9174,12 @@ static ypObject *_yp_chrC( int type, yp_int_t i ) {
     ypStringLib_encinfo *newEnc;
 
     if( i < 0 || i > ypStringLib_MAX_UNICODE ) return yp_ValueError;
+
+    // clang-format off
     newEnc_code = i > 0xFFFFu ? ypStringLib_ENC_UCS_4 :
                   i > 0xFFu   ? ypStringLib_ENC_UCS_2 :
                   ypStringLib_ENC_LATIN_1;
+    // clang-format on
 
     newS = _ypStr_new( type, 1, /*alloclen_fixed=*/TRUE, newEnc_code );
     if( yp_isexceptionC( newS ) ) return newS;
@@ -9241,7 +9257,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         _ypStr_new_latin_1,                 // new
         _ypStr_copy,                        // copy
         _ypStr_grow_onextend,               // grow_onextend
-        NULL, /*chrarray_clear*/            // clear
+        chrarray_clear,                     // clear
     },
     {   // ypStringLib_ENC_UCS_2
         1,                                  // sizeshift
@@ -9256,7 +9272,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         _ypStr_new_ucs_2,                   // new
         _ypStr_copy,                        // copy
         _ypStr_grow_onextend,               // grow_onextend
-        NULL, /*chrarray_clear*/            // clear
+        chrarray_clear,                     // clear
     },
     {   // ypStringLib_ENC_UCS_4
         2,                                  // sizeshift
@@ -9271,7 +9287,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
         _ypStr_new_ucs_4,                   // new
         _ypStr_copy,                        // copy
         _ypStr_grow_onextend,               // grow_onextend
-        NULL, /*chrarray_clear*/            // clear
+        chrarray_clear,                     // clear
     }
 };
 
@@ -9279,10 +9295,16 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
 // TODO Rethink where we split off to a type-specific function, and where we call a generic
 // ypStringLib
 #define _ypStringLib_REDIRECT1( ob, meth, args ) \
-    do {int ob_pair = ypObject_TYPE_PAIR_CODE( ob ); \
-        if( ob_pair == ypStr_CODE ) return str_ ## meth args; \
-        if( ob_pair == ypBytes_CODE ) return bytes_ ## meth args; \
-        return_yp_BAD_TYPE( ob ); } while( 0 )
+    do { \
+        int ob_pair = ypObject_TYPE_PAIR_CODE( ob ); \
+        if( ob_pair == ypStr_CODE ) { \
+            return str_ ## meth args; \
+        } \
+        if( ob_pair == ypBytes_CODE ) { \
+            return bytes_ ## meth args; \
+        } \
+        return_yp_BAD_TYPE( ob ); \
+    } while( 0 )
 
 
 ypObject *yp_isalnum( ypObject *s ) {
@@ -10161,8 +10183,10 @@ static ypObject *tuple_eq( ypObject *sq, ypObject *x )
     // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when sq!=x.
     if( ypObject_CACHED_HASH( sq ) != ypObject_HASH_INVALID &&
-        ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
-        ypObject_CACHED_HASH( sq ) != ypObject_CACHED_HASH( x ) ) return yp_False;
+            ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
+            ypObject_CACHED_HASH( sq ) != ypObject_CACHED_HASH( x ) ) {
+        return yp_False;
+    }
     // TODO What if we haven't cached this hash yet, but we could?  Calculating the hash now could
     // speed up future comparisons against these objects.  But!  What if we're a tuple of mutable
     // objects...we will then attempt to calculate the hash on every comparison, only to fail.  If
@@ -10475,10 +10499,10 @@ static void ypQuickIter_tuple_close( ypQuickIter_state *state ) {
 }
 
 static const ypQuickIter_methods ypQuickIter_tuple_methods = {
-    ypQuickIter_tuple_nextX,
-    ypQuickIter_tuple_next,
-    ypQuickIter_tuple_lenhint,
-    ypQuickIter_tuple_close
+    ypQuickIter_tuple_nextX,    // nextX
+    ypQuickIter_tuple_next,     // next
+    ypQuickIter_tuple_lenhint,  // lenhint
+    ypQuickIter_tuple_close     // close
 };
 
 // Initializes state with the given tuple.  Always succeeds.  Use ypQuickIter_tuple_methods as the
@@ -10512,10 +10536,10 @@ static void ypQuickSeq_tuple_close( ypQuickSeq_state *state ) {
 }
 
 static const ypQuickSeq_methods ypQuickSeq_tuple_methods = {
-    ypQuickSeq_tuple_getindexX,
-    ypQuickSeq_tuple_getindex,
-    ypQuickSeq_tuple_len,
-    ypQuickSeq_tuple_close
+    ypQuickSeq_tuple_getindexX, // getindexX
+    ypQuickSeq_tuple_getindex,  // getindex
+    ypQuickSeq_tuple_len,       // len
+    ypQuickSeq_tuple_close      // close
 };
 
 // Initializes state with the given tuple.  Always succeeds.  Use ypQuickSeq_tuple_methods as the
@@ -10972,8 +10996,8 @@ static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t
     //lint -unreachable
     return yp_SystemError;
 
-// When the code jumps here, it means ep points to the proper entry
 success:
+    // When the code jumps here, it means ep points to the proper entry
     *loc = ep;
     return yp_None;
 }
@@ -14372,11 +14396,11 @@ ypObject * const yp_type_range = (ypObject *) &ypRange_Type;
  *************************************************************************************************/
 
 static const yp_initialize_kwparams_t _default_initialize = {
-    yp_sizeof( yp_initialize_kwparams_t ),
-    _default_yp_malloc,
-    _default_yp_malloc_resize,
-    _default_yp_free,
-    /*everything_immortal=*/FALSE
+    yp_sizeof( yp_initialize_kwparams_t ),  // sizeof_struct
+    _default_yp_malloc,                     // yp_malloc
+    _default_yp_malloc_resize,              // yp_malloc_resize
+    _default_yp_free,                       // yp_malloc_free
+    FALSE,                                  // everything_immortal
 };
 
 // Helpful macro, for use only by yp_initialize and friends, to retrieve a parameter from
