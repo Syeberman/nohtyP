@@ -146,7 +146,7 @@ yp_STATIC_ASSERT( sizeof( "abcd" ) == 5, sizeof_str_includes_null );
 
 typedef size_t yp_uhash_t;
 
-// ypObject_HEAD defines the initial segment of every ypObject
+// ypObject_HEAD defines the initial segment of every ypObject; it must be followed by a semicolon
 #define ypObject_HEAD _ypObject_HEAD
 
 // The least-significant bit of the type code specifies if the type is immutable (0) or not
@@ -288,7 +288,7 @@ typedef struct {
 
 // Type objects hold pointers to each type's methods.
 typedef struct {
-    ypObject_HEAD
+    ypObject_HEAD;
     ypObject *tp_name; /* For printing, in format "<module>.<name>" */
 
     // Object fundamentals
@@ -1825,22 +1825,22 @@ typedef yp_int32_t _yp_iter_lenhint_t;
 
 // _ypIterObject_HEAD shared with friendly classes below
 #define _ypIterObject_HEAD_NO_PADDING \
-    ypObject_HEAD \
+    ypObject_HEAD; \
     _yp_iter_lenhint_t ob_lenhint; \
     yp_uint32_t ob_objlocs; \
-    yp_generator_func_t ob_func;
+    yp_generator_func_t ob_func /* force use of semi-colon */
 // To ensure that ob_inline_data is aligned properly, we need to pad on some platforms
 // TODO If we use ob_len to store the lenhint, yp_lenC would have to always call tp_len, but then
 // we could trim 8 bytes off all iterators
 #if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
 #define _ypIterObject_HEAD \
-    _ypIterObject_HEAD_NO_PADDING \
-    void *_ob_padding;
+    _ypIterObject_HEAD_NO_PADDING; \
+    void *_ob_padding /* force use of semi-colon */
 #else
 #define _ypIterObject_HEAD _ypIterObject_HEAD_NO_PADDING
 #endif
 typedef struct {
-    _ypIterObject_HEAD
+    _ypIterObject_HEAD;
     yp_INLINE_DATA( yp_uint8_t );
 } ypIterObject;
 yp_STATIC_ASSERT( yp_offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_iter_inline_data );
@@ -2165,7 +2165,7 @@ ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhi
 // (Allows full iter objects to be created from types that support the mini iterator protocol)
 
 typedef struct {
-    _ypIterObject_HEAD
+    _ypIterObject_HEAD;
     ypObject *mi;
     yp_uint64_t mi_state;
 } ypMiIterObject;
@@ -2749,7 +2749,7 @@ static ypTypeObject ypInvalidated_Type = {
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 typedef struct {
-    ypObject_HEAD
+    ypObject_HEAD;
     ypObject *name;
     ypObject *super;
 } ypExceptionObject;
@@ -3142,7 +3142,7 @@ ypObject * const yp_None = &_yp_None_struct;
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
 typedef struct {
-    ypObject_HEAD
+    ypObject_HEAD;
     char value;
 } ypBoolObject;
 #define _ypBool_VALUE( b ) ( ((ypBoolObject *)b)->value )
@@ -3269,7 +3269,7 @@ typedef struct _ypIntObject ypIntObject;
 
 // Arithmetic code depends on both int and float particulars being defined first
 typedef struct {
-    ypObject_HEAD
+    ypObject_HEAD;
     yp_float_t value;
 } ypFloatObject;
 #define ypFloat_VALUE( f ) ( ((ypFloatObject *)f)->value )
@@ -9462,7 +9462,7 @@ ypObject *yp_splitlines2( ypObject *s, ypObject *keepends ) {
  *************************************************************************************************/
 
 typedef struct {
-    ypObject_HEAD
+    ypObject_HEAD;
     yp_INLINE_DATA( ypObject * );
 } ypTupleObject;
 #define ypTuple_ARRAY( sq )         ( (ypObject **) ((ypObject *)sq)->ob_data )
@@ -10643,7 +10643,7 @@ typedef struct {
     ypObject *se_key;
 } ypSet_KeyEntry;
 typedef struct {
-    ypObject_HEAD
+    ypObject_HEAD;
     yp_ssize_t fill; // # Active + # Dummy
     yp_INLINE_DATA( ypSet_KeyEntry );
 } ypSetObject;
@@ -10700,7 +10700,7 @@ static ypSetObject _yp_frozenset_empty_struct = {
 
 // set code relies on some of the internals from the dict implementation
 typedef struct {
-    ypObject_HEAD
+    ypObject_HEAD;
     ypObject *keyset;
     yp_INLINE_DATA( ypObject * );
 } ypDictObject;
@@ -13288,7 +13288,7 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
 typedef struct {
-    ypObject_HEAD
+    ypObject_HEAD;
     yp_int_t start; // all ranges of len < 1 have a start of 0
     yp_int_t step;  // all ranges of len < 2 have a step of 1
 } ypRangeObject;

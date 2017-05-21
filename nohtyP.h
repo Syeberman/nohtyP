@@ -1834,16 +1834,16 @@ struct _ypObject {
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
 
-// ypObject_HEAD defines the initial segment of every ypObject
+// ypObject_HEAD defines the initial segment of every ypObject; it must be followed by a semicolon
 #define _ypObject_HEAD \
-    ypObject ob_base;
+    ypObject ob_base /* force use of semi-colon */
 // Declares the ob_inline_data array for container object structures
 #define _yp_INLINE_DATA( elemType ) \
     elemType ob_inline_data[]
 
 // These structures are likely to change in future versions; they should only exist in-memory
 struct _ypIntObject {
-    _ypObject_HEAD
+    _ypObject_HEAD;
     // TODO If sizeof(yp_int_t)==sizeof(yp_hash_t), we _could_ use ob_hash instead of value, except:
     //  - ob_hash is currently only supposed to be for immutable values
     //  - Value -1 gets mapped to hash -2, which if cached would *change the value* of "-1"
@@ -1852,11 +1852,11 @@ struct _ypIntObject {
     yp_int_t value;
 };
 struct _ypBytesObject {
-    _ypObject_HEAD
+    _ypObject_HEAD;
     _yp_INLINE_DATA( yp_uint8_t );
 };
 struct _ypStrObject {
-    _ypObject_HEAD
+    _ypObject_HEAD;
     ypObject *utf_8;
     _yp_INLINE_DATA( yp_uint8_t );
 };
