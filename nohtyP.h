@@ -1835,16 +1835,15 @@ struct _ypObject {
 };
 
 // ypObject_HEAD defines the initial segment of every ypObject; it must be followed by a semicolon
-#define _ypObject_HEAD \
-    ypObject ob_base /* force use of semi-colon */
+#define _ypObject_HEAD ypObject ob_base /* force use of semi-colon */
 // Declares the ob_inline_data array for container object structures
-#define _yp_INLINE_DATA( elemType ) \
-    elemType ob_inline_data[]
+#define _yp_INLINE_DATA( elemType ) elemType ob_inline_data[]
 
 // These structures are likely to change in future versions; they should only exist in-memory
 struct _ypIntObject {
     _ypObject_HEAD;
-    // TODO If sizeof(yp_int_t)==sizeof(yp_hash_t), we _could_ use ob_hash instead of value, except:
+    // TODO If sizeof(yp_int_t)==sizeof(yp_hash_t), we _could_ use ob_hash instead of value,
+    // except:
     //  - ob_hash is currently only supposed to be for immutable values
     //  - Value -1 gets mapped to hash -2, which if cached would *change the value* of "-1"
     //  - We could _not_ make this optimization for floats...
@@ -1881,38 +1880,42 @@ struct _ypStrObject {
 #define _ypStr_CODE ( 18u )
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-#define _yp_IMMORTAL_HEAD_INIT( type, type_flags, data, len ) \
-    { type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, \
-      len, _ypObject_LEN_INVALID, _ypObject_HASH_INVALID, data }
-#define _yp_NOQUAL  // Used in place of static or extern for qual
-#define _yp_IMMORTAL_INT( qual, name, value ) \
-    static struct _ypIntObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID ), (value) }; \
-    qual ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-#define _yp_IMMORTAL_BYTES( qual, name, value ) \
-    static const char _ ## name ## _data[] = value; \
-    static struct _ypBytesObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypBytes_CODE, _ypStringLib_ENC_BYTES, \
-        (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ) }; \
-    qual ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
-#define _yp_IMMORTAL_STR_LATIN_1( qual, name, value ) \
-    static const char _ ## name ## _data[] = value; \
-    static struct _ypStrObject _ ## name ## _struct = { _yp_IMMORTAL_HEAD_INIT( \
-        _ypStr_CODE, _ypStringLib_ENC_LATIN_1, \
-        (void *) _ ## name ## _data, sizeof( _ ## name ## _data )-1 ), NULL }; \
-    qual ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+#define _yp_IMMORTAL_HEAD_INIT( type, type_flags, data, len )                       \
+    {                                                                               \
+        type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, len, _ypObject_LEN_INVALID, \
+                _ypObject_HASH_INVALID, data                                        \
+    }
+#define _yp_NOQUAL // Used in place of static or extern for qual
+#define _yp_IMMORTAL_INT( qual, name, value )                                                  \
+    static struct _ypIntObject _##name##_struct = {                                            \
+            _yp_IMMORTAL_HEAD_INIT( _ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID ), ( value )}; \
+    qual ypObject *const name = (ypObject *) &_##name##_struct /* force use of semi-colon */
+#define _yp_IMMORTAL_BYTES( qual, name, value )                                               \
+    static const char            _##name##_data[] = value;                                    \
+    static struct _ypBytesObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT( _ypBytes_CODE,   \
+            _ypStringLib_ENC_BYTES, (void *) _##name##_data, sizeof( _##name##_data ) - 1 )}; \
+    qual ypObject *const name = (ypObject *) &_##name##_struct /* force use of semi-colon */
+#define _yp_IMMORTAL_STR_LATIN_1( qual, name, value )                        \
+    static const char          _##name##_data[] = value;                     \
+    static struct _ypStrObject _##name##_struct = {                          \
+            _yp_IMMORTAL_HEAD_INIT( _ypStr_CODE, _ypStringLib_ENC_LATIN_1,   \
+                    (void *) _##name##_data, sizeof( _##name##_data ) - 1 ), \
+            NULL};                                                           \
+    qual ypObject *const name = (ypObject *) &_##name##_struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
-#define yp_IMMORTAL_INT( name, value )          _yp_IMMORTAL_INT( _yp_NOQUAL, name, value )
-#define yp_IMMORTAL_BYTES( name, value )        _yp_IMMORTAL_BYTES( _yp_NOQUAL, name, value )
-#define yp_IMMORTAL_STR_LATIN_1( name, value )  _yp_IMMORTAL_STR_LATIN_1( _yp_NOQUAL, name, value )
+#define yp_IMMORTAL_INT( name, value ) _yp_IMMORTAL_INT( _yp_NOQUAL, name, value )
+#define yp_IMMORTAL_BYTES( name, value ) _yp_IMMORTAL_BYTES( _yp_NOQUAL, name, value )
+#define yp_IMMORTAL_STR_LATIN_1( name, value ) _yp_IMMORTAL_STR_LATIN_1( _yp_NOQUAL, name, value )
 
-#define yp_IMMORTAL_INT_static( name, value )          _yp_IMMORTAL_INT( static, name, value )
-#define yp_IMMORTAL_BYTES_static( name, value )        _yp_IMMORTAL_BYTES( static, name, value )
-#define yp_IMMORTAL_STR_LATIN_1_static( name, value )  _yp_IMMORTAL_STR_LATIN_1( static, name, value )
+#define yp_IMMORTAL_INT_static( name, value ) _yp_IMMORTAL_INT( static, name, value )
+#define yp_IMMORTAL_BYTES_static( name, value ) _yp_IMMORTAL_BYTES( static, name, value )
+#define yp_IMMORTAL_STR_LATIN_1_static( name, value ) \
+    _yp_IMMORTAL_STR_LATIN_1( static, name, value )
 
 #ifdef yp_FUTURE
 // The implementation of yp_IF is considered "internal"; see above for documentation
+// clang-format off
 #define _yp_IF( expression, decref_expression ) { \
     ypObject *_yp_IF_expr; \
     ypObject *_yp_IF_cond; \
@@ -1941,10 +1944,12 @@ struct _ypStrObject {
 #define yp_ENDIF \
     } } \
 }
+// clang-format on
 #endif
 
 #ifdef yp_FUTURE
 // The implementation of yp_WHILE is considered "internal"; see above for documentation
+// clang-format off
 #define _yp_WHILE( expression, decref_expression ) { \
     ypObject *_yp_WHILE_expr; \
     ypObject *_yp_WHILE_cond; \
@@ -1964,10 +1969,12 @@ struct _ypStrObject {
 #define yp_ENDWHILE \
     } \
 }
+// clang-format on
 #endif
 
 #ifdef yp_FUTURE
 // The implementation of yp_FOR is considered "internal"; see above for documentation
+// clang-format off
 #define _yp_FOR( target, expression, decref_expression ) { \
     yp_uint64_t _yp_FOR_state; \
     ypObject *_yp_FOR_item; \
@@ -1998,6 +2005,7 @@ struct _ypStrObject {
     } } \
     yp_decref( _yp_FOR_iter ); \
 }
+// clang-format on
 #endif
 
 #ifdef yp_FUTURE
