@@ -7,7 +7,10 @@ MaxEmptyLinesToKeep: 2
 AlignAfterOpenBracket: DontAlign
 AlignConsecutiveDeclarations: true
 AlignEscapedNewlinesLeft: true
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
 SpaceAfterCStyleCast: true  # TODO disable
 SortIncludes: false  # TODO enable
 SpacesInParentheses: true  # TODO disable
 ---
+# TODO clang-tidy YOUR_FILE.cpp -fix -checks="readability-braces-around-statements" -- COMPILE_OPTIONS

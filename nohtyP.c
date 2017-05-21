@@ -7,22 +7,32 @@
 
 // TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
 // yp_sys_minint, or yp_sys_maxsize
+
 // TODO Audit the use of leading underscore and ensure consistency
-// TODO A flag on (immutable) objects to verify the stored hash.  Flag is set when internal pointers
-// are returned (think yp_asencodedCX), then verified/cleared when yp_hash/currenthash is called
-// again.  Provides a safeguard against this internal data being modified.
+
+// TODO A flag on (immutable) objects to verify the stored hash.  Flag is set when internal
+// pointers are returned (think yp_asencodedCX), then verified/cleared when yp_hash/currenthash is
+// called again.  Provides a safeguard against this internal data being modified.
+
 // TODO Implement array datatype (I don't think struct is needed though)
+
 // TODO Similarly to array, implement an "intset" datatype that stores ints as bitmasks; use the
 // same typecodes as array/struct.  i.e. storing 63 sets bit 1u<<63.  Like array, don't have to
 // interoperate with two different typecodes, but do have to work with generic Python containers
+
 // TODO what do we gain by caching the hash?  We already jump through hoops to use the hash
 // stored in the hash table where possible.
+
 // TODO Is there a way to reduce the size of type+refcnt+len+alloclen to 64 bits, without hitting
 // potential performance issues?
+
 // TODO Do like Python and have just type+refcnt for non-containers
+
 // TODO Python now has operator.length_hint that accepts a default=0 value to return
+
 // TODO Move all the in-line overflow checks into macros/functions that use platform-efficient
-// versions as appropriate (like https://gcc.gnu.org/onlinedocs/gcc/Integer-Overflow-Builtins.html).
+// versions as appropriate (like
+// https://gcc.gnu.org/onlinedocs/gcc/Integer-Overflow-Builtins.html).
 
 
 #include "nohtyP.h"
@@ -467,13 +477,13 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE_matches );
         *name ## _miniiterfunc, \
         *name ## _objproc \
     } };
-DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for use in methods the type doesn't support
+DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for methods the type doesn't support
 // TODO A yp_ImmutableTypeError, subexception of yp_TypeError, for methods that are supported only
 // by the mutable version.  Then, add a debug yp_initialize assert to ensure all type tables uses
 // this appropriately.
 DEFINE_GENERIC_METHODS( TypeError, yp_TypeError );
-DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for use by Invalidated objects
-DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for use by exception objects; returns "self"
+DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for Invalidated objects
+DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for exception objects; returns "self"
 
 // For use when an object doesn't support a particular comparison operation
 extern ypObject * const yp_ComparisonNotImplemented;
@@ -1476,18 +1486,21 @@ typedef union {
 // The various ypQuickIter_new_* calls either correspond with, or return a pointer to, one of
 // these method tables, which is used to manipulate the associated ypQuickIter_state.
 typedef struct {
-    // Returns a *borrowed* reference to the next yielded value, or an exception.  If the
-    // iterator is exhausted, returns NULL.  The borrowed reference becomes invalid when a new value
-    // is yielded or close is called.
+    // Returns a *borrowed* reference to the next yielded value, or an exception.  If the iterator
+    // is exhausted, returns NULL.  The borrowed reference becomes invalid when a new value is
+    // yielded or close is called.
     ypObject *(*nextX)( ypQuickIter_state *state );
+
     // Similar to nextX, but returns a new reference (that will remain valid until decref'ed).
     ypObject *(*next)( ypQuickIter_state *state );
+
     // Returns the number of items left to be yielded.  Sets *isexact to true if this is an exact
     // value, or false if this is an estimate.  On error, sets *exc, returns zero, and *isexact is
     // undefined.
     // TODO Do like Python, and instead of *isexact accept a default hint that is returned?
     // There's also the idea of a ypObject_MIN_LENHINT...
     yp_ssize_t (*lenhint)( ypQuickIter_state *state, int *isexact, ypObject **exc );
+
     // Closes the ypQuickIter.  Any further operations on state will be undefined.
     // TODO If any of these close methods raise errors, we'll need to return them
     void (*close)( ypQuickIter_state *state );
@@ -1931,8 +1944,8 @@ static ypObject *iter_send( ypObject *i, ypObject *value )
 
     // As per Python, when a generator raises an exception, it can't continue to yield values, so
     // close it.  If iter_close fails just ignore it: result is already set to an exception.
-    // TODO Don't hide errors from iter_close; instead, use Python's "while handling this exception,
-    // another occured" style of reporting
+    // TODO Don't hide errors from iter_close; instead, use Python's "while handling this
+    // exception, another occured" style of reporting
     if( yp_isexceptionC( result ) ) {
         (void) iter_close( i );
         return result;
@@ -5130,10 +5143,10 @@ typedef struct _yp_codecs_error_handler_params_t {
 typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position );
 
-// Registers the alias as an alternate name for the encoding and returns the immortal yp_None.
-// Both alias and encoding are normalized before being registered (lowercased, ' ' and '_' converted
-// to '-').  Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there
-// is no other protection against using encoding names as aliases.  Returns an exception on error.
+// Registers the alias as an alternate name for the encoding and returns the immortal yp_None. Both
+// alias and encoding are normalized before being registered (lowercased, ' ' and '_' converted to
+// '-').  Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there is no
+// other protection against using encoding names as aliases.  Returns an exception on error.
 static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *encoding );
 
 // Returns a new reference to the normalized, unaliased encoding name.
@@ -6336,8 +6349,8 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
             if( yp_isexceptionC( replacement ) ) return replacement;
             source = starts + newPos;
 
-            // We can now update our expectation of how many more characters will be added: it's the
-            // number of byes left to decode (remembering source was modified above).
+            // We can now update our expectation of how many more characters will be added: it's
+            // the number of byes left to decode (remembering source was modified above).
             result = ypStringLib_decode_concat_replacement(
                 dest, replacement, end - source );
             yp_decref( replacement );
@@ -6510,7 +6523,7 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
         // as many characters as we estimated and there's still room in the inline buffer.  We
         // _could_ keep adjusting fake_end until there's no more room, but I don't think this is
         // advantageous.  Don't the first few characters usually determine the encoding?
-        // XXX Can't overflow because we've checked len<=MAX, and len is the worst-case num of chars
+        // XXX Can't overflow because we've checked len<=MAX, and len is worst-case num of chars
         dest_requiredLen = ypStringLib_LEN( dest ) /*ch isn't a char*/ + (end - source);
         if( dest_requiredLen > ypStringLib_ALLOCLEN( dest )-1 ) {
             result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
@@ -6602,8 +6615,8 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
 
         // Otherwise, it's not entirely ASCII, but we know it starts that way, so copy over the
         // part we know and move on to the main loop
-        // XXX We know that the first leading_ascii characters only need one byte, but the remaining
-        // might need up to two
+        // XXX We know that the first leading_ascii characters only need one byte, but the
+        // remaining might need up to two
         if( source_len - leading_ascii > (ypStringLib_LEN_MAX - leading_ascii) / 2 ) {
             return yp_MemorySizeOverflowError;
         }
@@ -6755,8 +6768,8 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
     return dest;
 }
 
-// TODO This code is actually pretty simple.  Rethink the idea of keeping a utf_8 object
-// associated with str objects.  If we remove it, we can use common new/copy/grow between str/bytes.
+// TODO This code is actually pretty simple.  Rethink the idea of keeping a utf_8 object associated
+// with str objects.  If we remove it, we can use common new/copy/grow between str/bytes.
 static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
 {
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypBytes_CODE, "incorrect bytes type" );
@@ -7100,8 +7113,8 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
     source_data = (yp_uint8_t *) params->source.data.ptr;
 
     if( encoding == yp_s_utf_8 ) {
-        // TODO The equivalent Python code assumes null-termination of source, or it might overflow.
-        // Contribute a fix back to Python.
+        // TODO The equivalent Python code assumes null-termination of source, or it might
+        // overflow. Contribute a fix back to Python.
         yp_ssize_t badEnd;      // index of end of surrogates to replace from source
         yp_ssize_t repLen = 0;  // number of surrogate characters (once decoded) to replace
 
@@ -7374,7 +7387,7 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject **mi, yp_uint6
                 newLen+1, lenhint, ypBytes_ALLOCLEN_MAX );
             if( oldptr == NULL ) return yp_MemoryError;
             if( ypBytes_DATA( b ) != oldptr ) {
-                memcpy( ypBytes_DATA( b ), oldptr, newLen-1 ); // -1 for the byte we haven't written
+                memcpy( ypBytes_DATA( b ), oldptr, newLen-1 ); // -1 for byte we haven't written
                 ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
             }
         }
@@ -9241,7 +9254,8 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
 };
 
 // Assume these are most-likely to be run against str/chrarrays, so put that check first
-// TODO Rethink where we split off to a type-specific function, and where we call a generic ypStringLib
+// TODO Rethink where we split off to a type-specific function, and where we call a generic
+// ypStringLib
 #define _ypStringLib_REDIRECT1( ob, meth, args ) \
     do {int ob_pair = ypObject_TYPE_PAIR_CODE( ob ); \
         if( ob_pair == ypStr_CODE ) return str_ ## meth args; \
