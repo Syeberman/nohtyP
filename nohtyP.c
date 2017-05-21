@@ -248,7 +248,7 @@ typedef struct {
 typedef struct {
     objobjproc tp_concat;
     objssizeproc tp_repeat;
-    objssizeobjproc tp_getindex;    /* if defval is NULL, raise exception if missing */
+    objssizeobjproc tp_getindex;    // if defval is NULL, raise exception if missing
     objsliceproc tp_getslice;
     findfunc tp_find;
     countfunc tp_count;
@@ -299,11 +299,11 @@ typedef struct {
 // Type objects hold pointers to each type's methods.
 typedef struct {
     ypObject_HEAD;
-    ypObject *tp_name; /* For printing, in format "<module>.<name>" */
+    ypObject *tp_name;  // For printing, in format "<module>.<name>"
 
     // Object fundamentals
     objproc tp_dealloc;
-    traversefunc tp_traverse; /* call function for all accessible objects; return on exception */
+    traversefunc tp_traverse;  // call function for all accessible objects; return on exception
     // TODO str, repr have the possibility of recursion; trap & test
     objproc tp_str;
     objproc tp_repr;
@@ -314,7 +314,7 @@ typedef struct {
     objproc tp_frozen_copy;
     traversefunc tp_unfrozen_deepcopy;
     traversefunc tp_frozen_deepcopy;
-    objproc tp_invalidate; /* clear, then transmute self to ypInvalidated */
+    objproc tp_invalidate;  // clear, then transmute self to ypInvalidated
 
     // Boolean operations and comparisons
     objproc tp_bool;
@@ -339,16 +339,16 @@ typedef struct {
     miniiter_lenhintfunc tp_miniiter_lenhint;
     objproc tp_iter;
     objproc tp_iter_reversed;
-    objobjproc tp_send; /* called for both yp_send and yp_throw (i.e. accepts exceptions) */
+    objobjproc tp_send;  // called for both yp_send and yp_throw (i.e. accepts exceptions)
 
     // Container operations
     objobjproc tp_contains;
     lenfunc tp_len;
     objobjproc tp_push;
-    objproc tp_clear; /* delete references to contained objects */
+    objproc tp_clear;  // delete references to contained objects
     objproc tp_pop;
-    objobjobjproc tp_remove; /* if onmissing is NULL, raise exception if missing */
-    objobjobjproc tp_getdefault; /* if defval is NULL, raise exception if missing */
+    objobjobjproc tp_remove;  // if onmissing is NULL, raise exception if missing
+    objobjobjproc tp_getdefault;  // if defval is NULL, raise exception if missing
     objobjobjproc tp_setitem;
     objobjproc tp_delitem;
     objvalistproc tp_update;
@@ -552,19 +552,18 @@ int yp_isexceptionC( ypObject *x ) {
 #define yp_sizeof_member( structType, member ) yp_sizeof( ((structType *)0)->member )
 
 // XXX Adapted from _Py_SIZE_ROUND_DOWN et al
-/* Below "a" is a power of 2. */
-/* Round down size "n" to be a multiple of "a". */
+// Below "a" is a power of 2.  Round down size "n" to be a multiple of "a".
 #define yp_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a) - 1))
-/* Round up size "n" to be a multiple of "a". */
+// Round up size "n" to be a multiple of "a".
 #define yp_SIZE_ROUND_UP(n, a) (((size_t)(n) + \
         (size_t)((a) - 1)) & ~(size_t)((a) - 1))
 yp_STATIC_ASSERT( yp_sizeof( size_t ) == yp_sizeof( void * ), uintptr_unnecessary );
-/* Round pointer "p" down to the closest "a"-aligned address <= "p". */
+// Round pointer "p" down to the closest "a"-aligned address <= "p".
 #define yp_ALIGN_DOWN(p, a) ((void *)((size_t)(p) & ~(size_t)((a) - 1)))
-/* Round pointer "p" up to the closest "a"-aligned address >= "p". */
+// Round pointer "p" up to the closest "a"-aligned address >= "p".
 #define yp_ALIGN_UP(p, a) ((void *)(((size_t)(p) + \
         (size_t)((a) - 1)) & ~(size_t)((a) - 1)))
-/* Check if pointer "p" is aligned to "a"-bytes boundary. */
+// Check if pointer "p" is aligned to "a"-bytes boundary.
 #define yp_IS_ALIGNED(p, a) (!((size_t)(p) & (size_t)((a) - 1)))
 
 // For N functions (that take variable arguments); to be used as follows:
@@ -664,9 +663,9 @@ static yp_hash_t yp_HashDouble( double v )
     x = 0;
     while (m) {
         x = ((x << 28) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - 28);
-        m *= 268435456.0;  /* 2**28 */
+        m *= 268435456.0;  // 2**28
         e -= 28;
-        y = (yp_uhash_t)m;  /* pull out integer part */
+        y = (yp_uhash_t)m;  // pull out integer part
         m -= y;
         x += y;
         if (x >= _ypHASH_MODULUS) {
@@ -674,7 +673,7 @@ static yp_hash_t yp_HashDouble( double v )
         }
     }
 
-    /* adjust for the exponent;  first reduce it modulo _ypHASH_BITS */
+    // adjust for the exponent;  first reduce it modulo _ypHASH_BITS
     e = e >= 0 ? e % _ypHASH_BITS : _ypHASH_BITS-1-((-1-e) % _ypHASH_BITS);
     x = ((x << e) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - e);
 
@@ -707,13 +706,13 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
     yp_ssize_t i;
 
     if( len == 0 ) return 0;
-    x = 0; /*(yp_uhash_t) _yp_HashSecret.prefix;*/
+    x = 0; // (yp_uhash_t) _yp_HashSecret.prefix;
     x ^= (yp_uhash_t) *p << 7;
     for (i = 0; i < len; i++) {
         x = (_ypHASH_MULTIPLIER * x) ^ (yp_uhash_t) *p++;
     }
     x ^= (yp_uhash_t) len;
-    /*x ^= (yp_uhash_t) _yp_HashSecret.suffix;*/
+    // x ^= (yp_uhash_t) _yp_HashSecret.suffix;
     if (x == (yp_uhash_t) ypObject_HASH_INVALID) {
         x = (yp_uhash_t) (ypObject_HASH_INVALID-1);
     }
@@ -753,7 +752,7 @@ static yp_ssize_t _yp_recursion_limit = 1000;
 #define _yp_CTF_SPACE  0x08
 #define _yp_CTF_XDIGIT 0x10
 
-/* Unlike their C counterparts, the following macros are meant only for yp_uint8_t values. */
+// Unlike their C counterparts, the following macros are meant only for yp_uint8_t values.
 #define yp_ISLOWER(c)  (_yp_ctype_table[c] & _yp_CTF_LOWER)
 #define yp_ISUPPER(c)  (_yp_ctype_table[c] & _yp_CTF_UPPER)
 #define yp_ISALPHA(c)  (_yp_ctype_table[c] & _yp_CTF_ALPHA)
@@ -768,134 +767,134 @@ static yp_ssize_t _yp_recursion_limit = 1000;
 // XXX Adapted from Python's pyctype.c and pyctype.h
 // TODO In Python, this is a table of unsigned ints, which is unnecessarily large; contribute a fix
 const yp_uint8_t _yp_ctype_table[256] = {
-    0, /* 0x0 '\x00' */
-    0, /* 0x1 '\x01' */
-    0, /* 0x2 '\x02' */
-    0, /* 0x3 '\x03' */
-    0, /* 0x4 '\x04' */
-    0, /* 0x5 '\x05' */
-    0, /* 0x6 '\x06' */
-    0, /* 0x7 '\x07' */
-    0, /* 0x8 '\x08' */
-    _yp_CTF_SPACE, /* 0x9 '\t' */
-    _yp_CTF_SPACE, /* 0xa '\n' */
-    _yp_CTF_SPACE, /* 0xb '\v' */
-    _yp_CTF_SPACE, /* 0xc '\f' */
-    _yp_CTF_SPACE, /* 0xd '\r' */
-    0, /* 0xe '\x0e' */
-    0, /* 0xf '\x0f' */
-    0, /* 0x10 '\x10' */
-    0, /* 0x11 '\x11' */
-    0, /* 0x12 '\x12' */
-    0, /* 0x13 '\x13' */
-    0, /* 0x14 '\x14' */
-    0, /* 0x15 '\x15' */
-    0, /* 0x16 '\x16' */
-    0, /* 0x17 '\x17' */
-    0, /* 0x18 '\x18' */
-    0, /* 0x19 '\x19' */
-    0, /* 0x1a '\x1a' */
-    0, /* 0x1b '\x1b' */
-    0, /* 0x1c '\x1c' */
-    0, /* 0x1d '\x1d' */
-    0, /* 0x1e '\x1e' */
-    0, /* 0x1f '\x1f' */
-    _yp_CTF_SPACE, /* 0x20 ' ' */
-    0, /* 0x21 '!' */
-    0, /* 0x22 '"' */
-    0, /* 0x23 '#' */
-    0, /* 0x24 '$' */
-    0, /* 0x25 '%' */
-    0, /* 0x26 '&' */
-    0, /* 0x27 "'" */
-    0, /* 0x28 '(' */
-    0, /* 0x29 ')' */
-    0, /* 0x2a '*' */
-    0, /* 0x2b '+' */
-    0, /* 0x2c ',' */
-    0, /* 0x2d '-' */
-    0, /* 0x2e '.' */
-    0, /* 0x2f '/' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x30 '0' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x31 '1' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x32 '2' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x33 '3' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x34 '4' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x35 '5' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x36 '6' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x37 '7' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x38 '8' */
-    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, /* 0x39 '9' */
-    0, /* 0x3a ':' */
-    0, /* 0x3b ';' */
-    0, /* 0x3c '<' */
-    0, /* 0x3d '=' */
-    0, /* 0x3e '>' */
-    0, /* 0x3f '?' */
-    0, /* 0x40 '@' */
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x41 'A' */
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x42 'B' */
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x43 'C' */
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x44 'D' */
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x45 'E' */
-    _yp_CTF_UPPER|_yp_CTF_XDIGIT, /* 0x46 'F' */
-    _yp_CTF_UPPER, /* 0x47 'G' */
-    _yp_CTF_UPPER, /* 0x48 'H' */
-    _yp_CTF_UPPER, /* 0x49 'I' */
-    _yp_CTF_UPPER, /* 0x4a 'J' */
-    _yp_CTF_UPPER, /* 0x4b 'K' */
-    _yp_CTF_UPPER, /* 0x4c 'L' */
-    _yp_CTF_UPPER, /* 0x4d 'M' */
-    _yp_CTF_UPPER, /* 0x4e 'N' */
-    _yp_CTF_UPPER, /* 0x4f 'O' */
-    _yp_CTF_UPPER, /* 0x50 'P' */
-    _yp_CTF_UPPER, /* 0x51 'Q' */
-    _yp_CTF_UPPER, /* 0x52 'R' */
-    _yp_CTF_UPPER, /* 0x53 'S' */
-    _yp_CTF_UPPER, /* 0x54 'T' */
-    _yp_CTF_UPPER, /* 0x55 'U' */
-    _yp_CTF_UPPER, /* 0x56 'V' */
-    _yp_CTF_UPPER, /* 0x57 'W' */
-    _yp_CTF_UPPER, /* 0x58 'X' */
-    _yp_CTF_UPPER, /* 0x59 'Y' */
-    _yp_CTF_UPPER, /* 0x5a 'Z' */
-    0, /* 0x5b '[' */
-    0, /* 0x5c '\\' */
-    0, /* 0x5d ']' */
-    0, /* 0x5e '^' */
-    0, /* 0x5f '_' */
-    0, /* 0x60 '`' */
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x61 'a' */
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x62 'b' */
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x63 'c' */
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x64 'd' */
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x65 'e' */
-    _yp_CTF_LOWER|_yp_CTF_XDIGIT, /* 0x66 'f' */
-    _yp_CTF_LOWER, /* 0x67 'g' */
-    _yp_CTF_LOWER, /* 0x68 'h' */
-    _yp_CTF_LOWER, /* 0x69 'i' */
-    _yp_CTF_LOWER, /* 0x6a 'j' */
-    _yp_CTF_LOWER, /* 0x6b 'k' */
-    _yp_CTF_LOWER, /* 0x6c 'l' */
-    _yp_CTF_LOWER, /* 0x6d 'm' */
-    _yp_CTF_LOWER, /* 0x6e 'n' */
-    _yp_CTF_LOWER, /* 0x6f 'o' */
-    _yp_CTF_LOWER, /* 0x70 'p' */
-    _yp_CTF_LOWER, /* 0x71 'q' */
-    _yp_CTF_LOWER, /* 0x72 'r' */
-    _yp_CTF_LOWER, /* 0x73 's' */
-    _yp_CTF_LOWER, /* 0x74 't' */
-    _yp_CTF_LOWER, /* 0x75 'u' */
-    _yp_CTF_LOWER, /* 0x76 'v' */
-    _yp_CTF_LOWER, /* 0x77 'w' */
-    _yp_CTF_LOWER, /* 0x78 'x' */
-    _yp_CTF_LOWER, /* 0x79 'y' */
-    _yp_CTF_LOWER, /* 0x7a 'z' */
-    0, /* 0x7b '{' */
-    0, /* 0x7c '|' */
-    0, /* 0x7d '}' */
-    0, /* 0x7e '~' */
-    0, /* 0x7f '\x7f' */
+    0, // 0x0 '\x00'
+    0, // 0x1 '\x01'
+    0, // 0x2 '\x02'
+    0, // 0x3 '\x03'
+    0, // 0x4 '\x04'
+    0, // 0x5 '\x05'
+    0, // 0x6 '\x06'
+    0, // 0x7 '\x07'
+    0, // 0x8 '\x08'
+    _yp_CTF_SPACE, // 0x9 '\t'
+    _yp_CTF_SPACE, // 0xa '\n'
+    _yp_CTF_SPACE, // 0xb '\v'
+    _yp_CTF_SPACE, // 0xc '\f'
+    _yp_CTF_SPACE, // 0xd '\r'
+    0, // 0xe '\x0e'
+    0, // 0xf '\x0f'
+    0, // 0x10 '\x10'
+    0, // 0x11 '\x11'
+    0, // 0x12 '\x12'
+    0, // 0x13 '\x13'
+    0, // 0x14 '\x14'
+    0, // 0x15 '\x15'
+    0, // 0x16 '\x16'
+    0, // 0x17 '\x17'
+    0, // 0x18 '\x18'
+    0, // 0x19 '\x19'
+    0, // 0x1a '\x1a'
+    0, // 0x1b '\x1b'
+    0, // 0x1c '\x1c'
+    0, // 0x1d '\x1d'
+    0, // 0x1e '\x1e'
+    0, // 0x1f '\x1f'
+    _yp_CTF_SPACE, // 0x20 ' '
+    0, // 0x21 '!'
+    0, // 0x22 '"'
+    0, // 0x23 '#'
+    0, // 0x24 '$'
+    0, // 0x25 '%'
+    0, // 0x26 '&'
+    0, // 0x27 "'"
+    0, // 0x28 '('
+    0, // 0x29 ')'
+    0, // 0x2a '*'
+    0, // 0x2b '+'
+    0, // 0x2c ','
+    0, // 0x2d '-'
+    0, // 0x2e '.'
+    0, // 0x2f '/'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x30 '0'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x31 '1'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x32 '2'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x33 '3'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x34 '4'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x35 '5'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x36 '6'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x37 '7'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x38 '8'
+    _yp_CTF_DIGIT|_yp_CTF_XDIGIT, // 0x39 '9'
+    0, // 0x3a ':'
+    0, // 0x3b ';'
+    0, // 0x3c '<'
+    0, // 0x3d '='
+    0, // 0x3e '>'
+    0, // 0x3f '?'
+    0, // 0x40 '@'
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x41 'A'
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x42 'B'
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x43 'C'
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x44 'D'
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x45 'E'
+    _yp_CTF_UPPER|_yp_CTF_XDIGIT, // 0x46 'F'
+    _yp_CTF_UPPER, // 0x47 'G'
+    _yp_CTF_UPPER, // 0x48 'H'
+    _yp_CTF_UPPER, // 0x49 'I'
+    _yp_CTF_UPPER, // 0x4a 'J'
+    _yp_CTF_UPPER, // 0x4b 'K'
+    _yp_CTF_UPPER, // 0x4c 'L'
+    _yp_CTF_UPPER, // 0x4d 'M'
+    _yp_CTF_UPPER, // 0x4e 'N'
+    _yp_CTF_UPPER, // 0x4f 'O'
+    _yp_CTF_UPPER, // 0x50 'P'
+    _yp_CTF_UPPER, // 0x51 'Q'
+    _yp_CTF_UPPER, // 0x52 'R'
+    _yp_CTF_UPPER, // 0x53 'S'
+    _yp_CTF_UPPER, // 0x54 'T'
+    _yp_CTF_UPPER, // 0x55 'U'
+    _yp_CTF_UPPER, // 0x56 'V'
+    _yp_CTF_UPPER, // 0x57 'W'
+    _yp_CTF_UPPER, // 0x58 'X'
+    _yp_CTF_UPPER, // 0x59 'Y'
+    _yp_CTF_UPPER, // 0x5a 'Z'
+    0, // 0x5b '['
+    0, // 0x5c '\\'
+    0, // 0x5d ']'
+    0, // 0x5e '^'
+    0, // 0x5f '_'
+    0, // 0x60 '`'
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x61 'a'
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x62 'b'
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x63 'c'
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x64 'd'
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x65 'e'
+    _yp_CTF_LOWER|_yp_CTF_XDIGIT, // 0x66 'f'
+    _yp_CTF_LOWER, // 0x67 'g'
+    _yp_CTF_LOWER, // 0x68 'h'
+    _yp_CTF_LOWER, // 0x69 'i'
+    _yp_CTF_LOWER, // 0x6a 'j'
+    _yp_CTF_LOWER, // 0x6b 'k'
+    _yp_CTF_LOWER, // 0x6c 'l'
+    _yp_CTF_LOWER, // 0x6d 'm'
+    _yp_CTF_LOWER, // 0x6e 'n'
+    _yp_CTF_LOWER, // 0x6f 'o'
+    _yp_CTF_LOWER, // 0x70 'p'
+    _yp_CTF_LOWER, // 0x71 'q'
+    _yp_CTF_LOWER, // 0x72 'r'
+    _yp_CTF_LOWER, // 0x73 's'
+    _yp_CTF_LOWER, // 0x74 't'
+    _yp_CTF_LOWER, // 0x75 'u'
+    _yp_CTF_LOWER, // 0x76 'v'
+    _yp_CTF_LOWER, // 0x77 'w'
+    _yp_CTF_LOWER, // 0x78 'x'
+    _yp_CTF_LOWER, // 0x79 'y'
+    _yp_CTF_LOWER, // 0x7a 'z'
+    0, // 0x7b '{'
+    0, // 0x7c '|'
+    0, // 0x7d '}'
+    0, // 0x7e '~'
+    0, // 0x7f '\x7f'
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3783,7 +3782,7 @@ void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *_div, yp_int_t *_mod, ypObjec
         *exc = yp_ZeroDivisionError;
         goto error;
     }
-    /* (-sys.maxint-1)/-1 is the only overflow case. */
+    // (-sys.maxint-1)/-1 is the only overflow case.
     if (y == -1 && x == yp_INT_T_MIN) {
         *exc = yp_OverflowError;
         goto error;
@@ -3805,7 +3804,7 @@ void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *_div, yp_int_t *_mod, ypObjec
      * ceiling of the infinitely precise quotient.  We want the floor,
      * and we have it iff the remainder's sign matches y's.
      */
-    if (xmody && ((y ^ xmody) < 0) /* i.e. and signs differ */) {
+    if (xmody && ((y ^ xmody) < 0)) {  // i.e. and signs differ
         xmody += y;
         --xdivy;
         yp_ASSERT1(xmody && ((y ^ xmody) >= 0));
@@ -3845,7 +3844,7 @@ yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
     temp = x;
     result = 1;
     while (y > 0) {
-        prev = result;              /* Save value for overflow check */
+        prev = result;              // Save value for overflow check
         if (y & 1) {
             /*
              * The (unsigned long) cast below ensures that the multiplication
@@ -3855,20 +3854,20 @@ yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
              */
             result = yp_UINT_MATH(result, *, temp);
             if (temp == 0)
-                break; /* Avoid result / 0 */
+                break; // Avoid result / 0
             if (result / temp != prev) {
                 return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
             }
         }
-        y >>= 1;               /* Shift exponent down by 1 bit */
+        y >>= 1;               // Shift exponent down by 1 bit
         if (y==0) break;
         prev = temp;
-        temp = yp_UINT_MATH(temp, *, temp);  /* Square the value of temp */
+        temp = yp_UINT_MATH(temp, *, temp);  // Square the value of temp
         if (prev != 0 && temp / prev != prev) {
             return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
         }
         if (z) {
-            /* If we did a multiplication, perform a modulo */
+            // If we did a multiplication, perform a modulo
             result = result % z;
             temp = temp % z;
         }
@@ -4901,7 +4900,7 @@ yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc )
 // XXX Adapted from Python's float_trunc
 yp_int_t yp_asintLF( yp_float_t x, ypObject **exc )
 {
-    yp_float_t wholepart;           /* integral portion of x, rounded toward 0 */
+    yp_float_t wholepart;           // integral portion of x, rounded toward 0
 
     (void)modf(x, &wholepart);
     /* Try to get out cheap if this fits in a Python int.  The attempt
@@ -4926,9 +4925,9 @@ yp_int_t yp_asintLF( yp_float_t x, ypObject **exc )
 // XXX Adapted from Python's float_trunc
 static yp_int_t yp_asint_exactLF( yp_float_t x, ypObject **exc )
 {
-    yp_float_t wholepart;           /* integral portion of x, rounded toward 0 */
+    yp_float_t wholepart;           // integral portion of x, rounded toward 0
 
-    if (modf(x, &wholepart) != 0.0) {   /* returns fractional portion of x */
+    if (modf(x, &wholepart) != 0.0) {   // returns fractional portion of x
         return_yp_CEXC_ERR( 0, exc, yp_ArithmeticError );
     }
     if (yp_INT_T_MIN < wholepart && wholepart < yp_INT_T_MAX) {
@@ -6081,7 +6080,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
         }
 
         if (ch < 0xE0) {
-            /* \xC2\x80-\xDF\xBF -- 0080-07FF */
+            // \xC2\x80-\xDF\xBF -- 0080-07FF
             yp_uint32_t ch2;
             if (ch < 0xC2) {
                 /* invalid sequence
@@ -6106,7 +6105,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             yp_ASSERT1 ((ch > 0x007F) && (ch <= 0x07FF));
             s += 2;
             if (ch > dest_max_char) {
-                /* Out-of-range */
+                // Out-of-range
                 goto Return;
             }
             dest_setindexX( dest_data, dest_len, ch );
@@ -6115,7 +6114,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
         }
 
         if (ch < 0xF0) {
-            /* \xE0\xA0\x80-\xEF\xBF\xBF -- 0800-FFFF */
+            // \xE0\xA0\x80-\xEF\xBF\xBF -- 0800-FFFF
             yp_uint32_t ch2, ch3;
             if (end - s < 3) {
                 /* unexpected end of data: the caller will decide whether
@@ -6127,7 +6126,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
                 ch2 = s[1];
                 if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2) ||
                     (ch2 < 0xA0 ? ch == 0xE0 : ch == 0xED)) {
-                    /* for clarification see comments below */
+                    // for clarification see comments below
                     ch = ypStringLib_UTF_8_INVALID_CONT_1;
                     goto Return;
                 }
@@ -6165,7 +6164,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             yp_ASSERT1 ((ch > 0x07FF) && (ch <= 0xFFFF));
             s += 3;
             if (ch > dest_max_char) {
-                /* Out-of-range */
+                // Out-of-range
                 goto Return;
             }
             dest_setindexX( dest_data, dest_len, ch );
@@ -6174,7 +6173,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
         }
 
         if (ch < 0xF5) {
-            /* \xF0\x90\x80\x80-\xF4\x8F\xBF\xBF -- 10000-10FFFF */
+            // \xF0\x90\x80\x80-\xF4\x8F\xBF\xBF -- 10000-10FFFF
             yp_uint32_t ch2, ch3, ch4;
             if (end - s < 4) {
                 /* unexpected end of data: the caller will decide whether
@@ -6186,7 +6185,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
                 ch2 = s[1];
                 if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2) ||
                     (ch2 < 0x90 ? ch == 0xF0 : ch == 0xF4)) {
-                    /* for clarification see comments below */
+                    // for clarification see comments below
                     ch = ypStringLib_UTF_8_INVALID_CONT_1;
                     goto Return;
                 }
@@ -6236,7 +6235,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             yp_ASSERT1 ((ch > 0xFFFF) && (ch <= 0x10FFFF));
             s += 4;
             if (ch > dest_max_char) {
-                /* Out-of-range */
+                // Out-of-range
                 goto Return;
             }
             dest_setindexX( dest_data, dest_len, ch );
@@ -6433,7 +6432,7 @@ static ypObject *_ypStringLib_decode_utf_8_ascii_start( int type,
 static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     ypObject *dest, const yp_uint8_t **source )
 {
-    yp_ssize_t dest_maxinline = ypStringLib_ALLOCLEN( dest ) - 1 /*-1 for terminator*/;
+    yp_ssize_t dest_maxinline = ypStringLib_ALLOCLEN( dest ) - 1;  // -1 for terminator
     // TODO Does it really make sense to use the entire inline buffer for the precheck?  Aren't
     // strings "usually" entirely latin-1, or ucs-2, or ucs-4?  Isn't it enough just to check the
     // first, I dunno, 16 characters?  Doing this won't save on allocations, but it *will* save
@@ -6500,7 +6499,7 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
     if( yp_isexceptionC( dest ) ) return dest;
 
     // Shortcut: if the inline array can fit all decoded characters anyway, jump to outer loop
-    if( len <= ypStringLib_ALLOCLEN( dest )-1 /*-1 for terminator*/ ) {
+    if( len <= ypStringLib_ALLOCLEN( dest )-1) {  // -1 for terminator
         goto outer_loop;
     }
 
@@ -8615,7 +8614,7 @@ static ypObject *str_concat( ypObject *s, ypObject *x )
     ypStringLib_elemcopy( newEnc->sizeshift, ypStr_DATA( newS ), 0,
             ypStringLib_ENC( s )->sizeshift, ypStr_DATA( s ), 0, ypStr_LEN( s ) );
     ypStringLib_elemcopy( newEnc->sizeshift, ypStr_DATA( newS ), ypStr_LEN( s ),
-            ypStringLib_ENC( x )->sizeshift, ypStr_DATA( x ), 0, ypStr_LEN( x )+1/*+null*/ );
+            ypStringLib_ENC( x )->sizeshift, ypStr_DATA( x ), 0, ypStr_LEN( x )+1 );  // incl null
     ypStr_SET_LEN( newS, newLen );
     ypStr_ASSERT_INVARIANTS( newS );
     return newS;
@@ -10174,7 +10173,7 @@ static ypObject *tuple_currenthash( ypObject *sq,
         result = hash_visitor(*p++, hash_memo, &y);
         if (yp_isexceptionC(result)) return result;
         x = (x ^ y) * mult;
-        /* the cast might truncate len; that doesn't change hash stability */
+        // the cast might truncate len; that doesn't change hash stability
         mult += (yp_hash_t)(82520L + len + len);
     }
     x += 97531L;
@@ -11803,14 +11802,14 @@ static ypObject *set_pop( ypObject *so ) {
          * finger that's out of bounds now because it wrapped around
          * or the table shrunk -- simply make sure it's in bounds now.
          */
-        if( i > ypSet_MASK( so ) || i < 1 ) i = 1; /* skip slot 0 */
+        if( i > ypSet_MASK( so ) || i < 1 ) i = 1; // skip slot 0
         while( !ypSet_ENTRY_USED( table+i ) ) {
             i++;
             if( i > ypSet_MASK( so ) ) i = 1;
         }
     }
     key = _ypSet_removekey( so, table+i );
-    table->se_hash = i + 1;  /* next place to start */
+    table->se_hash = i + 1;  // next place to start
     return key;
 }
 
@@ -12765,7 +12764,7 @@ static ypObject *dict_popitem( ypObject *mp, ypObject **key, ypObject **value )
     *value = values[i];
     values[i] = NULL;
     ypDict_SET_LEN( mp, ypDict_LEN( mp ) - 1 );
-    ypDict_SET_POPITEM_FINGER( mp, i + 1 );  /* next place to start */
+    ypDict_SET_POPITEM_FINGER( mp, i + 1 );  // next place to start
     return yp_None;
 }
 
@@ -14278,41 +14277,41 @@ void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t 
 
 // Recall that C helpfully sets missing array elements to NULL
 static ypTypeObject *ypTypeTable[255] = {
-    &ypInvalidated_Type,/* ypInvalidated_CODE          (  0u) */
-    &ypInvalidated_Type,/*                             (  1u) */
-    &ypException_Type,  /* ypException_CODE            (  2u) */
-    &ypException_Type,  /*                             (  3u) */
-    &ypType_Type,       /* ypType_CODE                 (  4u) */
-    &ypType_Type,       /*                             (  5u) */
+    &ypInvalidated_Type,// ypInvalidated_CODE          (  0u)
+    &ypInvalidated_Type,//                             (  1u)
+    &ypException_Type,  // ypException_CODE            (  2u)
+    &ypException_Type,  //                             (  3u)
+    &ypType_Type,       // ypType_CODE                 (  4u)
+    &ypType_Type,       //                             (  5u)
 
-    &ypNoneType_Type,   /* ypNoneType_CODE             (  6u) */
-    &ypNoneType_Type,   /*                             (  7u) */
-    &ypBool_Type,       /* ypBool_CODE                 (  8u) */
-    &ypBool_Type,       /*                             (  9u) */
+    &ypNoneType_Type,   // ypNoneType_CODE             (  6u)
+    &ypNoneType_Type,   //                             (  7u)
+    &ypBool_Type,       // ypBool_CODE                 (  8u)
+    &ypBool_Type,       //                             (  9u)
 
-    &ypInt_Type,        /* ypInt_CODE                  ( 10u) */
-    &ypIntStore_Type,   /* ypIntStore_CODE             ( 11u) */
-    &ypFloat_Type,      /* ypFloat_CODE                ( 12u) */
-    &ypFloatStore_Type, /* ypFloatStore_CODE           ( 13u) */
+    &ypInt_Type,        // ypInt_CODE                  ( 10u)
+    &ypIntStore_Type,   // ypIntStore_CODE             ( 11u)
+    &ypFloat_Type,      // ypFloat_CODE                ( 12u)
+    &ypFloatStore_Type, // ypFloatStore_CODE           ( 13u)
 
-    &ypIter_Type,       /* ypFrozenIter_CODE           ( 14u) */
-    &ypIter_Type,       /* ypIter_CODE                 ( 15u) */
+    &ypIter_Type,       // ypFrozenIter_CODE           ( 14u)
+    &ypIter_Type,       // ypIter_CODE                 ( 15u)
 
-    &ypBytes_Type,      /* ypBytes_CODE                ( 16u) */
-    &ypByteArray_Type,  /* ypByteArray_CODE            ( 17u) */
-    &ypStr_Type,        /* ypStr_CODE                  ( 18u) */
-    &ypChrArray_Type,   /* ypChrArray_CODE             ( 19u) */
-    &ypTuple_Type,      /* ypTuple_CODE                ( 20u) */
-    &ypList_Type,       /* ypList_CODE                 ( 21u) */
+    &ypBytes_Type,      // ypBytes_CODE                ( 16u)
+    &ypByteArray_Type,  // ypByteArray_CODE            ( 17u)
+    &ypStr_Type,        // ypStr_CODE                  ( 18u)
+    &ypChrArray_Type,   // ypChrArray_CODE             ( 19u)
+    &ypTuple_Type,      // ypTuple_CODE                ( 20u)
+    &ypList_Type,       // ypList_CODE                 ( 21u)
 
-    &ypFrozenSet_Type,  /* ypFrozenSet_CODE            ( 22u) */
-    &ypSet_Type,        /* ypSet_CODE                  ( 23u) */
+    &ypFrozenSet_Type,  // ypFrozenSet_CODE            ( 22u)
+    &ypSet_Type,        // ypSet_CODE                  ( 23u)
 
-    &ypFrozenDict_Type, /* ypFrozenDict_CODE           ( 24u) */
-    &ypDict_Type,       /* ypDict_CODE                 ( 25u) */
+    &ypFrozenDict_Type, // ypFrozenDict_CODE           ( 24u)
+    &ypDict_Type,       // ypDict_CODE                 ( 25u)
 
-    &ypRange_Type,      /* ypRange_CODE                ( 26u) */
-    &ypRange_Type,      /*                             ( 27u) */
+    &ypRange_Type,      // ypRange_CODE                ( 26u)
+    &ypRange_Type,      //                             ( 27u)
 };
 
 ypObject *yp_type( ypObject *object ) {
@@ -14362,16 +14361,16 @@ static const yp_initialize_kwparams_t _default_initialize = {
     (yp_offsetof( yp_initialize_kwparams_t, key ) + yp_sizeof_member( yp_initialize_kwparams_t, key ))
 #define yp_INIT_PARAM2( key, default_cond ) \
     ( kwparams->sizeof_struct < _yp_INIT_PARAM_END( key ) ? \
-        _default_initialize.key \
-      : kwparams->key default_cond ? \
-        _default_initialize.key \
-      : /*else*/ \
+        _default_initialize.key : \
+      kwparams->key default_cond ? \
+        _default_initialize.key : \
+      /* else */ \
         kwparams->key \
     )
 #define yp_INIT_PARAM1( key ) \
     ( kwparams->sizeof_struct < _yp_INIT_PARAM_END( key ) ? \
-        _default_initialize.key \
-      : /*else*/ \
+        _default_initialize.key : \
+      /* else */ \
         kwparams->key \
     )
 
