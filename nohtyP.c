@@ -367,6 +367,7 @@ typedef struct {
 static ypTypeObject *ypTypeTable[255];
 
 // Codes for the standard types (for lookup in the type table)
+// clang-format off
 #define ypInvalidated_CODE          (  0u)
 // no mutable ypInvalidated type    (  1u)
 #define ypException_CODE            (  2u)
@@ -402,6 +403,7 @@ static ypTypeObject *ypTypeTable[255];
 
 #define ypRange_CODE                ( 26u)
 // no mutable ypRange type          ( 27u)
+// clang-format on
 
 yp_STATIC_ASSERT( _ypInt_CODE == ypInt_CODE, ypInt_CODE_matches );
 yp_STATIC_ASSERT( _ypBytes_CODE == ypBytes_CODE, ypBytes_CODE_matches );
@@ -409,6 +411,7 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE_matches );
 
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
+// clang-format off
 #define DEFINE_GENERIC_METHODS( name, retval ) \
     static ypObject *name ## _objproc( ypObject *x ) { return retval; } \
     static ypObject *name ## _objobjproc( ypObject *x, ypObject *y ) { return retval; } \
@@ -477,6 +480,8 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE_matches );
         *name ## _miniiterfunc, \
         *name ## _objproc \
     } };
+// clang-format on
+
 DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for methods the type doesn't support
 // TODO A yp_ImmutableTypeError, subexception of yp_TypeError, for methods that are supported only
 // by the mutable version.  Then, add a debug yp_initialize assert to ensure all type tables uses
@@ -527,6 +532,7 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
 //  - it's an exception, so return it
 //  - it's some other type, so return yp_TypeError
 // TODO It'd be nice to remove a comparison from this, as a minor efficiency, but not sure how
+// clang-format off
 #define yp_BAD_TYPE( bad_ob ) ( \
     ypObject_TYPE_PAIR_CODE( bad_ob ) == ypInvalidated_CODE ? \
         yp_InvalidatedError : \
@@ -534,6 +540,7 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
         (bad_ob) : \
     /* else */ \
         yp_TypeError )
+// clang-format on
 #define return_yp_BAD_TYPE( bad_ob ) \
     return_yp_ERR( yp_BAD_TYPE( bad_ob ) )
 #define return_yp_INPLACE_BAD_TYPE( ob, bad_ob ) \
@@ -743,6 +750,7 @@ static yp_ssize_t _yp_recursion_limit = 1000;
  * Locale-independent ctype.h-like macros
  * XXX This entire section is adapted from Python's pyctype.c and pyctype.h
  *************************************************************************************************/
+// clang-format off
 
 #define _yp_CTF_LOWER  0x01
 #define _yp_CTF_UPPER  0x02
@@ -976,6 +984,8 @@ const yp_uint8_t _yp_ctype_toupper[256] = {
     0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
     0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
 };
+
+// clang-format on
 
 
 /*************************************************************************************************
@@ -3319,6 +3329,7 @@ yp_IMMORTAL_INT( yp_sys_minint, yp_INT_T_MIN );
  * Note that when converting a base B string, a yp_uint8_t c is a legitimate
  * base B digit iff _ypInt_digit_value[c] < B.
  */
+// clang-format off
 unsigned char _ypInt_digit_value[256] = {
     37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
     37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
@@ -3337,6 +3348,7 @@ unsigned char _ypInt_digit_value[256] = {
     37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
     37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
 };
+// clang-format on
 
 // XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
 static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y );
@@ -4293,10 +4305,13 @@ _ypInt_PUBLIC_UNARY_FUNCTION( abs );
 _ypInt_PUBLIC_UNARY_FUNCTION( invert );
 
 // XXX Adapted from Python 2.7's bits_in_ulong
+// clang-format off
 static const yp_uint8_t _BitLengthTable[32] = {
     0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4,
     5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5
 };
+// clang-format on
+
 yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc )
 {
     yp_int_t x_abs;
@@ -4335,6 +4350,7 @@ static ypIntObject _ypInt_pre_allocated[] = {
     _ypInt_PREALLOC( -1 ),
 
     // Allocates a range of 2, 4, etc starting at the given multiple of 2, 4, etc
+    // clang-format off
     #define _ypInt_PREALLOC002( v ) _ypInt_PREALLOC(    v ), _ypInt_PREALLOC(    (v) | 0x01 )
     #define _ypInt_PREALLOC004( v ) _ypInt_PREALLOC002( v ), _ypInt_PREALLOC002( (v) | 0x02 )
     #define _ypInt_PREALLOC008( v ) _ypInt_PREALLOC004( v ), _ypInt_PREALLOC004( (v) | 0x04 )
@@ -4343,15 +4359,18 @@ static ypIntObject _ypInt_pre_allocated[] = {
     #define _ypInt_PREALLOC064( v ) _ypInt_PREALLOC032( v ), _ypInt_PREALLOC032( (v) | 0x20 )
     #define _ypInt_PREALLOC128( v ) _ypInt_PREALLOC064( v ), _ypInt_PREALLOC064( (v) | 0x40 )
     #define _ypInt_PREALLOC256( v ) _ypInt_PREALLOC128( v ), _ypInt_PREALLOC128( (v) | 0x80 )
+    // clang-format on
     _ypInt_PREALLOC256( 0 ), // pre-allocates range( 256 )
 
     _ypInt_PREALLOC( 256 ),
 };
 
+// clang-format off
 ypObject * const yp_i_neg_one = (ypObject *) &(_ypInt_pre_allocated[-1 - _ypInt_PREALLOC_START]);
 ypObject * const yp_i_zero    = (ypObject *) &(_ypInt_pre_allocated[ 0 - _ypInt_PREALLOC_START]);
 ypObject * const yp_i_one     = (ypObject *) &(_ypInt_pre_allocated[ 1 - _ypInt_PREALLOC_START]);
 ypObject * const yp_i_two     = (ypObject *) &(_ypInt_pre_allocated[ 2 - _ypInt_PREALLOC_START]);
+// clang-format on
 
 ypObject *yp_intC( yp_int_t value )
 {
@@ -4452,6 +4471,7 @@ yp_ ## name ## _t yp_as ## name ## C( ypObject *x, ypObject **exc ) { \
     if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_OverflowError ); \
     return retval; \
 }
+// clang-format off
 _ypInt_PUBLIC_AS_C_FUNCTION( int8,   0xFF );
 _ypInt_PUBLIC_AS_C_FUNCTION( uint8,  0xFFu );
 _ypInt_PUBLIC_AS_C_FUNCTION( int16,  0xFFFF );
@@ -4463,6 +4483,7 @@ yp_STATIC_ASSERT( yp_sizeof( yp_ssize_t ) < yp_sizeof( yp_int_t ), sizeof_yp_ssi
 _ypInt_PUBLIC_AS_C_FUNCTION( ssize,  (yp_ssize_t) 0xFFFFFFFF );
 _ypInt_PUBLIC_AS_C_FUNCTION( hash,   (yp_hash_t) 0xFFFFFFFF );
 #endif
+// clang-format on
 
 // The functions below assume/assert that yp_int_t is 64 bits
 yp_STATIC_ASSERT( yp_sizeof( yp_int_t ) == 8, sizeof_yp_int );
@@ -6034,12 +6055,14 @@ final_loop:
 // _ypStringLib_decode_utf_8_inner_loop either returns one of these values, or the out-of-range
 // character (>0xFF) that was decoded (but not written to dest).  The "invalid continuation" values
 // (1, 2, and 3) are chosen so that the value gives the number of bytes that must be skipped.
+// clang-format off
 #define ypStringLib_UTF_8_DATA_END          (0u)    // aka success
 #define ypStringLib_UTF_8_INVALID_CONT_1    (1u)
 #define ypStringLib_UTF_8_INVALID_CONT_2    (2u)
 #define ypStringLib_UTF_8_INVALID_CONT_3    (3u)
 #define ypStringLib_UTF_8_INVALID_START     (4u)
 #define ypStringLib_UTF_8_INVALID_END       (5u)    // *unexpected* end of data
+// clang-format on
 
 // Appends the decoded bytes to dest, updating its length.  If a decoding error occurs, *source
 // will point to the start of the invalid sequence of bytes, and one of the above error codes will
@@ -14276,6 +14299,7 @@ void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t 
 // XXX Make sure this corresponds with ypInvalidated_CODE et al!
 
 // Recall that C helpfully sets missing array elements to NULL
+// clang-format off
 static ypTypeObject *ypTypeTable[255] = {
     &ypInvalidated_Type,// ypInvalidated_CODE          (  0u)
     &ypInvalidated_Type,//                             (  1u)
@@ -14313,6 +14337,7 @@ static ypTypeObject *ypTypeTable[255] = {
     &ypRange_Type,      // ypRange_CODE                ( 26u)
     &ypRange_Type,      //                             ( 27u)
 };
+// clang-format on
 
 ypObject *yp_type( ypObject *object ) {
     return (ypObject *) ypObject_TYPE( object );
@@ -14357,6 +14382,7 @@ static const yp_initialize_kwparams_t _default_initialize = {
 // Helpful macro, for use only by yp_initialize and friends, to retrieve a parameter from
 // kwparams.  Returns the default value if kwparams is too small to hold the parameter, or if
 // the expression "kwparams->key default_cond" (ie "kwparams->yp_malloc ==NULL") evaluates to true.
+// clang-format off
 #define _yp_INIT_PARAM_END( key ) \
     (yp_offsetof( yp_initialize_kwparams_t, key ) + yp_sizeof_member( yp_initialize_kwparams_t, key ))
 #define yp_INIT_PARAM2( key, default_cond ) \
@@ -14373,6 +14399,7 @@ static const yp_initialize_kwparams_t _default_initialize = {
       /* else */ \
         kwparams->key \
     )
+// clang-format on
 
 // Called *exactly* *once* by yp_initialize to set up memory management.  Further, setting
 // yp_malloc here helps ensure that yp_initialize is called before anything else in the library
@@ -14411,13 +14438,15 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
 {
     // The set of standard encodings
     // TODO This would be easier to maintain with a "yp_N" macro to count args
+    // clang-format off
     _yp_codecs_standard = yp_setN( 11,
-            yp_s_ascii,     yp_s_latin_1,
-            yp_s_utf_8,
-            yp_s_utf_16,    yp_s_utf_16be,      yp_s_utf_16le,
-            yp_s_utf_32,    yp_s_utf_32be,      yp_s_utf_32le,
-            yp_s_ucs_2,     yp_s_ucs_4
-            );
+        yp_s_ascii,     yp_s_latin_1,
+        yp_s_utf_8,
+        yp_s_utf_16,    yp_s_utf_16be,      yp_s_utf_16le,
+        yp_s_utf_32,    yp_s_utf_32be,      yp_s_utf_32le,
+        yp_s_ucs_2,     yp_s_ucs_4
+    );
+    // clang-format on
 
     // Codec aliases
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
@@ -14428,6 +14457,7 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
         yp_IMMORTAL_STR_LATIN_1( _alias_obj, alias ); \
         yp_setitem( &_yp_codecs_alias2encoding, _alias_obj, (name) ); \
     } while( 0 )
+    // clang-format off
     yp_codecs_init_ADD_ALIAS( "646",            yp_s_ascii );
     yp_codecs_init_ADD_ALIAS( "ansi_x3.4_1968", yp_s_ascii );
     yp_codecs_init_ADD_ALIAS( "ansi_x3_4_1968", yp_s_ascii );
@@ -14447,6 +14477,7 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     // yp_s_utf_32le
     // yp_s_ucs_2
     // yp_s_ucs_4
+    // clang-format on
 
     // The error-handler registry
     // XXX Oddly, gcc 4.8 doesn't like us creating immortal ints from function pointers
@@ -14456,6 +14487,7 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     _yp_codecs_errors2handler = yp_dictK( 0 );
 #define yp_codecs_init_ADD_ERROR( name, func ) \
         yp_o2i_setitemC( &_yp_codecs_errors2handler, (name), (yp_ssize_t) (func) )
+    // clang-format off
     yp_codecs_init_ADD_ERROR( yp_s_strict,            yp_codecs_strict_errors );
     yp_codecs_init_ADD_ERROR( yp_s_replace,           yp_codecs_replace_errors );
     yp_codecs_init_ADD_ERROR( yp_s_ignore,            yp_codecs_ignore_errors );
@@ -14463,6 +14495,7 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     yp_codecs_init_ADD_ERROR( yp_s_backslashreplace,  yp_codecs_backslashreplace_errors );
     yp_codecs_init_ADD_ERROR( yp_s_surrogateescape,   yp_codecs_surrogateescape_errors );
     yp_codecs_init_ADD_ERROR( yp_s_surrogatepass,     yp_codecs_surrogatepass_errors );
+    // clang-format on
 }
 
 void yp_initialize( const yp_initialize_kwparams_t *kwparams )
@@ -14483,4 +14516,3 @@ void yp_initialize( const yp_initialize_kwparams_t *kwparams )
     _ypMem_initialize( kwparams );
     _yp_codecs_initialize( kwparams );
 }
-
