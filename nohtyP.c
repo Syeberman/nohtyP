@@ -1539,10 +1539,10 @@ static void ypQuickIter_var_close( ypQuickIter_state *state ) {
 }
 
 static const ypQuickIter_methods ypQuickIter_var_methods = {
-    ypQuickIter_var_nextX,
-    ypQuickIter_var_next,
-    ypQuickIter_var_lenhint,
-    ypQuickIter_var_close
+    ypQuickIter_var_nextX,      // nextX
+    ypQuickIter_var_next,       // next
+    ypQuickIter_var_lenhint,    // lenhint
+    ypQuickIter_var_close       // close
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
@@ -1598,10 +1598,10 @@ static void ypQuickIter_mi_close( ypQuickIter_state *state ) {
 }
 
 static const ypQuickIter_methods ypQuickIter_mi_methods = {
-    ypQuickIter_mi_nextX,
-    ypQuickIter_mi_next,
-    ypQuickIter_mi_lenhint,
-    ypQuickIter_mi_close
+    ypQuickIter_mi_nextX,       // nextX
+    ypQuickIter_mi_next,        // next
+    ypQuickIter_mi_lenhint,     // lenhint
+    ypQuickIter_mi_close        // close
 };
 
 
@@ -1722,10 +1722,10 @@ static void ypQuickSeq_var_close( ypQuickSeq_state *state ) {
 }
 
 static const ypQuickSeq_methods ypQuickSeq_var_methods = {
-    ypQuickSeq_var_getindexX,
-    ypQuickSeq_var_getindex,
-    ypQuickSeq_var_len,
-    ypQuickSeq_var_close
+    ypQuickSeq_var_getindexX,   // getindexX
+    ypQuickSeq_var_getindex,    // getindex
+    ypQuickSeq_var_len,         // len
+    ypQuickSeq_var_close        // close
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
@@ -1778,10 +1778,10 @@ static void ypQuickSeq_seq_close( ypQuickSeq_state *state ) {
 }
 
 static const ypQuickSeq_methods ypQuickSeq_seq_methods = {
-    ypQuickSeq_seq_getindexX,
-    ypQuickSeq_seq_getindex,
-    ypQuickSeq_seq_len,
-    ypQuickSeq_seq_close
+    ypQuickSeq_seq_getindexX,   // getindexX
+    ypQuickSeq_seq_getindex,    // getindex
+    ypQuickSeq_seq_len,         // len
+    ypQuickSeq_seq_close        // close
 };
 
 
