@@ -516,6 +516,10 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
+#define MIN3(a, b, c) MIN(MIN(a, b), c)
+#define MIN4(a, b, c, d) MIN(MIN(a, b), MIN(c, d))
+
+
 // Functions that return nohtyP objects simply need to return the error object to "raise" it
 // Use this as "return_yp_ERR( x, yp_ValueError );" to return the error properly
 #define return_yp_ERR(_err)             \
@@ -5254,10 +5258,9 @@ typedef struct _ypStrObject ypStrObject;
 // UCS-4 character, thus quadrupling its size.)
 // XXX On the flip side, this means it's possible to create a string that, when encoded, cannot
 // fit in a bytes object, as it'll be larger than LEN_MAX.
-#define ypStringLib_ALLOCLEN_MAX                                         \
-    ((yp_ssize_t)MIN(MIN(yp_SSIZE_T_MAX - yp_sizeof(ypBytesObject),      \
-                             (yp_SSIZE_T_MAX - yp_sizeof(ypStrObject)) / \
-                                     4 /* /4 for elemsize of UCS-4 */),  \
+#define ypStringLib_ALLOCLEN_MAX                                                          \
+    ((yp_ssize_t)MIN3(yp_SSIZE_T_MAX - yp_sizeof(ypBytesObject),                          \
+            (yp_SSIZE_T_MAX - yp_sizeof(ypStrObject)) / 4 /* /4 for elemsize of UCS-4 */, \
             ypObject_LEN_MAX))
 #define ypStringLib_LEN_MAX (ypStringLib_ALLOCLEN_MAX - 1 /* for null terminator */)
 
@@ -10748,10 +10751,9 @@ yp_STATIC_ASSERT((_ypMem_ideal_size_DEFAULT - yp_offsetof(ypSetObject, ob_inline
 // sets
 // XXX ypSet_ALLOCLEN_MAX may be larger than the true maximum
 // TODO We could calculate the exact maximum in yp_initialize...
-#define ypSet_ALLOCLEN_MAX                                                                       \
-    ((yp_ssize_t)MIN(                                                                            \
-            MIN(MIN(yp_SSIZE_T_MAX / ypSet_RESIZE_AT_NMR, yp_SSIZE_T_MAX / ypSet_RESIZE_AT_DNM), \
-                    (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) / yp_sizeof(ypSet_KeyEntry)),      \
+#define ypSet_ALLOCLEN_MAX                                                                        \
+    ((yp_ssize_t)MIN4(yp_SSIZE_T_MAX / ypSet_RESIZE_AT_NMR, yp_SSIZE_T_MAX / ypSet_RESIZE_AT_DNM, \
+            (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) / yp_sizeof(ypSet_KeyEntry),                \
             ypObject_LEN_MAX))
 #define ypSet_LEN_MAX \
     ((yp_ssize_t)(ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
