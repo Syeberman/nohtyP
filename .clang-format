@@ -4,13 +4,21 @@ ColumnLimit: 99
 IndentWidth: 4
 ContinuationIndentWidth: 8
 MaxEmptyLinesToKeep: 2
+SpacesBeforeTrailingComments: 2
 AlignAfterOpenBracket: DontAlign
 AlignConsecutiveDeclarations: true
 AlignEscapedNewlinesLeft: true
 AllowShortIfStatementsOnASingleLine: true
+AllowShortBlocksOnASingleLine: false
 AllowShortLoopsOnASingleLine: true
-SpaceAfterCStyleCast: true  # TODO disable
-SortIncludes: false  # TODO enable
-SpacesInParentheses: true  # TODO disable
+BreakBeforeTernaryOperators: false
+BreakBeforeBraces: Linux
+CommentPragmas: '^lint '
+IndentCaseLabels: true # TODO remove
+SpaceAfterCStyleCast: true  # TODO remove
+SortIncludes: false  # TODO remove
+SpaceBeforeParens: false # TODO remove
+SpacesInParentheses: true  # TODO remove
+SpaceInEmptyParentheses: true # TODO remove
 ---
 # TODO clang-tidy YOUR_FILE.cpp -fix -checks="readability-braces-around-statements" -- COMPILE_OPTIONS
