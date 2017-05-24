@@ -923,27 +923,27 @@ ypAPI void yp_updateNV( ypObject **mapping, int n, va_list args );
 // will return a bytearray, while a slice of a str is another str, and so forth.
 
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC4 et al.
-ypAPI ypObject *const yp_s_ascii;    // "ascii"
-ypAPI ypObject *const yp_s_latin_1;  // "latin-1"
-ypAPI ypObject *const yp_s_utf_8;    // "utf-8"
-ypAPI ypObject *const yp_s_utf_16;   // "utf-16"
-ypAPI ypObject *const yp_s_utf_16be; // "utf-16be"
-ypAPI ypObject *const yp_s_utf_16le; // "utf-16le"
-ypAPI ypObject *const yp_s_utf_32;   // "utf-32"
-ypAPI ypObject *const yp_s_utf_32be; // "utf-32be"
-ypAPI ypObject *const yp_s_utf_32le; // "utf-32le"
-ypAPI ypObject *const yp_s_ucs_2;    // "ucs-2"
-ypAPI ypObject *const yp_s_ucs_4;    // "ucs-4"
+ypAPI ypObject *const yp_s_ascii;     // "ascii"
+ypAPI ypObject *const yp_s_latin_1;   // "latin-1"
+ypAPI ypObject *const yp_s_utf_8;     // "utf-8"
+ypAPI ypObject *const yp_s_utf_16;    // "utf-16"
+ypAPI ypObject *const yp_s_utf_16be;  // "utf-16be"
+ypAPI ypObject *const yp_s_utf_16le;  // "utf-16le"
+ypAPI ypObject *const yp_s_utf_32;    // "utf-32"
+ypAPI ypObject *const yp_s_utf_32be;  // "utf-32be"
+ypAPI ypObject *const yp_s_utf_32le;  // "utf-32le"
+ypAPI ypObject *const yp_s_ucs_2;     // "ucs-2"
+ypAPI ypObject *const yp_s_ucs_4;     // "ucs-4"
 
 // Immortal strs representing common string encoding error-handling schemes, for convience with
 // yp_str_frombytesC4 et al.
-ypAPI ypObject *const yp_s_strict;            // "strict"
-ypAPI ypObject *const yp_s_replace;           // "replace"
-ypAPI ypObject *const yp_s_ignore;            // "ignore"
-ypAPI ypObject *const yp_s_xmlcharrefreplace; // "xmlcharrefreplace"
-ypAPI ypObject *const yp_s_backslashreplace;  // "backslashreplace"
-ypAPI ypObject *const yp_s_surrogateescape;   // "surrogateescape"
-ypAPI ypObject *const yp_s_surrogatepass;     // "surrogatepass"
+ypAPI ypObject *const yp_s_strict;             // "strict"
+ypAPI ypObject *const yp_s_replace;            // "replace"
+ypAPI ypObject *const yp_s_ignore;             // "ignore"
+ypAPI ypObject *const yp_s_xmlcharrefreplace;  // "xmlcharrefreplace"
+ypAPI ypObject *const yp_s_backslashreplace;   // "backslashreplace"
+ypAPI ypObject *const yp_s_surrogateescape;    // "surrogateescape"
+ypAPI ypObject *const yp_s_surrogatepass;      // "surrogatepass"
 
 // Returns the immortal yp_True if all characters in s are alphanumeric and there is at least one
 // character, otherwise yp_False.  A character is alphanumeric if one of the following returns
@@ -1614,7 +1614,7 @@ ypAPI int yp_isexceptionCNV( ypObject *x, int n, va_list args );
 // XXX Offsets will not change between versions: members from this struct will never be deleted,
 // only deprecated.
 typedef struct _yp_initialize_kwparams_t {
-    yp_ssize_t sizeof_struct; // Set to sizeof( yp_initialize_kwparams_t ) on allocation
+    yp_ssize_t sizeof_struct;  // Set to sizeof( yp_initialize_kwparams_t ) on allocation
 
     // yp_malloc, yp_malloc_resize, and yp_free allow you to specify custom memory allocation APIs.
     // It is recommended to set these to NULL to use nohtyP's internal defaults.  Any functions you
@@ -1823,14 +1823,14 @@ ypAPI ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t key, const yp_ui
 // XXX dicts repurpose ob_alloclen to hold a search finger for popitem
 typedef yp_int32_t _yp_ob_len_t;
 struct _ypObject {
-    yp_uint16_t  ob_type;       // type code
-    yp_uint8_t   ob_flags;      // type-independent flags
-    yp_uint8_t   ob_type_flags; // type-specific flags
-    yp_uint32_t  ob_refcnt;     // reference count
-    _yp_ob_len_t ob_len;        // length of object
-    _yp_ob_len_t ob_alloclen;   // allocated length
-    yp_hash_t    ob_hash;       // cached hash for immutables
-    void *       ob_data;       // pointer to object data
+    yp_uint16_t  ob_type;        // type code
+    yp_uint8_t   ob_flags;       // type-independent flags
+    yp_uint8_t   ob_type_flags;  // type-specific flags
+    yp_uint32_t  ob_refcnt;      // reference count
+    _yp_ob_len_t ob_len;         // length of object
+    _yp_ob_len_t ob_alloclen;    // allocated length
+    yp_hash_t    ob_hash;        // cached hash for immutables
+    void *       ob_data;        // pointer to object data
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
 
@@ -1885,7 +1885,7 @@ struct _ypStrObject {
         type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, len, _ypObject_LEN_INVALID, \
                 _ypObject_HASH_INVALID, data                                        \
     }
-#define _yp_NOQUAL // Used in place of static or extern for qual
+#define _yp_NOQUAL  // Used in place of static or extern for qual
 #define _yp_IMMORTAL_INT( qual, name, value )                                                  \
     static struct _ypIntObject _##name##_struct = {                                            \
             _yp_IMMORTAL_HEAD_INIT( _ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID ), ( value )}; \
@@ -2025,4 +2025,4 @@ struct _ypStrObject {
 #ifdef __cplusplus
 }
 #endif
-#endif // yp_NOHTYP_H
+#endif  // yp_NOHTYP_H

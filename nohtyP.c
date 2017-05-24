@@ -43,21 +43,21 @@
 #include <float.h>
 #include <math.h>
 
-#ifdef _MSC_VER // MSVC
+#ifdef _MSC_VER  // MSVC
 #include <Windows.h>
 #ifndef va_copy
-#define va_copy( d, s ) ( (d) = (s) )
+#define va_copy( d, s ) ( ( d ) = ( s ) )
 #endif
 #endif
 
-#ifdef __GNUC__ // GCC
-#define GCC_VER (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+#ifdef __GNUC__  // GCC
+#define GCC_VER ( __GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ )
 #include <stdint.h>
 #endif
 
 #ifndef TRUE
-#define TRUE    (1==1)
-#define FALSE   (0==1)
+#define TRUE ( 1 == 1 )
+#define FALSE ( 0 == 1 )
 #endif
 
 
@@ -70,39 +70,39 @@
 //  - 1: yp_ASSERT (minimal debugging)
 //  - 10: yp_DEBUG (print debugging)
 #ifndef yp_DEBUG_LEVEL
-    // Check for well-known debug defines; inspired from http://nothings.org/stb/stb_h.html
-    #if defined( DEBUG ) || defined( _DEBUG ) || defined( DBG )
-        #if defined( NDEBUG )
-            #define yp_DEBUG_LEVEL 0
-        #else
-            #define yp_DEBUG_LEVEL 1
-        #endif
-    #else
-        #define yp_DEBUG_LEVEL 0
-    #endif
+// Check for well-known debug defines; inspired from http://nothings.org/stb/stb_h.html
+#if defined( DEBUG ) || defined( _DEBUG ) || defined( DBG )
+#if defined( NDEBUG )
+#define yp_DEBUG_LEVEL 0
+#else
+#define yp_DEBUG_LEVEL 1
+#endif
+#else
+#define yp_DEBUG_LEVEL 0
+#endif
 #endif
 
 // From http://stackoverflow.com/questions/5641427
-#define _yp_S(x) #x
-#define _yp_S_(x) _yp_S(x)
-#define _yp_S__LINE__ _yp_S_(__LINE__)
+#define _yp_S( x ) #x
+#define _yp_S_( x ) _yp_S( x )
+#define _yp_S__LINE__ _yp_S_( __LINE__ )
 
 #if yp_DEBUG_LEVEL >= 1
-#define _yp_ASSERT( s_file, s_line, expr, ... ) \
-    do { \
-        if( !(expr) ) { \
-            (void) fflush( NULL ); \
+#define _yp_ASSERT( s_file, s_line, expr, ... )                                               \
+    do {                                                                                      \
+        if( !( expr ) ) {                                                                     \
+            (void) fflush( NULL );                                                            \
             fprintf( stderr, "%s", "\n  File " s_file ", line " s_line "\n    " #expr "\n" ); \
-            fprintf( stderr, "yp_ASSERT: " __VA_ARGS__ ); \
-            fprintf( stderr, "\n" ); \
-            abort( ); \
-        } \
+            fprintf( stderr, "yp_ASSERT: " __VA_ARGS__ );                                     \
+            fprintf( stderr, "\n" );                                                          \
+            abort( );                                                                         \
+        }                                                                                     \
     } while( 0 )
 #else
 #define _yp_ASSERT( ... )
 #endif
-#define yp_ASSERT( expr, ... )  _yp_ASSERT( "nohtyP.c", _yp_S__LINE__, expr, __VA_ARGS__ )
-#define yp_ASSERT1( expr )      yp_ASSERT( expr, "assertion failed" )
+#define yp_ASSERT( expr, ... ) _yp_ASSERT( "nohtyP.c", _yp_S__LINE__, expr, __VA_ARGS__ )
+#define yp_ASSERT1( expr ) yp_ASSERT( expr, "assertion failed" )
 
 // Issues a breakpoint if the debugger is attached, on supported platforms
 // TODO Debug only, and use only at the point the error is "raised" (rename to yp_raise?)
@@ -116,15 +116,25 @@ static void yp_breakonerr( ypObject *err ) {
 #endif
 
 #if yp_DEBUG_LEVEL >= 10
-#define yp_DEBUG0( fmt ) do { (void) fflush( NULL ); fprintf( stderr, fmt "\n" ); (void) fflush( NULL ); } while( 0 )
-#define yp_DEBUG( fmt, ... ) do { (void) fflush( NULL ); fprintf( stderr, fmt "\n", __VA_ARGS__ ); (void) fflush( NULL ); } while( 0 )
+#define yp_DEBUG0( fmt )             \
+    do {                             \
+        (void) fflush( NULL );       \
+        fprintf( stderr, fmt "\n" ); \
+        (void) fflush( NULL );       \
+    } while( 0 )
+#define yp_DEBUG( fmt, ... )                      \
+    do {                                          \
+        (void) fflush( NULL );                    \
+        fprintf( stderr, fmt "\n", __VA_ARGS__ ); \
+        (void) fflush( NULL );                    \
+    } while( 0 )
 #else
 #define yp_DEBUG0( fmt )
 #define yp_DEBUG( fmt, ... )
 #endif
 
 // We always perform static asserts: they don't affect runtime
-#define yp_STATIC_ASSERT( cond, tag ) typedef char assert_ ## tag[ (cond) ? 1 : -1 ]
+#define yp_STATIC_ASSERT( cond, tag ) typedef char assert_##tag[( cond ) ? 1 : -1]
 
 
 /*************************************************************************************************
@@ -142,10 +152,10 @@ yp_STATIC_ASSERT( sizeof( yp_uint64_t ) == 8, sizeof_uint64 );
 yp_STATIC_ASSERT( sizeof( yp_float32_t ) == 4, sizeof_float32 );
 yp_STATIC_ASSERT( sizeof( yp_float64_t ) == 8, sizeof_float64 );
 yp_STATIC_ASSERT( sizeof( yp_ssize_t ) == sizeof( size_t ), sizeof_ssize );
-yp_STATIC_ASSERT( yp_SSIZE_T_MAX == (SIZE_MAX/2), ssize_max );
-#define yp_MAX_ALIGNMENT (8)  // The maximum possible required alignment of any entity
+yp_STATIC_ASSERT( yp_SSIZE_T_MAX == ( SIZE_MAX / 2 ), ssize_max );
+#define yp_MAX_ALIGNMENT ( 8 )  // The maximum possible required alignment of any entity
 
-yp_STATIC_ASSERT( sizeof( struct _ypObject ) == 16+(2*sizeof( void * )), sizeof_ypObject );
+yp_STATIC_ASSERT( sizeof( struct _ypObject ) == 16 + ( 2 * sizeof( void * ) ), sizeof_ypObject );
 
 yp_STATIC_ASSERT( sizeof( "abcd" ) == 5, sizeof_str_includes_null );
 
@@ -160,84 +170,82 @@ typedef size_t yp_uhash_t;
 #define ypObject_HEAD _ypObject_HEAD
 
 // The least-significant bit of the type code specifies if the type is immutable (0) or not
-#define ypObject_TYPE_CODE( ob ) \
-    ( ((ypObject *)(ob))->ob_type )
-#define ypObject_SET_TYPE_CODE( ob, type ) \
-    ( ypObject_TYPE_CODE( ob ) = (type) )
-#define ypObject_TYPE_CODE_IS_MUTABLE( type ) \
-    ( (type) & 0x1u )
-#define ypObject_TYPE_CODE_AS_FROZEN( type ) \
-    ( (type) & 0xFEu )
-#define ypObject_TYPE( ob ) \
-    ( ypTypeTable[ypObject_TYPE_CODE( ob )] )
-#define ypObject_IS_MUTABLE( ob ) \
-    ( ypObject_TYPE_CODE_IS_MUTABLE( ypObject_TYPE_CODE( ob ) ) )
-#define ypObject_REFCNT( ob ) \
-    ( ((ypObject *)(ob))->ob_refcnt )
+#define ypObject_TYPE_CODE( ob ) ( ( (ypObject *) ( ob ) )->ob_type )
+#define ypObject_SET_TYPE_CODE( ob, type ) ( ypObject_TYPE_CODE( ob ) = ( type ) )
+#define ypObject_TYPE_CODE_IS_MUTABLE( type ) ( (type) &0x1u )
+#define ypObject_TYPE_CODE_AS_FROZEN( type ) ( (type) &0xFEu )
+#define ypObject_TYPE( ob ) ( ypTypeTable[ypObject_TYPE_CODE( ob )] )
+#define ypObject_IS_MUTABLE( ob ) ( ypObject_TYPE_CODE_IS_MUTABLE( ypObject_TYPE_CODE( ob ) ) )
+#define ypObject_REFCNT( ob ) ( ( (ypObject *) ( ob ) )->ob_refcnt )
 
 // Type pairs are identified by the immutable type code, as all its methods are supported by the
 // immutable version
-#define ypObject_TYPE_PAIR_CODE( ob ) \
-    ypObject_TYPE_CODE_AS_FROZEN( ypObject_TYPE_CODE( ob ) )
+#define ypObject_TYPE_PAIR_CODE( ob ) ypObject_TYPE_CODE_AS_FROZEN( ypObject_TYPE_CODE( ob ) )
 
 // TODO Need two types of immortals: statically-allocated immortals (so should never be
 // freed/invalidated) and overly-incref'd immortals (should be allowed to be invalidated and thus
 // free any extra data, although the object itself will never be free'd as we've lost track of the
 // refcounts)
-#define ypObject_REFCNT_IMMORTAL    _ypObject_REFCNT_IMMORTAL
+#define ypObject_REFCNT_IMMORTAL _ypObject_REFCNT_IMMORTAL
 
 // When a hash of this value is stored in ob_hash, call tp_currenthash
-#define ypObject_HASH_INVALID       _ypObject_HASH_INVALID
+#define ypObject_HASH_INVALID _ypObject_HASH_INVALID
 
 // Set ob_len or ob_alloclen to this value to signal an invalid length
-#define ypObject_LEN_INVALID        _ypObject_LEN_INVALID
+#define ypObject_LEN_INVALID _ypObject_LEN_INVALID
 
 // The largest length that can be stored in ob_len and ob_alloclen
-#define ypObject_LEN_MAX            ((yp_ssize_t) 0x7FFFFFFF)
+#define ypObject_LEN_MAX ( (yp_ssize_t) 0x7FFFFFFF )
 
 // The length, and allocated length, of the object
 // XXX Do not set a length >ypObject_LEN_MAX, or a negative length !=ypObject_LEN_INVALID
-#define ypObject_CACHED_LEN( ob )           ((yp_ssize_t) ((ypObject *)(ob))->ob_len)  // negative if invalid
-#define ypObject_SET_CACHED_LEN( ob, len )  (((ypObject *)(ob))->ob_len = (_yp_ob_len_t) (len))
-#define ypObject_ALLOCLEN( ob )             ((yp_ssize_t) ((ypObject *)(ob))->ob_alloclen)   // negative if invalid
-#define ypObject_SET_ALLOCLEN( ob, len )    (((ypObject *)(ob))->ob_alloclen = (_yp_ob_len_t) (len))
+#define ypObject_CACHED_LEN( ob ) \
+    ( ( yp_ssize_t )( (ypObject *) ( ob ) )->ob_len )  // negative if invalid
+#define ypObject_SET_CACHED_LEN( ob, len ) \
+    ( ( (ypObject *) ( ob ) )->ob_len = ( _yp_ob_len_t )( len ) )
+#define ypObject_ALLOCLEN( ob ) \
+    ( ( yp_ssize_t )( (ypObject *) ( ob ) )->ob_alloclen )  // negative if invalid
+#define ypObject_SET_ALLOCLEN( ob, len ) \
+    ( ( (ypObject *) ( ob ) )->ob_alloclen = ( _yp_ob_len_t )( len ) )
 
 // Hashes can be cached in the object for easy retrieval
-#define ypObject_CACHED_HASH( ob )  (((ypObject *)(ob))->ob_hash) // HASH_INVALID if invalid
+#define ypObject_CACHED_HASH( ob ) ( ( (ypObject *) ( ob ) )->ob_hash )  // HASH_INVALID if invalid
 
 // Base "constructor" for immortal objects
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
 // Base "constructor" for immortal type objects
 #define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT( ypType_CODE, 0, NULL, ypObject_LEN_INVALID )
-#define yp_IMMORTAL_INVALIDATED( name ) \
-    static struct _ypObject _ ## name ## _struct = _yp_IMMORTAL_HEAD_INIT( \
-        ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID ); \
-    ypObject * const name = &_ ## name ## _struct /* force use of semi-colon */
+#define yp_IMMORTAL_INVALIDATED( name )                                                   \
+    static struct _ypObject _##name##_struct =                                            \
+            _yp_IMMORTAL_HEAD_INIT( ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID ); \
+    ypObject *const name = &_##name##_struct /* force use of semi-colon */
 
 // Many object methods follow one of these generic function signatures
-typedef ypObject *(*objproc)( ypObject * );
-typedef ypObject *(*objobjproc)( ypObject *, ypObject * );
-typedef ypObject *(*objobjobjproc)( ypObject *, ypObject *, ypObject * );
-typedef ypObject *(*objssizeproc)( ypObject *, yp_ssize_t );
-typedef ypObject *(*objssizeobjproc)( ypObject *, yp_ssize_t, ypObject * );
-typedef ypObject *(*objsliceproc)( ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t );
-typedef ypObject *(*objsliceobjproc)( ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t, ypObject * );
-typedef ypObject *(*objvalistproc)( ypObject *, int, va_list );
+typedef ypObject *( *objproc )( ypObject * );
+typedef ypObject *( *objobjproc )( ypObject *, ypObject * );
+typedef ypObject *( *objobjobjproc )( ypObject *, ypObject *, ypObject * );
+typedef ypObject *( *objssizeproc )( ypObject *, yp_ssize_t );
+typedef ypObject *( *objssizeobjproc )( ypObject *, yp_ssize_t, ypObject * );
+typedef ypObject *( *objsliceproc )( ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t );
+typedef ypObject *( *objsliceobjproc )(
+        ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t, ypObject * );
+typedef ypObject *( *objvalistproc )( ypObject *, int, va_list );
 
 // Some functions have rather unique signatures
-typedef ypObject *(*visitfunc)( ypObject *, void * );
-typedef ypObject *(*traversefunc)( ypObject *, visitfunc, void * );
-typedef ypObject *(*hashvisitfunc)( ypObject *, void *, yp_hash_t * );
-typedef ypObject *(*hashfunc)( ypObject *, hashvisitfunc, void *, yp_hash_t * );
-typedef ypObject *(*miniiterfunc)( ypObject *, yp_uint64_t * );
-typedef ypObject *(*miniiter_lenhintfunc)( ypObject *, yp_uint64_t *, yp_ssize_t * );
-typedef ypObject *(*lenfunc)( ypObject *, yp_ssize_t * );
-typedef ypObject *(*countfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
+typedef ypObject *( *visitfunc )( ypObject *, void * );
+typedef ypObject *( *traversefunc )( ypObject *, visitfunc, void * );
+typedef ypObject *( *hashvisitfunc )( ypObject *, void *, yp_hash_t * );
+typedef ypObject *( *hashfunc )( ypObject *, hashvisitfunc, void *, yp_hash_t * );
+typedef ypObject *( *miniiterfunc )( ypObject *, yp_uint64_t * );
+typedef ypObject *( *miniiter_lenhintfunc )( ypObject *, yp_uint64_t *, yp_ssize_t * );
+typedef ypObject *( *lenfunc )( ypObject *, yp_ssize_t * );
+typedef ypObject *( *countfunc )( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t * );
 typedef enum { yp_FIND_FORWARD, yp_FIND_REVERSE } findfunc_direction;
-typedef ypObject *(*findfunc)( ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, findfunc_direction, yp_ssize_t * );
-typedef ypObject *(*sortfunc)( ypObject *, yp_sort_key_func_t, ypObject * );
-typedef ypObject *(*popitemfunc)( ypObject *, ypObject **, ypObject ** );
+typedef ypObject *( *findfunc )(
+        ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, findfunc_direction, yp_ssize_t * );
+typedef ypObject *( *sortfunc )( ypObject *, yp_sort_key_func_t, ypObject * );
+typedef ypObject *( *popitemfunc )( ypObject *, ypObject **, ypObject ** );
 
 // Suite of number methods.  A placeholder for now, as the current implementation doesn't allow
 // overriding yp_add et al (TODO).
@@ -246,23 +254,23 @@ typedef struct {
 } ypNumberMethods;
 
 typedef struct {
-    objobjproc tp_concat;
-    objssizeproc tp_repeat;
-    objssizeobjproc tp_getindex;    // if defval is NULL, raise exception if missing
-    objsliceproc tp_getslice;
-    findfunc tp_find;
-    countfunc tp_count;
+    objobjproc      tp_concat;
+    objssizeproc    tp_repeat;
+    objssizeobjproc tp_getindex;  // if defval is NULL, raise exception if missing
+    objsliceproc    tp_getslice;
+    findfunc        tp_find;
+    countfunc       tp_count;
     objssizeobjproc tp_setindex;
     objsliceobjproc tp_setslice;
-    objssizeproc tp_delindex;
-    objsliceproc tp_delslice;
-    objobjproc tp_append;
-    objobjproc tp_extend;
-    objssizeproc tp_irepeat;
+    objssizeproc    tp_delindex;
+    objsliceproc    tp_delslice;
+    objobjproc      tp_append;
+    objobjproc      tp_extend;
+    objssizeproc    tp_irepeat;
     objssizeobjproc tp_insert;
-    objssizeproc tp_popindex;
-    objproc tp_reverse;
-    sortfunc tp_sort;
+    objssizeproc    tp_popindex;
+    objproc         tp_reverse;
+    sortfunc        tp_sort;
 } ypSequenceMethods;
 
 typedef struct {
@@ -274,26 +282,26 @@ typedef struct {
     objvalistproc tp_union;
     objvalistproc tp_intersection;
     objvalistproc tp_difference;
-    objobjproc tp_symmetric_difference;
+    objobjproc    tp_symmetric_difference;
     // tp_update is elsewhere
     objvalistproc tp_intersection_update;
     objvalistproc tp_difference_update;
-    objobjproc tp_symmetric_difference_update;
+    objobjproc    tp_symmetric_difference_update;
     // tp_push (aka tp_set_add) is elsewhere
     objobjproc tp_pushunique;
 } ypSetMethods;
 
 typedef struct {
-    miniiterfunc tp_miniiter_items;
-    objproc tp_iter_items;
-    miniiterfunc tp_miniiter_keys;
-    objproc tp_iter_keys;
+    miniiterfunc  tp_miniiter_items;
+    objproc       tp_iter_items;
+    miniiterfunc  tp_miniiter_keys;
+    objproc       tp_iter_keys;
     objobjobjproc tp_popvalue;
-    popitemfunc tp_popitem;
+    popitemfunc   tp_popitem;
     objobjobjproc tp_setdefault;
     objvalistproc tp_updateK;
-    miniiterfunc tp_miniiter_values;
-    objproc tp_iter_values;
+    miniiterfunc  tp_miniiter_values;
+    objproc       tp_iter_values;
 } ypMappingMethods;
 
 // Type objects hold pointers to each type's methods.
@@ -302,22 +310,22 @@ typedef struct {
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
 
     // Object fundamentals
-    objproc tp_dealloc;
+    objproc      tp_dealloc;
     traversefunc tp_traverse;  // call function for all accessible objects; return on exception
     // TODO str, repr have the possibility of recursion; trap & test
     objproc tp_str;
     objproc tp_repr;
 
     // Freezing, copying, and invalidating
-    objproc tp_freeze;
-    objproc tp_unfrozen_copy;
-    objproc tp_frozen_copy;
+    objproc      tp_freeze;
+    objproc      tp_unfrozen_copy;
+    objproc      tp_frozen_copy;
     traversefunc tp_unfrozen_deepcopy;
     traversefunc tp_frozen_deepcopy;
-    objproc tp_invalidate;  // clear, then transmute self to ypInvalidated
+    objproc      tp_invalidate;  // clear, then transmute self to ypInvalidated
 
     // Boolean operations and comparisons
-    objproc tp_bool;
+    objproc    tp_bool;
     objobjproc tp_lt;
     objobjproc tp_le;
     objobjproc tp_eq;
@@ -327,30 +335,30 @@ typedef struct {
 
     // Generic object operations
     hashfunc tp_currenthash;
-    objproc tp_close;
+    objproc  tp_close;
 
     // Number operations
     ypNumberMethods *tp_as_number;
 
     // Iterator operations
-    miniiterfunc tp_miniiter;
-    miniiterfunc tp_miniiter_reversed;
-    miniiterfunc tp_miniiter_next;
+    miniiterfunc         tp_miniiter;
+    miniiterfunc         tp_miniiter_reversed;
+    miniiterfunc         tp_miniiter_next;
     miniiter_lenhintfunc tp_miniiter_lenhint;
-    objproc tp_iter;
-    objproc tp_iter_reversed;
+    objproc              tp_iter;
+    objproc              tp_iter_reversed;
     objobjproc tp_send;  // called for both yp_send and yp_throw (i.e. accepts exceptions)
 
     // Container operations
-    objobjproc tp_contains;
-    lenfunc tp_len;
-    objobjproc tp_push;
-    objproc tp_clear;  // delete references to contained objects
-    objproc tp_pop;
-    objobjobjproc tp_remove;  // if onmissing is NULL, raise exception if missing
+    objobjproc    tp_contains;
+    lenfunc       tp_len;
+    objobjproc    tp_push;
+    objproc       tp_clear;  // delete references to contained objects
+    objproc       tp_pop;
+    objobjobjproc tp_remove;      // if onmissing is NULL, raise exception if missing
     objobjobjproc tp_getdefault;  // if defval is NULL, raise exception if missing
     objobjobjproc tp_setitem;
-    objobjproc tp_delitem;
+    objobjproc    tp_delitem;
     objvalistproc tp_update;
 
     // Sequence operations
@@ -482,22 +490,26 @@ yp_STATIC_ASSERT( _ypStr_CODE == ypStr_CODE, ypStr_CODE_matches );
     } };
 // clang-format on
 
-DEFINE_GENERIC_METHODS( MethodError, yp_MethodError ); // for methods the type doesn't support
+DEFINE_GENERIC_METHODS( MethodError, yp_MethodError );  // for methods the type doesn't support
 // TODO A yp_ImmutableTypeError, subexception of yp_TypeError, for methods that are supported only
 // by the mutable version.  Then, add a debug yp_initialize assert to ensure all type tables uses
 // this appropriately.
 DEFINE_GENERIC_METHODS( TypeError, yp_TypeError );
-DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError ); // for Invalidated objects
-DEFINE_GENERIC_METHODS( ExceptionMethod, x ); // for exception objects; returns "self"
+DEFINE_GENERIC_METHODS( InvalidatedError, yp_InvalidatedError );  // for Invalidated objects
+DEFINE_GENERIC_METHODS( ExceptionMethod, x );  // for exception objects; returns "self"
 
 // For use when an object doesn't support a particular comparison operation
-extern ypObject * const yp_ComparisonNotImplemented;
-static ypObject *NotImplemented_comparefunc( ypObject *x, ypObject *y ) {
+extern ypObject *const yp_ComparisonNotImplemented;
+static ypObject *NotImplemented_comparefunc( ypObject *x, ypObject *y )
+{
     return yp_ComparisonNotImplemented;
 }
 
 // For use when an object contains no references to other objects
-static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo ) { return yp_None; } \
+static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo )
+{
+    return yp_None;
+}
 
 
 /*************************************************************************************************
@@ -505,27 +517,41 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
  *************************************************************************************************/
 
 #ifndef MIN
-#define MIN(a,b)   ((a) < (b) ? (a) : (b))
-#define MAX(a,b)   ((a) > (b) ? (a) : (b))
+#define MIN( a, b ) ( ( a ) < ( b ) ? ( a ) : ( b ) )
+#define MAX( a, b ) ( ( a ) > ( b ) ? ( a ) : ( b ) )
 #endif
 
 // Functions that return nohtyP objects simply need to return the error object to "raise" it
 // Use this as "return_yp_ERR( x, yp_ValueError );" to return the error properly
-#define return_yp_ERR( _err ) \
-    do { ypObject *_yp_ERR_err = (_err); return _yp_ERR_err; } while( 0 )
+#define return_yp_ERR( _err )             \
+    do {                                  \
+        ypObject *_yp_ERR_err = ( _err ); \
+        return _yp_ERR_err;               \
+    } while( 0 )
 
 // Functions that modify their inputs take a "ypObject **x".
 // Use this as "yp_INPLACE_ERR( x, yp_ValueError );" to discard x and set it to an exception
-#define yp_INPLACE_ERR( ob, _err ) \
-    do { ypObject *_yp_ERR_err = (_err); yp_decref( *(ob) ); *(ob) = (_yp_ERR_err); } while( 0 )
+#define yp_INPLACE_ERR( ob, _err )        \
+    do {                                  \
+        ypObject *_yp_ERR_err = ( _err ); \
+        yp_decref( *( ob ) );             \
+        *( ob ) = ( _yp_ERR_err );        \
+    } while( 0 )
 // Use this as "return_yp_INPLACE_ERR( x, yp_ValueError );" to return the error properly
-#define return_yp_INPLACE_ERR( ob, _err ) \
-    do { yp_INPLACE_ERR( (ob), (_err) ); return; } while( 0 )
+#define return_yp_INPLACE_ERR( ob, _err )   \
+    do {                                    \
+        yp_INPLACE_ERR( ( ob ), ( _err ) ); \
+        return;                             \
+    } while( 0 )
 
 // Functions that return C values take a "ypObject **exc" that are only modified on error and are
 // not discarded beforehand; they also need to return a valid C value
 #define return_yp_CEXC_ERR( retval, exc, _err ) \
-    do { ypObject *_yp_ERR_err = (_err); *(exc) = (_yp_ERR_err); return retval; } while( 0 )
+    do {                                        \
+        ypObject *_yp_ERR_err = ( _err );       \
+        *( exc ) = ( _yp_ERR_err );             \
+        return retval;                          \
+    } while( 0 )
 
 // When an object encounters an unknown type, there are three possible cases:
 //  - it's an invalidated object, so return yp_InvalidatedError
@@ -541,76 +567,78 @@ static ypObject *NoRefs_traversefunc( ypObject *x, visitfunc visitor, void *memo
     /* else */ \
         yp_TypeError )
 // clang-format on
-#define return_yp_BAD_TYPE( bad_ob ) \
-    return_yp_ERR( yp_BAD_TYPE( bad_ob ) )
+#define return_yp_BAD_TYPE( bad_ob ) return_yp_ERR( yp_BAD_TYPE( bad_ob ) )
 #define return_yp_INPLACE_BAD_TYPE( ob, bad_ob ) \
-    return_yp_INPLACE_ERR( (ob), yp_BAD_TYPE( bad_ob ) )
+    return_yp_INPLACE_ERR( ( ob ), yp_BAD_TYPE( bad_ob ) )
 #define return_yp_CEXC_BAD_TYPE( retval, exc, bad_ob ) \
-    return_yp_CEXC_ERR( (retval), (exc), yp_BAD_TYPE( bad_ob ) )
+    return_yp_CEXC_ERR( ( retval ), ( exc ), yp_BAD_TYPE( bad_ob ) )
 
-#define yp_IS_EXCEPTION_C( x ) (ypObject_TYPE_PAIR_CODE( x ) == ypException_CODE)
-int yp_isexceptionC( ypObject *x ) {
-    return yp_IS_EXCEPTION_C( x );
-}
+#define yp_IS_EXCEPTION_C( x ) ( ypObject_TYPE_PAIR_CODE( x ) == ypException_CODE )
+int yp_isexceptionC( ypObject *x ) { return yp_IS_EXCEPTION_C( x ); }
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
-#define yp_sizeof( x ) ((yp_ssize_t) sizeof( x ))
-#define yp_offsetof( structType, member ) ((yp_ssize_t) offsetof( structType, member ))
-#define yp_sizeof_member( structType, member ) yp_sizeof( ((structType *)0)->member )
+#define yp_sizeof( x ) ( (yp_ssize_t) sizeof( x ) )
+#define yp_offsetof( structType, member ) ( (yp_ssize_t) offsetof( structType, member ) )
+#define yp_sizeof_member( structType, member ) yp_sizeof( ( (structType *) 0 )->member )
 
 // XXX Adapted from _Py_SIZE_ROUND_DOWN et al
 // Below "a" is a power of 2.  Round down size "n" to be a multiple of "a".
-#define yp_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a) - 1))
+#define yp_SIZE_ROUND_DOWN( n, a ) ( ( size_t )( n ) & ~( size_t )( (a) -1 ) )
 // Round up size "n" to be a multiple of "a".
-#define yp_SIZE_ROUND_UP(n, a) (((size_t)(n) + \
-        (size_t)((a) - 1)) & ~(size_t)((a) - 1))
+#define yp_SIZE_ROUND_UP( n, a ) \
+    ( ( ( size_t )( n ) + ( size_t )( (a) -1 ) ) & ~( size_t )( (a) -1 ) )
 yp_STATIC_ASSERT( yp_sizeof( size_t ) == yp_sizeof( void * ), uintptr_unnecessary );
 // Round pointer "p" down to the closest "a"-aligned address <= "p".
-#define yp_ALIGN_DOWN(p, a) ((void *)((size_t)(p) & ~(size_t)((a) - 1)))
+#define yp_ALIGN_DOWN( p, a ) ( (void *) ( ( size_t )( p ) & ~( size_t )( (a) -1 ) ) )
 // Round pointer "p" up to the closest "a"-aligned address >= "p".
-#define yp_ALIGN_UP(p, a) ((void *)(((size_t)(p) + \
-        (size_t)((a) - 1)) & ~(size_t)((a) - 1)))
+#define yp_ALIGN_UP( p, a ) \
+    ( (void *) ( ( ( size_t )( p ) + ( size_t )( (a) -1 ) ) & ~( size_t )( (a) -1 ) ) )
 // Check if pointer "p" is aligned to "a"-bytes boundary.
-#define yp_IS_ALIGNED(p, a) (!((size_t)(p) & (size_t)((a) - 1)))
+#define yp_IS_ALIGNED( p, a ) ( !( ( size_t )( p ) & ( size_t )( (a) -1 ) ) )
 
 // For N functions (that take variable arguments); to be used as follows:
 //      return_yp_V_FUNC( ypObject *, yp_foobarV, (x, n, args), n )
 // v_func_args must end in the identifier "args", which is declared internal to the macro.
 #define return_yp_V_FUNC( v_func_rettype, v_func, v_func_args, last_fixed ) \
-    do {v_func_rettype retval; \
-        va_list args; \
-        va_start( args, last_fixed ); \
-        retval = v_func v_func_args; \
-        va_end( args ); \
-        return retval; } while( 0 )
+    do {                                                                    \
+        v_func_rettype retval;                                              \
+        va_list        args;                                                \
+        va_start( args, last_fixed );                                       \
+        retval = v_func v_func_args;                                        \
+        va_end( args );                                                     \
+        return retval;                                                      \
+    } while( 0 )
 
 // As above, but for functions without a return value
 #define return_yp_V_FUNC_void( v_func, v_func_args, last_fixed ) \
-    do {va_list args; \
-        va_start( args, last_fixed ); \
-        v_func v_func_args; \
-        va_end( args ); \
-        return; } while( 0 )
+    do {                                                         \
+        va_list args;                                            \
+        va_start( args, last_fixed );                            \
+        v_func v_func_args;                                      \
+        va_end( args );                                          \
+        return;                                                  \
+    } while( 0 )
 
 // As above, but for "K"-functions
-#define return_yp_K_FUNC        return_yp_V_FUNC
-#define return_yp_K_FUNC_void   return_yp_V_FUNC_void
+#define return_yp_K_FUNC return_yp_V_FUNC
+#define return_yp_K_FUNC_void return_yp_V_FUNC_void
 
 // For when we need to work with unsigned yp_int_t's in the math below; casting to unsigned helps
 // avoid undefined behaviour on overflow.
 typedef yp_uint64_t _yp_uint_t;
 yp_STATIC_ASSERT( yp_sizeof( _yp_uint_t ) == yp_sizeof( yp_int_t ), sizeof_yp_uint_eq_yp_int );
-#define yp_UINT_MATH( x, op, y ) ((yp_int_t) (((_yp_uint_t)(x)) op ((_yp_uint_t)(y))))
-#define yp_USIZE_MATH( x, op, y ) ((yp_ssize_t) (((size_t)(x)) op ((size_t)(y))))
+#define yp_UINT_MATH( x, op, y ) \
+    ( ( yp_int_t )( (( _yp_uint_t )( x )) op( ( _yp_uint_t )( y ) ) ) )
+#define yp_USIZE_MATH( x, op, y ) ( ( yp_ssize_t )( (( size_t )( x )) op( ( size_t )( y ) ) ) )
 
 #if defined( _MSC_VER )
 #define yp_IS_NAN _isnan
-#define yp_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
-#define yp_IS_FINITE(X) _finite(X)
+#define yp_IS_INFINITY( X ) ( !_finite( X ) && !_isnan( X ) )
+#define yp_IS_FINITE( X ) _finite( X )
 #elif defined( GCC_VER )
 #define yp_IS_NAN isnan
-#define yp_IS_INFINITY(X) (!finite(X) && !isnan(X))
-#define yp_IS_FINITE(X) finite(X)
+#define yp_IS_INFINITY( X ) ( !finite( X ) && !isnan( X ) )
+#define yp_IS_FINITE( X ) finite( X )
 #else
 #error Need to port Py_IS_NAN et al to nohtyP for this platform
 #endif
@@ -627,7 +655,7 @@ yp_STATIC_ASSERT( yp_sizeof( _yp_uint_t ) == yp_sizeof( yp_int_t ), sizeof_yp_ui
 #else
 #define _ypHASH_BITS 61
 #endif
-#define _ypHASH_MODULUS (((size_t)1 << _ypHASH_BITS) - 1)
+#define _ypHASH_MODULUS ( ( (size_t) 1 << _ypHASH_BITS ) - 1 )
 #define _ypHASH_INF 314159
 #define _ypHASH_NAN 0
 
@@ -645,22 +673,22 @@ static yp_hash_t yp_HashInt( yp_int_t v )
 // XXX Adapted from Python's _Py_HashDouble
 static yp_hash_t yp_HashDouble( double v )
 {
-    int e, sign;
-    double m;
+    int        e, sign;
+    double     m;
     yp_uhash_t x, y;
 
-    if (!yp_IS_FINITE(v)) {
-        if (yp_IS_INFINITY(v)) {
+    if( !yp_IS_FINITE( v ) ) {
+        if( yp_IS_INFINITY( v ) ) {
             return v > 0 ? _ypHASH_INF : -_ypHASH_INF;
         } else {
             return _ypHASH_NAN;
         }
     }
 
-    m = frexp(v, &e);
+    m = frexp( v, &e );
 
     sign = 1;
-    if (m < 0) {
+    if( m < 0 ) {
         sign = -1;
         m = -m;
     }
@@ -668,27 +696,27 @@ static yp_hash_t yp_HashDouble( double v )
     /* process 28 bits at a time;  this should work well both for binary
        and hexadecimal floating point. */
     x = 0;
-    while (m) {
-        x = ((x << 28) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - 28);
+    while( m ) {
+        x = ( ( x << 28 ) & _ypHASH_MODULUS ) | x >> ( _ypHASH_BITS - 28 );
         m *= 268435456.0;  // 2**28
         e -= 28;
-        y = (yp_uhash_t)m;  // pull out integer part
+        y = (yp_uhash_t) m;  // pull out integer part
         m -= y;
         x += y;
-        if (x >= _ypHASH_MODULUS) {
+        if( x >= _ypHASH_MODULUS ) {
             x -= _ypHASH_MODULUS;
         }
     }
 
     // adjust for the exponent;  first reduce it modulo _ypHASH_BITS
-    e = e >= 0 ? e % _ypHASH_BITS : _ypHASH_BITS-1-((-1-e) % _ypHASH_BITS);
-    x = ((x << e) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - e);
+    e = e >= 0 ? e % _ypHASH_BITS : _ypHASH_BITS - 1 - ( ( -1 - e ) % _ypHASH_BITS );
+    x = ( ( x << e ) & _ypHASH_MODULUS ) | x >> ( _ypHASH_BITS - e );
 
     x = x * sign;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID-1);
+    if( x == (yp_uhash_t) ypObject_HASH_INVALID ) {
+        x = ( yp_uhash_t )( ypObject_HASH_INVALID - 1 );
     }
-    return (yp_hash_t)x;
+    return (yp_hash_t) x;
 }
 
 // Return the hash of the given pointer; always succeeds
@@ -696,12 +724,12 @@ static yp_hash_t yp_HashDouble( double v )
 static yp_hash_t yp_HashPointer( void *p )
 {
     yp_hash_t x;
-    size_t y = (size_t) p;
+    size_t    y = (size_t) p;
     /* bottom 3 or 4 bits are likely to be 0; rotate y by 4 to avoid
        excessive hash collisions for dicts and sets */
-    y = (y >> 4) | (y << (8 * yp_sizeof( void * ) - 4));
+    y = ( y >> 4 ) | ( y << ( 8 * yp_sizeof( void * ) - 4 ) );
     x = (yp_hash_t) y;
-    if (x == ypObject_HASH_INVALID) x -= 1;
+    if( x == ypObject_HASH_INVALID ) x -= 1;
     return x;
 }
 
@@ -713,33 +741,33 @@ static yp_hash_t yp_HashBytes( yp_uint8_t *p, yp_ssize_t len )
     yp_ssize_t i;
 
     if( len == 0 ) return 0;
-    x = 0; // (yp_uhash_t) _yp_HashSecret.prefix;
+    x = 0;  // (yp_uhash_t) _yp_HashSecret.prefix;
     x ^= (yp_uhash_t) *p << 7;
-    for (i = 0; i < len; i++) {
-        x = (_ypHASH_MULTIPLIER * x) ^ (yp_uhash_t) *p++;
+    for( i = 0; i < len; i++ ) {
+        x = ( _ypHASH_MULTIPLIER * x ) ^ (yp_uhash_t) *p++;
     }
     x ^= (yp_uhash_t) len;
     // x ^= (yp_uhash_t) _yp_HashSecret.suffix;
-    if (x == (yp_uhash_t) ypObject_HASH_INVALID) {
-        x = (yp_uhash_t) (ypObject_HASH_INVALID-1);
+    if( x == (yp_uhash_t) ypObject_HASH_INVALID ) {
+        x = ( yp_uhash_t )( ypObject_HASH_INVALID - 1 );
     }
     return x;
 }
 
 
 // Maximum code point of Unicode 6.0: 0x10FFFF (1,114,111)
-#define ypStringLib_MAX_UNICODE     (0x10FFFFu)
+#define ypStringLib_MAX_UNICODE ( 0x10FFFFu )
 
 /* This Unicode character will be used as replacement character during
    decoding if the errors argument is set to "replace". Note: the
    Unicode character U+FFFD is the official REPLACEMENT CHARACTER in
    Unicode 3.0. */
-#define ypStringLib_UNICODE_REPLACEMENT_CHARACTER (0xFFFDu)
+#define ypStringLib_UNICODE_REPLACEMENT_CHARACTER ( 0xFFFDu )
 
 
 // Macros to work with surrogates
 // XXX Adapted from Python's unicodeobject.h
-#define ypStringLib_IS_SURROGATE(ch)    (0xD800 <= (ch) && (ch) <= 0xDFFF)
+#define ypStringLib_IS_SURROGATE( ch ) ( 0xD800 <= ( ch ) && ( ch ) <= 0xDFFF )
 
 
 // TODO Make this configurable via yp_initialize, and/or dynamically
@@ -1004,19 +1032,22 @@ const yp_uint8_t _yp_ctype_toupper[256] = {
 
 // Dummy memory allocation functions that always fail, to ensure yp_initialize is called first
 static void *_dummy_yp_malloc( yp_ssize_t *actual, yp_ssize_t size ) { return NULL; }
-static void *_dummy_yp_malloc_resize( yp_ssize_t *actual,
-        void *p, yp_ssize_t size, yp_ssize_t extra ) { return NULL; }
-static void _dummy_yp_free( void *p ) { }
+static void *_dummy_yp_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra )
+{
+    return NULL;
+}
+static void _dummy_yp_free( void *p ) {}
 
 // See docs for yp_initialize_kwparams_t.yp_malloc in nohtyP.h
-static void *(*yp_malloc)( yp_ssize_t *actual, yp_ssize_t size ) = _dummy_yp_malloc;
+static void *( *yp_malloc )( yp_ssize_t *actual, yp_ssize_t size ) = _dummy_yp_malloc;
 
 // See docs for yp_initialize_kwparams_t.yp_malloc_resize in nohtyP.h
-static void *(*yp_malloc_resize)( yp_ssize_t *actual,
-        void *p, yp_ssize_t size, yp_ssize_t extra ) = _dummy_yp_malloc_resize;
+static void *( *yp_malloc_resize )(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra ) = _dummy_yp_malloc_resize;
 
 // See docs for yp_initialize_kwparams_t.yp_free in nohtyP.h
-static void (*yp_free)( void *p ) = _dummy_yp_free;
+static void ( *yp_free )( void *p ) = _dummy_yp_free;
 
 // Microsoft gives a couple options for heaps; let's stick with the standard malloc/free plus
 // _msize and _expand
@@ -1030,12 +1061,12 @@ static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
     p = malloc( (size_t) size );
     if( p == NULL ) return NULL;
     *actual = (yp_ssize_t) _msize( p );
-    if( *actual < 0 ) *actual = yp_SSIZE_T_MAX; // we were given more memory than we can use
+    if( *actual < 0 ) *actual = yp_SSIZE_T_MAX;  // we were given more memory than we can use
     yp_DEBUG( "malloc: 0x%08X %d bytes", p, *actual );
     return p;
 }
-static void *_default_yp_malloc_resize( yp_ssize_t *actual,
-        void *p, yp_ssize_t size, yp_ssize_t extra )
+static void *_default_yp_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra )
 {
     void *newp;
     yp_ASSERT( size >= 0, "size cannot be negative" );
@@ -1045,16 +1076,17 @@ static void *_default_yp_malloc_resize( yp_ssize_t *actual,
     newp = _expand( p, (size_t) size );
     if( newp == NULL ) {
         size = yp_USIZE_MATH( size, +, extra );
-        if( size < 0 ) size = yp_SSIZE_T_MAX;   // addition overflowed; clamp to max
+        if( size < 0 ) size = yp_SSIZE_T_MAX;  // addition overflowed; clamp to max
         newp = malloc( (size_t) size );
         if( newp == NULL ) return NULL;
     }
     *actual = (yp_ssize_t) _msize( newp );
-    if( *actual < 0 ) *actual = yp_SSIZE_T_MAX; // we were given more memory than we can use
+    if( *actual < 0 ) *actual = yp_SSIZE_T_MAX;  // we were given more memory than we can use
     yp_DEBUG( "malloc_resize: 0x%08X %d bytes  (was 0x%08X)", newp, *actual, p );
     return newp;
 }
-static void _default_yp_free( void *p ) {
+static void _default_yp_free( void *p )
+{
     yp_DEBUG( "free: 0x%08X", p );
     free( p );
 }
@@ -1065,7 +1097,7 @@ static void _default_yp_free( void *p ) {
 #else
 // Rounds allocations up to a multiple that should be easy for most heaps without wasting space for
 // the smallest objects (ie ints); don't call with a negative size
-#define _yp_DEFAULT_MALLOC_ROUNDTO (16)
+#define _yp_DEFAULT_MALLOC_ROUNDTO ( 16 )
 static yp_ssize_t _default_yp_malloc_good_size( yp_ssize_t size )
 {
     yp_ssize_t diff;
@@ -1083,20 +1115,21 @@ static void *_default_yp_malloc( yp_ssize_t *actual, yp_ssize_t size )
     yp_DEBUG( "malloc: 0x%08X %d bytes", p, *actual );
     return p;
 }
-static void *_default_yp_malloc_resize( yp_ssize_t *actual,
-        void *p, yp_ssize_t size, yp_ssize_t extra )
+static void *_default_yp_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra )
 {
     void *newp;
     yp_ASSERT( size >= 0, "size cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
     size = yp_USIZE_MATH( size, +, extra );
-    if( size < 0 ) size = yp_SSIZE_T_MAX;   // addition overflowed; clamp to max
+    if( size < 0 ) size = yp_SSIZE_T_MAX;  // addition overflowed; clamp to max
     *actual = _default_yp_malloc_good_size( size );
     newp = malloc( *actual );
     yp_DEBUG( "malloc_resize: 0x%08X %d bytes  (was 0x%08X)", newp, *actual, p );
     return newp;
 }
-static void _default_yp_free( void *p ) {
+static void _default_yp_free( void *p )
+{
     yp_DEBUG( "free: 0x%08X", p );
     free( p );
 }
@@ -1110,7 +1143,8 @@ static void _default_yp_free( void *p ) {
 // This should be one of exactly two possible values, 1 (the default) or ypObject_REFCNT_IMMORTAL,
 // depending on yp_initialize's everything_immortal parameter
 static yp_uint32_t _ypMem_starting_refcnt = 1;
-yp_STATIC_ASSERT( yp_sizeof( _ypMem_starting_refcnt ) == yp_sizeof_member( ypObject, ob_refcnt ), sizeof_starting_refcnt );
+yp_STATIC_ASSERT( yp_sizeof( _ypMem_starting_refcnt ) == yp_sizeof_member( ypObject, ob_refcnt ),
+        sizeof_starting_refcnt );
 
 // Declares the ob_inline_data array for container object structures
 #define yp_INLINE_DATA _yp_INLINE_DATA
@@ -1118,7 +1152,8 @@ yp_STATIC_ASSERT( yp_sizeof( _ypMem_starting_refcnt ) == yp_sizeof_member( ypObj
 // When calculating the number of required bytes, there is protection at higher levels to ensure
 // the multiplication never overflows.  However, when calculating extra (or required+extra) bytes,
 // if the multiplication overflows we clamp to yp_SSIZE_T_MAX.
-static yp_ssize_t _ypMem_calc_extra_size( yp_ssize_t alloclen, yp_ssize_t elemsize ) {
+static yp_ssize_t _ypMem_calc_extra_size( yp_ssize_t alloclen, yp_ssize_t elemsize )
+{
     yp_ASSERT( alloclen >= 0, "alloclen cannot be negative" );
     yp_ASSERT( elemsize > 0, "elemsize cannot be <=0" );
     // If the multiplication will overflow, return the maximum size
@@ -1130,7 +1165,7 @@ static yp_ssize_t _ypMem_calc_extra_size( yp_ssize_t alloclen, yp_ssize_t elemsi
 static ypObject *_ypMem_malloc_fixed( int type, yp_ssize_t sizeof_obStruct )
 {
     yp_ssize_t size;
-    ypObject *ob = (ypObject *) yp_malloc( &size, sizeof_obStruct );
+    ypObject * ob = (ypObject *) yp_malloc( &size, sizeof_obStruct );
     if( ob == NULL ) return yp_MemoryError;
     ypObject_SET_ALLOCLEN( ob, ypObject_LEN_INVALID );
     ob->ob_data = NULL;
@@ -1141,34 +1176,35 @@ static ypObject *_ypMem_malloc_fixed( int type, yp_ssize_t sizeof_obStruct )
     yp_DEBUG( "MALLOC_FIXED: type %d 0x%08X", type, ob );
     return ob;
 }
-#define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( (type), yp_sizeof( obStruct ) )
+#define ypMem_MALLOC_FIXED( obStruct, type ) _ypMem_malloc_fixed( ( type ), yp_sizeof( obStruct ) )
 
 // Returns a malloc'd buffer for a container object holding alloclen elements in-line, or exception
 // on failure.  The container can neither grow nor shrink after allocation.  ob_inline_data in
 // obStruct is used to determine the element size and ob_data; ob_len is set to zero.  alloclen
 // must not be negative and offsetof_inline+(alloclen*elemsize) must not overflow.  ob_alloclen may
 // be larger than requested, but will never be larger than alloclen_max.
-static ypObject *_ypMem_malloc_container_inline(
-        int type, yp_ssize_t alloclen, yp_ssize_t alloclen_max,
-        yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
+static ypObject *_ypMem_malloc_container_inline( int type, yp_ssize_t alloclen,
+        yp_ssize_t alloclen_max, yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
 {
     yp_ssize_t size;
-    ypObject *ob;
+    ypObject * ob;
 
     yp_ASSERT( alloclen >= 0, "alloclen cannot be negative" );
     yp_ASSERT( alloclen <= alloclen_max, "alloclen cannot be larger than maximum" );
-    yp_ASSERT( alloclen_max <= ypObject_LEN_MAX, "alloclen_max cannot be larger than ypObject_LEN_MAX" );
-    yp_ASSERT( alloclen <= (yp_SSIZE_T_MAX-offsetof_inline)/elemsize, "yp_malloc size cannot overflow" );
+    yp_ASSERT( alloclen_max <= ypObject_LEN_MAX,
+            "alloclen_max cannot be larger than ypObject_LEN_MAX" );
+    yp_ASSERT( alloclen <= ( yp_SSIZE_T_MAX - offsetof_inline ) / elemsize,
+            "yp_malloc size cannot overflow" );
 
     // Allocate memory, then update alloclen based on actual size of buffer allocated
-    size = offsetof_inline + (alloclen*elemsize);
+    size = offsetof_inline + ( alloclen * elemsize );
     ob = (ypObject *) yp_malloc( &size, size );
     if( ob == NULL ) return yp_MemoryError;
-    alloclen = (size - offsetof_inline) / elemsize; // rounds down
+    alloclen = ( size - offsetof_inline ) / elemsize;  // rounds down
     if( alloclen > alloclen_max ) alloclen = alloclen_max;
 
     ypObject_SET_ALLOCLEN( ob, alloclen );
-    ob->ob_data = ((yp_uint8_t *)ob) + offsetof_inline;
+    ob->ob_data = ( (yp_uint8_t *) ob ) + offsetof_inline;
     ob->ob_type = type;
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
@@ -1177,10 +1213,10 @@ static ypObject *_ypMem_malloc_container_inline(
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_INLINE4( obStruct, type, alloclen, alloclen_max, elemsize ) \
-    _ypMem_malloc_container_inline( (type), (alloclen), (alloclen_max), \
-            yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
-#define ypMem_MALLOC_CONTAINER_INLINE( obStruct, type, alloclen, alloclen_max ) \
-    ypMem_MALLOC_CONTAINER_INLINE4( obStruct, (type), (alloclen), (alloclen_max), \
+    _ypMem_malloc_container_inline( ( type ), ( alloclen ), ( alloclen_max ),              \
+            yp_offsetof( obStruct, ob_inline_data ), ( elemsize ) )
+#define ypMem_MALLOC_CONTAINER_INLINE( obStruct, type, alloclen, alloclen_max )         \
+    ypMem_MALLOC_CONTAINER_INLINE4( obStruct, ( type ), ( alloclen ), ( alloclen_max ), \
             yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // XXX Cannot change once objects are allocated!  Since we use this value to compute inlinelen of
@@ -1188,10 +1224,10 @@ static ypObject *_ypMem_malloc_container_inline(
 // TODO Make this configurable via yp_initialize
 // TODO 64-bit PyDictObject is 128 bytes...we are larger!
 // TODO Static asserts to ensure that certain-sized objects fit with one allocation, then optimize
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
-#define _ypMem_ideal_size_DEFAULT ((yp_ssize_t) 128)
+#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu  // 32-bit (or less) platform
+#define _ypMem_ideal_size_DEFAULT ( (yp_ssize_t) 128 )
 #else
-#define _ypMem_ideal_size_DEFAULT ((yp_ssize_t) 256)
+#define _ypMem_ideal_size_DEFAULT ( (yp_ssize_t) 256 )
 #endif
 static yp_ssize_t _ypMem_ideal_size = _ypMem_ideal_size_DEFAULT;
 
@@ -1200,37 +1236,39 @@ static yp_ssize_t _ypMem_ideal_size = _ypMem_ideal_size_DEFAULT;
 // required elements, it is used, otherwise a separate buffer of required+extra elements is
 // allocated.  required and extra must not be negative and required*elemsize must not overflow.
 // ob_alloclen may be larger than requested, but will never be larger than alloclen_max.
-static yp_ssize_t _ypMem_inlinelen_container_variable( yp_ssize_t offsetof_inline, yp_ssize_t elemsize );
-static ypObject *_ypMem_malloc_container_variable(
-        int type, yp_ssize_t required, yp_ssize_t extra, yp_ssize_t alloclen_max,
-        yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
+static yp_ssize_t _ypMem_inlinelen_container_variable(
+        yp_ssize_t offsetof_inline, yp_ssize_t elemsize );
+static ypObject *_ypMem_malloc_container_variable( int type, yp_ssize_t required, yp_ssize_t extra,
+        yp_ssize_t alloclen_max, yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
 {
     yp_ssize_t size;
-    ypObject *ob;
+    ypObject * ob;
     yp_ssize_t alloclen;
 
     yp_ASSERT( required >= 0, "required cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
     yp_ASSERT( required <= alloclen_max, "required cannot be larger than maximum" );
-    yp_ASSERT( _ypMem_inlinelen_container_variable( offsetof_inline, elemsize ) <= alloclen_max, "inlinelen is larger than maximum?! (Is _ypMem_ideal_size set too high?)" );
-    yp_ASSERT( alloclen_max <= ypObject_LEN_MAX, "alloclen_max cannot be larger than ypObject_LEN_MAX" );
-    yp_ASSERT( required <= yp_SSIZE_T_MAX/elemsize, "required yp_malloc size cannot overflow" );
+    yp_ASSERT( _ypMem_inlinelen_container_variable( offsetof_inline, elemsize ) <= alloclen_max,
+            "inlinelen is larger than maximum?! (Is _ypMem_ideal_size set too high?)" );
+    yp_ASSERT( alloclen_max <= ypObject_LEN_MAX,
+            "alloclen_max cannot be larger than ypObject_LEN_MAX" );
+    yp_ASSERT( required <= yp_SSIZE_T_MAX / elemsize, "required yp_malloc size cannot overflow" );
     if( extra > alloclen_max - required ) extra = alloclen_max - required;
 
     // Allocate object memory, update alloclen based on actual size of buffer allocated, then see
     // if the data can fit inline or if it needs a separate buffer
     ob = (ypObject *) yp_malloc( &size, MAX( offsetof_inline, _ypMem_ideal_size ) );
     if( ob == NULL ) return yp_MemoryError;
-    alloclen = (size - offsetof_inline) / elemsize; // rounds down
-    if( required <= alloclen ) { // a valid check even if alloclen>max, because required<=max
-        ob->ob_data = ((yp_uint8_t *)ob) + offsetof_inline;
+    alloclen = ( size - offsetof_inline ) / elemsize;  // rounds down
+    if( required <= alloclen ) {  // a valid check even if alloclen>max, because required<=max
+        ob->ob_data = ( (yp_uint8_t *) ob ) + offsetof_inline;
     } else {
-        ob->ob_data = yp_malloc( &size, _ypMem_calc_extra_size( required+extra, elemsize ) );
+        ob->ob_data = yp_malloc( &size, _ypMem_calc_extra_size( required + extra, elemsize ) );
         if( ob->ob_data == NULL ) {
             yp_free( ob );
             return yp_MemoryError;
         }
-        alloclen = size / elemsize; // rounds down
+        alloclen = size / elemsize;  // rounds down
     }
     if( alloclen > alloclen_max ) alloclen = alloclen_max;
 
@@ -1242,28 +1280,29 @@ static ypObject *_ypMem_malloc_container_variable(
     yp_DEBUG( "MALLOC_CONTAINER_VARIABLE: type %d 0x%08X alloclen %d", type, ob, alloclen );
     return ob;
 }
-#define ypMem_MALLOC_CONTAINER_VARIABLE5( \
-        obStruct, type, required, extra, alloclen_max, elemsize ) \
-    _ypMem_malloc_container_variable( (type), (required), (extra), (alloclen_max), \
-            yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
+#define ypMem_MALLOC_CONTAINER_VARIABLE5(                                                  \
+        obStruct, type, required, extra, alloclen_max, elemsize )                          \
+    _ypMem_malloc_container_variable( ( type ), ( required ), ( extra ), ( alloclen_max ), \
+            yp_offsetof( obStruct, ob_inline_data ), ( elemsize ) )
 #define ypMem_MALLOC_CONTAINER_VARIABLE( obStruct, type, required, extra, alloclen_max ) \
-    ypMem_MALLOC_CONTAINER_VARIABLE5( obStruct, (type), (required), (extra), (alloclen_max), \
-            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
+    ypMem_MALLOC_CONTAINER_VARIABLE5( obStruct, ( type ), ( required ), ( extra ),       \
+            ( alloclen_max ), yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Returns the allocated length of the inline data buffer for the given object, which must have
 // been allocated with ypMem_MALLOC_CONTAINER_VARIABLE.
 // TODO The calculated inlinelen may be smaller than what our initial allocation actually provided
 static yp_ssize_t _ypMem_inlinelen_container_variable(
-        yp_ssize_t offsetof_inline, yp_ssize_t elemsize ) {
-    yp_ssize_t inlinelen = (_ypMem_ideal_size-offsetof_inline) / elemsize;
+        yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
+{
+    yp_ssize_t inlinelen = ( _ypMem_ideal_size - offsetof_inline ) / elemsize;
     if( inlinelen < 0 ) return 0;
     return inlinelen;
 }
 #define ypMem_INLINELEN_CONTAINER_VARIABLE3( ob, obStruct, elemsize ) \
-    _ypMem_inlinelen_container_variable( yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
+    _ypMem_inlinelen_container_variable( yp_offsetof( obStruct, ob_inline_data ), ( elemsize ) )
 #define ypMem_INLINELEN_CONTAINER_VARIABLE( ob, obStruct ) \
-    ypMem_INLINELEN_CONTAINER_VARIABLE3( (ob), obStruct, \
-            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
+    ypMem_INLINELEN_CONTAINER_VARIABLE3(                   \
+            ( ob ), obStruct, yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Resizes ob_data, the variable-portion of ob, and returns the previous value of ob_data
 // ("oldptr").  There are three possible scenarios:
@@ -1280,42 +1319,45 @@ static yp_ssize_t _ypMem_inlinelen_container_variable(
 // may be larger than requested, but will never be larger than alloclen_max.  Does not update
 // ob_len.
 // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
-static void *_ypMem_realloc_container_variable(
-        ypObject *ob, yp_ssize_t required, yp_ssize_t extra, yp_ssize_t alloclen_max,
-        yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
+static void *_ypMem_realloc_container_variable( ypObject *ob, yp_ssize_t required,
+        yp_ssize_t extra, yp_ssize_t alloclen_max, yp_ssize_t offsetof_inline,
+        yp_ssize_t elemsize )
 {
-    void *newptr;
-    void *oldptr;
+    void *     newptr;
+    void *     oldptr;
     yp_ssize_t size;
     yp_ssize_t extra_size;
     yp_ssize_t alloclen;
-    void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    void *     inlineptr = ( (yp_uint8_t *) ob ) + offsetof_inline;
     yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, elemsize );
 
     yp_ASSERT( required >= 0, "required cannot be negative" );
     yp_ASSERT( extra >= 0, "extra cannot be negative" );
     yp_ASSERT( required <= alloclen_max, "required cannot be larger than maximum" );
-    yp_ASSERT( inlinelen <= alloclen_max, "inlinelen is larger than maximum?! (Is _ypMem_ideal_size set too high?)" );
-    yp_ASSERT( alloclen_max <= ypObject_LEN_MAX, "alloclen_max cannot be larger than ypObject_LEN_MAX" );
-    yp_ASSERT( required <= yp_SSIZE_T_MAX/elemsize, "required yp_malloc size cannot overflow" );
+    yp_ASSERT( inlinelen <= alloclen_max,
+            "inlinelen is larger than maximum?! (Is _ypMem_ideal_size set too high?)" );
+    yp_ASSERT( alloclen_max <= ypObject_LEN_MAX,
+            "alloclen_max cannot be larger than ypObject_LEN_MAX" );
+    yp_ASSERT( required <= yp_SSIZE_T_MAX / elemsize, "required yp_malloc size cannot overflow" );
     if( extra > alloclen_max - required ) extra = alloclen_max - required;
 
     // If the minimum required allocation can fit inline, then prefer that over a separate buffer
     if( required <= inlinelen ) {
-        oldptr = ob->ob_data;   // might equal inlineptr
+        oldptr = ob->ob_data;  // might equal inlineptr
         ob->ob_data = inlineptr;
         ypObject_SET_ALLOCLEN( ob, inlinelen );
-        yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (to inline): 0x%08X alloclen %d", ob, ypObject_ALLOCLEN( ob ) );
+        yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (to inline): 0x%08X alloclen %d", ob,
+                ypObject_ALLOCLEN( ob ) );
         return oldptr;
     }
 
     // If the data is currently inline, it must be moved out into a separate buffer
     if( ob->ob_data == inlineptr ) {
-        newptr = yp_malloc( &size, _ypMem_calc_extra_size( required+extra, elemsize ) );
+        newptr = yp_malloc( &size, _ypMem_calc_extra_size( required + extra, elemsize ) );
         if( newptr == NULL ) return NULL;
-        oldptr = ob->ob_data;   // can't possibly equal newptr
+        oldptr = ob->ob_data;  // can't possibly equal newptr
         ob->ob_data = newptr;
-        alloclen = size / elemsize; // rounds down
+        alloclen = size / elemsize;  // rounds down
         if( alloclen > alloclen_max ) alloclen = alloclen_max;
         ypObject_SET_ALLOCLEN( ob, alloclen );
         yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (from inline): 0x%08X alloclen %d", ob, alloclen );
@@ -1326,20 +1368,21 @@ static void *_ypMem_realloc_container_variable(
     extra_size = _ypMem_calc_extra_size( extra, elemsize );
     newptr = yp_malloc_resize( &size, ob->ob_data, required * elemsize, extra_size );
     if( newptr == NULL ) return NULL;
-    oldptr = ob->ob_data;       // might equal newptr
+    oldptr = ob->ob_data;  // might equal newptr
     ob->ob_data = newptr;
-    alloclen = size / elemsize; // rounds down
+    alloclen = size / elemsize;  // rounds down
     if( alloclen > alloclen_max ) alloclen = alloclen_max;
     ypObject_SET_ALLOCLEN( ob, alloclen );
     yp_DEBUG( "REALLOC_CONTAINER_VARIABLE (malloc_resize): 0x%08X alloclen %d", ob, alloclen );
     return oldptr;
 }
-#define ypMem_REALLOC_CONTAINER_VARIABLE5( ob, obStruct, required, extra, alloclen_max, elemsize ) \
-    _ypMem_realloc_container_variable( (ob), (required), (extra), (alloclen_max), \
-            yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
+#define ypMem_REALLOC_CONTAINER_VARIABLE5(                                                \
+        ob, obStruct, required, extra, alloclen_max, elemsize )                           \
+    _ypMem_realloc_container_variable( ( ob ), ( required ), ( extra ), ( alloclen_max ), \
+            yp_offsetof( obStruct, ob_inline_data ), ( elemsize ) )
 #define ypMem_REALLOC_CONTAINER_VARIABLE( ob, obStruct, required, extra, alloclen_max ) \
-    ypMem_REALLOC_CONTAINER_VARIABLE5( (ob), obStruct, (required), (extra), (alloclen_max), \
-            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
+    ypMem_REALLOC_CONTAINER_VARIABLE5( ( ob ), obStruct, ( required ), ( extra ),       \
+            ( alloclen_max ), yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Called after a successful ypMem_REALLOC_CONTAINER_VARIABLE to free the previous value of ob_data
 // ("oldptr").  If ob_data was resized in-place, or if oldptr is the inline buffer, this is a
@@ -1348,22 +1391,23 @@ static void *_ypMem_realloc_container_variable(
 static void _ypMem_realloc_container_free_oldptr(
         ypObject *ob, void *oldptr, yp_ssize_t offsetof_inline )
 {
-    void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    void *inlineptr = ( (yp_uint8_t *) ob ) + offsetof_inline;
     yp_DEBUG( "REALLOC_CONTAINER_FREE_OLDPTR: 0x%08X", ob );
     if( oldptr != ob->ob_data && oldptr != inlineptr ) yp_free( oldptr );
 }
 #define ypMem_REALLOC_CONTAINER_FREE_OLDPTR( ob, obStruct, oldptr ) \
-    _ypMem_realloc_container_free_oldptr( (ob), oldptr, yp_offsetof( obStruct, ob_inline_data ) )
+    _ypMem_realloc_container_free_oldptr( ( ob ), oldptr, yp_offsetof( obStruct, ob_inline_data ) )
 
 // Resets ob_data to the inline buffer and frees the separate buffer (if there is one).  Any
 // contained objects must have already been discarded; no memory is copied.  Always succeeds.
 static void _ypMem_realloc_container_variable_clear(
         ypObject *ob, yp_ssize_t alloclen_max, yp_ssize_t offsetof_inline, yp_ssize_t elemsize )
 {
-    void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    void *     inlineptr = ( (yp_uint8_t *) ob ) + offsetof_inline;
     yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable( offsetof_inline, elemsize );
 
-    yp_ASSERT( inlinelen <= alloclen_max, "inlinelen is larger than maximum?! (Is _ypMem_ideal_size set too high?)" );
+    yp_ASSERT( inlinelen <= alloclen_max,
+            "inlinelen is larger than maximum?! (Is _ypMem_ideal_size set too high?)" );
 
     // Free any separately-allocated buffer
     if( ob->ob_data != inlineptr ) {
@@ -1371,14 +1415,15 @@ static void _ypMem_realloc_container_variable_clear(
         ob->ob_data = inlineptr;
         ypObject_SET_ALLOCLEN( ob, inlinelen );
     }
-    yp_DEBUG( "REALLOC_CONTAINER_VARIABLE_CLEAR: 0x%08X alloclen %d", ob, ypObject_ALLOCLEN( ob ) );
+    yp_DEBUG(
+            "REALLOC_CONTAINER_VARIABLE_CLEAR: 0x%08X alloclen %d", ob, ypObject_ALLOCLEN( ob ) );
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR3( ob, obStruct, alloclen_max, elemsize ) \
-    _ypMem_realloc_container_variable_clear( (ob), (alloclen_max), \
-            yp_offsetof( obStruct, ob_inline_data ), (elemsize) )
+    _ypMem_realloc_container_variable_clear(                                            \
+            ( ob ), ( alloclen_max ), yp_offsetof( obStruct, ob_inline_data ), ( elemsize ) )
 #define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( ob, obStruct, alloclen_max ) \
-    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR3( (ob), obStruct, (alloclen_max), \
-            yp_sizeof_member( obStruct, ob_inline_data[0] ) )
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR3(                                 \
+            ( ob ), obStruct, ( alloclen_max ), yp_sizeof_member( obStruct, ob_inline_data[0] ) )
 
 // Frees an object allocated with ypMem_MALLOC_FIXED
 #define ypMem_FREE_FIXED yp_free
@@ -1386,7 +1431,7 @@ static void _ypMem_realloc_container_variable_clear(
 // Frees an object allocated with either ypMem_MALLOC_CONTAINER_* macro
 static void _ypMem_free_container( ypObject *ob, yp_ssize_t offsetof_inline )
 {
-    void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
+    void *inlineptr = ( (yp_uint8_t *) ob ) + offsetof_inline;
     yp_DEBUG( "FREE_CONTAINER: 0x%08X", ob );
     if( ob->ob_data != inlineptr ) yp_free( ob->ob_data );
     yp_free( ob );
@@ -1403,7 +1448,7 @@ static void _ypMem_free_container( ypObject *ob, yp_ssize_t offsetof_inline )
 // by users of the API...even if through a DLL?
 ypObject *yp_incref( ypObject *x )
 {
-    if( ypObject_REFCNT( x ) >= ypObject_REFCNT_IMMORTAL ) return x; // no-op
+    if( ypObject_REFCNT( x ) >= ypObject_REFCNT_IMMORTAL ) return x;  // no-op
     ypObject_REFCNT( x ) += 1;
     yp_DEBUG( "incref: 0x%08X refcnt %d", x, ypObject_REFCNT( x ) );
     return x;
@@ -1435,7 +1480,7 @@ void yp_increfN( int n, ... )
 // the exception-returning version.
 void yp_decref( ypObject *x )
 {
-    if( ypObject_REFCNT( x ) >= ypObject_REFCNT_IMMORTAL ) return; // no-op
+    if( ypObject_REFCNT( x ) >= ypObject_REFCNT_IMMORTAL ) return;  // no-op
 
     if( ypObject_REFCNT( x ) <= 1 ) {
         ypObject *result;
@@ -1476,19 +1521,19 @@ void yp_decrefN( int n, ... )
 // Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
 
 typedef union {
-    struct {            // State for ypQuickIter_var_*
-        yp_ssize_t n;       // Number of variable arguments remaining
-        va_list args;       // Current state of variable arguments ("owned")
+    struct {              // State for ypQuickIter_var_*
+        yp_ssize_t n;     // Number of variable arguments remaining
+        va_list    args;  // Current state of variable arguments ("owned")
     } var;
-    struct {            // State for ypQuickIter_tuple_*
-        yp_ssize_t i;       // Index of next value to yield
-        ypObject *obj;      // The tuple or list object being iterated over (borrowed)
+    struct {             // State for ypQuickIter_tuple_*
+        yp_ssize_t i;    // Index of next value to yield
+        ypObject * obj;  // The tuple or list object being iterated over (borrowed)
     } tuple;
-    struct {            // State for ypQuickIter_mi_*
+    struct {                    // State for ypQuickIter_mi_*
         yp_uint64_t state;      // Mini iterator state
-        ypObject *iter;         // Mini iterator object (owned)
-        ypObject *to_decref;    // Held on behalf of nextX (owned, discarded by nextX/close)
-        yp_ssize_t len;         // >=0 if lenhint is exact; otherwise rely on yp_miniiter_lenhint
+        ypObject *  iter;       // Mini iterator object (owned)
+        ypObject *  to_decref;  // Held on behalf of nextX (owned, discarded by nextX/close)
+        yp_ssize_t  len;        // >=0 if lenhint is exact; otherwise rely on yp_miniiter_lenhint
     } mi;
 } ypQuickIter_state;
 
@@ -1498,31 +1543,33 @@ typedef struct {
     // Returns a *borrowed* reference to the next yielded value, or an exception.  If the iterator
     // is exhausted, returns NULL.  The borrowed reference becomes invalid when a new value is
     // yielded or close is called.
-    ypObject *(*nextX)( ypQuickIter_state *state );
+    ypObject *( *nextX )( ypQuickIter_state *state );
 
     // Similar to nextX, but returns a new reference (that will remain valid until decref'ed).
-    ypObject *(*next)( ypQuickIter_state *state );
+    ypObject *( *next )( ypQuickIter_state *state );
 
     // Returns the number of items left to be yielded.  Sets *isexact to true if this is an exact
     // value, or false if this is an estimate.  On error, sets *exc, returns zero, and *isexact is
     // undefined.
     // TODO Do like Python, and instead of *isexact accept a default hint that is returned?
     // There's also the idea of a ypObject_MIN_LENHINT...
-    yp_ssize_t (*lenhint)( ypQuickIter_state *state, int *isexact, ypObject **exc );
+    yp_ssize_t ( *lenhint )( ypQuickIter_state *state, int *isexact, ypObject **exc );
 
     // Closes the ypQuickIter.  Any further operations on state will be undefined.
     // TODO If any of these close methods raise errors, we'll need to return them
-    void (*close)( ypQuickIter_state *state );
+    void ( *close )( ypQuickIter_state *state );
 } ypQuickIter_methods;
 
 
-static ypObject *ypQuickIter_var_nextX( ypQuickIter_state *state ) {
+static ypObject *ypQuickIter_var_nextX( ypQuickIter_state *state )
+{
     if( state->var.n <= 0 ) return NULL;
     state->var.n -= 1;
-    return va_arg( state->var.args, ypObject * ); // borrowed
+    return va_arg( state->var.args, ypObject * );  // borrowed
 }
 
-static ypObject *ypQuickIter_var_next( ypQuickIter_state *state ) {
+static ypObject *ypQuickIter_var_next( ypQuickIter_state *state )
+{
     ypObject *x = ypQuickIter_var_nextX( state );
     return x == NULL ? NULL : yp_incref( x );
 }
@@ -1534,20 +1581,19 @@ static yp_ssize_t ypQuickIter_var_lenhint( ypQuickIter_state *state, int *isexac
     return state->var.n;
 }
 
-static void ypQuickIter_var_close( ypQuickIter_state *state ) {
-    va_end( state->var.args );
-}
+static void ypQuickIter_var_close( ypQuickIter_state *state ) { va_end( state->var.args ); }
 
 static const ypQuickIter_methods ypQuickIter_var_methods = {
-    ypQuickIter_var_nextX,      // nextX
-    ypQuickIter_var_next,       // next
-    ypQuickIter_var_lenhint,    // lenhint
-    ypQuickIter_var_close       // close
+        ypQuickIter_var_nextX,    // nextX
+        ypQuickIter_var_next,     // next
+        ypQuickIter_var_lenhint,  // lenhint
+        ypQuickIter_var_close     // close
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
 // ypQuickIter_var_methods as the method table.  The QuickIter is only valid so long as args is.
-static void ypQuickIter_new_fromvar( ypQuickIter_state *state, int n, va_list args ) {
+static void ypQuickIter_new_fromvar( ypQuickIter_state *state, int n, va_list args )
+{
     state->var.n = n;
     va_copy( state->var.args, args );
 }
@@ -1564,15 +1610,17 @@ static void ypQuickIter_new_fromtuple( ypQuickIter_state *state, ypObject *tuple
 // TODO Like tuples, sets and dicts can return borrowed references
 
 
-static ypObject *ypQuickIter_mi_next( ypQuickIter_state *state ) {
+static ypObject *ypQuickIter_mi_next( ypQuickIter_state *state )
+{
     // TODO What if we were to store tp_miniiter_next?
-    ypObject *x = yp_miniiter_next( &(state->mi.iter), &(state->mi.state) );    // new ref
+    ypObject *x = yp_miniiter_next( &( state->mi.iter ), &( state->mi.state ) );  // new ref
     if( yp_isexceptionC2( x, yp_StopIteration ) ) return NULL;
     if( state->mi.len >= 0 ) state->mi.len -= 1;
     return x;
 }
 
-static ypObject *ypQuickIter_mi_nextX( ypQuickIter_state *state ) {
+static ypObject *ypQuickIter_mi_nextX( ypQuickIter_state *state )
+{
     // This function yields borrowed references; since they are not discarded by the caller, we
     // need to retain these references ourselves and discard them when done.
     ypObject *x = ypQuickIter_mi_next( state );
@@ -1589,19 +1637,20 @@ static yp_ssize_t ypQuickIter_mi_lenhint( ypQuickIter_state *state, int *isexact
         return state->mi.len;
     } else {
         *isexact = FALSE;
-        return yp_miniiter_lenhintC( state->mi.iter, &(state->mi.state), exc );
+        return yp_miniiter_lenhintC( state->mi.iter, &( state->mi.state ), exc );
     }
 }
 
-static void ypQuickIter_mi_close( ypQuickIter_state *state ) {
+static void ypQuickIter_mi_close( ypQuickIter_state *state )
+{
     yp_decrefN( 2, state->mi.to_decref, state->mi.iter );
 }
 
 static const ypQuickIter_methods ypQuickIter_mi_methods = {
-    ypQuickIter_mi_nextX,       // nextX
-    ypQuickIter_mi_next,        // next
-    ypQuickIter_mi_lenhint,     // lenhint
-    ypQuickIter_mi_close        // close
+        ypQuickIter_mi_nextX,    // nextX
+        ypQuickIter_mi_next,     // next
+        ypQuickIter_mi_lenhint,  // lenhint
+        ypQuickIter_mi_close     // close
 };
 
 
@@ -1620,13 +1669,13 @@ static ypObject *ypQuickIter_new_fromiterable(
     } else {
         // We may eventually special-case other types, but for now treat them as generic iterables
         ypObject *exc = yp_None;
-        ypObject *mi = yp_miniiter( iterable, &(state->mi.state) );
+        ypObject *mi = yp_miniiter( iterable, &( state->mi.state ) );
         if( yp_isexceptionC( mi ) ) return mi;
         *methods = &ypQuickIter_mi_methods;
         state->mi.iter = mi;
         state->mi.to_decref = yp_None;
         state->mi.len = yp_lenC( iterable, &exc );
-        if( yp_isexceptionC( exc ) ) state->mi.len = -1;    // indicates yp_miniiter_lenhintC
+        if( yp_isexceptionC( exc ) ) state->mi.len = -1;  // indicates yp_miniiter_lenhintC
         return yp_None;
     }
 }
@@ -1651,18 +1700,18 @@ static ypObject *ypQuickIter_new_fromiterable(
 // Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
 
 typedef union {
-    struct {            // State for ypQuickSeq_var_*
-        yp_ssize_t len;         // Number of ypObject*s in args/orig_args
-        yp_ssize_t i;           // Current index
-        ypObject *x;            // Object at index i (borrowed) (invalid if len<1)
-        va_list args;           // Current state of variable arguments ("owned")
-        va_list orig_args;      // The starting point for args ("owned")
+    struct {                   // State for ypQuickSeq_var_*
+        yp_ssize_t len;        // Number of ypObject*s in args/orig_args
+        yp_ssize_t i;          // Current index
+        ypObject * x;          // Object at index i (borrowed) (invalid if len<1)
+        va_list    args;       // Current state of variable arguments ("owned")
+        va_list    orig_args;  // The starting point for args ("owned")
     } var;
-    ypObject *obj;      // State for ypQuickSeq_tuple_*, etc (borrowed)
+    ypObject *obj;  // State for ypQuickSeq_tuple_*, etc (borrowed)
     // TODO bytes, str, other seq objs could all have their own state here
-    struct {            // State for ypQuickSeq_seq_*
-        ypObject *obj;          // Sequence object (borrowed)
-        ypObject *to_decref;    // Held for getindexX (owned, discarded by getindexX/close)
+    struct {                  // State for ypQuickSeq_seq_*
+        ypObject *obj;        // Sequence object (borrowed)
+        ypObject *to_decref;  // Held for getindexX (owned, discarded by getindexX/close)
     } seq;
     // TODO sets and dicts can be "indexed" here, in contexts where they would be convereted to a
     // tuple anyway
@@ -1674,15 +1723,15 @@ typedef struct {
     // Returns a *borrowed* reference to the object at index i, or an exception.  If the index is
     // out-of-range, returns NULL; negative indicies are not allowed.  The borrowed reference
     // becomes invalid when a new value is retrieved or close is called.
-    ypObject *(*getindexX)( ypQuickSeq_state *state, yp_ssize_t i );
+    ypObject *( *getindexX )( ypQuickSeq_state *state, yp_ssize_t i );
     // Similar to getindexX, but returns a new reference (that will remain valid until decref'ed).
-    ypObject *(*getindex)( ypQuickSeq_state *state, yp_ssize_t i );
+    ypObject *( *getindex )( ypQuickSeq_state *state, yp_ssize_t i );
     // Returns the total number of elements in the ypQuickSeq.  On error, sets *exc and returns
     // zero.
-    yp_ssize_t (*len)( ypQuickSeq_state *state, ypObject **exc );
+    yp_ssize_t ( *len )( ypQuickSeq_state *state, ypObject **exc );
     // Closes the ypQuickSeq.  Any further operations on state will be undefined.
     // TODO If any of these close methods raise errors, we'll need to return them
-    void (*close)( ypQuickSeq_state *state );
+    void ( *close )( ypQuickSeq_state *state );
 } ypQuickSeq_methods;
 
 
@@ -1707,30 +1756,34 @@ static ypObject *ypQuickSeq_var_getindexX( ypQuickSeq_state *state, yp_ssize_t i
     return state->var.x;
 }
 
-static ypObject *ypQuickSeq_var_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
+static ypObject *ypQuickSeq_var_getindex( ypQuickSeq_state *state, yp_ssize_t i )
+{
     ypObject *x = ypQuickSeq_var_getindexX( state, i );
     return x == NULL ? NULL : yp_incref( x );
 }
 
-static yp_ssize_t ypQuickSeq_var_len( ypQuickSeq_state *state, ypObject **exc ) {
+static yp_ssize_t ypQuickSeq_var_len( ypQuickSeq_state *state, ypObject **exc )
+{
     return state->var.len;
 }
 
-static void ypQuickSeq_var_close( ypQuickSeq_state *state ) {
+static void ypQuickSeq_var_close( ypQuickSeq_state *state )
+{
     va_end( state->var.args );
     va_end( state->var.orig_args );
 }
 
 static const ypQuickSeq_methods ypQuickSeq_var_methods = {
-    ypQuickSeq_var_getindexX,   // getindexX
-    ypQuickSeq_var_getindex,    // getindex
-    ypQuickSeq_var_len,         // len
-    ypQuickSeq_var_close        // close
+        ypQuickSeq_var_getindexX,  // getindexX
+        ypQuickSeq_var_getindex,   // getindex
+        ypQuickSeq_var_len,        // len
+        ypQuickSeq_var_close       // close
 };
 
 // Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
 // ypQuickSeq_var_methods as the method table.  The QuickSeq is only valid so long as args is.
-static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list args ) {
+static void ypQuickSeq_new_fromvar( ypQuickSeq_state *state, int n, va_list args )
+{
     state->var.len = MAX( n, 0 );
     va_copy( state->var.orig_args, args );  // "owned"
     va_copy( state->var.args, args );       // "owned"
@@ -1751,15 +1804,17 @@ static const ypQuickSeq_methods ypQuickSeq_tuple_methods;
 static void ypQuickSeq_new_fromtuple( ypQuickSeq_state *state, ypObject *tuple );
 
 
-static ypObject *ypQuickSeq_seq_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
+static ypObject *ypQuickSeq_seq_getindex( ypQuickSeq_state *state, yp_ssize_t i )
+{
     ypObject *x;
     yp_ASSERT( i >= 0, "negative indicies not allowed in ypQuickSeq" );
-    x = yp_getindexC( state->seq.obj, i );      // new ref
+    x = yp_getindexC( state->seq.obj, i );  // new ref
     if( yp_isexceptionC2( x, yp_IndexError ) ) return NULL;
     return x;
 }
 
-static ypObject *ypQuickSeq_seq_getindexX( ypQuickSeq_state *state, yp_ssize_t i ) {
+static ypObject *ypQuickSeq_seq_getindexX( ypQuickSeq_state *state, yp_ssize_t i )
+{
     // This function returns borrowed references; since they are not discarded by the caller, we
     // need to retain these references ourselves and discard them when done.
     ypObject *x = ypQuickSeq_seq_getindex( state, i );
@@ -1769,19 +1824,18 @@ static ypObject *ypQuickSeq_seq_getindexX( ypQuickSeq_state *state, yp_ssize_t i
     return x;
 }
 
-static yp_ssize_t ypQuickSeq_seq_len( ypQuickSeq_state *state, ypObject **exc ) {
-    return yp_lenC( state->seq.obj, exc );     // returns zero on error
+static yp_ssize_t ypQuickSeq_seq_len( ypQuickSeq_state *state, ypObject **exc )
+{
+    return yp_lenC( state->seq.obj, exc );  // returns zero on error
 }
 
-static void ypQuickSeq_seq_close( ypQuickSeq_state *state ) {
-    yp_decref( state->seq.to_decref );
-}
+static void ypQuickSeq_seq_close( ypQuickSeq_state *state ) { yp_decref( state->seq.to_decref ); }
 
 static const ypQuickSeq_methods ypQuickSeq_seq_methods = {
-    ypQuickSeq_seq_getindexX,   // getindexX
-    ypQuickSeq_seq_getindex,    // getindex
-    ypQuickSeq_seq_len,         // len
-    ypQuickSeq_seq_close        // close
+        ypQuickSeq_seq_getindexX,  // getindexX
+        ypQuickSeq_seq_getindex,   // getindex
+        ypQuickSeq_seq_len,        // len
+        ypQuickSeq_seq_close       // close
 };
 
 
@@ -1816,7 +1870,7 @@ static ypObject *ypQuickSeq_new_fromsequence(
         ypObject *result = yp_getindexC( sequence, yp_SSIZE_T_MAX );
         if( !yp_isexceptionC2( result, yp_IndexError ) ) {
             if( yp_isexceptionC( result ) ) return result;
-            yp_decref( result ); // discard unexpectedly-returned value
+            yp_decref( result );  // discard unexpectedly-returned value
             return yp_RuntimeError;
         }
         *methods = &ypQuickSeq_seq_methods;
@@ -1843,19 +1897,19 @@ static int ypQuickSeq_new_fromiterable_builtins(
  *************************************************************************************************/
 
 typedef yp_int32_t _yp_iter_lenhint_t;
-#define ypIter_LENHINT_MAX  ((yp_ssize_t) 0x7FFFFFFF)
+#define ypIter_LENHINT_MAX ( (yp_ssize_t) 0x7FFFFFFF )
 
 // _ypIterObject_HEAD shared with friendly classes below
 #define _ypIterObject_HEAD_NO_PADDING \
-    ypObject_HEAD; \
-    _yp_iter_lenhint_t ob_lenhint; \
-    yp_uint32_t ob_objlocs; \
+    ypObject_HEAD;                    \
+    _yp_iter_lenhint_t  ob_lenhint;   \
+    yp_uint32_t         ob_objlocs;   \
     yp_generator_func_t ob_func /* force use of semi-colon */
 // To ensure that ob_inline_data is aligned properly, we need to pad on some platforms
 // TODO If we use ob_len to store the lenhint, yp_lenC would have to always call tp_len, but then
 // we could trim 8 bytes off all iterators
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
-#define _ypIterObject_HEAD \
+#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu  // 32-bit (or less) platform
+#define _ypIterObject_HEAD         \
     _ypIterObject_HEAD_NO_PADDING; \
     void *_ob_padding /* force use of semi-colon */
 #else
@@ -1865,30 +1919,30 @@ typedef struct {
     _ypIterObject_HEAD;
     yp_INLINE_DATA( yp_uint8_t );
 } ypIterObject;
-yp_STATIC_ASSERT( yp_offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_iter_inline_data );
+yp_STATIC_ASSERT( yp_offsetof( ypIterObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0,
+        alignof_iter_inline_data );
 
-#define ypIter_STATE( i )       ( ((ypObject *)i)->ob_data )
-#define ypIter_STATE_SIZE       ypObject_ALLOCLEN
-#define ypIter_SET_STATE_SIZE   ypObject_SET_ALLOCLEN
-#define ypIter_LENHINT( i )     ( ((ypIterObject *)i)->ob_lenhint )
+#define ypIter_STATE( i ) ( ( (ypObject *) i )->ob_data )
+#define ypIter_STATE_SIZE ypObject_ALLOCLEN
+#define ypIter_SET_STATE_SIZE ypObject_SET_ALLOCLEN
+#define ypIter_LENHINT( i ) ( ( (ypIterObject *) i )->ob_lenhint )
 // ob_objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state
-#define ypIter_OBJLOCS( i )     ( ((ypIterObject *)i)->ob_objlocs )
-#define ypIter_FUNC( i )        ( ((ypIterObject *)i)->ob_func )
+#define ypIter_OBJLOCS( i ) ( ( (ypIterObject *) i )->ob_objlocs )
+#define ypIter_FUNC( i ) ( ( (ypIterObject *) i )->ob_func )
 
 // The maximum possible length of an iter
-#define ypIter_STATE_SIZE_MAX ( (yp_ssize_t) MIN( \
-            yp_SSIZE_T_MAX-yp_sizeof( ypIterObject ), \
-            ypObject_LEN_MAX ) )
+#define ypIter_STATE_SIZE_MAX \
+    ( (yp_ssize_t) MIN( yp_SSIZE_T_MAX - yp_sizeof( ypIterObject ), ypObject_LEN_MAX ) )
 
 // Iterator methods
 
 static ypObject *iter_traverse( ypObject *i, visitfunc visitor, void *memo )
 {
-    ypObject **p = (ypObject **) ypIter_STATE( i );
+    ypObject ** p = (ypObject **) ypIter_STATE( i );
     yp_uint32_t locs = ypIter_OBJLOCS( i );
-    ypObject *result;
+    ypObject *  result;
 
-    while( locs ) { // while there are still more objects to be found...
+    while( locs ) {  // while there are still more objects to be found...
         if( locs & 0x1u ) {
             result = visitor( *p, memo );
             if( yp_isexceptionC( result ) ) return result;
@@ -1900,12 +1954,14 @@ static ypObject *iter_traverse( ypObject *i, visitfunc visitor, void *memo )
 }
 
 // Decrements the reference count of the visited object
-static ypObject *_iter_closing_visitor( ypObject *x, void *memo ) {
+static ypObject *_iter_closing_visitor( ypObject *x, void *memo )
+{
     yp_decref( x );
     return yp_None;
 }
 
-static ypObject *_iter_closed_generator( ypObject *i, ypObject *value ) {
+static ypObject *_iter_closed_generator( ypObject *i, ypObject *value )
+{
     return yp_StopIteration;
 }
 static ypObject *iter_close( ypObject *i )
@@ -1914,8 +1970,8 @@ static ypObject *iter_close( ypObject *i )
     ypObject *result = ypIter_FUNC( i )( i, yp_GeneratorExit );
 
     // Close off this iterator
-    (void) iter_traverse( i, _iter_closing_visitor, NULL ); // never fails
-    ypIter_OBJLOCS( i ) = 0x0u; // they are all discarded now...
+    (void) iter_traverse( i, _iter_closing_visitor, NULL );  // never fails
+    ypIter_OBJLOCS( i ) = 0x0u;                              // they are all discarded now...
     ypIter_LENHINT( i ) = 0;
     ypIter_FUNC( i ) = _iter_closed_generator;
 
@@ -1923,29 +1979,30 @@ static ypObject *iter_close( ypObject *i )
     // errors.  Any other exception or yielded value _is_ an error, as per Python.
     if( yp_isexceptionCN( result, 2, yp_StopIteration, yp_GeneratorExit ) ) return yp_None;
     if( yp_isexceptionC( result ) ) return result;
-    yp_decref( result ); // discard unexpectedly-yielded value
+    yp_decref( result );  // discard unexpectedly-yielded value
     return yp_RuntimeError;
 }
 
 // iter objects can be returned from yp_miniiter...they simply ignore *state
-static ypObject *iter_miniiter( ypObject *i, yp_uint64_t *state ) {
-    *state = 0; // just in case...
+static ypObject *iter_miniiter( ypObject *i, yp_uint64_t *state )
+{
+    *state = 0;  // just in case...
     return yp_incref( i );
 }
 
 static ypObject *iter_send( ypObject *i, ypObject *value );
-static ypObject *iter_miniiter_next( ypObject *i, yp_uint64_t *state ) {
+static ypObject *iter_miniiter_next( ypObject *i, yp_uint64_t *state )
+{
     return iter_send( i, yp_None );
 }
 
-static ypObject *iter_miniiter_lenhint( ypObject *i, yp_uint64_t *state, yp_ssize_t *lenhint ) {
+static ypObject *iter_miniiter_lenhint( ypObject *i, yp_uint64_t *state, yp_ssize_t *lenhint )
+{
     *lenhint = ypIter_LENHINT( i ) < 0 ? 0 : ypIter_LENHINT( i );
     return yp_None;
 }
 
-static ypObject *iter_iter( ypObject *i ) {
-    return yp_incref( i );
-}
+static ypObject *iter_iter( ypObject *i ) { return yp_incref( i ); }
 
 static ypObject *iter_send( ypObject *i, ypObject *value )
 {
@@ -1964,76 +2021,77 @@ static ypObject *iter_send( ypObject *i, ypObject *value )
     return result;
 }
 
-static ypObject *iter_dealloc( ypObject *i ) {
-    (void) iter_close( i ); // ignore errors; discards all references
+static ypObject *iter_dealloc( ypObject *i )
+{
+    (void) iter_close( i );  // ignore errors; discards all references
     ypMem_FREE_CONTAINER( i, ypIterObject );
     return yp_None;
 }
 
 // A frozen iter behaves like a closed iter; as such, they share the same method table
 static ypTypeObject ypIter_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    iter_dealloc,                   // tp_dealloc
-    iter_traverse,                  // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        iter_dealloc,   // tp_dealloc
+        iter_traverse,  // tp_traverse
+        NULL,           // tp_str
+        NULL,           // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    MethodError_objproc,            // tp_unfrozen_copy
-    MethodError_objproc,            // tp_frozen_copy
-    MethodError_traversefunc,       // tp_unfrozen_deepcopy
-    MethodError_traversefunc,       // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,       // tp_freeze
+        MethodError_objproc,       // tp_unfrozen_copy
+        MethodError_objproc,       // tp_frozen_copy
+        MethodError_traversefunc,  // tp_unfrozen_deepcopy
+        MethodError_traversefunc,  // tp_frozen_deepcopy
+        MethodError_objproc,       // tp_invalidate
 
-    // Boolean operations and comparisons
-    MethodError_objproc,            // tp_bool
-    NotImplemented_comparefunc,     // tp_lt
-    NotImplemented_comparefunc,     // tp_le
-    NotImplemented_comparefunc,     // tp_eq
-    NotImplemented_comparefunc,     // tp_ne
-    NotImplemented_comparefunc,     // tp_ge
-    NotImplemented_comparefunc,     // tp_gt
+        // Boolean operations and comparisons
+        MethodError_objproc,         // tp_bool
+        NotImplemented_comparefunc,  // tp_lt
+        NotImplemented_comparefunc,  // tp_le
+        NotImplemented_comparefunc,  // tp_eq
+        NotImplemented_comparefunc,  // tp_ne
+        NotImplemented_comparefunc,  // tp_ge
+        NotImplemented_comparefunc,  // tp_gt
 
-    // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
-    iter_close,                     // tp_close
+        // Generic object operations
+        MethodError_hashfunc,  // tp_currenthash
+        iter_close,            // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    iter_miniiter,                  // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    iter_miniiter_next,             // tp_miniiter_next
-    iter_miniiter_lenhint,          // tp_miniiter_lenhint
-    iter_iter,                      // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    iter_send,                      // tp_send
+        // Iterator operations
+        iter_miniiter,           // tp_miniiter
+        TypeError_miniiterfunc,  // tp_miniiter_reversed
+        iter_miniiter_next,      // tp_miniiter_next
+        iter_miniiter_lenhint,   // tp_miniiter_lenhint
+        iter_iter,               // tp_iter
+        TypeError_objproc,       // tp_iter_reversed
+        iter_send,               // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    TypeError_lenfunc,              // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 // Public functions
@@ -2063,17 +2121,18 @@ ypObject *yp_iter_stateCX( ypObject *i, void **state, yp_ssize_t *size )
 
 // TODO Double-check and test the boundary conditions in this function
 // XXX Yes, Python also allows unpacking of non-sequence iterables: a,b,c={1,2,3} is valid
-void yp_unpackN( ypObject *iterable, int n, ... ) {
-    return_yp_V_FUNC_void( yp_unpackNV, (iterable, n, args), n );
+void yp_unpackN( ypObject *iterable, int n, ... )
+{
+    return_yp_V_FUNC_void( yp_unpackNV, ( iterable, n, args ), n );
 }
 void yp_unpackNV( ypObject *iterable, int n, va_list args_orig )
 {
     yp_uint64_t mi_state;
-    ypObject *mi;
-    va_list args;
-    int remaining;
-    ypObject *x = yp_None; // set to None in case n==0
-    ypObject **dest;
+    ypObject *  mi;
+    va_list     args;
+    int         remaining;
+    ypObject *  x = yp_None;  // set to None in case n==0
+    ypObject ** dest;
 
     // Set the given n arguments to the values yielded from iterable; if an exception occurs, we
     // will need to restart and discard these values.  Remember that if yp_miniiter fails,
@@ -2081,10 +2140,10 @@ void yp_unpackNV( ypObject *iterable, int n, va_list args_orig )
     // TODO Hmmm; let's say iterable was yp_StopIteration for some reason: this code would actually
     // succeed when n=0 even though it should probably fail...we should check the yp_miniiter
     // return (here and elsewhere)
-    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    mi = yp_miniiter( iterable, &mi_state );  // new ref
     va_copy( args, args_orig );
     for( remaining = n; remaining > 0; remaining-- ) {
-        x = yp_miniiter_next( &mi, &mi_state ); // new ref
+        x = yp_miniiter_next( &mi, &mi_state );  // new ref
         if( yp_isexceptionC( x ) ) {
             // If the iterable is too short, raise yp_ValueError
             if( yp_isexceptionC2( x, yp_StopIteration ) ) x = yp_ValueError;
@@ -2098,9 +2157,9 @@ void yp_unpackNV( ypObject *iterable, int n, va_list args_orig )
 
     // If we've been successful so far, then ensure we're at the end of iterable
     if( !yp_isexceptionC( x ) ) {
-        x = yp_miniiter_next( &mi, &mi_state ); // new ref
+        x = yp_miniiter_next( &mi, &mi_state );  // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) {
-            x = yp_None; // success!
+            x = yp_None;  // success!
         } else if( yp_isexceptionC( x ) ) {
             // some other exception occured
         } else {
@@ -2131,24 +2190,25 @@ void yp_unpackNV( ypObject *iterable, int n, va_list args_orig )
 // Generator Constructors
 
 // Increments the reference count of the visited object
-static ypObject *_iter_constructing_visitor( ypObject *x, void *memo ) {
+static ypObject *_iter_constructing_visitor( ypObject *x, void *memo )
+{
     yp_incref( x );
     return yp_None;
 }
 
-ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint,
-        void *state, yp_ssize_t size, int n, ... )
+ypObject *yp_generator_fromstructCN(
+        yp_generator_func_t func, yp_ssize_t lenhint, void *state, yp_ssize_t size, int n, ... )
 {
-    return_yp_V_FUNC( ypObject *, yp_generator_fromstructCNV,
-            (func, lenhint, state, size, n, args), n );
+    return_yp_V_FUNC(
+            ypObject *, yp_generator_fromstructCNV, ( func, lenhint, state, size, n, args ), n );
 }
-ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhint,
-        void *state, yp_ssize_t size, int n, va_list args )
+ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhint, void *state,
+        yp_ssize_t size, int n, va_list args )
 {
-    ypObject *i;
+    ypObject *  i;
     yp_uint32_t objlocs = 0x0u;
-    yp_ssize_t objoffset;
-    yp_ssize_t objloc_index;
+    yp_ssize_t  objoffset;
+    yp_ssize_t  objloc_index;
 
     if( size < 0 ) return yp_ValueError;
     if( size > ypIter_STATE_SIZE_MAX ) return yp_MemorySizeOverflowError;
@@ -2161,10 +2221,10 @@ ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhi
         objoffset = va_arg( args, yp_ssize_t );
         if( objoffset < 0 ) continue;
         if( objoffset > size - yp_sizeof( ypObject * ) ) continue;
-        if( objoffset%yp_sizeof( ypObject * ) != 0 ) return yp_SystemLimitationError;
+        if( objoffset % yp_sizeof( ypObject * ) != 0 ) return yp_SystemLimitationError;
         objloc_index = objoffset / yp_sizeof( ypObject * );
         if( objloc_index > 31 ) return yp_SystemLimitationError;
-        objlocs |= (0x1u << objloc_index);
+        objlocs |= ( 0x1u << objloc_index );
     }
 
     // Allocate the iterator
@@ -2179,7 +2239,7 @@ ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhi
     memcpy( ypIter_STATE( i ), state, size );
     ypIter_SET_STATE_SIZE( i, size );
     ypIter_OBJLOCS( i ) = objlocs;
-    (void) iter_traverse( i, _iter_constructing_visitor, NULL ); // never fails
+    (void) iter_traverse( i, _iter_constructing_visitor, NULL );  // never fails
     return i;
 }
 
@@ -2188,24 +2248,24 @@ ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhi
 
 typedef struct {
     _ypIterObject_HEAD;
-    ypObject *mi;
+    ypObject *  mi;
     yp_uint64_t mi_state;
 } ypMiIterObject;
-#define ypMiIter_MI( i )        ( ((ypMiIterObject *)i)->mi )
-#define ypMiIter_MI_STATE( i )  ( ((ypMiIterObject *)i)->mi_state )
+#define ypMiIter_MI( i ) ( ( (ypMiIterObject *) i )->mi )
+#define ypMiIter_MI_STATE( i ) ( ( (ypMiIterObject *) i )->mi_state )
 
 static ypObject *_ypMiIter_generator( ypObject *i, ypObject *value )
 {
     ypObject *mi = ypMiIter_MI( i );
-    if( yp_isexceptionC( value ) ) return value; // yp_GeneratorExit, in particular
+    if( yp_isexceptionC( value ) ) return value;  // yp_GeneratorExit, in particular
     return ypObject_TYPE( mi )->tp_miniiter_next( mi, &ypMiIter_MI_STATE( i ) );
 }
 
 static ypObject *_ypMiIter_from_miniiter( ypObject *x, miniiterfunc mi_constructor )
 {
-    ypObject *i;
-    ypObject *mi;
-    ypObject *result;
+    ypObject * i;
+    ypObject * mi;
+    ypObject * result;
     yp_ssize_t lenhint;
 
     // Allocate the iterator
@@ -2227,7 +2287,7 @@ static ypObject *_ypMiIter_from_miniiter( ypObject *x, miniiterfunc mi_construct
 
     // Set the attributes and return (mi_state set above)
     i->ob_len = ypObject_LEN_INVALID;
-    ypIter_STATE( i ) = &(ypMiIter_MI( i ));
+    ypIter_STATE( i ) = &( ypMiIter_MI( i ) );
     ypIter_SET_STATE_SIZE( i, yp_sizeof( ypMiIterObject ) - yp_offsetof( ypMiIterObject, mi ) );
     ypIter_FUNC( i ) = _ypMiIter_generator;
     ypIter_OBJLOCS( i ) = 0x1u;  // indicates mi at state offset zero
@@ -2238,12 +2298,14 @@ static ypObject *_ypMiIter_from_miniiter( ypObject *x, miniiterfunc mi_construct
 }
 
 // Assign this to tp_iter for types that support mini iterators
-static ypObject *_ypIter_from_miniiter( ypObject *x ) {
+static ypObject *_ypIter_from_miniiter( ypObject *x )
+{
     return _ypMiIter_from_miniiter( x, ypObject_TYPE( x )->tp_miniiter );
 }
 
 // Assign this to tp_iter_reversed for types that support reversed mini iterators
-static ypObject *_ypIter_from_miniiter_rev( ypObject *x ) {
+static ypObject *_ypIter_from_miniiter_rev( ypObject *x )
+{
     return _ypMiIter_from_miniiter( x, ypObject_TYPE( x )->tp_miniiter_reversed );
 }
 
@@ -2252,26 +2314,29 @@ static ypObject *_ypIter_from_miniiter_rev( ypObject *x ) {
 
 yp_STATIC_ASSERT( yp_sizeof( yp_uint64_t ) >= yp_sizeof( yp_ssize_t ), ssize_fits_uint64 );
 
-static ypObject *_ypSequence_miniiter( ypObject *x, yp_uint64_t *state ) {
-    *state = 0; // start at zero (first element) and count up
+static ypObject *_ypSequence_miniiter( ypObject *x, yp_uint64_t *state )
+{
+    *state = 0;  // start at zero (first element) and count up
     return yp_incref( x );
 }
 
-static ypObject *_ypSequence_miniiter_rev( ypObject *x, yp_uint64_t *state ) {
-    *state = (yp_uint64_t) -1; // start at -1 (last element) and count down
+static ypObject *_ypSequence_miniiter_rev( ypObject *x, yp_uint64_t *state )
+{
+    *state = (yp_uint64_t) -1;  // start at -1 (last element) and count down
     return yp_incref( x );
 }
 
-static ypObject *_ypSequence_miniiter_next( ypObject *x, yp_uint64_t *_state ) {
+static ypObject *_ypSequence_miniiter_next( ypObject *x, yp_uint64_t *_state )
+{
     yp_int64_t *state = (yp_int64_t *) _state;
-    ypObject *result = yp_getindexC( x, (yp_ssize_t) *state );
+    ypObject *  result = yp_getindexC( x, (yp_ssize_t) *state );
     if( yp_isexceptionC( result ) ) {
         return yp_isexceptionC2( result, yp_IndexError ) ? yp_StopIteration : result;
     }
 
-    if( *state >= 0 ) { // we are counting up from the first element
+    if( *state >= 0 ) {  // we are counting up from the first element
         *state += 1;
-    } else {            // we are counting down from the last element
+    } else {  // we are counting down from the last element
         *state -= 1;
     }
     return result;
@@ -2281,13 +2346,13 @@ static ypObject *_ypSequence_miniiter_next( ypObject *x, yp_uint64_t *_state ) {
 static ypObject *_ypSequence_miniiter_lenh( ypObject *x, yp_uint64_t *_state, yp_ssize_t *lenhint )
 {
     yp_int64_t *state = (yp_int64_t *) _state;
-    ypObject *exc = yp_None;
-    yp_ssize_t len = yp_lenC( x, &exc );
+    ypObject *  exc = yp_None;
+    yp_ssize_t  len = yp_lenC( x, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     if( *state >= 0 ) {
-        *lenhint = len - ((yp_ssize_t) *state);
+        *lenhint = len - ( (yp_ssize_t) *state );
     } else {
-        *lenhint = len - ((yp_ssize_t) (-1 - *state));
+        *lenhint = len - ( ( yp_ssize_t )( -1 - *state ) );
     }
     return yp_None;
 }
@@ -2305,10 +2370,10 @@ static ypObject *_ypSequence_miniiter_lenh( ypObject *x, yp_uint64_t *_state, yp
 // also when we call tp_freeze
 static ypObject *_yp_freeze( ypObject *x )
 {
-    int oldCode = ypObject_TYPE_CODE( x );
-    int newCode = ypObject_TYPE_CODE_AS_FROZEN( oldCode );
+    int           oldCode = ypObject_TYPE_CODE( x );
+    int           newCode = ypObject_TYPE_CODE_AS_FROZEN( oldCode );
     ypTypeObject *newType;
-    ypObject *exc = yp_None;
+    ypObject *    exc = yp_None;
 
     // Check if it's already frozen (no-op) or if it can't be frozen (error)
     if( oldCode == newCode ) return yp_None;
@@ -2340,7 +2405,7 @@ static ypObject *_yp_deepfreeze( ypObject *x, void *_memo )
     yp_pushuniqueE( memo, id, &exc );
     yp_decref( id );
     if( yp_isexceptionC( exc ) ) {
-        if( yp_isexceptionC2( exc, yp_KeyError ) ) return yp_None; // already in set
+        if( yp_isexceptionC2( exc, yp_KeyError ) ) return yp_None;  // already in set
         return exc;
     }
 
@@ -2361,27 +2426,28 @@ void yp_deepfreeze( ypObject **x )
     if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( x, result );
 }
 
-ypObject *yp_unfrozen_copy( ypObject *x ) {
-    return ypObject_TYPE( x )->tp_unfrozen_copy( x );
-}
+ypObject *yp_unfrozen_copy( ypObject *x ) { return ypObject_TYPE( x )->tp_unfrozen_copy( x ); }
 
 // XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
 // maybe even those should be copied as well...or just those that contain other objects
 // TODO It'd be nice to share code with yp_deepcopy2
-static ypObject *yp_unfrozen_deepcopy2( ypObject *x, void *memo ) {
+static ypObject *yp_unfrozen_deepcopy2( ypObject *x, void *memo )
+{
     // TODO don't forget to discard the new objects on error
     // TODO trap recursion & test
     return yp_NotImplementedError;
 }
 
-ypObject *yp_unfrozen_deepcopy( ypObject *x ) {
+ypObject *yp_unfrozen_deepcopy( ypObject *x )
+{
     ypObject *memo = yp_dictK( 0 );
     ypObject *result = yp_unfrozen_deepcopy2( x, memo );
     yp_decref( memo );
     return result;
 }
 
-ypObject *yp_frozen_copy( ypObject *x ) {
+ypObject *yp_frozen_copy( ypObject *x )
+{
     if( !ypObject_IS_MUTABLE( x ) ) return yp_incref( x );
     return ypObject_TYPE( x )->tp_frozen_copy( x );
 }
@@ -2389,40 +2455,44 @@ ypObject *yp_frozen_copy( ypObject *x ) {
 // XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
 // maybe even those should be copied as well...or just those that contain other objects
 // TODO It'd be nice to share code with yp_deepcopy2
-static ypObject *yp_frozen_deepcopy2( ypObject *x, void *memo ) {
+static ypObject *yp_frozen_deepcopy2( ypObject *x, void *memo )
+{
     // TODO don't forget to discard the new objects on error
     // TODO trap recursion & test
     return yp_NotImplementedError;
 }
 
-ypObject *yp_frozen_deepcopy( ypObject *x ) {
+ypObject *yp_frozen_deepcopy( ypObject *x )
+{
     ypObject *memo = yp_dictK( 0 );
     ypObject *result = yp_frozen_deepcopy2( x, memo );
     yp_decref( memo );
     return result;
 }
 
-ypObject *yp_copy( ypObject *x ) {
+ypObject *yp_copy( ypObject *x )
+{
     return ypObject_IS_MUTABLE( x ) ? yp_unfrozen_copy( x ) : yp_frozen_copy( x );
 }
 
 // Use this as the visitor for deep copies (copying exactly the same types)
 // XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
 // maybe even those should be copied as well...or just those that contain other objects
-static ypObject *yp_deepcopy2( ypObject *x, void *_memo ) {
+static ypObject *yp_deepcopy2( ypObject *x, void *_memo )
+{
     ypObject **memo = (ypObject **) _memo;
-    ypObject *id;
-    ypObject *result;
+    ypObject * id;
+    ypObject * result;
 
     // Avoid recursion: we only make one copy of each object
-    id = yp_intC( (yp_ssize_t) x ); // new ref
+    id = yp_intC( (yp_ssize_t) x );  // new ref
     result = yp_getitem( *memo, id );
     if( !yp_isexceptionC( result ) ) {
         yp_decref( id );
-        return result; // we've already made a copy of this object; return it
+        return result;  // we've already made a copy of this object; return it
     } else if( !yp_isexceptionC2( result, yp_KeyError ) ) {
         yp_decref( id );
-        return result; // some (unexpected) error occured
+        return result;  // some (unexpected) error occured
     }
 
     // If we get here, then this is the first time visiting this object
@@ -2441,7 +2511,8 @@ static ypObject *yp_deepcopy2( ypObject *x, void *_memo ) {
     return result;
 }
 
-ypObject *yp_deepcopy( ypObject *x ) {
+ypObject *yp_deepcopy( ypObject *x )
+{
     ypObject *memo = yp_dictK( 0 );
     ypObject *result = yp_deepcopy2( x, &memo );
     yp_decref( memo );
@@ -2473,9 +2544,9 @@ void yp_deepinvalidate( ypObject **x )
 // Returns 1 if the bool object is true, else 0; only valid on bool objects!  The return can also
 // be interpreted as the value of the boolean.
 // XXX This assumes that yp_True and yp_False are the only two bools
-#define ypBool_IS_TRUE_C( b ) ( (b) == yp_True )
+#define ypBool_IS_TRUE_C( b ) ( ( b ) == yp_True )
 
-#define ypBool_FROM_C( cond ) ( (cond) ? yp_True : yp_False )
+#define ypBool_FROM_C( cond ) ( ( cond ) ? yp_True : yp_False )
 
 // If you know that b is either yp_True, yp_False, or an exception, use this
 // XXX b should be a variable, _not_ an expression, as it's evaluated up to three times
@@ -2484,7 +2555,8 @@ void yp_deepinvalidate( ypObject **x )
                          ((b) == yp_False ? yp_True : (b)))
 // clang-format on
 
-ypObject *yp_not( ypObject *x ) {
+ypObject *yp_not( ypObject *x )
+{
     ypObject *result = yp_bool( x );
     return ypBool_NOT( result );
 }
@@ -2497,16 +2569,14 @@ ypObject *yp_or( ypObject *x, ypObject *y )
     return yp_incref( x );
 }
 
-ypObject *yp_orN( int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_orNV, (n, args), n );
-}
+ypObject *yp_orN( int n, ... ) { return_yp_V_FUNC( ypObject *, yp_orNV, ( n, args ), n ); }
 ypObject *yp_orNV( int n, va_list args )
 {
     ypObject *x;
     ypObject *b;
     if( n < 1 ) return yp_False;
     for( /*n already set*/; n > 1; n-- ) {
-        x = va_arg( args, ypObject * );     // borrowed
+        x = va_arg( args, ypObject * );  // borrowed
         b = yp_bool( x );
         if( yp_isexceptionC( b ) ) return b;
         if( b == yp_True ) return yp_incref( x );
@@ -2515,31 +2585,30 @@ ypObject *yp_orNV( int n, va_list args )
     return yp_incref( va_arg( args, ypObject * ) );
 }
 
-ypObject *yp_anyN( int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_anyNV, (n, args), n );
-}
-ypObject *yp_anyNV( int n, va_list args ) {
+ypObject *yp_anyN( int n, ... ) { return_yp_V_FUNC( ypObject *, yp_anyNV, ( n, args ), n ); }
+ypObject *yp_anyNV( int n, va_list args )
+{
     for( /*n already set*/; n > 0; n-- ) {
         ypObject *b = yp_bool( va_arg( args, ypObject * ) );
-        if( b != yp_False ) return b; // exit on yp_True or exception
+        if( b != yp_False ) return b;  // exit on yp_True or exception
     }
     return yp_False;
 }
 
 ypObject *yp_any( ypObject *iterable )
 {
-    ypObject *mi;
+    ypObject *  mi;
     yp_uint64_t mi_state;
-    ypObject *x;
-    ypObject *result = yp_False;
+    ypObject *  x;
+    ypObject *  result = yp_False;
 
-    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    mi = yp_miniiter( iterable, &mi_state );  // new ref
     while( 1 ) {
-        x = yp_miniiter_next( &mi, &mi_state ); // new ref
+        x = yp_miniiter_next( &mi, &mi_state );  // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
         result = yp_bool( x );
         yp_decref( x );
-        if( result != yp_False ) break; // exit on yp_True or exception
+        if( result != yp_False ) break;  // exit on yp_True or exception
     }
     yp_decref( mi );
     return result;
@@ -2553,16 +2622,14 @@ ypObject *yp_and( ypObject *x, ypObject *y )
     return yp_incref( y );
 }
 
-ypObject *yp_andN( int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_andNV, (n, args), n );
-}
+ypObject *yp_andN( int n, ... ) { return_yp_V_FUNC( ypObject *, yp_andNV, ( n, args ), n ); }
 ypObject *yp_andNV( int n, va_list args )
 {
     ypObject *x;
     ypObject *b;
     if( n < 1 ) return yp_True;
     for( /*n already set*/; n > 1; n-- ) {
-        x = va_arg( args, ypObject * );     // borrowed
+        x = va_arg( args, ypObject * );  // borrowed
         b = yp_bool( x );
         if( yp_isexceptionC( b ) ) return b;
         if( b == yp_False ) return yp_incref( x );
@@ -2571,31 +2638,30 @@ ypObject *yp_andNV( int n, va_list args )
     return yp_incref( va_arg( args, ypObject * ) );
 }
 
-ypObject *yp_allN( int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_allNV, (n, args), n );
-}
-ypObject *yp_allNV( int n, va_list args ) {
+ypObject *yp_allN( int n, ... ) { return_yp_V_FUNC( ypObject *, yp_allNV, ( n, args ), n ); }
+ypObject *yp_allNV( int n, va_list args )
+{
     for( /*n already set*/; n > 0; n-- ) {
         ypObject *b = yp_bool( va_arg( args, ypObject * ) );
-        if( b != yp_True ) return b; // exit on yp_False or exception
+        if( b != yp_True ) return b;  // exit on yp_False or exception
     }
     return yp_True;
 }
 
 ypObject *yp_all( ypObject *iterable )
 {
-    ypObject *mi;
+    ypObject *  mi;
     yp_uint64_t mi_state;
-    ypObject *x;
-    ypObject *result = yp_True;
+    ypObject *  x;
+    ypObject *  result = yp_True;
 
-    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    mi = yp_miniiter( iterable, &mi_state );  // new ref
     while( 1 ) {
-        x = yp_miniiter_next( &mi, &mi_state ); // new ref
+        x = yp_miniiter_next( &mi, &mi_state );  // new ref
         if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
         result = yp_bool( x );
         yp_decref( x );
-        if( result != yp_True ) break; // exit on yp_False or exception
+        if( result != yp_True ) break;  // exit on yp_False or exception
     }
     yp_decref( mi );
     return result;
@@ -2604,18 +2670,21 @@ ypObject *yp_all( ypObject *iterable )
 // Defined here are yp_lt, yp_le, yp_eq, yp_ne, yp_ge, and yp_gt
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 // TODO Comparison functions have the possibility of recursion; trap (also, add tests)
-extern ypObject * const yp_ComparisonNotImplemented;
-#define _ypBool_PUBLIC_CMP_FUNCTION( name, reflection, defval ) \
-    ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
-        ypTypeObject *type = ypObject_TYPE( x ); \
-        ypObject *result = type->tp_ ## name( x, y ); \
-        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), "tp_" #name " must return yp_True, yp_False, or an exception" ); \
-        if( result != yp_ComparisonNotImplemented ) return result; \
-        type = ypObject_TYPE( y ); \
-        result = type->tp_ ## reflection( y, x ); \
-        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), "tp_" #reflection " must return yp_True, yp_False, or an exception" ); \
-        if( result != yp_ComparisonNotImplemented ) return result; \
-        return (defval); \
+extern ypObject *const yp_ComparisonNotImplemented;
+#define _ypBool_PUBLIC_CMP_FUNCTION( name, reflection, defval )                          \
+    ypObject *yp_##name( ypObject *x, ypObject *y )                                      \
+    {                                                                                    \
+        ypTypeObject *type = ypObject_TYPE( x );                                         \
+        ypObject *    result = type->tp_##name( x, y );                                  \
+        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), \
+                "tp_" #name " must return yp_True, yp_False, or an exception" );         \
+        if( result != yp_ComparisonNotImplemented ) return result;                       \
+        type = ypObject_TYPE( y );                                                       \
+        result = type->tp_##reflection( y, x );                                          \
+        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), \
+                "tp_" #reflection " must return yp_True, yp_False, or an exception" );   \
+        if( result != yp_ComparisonNotImplemented ) return result;                       \
+        return ( defval );                                                               \
     }
 _ypBool_PUBLIC_CMP_FUNCTION( lt, gt, yp_TypeError );
 _ypBool_PUBLIC_CMP_FUNCTION( le, ge, yp_TypeError );
@@ -2629,11 +2698,11 @@ _ypBool_PUBLIC_CMP_FUNCTION( gt, lt, yp_TypeError );
 // the hash from ypSet's element table
 yp_STATIC_ASSERT( ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one );
 
-extern ypObject * const yp_RecursionLimitError;
+extern ypObject *const yp_RecursionLimitError;
 static ypObject *_yp_hash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
 {
     yp_ssize_t recursion_depth = (yp_ssize_t) _memo;
-    ypObject *result;
+    ypObject * result;
 
     // Check type, cached hash, and recursion depth first
     if( ypObject_IS_MUTABLE( x ) ) return_yp_BAD_TYPE( x );
@@ -2646,7 +2715,7 @@ static ypObject *_yp_hash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
 
     // TODO Contribute this generic hash caching back to Python?
     result = ypObject_TYPE( x )->tp_currenthash(
-        x, _yp_hash_visitor, (void *) (recursion_depth+1), hash );
+            x, _yp_hash_visitor, (void *) ( recursion_depth + 1 ), hash );
     if( yp_isexceptionC( result ) ) return result;
     ypObject_CACHED_HASH( x ) = *hash;
     return yp_None;
@@ -2662,7 +2731,7 @@ yp_hash_t yp_hashC( ypObject *x, ypObject **exc )
 static ypObject *_yp_cachedhash_visitor( ypObject *x, void *_memo, yp_hash_t *hash )
 {
     yp_ssize_t recursion_depth = (yp_ssize_t) _memo;
-    ypObject *result;
+    ypObject * result;
 
     // Check cached hash, and recursion depth first
     if( !ypObject_IS_MUTABLE( x ) && ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID ) {
@@ -2673,7 +2742,7 @@ static ypObject *_yp_cachedhash_visitor( ypObject *x, void *_memo, yp_hash_t *ha
     if( recursion_depth > _yp_recursion_limit ) return yp_RecursionLimitError;
 
     result = ypObject_TYPE( x )->tp_currenthash(
-        x, _yp_cachedhash_visitor, (void *) (recursion_depth+1), hash );
+            x, _yp_cachedhash_visitor, (void *) ( recursion_depth + 1 ), hash );
     // XXX We can't record the cached hash here: consider that yp_hash on a tuple with mutable
     // objects cannot succeed, but we (ie yp_currenthash) _can_
     return result;
@@ -2689,7 +2758,7 @@ yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc )
 yp_ssize_t yp_lenC( ypObject *x, ypObject **exc )
 {
     yp_ssize_t len = ypObject_CACHED_LEN( x );
-    ypObject *result;
+    ypObject * result;
 
     if( len >= 0 ) return len;
     result = ypObject_TYPE( x )->tp_len( x, &len );
@@ -2704,68 +2773,68 @@ yp_ssize_t yp_lenC( ypObject *x, ypObject **exc )
  *************************************************************************************************/
 
 static ypTypeObject ypInvalidated_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                               // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    MethodError_objproc,                // tp_dealloc
-    NoRefs_traversefunc,                // tp_traverse
-    NULL,                               // tp_str
-    NULL,                               // tp_repr
+        // Object fundamentals
+        MethodError_objproc,  // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    InvalidatedError_objproc,           // tp_freeze
-    InvalidatedError_objproc,           // tp_unfrozen_copy
-    InvalidatedError_objproc,           // tp_frozen_copy
-    InvalidatedError_traversefunc,      // tp_unfrozen_deepcopy
-    InvalidatedError_traversefunc,      // tp_frozen_deepcopy
-    InvalidatedError_objproc,           // tp_invalidate
+        // Freezing, copying, and invalidating
+        InvalidatedError_objproc,       // tp_freeze
+        InvalidatedError_objproc,       // tp_unfrozen_copy
+        InvalidatedError_objproc,       // tp_frozen_copy
+        InvalidatedError_traversefunc,  // tp_unfrozen_deepcopy
+        InvalidatedError_traversefunc,  // tp_frozen_deepcopy
+        InvalidatedError_objproc,       // tp_invalidate
 
-    // Boolean operations and comparisons
-    InvalidatedError_objproc,           // tp_bool
-    InvalidatedError_objobjproc,        // tp_lt
-    InvalidatedError_objobjproc,        // tp_le
-    InvalidatedError_objobjproc,        // tp_eq
-    InvalidatedError_objobjproc,        // tp_ne
-    InvalidatedError_objobjproc,        // tp_ge
-    InvalidatedError_objobjproc,        // tp_gt
+        // Boolean operations and comparisons
+        InvalidatedError_objproc,     // tp_bool
+        InvalidatedError_objobjproc,  // tp_lt
+        InvalidatedError_objobjproc,  // tp_le
+        InvalidatedError_objobjproc,  // tp_eq
+        InvalidatedError_objobjproc,  // tp_ne
+        InvalidatedError_objobjproc,  // tp_ge
+        InvalidatedError_objobjproc,  // tp_gt
 
-    // Generic object operations
-    InvalidatedError_hashfunc,          // tp_currenthash
-    InvalidatedError_objproc,           // tp_close
+        // Generic object operations
+        InvalidatedError_hashfunc,  // tp_currenthash
+        InvalidatedError_objproc,   // tp_close
 
-    // Number operations
-    InvalidatedError_NumberMethods,     // tp_as_number
+        // Number operations
+        InvalidatedError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    InvalidatedError_miniiterfunc,      // tp_miniiter
-    InvalidatedError_miniiterfunc,      // tp_miniiter_reversed
-    InvalidatedError_miniiterfunc,      // tp_miniiter_next
-    InvalidatedError_miniiter_lenhfunc, // tp_miniiter_lenhint
-    InvalidatedError_objproc,           // tp_iter
-    InvalidatedError_objproc,           // tp_iter_reversed
-    InvalidatedError_objobjproc,        // tp_send
+        // Iterator operations
+        InvalidatedError_miniiterfunc,       // tp_miniiter
+        InvalidatedError_miniiterfunc,       // tp_miniiter_reversed
+        InvalidatedError_miniiterfunc,       // tp_miniiter_next
+        InvalidatedError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        InvalidatedError_objproc,            // tp_iter
+        InvalidatedError_objproc,            // tp_iter_reversed
+        InvalidatedError_objobjproc,         // tp_send
 
-    // Container operations
-    InvalidatedError_objobjproc,        // tp_contains
-    InvalidatedError_lenfunc,           // tp_len
-    InvalidatedError_objobjproc,        // tp_push
-    InvalidatedError_objproc,           // tp_clear
-    InvalidatedError_objproc,           // tp_pop
-    InvalidatedError_objobjobjproc,     // tp_remove
-    InvalidatedError_objobjobjproc,     // tp_getdefault
-    InvalidatedError_objobjobjproc,     // tp_setitem
-    InvalidatedError_objobjproc,        // tp_delitem
-    InvalidatedError_objvalistproc,     // tp_update
+        // Container operations
+        InvalidatedError_objobjproc,     // tp_contains
+        InvalidatedError_lenfunc,        // tp_len
+        InvalidatedError_objobjproc,     // tp_push
+        InvalidatedError_objproc,        // tp_clear
+        InvalidatedError_objproc,        // tp_pop
+        InvalidatedError_objobjobjproc,  // tp_remove
+        InvalidatedError_objobjobjproc,  // tp_getdefault
+        InvalidatedError_objobjobjproc,  // tp_setitem
+        InvalidatedError_objobjproc,     // tp_delitem
+        InvalidatedError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    InvalidatedError_SequenceMethods,   // tp_as_sequence
+        // Sequence operations
+        InvalidatedError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    InvalidatedError_SetMethods,        // tp_as_set
+        // Set operations
+        InvalidatedError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    InvalidatedError_MappingMethods     // tp_as_mapping
+        // Mapping operations
+        InvalidatedError_MappingMethods  // tp_as_mapping
 };
 
 
@@ -2782,72 +2851,72 @@ typedef struct {
     ypObject *name;
     ypObject *super;
 } ypExceptionObject;
-#define _ypException_NAME( e )  ( ((ypExceptionObject *)e)->name )
-#define _ypException_SUPER( e ) ( ((ypExceptionObject *)e)->super )
+#define _ypException_NAME( e ) ( ( (ypExceptionObject *) e )->name )
+#define _ypException_SUPER( e ) ( ( (ypExceptionObject *) e )->super )
 
 static ypTypeObject ypException_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                               // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    MethodError_objproc,                // tp_dealloc
-    NoRefs_traversefunc,                // tp_traverse
-    NULL,                               // tp_str
-    NULL,                               // tp_repr
+        // Object fundamentals
+        MethodError_objproc,  // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    ExceptionMethod_objproc,            // tp_freeze
-    ExceptionMethod_objproc,            // tp_unfrozen_copy
-    ExceptionMethod_objproc,            // tp_frozen_copy
-    ExceptionMethod_traversefunc,       // tp_unfrozen_deepcopy
-    ExceptionMethod_traversefunc,       // tp_frozen_deepcopy
-    ExceptionMethod_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        ExceptionMethod_objproc,       // tp_freeze
+        ExceptionMethod_objproc,       // tp_unfrozen_copy
+        ExceptionMethod_objproc,       // tp_frozen_copy
+        ExceptionMethod_traversefunc,  // tp_unfrozen_deepcopy
+        ExceptionMethod_traversefunc,  // tp_frozen_deepcopy
+        ExceptionMethod_objproc,       // tp_invalidate
 
-    // Boolean operations and comparisons
-    ExceptionMethod_objproc,            // tp_bool
-    ExceptionMethod_objobjproc,         // tp_lt
-    ExceptionMethod_objobjproc,         // tp_le
-    ExceptionMethod_objobjproc,         // tp_eq
-    ExceptionMethod_objobjproc,         // tp_ne
-    ExceptionMethod_objobjproc,         // tp_ge
-    ExceptionMethod_objobjproc,         // tp_gt
+        // Boolean operations and comparisons
+        ExceptionMethod_objproc,     // tp_bool
+        ExceptionMethod_objobjproc,  // tp_lt
+        ExceptionMethod_objobjproc,  // tp_le
+        ExceptionMethod_objobjproc,  // tp_eq
+        ExceptionMethod_objobjproc,  // tp_ne
+        ExceptionMethod_objobjproc,  // tp_ge
+        ExceptionMethod_objobjproc,  // tp_gt
 
-    // Generic object operations
-    ExceptionMethod_hashfunc,           // tp_currenthash
-    ExceptionMethod_objproc,            // tp_close
+        // Generic object operations
+        ExceptionMethod_hashfunc,  // tp_currenthash
+        ExceptionMethod_objproc,   // tp_close
 
-    // Number operations
-    ExceptionMethod_NumberMethods,      // tp_as_number
+        // Number operations
+        ExceptionMethod_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    ExceptionMethod_miniiterfunc,       // tp_miniiter
-    ExceptionMethod_miniiterfunc,       // tp_miniiter_reversed
-    ExceptionMethod_miniiterfunc,       // tp_miniiter_next
-    ExceptionMethod_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    ExceptionMethod_objproc,            // tp_iter
-    ExceptionMethod_objproc,            // tp_iter_reversed
-    ExceptionMethod_objobjproc,         // tp_send
+        // Iterator operations
+        ExceptionMethod_miniiterfunc,       // tp_miniiter
+        ExceptionMethod_miniiterfunc,       // tp_miniiter_reversed
+        ExceptionMethod_miniiterfunc,       // tp_miniiter_next
+        ExceptionMethod_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        ExceptionMethod_objproc,            // tp_iter
+        ExceptionMethod_objproc,            // tp_iter_reversed
+        ExceptionMethod_objobjproc,         // tp_send
 
-    // Container operations
-    ExceptionMethod_objobjproc,         // tp_contains
-    ExceptionMethod_lenfunc,            // tp_len
-    ExceptionMethod_objobjproc,         // tp_push
-    ExceptionMethod_objproc,            // tp_clear
-    ExceptionMethod_objproc,            // tp_pop
-    ExceptionMethod_objobjobjproc,      // tp_remove
-    ExceptionMethod_objobjobjproc,      // tp_getdefault
-    ExceptionMethod_objobjobjproc,      // tp_setitem
-    ExceptionMethod_objobjproc,         // tp_delitem
-    ExceptionMethod_objvalistproc,      // tp_update
+        // Container operations
+        ExceptionMethod_objobjproc,     // tp_contains
+        ExceptionMethod_lenfunc,        // tp_len
+        ExceptionMethod_objobjproc,     // tp_push
+        ExceptionMethod_objproc,        // tp_clear
+        ExceptionMethod_objproc,        // tp_pop
+        ExceptionMethod_objobjobjproc,  // tp_remove
+        ExceptionMethod_objobjobjproc,  // tp_getdefault
+        ExceptionMethod_objobjobjproc,  // tp_setitem
+        ExceptionMethod_objobjproc,     // tp_delitem
+        ExceptionMethod_objvalistproc,  // tp_update
 
-    // Sequence operations
-    ExceptionMethod_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        ExceptionMethod_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    ExceptionMethod_SetMethods,         // tp_as_set
+        // Set operations
+        ExceptionMethod_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    ExceptionMethod_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        ExceptionMethod_MappingMethods  // tp_as_mapping
 };
 
 // No constructors for exceptions; all such objects are immortal
@@ -2855,14 +2924,14 @@ static ypTypeObject ypException_Type = {
 // The immortal exception objects; this should match Python's hierarchy:
 //  http://docs.python.org/3/library/exceptions.html
 
-#define _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, superptr ) \
-    yp_IMMORTAL_STR_LATIN_1( name ## _name, #name ); \
-    static ypExceptionObject _ ## name ## _struct = { \
-        yp_IMMORTAL_HEAD_INIT( ypException_CODE, 0, NULL, 0 ), \
-        (ypObject *) &_ ## name ## _name_struct, (superptr) }; \
-    ypObject * const name = (ypObject *) &_ ## name ## _struct /* force use of semi-colon */
+#define _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, superptr )          \
+    yp_IMMORTAL_STR_LATIN_1( name##_name, #name );                 \
+    static ypExceptionObject _##name##_struct = {                  \
+            yp_IMMORTAL_HEAD_INIT( ypException_CODE, 0, NULL, 0 ), \
+            (ypObject *) &_##name##_name_struct, ( superptr )};    \
+    ypObject *const name = (ypObject *) &_##name##_struct /* force use of semi-colon */
 #define _yp_IMMORTAL_EXCEPTION( name, super ) \
-    _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, (ypObject *) &_ ## super ## _struct )
+    _yp_IMMORTAL_EXCEPTION_SUPERPTR( name, (ypObject *) &_##super##_struct )
 
 // clang-format off
 _yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
@@ -2929,10 +2998,10 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
 static int _yp_isexceptionC2( ypObject *x, ypObject *exc )
 {
     do {
-        if( x == exc ) return 1; // x is a (sub)exception of exc
+        if( x == exc ) return 1;  // x is a (sub)exception of exc
         x = _ypException_SUPER( x );
     } while( x != NULL );
-    return 0; // neither x nor its superexceptions match exc
+    return 0;  // neither x nor its superexceptions match exc
 }
 
 int yp_isexceptionC2( ypObject *x, ypObject *exc )
@@ -2954,7 +3023,7 @@ static int _yp_isexceptionCNV( ypObject *x, int n, va_list args )
 int yp_isexceptionCN( ypObject *x, int n, ... )
 {
     va_list args;
-    int result;
+    int     result;
 
     if( !yp_IS_EXCEPTION_C( x ) ) return 0;
 
@@ -2986,88 +3055,85 @@ int yp_isexceptionCNV( ypObject *x, int n, va_list args )
 // Even get fancy and do:
 //  #define yp_SWITCH_EXCEPTION( x, n, ... ) switch( yp_switchexceptionCN( x, n, ... ) )
 // Then, even fancier, a form of yp_ELSE_EXCEPT (et al) like yp_ELSE_SWITCH_EXCEPT
-//ypAPI int yp_switchexceptionCN( ypObject *x, int n, ... );
+// ypAPI int yp_switchexceptionCN( ypObject *x, int n, ... );
 
 
 /*************************************************************************************************
  * Types
  *************************************************************************************************/
 
-static ypObject *type_frozen_copy( ypObject *t ) {
+static ypObject *type_frozen_copy( ypObject *t ) { return yp_incref( t ); }
+
+static ypObject *type_frozen_deepcopy( ypObject *t, visitfunc copy_visitor, void *copy_memo )
+{
     return yp_incref( t );
 }
 
-static ypObject *type_frozen_deepcopy( ypObject *t, visitfunc copy_visitor, void *copy_memo ) {
-    return yp_incref( t );
-}
-
-static ypObject *type_bool( ypObject *t ) {
-    return yp_True;
-}
+static ypObject *type_bool( ypObject *t ) { return yp_True; }
 
 static ypTypeObject ypType_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    MethodError_objproc,            // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        MethodError_objproc,  // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    type_frozen_copy,               // tp_unfrozen_copy
-    type_frozen_copy,               // tp_frozen_copy
-    type_frozen_deepcopy,           // tp_unfrozen_deepcopy
-    type_frozen_deepcopy,           // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,   // tp_freeze
+        type_frozen_copy,      // tp_unfrozen_copy
+        type_frozen_copy,      // tp_frozen_copy
+        type_frozen_deepcopy,  // tp_unfrozen_deepcopy
+        type_frozen_deepcopy,  // tp_frozen_deepcopy
+        MethodError_objproc,   // tp_invalidate
 
-    // Boolean operations and comparisons
-    type_bool,                      // tp_bool
-    NotImplemented_comparefunc,     // tp_lt
-    NotImplemented_comparefunc,     // tp_le
-    NotImplemented_comparefunc,     // tp_eq
-    NotImplemented_comparefunc,     // tp_ne
-    NotImplemented_comparefunc,     // tp_ge
-    NotImplemented_comparefunc,     // tp_gt
+        // Boolean operations and comparisons
+        type_bool,                   // tp_bool
+        NotImplemented_comparefunc,  // tp_lt
+        NotImplemented_comparefunc,  // tp_le
+        NotImplemented_comparefunc,  // tp_eq
+        NotImplemented_comparefunc,  // tp_ne
+        NotImplemented_comparefunc,  // tp_ge
+        NotImplemented_comparefunc,  // tp_gt
 
-    // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        MethodError_hashfunc,  // tp_currenthash
+        MethodError_objproc,   // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    TypeError_miniiterfunc,         // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    TypeError_objproc,              // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        TypeError_miniiterfunc,         // tp_miniiter
+        TypeError_miniiterfunc,         // tp_miniiter_reversed
+        MethodError_miniiterfunc,       // tp_miniiter_next
+        MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        TypeError_objproc,              // tp_iter
+        TypeError_objproc,              // tp_iter_reversed
+        TypeError_objobjproc,           // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    TypeError_lenfunc,              // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 
@@ -3077,93 +3143,91 @@ static ypTypeObject ypType_Type = {
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
-static ypObject *nonetype_frozen_copy( ypObject *n ) {
+static ypObject *nonetype_frozen_copy( ypObject *n ) { return yp_None; }
+
+static ypObject *nonetype_frozen_deepcopy( ypObject *n, visitfunc copy_visitor, void *copy_memo )
+{
     return yp_None;
 }
 
-static ypObject *nonetype_frozen_deepcopy( ypObject *n, visitfunc copy_visitor, void *copy_memo ) {
-    return yp_None;
-}
+static ypObject *nonetype_bool( ypObject *n ) { return yp_False; }
 
-static ypObject *nonetype_bool( ypObject *n ) {
-    return yp_False;
-}
-
-static ypObject *nonetype_currenthash( ypObject *n,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
+static ypObject *nonetype_currenthash(
+        ypObject *n, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+{
     // Since we never contain mutable objects, we can cache our hash
     *hash = ypObject_CACHED_HASH( yp_None ) = yp_HashPointer( yp_None );
     return yp_None;
 }
 
 static ypTypeObject ypNoneType_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    MethodError_objproc,            // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        MethodError_objproc,  // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    nonetype_frozen_copy,           // tp_unfrozen_copy
-    nonetype_frozen_copy,           // tp_frozen_copy
-    nonetype_frozen_deepcopy,       // tp_unfrozen_deepcopy
-    nonetype_frozen_deepcopy,       // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,       // tp_freeze
+        nonetype_frozen_copy,      // tp_unfrozen_copy
+        nonetype_frozen_copy,      // tp_frozen_copy
+        nonetype_frozen_deepcopy,  // tp_unfrozen_deepcopy
+        nonetype_frozen_deepcopy,  // tp_frozen_deepcopy
+        MethodError_objproc,       // tp_invalidate
 
-    // Boolean operations and comparisons
-    nonetype_bool,                  // tp_bool
-    NotImplemented_comparefunc,     // tp_lt
-    NotImplemented_comparefunc,     // tp_le
-    NotImplemented_comparefunc,     // tp_eq
-    NotImplemented_comparefunc,     // tp_ne
-    NotImplemented_comparefunc,     // tp_ge
-    NotImplemented_comparefunc,     // tp_gt
+        // Boolean operations and comparisons
+        nonetype_bool,               // tp_bool
+        NotImplemented_comparefunc,  // tp_lt
+        NotImplemented_comparefunc,  // tp_le
+        NotImplemented_comparefunc,  // tp_eq
+        NotImplemented_comparefunc,  // tp_ne
+        NotImplemented_comparefunc,  // tp_ge
+        NotImplemented_comparefunc,  // tp_gt
 
-    // Generic object operations
-    nonetype_currenthash,           // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        nonetype_currenthash,  // tp_currenthash
+        MethodError_objproc,   // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    TypeError_miniiterfunc,         // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    TypeError_objproc,              // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        TypeError_miniiterfunc,         // tp_miniiter
+        TypeError_miniiterfunc,         // tp_miniiter_reversed
+        MethodError_miniiterfunc,       // tp_miniiter_next
+        MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        TypeError_objproc,              // tp_iter
+        TypeError_objproc,              // tp_iter_reversed
+        TypeError_objobjproc,           // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    TypeError_lenfunc,              // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 // No constructors for nonetypes; there is exactly one, immortal object
 static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT( ypNoneType_CODE, 0, NULL, 0 );
-ypObject * const yp_None = &_yp_None_struct;
+ypObject *const yp_None = &_yp_None_struct;
 
 
 /*************************************************************************************************
@@ -3176,25 +3240,23 @@ typedef struct {
     ypObject_HEAD;
     char value;
 } ypBoolObject;
-#define _ypBool_VALUE( b ) ( ((ypBoolObject *)b)->value )
+#define _ypBool_VALUE( b ) ( ( (ypBoolObject *) b )->value )
 
-static ypObject *bool_frozen_copy( ypObject *b ) {
+static ypObject *bool_frozen_copy( ypObject *b ) { return b; }
+
+static ypObject *bool_frozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo )
+{
     return b;
 }
 
-static ypObject *bool_frozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
-    return b;
-}
-
-static ypObject *bool_bool( ypObject *b ) {
-    return b;
-}
+static ypObject *bool_bool( ypObject *b ) { return b; }
 
 // Here be bool_lt, bool_le, bool_eq, bool_ne, bool_ge, bool_gt
-#define _ypBool_RELATIVE_CMP_FUNCTION( name, operator ) \
-    static ypObject *bool_ ## name( ypObject *b, ypObject *x ) { \
+#define _ypBool_RELATIVE_CMP_FUNCTION( name, operator)                                        \
+    static ypObject *bool_##name( ypObject *b, ypObject *x )                                  \
+    {                                                                                         \
         if( ypObject_TYPE_PAIR_CODE( x ) != ypBool_CODE ) return yp_ComparisonNotImplemented; \
-        return ypBool_FROM_C( _ypBool_VALUE( b ) operator _ypBool_VALUE( x ) ); \
+        return ypBool_FROM_C( _ypBool_VALUE( b ) operator _ypBool_VALUE( x ) );               \
     }
 _ypBool_RELATIVE_CMP_FUNCTION( lt, < );
 _ypBool_RELATIVE_CMP_FUNCTION( le, <= );
@@ -3204,77 +3266,77 @@ _ypBool_RELATIVE_CMP_FUNCTION( ge, >= );
 _ypBool_RELATIVE_CMP_FUNCTION( gt, > );
 
 // XXX Adapted from Python's int_hash (now obsolete)
-static ypObject *bool_currenthash( ypObject *b,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+static ypObject *bool_currenthash(
+        ypObject *b, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
     // This must remain consistent with the other numeric types
-    *hash = (yp_hash_t) _ypBool_VALUE( b ); // either 0 or 1
+    *hash = (yp_hash_t) _ypBool_VALUE( b );  // either 0 or 1
     return yp_None;
 }
 
 static ypTypeObject ypBool_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    MethodError_objproc,            // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        MethodError_objproc,  // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    bool_frozen_copy,               // tp_unfrozen_copy
-    bool_frozen_copy,               // tp_frozen_copy
-    bool_frozen_deepcopy,           // tp_unfrozen_deepcopy
-    bool_frozen_deepcopy,           // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,   // tp_freeze
+        bool_frozen_copy,      // tp_unfrozen_copy
+        bool_frozen_copy,      // tp_frozen_copy
+        bool_frozen_deepcopy,  // tp_unfrozen_deepcopy
+        bool_frozen_deepcopy,  // tp_frozen_deepcopy
+        MethodError_objproc,   // tp_invalidate
 
-    // Boolean operations and comparisons
-    bool_bool,                      // tp_bool
-    bool_lt,                        // tp_lt
-    bool_le,                        // tp_le
-    bool_eq,                        // tp_eq
-    bool_ne,                        // tp_ne
-    bool_ge,                        // tp_ge
-    bool_gt,                        // tp_gt
+        // Boolean operations and comparisons
+        bool_bool,  // tp_bool
+        bool_lt,    // tp_lt
+        bool_le,    // tp_le
+        bool_eq,    // tp_eq
+        bool_ne,    // tp_ne
+        bool_ge,    // tp_ge
+        bool_gt,    // tp_gt
 
-    // Generic object operations
-    bool_currenthash,               // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        bool_currenthash,     // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    TypeError_miniiterfunc,         // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    TypeError_objproc,              // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        TypeError_miniiterfunc,         // tp_miniiter
+        TypeError_miniiterfunc,         // tp_miniiter_reversed
+        MethodError_miniiterfunc,       // tp_miniiter_next
+        MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        TypeError_objproc,              // tp_iter
+        TypeError_objproc,              // tp_iter_reversed
+        TypeError_objobjproc,           // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    TypeError_lenfunc,              // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 
@@ -3283,9 +3345,9 @@ static ypTypeObject ypBool_Type = {
 // There are exactly two bool objects
 // TODO Could initialize ypObject_CACHED_HASH here
 static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, 0, NULL, 0 ), 1};
-ypObject * const yp_True = (ypObject *) &_yp_True_struct;
+ypObject *const     yp_True = (ypObject *) &_yp_True_struct;
 static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT( ypBool_CODE, 0, NULL, 0 ), 0};
-ypObject * const yp_False = (ypObject *) &_yp_False_struct;
+ypObject *const     yp_False = (ypObject *) &_yp_False_struct;
 
 
 /*************************************************************************************************
@@ -3296,22 +3358,22 @@ ypObject * const yp_False = (ypObject *) &_yp_False_struct;
 
 // struct _ypIntObject is declared in nohtyP.h for use by yp_IMMORTAL_INT
 typedef struct _ypIntObject ypIntObject;
-#define ypInt_VALUE( i ) ( ((ypIntObject *)i)->value )
+#define ypInt_VALUE( i ) ( ( (ypIntObject *) i )->value )
 
 // Arithmetic code depends on both int and float particulars being defined first
 typedef struct {
     ypObject_HEAD;
     yp_float_t value;
 } ypFloatObject;
-#define ypFloat_VALUE( f ) ( ((ypFloatObject *)f)->value )
+#define ypFloat_VALUE( f ) ( ( (ypFloatObject *) f )->value )
 
 // Signatures of some specialized arithmetic functions
-typedef yp_int_t (*arithLfunc)( yp_int_t, yp_int_t, ypObject ** );
-typedef yp_float_t (*arithLFfunc)( yp_float_t, yp_float_t, ypObject ** );
-typedef void (*iarithCfunc)( ypObject **, yp_int_t );
-typedef void (*iarithCFfunc)( ypObject **, yp_float_t );
-typedef yp_int_t (*unaryLfunc)( yp_int_t, ypObject ** );
-typedef yp_float_t (*unaryLFfunc)( yp_float_t, ypObject ** );
+typedef yp_int_t ( *arithLfunc )( yp_int_t, yp_int_t, ypObject ** );
+typedef yp_float_t ( *arithLFfunc )( yp_float_t, yp_float_t, ypObject ** );
+typedef void ( *iarithCfunc )( ypObject **, yp_int_t );
+typedef void ( *iarithCFfunc )( ypObject **, yp_float_t );
+typedef yp_int_t ( *unaryLfunc )( yp_int_t, ypObject ** );
+typedef yp_float_t ( *unaryLFfunc )( yp_float_t, ypObject ** );
 
 // Bitwise operations on floats aren't supported, so these functions simply raise yp_TypeError
 static void yp_ilshiftCF( ypObject **x, yp_float_t y );
@@ -3361,10 +3423,10 @@ unsigned char _ypInt_digit_value[256] = {
 
 // XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
 static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y );
-static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), const yp_uint8_t *bytes,
-        yp_int_t base )
+static ypObject *_ypInt_from_ascii(
+        ypObject *( *allocator )( yp_int_t ), const yp_uint8_t *bytes, yp_int_t base )
 {
-    int sign;
+    int      sign;
     yp_int_t result;
     yp_int_t digit;
 
@@ -3396,13 +3458,13 @@ static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), const yp
             goto endofdigits;
         } else if( *bytes == 'b' || *bytes == 'B' ) {
             if( base == 0 ) base = 2;
-            if( base == 2 ) bytes++; // consume this character only if the base agrees
+            if( base == 2 ) bytes++;  // consume this character only if the base agrees
         } else if( *bytes == 'o' || *bytes == 'O' ) {
             if( base == 0 ) base = 8;
-            if( base == 8 ) bytes++; // (ditto)
+            if( base == 8 ) bytes++;  // (ditto)
         } else if( *bytes == 'x' || *bytes == 'X' ) {
             if( base == 0 ) base = 16;
-            if( base == 16 ) bytes++; // (ditto)
+            if( base == 16 ) bytes++;  // (ditto)
         } else {
             // Leading zeroes are allowed if the value is zero, regardless of base (ie "00000");
             // once again, it's always safe to consume leading zeroes
@@ -3417,7 +3479,7 @@ static ypObject *_ypInt_from_ascii( ypObject *(*allocator)( yp_int_t ), const yp
         }
     }
     if( base == 0 ) {
-        base = 10; // a Python literal without a prefix is base 10
+        base = 10;  // a Python literal without a prefix is base 10
     } else if( base < 2 || base > 36 ) {
         return yp_ValueError;
     }
@@ -3459,7 +3521,7 @@ checkforintmin:
     // If we overflowed to exactly yp_INT_T_MIN, and our result is supposed to be negative,
     // and there are no more digits, then we've decoded yp_INT_T_MIN
     if( result == yp_INT_T_MIN && sign < 0 && _ypInt_digit_value[*bytes] >= base ) {
-        sign = 1; // result is already negative
+        sign = 1;  // result is already negative
         goto endofdigits;
     }
     return yp_OverflowError;
@@ -3468,38 +3530,36 @@ checkforintmin:
 
 // Public Methods
 
-static ypObject *int_dealloc( ypObject *i ) {
+static ypObject *int_dealloc( ypObject *i )
+{
     ypMem_FREE_FIXED( i );
     return yp_None;
 }
 
-static ypObject *int_unfrozen_copy( ypObject *i ) {
+static ypObject *int_unfrozen_copy( ypObject *i ) { return yp_intstoreC( ypInt_VALUE( i ) ); }
+
+// FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
+static ypObject *int_frozen_copy( ypObject *i ) { return yp_intC( ypInt_VALUE( i ) ); }
+
+static ypObject *int_unfrozen_deepcopy( ypObject *i, visitfunc copy_visitor, void *copy_memo )
+{
     return yp_intstoreC( ypInt_VALUE( i ) );
 }
 
 // FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
-static ypObject *int_frozen_copy( ypObject *i ) {
+static ypObject *int_frozen_deepcopy( ypObject *i, visitfunc copy_visitor, void *copy_memo )
+{
     return yp_intC( ypInt_VALUE( i ) );
 }
 
-static ypObject *int_unfrozen_deepcopy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
-    return yp_intstoreC( ypInt_VALUE( i ) );
-}
-
-// FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
-static ypObject *int_frozen_deepcopy( ypObject *i, visitfunc copy_visitor, void *copy_memo ) {
-    return yp_intC( ypInt_VALUE( i ) );
-}
-
-static ypObject *int_bool( ypObject *i ) {
-    return ypBool_FROM_C( ypInt_VALUE( i ) );
-}
+static ypObject *int_bool( ypObject *i ) { return ypBool_FROM_C( ypInt_VALUE( i ) ); }
 
 // Here be int_lt, int_le, int_eq, int_ne, int_ge, int_gt
-#define _ypInt_RELATIVE_CMP_FUNCTION( name, operator ) \
-    static ypObject *int_ ## name( ypObject *i, ypObject *x ) { \
+#define _ypInt_RELATIVE_CMP_FUNCTION( name, operator)                                        \
+    static ypObject *int_##name( ypObject *i, ypObject *x )                                  \
+    {                                                                                        \
         if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return yp_ComparisonNotImplemented; \
-        return ypBool_FROM_C( ypInt_VALUE( i ) operator ypInt_VALUE( x ) ); \
+        return ypBool_FROM_C( ypInt_VALUE( i ) operator ypInt_VALUE( x ) );                  \
     }
 _ypInt_RELATIVE_CMP_FUNCTION( lt, < );
 _ypInt_RELATIVE_CMP_FUNCTION( le, <= );
@@ -3511,8 +3571,8 @@ _ypInt_RELATIVE_CMP_FUNCTION( gt, > );
 // XXX Adapted from Python's int_hash (now obsolete)
 // TODO adapt from long_hash instead, which seems to handle this differently
 // TODO Move this to a _yp_HashLong function?
-static ypObject *int_currenthash( ypObject *i,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+static ypObject *int_currenthash(
+        ypObject *i, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
     // This must remain consistent with the other numeric types
     *hash = yp_HashInt( ypInt_VALUE( i ) );
@@ -3525,140 +3585,140 @@ static ypObject *int_currenthash( ypObject *i,
 }
 
 static ypTypeObject ypInt_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    int_dealloc,                    // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        int_dealloc,          // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    int_unfrozen_copy,              // tp_unfrozen_copy
-    int_frozen_copy,                // tp_frozen_copy
-    int_unfrozen_deepcopy,          // tp_unfrozen_deepcopy
-    int_frozen_deepcopy,            // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,    // tp_freeze
+        int_unfrozen_copy,      // tp_unfrozen_copy
+        int_frozen_copy,        // tp_frozen_copy
+        int_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        int_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,    // tp_invalidate
 
-    // Boolean operations and comparisons
-    int_bool,                       // tp_bool
-    int_lt,                         // tp_lt
-    int_le,                         // tp_le
-    int_eq,                         // tp_eq
-    int_ne,                         // tp_ne
-    int_ge,                         // tp_ge
-    int_gt,                         // tp_gt
+        // Boolean operations and comparisons
+        int_bool,  // tp_bool
+        int_lt,    // tp_lt
+        int_le,    // tp_le
+        int_eq,    // tp_eq
+        int_ne,    // tp_ne
+        int_ge,    // tp_ge
+        int_gt,    // tp_gt
 
-    // Generic object operations
-    int_currenthash,                // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        int_currenthash,      // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    TypeError_miniiterfunc,         // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    TypeError_objproc,              // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        TypeError_miniiterfunc,         // tp_miniiter
+        TypeError_miniiterfunc,         // tp_miniiter_reversed
+        MethodError_miniiterfunc,       // tp_miniiter_next
+        MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        TypeError_objproc,              // tp_iter
+        TypeError_objproc,              // tp_iter_reversed
+        TypeError_objobjproc,           // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    TypeError_lenfunc,              // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 static ypTypeObject ypIntStore_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    int_dealloc,                    // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        int_dealloc,          // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    int_unfrozen_copy,              // tp_unfrozen_copy
-    int_frozen_copy,                // tp_frozen_copy
-    int_unfrozen_deepcopy,          // tp_unfrozen_deepcopy
-    int_frozen_deepcopy,            // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,    // tp_freeze
+        int_unfrozen_copy,      // tp_unfrozen_copy
+        int_frozen_copy,        // tp_frozen_copy
+        int_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        int_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,    // tp_invalidate
 
-    // Boolean operations and comparisons
-    int_bool,                       // tp_bool
-    int_lt,                         // tp_lt
-    int_le,                         // tp_le
-    int_eq,                         // tp_eq
-    int_ne,                         // tp_ne
-    int_ge,                         // tp_ge
-    int_gt,                         // tp_gt
+        // Boolean operations and comparisons
+        int_bool,  // tp_bool
+        int_lt,    // tp_lt
+        int_le,    // tp_le
+        int_eq,    // tp_eq
+        int_ne,    // tp_ne
+        int_ge,    // tp_ge
+        int_gt,    // tp_gt
 
-    // Generic object operations
-    int_currenthash,                // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        int_currenthash,      // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    TypeError_miniiterfunc,         // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    TypeError_objproc,              // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        TypeError_miniiterfunc,         // tp_miniiter
+        TypeError_miniiterfunc,         // tp_miniiter_reversed
+        MethodError_miniiterfunc,       // tp_miniiter_next
+        MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        TypeError_objproc,              // tp_iter
+        TypeError_objproc,              // tp_iter_reversed
+        TypeError_objobjproc,           // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    TypeError_lenfunc,              // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 // XXX Adapted from Python 2.7's int_add
 yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
     yp_int_t result = yp_UINT_MATH( x, +, y );
-    if( (result^x) < 0 && (result^y) < 0 ) {
+    if( ( result ^ x ) < 0 && ( result ^ y ) < 0 ) {
         return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
     }
     return result;
@@ -3668,7 +3728,7 @@ yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc )
 yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
     yp_int_t result = yp_UINT_MATH( x, -, y );
-    if( (result^x) < 0 && (result^~y) < 0 ) {
+    if( ( result ^ x ) < 0 && ( result ^ ~y ) < 0 ) {
         return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
     }
     return result;
@@ -3709,8 +3769,8 @@ static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y )
      * We still need to check for overflow in this addition, then we can return the result.
      */
     const yp_int_t num_bits_halved = yp_sizeof( yp_int_t ) / 2 * 8;
-    const yp_int_t bit_mask_halved = (1ull << num_bits_halved) - 1ull;
-    yp_int_t result_hi, result_lo;
+    const yp_int_t bit_mask_halved = ( 1ull << num_bits_halved ) - 1ull;
+    yp_int_t       result_hi, result_lo;
 
     // Split x and y into high and low halves
     yp_int_t x_hi = yp_UINT_MATH( x, >>, num_bits_halved );
@@ -3726,11 +3786,11 @@ static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y )
     } else if( y_hi == 0 ) {
         result_hi = yp_UINT_MATH( x_hi, *, y_lo );
     } else {
-        return -1; // overflow
+        return -1;  // overflow
     }
 
     // Shift the intermediate high-part of the result, checking for overflow
-    if( result_hi & ~bit_mask_halved ) return -1; // overflow
+    if( result_hi & ~bit_mask_halved ) return -1;  // overflow
     result_hi = yp_UINT_MATH( result_hi, <<, num_bits_halved );
     if( result_hi < 0 ) {
         // If adding x_lo*y_lo would not change result_hi, then we may be dealing with
@@ -3743,7 +3803,7 @@ static yp_int_t _yp_mulL_posints( yp_int_t x, yp_int_t y )
     // Finally, add the low-part of the result to the high-part, check for overflow, and return;
     // the caller checks for overflow on the final addition
     result_lo = yp_UINT_MATH( x_lo, *, y_lo );
-    if( result_lo < 0 ) return -1; // overflow
+    if( result_lo < 0 ) return -1;  // overflow
     return yp_UINT_MATH( result_hi, +, result_lo );
 }
 
@@ -3756,8 +3816,14 @@ yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc )
 
     if( x == yp_INT_T_MIN ) return _yp_mulL_minint( y, exc );
     if( y == yp_INT_T_MIN ) return _yp_mulL_minint( x, exc );
-    if( x < 0 ) { sign = -sign; x = -x; }
-    if( y < 0 ) { sign = -sign; y = -y; }
+    if( x < 0 ) {
+        sign = -sign;
+        x = -x;
+    }
+    if( y < 0 ) {
+        sign = -sign;
+        y = -y;
+    }
 
     // If we overflow to exactly yp_INT_T_MIN, and our result is supposed to be negative, then
     // we've calculated yp_INT_T_MIN; all other overflows are errors
@@ -3772,7 +3838,7 @@ yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc )
 // XXX Operands are fist converted to float, then divided; result always a float
 yp_float_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    ypObject *subexc = yp_None;
+    ypObject * subexc = yp_None;
     yp_float_t x_asfloat, y_asfloat;
 
     x_asfloat = yp_asfloatL( x, &subexc );
@@ -3801,12 +3867,12 @@ void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *_div, yp_int_t *_mod, ypObjec
 {
     yp_int_t xdivy, xmody;
 
-    if (y == 0) {
+    if( y == 0 ) {
         *exc = yp_ZeroDivisionError;
         goto error;
     }
     // (-sys.maxint-1)/-1 is the only overflow case.
-    if (y == -1 && x == yp_INT_T_MIN) {
+    if( y == -1 && x == yp_INT_T_MIN ) {
         *exc = yp_OverflowError;
         goto error;
     }
@@ -3827,10 +3893,10 @@ void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *_div, yp_int_t *_mod, ypObjec
      * ceiling of the infinitely precise quotient.  We want the floor,
      * and we have it iff the remainder's sign matches y's.
      */
-    if (xmody && ((y ^ xmody) < 0)) {  // i.e. and signs differ
+    if( xmody && ( ( y ^ xmody ) < 0 ) ) {  // i.e. and signs differ
         xmody += y;
         --xdivy;
-        yp_ASSERT1(xmody && ((y ^ xmody) >= 0));
+        yp_ASSERT1( xmody && ( ( y ^ xmody ) >= 0 ) );
     }
     *_div = xdivy;
     *_mod = xmody;
@@ -3841,16 +3907,13 @@ error:
     *_mod = 0;
 }
 
-yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject **exc )
-{
-    return yp_powL3( x, y, 0, exc );
-}
+yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject **exc ) { return yp_powL3( x, y, 0, exc ); }
 
 // XXX Adapted from Python 2.7's int_pow
 yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
 {
     yp_int_t result, temp, prev;
-    if (y < 0) {
+    if( y < 0 ) {
         // XXX A negative exponent means a float should be returned, which we can't do here, so
         // this is handled at higher levels
         return_yp_CEXC_ERR( 0, exc, yp_ValueError );
@@ -3866,38 +3929,37 @@ yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
      */
     temp = x;
     result = 1;
-    while (y > 0) {
-        prev = result;              // Save value for overflow check
-        if (y & 1) {
+    while( y > 0 ) {
+        prev = result;  // Save value for overflow check
+        if( y & 1 ) {
             /*
              * The (unsigned long) cast below ensures that the multiplication
              * is interpreted as an unsigned operation rather than a signed one
              * (C99 6.3.1.8p1), thus avoiding the perils of undefined behaviour
              * from signed arithmetic overflow (C99 6.5p5).  See issue #12973.
              */
-            result = yp_UINT_MATH(result, *, temp);
-            if (temp == 0)
-                break; // Avoid result / 0
-            if (result / temp != prev) {
+            result = yp_UINT_MATH( result, *, temp );
+            if( temp == 0 ) break;  // Avoid result / 0
+            if( result / temp != prev ) {
                 return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
             }
         }
-        y >>= 1;               // Shift exponent down by 1 bit
-        if (y==0) break;
+        y >>= 1;  // Shift exponent down by 1 bit
+        if( y == 0 ) break;
         prev = temp;
-        temp = yp_UINT_MATH(temp, *, temp);  // Square the value of temp
-        if (prev != 0 && temp / prev != prev) {
+        temp = yp_UINT_MATH( temp, *, temp );  // Square the value of temp
+        if( prev != 0 && temp / prev != prev ) {
             return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
         }
-        if (z) {
+        if( z ) {
             // If we did a multiplication, perform a modulo
             result = result % z;
             temp = temp % z;
         }
     }
-    if (z) {
+    if( z ) {
         yp_int_t div;
-        yp_divmodL(result, z, &div, &result, exc);
+        yp_divmodL( result, z, &div, &result, exc );
         return result;
     } else {
         return result;
@@ -3906,44 +3968,35 @@ yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc )
 
 // Verify that this platform sign-extends on right-shifts (assumes compiler uses same rules
 // as target processor, which it should)
-yp_STATIC_ASSERT( (-1LL >> 1) == -1LL, right_shift_sign_extends );
+yp_STATIC_ASSERT( ( -1LL >> 1 ) == -1LL, right_shift_sign_extends );
 
 // XXX Adapted from Python 2.7's int_lshift
 yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
     yp_int_t result;
-    if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_ValueError ); // negative shift count
-    if( x == 0 ) return 0; // 0 can be shifted by 50 million bits for all we care
-    if( y >= (yp_sizeof( yp_int_t ) * 8) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_ValueError );  // negative shift count
+    if( x == 0 ) return 0;  // 0 can be shifted by 50 million bits for all we care
+    if( y >= ( yp_sizeof( yp_int_t ) * 8 ) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
     result = x << y;
-    if( x != (result >> y) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
+    if( x != ( result >> y ) ) return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
     return result;
 }
 
 // XXX Adapted from Python 2.7's int_rshift
 yp_int_t yp_rshiftL( yp_int_t x, yp_int_t y, ypObject **exc )
 {
-    if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_ValueError ); // negative shift count
-    if( y >= (yp_sizeof( yp_int_t ) * 8) ) {
+    if( y < 0 ) return_yp_CEXC_ERR( 0, exc, yp_ValueError );  // negative shift count
+    if( y >= ( yp_sizeof( yp_int_t ) * 8 ) ) {
         return x < 0 ? -1 : 0;
     }
     return x >> y;
 }
 
-yp_int_t yp_ampL( yp_int_t x, yp_int_t y, ypObject **exc )
-{
-    return x & y;
-}
+yp_int_t yp_ampL( yp_int_t x, yp_int_t y, ypObject **exc ) { return x & y; }
 
-yp_int_t yp_xorL( yp_int_t x, yp_int_t y, ypObject **exc )
-{
-    return x ^ y;
-}
+yp_int_t yp_xorL( yp_int_t x, yp_int_t y, ypObject **exc ) { return x ^ y; }
 
-yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject **exc )
-{
-    return x | y;
-}
+yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject **exc ) { return x | y; }
 
 // XXX Adapted from Python 2.7's int_neg
 yp_int_t yp_negL( yp_int_t x, ypObject **exc )
@@ -3952,10 +4005,7 @@ yp_int_t yp_negL( yp_int_t x, ypObject **exc )
     return -x;
 }
 
-yp_int_t yp_posL( yp_int_t x, ypObject **exc )
-{
-    return x;
-}
+yp_int_t yp_posL( yp_int_t x, ypObject **exc ) { return x; }
 
 yp_int_t yp_absL( yp_int_t x, ypObject **exc )
 {
@@ -3963,15 +4013,12 @@ yp_int_t yp_absL( yp_int_t x, ypObject **exc )
     return x;
 }
 
-yp_int_t yp_invertL( yp_int_t x, ypObject **exc )
-{
-    return ~x;
-}
+yp_int_t yp_invertL( yp_int_t x, ypObject **exc ) { return ~x; }
 
 // XXX Overloading of add/etc currently not supported
 static void iarithmeticC( ypObject **x, yp_int_t y, arithLfunc intop, iarithCFfunc floatop )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( *x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
 
     if( x_pair == ypInt_CODE ) {
@@ -4011,19 +4058,18 @@ static void iarithmetic( ypObject **x, ypObject *y, iarithCfunc intop, iarithCFf
     return_yp_INPLACE_BAD_TYPE( x, y );
 }
 
-static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop,
-        int result_mutable )
+static ypObject *arithmetic_intop( yp_int_t x, yp_int_t y, arithLfunc intop, int result_mutable )
 {
     ypObject *exc = yp_None;
-    yp_int_t result = intop( x, y, &exc );
+    yp_int_t  result = intop( x, y, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     if( result_mutable ) return yp_intstoreC( result );
     return yp_intC( result );
 }
-static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithLFfunc floatop,
-        int result_mutable )
+static ypObject *arithmetic_floatop(
+        yp_float_t x, yp_float_t y, arithLFfunc floatop, int result_mutable )
 {
-    ypObject *exc = yp_None;
+    ypObject * exc = yp_None;
     yp_float_t result = floatop( x, y, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     if( result_mutable ) return yp_floatstoreCF( result );
@@ -4031,9 +4077,9 @@ static ypObject *arithmetic_floatop( yp_float_t x, yp_float_t y, arithLFfunc flo
 }
 static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithLFfunc floatop )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
-    int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    int result_mutable = ypObject_IS_MUTABLE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       y_pair = ypObject_TYPE_PAIR_CODE( y );
+    int       result_mutable = ypObject_IS_MUTABLE( x );
     ypObject *exc = yp_None;
 
     // Coerce the numeric operands to a common type
@@ -4053,8 +4099,8 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithLF
             if( yp_isexceptionC( exc ) ) return exc;
             return arithmetic_floatop( x_asfloat, ypFloat_VALUE( y ), floatop, result_mutable );
         } else if( x_pair == ypFloat_CODE ) {
-            return arithmetic_floatop( ypFloat_VALUE( x ), ypFloat_VALUE( y ), floatop,
-                    result_mutable );
+            return arithmetic_floatop(
+                    ypFloat_VALUE( x ), ypFloat_VALUE( y ), floatop, result_mutable );
         } else {
             return_yp_BAD_TYPE( x );
         }
@@ -4064,15 +4110,18 @@ static ypObject *arithmetic( ypObject *x, ypObject *y, arithLfunc intop, arithLF
 }
 
 // Defined here are yp_iaddC (et al), yp_iadd (et al), and yp_add (et al)
-#define _ypInt_PUBLIC_ARITH_FUNCTION( name ) \
-    void yp_i ## name ## C( ypObject **x, yp_int_t y ) { \
-        iarithmeticC( x, y, yp_ ## name ## L, yp_i ## name ## CF ); \
-    } \
-    void yp_i ## name( ypObject **x, ypObject *y ) { \
-        iarithmetic( x, y, yp_i ## name ## C, yp_i ## name ## CF ); \
-    } \
-    ypObject *yp_ ## name( ypObject *x, ypObject *y ) { \
-        return arithmetic( x, y, yp_ ## name ## L, yp_ ## name ## LF ); \
+#define _ypInt_PUBLIC_ARITH_FUNCTION( name )                    \
+    void yp_i##name##C( ypObject **x, yp_int_t y )              \
+    {                                                           \
+        iarithmeticC( x, y, yp_##name##L, yp_i##name##CF );     \
+    }                                                           \
+    void yp_i##name( ypObject **x, ypObject *y )                \
+    {                                                           \
+        iarithmetic( x, y, yp_i##name##C, yp_i##name##CF );     \
+    }                                                           \
+    ypObject *yp_##name( ypObject *x, ypObject *y )             \
+    {                                                           \
+        return arithmetic( x, y, yp_##name##L, yp_##name##LF ); \
     }
 _ypInt_PUBLIC_ARITH_FUNCTION( add );
 _ypInt_PUBLIC_ARITH_FUNCTION( sub );
@@ -4085,12 +4134,12 @@ _ypInt_PUBLIC_ARITH_FUNCTION( pow );
 _ypInt_PUBLIC_ARITH_FUNCTION( lshift );
 _ypInt_PUBLIC_ARITH_FUNCTION( rshift );
 _ypInt_PUBLIC_ARITH_FUNCTION( amp );
-_ypInt_PUBLIC_ARITH_FUNCTION( xor );
+_ypInt_PUBLIC_ARITH_FUNCTION ( xor);
 _ypInt_PUBLIC_ARITH_FUNCTION( bar );
 
 void yp_itruedivC( ypObject **x, yp_int_t y )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( *x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
 
     if( x_pair == ypInt_CODE ) {
@@ -4128,10 +4177,10 @@ void yp_itruediv( ypObject **x, ypObject *y )
 
 ypObject *yp_truediv( ypObject *x, ypObject *y )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
-    int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    int result_mutable = ypObject_IS_MUTABLE( x );
-    ypObject *exc = yp_None;
+    int        x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int        y_pair = ypObject_TYPE_PAIR_CODE( y );
+    int        result_mutable = ypObject_IS_MUTABLE( x );
+    ypObject * exc = yp_None;
     yp_float_t result;
 
     // Coerce the numeric operands to a common type
@@ -4163,34 +4212,34 @@ ypObject *yp_truediv( ypObject *x, ypObject *y )
     return yp_floatCF( result );
 }
 
-static ypObject *_yp_divmod_ints( yp_int_t x, yp_int_t y, ypObject **div, ypObject **mod,
-        int result_mutable )
+static ypObject *_yp_divmod_ints(
+        yp_int_t x, yp_int_t y, ypObject **div, ypObject **mod, int result_mutable )
 {
     ypObject *exc = yp_None;
-    ypObject *(*allocator)( yp_int_t ) = result_mutable ? yp_intstoreC : yp_intC;
+    ypObject *( *allocator )( yp_int_t ) = result_mutable ? yp_intstoreC : yp_intC;
     yp_int_t divC, modC;
     yp_divmodL( x, y, &divC, &modC, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
-    *div = allocator( divC ); // new ref
+    *div = allocator( divC );  // new ref
     if( yp_isexceptionC( *div ) ) return *div;
-    *mod = allocator( modC ); // new ref
+    *mod = allocator( modC );  // new ref
     if( yp_isexceptionC( *mod ) ) {
         yp_decref( *div );
         return *mod;
     }
     return yp_None;
 }
-static ypObject *_yp_divmod_floats( yp_float_t x, yp_float_t y, ypObject **div, ypObject **mod,
-        int result_mutable  )
+static ypObject *_yp_divmod_floats(
+        yp_float_t x, yp_float_t y, ypObject **div, ypObject **mod, int result_mutable )
 {
     ypObject *exc = yp_None;
-    ypObject *(*allocator)( yp_float_t ) = result_mutable ? yp_floatstoreCF : yp_floatCF;
+    ypObject *( *allocator )( yp_float_t ) = result_mutable ? yp_floatstoreCF : yp_floatCF;
     yp_float_t divC, modC;
     yp_divmodLF( x, y, &divC, &modC, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
-    *div = allocator( divC ); // new ref
+    *div = allocator( divC );  // new ref
     if( yp_isexceptionC( *div ) ) return *div;
-    *mod = allocator( modC ); // new ref
+    *mod = allocator( modC );  // new ref
     if( yp_isexceptionC( *mod ) ) {
         yp_decref( *div );
         return *mod;
@@ -4199,9 +4248,9 @@ static ypObject *_yp_divmod_floats( yp_float_t x, yp_float_t y, ypObject **div, 
 }
 static ypObject *_yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
-    int y_pair = ypObject_TYPE_PAIR_CODE( y );
-    int result_mutable = ypObject_IS_MUTABLE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       y_pair = ypObject_TYPE_PAIR_CODE( y );
+    int       result_mutable = ypObject_IS_MUTABLE( x );
     ypObject *exc = yp_None;
 
     // Coerce the numeric operands to a common type
@@ -4221,8 +4270,8 @@ static ypObject *_yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject 
             if( yp_isexceptionC( exc ) ) return exc;
             return _yp_divmod_floats( x_asfloat, ypFloat_VALUE( y ), div, mod, result_mutable );
         } else if( x_pair == ypFloat_CODE ) {
-            return _yp_divmod_floats( ypFloat_VALUE( x ), ypFloat_VALUE( y ), div, mod,
-                    result_mutable );
+            return _yp_divmod_floats(
+                    ypFloat_VALUE( x ), ypFloat_VALUE( y ), div, mod, result_mutable );
         } else {
             return_yp_BAD_TYPE( x );
         }
@@ -4230,7 +4279,8 @@ static ypObject *_yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject 
         return_yp_BAD_TYPE( y );
     }
 }
-void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod ) {
+void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod )
+{
     // Ensure both div and mod are set to an exception on error
     ypObject *result = _yp_divmod( x, y, div, mod );
     if( yp_isexceptionC( result ) ) {
@@ -4240,7 +4290,7 @@ void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod ) {
 
 static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryLFfunc floatop )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( *x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( *x );
     ypObject *exc = yp_None;
 
     if( x_pair == ypInt_CODE ) {
@@ -4274,7 +4324,7 @@ static void iunaryoperation( ypObject **x, unaryLfunc intop, unaryLFfunc floatop
 
 static ypObject *unaryoperation( ypObject *x, unaryLfunc intop, unaryLFfunc floatop )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
     ypObject *exc = yp_None;
 
     if( x_pair == ypInt_CODE ) {
@@ -4303,13 +4353,9 @@ static ypObject *unaryoperation( ypObject *x, unaryLfunc intop, unaryLFfunc floa
 }
 
 // Defined here are yp_ineg (et al), and yp_neg (et al)
-#define _ypInt_PUBLIC_UNARY_FUNCTION( name ) \
-    void yp_i ## name( ypObject **x ) { \
-        iunaryoperation( x, yp_ ## name ## L, yp_ ## name ## LF ); \
-    } \
-    ypObject *yp_ ## name( ypObject *x ) { \
-        return unaryoperation( x, yp_ ## name ## L, yp_ ## name ## LF ); \
-    }
+#define _ypInt_PUBLIC_UNARY_FUNCTION( name )                                               \
+    void yp_i##name( ypObject **x ) { iunaryoperation( x, yp_##name##L, yp_##name##LF ); } \
+    ypObject *yp_##name( ypObject *x ) { return unaryoperation( x, yp_##name##L, yp_##name##LF ); }
 _ypInt_PUBLIC_UNARY_FUNCTION( neg );
 _ypInt_PUBLIC_UNARY_FUNCTION( pos );
 _ypInt_PUBLIC_UNARY_FUNCTION( abs );
@@ -4386,7 +4432,7 @@ ypObject * const yp_i_two     = (ypObject *) &(_ypInt_pre_allocated[ 2 - _ypInt_
 ypObject *yp_intC( yp_int_t value )
 {
     if( _ypInt_PREALLOC_START <= value && value < _ypInt_PREALLOC_END ) {
-        return (ypObject *) &(_ypInt_pre_allocated[value - _ypInt_PREALLOC_START]);
+        return (ypObject *) &( _ypInt_pre_allocated[value - _ypInt_PREALLOC_START] );
     } else {
         ypObject *i = ypMem_MALLOC_FIXED( ypIntObject, ypInt_CODE );
         if( yp_isexceptionC( i ) ) return i;
@@ -4406,10 +4452,10 @@ ypObject *yp_intstoreC( yp_int_t value )
 }
 
 // base is ignored if x is not a bytes or string
-static ypObject *_ypInt( ypObject *(*allocator)( yp_int_t ), ypObject *x, yp_int_t base )
+static ypObject *_ypInt( ypObject *( *allocator )( yp_int_t ), ypObject *x, yp_int_t base )
 {
     ypObject *exc = yp_None;
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
 
     if( x_pair == ypInt_CODE ) {
         return allocator( ypInt_VALUE( x ) );
@@ -4421,38 +4467,39 @@ static ypObject *_ypInt( ypObject *(*allocator)( yp_int_t ), ypObject *x, yp_int
         return allocator( ypBool_IS_TRUE_C( x ) );
     } else if( x_pair == ypBytes_CODE ) {
         const yp_uint8_t *bytes;
-        ypObject *result = yp_asbytesCX( x, &bytes, NULL );
-        if( yp_isexceptionC( result ) ) return yp_ValueError; // contains null bytes
+        ypObject *        result = yp_asbytesCX( x, &bytes, NULL );
+        if( yp_isexceptionC( result ) ) return yp_ValueError;  // contains null bytes
         return _ypInt_from_ascii( allocator, bytes, base );
     } else if( x_pair == ypStr_CODE ) {
         // TODO Implement decoding
         const yp_uint8_t *encoded;
-        ypObject *encoding;
-        ypObject *result = yp_asencodedCX( x, &encoded, NULL, &encoding );
-        if( yp_isexceptionC( result ) ) return yp_ValueError; // contains null bytes
+        ypObject *        encoding;
+        ypObject *        result = yp_asencodedCX( x, &encoded, NULL, &encoding );
+        if( yp_isexceptionC( result ) ) return yp_ValueError;  // contains null bytes
         if( encoding != yp_s_latin_1 ) return yp_NotImplementedError;
         return _ypInt_from_ascii( allocator, encoded, base );
     } else {
         return_yp_BAD_TYPE( x );
     }
 }
-ypObject *yp_int_baseC( ypObject *x, yp_int_t base ) {
+ypObject *yp_int_baseC( ypObject *x, yp_int_t base )
+{
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     if( x_pair != ypBytes_CODE && x_pair != ypStr_CODE ) return_yp_BAD_TYPE( x );
     return _ypInt( yp_intC, x, base );
 }
-ypObject *yp_intstore_baseC( ypObject *x, yp_int_t base ) {
+ypObject *yp_intstore_baseC( ypObject *x, yp_int_t base )
+{
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
     if( x_pair != ypBytes_CODE && x_pair != ypStr_CODE ) return_yp_BAD_TYPE( x );
     return _ypInt( yp_intstoreC, x, base );
 }
-ypObject *yp_int( ypObject *x ) {
+ypObject *yp_int( ypObject *x )
+{
     if( ypObject_TYPE_CODE( x ) == ypInt_CODE ) return yp_incref( x );
     return _ypInt( yp_intC, x, 10 );
 }
-ypObject *yp_intstore( ypObject *x ) {
-    return _ypInt( yp_intstoreC, x, 10 );
-}
+ypObject *yp_intstore( ypObject *x ) { return _ypInt( yp_intstoreC, x, 10 ); }
 
 // Public conversion functions
 
@@ -4475,12 +4522,15 @@ yp_int_t yp_asintC( ypObject *x, ypObject **exc )
 // zero, which can be represented in every integer type, so we won't override any yp_TypeError
 // errors.
 // TODO review http://blog.reverberate.org/2012/12/testing-for-integer-overflow-in-c-and-c.html
-#define _ypInt_PUBLIC_AS_C_FUNCTION( name, mask ) \
-yp_ ## name ## _t yp_as ## name ## C( ypObject *x, ypObject **exc ) { \
-    yp_int_t asint = yp_asintC( x, exc ); \
-    yp_ ## name ## _t retval = (yp_ ## name ## _t) (asint & (mask)); \
-    if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_OverflowError ); \
-    return retval; \
+#define _ypInt_PUBLIC_AS_C_FUNCTION( name, mask )                                             \
+    \
+yp_##name##_t yp_as##name##C( ypObject *x, ypObject **exc )                                   \
+    {                                                                                         \
+        yp_int_t      asint = yp_asintC( x, exc );                                            \
+        yp_##name##_t retval = ( yp_##name##_t )( asint & ( mask ) );                         \
+        if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_OverflowError ); \
+        return retval;                                                                        \
+    \
 }
 // clang-format off
 _ypInt_PUBLIC_AS_C_FUNCTION( int8,   0xFF );
@@ -4498,23 +4548,18 @@ _ypInt_PUBLIC_AS_C_FUNCTION( hash,   (yp_hash_t) 0xFFFFFFFF );
 
 // The functions below assume/assert that yp_int_t is 64 bits
 yp_STATIC_ASSERT( yp_sizeof( yp_int_t ) == 8, sizeof_yp_int );
-yp_int64_t yp_asint64C( ypObject *x, ypObject **exc ) {
-    return yp_asintC( x, exc );
-}
-yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc ) {
+yp_int64_t yp_asint64C( ypObject *x, ypObject **exc ) { return yp_asintC( x, exc ); }
+yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc )
+{
     yp_int_t asint = yp_asintC( x, exc );
     if( asint < 0 ) return_yp_CEXC_ERR( (yp_uint64_t) asint, exc, yp_OverflowError );
     return (yp_uint64_t) asint;
 }
 
-#if yp_SSIZE_T_MAX > 0x7FFFFFFFu // 64-bit (or more) platform
+#if yp_SSIZE_T_MAX > 0x7FFFFFFFu  // 64-bit (or more) platform
 yp_STATIC_ASSERT( yp_sizeof( yp_ssize_t ) == yp_sizeof( yp_int_t ), sizeof_yp_ssize_eq_yp_int );
-yp_ssize_t yp_asssizeC( ypObject *x, ypObject **exc ) {
-    return yp_asintC( x, exc );
-}
-yp_hash_t yp_ashashC( ypObject *x, ypObject **exc ) {
-    return yp_asintC( x, exc );
-}
+yp_ssize_t yp_asssizeC( ypObject *x, ypObject **exc ) { return yp_asintC( x, exc ); }
+yp_hash_t yp_ashashC( ypObject *x, ypObject **exc ) { return yp_asintC( x, exc ); }
 #endif
 
 // TODO Make this a public API?
@@ -4547,47 +4592,48 @@ static yp_int_t yp_asint_exactC( ypObject *x, ypObject **exc )
 
 // ypFloatObject and ypFloat_VALUE are defined above for use by the int code
 
-static ypObject *float_dealloc( ypObject *f ) {
+static ypObject *float_dealloc( ypObject *f )
+{
     ypMem_FREE_FIXED( f );
     return yp_None;
 }
 
-static ypObject *float_unfrozen_copy( ypObject *f ) {
+static ypObject *float_unfrozen_copy( ypObject *f )
+{
     return yp_floatstoreCF( ypFloat_VALUE( f ) );
 }
 
-static ypObject *float_frozen_copy( ypObject *f ) {
-    return yp_floatCF( ypFloat_VALUE( f ) );
-}
+static ypObject *float_frozen_copy( ypObject *f ) { return yp_floatCF( ypFloat_VALUE( f ) ); }
 
-static ypObject *float_unfrozen_deepcopy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *float_unfrozen_deepcopy( ypObject *f, visitfunc copy_visitor, void *copy_memo )
+{
     return yp_floatstoreCF( ypFloat_VALUE( f ) );
 }
 
-static ypObject *float_frozen_deepcopy( ypObject *f, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *float_frozen_deepcopy( ypObject *f, visitfunc copy_visitor, void *copy_memo )
+{
     return yp_floatCF( ypFloat_VALUE( f ) );
 }
 
-static ypObject *float_bool( ypObject *f ) {
-    return ypBool_FROM_C( ypFloat_VALUE( f ) != 0.0 );
-}
+static ypObject *float_bool( ypObject *f ) { return ypBool_FROM_C( ypFloat_VALUE( f ) != 0.0 ); }
 
 // Here be float_lt, float_le, float_eq, float_ne, float_ge, float_gt
-#define _ypFloat_RELATIVE_CMP_FUNCTION( name, operator ) \
-    static ypObject *float_ ## name( ypObject *f, ypObject *x ) { \
-        yp_float_t x_asfloat; \
-        int x_pair = ypObject_TYPE_PAIR_CODE( x ); \
-        \
-        if( x_pair == ypFloat_CODE ) { \
-            x_asfloat = ypFloat_VALUE( x ); \
-        } else if( x_pair == ypInt_CODE ) { \
-            ypObject *exc = yp_None; \
-            x_asfloat = yp_asfloatL( ypInt_VALUE( x ), &exc ); \
-            if( yp_isexceptionC( exc ) ) return exc; \
-        } else { \
-            return yp_ComparisonNotImplemented; \
-        } \
-        return ypBool_FROM_C( ypFloat_VALUE( f ) operator x_asfloat ); \
+#define _ypFloat_RELATIVE_CMP_FUNCTION( name, operator)               \
+    static ypObject *float_##name( ypObject *f, ypObject *x )         \
+    {                                                                 \
+        yp_float_t x_asfloat;                                         \
+        int        x_pair = ypObject_TYPE_PAIR_CODE( x );             \
+                                                                      \
+        if( x_pair == ypFloat_CODE ) {                                \
+            x_asfloat = ypFloat_VALUE( x );                           \
+        } else if( x_pair == ypInt_CODE ) {                           \
+            ypObject *exc = yp_None;                                  \
+            x_asfloat = yp_asfloatL( ypInt_VALUE( x ), &exc );        \
+            if( yp_isexceptionC( exc ) ) return exc;                  \
+        } else {                                                      \
+            return yp_ComparisonNotImplemented;                       \
+        }                                                             \
+        return ypBool_FROM_C( ypFloat_VALUE( f ) operator x_asfloat); \
     }
 _ypFloat_RELATIVE_CMP_FUNCTION( lt, < );
 _ypFloat_RELATIVE_CMP_FUNCTION( le, <= );
@@ -4596,8 +4642,8 @@ _ypFloat_RELATIVE_CMP_FUNCTION( ne, != );
 _ypFloat_RELATIVE_CMP_FUNCTION( ge, >= );
 _ypFloat_RELATIVE_CMP_FUNCTION( gt, > );
 
-static ypObject *float_currenthash( ypObject *f,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+static ypObject *float_currenthash(
+        ypObject *f, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
     // This must remain consistent with the other numeric types
     *hash = yp_HashDouble( ypFloat_VALUE( f ) );
@@ -4608,153 +4654,153 @@ static ypObject *float_currenthash( ypObject *f,
 }
 
 static ypTypeObject ypFloat_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    float_dealloc,                  // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        float_dealloc,        // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    float_unfrozen_copy,            // tp_unfrozen_copy
-    float_frozen_copy,              // tp_frozen_copy
-    float_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
-    float_frozen_deepcopy,          // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,      // tp_freeze
+        float_unfrozen_copy,      // tp_unfrozen_copy
+        float_frozen_copy,        // tp_frozen_copy
+        float_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        float_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,      // tp_invalidate
 
-    // Boolean operations and comparisons
-    float_bool,                     // tp_bool
-    float_lt,                       // tp_lt
-    float_le,                       // tp_le
-    float_eq,                       // tp_eq
-    float_ne,                       // tp_ne
-    float_ge,                       // tp_ge
-    float_gt,                       // tp_gt
+        // Boolean operations and comparisons
+        float_bool,  // tp_bool
+        float_lt,    // tp_lt
+        float_le,    // tp_le
+        float_eq,    // tp_eq
+        float_ne,    // tp_ne
+        float_ge,    // tp_ge
+        float_gt,    // tp_gt
 
-    // Generic object operations
-    float_currenthash,              // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        float_currenthash,    // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    TypeError_miniiterfunc,         // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    TypeError_objproc,              // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        TypeError_miniiterfunc,         // tp_miniiter
+        TypeError_miniiterfunc,         // tp_miniiter_reversed
+        MethodError_miniiterfunc,       // tp_miniiter_next
+        MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        TypeError_objproc,              // tp_iter
+        TypeError_objproc,              // tp_iter_reversed
+        TypeError_objobjproc,           // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    TypeError_lenfunc,              // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 static ypTypeObject ypFloatStore_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    float_dealloc,                  // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        float_dealloc,        // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    float_unfrozen_copy,            // tp_unfrozen_copy
-    float_frozen_copy,              // tp_frozen_copy
-    float_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
-    float_frozen_deepcopy,          // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,      // tp_freeze
+        float_unfrozen_copy,      // tp_unfrozen_copy
+        float_frozen_copy,        // tp_frozen_copy
+        float_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        float_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,      // tp_invalidate
 
-    // Boolean operations and comparisons
-    float_bool,                     // tp_bool
-    float_lt,                       // tp_lt
-    float_le,                       // tp_le
-    float_eq,                       // tp_eq
-    float_ne,                       // tp_ne
-    float_ge,                       // tp_ge
-    float_gt,                       // tp_gt
+        // Boolean operations and comparisons
+        float_bool,  // tp_bool
+        float_lt,    // tp_lt
+        float_le,    // tp_le
+        float_eq,    // tp_eq
+        float_ne,    // tp_ne
+        float_ge,    // tp_ge
+        float_gt,    // tp_gt
 
-    // Generic object operations
-    float_currenthash,              // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        float_currenthash,    // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    TypeError_miniiterfunc,         // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    MethodError_miniiterfunc,       // tp_miniiter_next
-    MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
-    TypeError_objproc,              // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        TypeError_miniiterfunc,         // tp_miniiter
+        TypeError_miniiterfunc,         // tp_miniiter_reversed
+        MethodError_miniiterfunc,       // tp_miniiter_next
+        MethodError_miniiter_lenhfunc,  // tp_miniiter_lenhint
+        TypeError_objproc,              // tp_iter
+        TypeError_objproc,              // tp_iter_reversed
+        TypeError_objobjproc,           // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    TypeError_lenfunc,              // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 yp_float_t yp_addLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return x + y; // TODO overflow check
+    return x + y;  // TODO overflow check
 }
 
 yp_float_t yp_subLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return x - y; // TODO overflow check
+    return x - y;  // TODO overflow check
 }
 
 yp_float_t yp_mulLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return x * y; // TODO overflow check
+    return x * y;  // TODO overflow check
 }
 
 yp_float_t yp_truedivLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return x / y; // TODO overflow check
+    return x / y;  // TODO overflow check
 }
 
 // XXX Although the return value is a whole number, in Python if one of the operands are floats,
@@ -4776,18 +4822,15 @@ void yp_divmodLF( yp_float_t x, yp_float_t y, yp_float_t *_div, yp_float_t *_mod
 
 yp_float_t yp_powLF( yp_float_t x, yp_float_t y, ypObject **exc )
 {
-    return pow( x, y ); // TODO overflow check
+    return pow( x, y );  // TODO overflow check
 }
 
 yp_float_t yp_negLF( yp_float_t x, ypObject **exc )
 {
-    return -x; // TODO overflow check
+    return -x;  // TODO overflow check
 }
 
-yp_float_t yp_posLF( yp_float_t x, ypObject **exc )
-{
-    return x;
-}
+yp_float_t yp_posLF( yp_float_t x, ypObject **exc ) { return x; }
 
 yp_float_t yp_absLF( yp_float_t x, ypObject **exc )
 {
@@ -4797,8 +4840,8 @@ yp_float_t yp_absLF( yp_float_t x, ypObject **exc )
 
 static void iarithmeticCF( ypObject **x, yp_float_t y, arithLFfunc floatop )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( *x );
-    ypObject *exc = yp_None;
+    int        x_pair = ypObject_TYPE_PAIR_CODE( *x );
+    ypObject * exc = yp_None;
     yp_float_t result;
 
     if( x_pair == ypFloat_CODE ) {
@@ -4827,9 +4870,7 @@ static void iarithmeticCF( ypObject **x, yp_float_t y, arithLFfunc floatop )
 
 // Defined here are yp_iaddCF (et al)
 #define _ypFloat_PUBLIC_ARITH_FUNCTION( name ) \
-    void yp_i ## name ## CF( ypObject **x, yp_float_t y ) { \
-        iarithmeticCF( x, y, yp_ ## name ## LF ); \
-    }
+    void yp_i##name##CF( ypObject **x, yp_float_t y ) { iarithmeticCF( x, y, yp_##name##LF ); }
 _ypFloat_PUBLIC_ARITH_FUNCTION( add );
 _ypFloat_PUBLIC_ARITH_FUNCTION( sub );
 _ypFloat_PUBLIC_ARITH_FUNCTION( mul );
@@ -4839,37 +4880,39 @@ _ypFloat_PUBLIC_ARITH_FUNCTION( mod );
 _ypFloat_PUBLIC_ARITH_FUNCTION( pow );
 
 // Binary operations are not applicable on floats
-static void yp_ilshiftCF( ypObject **x, yp_float_t y ) {
+static void yp_ilshiftCF( ypObject **x, yp_float_t y )
+{
     return_yp_INPLACE_ERR( x, yp_TypeError );
 }
-static void yp_irshiftCF( ypObject **x, yp_float_t y ) {
+static void yp_irshiftCF( ypObject **x, yp_float_t y )
+{
     return_yp_INPLACE_ERR( x, yp_TypeError );
 }
-static void yp_iampCF( ypObject **x, yp_float_t y ) {
-    return_yp_INPLACE_ERR( x, yp_TypeError );
-}
-static void yp_ixorCF( ypObject **x, yp_float_t y ) {
-    return_yp_INPLACE_ERR( x, yp_TypeError );
-}
-static void yp_ibarCF( ypObject **x, yp_float_t y ) {
-    return_yp_INPLACE_ERR( x, yp_TypeError );
-}
-static yp_float_t yp_lshiftLF( yp_float_t x, yp_float_t y, ypObject **exc ) {
+static void yp_iampCF( ypObject **x, yp_float_t y ) { return_yp_INPLACE_ERR( x, yp_TypeError ); }
+static void yp_ixorCF( ypObject **x, yp_float_t y ) { return_yp_INPLACE_ERR( x, yp_TypeError ); }
+static void yp_ibarCF( ypObject **x, yp_float_t y ) { return_yp_INPLACE_ERR( x, yp_TypeError ); }
+static yp_float_t yp_lshiftLF( yp_float_t x, yp_float_t y, ypObject **exc )
+{
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
-static yp_float_t yp_rshiftLF( yp_float_t x, yp_float_t y, ypObject **exc ) {
+static yp_float_t yp_rshiftLF( yp_float_t x, yp_float_t y, ypObject **exc )
+{
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
-static yp_float_t yp_ampLF( yp_float_t x, yp_float_t y, ypObject **exc ) {
+static yp_float_t yp_ampLF( yp_float_t x, yp_float_t y, ypObject **exc )
+{
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
-static yp_float_t yp_xorLF( yp_float_t x, yp_float_t y, ypObject **exc ) {
+static yp_float_t yp_xorLF( yp_float_t x, yp_float_t y, ypObject **exc )
+{
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
-static yp_float_t yp_barLF( yp_float_t x, yp_float_t y, ypObject **exc ) {
+static yp_float_t yp_barLF( yp_float_t x, yp_float_t y, ypObject **exc )
+{
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
-static yp_float_t yp_invertLF( yp_float_t x, ypObject **exc ) {
+static yp_float_t yp_invertLF( yp_float_t x, ypObject **exc )
+{
     return_yp_CEXC_ERR( 0.0, exc, yp_TypeError );
 }
 
@@ -4892,20 +4935,19 @@ ypObject *yp_floatstoreCF( yp_float_t value )
     return f;
 }
 
-static ypObject *_ypFloat( ypObject *(*allocator)( yp_float_t ), ypObject *x )
+static ypObject *_ypFloat( ypObject *( *allocator )( yp_float_t ), ypObject *x )
 {
-    ypObject *exc = yp_None;
+    ypObject * exc = yp_None;
     yp_float_t x_asfloat = yp_asfloatC( x, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     return allocator( x_asfloat );
 }
-ypObject *yp_float( ypObject *x ) {
+ypObject *yp_float( ypObject *x )
+{
     if( ypObject_TYPE_CODE( x ) == ypFloat_CODE ) return yp_incref( x );
     return _ypFloat( yp_floatCF, x );
 }
-ypObject *yp_floatstore( ypObject *x ) {
-    return _ypFloat( yp_floatstoreCF, x );
-}
+ypObject *yp_floatstore( ypObject *x ) { return _ypFloat( yp_floatstoreCF, x ); }
 
 // Public conversion functions
 
@@ -4932,9 +4974,9 @@ yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc )
 // XXX Adapted from Python's float_trunc
 yp_int_t yp_asintLF( yp_float_t x, ypObject **exc )
 {
-    yp_float_t wholepart;           // integral portion of x, rounded toward 0
+    yp_float_t wholepart;  // integral portion of x, rounded toward 0
 
-    (void)modf(x, &wholepart);
+    (void) modf( x, &wholepart );
     /* Try to get out cheap if this fits in a Python int.  The attempt
      * to cast to long must be protected, as C doesn't define what
      * happens if the double is too big to fit in a long.  Some rare
@@ -4947,8 +4989,8 @@ yp_int_t yp_asintLF( yp_float_t x, ypObject **exc )
      * yield true from the C expression wholepart<=LONG_MAX, despite
      * that wholepart is actually greater than LONG_MAX.
      */
-    if (yp_INT_T_MIN < wholepart && wholepart < yp_INT_T_MAX) {
-        return (yp_int_t)wholepart;
+    if( yp_INT_T_MIN < wholepart && wholepart < yp_INT_T_MAX ) {
+        return (yp_int_t) wholepart;
     }
     return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
 }
@@ -4957,13 +4999,13 @@ yp_int_t yp_asintLF( yp_float_t x, ypObject **exc )
 // XXX Adapted from Python's float_trunc
 static yp_int_t yp_asint_exactLF( yp_float_t x, ypObject **exc )
 {
-    yp_float_t wholepart;           // integral portion of x, rounded toward 0
+    yp_float_t wholepart;  // integral portion of x, rounded toward 0
 
-    if (modf(x, &wholepart) != 0.0) {   // returns fractional portion of x
+    if( modf( x, &wholepart ) != 0.0 ) {  // returns fractional portion of x
         return_yp_CEXC_ERR( 0, exc, yp_ArithmeticError );
     }
-    if (yp_INT_T_MIN < wholepart && wholepart < yp_INT_T_MAX) {
-        return (yp_int_t)wholepart;
+    if( yp_INT_T_MIN < wholepart && wholepart < yp_INT_T_MAX ) {
+        return (yp_int_t) wholepart;
     }
     return_yp_CEXC_ERR( 0, exc, yp_OverflowError );
 }
@@ -4994,24 +5036,24 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
 {
     // Adjust step
     if( *step == 0 ) return yp_ValueError;
-    if( *step < -yp_SSIZE_T_MAX ) *step = -yp_SSIZE_T_MAX; // ensure *step can be negated
+    if( *step < -yp_SSIZE_T_MAX ) *step = -yp_SSIZE_T_MAX;  // ensure *step can be negated
 
     // Adjust start
     if( *start == yp_SLICE_DEFAULT ) {
-        *start = (*step < 0) ? length-1 : 0;
+        *start = ( *step < 0 ) ? length - 1 : 0;
     } else {
         if( *start < 0 ) *start += length;
-        if( *start < 0 ) *start = (*step < 0) ? -1 : 0;
-        if( *start >= length ) *start = (*step < 0) ? length-1 : length;
+        if( *start < 0 ) *start = ( *step < 0 ) ? -1 : 0;
+        if( *start >= length ) *start = ( *step < 0 ) ? length - 1 : length;
     }
 
     // Adjust stop
     if( *stop == yp_SLICE_DEFAULT ) {
-        *stop = (*step < 0) ? -1 : length;
+        *stop = ( *step < 0 ) ? -1 : length;
     } else {
         if( *stop < 0 ) *stop += length;
-        if( *stop < 0 ) *stop = (*step < 0) ? -1 : 0;
-        if( *stop >= length ) *stop = (*step < 0) ? length-1 : length;
+        if( *stop < 0 ) *stop = ( *step < 0 ) ? -1 : 0;
+        if( *stop >= length ) *stop = ( *step < 0 ) ? length - 1 : length;
     }
 
     // Calculate slicelength
@@ -5019,13 +5061,13 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
         if( *stop >= *start ) {
             *slicelength = 0;
         } else {
-            *slicelength = (*stop - *start + 1) / (*step) + 1;
+            *slicelength = ( *stop - *start + 1 ) / ( *step ) + 1;
         }
     } else {
         if( *start >= *stop ) {
             *slicelength = 0;
         } else {
-            *slicelength = (*stop - *start - 1) / (*step) + 1;
+            *slicelength = ( *stop - *start - 1 ) / ( *step ) + 1;
         }
     }
 
@@ -5035,25 +5077,25 @@ static ypObject *ypSlice_AdjustIndicesC( yp_ssize_t length, yp_ssize_t *start, y
 // Using the given _adjusted_ values, in-place converts the given start/stop/step values to the
 // inverse slice, where *step=-(*step).  slicelength must be >0 (slicelength==0 is a no-op).
 // XXX Adapted from Python's list_ass_subscript
-static void _ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step,
-        yp_ssize_t slicelength )
+static void _ypSlice_InvertIndicesC(
+        yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step, yp_ssize_t slicelength )
 {
     yp_ASSERT( slicelength > 0, "slicelen must be >0" );
     if( *step < 0 ) {
         // This comes direct from list_ass_subscript
         *stop = *start + 1;
-        *start = *stop + (*step) * (slicelength - 1) - 1;
+        *start = *stop + ( *step ) * ( slicelength - 1 ) - 1;
     } else {
         // This part I've inferred
         *stop = *start - 1;
-        *start = *stop + (*step) * (slicelength - 1) + 1;
+        *start = *stop + ( *step ) * ( slicelength - 1 ) + 1;
     }
-    *step = -(*step);
+    *step = -( *step );
 }
 
 // Returns the index of the i'th item in the slice with the given adjusted start/step values.  i
 // must be in range(slicelength).
-#define ypSlice_INDEX( start, step, i )  ((start) + (i)*(step))
+#define ypSlice_INDEX( start, step, i ) ( ( start ) + ( i ) * ( step ) )
 
 // Used by tp_repeat et al to perform the necessary memcpy's.  data must be allocated to hold
 // factor*n_size objects, the bytes to repeat must be in the first n_size bytes of data, and the
@@ -5062,13 +5104,14 @@ static void _ypSlice_InvertIndicesC( yp_ssize_t *start, yp_ssize_t *stop, yp_ssi
 static void _ypSequence_repeat_memcpy( void *_data, yp_ssize_t factor, yp_ssize_t n_size )
 {
     yp_uint8_t *data = (yp_uint8_t *) _data;
-    yp_ssize_t copied; // the number of times [:n_size] has been repeated (starts at 1, of course)
+    yp_ssize_t copied;  // the number of times [:n_size] has been repeated (starts at 1, of course)
     yp_ASSERT( factor > 0 && n_size > 0, "factor and n_size must both be strictly positive" );
     yp_ASSERT( factor <= yp_SSIZE_T_MAX / n_size, "factor*n_size too large" );
-    for( copied = 1; copied*2 < factor; copied *= 2 ) {
-        memcpy( data+(n_size*copied), data+0, n_size*copied );
+    for( copied = 1; copied * 2 < factor; copied *= 2 ) {
+        memcpy( data + ( n_size * copied ), data + 0, n_size * copied );
     }
-    memcpy( data+(n_size*copied), data+0, n_size*(factor-copied) ); // no-op if factor==copied
+    memcpy( data + ( n_size * copied ), data + 0,
+            n_size * ( factor - copied ) );  // no-op if factor==copied
 }
 
 // Used to remove elements from an array containing length elements, each of elemsize bytes.
@@ -5084,12 +5127,13 @@ static void _ypSlice_delslice_memmove( void *array, yp_ssize_t length, yp_ssize_
 
     if( step == 1 ) {
         // One contiguous section
-        memmove( bytes+(start*elemsize), bytes+(stop*elemsize), (length-stop)*elemsize );
+        memmove( bytes + ( start * elemsize ), bytes + ( stop * elemsize ),
+                ( length - stop ) * elemsize );
     } else {
-        yp_ssize_t remaining = slicelength;
-        yp_uint8_t *chunk_dst = bytes + (start * elemsize);
+        yp_ssize_t  remaining = slicelength;
+        yp_uint8_t *chunk_dst = bytes + ( start * elemsize );
         yp_uint8_t *chunk_src = chunk_dst + elemsize;
-        yp_ssize_t  chunk_len = (step - 1) * elemsize;
+        yp_ssize_t  chunk_len = ( step - 1 ) * elemsize;
         while( remaining > 1 ) {
             memmove( chunk_dst, chunk_src, chunk_len );
             chunk_dst += chunk_len;
@@ -5097,31 +5141,34 @@ static void _ypSlice_delslice_memmove( void *array, yp_ssize_t length, yp_ssize_
             remaining -= 1;
         }
         // The last chunk is likely truncated, and not a full step*elemsize in size
-        chunk_len = (bytes + (length * elemsize)) - chunk_src;
+        chunk_len = ( bytes + ( length * elemsize ) ) - chunk_src;
         memmove( chunk_dst, chunk_src, chunk_len );
     }
 }
 
-static ypObject *_ypSequence_getdefault( ypObject *x, ypObject *key, ypObject *defval ) {
-    ypObject *exc = yp_None;
+static ypObject *_ypSequence_getdefault( ypObject *x, ypObject *key, ypObject *defval )
+{
+    ypObject *    exc = yp_None;
     ypTypeObject *type = ypObject_TYPE( x );
-    yp_ssize_t index = yp_asssizeC( key, &exc );
+    yp_ssize_t    index = yp_asssizeC( key, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     return type->tp_as_sequence->tp_getindex( x, index, defval );
 }
 
-static ypObject *_ypSequence_setitem( ypObject *x, ypObject *key, ypObject *value ) {
-    ypObject *exc = yp_None;
+static ypObject *_ypSequence_setitem( ypObject *x, ypObject *key, ypObject *value )
+{
+    ypObject *    exc = yp_None;
     ypTypeObject *type = ypObject_TYPE( x );
-    yp_ssize_t index = yp_asssizeC( key, &exc );
+    yp_ssize_t    index = yp_asssizeC( key, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     return type->tp_as_sequence->tp_setindex( x, index, value );
 }
 
-static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
-    ypObject *exc = yp_None;
+static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key )
+{
+    ypObject *    exc = yp_None;
     ypTypeObject *type = ypObject_TYPE( x );
-    yp_ssize_t index = yp_asssizeC( key, &exc );
+    yp_ssize_t    index = yp_asssizeC( key, &exc );
     if( yp_isexceptionC( exc ) ) return exc;
     return type->tp_as_sequence->tp_delindex( x, index );
 }
@@ -5137,33 +5184,33 @@ static ypObject *_ypSequence_delitem( ypObject *x, ypObject *key ) {
 // codec, as Python does
 
 typedef struct _yp_codecs_error_handler_params_t {
-    yp_ssize_t sizeof_struct;   // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
+    yp_ssize_t sizeof_struct;  // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
 
     // Details of the error.  All references, va_lists, and pointers are borrowed and should not be
     // replaced.
     // TODO Python's error handlers are flexible enough to take any exception object containing
     // any data.  Make sure this, while optimized for Unicode, can do the same.
-    ypObject *exc;          // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
-    ypObject *encoding;     // The unaliased name of the encoding that raised the error
-    struct {                // A to-be-formatted string+args describing the specific codec error
-        const yp_uint8_t *format;   // ASCII-encoded printf-style format string
-        va_list args;               // printf-style format arguments
+    ypObject *exc;       // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
+    ypObject *encoding;  // The unaliased name of the encoding that raised the error
+    struct {             // A to-be-formatted string+args describing the specific codec error
+        const yp_uint8_t *format;  // ASCII-encoded printf-style format string
+        va_list           args;    // printf-style format arguments
     } reason;
-    struct {                // The object/data the codec was attempting to encode/decode
-        ypObject *object;       // The source object; NULL if working strictly from raw data
-                                // XXX For example, yp_str_frombytesC4 will set this to NULL
+    struct {               // The object/data the codec was attempting to encode/decode
+        ypObject *object;  // The source object; NULL if working strictly from raw data
+                           // XXX For example, yp_str_frombytesC4 will set this to NULL
         // TODO Function to return ptr or, if it's NULL, a pointer to the data from within object
-        struct {                // The source data; ptr and/or type may be NULL iff object isn't
-            ypObject *type;         // An indication of the type of data pointed to:
-                                    //  - str-like: set to encoding name as per yp_asencodedCX
-                                    //  - bytes-like: set to yp_type_bytes
-                                    //  - other codecs may set this to other objects
-            const void *ptr;        // Pointer to the source data
-            yp_ssize_t len;         // Length of source data
+        struct {              // The source data; ptr and/or type may be NULL iff object isn't
+            ypObject *type;   // An indication of the type of data pointed to:
+                              //  - str-like: set to encoding name as per yp_asencodedCX
+                              //  - bytes-like: set to yp_type_bytes
+                              //  - other codecs may set this to other objects
+            const void *ptr;  // Pointer to the source data
+            yp_ssize_t  len;  // Length of source data
         } data;
     } source;
-    yp_ssize_t start;       // The first index of invalid data in source
-    yp_ssize_t end;         // The index after the last invalid data in source
+    yp_ssize_t start;  // The first index of invalid data in source
+    yp_ssize_t end;    // The index after the last invalid data in source
 } yp_codecs_error_handler_params_t;
 
 // Error handler.  Either raise params->exc, or a different error, via *replacement.  Otherwise,
@@ -5171,7 +5218,7 @@ typedef struct _yp_codecs_error_handler_params_t {
 // which to restart encoding/decoding.
 // XXX It's possible for *new_position to be less than or even greater than params->end on output
 // TODO returning (replacement, new_position) is strictly a Unicode thing: generalize
-typedef void (*yp_codecs_error_handler_func_t)( yp_codecs_error_handler_params_t *params,
+typedef void ( *yp_codecs_error_handler_func_t )( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position );
 
 // Registers the alias as an alternate name for the encoding and returns the immortal yp_None. Both
@@ -5211,23 +5258,23 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, y
 
 // Macros on ob_type_flags for string objects (bytes and str), used to index into
 // ypStringLib_encs.
-#define ypStringLib_ENC_BYTES       _ypStringLib_ENC_BYTES
-#define ypStringLib_ENC_LATIN_1     _ypStringLib_ENC_LATIN_1
-#define ypStringLib_ENC_UCS_2       _ypStringLib_ENC_UCS_2
-#define ypStringLib_ENC_UCS_4       _ypStringLib_ENC_UCS_4
+#define ypStringLib_ENC_BYTES _ypStringLib_ENC_BYTES
+#define ypStringLib_ENC_LATIN_1 _ypStringLib_ENC_LATIN_1
+#define ypStringLib_ENC_UCS_2 _ypStringLib_ENC_UCS_2
+#define ypStringLib_ENC_UCS_4 _ypStringLib_ENC_UCS_4
 
 // struct _ypBytesObject is declared in nohtyP.h for use by yp_IMMORTAL_BYTES
 typedef struct _ypBytesObject ypBytesObject;
 // struct _ypStrObject is declared in nohtyP.h for use by yp_IMMORTAL_STR_LATIN_1 et al
 typedef struct _ypStrObject ypStrObject;
 
-#define ypStringLib_ENC_CODE( s )   ( ((ypObject *)(s))->ob_type_flags )
-#define ypStringLib_ENC( s )        ( &(ypStringLib_encs[ypStringLib_ENC_CODE( s )]) )
-#define ypStringLib_DATA( s )       ( ((ypObject *)s)->ob_data )
-#define ypStringLib_LEN             ypObject_CACHED_LEN
-#define ypStringLib_SET_LEN         ypObject_SET_CACHED_LEN
-#define ypStringLib_ALLOCLEN        ypObject_ALLOCLEN
-#define ypStringLib_SET_ALLOCLEN    ypObject_SET_ALLOCLEN
+#define ypStringLib_ENC_CODE( s ) ( ( (ypObject *) ( s ) )->ob_type_flags )
+#define ypStringLib_ENC( s ) ( &( ypStringLib_encs[ypStringLib_ENC_CODE( s )] ) )
+#define ypStringLib_DATA( s ) ( ( (ypObject *) s )->ob_data )
+#define ypStringLib_LEN ypObject_CACHED_LEN
+#define ypStringLib_SET_LEN ypObject_SET_CACHED_LEN
+#define ypStringLib_ALLOCLEN ypObject_ALLOCLEN
+#define ypStringLib_SET_ALLOCLEN ypObject_SET_ALLOCLEN
 
 // The maximum possible alloclen and length of any string object.  While Latin-1 could technically
 // allow four times as much data as UCS-4, for simplicity we use one maximum length for all
@@ -5235,60 +5282,60 @@ typedef struct _ypStrObject ypStrObject;
 // UCS-4 character, thus quadrupling its size.)
 // XXX On the flip side, this means it's possible to create a string that, when encoded, cannot
 // fit in a bytes object, as it'll be larger than LEN_MAX.
-#define ypStringLib_ALLOCLEN_MAX ( (yp_ssize_t) MIN( MIN( \
-            yp_SSIZE_T_MAX-yp_sizeof( ypBytesObject ), \
-            (yp_SSIZE_T_MAX-yp_sizeof( ypStrObject )) / 4 /* /4 for elemsize of UCS-4 */ ), \
+#define ypStringLib_ALLOCLEN_MAX                                                \
+    ( (yp_ssize_t) MIN( MIN( yp_SSIZE_T_MAX - yp_sizeof( ypBytesObject ),       \
+                                ( yp_SSIZE_T_MAX - yp_sizeof( ypStrObject ) ) / \
+                                        4 /* /4 for elemsize of UCS-4 */ ),     \
             ypObject_LEN_MAX ) )
-#define ypStringLib_LEN_MAX (ypStringLib_ALLOCLEN_MAX - 1 /* for null terminator */)
+#define ypStringLib_LEN_MAX ( ypStringLib_ALLOCLEN_MAX - 1 /* for null terminator */ )
 
 // Returns true if ob is one of the types supported by ypStringLib
-#define ypStringLib_TYPE_CHECK( ob ) \
-    (ypObject_TYPE_PAIR_CODE( ob ) == ypStr_CODE || ypObject_TYPE_PAIR_CODE( ob ) == ypBytes_CODE)
+#define ypStringLib_TYPE_CHECK( ob )                 \
+    ( ypObject_TYPE_PAIR_CODE( ob ) == ypStr_CODE || \
+            ypObject_TYPE_PAIR_CODE( ob ) == ypBytes_CODE )
 
 // Debug-only macro to verify that bytes/str instances are stored as we expect
-#define ypStringLib_ASSERT_INVARIANTS( s ) \
-    do {yp_ASSERT( \
-            ypStringLib_ALLOCLEN( s ) < 0 /*immortals have an invalid alloclen*/ || \
-            ypStringLib_ALLOCLEN( s ) <= ypStringLib_ALLOCLEN_MAX, \
-            "bytes/str alloclen larger than ALLOCLEN_MAX" ); \
-        yp_ASSERT( \
-            ypStringLib_LEN( s ) >= 0 && \
-            ypStringLib_LEN( s ) <= ypStringLib_LEN_MAX, \
-            "bytes/str len not in range(LEN_MAX+1)" ); \
-        yp_ASSERT( \
-            ypStringLib_ALLOCLEN( s ) < 0 /*immortals have an invalid alloclen*/ || \
-            ypStringLib_LEN( s ) <= ypStringLib_ALLOCLEN( s ) - 1 /*null terminator*/, \
-            "bytes/str len (plus null terminator) larger than alloclen" ); \
-        yp_ASSERT( \
-            ypStringLib_ENC_CODE( s ) == ypStringLib_ENC_BYTES || \
-            ypStringLib_checkenc( ypStringLib_ENC_CODE( s ), \
-                ypStringLib_DATA( s ), ypStringLib_LEN( s ) ) == ypStringLib_ENC_CODE( s ), \
-            "str not stored in smallest representation" ); \
-        yp_ASSERT( \
-            ypStringLib_ENC( s )->getindexX( ypStringLib_DATA( s ), ypStringLib_LEN( s ) ) == 0, \
-            "bytes/str not internally null-terminated" ); \
+#define ypStringLib_ASSERT_INVARIANTS( s )                                                      \
+    do {                                                                                        \
+        yp_ASSERT( ypStringLib_ALLOCLEN( s ) < 0 /*immortals have an invalid alloclen*/ ||      \
+                           ypStringLib_ALLOCLEN( s ) <= ypStringLib_ALLOCLEN_MAX,               \
+                "bytes/str alloclen larger than ALLOCLEN_MAX" );                                \
+        yp_ASSERT( ypStringLib_LEN( s ) >= 0 && ypStringLib_LEN( s ) <= ypStringLib_LEN_MAX,    \
+                "bytes/str len not in range(LEN_MAX+1)" );                                      \
+        yp_ASSERT( ypStringLib_ALLOCLEN( s ) < 0 /*immortals have an invalid alloclen*/ ||      \
+                           ypStringLib_LEN( s ) <=                                              \
+                                   ypStringLib_ALLOCLEN( s ) - 1 /*null terminator*/,           \
+                "bytes/str len (plus null terminator) larger than alloclen" );                  \
+        yp_ASSERT(                                                                              \
+                ypStringLib_ENC_CODE( s ) == ypStringLib_ENC_BYTES ||                           \
+                        ypStringLib_checkenc( ypStringLib_ENC_CODE( s ), ypStringLib_DATA( s ), \
+                                ypStringLib_LEN( s ) ) == ypStringLib_ENC_CODE( s ),            \
+                "str not stored in smallest representation" );                                  \
+        yp_ASSERT( ypStringLib_ENC( s )->getindexX(                                             \
+                           ypStringLib_DATA( s ), ypStringLib_LEN( s ) ) == 0,                  \
+                "bytes/str not internally null-terminated" );                                   \
     } while( 0 )
 
 // Empty bytes can be represented by this, immortal object
-static ypBytesObject _yp_bytes_empty_struct = {
-    { ypBytes_CODE, 0, ypStringLib_ENC_BYTES, ypObject_REFCNT_IMMORTAL,
-    0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, "" } };
-#define _yp_bytes_empty     ((ypObject *) &_yp_bytes_empty_struct)
+static ypBytesObject _yp_bytes_empty_struct = {{ypBytes_CODE, 0, ypStringLib_ENC_BYTES,
+        ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, ""}};
+#define _yp_bytes_empty ( (ypObject *) &_yp_bytes_empty_struct )
 
 // Empty strs can be represented by this, immortal object
 static ypStrObject _yp_str_empty_struct = {
-    { ypStr_CODE, 0, ypStringLib_ENC_LATIN_1, ypObject_REFCNT_IMMORTAL,
-    0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, "" }, _yp_bytes_empty };
-#define _yp_str_empty   ((ypObject *) &_yp_str_empty_struct)
+        {ypStr_CODE, 0, ypStringLib_ENC_LATIN_1, ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID,
+                ypObject_HASH_INVALID, ""},
+        _yp_bytes_empty};
+#define _yp_str_empty ( (ypObject *) &_yp_str_empty_struct )
 
 // Gets the ordinal at src[src_i].  src_i must be in range(len): no bounds checking is performed.
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
-typedef yp_uint32_t (*ypStringLib_getindexXfunc)( const void *src, yp_ssize_t src_i );
+typedef yp_uint32_t ( *ypStringLib_getindexXfunc )( const void *src, yp_ssize_t src_i );
 
 // Sets dest[dest_i] to value.  dest_i must be in range(alloclen): no bounds checking is performed.
 // XXX dest's encoding must be able to store value
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
-typedef void (*ypStringLib_setindexXfunc)( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
+typedef void ( *ypStringLib_setindexXfunc )( void *dest, yp_ssize_t dest_i, yp_uint32_t value );
 
 // XXX In general for this table, make sure you do not use type codes with the wrong
 // ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
@@ -5296,16 +5343,16 @@ typedef void (*ypStringLib_setindexXfunc)( void *dest, yp_ssize_t dest_i, yp_uin
 // they might as well be statically-linked.  Alternatively, those generic functions could be
 // specialized.  Review these functions and find the right balance between the two schemes.
 typedef struct {
-    int sizeshift;                          // len<<sizeshift gives the size in bytes
-    yp_ssize_t elemsize;                    // The size (in bytes) of one character
-    yp_uint32_t max_char;                   // Largest character value that encoding can store
-                                            //  (may be larger than ypStringLib_MAX_UNICODE)
-    int code;                               // The ypStringLib_ENC_* value of the encoding
-    ypObject *name;                         // Immortal str of the encoding name (ie yp_s_latin_1)
-    ypObject *empty_immutable;              // The immortal, empty immutable for this type
-    ypObject *(*empty_mutable)( void );     // Returns a new, empty mutable version of this type
-    ypStringLib_getindexXfunc getindexX;    // Gets the ordinal at src[src_i]
-    ypStringLib_setindexXfunc setindexX;    // Sets dest[dest_i] to value
+    int         sizeshift;                 // len<<sizeshift gives the size in bytes
+    yp_ssize_t  elemsize;                  // The size (in bytes) of one character
+    yp_uint32_t max_char;                  // Largest character value that encoding can store
+                                           //  (may be larger than ypStringLib_MAX_UNICODE)
+    int       code;                        // The ypStringLib_ENC_* value of the encoding
+    ypObject *name;                        // Immortal str of the encoding name (ie yp_s_latin_1)
+    ypObject *empty_immutable;             // The immortal, empty immutable for this type
+    ypObject *( *empty_mutable )( void );  // Returns a new, empty mutable version of this type
+    ypStringLib_getindexXfunc getindexX;   // Gets the ordinal at src[src_i]
+    ypStringLib_setindexXfunc setindexX;   // Sets dest[dest_i] to value
 
     // Returns a new type-object with the given requiredLen, plus the null terminator, for this
     // encoding.  If type is immutable and alloclen_fixed is true (indicating the object will
@@ -5313,24 +5360,24 @@ typedef struct {
     // XXX Remember to add the null terminator
     // XXX Check for the empty_immutable case first: this function will _always_ allocate
     // TODO Put protection in place to detect when INLINE objects attempt to be resized
-    ypObject *(*new)( int type, yp_ssize_t requiredLen, int alloclen_fixed );
+    ypObject *( *new )( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 
     // Returns a new copy of s of the given type.  If type is immutable and alloclen_fixed is true
     // (indicating the object will never grow), the data is placed inline with one allocation.
     // XXX Check for lazy copies first: this function will _always_ allocate
     // XXX Similarly, check for the empty_immutable case first
-    ypObject *(*copy)( int type, ypObject *s, int alloclen_fixed );
+    ypObject *( *copy )( int type, ypObject *s, int alloclen_fixed );
 
     // Called on push/append, extend, irepeat, and similar functions to increase the alloclen
     // and/or elemsize of s to fit requiredLen (plus null terminator).  enc_code must be the same
     // or larger as currently.
     // XXX Does not update ypStringLib_LEN and does not null-terminate
     // TODO if memory error is the only possible error, consider returning boolean
-    ypObject *(*grow_onextend)( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra,
-            int enc_code );
+    ypObject *( *grow_onextend )(
+            ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra, int enc_code );
 
     // Clears s, possibly freeing some memory.
-    ypObject *(*clear)( ypObject *s );
+    ypObject *( *clear )( ypObject *s );
 } ypStringLib_encinfo;
 static ypStringLib_encinfo ypStringLib_encs[4];
 
@@ -5338,33 +5385,39 @@ static ypStringLib_encinfo ypStringLib_encs[4];
 // Getters, setters, and copiers for our three internal encodings
 
 // Gets ordinal at src[src_i]
-static yp_uint32_t ypStringLib_getindexX_1byte( const void *src, yp_ssize_t src_i ) {
+static yp_uint32_t ypStringLib_getindexX_1byte( const void *src, yp_ssize_t src_i )
+{
     yp_ASSERT( src_i >= 0, "indicies must be >=0" );
-    return ((yp_uint8_t *)src)[src_i];
+    return ( (yp_uint8_t *) src )[src_i];
 }
-static yp_uint32_t ypStringLib_getindexX_2bytes( const void *src, yp_ssize_t src_i ) {
+static yp_uint32_t ypStringLib_getindexX_2bytes( const void *src, yp_ssize_t src_i )
+{
     yp_ASSERT( src_i >= 0, "indicies must be >=0" );
-    return ((yp_uint16_t *)src)[src_i];
+    return ( (yp_uint16_t *) src )[src_i];
 }
-static yp_uint32_t ypStringLib_getindexX_4bytes( const void *src, yp_ssize_t src_i ) {
+static yp_uint32_t ypStringLib_getindexX_4bytes( const void *src, yp_ssize_t src_i )
+{
     yp_ASSERT( src_i >= 0, "indicies must be >=0" );
-    return ((yp_uint32_t *)src)[src_i];
+    return ( (yp_uint32_t *) src )[src_i];
 }
 
 // Sets dest[dest_i] to value
-static void ypStringLib_setindexX_1byte( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+static void ypStringLib_setindexX_1byte( void *dest, yp_ssize_t dest_i, yp_uint32_t value )
+{
     yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
     yp_ASSERT( value <= 0xFFu, "value too large for a byte" );
-    ((yp_uint8_t *)dest)[dest_i] = (yp_uint8_t) (value & 0xFFu);
+    ( (yp_uint8_t *) dest )[dest_i] = ( yp_uint8_t )( value & 0xFFu );
 }
-static void ypStringLib_setindexX_2bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+static void ypStringLib_setindexX_2bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value )
+{
     yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
     yp_ASSERT( value <= 0xFFFFu, "value too large for a byte" );
-    ((yp_uint16_t *)dest)[dest_i] = (yp_uint16_t) (value & 0xFFFFu);
+    ( (yp_uint16_t *) dest )[dest_i] = ( yp_uint16_t )( value & 0xFFFFu );
 }
-static void ypStringLib_setindexX_4bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value ) {
+static void ypStringLib_setindexX_4bytes( void *dest, yp_ssize_t dest_i, yp_uint32_t value )
+{
     yp_ASSERT( dest_i >= 0, "indicies must be >=0" );
-    ((yp_uint32_t *)dest)[dest_i] = value;
+    ( (yp_uint32_t *) dest )[dest_i] = value;
 }
 
 // A version of ypStringLib_upconvert that copies from UCS-2 to UCS-4
@@ -5372,11 +5425,12 @@ static void ypStringLib_setindexX_4bytes( void *dest, yp_ssize_t dest_i, yp_uint
 static void ypStringLib_upconvert_4from2( void *_data, yp_ssize_t len )
 {
     // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint32_t *dest = ((yp_uint32_t *) _data) + len-1;
-    const yp_uint16_t *src = ((yp_uint16_t *) _data) + len-1;
+    yp_uint32_t *      dest = ( (yp_uint32_t *) _data ) + len - 1;
+    const yp_uint16_t *src = ( (yp_uint16_t *) _data ) + len - 1;
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
-        dest--; src--;
+        dest--;
+        src--;
     }
 }
 
@@ -5385,11 +5439,12 @@ static void ypStringLib_upconvert_4from2( void *_data, yp_ssize_t len )
 static void ypStringLib_upconvert_4from1( void *_data, yp_ssize_t len )
 {
     // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint32_t *dest = ((yp_uint32_t *) _data) + len-1;
-    const yp_uint8_t *src = ((yp_uint8_t *) _data) + len-1;
+    yp_uint32_t *     dest = ( (yp_uint32_t *) _data ) + len - 1;
+    const yp_uint8_t *src = ( (yp_uint8_t *) _data ) + len - 1;
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
-        dest--; src--;
+        dest--;
+        src--;
     }
 }
 
@@ -5398,21 +5453,23 @@ static void ypStringLib_upconvert_4from1( void *_data, yp_ssize_t len )
 static void ypStringLib_upconvert_2from1( void *_data, yp_ssize_t len )
 {
     // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint16_t *dest = ((yp_uint16_t *) _data) + len-1;
-    const yp_uint8_t *src = ((yp_uint8_t *) _data) + len-1;
+    yp_uint16_t *     dest = ( (yp_uint16_t *) _data ) + len - 1;
+    const yp_uint8_t *src = ( (yp_uint8_t *) _data ) + len - 1;
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
-        dest--; src--;
+        dest--;
+        src--;
     }
 }
 
 // Converts the len characters at data to a larger encoding
 // XXX There must be enough room in data to fit the larger characters
 // XXX new_sizeshift must be larger than old_sizeshift
-static void ypStringLib_upconvert( int new_sizeshift,
-        int old_sizeshift, void *data, yp_ssize_t len )
+static void ypStringLib_upconvert(
+        int new_sizeshift, int old_sizeshift, void *data, yp_ssize_t len )
 {
-    yp_ASSERT( new_sizeshift > old_sizeshift, "can only upconvert to a larger encoding, of course" );
+    yp_ASSERT(
+            new_sizeshift > old_sizeshift, "can only upconvert to a larger encoding, of course" );
     if( new_sizeshift == 2 ) {  // UCS-4
         if( old_sizeshift == 1 ) {
             ypStringLib_upconvert_4from2( data, len );
@@ -5420,7 +5477,7 @@ static void ypStringLib_upconvert( int new_sizeshift,
             yp_ASSERT( old_sizeshift == 0, "unexpected old_sizeshift" );
             ypStringLib_upconvert_4from1( data, len );
         }
-    } else {                    // UCS-2
+    } else {  // UCS-2
         // If dest was sizeshift 0, then src would be too, and we'd have hit the memcpy case
         yp_ASSERT( new_sizeshift == 1, "unexpected new_sizeshift" );
         yp_ASSERT( old_sizeshift == 0, "unexpected old_sizeshift" );
@@ -5430,43 +5487,46 @@ static void ypStringLib_upconvert( int new_sizeshift,
 
 // A version of ypStringLib_elemcopy that copies from UCS-2 to UCS-4
 // TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_elemcopy_4from2( void *_dest, yp_ssize_t dest_i,
-        const void *_src, yp_ssize_t src_i, yp_ssize_t len )
+static void ypStringLib_elemcopy_4from2(
+        void *_dest, yp_ssize_t dest_i, const void *_src, yp_ssize_t src_i, yp_ssize_t len )
 {
-    yp_uint32_t *dest = ((yp_uint32_t *) _dest) + dest_i;
-    const yp_uint16_t *src = ((yp_uint16_t *) _src) + src_i;
-    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
+    yp_uint32_t *      dest = ( (yp_uint32_t *) _dest ) + dest_i;
+    const yp_uint16_t *src = ( (yp_uint16_t *) _src ) + src_i;
+    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >= 0, "indicies/lengths must be >=0" );
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
-        dest++; src++;
+        dest++;
+        src++;
     }
 }
 
 // A version of ypStringLib_elemcopy that copies from Latin-1 to UCS-4
 // TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_elemcopy_4from1( void *_dest, yp_ssize_t dest_i,
-        const void *_src, yp_ssize_t src_i, yp_ssize_t len )
+static void ypStringLib_elemcopy_4from1(
+        void *_dest, yp_ssize_t dest_i, const void *_src, yp_ssize_t src_i, yp_ssize_t len )
 {
-    yp_uint32_t *dest = ((yp_uint32_t *) _dest) + dest_i;
-    const yp_uint8_t *src = ((yp_uint8_t *)  _src) + src_i;
-    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
+    yp_uint32_t *     dest = ( (yp_uint32_t *) _dest ) + dest_i;
+    const yp_uint8_t *src = ( (yp_uint8_t *) _src ) + src_i;
+    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >= 0, "indicies/lengths must be >=0" );
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
-        dest++; src++;
+        dest++;
+        src++;
     }
 }
 
 // A version of ypStringLib_elemcopy that copies from Latin-1 to UCS-2
 // TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_elemcopy_2from1( void *_dest, yp_ssize_t dest_i,
-        const void *_src, yp_ssize_t src_i, yp_ssize_t len )
+static void ypStringLib_elemcopy_2from1(
+        void *_dest, yp_ssize_t dest_i, const void *_src, yp_ssize_t src_i, yp_ssize_t len )
 {
-    yp_uint16_t *dest = ((yp_uint16_t *) _dest) + dest_i;
-    const yp_uint8_t *src = ((yp_uint8_t *)  _src) + src_i;
-    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
+    yp_uint16_t *     dest = ( (yp_uint16_t *) _dest ) + dest_i;
+    const yp_uint8_t *src = ( (yp_uint8_t *) _src ) + src_i;
+    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >= 0, "indicies/lengths must be >=0" );
     for( /*len already set*/; len > 0; len-- ) {
         *dest = *src;
-        dest++; src++;
+        dest++;
+        src++;
     }
 }
 
@@ -5477,11 +5537,11 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
         int src_sizeshift, const void *src, yp_ssize_t src_i, yp_ssize_t len )
 {
     yp_ASSERT( dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding" );
-    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >=0, "indicies/lengths must be >=0" );
+    yp_ASSERT( dest_i >= 0 && src_i >= 0 && len >= 0, "indicies/lengths must be >=0" );
     if( dest_sizeshift == src_sizeshift ) {
         // Huzzah!  We get to use the nice-and-quick memcpy
-        memcpy( ((yp_uint8_t *) dest) + (dest_i << dest_sizeshift),
-                ((const yp_uint8_t *) src) + (src_i << dest_sizeshift),
+        memcpy( ( (yp_uint8_t *) dest ) + ( dest_i << dest_sizeshift ),
+                ( (const yp_uint8_t *) src ) + ( src_i << dest_sizeshift ),
                 len << dest_sizeshift );
     } else if( dest_sizeshift == 2 ) {  // UCS-4
         // If src was also sizeshift 2, then we'd have hit the memcpy case
@@ -5491,7 +5551,7 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
             yp_ASSERT( src_sizeshift == 0, "unexpected src_sizeshift" );
             ypStringLib_elemcopy_4from1( dest, dest_i, src, src_i, len );
         }
-    } else {                            // UCS-2
+    } else {  // UCS-2
         // If dest was sizeshift 0, then src would be too, and we'd have hit the memcpy case
         yp_ASSERT( dest_sizeshift == 1, "unexpected dest_sizeshift" );
         yp_ASSERT( src_sizeshift == 0, "unexpected src_sizeshift" );
@@ -5500,17 +5560,20 @@ static void ypStringLib_elemcopy( int dest_sizeshift, void *dest, yp_ssize_t des
 }
 
 
-# define ypStringLib_TYPE_CHECKENC_1FROM2_MASK 0xFF00FF00FF00FF00ULL
-yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_TYPE_CHECKENC_1FROM2_MASK) == ypStringLib_TYPE_CHECKENC_1FROM2_MASK, checkenc_1from2_mask_matches_type );
+#define ypStringLib_TYPE_CHECKENC_1FROM2_MASK 0xFF00FF00FF00FF00ULL
+yp_STATIC_ASSERT( ( (_yp_uint_t) ypStringLib_TYPE_CHECKENC_1FROM2_MASK ) ==
+                          ypStringLib_TYPE_CHECKENC_1FROM2_MASK,
+        checkenc_1from2_mask_matches_type );
 // Returns the ypStringLib_ENC_* that _should_ be used for the given UCS-2-encoded string
 // XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
 static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
 {
-    const _yp_uint_t mask = ypStringLib_TYPE_CHECKENC_1FROM2_MASK;
+    const _yp_uint_t  mask = ypStringLib_TYPE_CHECKENC_1FROM2_MASK;
     const yp_uint8_t *p = data;
-    const yp_uint8_t *end = p + (len * 2);
+    const yp_uint8_t *end = p + ( len * 2 );
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN( end, yp_sizeof( _yp_uint_t ) );
-    yp_ASSERT( (*(yp_uint8_t *) &mask) == 0, "ypStringLib_checkenc_ucs_2 doesn't support big-endian yet" );
+    yp_ASSERT( ( *(yp_uint8_t *) &mask ) == 0,
+            "ypStringLib_checkenc_ucs_2 doesn't support big-endian yet" );
     yp_ASSERT( yp_IS_ALIGNED( data, 2 ), "unexpected alignment for ucs-2 data" );
     yp_ASSERT( len >= 0, "negative length" );
 
@@ -5519,7 +5582,7 @@ static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
 
     // Read the first few elements until we're aligned
     while( !yp_IS_ALIGNED( p, yp_sizeof( _yp_uint_t ) ) ) {
-        yp_uint16_t value = *((yp_uint16_t *) p);
+        yp_uint16_t value = *( (yp_uint16_t *) p );
         // TODO This won't work on big-endian: will need a mask (for uint) and smallmask (uint16)
         if( value & mask ) return ypStringLib_ENC_UCS_2;
         p += 2;
@@ -5527,39 +5590,44 @@ static int ypStringLib_checkenc_ucs_2( const void *data, yp_ssize_t len )
 
     // Now read as many aligned ints as we can
     while( p < aligned_end ) {
-        _yp_uint_t value = *((_yp_uint_t *) p);
+        _yp_uint_t value = *( (_yp_uint_t *) p );
         if( value & mask ) return ypStringLib_ENC_UCS_2;
         p += yp_sizeof( _yp_uint_t );
     }
 
-    // Now read the final, unaligned elements
+// Now read the final, unaligned elements
 final_loop:
     while( p < end ) {
-        yp_uint16_t value = *((yp_uint16_t *) p);
+        yp_uint16_t value = *( (yp_uint16_t *) p );
         if( value & mask ) return ypStringLib_ENC_UCS_2;
         p += 2;
     }
     return ypStringLib_ENC_LATIN_1;
 }
 
-# define ypStringLib_TYPE_CHECKENC_1FROM4_MASK 0xFFFFFF00FFFFFF00ULL
-yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_TYPE_CHECKENC_1FROM4_MASK) == ypStringLib_TYPE_CHECKENC_1FROM4_MASK, checkenc_1from4_mask_matches_type );
-# define ypStringLib_TYPE_CHECKENC_2FROM4_MASK 0xFFFF0000FFFF0000ULL
-yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_TYPE_CHECKENC_2FROM4_MASK) == ypStringLib_TYPE_CHECKENC_2FROM4_MASK, checkenc_2from4_mask_matches_type );
+#define ypStringLib_TYPE_CHECKENC_1FROM4_MASK 0xFFFFFF00FFFFFF00ULL
+yp_STATIC_ASSERT( ( (_yp_uint_t) ypStringLib_TYPE_CHECKENC_1FROM4_MASK ) ==
+                          ypStringLib_TYPE_CHECKENC_1FROM4_MASK,
+        checkenc_1from4_mask_matches_type );
+#define ypStringLib_TYPE_CHECKENC_2FROM4_MASK 0xFFFF0000FFFF0000ULL
+yp_STATIC_ASSERT( ( (_yp_uint_t) ypStringLib_TYPE_CHECKENC_2FROM4_MASK ) ==
+                          ypStringLib_TYPE_CHECKENC_2FROM4_MASK,
+        checkenc_2from4_mask_matches_type );
 // Returns true if the UCS-4 string can be encoded in the encoding matching mask.  *p will point
 // to the location that failed the check, or to *end on success.
-static int _ypStringLib_checkenc_ucs_4( _yp_uint_t mask,
-    const yp_uint8_t **p, const yp_uint8_t *end )
+static int _ypStringLib_checkenc_ucs_4(
+        _yp_uint_t mask, const yp_uint8_t **p, const yp_uint8_t *end )
 {
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN( end, yp_sizeof( _yp_uint_t ) );
-    yp_ASSERT( (*(yp_uint8_t *) &mask) == 0, "ypStringLib_checkenc_ucs_4 doesn't support big-endian yet" );
+    yp_ASSERT( ( *(yp_uint8_t *) &mask ) == 0,
+            "ypStringLib_checkenc_ucs_4 doesn't support big-endian yet" );
 
     // If we don't contain an aligned _yp_uint_t, jump to the end
     if( aligned_end - *p < yp_sizeof( _yp_uint_t ) ) goto final_loop;
 
     // Read the first few elements until we're aligned
     while( !yp_IS_ALIGNED( *p, yp_sizeof( _yp_uint_t ) ) ) {
-        yp_uint32_t value = *((yp_uint32_t *) *p);
+        yp_uint32_t value = *( (yp_uint32_t *) *p );
         // TODO This won't work on big-endian: will need a mask (for uint) and smallmask (uint16)
         if( value & mask ) return FALSE;
         *p += 4;
@@ -5567,15 +5635,15 @@ static int _ypStringLib_checkenc_ucs_4( _yp_uint_t mask,
 
     // Now read as many aligned ints as we can
     while( *p < aligned_end ) {
-        _yp_uint_t value = *((_yp_uint_t *) *p);
+        _yp_uint_t value = *( (_yp_uint_t *) *p );
         if( value & mask ) return FALSE;
         *p += yp_sizeof( _yp_uint_t );
     }
 
-    // Now read the final, unaligned elements
+// Now read the final, unaligned elements
 final_loop:
     while( *p < end ) {
-        yp_uint32_t value = *((yp_uint32_t *) *p);
+        yp_uint32_t value = *( (yp_uint32_t *) *p );
         if( value & mask ) return FALSE;
         *p += 4;
     }
@@ -5586,7 +5654,7 @@ final_loop:
 static int ypStringLib_checkenc_ucs_4( const void *data, yp_ssize_t len )
 {
     const yp_uint8_t *p = data;
-    const yp_uint8_t *end = p + (len * 4);
+    const yp_uint8_t *end = p + ( len * 4 );
     yp_ASSERT( yp_IS_ALIGNED( data, 4 ), "unexpected alignment for ucs-4 data" );
     yp_ASSERT( len >= 0, "negative length" );
 
@@ -5619,10 +5687,10 @@ static int ypStringLib_checkenc( int enc, const void *data, yp_ssize_t len )
 
 static ypObject *ypStringLib_repeat( ypObject *s, yp_ssize_t factor )
 {
-    yp_ssize_t s_len = ypStringLib_LEN( s );
+    yp_ssize_t           s_len = ypStringLib_LEN( s );
     ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
-    yp_ssize_t newLen;
-    ypObject *newS;
+    yp_ssize_t           newLen;
+    ypObject *           newS;
 
     if( !ypObject_IS_MUTABLE( s ) ) {
         if( s_len < 1 || factor < 1 ) return s_enc->empty_immutable;
@@ -5635,7 +5703,7 @@ static ypObject *ypStringLib_repeat( ypObject *s, yp_ssize_t factor )
 
     if( factor > ypStringLib_LEN_MAX / s_len ) return yp_MemorySizeOverflowError;
     newLen = s_len * factor;
-    newS = s_enc->new( ypObject_TYPE_CODE( s ), newLen, /*alloclen_fixed=*/TRUE ); // new ref
+    newS = s_enc->new( ypObject_TYPE_CODE( s ), newLen, /*alloclen_fixed=*/TRUE );  // new ref
     if( yp_isexceptionC( newS ) ) return newS;
 
     memcpy( ypStringLib_DATA( newS ), ypStringLib_DATA( s ), s_len << s_enc->sizeshift );
@@ -5648,17 +5716,17 @@ static ypObject *ypStringLib_repeat( ypObject *s, yp_ssize_t factor )
 
 static ypObject *ypStringLib_irepeat( ypObject *s, yp_ssize_t factor )
 {
-    yp_ssize_t s_len = ypStringLib_LEN( s );
+    yp_ssize_t           s_len = ypStringLib_LEN( s );
     ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
-    yp_ssize_t newLen;
+    yp_ssize_t           newLen;
 
     yp_ASSERT( ypObject_IS_MUTABLE( s ), "irepeat called on immutable object" );
-    if( s_len < 1 || factor == 1 ) return yp_None; // no-op
+    if( s_len < 1 || factor == 1 ) return yp_None;  // no-op
     if( factor < 1 ) return s_enc->clear( s );
 
     if( factor > ypStringLib_LEN_MAX / s_len ) return yp_MemorySizeOverflowError;
     newLen = s_len * factor;
-    if( ypStringLib_ALLOCLEN( s )-1 < newLen ) {
+    if( ypStringLib_ALLOCLEN( s ) - 1 < newLen ) {
         // TODO Over-allocate?
         ypObject *result = s_enc->grow_onextend( s, newLen, 0, s_enc->code );
         if( yp_isexceptionC( result ) ) return result;
@@ -5675,16 +5743,16 @@ static ypObject *ypStringLib_irepeat( ypObject *s, yp_ssize_t factor )
 // There are some efficiencies we can exploit if iterable/x is a fellow string object
 static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
 {
-    yp_ssize_t s_len = ypStringLib_LEN( s );
-    void *x_data = ypStringLib_DATA( x );
-    yp_ssize_t x_len = ypStringLib_LEN( x );
+    yp_ssize_t           s_len = ypStringLib_LEN( s );
+    void *               x_data = ypStringLib_DATA( x );
+    yp_ssize_t           x_len = ypStringLib_LEN( x );
     ypStringLib_encinfo *x_enc = ypStringLib_ENC( x );
-    yp_ssize_t i;
-    void *result_data;
-    yp_ssize_t result_len;
-    int result_enc_code;
+    yp_ssize_t           i;
+    void *               result_data;
+    yp_ssize_t           result_len;
+    int                  result_enc_code;
     ypStringLib_encinfo *result_enc;
-    ypObject *result;
+    ypObject *           result;
 
     if( ypObject_TYPE_PAIR_CODE( s ) != ypObject_TYPE_PAIR_CODE( x ) ) return yp_TypeError;
     ypStringLib_ASSERT_INVARIANTS( s );
@@ -5702,24 +5770,24 @@ static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
     }
 
     // Calculate how long the result is going to be and which encoding we'll use
-    if( s_len > (ypStringLib_LEN_MAX-x_len) / (x_len-1) ) {
+    if( s_len > ( ypStringLib_LEN_MAX - x_len ) / ( x_len - 1 ) ) {
         return yp_MemorySizeOverflowError;
     }
-    result_len = (s_len * (x_len-1)) + x_len;
+    result_len = ( s_len * ( x_len - 1 ) ) + x_len;
     result_enc_code = MAX( ypStringLib_ENC_CODE( s ), ypStringLib_ENC_CODE( x ) );
 
     // Now we can create the result object...
-    result_enc = &(ypStringLib_encs[result_enc_code]);
+    result_enc = &( ypStringLib_encs[result_enc_code] );
     result = result_enc->new( ypObject_TYPE_CODE( s ), result_len, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( result ) ) return result;
 
     // ...and populate it, remembering to null-terminate and update the length
     result_data = ypStringLib_DATA( result );
-    ypStringLib_elemcopy( result_enc->sizeshift, result_data, 1,
-            ypStringLib_ENC( s )->sizeshift, ypStringLib_DATA( s ), 0, s_len );
-    _ypSequence_repeat_memcpy( result_data, x_len-1, (s_len+1) << result_enc->sizeshift );
+    ypStringLib_elemcopy( result_enc->sizeshift, result_data, 1, ypStringLib_ENC( s )->sizeshift,
+            ypStringLib_DATA( s ), 0, s_len );
+    _ypSequence_repeat_memcpy( result_data, x_len - 1, ( s_len + 1 ) << result_enc->sizeshift );
     for( i = 0; i < x_len; i++ ) {
-        result_enc->setindexX( result_data, i*(s_len+1), x_enc->getindexX( x_data, i ) );
+        result_enc->setindexX( result_data, i * ( s_len + 1 ), x_enc->getindexX( x_data, i ) );
     }
     result_enc->setindexX( result_data, result_len, 0 );
     ypStringLib_SET_LEN( result, result_len );
@@ -5730,22 +5798,23 @@ static ypObject *ypStringLib_join_from_string( ypObject *s, ypObject *x )
 // Performs the necessary elemcopy's on behalf of ypStringLib_join, null-terminates, and updates
 // result's length.  Assumes adequate space has already been allocated, and that type checking on
 // seq's elements has already been performed.
-static void _ypStringLib_join_elemcopy( ypObject *result,
-        ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
+static void _ypStringLib_join_elemcopy(
+        ypObject *result, ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
 {
     ypStringLib_encinfo *result_enc = ypStringLib_ENC( result );
-    int result_sizeshift = result_enc->sizeshift;
-    void *result_data = ypStringLib_DATA( result );
-    yp_ssize_t result_len = 0;
-    yp_ssize_t s_len = ypStringLib_LEN( s );
-    yp_ssize_t i;
+    int                  result_sizeshift = result_enc->sizeshift;
+    void *               result_data = ypStringLib_DATA( result );
+    yp_ssize_t           result_len = 0;
+    yp_ssize_t           s_len = ypStringLib_LEN( s );
+    yp_ssize_t           i;
 
     if( s_len < 1 ) {
         // The separator is empty, so we just concatenate seq's elements
         for( i = 0; /*stop at NULL*/; i++ ) {
-            ypObject *x = seq->getindexX( state, i );   // borrowed
+            ypObject *x = seq->getindexX( state, i );  // borrowed
             if( x == NULL ) break;
-            yp_ASSERT( ypStringLib_TYPE_CHECK( x ), "ypStringLib_join didn't perform type checking" );
+            yp_ASSERT(
+                    ypStringLib_TYPE_CHECK( x ), "ypStringLib_join didn't perform type checking" );
             ypStringLib_ASSERT_INVARIANTS( x );
             ypStringLib_elemcopy( result_sizeshift, result_data, result_len,
                     ypStringLib_ENC( x )->sizeshift, ypStringLib_DATA( x ), 0,
@@ -5756,20 +5825,21 @@ static void _ypStringLib_join_elemcopy( ypObject *result,
     } else {
         // We need to insert the separator between seq's elements; recall that we know there is at
         // least one element in seq
-        int s_sizeshift = ypStringLib_ENC( s )->sizeshift;
-        void *s_data = ypStringLib_DATA( s );
-        ypObject *x = seq->getindexX( state, 0 );   // borrowed
+        int       s_sizeshift = ypStringLib_ENC( s )->sizeshift;
+        void *    s_data = ypStringLib_DATA( s );
+        ypObject *x = seq->getindexX( state, 0 );  // borrowed
         yp_ASSERT( x != NULL, "_ypStringLib_join_elemcopy passed an empty seq" );
         for( i = 1; /*stop at NULL*/; i++ ) {
-            yp_ASSERT( ypStringLib_TYPE_CHECK( x ), "ypStringLib_join didn't perform type checking" );
+            yp_ASSERT(
+                    ypStringLib_TYPE_CHECK( x ), "ypStringLib_join didn't perform type checking" );
             ypStringLib_elemcopy( result_sizeshift, result_data, result_len,
                     ypStringLib_ENC( x )->sizeshift, ypStringLib_DATA( x ), 0,
                     ypStringLib_LEN( x ) );
             result_len += ypStringLib_LEN( x );
-            x = seq->getindexX( state, i );   // borrowed
+            x = seq->getindexX( state, i );  // borrowed
             if( x == NULL ) break;
-            ypStringLib_elemcopy( result_sizeshift, result_data, result_len,
-                    s_sizeshift, s_data, 0, s_len );
+            ypStringLib_elemcopy(
+                    result_sizeshift, result_data, result_len, s_sizeshift, s_data, 0, s_len );
             result_len += s_len;
         }
     }
@@ -5785,15 +5855,15 @@ static ypObject *ypStringLib_join(
         ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state )
 {
     // TODO Here and everywhere, we could instead set exc to NULL, then return if non-NULL
-    ypObject *exc = yp_None;
-    unsigned s_pair = ypObject_TYPE_PAIR_CODE( s );
-    yp_ssize_t seq_len;
-    yp_ssize_t i;
-    ypObject *x;
-    yp_ssize_t result_len;
-    int result_enc_code;
+    ypObject *           exc = yp_None;
+    unsigned             s_pair = ypObject_TYPE_PAIR_CODE( s );
+    yp_ssize_t           seq_len;
+    yp_ssize_t           i;
+    ypObject *           x;
+    yp_ssize_t           result_len;
+    int                  result_enc_code;
     ypStringLib_encinfo *result_enc;
-    ypObject *result;
+    ypObject *           result;
 
     ypStringLib_ASSERT_INVARIANTS( s );
 
@@ -5804,7 +5874,7 @@ static ypObject *ypStringLib_join(
         if( !ypObject_IS_MUTABLE( s ) ) return ypStringLib_ENC( s )->empty_immutable;
         return ypStringLib_ENC( s )->empty_mutable( );
     } else if( seq_len == 1 ) {
-        x = seq->getindexX( state, 0 );     // borrowed
+        x = seq->getindexX( state, 0 );  // borrowed
         if( ypObject_TYPE_PAIR_CODE( x ) != s_pair ) return_yp_BAD_TYPE( x );
         // Remember we need to return an object of the same type as s.  If s and x are both
         // immutable then we can rely on a shallow copy.
@@ -5814,13 +5884,13 @@ static ypObject *ypStringLib_join(
 
     // Calculate how long the result is going to be, which encoding we'll use, and ensure seq
     // contains the correct types
-    if( ypStringLib_LEN( s ) > ypStringLib_LEN_MAX / (seq_len-1) ) {
+    if( ypStringLib_LEN( s ) > ypStringLib_LEN_MAX / ( seq_len - 1 ) ) {
         return yp_MemorySizeOverflowError;
     }
-    result_len = ypStringLib_LEN( s ) * (seq_len-1);
-    result_enc_code = ypStringLib_ENC_CODE( s );   // if s is empty the code is Latin-1 or BYTES
+    result_len = ypStringLib_LEN( s ) * ( seq_len - 1 );
+    result_enc_code = ypStringLib_ENC_CODE( s );  // if s is empty the code is Latin-1 or BYTES
     for( i = 0; i < seq_len; i++ ) {
-        x = seq->getindexX( state, i );     // borrowed
+        x = seq->getindexX( state, i );  // borrowed
         if( ypObject_TYPE_PAIR_CODE( x ) != s_pair ) return_yp_BAD_TYPE( x );
         if( result_len > ypStringLib_LEN_MAX - ypStringLib_LEN( x ) ) {
             return yp_MemorySizeOverflowError;
@@ -5832,11 +5902,12 @@ static ypObject *ypStringLib_join(
     }
 
     // Now we can create the result object and populate it
-    result_enc = &(ypStringLib_encs[result_enc_code]);
+    result_enc = &( ypStringLib_encs[result_enc_code] );
     result = result_enc->new( ypObject_TYPE_CODE( s ), result_len, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( result ) ) return result;
     _ypStringLib_join_elemcopy( result, s, seq, state );
-    yp_ASSERT( ypStringLib_LEN( result ) == result_len, "joined result isn't length originally calculated" );
+    yp_ASSERT( ypStringLib_LEN( result ) == result_len,
+            "joined result isn't length originally calculated" );
     ypStringLib_ASSERT_INVARIANTS( result );
     return result;
 }
@@ -5849,16 +5920,14 @@ static ypObject *ypStringLib_join(
 // encoded bytes (using ypStringLib_encode_concat_replacement, perhaps).  Returns exception on
 // error (*newPos will be undefined).
 // XXX Adapted from Python's unicode_encode_call_errorhandler
-static ypObject *ypStringLib_encode_call_errorhandler(
-    yp_codecs_error_handler_func_t errorHandler, const char *reason,
-    ypObject *encoding, ypObject *source,
-    yp_ssize_t errStart, yp_ssize_t errEnd,
-    yp_ssize_t *newPos )
+static ypObject *ypStringLib_encode_call_errorhandler( yp_codecs_error_handler_func_t errorHandler,
+        const char *reason, ypObject *encoding, ypObject *source, yp_ssize_t errStart,
+        yp_ssize_t errEnd, yp_ssize_t *newPos )
 {
-    ypObject *exc = yp_None;
+    ypObject *                       exc = yp_None;
     yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
-    ypObject *replacement;
-    yp_ssize_t source_len = ypStringLib_LEN( source );
+    ypObject *                       replacement;
+    yp_ssize_t                       source_len = ypStringLib_LEN( source );
 
     params.exc = yp_UnicodeEncodeError;
     params.encoding = encoding;
@@ -5872,9 +5941,9 @@ static ypObject *ypStringLib_encode_call_errorhandler(
     params.start = errStart;
     params.end = errEnd;
 
-    replacement = yp_SystemError;   // in case errorhandler forgets to modify replacement
-    *newPos = yp_SSIZE_T_MAX;       // ... ditto, for newPos
-    errorHandler( &params, &replacement, newPos );   // replacement is a new ref on output
+    replacement = yp_SystemError;  // in case errorhandler forgets to modify replacement
+    *newPos = yp_SSIZE_T_MAX;      // ... ditto, for newPos
+    errorHandler( &params, &replacement, newPos );  // replacement is a new ref on output
     if( ypObject_TYPE_PAIR_CODE( replacement ) != ypBytes_CODE ) {
         ypObject *typeErr = yp_BAD_TYPE( replacement );
         yp_decref( replacement );
@@ -5884,10 +5953,10 @@ static ypObject *ypStringLib_encode_call_errorhandler(
     // XXX Python allows the bytes variable in the exception to be modified and replaced here, but
     // this isn't documented and I'm assuming it's a deprecated feature
 
-    if( *newPos < 0 ) *newPos = source_len+(*newPos);
+    if( *newPos < 0 ) *newPos = source_len + ( *newPos );
     if( newPos < 0 || *newPos > source_len ) {
         yp_decref( replacement );
-        return yp_IndexError;   // "position %zd from error handler out of bounds"
+        return yp_IndexError;  // "position %zd from error handler out of bounds"
     }
 
     return replacement;
@@ -5896,19 +5965,20 @@ static ypObject *ypStringLib_encode_call_errorhandler(
 // future_growth is an upper-bound estimate of the number of additional bytes, not including
 // the replacement text, that are expected to be added to encoded.  After appending, encoded will
 // have at least future_growth space available.  Does not null-terminate encoded.
-static ypObject *_ypBytes_grow_onextend( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra,
-        int enc_code );
+static ypObject *_ypBytes_grow_onextend(
+        ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra, int enc_code );
 static ypObject *ypStringLib_encode_concat_replacement(
-    ypObject *encoded, ypObject *replacement, yp_ssize_t future_growth )
+        ypObject *encoded, ypObject *replacement, yp_ssize_t future_growth )
 {
-    yp_ssize_t encoded_len;
-    yp_ssize_t replacement_len;
-    yp_ssize_t newLen;
-    yp_ssize_t newAlloclen;
-    ypObject *result;
+    yp_ssize_t  encoded_len;
+    yp_ssize_t  replacement_len;
+    yp_ssize_t  newLen;
+    yp_ssize_t  newAlloclen;
+    ypObject *  result;
     yp_uint8_t *encoded_data;
 
-    yp_ASSERT( ypObject_TYPE_PAIR_CODE( replacement ) == ypBytes_CODE, "replacement must be a bytes" );
+    yp_ASSERT( ypObject_TYPE_PAIR_CODE( replacement ) == ypBytes_CODE,
+            "replacement must be a bytes" );
     yp_ASSERT( future_growth >= 0, "future_growth can't be negative" );
 
     encoded_len = ypStringLib_LEN( encoded );
@@ -5937,15 +6007,13 @@ static ypObject *ypStringLib_encode_concat_replacement(
 // decoded string (using ypStringLib_decode_concat_replacement, perhaps).  Returns exception on
 // error (*newPos will be undefined).
 // XXX Adapted from Python's unicode_decode_call_errorhandler_writer
-static ypObject *ypStringLib_decode_call_errorhandler(
-    yp_codecs_error_handler_func_t errorHandler, const char *reason,
-    ypObject *encoding, const yp_uint8_t *source, yp_ssize_t source_len,
-    yp_ssize_t errStart, yp_ssize_t errEnd,
-    yp_ssize_t *newPos )
+static ypObject *ypStringLib_decode_call_errorhandler( yp_codecs_error_handler_func_t errorHandler,
+        const char *reason, ypObject *encoding, const yp_uint8_t *source, yp_ssize_t source_len,
+        yp_ssize_t errStart, yp_ssize_t errEnd, yp_ssize_t *newPos )
 {
-    ypObject *exc = yp_None;
+    ypObject *                       exc = yp_None;
     yp_codecs_error_handler_params_t params = {sizeof( yp_codecs_error_handler_params_t )};
-    ypObject *replacement;
+    ypObject *                       replacement;
 
     params.exc = yp_UnicodeDecodeError;
     params.encoding = encoding;
@@ -5957,9 +6025,9 @@ static ypObject *ypStringLib_decode_call_errorhandler(
     params.start = errStart;
     params.end = errEnd;
 
-    replacement = yp_SystemError;   // in case errorhandler forgets to modify replacement
-    *newPos = yp_SSIZE_T_MAX;       // ...ditto, for newPos
-    errorHandler( &params, &replacement, newPos );   // replacement is new ref on output
+    replacement = yp_SystemError;  // in case errorhandler forgets to modify replacement
+    *newPos = yp_SSIZE_T_MAX;      // ...ditto, for newPos
+    errorHandler( &params, &replacement, newPos );  // replacement is new ref on output
     if( ypObject_TYPE_PAIR_CODE( replacement ) != ypStr_CODE ) {
         ypObject *typeErr = yp_BAD_TYPE( replacement );
         yp_decref( replacement );
@@ -5969,10 +6037,10 @@ static ypObject *ypStringLib_decode_call_errorhandler(
     // XXX Python allows the bytes variable in the exception to be modified and replaced here, but
     // this isn't documented and I'm assuming it's a deprecated feature
 
-    if( *newPos < 0 ) *newPos = source_len+(*newPos);
+    if( *newPos < 0 ) *newPos = source_len + ( *newPos );
     if( newPos < 0 || *newPos > source_len ) {
         yp_decref( replacement );
-        return yp_IndexError;   // "position %zd from error handler out of bounds"
+        return yp_IndexError;  // "position %zd from error handler out of bounds"
     }
 
     return replacement;
@@ -5981,16 +6049,17 @@ static ypObject *ypStringLib_decode_call_errorhandler(
 // future_growth is an upper-bound estimate of the number of additional characters, not including
 // the replacement text, that are expected to be added to decoded.  After appending, decoded will
 // have at least future_growth space available.  Does not null-terminate decoded.
-static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra,
-        int enc_code );
+static ypObject *_ypStr_grow_onextend(
+        ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra, int enc_code );
 static ypObject *ypStringLib_decode_concat_replacement(
-    ypObject *decoded, ypObject *replacement, yp_ssize_t future_growth )
+        ypObject *decoded, ypObject *replacement, yp_ssize_t future_growth )
 {
     yp_ssize_t newLen;
     yp_ssize_t newAlloclen;
-    ypObject *result;
+    ypObject * result;
 
-    yp_ASSERT( ypObject_TYPE_PAIR_CODE( replacement ) == ypStr_CODE, "replacement must be a string" );
+    yp_ASSERT(
+            ypObject_TYPE_PAIR_CODE( replacement ) == ypStr_CODE, "replacement must be a string" );
     yp_ASSERT( future_growth >= 0, "future_growth can't be negative" );
 
     if( ypStringLib_LEN( replacement ) > ypStringLib_LEN_MAX - ypStringLib_LEN( decoded ) ) {
@@ -6002,20 +6071,15 @@ static ypObject *ypStringLib_decode_concat_replacement(
     }
     newAlloclen = newLen + future_growth;
     if( ypStringLib_ALLOCLEN( decoded ) < newAlloclen ||
-        ypStringLib_ENC( decoded ) < ypStringLib_ENC( replacement ) )
-    {
-        result = _ypStr_grow_onextend( decoded, newAlloclen, 0,
-            ypStringLib_ENC_CODE( replacement ) );
+            ypStringLib_ENC( decoded ) < ypStringLib_ENC( replacement ) ) {
+        result = _ypStr_grow_onextend(
+                decoded, newAlloclen, 0, ypStringLib_ENC_CODE( replacement ) );
         if( yp_isexceptionC( result ) ) return result;
     }
 
-    ypStringLib_elemcopy(
-        ypStringLib_ENC( decoded )->sizeshift, ypStringLib_DATA( decoded ),
-            ypStringLib_LEN( decoded ),
-        ypStringLib_ENC( replacement )->sizeshift, ypStringLib_DATA( replacement ),
-            0,
-        ypStringLib_LEN( replacement )
-    );
+    ypStringLib_elemcopy( ypStringLib_ENC( decoded )->sizeshift, ypStringLib_DATA( decoded ),
+            ypStringLib_LEN( decoded ), ypStringLib_ENC( replacement )->sizeshift,
+            ypStringLib_DATA( replacement ), 0, ypStringLib_LEN( replacement ) );
     ypStringLib_SET_LEN( decoded, newLen );
     return yp_None;
 }
@@ -6026,12 +6090,13 @@ static ypObject *ypStringLib_decode_concat_replacement(
 // Returns the number of consecutive ascii bytes starting at start.  Valid for ascii, latin-1, and
 // utf-8 encodings.
 // XXX Adapted from Python's ascii_decode
-# define ypStringLib_ASCII_CHAR_MASK 0x8080808080808080ULL
-yp_STATIC_ASSERT( ((_yp_uint_t) ypStringLib_ASCII_CHAR_MASK) == ypStringLib_ASCII_CHAR_MASK, ascii_mask_matches_type );
+#define ypStringLib_ASCII_CHAR_MASK 0x8080808080808080ULL
+yp_STATIC_ASSERT( ( (_yp_uint_t) ypStringLib_ASCII_CHAR_MASK ) == ypStringLib_ASCII_CHAR_MASK,
+        ascii_mask_matches_type );
 static yp_ssize_t ypStringLib_count_ascii_bytes( const yp_uint8_t *start, const yp_uint8_t *end )
 {
     const yp_uint8_t *p = start;
-    const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof( _yp_uint_t ));
+    const yp_uint8_t *aligned_end = yp_ALIGN_DOWN( end, yp_sizeof( _yp_uint_t ) );
 
     // If we don't contain an aligned _yp_uint_t, jump to the end
     if( aligned_end - start < yp_sizeof( _yp_uint_t ) ) goto final_loop;
@@ -6039,29 +6104,29 @@ static yp_ssize_t ypStringLib_count_ascii_bytes( const yp_uint8_t *start, const 
     // Read the first few bytes until we're aligned.  We can return early because we're reading
     // byte-by-byte.
     while( !yp_IS_ALIGNED( p, yp_sizeof( _yp_uint_t ) ) ) {
-        if( ((yp_uint8_t) *p) & 0x80 ) return p - start;
+        if( ( (yp_uint8_t) *p ) & 0x80 ) return p - start;
         ++p;
     }
 
     // Now read as many aligned ints as we can.  Remember that even though the CHAR_MASK test may
     // fail, there may still be a few ascii bytes, so we still need to jump to the end.
     while( p < aligned_end ) {
-        _yp_uint_t value = *((_yp_uint_t *) p);
+        _yp_uint_t value = *( (_yp_uint_t *) p );
         if( value & ypStringLib_ASCII_CHAR_MASK ) break;
         p += yp_sizeof( _yp_uint_t );
     }
 
-    // Now read the final, unaligned bytes
+// Now read the final, unaligned bytes
 final_loop:
     while( p < end ) {
-        if( ((yp_uint8_t) *p) & 0x80 ) break;
+        if( ( (yp_uint8_t) *p ) & 0x80 ) break;
         ++p;
     }
     return p - start;
 }
 
 // Returns true iff the byte is a valid utf-8 continuation character (i.e. 10xxxxxx)
-#define ypStringLib_UTF_8_IS_CONTINUATION( ch ) ((ch) >= 0x80 && (ch) < 0xC0)
+#define ypStringLib_UTF_8_IS_CONTINUATION( ch ) ( ( ch ) >= 0x80 && ( ch ) < 0xC0 )
 
 // _ypStringLib_decode_utf_8_inner_loop either returns one of these values, or the out-of-range
 // character (>0xFF) that was decoded (but not written to dest).  The "invalid continuation" values
@@ -6082,63 +6147,62 @@ final_loop:
 // it will be up to the caller to reallocate dest *and* append the character.
 // XXX Don't forget to append the valid-but-too-large character to dest!
 // XXX Adapted from Python's STRINGLIB(utf8_decode)
-static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
-    const yp_uint8_t **source, const yp_uint8_t *end )
+static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop(
+        ypObject *dest, const yp_uint8_t **source, const yp_uint8_t *end )
 {
-    yp_uint32_t ch;
-    const yp_uint8_t *s = *source;
-    int dest_sizeshift = ypStringLib_ENC( dest )->sizeshift;
-    yp_uint32_t dest_max_char = ypStringLib_ENC( dest )->max_char;
+    yp_uint32_t               ch;
+    const yp_uint8_t *        s = *source;
+    int                       dest_sizeshift = ypStringLib_ENC( dest )->sizeshift;
+    yp_uint32_t               dest_max_char = ypStringLib_ENC( dest )->max_char;
     ypStringLib_setindexXfunc dest_setindexX = ypStringLib_ENC( dest )->setindexX;
-    void *dest_data = ypStringLib_DATA( dest );
-    yp_ssize_t dest_len = ypStringLib_LEN( dest );
+    void *                    dest_data = ypStringLib_DATA( dest );
+    yp_ssize_t                dest_len = ypStringLib_LEN( dest );
 
-    while (s < end) {
+    while( s < end ) {
         // We're going to be decoding at least one character, so make sure there's room
-        yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - dest_len >= 1 );
+        yp_ASSERT1( ypStringLib_ALLOCLEN( dest ) - 1 - dest_len >= 1 );
         ch = *s;
 
-        if (ch < 0x80) {
+        if( ch < 0x80 ) {
             /* Fast path for runs of ASCII characters. Given that common UTF-8
                input will consist of an overwhelming majority of ASCII
                characters, we try to optimize for this case.
             */
             yp_ssize_t ascii_len = ypStringLib_count_ascii_bytes( s, end );
             yp_ASSERT1( ascii_len > 0 );
-            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - dest_len >= ascii_len );
-            ypStringLib_elemcopy( dest_sizeshift, dest_data, dest_len,
-                    0/*(ascii sizeshift)*/, s, 0, ascii_len );
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest ) - 1 - dest_len >= ascii_len );
+            ypStringLib_elemcopy( dest_sizeshift, dest_data, dest_len, 0 /*(ascii sizeshift)*/, s,
+                    0, ascii_len );
             s += ascii_len;
             dest_len += ascii_len;
             continue;
         }
 
-        if (ch < 0xE0) {
+        if( ch < 0xE0 ) {
             // \xC2\x80-\xDF\xBF -- 0080-07FF
             yp_uint32_t ch2;
-            if (ch < 0xC2) {
+            if( ch < 0xC2 ) {
                 /* invalid sequence
                 \x80-\xBF -- continuation byte
                 \xC0-\xC1 -- fake 0000-007F */
                 ch = ypStringLib_UTF_8_INVALID_START;
                 goto Return;
             }
-            if (end - s < 2) {
+            if( end - s < 2 ) {
                 /* unexpected end of data: the caller will decide whether
                    it's an error or not */
                 ch = ypStringLib_UTF_8_INVALID_END;
                 goto Return;
             }
             ch2 = s[1];
-            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2)) {
+            if( !ypStringLib_UTF_8_IS_CONTINUATION( ch2 ) ) {
                 ch = ypStringLib_UTF_8_INVALID_CONT_1;
                 goto Return;
             }
-            ch = (ch << 6) + ch2 -
-                 ((0xC0 << 6) + 0x80);
-            yp_ASSERT1 ((ch > 0x007F) && (ch <= 0x07FF));
+            ch = ( ch << 6 ) + ch2 - ( ( 0xC0 << 6 ) + 0x80 );
+            yp_ASSERT1( ( ch > 0x007F ) && ( ch <= 0x07FF ) );
             s += 2;
-            if (ch > dest_max_char) {
+            if( ch > dest_max_char ) {
                 // Out-of-range
                 goto Return;
             }
@@ -6147,19 +6211,19 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             continue;
         }
 
-        if (ch < 0xF0) {
+        if( ch < 0xF0 ) {
             // \xE0\xA0\x80-\xEF\xBF\xBF -- 0800-FFFF
             yp_uint32_t ch2, ch3;
-            if (end - s < 3) {
+            if( end - s < 3 ) {
                 /* unexpected end of data: the caller will decide whether
                    it's an error or not */
-                if (end - s < 2) {
+                if( end - s < 2 ) {
                     ch = ypStringLib_UTF_8_INVALID_END;
                     goto Return;
                 }
                 ch2 = s[1];
-                if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2) ||
-                    (ch2 < 0xA0 ? ch == 0xE0 : ch == 0xED)) {
+                if( !ypStringLib_UTF_8_IS_CONTINUATION( ch2 ) ||
+                        ( ch2 < 0xA0 ? ch == 0xE0 : ch == 0xED ) ) {
                     // for clarification see comments below
                     ch = ypStringLib_UTF_8_INVALID_CONT_1;
                     goto Return;
@@ -6169,18 +6233,18 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             }
             ch2 = s[1];
             ch3 = s[2];
-            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2)) {
+            if( !ypStringLib_UTF_8_IS_CONTINUATION( ch2 ) ) {
                 ch = ypStringLib_UTF_8_INVALID_CONT_1;
                 goto Return;
             }
-            if (ch == 0xE0) {
-                if (ch2 < 0xA0) {
+            if( ch == 0xE0 ) {
+                if( ch2 < 0xA0 ) {
                     /* invalid sequence
                        \xE0\x80\x80-\xE0\x9F\xBF -- fake 0000-0800 */
                     ch = ypStringLib_UTF_8_INVALID_CONT_1;
                     goto Return;
                 }
-            } else if (ch == 0xED && ch2 >= 0xA0) {
+            } else if( ch == 0xED && ch2 >= 0xA0 ) {
                 /* Decoding UTF-8 sequences in range \xED\xA0\x80-\xED\xBF\xBF
                    will result in surrogates in range D800-DFFF. Surrogates are
                    not valid UTF-8 so they are rejected.
@@ -6189,15 +6253,14 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
                 ch = ypStringLib_UTF_8_INVALID_CONT_1;
                 goto Return;
             }
-            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch3)) {
+            if( !ypStringLib_UTF_8_IS_CONTINUATION( ch3 ) ) {
                 ch = ypStringLib_UTF_8_INVALID_CONT_2;
                 goto Return;
             }
-            ch = (ch << 12) + (ch2 << 6) + ch3 -
-                 ((0xE0 << 12) + (0x80 << 6) + 0x80);
-            yp_ASSERT1 ((ch > 0x07FF) && (ch <= 0xFFFF));
+            ch = ( ch << 12 ) + ( ch2 << 6 ) + ch3 - ( ( 0xE0 << 12 ) + ( 0x80 << 6 ) + 0x80 );
+            yp_ASSERT1( ( ch > 0x07FF ) && ( ch <= 0xFFFF ) );
             s += 3;
-            if (ch > dest_max_char) {
+            if( ch > dest_max_char ) {
                 // Out-of-range
                 goto Return;
             }
@@ -6206,29 +6269,29 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             continue;
         }
 
-        if (ch < 0xF5) {
+        if( ch < 0xF5 ) {
             // \xF0\x90\x80\x80-\xF4\x8F\xBF\xBF -- 10000-10FFFF
             yp_uint32_t ch2, ch3, ch4;
-            if (end - s < 4) {
+            if( end - s < 4 ) {
                 /* unexpected end of data: the caller will decide whether
                    it's an error or not */
-                if (end - s < 2) {
+                if( end - s < 2 ) {
                     ch = ypStringLib_UTF_8_INVALID_END;
                     goto Return;
                 }
                 ch2 = s[1];
-                if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2) ||
-                    (ch2 < 0x90 ? ch == 0xF0 : ch == 0xF4)) {
+                if( !ypStringLib_UTF_8_IS_CONTINUATION( ch2 ) ||
+                        ( ch2 < 0x90 ? ch == 0xF0 : ch == 0xF4 ) ) {
                     // for clarification see comments below
                     ch = ypStringLib_UTF_8_INVALID_CONT_1;
                     goto Return;
                 }
-                if (end - s < 3) {
+                if( end - s < 3 ) {
                     ch = ypStringLib_UTF_8_INVALID_END;
                     goto Return;
                 }
                 ch3 = s[2];
-                if (!ypStringLib_UTF_8_IS_CONTINUATION(ch3)) {
+                if( !ypStringLib_UTF_8_IS_CONTINUATION( ch3 ) ) {
                     ch = ypStringLib_UTF_8_INVALID_CONT_2;
                     goto Return;
                 }
@@ -6238,37 +6301,37 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop( ypObject *dest,
             ch2 = s[1];
             ch3 = s[2];
             ch4 = s[3];
-            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch2)) {
+            if( !ypStringLib_UTF_8_IS_CONTINUATION( ch2 ) ) {
                 ch = ypStringLib_UTF_8_INVALID_CONT_1;
                 goto Return;
             }
-            if (ch == 0xF0) {
-                if (ch2 < 0x90) {
+            if( ch == 0xF0 ) {
+                if( ch2 < 0x90 ) {
                     /* invalid sequence
                        \xF0\x80\x80\x80-\xF0\x8F\xBF\xBF -- fake 0000-FFFF */
                     ch = ypStringLib_UTF_8_INVALID_CONT_1;
                     goto Return;
                 }
-            } else if (ch == 0xF4 && ch2 >= 0x90) {
+            } else if( ch == 0xF4 && ch2 >= 0x90 ) {
                 /* invalid sequence
                    \xF4\x90\x80\80- -- 110000- overflow */
                 // This is the ypStringLib_MAX_UNICODE case
                 ch = ypStringLib_UTF_8_INVALID_CONT_1;
                 goto Return;
             }
-            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch3)) {
+            if( !ypStringLib_UTF_8_IS_CONTINUATION( ch3 ) ) {
                 ch = ypStringLib_UTF_8_INVALID_CONT_2;
                 goto Return;
             }
-            if (!ypStringLib_UTF_8_IS_CONTINUATION(ch4)) {
+            if( !ypStringLib_UTF_8_IS_CONTINUATION( ch4 ) ) {
                 ch = ypStringLib_UTF_8_INVALID_CONT_3;
                 goto Return;
             }
-            ch = (ch << 18) + (ch2 << 12) + (ch3 << 6) + ch4 -
-                 ((0xF0 << 18) + (0x80 << 12) + (0x80 << 6) + 0x80);
-            yp_ASSERT1 ((ch > 0xFFFF) && (ch <= 0x10FFFF));
+            ch = ( ch << 18 ) + ( ch2 << 12 ) + ( ch3 << 6 ) + ch4 -
+                 ( ( 0xF0 << 18 ) + ( 0x80 << 12 ) + ( 0x80 << 6 ) + 0x80 );
+            yp_ASSERT1( ( ch > 0xFFFF ) && ( ch <= 0x10FFFF ) );
             s += 4;
-            if (ch > dest_max_char) {
+            if( ch > dest_max_char ) {
                 // Out-of-range
                 goto Return;
             }
@@ -6294,29 +6357,30 @@ Return:
 // current encoding.  This will up-convert dest to an encoding that can fit ch, then append ch.
 // dest will have space for requiredLen characters plus the null terminator (make sure this
 // includes room for ch).
-static ypObject *_ypStringLib_decode_utf_8_grow_encoding( ypObject *dest, yp_uint32_t ch,
-    yp_ssize_t requiredLen )
+static ypObject *_ypStringLib_decode_utf_8_grow_encoding(
+        ypObject *dest, yp_uint32_t ch, yp_ssize_t requiredLen )
 {
-    int newEnc;
+    int       newEnc;
     ypObject *result;
-    yp_ASSERT( ch > 0xFFu, "only call when _ypStringLib_decode_utf_8_inner_loop can't fit the decoded character" );
+    yp_ASSERT( ch > 0xFFu, "only call when _ypStringLib_decode_utf_8_inner_loop can't fit the "
+                           "decoded character" );
     yp_ASSERT( requiredLen - ypStringLib_LEN( dest ) > 0, "not enough room given to write ch" );
 
     newEnc = ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2;
-    yp_ASSERT( newEnc > ypStringLib_ENC_CODE( dest ), "function called without actually needing to grow the encoding" );
+    yp_ASSERT( newEnc > ypStringLib_ENC_CODE( dest ),
+            "function called without actually needing to grow the encoding" );
     result = _ypStr_grow_onextend( dest, requiredLen, 0, newEnc );
     if( yp_isexceptionC( result ) ) return result;
 
-    ypStringLib_encs[newEnc].setindexX(
-            ypStringLib_DATA( dest ), ypStringLib_LEN( dest ), ch );
+    ypStringLib_encs[newEnc].setindexX( ypStringLib_DATA( dest ), ypStringLib_LEN( dest ), ch );
     ypStringLib_SET_LEN( dest, ypStringLib_LEN( dest ) + 1 );
     return yp_None;
 }
 
-static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
-    const yp_uint8_t *starts, const yp_uint8_t *source, const yp_uint8_t *end, ypObject *errors )
+static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest, const yp_uint8_t *starts,
+        const yp_uint8_t *source, const yp_uint8_t *end, ypObject *errors )
 {
-    ypObject *result;
+    ypObject *                     result;
     yp_codecs_error_handler_func_t errorHandler = NULL;
 
     while( 1 ) {
@@ -6324,10 +6388,12 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
 
         if( ch == ypStringLib_UTF_8_DATA_END ) {
             // That's it, everything's decoded.  Null-terminate the object and return.
-            yp_ASSERT( source == end, "_ypStringLib_decode_utf_8_inner_loop didn't end at the end...?" );
-            // TODO See how much wasted space is left here and if we should release some back to the heap
+            yp_ASSERT( source == end,
+                    "_ypStringLib_decode_utf_8_inner_loop didn't end at the end...?" );
+            // TODO See how much wasted space is left here and if we should release some back to
+            // the heap
             ypStringLib_ENC( dest )->setindexX(
-                ypStringLib_DATA( dest ), ypStringLib_LEN( dest ), 0 );
+                    ypStringLib_DATA( dest ), ypStringLib_LEN( dest ), 0 );
             ypStringLib_ASSERT_INVARIANTS( dest );
             return yp_None;
 
@@ -6336,7 +6402,8 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
             // Update our expectation of how many more characters will be added: it's the
             // number of byes left to decode (remembering source was modified above).
             // XXX This can't overflow because dest_alloclen should be smaller than currently
-            yp_ssize_t dest_requiredLen = ypStringLib_LEN( dest ) + 1 /*for ch*/ + (end - source);
+            yp_ssize_t dest_requiredLen =
+                    ypStringLib_LEN( dest ) + 1 /*for ch*/ + ( end - source );
             result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
             if( yp_isexceptionC( result ) ) return result;
 
@@ -6344,11 +6411,11 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
             // We've hit a decoding error: call the error handler
             // TODO Test surrogate characters in the start, end, and middle of string, both on
             // encode and decode, and multiple contiguous and non-contiguous surrogates
-            ypObject *replacement;
-            yp_ssize_t newPos;
+            ypObject *        replacement;
+            yp_ssize_t        newPos;
             const yp_uint8_t *errmsg;
-            yp_ssize_t errEnd;
-            yp_ssize_t errStart = source - starts;
+            yp_ssize_t        errEnd;
+            yp_ssize_t        errStart = source - starts;
             switch( ch ) {
                 case ypStringLib_UTF_8_INVALID_END:
                     errmsg = "unexpected end of data";
@@ -6377,15 +6444,14 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop( ypObject *dest,
             }
 
             replacement = ypStringLib_decode_call_errorhandler(  // new ref
-                errorHandler, errmsg, yp_s_utf_8, starts, end - starts,
-                errStart, errEnd, &newPos );
+                    errorHandler, errmsg, yp_s_utf_8, starts, end - starts, errStart, errEnd,
+                    &newPos );
             if( yp_isexceptionC( replacement ) ) return replacement;
             source = starts + newPos;
 
             // We can now update our expectation of how many more characters will be added: it's
             // the number of byes left to decode (remembering source was modified above).
-            result = ypStringLib_decode_concat_replacement(
-                dest, replacement, end - source );
+            result = ypStringLib_decode_concat_replacement( dest, replacement, end - source );
             yp_decref( replacement );
             if( yp_isexceptionC( result ) ) return result;
         }
@@ -6400,7 +6466,7 @@ static ypObject *_ypStringLib_decode_utf_8_onnull( int type, yp_ssize_t len )
 {
     ypObject *newS = _ypStr_new_latin_1( type, len, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newS ) ) return newS;
-    memset( ypStringLib_DATA( newS ), 0, len+1 /*+1 for extra null terminator*/ );
+    memset( ypStringLib_DATA( newS ), 0, len + 1 /*+1 for extra null terminator*/ );
     ypStringLib_SET_LEN( newS, len );
     ypStringLib_ASSERT_INVARIANTS( newS );
     return newS;
@@ -6408,14 +6474,14 @@ static ypObject *_ypStringLib_decode_utf_8_onnull( int type, yp_ssize_t len )
 
 // Called when source starts with at least one ascii character.  Returns the decoded string object.
 static ypObject *_yp_chrC( int type, yp_int_t i );
-static ypObject *_ypStringLib_decode_utf_8_ascii_start( int type,
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
+static ypObject *_ypStringLib_decode_utf_8_ascii_start(
+        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
 {
     const yp_uint8_t *starts = source;
     const yp_uint8_t *end = source + len;
-    yp_ssize_t leading_ascii;
-    ypObject *dest;
-    ypObject *result;
+    yp_ssize_t        leading_ascii;
+    ypObject *        dest;
+    ypObject *        result;
     yp_ASSERT( len > 0, "zero-length strings should be handled before this function" );
     yp_ASSERT( source[0] < 0x80u, "call this only on strings that start with ascii characters" );
 
@@ -6426,13 +6492,14 @@ static ypObject *_ypStringLib_decode_utf_8_ascii_start( int type,
 
     // If the string is entirely ASCII characters, we can memcpy and possibly allocate in-line
     leading_ascii = ypStringLib_count_ascii_bytes( source, end );
-    yp_ASSERT( leading_ascii > 0 && leading_ascii <= len, "unexpected output from ypStringLib_count_ascii_bytes" );
+    yp_ASSERT( leading_ascii > 0 && leading_ascii <= len,
+            "unexpected output from ypStringLib_count_ascii_bytes" );
     if( leading_ascii == len ) {
         // TODO When we have an associated UTF-8 bytes object, we can share the ASCII buffer
         dest = _ypStr_new_latin_1( type, len, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( dest ) ) return dest;
         memcpy( ypStringLib_DATA( dest ), source, len );
-        ((yp_uint8_t *) ypStringLib_DATA( dest ))[len] = 0;
+        ( (yp_uint8_t *) ypStringLib_DATA( dest ) )[len] = 0;
         ypStringLib_SET_LEN( dest, len );
         ypStringLib_ASSERT_INVARIANTS( dest );
         return dest;
@@ -6464,7 +6531,7 @@ static ypObject *_ypStringLib_decode_utf_8_ascii_start( int type,
 // character; dest may be re-encoded in-place.  On input, dest must be empty and latin-1, and
 // *source must be larger than dest's inline buffer (otherwise there's no point in the precheck).
 static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
-    ypObject *dest, const yp_uint8_t **source )
+        ypObject *dest, const yp_uint8_t **source )
 {
     yp_ssize_t dest_maxinline = ypStringLib_ALLOCLEN( dest ) - 1;  // -1 for terminator
     // TODO Does it really make sense to use the entire inline buffer for the precheck?  Aren't
@@ -6474,10 +6541,10 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     // ...But wait, consider an HTML page.  It's going to start with a bunch of ASCII, then
     // anything ucs-2 or ucs-4 will be in the middle.  What use cases am I optimizing for:
     // converting a whole document, or small strings one-at-a-time?
-    const yp_uint8_t *fake_end = (*source) + dest_maxinline;
-    yp_uint32_t ch;
-    void *dest_data;
-    yp_ssize_t dest_len;
+    const yp_uint8_t *fake_end = ( *source ) + dest_maxinline;
+    yp_uint32_t       ch;
+    void *            dest_data;
+    yp_ssize_t        dest_len;
 
     yp_ASSERT( dest_maxinline > 0, "str's inline buffer should fit at least one character" );
     ch = _ypStringLib_decode_utf_8_inner_loop( dest, source, fake_end );
@@ -6489,38 +6556,38 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
 
     // To do anything useful, we need room to upconvert, write ch, then write at least one more
     // character.  If we can't, we bail.
-    dest_maxinline = (ypStringLib_ALLOCLEN( dest )/2) - 1;
+    dest_maxinline = ( ypStringLib_ALLOCLEN( dest ) / 2 ) - 1;
     dest_len = ypStringLib_LEN( dest );
     // -1 for ch, then -1 to make sure we can detect at least one more character
-    if( dest_maxinline-2 < dest_len ) {
+    if( dest_maxinline - 2 < dest_len ) {
         return ch;
     }
 
     // Convert to ucs-2, and don't forget to write ch!
     dest_data = ypStringLib_DATA( dest );
     ypStringLib_upconvert_2from1( dest_data, dest_len );
-    ((yp_uint16_t *)dest_data)[dest_len] = ch;
+    ( (yp_uint16_t *) dest_data )[dest_len] = ch;
     dest_len += 1;
     ypStringLib_SET_LEN( dest, dest_len );
     ypStringLib_ENC_CODE( dest ) = ypStringLib_ENC_UCS_2;
-    ypStringLib_SET_ALLOCLEN( dest, ypStringLib_ALLOCLEN( dest )/2 );
+    ypStringLib_SET_ALLOCLEN( dest, ypStringLib_ALLOCLEN( dest ) / 2 );
 
     // We are at least ucs-2: see if we are actually ucs-4.  Recall that source was modified above.
-    fake_end = (*source) + (dest_maxinline - dest_len);
+    fake_end = ( *source ) + ( dest_maxinline - dest_len );
     return _ypStringLib_decode_utf_8_inner_loop( dest, source, fake_end );
 }
 
 // Called by ypStringLib_decode_frombytesC_utf_8 in the general case.  Returns the decoded string
 // object.
-static ypObject *_ypStringLib_decode_utf_8( int type,
-    const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
+static ypObject *_ypStringLib_decode_utf_8(
+        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
 {
     const yp_uint8_t *starts = source;
     const yp_uint8_t *end = source + len;
-    ypObject *dest;
-    yp_uint32_t ch;
-    yp_ssize_t dest_requiredLen;
-    ypObject *result;
+    ypObject *        dest;
+    yp_uint32_t       ch;
+    yp_ssize_t        dest_requiredLen;
+    ypObject *        result;
     yp_ASSERT( len > 0, "zero-length strings should be handled before _ypStringLib_decode_utf_8" );
     yp_ASSERT( len <= ypStringLib_LEN_MAX, "can't decode more than ypStringLib_LEN_MAX bytes" );
 
@@ -6529,11 +6596,11 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
     // inline buffer, to see if we can tell what element size we _should_ be using
     // TODO Contribute this optimization back to Python?
 
-    dest = _ypStr_new_latin_1( type, 0, /*alloclen_fixed=*/FALSE ); // new ref
+    dest = _ypStr_new_latin_1( type, 0, /*alloclen_fixed=*/FALSE );  // new ref
     if( yp_isexceptionC( dest ) ) return dest;
 
     // Shortcut: if the inline array can fit all decoded characters anyway, jump to outer loop
-    if( len <= ypStringLib_ALLOCLEN( dest )-1) {  // -1 for terminator
+    if( len <= ypStringLib_ALLOCLEN( dest ) - 1 ) {  // -1 for terminator
         goto outer_loop;
     }
 
@@ -6541,8 +6608,9 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
 
     if( ch > 0xFFu ) {
         // Success!  We've can start off appropriately up-converted.
-        // XXX Can't overflow because we've checked len<=MAX, and len is the worst-case num of chars
-        dest_requiredLen = ypStringLib_LEN( dest ) + 1 /*for ch*/ + (end - source);
+        // XXX Can't overflow because we've checked len<=MAX, and len is the worst-case num of
+        // chars
+        dest_requiredLen = ypStringLib_LEN( dest ) + 1 /*for ch*/ + ( end - source );
         result = _ypStringLib_decode_utf_8_grow_encoding( dest, ch, dest_requiredLen );
         if( yp_isexceptionC( result ) ) {
             yp_decref( dest );
@@ -6557,9 +6625,10 @@ static ypObject *_ypStringLib_decode_utf_8( int type,
         // _could_ keep adjusting fake_end until there's no more room, but I don't think this is
         // advantageous.  Don't the first few characters usually determine the encoding?
         // XXX Can't overflow because we've checked len<=MAX, and len is worst-case num of chars
-        dest_requiredLen = ypStringLib_LEN( dest ) /*ch isn't a char*/ + (end - source);
-        if( dest_requiredLen > ypStringLib_ALLOCLEN( dest )-1 ) {
-            result = _ypStr_grow_onextend( dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
+        dest_requiredLen = ypStringLib_LEN( dest ) /*ch isn't a char*/ + ( end - source );
+        if( dest_requiredLen > ypStringLib_ALLOCLEN( dest ) - 1 ) {
+            result = _ypStr_grow_onextend(
+                    dest, dest_requiredLen, 0, ypStringLib_ENC_CODE( dest ) );
             if( yp_isexceptionC( result ) ) {
                 yp_decref( dest );
                 return result;
@@ -6589,11 +6658,12 @@ outer_loop:
 // triggering an upconvert of previously-decoded characters)
 // TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
 // decoding errors
-static ypObject *ypStringLib_decode_frombytesC_utf_8( int type,
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
+static ypObject *ypStringLib_decode_frombytesC_utf_8(
+        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors )
 {
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
-    yp_ASSERT( len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before ypStringLib_decode_frombytesC_*)" );
+    yp_ASSERT( len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before "
+                         "ypStringLib_decode_frombytesC_*)" );
     yp_ASSERT( len <= ypStringLib_LEN_MAX, "can't decode more than ypStringLib_LEN_MAX bytes" );
 
     // Handle the empty-string and string-of-nulls cases first
@@ -6620,18 +6690,20 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
 static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fixed );
 static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *source )
 {
-    yp_ssize_t   const source_len = ypStringLib_LEN( source );
-    yp_uint8_t * const source_data = ypStringLib_DATA( source );
-    yp_uint8_t * const source_end = source_data + source_len;
-    yp_uint8_t *s;  // moving source_data pointer
-    ypObject *dest;
-    yp_ssize_t dest_alloclen;
-    yp_uint8_t *dest_data;
-    yp_uint8_t *d;  // moving dest_data pointer
+    yp_ssize_t const  source_len = ypStringLib_LEN( source );
+    yp_uint8_t *const source_data = ypStringLib_DATA( source );
+    yp_uint8_t *const source_end = source_data + source_len;
+    yp_uint8_t *      s;  // moving source_data pointer
+    ypObject *        dest;
+    yp_ssize_t        dest_alloclen;
+    yp_uint8_t *      dest_data;
+    yp_uint8_t *      d;  // moving dest_data pointer
 
     ypStringLib_ASSERT_INVARIANTS( source );
-    yp_ASSERT( ypStringLib_ENC_CODE( source ) == ypStringLib_ENC_LATIN_1, "_ypStringLib_encode_utf_8_from_latin_1 called on wrong str encoding" );
-    yp_ASSERT( source_len > 0, "empty-string case should be handled before _ypStringLib_encode_utf_8_from_latin_1" );
+    yp_ASSERT( ypStringLib_ENC_CODE( source ) == ypStringLib_ENC_LATIN_1,
+            "_ypStringLib_encode_utf_8_from_latin_1 called on wrong str encoding" );
+    yp_ASSERT( source_len > 0,
+            "empty-string case should be handled before _ypStringLib_encode_utf_8_from_latin_1" );
 
     // We optimize for UTF-8 data that is completely, or almost-completely, ASCII, since ASCII is
     // equivalent to the first 128 ordinals in Unicode
@@ -6650,10 +6722,10 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
         // part we know and move on to the main loop
         // XXX We know that the first leading_ascii characters only need one byte, but the
         // remaining might need up to two
-        if( source_len - leading_ascii > (ypStringLib_LEN_MAX - leading_ascii) / 2 ) {
+        if( source_len - leading_ascii > ( ypStringLib_LEN_MAX - leading_ascii ) / 2 ) {
             return yp_MemorySizeOverflowError;
         }
-        dest_alloclen = leading_ascii + (source_len - leading_ascii)*2;
+        dest_alloclen = leading_ascii + ( source_len - leading_ascii ) * 2;
         dest = _ypBytes_new( type, dest_alloclen, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( dest ) ) return dest;
         dest_data = ypStringLib_DATA( dest );
@@ -6661,10 +6733,10 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
         s = source_data + leading_ascii;
         d = dest_data + leading_ascii;
 
-    // If it doesn't start with any ASCII...well...not much we can do
+        // If it doesn't start with any ASCII...well...not much we can do
     } else {
         if( source_len > ypStringLib_LEN_MAX / 2 ) return yp_MemorySizeOverflowError;
-        dest = _ypBytes_new( type, source_len*2, /*alloclen_fixed=*/TRUE );
+        dest = _ypBytes_new( type, source_len * 2, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( dest ) ) return dest;
         s = source_data;
         d = dest_data = ypStringLib_DATA( dest );
@@ -6681,15 +6753,15 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
             // TODO Contribute this optimization back to Python
             yp_ssize_t ascii_len = ypStringLib_count_ascii_bytes( s, source_end );
             yp_ASSERT1( ascii_len > 0 );
-            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= ascii_len );
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest ) - 1 - ( d - dest_data ) >= ascii_len );
             memcpy( d, s, ascii_len );
             d += ascii_len;
             s += ascii_len;
 
         } else {
-            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 2 );
-            *d++ = (yp_uint8_t)(0xc0u | (ch >> 6));
-            *d++ = (yp_uint8_t)(0x80u | (ch & 0x3fu));
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest ) - 1 - ( d - dest_data ) >= 2 );
+            *d++ = ( yp_uint8_t )( 0xc0u | ( ch >> 6 ) );
+            *d++ = ( yp_uint8_t )( 0x80u | ( ch & 0x3fu ) );
             s += 1;
         }
     }
@@ -6697,7 +6769,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
     // Null-terminate, update length, and return
     // TODO Trim excess memory here (certainly if it can be done in-place)
     *d = 0;
-    ypStringLib_SET_LEN( dest, d-dest_data );
+    ypStringLib_SET_LEN( dest, d - dest_data );
     ypStringLib_ASSERT_INVARIANTS( dest );
     return dest;
 }
@@ -6710,25 +6782,26 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1( int type, ypObject *sou
 // TODO However, trimming the buffer might be a good idea
 static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject *errors )
 {
-    yp_ssize_t const source_len = ypStringLib_LEN( source );
-    void * const source_data = ypStringLib_DATA( source );
-    int source_enc = ypStringLib_ENC_CODE( source );
-    ypStringLib_getindexXfunc getindexX = ypStringLib_ENC( source )->getindexX;
-    yp_ssize_t maxCharSize;
-    yp_ssize_t i;   // index into source_data
-    ypObject *dest;
-    yp_uint8_t *dest_data;
-    yp_uint8_t *d;  // moving dest_data pointer
+    yp_ssize_t const               source_len = ypStringLib_LEN( source );
+    void *const                    source_data = ypStringLib_DATA( source );
+    int                            source_enc = ypStringLib_ENC_CODE( source );
+    ypStringLib_getindexXfunc      getindexX = ypStringLib_ENC( source )->getindexX;
+    yp_ssize_t                     maxCharSize;
+    yp_ssize_t                     i;  // index into source_data
+    ypObject *                     dest;
+    yp_uint8_t *                   dest_data;
+    yp_uint8_t *                   d;  // moving dest_data pointer
     yp_codecs_error_handler_func_t errorHandler = NULL;
-    ypObject *replacement;
-    ypObject *result;
+    ypObject *                     replacement;
+    ypObject *                     result;
 
     ypStringLib_ASSERT_INVARIANTS( source );
-    yp_ASSERT( source_enc != ypStringLib_ENC_LATIN_1, "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings" );
+    yp_ASSERT( source_enc != ypStringLib_ENC_LATIN_1,
+            "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings" );
     maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 3 : 4;
 
     if( source_len > ypStringLib_LEN_MAX / maxCharSize ) return yp_MemorySizeOverflowError;
-    dest = _ypBytes_new( type, source_len*maxCharSize, /*alloclen_fixed=*/FALSE ); // new ref
+    dest = _ypBytes_new( type, source_len * maxCharSize, /*alloclen_fixed=*/FALSE );  // new ref
     if( yp_isexceptionC( dest ) ) return dest;
     d = dest_data = ypStringLib_DATA( dest );
 
@@ -6736,13 +6809,13 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
         yp_uint32_t ch = getindexX( source_data, i );
 
         if( ch < 0x80u ) {
-            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 1 );
-            *d++ = (yp_uint8_t)ch;
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest ) - 1 - ( d - dest_data ) >= 1 );
+            *d++ = (yp_uint8_t) ch;
 
         } else if( ch < 0x0800u ) {
-            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 2 );
-            *d++ = (yp_uint8_t)(0xc0u |  (ch >> 6));
-            *d++ = (yp_uint8_t)(0x80u | ( ch       & 0x3fu));
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest ) - 1 - ( d - dest_data ) >= 2 );
+            *d++ = ( yp_uint8_t )( 0xc0u | ( ch >> 6 ) );
+            *d++ = ( yp_uint8_t )( 0x80u | ( ch & 0x3fu ) );
 
         } else if( ypStringLib_IS_SURROGATE( ch ) ) {
             // TODO We could refactor this like on decode: the function returns the surrogate
@@ -6758,7 +6831,7 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
 
             // TODO Supply an error reason string
             replacement = ypStringLib_encode_call_errorhandler(
-                errorHandler, NULL, yp_s_utf_8, source, i, i+1, &i );
+                    errorHandler, NULL, yp_s_utf_8, source, i, i + 1, &i );
             if( yp_isexceptionC( replacement ) ) {
                 yp_decref( dest );
                 return replacement;
@@ -6769,7 +6842,7 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
             // ypStringLib_encode_concat_replacement needs dest's len set appropriately.
             ypStringLib_SET_LEN( dest, d - dest_data );
             result = ypStringLib_encode_concat_replacement(
-                dest, replacement, (source_len - i) * maxCharSize );
+                    dest, replacement, ( source_len - i ) * maxCharSize );
             if( yp_isexceptionC( result ) ) {
                 yp_decref( dest );
                 return result;
@@ -6779,24 +6852,24 @@ static ypObject *_ypStringLib_encode_utf_8( int type, ypObject *source, ypObject
             d = dest_data + ypStringLib_LEN( dest );
 
         } else if( ch < 0x10000u ) {
-            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 3 );
-            *d++ = (yp_uint8_t)(0xe0u |  (ch >> 12));
-            *d++ = (yp_uint8_t)(0x80u | ((ch >> 6) & 0x3fu));
-            *d++ = (yp_uint8_t)(0x80u | ( ch       & 0x3fu));
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest ) - 1 - ( d - dest_data ) >= 3 );
+            *d++ = ( yp_uint8_t )( 0xe0u | ( ch >> 12 ) );
+            *d++ = ( yp_uint8_t )( 0x80u | ( ( ch >> 6 ) & 0x3fu ) );
+            *d++ = ( yp_uint8_t )( 0x80u | ( ch & 0x3fu ) );
 
         } else {
             yp_ASSERT1( ch <= ypStringLib_MAX_UNICODE );
-            yp_ASSERT1( ypStringLib_ALLOCLEN( dest )-1 - (d-dest_data) >= 4 );
-            *d++ = (yp_uint8_t)(0xf0u |  (ch >> 18));
-            *d++ = (yp_uint8_t)(0x80u | ((ch >> 12) & 0x3fu));
-            *d++ = (yp_uint8_t)(0x80u | ((ch >> 6)  & 0x3fu));
-            *d++ = (yp_uint8_t)(0x80u | ( ch        & 0x3fu));
+            yp_ASSERT1( ypStringLib_ALLOCLEN( dest ) - 1 - ( d - dest_data ) >= 4 );
+            *d++ = ( yp_uint8_t )( 0xf0u | ( ch >> 18 ) );
+            *d++ = ( yp_uint8_t )( 0x80u | ( ( ch >> 12 ) & 0x3fu ) );
+            *d++ = ( yp_uint8_t )( 0x80u | ( ( ch >> 6 ) & 0x3fu ) );
+            *d++ = ( yp_uint8_t )( 0x80u | ( ch & 0x3fu ) );
         }
     }
 
     // Null-terminate, update length, and return
     *d = 0;
-    ypStringLib_SET_LEN( dest, d-dest_data );
+    ypStringLib_SET_LEN( dest, d - dest_data );
     ypStringLib_ASSERT_INVARIANTS( dest );
     return dest;
 }
@@ -6834,8 +6907,8 @@ static ypObject *ypStringLib_encode_utf_8( int type, ypObject *source, ypObject 
 static ypStringLib_getindexXfunc _yp_codecs_strenc2getindexX( ypObject *encoding )
 {
     if( encoding == yp_s_latin_1 ) return ypStringLib_getindexX_1byte;
-    if( encoding == yp_s_ucs_2 )   return ypStringLib_getindexX_2bytes;
-    if( encoding == yp_s_ucs_4 )   return ypStringLib_getindexX_4bytes;
+    if( encoding == yp_s_ucs_2 ) return ypStringLib_getindexX_2bytes;
+    if( encoding == yp_s_ucs_4 ) return ypStringLib_getindexX_4bytes;
     // params->source.data.type must be one of the exact objects above, as per yp_asencodedCX
     return NULL;
 }
@@ -6862,9 +6935,9 @@ static ypObject *_yp_codecs_alias2encoding = NULL;
 static ypObject *_yp_codecs_normalize_encoding_name( ypObject *encoding )
 {
     yp_uint8_t *data;
-    yp_ssize_t len;
-    yp_ssize_t i;
-    ypObject *norm;
+    yp_ssize_t  len;
+    yp_ssize_t  i;
+    ypObject *  norm;
     yp_uint8_t *norm_data;
 
     // Only latin-1 names are accepted
@@ -6921,8 +6994,8 @@ static ypObject *_yp_codecs_register_alias_norm( ypObject *alias_norm, ypObject 
 static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *encoding )
 {
     ypObject *result;
-    ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias ); // new ref
-    ypObject *encoding_norm = _yp_codecs_normalize_encoding_name( encoding );   // new ref
+    ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias );        // new ref
+    ypObject *encoding_norm = _yp_codecs_normalize_encoding_name( encoding );  // new ref
     if( yp_isexceptionC( alias_norm ) ) {
         result = alias_norm;
     } else if( yp_isexceptionC( encoding_norm ) ) {
@@ -6937,7 +7010,7 @@ static ypObject *yp_codecs_register_alias( ypObject *alias, ypObject *encoding )
 static ypObject *yp_codecs_lookup_alias( ypObject *alias )
 {
     ypObject *encoding;
-    ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias ); // new ref
+    ypObject *alias_norm = _yp_codecs_normalize_encoding_name( alias );  // new ref
     if( yp_isexceptionC( alias_norm ) ) return alias_norm;
     encoding = yp_getitem( _yp_codecs_alias2encoding, alias_norm );
     yp_decref( alias_norm );
@@ -6967,7 +7040,7 @@ static ypObject *yp_codecs_register_error(
     ypObject *result = yp_intC( (yp_ssize_t) error_handler );
     yp_setitemE( _yp_codecs_errors2handler, name, result, &exc );
     yp_decref( result );
-    return exc;     // on success or exception
+    return exc;  // on success or exception
 }
 
 static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
@@ -6975,9 +7048,9 @@ static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
 static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE( ypObject *name, ypObject **_exc )
 {
     ypObject *exc = yp_None;
-    ypObject *result = yp_getitem( _yp_codecs_errors2handler, name );   // new ref
+    ypObject *result = yp_getitem( _yp_codecs_errors2handler, name );  // new ref
     yp_codecs_error_handler_func_t error_handler =
-        (yp_codecs_error_handler_func_t) yp_asssizeC( result, &exc );
+            (yp_codecs_error_handler_func_t) yp_asssizeC( result, &exc );
     yp_decref( result );
     if( yp_isexceptionC( exc ) ) {
         *_exc = exc;
@@ -6998,7 +7071,8 @@ static void yp_codecs_strict_errors( yp_codecs_error_handler_params_t *params,
 }
 
 yp_IMMORTAL_STR_LATIN_1( yp_codecs_replace_errors_onencode, "?" );
-static ypObject *yp_codecs_replace_errors_ondecode = NULL;  // TODO Make immortal (yp_IMMORTAL_STR_UCS_2)
+static ypObject *yp_codecs_replace_errors_ondecode =
+        NULL;  // TODO Make immortal (yp_IMMORTAL_STR_UCS_2)
 static void yp_codecs_replace_errors( yp_codecs_error_handler_params_t *params,
         ypObject **replacement, yp_ssize_t *new_position )
 {
@@ -7014,20 +7088,20 @@ static void yp_codecs_replace_errors( yp_codecs_error_handler_params_t *params,
 
     } else if( yp_isexceptionC2( params->exc, yp_UnicodeDecodeError ) ) {
         if( yp_codecs_replace_errors_ondecode == NULL ) {
-            ypObject *result = yp_chrC( ypStringLib_UNICODE_REPLACEMENT_CHARACTER ); // new ref
+            ypObject *result = yp_chrC( ypStringLib_UNICODE_REPLACEMENT_CHARACTER );  // new ref
             if( yp_isexceptionC( result ) ) {
                 *replacement = result;
                 *new_position = yp_SSIZE_T_MAX;
                 return;
             }
-            yp_codecs_replace_errors_ondecode = result; // stolen ref
+            yp_codecs_replace_errors_ondecode = result;  // stolen ref
         }
         *replacement = yp_incref( yp_codecs_replace_errors_ondecode );
         *new_position = params->end;
         return;
 
     } else {
-        *replacement = yp_TypeError;    // unhandled encoding exception
+        *replacement = yp_TypeError;  // unhandled encoding exception
         *new_position = yp_SSIZE_T_MAX;
         return;
     }
@@ -7064,12 +7138,13 @@ static void yp_codecs_backslashreplace_errors( yp_codecs_error_handler_params_t 
 // Returns true if the three bytes at x _could_ be a utf-8 encoded surrogate, or false if it
 // definitely is not
 // XXX x must contain at least three bytes
-#define _yp_codecs_UTF8_SURROGATE_PRECHECK( x ) \
-     ( ((x)[0] & 0xf0u) == 0xe0u && ((x)[1] & 0xc0u) == 0x80u && ((x)[2] & 0xc0u) == 0x80u )
+#define _yp_codecs_UTF8_SURROGATE_PRECHECK( x )                         \
+    ( ( ( x )[0] & 0xf0u ) == 0xe0u && ( ( x )[1] & 0xc0u ) == 0x80u && \
+            ( ( x )[2] & 0xc0u ) == 0x80u )
 // Decodes the utf-8 characters using the three bytes at x; PRECHECK must have returned true; the
 // resulting character may not actually be a surrogate
 #define _yp_codecs_UTF8_SURROGATE_DECODE( x ) \
-     ( (((x)[0] & 0x0fu) << 12) + (((x)[1] & 0x3fu) << 6) + ((x)[2] & 0x3fu) )
+    ( ( ( ( x )[0] & 0x0fu ) << 12 ) + ( ( ( x )[1] & 0x3fu ) << 6 ) + ( ( x )[2] & 0x3fu ) )
 
 // TODO It'd be nice to share code with surrogatepass...
 static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *params,
@@ -7080,13 +7155,13 @@ static void yp_codecs_surrogateescape_errors( yp_codecs_error_handler_params_t *
 }
 
 // XXX Adapted from PyCodec_SurrogatePassErrors
-static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
-        yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
+static ypObject *_yp_codecs_surrogatepass_errors_onencode(
+        ypObject *encoding, yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
 {
     ypStringLib_getindexXfunc getindexX;
-    ypObject *replacement;
-    yp_uint8_t *outp;
-    yp_ssize_t i;
+    ypObject *                replacement;
+    yp_uint8_t *              outp;
+    yp_ssize_t                i;
 
     getindexX = _yp_codecs_strenc2getindexX( params->source.data.type );
     if( getindexX == NULL ) return yp_TypeError;  // params->source.data.type not a string type
@@ -7102,44 +7177,45 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode( ypObject *encoding,
             if( !ypStringLib_IS_SURROGATE( ch ) ) break;
             badLen += 1;
         }
-        if( badLen < 1 ) return params->exc; // not a surrogate: raise original error
+        if( badLen < 1 ) return params->exc;  // not a surrogate: raise original error
 
         if( badLen > ypStringLib_LEN_MAX / 3 ) return yp_MemorySizeOverflowError;
-        replacement = _ypBytes_new( ypBytes_CODE, 3*badLen, /*alloclen_fixed=*/TRUE );
+        replacement = _ypBytes_new( ypBytes_CODE, 3 * badLen, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( replacement ) ) return replacement;
 
         badEnd = params->start + badLen;
         outp = (yp_uint8_t *) ypStringLib_DATA( replacement );
         for( i = params->start; i < badEnd; i++ ) {
             yp_int_t ch = getindexX( params->source.data.ptr, i );
-            yp_ASSERT( ypStringLib_IS_SURROGATE( ch ), "problem in loop above" ); // paranoia
+            yp_ASSERT( ypStringLib_IS_SURROGATE( ch ), "problem in loop above" );  // paranoia
             // TODO This bit of code is repeated: what about shared macros to detect/encode/decode
             // the individual types of characters in a utf-8 string?
-            *outp++ = (yp_uint8_t)(0xe0u | (ch >> 12));
-            *outp++ = (yp_uint8_t)(0x80u | ((ch >> 6) & 0x3fu));
-            *outp++ = (yp_uint8_t)(0x80u | (ch & 0x3fu));
+            *outp++ = ( yp_uint8_t )( 0xe0u | ( ch >> 12 ) );
+            *outp++ = ( yp_uint8_t )( 0x80u | ( ( ch >> 6 ) & 0x3fu ) );
+            *outp++ = ( yp_uint8_t )( 0x80u | ( ch & 0x3fu ) );
         }
         *outp = 0;  // null-terminate
-        ypStringLib_SET_LEN( replacement, 3*badLen );
+        ypStringLib_SET_LEN( replacement, 3 * badLen );
         *new_position = badEnd;
         ypStringLib_ASSERT_INVARIANTS( replacement );
         return replacement;
 
     } else {
-        yp_ASSERT( !yp_isexceptionC( encoding ), "yp_set_getintern exceptions should be caught in yp_codecs_surrogatepass_errors" );
-        return params->exc;     // unsupported standard encoding: raise original error
+        yp_ASSERT( !yp_isexceptionC( encoding ),
+                "yp_set_getintern exceptions should be caught in yp_codecs_surrogatepass_errors" );
+        return params->exc;  // unsupported standard encoding: raise original error
     }
 }
 // XXX Adapted from PyCodec_SurrogatePassErrors
 static ypObject *_ypStr_new_ucs_2( int type, yp_ssize_t requiredLen, int alloclen_fixed );
-static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
-        yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
+static ypObject *_yp_codecs_surrogatepass_errors_ondecode(
+        ypObject *encoding, yp_codecs_error_handler_params_t *params, yp_ssize_t *new_position )
 {
-    ypObject *replacement;
-    yp_uint8_t *source_data;
+    ypObject *   replacement;
+    yp_uint8_t * source_data;
     yp_uint16_t *outp;
-    yp_ssize_t i;
-    yp_uint16_t ch;
+    yp_ssize_t   i;
+    yp_uint16_t  ch;
 
     // Of course, our source must be a bytes object
     if( params->source.data.type != yp_type_bytes ) return yp_TypeError;
@@ -7159,7 +7235,7 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
             if( !ypStringLib_IS_SURROGATE( ch ) ) break;
             repLen += 1;
         }
-        if( repLen < 1 ) return params->exc; // not a surrogate: raise original error
+        if( repLen < 1 ) return params->exc;  // not a surrogate: raise original error
 
         // All surrogates are represented in ucs-2
         // TODO This check will never fail, so long as source.data.len<ypStringLib_LEN_MAX
@@ -7167,12 +7243,13 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         replacement = _ypStr_new_ucs_2( ypStr_CODE, repLen, /*alloclen_fixed=*/TRUE );
         if( yp_isexceptionC( replacement ) ) return replacement;
 
-        badEnd = params->start + (repLen * 3);
+        badEnd = params->start + ( repLen * 3 );
         outp = (yp_uint16_t *) ypStringLib_DATA( replacement );
         for( i = params->start; i < badEnd; i += 3 ) {
-            yp_ASSERT( _yp_codecs_UTF8_SURROGATE_PRECHECK( source_data + i ), "problem in loop above" ); // paranoia
+            yp_ASSERT( _yp_codecs_UTF8_SURROGATE_PRECHECK( source_data + i ),
+                    "problem in loop above" );  // paranoia
             ch = _yp_codecs_UTF8_SURROGATE_DECODE( source_data + i );
-            yp_ASSERT( ypStringLib_IS_SURROGATE( ch ), "problem in loop above" ); // more paranoia
+            yp_ASSERT( ypStringLib_IS_SURROGATE( ch ), "problem in loop above" );  // more paranoia
             *outp++ = ch;
         }
         *outp = 0;  // null-terminate
@@ -7182,8 +7259,9 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode( ypObject *encoding,
         return replacement;
 
     } else {
-        yp_ASSERT( !yp_isexceptionC( encoding ), "yp_set_getintern exceptions should be caught in yp_codecs_surrogatepass_errors" );
-        return params->exc;     // unsupported standard encoding: raise original error
+        yp_ASSERT( !yp_isexceptionC( encoding ),
+                "yp_set_getintern exceptions should be caught in yp_codecs_surrogatepass_errors" );
+        return params->exc;  // unsupported standard encoding: raise original error
     }
 }
 static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *params,
@@ -7197,12 +7275,12 @@ static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *pa
     }
     // TODO Get the getindexX function here for the data
 
-    encoding = yp_set_getintern( _yp_codecs_standard, params->encoding ); // new ref
+    encoding = yp_set_getintern( _yp_codecs_standard, params->encoding );  // new ref
     if( yp_isexceptionC( encoding ) ) {
         if( yp_isexceptionC2( encoding, yp_KeyError ) ) {
-            *replacement = params->exc; // completely-unknown encoding: raise original error
+            *replacement = params->exc;  // completely-unknown encoding: raise original error
         } else {
-            *replacement = encoding;    // unexpected error in yp_set_getintern
+            *replacement = encoding;  // unexpected error in yp_set_getintern
         }
         goto onerror;
     }
@@ -7212,7 +7290,7 @@ static void yp_codecs_surrogatepass_errors( yp_codecs_error_handler_params_t *pa
     } else if( yp_isexceptionC2( params->exc, yp_UnicodeDecodeError ) ) {
         *replacement = _yp_codecs_surrogatepass_errors_ondecode( encoding, params, new_position );
     } else {
-        *replacement = yp_TypeError;    // unhandled encoding exception
+        *replacement = yp_TypeError;  // unhandled encoding exception
     }
     yp_decref( encoding );
     if( yp_isexceptionC( *replacement ) ) goto onerror;
@@ -7231,21 +7309,24 @@ onerror:
 // ypBytesObject is declared in the StringLib section
 // XXX Since bytes are likely to be used to store arbitrary structures, make sure our alignment is
 // compatible will all data types
-yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0, alignof_bytes_inline_data );
+yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMENT == 0,
+        alignof_bytes_inline_data );
 
-#define ypBytes_DATA( b )           ( (yp_uint8_t *) ypStringLib_DATA( b ) )
-#define ypBytes_LEN                 ypStringLib_LEN
-#define ypBytes_SET_LEN             ypStringLib_SET_LEN
-#define ypBytes_ALLOCLEN            ypStringLib_ALLOCLEN
-#define ypBytes_INLINE_DATA( b )    ( ((ypBytesObject *)b)->ob_inline_data )
+#define ypBytes_DATA( b ) ( (yp_uint8_t *) ypStringLib_DATA( b ) )
+#define ypBytes_LEN ypStringLib_LEN
+#define ypBytes_SET_LEN ypStringLib_SET_LEN
+#define ypBytes_ALLOCLEN ypStringLib_ALLOCLEN
+#define ypBytes_INLINE_DATA( b ) ( ( (ypBytesObject *) b )->ob_inline_data )
 
 // The maximum possible alloclen and len of a bytes
-#define ypBytes_ALLOCLEN_MAX    ypStringLib_ALLOCLEN_MAX
-#define ypBytes_LEN_MAX         ypStringLib_LEN_MAX
+#define ypBytes_ALLOCLEN_MAX ypStringLib_ALLOCLEN_MAX
+#define ypBytes_LEN_MAX ypStringLib_LEN_MAX
 
-#define ypBytes_ASSERT_INVARIANTS( b ) \
-    do {yp_ASSERT( ypStringLib_ENC_CODE( b ) == ypStringLib_ENC_BYTES, "bad StrLib_ENC for bytes" ); \
-        ypStringLib_ASSERT_INVARIANTS( b ); \
+#define ypBytes_ASSERT_INVARIANTS( b )                                                            \
+    do {                                                                                          \
+        yp_ASSERT(                                                                                \
+                ypStringLib_ENC_CODE( b ) == ypStringLib_ENC_BYTES, "bad StrLib_ENC for bytes" ); \
+        ypStringLib_ASSERT_INVARIANTS( b );                                                       \
     } while( 0 )
 
 // _yp_bytes_empty is defined above
@@ -7253,8 +7334,9 @@ yp_STATIC_ASSERT( yp_offsetof( ypBytesObject, ob_inline_data ) % yp_MAX_ALIGNMEN
 // Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or
 // inserting bytes (the new space is uninitialized).  Assumes enough space is allocated for the
 // move.  Recall that memmove handles overlap.  Also adjusts null terminator.
-#define ypBytes_ELEMMOVE( b, dest, src ) \
-    memmove( ypBytes_DATA( b )+(dest), ypBytes_DATA( b )+(src), ypBytes_LEN( b )-(src)+1 );
+#define ypBytes_ELEMMOVE( b, dest, src )                                \
+    memmove( ypBytes_DATA( b ) + ( dest ), ypBytes_DATA( b ) + ( src ), \
+            ypBytes_LEN( b ) - ( src ) + 1 );
 
 // When byte arrays are accepted from C, a negative len indicates that strlen( source ) should be
 // used as the length.  This function updates *len accordingly.  Returns false if the final value
@@ -7290,11 +7372,11 @@ static ypObject *_ypBytes_new( int type, yp_ssize_t requiredLen, int alloclen_fi
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
     yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
     if( alloclen_fixed && type == ypBytes_CODE ) {
-        newB = ypMem_MALLOC_CONTAINER_INLINE( ypBytesObject, ypBytes_CODE,
-            requiredLen+1, ypBytes_ALLOCLEN_MAX );
+        newB = ypMem_MALLOC_CONTAINER_INLINE(
+                ypBytesObject, ypBytes_CODE, requiredLen + 1, ypBytes_ALLOCLEN_MAX );
     } else {
-        newB = ypMem_MALLOC_CONTAINER_VARIABLE( ypBytesObject, type,
-            requiredLen+1, 0, ypBytes_ALLOCLEN_MAX );
+        newB = ypMem_MALLOC_CONTAINER_VARIABLE(
+                ypBytesObject, type, requiredLen + 1, 0, ypBytes_ALLOCLEN_MAX );
     }
     ypStringLib_ENC_CODE( newB ) = ypStringLib_ENC_BYTES;
     return newB;
@@ -7306,7 +7388,7 @@ static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
 {
     ypObject *copy = _ypBytes_new( type, ypBytes_LEN( b ), alloclen_fixed );
     if( yp_isexceptionC( copy ) ) return copy;
-    memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b )+1 );
+    memcpy( ypBytes_DATA( copy ), ypBytes_DATA( b ), ypBytes_LEN( b ) + 1 );
     ypBytes_SET_LEN( copy, ypBytes_LEN( b ) );
     ypBytes_ASSERT_INVARIANTS( copy );
     return copy;
@@ -7315,16 +7397,17 @@ static ypObject *_ypBytes_copy( int type, ypObject *b, int alloclen_fixed )
 // Called on push/append, extend, or irepeat to increase the allocated size of b to fit
 // requiredLen (plus null terminator).  Does not update ypBytes_LEN and does not null-terminate.
 // enc_code must be ypStringLib_ENC_BYTES.
-static ypObject *_ypBytes_grow_onextend( ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra,
-        int enc_code )
+static ypObject *_ypBytes_grow_onextend(
+        ypObject *b, yp_ssize_t requiredLen, yp_ssize_t extra, int enc_code )
 {
     void *oldptr;
     yp_ASSERT( requiredLen >= ypBytes_LEN( b ), "requiredLen cannot be <len(b)" );
-    yp_ASSERT( requiredLen >= ypBytes_ALLOCLEN( b )-1, "_ypBytes_grow_onextend called unnecessarily" );
+    yp_ASSERT( requiredLen >= ypBytes_ALLOCLEN( b ) - 1,
+            "_ypBytes_grow_onextend called unnecessarily" );
     yp_ASSERT( requiredLen <= ypBytes_LEN_MAX, "requiredLen cannot be >max" );
     yp_ASSERT( enc_code == ypStringLib_ENC_BYTES, "enc_code must be ypStringLib_ENC_BYTES" );
-    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject,
-        requiredLen+1, extra, ypBytes_ALLOCLEN_MAX );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE(
+            b, ypBytesObject, requiredLen + 1, extra, ypBytes_ALLOCLEN_MAX );
     if( oldptr == NULL ) return yp_MemoryError;
     if( ypBytes_DATA( b ) != oldptr ) {
         memcpy( ypBytes_DATA( b ), oldptr, ypBytes_LEN( b ) );
@@ -7334,24 +7417,25 @@ static ypObject *_ypBytes_grow_onextend( ypObject *b, yp_ssize_t requiredLen, yp
 }
 
 // As yp_asuint8C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
-static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc ) {
-    yp_int_t asint;
+static yp_uint8_t _ypBytes_asuint8C( ypObject *x, ypObject **exc )
+{
+    yp_int_t   asint;
     yp_uint8_t retval;
 
     if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x );
     asint = yp_asintC( x, exc );
-    retval = (yp_uint8_t) (asint & 0xFFu);
+    retval = ( yp_uint8_t )( asint & 0xFFu );
     if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_ValueError );
     return retval;
 }
 
 // If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
 // x is a fellow bytes, set *x_data and *x_len.  Otherwise, returns an exception.
-static ypObject *_ypBytes_coerce_intorbytes( ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len,
-        yp_uint8_t *storage )
+static ypObject *_ypBytes_coerce_intorbytes(
+        ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len, yp_uint8_t *storage )
 {
     ypObject *exc = yp_None;
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
 
     if( x_pair == ypBool_CODE || x_pair == ypInt_CODE ) {
         *storage = _ypBytes_asuint8C( x, &exc );
@@ -7377,12 +7461,12 @@ static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
 
     if( ypBytes_LEN( b ) > ypBytes_LEN_MAX - ypBytes_LEN( x ) ) return yp_MemorySizeOverflowError;
     newLen = ypBytes_LEN( b ) + ypBytes_LEN( x );
-    if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
+    if( ypBytes_ALLOCLEN( b ) - 1 < newLen ) {
         // TODO Over-allocate
         ypObject *result = _ypBytes_grow_onextend( b, newLen, 0, ypStringLib_ENC_BYTES );
         if( yp_isexceptionC( result ) ) return result;
     }
-    memcpy( ypBytes_DATA( b )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
+    memcpy( ypBytes_DATA( b ) + ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
     ypBytes_DATA( b )[newLen] = '\0';
     ypBytes_SET_LEN( b, newLen );
     ypBytes_ASSERT_INVARIANTS( b );
@@ -7394,15 +7478,15 @@ static ypObject *_ypBytes_extend_from_bytes( ypObject *b, ypObject *x )
 // XXX Do "b[len(b)]=0" when this returns (even on error)
 static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject **mi, yp_uint64_t *mi_state )
 {
-    ypObject *exc = yp_None;
-    ypObject *x;
+    ypObject * exc = yp_None;
+    ypObject * x;
     yp_uint8_t x_asbyte;
-    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc ); // zero on error
+    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc );  // zero on error
     yp_ssize_t newLen = ypBytes_LEN( b );
-    void *oldptr;
+    void *     oldptr;
 
     while( 1 ) {
-        x = yp_miniiter_next( mi, mi_state ); // new ref
+        x = yp_miniiter_next( mi, mi_state );  // new ref
         if( yp_isexceptionC( x ) ) {
             if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
             return x;
@@ -7410,21 +7494,21 @@ static ypObject *_ypBytes_extend_from_iter( ypObject *b, ypObject **mi, yp_uint6
         x_asbyte = _ypBytes_asuint8C( x, &exc );
         yp_decref( x );
         if( yp_isexceptionC( exc ) ) return exc;
-        lenhint -= 1; // check for <0 only when we need it
+        lenhint -= 1;  // check for <0 only when we need it
 
         if( newLen > ypBytes_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
         newLen += 1;
-        if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
+        if( ypBytes_ALLOCLEN( b ) - 1 < newLen ) {
             if( lenhint < 0 ) lenhint = 0;
-            oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject,
-                newLen+1, lenhint, ypBytes_ALLOCLEN_MAX );
+            oldptr = ypMem_REALLOC_CONTAINER_VARIABLE(
+                    b, ypBytesObject, newLen + 1, lenhint, ypBytes_ALLOCLEN_MAX );
             if( oldptr == NULL ) return yp_MemoryError;
             if( ypBytes_DATA( b ) != oldptr ) {
-                memcpy( ypBytes_DATA( b ), oldptr, newLen-1 ); // -1 for byte we haven't written
+                memcpy( ypBytes_DATA( b ), oldptr, newLen - 1 );  // -1 for byte we haven't written
                 ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
             }
         }
-        ypBytes_DATA( b )[newLen-1] = x_asbyte;
+        ypBytes_DATA( b )[newLen - 1] = x_asbyte;
     }
 
     // Modifying len here allows us to bail easily above, relying on the calling code to replace
@@ -7443,12 +7527,12 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
     } else if( iterable_pair == ypStr_CODE ) {
         return yp_TypeError;
     } else {
-        ypObject *result;
+        ypObject *  result;
         yp_uint64_t mi_state;
-        ypObject *mi = yp_miniiter( iterable, &mi_state ); // new ref
+        ypObject *  mi = yp_miniiter( iterable, &mi_state );  // new ref
         if( yp_isexceptionC( mi ) ) return mi;
         result = _ypBytes_extend_from_iter( b, &mi, &mi_state );
-        ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0'; // up to us to add null-terminator
+        ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0';  // up to us to add null-terminator
         yp_decref( mi );
         ypBytes_ASSERT_INVARIANTS( b );
         return result;
@@ -7458,30 +7542,31 @@ static ypObject *_ypBytes_extend( ypObject *b, ypObject *iterable )
 // Called on a setslice of step 1 and positive growBy, or an insert.  Will shift the data at
 // b[stop:] to start at b[stop+growBy]; the data at b[start:stop+growBy] will be uninitialized.
 // Updates ypBytes_LEN and writes the null terminator.  On error, b is not modified.
-static ypObject *_ypBytes_setslice_grow( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t growBy, yp_ssize_t extra )
+static ypObject *_ypBytes_setslice_grow(
+        ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t growBy, yp_ssize_t extra )
 {
-    yp_ssize_t newLen;
+    yp_ssize_t  newLen;
     yp_uint8_t *oldptr;
     yp_ASSERT( growBy >= 1, "growBy cannot be less than 1" );
 
     // Ensure there's enough space allocated
     if( ypBytes_LEN( b ) > ypBytes_LEN_MAX - growBy ) return yp_MemorySizeOverflowError;
     newLen = ypBytes_LEN( b ) + growBy;
-    if( ypBytes_ALLOCLEN( b )-1 < newLen ) {
-        oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject,
-            newLen+1, extra, ypBytes_ALLOCLEN_MAX );
+    if( ypBytes_ALLOCLEN( b ) - 1 < newLen ) {
+        oldptr = ypMem_REALLOC_CONTAINER_VARIABLE(
+                b, ypBytesObject, newLen + 1, extra, ypBytes_ALLOCLEN_MAX );
         if( oldptr == NULL ) return yp_MemoryError;
         if( ypBytes_DATA( b ) == oldptr ) {
-            ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
+            ypBytes_ELEMMOVE( b, stop + growBy, stop );  // memmove: data overlaps
         } else {
             // The data doesn't overlap, so use memcpy
             memcpy( ypBytes_DATA( b ), oldptr, start );
-            memcpy( ypBytes_DATA( b )+stop+growBy, oldptr+stop, ypBytes_LEN( b )-stop+1 );
+            memcpy( ypBytes_DATA( b ) + stop + growBy, oldptr + stop,
+                    ypBytes_LEN( b ) - stop + 1 );
             ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
         }
     } else {
-        ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
+        ypBytes_ELEMMOVE( b, stop + growBy, stop );  // memmove: data overlaps
     }
     ypBytes_SET_LEN( b, newLen );
     ypBytes_ASSERT_INVARIANTS( b );
@@ -7489,12 +7574,12 @@ static ypObject *_ypBytes_setslice_grow( ypObject *b, yp_ssize_t start, yp_ssize
 }
 
 // XXX b and x must _not_ be the same object (pass a copy of x if so)
-static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t step );
-static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t step, ypObject *x )
+static ypObject *bytearray_delslice(
+        ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step );
+static ypObject *_ypBytes_setslice_from_bytes(
+        ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x )
 {
-    ypObject *result;
+    ypObject * result;
     yp_ssize_t slicelength;
 
     yp_ASSERT( b != x, "make a copy of x when b is x" );
@@ -7505,19 +7590,19 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
 
     if( step == 1 ) {
         // Note that -len(b)<=growBy<=len(x), so the growBy calculation can't overflow
-        yp_ssize_t growBy = ypBytes_LEN( x ) - slicelength; // negative means array shrinking
+        yp_ssize_t growBy = ypBytes_LEN( x ) - slicelength;  // negative means array shrinking
         if( growBy > 0 ) {
             // TODO Over-allocate?
             result = _ypBytes_setslice_grow( b, start, stop, growBy, 0 );
             if( yp_isexceptionC( result ) ) return result;
         } else if( growBy < 0 ) {
             // Shrinking, so we know we have enough memory allocated
-            ypBytes_ELEMMOVE( b, stop+growBy, stop );   // memmove: data overlaps
+            ypBytes_ELEMMOVE( b, stop + growBy, stop );  // memmove: data overlaps
             ypBytes_SET_LEN( b, ypBytes_LEN( b ) + growBy );
         }
 
         // There are now len(x) bytes starting at b[start] waiting for x's data
-        memcpy( ypBytes_DATA( b )+start, ypBytes_DATA( x ), ypBytes_LEN( x ) );
+        memcpy( ypBytes_DATA( b ) + start, ypBytes_DATA( x ), ypBytes_LEN( x ) );
     } else {
         yp_ssize_t i;
         if( ypBytes_LEN( x ) != slicelength ) return yp_ValueError;
@@ -7532,40 +7617,42 @@ static ypObject *_ypBytes_setslice_from_bytes( ypObject *b, yp_ssize_t start, yp
 
 // Public Methods
 
-static ypObject *bytes_unfrozen_copy( ypObject *b ) {
+static ypObject *bytes_unfrozen_copy( ypObject *b )
+{
     return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *bytes_frozen_copy( ypObject *b ) {
+static ypObject *bytes_frozen_copy( ypObject *b )
+{
     if( ypBytes_LEN( b ) < 1 ) return _yp_bytes_empty;
     // A shallow copy of a bytes to a bytes doesn't require an actual copy
     if( ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return yp_incref( b );
     return _ypBytes_copy( ypBytes_CODE, b, /*alloclen_fixed=*/TRUE );
 }
 
-static ypObject *bytes_unfrozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *bytes_unfrozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo )
+{
     return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *bytes_frozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *bytes_frozen_deepcopy( ypObject *b, visitfunc copy_visitor, void *copy_memo )
+{
     if( ypBytes_LEN( b ) < 1 ) return _yp_bytes_empty;
     return _ypBytes_copy( ypBytes_CODE, b, /*alloclen_fixed=*/TRUE );
 }
 
-static ypObject *bytes_bool( ypObject *b ) {
-    return ypBool_FROM_C( ypBytes_LEN( b ) );
-}
+static ypObject *bytes_bool( ypObject *b ) { return ypBool_FROM_C( ypBytes_LEN( b ) ); }
 
 static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *i )
 {
     yp_uint8_t *x_data;
-    yp_ssize_t x_len;
-    yp_uint8_t storage;
-    ypObject *result;
-    yp_ssize_t step = 1;    // may change to -1
-    yp_ssize_t b_rlen;      // remaining length
-    yp_uint8_t *b_rdata;    // remaining data
+    yp_ssize_t  x_len;
+    yp_uint8_t  storage;
+    ypObject *  result;
+    yp_ssize_t  step = 1;  // may change to -1
+    yp_ssize_t  b_rlen;    // remaining length
+    yp_uint8_t *b_rdata;   // remaining data
 
     result = _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
     if( yp_isexceptionC( result ) ) return result;
@@ -7574,7 +7661,7 @@ static ypObject *bytes_find( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssiz
     // and (unadjusted) start>len(b).  While we're at it, we can short-cut a b_rlen==0 case.
     if( start >= ypBytes_LEN( b ) ) {
         if( x_len < 1 ) {
-            *i = (start == ypBytes_LEN( b ) ? ypBytes_LEN( b ) : -1);
+            *i = ( start == ypBytes_LEN( b ) ? ypBytes_LEN( b ) : -1 );
         } else {
             *i = -1;
         }
@@ -7612,7 +7699,7 @@ static ypObject *_bytes_concat_copy( int type, ypObject *b )
 static ypObject *bytes_concat( ypObject *b, ypObject *x )
 {
     yp_ssize_t newLen;
-    ypObject *newB;
+    ypObject * newB;
 
     // Check the type, and optimize the case where b or x are empty
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return_yp_BAD_TYPE( x );
@@ -7625,7 +7712,7 @@ static ypObject *bytes_concat( ypObject *b, ypObject *x )
     if( yp_isexceptionC( newB ) ) return newB;
 
     memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ), ypBytes_LEN( b ) );
-    memcpy( ypBytes_DATA( newB )+ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
+    memcpy( ypBytes_DATA( newB ) + ypBytes_LEN( b ), ypBytes_DATA( x ), ypBytes_LEN( x ) );
     ypBytes_DATA( newB )[newLen] = '\0';
     ypBytes_SET_LEN( newB, newLen );
     ypBytes_ASSERT_INVARIANTS( newB );
@@ -7646,7 +7733,7 @@ static ypObject *bytes_getindex( ypObject *b, yp_ssize_t i, ypObject *defval )
 
 static ypObject *bytearray_setindex( ypObject *b, yp_ssize_t i, ypObject *x )
 {
-    ypObject *exc = yp_None;
+    ypObject * exc = yp_None;
     yp_uint8_t x_value;
 
     x_value = _ypBytes_asuint8C( x, &exc );
@@ -7666,16 +7753,16 @@ static ypObject *bytearray_delindex( ypObject *b, yp_ssize_t i )
         return yp_IndexError;
     }
 
-    ypBytes_ELEMMOVE( b, i, i+1 );
+    ypBytes_ELEMMOVE( b, i, i + 1 );
     ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
     return yp_None;
 }
 
 static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    ypObject *result;
+    ypObject * result;
     yp_ssize_t newLen;
-    ypObject *newB;
+    ypObject * newB;
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &newLen );
     if( yp_isexceptionC( result ) ) return result;
@@ -7688,7 +7775,7 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     if( yp_isexceptionC( newB ) ) return newB;
 
     if( step == 1 ) {
-        memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b )+start, newLen );
+        memcpy( ypBytes_DATA( newB ), ypBytes_DATA( b ) + start, newLen );
     } else {
         yp_ssize_t i;
         for( i = 0; i < newLen; i++ ) {
@@ -7701,8 +7788,8 @@ static ypObject *bytes_getslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
     return newB;
 }
 
-static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t step, ypObject *x )
+static ypObject *bytearray_setslice(
+        ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x )
 {
     int x_pair = ypObject_TYPE_PAIR_CODE( x );
 
@@ -7721,18 +7808,18 @@ static ypObject *bytearray_setslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
     }
 }
 
-static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t step )
+static ypObject *bytearray_delslice(
+        ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    ypObject *result;
+    ypObject * result;
     yp_ssize_t slicelength;
 
     result = ypSlice_AdjustIndicesC( ypBytes_LEN( b ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
-    if( slicelength < 1 ) return yp_None; // no-op
+    if( slicelength < 1 ) return yp_None;  // no-op
     // Add one to the length to include the hidden null-terminator
-    _ypSlice_delslice_memmove( ypBytes_DATA( b ), ypBytes_LEN( b )+1, 1,
-            start, stop, step, slicelength );
+    _ypSlice_delslice_memmove(
+            ypBytes_DATA( b ), ypBytes_LEN( b ) + 1, 1, start, stop, step, slicelength );
     ypBytes_SET_LEN( b, ypBytes_LEN( b ) - slicelength );
     ypBytes_ASSERT_INVARIANTS( b );
     return yp_None;
@@ -7744,9 +7831,9 @@ static ypObject *bytearray_delslice( ypObject *b, yp_ssize_t start, yp_ssize_t s
 
 static ypObject *bytearray_insert( ypObject *b, yp_ssize_t i, ypObject *x )
 {
-    ypObject *exc = yp_None;
+    ypObject * exc = yp_None;
     yp_uint8_t x_asbyte;
-    ypObject *result;
+    ypObject * result;
 
     // Check for exceptions, then adjust the index (noting it should behave like b[i:i]=[x])
     x_asbyte = _ypBytes_asuint8C( x, &exc );
@@ -7776,7 +7863,7 @@ static ypObject *bytearray_popindex( ypObject *b, yp_ssize_t i )
     }
 
     result = yp_intC( ypBytes_DATA( b )[i] );
-    ypBytes_ELEMMOVE( b, i, i+1 );
+    ypBytes_ELEMMOVE( b, i, i + 1 );
     ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
     ypBytes_ASSERT_INVARIANTS( b );
     return result;
@@ -7800,7 +7887,7 @@ static ypObject *bytearray_reverse( ypObject *b )
 
 static ypObject *bytes_contains( ypObject *b, ypObject *x )
 {
-    ypObject *result;
+    ypObject * result;
     yp_ssize_t i = -1;
 
     result = bytes_find( b, x, 0, yp_SLICE_USELEN, yp_FIND_FORWARD, &i );
@@ -7822,10 +7909,12 @@ static ypObject *bytearray_push( ypObject *b, ypObject *x )
 
 static ypObject *bytearray_clear( ypObject *b )
 {
-    void *oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, 0+1, 0, ypBytes_ALLOCLEN_MAX );
+    void *oldptr =
+            ypMem_REALLOC_CONTAINER_VARIABLE( b, ypBytesObject, 0 + 1, 0, ypBytes_ALLOCLEN_MAX );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( b, ypBytesObject, oldptr );
-    yp_ASSERT( ypBytes_DATA( b ) == ypBytes_INLINE_DATA( b ), "bytearray_clear didn't allocate inline!" );
+    yp_ASSERT( ypBytes_DATA( b ) == ypBytes_INLINE_DATA( b ),
+            "bytearray_clear didn't allocate inline!" );
     ypBytes_DATA( b )[0] = '\0';
     ypBytes_SET_LEN( b, 0 );
     ypBytes_ASSERT_INVARIANTS( b );
@@ -7837,7 +7926,7 @@ static ypObject *bytearray_pop( ypObject *b )
     ypObject *result;
 
     if( ypBytes_LEN( b ) < 1 ) return yp_IndexError;
-    result = yp_intC( ypBytes_DATA( b )[ypBytes_LEN( b )-1] );
+    result = yp_intC( ypBytes_DATA( b )[ypBytes_LEN( b ) - 1] );
     ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
     ypBytes_DATA( b )[ypBytes_LEN( b )] = '\0';
     ypBytes_ASSERT_INVARIANTS( b );
@@ -7847,7 +7936,7 @@ static ypObject *bytearray_pop( ypObject *b )
 // onmissing must be an immortal, or NULL
 static ypObject *bytearray_remove( ypObject *b, ypObject *x, ypObject *onmissing )
 {
-    ypObject *exc = yp_None;
+    ypObject * exc = yp_None;
     yp_uint8_t x_asbyte;
     yp_ssize_t i;
 
@@ -7858,7 +7947,7 @@ static ypObject *bytearray_remove( ypObject *b, ypObject *x, ypObject *onmissing
         if( x_asbyte != ypBytes_DATA( b )[i] ) continue;
 
         // We found a match to remove
-        ypBytes_ELEMMOVE( b, i, i+1 );
+        ypBytes_ELEMMOVE( b, i, i + 1 );
         ypBytes_SET_LEN( b, ypBytes_LEN( b ) - 1 );
         return yp_None;
     }
@@ -7869,16 +7958,16 @@ static ypObject *bytearray_remove( ypObject *b, ypObject *x, ypObject *onmissing
 
 // TODO allow custom min/max methods?
 
-static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t *n )
+static ypObject *bytes_count(
+        ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *n )
 {
     yp_uint8_t *x_data;
-    yp_ssize_t x_len;
-    yp_uint8_t storage;
-    ypObject *result;
-    yp_ssize_t step = 1;
-    yp_ssize_t b_rlen;     // remaining length
-    yp_uint8_t *b_rdata;   // remaining data
+    yp_ssize_t  x_len;
+    yp_uint8_t  storage;
+    ypObject *  result;
+    yp_ssize_t  step = 1;
+    yp_ssize_t  b_rlen;   // remaining length
+    yp_uint8_t *b_rdata;  // remaining data
 
     result = _ypBytes_coerce_intorbytes( x, &x_data, &x_len, &storage );
     if( yp_isexceptionC( result ) ) return result;
@@ -7887,7 +7976,7 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
     // and (unadjusted) start>len(b).  While we're at it, we can short-cut a b_rlen==0 case.
     if( start >= ypBytes_LEN( b ) ) {
         if( x_len < 1 ) {
-            *n = (start == ypBytes_LEN( b ) ? 1 : 0);
+            *n = ( start == ypBytes_LEN( b ) ? 1 : 0 );
         } else {
             *n = 0;
         }
@@ -7910,170 +7999,150 @@ static ypObject *bytes_count( ypObject *b, ypObject *x, yp_ssize_t start, yp_ssi
     while( b_rlen >= x_len ) {
         if( memcmp( b_rdata, x_data, x_len ) == 0 ) {
             *n += 1;
-            b_rdata += x_len; b_rlen -= x_len;
+            b_rdata += x_len;
+            b_rlen -= x_len;
         } else {
-            b_rdata += 1; b_rlen -= 1;
+            b_rdata += 1;
+            b_rlen -= 1;
         }
     }
     return yp_None;
 }
 
-static ypObject *bytes_isalnum( ypObject *b ) {
+static ypObject *bytes_isalnum( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_isalpha( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_isdecimal( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_isdigit( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_isidentifier( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_islower( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_isnumeric( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_isprintable( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_isspace( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_isupper( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_startswith(
+        ypObject *b, ypObject *prefix, yp_ssize_t start, yp_ssize_t end )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_isalpha( ypObject *b ) {
+static ypObject *bytes_endswith( ypObject *b, ypObject *suffix, yp_ssize_t start, yp_ssize_t end )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_isdecimal( ypObject *b ) {
+static ypObject *bytes_lower( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_upper( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_casefold( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_swapcase( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_capitalize( ypObject *b ) { return yp_NotImplementedError; }
+
+static ypObject *bytes_ljust( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_isdigit( ypObject *b ) {
+static ypObject *bytes_rjust( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_isidentifier( ypObject *b ) {
+static ypObject *bytes_center( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_islower( ypObject *b ) {
+static ypObject *bytes_expandtabs( ypObject *b, yp_ssize_t tabsize )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_isnumeric( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_isprintable( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_isspace( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_isupper( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_startswith( ypObject *b, ypObject *prefix,
-        yp_ssize_t start, yp_ssize_t end ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_endswith( ypObject *b, ypObject *suffix,
-        yp_ssize_t start, yp_ssize_t end ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_lower( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_upper( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_casefold( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_swapcase( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_capitalize( ypObject *b ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_ljust( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_rjust( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_center( ypObject *b, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_expandtabs( ypObject *b, yp_ssize_t tabsize ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *bytes_replace( ypObject *b, ypObject *oldsub, ypObject *newsub,
-        yp_ssize_t count )
+static ypObject *bytes_replace( ypObject *b, ypObject *oldsub, ypObject *newsub, yp_ssize_t count )
 {
     if( ypObject_TYPE_PAIR_CODE( oldsub ) != ypBytes_CODE ) return_yp_BAD_TYPE( oldsub );
     if( ypObject_TYPE_PAIR_CODE( newsub ) != ypBytes_CODE ) return_yp_BAD_TYPE( newsub );
-    if( (ypBytes_LEN( oldsub ) < 1 && ypBytes_LEN( newsub ) < 1) || count == 0 ) {
+    if( ( ypBytes_LEN( oldsub ) < 1 && ypBytes_LEN( newsub ) < 1 ) || count == 0 ) {
         if( ypObject_TYPE_CODE( b ) == ypBytes_CODE ) return yp_incref( b );
         return _ypBytes_copy( ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE );
     }
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_lstrip( ypObject *b, ypObject *chars ) {
-    return yp_NotImplementedError;
-}
+static ypObject *bytes_lstrip( ypObject *b, ypObject *chars ) { return yp_NotImplementedError; }
 
-static ypObject *bytes_rstrip( ypObject *b, ypObject *chars ) {
-    return yp_NotImplementedError;
-}
+static ypObject *bytes_rstrip( ypObject *b, ypObject *chars ) { return yp_NotImplementedError; }
 
-static ypObject *bytes_strip( ypObject *b, ypObject *chars ) {
-    return yp_NotImplementedError;
-}
+static ypObject *bytes_strip( ypObject *b, ypObject *chars ) { return yp_NotImplementedError; }
 
-static void bytes_partition( ypObject *b, ypObject *sep,
-        ypObject **part0, ypObject **part1, ypObject **part2 ) {
+static void bytes_partition(
+        ypObject *b, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2 )
+{
     *part0 = *part1 = *part2 = yp_NotImplementedError;
 }
 
-static void bytes_rpartition( ypObject *b, ypObject *sep,
-        ypObject **part0, ypObject **part1, ypObject **part2 ) {
+static void bytes_rpartition(
+        ypObject *b, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2 )
+{
     *part0 = *part1 = *part2 = yp_NotImplementedError;
 }
 
-static ypObject *bytes_split( ypObject *b, ypObject *sep, yp_ssize_t maxsplit ) {
+static ypObject *bytes_split( ypObject *b, ypObject *sep, yp_ssize_t maxsplit )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_rsplit( ypObject *b, ypObject *sep, yp_ssize_t maxsplit ) {
+static ypObject *bytes_rsplit( ypObject *b, ypObject *sep, yp_ssize_t maxsplit )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *bytes_splitlines( ypObject *b, ypObject *keepends ) {
+static ypObject *bytes_splitlines( ypObject *b, ypObject *keepends )
+{
     return yp_NotImplementedError;
 }
 
 // Returns -1, 0, or 1 as per memcmp
-static int _ypBytes_relative_cmp( ypObject *b, ypObject *x ) {
+static int _ypBytes_relative_cmp( ypObject *b, ypObject *x )
+{
     yp_ssize_t b_len = ypBytes_LEN( b );
     yp_ssize_t x_len = ypBytes_LEN( x );
-    int cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) );
-    if( cmp == 0 ) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0);
+    int        cmp = memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), MIN( b_len, x_len ) );
+    if( cmp == 0 ) cmp = b_len < x_len ? -1 : ( b_len > x_len ? 1 : 0 );
     return cmp;
 }
-static ypObject *bytes_lt( ypObject *b, ypObject *x ) {
+static ypObject *bytes_lt( ypObject *b, ypObject *x )
+{
     if( b == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) < 0 );
 }
-static ypObject *bytes_le( ypObject *b, ypObject *x ) {
+static ypObject *bytes_le( ypObject *b, ypObject *x )
+{
     if( b == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) <= 0 );
 }
-static ypObject *bytes_ge( ypObject *b, ypObject *x ) {
+static ypObject *bytes_ge( ypObject *b, ypObject *x )
+{
     if( b == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) >= 0 );
 }
-static ypObject *bytes_gt( ypObject *b, ypObject *x ) {
+static ypObject *bytes_gt( ypObject *b, ypObject *x )
+{
     if( b == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_relative_cmp( b, x ) > 0 );
@@ -8081,26 +8150,30 @@ static ypObject *bytes_gt( ypObject *b, ypObject *x ) {
 
 // Returns true (1) if the two bytes/bytearrays are equal.  Size is a quick way to check equality.
 // TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
-static int _ypBytes_are_equal( ypObject *b, ypObject *x ) {
+static int _ypBytes_are_equal( ypObject *b, ypObject *x )
+{
     yp_ssize_t b_len = ypBytes_LEN( b );
     yp_ssize_t x_len = ypBytes_LEN( x );
     if( b_len != x_len ) return 0;
     return memcmp( ypBytes_DATA( b ), ypBytes_DATA( x ), b_len ) == 0;
 }
-static ypObject *bytes_eq( ypObject *b, ypObject *x ) {
+static ypObject *bytes_eq( ypObject *b, ypObject *x )
+{
     if( b == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypBytes_are_equal( b, x ) );
 }
-static ypObject *bytes_ne( ypObject *b, ypObject *x ) {
+static ypObject *bytes_ne( ypObject *b, ypObject *x )
+{
     if( b == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypBytes_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( !_ypBytes_are_equal( b, x ) );
 }
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
-static ypObject *bytes_currenthash( ypObject *b,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
+static ypObject *bytes_currenthash(
+        ypObject *b, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+{
     *hash = yp_HashBytes( ypBytes_DATA( b ), ypBytes_LEN( b ) );
 
     // Since we never contain mutable objects, we can cache our hash
@@ -8108,182 +8181,183 @@ static ypObject *bytes_currenthash( ypObject *b,
     return yp_None;
 }
 
-static ypObject *bytes_dealloc( ypObject *b ) {
+static ypObject *bytes_dealloc( ypObject *b )
+{
     ypMem_FREE_CONTAINER( b, ypBytesObject );
     return yp_None;
 }
 
 static ypSequenceMethods ypBytes_as_sequence = {
-    bytes_concat,                   // tp_concat
-    bytes_repeat,                   // tp_repeat
-    bytes_getindex,                 // tp_getindex
-    bytes_getslice,                 // tp_getslice
-    bytes_find,                     // tp_find
-    bytes_count,                    // tp_count
-    MethodError_objssizeobjproc,    // tp_setindex
-    MethodError_objsliceobjproc,    // tp_setslice
-    MethodError_objssizeproc,       // tp_delindex
-    MethodError_objsliceproc,       // tp_delslice
-    MethodError_objobjproc,         // tp_append
-    MethodError_objobjproc,         // tp_extend
-    MethodError_objssizeproc,       // tp_irepeat
-    MethodError_objssizeobjproc,    // tp_insert
-    MethodError_objssizeproc,       // tp_popindex
-    MethodError_objproc,            // tp_reverse
-    MethodError_sortfunc            // tp_sort
+        bytes_concat,                 // tp_concat
+        bytes_repeat,                 // tp_repeat
+        bytes_getindex,               // tp_getindex
+        bytes_getslice,               // tp_getslice
+        bytes_find,                   // tp_find
+        bytes_count,                  // tp_count
+        MethodError_objssizeobjproc,  // tp_setindex
+        MethodError_objsliceobjproc,  // tp_setslice
+        MethodError_objssizeproc,     // tp_delindex
+        MethodError_objsliceproc,     // tp_delslice
+        MethodError_objobjproc,       // tp_append
+        MethodError_objobjproc,       // tp_extend
+        MethodError_objssizeproc,     // tp_irepeat
+        MethodError_objssizeobjproc,  // tp_insert
+        MethodError_objssizeproc,     // tp_popindex
+        MethodError_objproc,          // tp_reverse
+        MethodError_sortfunc          // tp_sort
 };
 
 static ypTypeObject ypBytes_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    bytes_dealloc,                  // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        bytes_dealloc,        // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    bytes_unfrozen_copy,            // tp_unfrozen_copy
-    bytes_frozen_copy,              // tp_frozen_copy
-    bytes_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
-    bytes_frozen_deepcopy,          // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,      // tp_freeze
+        bytes_unfrozen_copy,      // tp_unfrozen_copy
+        bytes_frozen_copy,        // tp_frozen_copy
+        bytes_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        bytes_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,      // tp_invalidate
 
-    // Boolean operations and comparisons
-    bytes_bool,                     // tp_bool
-    bytes_lt,                       // tp_lt
-    bytes_le,                       // tp_le
-    bytes_eq,                       // tp_eq
-    bytes_ne,                       // tp_ne
-    bytes_ge,                       // tp_ge
-    bytes_gt,                       // tp_gt
+        // Boolean operations and comparisons
+        bytes_bool,  // tp_bool
+        bytes_lt,    // tp_lt
+        bytes_le,    // tp_le
+        bytes_eq,    // tp_eq
+        bytes_ne,    // tp_ne
+        bytes_ge,    // tp_ge
+        bytes_gt,    // tp_gt
 
-    // Generic object operations
-    bytes_currenthash,              // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        bytes_currenthash,    // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    _ypSequence_miniiter,           // tp_miniiter
-    _ypSequence_miniiter_rev,       // tp_miniiter_reversed
-    _ypSequence_miniiter_next,      // tp_miniiter_next
-    _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        _ypSequence_miniiter,       // tp_miniiter
+        _ypSequence_miniiter_rev,   // tp_miniiter_reversed
+        _ypSequence_miniiter_next,  // tp_miniiter_next
+        _ypSequence_miniiter_lenh,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,      // tp_iter
+        _ypIter_from_miniiter_rev,  // tp_iter_reversed
+        TypeError_objobjproc,       // tp_send
 
-    // Container operations
-    bytes_contains,                 // tp_contains
-    bytes_len,                      // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    _ypSequence_getdefault,         // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        bytes_contains,             // tp_contains
+        bytes_len,                  // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        _ypSequence_getdefault,     // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    &ypBytes_as_sequence,           // tp_as_sequence
+        // Sequence operations
+        &ypBytes_as_sequence,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 static ypSequenceMethods ypByteArray_as_sequence = {
-    bytes_concat,                   // tp_concat
-    bytes_repeat,                   // tp_repeat
-    bytes_getindex,                 // tp_getindex
-    bytes_getslice,                 // tp_getslice
-    bytes_find,                     // tp_find
-    bytes_count,                    // tp_count
-    bytearray_setindex,             // tp_setindex
-    bytearray_setslice,             // tp_setslice
-    bytearray_delindex,             // tp_delindex
-    bytearray_delslice,             // tp_delslice
-    bytearray_push,                 // tp_append
-    bytearray_extend,               // tp_extend
-    bytearray_irepeat,              // tp_irepeat
-    bytearray_insert,               // tp_insert
-    bytearray_popindex,             // tp_popindex
-    bytearray_reverse,              // tp_reverse
-    MethodError_sortfunc            // tp_sort
+        bytes_concat,         // tp_concat
+        bytes_repeat,         // tp_repeat
+        bytes_getindex,       // tp_getindex
+        bytes_getslice,       // tp_getslice
+        bytes_find,           // tp_find
+        bytes_count,          // tp_count
+        bytearray_setindex,   // tp_setindex
+        bytearray_setslice,   // tp_setslice
+        bytearray_delindex,   // tp_delindex
+        bytearray_delslice,   // tp_delslice
+        bytearray_push,       // tp_append
+        bytearray_extend,     // tp_extend
+        bytearray_irepeat,    // tp_irepeat
+        bytearray_insert,     // tp_insert
+        bytearray_popindex,   // tp_popindex
+        bytearray_reverse,    // tp_reverse
+        MethodError_sortfunc  // tp_sort
 };
 
 static ypTypeObject ypByteArray_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    bytes_dealloc,                  // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        bytes_dealloc,        // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    bytes_unfrozen_copy,            // tp_unfrozen_copy
-    bytes_frozen_copy,              // tp_frozen_copy
-    bytes_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
-    bytes_frozen_deepcopy,          // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,      // tp_freeze
+        bytes_unfrozen_copy,      // tp_unfrozen_copy
+        bytes_frozen_copy,        // tp_frozen_copy
+        bytes_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        bytes_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,      // tp_invalidate
 
-    // Boolean operations and comparisons
-    bytes_bool,                     // tp_bool
-    bytes_lt,                       // tp_lt
-    bytes_le,                       // tp_le
-    bytes_eq,                       // tp_eq
-    bytes_ne,                       // tp_ne
-    bytes_ge,                       // tp_ge
-    bytes_gt,                       // tp_gt
+        // Boolean operations and comparisons
+        bytes_bool,  // tp_bool
+        bytes_lt,    // tp_lt
+        bytes_le,    // tp_le
+        bytes_eq,    // tp_eq
+        bytes_ne,    // tp_ne
+        bytes_ge,    // tp_ge
+        bytes_gt,    // tp_gt
 
-    // Generic object operations
-    bytes_currenthash,              // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        bytes_currenthash,    // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    _ypSequence_miniiter,           // tp_miniiter
-    _ypSequence_miniiter_rev,       // tp_miniiter_reversed
-    _ypSequence_miniiter_next,      // tp_miniiter_next
-    _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        _ypSequence_miniiter,       // tp_miniiter
+        _ypSequence_miniiter_rev,   // tp_miniiter_reversed
+        _ypSequence_miniiter_next,  // tp_miniiter_next
+        _ypSequence_miniiter_lenh,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,      // tp_iter
+        _ypIter_from_miniiter_rev,  // tp_iter_reversed
+        TypeError_objobjproc,       // tp_send
 
-    // Container operations
-    bytes_contains,                 // tp_contains
-    bytes_len,                      // tp_len
-    bytearray_push,                 // tp_push
-    bytearray_clear,                // tp_clear
-    bytearray_pop,                  // tp_pop
-    bytearray_remove,               // tp_remove
-    _ypSequence_getdefault,         // tp_getdefault
-    _ypSequence_setitem,            // tp_setitem
-    _ypSequence_delitem,            // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        bytes_contains,             // tp_contains
+        bytes_len,                  // tp_len
+        bytearray_push,             // tp_push
+        bytearray_clear,            // tp_clear
+        bytearray_pop,              // tp_pop
+        bytearray_remove,           // tp_remove
+        _ypSequence_getdefault,     // tp_getdefault
+        _ypSequence_setitem,        // tp_setitem
+        _ypSequence_delitem,        // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    &ypByteArray_as_sequence,       // tp_as_sequence
+        // Sequence operations
+        &ypByteArray_as_sequence,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
-static ypObject *_yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len )
+static ypObject *_yp_asbytesCX( ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len )
 {
     if( ypObject_TYPE_PAIR_CODE( seq ) != ypBytes_CODE ) return_yp_BAD_TYPE( seq );
     *bytes = ypBytes_DATA( seq );
@@ -8294,7 +8368,8 @@ static ypObject *_yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssi
     }
     return yp_None;
 }
-ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len ) {
+ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len )
+{
     ypObject *result = _yp_asbytesCX( seq, bytes, len );
     if( yp_isexceptionC( result ) ) {
         *bytes = NULL;
@@ -8320,7 +8395,7 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
 
     // Initialize the data
     if( source == NULL ) {
-        memset( ypBytes_DATA( b ), 0, len+1 );
+        memset( ypBytes_DATA( b ), 0, len + 1 );
     } else {
         memcpy( ypBytes_DATA( b ), source, len );
         ypBytes_DATA( b )[len] = '\0';
@@ -8329,17 +8404,19 @@ static ypObject *_ypBytesC( int type, const yp_uint8_t *source, yp_ssize_t len )
     ypBytes_ASSERT_INVARIANTS( b );
     return b;
 }
-ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len ) {
+ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len )
+{
     if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     return _ypBytesC( ypBytes_CODE, source, len );
 }
-ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len ) {
+ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len )
+{
     if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     return _ypBytesC( ypByteArray_CODE, source, len );
 }
 
-static ypObject *_ypBytes_encode( int type,
-        ypObject *source, ypObject *encoding, ypObject *errors )
+static ypObject *_ypBytes_encode(
+        int type, ypObject *source, ypObject *encoding, ypObject *errors )
 {
     ypObject *result;
     if( ypObject_TYPE_PAIR_CODE( source ) != ypStr_CODE ) return_yp_BAD_TYPE( source );
@@ -8354,26 +8431,30 @@ static ypObject *_ypBytes_encode( int type,
     ypBytes_ASSERT_INVARIANTS( result );
     return result;
 }
-ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors ) {
+ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors )
+{
     return _ypBytes_encode( ypBytes_CODE, source, encoding, errors );
 }
-ypObject *yp_bytearray3( ypObject *source, ypObject *encoding, ypObject *errors ) {
+ypObject *yp_bytearray3( ypObject *source, ypObject *encoding, ypObject *errors )
+{
     return _ypBytes_encode( ypByteArray_CODE, source, encoding, errors );
 }
-ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors ) {
-    return _ypBytes_encode( ypObject_IS_MUTABLE( s ) ? ypByteArray_CODE : ypBytes_CODE,
-            s, encoding, errors );
+ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors )
+{
+    return _ypBytes_encode(
+            ypObject_IS_MUTABLE( s ) ? ypByteArray_CODE : ypBytes_CODE, s, encoding, errors );
 }
-ypObject *yp_encode( ypObject *s ) {
+ypObject *yp_encode( ypObject *s )
+{
     if( ypObject_TYPE_PAIR_CODE( s ) != ypStr_CODE ) return_yp_BAD_TYPE( s );
-    return ypStringLib_encode_utf_8( ypObject_IS_MUTABLE( s ) ? ypByteArray_CODE : ypBytes_CODE,
-            s, yp_s_strict );
+    return ypStringLib_encode_utf_8(
+            ypObject_IS_MUTABLE( s ) ? ypByteArray_CODE : ypBytes_CODE, s, yp_s_strict );
 }
 
 static ypObject *_ypBytes( int type, ypObject *source )
 {
     ypObject *exc = yp_None;
-    int source_pair = ypObject_TYPE_PAIR_CODE( source );
+    int       source_pair = ypObject_TYPE_PAIR_CODE( source );
 
     if( source_pair == ypBytes_CODE ) {
         if( type == ypBytes_CODE ) {
@@ -8393,8 +8474,8 @@ static ypObject *_ypBytes( int type, ypObject *source )
         return yp_TypeError;
     } else {
         // Treat it as a generic iterator
-        ypObject *newB;
-        ypObject *result;
+        ypObject * newB;
+        ypObject * result;
         yp_ssize_t lenhint = yp_lenC( source, &exc );
         if( yp_isexceptionC( exc ) ) {
             // Ignore errors determining lenhint; it just means we can't pre-allocate
@@ -8420,18 +8501,16 @@ static ypObject *_ypBytes( int type, ypObject *source )
         return newB;
     }
 }
-ypObject *yp_bytes( ypObject *source ) {
-    return _ypBytes( ypBytes_CODE, source );
-}
-ypObject *yp_bytearray( ypObject *source ) {
-    return _ypBytes( ypByteArray_CODE, source );
-}
+ypObject *yp_bytes( ypObject *source ) { return _ypBytes( ypBytes_CODE, source ); }
+ypObject *yp_bytearray( ypObject *source ) { return _ypBytes( ypByteArray_CODE, source ); }
 
-ypObject *yp_bytes0( void ) {
+ypObject *yp_bytes0( void )
+{
     ypBytes_ASSERT_INVARIANTS( _yp_bytes_empty );
     return _yp_bytes_empty;
 }
-ypObject *yp_bytearray0( void ) {
+ypObject *yp_bytearray0( void )
+{
     ypObject *newB = _ypBytes_new( ypByteArray_CODE, 0, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newB ) ) return newB;
     ypBytes_DATA( newB )[0] = '\0';
@@ -8453,19 +8532,21 @@ yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % 4 == 0, alignof_s
 
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
 
-#define ypStr_DATA              ypStringLib_DATA
-#define ypStr_LEN               ypStringLib_LEN
-#define ypStr_SET_LEN           ypStringLib_SET_LEN
-#define ypStr_ALLOCLEN          ypStringLib_ALLOCLEN
-#define ypStr_CACHED_UTF_8( s ) ( ((ypStrObject *)s)->utf_8 )  // NULL if no cached bytes obj
-#define ypStr_INLINE_DATA( s )  ( ((ypStrObject *)s)->ob_inline_data )
+#define ypStr_DATA ypStringLib_DATA
+#define ypStr_LEN ypStringLib_LEN
+#define ypStr_SET_LEN ypStringLib_SET_LEN
+#define ypStr_ALLOCLEN ypStringLib_ALLOCLEN
+#define ypStr_CACHED_UTF_8( s ) ( ( (ypStrObject *) s )->utf_8 )  // NULL if no cached bytes obj
+#define ypStr_INLINE_DATA( s ) ( ( (ypStrObject *) s )->ob_inline_data )
 
-#define ypStr_ALLOCLEN_MAX  ypStringLib_ALLOCLEN_MAX
-#define ypStr_LEN_MAX       ypStringLib_LEN_MAX
+#define ypStr_ALLOCLEN_MAX ypStringLib_ALLOCLEN_MAX
+#define ypStr_LEN_MAX ypStringLib_LEN_MAX
 
-#define ypStr_ASSERT_INVARIANTS( s ) \
-    do {yp_ASSERT( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_BYTES, "bad StrLib_ENC for str" ); \
-        ypStringLib_ASSERT_INVARIANTS( s ); \
+#define ypStr_ASSERT_INVARIANTS( s )                                                            \
+    do {                                                                                        \
+        yp_ASSERT(                                                                              \
+                ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_BYTES, "bad StrLib_ENC for str" ); \
+        ypStringLib_ASSERT_INVARIANTS( s );                                                     \
     } while( 0 )
 
 // _yp_str_empty is defined above
@@ -8477,35 +8558,39 @@ yp_STATIC_ASSERT( yp_offsetof( ypStrObject, ob_inline_data ) % 4 == 0, alignof_s
 // XXX Check for the _yp_str_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
-static ypObject *_ypStr_new5( int type, yp_ssize_t requiredLen, int alloclen_fixed,
-        int enc_code, yp_ssize_t elemsize )
+static ypObject *_ypStr_new5(
+        int type, yp_ssize_t requiredLen, int alloclen_fixed, int enc_code, yp_ssize_t elemsize )
 {
     ypObject *newS;
     yp_ASSERT( ypObject_TYPE_CODE_AS_FROZEN( type ) == ypStr_CODE, "incorrect str type" );
     yp_ASSERT( requiredLen >= 0, "requiredLen cannot be negative" );
     yp_ASSERT( requiredLen <= ypStr_LEN_MAX, "requiredLen cannot be >max" );
     if( alloclen_fixed && type == ypStr_CODE ) {
-        newS = ypMem_MALLOC_CONTAINER_INLINE4( ypStrObject, ypStr_CODE,
-            requiredLen+1, ypStr_ALLOCLEN_MAX, elemsize );
+        newS = ypMem_MALLOC_CONTAINER_INLINE4(
+                ypStrObject, ypStr_CODE, requiredLen + 1, ypStr_ALLOCLEN_MAX, elemsize );
     } else {
-        newS = ypMem_MALLOC_CONTAINER_VARIABLE5( ypStrObject, type,
-            requiredLen+1, 0, ypStr_ALLOCLEN_MAX, elemsize );
+        newS = ypMem_MALLOC_CONTAINER_VARIABLE5(
+                ypStrObject, type, requiredLen + 1, 0, ypStr_ALLOCLEN_MAX, elemsize );
     }
     ypStringLib_ENC_CODE( newS ) = enc_code;
     ypStr_CACHED_UTF_8( newS ) = NULL;
     return newS;
 }
-static ypObject *_ypStr_new( int type, yp_ssize_t requiredLen, int alloclen_fixed, int enc_code ) {
-    return _ypStr_new5( type, requiredLen, alloclen_fixed, enc_code,
-            ypStringLib_encs[enc_code].elemsize );
+static ypObject *_ypStr_new( int type, yp_ssize_t requiredLen, int alloclen_fixed, int enc_code )
+{
+    return _ypStr_new5(
+            type, requiredLen, alloclen_fixed, enc_code, ypStringLib_encs[enc_code].elemsize );
 }
-static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed ) {
+static ypObject *_ypStr_new_latin_1( int type, yp_ssize_t requiredLen, int alloclen_fixed )
+{
     return _ypStr_new5( type, requiredLen, alloclen_fixed, ypStringLib_ENC_LATIN_1, 1 );
 }
-static ypObject *_ypStr_new_ucs_2( int type, yp_ssize_t requiredLen, int alloclen_fixed ) {
+static ypObject *_ypStr_new_ucs_2( int type, yp_ssize_t requiredLen, int alloclen_fixed )
+{
     return _ypStr_new5( type, requiredLen, alloclen_fixed, ypStringLib_ENC_UCS_2, 2 );
 }
-static ypObject *_ypStr_new_ucs_4( int type, yp_ssize_t requiredLen, int alloclen_fixed ) {
+static ypObject *_ypStr_new_ucs_4( int type, yp_ssize_t requiredLen, int alloclen_fixed )
+{
     return _ypStr_new5( type, requiredLen, alloclen_fixed, ypStringLib_ENC_UCS_4, 4 );
 }
 
@@ -8516,7 +8601,7 @@ static ypObject *_ypStr_copy( int type, ypObject *s, int alloclen_fixed )
     ypStringLib_encinfo *s_enc = ypStringLib_ENC( s );
     ypObject *copy = _ypStr_new( type, ypStr_LEN( s ), alloclen_fixed, ypStringLib_ENC_CODE( s ) );
     if( yp_isexceptionC( copy ) ) return copy;
-    memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), (ypStr_LEN( s )+1) << s_enc->sizeshift );
+    memcpy( ypStr_DATA( copy ), ypStr_DATA( s ), ( ypStr_LEN( s ) + 1 ) << s_enc->sizeshift );
     ypStr_SET_LEN( copy, ypStr_LEN( s ) );
     ypStr_ASSERT_INVARIANTS( copy );
     return copy;
@@ -8525,15 +8610,16 @@ static ypObject *_ypStr_copy( int type, ypObject *s, int alloclen_fixed )
 // Called on push/append, extend, or irepeat to increase the alloclen and/or elemsize of s to fit
 // requiredLen (plus null terminator).  Does not update ypStr_LEN and does not null-terminate.
 // enc_code must be the same or larger as currently.
-static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra,
-        int newEnc_code )
+static ypObject *_ypStr_grow_onextend(
+        ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra, int newEnc_code )
 {
     ypStringLib_encinfo *oldEnc = ypStringLib_ENC( s );
-    ypStringLib_encinfo *newEnc = &(ypStringLib_encs[newEnc_code]);
-    void *oldptr;
+    ypStringLib_encinfo *newEnc = &( ypStringLib_encs[newEnc_code] );
+    void *               oldptr;
 
     yp_ASSERT( requiredLen >= ypStr_LEN( s ), "requiredLen cannot be <len(s)" );
-    yp_ASSERT( requiredLen > ypStr_ALLOCLEN( s )-1 || newEnc_code > oldEnc->code, "_ypStr_grow_onextend called unnecessarily" );
+    yp_ASSERT( requiredLen > ypStr_ALLOCLEN( s ) - 1 || newEnc_code > oldEnc->code,
+            "_ypStr_grow_onextend called unnecessarily" );
     yp_ASSERT( requiredLen <= ypStr_LEN_MAX, "requiredLen cannot be >max" );
     yp_ASSERT( newEnc_code >= oldEnc->code, "can't 'grow' to a smaller encoding" );
 
@@ -8541,20 +8627,20 @@ static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_s
 
     // ypMem_REALLOC sets alloclen, but does not require it to be correct on input.  If it did,
     // we'd need to adjust it to the new encoding first.
-    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE5( s, ypStrObject,
-        requiredLen+1, extra, ypStr_ALLOCLEN_MAX, newEnc->elemsize );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE5(
+            s, ypStrObject, requiredLen + 1, extra, ypStr_ALLOCLEN_MAX, newEnc->elemsize );
     if( oldptr == NULL ) return yp_MemoryError;
 
     // alloclen is now updated for the new encoding, but the data may still be in the old encoding
     // and/or may need to be copied over from oldptr
     if( ypStr_DATA( s ) == oldptr ) {
         if( oldEnc != newEnc ) {
-            ypStringLib_upconvert( newEnc->sizeshift,
-                    oldEnc->sizeshift, ypStr_DATA( s ), ypStr_LEN( s ) );
+            ypStringLib_upconvert(
+                    newEnc->sizeshift, oldEnc->sizeshift, ypStr_DATA( s ), ypStr_LEN( s ) );
         }
     } else {
-        ypStringLib_elemcopy( newEnc->sizeshift, ypStr_DATA( s ), 0,
-                oldEnc->sizeshift, oldptr, 0, ypStr_LEN( s ) );
+        ypStringLib_elemcopy( newEnc->sizeshift, ypStr_DATA( s ), 0, oldEnc->sizeshift, oldptr, 0,
+                ypStr_LEN( s ) );
         ypMem_REALLOC_CONTAINER_FREE_OLDPTR( s, ypStrObject, oldptr );
     }
     ypStringLib_ENC_CODE( s ) = newEnc_code;
@@ -8562,24 +8648,25 @@ static ypObject *_ypStr_grow_onextend( ypObject *s, yp_ssize_t requiredLen, yp_s
 }
 
 // As yp_asuint32C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
-static yp_uint32_t _ypStr_asuint32C( ypObject *x, ypObject **exc ) {
-    yp_int_t asint;
+static yp_uint32_t _ypStr_asuint32C( ypObject *x, ypObject **exc )
+{
+    yp_int_t    asint;
     yp_uint32_t retval;
 
     if( ypObject_TYPE_PAIR_CODE( x ) != ypInt_CODE ) return_yp_CEXC_BAD_TYPE( 0, exc, x );
     asint = yp_asintC( x, exc );
-    retval = (yp_uint32_t) (asint & 0xFFFFFFFFu);
+    retval = ( yp_uint32_t )( asint & 0xFFFFFFFFu );
     if( (yp_int_t) retval != asint ) return_yp_CEXC_ERR( retval, exc, yp_ValueError );
     return retval;
 }
 
 // If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
 // x is a fellow str, set *x_data and *x_len.  Otherwise, returns an exception.
-static ypObject *_ypStr_coerce_intorstr( ypObject *x, void **x_data, yp_ssize_t *x_len,
-        yp_uint32_t *storage )
+static ypObject *_ypStr_coerce_intorstr(
+        ypObject *x, void **x_data, yp_ssize_t *x_len, yp_uint32_t *storage )
 {
     ypObject *exc = yp_None;
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
 
     if( x_pair == ypBool_CODE || x_pair == ypInt_CODE ) {
         *storage = _ypStr_asuint32C( x, &exc );
@@ -8596,29 +8683,31 @@ static ypObject *_ypStr_coerce_intorstr( ypObject *x, void **x_data, yp_ssize_t 
     }
 }
 
-static ypObject *str_unfrozen_copy( ypObject *s ) {
+static ypObject *str_unfrozen_copy( ypObject *s )
+{
     return _ypStr_copy( ypChrArray_CODE, s, TRUE );
 }
 
-static ypObject *str_frozen_copy( ypObject *s ) {
+static ypObject *str_frozen_copy( ypObject *s )
+{
     if( ypStr_LEN( s ) < 1 ) return _yp_str_empty;
     // A shallow copy of a str to a str doesn't require an actual copy
     if( ypObject_TYPE_CODE( s ) == ypStr_CODE ) return yp_incref( s );
     return _ypStr_copy( ypStr_CODE, s, TRUE );
 }
 
-static ypObject *str_unfrozen_deepcopy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *str_unfrozen_deepcopy( ypObject *s, visitfunc copy_visitor, void *copy_memo )
+{
     return _ypStr_copy( ypChrArray_CODE, s, TRUE );
 }
 
-static ypObject *str_frozen_deepcopy( ypObject *s, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *str_frozen_deepcopy( ypObject *s, visitfunc copy_visitor, void *copy_memo )
+{
     if( ypStr_LEN( s ) < 1 ) return _yp_str_empty;
     return _ypStr_copy( ypStr_CODE, s, TRUE );
 }
 
-static ypObject *str_bool( ypObject *s ) {
-    return ypBool_FROM_C( ypStr_LEN( s ) );
-}
+static ypObject *str_bool( ypObject *s ) { return ypBool_FROM_C( ypStr_LEN( s ) ); }
 
 // Called when concatenating with an empty object: can simply make a copy (ensuring proper type)
 static ypObject *_str_concat_copy( int type, ypObject *s )
@@ -8628,9 +8717,9 @@ static ypObject *_str_concat_copy( int type, ypObject *s )
 }
 static ypObject *str_concat( ypObject *s, ypObject *x )
 {
-    yp_ssize_t newLen;
-    int newEnc_code;
-    ypObject *newS;
+    yp_ssize_t           newLen;
+    int                  newEnc_code;
+    ypObject *           newS;
     ypStringLib_encinfo *newEnc;
 
     // Check the type, and optimize the case where s or x are empty
@@ -8643,12 +8732,13 @@ static ypObject *str_concat( ypObject *s, ypObject *x )
     newEnc_code = MAX( ypStringLib_ENC_CODE( s ), ypStringLib_ENC_CODE( x ) );
     newS = _ypStr_new( ypObject_TYPE_CODE( s ), newLen, /*alloclen_fixed=*/TRUE, newEnc_code );
     if( yp_isexceptionC( newS ) ) return newS;
-    newEnc = &(ypStringLib_encs[newEnc_code]);
+    newEnc = &( ypStringLib_encs[newEnc_code] );
 
     ypStringLib_elemcopy( newEnc->sizeshift, ypStr_DATA( newS ), 0,
             ypStringLib_ENC( s )->sizeshift, ypStr_DATA( s ), 0, ypStr_LEN( s ) );
     ypStringLib_elemcopy( newEnc->sizeshift, ypStr_DATA( newS ), ypStr_LEN( s ),
-            ypStringLib_ENC( x )->sizeshift, ypStr_DATA( x ), 0, ypStr_LEN( x )+1 );  // incl null
+            ypStringLib_ENC( x )->sizeshift, ypStr_DATA( x ), 0,
+            ypStr_LEN( x ) + 1 );  // incl null
     ypStr_SET_LEN( newS, newLen );
     ypStr_ASSERT_INVARIANTS( newS );
     return newS;
@@ -8671,138 +8761,116 @@ static ypObject *str_len( ypObject *s, yp_ssize_t *len )
     return yp_None;
 }
 
-static ypObject *str_isalnum( ypObject *s ) {
+static ypObject *str_isalnum( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_isalpha( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_isdecimal( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_isdigit( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_isidentifier( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_islower( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_isnumeric( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_isprintable( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_isspace( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_isupper( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_startswith( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_isalpha( ypObject *s ) {
+static ypObject *str_endswith( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_isdecimal( ypObject *s ) {
+static ypObject *str_lower( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_upper( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_casefold( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_swapcase( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_capitalize( ypObject *s ) { return yp_NotImplementedError; }
+
+static ypObject *str_ljust( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_isdigit( ypObject *s ) {
+static ypObject *str_rjust( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_isidentifier( ypObject *s ) {
+static ypObject *str_center( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_islower( ypObject *s ) {
+static ypObject *str_expandtabs( ypObject *s, yp_ssize_t tabsize )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_isnumeric( ypObject *s ) {
+static ypObject *str_replace( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_isprintable( ypObject *s ) {
-    return yp_NotImplementedError;
-}
+static ypObject *str_lstrip( ypObject *s, ypObject *chars ) { return yp_NotImplementedError; }
 
-static ypObject *str_isspace( ypObject *s ) {
-    return yp_NotImplementedError;
-}
+static ypObject *str_rstrip( ypObject *s, ypObject *chars ) { return yp_NotImplementedError; }
 
-static ypObject *str_isupper( ypObject *s ) {
-    return yp_NotImplementedError;
-}
+static ypObject *str_strip( ypObject *s, ypObject *chars ) { return yp_NotImplementedError; }
 
-static ypObject *str_startswith( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_endswith( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_lower( ypObject *s ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_upper( ypObject *s ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_casefold( ypObject *s ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_swapcase( ypObject *s ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_capitalize( ypObject *s ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_ljust( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_rjust( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_center( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_expandtabs( ypObject *s, yp_ssize_t tabsize ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_replace( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_lstrip( ypObject *s, ypObject *chars ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_rstrip( ypObject *s, ypObject *chars ) {
-    return yp_NotImplementedError;
-}
-
-static ypObject *str_strip( ypObject *s, ypObject *chars ) {
-    return yp_NotImplementedError;
-}
-
-static void str_partition( ypObject *s, ypObject *sep,
-        ypObject **part0, ypObject **part1, ypObject **part2 ) {
+static void str_partition(
+        ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2 )
+{
     *part0 = *part1 = *part2 = yp_NotImplementedError;
 }
 
-static void str_rpartition( ypObject *s, ypObject *sep,
-        ypObject **part0, ypObject **part1, ypObject **part2 ) {
+static void str_rpartition(
+        ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2 )
+{
     *part0 = *part1 = *part2 = yp_NotImplementedError;
 }
 
-static ypObject *str_split( ypObject *s, ypObject *sep, yp_ssize_t maxsplit ) {
+static ypObject *str_split( ypObject *s, ypObject *sep, yp_ssize_t maxsplit )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_rsplit( ypObject *s, ypObject *sep, yp_ssize_t maxsplit ) {
+static ypObject *str_rsplit( ypObject *s, ypObject *sep, yp_ssize_t maxsplit )
+{
     return yp_NotImplementedError;
 }
 
-static ypObject *str_splitlines( ypObject *s, ypObject *keepends ) {
+static ypObject *str_splitlines( ypObject *s, ypObject *keepends )
+{
     return yp_NotImplementedError;
 }
 
 
 // Returns -1, 0, or 1 as per memcmp
-static int _ypStr_relative_cmp( ypObject *s, ypObject *x ) {
+static int _ypStr_relative_cmp( ypObject *s, ypObject *x )
+{
     yp_ssize_t s_len = ypStr_LEN( s );
     yp_ssize_t x_len = ypStr_LEN( x );
-    int cmp = memcmp( ypStr_DATA( s ), ypStr_DATA( x ), MIN( s_len, x_len ) );
-    if( cmp == 0 ) cmp = s_len < x_len ? -1 : (s_len > x_len ? 1 : 0);
+    int        cmp = memcmp( ypStr_DATA( s ), ypStr_DATA( x ), MIN( s_len, x_len ) );
+    if( cmp == 0 ) cmp = s_len < x_len ? -1 : ( s_len > x_len ? 1 : 0 );
     return cmp;
 }
-static ypObject *str_lt( ypObject *s, ypObject *x ) {
+static ypObject *str_lt( ypObject *s, ypObject *x )
+{
     if( s == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     // TODO relative comps for ucs-2 and -4
@@ -8810,7 +8878,8 @@ static ypObject *str_lt( ypObject *s, ypObject *x ) {
     if( ypStringLib_ENC_CODE( x ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) < 0 );
 }
-static ypObject *str_le( ypObject *s, ypObject *x ) {
+static ypObject *str_le( ypObject *s, ypObject *x )
+{
     if( s == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     // TODO relative comps for ucs-2 and -4
@@ -8818,7 +8887,8 @@ static ypObject *str_le( ypObject *s, ypObject *x ) {
     if( ypStringLib_ENC_CODE( x ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) <= 0 );
 }
-static ypObject *str_ge( ypObject *s, ypObject *x ) {
+static ypObject *str_ge( ypObject *s, ypObject *x )
+{
     if( s == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     // TODO relative comps for ucs-2 and -4
@@ -8826,7 +8896,8 @@ static ypObject *str_ge( ypObject *s, ypObject *x ) {
     if( ypStringLib_ENC_CODE( x ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     return ypBool_FROM_C( _ypStr_relative_cmp( s, x ) >= 0 );
 }
-static ypObject *str_gt( ypObject *s, ypObject *x ) {
+static ypObject *str_gt( ypObject *s, ypObject *x )
+{
     if( s == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     // TODO relative comps for ucs-2 and -4
@@ -8837,21 +8908,25 @@ static ypObject *str_gt( ypObject *s, ypObject *x ) {
 
 // Returns true (1) if the two str/chrarrays are equal.  Size is a quick way to check equality.
 // TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
-static int _ypStr_are_equal( ypObject *s, ypObject *x ) {
+static int _ypStr_are_equal( ypObject *s, ypObject *x )
+{
     yp_ssize_t s_len = ypStr_LEN( s );
     yp_ssize_t x_len = ypStr_LEN( x );
     if( s_len != x_len ) return 0;
     // Recall strs are stored in the smallest encoding that can hold them, so different encodings
     // means differing characters
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_CODE( x ) ) return 0;
-    return memcmp( ypStr_DATA( s ), ypStr_DATA( x ), s_len<<ypStringLib_ENC( s )->sizeshift ) == 0;
+    return memcmp( ypStr_DATA( s ), ypStr_DATA( x ), s_len << ypStringLib_ENC( s )->sizeshift ) ==
+           0;
 }
-static ypObject *str_eq( ypObject *s, ypObject *x ) {
+static ypObject *str_eq( ypObject *s, ypObject *x )
+{
     if( s == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( _ypStr_are_equal( s, x ) );
 }
-static ypObject *str_ne( ypObject *s, ypObject *x ) {
+static ypObject *str_ne( ypObject *s, ypObject *x )
+{
     if( s == x ) return yp_False;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypStr_CODE ) return yp_ComparisonNotImplemented;
     return ypBool_FROM_C( !_ypStr_are_equal( s, x ) );
@@ -8859,8 +8934,9 @@ static ypObject *str_ne( ypObject *s, ypObject *x ) {
 
 // Must work even for mutables; yp_hash handles caching this value and denying its use for mutables
 // TODO bring this in-line with Python's string hashing; it's currently using bytes hashing
-static ypObject *str_currenthash( ypObject *s,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) {
+static ypObject *str_currenthash(
+        ypObject *s, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+{
     if( ypStringLib_ENC_CODE( s ) != ypStringLib_ENC_LATIN_1 ) return yp_NotImplementedError;
     *hash = yp_HashBytes( ypStr_DATA( s ), ypStr_LEN( s ) << ypStringLib_ENC( s )->sizeshift );
 
@@ -8871,183 +8947,184 @@ static ypObject *str_currenthash( ypObject *s,
 
 #define chrarray_clear NULL
 
-static ypObject *str_dealloc( ypObject *s ) {
+static ypObject *str_dealloc( ypObject *s )
+{
     ypMem_FREE_CONTAINER( s, ypStrObject );
     return yp_None;
 }
 
 static ypSequenceMethods ypStr_as_sequence = {
-    str_concat,                     // tp_concat
-    str_repeat,                     // tp_repeat
-    str_getindex,                   // tp_getindex
-    MethodError_objsliceproc,       // tp_getslice
-    MethodError_findfunc,           // tp_find
-    MethodError_countfunc,          // tp_count
-    MethodError_objssizeobjproc,    // tp_setindex
-    MethodError_objsliceobjproc,    // tp_setslice
-    MethodError_objssizeproc,       // tp_delindex
-    MethodError_objsliceproc,       // tp_delslice
-    MethodError_objobjproc,         // tp_append
-    MethodError_objobjproc,         // tp_extend
-    MethodError_objssizeproc,       // tp_irepeat
-    MethodError_objssizeobjproc,    // tp_insert
-    MethodError_objssizeproc,       // tp_popindex
-    MethodError_objproc,            // tp_reverse
-    MethodError_sortfunc            // tp_sort
+        str_concat,                   // tp_concat
+        str_repeat,                   // tp_repeat
+        str_getindex,                 // tp_getindex
+        MethodError_objsliceproc,     // tp_getslice
+        MethodError_findfunc,         // tp_find
+        MethodError_countfunc,        // tp_count
+        MethodError_objssizeobjproc,  // tp_setindex
+        MethodError_objsliceobjproc,  // tp_setslice
+        MethodError_objssizeproc,     // tp_delindex
+        MethodError_objsliceproc,     // tp_delslice
+        MethodError_objobjproc,       // tp_append
+        MethodError_objobjproc,       // tp_extend
+        MethodError_objssizeproc,     // tp_irepeat
+        MethodError_objssizeobjproc,  // tp_insert
+        MethodError_objssizeproc,     // tp_popindex
+        MethodError_objproc,          // tp_reverse
+        MethodError_sortfunc          // tp_sort
 };
 
 static ypTypeObject ypStr_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    str_dealloc,                    // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        str_dealloc,          // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    str_unfrozen_copy,              // tp_unfrozen_copy
-    str_frozen_copy,                // tp_frozen_copy
-    str_unfrozen_deepcopy,          // tp_unfrozen_deepcopy
-    str_frozen_deepcopy,            // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,    // tp_freeze
+        str_unfrozen_copy,      // tp_unfrozen_copy
+        str_frozen_copy,        // tp_frozen_copy
+        str_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        str_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,    // tp_invalidate
 
-    // Boolean operations and comparisons
-    str_bool,                       // tp_bool
-    str_lt,                         // tp_lt
-    str_le,                         // tp_le
-    str_eq,                         // tp_eq
-    str_ne,                         // tp_ne
-    str_ge,                         // tp_ge
-    str_gt,                         // tp_gt
+        // Boolean operations and comparisons
+        str_bool,  // tp_bool
+        str_lt,    // tp_lt
+        str_le,    // tp_le
+        str_eq,    // tp_eq
+        str_ne,    // tp_ne
+        str_ge,    // tp_ge
+        str_gt,    // tp_gt
 
-    // Generic object operations
-    str_currenthash,                // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        str_currenthash,      // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    _ypSequence_miniiter,           // tp_miniiter
-    _ypSequence_miniiter_rev,       // tp_miniiter_reversed
-    _ypSequence_miniiter_next,      // tp_miniiter_next
-    _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        _ypSequence_miniiter,       // tp_miniiter
+        _ypSequence_miniiter_rev,   // tp_miniiter_reversed
+        _ypSequence_miniiter_next,  // tp_miniiter_next
+        _ypSequence_miniiter_lenh,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,      // tp_iter
+        _ypIter_from_miniiter_rev,  // tp_iter_reversed
+        TypeError_objobjproc,       // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    str_len,                        // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    _ypSequence_getdefault,         // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        str_len,                    // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        _ypSequence_getdefault,     // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    &ypStr_as_sequence,             // tp_as_sequence
+        // Sequence operations
+        &ypStr_as_sequence,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 static ypSequenceMethods ypChrArray_as_sequence = {
-    str_concat,                     // tp_concat
-    MethodError_objssizeproc,       // tp_repeat
-    str_getindex,                   // tp_getindex
-    MethodError_objsliceproc,       // tp_getslice
-    MethodError_findfunc,           // tp_find
-    MethodError_countfunc,          // tp_count
-    MethodError_objssizeobjproc,    // tp_setindex
-    MethodError_objsliceobjproc,    // tp_setslice
-    MethodError_objssizeproc,       // tp_delindex
-    MethodError_objsliceproc,       // tp_delslice
-    MethodError_objobjproc,         // tp_append
-    MethodError_objobjproc,         // tp_extend
-    MethodError_objssizeproc,       // tp_irepeat
-    MethodError_objssizeobjproc,    // tp_insert
-    MethodError_objssizeproc,       // tp_popindex
-    MethodError_objproc,            // tp_reverse
-    MethodError_sortfunc            // tp_sort
+        str_concat,                   // tp_concat
+        MethodError_objssizeproc,     // tp_repeat
+        str_getindex,                 // tp_getindex
+        MethodError_objsliceproc,     // tp_getslice
+        MethodError_findfunc,         // tp_find
+        MethodError_countfunc,        // tp_count
+        MethodError_objssizeobjproc,  // tp_setindex
+        MethodError_objsliceobjproc,  // tp_setslice
+        MethodError_objssizeproc,     // tp_delindex
+        MethodError_objsliceproc,     // tp_delslice
+        MethodError_objobjproc,       // tp_append
+        MethodError_objobjproc,       // tp_extend
+        MethodError_objssizeproc,     // tp_irepeat
+        MethodError_objssizeobjproc,  // tp_insert
+        MethodError_objssizeproc,     // tp_popindex
+        MethodError_objproc,          // tp_reverse
+        MethodError_sortfunc          // tp_sort
 };
 
 static ypTypeObject ypChrArray_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    str_dealloc,                    // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        str_dealloc,          // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    str_unfrozen_copy,              // tp_unfrozen_copy
-    str_frozen_copy,                // tp_frozen_copy
-    str_unfrozen_deepcopy,          // tp_unfrozen_deepcopy
-    str_frozen_deepcopy,            // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,    // tp_freeze
+        str_unfrozen_copy,      // tp_unfrozen_copy
+        str_frozen_copy,        // tp_frozen_copy
+        str_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        str_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,    // tp_invalidate
 
-    // Boolean operations and comparisons
-    str_bool,                       // tp_bool
-    str_lt,                         // tp_lt
-    str_le,                         // tp_le
-    str_eq,                         // tp_eq
-    str_ne,                         // tp_ne
-    str_ge,                         // tp_ge
-    str_gt,                         // tp_gt
+        // Boolean operations and comparisons
+        str_bool,  // tp_bool
+        str_lt,    // tp_lt
+        str_le,    // tp_le
+        str_eq,    // tp_eq
+        str_ne,    // tp_ne
+        str_ge,    // tp_ge
+        str_gt,    // tp_gt
 
-    // Generic object operations
-    str_currenthash,                // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        str_currenthash,      // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    _ypSequence_miniiter,           // tp_miniiter
-    _ypSequence_miniiter_rev,       // tp_miniiter_reversed
-    _ypSequence_miniiter_next,      // tp_miniiter_next
-    _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        _ypSequence_miniiter,       // tp_miniiter
+        _ypSequence_miniiter_rev,   // tp_miniiter_reversed
+        _ypSequence_miniiter_next,  // tp_miniiter_next
+        _ypSequence_miniiter_lenh,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,      // tp_iter
+        _ypIter_from_miniiter_rev,  // tp_iter_reversed
+        TypeError_objobjproc,       // tp_send
 
-    // Container operations
-    MethodError_objobjproc,         // tp_contains
-    str_len,                        // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    _ypSequence_getdefault,         // tp_getdefault
-    _ypSequence_setitem,            // tp_setitem
-    _ypSequence_delitem,            // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        str_len,                    // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        _ypSequence_getdefault,     // tp_getdefault
+        _ypSequence_setitem,        // tp_setitem
+        _ypSequence_delitem,        // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    &ypChrArray_as_sequence,        // tp_as_sequence
+        // Sequence operations
+        &ypChrArray_as_sequence,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
-static ypObject *_yp_asencodedCX( ypObject *s, const yp_uint8_t * *encoded, yp_ssize_t *size,
-        ypObject * *encoding )
+static ypObject *_yp_asencodedCX(
+        ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding )
 {
     if( ypObject_TYPE_PAIR_CODE( s ) != ypStr_CODE ) return_yp_BAD_TYPE( s );
     ypStr_ASSERT_INVARIANTS( s );
@@ -9062,8 +9139,8 @@ static ypObject *_yp_asencodedCX( ypObject *s, const yp_uint8_t * *encoded, yp_s
     *encoding = ypStringLib_ENC( s )->name;
     return yp_None;
 }
-ypObject *yp_asencodedCX( ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size,
-        ypObject **encoding )
+ypObject *yp_asencodedCX(
+        ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding )
 {
     ypObject *result = _yp_asencodedCX( s, encoded, size, encoding );
     if( yp_isexceptionC( result ) ) {
@@ -9076,8 +9153,8 @@ ypObject *yp_asencodedCX( ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *s
 
 // Public constructors
 
-static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_t len,
-        ypObject *encoding, ypObject *errors )
+static ypObject *_ypStr_frombytes(
+        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors )
 {
     ypObject *result;
 
@@ -9093,25 +9170,28 @@ static ypObject *_ypStr_frombytes( int type, const yp_uint8_t *source, yp_ssize_
     ypStr_ASSERT_INVARIANTS( result );
     return result;
 }
-ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
-        ypObject *encoding, ypObject *errors ) {
+ypObject *yp_str_frombytesC4(
+        const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors )
+{
     return _ypStr_frombytes( ypStr_CODE, source, len, encoding, errors );
 }
-ypObject *yp_chrarray_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
-        ypObject *encoding, ypObject *errors ) {
+ypObject *yp_chrarray_frombytesC4(
+        const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors )
+{
     return _ypStr_frombytes( ypChrArray_CODE, source, len, encoding, errors );
 }
-ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
+ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len )
+{
     if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     return ypStringLib_decode_frombytesC_utf_8( ypStr_CODE, source, len, yp_s_strict );
 }
-ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len ) {
+ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len )
+{
     if( !ypBytes_adjust_lenC( source, &len ) ) return yp_MemorySizeOverflowError;
     return ypStringLib_decode_frombytesC_utf_8( ypChrArray_CODE, source, len, yp_s_strict );
 }
 
-static ypObject *_ypStr_decode( int type,
-        ypObject *source, ypObject *encoding, ypObject *errors )
+static ypObject *_ypStr_decode( int type, ypObject *source, ypObject *encoding, ypObject *errors )
 {
     ypObject *result;
     if( ypObject_TYPE_PAIR_CODE( source ) != ypBytes_CODE ) return_yp_BAD_TYPE( source );
@@ -9120,57 +9200,57 @@ static ypObject *_ypStr_decode( int type,
     if( yp_eq( encoding, yp_s_utf_8 ) != yp_True ) return yp_NotImplementedError;
 
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
-    result = ypStringLib_decode_frombytesC_utf_8( type,
-            ypBytes_DATA( source ), ypBytes_LEN( source ), errors );
+    result = ypStringLib_decode_frombytesC_utf_8(
+            type, ypBytes_DATA( source ), ypBytes_LEN( source ), errors );
     if( yp_isexceptionC( result ) ) return result;
     yp_ASSERT( ypObject_TYPE_CODE( result ) == type, "text encoding didn't return correct type" );
     ypStr_ASSERT_INVARIANTS( result );
     return result;
 }
-ypObject *yp_str3( ypObject *source, ypObject *encoding, ypObject *errors ) {
+ypObject *yp_str3( ypObject *source, ypObject *encoding, ypObject *errors )
+{
     return _ypStr_decode( ypStr_CODE, source, encoding, errors );
 }
-ypObject *yp_chrarray3( ypObject *source, ypObject *encoding, ypObject *errors ) {
+ypObject *yp_chrarray3( ypObject *source, ypObject *encoding, ypObject *errors )
+{
     return _ypStr_decode( ypChrArray_CODE, source, encoding, errors );
 }
-ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors ) {
-    return _ypStr_decode( ypObject_IS_MUTABLE( b ) ? ypChrArray_CODE : ypStr_CODE,
-            b, encoding, errors );
+ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors )
+{
+    return _ypStr_decode(
+            ypObject_IS_MUTABLE( b ) ? ypChrArray_CODE : ypStr_CODE, b, encoding, errors );
 }
-ypObject *yp_decode( ypObject *b ) {
+ypObject *yp_decode( ypObject *b )
+{
     if( ypObject_TYPE_PAIR_CODE( b ) != ypBytes_CODE ) return_yp_BAD_TYPE( b );
     return ypStringLib_decode_frombytesC_utf_8(
-            ypObject_IS_MUTABLE( b ) ? ypChrArray_CODE : ypStr_CODE,
-            ypBytes_DATA( b ), ypBytes_LEN( b ), yp_s_strict );
+            ypObject_IS_MUTABLE( b ) ? ypChrArray_CODE : ypStr_CODE, ypBytes_DATA( b ),
+            ypBytes_LEN( b ), yp_s_strict );
 }
 
-static ypObject *_ypStr( int type, ypObject *object )
+static ypObject *_ypStr( int type, ypObject *object ) { return yp_NotImplementedError; }
+ypObject *yp_str( ypObject *object ) { return _ypStr( ypStr_CODE, object ); }
+ypObject *yp_chrarray( ypObject *object ) { return _ypStr( ypChrArray_CODE, object ); }
+
+ypObject *yp_str0( void )
 {
-    return yp_NotImplementedError;
-}
-ypObject *yp_str( ypObject *object ) {
-    return _ypStr( ypStr_CODE, object );
-}
-ypObject *yp_chrarray( ypObject *object ) {
-    return _ypStr( ypChrArray_CODE, object );
-}
-
-ypObject *yp_str0( void ) {
     ypStr_ASSERT_INVARIANTS( _yp_str_empty );
     return _yp_str_empty;
 }
-ypObject *yp_chrarray0( void ) {
+ypObject *yp_chrarray0( void )
+{
     ypObject *newS = _ypStr_new_latin_1( ypChrArray_CODE, 0, /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newS ) ) return newS;
-    ((yp_uint8_t *) ypStr_DATA( newS ))[0] = 0;
+    ( (yp_uint8_t *) ypStr_DATA( newS ) )[0] = 0;
     ypStr_ASSERT_INVARIANTS( newS );
     return newS;
 }
 
 // TODO Statically-allocate the first 256 characters for ypStr_CODE only?
-static ypObject *_yp_chrC( int type, yp_int_t i ) {
-    int newEnc_code;
-    ypObject *newS;
+static ypObject *_yp_chrC( int type, yp_int_t i )
+{
+    int                  newEnc_code;
+    ypObject *           newS;
     ypStringLib_encinfo *newEnc;
 
     if( i < 0 || i > ypStringLib_MAX_UNICODE ) return yp_ValueError;
@@ -9183,41 +9263,40 @@ static ypObject *_yp_chrC( int type, yp_int_t i ) {
 
     newS = _ypStr_new( type, 1, /*alloclen_fixed=*/TRUE, newEnc_code );
     if( yp_isexceptionC( newS ) ) return newS;
-    yp_ASSERT( ypStr_DATA( newS ) == ypStr_INLINE_DATA( newS ), "yp_chrC didn't allocate inline!" );
+    yp_ASSERT(
+            ypStr_DATA( newS ) == ypStr_INLINE_DATA( newS ), "yp_chrC didn't allocate inline!" );
 
     // Recall we've already checked that i isn't outside of a 32-bit range (MAX_UNICODE)
-    newEnc = &(ypStringLib_encs[newEnc_code]);
+    newEnc = &( ypStringLib_encs[newEnc_code] );
     newEnc->setindexX( ypStr_DATA( newS ), 0, (yp_uint32_t) i );
     newEnc->setindexX( ypStr_DATA( newS ), 1, 0 );
     ypStr_SET_LEN( newS, 1 );
     ypStr_ASSERT_INVARIANTS( newS );
     return newS;
 }
-ypObject *yp_chrC( yp_int_t i ) {
-    return _yp_chrC( ypStr_CODE, i );
-}
+ypObject *yp_chrC( yp_int_t i ) { return _yp_chrC( ypStr_CODE, i ); }
 
 // Immortal constants
 
-yp_IMMORTAL_STR_LATIN_1( yp_s_ascii,     "ascii" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_latin_1,   "latin-1" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_8,     "utf-8" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16,    "utf-16" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16be,  "utf-16be" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16le,  "utf-16le" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32,    "utf-32" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32be,  "utf-32be" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32le,  "utf-32le" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_ucs_2,     "ucs-2" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_ucs_4,     "ucs-4" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_ascii, "ascii" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_latin_1, "latin-1" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_8, "utf-8" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16, "utf-16" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16be, "utf-16be" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_16le, "utf-16le" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32, "utf-32" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32be, "utf-32be" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_utf_32le, "utf-32le" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_ucs_2, "ucs-2" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_ucs_4, "ucs-4" );
 
-yp_IMMORTAL_STR_LATIN_1( yp_s_strict,               "strict" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_replace,              "replace" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_ignore,               "ignore" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_xmlcharrefreplace,    "xmlcharrefreplace" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_backslashreplace,     "backslashreplace" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_surrogateescape,      "surrogateescape" );
-yp_IMMORTAL_STR_LATIN_1( yp_s_surrogatepass,        "surrogatepass" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_strict, "strict" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_replace, "replace" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_ignore, "ignore" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_xmlcharrefreplace, "xmlcharrefreplace" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_backslashreplace, "backslashreplace" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_surrogateescape, "surrogateescape" );
+yp_IMMORTAL_STR_LATIN_1( yp_s_surrogatepass, "surrogatepass" );
 
 
 /*************************************************************************************************
@@ -9229,224 +9308,199 @@ yp_IMMORTAL_STR_LATIN_1( yp_s_surrogatepass,        "surrogatepass" );
 
 // XXX Setting name requires knowing what yp_IMMORTAL_STR_LATIN_1 calls its struct
 static ypStringLib_encinfo ypStringLib_encs[4] = {
-    {   // ypStringLib_ENC_BYTES
-        0,                                  // sizeshift
-        1,                                  // elemsize
-        0xFFu,                              // max_char
-        ypStringLib_ENC_BYTES,              // code
-        NULL,                               // name
-        _yp_bytes_empty,                    // empty_immutable
-        yp_bytearray0,                      // empty_mutable
-        ypStringLib_getindexX_1byte,        // getindexX
-        ypStringLib_setindexX_1byte,        // setindexX
-        _ypBytes_new,                       // new
-        _ypBytes_copy,                      // copy
-        _ypBytes_grow_onextend,             // grow_onextend
-        bytearray_clear                     // clear
-    },
-    {   // ypStringLib_ENC_LATIN_1
-        0,                                  // sizeshift
-        1,                                  // elemsize
-        0xFFu,                              // max_char
-        ypStringLib_ENC_LATIN_1,            // code
-        (ypObject *)&_yp_s_latin_1_struct,  // name
-        _yp_str_empty,                      // empty_immutable
-        yp_chrarray0,                       // empty_mutable
-        ypStringLib_getindexX_1byte,        // getindexX
-        ypStringLib_setindexX_1byte,        // setindexX
-        _ypStr_new_latin_1,                 // new
-        _ypStr_copy,                        // copy
-        _ypStr_grow_onextend,               // grow_onextend
-        chrarray_clear,                     // clear
-    },
-    {   // ypStringLib_ENC_UCS_2
-        1,                                  // sizeshift
-        2,                                  // elemsize
-        0xFFFFu,                            // max_char
-        ypStringLib_ENC_UCS_2,              // code
-        (ypObject *)&_yp_s_ucs_2_struct,    // name
-        _yp_str_empty,                      // empty_immutable
-        yp_chrarray0,                       // empty_mutable
-        ypStringLib_getindexX_2bytes,       // getindexX
-        ypStringLib_setindexX_2bytes,       // setindexX
-        _ypStr_new_ucs_2,                   // new
-        _ypStr_copy,                        // copy
-        _ypStr_grow_onextend,               // grow_onextend
-        chrarray_clear,                     // clear
-    },
-    {   // ypStringLib_ENC_UCS_4
-        2,                                  // sizeshift
-        4,                                  // elemsize
-        0xFFFFFFFFu,                        // max_char
-        ypStringLib_ENC_UCS_4,              // code
-        (ypObject *)&_yp_s_ucs_4_struct,    // name
-        _yp_str_empty,                      // empty_immutable
-        yp_chrarray0,                       // empty_mutable
-        ypStringLib_getindexX_4bytes,       // getindexX
-        ypStringLib_setindexX_4bytes,       // setindexX
-        _ypStr_new_ucs_4,                   // new
-        _ypStr_copy,                        // copy
-        _ypStr_grow_onextend,               // grow_onextend
-        chrarray_clear,                     // clear
-    }
-};
+        {
+                // ypStringLib_ENC_BYTES
+                0,                            // sizeshift
+                1,                            // elemsize
+                0xFFu,                        // max_char
+                ypStringLib_ENC_BYTES,        // code
+                NULL,                         // name
+                _yp_bytes_empty,              // empty_immutable
+                yp_bytearray0,                // empty_mutable
+                ypStringLib_getindexX_1byte,  // getindexX
+                ypStringLib_setindexX_1byte,  // setindexX
+                _ypBytes_new,                 // new
+                _ypBytes_copy,                // copy
+                _ypBytes_grow_onextend,       // grow_onextend
+                bytearray_clear               // clear
+        },
+        {
+                // ypStringLib_ENC_LATIN_1
+                0,                                   // sizeshift
+                1,                                   // elemsize
+                0xFFu,                               // max_char
+                ypStringLib_ENC_LATIN_1,             // code
+                (ypObject *) &_yp_s_latin_1_struct,  // name
+                _yp_str_empty,                       // empty_immutable
+                yp_chrarray0,                        // empty_mutable
+                ypStringLib_getindexX_1byte,         // getindexX
+                ypStringLib_setindexX_1byte,         // setindexX
+                _ypStr_new_latin_1,                  // new
+                _ypStr_copy,                         // copy
+                _ypStr_grow_onextend,                // grow_onextend
+                chrarray_clear,                      // clear
+        },
+        {
+                // ypStringLib_ENC_UCS_2
+                1,                                 // sizeshift
+                2,                                 // elemsize
+                0xFFFFu,                           // max_char
+                ypStringLib_ENC_UCS_2,             // code
+                (ypObject *) &_yp_s_ucs_2_struct,  // name
+                _yp_str_empty,                     // empty_immutable
+                yp_chrarray0,                      // empty_mutable
+                ypStringLib_getindexX_2bytes,      // getindexX
+                ypStringLib_setindexX_2bytes,      // setindexX
+                _ypStr_new_ucs_2,                  // new
+                _ypStr_copy,                       // copy
+                _ypStr_grow_onextend,              // grow_onextend
+                chrarray_clear,                    // clear
+        },
+        {
+                // ypStringLib_ENC_UCS_4
+                2,                                 // sizeshift
+                4,                                 // elemsize
+                0xFFFFFFFFu,                       // max_char
+                ypStringLib_ENC_UCS_4,             // code
+                (ypObject *) &_yp_s_ucs_4_struct,  // name
+                _yp_str_empty,                     // empty_immutable
+                yp_chrarray0,                      // empty_mutable
+                ypStringLib_getindexX_4bytes,      // getindexX
+                ypStringLib_setindexX_4bytes,      // setindexX
+                _ypStr_new_ucs_4,                  // new
+                _ypStr_copy,                       // copy
+                _ypStr_grow_onextend,              // grow_onextend
+                chrarray_clear,                    // clear
+        }};
 
 // Assume these are most-likely to be run against str/chrarrays, so put that check first
 // TODO Rethink where we split off to a type-specific function, and where we call a generic
 // ypStringLib
-#define _ypStringLib_REDIRECT1( ob, meth, args ) \
-    do { \
+#define _ypStringLib_REDIRECT1( ob, meth, args )     \
+    do {                                             \
         int ob_pair = ypObject_TYPE_PAIR_CODE( ob ); \
-        if( ob_pair == ypStr_CODE ) { \
-            return str_ ## meth args; \
-        } \
-        if( ob_pair == ypBytes_CODE ) { \
-            return bytes_ ## meth args; \
-        } \
-        return_yp_BAD_TYPE( ob ); \
+        if( ob_pair == ypStr_CODE ) {                \
+            return str_##meth args;                  \
+        }                                            \
+        if( ob_pair == ypBytes_CODE ) {              \
+            return bytes_##meth args;                \
+        }                                            \
+        return_yp_BAD_TYPE( ob );                    \
     } while( 0 )
 
 
-ypObject *yp_isalnum( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isalnum, (s) );
+ypObject *yp_isalnum( ypObject *s ) { _ypStringLib_REDIRECT1( s, isalnum, ( s ) ); }
+
+ypObject *yp_isalpha( ypObject *s ) { _ypStringLib_REDIRECT1( s, isalpha, ( s ) ); }
+
+ypObject *yp_isdecimal( ypObject *s ) { _ypStringLib_REDIRECT1( s, isdecimal, ( s ) ); }
+
+ypObject *yp_isdigit( ypObject *s ) { _ypStringLib_REDIRECT1( s, isdigit, ( s ) ); }
+
+ypObject *yp_isidentifier( ypObject *s ) { _ypStringLib_REDIRECT1( s, isidentifier, ( s ) ); }
+
+ypObject *yp_islower( ypObject *s ) { _ypStringLib_REDIRECT1( s, islower, ( s ) ); }
+
+ypObject *yp_isnumeric( ypObject *s ) { _ypStringLib_REDIRECT1( s, isnumeric, ( s ) ); }
+
+ypObject *yp_isprintable( ypObject *s ) { _ypStringLib_REDIRECT1( s, isprintable, ( s ) ); }
+
+ypObject *yp_isspace( ypObject *s ) { _ypStringLib_REDIRECT1( s, isspace, ( s ) ); }
+
+ypObject *yp_isupper( ypObject *s ) { _ypStringLib_REDIRECT1( s, isupper, ( s ) ); }
+
+ypObject *yp_startswithC4( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end )
+{
+    _ypStringLib_REDIRECT1( s, startswith, ( s, prefix, start, end ) );
 }
 
-ypObject *yp_isalpha( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isalpha, (s) );
-}
-
-ypObject *yp_isdecimal( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isdecimal, (s) );
-}
-
-ypObject *yp_isdigit( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isdigit, (s) );
-}
-
-ypObject *yp_isidentifier( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isidentifier, (s) );
-}
-
-ypObject *yp_islower( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, islower, (s) );
-}
-
-ypObject *yp_isnumeric( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isnumeric, (s) );
-}
-
-ypObject *yp_isprintable( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isprintable, (s) );
-}
-
-ypObject *yp_isspace( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isspace, (s) );
-}
-
-ypObject *yp_isupper( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, isupper, (s) );
-}
-
-ypObject *yp_startswithC4( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end ) {
-    _ypStringLib_REDIRECT1( s, startswith, (s, prefix, start, end) );
-}
-
-ypObject *yp_startswithC( ypObject *s, ypObject *prefix ) {
+ypObject *yp_startswithC( ypObject *s, ypObject *prefix )
+{
     return yp_startswithC4( s, prefix, 0, yp_SLICE_USELEN );
 }
 
-ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end ) {
-    _ypStringLib_REDIRECT1( s, endswith, (s, suffix, start, end) );
+ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end )
+{
+    _ypStringLib_REDIRECT1( s, endswith, ( s, suffix, start, end ) );
 }
 
-ypObject *yp_endswithC( ypObject *s, ypObject *suffix ) {
+ypObject *yp_endswithC( ypObject *s, ypObject *suffix )
+{
     return yp_endswithC4( s, suffix, 0, yp_SLICE_USELEN );
 }
 
-ypObject *yp_lower( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, lower, (s) );
+ypObject *yp_lower( ypObject *s ) { _ypStringLib_REDIRECT1( s, lower, ( s ) ); }
+
+ypObject *yp_upper( ypObject *s ) { _ypStringLib_REDIRECT1( s, upper, ( s ) ); }
+
+ypObject *yp_casefold( ypObject *s ) { _ypStringLib_REDIRECT1( s, casefold, ( s ) ); }
+
+ypObject *yp_swapcase( ypObject *s ) { _ypStringLib_REDIRECT1( s, swapcase, ( s ) ); }
+
+ypObject *yp_capitalize( ypObject *s ) { _ypStringLib_REDIRECT1( s, capitalize, ( s ) ); }
+
+ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar )
+{
+    _ypStringLib_REDIRECT1( s, ljust, ( s, width, ord_fillchar ) );
 }
 
-ypObject *yp_upper( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, upper, (s) );
+ypObject *yp_ljustC( ypObject *s, yp_ssize_t width ) { return yp_ljustC3( s, width, ' ' ); }
+
+ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar )
+{
+    _ypStringLib_REDIRECT1( s, rjust, ( s, width, ord_fillchar ) );
 }
 
-ypObject *yp_casefold( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, casefold, (s) );
+ypObject *yp_rjustC( ypObject *s, yp_ssize_t width ) { return yp_rjustC3( s, width, ' ' ); }
+
+ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar )
+{
+    _ypStringLib_REDIRECT1( s, center, ( s, width, ord_fillchar ) );
 }
 
-ypObject *yp_swapcase( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, swapcase, (s) );
+ypObject *yp_centerC( ypObject *s, yp_ssize_t width ) { return yp_centerC3( s, width, ' ' ); }
+
+ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize )
+{
+    _ypStringLib_REDIRECT1( s, expandtabs, ( s, tabsize ) );
 }
 
-ypObject *yp_capitalize( ypObject *s ) {
-    _ypStringLib_REDIRECT1( s, capitalize, (s) );
+ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count )
+{
+    _ypStringLib_REDIRECT1( s, replace, ( s, oldsub, newsub, count ) );
 }
 
-ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    _ypStringLib_REDIRECT1( s, ljust, (s, width, ord_fillchar) );
-}
-
-ypObject *yp_ljustC( ypObject *s, yp_ssize_t width ) {
-    return yp_ljustC3( s, width, ' ' );
-}
-
-ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    _ypStringLib_REDIRECT1( s, rjust, (s, width, ord_fillchar) );
-}
-
-ypObject *yp_rjustC( ypObject *s, yp_ssize_t width ) {
-    return yp_rjustC3( s, width, ' ' );
-}
-
-ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar ) {
-    _ypStringLib_REDIRECT1( s, center, (s, width, ord_fillchar) );
-}
-
-ypObject *yp_centerC( ypObject *s, yp_ssize_t width ) {
-    return yp_centerC3( s, width, ' ' );
-}
-
-ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize ) {
-    _ypStringLib_REDIRECT1( s, expandtabs, (s, tabsize) );
-}
-
-ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count ) {
-    _ypStringLib_REDIRECT1( s, replace, (s, oldsub, newsub, count) );
-}
-
-ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub ) {
+ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub )
+{
     return yp_replaceC4( s, oldsub, newsub, -1 );
 }
 
-ypObject *yp_lstrip2( ypObject *s, ypObject *chars ) {
-    _ypStringLib_REDIRECT1( s, lstrip, (s, chars) );
+ypObject *yp_lstrip2( ypObject *s, ypObject *chars )
+{
+    _ypStringLib_REDIRECT1( s, lstrip, ( s, chars ) );
 }
 
-ypObject *yp_lstrip( ypObject *s ) {
-    return yp_lstrip2( s, yp_None );
+ypObject *yp_lstrip( ypObject *s ) { return yp_lstrip2( s, yp_None ); }
+
+ypObject *yp_rstrip2( ypObject *s, ypObject *chars )
+{
+    _ypStringLib_REDIRECT1( s, rstrip, ( s, chars ) );
 }
 
-ypObject *yp_rstrip2( ypObject *s, ypObject *chars ) {
-    _ypStringLib_REDIRECT1( s, rstrip, (s, chars) );
+ypObject *yp_rstrip( ypObject *s ) { return yp_rstrip2( s, yp_None ); }
+
+ypObject *yp_strip2( ypObject *s, ypObject *chars )
+{
+    _ypStringLib_REDIRECT1( s, strip, ( s, chars ) );
 }
 
-ypObject *yp_rstrip( ypObject *s ) {
-    return yp_rstrip2( s, yp_None );
-}
+ypObject *yp_strip( ypObject *s ) { return yp_strip2( s, yp_None ); }
 
-ypObject *yp_strip2( ypObject *s, ypObject *chars ) {
-    _ypStringLib_REDIRECT1( s, strip, (s, chars) );
-}
-
-ypObject *yp_strip( ypObject *s ) {
-    return yp_strip2( s, yp_None );
-}
-
-ypObject *yp_join( ypObject *s, ypObject *iterable ) {
+ypObject *yp_join( ypObject *s, ypObject *iterable )
+{
     const ypQuickSeq_methods *methods;
-    ypQuickSeq_state state;
-    ypObject *result;
+    ypQuickSeq_state          state;
+    ypObject *                result;
 
     if( !ypStringLib_TYPE_CHECK( s ) ) return_yp_BAD_TYPE( s );
     if( ypStringLib_TYPE_CHECK( iterable ) ) {
@@ -9471,12 +9525,14 @@ ypObject *yp_join( ypObject *s, ypObject *iterable ) {
     return result;
 }
 
-ypObject *yp_joinN( ypObject *s, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_joinNV, (s, n, args), n );
+ypObject *yp_joinN( ypObject *s, int n, ... )
+{
+    return_yp_V_FUNC( ypObject *, yp_joinNV, ( s, n, args ), n );
 }
-ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
+ypObject *yp_joinNV( ypObject *s, int n, va_list args )
+{
     ypQuickSeq_state state;
-    ypObject *result;
+    ypObject *       result;
 
     if( !ypStringLib_TYPE_CHECK( s ) ) return_yp_BAD_TYPE( s );
     ypQuickSeq_new_fromvar( &state, n, args );
@@ -9487,31 +9543,30 @@ ypObject *yp_joinNV( ypObject *s, int n, va_list args ) {
     return result;
 }
 
-void yp_partition( ypObject *s, ypObject *sep,
-        ypObject **part0, ypObject **part1, ypObject **part2 );
+void yp_partition(
+        ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2 );
 
-void yp_rpartition( ypObject *s, ypObject *sep,
-        ypObject **part0, ypObject **part1, ypObject **part2 );
+void yp_rpartition(
+        ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2 );
 
-ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit ) {
-    _ypStringLib_REDIRECT1( s, split, (s, sep, maxsplit) );
+ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit )
+{
+    _ypStringLib_REDIRECT1( s, split, ( s, sep, maxsplit ) );
 }
 
-ypObject *yp_split2( ypObject *s, ypObject *sep ) {
-    return yp_splitC3( s, sep, -1 );
-}
+ypObject *yp_split2( ypObject *s, ypObject *sep ) { return yp_splitC3( s, sep, -1 ); }
 
-ypObject *yp_split( ypObject *s ) {
-    return yp_splitC3( s, yp_None, -1 );
-}
+ypObject *yp_split( ypObject *s ) { return yp_splitC3( s, yp_None, -1 ); }
 
 // TODO use a direction parameter internally like in find/rfind?
-ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit ) {
-    _ypStringLib_REDIRECT1( s, rsplit, (s, sep, maxsplit) );
+ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit )
+{
+    _ypStringLib_REDIRECT1( s, rsplit, ( s, sep, maxsplit ) );
 }
 
-ypObject *yp_splitlines2( ypObject *s, ypObject *keepends ) {
-    _ypStringLib_REDIRECT1( s, splitlines, (s, keepends) );
+ypObject *yp_splitlines2( ypObject *s, ypObject *keepends )
+{
+    _ypStringLib_REDIRECT1( s, splitlines, ( s, keepends ) );
 }
 
 
@@ -9523,32 +9578,32 @@ typedef struct {
     ypObject_HEAD;
     yp_INLINE_DATA( ypObject * );
 } ypTupleObject;
-#define ypTuple_ARRAY( sq )         ( (ypObject **) ((ypObject *)sq)->ob_data )
-#define ypTuple_LEN                 ypObject_CACHED_LEN
-#define ypTuple_SET_LEN             ypObject_SET_CACHED_LEN
-#define ypTuple_ALLOCLEN            ypObject_ALLOCLEN
-#define ypTuple_INLINE_DATA( sq )   ( ((ypTupleObject *)sq)->ob_inline_data )
+#define ypTuple_ARRAY( sq ) ( (ypObject **) ( (ypObject *) sq )->ob_data )
+#define ypTuple_LEN ypObject_CACHED_LEN
+#define ypTuple_SET_LEN ypObject_SET_CACHED_LEN
+#define ypTuple_ALLOCLEN ypObject_ALLOCLEN
+#define ypTuple_INLINE_DATA( sq ) ( ( (ypTupleObject *) sq )->ob_inline_data )
 
 // The maximum possible alloclen and length of a tuple
-#define ypTuple_ALLOCLEN_MAX ( (yp_ssize_t) MIN( \
-            (yp_SSIZE_T_MAX-yp_sizeof( ypTupleObject )) / yp_sizeof( ypObject * ), \
+#define ypTuple_ALLOCLEN_MAX                                                           \
+    ( (yp_ssize_t) MIN(                                                                \
+            ( yp_SSIZE_T_MAX - yp_sizeof( ypTupleObject ) ) / yp_sizeof( ypObject * ), \
             ypObject_LEN_MAX ) )
 #define ypTuple_LEN_MAX ypTuple_ALLOCLEN_MAX
 
 // Empty tuples can be represented by this, immortal object
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty tuple?
-static ypObject *_yp_tuple_empty_data[1] = {NULL};
-static ypTupleObject _yp_tuple_empty_struct = {
-    { ypTuple_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
-    0, 0, ypObject_HASH_INVALID, _yp_tuple_empty_data } };
-#define _yp_tuple_empty     ((ypObject *) &_yp_tuple_empty_struct)
+static ypObject *    _yp_tuple_empty_data[1] = {NULL};
+static ypTupleObject _yp_tuple_empty_struct = {{ypTuple_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0,
+        ypObject_HASH_INVALID, _yp_tuple_empty_data}};
+#define _yp_tuple_empty ( (ypObject *) &_yp_tuple_empty_struct )
 
 // Moves the elements from [src:] to the index dest; this can be used when deleting items (they
 // must be discarded first), or inserting (the new space is uninitialized).  Assumes enough space
 // is allocated for the move.  Recall that memmove handles overlap.
-#define ypTuple_ELEMMOVE( sq, dest, src ) \
-    memmove( ypTuple_ARRAY( sq )+(dest), ypTuple_ARRAY( sq )+(src), \
-            (ypTuple_LEN( sq )-(src)) * yp_sizeof( ypObject * ) );
+#define ypTuple_ELEMMOVE( sq, dest, src )                                   \
+    memmove( ypTuple_ARRAY( sq ) + ( dest ), ypTuple_ARRAY( sq ) + ( src ), \
+            ( ypTuple_LEN( sq ) - ( src ) ) * yp_sizeof( ypObject * ) );
 
 // Return a new tuple/list object with the given alloclen.  If type is immutable and
 // alloclen_fixed is true (indicating the object will never grow), the data is placed inline
@@ -9556,15 +9611,16 @@ static ypTupleObject _yp_tuple_empty_struct = {
 // XXX Check for the _yp_tuple_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
-static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen, int alloclen_fixed ) {
+static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen, int alloclen_fixed )
+{
     yp_ASSERT( alloclen >= 0, "alloclen cannot be negative" );
     yp_ASSERT( alloclen <= ypTuple_ALLOCLEN_MAX, "alloclen cannot be >max" );
     if( alloclen_fixed && type == ypTuple_CODE ) {
-        return ypMem_MALLOC_CONTAINER_INLINE( ypTupleObject, ypTuple_CODE,
-            alloclen, ypTuple_ALLOCLEN_MAX );
+        return ypMem_MALLOC_CONTAINER_INLINE(
+                ypTupleObject, ypTuple_CODE, alloclen, ypTuple_ALLOCLEN_MAX );
     } else {
-        return ypMem_MALLOC_CONTAINER_VARIABLE( ypTupleObject, type,
-            alloclen, 0, ypTuple_ALLOCLEN_MAX );
+        return ypMem_MALLOC_CONTAINER_VARIABLE(
+                ypTupleObject, type, alloclen, 0, ypTuple_ALLOCLEN_MAX );
     }
 }
 
@@ -9572,21 +9628,21 @@ static ypObject *_ypTuple_new( int type, yp_ssize_t alloclen, int alloclen_fixed
 static ypObject *_ypTuple_copy( int type, ypObject *x, int alloclen_fixed )
 {
     yp_ssize_t i;
-    ypObject *sq = _ypTuple_new( type, ypTuple_LEN( x ), alloclen_fixed );
+    ypObject * sq = _ypTuple_new( type, ypTuple_LEN( x ), alloclen_fixed );
     if( yp_isexceptionC( sq ) ) return sq;
-    memcpy( ypTuple_ARRAY( sq ), ypTuple_ARRAY( x ), ypTuple_LEN( x )*yp_sizeof( ypObject * ) );
+    memcpy( ypTuple_ARRAY( sq ), ypTuple_ARRAY( x ), ypTuple_LEN( x ) * yp_sizeof( ypObject * ) );
     for( i = 0; i < ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
     ypTuple_SET_LEN( sq, ypTuple_LEN( x ) );
     return sq;
 }
 
 // XXX Check for the _yp_tuple_empty case first
-static ypObject *_ypTuple_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
-        int alloclen_fixed )
+static ypObject *_ypTuple_deepcopy(
+        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, int alloclen_fixed )
 {
-    ypObject *sq;
+    ypObject * sq;
     yp_ssize_t i;
-    ypObject *item;
+    ypObject * item;
 
     sq = _ypTuple_new( type, ypTuple_LEN( x ), alloclen_fixed );
     if( yp_isexceptionC( sq ) ) return sq;
@@ -9610,7 +9666,7 @@ static ypObject *_ypTuple_deepcopy( int type, ypObject *x, visitfunc copy_visito
 // factor and n must both be greater than zero.  Cannot fail.
 // XXX Handle the "empty" case (factor<1 or n<1) before calling this function
 #define _ypTuple_repeat_memcpy( sq, factor, n ) \
-    _ypSequence_repeat_memcpy( ypTuple_ARRAY( sq ), (factor), (n)*sizeof( ypObject * ) )
+    _ypSequence_repeat_memcpy( ypTuple_ARRAY( sq ), ( factor ), ( n ) * sizeof( ypObject * ) )
 
 // Called on push/append, extend, or irepeat to increase the allocated size of the tuple.  Does not
 // update ypTuple_LEN.
@@ -9619,8 +9675,8 @@ static ypObject *_ypTuple_extend_grow( ypObject *sq, yp_ssize_t required, yp_ssi
     void *oldptr;
     yp_ASSERT( required >= ypTuple_LEN( sq ), "required cannot be <len(sq)" );
     yp_ASSERT( required <= ypTuple_LEN_MAX, "required cannot be >max" );
-    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject,
-        required, extra, ypTuple_ALLOCLEN_MAX );
+    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE(
+            sq, ypTupleObject, required, extra, ypTuple_ALLOCLEN_MAX );
     if( oldptr == NULL ) return yp_MemoryError;
     if( ypTuple_ARRAY( sq ) != oldptr ) {
         memcpy( ypTuple_ARRAY( sq ), oldptr, ypTuple_LEN( sq ) * yp_sizeof( ypObject * ) );
@@ -9635,9 +9691,9 @@ static ypObject *_ypTuple_push( ypObject *sq, ypObject *x, yp_ssize_t growhint )
 {
     ypObject *result;
     if( ypTuple_LEN( sq ) > ypTuple_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
-    if( ypTuple_ALLOCLEN( sq ) < ypTuple_LEN( sq )+1 ) {
+    if( ypTuple_ALLOCLEN( sq ) < ypTuple_LEN( sq ) + 1 ) {
         if( growhint < 0 ) growhint = 0;
-        result = _ypTuple_extend_grow( sq, ypTuple_LEN( sq )+1, growhint );
+        result = _ypTuple_extend_grow( sq, ypTuple_LEN( sq ) + 1, growhint );
         if( yp_isexceptionC( result ) ) return result;
     }
     ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] = yp_incref( x );
@@ -9657,8 +9713,8 @@ static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
         ypObject *result = _ypTuple_extend_grow( sq, newLen, 0 );
         if( yp_isexceptionC( result ) ) return result;
     }
-    memcpy( ypTuple_ARRAY( sq )+ypTuple_LEN( sq ), ypTuple_ARRAY( x ),
-            ypTuple_LEN( x )*yp_sizeof( ypObject * ) );
+    memcpy( ypTuple_ARRAY( sq ) + ypTuple_LEN( sq ), ypTuple_ARRAY( x ),
+            ypTuple_LEN( x ) * yp_sizeof( ypObject * ) );
     for( i = ypTuple_LEN( sq ); i < newLen; i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
     ypTuple_SET_LEN( sq, newLen );
     return yp_None;
@@ -9666,18 +9722,18 @@ static ypObject *_ypTuple_extend_from_tuple( ypObject *sq, ypObject *x )
 
 static ypObject *_ypTuple_extend_from_iter( ypObject *sq, ypObject **mi, yp_uint64_t *mi_state )
 {
-    ypObject *exc = yp_None;
-    ypObject *x;
-    ypObject *result;
-    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc ); // zero on error
+    ypObject * exc = yp_None;
+    ypObject * x;
+    ypObject * result;
+    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc );  // zero on error
 
     while( 1 ) {
-        x = yp_miniiter_next( mi, mi_state ); // new ref
+        x = yp_miniiter_next( mi, mi_state );  // new ref
         if( yp_isexceptionC( x ) ) {
             if( yp_isexceptionC2( x, yp_StopIteration ) ) break;
             return x;
         }
-        lenhint -= 1; // check for <0 only when we need it in _ypTuple_push
+        lenhint -= 1;  // check for <0 only when we need it in _ypTuple_push
         result = _ypTuple_push( sq, x, lenhint );
         yp_decref( x );
         if( yp_isexceptionC( result ) ) return result;
@@ -9690,9 +9746,9 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         return _ypTuple_extend_from_tuple( sq, iterable );
     } else {
-        ypObject *result;
+        ypObject *  result;
         yp_uint64_t mi_state;
-        ypObject *mi = yp_miniiter( iterable, &mi_state ); // new ref
+        ypObject *  mi = yp_miniiter( iterable, &mi_state );  // new ref
         if( yp_isexceptionC( mi ) ) return mi;
         result = _ypTuple_extend_from_iter( sq, &mi, &mi_state );
         yp_decref( mi );
@@ -9703,22 +9759,23 @@ static ypObject *_ypTuple_extend( ypObject *sq, ypObject *iterable )
 // Called by setslice to discard the items at sq[start:stop] and shift the items at sq[stop:] to
 // start at sq[stop+growBy]; the pointers at sq[start:stop+growBy] will be uninitialized.  sq must
 // have enough space allocated for the move. Updates ypTuple_LEN.  Cannot fail.
-static void _ypTuple_setslice_elemmove( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t growBy )
+static void _ypTuple_setslice_elemmove(
+        ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t growBy )
 {
     yp_ssize_t i;
     yp_ASSERT( growBy >= -ypTuple_LEN( sq ), "growBy cannot be less than -len(sq)" );
-    yp_ASSERT( ypTuple_LEN( sq )+growBy <= ypTuple_ALLOCLEN( sq ), "must be enough space for move" );
+    yp_ASSERT( ypTuple_LEN( sq ) + growBy <= ypTuple_ALLOCLEN( sq ),
+            "must be enough space for move" );
     for( i = start; i < stop; i++ ) yp_decref( ypTuple_ARRAY( sq )[i] );
-    ypTuple_ELEMMOVE( sq, stop+growBy, stop );
+    ypTuple_ELEMMOVE( sq, stop + growBy, stop );
     ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) + growBy );
 }
 
 // Called on a setslice of step 1 and positive growBy, or an insert.  Similar to
 // _ypTuple_setslice_elemmove, except sq will grow if it doesn't have enough space allocated.  On
 // error, sq is not modified.
-static ypObject *_ypTuple_setslice_grow( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t growBy, yp_ssize_t extra )
+static ypObject *_ypTuple_setslice_grow(
+        ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t growBy, yp_ssize_t extra )
 {
     yp_ssize_t newLen;
     ypObject **oldptr;
@@ -9730,8 +9787,8 @@ static ypObject *_ypTuple_setslice_grow( ypObject *sq, yp_ssize_t start, yp_ssiz
     if( ypTuple_LEN( sq ) > ypTuple_LEN_MAX - growBy ) return yp_MemorySizeOverflowError;
     newLen = ypTuple_LEN( sq ) + growBy;
     if( ypTuple_ALLOCLEN( sq ) < newLen ) {
-        oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( sq, ypTupleObject,
-            newLen, extra, ypTuple_ALLOCLEN_MAX );
+        oldptr = ypMem_REALLOC_CONTAINER_VARIABLE(
+                sq, ypTupleObject, newLen, extra, ypTuple_ALLOCLEN_MAX );
         if( oldptr == NULL ) return yp_MemoryError;
         if( ypTuple_ARRAY( sq ) == oldptr ) {
             _ypTuple_setslice_elemmove( sq, start, stop, growBy );
@@ -9739,8 +9796,8 @@ static ypObject *_ypTuple_setslice_grow( ypObject *sq, yp_ssize_t start, yp_ssiz
             // The data doesn't overlap, so use memcpy, remembering to discard sq[start:stop]
             for( i = start; i < stop; i++ ) yp_decref( oldptr[i] );
             memcpy( ypTuple_ARRAY( sq ), oldptr, start * yp_sizeof( ypObject * ) );
-            memcpy( ypTuple_ARRAY( sq )+stop+growBy, oldptr+stop,
-                    (ypTuple_LEN( sq )-stop) * yp_sizeof( ypObject * ) );
+            memcpy( ypTuple_ARRAY( sq ) + stop + growBy, oldptr + stop,
+                    ( ypTuple_LEN( sq ) - stop ) * yp_sizeof( ypObject * ) );
             ypMem_REALLOC_CONTAINER_FREE_OLDPTR( sq, ypTupleObject, oldptr );
             ypTuple_SET_LEN( sq, newLen );
         }
@@ -9752,10 +9809,10 @@ static ypObject *_ypTuple_setslice_grow( ypObject *sq, yp_ssize_t start, yp_ssiz
 
 // XXX sq and x must _not_ be the same object (pass a copy of x if so)
 static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step );
-static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
-        yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x )
+static ypObject *_ypTuple_setslice_from_tuple(
+        ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x )
 {
-    ypObject *result;
+    ypObject * result;
     yp_ssize_t slicelength;
     yp_ssize_t i;
 
@@ -9767,7 +9824,7 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
 
     if( step == 1 ) {
         // Note that -len(sq)<=growBy<=len(x), so the growBy calculation can't overflow
-        yp_ssize_t growBy = ypTuple_LEN( x ) - slicelength; // negative means list shrinking
+        yp_ssize_t growBy = ypTuple_LEN( x ) - slicelength;  // negative means list shrinking
         if( growBy > 0 ) {
             // TODO Over-allocate?
             result = _ypTuple_setslice_grow( sq, start, stop, growBy, 0 );
@@ -9778,9 +9835,9 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
         }
 
         // There are now len(x) elements starting at sq[start] waiting for x's items
-        memcpy( ypTuple_ARRAY( sq )+start, ypTuple_ARRAY( x ),
-            ypTuple_LEN( x )*yp_sizeof( ypObject * ) );
-        for( i = start; i < start+ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
+        memcpy( ypTuple_ARRAY( sq ) + start, ypTuple_ARRAY( x ),
+                ypTuple_LEN( x ) * yp_sizeof( ypObject * ) );
+        for( i = start; i < start + ypTuple_LEN( x ); i++ ) yp_incref( ypTuple_ARRAY( sq )[i] );
     } else {
         if( ypTuple_LEN( x ) != slicelength ) return yp_ValueError;
         for( i = 0; i < slicelength; i++ ) {
@@ -9796,9 +9853,9 @@ static ypObject *_ypTuple_setslice_from_tuple( ypObject *sq,
 
 static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
 {
-    ypObject *exc = yp_None;
-    ypObject *newSq;
-    ypObject *result;
+    ypObject * exc = yp_None;
+    ypObject * newSq;
+    ypObject * result;
     yp_ssize_t iterable_maxLen = ypTuple_LEN_MAX - ypTuple_LEN( sq );
     yp_ssize_t lenhint;
 
@@ -9822,7 +9879,7 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
         return yp_MemorySizeOverflowError;
     }
 
-    newSq = _ypTuple_new( ypObject_TYPE_CODE( sq ), ypTuple_LEN( sq )+lenhint,
+    newSq = _ypTuple_new( ypObject_TYPE_CODE( sq ), ypTuple_LEN( sq ) + lenhint,
             /*alloclen_fixed=*/FALSE );
     if( yp_isexceptionC( newSq ) ) return newSq;
     result = _ypTuple_extend_from_tuple( newSq, sq );
@@ -9838,8 +9895,8 @@ static ypObject *tuple_concat( ypObject *sq, ypObject *iterable )
 
 static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
 {
-    int sq_type = ypObject_TYPE_CODE( sq );
-    ypObject *newSq;
+    int        sq_type = ypObject_TYPE_CODE( sq );
+    ypObject * newSq;
     yp_ssize_t i;
 
     if( sq_type == ypTuple_CODE ) {
@@ -9856,13 +9913,15 @@ static ypObject *tuple_repeat( ypObject *sq, yp_ssize_t factor )
     }
 
     if( factor > ypTuple_LEN_MAX / ypTuple_LEN( sq ) ) return yp_MemorySizeOverflowError;
-    newSq = _ypTuple_new( sq_type, ypTuple_LEN( sq )*factor, /*alloclen_fixed=*/TRUE ); // new ref
+    newSq = _ypTuple_new(
+            sq_type, ypTuple_LEN( sq ) * factor, /*alloclen_fixed=*/TRUE );  // new ref
     if( yp_isexceptionC( newSq ) ) return newSq;
 
-    memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ), ypTuple_LEN( sq )*yp_sizeof( ypObject * ) );
+    memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ),
+            ypTuple_LEN( sq ) * yp_sizeof( ypObject * ) );
     _ypTuple_repeat_memcpy( newSq, factor, ypTuple_LEN( sq ) );
 
-    ypTuple_SET_LEN( newSq, factor*ypTuple_LEN( sq ) );
+    ypTuple_SET_LEN( newSq, factor * ypTuple_LEN( sq ) );
     for( i = 0; i < ypTuple_LEN( newSq ); i++ ) {
         yp_incref( ypTuple_ARRAY( newSq )[i] );
     }
@@ -9880,10 +9939,10 @@ static ypObject *tuple_getindex( ypObject *sq, yp_ssize_t i, ypObject *defval )
 
 static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    int sq_type = ypObject_TYPE_CODE( sq );
-    ypObject *result;
+    int        sq_type = ypObject_TYPE_CODE( sq );
+    ypObject * result;
     yp_ssize_t newLen;
-    ypObject *newSq;
+    ypObject * newSq;
     yp_ssize_t i;
 
     result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &newLen );
@@ -9904,13 +9963,13 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
     if( yp_isexceptionC( newSq ) ) return newSq;
 
     if( step == 1 ) {
-        memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq )+start,
+        memcpy( ypTuple_ARRAY( newSq ), ypTuple_ARRAY( sq ) + start,
                 newLen * yp_sizeof( ypObject * ) );
         for( i = 0; i < newLen; i++ ) yp_incref( ypTuple_ARRAY( newSq )[i] );
     } else {
         for( i = 0; i < newLen; i++ ) {
             ypTuple_ARRAY( newSq )[i] =
-                yp_incref( ypTuple_ARRAY( sq )[ypSlice_INDEX( start, step, i )] );
+                    yp_incref( ypTuple_ARRAY( sq )[ypSlice_INDEX( start, step, i )] );
         }
     }
     ypTuple_SET_LEN( newSq, newLen );
@@ -9920,9 +9979,9 @@ static ypObject *tuple_getslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop
 static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *index )
 {
-    ypObject *result;
-    yp_ssize_t step = 1;    // may change to -1
-    yp_ssize_t sq_rlen;     // remaining length
+    ypObject * result;
+    yp_ssize_t step = 1;  // may change to -1
+    yp_ssize_t sq_rlen;   // remaining length
     yp_ssize_t i;
 
     result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &sq_rlen );
@@ -9943,12 +10002,12 @@ static ypObject *tuple_find( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssi
     return yp_None;
 }
 
-static ypObject *tuple_count( ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t *count )
+static ypObject *tuple_count(
+        ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *count )
 {
-    ypObject *result;
-    yp_ssize_t step = 1; // ignored; assumed unchanged by ypSlice_AdjustIndicesC
-    yp_ssize_t newLen; // ignored
+    ypObject * result;
+    yp_ssize_t step = 1;  // ignored; assumed unchanged by ypSlice_AdjustIndicesC
+    yp_ssize_t newLen;    // ignored
     yp_ssize_t i;
     yp_ssize_t n = 0;
 
@@ -9975,8 +10034,8 @@ static ypObject *list_setindex( ypObject *sq, yp_ssize_t i, ypObject *x )
     return yp_None;
 }
 
-static ypObject *list_setslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step,
-        ypObject *x )
+static ypObject *list_setslice(
+        ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x )
 {
     // If x is not a tuple/list, or if it is the same object as sq, then a copy must first be made
     if( ypObject_TYPE_PAIR_CODE( x ) == ypTuple_CODE && sq != x ) {
@@ -10000,7 +10059,7 @@ static ypObject *list_popindex( ypObject *sq, yp_ssize_t i )
     }
 
     result = ypTuple_ARRAY( sq )[i];
-    ypTuple_ELEMMOVE( sq, i, i+1 );
+    ypTuple_ELEMMOVE( sq, i, i + 1 );
     ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) - 1 );
     return result;
 }
@@ -10030,13 +10089,13 @@ static ypObject *list_delindex( ypObject *sq, yp_ssize_t i )
 
 static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    ypObject *result;
+    ypObject * result;
     yp_ssize_t slicelength;
     yp_ssize_t i;
 
     result = ypSlice_AdjustIndicesC( ypTuple_LEN( sq ), &start, &stop, &step, &slicelength );
     if( yp_isexceptionC( result ) ) return result;
-    if( slicelength < 1 ) return yp_None; // no-op
+    if( slicelength < 1 ) return yp_None;  // no-op
 
     // First discard references, then shift the remaining pointers
     for( i = 0; i < slicelength; i++ ) {
@@ -10053,11 +10112,11 @@ static ypObject *list_delslice( ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
 static ypObject *list_clear( ypObject *sq );
 static ypObject *list_irepeat( ypObject *sq, yp_ssize_t factor )
 {
-    ypObject *result;
+    ypObject * result;
     yp_ssize_t startLen = ypTuple_LEN( sq );
     yp_ssize_t i;
 
-    if( startLen < 1 || factor == 1 ) return yp_None; // no-op
+    if( startLen < 1 || factor == 1 ) return yp_None;  // no-op
     if( factor < 1 ) return list_clear( sq );
 
     if( factor > ypTuple_LEN_MAX / startLen ) return yp_MemorySizeOverflowError;
@@ -10109,29 +10168,31 @@ static ypObject *tuple_traverse( ypObject *sq, visitfunc visitor, void *memo )
     return yp_None;
 }
 
-static ypObject *tuple_unfrozen_copy( ypObject *sq ) {
+static ypObject *tuple_unfrozen_copy( ypObject *sq )
+{
     return _ypTuple_copy( ypList_CODE, sq, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *tuple_frozen_copy( ypObject *sq ) {
+static ypObject *tuple_frozen_copy( ypObject *sq )
+{
     if( ypTuple_LEN( sq ) < 1 ) return _yp_tuple_empty;
     // A shallow copy of a tuple to a tuple doesn't require an actual copy
     if( ypObject_TYPE_CODE( sq ) == ypTuple_CODE ) return yp_incref( sq );
     return _ypTuple_copy( ypTuple_CODE, sq, /*alloclen_fixed=*/TRUE );
 }
 
-static ypObject *tuple_unfrozen_deepcopy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *tuple_unfrozen_deepcopy( ypObject *sq, visitfunc copy_visitor, void *copy_memo )
+{
     return _ypTuple_deepcopy( ypList_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *tuple_frozen_deepcopy( ypObject *sq, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *tuple_frozen_deepcopy( ypObject *sq, visitfunc copy_visitor, void *copy_memo )
+{
     if( ypTuple_LEN( sq ) < 1 ) return _yp_tuple_empty;
     return _ypTuple_deepcopy( ypTuple_CODE, sq, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
-static ypObject *tuple_bool( ypObject *sq ) {
-    return ypBool_FROM_C( ypTuple_LEN( sq ) );
-}
+static ypObject *tuple_bool( ypObject *sq ) { return ypBool_FROM_C( ypTuple_LEN( sq ) ); }
 
 // Sets *i to the index in sq and x of the first differing element, or -1 if the elements are equal
 // up to the length of the shortest object.  Returns exception on error.
@@ -10148,21 +10209,22 @@ static ypObject *_ypTuple_cmp_first_difference( ypObject *sq, ypObject *x, yp_ss
     // XXX Python's list implementation has protection against the length being modified during the
     // comparison; that isn't required here, at least not yet
     min_len = MIN( ypTuple_LEN( sq ), ypTuple_LEN( x ) );
-    for( *i = 0; *i < min_len; (*i)++ ) {
+    for( *i = 0; *i < min_len; ( *i )++ ) {
         ypObject *result = yp_eq( ypTuple_ARRAY( sq )[*i], ypTuple_ARRAY( x )[*i] );
-        if( result != yp_True ) return result; // returns on yp_False or an exception
+        if( result != yp_True ) return result;  // returns on yp_False or an exception
     }
     *i = -1;
     return yp_True;
 }
 // Here be tuple_lt, tuple_le, tuple_ge, tuple_gt
-#define _ypTuple_RELATIVE_CMP_FUNCTION( name, len_cmp_op ) \
-    static ypObject *tuple_ ## name( ypObject *sq, ypObject *x ) { \
-        yp_ssize_t i = -1; \
-        ypObject *result = _ypTuple_cmp_first_difference( sq, x, &i ); \
-        if( yp_isexceptionC( result ) ) return result; \
+#define _ypTuple_RELATIVE_CMP_FUNCTION( name, len_cmp_op )                                 \
+    static ypObject *tuple_##name( ypObject *sq, ypObject *x )                             \
+    {                                                                                      \
+        yp_ssize_t i = -1;                                                                 \
+        ypObject * result = _ypTuple_cmp_first_difference( sq, x, &i );                    \
+        if( yp_isexceptionC( result ) ) return result;                                     \
         if( i < 0 ) return ypBool_FROM_C( ypTuple_LEN( sq ) len_cmp_op ypTuple_LEN( x ) ); \
-        return yp_ ## name( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] ); \
+        return yp_##name( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] );                 \
     }
 _ypTuple_RELATIVE_CMP_FUNCTION( lt, < );
 _ypTuple_RELATIVE_CMP_FUNCTION( le, <= );
@@ -10195,39 +10257,40 @@ static ypObject *tuple_eq( ypObject *sq, ypObject *x )
 
     for( i = 0; i < sq_len; i++ ) {
         ypObject *result = yp_eq( ypTuple_ARRAY( sq )[i], ypTuple_ARRAY( x )[i] );
-        if( result != yp_True ) return result; // returns on yp_False or an exception
+        if( result != yp_True ) return result;  // returns on yp_False or an exception
     }
     return yp_True;
 }
-static ypObject *tuple_ne( ypObject *sq, ypObject *x ) {
+static ypObject *tuple_ne( ypObject *sq, ypObject *x )
+{
     ypObject *result = tuple_eq( sq, x );
     return ypBool_NOT( result );
 }
 
 // XXX Adapted from Python's tuplehash
-static ypObject *tuple_currenthash( ypObject *sq,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+static ypObject *tuple_currenthash(
+        ypObject *sq, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
-    ypObject *result;
+    ypObject * result;
     yp_uhash_t x;
-    yp_hash_t y;
-    yp_ssize_t len = ypTuple_LEN(sq);
+    yp_hash_t  y;
+    yp_ssize_t len = ypTuple_LEN( sq );
     ypObject **p;
     yp_uhash_t mult = _ypHASH_MULTIPLIER;
     x = 0x345678;
-    p = ypTuple_ARRAY(sq);
-    while (--len >= 0) {
-        result = hash_visitor(*p++, hash_memo, &y);
-        if (yp_isexceptionC(result)) return result;
-        x = (x ^ y) * mult;
+    p = ypTuple_ARRAY( sq );
+    while( --len >= 0 ) {
+        result = hash_visitor( *p++, hash_memo, &y );
+        if( yp_isexceptionC( result ) ) return result;
+        x = ( x ^ y ) * mult;
         // the cast might truncate len; that doesn't change hash stability
-        mult += (yp_hash_t)(82520L + len + len);
+        mult += ( yp_hash_t )( 82520L + len + len );
     }
     x += 97531L;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
+    if( x == (yp_uhash_t) ypObject_HASH_INVALID ) {
+        x = ( yp_uhash_t )( ypObject_HASH_INVALID - 1 );
     }
-    *hash = (yp_hash_t)x;
+    *hash = (yp_hash_t) x;
     return yp_None;
 }
 
@@ -10236,17 +10299,19 @@ static ypObject *tuple_contains( ypObject *sq, ypObject *x )
     yp_ssize_t i;
     for( i = 0; i < ypTuple_LEN( sq ); i++ ) {
         ypObject *result = yp_eq( x, ypTuple_ARRAY( sq )[i] );
-        if( result != yp_False ) return result; // yp_True, or an exception
+        if( result != yp_False ) return result;  // yp_True, or an exception
     }
     return yp_False;
 }
 
-static ypObject *tuple_len( ypObject *sq, yp_ssize_t *len ) {
+static ypObject *tuple_len( ypObject *sq, yp_ssize_t *len )
+{
     *len = ypTuple_LEN( sq );
     return yp_None;
 }
 
-static ypObject *list_push( ypObject *sq, ypObject *x ) {
+static ypObject *list_push( ypObject *sq, ypObject *x )
+{
     // TODO over-allocate via growhint
     return _ypTuple_push( sq, x, 0 );
 }
@@ -10260,7 +10325,8 @@ static ypObject *list_clear( ypObject *sq )
         yp_decref( ypTuple_ARRAY( sq )[ypTuple_LEN( sq )] );
     }
     ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( sq, ypTupleObject, ypTuple_ALLOCLEN_MAX );
-    yp_ASSERT( ypTuple_ARRAY( sq ) == ypTuple_INLINE_DATA( sq ), "list_clear didn't allocate inline!" );
+    yp_ASSERT( ypTuple_ARRAY( sq ) == ypTuple_INLINE_DATA( sq ),
+            "list_clear didn't allocate inline!" );
     return yp_None;
 }
 
@@ -10282,7 +10348,7 @@ static ypObject *list_remove( ypObject *sq, ypObject *x, ypObject *onmissing )
 
         // result must be yp_True, so we found a match to remove
         yp_decref( ypTuple_ARRAY( sq )[i] );
-        ypTuple_ELEMMOVE( sq, i, i+1 );
+        ypTuple_ELEMMOVE( sq, i, i + 1 );
         ypTuple_SET_LEN( sq, ypTuple_LEN( sq ) - 1 );
         return yp_None;
     }
@@ -10301,213 +10367,218 @@ static ypObject *tuple_dealloc( ypObject *sq )
 }
 
 static ypSequenceMethods ypTuple_as_sequence = {
-    tuple_concat,                   // tp_concat
-    tuple_repeat,                   // tp_repeat
-    tuple_getindex,                 // tp_getindex
-    tuple_getslice,                 // tp_getslice
-    tuple_find,                     // tp_find
-    tuple_count,                    // tp_count
-    MethodError_objssizeobjproc,    // tp_setindex
-    MethodError_objsliceobjproc,    // tp_setslice
-    MethodError_objssizeproc,       // tp_delindex
-    MethodError_objsliceproc,       // tp_delslice
-    MethodError_objobjproc,         // tp_append
-    MethodError_objobjproc,         // tp_extend
-    MethodError_objssizeproc,       // tp_irepeat
-    MethodError_objssizeobjproc,    // tp_insert
-    MethodError_objssizeproc,       // tp_popindex
-    MethodError_objproc,            // tp_reverse
-    MethodError_sortfunc            // tp_sort
+        tuple_concat,                 // tp_concat
+        tuple_repeat,                 // tp_repeat
+        tuple_getindex,               // tp_getindex
+        tuple_getslice,               // tp_getslice
+        tuple_find,                   // tp_find
+        tuple_count,                  // tp_count
+        MethodError_objssizeobjproc,  // tp_setindex
+        MethodError_objsliceobjproc,  // tp_setslice
+        MethodError_objssizeproc,     // tp_delindex
+        MethodError_objsliceproc,     // tp_delslice
+        MethodError_objobjproc,       // tp_append
+        MethodError_objobjproc,       // tp_extend
+        MethodError_objssizeproc,     // tp_irepeat
+        MethodError_objssizeobjproc,  // tp_insert
+        MethodError_objssizeproc,     // tp_popindex
+        MethodError_objproc,          // tp_reverse
+        MethodError_sortfunc          // tp_sort
 };
 
 static ypTypeObject ypTuple_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    tuple_dealloc,                  // tp_dealloc
-    tuple_traverse,                 // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        tuple_dealloc,   // tp_dealloc
+        tuple_traverse,  // tp_traverse
+        NULL,            // tp_str
+        NULL,            // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    tuple_unfrozen_copy,            // tp_unfrozen_copy
-    tuple_frozen_copy,              // tp_frozen_copy
-    tuple_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
-    tuple_frozen_deepcopy,          // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,      // tp_freeze
+        tuple_unfrozen_copy,      // tp_unfrozen_copy
+        tuple_frozen_copy,        // tp_frozen_copy
+        tuple_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        tuple_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,      // tp_invalidate
 
-    // Boolean operations and comparisons
-    tuple_bool,                     // tp_bool
-    tuple_lt,                       // tp_lt
-    tuple_le,                       // tp_le
-    tuple_eq,                       // tp_eq
-    tuple_ne,                       // tp_ne
-    tuple_ge,                       // tp_ge
-    tuple_gt,                       // tp_gt
+        // Boolean operations and comparisons
+        tuple_bool,  // tp_bool
+        tuple_lt,    // tp_lt
+        tuple_le,    // tp_le
+        tuple_eq,    // tp_eq
+        tuple_ne,    // tp_ne
+        tuple_ge,    // tp_ge
+        tuple_gt,    // tp_gt
 
-    // Generic object operations
-    tuple_currenthash,              // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        tuple_currenthash,    // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    _ypSequence_miniiter,           // tp_miniiter
-    _ypSequence_miniiter_rev,       // tp_miniiter_reversed
-    _ypSequence_miniiter_next,      // tp_miniiter_next
-    _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        _ypSequence_miniiter,       // tp_miniiter
+        _ypSequence_miniiter_rev,   // tp_miniiter_reversed
+        _ypSequence_miniiter_next,  // tp_miniiter_next
+        _ypSequence_miniiter_lenh,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,      // tp_iter
+        _ypIter_from_miniiter_rev,  // tp_iter_reversed
+        TypeError_objobjproc,       // tp_send
 
-    // Container operations
-    tuple_contains,                 // tp_contains
-    tuple_len,                      // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    _ypSequence_getdefault,         // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        tuple_contains,             // tp_contains
+        tuple_len,                  // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        _ypSequence_getdefault,     // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    &ypTuple_as_sequence,           // tp_as_sequence
+        // Sequence operations
+        &ypTuple_as_sequence,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 static ypSequenceMethods ypList_as_sequence = {
-    tuple_concat,                   // tp_concat
-    tuple_repeat,                   // tp_repeat
-    tuple_getindex,                 // tp_getindex
-    tuple_getslice,                 // tp_getslice
-    tuple_find,                     // tp_find
-    tuple_count,                    // tp_count
-    list_setindex,                  // tp_setindex
-    list_setslice,                  // tp_setslice
-    list_delindex,                  // tp_delindex
-    list_delslice,                  // tp_delslice
-    list_push,                      // tp_append
-    list_extend,                    // tp_extend
-    list_irepeat,                   // tp_irepeat
-    list_insert,                    // tp_insert
-    list_popindex,                  // tp_popindex
-    list_reverse,                   // tp_reverse
-    MethodError_sortfunc            // tp_sort
+        tuple_concat,         // tp_concat
+        tuple_repeat,         // tp_repeat
+        tuple_getindex,       // tp_getindex
+        tuple_getslice,       // tp_getslice
+        tuple_find,           // tp_find
+        tuple_count,          // tp_count
+        list_setindex,        // tp_setindex
+        list_setslice,        // tp_setslice
+        list_delindex,        // tp_delindex
+        list_delslice,        // tp_delslice
+        list_push,            // tp_append
+        list_extend,          // tp_extend
+        list_irepeat,         // tp_irepeat
+        list_insert,          // tp_insert
+        list_popindex,        // tp_popindex
+        list_reverse,         // tp_reverse
+        MethodError_sortfunc  // tp_sort
 };
 
 static ypTypeObject ypList_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    tuple_dealloc,                  // tp_dealloc
-    tuple_traverse,                 // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        tuple_dealloc,   // tp_dealloc
+        tuple_traverse,  // tp_traverse
+        NULL,            // tp_str
+        NULL,            // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    tuple_unfrozen_copy,            // tp_unfrozen_copy
-    tuple_frozen_copy,              // tp_frozen_copy
-    tuple_unfrozen_deepcopy,        // tp_unfrozen_deepcopy
-    tuple_frozen_deepcopy,          // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,      // tp_freeze
+        tuple_unfrozen_copy,      // tp_unfrozen_copy
+        tuple_frozen_copy,        // tp_frozen_copy
+        tuple_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        tuple_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,      // tp_invalidate
 
-    // Boolean operations and comparisons
-    tuple_bool,                     // tp_bool
-    tuple_lt,                       // tp_lt
-    tuple_le,                       // tp_le
-    tuple_eq,                       // tp_eq
-    tuple_ne,                       // tp_ne
-    tuple_ge,                       // tp_ge
-    tuple_gt,                       // tp_gt
+        // Boolean operations and comparisons
+        tuple_bool,  // tp_bool
+        tuple_lt,    // tp_lt
+        tuple_le,    // tp_le
+        tuple_eq,    // tp_eq
+        tuple_ne,    // tp_ne
+        tuple_ge,    // tp_ge
+        tuple_gt,    // tp_gt
 
-    // Generic object operations
-    tuple_currenthash,              // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        tuple_currenthash,    // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    _ypSequence_miniiter,           // tp_miniiter
-    _ypSequence_miniiter_rev,       // tp_miniiter_reversed
-    _ypSequence_miniiter_next,      // tp_miniiter_next
-    _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        _ypSequence_miniiter,       // tp_miniiter
+        _ypSequence_miniiter_rev,   // tp_miniiter_reversed
+        _ypSequence_miniiter_next,  // tp_miniiter_next
+        _ypSequence_miniiter_lenh,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,      // tp_iter
+        _ypIter_from_miniiter_rev,  // tp_iter_reversed
+        TypeError_objobjproc,       // tp_send
 
-    // Container operations
-    tuple_contains,                 // tp_contains
-    tuple_len,                      // tp_len
-    list_push,                      // tp_push
-    list_clear,                     // tp_clear
-    list_pop,                       // tp_pop
-    list_remove,                    // tp_remove
-    _ypSequence_getdefault,         // tp_getdefault
-    _ypSequence_setitem,            // tp_setitem
-    _ypSequence_delitem,            // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        tuple_contains,             // tp_contains
+        tuple_len,                  // tp_len
+        list_push,                  // tp_push
+        list_clear,                 // tp_clear
+        list_pop,                   // tp_pop
+        list_remove,                // tp_remove
+        _ypSequence_getdefault,     // tp_getdefault
+        _ypSequence_setitem,        // tp_setitem
+        _ypSequence_delitem,        // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    &ypList_as_sequence,            // tp_as_sequence
+        // Sequence operations
+        &ypList_as_sequence,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 
 // Custom ypQuickIter support
 
-static ypObject *ypQuickIter_tuple_nextX( ypQuickIter_state *state ) {
+static ypObject *ypQuickIter_tuple_nextX( ypQuickIter_state *state )
+{
     ypObject *x;
     if( state->tuple.i >= ypTuple_LEN( state->tuple.obj ) ) return NULL;
-    x = ypTuple_ARRAY( state->tuple.obj )[state->tuple.i];   // borrowed
+    x = ypTuple_ARRAY( state->tuple.obj )[state->tuple.i];  // borrowed
     state->tuple.i += 1;
     return x;
 }
 
-static ypObject *ypQuickIter_tuple_next( ypQuickIter_state *state ) {
+static ypObject *ypQuickIter_tuple_next( ypQuickIter_state *state )
+{
     ypObject *x = ypQuickIter_tuple_nextX( state );
     return x == NULL ? NULL : yp_incref( x );
 }
 
-static yp_ssize_t ypQuickIter_tuple_lenhint( ypQuickIter_state *state, int *isexact,
-        ypObject **exc )
+static yp_ssize_t ypQuickIter_tuple_lenhint(
+        ypQuickIter_state *state, int *isexact, ypObject **exc )
 {
-    yp_ASSERT( state->tuple.i >= 0 && state->tuple.i <= ypTuple_LEN( state->tuple.obj ), "state->tuple.i should be in range(len+1)" );
+    yp_ASSERT( state->tuple.i >= 0 && state->tuple.i <= ypTuple_LEN( state->tuple.obj ),
+            "state->tuple.i should be in range(len+1)" );
     *isexact = TRUE;
     return ypTuple_LEN( state->tuple.obj ) - state->tuple.i;
 }
 
-static void ypQuickIter_tuple_close( ypQuickIter_state *state ) {
+static void ypQuickIter_tuple_close( ypQuickIter_state *state )
+{
     // No-op.  We don't yp_decref because it's a borrowed reference.
 }
 
 static const ypQuickIter_methods ypQuickIter_tuple_methods = {
-    ypQuickIter_tuple_nextX,    // nextX
-    ypQuickIter_tuple_next,     // next
-    ypQuickIter_tuple_lenhint,  // lenhint
-    ypQuickIter_tuple_close     // close
+        ypQuickIter_tuple_nextX,    // nextX
+        ypQuickIter_tuple_next,     // next
+        ypQuickIter_tuple_lenhint,  // lenhint
+        ypQuickIter_tuple_close     // close
 };
 
 // Initializes state with the given tuple.  Always succeeds.  Use ypQuickIter_tuple_methods as the
 // method table.  tuple is borrowed by state and most not be freed until methods->close is called.
-static void ypQuickIter_new_fromtuple( ypQuickIter_state *state, ypObject *tuple ) {
+static void ypQuickIter_new_fromtuple( ypQuickIter_state *state, ypObject *tuple )
+{
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( tuple ) == ypTuple_CODE, "tuple must be a tuple/list" );
     state->tuple.i = 0;
     state->tuple.obj = tuple;
@@ -10516,35 +10587,40 @@ static void ypQuickIter_new_fromtuple( ypQuickIter_state *state, ypObject *tuple
 
 // Custom ypQuickSeq support
 
-static ypObject *ypQuickSeq_tuple_getindexX( ypQuickSeq_state *state, yp_ssize_t i ) {
+static ypObject *ypQuickSeq_tuple_getindexX( ypQuickSeq_state *state, yp_ssize_t i )
+{
     yp_ASSERT( i >= 0, "negative indicies not allowed in ypQuickSeq" );
     if( i >= ypTuple_LEN( state->obj ) ) return NULL;
     return ypTuple_ARRAY( state->obj )[i];
 }
 
-static ypObject *ypQuickSeq_tuple_getindex( ypQuickSeq_state *state, yp_ssize_t i ) {
+static ypObject *ypQuickSeq_tuple_getindex( ypQuickSeq_state *state, yp_ssize_t i )
+{
     ypObject *x = ypQuickSeq_tuple_getindexX( state, i );
     return x == NULL ? NULL : yp_incref( x );
 }
 
-static yp_ssize_t ypQuickSeq_tuple_len( ypQuickSeq_state *state, ypObject **exc ) {
+static yp_ssize_t ypQuickSeq_tuple_len( ypQuickSeq_state *state, ypObject **exc )
+{
     return ypTuple_LEN( state->obj );
 }
 
-static void ypQuickSeq_tuple_close( ypQuickSeq_state *state ) {
+static void ypQuickSeq_tuple_close( ypQuickSeq_state *state )
+{
     // No-op.  We don't yp_decref because it's a borrowed reference.
 }
 
 static const ypQuickSeq_methods ypQuickSeq_tuple_methods = {
-    ypQuickSeq_tuple_getindexX, // getindexX
-    ypQuickSeq_tuple_getindex,  // getindex
-    ypQuickSeq_tuple_len,       // len
-    ypQuickSeq_tuple_close      // close
+        ypQuickSeq_tuple_getindexX,  // getindexX
+        ypQuickSeq_tuple_getindex,   // getindex
+        ypQuickSeq_tuple_len,        // len
+        ypQuickSeq_tuple_close       // close
 };
 
 // Initializes state with the given tuple.  Always succeeds.  Use ypQuickSeq_tuple_methods as the
 // method table.  tuple is borrowed by state and must not be freed until methods->close is called.
-static void ypQuickSeq_new_fromtuple( ypQuickSeq_state *state, ypObject *tuple ) {
+static void ypQuickSeq_new_fromtuple( ypQuickSeq_state *state, ypObject *tuple )
+{
     yp_ASSERT( ypObject_TYPE_PAIR_CODE( tuple ) == ypTuple_CODE, "tuple must be a tuple/list" );
     state->obj = tuple;
 }
@@ -10555,13 +10631,13 @@ static void ypQuickSeq_new_fromtuple( ypQuickSeq_state *state, ypObject *tuple )
 // XXX Check for the empty tuple/list cases first
 static ypObject *_ypTupleNV( int type, int n, va_list args )
 {
-    int i;
+    int       i;
     ypObject *newSq = _ypTuple_new( type, n, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newSq ) ) return newSq;
 
     // Extract the objects from args first; we incref these later, which makes it easier to bail
     for( i = 0; i < n; i++ ) {
-        ypObject *x = va_arg( args, ypObject * );   // borrowed
+        ypObject *x = va_arg( args, ypObject * );  // borrowed
         if( yp_isexceptionC( x ) ) {
             yp_decref( newSq );
             return x;
@@ -10575,20 +10651,24 @@ static ypObject *_ypTupleNV( int type, int n, va_list args )
     return newSq;
 }
 
-ypObject *yp_tupleN( int n, ... ) {
+ypObject *yp_tupleN( int n, ... )
+{
     if( n < 1 ) return _yp_tuple_empty;
-    return_yp_V_FUNC( ypObject *, _ypTupleNV, (ypTuple_CODE, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypTupleNV, ( ypTuple_CODE, n, args ), n );
 }
-ypObject *yp_tupleNV( int n, va_list args ) {
+ypObject *yp_tupleNV( int n, va_list args )
+{
     if( n < 1 ) return _yp_tuple_empty;
     return _ypTupleNV( ypTuple_CODE, n, args );
 }
 
-ypObject *yp_listN( int n, ... ) {
+ypObject *yp_listN( int n, ... )
+{
     if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return_yp_V_FUNC( ypObject *, _ypTupleNV, (ypList_CODE, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypTupleNV, ( ypList_CODE, n, args ), n );
 }
-ypObject *yp_listNV( int n, va_list args ) {
+ypObject *yp_listNV( int n, va_list args )
+{
     if( n < 1 ) return _ypTuple_new( ypList_CODE, 0, /*alloclen_fixed=*/FALSE );
     return _ypTupleNV( ypList_CODE, n, args );
 }
@@ -10596,9 +10676,9 @@ ypObject *yp_listNV( int n, va_list args ) {
 // XXX Check for the "fellow tuple/list" case _before_ calling this function
 static ypObject *_ypTuple( int type, ypObject *iterable )
 {
-    ypObject *exc = yp_None;
-    ypObject *newSq;
-    ypObject *result;
+    ypObject * exc = yp_None;
+    ypObject * newSq;
+    ypObject * result;
     yp_ssize_t lenhint = yp_lenC( iterable, &exc );
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
@@ -10623,7 +10703,8 @@ static ypObject *_ypTuple( int type, ypObject *iterable )
     return newSq;
 }
 
-ypObject *yp_tuple( ypObject *iterable ) {
+ypObject *yp_tuple( ypObject *iterable )
+{
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         if( ypTuple_LEN( iterable ) < 1 ) return _yp_tuple_empty;
         if( ypObject_TYPE_CODE( iterable ) == ypTuple_CODE ) return yp_incref( iterable );
@@ -10632,7 +10713,8 @@ ypObject *yp_tuple( ypObject *iterable ) {
     return _ypTuple( ypTuple_CODE, iterable );
 }
 
-ypObject *yp_list( ypObject *iterable ) {
+ypObject *yp_list( ypObject *iterable )
+{
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypTuple_CODE ) {
         return _ypTuple_copy( ypList_CODE, iterable, /*alloclen_fixed=*/FALSE );
     }
@@ -10641,9 +10723,9 @@ ypObject *yp_list( ypObject *iterable ) {
 
 static ypObject *_ypTuple_repeatCNV( int type, yp_ssize_t factor, int n, va_list args )
 {
-    ypObject *newSq;
+    ypObject * newSq;
     yp_ssize_t i;
-    ypObject *item;
+    ypObject * item;
 
     if( factor < 1 || n < 1 ) {
         if( type == ypTuple_CODE ) return _yp_tuple_empty;
@@ -10651,7 +10733,7 @@ static ypObject *_ypTuple_repeatCNV( int type, yp_ssize_t factor, int n, va_list
     }
 
     if( factor > ypTuple_LEN_MAX / n ) return yp_MemorySizeOverflowError;
-    newSq = _ypTuple_new( type, factor*n, /*alloclen_fixed=*/TRUE ); // new ref
+    newSq = _ypTuple_new( type, factor * n, /*alloclen_fixed=*/TRUE );  // new ref
     if( yp_isexceptionC( newSq ) ) return newSq;
 
     // Extract the objects from args first; we incref these later, which makes it easier to bail
@@ -10667,24 +10749,28 @@ static ypObject *_ypTuple_repeatCNV( int type, yp_ssize_t factor, int n, va_list
 
     // Now set the other attributes, increment the reference counts, and return
     // TODO Do we want a back-door way to increment the reference counts by n?
-    ypTuple_SET_LEN( newSq, factor*n );
+    ypTuple_SET_LEN( newSq, factor * n );
     for( i = 0; i < ypTuple_LEN( newSq ); i++ ) {
         yp_incref( ypTuple_ARRAY( newSq )[i] );
     }
     return newSq;
 }
 
-ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCNV, (ypTuple_CODE, factor, n, args), n );
+ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... )
+{
+    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCNV, ( ypTuple_CODE, factor, n, args ), n );
 }
-ypObject *yp_tuple_repeatCNV( yp_ssize_t factor, int n, va_list args ) {
+ypObject *yp_tuple_repeatCNV( yp_ssize_t factor, int n, va_list args )
+{
     return _ypTuple_repeatCNV( ypTuple_CODE, factor, n, args );
 }
 
-ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCNV, (ypList_CODE, factor, n, args), n );
+ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... )
+{
+    return_yp_V_FUNC( ypObject *, _ypTuple_repeatCNV, ( ypList_CODE, factor, n, args ), n );
 }
-ypObject *yp_list_repeatCNV( yp_ssize_t factor, int n, va_list args ) {
+ypObject *yp_list_repeatCNV( yp_ssize_t factor, int n, va_list args )
+{
     return _ypTuple_repeatCNV( ypList_CODE, factor, n, args );
 }
 
@@ -10704,59 +10790,62 @@ typedef struct {
 } ypSet_KeyEntry;
 typedef struct {
     ypObject_HEAD;
-    yp_ssize_t fill; // # Active + # Dummy
+    yp_ssize_t fill;  // # Active + # Dummy
     yp_INLINE_DATA( ypSet_KeyEntry );
 } ypSetObject;
 
-#define ypSet_TABLE( so )               ( (ypSet_KeyEntry *) ((ypObject *)so)->ob_data )
-#define ypSet_SET_TABLE( so, value )    ( ((ypObject *)so)->ob_data = (void *) (value) )
-#define ypSet_LEN                       ypObject_CACHED_LEN
-#define ypSet_SET_LEN                   ypObject_SET_CACHED_LEN
-#define ypSet_FILL( so )                ( ((ypSetObject *)so)->fill )
-#define ypSet_ALLOCLEN                  ypObject_ALLOCLEN
-#define ypSet_SET_ALLOCLEN              ypObject_SET_ALLOCLEN
-#define ypSet_MASK( so )                ( ypSet_ALLOCLEN( so ) - 1 )
-#define ypSet_INLINE_DATA( so )         ( ((ypSetObject *)so)->ob_inline_data )
+#define ypSet_TABLE( so ) ( (ypSet_KeyEntry *) ( (ypObject *) so )->ob_data )
+#define ypSet_SET_TABLE( so, value ) ( ( (ypObject *) so )->ob_data = (void *) ( value ) )
+#define ypSet_LEN ypObject_CACHED_LEN
+#define ypSet_SET_LEN ypObject_SET_CACHED_LEN
+#define ypSet_FILL( so ) ( ( (ypSetObject *) so )->fill )
+#define ypSet_ALLOCLEN ypObject_ALLOCLEN
+#define ypSet_SET_ALLOCLEN ypObject_SET_ALLOCLEN
+#define ypSet_MASK( so ) ( ypSet_ALLOCLEN( so ) - 1 )
+#define ypSet_INLINE_DATA( so ) ( ( (ypSetObject *) so )->ob_inline_data )
 
-#define ypSet_PERTURB_SHIFT (5)
+#define ypSet_PERTURB_SHIFT ( 5 )
 
 // This tests that, by default, the inline data is enough to hold ypSet_ALLOCLEN_MIN elements
-#define ypSet_ALLOCLEN_MIN ((yp_ssize_t) 8)
-yp_STATIC_ASSERT( (_ypMem_ideal_size_DEFAULT-yp_offsetof( ypSetObject, ob_inline_data )) / yp_sizeof( ypSet_KeyEntry ) >= ypSet_ALLOCLEN_MIN, ypSet_minsize_inline );
+#define ypSet_ALLOCLEN_MIN ( (yp_ssize_t) 8 )
+yp_STATIC_ASSERT( ( _ypMem_ideal_size_DEFAULT - yp_offsetof( ypSetObject, ob_inline_data ) ) /
+                                  yp_sizeof( ypSet_KeyEntry ) >=
+                          ypSet_ALLOCLEN_MIN,
+        ypSet_minsize_inline );
 
 // The threshold at which we resize the set, expressed as a fraction of alloclen (ie 2/3)
-#define ypSet_RESIZE_AT_NMR (2) // numerator
-#define ypSet_RESIZE_AT_DNM (3) // denominator
+#define ypSet_RESIZE_AT_NMR ( 2 )  // numerator
+#define ypSet_RESIZE_AT_DNM ( 3 )  // denominator
 
 // We don't want the multiplications in _ypSet_space_remaining, _ypSet_calc_alloclen, and
 // _ypSet_resize overflowing, so we impose a separate limit on the maximum len and alloclen for
 // sets
 // XXX ypSet_ALLOCLEN_MAX may be larger than the true maximum
 // TODO We could calculate the exact maximum in yp_initialize...
-#define ypSet_ALLOCLEN_MAX   ( (yp_ssize_t) MIN( MIN( MIN( \
-                    yp_SSIZE_T_MAX/ypSet_RESIZE_AT_NMR, \
-                    yp_SSIZE_T_MAX/ypSet_RESIZE_AT_DNM ), \
-                    (yp_SSIZE_T_MAX-yp_sizeof( ypSetObject )) / yp_sizeof( ypSet_KeyEntry ) ), \
-                    ypObject_LEN_MAX ) )
+#define ypSet_ALLOCLEN_MAX                                                      \
+    ( (yp_ssize_t) MIN( MIN( MIN( yp_SSIZE_T_MAX / ypSet_RESIZE_AT_NMR,         \
+                                     yp_SSIZE_T_MAX / ypSet_RESIZE_AT_DNM ),    \
+                                ( yp_SSIZE_T_MAX - yp_sizeof( ypSetObject ) ) / \
+                                        yp_sizeof( ypSet_KeyEntry ) ),          \
+            ypObject_LEN_MAX ) )
 #define ypSet_LEN_MAX \
-    ( (yp_ssize_t) (ypSet_ALLOCLEN_MAX*ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM )
+    ( ( yp_ssize_t )( ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR ) / ypSet_RESIZE_AT_DNM )
 
 // A placeholder to replace deleted entries in the hash table
 yp_IMMORTAL_INVALIDATED( ypSet_dummy );
 
 // Empty frozensets can be represented by this, immortal object
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
-static ypSetObject _yp_frozenset_empty_struct = {
-    { ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
-    0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozenset_empty_data }, 0 };
-#define _yp_frozenset_empty     ((ypObject *) &_yp_frozenset_empty_struct)
+static ypSetObject    _yp_frozenset_empty_struct = {
+        {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
+                ypObject_HASH_INVALID, _yp_frozenset_empty_data},
+        0};
+#define _yp_frozenset_empty ( (ypObject *) &_yp_frozenset_empty_struct )
 
 // Returns true if the given ypSet_KeyEntry contains a valid key
-#define ypSet_ENTRY_USED( loc ) \
-    ( (loc)->se_key != NULL && (loc)->se_key != ypSet_dummy )
+#define ypSet_ENTRY_USED( loc ) ( ( loc )->se_key != NULL && ( loc )->se_key != ypSet_dummy )
 // Returns the index of the given ypSet_KeyEntry in the hash table
-#define ypSet_ENTRY_INDEX( so, loc ) \
-    ( (yp_ssize_t) ( (loc) - ypSet_TABLE( so ) ) )
+#define ypSet_ENTRY_INDEX( so, loc ) ( ( yp_ssize_t )( (loc) -ypSet_TABLE( so ) ) )
 
 // set code relies on some of the internals from the dict implementation
 typedef struct {
@@ -10764,15 +10853,16 @@ typedef struct {
     ypObject *keyset;
     yp_INLINE_DATA( ypObject * );
 } ypDictObject;
-#define ypDict_LEN      ypObject_CACHED_LEN
-#define ypDict_SET_LEN  ypObject_SET_CACHED_LEN
+#define ypDict_LEN ypObject_CACHED_LEN
+#define ypDict_SET_LEN ypObject_SET_CACHED_LEN
 
 // Before adding keys to the set, call this function to determine if a resize is necessary.
 // Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
 // added before the next resize.
 // XXX Adapted from PyDict_SetItem, although our thresholds are slightly different
 // TODO If we make this threshold configurable, the assert should be in yp_initialize
-yp_STATIC_ASSERT( ypSet_RESIZE_AT_NMR <= yp_SSIZE_T_MAX / ypSet_ALLOCLEN_MAX, ypSet_space_remaining_cant_overflow );
+yp_STATIC_ASSERT( ypSet_RESIZE_AT_NMR <= yp_SSIZE_T_MAX / ypSet_ALLOCLEN_MAX,
+        ypSet_space_remaining_cant_overflow );
 static yp_ssize_t _ypSet_space_remaining( ypObject *so )
 {
     /* If fill >= 2/3 size, adjust size.  Normally, this doubles or
@@ -10781,9 +10871,9 @@ static yp_ssize_t _ypSet_space_remaining( ypObject *so )
      * keys have been deleted).
      */
     // XXX ypSet_space_remaining_cant_overflow ensures this can't overflow
-    yp_ssize_t retval = (ypSet_ALLOCLEN( so )*ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM;
+    yp_ssize_t retval = ( ypSet_ALLOCLEN( so ) * ypSet_RESIZE_AT_NMR ) / ypSet_RESIZE_AT_DNM;
     retval -= ypSet_FILL( so );
-    if( retval <= 0 ) return 0; // should resize before adding keys
+    if( retval <= 0 ) return 0;  // should resize before adding keys
     return retval;
 }
 
@@ -10791,7 +10881,8 @@ static yp_ssize_t _ypSet_space_remaining( ypObject *so )
 // XXX Adapted from Python's dictresize
 // TODO Can we improve by using some bit-twiddling to get the highest power of 2?
 // TODO If we make this threshold configurable, the assert should be in yp_initialize
-yp_STATIC_ASSERT( ypSet_RESIZE_AT_DNM <= yp_SSIZE_T_MAX / ypSet_LEN_MAX, ypSet_calc_alloclen_cant_overflow );
+yp_STATIC_ASSERT(
+        ypSet_RESIZE_AT_DNM <= yp_SSIZE_T_MAX / ypSet_LEN_MAX, ypSet_calc_alloclen_cant_overflow );
 static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
 {
     yp_ssize_t minentries;
@@ -10800,10 +10891,9 @@ static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
     yp_ASSERT( minused >= 0, "minused cannot be negative" );
     yp_ASSERT( minused <= ypSet_LEN_MAX, "minused cannot be greater than max" );
     // XXX ypSet_calc_alloclen_cant_overflow ensures this can't overflow
-    minentries = ((minused * ypSet_RESIZE_AT_DNM) / ypSet_RESIZE_AT_NMR) + 1;
-    for( alloclen = ypSet_ALLOCLEN_MIN;
-         alloclen <= minentries && alloclen > 0;
-         alloclen <<= 1 );
+    minentries = ( ( minused * ypSet_RESIZE_AT_DNM ) / ypSet_RESIZE_AT_NMR ) + 1;
+    for( alloclen = ypSet_ALLOCLEN_MIN; alloclen <= minentries && alloclen > 0; alloclen <<= 1 )
+        ;
     // TODO If we could trust that ypSet_ALLOCLEN_MAX was the true maximum (ie, a power of 2), then
     // we could turn this to an assert, or just remove it: ypSet_LEN_MAX would ensure this is never
     // reached
@@ -10817,12 +10907,12 @@ static yp_ssize_t _ypSet_calc_alloclen( yp_ssize_t minused )
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypSet_new( int type, yp_ssize_t minused, int alloclen_fixed )
 {
-    ypObject *so;
+    ypObject * so;
     yp_ssize_t alloclen = _ypSet_calc_alloclen( minused );
     if( alloclen < 1 ) return yp_MemorySizeOverflowError;
     if( alloclen_fixed && type == ypFrozenSet_CODE ) {
-        so = ypMem_MALLOC_CONTAINER_INLINE( ypSetObject, ypFrozenSet_CODE,
-            alloclen, ypSet_ALLOCLEN_MAX );
+        so = ypMem_MALLOC_CONTAINER_INLINE(
+                ypSetObject, ypFrozenSet_CODE, alloclen, ypSet_ALLOCLEN_MAX );
     } else {
         so = ypMem_MALLOC_CONTAINER_VARIABLE( ypSetObject, type, alloclen, 0, ypSet_ALLOCLEN_MAX );
     }
@@ -10838,14 +10928,14 @@ static ypObject *_ypSet_new( int type, yp_ssize_t minused, int alloclen_fixed )
 // XXX Check for the "lazy shallow copy" and "_yp_frozenset_empty" cases first
 // TODO It's tempting to look into memcpy to copy the tables, although that would mean the copy
 // would be just as dirty as the original.  But if the original isn't "too dirty"...
-static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
-        ypSet_KeyEntry **ep );
+static void _ypSet_movekey_clean(
+        ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep );
 static ypObject *_ypSet_copy( int type, ypObject *x, int alloclen_fixed )
 {
-    yp_ssize_t keysleft = ypSet_LEN( x );
+    yp_ssize_t      keysleft = ypSet_LEN( x );
     ypSet_KeyEntry *otherkeys = ypSet_TABLE( x );
-    ypObject *so;
-    yp_ssize_t i;
+    ypObject *      so;
+    yp_ssize_t      i;
     ypSet_KeyEntry *loc;
 
     so = _ypSet_new( type, keysleft, alloclen_fixed );
@@ -10863,14 +10953,14 @@ static ypObject *_ypSet_copy( int type, ypObject *x, int alloclen_fixed )
 // XXX Check for the _yp_frozenset_empty case first
 // XXX We're trusting that copy_visitor will behave properly and return an object that has the same
 // hash as the original and that is unequal to anything else in the other set
-static ypObject *_ypSet_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
-        int alloclen_fixed )
+static ypObject *_ypSet_deepcopy(
+        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, int alloclen_fixed )
 {
-    yp_ssize_t keysleft = ypSet_LEN( x );
+    yp_ssize_t      keysleft = ypSet_LEN( x );
     ypSet_KeyEntry *otherkeys = ypSet_TABLE( x );
-    ypObject *so;
-    yp_ssize_t i;
-    ypObject *key;
+    ypObject *      so;
+    yp_ssize_t      i;
+    ypObject *      key;
     ypSet_KeyEntry *loc;
 
     so = _ypSet_new( type, keysleft, alloclen_fixed );
@@ -10894,18 +10984,20 @@ static ypObject *_ypSet_deepcopy( int type, ypObject *x, visitfunc copy_visitor,
 // need for future resizes, call with a larger minused.  Returns yp_None, or an exception on error.
 // XXX We can't use ypMem_REALLOC_CONTAINER_VARIABLE because we can never resize in-place
 // TODO Do we want to split minused into required and extra, like in other areas?
-yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof( ypSet_KeyEntry ), ypSet_resize_cant_overflow );
+yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof( ypSet_KeyEntry ),
+        ypSet_resize_cant_overflow );
 static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
 {
-    yp_ssize_t newalloclen;
+    yp_ssize_t      newalloclen;
     ypSet_KeyEntry *newkeys;
-    yp_ssize_t newsize;
+    yp_ssize_t      newsize;
     ypSet_KeyEntry *oldkeys;
-    yp_ssize_t keysleft;
-    yp_ssize_t i;
+    yp_ssize_t      keysleft;
+    yp_ssize_t      i;
     ypSet_KeyEntry *loc;
-    yp_ssize_t inlinelen = ypMem_INLINELEN_CONTAINER_VARIABLE( so, ypSetObject );
-    yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
+    yp_ssize_t      inlinelen = ypMem_INLINELEN_CONTAINER_VARIABLE( so, ypSetObject );
+    yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN,
+            "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
 
     // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
     newalloclen = _ypSet_calc_alloclen( minused );
@@ -10914,7 +11006,8 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
         newkeys = ypSet_INLINE_DATA( so );
     } else {
         // XXX ypSet_resize_cant_overflow ensures this can't overflow
-        newkeys = (ypSet_KeyEntry *) yp_malloc( &newsize, newalloclen * yp_sizeof( ypSet_KeyEntry ) );
+        newkeys = (ypSet_KeyEntry *) yp_malloc(
+                &newsize, newalloclen * yp_sizeof( ypSet_KeyEntry ) );
         if( newkeys == NULL ) return yp_MemoryError;
     }
     memset( newkeys, 0, newalloclen * yp_sizeof( ypSet_KeyEntry ) );
@@ -10927,7 +11020,8 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
     ypSet_FILL( so ) = 0;
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
     ypSet_SET_ALLOCLEN( so, newalloclen );
-    yp_ASSERT( _ypSet_space_remaining( so ) >= minused, "resized set doesn't have requested room" );
+    yp_ASSERT(
+            _ypSet_space_remaining( so ) >= minused, "resized set doesn't have requested room" );
 
     // Move the keys from the old table before free'ing it
     for( i = 0; keysleft > 0; i++ ) {
@@ -10946,25 +11040,25 @@ static ypObject *_ypSet_resize( ypObject *so, yp_ssize_t minused )
 // for now, but investigate...
 // TODO Update as per http://bugs.python.org/issue18771?
 // XXX Adapted from Python's lookdict in dictobject.c
-static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t hash,
-        ypSet_KeyEntry **loc )
+static ypObject *_ypSet_lookkey(
+        ypObject *so, ypObject *key, register yp_hash_t hash, ypSet_KeyEntry **loc )
 {
-    register size_t i;
-    register size_t perturb;
+    register size_t          i;
+    register size_t          perturb;
     register ypSet_KeyEntry *freeslot;
-    register size_t mask = (size_t) ypSet_MASK( so );
-    ypSet_KeyEntry *ep0 = ypSet_TABLE( so );
+    register size_t          mask = (size_t) ypSet_MASK( so );
+    ypSet_KeyEntry *         ep0 = ypSet_TABLE( so );
     register ypSet_KeyEntry *ep;
-    register ypObject *cmp;
+    register ypObject *      cmp;
 
-    i = (size_t)hash & mask;
+    i = (size_t) hash & mask;
     ep = &ep0[i];
-    if (ep->se_key == NULL || ep->se_key == key) goto success;
+    if( ep->se_key == NULL || ep->se_key == key ) goto success;
 
-    if (ep->se_key == ypSet_dummy) {
+    if( ep->se_key == ypSet_dummy ) {
         freeslot = ep;
     } else {
-        if (ep->se_hash == hash) {
+        if( ep->se_hash == hash ) {
             // Python has protection here against __eq__ changing this set object; hopefully not a
             // problem in nohtyP
             cmp = yp_eq( ep->se_key, key );
@@ -10976,20 +11070,20 @@ static ypObject *_ypSet_lookkey( ypObject *so, ypObject *key, register yp_hash_t
 
     // In the loop, se_key == ypSet_dummy is by far (factor of 100s) the least likely
     // outcome, so test for that last
-    for (perturb = hash; ; perturb >>= ypSet_PERTURB_SHIFT) {
-        i = (i << 2) + i + perturb + 1;
+    for( perturb = hash;; perturb >>= ypSet_PERTURB_SHIFT ) {
+        i = ( i << 2 ) + i + perturb + 1;
         ep = &ep0[i & mask];
-        if (ep->se_key == NULL) {
+        if( ep->se_key == NULL ) {
             if( freeslot != NULL ) ep = freeslot;
             goto success;
         }
-        if (ep->se_key == key) goto success;
-        if (ep->se_hash == hash && ep->se_key != ypSet_dummy) {
+        if( ep->se_key == key ) goto success;
+        if( ep->se_hash == hash && ep->se_key != ypSet_dummy ) {
             // Same __eq__ protection is here as well in Python
             cmp = yp_eq( ep->se_key, key );
             if( yp_isexceptionC( cmp ) ) return cmp;
             if( cmp == yp_True ) goto success;
-        } else if (ep->se_key == ypSet_dummy && freeslot == NULL) {
+        } else if( ep->se_key == ypSet_dummy && freeslot == NULL ) {
             freeslot = ep;
         }
     }
@@ -11005,8 +11099,7 @@ success:
 // Steals key and adds it to the hash table at the given location.  loc must not currently be in
 // use! Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict in dictobject.c
-static void _ypSet_movekey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
-        yp_hash_t hash )
+static void _ypSet_movekey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash )
 {
     if( loc->se_key == NULL ) ypSet_FILL( so ) += 1;
     loc->se_key = key;
@@ -11019,23 +11112,23 @@ static void _ypSet_movekey( ypObject *so, ypSet_KeyEntry *loc, ypObject *key,
 // cleaning/resizing/copying a table.  Sets *loc to the location at which the key was inserted.
 // Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
-static void _ypSet_movekey_clean( ypObject *so, ypObject *key, yp_hash_t hash,
-        ypSet_KeyEntry **ep )
+static void _ypSet_movekey_clean(
+        ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep )
 {
-    size_t i;
-    size_t perturb;
-    size_t mask = (size_t) ypSet_MASK( so );
+    size_t          i;
+    size_t          perturb;
+    size_t          mask = (size_t) ypSet_MASK( so );
     ypSet_KeyEntry *ep0 = ypSet_TABLE( so );
 
     i = hash & mask;
-    (*ep) = &ep0[i];
-    for (perturb = hash; (*ep)->se_key != NULL; perturb >>= ypSet_PERTURB_SHIFT) {
-        i = (i << 2) + i + perturb + 1;
-        (*ep) = &ep0[i & mask];
+    ( *ep ) = &ep0[i];
+    for( perturb = hash; ( *ep )->se_key != NULL; perturb >>= ypSet_PERTURB_SHIFT ) {
+        i = ( i << 2 ) + i + perturb + 1;
+        ( *ep ) = &ep0[i & mask];
     }
     ypSet_FILL( so ) += 1;
-    (*ep)->se_key = key;
-    (*ep)->se_hash = hash;
+    ( *ep )->se_key = key;
+    ( *ep )->se_hash = hash;
     ypSet_SET_LEN( so, ypSet_LEN( so ) + 1 );
 }
 
@@ -11055,13 +11148,13 @@ static ypObject *_ypSet_removekey( ypObject *so, ypSet_KeyEntry *loc )
 // Returns yp_True if so was modified, yp_False if it wasn't due to the key already being in the
 // set, or an exception on error.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft,
-        yp_ssize_t growhint )
+static ypObject *_ypSet_push(
+        ypObject *so, ypObject *key, yp_ssize_t *spaceleft, yp_ssize_t growhint )
 {
-    yp_hash_t hash;
-    ypObject *result = yp_None;
+    yp_hash_t       hash;
+    ypObject *      result = yp_None;
     ypSet_KeyEntry *loc;
-    yp_ssize_t newlen;
+    yp_ssize_t      newlen;
 
     // Look for the appropriate entry in the hash table
     hash = yp_hashC( key, &result );
@@ -11084,9 +11177,9 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
     // overflows ypSet_LEN_MAX (or yp_SSIZE_T_MAX), clamp to ypSet_LEN_MAX.
     if( growhint < 0 ) growhint = 0;
     if( ypSet_LEN( so ) > ypSet_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
-    newlen = yp_USIZE_MATH( ypSet_LEN( so )+1, +, growhint );
-    if( newlen < 0 || newlen > ypSet_LEN_MAX ) newlen = ypSet_LEN_MAX; // addition overflowed
-    result = _ypSet_resize( so, newlen );   // invalidates loc
+    newlen = yp_USIZE_MATH( ypSet_LEN( so ) + 1, +, growhint );
+    if( newlen < 0 || newlen > ypSet_LEN_MAX ) newlen = ypSet_LEN_MAX;  // addition overflowed
+    result = _ypSet_resize( so, newlen );                               // invalidates loc
     if( yp_isexceptionC( result ) ) return result;
 
     _ypSet_movekey_clean( so, yp_incref( key ), hash, &loc );
@@ -11099,8 +11192,8 @@ static ypObject *_ypSet_push( ypObject *so, ypObject *key, yp_ssize_t *spaceleft
 // set, or an exception on error.
 static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
 {
-    yp_hash_t hash;
-    ypObject *result = yp_None;
+    yp_hash_t       hash;
+    ypObject *      result = yp_None;
     ypSet_KeyEntry *loc;
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
@@ -11114,7 +11207,7 @@ static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
     if( !ypSet_ENTRY_USED( loc ) ) return ypSet_dummy;
 
     // Otherwise, we need to remove the key
-    return _ypSet_removekey( so, loc ); // new ref
+    return _ypSet_removekey( so, loc );  // new ref
 }
 
 // XXX Check for the so==x case _before_ calling this function
@@ -11122,9 +11215,9 @@ static ypObject *_ypSet_pop( ypObject *so, ypObject *key )
 static ypObject *_ypSet_isdisjoint( ypObject *so, ypObject *x )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    yp_ssize_t keysleft = ypSet_LEN( so );
-    yp_ssize_t i;
-    ypObject *result;
+    yp_ssize_t      keysleft = ypSet_LEN( so );
+    yp_ssize_t      i;
+    ypObject *      result;
     ypSet_KeyEntry *loc;
 
     for( i = 0; keysleft > 0; i++ ) {
@@ -11142,9 +11235,9 @@ static ypObject *_ypSet_isdisjoint( ypObject *so, ypObject *x )
 static ypObject *_ypSet_issubset( ypObject *so, ypObject *x )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    yp_ssize_t keysleft = ypSet_LEN( so );
-    yp_ssize_t i;
-    ypObject *result;
+    yp_ssize_t      keysleft = ypSet_LEN( so );
+    yp_ssize_t      i;
+    ypObject *      result;
     ypSet_KeyEntry *loc;
 
     if( ypSet_LEN( so ) > ypSet_LEN( x ) ) return yp_False;
@@ -11161,11 +11254,11 @@ static ypObject *_ypSet_issubset( ypObject *so, ypObject *x )
 // XXX Check for the so==other case _before_ calling this function
 static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
 {
-    yp_ssize_t keysleft = ypSet_LEN( other );
+    yp_ssize_t      keysleft = ypSet_LEN( other );
     ypSet_KeyEntry *otherkeys = ypSet_TABLE( other );
-    yp_ssize_t spaceleft = _ypSet_space_remaining( so );
-    ypObject *result;
-    yp_ssize_t i;
+    yp_ssize_t      spaceleft = _ypSet_space_remaining( so );
+    ypObject *      result;
+    yp_ssize_t      i;
 
     for( i = 0; keysleft > 0; i++ ) {
         if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
@@ -11179,19 +11272,19 @@ static ypObject *_ypSet_update_from_set( ypObject *so, ypObject *other )
 
 static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **mi, yp_uint64_t *mi_state )
 {
-    ypObject *exc = yp_None;
-    ypObject *key;
-    ypObject *result;
+    ypObject * exc = yp_None;
+    ypObject * key;
+    ypObject * result;
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
-    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc ); // zero on error
+    yp_ssize_t lenhint = yp_miniiter_lenhintC( *mi, mi_state, &exc );  // zero on error
 
     while( 1 ) {
-        key = yp_miniiter_next( mi, mi_state ); // new ref
+        key = yp_miniiter_next( mi, mi_state );  // new ref
         if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break;
             return key;
         }
-        lenhint -= 1; // check for <0 only when we need it in _ypSet_push
+        lenhint -= 1;  // check for <0 only when we need it in _ypSet_push
         result = _ypSet_push( so, key, &spaceleft, lenhint );
         yp_decref( key );
         if( yp_isexceptionC( result ) ) return result;
@@ -11205,16 +11298,16 @@ static ypObject *_ypSet_update_from_iter( ypObject *so, ypObject **mi, yp_uint64
 // XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 {
-    int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
-    ypObject *mi;
+    int         iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
+    ypObject *  mi;
     yp_uint64_t mi_state;
-    ypObject *result;
+    ypObject *  result;
 
     // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_update_from_set( so, iterable );
     } else {
-        mi = yp_miniiter( iterable, &mi_state ); // new ref
+        mi = yp_miniiter( iterable, &mi_state );  // new ref
         if( yp_isexceptionC( mi ) ) return mi;
         result = _ypSet_update_from_iter( so, &mi, &mi_state );
         yp_decref( mi );
@@ -11225,29 +11318,31 @@ static ypObject *_ypSet_update( ypObject *so, ypObject *iterable )
 // XXX Check the so==other case _before_ calling this function
 static ypObject *_ypSet_intersection_update_from_set( ypObject *so, ypObject *other )
 {
-    yp_ssize_t keysleft = ypSet_LEN( so );
+    yp_ssize_t      keysleft = ypSet_LEN( so );
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    yp_ssize_t i;
+    yp_ssize_t      i;
     ypSet_KeyEntry *other_loc;
-    ypObject *result;
+    ypObject *      result;
 
     // Since we're only removing keys from so, it won't be resized, so we can loop over it.  We
     // break once so is empty because we aren't expecting any errors from _ypSet_lookkey.
     for( i = 0; keysleft > 0; i++ ) {
         if( ypSet_LEN( so ) < 1 ) break;
-        yp_ASSERT( keys == ypSet_TABLE( so ) && i < ypSet_ALLOCLEN( so ), "removing keys shouldn't resize set" );
+        yp_ASSERT( keys == ypSet_TABLE( so ) && i < ypSet_ALLOCLEN( so ),
+                "removing keys shouldn't resize set" );
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
         keysleft -= 1;
         result = _ypSet_lookkey( other, keys[i].se_key, keys[i].se_hash, &other_loc );
         if( yp_isexceptionC( result ) ) return result;
-        if( ypSet_ENTRY_USED( other_loc ) ) continue; // if entry used, key is in other
+        if( ypSet_ENTRY_USED( other_loc ) ) continue;  // if entry used, key is in other
         yp_decref( _ypSet_removekey( so, &keys[i] ) );
     }
     return yp_None;
 }
 
 // TODO This _allows_ mi to yield mutable values, unlike issubset; standardize
-static ypObject *_ypSet_difference_update_from_iter( ypObject *so, ypObject **mi, yp_uint64_t *mi_state );
+static ypObject *_ypSet_difference_update_from_iter(
+        ypObject *so, ypObject **mi, yp_uint64_t *mi_state );
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other );
 static ypObject *_ypSet_intersection_update_from_iter(
         ypObject *so, ypObject **mi, yp_uint64_t *mi_state )
@@ -11259,7 +11354,7 @@ static ypObject *_ypSet_intersection_update_from_iter(
     // implement this as ypSet_intersection?
     // Unfortunately, we need to create a short-lived copy of so.  It's either that, or convert
     // mi to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
-    so_toremove = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    so_toremove = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE );  // new ref
     if( yp_isexceptionC( so_toremove ) ) return so_toremove;
 
     // Remove items from so_toremove that are yielded by mi.  so_toremove is then a set
@@ -11276,16 +11371,16 @@ static ypObject *_ypSet_intersection_update_from_iter(
 // XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
 {
-    int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
-    ypObject *mi;
+    int         iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
+    ypObject *  mi;
     yp_uint64_t mi_state;
-    ypObject *result;
+    ypObject *  result;
 
     // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_intersection_update_from_set( so, iterable );
     } else {
-        mi = yp_miniiter( iterable, &mi_state ); // new ref
+        mi = yp_miniiter( iterable, &mi_state );  // new ref
         if( yp_isexceptionC( mi ) ) return mi;
         result = _ypSet_intersection_update_from_iter( so, &mi, &mi_state );
         yp_decref( mi );
@@ -11296,10 +11391,10 @@ static ypObject *_ypSet_intersection_update( ypObject *so, ypObject *iterable )
 // XXX Check for the so==other case _before_ calling this function
 static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *other )
 {
-    yp_ssize_t keysleft = ypSet_LEN( other );
+    yp_ssize_t      keysleft = ypSet_LEN( other );
     ypSet_KeyEntry *otherkeys = ypSet_TABLE( other );
-    ypObject *result;
-    yp_ssize_t i;
+    ypObject *      result;
+    yp_ssize_t      i;
     ypSet_KeyEntry *loc;
 
     // We break once so is empty because we aren't expecting any errors from _ypSet_lookkey
@@ -11309,7 +11404,7 @@ static ypObject *_ypSet_difference_update_from_set( ypObject *so, ypObject *othe
         keysleft -= 1;
         result = _ypSet_lookkey( so, otherkeys[i].se_key, otherkeys[i].se_hash, &loc );
         if( yp_isexceptionC( result ) ) return result;
-        if( !ypSet_ENTRY_USED( loc ) ) continue; // if entry not used, key is not in set
+        if( !ypSet_ENTRY_USED( loc ) ) continue;  // if entry not used, key is not in set
         yp_decref( _ypSet_removekey( so, loc ) );
     }
     return yp_None;
@@ -11324,12 +11419,12 @@ static ypObject *_ypSet_difference_update_from_iter(
 
     // It's tempting to stop once so is empty, but doing so would mask errors in yielded keys
     while( 1 ) {
-        key = yp_miniiter_next( mi, mi_state ); // new ref
+        key = yp_miniiter_next( mi, mi_state );  // new ref
         if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break;
             return key;
         }
-        result = _ypSet_pop( so, key ); // new ref
+        result = _ypSet_pop( so, key );  // new ref
         yp_decref( key );
         if( yp_isexceptionC( result ) ) return result;
         yp_decref( result );
@@ -11341,16 +11436,16 @@ static ypObject *_ypSet_difference_update_from_iter(
 // XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
 {
-    int iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
-    ypObject *mi;
+    int         iterable_pair = ypObject_TYPE_PAIR_CODE( iterable );
+    ypObject *  mi;
     yp_uint64_t mi_state;
-    ypObject *result;
+    ypObject *  result;
 
     // Recall that type pairs are identified by the immutable type code
     if( iterable_pair == ypFrozenSet_CODE ) {
         return _ypSet_difference_update_from_set( so, iterable );
     } else {
-        mi = yp_miniiter( iterable, &mi_state ); // new ref
+        mi = yp_miniiter( iterable, &mi_state );  // new ref
         if( yp_isexceptionC( mi ) ) return mi;
         result = _ypSet_difference_update_from_iter( so, &mi, &mi_state );
         yp_decref( mi );
@@ -11361,11 +11456,11 @@ static ypObject *_ypSet_difference_update( ypObject *so, ypObject *iterable )
 // XXX Check for the so==other case _before_ calling this function
 static ypObject *_ypSet_symmetric_difference_update_from_set( ypObject *so, ypObject *other )
 {
-    yp_ssize_t spaceleft = _ypSet_space_remaining( so );
-    yp_ssize_t keysleft = ypSet_LEN( other );
+    yp_ssize_t      spaceleft = _ypSet_space_remaining( so );
+    yp_ssize_t      keysleft = ypSet_LEN( other );
     ypSet_KeyEntry *otherkeys = ypSet_TABLE( other );
-    ypObject *result;
-    yp_ssize_t i;
+    ypObject *      result;
+    yp_ssize_t      i;
 
     for( i = 0; keysleft > 0; i++ ) {
         if( !ypSet_ENTRY_USED( &otherkeys[i] ) ) continue;
@@ -11376,7 +11471,8 @@ static ypObject *_ypSet_symmetric_difference_update_from_set( ypObject *so, ypOb
         result = _ypSet_pop( so, otherkeys[i].se_key );
         if( yp_isexceptionC( result ) ) return result;
         if( result == ypSet_dummy ) {
-            result = _ypSet_push( so, otherkeys[i].se_key, &spaceleft, keysleft ); // may resize so
+            result =
+                    _ypSet_push( so, otherkeys[i].se_key, &spaceleft, keysleft );  // may resize so
             if( yp_isexceptionC( result ) ) return result;
         } else {
             // XXX spaceleft based on alloclen and fill, so doesn't change on deletions
@@ -11392,9 +11488,9 @@ static ypObject *_ypSet_symmetric_difference_update_from_set( ypObject *so, ypOb
 static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    yp_ssize_t keysleft = ypSet_LEN( so );
-    yp_ssize_t i;
-    ypObject *result;
+    yp_ssize_t      keysleft = ypSet_LEN( so );
+    yp_ssize_t      i;
+    ypObject *      result;
 
     for( i = 0; keysleft > 0; i++ ) {
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
@@ -11405,44 +11501,49 @@ static ypObject *frozenset_traverse( ypObject *so, visitfunc visitor, void *memo
     return yp_None;
 }
 
-static ypObject *frozenset_freeze( ypObject *so ) {
-    return yp_None; // no-op, currently
+static ypObject *frozenset_freeze( ypObject *so )
+{
+    return yp_None;  // no-op, currently
 }
 
-static ypObject *frozenset_unfrozen_copy( ypObject *so  ) {
+static ypObject *frozenset_unfrozen_copy( ypObject *so )
+{
     return _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *frozenset_frozen_copy( ypObject *so ) {
+static ypObject *frozenset_frozen_copy( ypObject *so )
+{
     if( ypSet_LEN( so ) < 1 ) return _yp_frozenset_empty;
     // A shallow copy of a frozenset to a frozenset doesn't require an actual copy
     if( ypObject_TYPE_CODE( so ) == ypFrozenSet_CODE ) return yp_incref( so );
     return _ypSet_copy( ypFrozenSet_CODE, so, /*alloclen_fixed=*/TRUE );
 }
 
-static ypObject *frozenset_unfrozen_deepcopy( ypObject *so, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *frozenset_unfrozen_deepcopy(
+        ypObject *so, visitfunc copy_visitor, void *copy_memo )
+{
     return _ypSet_deepcopy( ypSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *frozenset_frozen_deepcopy( ypObject *so, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *frozenset_frozen_deepcopy( ypObject *so, visitfunc copy_visitor, void *copy_memo )
+{
     if( ypSet_LEN( so ) < 1 ) return _yp_frozenset_empty;
-    return _ypSet_deepcopy( ypFrozenSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
+    return _ypSet_deepcopy(
+            ypFrozenSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
-static ypObject *frozenset_bool( ypObject *so ) {
-    return ypBool_FROM_C( ypSet_LEN( so ) );
-}
+static ypObject *frozenset_bool( ypObject *so ) { return ypBool_FROM_C( ypSet_LEN( so ) ); }
 
 // XXX Adapted from Python's frozenset_hash
-static ypObject *frozenset_currenthash( ypObject *so,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *_hash )
+static ypObject *frozenset_currenthash(
+        ypObject *so, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *_hash )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    yp_ssize_t keysleft = ypSet_LEN( so );
-    yp_ssize_t i;
-    yp_uhash_t h, hash = 1927868237U;
+    yp_ssize_t      keysleft = ypSet_LEN( so );
+    yp_ssize_t      i;
+    yp_uhash_t      h, hash = 1927868237U;
 
-    hash *= (yp_uhash_t)ypSet_LEN(so) + 1;
+    hash *= (yp_uhash_t) ypSet_LEN( so ) + 1;
     for( i = 0; keysleft > 0; i++ ) {
         if( !ypSet_ENTRY_USED( &keys[i] ) ) continue;
         keysleft -= 1;
@@ -11452,13 +11553,13 @@ static ypObject *frozenset_currenthash( ypObject *so,
            hashes so that many distinct combinations collapse to only
            a handful of distinct hash values. */
         h = keys[i].se_hash;
-        hash ^= (h ^ (h << 16) ^ 89869747U)  * 3644798167U;
+        hash ^= ( h ^ ( h << 16 ) ^ 89869747U ) * 3644798167U;
     }
     hash = hash * 69069U + 907133923U;
-    if (hash == (yp_uhash_t)ypObject_HASH_INVALID) {
+    if( hash == (yp_uhash_t) ypObject_HASH_INVALID ) {
         hash = 590923713U;
     }
-    *_hash = (yp_hash_t)hash;
+    *_hash = (yp_hash_t) hash;
 
     // Since we never contain mutable objects, we can cache our hash
     if( !ypObject_IS_MUTABLE( so ) ) ypObject_CACHED_HASH( so ) = *_hash;
@@ -11470,7 +11571,8 @@ typedef struct {
     yp_uint32_t index;
 } ypSetMiState;
 yp_STATIC_ASSERT( ypSet_LEN_MAX <= 0xFFFFFFFFu, len_fits_32_bits );
-yp_STATIC_ASSERT( yp_sizeof( yp_uint64_t ) >= yp_sizeof( ypSetMiState ), ypSetMiState_fits_uint64 );
+yp_STATIC_ASSERT(
+        yp_sizeof( yp_uint64_t ) >= yp_sizeof( ypSetMiState ), ypSetMiState_fits_uint64 );
 
 static ypObject *frozenset_miniiter( ypObject *so, yp_uint64_t *_state )
 {
@@ -11483,13 +11585,13 @@ static ypObject *frozenset_miniiter( ypObject *so, yp_uint64_t *_state )
 // XXX We need to be a little suspicious of _state...just in case the caller has changed it
 static ypObject *frozenset_miniiter_next( ypObject *so, yp_uint64_t *_state )
 {
-    ypSetMiState *state = (ypSetMiState *) _state;
+    ypSetMiState *  state = (ypSetMiState *) _state;
     ypSet_KeyEntry *loc;
 
     // Find the next entry
     if( state->keysleft < 1 ) return yp_StopIteration;
     while( 1 ) {
-        if( ((yp_ssize_t) state->index) >= ypSet_ALLOCLEN( so ) ) {
+        if( ( (yp_ssize_t) state->index ) >= ypSet_ALLOCLEN( so ) ) {
             state->keysleft = 0;
             return yp_StopIteration;
         }
@@ -11506,14 +11608,14 @@ static ypObject *frozenset_miniiter_next( ypObject *so, yp_uint64_t *_state )
 static ypObject *frozenset_miniiter_lenhint(
         ypObject *so, yp_uint64_t *state, yp_ssize_t *lenhint )
 {
-    *lenhint = ((ypSetMiState *) state)->keysleft;
+    *lenhint = ( (ypSetMiState *) state )->keysleft;
     return yp_None;
 }
 
 static ypObject *frozenset_contains( ypObject *so, ypObject *x )
 {
-    yp_hash_t hash;
-    ypObject *result = yp_None;
+    yp_hash_t       hash;
+    ypObject *      result = yp_None;
     ypSet_KeyEntry *loc;
 
     hash = yp_currenthashC( x, &result );
@@ -11544,7 +11646,7 @@ static ypObject *frozenset_isdisjoint( ypObject *so, ypObject *x )
 
 static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
     ypObject *x_asset;
     ypObject *result;
 
@@ -11568,7 +11670,7 @@ static ypObject *frozenset_issubset( ypObject *so, ypObject *x )
 // Remember that if x.issubset(so), then so.issuperset(x)
 static ypObject *frozenset_issuperset( ypObject *so, ypObject *x )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
     ypObject *x_asset;
     ypObject *result;
 
@@ -11614,8 +11716,9 @@ static ypObject *frozenset_eq( ypObject *so, ypObject *x )
     // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when so!=x.
     if( ypObject_CACHED_HASH( so ) != ypObject_HASH_INVALID &&
-        ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
-        ypObject_CACHED_HASH( so ) != ypObject_CACHED_HASH( x ) ) return yp_False;
+            ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
+            ypObject_CACHED_HASH( so ) != ypObject_CACHED_HASH( x ) )
+        return yp_False;
 
     return _ypSet_issubset( so, x );
 }
@@ -11645,7 +11748,7 @@ static ypObject *set_update( ypObject *so, int n, va_list args )
 {
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
-        ypObject *x = va_arg( args, ypObject * );   // borrowed
+        ypObject *x = va_arg( args, ypObject * );  // borrowed
         if( so == x ) continue;
         result = _ypSet_update( so, x );
         if( yp_isexceptionC( result ) ) return result;
@@ -11658,7 +11761,7 @@ static ypObject *set_intersection_update( ypObject *so, int n, va_list args )
     ypObject *result;
     // It's tempting to stop once so is empty, but doing so would mask errors in args
     for( /*n already set*/; n > 0; n-- ) {
-        ypObject *x = va_arg( args, ypObject * );   // borrowed
+        ypObject *x = va_arg( args, ypObject * );  // borrowed
         if( so == x ) continue;
         result = _ypSet_intersection_update( so, x );
         if( yp_isexceptionC( result ) ) return result;
@@ -11672,7 +11775,7 @@ static ypObject *set_difference_update( ypObject *so, int n, va_list args )
     ypObject *result;
     // It's tempting to stop once so is empty, but doing so would mask errors in args
     for( /*n already set*/; n > 0; n-- ) {
-        ypObject *x = va_arg( args, ypObject * );   // borrowed
+        ypObject *x = va_arg( args, ypObject * );  // borrowed
         if( so == x ) {
             result = set_clear( so );
         } else {
@@ -11685,7 +11788,7 @@ static ypObject *set_difference_update( ypObject *so, int n, va_list args )
 
 static ypObject *set_symmetric_difference_update( ypObject *so, ypObject *x )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
     ypObject *result;
 
     if( so == x ) return set_clear( so );
@@ -11716,7 +11819,7 @@ static ypObject *frozenset_union( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE );  // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -11734,7 +11837,7 @@ static ypObject *frozenset_intersection( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE );  // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_intersection_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -11752,7 +11855,7 @@ static ypObject *frozenset_difference( ypObject *so, int n, va_list args )
 
     if( !ypObject_IS_MUTABLE( so ) && n < 1 ) return yp_incref( so );
 
-    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE );  // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_difference_update( newSo, n, args );
     if( yp_isexceptionC( result ) ) {
@@ -11768,7 +11871,7 @@ static ypObject *frozenset_symmetric_difference( ypObject *so, ypObject *x )
     ypObject *result;
     ypObject *newSo;
 
-    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE ); // new ref
+    newSo = _ypSet_copy( ypSet_CODE, so, /*alloclen_fixed=*/FALSE );  // new ref
     if( yp_isexceptionC( newSo ) ) return newSo;
     result = set_symmetric_difference_update( newSo, x );
     if( yp_isexceptionC( result ) ) {
@@ -11779,7 +11882,8 @@ static ypObject *frozenset_symmetric_difference( ypObject *so, ypObject *x )
     return newSo;
 }
 
-static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
+static ypObject *set_pushunique( ypObject *so, ypObject *x )
+{
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     // TODO Over-allocate
     ypObject *result = _ypSet_push( so, x, &spaceleft, 0 );
@@ -11787,7 +11891,8 @@ static ypObject *set_pushunique( ypObject *so, ypObject *x ) {
     return result == yp_True ? yp_None : yp_KeyError;
 }
 
-static ypObject *set_push( ypObject *so, ypObject *x ) {
+static ypObject *set_push( ypObject *so, ypObject *x )
+{
     yp_ssize_t spaceleft = _ypSet_space_remaining( so );
     // TODO Over-allocate
     ypObject *result = _ypSet_push( so, x, &spaceleft, 0 );
@@ -11798,8 +11903,8 @@ static ypObject *set_push( ypObject *so, ypObject *x ) {
 static ypObject *set_clear( ypObject *so )
 {
     ypSet_KeyEntry *oldkeys = ypSet_TABLE( so );
-    yp_ssize_t keysleft = ypSet_LEN( so );
-    yp_ssize_t i;
+    yp_ssize_t      keysleft = ypSet_LEN( so );
+    yp_ssize_t      i;
 
     if( ypSet_FILL( so ) < 1 ) return yp_None;
 
@@ -11816,11 +11921,12 @@ static ypObject *set_clear( ypObject *so )
     // Free memory
     ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR( so, ypSetObject, ypSet_ALLOCLEN_MAX );
     yp_ASSERT( ypSet_TABLE( so ) == ypSet_INLINE_DATA( so ), "set_clear didn't allocate inline!" );
-    yp_ASSERT( ypSet_ALLOCLEN( so ) >= ypSet_ALLOCLEN_MIN, "set inlinelen must be at least ypSet_ALLOCLEN_MIN" );
+    yp_ASSERT( ypSet_ALLOCLEN( so ) >= ypSet_ALLOCLEN_MIN,
+            "set inlinelen must be at least ypSet_ALLOCLEN_MIN" );
 
     // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    ypSet_SET_ALLOCLEN( so, ypSet_ALLOCLEN_MIN ); // we can't make use of the excess anyway
+    ypSet_SET_ALLOCLEN( so, ypSet_ALLOCLEN_MIN );  // we can't make use of the excess anyway
     ypSet_SET_LEN( so, 0 );
     ypSet_FILL( so ) = 0;
     memset( ypSet_TABLE( so ), 0, ypSet_ALLOCLEN_MIN * yp_sizeof( ypSet_KeyEntry ) );
@@ -11830,12 +11936,13 @@ static ypObject *set_clear( ypObject *so )
 // Note the difference between this, which removes an arbitrary key, and _ypSet_pop, which removes
 // a specific key
 // XXX Adapted from Python's set_pop
-static ypObject *set_pop( ypObject *so ) {
-    register yp_ssize_t i = 0;
+static ypObject *set_pop( ypObject *so )
+{
+    register yp_ssize_t      i = 0;
     register ypSet_KeyEntry *table = ypSet_TABLE( so );
-    ypObject *key;
+    ypObject *               key;
 
-    if( ypSet_LEN( so ) < 1 ) return yp_KeyError; // "pop from an empty set"
+    if( ypSet_LEN( so ) < 1 ) return yp_KeyError;  // "pop from an empty set"
 
     /* We abuse the hash field of slot 0 to hold a search finger:
      * If slot 0 has a value, use slot 0.
@@ -11849,18 +11956,19 @@ static ypObject *set_pop( ypObject *so ) {
          * finger that's out of bounds now because it wrapped around
          * or the table shrunk -- simply make sure it's in bounds now.
          */
-        if( i > ypSet_MASK( so ) || i < 1 ) i = 1; // skip slot 0
-        while( !ypSet_ENTRY_USED( table+i ) ) {
+        if( i > ypSet_MASK( so ) || i < 1 ) i = 1;  // skip slot 0
+        while( !ypSet_ENTRY_USED( table + i ) ) {
             i++;
             if( i > ypSet_MASK( so ) ) i = 1;
         }
     }
-    key = _ypSet_removekey( so, table+i );
+    key = _ypSet_removekey( so, table + i );
     table->se_hash = i + 1;  // next place to start
     return key;
 }
 
-static ypObject *frozenset_len( ypObject *so, yp_ssize_t *len ) {
+static ypObject *frozenset_len( ypObject *so, yp_ssize_t *len )
+{
     *len = ypSet_LEN( so );
     return yp_None;
 }
@@ -11881,8 +11989,8 @@ static ypObject *set_remove( ypObject *so, ypObject *x, ypObject *onmissing )
 static ypObject *frozenset_dealloc( ypObject *so )
 {
     ypSet_KeyEntry *keys = ypSet_TABLE( so );
-    yp_ssize_t keysleft = ypSet_LEN( so );
-    yp_ssize_t i;
+    yp_ssize_t      keysleft = ypSet_LEN( so );
+    yp_ssize_t      i;
 
     // Nobody is referencing us, so yp_decref doesn't require us to be in a good state
     for( i = 0; keysleft > 0; i++ ) {
@@ -11895,167 +12003,167 @@ static ypObject *frozenset_dealloc( ypObject *so )
 }
 
 static ypSetMethods ypFrozenSet_as_set = {
-    frozenset_isdisjoint,           // tp_isdisjoint
-    frozenset_issubset,             // tp_issubset
-    // tp_lt is elsewhere
-    frozenset_issuperset,           // tp_issuperset
-    // tp_gt is elsewhere
-    frozenset_union,                // tp_union
-    frozenset_intersection,         // tp_intersection
-    frozenset_difference,           // tp_difference
-    frozenset_symmetric_difference, // tp_symmetric_difference
-    MethodError_objvalistproc,      // tp_intersection_update
-    MethodError_objvalistproc,      // tp_difference_update
-    MethodError_objobjproc,         // tp_symmetric_difference_update
-    // tp_push (aka tp_set_ad) is elsewhere
-    MethodError_objobjproc          // tp_pushunique
+        frozenset_isdisjoint,  // tp_isdisjoint
+        frozenset_issubset,    // tp_issubset
+        // tp_lt is elsewhere
+        frozenset_issuperset,  // tp_issuperset
+        // tp_gt is elsewhere
+        frozenset_union,                 // tp_union
+        frozenset_intersection,          // tp_intersection
+        frozenset_difference,            // tp_difference
+        frozenset_symmetric_difference,  // tp_symmetric_difference
+        MethodError_objvalistproc,       // tp_intersection_update
+        MethodError_objvalistproc,       // tp_difference_update
+        MethodError_objobjproc,          // tp_symmetric_difference_update
+        // tp_push (aka tp_set_ad) is elsewhere
+        MethodError_objobjproc  // tp_pushunique
 };
 
 static ypTypeObject ypFrozenSet_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    frozenset_dealloc,              // tp_dealloc
-    frozenset_traverse,             // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        frozenset_dealloc,   // tp_dealloc
+        frozenset_traverse,  // tp_traverse
+        NULL,                // tp_str
+        NULL,                // tp_repr
 
-    // Freezing, copying, and invalidating
-    frozenset_freeze,               // tp_freeze
-    frozenset_unfrozen_copy,        // tp_unfrozen_copy
-    frozenset_frozen_copy,          // tp_frozen_copy
-    frozenset_unfrozen_deepcopy,    // tp_unfrozen_deepcopy
-    frozenset_frozen_deepcopy,      // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        frozenset_freeze,             // tp_freeze
+        frozenset_unfrozen_copy,      // tp_unfrozen_copy
+        frozenset_frozen_copy,        // tp_frozen_copy
+        frozenset_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        frozenset_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,          // tp_invalidate
 
-    // Boolean operations and comparisons
-    frozenset_bool,                 // tp_bool
-    frozenset_lt,                   // tp_lt
-    frozenset_le,                   // tp_le
-    frozenset_eq,                   // tp_eq
-    frozenset_ne,                   // tp_ne
-    frozenset_ge,                   // tp_ge
-    frozenset_gt,                   // tp_gt
+        // Boolean operations and comparisons
+        frozenset_bool,  // tp_bool
+        frozenset_lt,    // tp_lt
+        frozenset_le,    // tp_le
+        frozenset_eq,    // tp_eq
+        frozenset_ne,    // tp_ne
+        frozenset_ge,    // tp_ge
+        frozenset_gt,    // tp_gt
 
-    // Generic object operations
-    frozenset_currenthash,          // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        frozenset_currenthash,  // tp_currenthash
+        MethodError_objproc,    // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    frozenset_miniiter,             // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    frozenset_miniiter_next,        // tp_miniiter_next
-    frozenset_miniiter_lenhint,     // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        frozenset_miniiter,          // tp_miniiter
+        TypeError_miniiterfunc,      // tp_miniiter_reversed
+        frozenset_miniiter_next,     // tp_miniiter_next
+        frozenset_miniiter_lenhint,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,       // tp_iter
+        TypeError_objproc,           // tp_iter_reversed
+        TypeError_objobjproc,        // tp_send
 
-    // Container operations
-    frozenset_contains,             // tp_contains
-    frozenset_len,                  // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        frozenset_contains,         // tp_contains
+        frozenset_len,              // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    &ypFrozenSet_as_set,            // tp_as_set
+        // Set operations
+        &ypFrozenSet_as_set,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 static ypSetMethods ypSet_as_set = {
-    frozenset_isdisjoint,           // tp_isdisjoint
-    frozenset_issubset,             // tp_issubset
-    // tp_lt is elsewhere
-    frozenset_issuperset,           // tp_issuperset
-    // tp_gt is elsewhere
-    frozenset_union,                // tp_union
-    frozenset_intersection,         // tp_intersection
-    frozenset_difference,           // tp_difference
-    frozenset_symmetric_difference, // tp_symmetric_difference
-    set_intersection_update,        // tp_intersection_update
-    set_difference_update,          // tp_difference_update
-    set_symmetric_difference_update,// tp_symmetric_difference_update
-    // tp_push (aka tp_set_ad) is elsewhere
-    set_pushunique,                 // tp_pushunique
+        frozenset_isdisjoint,  // tp_isdisjoint
+        frozenset_issubset,    // tp_issubset
+        // tp_lt is elsewhere
+        frozenset_issuperset,  // tp_issuperset
+        // tp_gt is elsewhere
+        frozenset_union,                  // tp_union
+        frozenset_intersection,           // tp_intersection
+        frozenset_difference,             // tp_difference
+        frozenset_symmetric_difference,   // tp_symmetric_difference
+        set_intersection_update,          // tp_intersection_update
+        set_difference_update,            // tp_difference_update
+        set_symmetric_difference_update,  // tp_symmetric_difference_update
+        // tp_push (aka tp_set_ad) is elsewhere
+        set_pushunique,  // tp_pushunique
 };
 
 static ypTypeObject ypSet_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    frozenset_dealloc,              // tp_dealloc
-    frozenset_traverse,             // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        frozenset_dealloc,   // tp_dealloc
+        frozenset_traverse,  // tp_traverse
+        NULL,                // tp_str
+        NULL,                // tp_repr
 
-    // Freezing, copying, and invalidating
-    frozenset_freeze,               // tp_freeze
-    frozenset_unfrozen_copy,        // tp_unfrozen_copy
-    frozenset_frozen_copy,          // tp_frozen_copy
-    frozenset_unfrozen_deepcopy,    // tp_unfrozen_deepcopy
-    frozenset_frozen_deepcopy,      // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        frozenset_freeze,             // tp_freeze
+        frozenset_unfrozen_copy,      // tp_unfrozen_copy
+        frozenset_frozen_copy,        // tp_frozen_copy
+        frozenset_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        frozenset_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,          // tp_invalidate
 
-    // Boolean operations and comparisons
-    frozenset_bool,                 // tp_bool
-    frozenset_lt,                   // tp_lt
-    frozenset_le,                   // tp_le
-    frozenset_eq,                   // tp_eq
-    frozenset_ne,                   // tp_ne
-    frozenset_ge,                   // tp_ge
-    frozenset_gt,                   // tp_gt
+        // Boolean operations and comparisons
+        frozenset_bool,  // tp_bool
+        frozenset_lt,    // tp_lt
+        frozenset_le,    // tp_le
+        frozenset_eq,    // tp_eq
+        frozenset_ne,    // tp_ne
+        frozenset_ge,    // tp_ge
+        frozenset_gt,    // tp_gt
 
-    // Generic object operations
-    frozenset_currenthash,          // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        frozenset_currenthash,  // tp_currenthash
+        MethodError_objproc,    // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    frozenset_miniiter,             // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    frozenset_miniiter_next,        // tp_miniiter_next
-    frozenset_miniiter_lenhint,     // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        frozenset_miniiter,          // tp_miniiter
+        TypeError_miniiterfunc,      // tp_miniiter_reversed
+        frozenset_miniiter_next,     // tp_miniiter_next
+        frozenset_miniiter_lenhint,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,       // tp_iter
+        TypeError_objproc,           // tp_iter_reversed
+        TypeError_objobjproc,        // tp_send
 
-    // Container operations
-    frozenset_contains,             // tp_contains
-    frozenset_len,                  // tp_len
-    set_push,                       // tp_push
-    set_clear,                      // tp_clear
-    set_pop,                        // tp_pop
-    set_remove,                     // tp_remove
-    MethodError_objobjobjproc,      // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    set_update,                     // tp_update
+        // Container operations
+        frozenset_contains,         // tp_contains
+        frozenset_len,              // tp_len
+        set_push,                   // tp_push
+        set_clear,                  // tp_clear
+        set_pop,                    // tp_pop
+        set_remove,                 // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        set_update,                 // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    &ypSet_as_set,                  // tp_as_set
+        // Set operations
+        &ypSet_as_set,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 
@@ -12074,8 +12182,8 @@ void yp_set_add( ypObject **set, ypObject *x )
 // use...but then what else should we call this?  Do we jump right to yp_getintern?
 static ypObject *yp_set_getintern( ypObject *set, ypObject *x )
 {
-    yp_hash_t hash;
-    ypObject *result = yp_None;
+    yp_hash_t       hash;
+    ypObject *      result = yp_None;
     ypSet_KeyEntry *loc;
 
     hash = yp_currenthashC( x, &result );
@@ -12092,12 +12200,12 @@ static ypObject *yp_set_getintern( ypObject *set, ypObject *x )
 static ypObject *_ypSetNV( int type, int n, va_list args )
 {
     yp_ssize_t spaceleft;
-    ypObject *result;
-    ypObject *newSo = _ypSet_new( type, n, /*alloclen_fixed=*/TRUE );
+    ypObject * result;
+    ypObject * newSo = _ypSet_new( type, n, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( newSo ) ) return newSo;
     spaceleft = _ypSet_space_remaining( newSo );
     while( n > 0 ) {
-        ypObject *x = va_arg( args, ypObject * );   // borrowed
+        ypObject *x = va_arg( args, ypObject * );  // borrowed
         if( yp_isexceptionC( x ) ) {
             yp_decref( newSo );
             return x;
@@ -12112,20 +12220,24 @@ static ypObject *_ypSetNV( int type, int n, va_list args )
     return newSo;
 }
 
-ypObject *yp_frozensetN( int n, ... ) {
+ypObject *yp_frozensetN( int n, ... )
+{
     if( n < 1 ) return _yp_frozenset_empty;
-    return_yp_V_FUNC( ypObject *, _ypSetNV, (ypFrozenSet_CODE, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypSetNV, ( ypFrozenSet_CODE, n, args ), n );
 }
-ypObject *yp_frozensetNV( int n, va_list args ) {
+ypObject *yp_frozensetNV( int n, va_list args )
+{
     if( n < 1 ) return _yp_frozenset_empty;
     return _ypSetNV( ypFrozenSet_CODE, n, args );
 }
 
-ypObject *yp_setN( int n, ... ) {
+ypObject *yp_setN( int n, ... )
+{
     if( n < 1 ) return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return_yp_V_FUNC( ypObject *, _ypSetNV, (ypSet_CODE, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypSetNV, ( ypSet_CODE, n, args ), n );
 }
-ypObject *yp_setNV( int n, va_list args ) {
+ypObject *yp_setNV( int n, va_list args )
+{
     if( n < 1 ) return _ypSet_new( ypSet_CODE, 0, /*alloclen_fixed=*/FALSE );
     return _ypSetNV( ypSet_CODE, n, args );
 }
@@ -12133,9 +12245,9 @@ ypObject *yp_setNV( int n, va_list args ) {
 // XXX Check for the "fellow frozenset/set" case _before_ calling this function
 static ypObject *_ypSet( int type, ypObject *iterable )
 {
-    ypObject *exc = yp_None;
-    ypObject *newSo;
-    ypObject *result;
+    ypObject * exc = yp_None;
+    ypObject * newSo;
+    ypObject * result;
     yp_ssize_t lenhint = yp_lenC( iterable, &exc );
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
@@ -12160,7 +12272,8 @@ static ypObject *_ypSet( int type, ypObject *iterable )
     return newSo;
 }
 
-ypObject *yp_frozenset( ypObject *iterable ) {
+ypObject *yp_frozenset( ypObject *iterable )
+{
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypFrozenSet_CODE ) {
         if( ypSet_LEN( iterable ) < 1 ) return _yp_frozenset_empty;
         if( ypObject_TYPE_CODE( iterable ) == ypFrozenSet_CODE ) return yp_incref( iterable );
@@ -12169,7 +12282,8 @@ ypObject *yp_frozenset( ypObject *iterable ) {
     return _ypSet( ypFrozenSet_CODE, iterable );
 }
 
-ypObject *yp_set( ypObject *iterable ) {
+ypObject *yp_set( ypObject *iterable )
+{
     if( ypObject_TYPE_PAIR_CODE( iterable ) == ypFrozenSet_CODE ) {
         return _ypSet_copy( ypSet_CODE, iterable, /*alloclen_fixed=*/FALSE );
     }
@@ -12190,39 +12304,42 @@ ypObject *yp_set( ypObject *iterable ) {
 // plus side, we can allocate it's data inline (via alloclen_fixed).
 
 // ypDictObject and ypDict_LEN are defined above, for use by the set code
-#define ypDict_KEYSET( mp )         ( ((ypDictObject *)mp)->keyset )
-#define ypDict_ALLOCLEN( mp )       ypSet_ALLOCLEN( ypDict_KEYSET( mp ) )
-#define ypDict_VALUES( mp )         ( (ypObject **) ((ypObject *)mp)->ob_data )
-#define ypDict_SET_VALUES( mp, x )  ( ((ypObject *)mp)->ob_data = x )
-#define ypDict_INLINE_DATA( mp )    ( ((ypDictObject *)mp)->ob_inline_data )
+#define ypDict_KEYSET( mp ) ( ( (ypDictObject *) mp )->keyset )
+#define ypDict_ALLOCLEN( mp ) ypSet_ALLOCLEN( ypDict_KEYSET( mp ) )
+#define ypDict_VALUES( mp ) ( (ypObject **) ( (ypObject *) mp )->ob_data )
+#define ypDict_SET_VALUES( mp, x ) ( ( (ypObject *) mp )->ob_data = x )
+#define ypDict_INLINE_DATA( mp ) ( ( (ypDictObject *) mp )->ob_inline_data )
 
 // XXX The dict's alloclen is always equal to the keyset alloclen, and we don't use the standard
 // ypMem_* macros to resize the dict, so we repurpose mp->ob_alloclen to be the search finger for
 // dict_popitem; if it gets corrupted, it's no big deal, because it's just a place to start
 // searching
-#define ypDict_POPITEM_FINGER       ypObject_ALLOCLEN
-#define ypDict_SET_POPITEM_FINGER   ypObject_SET_ALLOCLEN
+#define ypDict_POPITEM_FINGER ypObject_ALLOCLEN
+#define ypDict_SET_POPITEM_FINGER ypObject_SET_ALLOCLEN
 
 // dicts cannot grow larger than the associated keyset
-#define ypDict_ALLOCLEN_MAX     ypSet_ALLOCLEN_MAX
-#define ypDict_LEN_MAX          ypSet_LEN_MAX
+#define ypDict_ALLOCLEN_MAX ypSet_ALLOCLEN_MAX
+#define ypDict_LEN_MAX ypSet_LEN_MAX
 
 // Returns a pointer to the value element corresponding to the given key location
 #define ypDict_VALUE_ENTRY( mp, key_loc ) \
-    ( &(ypDict_VALUES( mp )[ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), key_loc )]) )
+    ( &( ypDict_VALUES( mp )[ypSet_ENTRY_INDEX( ypDict_KEYSET( mp ), key_loc )] ) )
 
 // So long as each entry in the dict's value array is no larger than each entry in the set's
 // key/hash array, we can share ypSet_ALLOCLEN_MAX and ypSet_LEN_MAX without fear of overflow
-yp_STATIC_ASSERT( yp_sizeof( ypObject * ) <= yp_sizeof( ypSet_KeyEntry ), ypDict_data_not_larger_than_set_data );
-yp_STATIC_ASSERT( (yp_SSIZE_T_MAX-yp_sizeof( ypDictObject )) / yp_sizeof( ypObject * ) >= ypSet_ALLOCLEN_MAX, ypDict_alloclen_max_not_smaller_than_set_alloclen_max );
+yp_STATIC_ASSERT( yp_sizeof( ypObject * ) <= yp_sizeof( ypSet_KeyEntry ),
+        ypDict_data_not_larger_than_set_data );
+yp_STATIC_ASSERT( ( yp_SSIZE_T_MAX - yp_sizeof( ypDictObject ) ) / yp_sizeof( ypObject * ) >=
+                          ypSet_ALLOCLEN_MAX,
+        ypDict_alloclen_max_not_smaller_than_set_alloclen_max );
 
 // Empty frozendicts can be represented by this, immortal object
-static ypObject _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
+static ypObject     _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypDictObject _yp_frozendict_empty_struct = {
-    { ypFrozenDict_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
-    0, ypSet_ALLOCLEN_MIN, ypObject_HASH_INVALID, _yp_frozendict_empty_data },
-    _yp_frozenset_empty };
-#define _yp_frozendict_empty    ((ypObject *) &_yp_frozendict_empty_struct)
+        {ypFrozenDict_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
+                ypObject_HASH_INVALID, _yp_frozendict_empty_data},
+        _yp_frozenset_empty};
+#define _yp_frozendict_empty ( (ypObject *) &_yp_frozendict_empty_struct )
 
 // Returns a new, empty dict or frozendict object to hold minused entries
 // XXX Check for the _yp_frozendict_empty case first
@@ -12230,20 +12347,20 @@ static ypDictObject _yp_frozendict_empty_struct = {
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypDict_new( int type, yp_ssize_t minused, int alloclen_fixed )
 {
-    ypObject *keyset;
+    ypObject * keyset;
     yp_ssize_t alloclen;
-    ypObject *mp;
+    ypObject * mp;
 
     // We always allocate our keyset's data INLINE
     keyset = _ypSet_new( ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
     if( alloclen_fixed && type == ypFrozenDict_CODE ) {
-        mp = ypMem_MALLOC_CONTAINER_INLINE( ypDictObject, ypFrozenDict_CODE,
-            alloclen, ypDict_ALLOCLEN_MAX );
+        mp = ypMem_MALLOC_CONTAINER_INLINE(
+                ypDictObject, ypFrozenDict_CODE, alloclen, ypDict_ALLOCLEN_MAX );
     } else {
-        mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type,
-            alloclen, 0, ypDict_ALLOCLEN_MAX );
+        mp = ypMem_MALLOC_CONTAINER_VARIABLE(
+                ypDictObject, type, alloclen, 0, ypDict_ALLOCLEN_MAX );
     }
     if( yp_isexceptionC( mp ) ) {
         yp_decref( keyset );
@@ -12259,9 +12376,9 @@ static ypObject *_ypDict_new( int type, yp_ssize_t minused, int alloclen_fixed )
 // TODO Is there a point where the original is so dirty that we'd be better spinning a new keyset?
 static ypObject *_ypDict_copy( int type, ypObject *x, int alloclen_fixed )
 {
-    ypObject *keyset;
+    ypObject * keyset;
     yp_ssize_t alloclen;
-    ypObject *mp;
+    ypObject * mp;
     ypObject **values;
     yp_ssize_t valuesleft;
     yp_ssize_t i;
@@ -12270,11 +12387,11 @@ static ypObject *_ypDict_copy( int type, ypObject *x, int alloclen_fixed )
     keyset = ypDict_KEYSET( x );
     alloclen = ypSet_ALLOCLEN( keyset );
     if( alloclen_fixed && type == ypFrozenDict_CODE ) {
-        mp = ypMem_MALLOC_CONTAINER_INLINE( ypDictObject, ypFrozenDict_CODE,
-            alloclen, ypDict_ALLOCLEN_MAX );
+        mp = ypMem_MALLOC_CONTAINER_INLINE(
+                ypDictObject, ypFrozenDict_CODE, alloclen, ypDict_ALLOCLEN_MAX );
     } else {
-        mp = ypMem_MALLOC_CONTAINER_VARIABLE( ypDictObject, type,
-            alloclen, 0, ypDict_ALLOCLEN_MAX );
+        mp = ypMem_MALLOC_CONTAINER_VARIABLE(
+                ypDictObject, type, alloclen, 0, ypDict_ALLOCLEN_MAX );
     }
     if( yp_isexceptionC( mp ) ) return mp;
     ypDict_KEYSET( mp ) = yp_incref( keyset );
@@ -12295,8 +12412,8 @@ static ypObject *_ypDict_copy( int type, ypObject *x, int alloclen_fixed )
 // XXX Check for the _yp_frozendict_empty case first
 // TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
 // either a) optimizing x first, or b) not sharing the keyset of this object
-static ypObject *_ypDict_deepcopy( int type, ypObject *x, visitfunc copy_visitor, void *copy_memo,
-        int alloclen_fixed )
+static ypObject *_ypDict_deepcopy(
+        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, int alloclen_fixed )
 {
     // TODO We can't use copy_visitor to copy the keys, because it might be yp_unfrozen_deepcopy2!
     return yp_NotImplementedError;
@@ -12307,21 +12424,23 @@ static ypObject *_ypDict_deepcopy( int type, ypObject *x, visitfunc copy_visitor
 // XXX If ever this is rewritten to use the ypMem_* macros, remember that mp->ob_alloclen is _not_
 // the allocation length: it has been repurposed (see ypDict_POPITEM_FINGER)
 // TODO Do we want to split minused into required and extra, like in other areas?
-yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof( ypObject * ), ypDict_resize_cant_overflow );
+yp_STATIC_ASSERT( ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof( ypObject * ),
+        ypDict_resize_cant_overflow );
 static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
 {
-    ypObject *newkeyset;
-    yp_ssize_t newalloclen;
-    ypObject **newvalues;
-    yp_ssize_t newsize;
+    ypObject *      newkeyset;
+    yp_ssize_t      newalloclen;
+    ypObject **     newvalues;
+    yp_ssize_t      newsize;
     ypSet_KeyEntry *oldkeys;
-    ypObject **oldvalues;
-    yp_ssize_t valuesleft;
-    yp_ssize_t i;
-    ypObject *value;
+    ypObject **     oldvalues;
+    yp_ssize_t      valuesleft;
+    yp_ssize_t      i;
+    ypObject *      value;
     ypSet_KeyEntry *newkey_loc;
-    yp_ssize_t inlinelen = ypMem_INLINELEN_CONTAINER_VARIABLE( mp, ypDictObject );
-    yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
+    yp_ssize_t      inlinelen = ypMem_INLINELEN_CONTAINER_VARIABLE( mp, ypDictObject );
+    yp_ASSERT( inlinelen >= ypSet_ALLOCLEN_MIN,
+            "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN" );
 
     // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
     newkeyset = _ypSet_new( ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE );
@@ -12347,8 +12466,8 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
         value = ypDict_VALUES( mp )[i];
         if( value == NULL ) continue;
         valuesleft -= 1;
-        _ypSet_movekey_clean( newkeyset, yp_incref( oldkeys[i].se_key ), oldkeys[i].se_hash,
-                &newkey_loc );
+        _ypSet_movekey_clean(
+                newkeyset, yp_incref( oldkeys[i].se_key ), oldkeys[i].se_hash, &newkey_loc );
         newvalues[ypSet_ENTRY_INDEX( newkeyset, newkey_loc )] = oldvalues[i];
     }
 
@@ -12370,8 +12489,8 @@ static ypObject *_ypDict_resize( ypObject *mp, yp_ssize_t minused )
 static ypObject *_ypDict_push_newkey( ypObject *mp, ypSet_KeyEntry **key_loc, ypObject *key,
         yp_hash_t hash, ypObject *value, yp_ssize_t *spaceleft, yp_ssize_t growhint )
 {
-    ypObject *keyset = ypDict_KEYSET( mp );
-    ypObject *result;
+    ypObject * keyset = ypDict_KEYSET( mp );
+    ypObject * result;
     yp_ssize_t newlen;
 
     // It's possible we can add the key without resizing
@@ -12388,8 +12507,8 @@ static ypObject *_ypDict_push_newkey( ypObject *mp, ypSet_KeyEntry **key_loc, yp
     // overflows ypSet_LEN_MAX (or yp_SSIZE_T_MAX), clamp to ypSet_LEN_MAX.
     if( growhint < 0 ) growhint = 0;
     if( ypDict_LEN( mp ) > ypSet_LEN_MAX - 1 ) return yp_MemorySizeOverflowError;
-    newlen = yp_USIZE_MATH( ypDict_LEN( mp )+1, +, growhint );
-    if( newlen < 0 || newlen > ypSet_LEN_MAX ) newlen = ypSet_LEN_MAX; // addition overflowed
+    newlen = yp_USIZE_MATH( ypDict_LEN( mp ) + 1, +, growhint );
+    if( newlen < 0 || newlen > ypSet_LEN_MAX ) newlen = ypSet_LEN_MAX;  // addition overflowed
     result = _ypDict_resize( mp, newlen );  // invalidates keyset and *key_loc
     if( yp_isexceptionC( result ) ) return result;
 
@@ -12410,11 +12529,11 @@ static ypObject *_ypDict_push_newkey( ypObject *mp, ypSet_KeyEntry **key_loc, yp
 static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int override,
         yp_ssize_t *spaceleft, yp_ssize_t growhint )
 {
-    yp_hash_t hash;
-    ypObject *keyset = ypDict_KEYSET( mp );
+    yp_hash_t       hash;
+    ypObject *      keyset = ypDict_KEYSET( mp );
     ypSet_KeyEntry *key_loc;
-    ypObject *result = yp_None;
-    ypObject **value_loc;
+    ypObject *      result = yp_None;
+    ypObject **     value_loc;
 
     // Look for the appropriate entry in the hash table
     hash = yp_hashC( key, &result );
@@ -12446,12 +12565,12 @@ static ypObject *_ypDict_push( ypObject *mp, ypObject *key, ypObject *value, int
 // if it wasn't due to the value not being set, or an exception on error.
 static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
 {
-    yp_hash_t hash;
-    ypObject *keyset = ypDict_KEYSET( mp );
+    yp_hash_t       hash;
+    ypObject *      keyset = ypDict_KEYSET( mp );
     ypSet_KeyEntry *key_loc;
-    ypObject *result = yp_None;
-    ypObject **value_loc;
-    ypObject *oldvalue;
+    ypObject *      result = yp_None;
+    ypObject **     value_loc;
+    ypObject *      oldvalue;
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
@@ -12469,7 +12588,7 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
     oldvalue = *value_loc;
     *value_loc = NULL;
     ypDict_SET_LEN( mp, ypDict_LEN( mp ) - 1 );
-    return oldvalue; // new ref
+    return oldvalue;  // new ref
 }
 
 // Item iterators yield iterators that yield exactly 2 values: key first, then value.  This
@@ -12479,8 +12598,8 @@ static ypObject *_ypDict_pop( ypObject *mp, ypObject *key )
 // will be the key, and which the value)
 static void _ypDict_iter_items_next( ypObject **itemiter, ypObject **key, ypObject **value )
 {
-    ypObject *keyvaliter = yp_next( itemiter ); // new ref
-    if( yp_isexceptionC( keyvaliter ) ) { // including yp_StopIteration
+    ypObject *keyvaliter = yp_next( itemiter );  // new ref
+    if( yp_isexceptionC( keyvaliter ) ) {        // including yp_StopIteration
         *key = *value = keyvaliter;
         return;
     }
@@ -12492,10 +12611,10 @@ static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
     yp_ssize_t valuesleft = ypDict_LEN( other );
-    ypObject *other_keyset = ypDict_KEYSET( other );
+    ypObject * other_keyset = ypDict_KEYSET( other );
     yp_ssize_t i;
-    ypObject *other_value;
-    ypObject *result;
+    ypObject * other_value;
+    ypObject * result;
 
     // TODO If mp is empty, then we can clear mp, use other's keyset, and memcpy the array of
     // values.
@@ -12515,20 +12634,20 @@ static ypObject *_ypDict_update_from_dict( ypObject *mp, ypObject *other )
 
 static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject **itemiter )
 {
-    ypObject *exc = yp_None;
-    ypObject *result;
-    ypObject *key;
-    ypObject *value;
+    ypObject * exc = yp_None;
+    ypObject * result;
+    ypObject * key;
+    ypObject * value;
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
-    yp_ssize_t lenhint = yp_iter_lenhintC( *itemiter, &exc ); // zero on error
+    yp_ssize_t lenhint = yp_iter_lenhintC( *itemiter, &exc );  // zero on error
 
     while( 1 ) {
-        _ypDict_iter_items_next( itemiter, &key, &value ); // new refs: key, value
+        _ypDict_iter_items_next( itemiter, &key, &value );  // new refs: key, value
         if( yp_isexceptionC( key ) ) {
             if( yp_isexceptionC2( key, yp_StopIteration ) ) break;
             return key;
         }
-        lenhint -= 1; // check for <0 only when we need it in _ypDict_push
+        lenhint -= 1;  // check for <0 only when we need it in _ypDict_push
         result = _ypDict_push( mp, key, value, 1, &spaceleft, lenhint );
         yp_decrefN( 2, key, value );
         if( yp_isexceptionC( result ) ) return result;
@@ -12543,7 +12662,7 @@ static ypObject *_ypDict_update_from_iter( ypObject *mp, ypObject **itemiter )
 // TODO Could a special (key,value)-handling ypQuickIter consolidate this code or make it quicker?
 static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
 {
-    int x_pair = ypObject_TYPE_PAIR_CODE( x );
+    int       x_pair = ypObject_TYPE_PAIR_CODE( x );
     ypObject *itemiter;
     ypObject *result;
 
@@ -12554,8 +12673,8 @@ static ypObject *_ypDict_update( ypObject *mp, ypObject *x )
         return _ypDict_update_from_dict( mp, x );
     } else {
         // TODO replace with yp_miniiter_items once supported
-        itemiter = yp_iter_items( x ); // new ref
-        if( yp_isexceptionC2( itemiter, yp_MethodError ) ) itemiter = yp_iter( x ); // new ref
+        itemiter = yp_iter_items( x );                                               // new ref
+        if( yp_isexceptionC2( itemiter, yp_MethodError ) ) itemiter = yp_iter( x );  // new ref
         if( yp_isexceptionC( itemiter ) ) return itemiter;
         result = _ypDict_update_from_iter( mp, &itemiter );
         yp_decref( itemiter );
@@ -12569,8 +12688,8 @@ static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *mem
 {
     yp_ssize_t valuesleft = ypDict_LEN( mp );
     yp_ssize_t i;
-    ypObject *value;
-    ypObject *result;
+    ypObject * value;
+    ypObject * result;
 
     result = visitor( ypDict_KEYSET( mp ), memo );
     if( yp_isexceptionC( result ) ) return result;
@@ -12585,40 +12704,44 @@ static ypObject *frozendict_traverse( ypObject *mp, visitfunc visitor, void *mem
     return yp_None;
 }
 
-static ypObject *frozendict_unfrozen_copy( ypObject *x ) {
+static ypObject *frozendict_unfrozen_copy( ypObject *x )
+{
     return _ypDict_copy( ypDict_CODE, x, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *frozendict_frozen_copy( ypObject *x ) {
+static ypObject *frozendict_frozen_copy( ypObject *x )
+{
     if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
     // A shallow copy of a frozendict to a frozendict doesn't require an actual copy
     if( ypObject_TYPE_CODE( x ) == ypFrozenDict_CODE ) return yp_incref( x );
     return _ypDict_copy( ypFrozenDict_CODE, x, /*alloclen_fixed=*/TRUE );
 }
 
-static ypObject *frozendict_unfrozen_deepcopy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *frozendict_unfrozen_deepcopy(
+        ypObject *x, visitfunc copy_visitor, void *copy_memo )
+{
     return _ypDict_deepcopy( ypDict_CODE, x, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE );
 }
 
-static ypObject *frozendict_frozen_deepcopy( ypObject *x, visitfunc copy_visitor, void *copy_memo ) {
+static ypObject *frozendict_frozen_deepcopy( ypObject *x, visitfunc copy_visitor, void *copy_memo )
+{
     if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
-    return _ypDict_deepcopy( ypFrozenDict_CODE, x, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
+    return _ypDict_deepcopy(
+            ypFrozenDict_CODE, x, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE );
 }
 
-static ypObject *frozendict_bool( ypObject *mp ) {
-    return ypBool_FROM_C( ypDict_LEN( mp ) );
-}
+static ypObject *frozendict_bool( ypObject *mp ) { return ypBool_FROM_C( ypDict_LEN( mp ) ); }
 
 // TODO comparison functions can recurse, just like currenthash...fix!
 static ypObject *frozendict_eq( ypObject *mp, ypObject *x )
 {
-    yp_ssize_t valuesleft;
-    yp_ssize_t mp_i;
-    ypObject *mp_value;
+    yp_ssize_t      valuesleft;
+    yp_ssize_t      mp_i;
+    ypObject *      mp_value;
     ypSet_KeyEntry *mp_key_loc;
     ypSet_KeyEntry *x_key_loc;
-    ypObject *x_value;
-    ypObject *result;
+    ypObject *      x_value;
+    ypObject *      result;
 
     if( mp == x ) return yp_True;
     if( ypObject_TYPE_PAIR_CODE( x ) != ypFrozenDict_CODE ) return yp_ComparisonNotImplemented;
@@ -12627,8 +12750,9 @@ static ypObject *frozendict_eq( ypObject *mp, ypObject *x )
     // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when mp!=x.
     if( ypObject_CACHED_HASH( mp ) != ypObject_HASH_INVALID &&
-        ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
-        ypObject_CACHED_HASH( mp ) != ypObject_CACHED_HASH( x ) ) return yp_False;
+            ypObject_CACHED_HASH( x ) != ypObject_HASH_INVALID &&
+            ypObject_CACHED_HASH( mp ) != ypObject_CACHED_HASH( x ) )
+        return yp_False;
 
     valuesleft = ypDict_LEN( mp );
     for( mp_i = 0; valuesleft > 0; mp_i++ ) {
@@ -12638,20 +12762,21 @@ static ypObject *frozendict_eq( ypObject *mp, ypObject *x )
         mp_key_loc = ypSet_TABLE( ypDict_KEYSET( mp ) ) + mp_i;
 
         // If the key is not also in x, mp and x are not equal
-        result = _ypSet_lookkey( ypDict_KEYSET( x ),
-                mp_key_loc->se_key, mp_key_loc->se_hash, &x_key_loc );
+        result = _ypSet_lookkey(
+                ypDict_KEYSET( x ), mp_key_loc->se_key, mp_key_loc->se_hash, &x_key_loc );
         if( yp_isexceptionC( result ) ) return result;
         x_value = *ypDict_VALUE_ENTRY( x, x_key_loc );
         if( x_value == NULL ) return yp_False;
 
         // If the values are not equal, then neither are mp and x
         result = yp_eq( mp_value, x_value );
-        if( result != yp_True ) return result; // yp_False or an exception
+        if( result != yp_True ) return result;  // yp_False or an exception
     }
     return yp_True;
 }
 
-static ypObject *frozendict_ne( ypObject *mp, ypObject *x ) {
+static ypObject *frozendict_ne( ypObject *mp, ypObject *x )
+{
     ypObject *result = frozendict_eq( mp, x );
     return ypBool_NOT( result );
 }
@@ -12666,30 +12791,32 @@ static ypObject *frozendict_ne( ypObject *mp, ypObject *x ) {
 
 static ypObject *frozendict_contains( ypObject *mp, ypObject *key )
 {
-    yp_hash_t hash;
-    ypObject *keyset = ypDict_KEYSET( mp );
+    yp_hash_t       hash;
+    ypObject *      keyset = ypDict_KEYSET( mp );
     ypSet_KeyEntry *key_loc;
-    ypObject *result = yp_None;
+    ypObject *      result = yp_None;
 
     hash = yp_currenthashC( key, &result );
     if( yp_isexceptionC( result ) ) return result;
     result = _ypSet_lookkey( keyset, key, hash, &key_loc );
     if( yp_isexceptionC( result ) ) return result;
-    return ypBool_FROM_C( (*ypDict_VALUE_ENTRY( mp, key_loc )) != NULL );
+    return ypBool_FROM_C( ( *ypDict_VALUE_ENTRY( mp, key_loc ) ) != NULL );
 }
 
-static ypObject *frozendict_len( ypObject *mp, yp_ssize_t *len ) {
+static ypObject *frozendict_len( ypObject *mp, yp_ssize_t *len )
+{
     *len = ypDict_LEN( mp );
     return yp_None;
 }
 
-static ypObject *dict_clear( ypObject *mp ) {
-    ypObject *keyset;
+static ypObject *dict_clear( ypObject *mp )
+{
+    ypObject * keyset;
     yp_ssize_t alloclen;
     ypObject **oldvalues = ypDict_VALUES( mp );
     yp_ssize_t valuesleft = ypDict_LEN( mp );
     yp_ssize_t i;
-    void *oldptr;
+    void *     oldptr;
 
     if( ypDict_LEN( mp ) < 1 ) return yp_None;
 
@@ -12700,7 +12827,8 @@ static ypObject *dict_clear( ypObject *mp ) {
     keyset = _ypSet_new( ypFrozenSet_CODE, 0, /*alloclen_fixed=*/TRUE );
     if( yp_isexceptionC( keyset ) ) return keyset;
     alloclen = ypSet_ALLOCLEN( keyset );
-    yp_ASSERT( alloclen == ypSet_ALLOCLEN_MIN, "expect alloclen of ypSet_ALLOCLEN_MIN for new keyset" );
+    yp_ASSERT( alloclen == ypSet_ALLOCLEN_MIN,
+            "expect alloclen of ypSet_ALLOCLEN_MIN for new keyset" );
 
     // Discard the old values
     // TODO yp_decref _could_ run code that requires us to be in a good state...but this isn't as
@@ -12716,11 +12844,14 @@ static ypObject *dict_clear( ypObject *mp ) {
     // TODO ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR would be better, if we could trust that alloclen
     // was always ypSet_ALLOCLEN_MIN, and that inlinelen for dicts was >=ypSet_ALLOCLEN_MIN
     yp_decref( ypDict_KEYSET( mp ) );
-    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, 0, ypDict_ALLOCLEN_MAX );
+    oldptr =
+            ypMem_REALLOC_CONTAINER_VARIABLE( mp, ypDictObject, alloclen, 0, ypDict_ALLOCLEN_MAX );
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     if( oldptr != NULL ) ypMem_REALLOC_CONTAINER_FREE_OLDPTR( mp, ypDictObject, oldptr );
-    yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ), "dict_clear didn't allocate inline!" );
-    yp_ASSERT( ypObject_ALLOCLEN( mp ) >= ypSet_ALLOCLEN_MIN, "dict inlinelen must be at least ypSet_ALLOCLEN_MIN" );
+    yp_ASSERT( ypDict_VALUES( mp ) == ypDict_INLINE_DATA( mp ),
+            "dict_clear didn't allocate inline!" );
+    yp_ASSERT( ypObject_ALLOCLEN( mp ) >= ypSet_ALLOCLEN_MIN,
+            "dict inlinelen must be at least ypSet_ALLOCLEN_MIN" );
 
     // Update our attributes and return
     ypDict_SET_LEN( mp, 0 );
@@ -12732,11 +12863,11 @@ static ypObject *dict_clear( ypObject *mp ) {
 // A defval of NULL means to raise an error if key is not in dict
 static ypObject *frozendict_getdefault( ypObject *mp, ypObject *key, ypObject *defval )
 {
-    yp_hash_t hash;
-    ypObject *keyset = ypDict_KEYSET( mp );
+    yp_hash_t       hash;
+    ypObject *      keyset = ypDict_KEYSET( mp );
     ypSet_KeyEntry *key_loc;
-    ypObject *result = yp_None;
-    ypObject *value;
+    ypObject *      result = yp_None;
+    ypObject *      value;
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
@@ -12791,7 +12922,7 @@ static ypObject *dict_popitem( ypObject *mp, ypObject **key, ypObject **value )
     register yp_ssize_t i;
     register ypObject **values = ypDict_VALUES( mp );
 
-    if( ypDict_LEN( mp ) < 1 ) return yp_KeyError; // "pop from an empty dict"
+    if( ypDict_LEN( mp ) < 1 ) return yp_KeyError;  // "pop from an empty dict"
 
     /* We abuse mp->ob_alloclen to hold a search finger; recall
      * ypDict_ALLOCLEN uses the keyset's ob_alloclen
@@ -12817,11 +12948,11 @@ static ypObject *dict_popitem( ypObject *mp, ypObject **key, ypObject **value )
 
 static ypObject *dict_setdefault( ypObject *mp, ypObject *key, ypObject *defval )
 {
-    yp_hash_t hash;
-    ypObject *keyset = ypDict_KEYSET( mp );
+    yp_hash_t       hash;
+    ypObject *      keyset = ypDict_KEYSET( mp );
     ypSet_KeyEntry *key_loc;
-    ypObject *result = yp_None;
-    ypObject **value_loc;
+    ypObject *      result = yp_None;
+    ypObject **     value_loc;
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
@@ -12853,13 +12984,13 @@ static ypObject *dict_setdefault( ypObject *mp, ypObject *key, ypObject *defval 
 static ypObject *dict_updateK( ypObject *mp, int n, va_list args )
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining( ypDict_KEYSET( mp ) );
-    ypObject *result = yp_None;
-    ypObject *key;
-    ypObject *value;
+    ypObject * result = yp_None;
+    ypObject * key;
+    ypObject * value;
 
     while( n > 0 ) {
-        key = va_arg( args, ypObject * ); // borrowed
-        value = va_arg( args, ypObject * ); // borrowed
+        key = va_arg( args, ypObject * );    // borrowed
+        value = va_arg( args, ypObject * );  // borrowed
         n -= 1;
         result = _ypDict_push( mp, key, value, 1, &spaceleft, n );
         if( yp_isexceptionC( result ) ) return result;
@@ -12871,7 +13002,7 @@ static ypObject *dict_update( ypObject *mp, int n, va_list args )
 {
     ypObject *result;
     for( /*n already set*/; n > 0; n-- ) {
-        ypObject *x = va_arg( args, ypObject * );   // borrowed
+        ypObject *x = va_arg( args, ypObject * );  // borrowed
         if( mp == x ) continue;
         result = _ypDict_update( mp, x );
         if( yp_isexceptionC( result ) ) return result;
@@ -12888,7 +13019,8 @@ typedef struct {
     _yp_dict_mi_len_t index : 31;
 } ypDictMiState;
 yp_STATIC_ASSERT( ypDict_LEN_MAX <= 0x7FFFFFFFu, len_fits_31_bits );
-yp_STATIC_ASSERT( yp_sizeof( yp_uint64_t ) >= yp_sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
+yp_STATIC_ASSERT(
+        yp_sizeof( yp_uint64_t ) >= yp_sizeof( ypDictMiState ), ypDictMiState_fits_uint64 );
 
 static ypObject *frozendict_miniiter_items( ypObject *mp, yp_uint64_t *_state )
 {
@@ -12899,7 +13031,8 @@ static ypObject *frozendict_miniiter_items( ypObject *mp, yp_uint64_t *_state )
     state->index = 0;
     return yp_incref( mp );
 }
-static ypObject *frozendict_iter_items( ypObject *x ) {
+static ypObject *frozendict_iter_items( ypObject *x )
+{
     return _ypMiIter_from_miniiter( x, frozendict_miniiter_items );
 }
 
@@ -12912,7 +13045,8 @@ static ypObject *frozendict_miniiter_keys( ypObject *mp, yp_uint64_t *_state )
     state->index = 0;
     return yp_incref( mp );
 }
-static ypObject *frozendict_iter_keys( ypObject *x ) {
+static ypObject *frozendict_iter_keys( ypObject *x )
+{
     return _ypMiIter_from_miniiter( x, frozendict_miniiter_keys );
 }
 
@@ -12925,16 +13059,17 @@ static ypObject *frozendict_miniiter_values( ypObject *mp, yp_uint64_t *_state )
     state->index = 0;
     return yp_incref( mp );
 }
-static ypObject *frozendict_iter_values( ypObject *x ) {
+static ypObject *frozendict_iter_values( ypObject *x )
+{
     return _ypMiIter_from_miniiter( x, frozendict_miniiter_values );
 }
 
 // XXX We need to be a little suspicious of _state...just in case the caller has changed it
 static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
 {
-    ypObject *result;
+    ypObject *     result;
     ypDictMiState *state = (ypDictMiState *) _state;
-    yp_ssize_t index = state->index; // don't forget to write it back
+    yp_ssize_t     index = state->index;  // don't forget to write it back
     if( state->itemsleft < 1 ) return yp_StopIteration;
 
     // Find the next entry
@@ -12954,7 +13089,7 @@ static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
             // TODO An internal _yp_tuple2, which trusts it won't be passed exceptions, would be
             // quite efficient here
             result = yp_tupleN( 2, ypSet_TABLE( ypDict_KEYSET( mp ) )[index].se_key,
-                                   ypDict_VALUES( mp )[index] );
+                    ypDict_VALUES( mp )[index] );
         } else {
             result = yp_incref( ypSet_TABLE( ypDict_KEYSET( mp ) )[index].se_key );
         }
@@ -12962,13 +13097,13 @@ static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
         if( state->values ) {
             result = yp_incref( ypDict_VALUES( mp )[index] );
         } else {
-            result = yp_SystemError; // should never occur
+            result = yp_SystemError;  // should never occur
         }
     }
     if( yp_isexceptionC( result ) ) return result;
 
     // Update state and return
-    state->index = (_yp_dict_mi_len_t) (index + 1);
+    state->index = ( _yp_dict_mi_len_t )( index + 1 );
     state->itemsleft -= 1;
     return result;
 }
@@ -12976,7 +13111,7 @@ static ypObject *frozendict_miniiter_next( ypObject *mp, yp_uint64_t *_state )
 static ypObject *frozendict_miniiter_lenhint(
         ypObject *mp, yp_uint64_t *state, yp_ssize_t *lenhint )
 {
-    *lenhint = ((ypDictMiState *) state)->itemsleft;
+    *lenhint = ( (ypDictMiState *) state )->itemsleft;
     return yp_None;
 }
 
@@ -12998,159 +13133,159 @@ static ypObject *frozendict_dealloc( ypObject *mp )
 }
 
 static ypMappingMethods ypFrozenDict_as_mapping = {
-    frozendict_miniiter_items,      // tp_miniiter_items
-    frozendict_iter_items,          // tp_iter_items
-    frozendict_miniiter_keys,       // tp_miniiter_keys
-    frozendict_iter_keys,           // tp_iter_keys
-    MethodError_objobjobjproc,      // tp_popvalue
-    MethodError_popitemfunc,        // tp_popitem
-    MethodError_objobjobjproc,      // tp_setdefault
-    MethodError_objvalistproc,      // tp_updateK
-    frozendict_miniiter_values,     // tp_miniiter_values
-    frozendict_iter_values          // tp_iter_values
+        frozendict_miniiter_items,   // tp_miniiter_items
+        frozendict_iter_items,       // tp_iter_items
+        frozendict_miniiter_keys,    // tp_miniiter_keys
+        frozendict_iter_keys,        // tp_iter_keys
+        MethodError_objobjobjproc,   // tp_popvalue
+        MethodError_popitemfunc,     // tp_popitem
+        MethodError_objobjobjproc,   // tp_setdefault
+        MethodError_objvalistproc,   // tp_updateK
+        frozendict_miniiter_values,  // tp_miniiter_values
+        frozendict_iter_values       // tp_iter_values
 };
 
 static ypTypeObject ypFrozenDict_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    frozendict_dealloc,             // tp_dealloc
-    frozendict_traverse,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        frozendict_dealloc,   // tp_dealloc
+        frozendict_traverse,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    frozendict_unfrozen_copy,       // tp_unfrozen_copy
-    frozendict_frozen_copy,         // tp_frozen_copy
-    frozendict_unfrozen_deepcopy,   // tp_unfrozen_deepcopy
-    frozendict_frozen_deepcopy,     // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,           // tp_freeze
+        frozendict_unfrozen_copy,      // tp_unfrozen_copy
+        frozendict_frozen_copy,        // tp_frozen_copy
+        frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        frozendict_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,           // tp_invalidate
 
-    // Boolean operations and comparisons
-    frozendict_bool,                // tp_bool
-    NotImplemented_comparefunc,     // tp_lt
-    NotImplemented_comparefunc,     // tp_le
-    frozendict_eq,                  // tp_eq
-    frozendict_ne,                  // tp_ne
-    NotImplemented_comparefunc,     // tp_ge
-    NotImplemented_comparefunc,     // tp_gt
+        // Boolean operations and comparisons
+        frozendict_bool,             // tp_bool
+        NotImplemented_comparefunc,  // tp_lt
+        NotImplemented_comparefunc,  // tp_le
+        frozendict_eq,               // tp_eq
+        frozendict_ne,               // tp_ne
+        NotImplemented_comparefunc,  // tp_ge
+        NotImplemented_comparefunc,  // tp_gt
 
-    // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        MethodError_hashfunc,  // tp_currenthash
+        MethodError_objproc,   // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    frozendict_miniiter_keys,       // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    frozendict_miniiter_next,       // tp_miniiter_next
-    frozendict_miniiter_lenhint,    // tp_miniiter_lenhint
-    frozendict_iter_keys,           // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        frozendict_miniiter_keys,     // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        frozendict_miniiter_next,     // tp_miniiter_next
+        frozendict_miniiter_lenhint,  // tp_miniiter_lenhint
+        frozendict_iter_keys,         // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
-    // Container operations
-    frozendict_contains,            // tp_contains
-    frozendict_len,                 // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    frozendict_getdefault,          // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        frozendict_contains,        // tp_contains
+        frozendict_len,             // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        frozendict_getdefault,      // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    &ypFrozenDict_as_mapping        // tp_as_mapping
+        // Mapping operations
+        &ypFrozenDict_as_mapping  // tp_as_mapping
 };
 
 static ypMappingMethods ypDict_as_mapping = {
-    frozendict_miniiter_items,      // tp_miniiter_items
-    frozendict_iter_items,          // tp_iter_items
-    frozendict_miniiter_keys,       // tp_miniiter_keys
-    frozendict_iter_keys,           // tp_iter_keys
-    dict_popvalue,                  // tp_popvalue
-    dict_popitem,                   // tp_popitem
-    dict_setdefault,                // tp_setdefault
-    dict_updateK,                   // tp_updateK
-    frozendict_miniiter_values,     // tp_miniiter_values
-    frozendict_iter_values          // tp_iter_values
+        frozendict_miniiter_items,   // tp_miniiter_items
+        frozendict_iter_items,       // tp_iter_items
+        frozendict_miniiter_keys,    // tp_miniiter_keys
+        frozendict_iter_keys,        // tp_iter_keys
+        dict_popvalue,               // tp_popvalue
+        dict_popitem,                // tp_popitem
+        dict_setdefault,             // tp_setdefault
+        dict_updateK,                // tp_updateK
+        frozendict_miniiter_values,  // tp_miniiter_values
+        frozendict_iter_values       // tp_iter_values
 };
 
 static ypTypeObject ypDict_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    frozendict_dealloc,             // tp_dealloc
-    frozendict_traverse,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        frozendict_dealloc,   // tp_dealloc
+        frozendict_traverse,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    frozendict_unfrozen_copy,       // tp_unfrozen_copy
-    frozendict_frozen_copy,         // tp_frozen_copy
-    MethodError_traversefunc,       // tp_unfrozen_deepcopy
-    MethodError_traversefunc,       // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,       // tp_freeze
+        frozendict_unfrozen_copy,  // tp_unfrozen_copy
+        frozendict_frozen_copy,    // tp_frozen_copy
+        MethodError_traversefunc,  // tp_unfrozen_deepcopy
+        MethodError_traversefunc,  // tp_frozen_deepcopy
+        MethodError_objproc,       // tp_invalidate
 
-    // Boolean operations and comparisons
-    frozendict_bool,                // tp_bool
-    NotImplemented_comparefunc,     // tp_lt
-    NotImplemented_comparefunc,     // tp_le
-    frozendict_eq,                  // tp_eq
-    frozendict_ne,                  // tp_ne
-    NotImplemented_comparefunc,     // tp_ge
-    NotImplemented_comparefunc,     // tp_gt
+        // Boolean operations and comparisons
+        frozendict_bool,             // tp_bool
+        NotImplemented_comparefunc,  // tp_lt
+        NotImplemented_comparefunc,  // tp_le
+        frozendict_eq,               // tp_eq
+        frozendict_ne,               // tp_ne
+        NotImplemented_comparefunc,  // tp_ge
+        NotImplemented_comparefunc,  // tp_gt
 
-    // Generic object operations
-    MethodError_hashfunc,           // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        MethodError_hashfunc,  // tp_currenthash
+        MethodError_objproc,   // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    frozendict_miniiter_keys,       // tp_miniiter
-    TypeError_miniiterfunc,         // tp_miniiter_reversed
-    frozendict_miniiter_next,       // tp_miniiter_next
-    frozendict_miniiter_lenhint,    // tp_miniiter_lenhint
-    frozendict_iter_keys,           // tp_iter
-    TypeError_objproc,              // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        frozendict_miniiter_keys,     // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        frozendict_miniiter_next,     // tp_miniiter_next
+        frozendict_miniiter_lenhint,  // tp_miniiter_lenhint
+        frozendict_iter_keys,         // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
-    // Container operations
-    frozendict_contains,            // tp_contains
-    frozendict_len,                 // tp_len
-    MethodError_objobjproc,         // tp_push
-    dict_clear,                     // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    frozendict_getdefault,          // tp_getdefault
-    dict_setitem,                   // tp_setitem
-    dict_delitem,                   // tp_delitem
-    dict_update,                    // tp_update
+        // Container operations
+        frozendict_contains,        // tp_contains
+        frozendict_len,             // tp_len
+        MethodError_objobjproc,     // tp_push
+        dict_clear,                 // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        frozendict_getdefault,      // tp_getdefault
+        dict_setitem,               // tp_setitem
+        dict_delitem,               // tp_delitem
+        dict_update,                // tp_update
 
-    // Sequence operations
-    MethodError_SequenceMethods,    // tp_as_sequence
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    &ypDict_as_mapping              // tp_as_mapping
+        // Mapping operations
+        &ypDict_as_mapping  // tp_as_mapping
 };
 
 // Constructors
@@ -13170,20 +13305,24 @@ static ypObject *_ypDictKV( int type, int n, va_list args )
     return newMp;
 }
 
-ypObject *yp_frozendictK( int n, ... ) {
+ypObject *yp_frozendictK( int n, ... )
+{
     if( n < 1 ) return _yp_frozendict_empty;
-    return_yp_V_FUNC( ypObject *, _ypDictKV, (ypFrozenDict_CODE, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypDictKV, ( ypFrozenDict_CODE, n, args ), n );
 }
-ypObject *yp_frozendictKV( int n, va_list args ) {
+ypObject *yp_frozendictKV( int n, va_list args )
+{
     if( n < 1 ) return _yp_frozendict_empty;
     return _ypDictKV( ypFrozenDict_CODE, n, args );
 }
 
-ypObject *yp_dictK( int n, ... ) {
+ypObject *yp_dictK( int n, ... )
+{
     if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return_yp_V_FUNC( ypObject *, _ypDictKV, (ypDict_CODE, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypDictKV, ( ypDict_CODE, n, args ), n );
 }
-ypObject *yp_dictKV( int n, va_list args ) {
+ypObject *yp_dictKV( int n, va_list args )
+{
     if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     return _ypDictKV( ypDict_CODE, n, args );
 }
@@ -13191,9 +13330,9 @@ ypObject *yp_dictKV( int n, va_list args ) {
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
 static ypObject *_ypDict( int type, ypObject *x )
 {
-    ypObject *exc = yp_None;
-    ypObject *newMp;
-    ypObject *result;
+    ypObject * exc = yp_None;
+    ypObject * newMp;
+    ypObject * result;
     yp_ssize_t lenhint = yp_lenC( x, &exc );
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
@@ -13218,7 +13357,8 @@ static ypObject *_ypDict( int type, ypObject *x )
     return newMp;
 }
 
-ypObject *yp_frozendict( ypObject *x ) {
+ypObject *yp_frozendict( ypObject *x )
+{
     // If x is a fellow dict then perform a copy so we can share keysets
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
         if( ypDict_LEN( x ) < 1 ) return _yp_frozendict_empty;
@@ -13228,7 +13368,8 @@ ypObject *yp_frozendict( ypObject *x ) {
     return _ypDict( ypFrozenDict_CODE, x );
 }
 
-ypObject *yp_dict( ypObject *x ) {
+ypObject *yp_dict( ypObject *x )
+{
     // If x is a fellow dict then perform a copy so we can share keysets
     if( ypObject_TYPE_PAIR_CODE( x ) == ypFrozenDict_CODE ) {
         return _ypDict_copy( ypDict_CODE, x, /*alloclen_fixed=*/FALSE );
@@ -13240,9 +13381,9 @@ ypObject *yp_dict( ypObject *x ) {
 static ypObject *_ypDict_fromkeysNV( int type, ypObject *value, int n, va_list args )
 {
     yp_ssize_t spaceleft;
-    ypObject *result = yp_None;
-    ypObject *key;
-    ypObject *newMp;
+    ypObject * result = yp_None;
+    ypObject * key;
+    ypObject * newMp;
 
     if( n > ypDict_LEN_MAX ) return yp_MemorySizeOverflowError;
     newMp = _ypDict_new( type, n, /*alloclen_fixed=*/TRUE );
@@ -13250,7 +13391,7 @@ static ypObject *_ypDict_fromkeysNV( int type, ypObject *value, int n, va_list a
     spaceleft = _ypSet_space_remaining( ypDict_KEYSET( newMp ) );
 
     while( n > 0 ) {
-        key = va_arg( args, ypObject * ); // borrowed
+        key = va_arg( args, ypObject * );  // borrowed
         n -= 1;
         result = _ypDict_push( newMp, key, value, 1, &spaceleft, n );
         if( yp_isexceptionC( result ) ) break;
@@ -13262,34 +13403,38 @@ static ypObject *_ypDict_fromkeysNV( int type, ypObject *value, int n, va_list a
     return newMp;
 }
 
-ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... ) {
+ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... )
+{
     if( n < 1 ) return _yp_frozendict_empty;
-    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, ( ypFrozenDict_CODE, value, n, args ), n );
 }
-ypObject *yp_frozendict_fromkeysNV( ypObject *value, int n, va_list args ) {
+ypObject *yp_frozendict_fromkeysNV( ypObject *value, int n, va_list args )
+{
     if( n < 1 ) return _yp_frozendict_empty;
     return _ypDict_fromkeysNV( ypFrozenDict_CODE, value, n, args );
 }
 
-ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... ) {
+ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... )
+{
     if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
-    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n );
+    return_yp_V_FUNC( ypObject *, _ypDict_fromkeysNV, ( ypDict_CODE, value, n, args ), n );
 }
-ypObject *yp_dict_fromkeysNV( ypObject *value, int n, va_list args ) {
+ypObject *yp_dict_fromkeysNV( ypObject *value, int n, va_list args )
+{
     if( n < 1 ) return _ypDict_new( ypDict_CODE, 0, /*alloclen_fixed=*/FALSE );
     return _ypDict_fromkeysNV( ypDict_CODE, value, n, args );
 }
 
 static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value )
 {
-    ypObject *exc = yp_None;
-    ypObject *result = yp_None;
-    ypObject *mi;
+    ypObject *  exc = yp_None;
+    ypObject *  result = yp_None;
+    ypObject *  mi;
     yp_uint64_t mi_state;
-    ypObject *newMp;
-    yp_ssize_t spaceleft;
-    ypObject *key;
-    yp_ssize_t lenhint = yp_lenC( iterable, &exc );
+    ypObject *  newMp;
+    yp_ssize_t  spaceleft;
+    ypObject *  key;
+    yp_ssize_t  lenhint = yp_lenC( iterable, &exc );
     if( yp_isexceptionC( exc ) ) {
         // Ignore errors determining lenhint; it just means we can't pre-allocate
         lenhint = yp_iter_lenhintC( iterable, &exc );
@@ -13303,10 +13448,10 @@ static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value
         return yp_MemorySizeOverflowError;
     }
 
-    mi = yp_miniiter( iterable, &mi_state ); // new ref
+    mi = yp_miniiter( iterable, &mi_state );  // new ref
     if( yp_isexceptionC( mi ) ) return mi;
 
-    newMp = _ypDict_new( type, lenhint, /*alloclen_fixed=*/FALSE ); // new ref
+    newMp = _ypDict_new( type, lenhint, /*alloclen_fixed=*/FALSE );  // new ref
     if( yp_isexceptionC( newMp ) ) {
         yp_decref( mi );
         return newMp;
@@ -13314,9 +13459,9 @@ static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value
     spaceleft = _ypSet_space_remaining( ypDict_KEYSET( newMp ) );
 
     while( 1 ) {
-        key = yp_miniiter_next( &mi, &mi_state ); // new ref
+        key = yp_miniiter_next( &mi, &mi_state );  // new ref
         if( yp_isexceptionC( key ) ) {
-            if( yp_isexceptionC2( key, yp_StopIteration ) ) break; // end of iterator
+            if( yp_isexceptionC2( key, yp_StopIteration ) ) break;  // end of iterator
             result = key;
             break;
         }
@@ -13333,10 +13478,12 @@ static ypObject *_ypDict_fromkeys( int type, ypObject *iterable, ypObject *value
     return newMp;
 }
 
-ypObject *yp_frozendict_fromkeys( ypObject *iterable, ypObject *value ) {
+ypObject *yp_frozendict_fromkeys( ypObject *iterable, ypObject *value )
+{
     return _ypDict_fromkeys( ypFrozenDict_CODE, iterable, value );
 }
-ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
+ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value )
+{
     return _ypDict_fromkeys( ypDict_CODE, iterable, value );
 }
 
@@ -13349,46 +13496,47 @@ ypObject *yp_dict_fromkeys( ypObject *iterable, ypObject *value ) {
 
 typedef struct {
     ypObject_HEAD;
-    yp_int_t start; // all ranges of len < 1 have a start of 0
-    yp_int_t step;  // all ranges of len < 2 have a step of 1
+    yp_int_t start;  // all ranges of len < 1 have a start of 0
+    yp_int_t step;   // all ranges of len < 2 have a step of 1
 } ypRangeObject;
 
-#define ypRange_START( r )  ( ((ypRangeObject *)r)->start )
-#define ypRange_STEP( r )   ( ((ypRangeObject *)r)->step )
-#define ypRange_LEN         ypObject_CACHED_LEN
-#define ypRange_SET_LEN     ypObject_SET_CACHED_LEN
+#define ypRange_START( r ) ( ( (ypRangeObject *) r )->start )
+#define ypRange_STEP( r ) ( ( (ypRangeObject *) r )->step )
+#define ypRange_LEN ypObject_CACHED_LEN
+#define ypRange_SET_LEN ypObject_SET_CACHED_LEN
 
 // We normalize start and step for small ranges to make comparisons and hashes easier; use this to
 // ensure we've done it correctly
-#define ypRange_ASSERT_NORMALIZED( r ) \
-    do {yp_ASSERT( ypRange_LEN( r ) > 0 || ypRange_START( r ) == 0, "empty range should have start of 0" ); \
-        yp_ASSERT( ypRange_LEN( r ) > 1 || ypRange_STEP( r ) == 1, "0- or 1-range should have step of 1" ); \
+#define ypRange_ASSERT_NORMALIZED( r )                              \
+    do {                                                            \
+        yp_ASSERT( ypRange_LEN( r ) > 0 || ypRange_START( r ) == 0, \
+                "empty range should have start of 0" );             \
+        yp_ASSERT( ypRange_LEN( r ) > 1 || ypRange_STEP( r ) == 1,  \
+                "0- or 1-range should have step of 1" );            \
     } while( 0 )
 
 // Returns the value at i, assuming i is an adjusted index
-#define ypRange_GET_INDEX( r, i )   ((yp_int_t) (ypRange_START( r ) + (ypRange_STEP( r ) * (i))))
+#define ypRange_GET_INDEX( r, i ) \
+    ( ( yp_int_t )( ypRange_START( r ) + ( ypRange_STEP( r ) * ( i ) ) ) )
 
 // Returns true if the two ranges are equal (assuming r and x both pass ypRange_ASSERT_NORMALIZED)
-#define ypRange_ARE_EQUAL( r, x ) \
-    ( ypRange_LEN( r ) == ypRange_LEN( x ) && \
-      ypRange_START( r ) == ypRange_START( x ) && \
-      ypRange_STEP( r ) == ypRange_STEP( x ) \
-    )
+#define ypRange_ARE_EQUAL( r, x )                                                         \
+    ( ypRange_LEN( r ) == ypRange_LEN( x ) && ypRange_START( r ) == ypRange_START( x ) && \
+            ypRange_STEP( r ) == ypRange_STEP( x ) )
 
 // Use yp_rangeC( 0 ) as the standard empty struct
 static ypRangeObject _yp_range_empty_struct = {
-    { ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL,
-    0, 0, ypObject_HASH_INVALID, NULL }, 0, 1 };
-#define _yp_range_empty     ((ypObject *) &_yp_range_empty_struct)
+        {ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0, ypObject_HASH_INVALID, NULL}, 0, 1};
+#define _yp_range_empty ( (ypObject *) &_yp_range_empty_struct )
 
 // Determines the index in r for the given object x, or -1 if it isn't in the range
 // XXX If using *index as an actual index, ensure it doesn't overflow yp_ssize_t
 static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_ssize_t *index )
 {
     ypObject *exc = yp_None;
-    yp_int_t r_end;
-    yp_int_t x_offset;
-    yp_int_t x_asint = yp_asint_exactC( x, &exc );
+    yp_int_t  r_end;
+    yp_int_t  x_offset;
+    yp_int_t  x_asint = yp_asint_exactC( x, &exc );
     if( yp_isexceptionC( exc ) ) {
         // If x isn't an int or float, or can't be exactly converted to an equal int, then it's not
         // contained in this range
@@ -13399,7 +13547,8 @@ static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_ssize_t *index )
         return exc;
     }
 
-    yp_ASSERT( ypRange_LEN( r ) <= yp_SSIZE_T_MAX, "range.find not supporting range lengths >yp_SSIZE_T_MAX" );
+    yp_ASSERT( ypRange_LEN( r ) <= yp_SSIZE_T_MAX,
+            "range.find not supporting range lengths >yp_SSIZE_T_MAX" );
     r_end = ypRange_GET_INDEX( r, ypRange_LEN( r ) );
     if( ypRange_STEP( r ) < 0 ) {
         if( x_asint <= r_end || ypRange_START( r ) < x_asint ) {
@@ -13415,17 +13564,16 @@ static ypObject *_ypRange_find( ypObject *r, ypObject *x, yp_ssize_t *index )
 
     x_offset = x_asint - ypRange_START( r );
     if( x_offset % ypRange_STEP( r ) == 0 ) {
-        yp_ASSERT( (x_offset / ypRange_STEP( r )) <= yp_SSIZE_T_MAX, "impossibly, range.find calculated an index >yp_SSIZE_T_MAX (?!)" );
-        *index = (yp_ssize_t) (x_offset / ypRange_STEP( r ));
+        yp_ASSERT( ( x_offset / ypRange_STEP( r ) ) <= yp_SSIZE_T_MAX,
+                "impossibly, range.find calculated an index >yp_SSIZE_T_MAX (?!)" );
+        *index = ( yp_ssize_t )( x_offset / ypRange_STEP( r ) );
     } else {
         *index = -1;
     }
     return yp_None;
 }
 
-static ypObject *range_frozen_copy( ypObject *r ) {
-    return yp_incref( r );
-}
+static ypObject *range_frozen_copy( ypObject *r ) { return yp_incref( r ); }
 
 static ypObject *range_frozen_deepcopy( ypObject *r, visitfunc copy_visitor, void *copy_memo )
 {
@@ -13441,9 +13589,7 @@ static ypObject *range_frozen_deepcopy( ypObject *r, visitfunc copy_visitor, voi
     return newR;
 }
 
-static ypObject *range_bool( ypObject *r ) {
-    return ypBool_FROM_C( ypRange_LEN( r ) );
-}
+static ypObject *range_bool( ypObject *r ) { return ypBool_FROM_C( ypRange_LEN( r ) ); }
 
 // XXX Using ypSequence_AdjustIndexC assumes we don't have ranges longer than yp_SSIZE_T_MAX
 static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
@@ -13458,9 +13604,9 @@ static ypObject *range_getindex( ypObject *r, yp_ssize_t i, ypObject *defval )
 // XXX Using ypSlice_AdjustIndicesC assumes we don't have ranges longer than yp_SSIZE_T_MAX
 static ypObject *range_getslice( ypObject *r, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step )
 {
-    ypObject *result;
+    ypObject * result;
     yp_ssize_t newR_len;
-    ypObject *newR;
+    ypObject * newR;
 
     result = ypSlice_AdjustIndicesC( ypRange_LEN( r ), &start, &stop, &step, &newR_len );
     if( yp_isexceptionC( result ) ) return result;
@@ -13482,7 +13628,7 @@ static ypObject *range_getslice( ypObject *r, yp_ssize_t start, yp_ssize_t stop,
 static ypObject *range_contains( ypObject *r, ypObject *x )
 {
     yp_ssize_t index;
-    ypObject *result = _ypRange_find( r, x, &index );
+    ypObject * result = _ypRange_find( r, x, &index );
     if( yp_isexceptionC( result ) ) return result;
     return ypBool_FROM_C( index >= 0 );
 }
@@ -13491,10 +13637,10 @@ static ypObject *range_contains( ypObject *r, ypObject *x )
 static ypObject *range_find( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *_index )
 {
-    yp_ssize_t step = 1;    // won't actually change
-    yp_ssize_t slicelength; // unnecessary
+    yp_ssize_t step = 1;     // won't actually change
+    yp_ssize_t slicelength;  // unnecessary
     yp_ssize_t index;
-    ypObject *result = _ypRange_find( r, x, &index );
+    ypObject * result = _ypRange_find( r, x, &index );
     if( yp_isexceptionC( result ) ) return result;
 
     result = ypSlice_AdjustIndicesC( ypRange_LEN( r ), &start, &stop, &step, &slicelength );
@@ -13511,13 +13657,13 @@ static ypObject *range_find( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssiz
 }
 
 // XXX Using ypSlice_AdjustIndicesC assumes we don't have ranges longer than yp_SSIZE_T_MAX
-static ypObject *range_count( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
-        yp_ssize_t *count )
+static ypObject *range_count(
+        ypObject *r, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *count )
 {
-    yp_ssize_t step = 1;    // won't actually change
-    yp_ssize_t slicelength; // unnecessary
+    yp_ssize_t step = 1;     // won't actually change
+    yp_ssize_t slicelength;  // unnecessary
     yp_ssize_t index;
-    ypObject *result = _ypRange_find( r, x, &index );
+    ypObject * result = _ypRange_find( r, x, &index );
     if( yp_isexceptionC( result ) ) return result;
 
     result = ypSlice_AdjustIndicesC( ypRange_LEN( r ), &start, &stop, &step, &slicelength );
@@ -13533,7 +13679,8 @@ static ypObject *range_count( ypObject *r, ypObject *x, yp_ssize_t start, yp_ssi
     return yp_None;
 }
 
-static ypObject *range_len( ypObject *r, yp_ssize_t *len ) {
+static ypObject *range_len( ypObject *r, yp_ssize_t *len )
+{
     *len = ypRange_LEN( r );
     return yp_None;
 }
@@ -13546,7 +13693,8 @@ static ypObject *range_eq( ypObject *r, ypObject *x )
     ypRange_ASSERT_NORMALIZED( x );
     return ypBool_FROM_C( ypRange_ARE_EQUAL( r, x ) );
 }
-static ypObject *range_ne( ypObject *r, ypObject *x ) {
+static ypObject *range_ne( ypObject *r, ypObject *x )
+{
     ypObject *result = range_eq( r, x );
     return ypBool_NOT( result );
 }
@@ -13561,129 +13709,130 @@ static ypObject *range_ne( ypObject *r, ypObject *x ) {
 // XXX Where Python uses None for start if len<1, we use 0, and where it uses None for step if
 // len<2, we use 1
 // XXX Adapted from Python's tuplehash and range_hash
-static ypObject *range_currenthash( ypObject *r,
-        hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
+static ypObject *range_currenthash(
+        ypObject *r, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash )
 {
     yp_uhash_t x = 0x345678;
     yp_uhash_t mult = _ypHASH_MULTIPLIER;
 
     ypRange_ASSERT_NORMALIZED( r );
 
-    x = (x ^ yp_HashInt( ypRange_LEN( r ) )) * mult;
-    mult += (yp_hash_t)(82520L + 2 + 2);
+    x = ( x ^ yp_HashInt( ypRange_LEN( r ) ) ) * mult;
+    mult += ( yp_hash_t )( 82520L + 2 + 2 );
 
-    x = (x ^ yp_HashInt( ypRange_START( r ) )) * mult;
-    mult += (yp_hash_t)(82520L + 1 + 1);
+    x = ( x ^ yp_HashInt( ypRange_START( r ) ) ) * mult;
+    mult += ( yp_hash_t )( 82520L + 1 + 1 );
 
-    x = (x ^ yp_HashInt( ypRange_STEP( r ) )) * mult;
-    mult += (yp_hash_t)(82520L + 0 + 0);
+    x = ( x ^ yp_HashInt( ypRange_STEP( r ) ) ) * mult;
+    mult += ( yp_hash_t )( 82520L + 0 + 0 );
 
     x += 97531L;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
+    if( x == (yp_uhash_t) ypObject_HASH_INVALID ) {
+        x = ( yp_uhash_t )( ypObject_HASH_INVALID - 1 );
     }
-    *hash = (yp_hash_t)x;
+    *hash = (yp_hash_t) x;
 
     // Since we never contain mutable objects, we can cache our hash
     ypObject_CACHED_HASH( yp_None ) = *hash;
     return yp_None;
 }
 
-static ypObject *range_dealloc( ypObject *r ) {
+static ypObject *range_dealloc( ypObject *r )
+{
     ypMem_FREE_FIXED( r );
     return yp_None;
 }
 
 static ypSequenceMethods ypRange_as_sequence = {
-    MethodError_objobjproc,         // tp_concat
-    MethodError_objssizeproc,       // tp_repeat
-    range_getindex,                 // tp_getindex
-    range_getslice,                 // tp_getslice
-    range_find,                     // tp_find
-    range_count,                    // tp_count
-    MethodError_objssizeobjproc,    // tp_setindex
-    MethodError_objsliceobjproc,    // tp_setslice
-    MethodError_objssizeproc,       // tp_delindex
-    MethodError_objsliceproc,       // tp_delslice
-    MethodError_objobjproc,         // tp_append
-    MethodError_objobjproc,         // tp_extend
-    MethodError_objssizeproc,       // tp_irepeat
-    MethodError_objssizeobjproc,    // tp_insert
-    MethodError_objssizeproc,       // tp_popindex
-    MethodError_objproc,            // tp_reverse
-    MethodError_sortfunc            // tp_sort
+        MethodError_objobjproc,       // tp_concat
+        MethodError_objssizeproc,     // tp_repeat
+        range_getindex,               // tp_getindex
+        range_getslice,               // tp_getslice
+        range_find,                   // tp_find
+        range_count,                  // tp_count
+        MethodError_objssizeobjproc,  // tp_setindex
+        MethodError_objsliceobjproc,  // tp_setslice
+        MethodError_objssizeproc,     // tp_delindex
+        MethodError_objsliceproc,     // tp_delslice
+        MethodError_objobjproc,       // tp_append
+        MethodError_objobjproc,       // tp_extend
+        MethodError_objssizeproc,     // tp_irepeat
+        MethodError_objssizeobjproc,  // tp_insert
+        MethodError_objssizeproc,     // tp_popindex
+        MethodError_objproc,          // tp_reverse
+        MethodError_sortfunc          // tp_sort
 };
 
 static ypTypeObject ypRange_Type = {
-    yp_TYPE_HEAD_INIT,
-    NULL,                           // tp_name
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
 
-    // Object fundamentals
-    range_dealloc,                  // tp_dealloc
-    NoRefs_traversefunc,            // tp_traverse
-    NULL,                           // tp_str
-    NULL,                           // tp_repr
+        // Object fundamentals
+        range_dealloc,        // tp_dealloc
+        NoRefs_traversefunc,  // tp_traverse
+        NULL,                 // tp_str
+        NULL,                 // tp_repr
 
-    // Freezing, copying, and invalidating
-    MethodError_objproc,            // tp_freeze
-    range_frozen_copy,              // tp_unfrozen_copy
-    range_frozen_copy,              // tp_frozen_copy
-    range_frozen_deepcopy,          // tp_unfrozen_deepcopy
-    range_frozen_deepcopy,          // tp_frozen_deepcopy
-    MethodError_objproc,            // tp_invalidate
+        // Freezing, copying, and invalidating
+        MethodError_objproc,    // tp_freeze
+        range_frozen_copy,      // tp_unfrozen_copy
+        range_frozen_copy,      // tp_frozen_copy
+        range_frozen_deepcopy,  // tp_unfrozen_deepcopy
+        range_frozen_deepcopy,  // tp_frozen_deepcopy
+        MethodError_objproc,    // tp_invalidate
 
-    // Boolean operations and comparisons
-    range_bool,                     // tp_bool
-    NotImplemented_comparefunc,     // tp_lt
-    NotImplemented_comparefunc,     // tp_le
-    range_eq,                       // tp_eq
-    range_ne,                       // tp_ne
-    NotImplemented_comparefunc,     // tp_ge
-    NotImplemented_comparefunc,     // tp_gt
+        // Boolean operations and comparisons
+        range_bool,                  // tp_bool
+        NotImplemented_comparefunc,  // tp_lt
+        NotImplemented_comparefunc,  // tp_le
+        range_eq,                    // tp_eq
+        range_ne,                    // tp_ne
+        NotImplemented_comparefunc,  // tp_ge
+        NotImplemented_comparefunc,  // tp_gt
 
-    // Generic object operations
-    range_currenthash,              // tp_currenthash
-    MethodError_objproc,            // tp_close
+        // Generic object operations
+        range_currenthash,    // tp_currenthash
+        MethodError_objproc,  // tp_close
 
-    // Number operations
-    MethodError_NumberMethods,      // tp_as_number
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
 
-    // Iterator operations
-    _ypSequence_miniiter,           // tp_miniiter
-    _ypSequence_miniiter_rev,       // tp_miniiter_reversed
-    _ypSequence_miniiter_next,      // tp_miniiter_next
-    _ypSequence_miniiter_lenh,      // tp_miniiter_lenhint
-    _ypIter_from_miniiter,          // tp_iter
-    _ypIter_from_miniiter_rev,      // tp_iter_reversed
-    TypeError_objobjproc,           // tp_send
+        // Iterator operations
+        _ypSequence_miniiter,       // tp_miniiter
+        _ypSequence_miniiter_rev,   // tp_miniiter_reversed
+        _ypSequence_miniiter_next,  // tp_miniiter_next
+        _ypSequence_miniiter_lenh,  // tp_miniiter_lenhint
+        _ypIter_from_miniiter,      // tp_iter
+        _ypIter_from_miniiter_rev,  // tp_iter_reversed
+        TypeError_objobjproc,       // tp_send
 
-    // Container operations
-    range_contains,                 // tp_contains
-    range_len,                      // tp_len
-    MethodError_objobjproc,         // tp_push
-    MethodError_objproc,            // tp_clear
-    MethodError_objproc,            // tp_pop
-    MethodError_objobjobjproc,      // tp_remove
-    _ypSequence_getdefault,         // tp_getdefault
-    MethodError_objobjobjproc,      // tp_setitem
-    MethodError_objobjproc,         // tp_delitem
-    MethodError_objvalistproc,      // tp_update
+        // Container operations
+        range_contains,             // tp_contains
+        range_len,                  // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        _ypSequence_getdefault,     // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
 
-    // Sequence operations
-    &ypRange_as_sequence,           // tp_as_sequence
+        // Sequence operations
+        &ypRange_as_sequence,  // tp_as_sequence
 
-    // Set operations
-    MethodError_SetMethods,         // tp_as_set
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
 
-    // Mapping operations
-    MethodError_MappingMethods      // tp_as_mapping
+        // Mapping operations
+        MethodError_MappingMethods  // tp_as_mapping
 };
 
 // XXX Adapted from Python's get_len_of_range
 ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
 {
     _yp_uint_t ulen;
-    ypObject *newR;
+    ypObject * newR;
 
     // Denying yp_INT_T_MIN ensures step can be negated
     if( step == 0 ) return yp_ValueError;
@@ -13705,17 +13854,17 @@ ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
     // Cast to unsigned to avoid undefined behaviour (a la yp_UINT_MATH)
     if( step < 0 ) {
         if( stop >= start ) return _yp_range_empty;
-        ulen = ((_yp_uint_t) start) - 1u - ((_yp_uint_t) stop);
-        ulen = 1u + ulen / ((_yp_uint_t) -step);
+        ulen = ( (_yp_uint_t) start ) - 1u - ( (_yp_uint_t) stop );
+        ulen = 1u + ulen / ( (_yp_uint_t) -step );
     } else {
         if( start >= stop ) return _yp_range_empty;
-        ulen = ((_yp_uint_t) stop) - 1u - ((_yp_uint_t) start);
-        ulen = 1u + ulen / ((_yp_uint_t) step);
+        ulen = ( (_yp_uint_t) stop ) - 1u - ( (_yp_uint_t) start );
+        ulen = 1u + ulen / ( (_yp_uint_t) step );
     }
     // TODO We could store len in our own _yp_uint_t field, to allow for larger ranges, but a lot
     // of other code would also have to change
-    if( ulen > ((_yp_uint_t) ypObject_LEN_MAX) ) return yp_SystemLimitationError;
-    if( ulen < 2 ) step = 1; // makes comparisons easier
+    if( ulen > ( (_yp_uint_t) ypObject_LEN_MAX ) ) return yp_SystemLimitationError;
+    if( ulen < 2 ) step = 1;  // makes comparisons easier
 
     newR = ypMem_MALLOC_FIXED( ypRangeObject, ypRange_CODE );
     if( yp_isexceptionC( newR ) ) return newR;
@@ -13725,9 +13874,7 @@ ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step )
     ypRange_ASSERT_NORMALIZED( newR );
     return newR;
 }
-ypObject *yp_rangeC( yp_int_t stop ) {
-    return yp_rangeC3( 0, stop, 1 );
-}
+ypObject *yp_rangeC( yp_int_t stop ) { return yp_rangeC3( 0, stop, 1 ); }
 
 
 /*************************************************************************************************
@@ -13738,73 +13885,92 @@ ypObject *yp_rangeC( yp_int_t stop ) {
 // are found elsewhere.
 
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
-#define _yp_REDIRECT1( ob, tp_meth, args ) \
-    do {ypTypeObject *type = ypObject_TYPE( ob ); \
-        return type->tp_meth args; } while( 0 )
+#define _yp_REDIRECT1( ob, tp_meth, args )               \
+    do {                                                 \
+        ypTypeObject *       type = ypObject_TYPE( ob ); \
+        return type->tp_meth args;                       \
+    } while( 0 )
 
-#define _yp_REDIRECT2( ob, tp_suite, suite_meth, args ) \
-    do {ypTypeObject *type = ypObject_TYPE( ob ); \
-        return type->tp_suite->suite_meth args; } while( 0 )
+#define _yp_REDIRECT2( ob, tp_suite, suite_meth, args )               \
+    do {                                                              \
+        ypTypeObject *                    type = ypObject_TYPE( ob ); \
+        return type->tp_suite->suite_meth args;                       \
+    } while( 0 )
 
-#define _yp_REDIRECT_BOOL1( ob, tp_meth, args ) \
-    do {ypTypeObject *type = ypObject_TYPE( ob ); \
-        ypObject *result = type->tp_meth args; \
-        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), #tp_meth " must return yp_True, yp_False, or an exception" ); \
-        return result; } while( 0 )
+#define _yp_REDIRECT_BOOL1( ob, tp_meth, args )                                          \
+    do {                                                                                 \
+        ypTypeObject *type = ypObject_TYPE( ob );                                        \
+        ypObject *result = type->tp_meth args;                                           \
+        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), \
+                #tp_meth " must return yp_True, yp_False, or an exception" );            \
+        return result;                                                                   \
+    } while( 0 )
 
-#define _yp_REDIRECT_BOOL2( ob, tp_suite, suite_meth, args ) \
-    do {ypTypeObject *type = ypObject_TYPE( ob ); \
-        ypObject *result = type->tp_suite->suite_meth args; \
-        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), #suite_meth " must return yp_True, yp_False, or an exception" ); \
-        return result; } while( 0 )
+#define _yp_REDIRECT_BOOL2( ob, tp_suite, suite_meth, args )                             \
+    do {                                                                                 \
+        ypTypeObject *type = ypObject_TYPE( ob );                                        \
+        ypObject *result = type->tp_suite->suite_meth args;                              \
+        yp_ASSERT( result == yp_True || result == yp_False || yp_isexceptionC( result ), \
+                #suite_meth " must return yp_True, yp_False, or an exception" );         \
+        return result;                                                                   \
+    } while( 0 )
 
-#define _yp_REDIRECT_EXC1( ob, tp_meth, args, pExc ) \
-    do {ypTypeObject *type = ypObject_TYPE( ob ); \
-        ypObject *result = type->tp_meth args; \
+#define _yp_REDIRECT_EXC1( ob, tp_meth, args, pExc )    \
+    do {                                                \
+        ypTypeObject *type = ypObject_TYPE( ob );       \
+        ypObject *result = type->tp_meth args;          \
         if( yp_isexceptionC( result ) ) *pExc = result; \
-        return; } while( 0 )
+        return;                                         \
+    } while( 0 )
 
 #define _yp_REDIRECT_EXC2( ob, tp_suite, suite_meth, args, pExc ) \
-    do {ypTypeObject *type = ypObject_TYPE( ob ); \
-        ypObject *result = type->tp_suite->suite_meth args; \
-        if( yp_isexceptionC( result ) ) *pExc = result; \
-        return; } while( 0 )
+    do {                                                          \
+        ypTypeObject *type = ypObject_TYPE( ob );                 \
+        ypObject *result = type->tp_suite->suite_meth args;       \
+        if( yp_isexceptionC( result ) ) *pExc = result;           \
+        return;                                                   \
+    } while( 0 )
 
-#define _yp_INPLACE1( pOb, tp_meth, args ) \
-    do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
-        ypObject *result = type->tp_meth args; \
+#define _yp_INPLACE1( pOb, tp_meth, args )                                    \
+    do {                                                                      \
+        ypTypeObject *type = ypObject_TYPE( *pOb );                           \
+        ypObject *result = type->tp_meth args;                                \
         if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
-        return; } while( 0 )
+        return;                                                               \
+    } while( 0 )
 
-#define _yp_INPLACE2( pOb, tp_suite, suite_meth, args ) \
-    do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
-        ypObject *result = type->tp_suite->suite_meth args; \
+#define _yp_INPLACE2( pOb, tp_suite, suite_meth, args )                       \
+    do {                                                                      \
+        ypTypeObject *type = ypObject_TYPE( *pOb );                           \
+        ypObject *result = type->tp_suite->suite_meth args;                   \
         if( yp_isexceptionC( result ) ) return_yp_INPLACE_ERR( pOb, result ); \
-        return; } while( 0 )
+        return;                                                               \
+    } while( 0 )
 
-#define _yp_INPLACE_RETURN1( pOb, tp_meth, args ) \
-    do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
-        ypObject *result = type->tp_meth args; \
+#define _yp_INPLACE_RETURN1( pOb, tp_meth, args )                      \
+    do {                                                               \
+        ypTypeObject *type = ypObject_TYPE( *pOb );                    \
+        ypObject *result = type->tp_meth args;                         \
         if( yp_isexceptionC( result ) ) yp_INPLACE_ERR( pOb, result ); \
-        return result; } while( 0 )
+        return result;                                                 \
+    } while( 0 )
 
-#define _yp_INPLACE_RETURN2( pOb, tp_suite, suite_meth, args ) \
-    do {ypTypeObject *type = ypObject_TYPE( *pOb ); \
-        ypObject *result = type->tp_suite->suite_meth args; \
+#define _yp_INPLACE_RETURN2( pOb, tp_suite, suite_meth, args )         \
+    do {                                                               \
+        ypTypeObject *type = ypObject_TYPE( *pOb );                    \
+        ypObject *result = type->tp_suite->suite_meth args;            \
         if( yp_isexceptionC( result ) ) yp_INPLACE_ERR( pOb, result ); \
-        return result; } while( 0 )
+        return result;                                                 \
+    } while( 0 )
 
-ypObject *yp_bool( ypObject *x ) {
-    _yp_REDIRECT_BOOL1( x, tp_bool, (x) );
-}
+ypObject *yp_bool( ypObject *x ) { _yp_REDIRECT_BOOL1( x, tp_bool, ( x ) ); }
 
-ypObject *yp_iter( ypObject *x ) {
-    _yp_REDIRECT1( x, tp_iter, (x) );
-}
+ypObject *yp_iter( ypObject *x ) { _yp_REDIRECT1( x, tp_iter, ( x ) ); }
 
-static ypObject *_yp_send( ypObject **iterator, ypObject *value ) {
+static ypObject *_yp_send( ypObject **iterator, ypObject *value )
+{
     ypTypeObject *type = ypObject_TYPE( *iterator );
-    ypObject *result = type->tp_send( *iterator, value );
+    ypObject *    result = type->tp_send( *iterator, value );
     if( yp_isexceptionC( result ) ) {
         // tp_send closes *iterator; it's up to us to not treat yp_StopIteration as a typical error
         if( !yp_isexceptionC2( result, yp_StopIteration ) ) {
@@ -13814,7 +13980,8 @@ static ypObject *_yp_send( ypObject **iterator, ypObject *value ) {
     return result;
 }
 
-ypObject *yp_send( ypObject **iterator, ypObject *value ) {
+ypObject *yp_send( ypObject **iterator, ypObject *value )
+{
     if( yp_isexceptionC( value ) ) {
         yp_INPLACE_ERR( iterator, value );
         return value;
@@ -13822,13 +13989,12 @@ ypObject *yp_send( ypObject **iterator, ypObject *value ) {
     return _yp_send( iterator, value );
 }
 
-ypObject *yp_next( ypObject **iterator ) {
-    return _yp_send( iterator, yp_None );
-}
+ypObject *yp_next( ypObject **iterator ) { return _yp_send( iterator, yp_None ); }
 
-ypObject *yp_next2( ypObject **iterator, ypObject *defval ) {
+ypObject *yp_next2( ypObject **iterator, ypObject *defval )
+{
     ypTypeObject *type = ypObject_TYPE( *iterator );
-    ypObject *result = type->tp_send( *iterator, yp_None );
+    ypObject *    result = type->tp_send( *iterator, yp_None );
     // tp_send closes *iterator; it's up to us to not treat yp_StopIteration as a typical error
     if( yp_isexceptionC2( result, yp_StopIteration ) ) {
         result = yp_incref( defval );
@@ -13841,7 +14007,8 @@ ypObject *yp_next2( ypObject **iterator, ypObject *defval ) {
     return result;
 }
 
-ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
+ypObject *yp_throw( ypObject **iterator, ypObject *exc )
+{
     if( !yp_isexceptionC( exc ) ) {
         yp_INPLACE_ERR( iterator, yp_TypeError );
         return yp_TypeError;
@@ -13849,311 +14016,367 @@ ypObject *yp_throw( ypObject **iterator, ypObject *exc ) {
     return _yp_send( iterator, exc );
 }
 
-ypObject *yp_reversed( ypObject *x ) {
-    _yp_REDIRECT1( x, tp_iter_reversed, (x) );
+ypObject *yp_reversed( ypObject *x ) { _yp_REDIRECT1( x, tp_iter_reversed, ( x ) ); }
+
+ypObject *yp_contains( ypObject *container, ypObject *x )
+{
+    _yp_REDIRECT_BOOL1( container, tp_contains, ( container, x ) );
+}
+ypObject *yp_in( ypObject *x, ypObject *container )
+{
+    _yp_REDIRECT_BOOL1( container, tp_contains, ( container, x ) );
 }
 
-ypObject *yp_contains( ypObject *container, ypObject *x ) {
-    _yp_REDIRECT_BOOL1( container, tp_contains, (container, x) );
-}
-ypObject *yp_in( ypObject *x, ypObject *container ) {
-    _yp_REDIRECT_BOOL1( container, tp_contains, (container, x) );
-}
-
-ypObject *yp_not_in( ypObject *x, ypObject *container ) {
+ypObject *yp_not_in( ypObject *x, ypObject *container )
+{
     ypObject *result = yp_in( x, container );
     return ypBool_NOT( result );
 }
 
-void yp_push( ypObject **container, ypObject *x ) {
-    _yp_INPLACE1( container, tp_push, (*container, x) );
+void yp_push( ypObject **container, ypObject *x )
+{
+    _yp_INPLACE1( container, tp_push, ( *container, x ) );
 }
 
-void yp_clear( ypObject **container ) {
-    _yp_INPLACE1( container, tp_clear, (*container) );
+void yp_clear( ypObject **container ) { _yp_INPLACE1( container, tp_clear, ( *container ) ); }
+
+ypObject *yp_pop( ypObject **container )
+{
+    _yp_INPLACE_RETURN1( container, tp_pop, ( *container ) );
 }
 
-ypObject *yp_pop( ypObject **container ) {
-    _yp_INPLACE_RETURN1( container, tp_pop, (*container) );
+ypObject *yp_concat( ypObject *sequence, ypObject *x )
+{
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_concat, ( sequence, x ) );
 }
 
-ypObject *yp_concat( ypObject *sequence, ypObject *x ) {
-    _yp_REDIRECT2( sequence, tp_as_sequence, tp_concat, (sequence, x) );
+ypObject *yp_repeatC( ypObject *sequence, yp_ssize_t factor )
+{
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_repeat, ( sequence, factor ) );
 }
 
-ypObject *yp_repeatC( ypObject *sequence, yp_ssize_t factor ) {
-    _yp_REDIRECT2( sequence, tp_as_sequence, tp_repeat, (sequence, factor) );
+ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i )
+{
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_getindex, ( sequence, i, NULL ) );
 }
 
-ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i ) {
-    _yp_REDIRECT2( sequence, tp_as_sequence, tp_getindex, (sequence, i, NULL) );
-}
-
-ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k ) {
-    _yp_REDIRECT2( sequence, tp_as_sequence, tp_getslice, (sequence, i, j, k) );
+ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k )
+{
+    _yp_REDIRECT2( sequence, tp_as_sequence, tp_getslice, ( sequence, i, j, k ) );
 }
 
 yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc )
 {
     yp_ssize_t index;
-    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_find(
-            sequence, x, i, j, yp_FIND_FORWARD, &index );
+    ypObject * result = ypObject_TYPE(
+            sequence )->tp_as_sequence->tp_find( sequence, x, i, j, yp_FIND_FORWARD, &index );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( -1, exc, result );
     yp_ASSERT( index >= -1, "tp_find cannot return <-1" );
     return index;
 }
 
-yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc )
+{
     return yp_findC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
-yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-        ypObject **exc )
+yp_ssize_t yp_indexC4(
+        ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc )
 {
-    ypObject *subexc = yp_None;
+    ypObject * subexc = yp_None;
     yp_ssize_t result = yp_findC4( sequence, x, i, j, &subexc );
     if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( -1, exc, subexc );
     if( result == -1 ) return_yp_CEXC_ERR( -1, exc, yp_ValueError );
     return result;
 }
 
-yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc )
+{
     return yp_indexC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
-yp_ssize_t yp_rfindC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-        ypObject **exc )
+yp_ssize_t yp_rfindC4(
+        ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc )
 {
     yp_ssize_t index;
-    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_find(
-            sequence, x, i, j, yp_FIND_REVERSE, &index );
+    ypObject * result = ypObject_TYPE(
+            sequence )->tp_as_sequence->tp_find( sequence, x, i, j, yp_FIND_REVERSE, &index );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( -1, exc, result );
     yp_ASSERT( index >= -1, "tp_find cannot return <-1" );
     return index;
 }
 
-yp_ssize_t yp_rfindC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+yp_ssize_t yp_rfindC( ypObject *sequence, ypObject *x, ypObject **exc )
+{
     return yp_rfindC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
-yp_ssize_t yp_rindexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-        ypObject **exc )
+yp_ssize_t yp_rindexC4(
+        ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc )
 {
-    ypObject *subexc = yp_None;
+    ypObject * subexc = yp_None;
     yp_ssize_t result = yp_rfindC4( sequence, x, i, j, &subexc );
     if( yp_isexceptionC( subexc ) ) return_yp_CEXC_ERR( -1, exc, subexc );
     if( result == -1 ) return_yp_CEXC_ERR( -1, exc, yp_ValueError );
     return result;
 }
 
-yp_ssize_t yp_rindexC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+yp_ssize_t yp_rindexC( ypObject *sequence, ypObject *x, ypObject **exc )
+{
     return yp_rindexC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
-yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-        ypObject **exc )
+yp_ssize_t yp_countC4(
+        ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc )
 {
     yp_ssize_t count;
-    ypObject *result = ypObject_TYPE( sequence )->tp_as_sequence->tp_count(
-            sequence, x, i, j, &count );
+    ypObject * result =
+            ypObject_TYPE( sequence )->tp_as_sequence->tp_count( sequence, x, i, j, &count );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
     yp_ASSERT( count >= 0, "tp_count cannot return negative" );
     return count;
 }
 
-yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc ) {
+yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc )
+{
     return yp_countC4( sequence, x, 0, yp_SLICE_USELEN, exc );
 }
 
-void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_setindex, (*sequence, i, x) );
+void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_setindex, ( *sequence, i, x ) );
 }
 
-void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k,
-        ypObject *x ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_setslice, (*sequence, i, j, k, x) );
+void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_setslice, ( *sequence, i, j, k, x ) );
 }
 
-void yp_delindexC( ypObject **sequence, yp_ssize_t i ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_delindex, (*sequence, i) );
+void yp_delindexC( ypObject **sequence, yp_ssize_t i )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_delindex, ( *sequence, i ) );
 }
 
-void yp_delsliceC4( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_delslice, (*sequence, i, j, k) );
+void yp_delsliceC4( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_delslice, ( *sequence, i, j, k ) );
 }
 
-void yp_append( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_append, (*sequence, x) );
+void yp_append( ypObject **sequence, ypObject *x )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_append, ( *sequence, x ) );
 }
 
-void yp_extend( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_extend, (*sequence, x) );
+void yp_extend( ypObject **sequence, ypObject *x )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_extend, ( *sequence, x ) );
 }
 
-void yp_irepeatC( ypObject **sequence, yp_ssize_t factor ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_irepeat, (*sequence, factor) );
+void yp_irepeatC( ypObject **sequence, yp_ssize_t factor )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_irepeat, ( *sequence, factor ) );
 }
 
-void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_insert, (*sequence, i, x) );
+void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_insert, ( *sequence, i, x ) );
 }
 
-ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i ) {
-    _yp_INPLACE_RETURN2( sequence, tp_as_sequence, tp_popindex, (*sequence, i) );
+ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i )
+{
+    _yp_INPLACE_RETURN2( sequence, tp_as_sequence, tp_popindex, ( *sequence, i ) );
 }
 
-void yp_remove( ypObject **sequence, ypObject *x ) {
-    _yp_INPLACE1( sequence, tp_remove, (*sequence, x, NULL) );
+void yp_remove( ypObject **sequence, ypObject *x )
+{
+    _yp_INPLACE1( sequence, tp_remove, ( *sequence, x, NULL ) );
 }
 
-void yp_reverse( ypObject **sequence ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_reverse, (*sequence) );
+void yp_reverse( ypObject **sequence )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_reverse, ( *sequence ) );
 }
 
-void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_sort, (*sequence, key, reverse) );
+void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_sort, ( *sequence, key, reverse ) );
 }
 
-void yp_sort( ypObject **sequence ) {
-    _yp_INPLACE2( sequence, tp_as_sequence, tp_sort, (*sequence, NULL, yp_False) );
+void yp_sort( ypObject **sequence )
+{
+    _yp_INPLACE2( sequence, tp_as_sequence, tp_sort, ( *sequence, NULL, yp_False ) );
 }
 
-ypObject *yp_isdisjoint( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_isdisjoint, (set, x) );
+ypObject *yp_isdisjoint( ypObject *set, ypObject *x )
+{
+    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_isdisjoint, ( set, x ) );
 }
 
-ypObject *yp_issubset( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_issubset, (set, x) );
+ypObject *yp_issubset( ypObject *set, ypObject *x )
+{
+    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_issubset, ( set, x ) );
 }
 
-ypObject *yp_issuperset( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_issuperset, (set, x) );
+ypObject *yp_issuperset( ypObject *set, ypObject *x )
+{
+    _yp_REDIRECT_BOOL2( set, tp_as_set, tp_issuperset, ( set, x ) );
 }
 
-ypObject *yp_unionN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_unionNV, (set, n, args), n );
+ypObject *yp_unionN( ypObject *set, int n, ... )
+{
+    return_yp_V_FUNC( ypObject *, yp_unionNV, ( set, n, args ), n );
 }
-ypObject *yp_unionNV( ypObject *set, int n, va_list args ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_union, (set, n, args) );
-}
-
-ypObject *yp_intersectionN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_intersectionNV, (set, n, args), n );
-}
-ypObject *yp_intersectionNV( ypObject *set, int n, va_list args ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_intersection, (set, n, args) );
+ypObject *yp_unionNV( ypObject *set, int n, va_list args )
+{
+    _yp_REDIRECT2( set, tp_as_set, tp_union, ( set, n, args ) );
 }
 
-ypObject *yp_differenceN( ypObject *set, int n, ... ) {
-    return_yp_V_FUNC( ypObject *, yp_differenceNV, (set, n, args), n );
+ypObject *yp_intersectionN( ypObject *set, int n, ... )
+{
+    return_yp_V_FUNC( ypObject *, yp_intersectionNV, ( set, n, args ), n );
 }
-ypObject *yp_differenceNV( ypObject *set, int n, va_list args ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_difference, (set, n, args) );
-}
-
-ypObject *yp_symmetric_difference( ypObject *set, ypObject *x ) {
-    _yp_REDIRECT2( set, tp_as_set, tp_symmetric_difference, (set, x) );
+ypObject *yp_intersectionNV( ypObject *set, int n, va_list args )
+{
+    _yp_REDIRECT2( set, tp_as_set, tp_intersection, ( set, n, args ) );
 }
 
-void yp_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_updateNV, (set, n, args), n );
+ypObject *yp_differenceN( ypObject *set, int n, ... )
+{
+    return_yp_V_FUNC( ypObject *, yp_differenceNV, ( set, n, args ), n );
 }
-void yp_updateNV( ypObject **set, int n, va_list args ) {
-    _yp_INPLACE1( set, tp_update, (*set, n, args) );
-}
-
-void yp_intersection_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_intersection_updateNV, (set, n, args), n );
-}
-void yp_intersection_updateNV( ypObject **set, int n, va_list args ) {
-    _yp_INPLACE2( set, tp_as_set, tp_intersection_update, (*set, n, args) );
+ypObject *yp_differenceNV( ypObject *set, int n, va_list args )
+{
+    _yp_REDIRECT2( set, tp_as_set, tp_difference, ( set, n, args ) );
 }
 
-void yp_difference_updateN( ypObject **set, int n, ... ) {
-    return_yp_V_FUNC_void( yp_difference_updateNV, (set, n, args), n );
-}
-void yp_difference_updateNV( ypObject **set, int n, va_list args ) {
-    _yp_INPLACE2( set, tp_as_set, tp_difference_update, (*set, n, args) );
+ypObject *yp_symmetric_difference( ypObject *set, ypObject *x )
+{
+    _yp_REDIRECT2( set, tp_as_set, tp_symmetric_difference, ( set, x ) );
 }
 
-void yp_symmetric_difference_update( ypObject **set, ypObject *x ) {
-    _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, (*set, x) );
+void yp_updateN( ypObject **set, int n, ... )
+{
+    return_yp_V_FUNC_void( yp_updateNV, ( set, n, args ), n );
+}
+void yp_updateNV( ypObject **set, int n, va_list args )
+{
+    _yp_INPLACE1( set, tp_update, ( *set, n, args ) );
 }
 
-void yp_pushuniqueE( ypObject *set, ypObject *x, ypObject **exc ) {
-    _yp_REDIRECT_EXC2( set, tp_as_set, tp_pushunique, (set, x), exc );
+void yp_intersection_updateN( ypObject **set, int n, ... )
+{
+    return_yp_V_FUNC_void( yp_intersection_updateNV, ( set, n, args ), n );
+}
+void yp_intersection_updateNV( ypObject **set, int n, va_list args )
+{
+    _yp_INPLACE2( set, tp_as_set, tp_intersection_update, ( *set, n, args ) );
 }
 
-void yp_discard( ypObject **set, ypObject *x ) {
-    _yp_INPLACE1( set, tp_remove, (*set, x, yp_None) );
+void yp_difference_updateN( ypObject **set, int n, ... )
+{
+    return_yp_V_FUNC_void( yp_difference_updateNV, ( set, n, args ), n );
+}
+void yp_difference_updateNV( ypObject **set, int n, va_list args )
+{
+    _yp_INPLACE2( set, tp_as_set, tp_difference_update, ( *set, n, args ) );
 }
 
-ypObject *yp_getitem( ypObject *mapping, ypObject *key ) {
-    _yp_REDIRECT1( mapping, tp_getdefault, (mapping, key, NULL) );
+void yp_symmetric_difference_update( ypObject **set, ypObject *x )
+{
+    _yp_INPLACE2( set, tp_as_set, tp_symmetric_difference_update, ( *set, x ) );
 }
 
-void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x ) {
-    _yp_INPLACE1( mapping, tp_setitem, (*mapping, key, x) );
+void yp_pushuniqueE( ypObject *set, ypObject *x, ypObject **exc )
+{
+    _yp_REDIRECT_EXC2( set, tp_as_set, tp_pushunique, ( set, x ), exc );
 }
 
-void yp_setitemE( ypObject *mapping, ypObject *key, ypObject *x, ypObject **exc ) {
-    _yp_REDIRECT_EXC1( mapping, tp_setitem, (mapping, key, x), exc );
+void yp_discard( ypObject **set, ypObject *x )
+{
+    _yp_INPLACE1( set, tp_remove, ( *set, x, yp_None ) );
 }
 
-void yp_delitem( ypObject **mapping, ypObject *key ) {
-    _yp_INPLACE1( mapping, tp_delitem, (*mapping, key) );
+ypObject *yp_getitem( ypObject *mapping, ypObject *key )
+{
+    _yp_REDIRECT1( mapping, tp_getdefault, ( mapping, key, NULL ) );
 }
 
-ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval ) {
-    _yp_REDIRECT1( mapping, tp_getdefault, (mapping, key, defval) );
+void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x )
+{
+    _yp_INPLACE1( mapping, tp_setitem, ( *mapping, key, x ) );
 }
 
-ypObject *yp_iter_items( ypObject *mapping ) {
-    _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_items, (mapping) );
+void yp_setitemE( ypObject *mapping, ypObject *key, ypObject *x, ypObject **exc )
+{
+    _yp_REDIRECT_EXC1( mapping, tp_setitem, ( mapping, key, x ), exc );
 }
 
-ypObject *yp_iter_keys( ypObject *mapping ) {
-    _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_keys, (mapping) );
+void yp_delitem( ypObject **mapping, ypObject *key )
+{
+    _yp_INPLACE1( mapping, tp_delitem, ( *mapping, key ) );
 }
 
-ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval ) {
-    _yp_INPLACE_RETURN2( mapping, tp_as_mapping, tp_popvalue, (*mapping, key, defval) );
+ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval )
+{
+    _yp_REDIRECT1( mapping, tp_getdefault, ( mapping, key, defval ) );
 }
 
-void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value ) {
+ypObject *yp_iter_items( ypObject *mapping )
+{
+    _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_items, ( mapping ) );
+}
+
+ypObject *yp_iter_keys( ypObject *mapping )
+{
+    _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_keys, ( mapping ) );
+}
+
+ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval )
+{
+    _yp_INPLACE_RETURN2( mapping, tp_as_mapping, tp_popvalue, ( *mapping, key, defval ) );
+}
+
+void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value )
+{
     ypTypeObject *type = ypObject_TYPE( *mapping );
-    ypObject *result = type->tp_as_mapping->tp_popitem( *mapping, key, value );
+    ypObject *    result = type->tp_as_mapping->tp_popitem( *mapping, key, value );
     if( yp_isexceptionC( result ) ) {
         *key = *value = result;
         yp_INPLACE_ERR( mapping, result );
     }
 }
 
-ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval ) {
+ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval )
+{
     ypTypeObject *type = ypObject_TYPE( *mapping );
-    ypObject *result = type->tp_as_mapping->tp_setdefault( *mapping, key, defval );
+    ypObject *    result = type->tp_as_mapping->tp_setdefault( *mapping, key, defval );
     if( yp_isexceptionC( result ) ) yp_INPLACE_ERR( mapping, result );
     return result;
 }
 
-void yp_updateK( ypObject **mapping, int n, ... ) {
-    return_yp_K_FUNC_void( yp_updateKV, (mapping, n, args), n );
+void yp_updateK( ypObject **mapping, int n, ... )
+{
+    return_yp_K_FUNC_void( yp_updateKV, ( mapping, n, args ), n );
 }
-void yp_updateKV( ypObject **mapping, int n, va_list args ) {
-    _yp_INPLACE2( mapping, tp_as_mapping, tp_updateK, (*mapping, n, args) );
-}
-
-ypObject *yp_iter_values( ypObject *mapping ) {
-    _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_values, (mapping) );
+void yp_updateKV( ypObject **mapping, int n, va_list args )
+{
+    _yp_INPLACE2( mapping, tp_as_mapping, tp_updateK, ( *mapping, n, args ) );
 }
 
-ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state ) {
-    _yp_REDIRECT1( x, tp_miniiter, (x, state) );
+ypObject *yp_iter_values( ypObject *mapping )
+{
+    _yp_REDIRECT2( mapping, tp_as_mapping, tp_iter_values, ( mapping ) );
 }
 
-ypObject *yp_miniiter_next( ypObject **mi, yp_uint64_t *state ) {
+ypObject *yp_miniiter( ypObject *x, yp_uint64_t *state )
+{
+    _yp_REDIRECT1( x, tp_miniiter, ( x, state ) );
+}
+
+ypObject *yp_miniiter_next( ypObject **mi, yp_uint64_t *state )
+{
     ypTypeObject *type = ypObject_TYPE( *mi );
-    ypObject *result = type->tp_miniiter_next( *mi, state );
+    ypObject *    result = type->tp_miniiter_next( *mi, state );
     if( yp_isexceptionC( result ) ) {
         // tp_miniiter_next closes; it's up to us to not treat yp_StopIteration as an "error"
         if( !yp_isexceptionC2( result, yp_StopIteration ) ) {
@@ -14163,9 +14386,10 @@ ypObject *yp_miniiter_next( ypObject **mi, yp_uint64_t *state ) {
     return result;
 }
 
-yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **exc ) {
+yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **exc )
+{
     yp_ssize_t lenhint = 0;
-    ypObject *result = ypObject_TYPE( mi )->tp_miniiter_lenhint( mi, state, &lenhint );
+    ypObject * result = ypObject_TYPE( mi )->tp_miniiter_lenhint( mi, state, &lenhint );
     if( yp_isexceptionC( result ) ) return_yp_CEXC_ERR( 0, exc, result );
     return lenhint < 0 ? 0 : lenhint;
 }
@@ -14179,46 +14403,51 @@ yp_ssize_t yp_miniiter_lenhintC( ypObject *mi, yp_uint64_t *state, ypObject **ex
 // Let's restrain ourselves and limit them to functions we actually find useful (and can test) in
 // our projects that integrate nohtyP.
 
-int yp_o2i_containsC( ypObject *container, yp_int_t xC, ypObject **exc ) {
+int yp_o2i_containsC( ypObject *container, yp_int_t xC, ypObject **exc )
+{
     ypObject *x = yp_intC( xC );
     ypObject *result = yp_contains( container, x );
     yp_decref( x );
     if( yp_isexceptionC( result ) ) *exc = result;
-    return result == yp_True; // returns false on yp_False or exception
+    return result == yp_True;  // returns false on yp_False or exception
 }
 
-void yp_o2i_pushC( ypObject **container, yp_int_t xC ) {
+void yp_o2i_pushC( ypObject **container, yp_int_t xC )
+{
     ypObject *x = yp_intC( xC );
     yp_push( container, x );
     yp_decref( x );
 }
 
-yp_int_t yp_o2i_popC( ypObject **container, ypObject **exc ) {
+yp_int_t yp_o2i_popC( ypObject **container, ypObject **exc )
+{
     ypObject *x = yp_pop( container );
-    yp_int_t xC = yp_asintC( x, exc );
+    yp_int_t  xC = yp_asintC( x, exc );
     yp_decref( x );
     return xC;
 }
 
-yp_int_t yp_o2i_getitemC( ypObject *container, ypObject *key, ypObject **exc ) {
+yp_int_t yp_o2i_getitemC( ypObject *container, ypObject *key, ypObject **exc )
+{
     ypObject *x = yp_getitem( container, key );
-    yp_int_t xC = yp_asintC( x, exc );
+    yp_int_t  xC = yp_asintC( x, exc );
     yp_decref( x );
     return xC;
 }
 
-void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t xC ) {
+void yp_o2i_setitemC( ypObject **container, ypObject *key, yp_int_t xC )
+{
     ypObject *x = yp_intC( xC );
     yp_setitem( container, key, x );
     yp_decref( x );
 }
 
-ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t * *encoded,
-        yp_ssize_t *size, ypObject * *encoding )
+ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t **encoded,
+        yp_ssize_t *size, ypObject **encoding )
 {
     ypObject *x;
     ypObject *result;
-    int container_pair = ypObject_TYPE_PAIR_CODE( container );
+    int       container_pair = ypObject_TYPE_PAIR_CODE( container );
 
     // XXX The pointer returned via *encoded is only valid so long as the str/chrarray object
     // remains allocated and isn't modified.  As such, limit this function to those containers that
@@ -14233,42 +14462,46 @@ ypObject *yp_o2s_getitemCX( ypObject *container, ypObject *key, const yp_uint8_t
     return result;
 }
 
-void yp_o2s_setitemC4( ypObject **container, ypObject *key,
-        const yp_uint8_t *xC, yp_ssize_t x_lenC )
+void yp_o2s_setitemC4(
+        ypObject **container, ypObject *key, const yp_uint8_t *xC, yp_ssize_t x_lenC )
 {
     ypObject *x = yp_str_frombytesC2( xC, x_lenC );
     yp_setitem( container, key, x );
     yp_decref( x );
 }
 
-ypObject *yp_i2o_getitemC( ypObject *container, yp_int_t keyC ) {
+ypObject *yp_i2o_getitemC( ypObject *container, yp_int_t keyC )
+{
     ypObject *key = yp_intC( keyC );
     ypObject *x = yp_getitem( container, key );
     yp_decref( key );
     return x;
 }
 
-void yp_i2o_setitemC( ypObject **container, yp_int_t keyC, ypObject *x ) {
+void yp_i2o_setitemC( ypObject **container, yp_int_t keyC, ypObject *x )
+{
     ypObject *key = yp_intC( keyC );
     yp_setitem( container, key, x );
     yp_decref( key );
 }
 
-yp_int_t yp_i2i_getitemC( ypObject *container, yp_int_t keyC, ypObject **exc ) {
+yp_int_t yp_i2i_getitemC( ypObject *container, yp_int_t keyC, ypObject **exc )
+{
     ypObject *key = yp_intC( keyC );
-    yp_int_t x = yp_o2i_getitemC( container, key, exc );
+    yp_int_t  x = yp_o2i_getitemC( container, key, exc );
     yp_decref( key );
     return x;
 }
 
-void yp_i2i_setitemC( ypObject **container, yp_int_t keyC, yp_int_t xC ) {
+void yp_i2i_setitemC( ypObject **container, yp_int_t keyC, yp_int_t xC )
+{
     ypObject *key = yp_intC( keyC );
     yp_o2i_setitemC( container, key, xC );
     yp_decref( key );
 }
 
-ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t keyC, const yp_uint8_t * *encoded,
-        yp_ssize_t *size, ypObject * *encoding )
+ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t keyC, const yp_uint8_t **encoded,
+        yp_ssize_t *size, ypObject **encoding )
 {
     ypObject *key = yp_intC( keyC );
     ypObject *result = yp_o2s_getitemCX( container, key, encoded, size, encoding );
@@ -14276,40 +14509,41 @@ ypObject *yp_i2s_getitemCX( ypObject *container, yp_int_t keyC, const yp_uint8_t
     return result;
 }
 
-void yp_i2s_setitemC4( ypObject **container, yp_int_t keyC,
-        const yp_uint8_t *xC, yp_ssize_t x_lenC )
+void yp_i2s_setitemC4(
+        ypObject **container, yp_int_t keyC, const yp_uint8_t *xC, yp_ssize_t x_lenC )
 {
     ypObject *key = yp_intC( keyC );
     yp_o2s_setitemC4( container, key, xC, x_lenC );
     yp_decref( key );
 }
 
-ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC ) {
+ypObject *yp_s2o_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC )
+{
     ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
     ypObject *x = yp_getitem( container, key );
     yp_decref( key );
     return x;
 }
 
-void yp_s2o_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
-        ypObject *x )
+void yp_s2o_setitemC4(
+        ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, ypObject *x )
 {
     ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
     yp_setitem( container, key, x );
     yp_decref( key );
 }
 
-yp_int_t yp_s2i_getitemC3( ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
-        ypObject **exc )
+yp_int_t yp_s2i_getitemC3(
+        ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, ypObject **exc )
 {
     ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
-    yp_int_t x = yp_o2i_getitemC( container, key, exc );
+    yp_int_t  x = yp_o2i_getitemC( container, key, exc );
     yp_decref( key );
     return x;
 }
 
-void yp_s2i_setitemC4( ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
-        yp_int_t xC )
+void yp_s2i_setitemC4(
+        ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, yp_int_t xC )
 {
     ypObject *key = yp_str_frombytesC2( keyC, key_lenC );
     yp_o2i_setitemC( container, key, xC );
@@ -14363,32 +14597,30 @@ static ypTypeObject *ypTypeTable[255] = {
 };
 // clang-format on
 
-ypObject *yp_type( ypObject *object ) {
-    return (ypObject *) ypObject_TYPE( object );
-}
+ypObject *yp_type( ypObject *object ) { return (ypObject *) ypObject_TYPE( object ); }
 
 // The immortal type objects
-ypObject * const yp_type_invalidated = (ypObject *) &ypInvalidated_Type;
-ypObject * const yp_type_exception = (ypObject *) &ypException_Type;
-ypObject * const yp_type_type = (ypObject *) &ypType_Type;
-ypObject * const yp_type_NoneType = (ypObject *) &ypNoneType_Type;
-ypObject * const yp_type_bool = (ypObject *) &ypBool_Type;
-ypObject * const yp_type_int = (ypObject *) &ypInt_Type;
-ypObject * const yp_type_intstore = (ypObject *) &ypIntStore_Type;
-ypObject * const yp_type_float = (ypObject *) &ypFloat_Type;
-ypObject * const yp_type_floatstore = (ypObject *) &ypFloatStore_Type;
-ypObject * const yp_type_iter = (ypObject *) &ypIter_Type;
-ypObject * const yp_type_bytes = (ypObject *) &ypBytes_Type;
-ypObject * const yp_type_bytearray = (ypObject *) &ypByteArray_Type;
-ypObject * const yp_type_str = (ypObject *) &ypStr_Type;
-ypObject * const yp_type_chrarray = (ypObject *) &ypChrArray_Type;
-ypObject * const yp_type_tuple = (ypObject *) &ypTuple_Type;
-ypObject * const yp_type_list = (ypObject *) &ypList_Type;
-ypObject * const yp_type_frozenset = (ypObject *) &ypFrozenSet_Type;
-ypObject * const yp_type_set = (ypObject *) &ypSet_Type;
-ypObject * const yp_type_frozendict = (ypObject *) &ypFrozenDict_Type;
-ypObject * const yp_type_dict = (ypObject *) &ypDict_Type;
-ypObject * const yp_type_range = (ypObject *) &ypRange_Type;
+ypObject *const yp_type_invalidated = (ypObject *) &ypInvalidated_Type;
+ypObject *const yp_type_exception = (ypObject *) &ypException_Type;
+ypObject *const yp_type_type = (ypObject *) &ypType_Type;
+ypObject *const yp_type_NoneType = (ypObject *) &ypNoneType_Type;
+ypObject *const yp_type_bool = (ypObject *) &ypBool_Type;
+ypObject *const yp_type_int = (ypObject *) &ypInt_Type;
+ypObject *const yp_type_intstore = (ypObject *) &ypIntStore_Type;
+ypObject *const yp_type_float = (ypObject *) &ypFloat_Type;
+ypObject *const yp_type_floatstore = (ypObject *) &ypFloatStore_Type;
+ypObject *const yp_type_iter = (ypObject *) &ypIter_Type;
+ypObject *const yp_type_bytes = (ypObject *) &ypBytes_Type;
+ypObject *const yp_type_bytearray = (ypObject *) &ypByteArray_Type;
+ypObject *const yp_type_str = (ypObject *) &ypStr_Type;
+ypObject *const yp_type_chrarray = (ypObject *) &ypChrArray_Type;
+ypObject *const yp_type_tuple = (ypObject *) &ypTuple_Type;
+ypObject *const yp_type_list = (ypObject *) &ypList_Type;
+ypObject *const yp_type_frozenset = (ypObject *) &ypFrozenSet_Type;
+ypObject *const yp_type_set = (ypObject *) &ypSet_Type;
+ypObject *const yp_type_frozendict = (ypObject *) &ypFrozenDict_Type;
+ypObject *const yp_type_dict = (ypObject *) &ypDict_Type;
+ypObject *const yp_type_range = (ypObject *) &ypRange_Type;
 
 
 /*************************************************************************************************
@@ -14396,11 +14628,11 @@ ypObject * const yp_type_range = (ypObject *) &ypRange_Type;
  *************************************************************************************************/
 
 static const yp_initialize_kwparams_t _default_initialize = {
-    yp_sizeof( yp_initialize_kwparams_t ),  // sizeof_struct
-    _default_yp_malloc,                     // yp_malloc
-    _default_yp_malloc_resize,              // yp_malloc_resize
-    _default_yp_free,                       // yp_malloc_free
-    FALSE,                                  // everything_immortal
+        yp_sizeof( yp_initialize_kwparams_t ),  // sizeof_struct
+        _default_yp_malloc,                     // yp_malloc
+        _default_yp_malloc_resize,              // yp_malloc_resize
+        _default_yp_free,                       // yp_malloc_free
+        FALSE,                                  // everything_immortal
 };
 
 // Helpful macro, for use only by yp_initialize and friends, to retrieve a parameter from
@@ -14430,9 +14662,9 @@ static const yp_initialize_kwparams_t _default_initialize = {
 // (because otherwise all mallocs result in yp_MemoryError).
 static void _ypMem_initialize( const yp_initialize_kwparams_t *kwparams )
 {
-    yp_malloc           = yp_INIT_PARAM2( yp_malloc,         ==NULL );
-    yp_malloc_resize    = yp_INIT_PARAM2( yp_malloc_resize,  ==NULL );
-    yp_free             = yp_INIT_PARAM2( yp_free,           ==NULL );
+    yp_malloc = yp_INIT_PARAM2( yp_malloc, == NULL );
+    yp_malloc_resize = yp_INIT_PARAM2( yp_malloc_resize, == NULL );
+    yp_free = yp_INIT_PARAM2( yp_free, == NULL );
 
     if( yp_INIT_PARAM1( everything_immortal ) ) {
         // All objects will be created immortal
@@ -14476,10 +14708,10 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a lenhint
     // (yp_dict_fromlenhint?)
     _yp_codecs_alias2encoding = yp_dictK( 0 );
-#define yp_codecs_init_ADD_ALIAS( alias, name ) \
-    do { \
-        yp_IMMORTAL_STR_LATIN_1( _alias_obj, alias ); \
-        yp_setitem( &_yp_codecs_alias2encoding, _alias_obj, (name) ); \
+#define yp_codecs_init_ADD_ALIAS( alias, name )                         \
+    do {                                                                \
+        yp_IMMORTAL_STR_LATIN_1( _alias_obj, alias );                   \
+        yp_setitem( &_yp_codecs_alias2encoding, _alias_obj, ( name ) ); \
     } while( 0 )
     // clang-format off
     yp_codecs_init_ADD_ALIAS( "646",            yp_s_ascii );
@@ -14510,7 +14742,7 @@ static void _yp_codecs_initialize( const yp_initialize_kwparams_t *kwparams )
     // (yp_dict_fromlenhint?)
     _yp_codecs_errors2handler = yp_dictK( 0 );
 #define yp_codecs_init_ADD_ERROR( name, func ) \
-        yp_o2i_setitemC( &_yp_codecs_errors2handler, (name), (yp_ssize_t) (func) )
+    yp_o2i_setitemC( &_yp_codecs_errors2handler, ( name ), ( yp_ssize_t )( func ) )
     // clang-format off
     yp_codecs_init_ADD_ERROR( yp_s_strict,            yp_codecs_strict_errors );
     yp_codecs_init_ADD_ERROR( yp_s_replace,           yp_codecs_replace_errors );
