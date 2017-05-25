@@ -13640,7 +13640,7 @@ static ypObject *range_currenthash(
     mult += (yp_hash_t)(82520L + 1 + 1);
 
     x = (x ^ yp_HashInt(ypRange_STEP(r))) * mult;
-    mult += (yp_hash_t)(82520L + 0 + 0);
+    // Unnecessary: mult += (yp_hash_t)(82520L + 0 + 0);
 
     x += 97531L;
     if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
