@@ -10817,10 +10817,14 @@ static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
 
     yp_ASSERT(minused >= 0, "minused cannot be negative");
     yp_ASSERT(minused <= ypSet_LEN_MAX, "minused cannot be greater than max");
+
     // XXX ypSet_calc_alloclen_cant_overflow ensures this can't overflow
     minentries = ((minused * ypSet_RESIZE_AT_DNM) / ypSet_RESIZE_AT_NMR) + 1;
-    for (alloclen = ypSet_ALLOCLEN_MIN; alloclen <= minentries && alloclen > 0; alloclen <<= 1)
-        ;
+    alloclen = ypSet_ALLOCLEN_MIN;
+    while (alloclen <= minentries && alloclen > 0) {
+        alloclen <<= 1;
+    }
+
     // TODO If we could trust that ypSet_ALLOCLEN_MAX was the true maximum (ie, a power of 2), then
     // we could turn this to an assert, or just remove it: ypSet_LEN_MAX would ensure this is never
     // reached
@@ -11635,8 +11639,9 @@ static ypObject *frozenset_eq(ypObject *so, ypObject *x)
     // obvious that the pre-computed hash, if available, can save us some time when so!=x.
     if (ypObject_CACHED_HASH(so) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
-            ypObject_CACHED_HASH(so) != ypObject_CACHED_HASH(x))
+            ypObject_CACHED_HASH(so) != ypObject_CACHED_HASH(x)) {
         return yp_False;
+    }
 
     return _ypSet_issubset(so, x);
 }
@@ -12666,8 +12671,9 @@ static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
     // obvious that the pre-computed hash, if available, can save us some time when mp!=x.
     if (ypObject_CACHED_HASH(mp) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
-            ypObject_CACHED_HASH(mp) != ypObject_CACHED_HASH(x))
+            ypObject_CACHED_HASH(mp) != ypObject_CACHED_HASH(x)) {
         return yp_False;
+    }
 
     valuesleft = ypDict_LEN(mp);
     for (mp_i = 0; valuesleft > 0; mp_i++) {
