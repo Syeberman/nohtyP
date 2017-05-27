@@ -2692,19 +2692,32 @@ static ypObject *_yp_hash_visitor(ypObject *x, void *_memo, yp_hash_t *hash)
     yp_ssize_t recursion_depth = (yp_ssize_t)_memo;
     ypObject * result;
 
-    // Check type, cached hash, and recursion depth first
-    if (ypObject_IS_MUTABLE(x)) return_yp_BAD_TYPE(x);
+    // To get the hash of a mutable value, use yp_currenthashC
+    if (ypObject_IS_MUTABLE(x)) {
+        *hash = ypObject_HASH_INVALID;
+        return_yp_BAD_TYPE(x);
+    }
+
+    // If the hash has already been calculated, return it immediately
     if (ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID) {
         *hash = ypObject_CACHED_HASH(x);
         return yp_None;
     }
+
+    // Protect against circular references while calculating the hash
     yp_ASSERT(recursion_depth >= 0, "recursion_depth can't be negative");
-    if (recursion_depth > _yp_recursion_limit) return yp_RecursionLimitError;
+    if (recursion_depth > _yp_recursion_limit) {
+        *hash = ypObject_HASH_INVALID;
+        return yp_RecursionLimitError;
+    }
 
     // TODO Contribute this generic hash caching back to Python?
     result = ypObject_TYPE(x)->tp_currenthash(
             x, _yp_hash_visitor, (void *)(recursion_depth + 1), hash);
-    if (yp_isexceptionC(result)) return result;
+    if (yp_isexceptionC(result)) {
+        *hash = ypObject_HASH_INVALID;
+        return result;
+    }
     ypObject_CACHED_HASH(x) = *hash;
     return yp_None;
 }
@@ -2727,7 +2740,10 @@ static ypObject *_yp_cachedhash_visitor(ypObject *x, void *_memo, yp_hash_t *has
         return yp_None;
     }
     yp_ASSERT(recursion_depth >= 0, "recursion_depth can't be negative");
-    if (recursion_depth > _yp_recursion_limit) return yp_RecursionLimitError;
+    if (recursion_depth > _yp_recursion_limit) {
+        *hash = ypObject_HASH_INVALID;
+        return yp_RecursionLimitError;
+    }
 
     result = ypObject_TYPE(x)->tp_currenthash(
             x, _yp_cachedhash_visitor, (void *)(recursion_depth + 1), hash);
@@ -4800,6 +4816,8 @@ yp_float_t yp_modLF(yp_float_t x, yp_float_t y, ypObject **exc)
 
 void yp_divmodLF(yp_float_t x, yp_float_t y, yp_float_t *_div, yp_float_t *_mod, ypObject **exc)
 {
+    *_div = 0;
+    *_mod = 0;
     *exc = yp_NotImplementedError;
 }
 
@@ -7393,6 +7411,7 @@ static ypObject *_ypBytes_coerce_intorbytes(
     int       x_pair = ypObject_TYPE_PAIR_CODE(x);
 
     if (x_pair == ypBool_CODE || x_pair == ypInt_CODE) {
+        // TODO _ypBytes_asuint8C doesn't support bools...
         *storage = _ypBytes_asuint8C(x, &exc);
         if (yp_isexceptionC(exc)) return exc;
         *x_data = storage;
@@ -7403,6 +7422,8 @@ static ypObject *_ypBytes_coerce_intorbytes(
         *x_len = ypBytes_LEN(x);
         return yp_None;
     } else {
+        *x_data = storage;  // better than NULL
+        *x_len = 0;
         return_yp_BAD_TYPE(x);
     }
 }
@@ -13460,6 +13481,7 @@ static ypObject *_ypRange_find(ypObject *r, ypObject *x, yp_ssize_t *index)
             *index = -1;
             return yp_None;
         }
+        *index = -1;
         return exc;
     }
 
