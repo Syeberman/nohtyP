@@ -40,12 +40,12 @@ class ToolsConfig:
         """Validates and returns a formatted representation of the config dictionary suitable to
         write out to the file.
         """
-        with io.BytesIO() as outfile:          # TODO StringIO in Python 3
+        with io.StringIO() as outfile:
+            prettify = pprint.PrettyPrinter(indent=1, width=120, stream=outfile)
             for key, value in sorted(config.items()):
-                if not isinstance(key, str):  # TODO In Python 3, check not key.isidentifier
+                if not key.isidentifier:
                     raise ValueError("invalid key (must be identifier): %r" % (key, ))
 
-                prettify = pprint.PrettyPrinter(indent=1, width=79, stream=outfile)
                 if not prettify.isreadable(value):
                     raise ValueError(
                         "invalid value (must round-trip through pprint): %r=%r" % (key, value))
