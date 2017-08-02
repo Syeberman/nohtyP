@@ -1,99 +1,65 @@
 # XXX NOT a SCons tool module; instead, a library for the python_* tool modules
 
+import ast
 import os
 import os.path
 import subprocess
-import glob
 import SCons.Errors
 import SCons.Platform
 import SCons.Tool
 import SCons.Warnings
+from tool_finder import ToolFinder
 
-_platform_name = SCons.Platform.Platform().name
-if _platform_name in ("win32", "cygwin"):
-    # Try some known, and unknown-but-logical, default locations for Python
-    _python_dir_globs = (
-        "C:\\Python*",
-        "C:\\Program Files\\Python*",
-        "C:\\Program Files (x86)\\Python*",
-        )
-    _python_exe_globs = (
-        "python.exe",
-        )
-else:
-    _python_dir_globs = ()  # rely on the environment's path for now
-    _python_exe_globs = (
-        "python[0-9].[0-9]",
-        "python",
-        )
+
+def _version_detector(python):
+    """Returns (hexversion, maxsize) for the given Python executable, or (None, None) on error.
+    """
+    try:
+        output = subprocess.check_output(
+            [str(python), "-c", "import sys; print((sys.hexversion, sys.maxsize))"],
+            encoding='utf-8', stderr=subprocess.PIPE)
+        hexversion, maxsize = ast.literal_eval(output.strip())
+        return hexversion, maxsize
+    except Exception:
+        return (None, None)
+
+
+python_finder = ToolFinder(
+    win_dirs=('Python*', ),
+    posix_dirs=(),  # rely on the environment's path for now
+    exe_globs=("python[0-9].[0-9]", "python"),
+    version_detector=_version_detector
+)
 
 
 def _arch2maxsize(targ_arch):
-    arch2opts = {
+    arch2maxsize = {
         "x86": 0x7FFFFFFF,
         "amd64": 0x7FFFFFFFFFFFFFFF,
-        }
+    }
     try:
-        opts = arch2opts[targ_arch]
+        maxsize = arch2maxsize[targ_arch]
     except KeyError:
         raise SCons.Errors.StopError("not yet supporting %r with python" % targ_arch)
-    return opts
-
-_test_python_cache = {}
-
-
-def _test_python(python, targ_hexversions, targ_arch):
-    """Tests if the given python matches the version, and supports the target arch.  Returns
-    hexversion if so, None if not.  Caches results for speed."""
-    # Get this first so we can fail quickly on new architectures
-    targ_maxsize = _arch2maxsize(targ_arch)
-
-    # See if we've tested this executable before
-    try:
-        output = _test_python_cache[python]
-    except KeyError:
-        try:
-            output = subprocess.check_output([python,
-                                              "-c", "import sys; print( (sys.hexversion, sys.maxsize) )"], stderr=subprocess.PIPE)
-        except:
-            output = ""
-        output = output.strip()
-        _test_python_cache[python] = output
-
-    # Parse the tuple that was output, failing on error, then see if it meets our requirements
-    try:
-        hexversion, maxsize = eval(output, {"__builtins__": None})
-    except:
-        return None
-    if hexversion not in targ_hexversions:
-        return None
-    if maxsize != targ_maxsize:
-        return None
-    return hexversion
-
-# TODO This, or something like it, should be in SCons
+    return maxsize
 
 
 def _find(env, targ_hexversions):
     """Find a python executable that can run our target's arch, returning the path or None.
     Picks the executable with the largest hexversion contained in targ_hexversions."""
-    dir_globs = list(os.environ.get("PATH", "").split(os.pathsep))
-    dir_globs.extend(_python_dir_globs)
-
-    python_globs = (os.path.join(dir, exe) for exe in _python_exe_globs for dir in dir_globs)
-    pythons = (python for pattern in python_globs for python in glob.iglob(pattern))
+    targ_maxsize = _arch2maxsize(env["TARGET_ARCH"])
 
     versions = []
-    for python in pythons:
-        python_hexversion = _test_python(python, targ_hexversions, env["TARGET_ARCH"])
-        if python_hexversion is None:
-            continue
-        versions.append((python_hexversion, python))
+    for python, (hexversion, maxsize) in python_finder:
+        if hexversion in targ_hexversions and maxsize == targ_maxsize:
+            versions.append((hexversion, python))
 
     if not versions:
         return None
-    versions.sort()         # sort by hexversion
-    return versions[-1][1]   # return the python path with the largest hexversion
+
+    versions.sort()  # sort by hexversion
+    # TODO It'd be nice to use Path objects everywhere we can
+    return str(versions[-1][1])   # return the python path with the largest hexversion
 
 
 def DefinePythonToolFunctions(hexversions, tool_name):
