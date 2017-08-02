@@ -21,7 +21,7 @@ def _version_detector(python):
         hexversion, maxsize = ast.literal_eval(output.strip())
         return hexversion, maxsize
     except Exception:
-        return (None, None)
+        return None, None
 
 
 python_finder = ToolFinder(

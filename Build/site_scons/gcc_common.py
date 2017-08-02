@@ -1,94 +1,38 @@
 # XXX NOT a SCons tool module; instead, a library for the gcc_* tool modules
+# TODO Add at least 3.4.6 (2006), 4.2.4 (2007+), 4.4.7 (2009+), 4.6.4 (2011+)
 
 import os
 import os.path
 import functools
 import subprocess
 import re
-import glob
 import tempfile
 import SCons.Errors
 import SCons.Platform
 import SCons.Tool
 import SCons.Warnings
 import cc_preprocessed
-
-# TODO Add at least 3.4.6 (2006), 4.2.4 (2007+), 4.4.7 (2009+), 4.6.4 (2011+)
-
-# Without a toolpath argument these will find SCons' tool modules
-_platform_name = SCons.Platform.Platform().name
-if _platform_name in ("win32", "cygwin"):
-    _tools = [SCons.Tool.Tool("mingw"), ]
-
-    # Try some known, and unknown-but-logical, default locations for mingw
-    _mingw_path_globs = (
-        # MinGW-w64 (http://sourceforge.net/projects/mingw-w64/)
-        "C:\\Program Files\\mingw-w64\\*\\*\\bin",
-        "C:\\Program Files (x86)\\mingw-w64\\*\\*\\bin",
-        # MinGW-builds (http://sourceforge.net/projects/mingwbuilds/)
-        "C:\\Program Files\\mingw-builds\\*\\*\\bin",
-                                    # C:\Program Files\mingw-builds\x64-4.8.1-win32-seh-rev5\mingw64
-        "C:\\Program Files (x86)\\mingw-builds\\*\\*\\bin",
-        # Win-builds (http://win-builds.org/)
-        "C:\\win-builds*\\bin",     # C:\win-builds-32, C:\win-builds-64, C:\win-builds-64-1.3
-        "C:\\win-builds*\\*\\bin",  # C:\win-builds-64\1.3
-        # Official MinGW (http://www.mingw.org/)
-        "C:\\MinGW*\\bin",          # C:\MinGW, C:\MinGW0.5, C:\MinGW_0.5
-        "C:\\MinGW\\*\\bin",        # C:\MinGW\0.5
-        )
-    _gcc_paths_found = [
-        binDir for pattern in _mingw_path_globs for binDir in glob.iglob(pattern)]
-else:
-    _tools = [SCons.Tool.Tool(x) for x in ("gcc", "g++", "gnulink")]
-    _gcc_paths_found = []   # rely on the environment's path for now
+from root_environment import SconscriptLog
+from tool_finder import ToolFinder
 
 
-def _archOptions(targ_os, targ_arch):
-    arch2opts = {
-        "x86": ("-m32", ),
-        "amd64": ("-m64", ),
-        }
-    try:
-        opts = arch2opts[targ_arch]
-    except KeyError:
-        SCons.Errors.StopError("not yet supporting %r with gcc" % targ_arch)
-    return opts
-
-_test_gcc_cache = {}
+_arch2opts = {
+    "x86": ("-m32", ),
+    "amd64": ("-m64", ),
+}
 _test_gcc_temp_dir = None
 
 
-def _test_gcc(gcc, re_dumpversion, targ_os, targ_arch, sconscriptLog):
-    """Tests if the given gcc matches the version, and supports the target OS and arch.  Caches
-    results for speed."""
-    # Get this first so we can fail quickly on new architectures
-    archOpts = _archOptions(targ_os, targ_arch)
-
-    # See if we've tested this executable before
-    try:
-        gcc_cache = _test_gcc_cache[gcc]
-    except KeyError:
-        gcc_cache = _test_gcc_cache[gcc] = {}
+def _version_detector(gcc):
+    """Returns (dumpversion, archs), where archs is a tuple of supported architectures."""
 
     # Determine if the version's right, returning if it isn't
     try:
-        dumpversion = gcc_cache["dumpversion"]
-    except KeyError:
-        try:
-            dumpversion = subprocess.check_output([gcc, "-dumpversion"], stderr=subprocess.PIPE)
-        except:
-            dumpversion = ""
-        dumpversion = dumpversion.strip()
-        gcc_cache["dumpversion"] = dumpversion
-    if re_dumpversion.search(dumpversion) is None:
-        return False
-
-    # If we've already tested this compiler for this architecture, return the cached value
-    # TODO when we support cross-compiling, check the os value too
-    try:
-        return gcc_cache[targ_arch]
-    except KeyError:
-        pass
+        dumpversion = subprocess.check_output(
+            [str(gcc), "-dumpversion"], encoding='utf-8', stderr=subprocess.PIPE
+        ).strip()
+    except Exception:
+        return "", ()
 
     # A small C file we can use to test if command arguments are supported
     global _test_gcc_temp_dir
@@ -98,37 +42,62 @@ def _test_gcc(gcc, re_dumpversion, targ_os, targ_arch, sconscriptLog):
             outfile.write("void main(){}\n")
 
     # Test to see if gcc supports the target
+    supportedArchs = []
     env = dict(os.environ)
-    env["PATH"] = os.path.dirname(gcc) + os.pathsep + env.get("PATH", "")
-    gcc_args = [gcc, "test.c"] + list(archOpts)
-    sconscriptLog.write("Testing %r for architecture support\n")
-    sconscriptLog.write("%r\n" % (gcc_args, ))
-    sconscriptLog.flush()
-    gcc_result = subprocess.call(gcc_args,
-                                 cwd=_test_gcc_temp_dir, stdout=sconscriptLog, stderr=sconscriptLog, env=env)
-    sconscriptLog.flush()
-    sconscriptLog.write("gcc returned %r\n" % gcc_result)
-    gcc_cache[targ_arch] = (gcc_result == 0)  # gcc returns non-zero on error
-    return gcc_cache[targ_arch]
+    env["PATH"] = str(gcc.parent) + os.pathsep + env.get("PATH", "")
+    for arch, archOpts in _arch2opts.items():
+        gcc_args = [str(gcc), "test.c"] + list(archOpts)
+        SconscriptLog.write("Testing %r for architecture support\n")
+        SconscriptLog.write("%r\n" % (gcc_args, ))
+        SconscriptLog.flush()
+        gcc_result = subprocess.call(
+            gcc_args,
+            cwd=_test_gcc_temp_dir, stdout=SconscriptLog, stderr=SconscriptLog, env=env)
+        SconscriptLog.flush()
+        SconscriptLog.write("gcc returned %r\n" % gcc_result)
+        if gcc_result == 0:  # gcc returns zero on success
+            supportedArchs.append(arch)
+
+    return dumpversion, tuple(supportedArchs)
+
+
+# Try some known, and unknown-but-logical, default locations for mingw
+gcc_finder = ToolFinder(
+    # MinGW-w64 (http://sourceforge.net/projects/mingw-w64/)
+    #   C:\Program Files\mingw-w64\x86_64-4.8.4-posix-seh-rt_v3-rev0\mingw64
+    # MinGW-builds (http://sourceforge.net/projects/mingwbuilds/)
+    #   C:\Program Files\mingw-builds\x64-4.8.1-win32-seh-rev5\mingw64
+    # Win-builds (http://win-builds.org/)
+    #   C:\win-builds-32, C:\win-builds-64, C:\win-builds-64-1.3, C:\win-builds-64\1.3
+    # Official MinGW (http://www.mingw.org/)
+    #   C:\MinGW, C:\MinGW0.5, C:\MinGW_0.5, C:\MinGW\0.5
+    win_dirs=(
+        'mingw*\\bin', 'mingw*\\*\\bin', 'mingw*\\*\\*\\bin',
+        'win-builds*\\bin', 'win-builds*\\*\\bin',
+    ),
+    posix_dirs=(),  # rely on the environment's path for now
+    exe_globs=("gcc-[0-9].[0-9]", "gcc"),
+    version_detector=_version_detector
+)
+
+
+# Without a toolpath argument these will find SCons' tool modules
+_platform_name = SCons.Platform.Platform().name
+if _platform_name in ("win32", "cygwin"):
+    _tools = [SCons.Tool.Tool("mingw"), ]
+else:
+    _tools = [SCons.Tool.Tool(x) for x in ("gcc", "g++", "gnulink")]
+
 
 # TODO This, or something like it, should be in SCons
-
-
-def _find(env, major, minor, re_dumpversion):
+def _find(env, re_dumpversion):
     """Find a gcc executable that can build our target OS and arch, returning the path or None."""
     if env["TARGET_OS"] != env["HOST_OS"]:
         raise SCons.Errors.StopError("not yet supporting cross-OS compile in GCC")
-    binDirs = list(os.environ.get("PATH", "").split(os.pathsep))
-    binDirs.extend(_gcc_paths_found)
-    staticExeName = "gcc-%d.%d" % (major, minor)
-    dynamicExeName = "gcc"
-    for exeName in (staticExeName, dynamicExeName):
-        for binDir in binDirs:
-            gcc = os.path.join(binDir, exeName)
-            supported = _test_gcc(gcc, re_dumpversion, env["TARGET_OS"], env["TARGET_ARCH"],
-                                  env["SCONSCRIPT_LOG"])
-            if supported:
-                return gcc
+
+    for gcc, (dumpversion, archs) in gcc_finder:
+        if re_dumpversion.match(dumpversion) and env["TARGET_ARCH"] in archs:
+            return str(gcc)  # TODO would be nice to use Path everywhere
     return None
 
 
@@ -172,7 +141,10 @@ def _updateLinkEmitters(env, version):
 def ApplyGCCOptions(env, version):
     """Updates env with GCC-specific compiler options for nohtyP.  version is numeric (ie 4.8).
     """
-    archOpts = _archOptions(env["TARGET_OS"], env["TARGET_ARCH"])
+    try:
+        archOpts = _arch2opts[env["TARGET_ARCH"]]
+    except KeyError:
+        SCons.Errors.StopError("not yet supporting %r with gcc" % env["TARGET_ARCH"])
 
     def addCcFlags(*args): env.AppendUnique(CCFLAGS=list(args))
     # TODO analyze? (enable -Wextra, disable -Werror, supress individual warnings)
@@ -287,7 +259,7 @@ def DefineGCCToolFunctions(numericVersion, major, minor):
 
         # If site_toolsconfig.py came up empty, find a gcc that supports our target, then update
         if not gcc_path:
-            gcc_path = _find(env, major, minor, re_dumpversion)
+            gcc_path = _find(env, re_dumpversion)
             if not gcc_path:
                 raise SCons.Errors.StopError("gcc %s.%s (%r) detection failed" %
                                              (major, minor, env["TARGET_ARCH"]))
