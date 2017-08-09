@@ -1712,7 +1712,7 @@ typedef union {
 // these method tables, which is used to manipulate the associated ypQuickIter_state.
 typedef struct {
     // Returns a *borrowed* reference to the object at index i, or an exception.  If the index is
-    // out-of-range, returns NULL; negative indicies are not allowed.  The borrowed reference
+    // out-of-range, returns NULL; negative indices are not allowed.  The borrowed reference
     // becomes invalid when a new value is retrieved or close is called.
     ypObject *(*getindexX)(ypQuickSeq_state *state, yp_ssize_t i);
     // Similar to getindexX, but returns a new reference (that will remain valid until decref'ed).
@@ -1728,7 +1728,7 @@ typedef struct {
 
 static ypObject *ypQuickSeq_var_getindexX(ypQuickSeq_state *state, yp_ssize_t i)
 {
-    yp_ASSERT(i >= 0, "negative indicies not allowed in ypQuickSeq");
+    yp_ASSERT(i >= 0, "negative indices not allowed in ypQuickSeq");
     if (i >= state->var.len) return NULL;
 
     // To go backwards, we have to restart state->var.args.  Note that if state->var.len is zero,
@@ -1798,7 +1798,7 @@ static void ypQuickSeq_new_fromtuple(ypQuickSeq_state *state, ypObject *tuple);
 static ypObject *ypQuickSeq_seq_getindex(ypQuickSeq_state *state, yp_ssize_t i)
 {
     ypObject *x;
-    yp_ASSERT(i >= 0, "negative indicies not allowed in ypQuickSeq");
+    yp_ASSERT(i >= 0, "negative indices not allowed in ypQuickSeq");
     x = yp_getindexC(state->seq.obj, i);  // new ref
     if (yp_isexceptionC2(x, yp_IndexError)) return NULL;
     return x;
@@ -5010,7 +5010,7 @@ static yp_int_t yp_asint_exactLF(yp_float_t x, ypObject **exc)
  * Common sequence functions
  *************************************************************************************************/
 
-// Using the given length, adjusts negative indicies to positive.  Returns false if the adjusted
+// Using the given length, adjusts negative indices to positive.  Returns false if the adjusted
 // index is out-of-bounds, else true.
 static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 {
@@ -5376,36 +5376,36 @@ static ypStringLib_encinfo ypStringLib_encs[4];
 // Gets ordinal at src[src_i]
 static yp_uint32_t ypStringLib_getindexX_1byte(const void *src, yp_ssize_t src_i)
 {
-    yp_ASSERT(src_i >= 0, "indicies must be >=0");
+    yp_ASSERT(src_i >= 0, "indices must be >=0");
     return ((yp_uint8_t *)src)[src_i];
 }
 static yp_uint32_t ypStringLib_getindexX_2bytes(const void *src, yp_ssize_t src_i)
 {
-    yp_ASSERT(src_i >= 0, "indicies must be >=0");
+    yp_ASSERT(src_i >= 0, "indices must be >=0");
     return ((yp_uint16_t *)src)[src_i];
 }
 static yp_uint32_t ypStringLib_getindexX_4bytes(const void *src, yp_ssize_t src_i)
 {
-    yp_ASSERT(src_i >= 0, "indicies must be >=0");
+    yp_ASSERT(src_i >= 0, "indices must be >=0");
     return ((yp_uint32_t *)src)[src_i];
 }
 
 // Sets dest[dest_i] to value
 static void ypStringLib_setindexX_1byte(void *dest, yp_ssize_t dest_i, yp_uint32_t value)
 {
-    yp_ASSERT(dest_i >= 0, "indicies must be >=0");
+    yp_ASSERT(dest_i >= 0, "indices must be >=0");
     yp_ASSERT(value <= 0xFFu, "value too large for a byte");
     ((yp_uint8_t *)dest)[dest_i] = (yp_uint8_t)(value & 0xFFu);
 }
 static void ypStringLib_setindexX_2bytes(void *dest, yp_ssize_t dest_i, yp_uint32_t value)
 {
-    yp_ASSERT(dest_i >= 0, "indicies must be >=0");
+    yp_ASSERT(dest_i >= 0, "indices must be >=0");
     yp_ASSERT(value <= 0xFFFFu, "value too large for a byte");
     ((yp_uint16_t *)dest)[dest_i] = (yp_uint16_t)(value & 0xFFFFu);
 }
 static void ypStringLib_setindexX_4bytes(void *dest, yp_ssize_t dest_i, yp_uint32_t value)
 {
-    yp_ASSERT(dest_i >= 0, "indicies must be >=0");
+    yp_ASSERT(dest_i >= 0, "indices must be >=0");
     ((yp_uint32_t *)dest)[dest_i] = value;
 }
 
@@ -5479,7 +5479,7 @@ static void ypStringLib_elemcopy_4from2(
 {
     yp_uint32_t *      dest = ((yp_uint32_t *)_dest) + dest_i;
     const yp_uint16_t *src = ((yp_uint16_t *)_src) + src_i;
-    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indicies/lengths must be >=0");
+    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
     for (/*len already set*/; len > 0; len--) {
         *dest = *src;
         dest++;
@@ -5494,7 +5494,7 @@ static void ypStringLib_elemcopy_4from1(
 {
     yp_uint32_t *     dest = ((yp_uint32_t *)_dest) + dest_i;
     const yp_uint8_t *src = ((yp_uint8_t *)_src) + src_i;
-    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indicies/lengths must be >=0");
+    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
     for (/*len already set*/; len > 0; len--) {
         *dest = *src;
         dest++;
@@ -5509,7 +5509,7 @@ static void ypStringLib_elemcopy_2from1(
 {
     yp_uint16_t *     dest = ((yp_uint16_t *)_dest) + dest_i;
     const yp_uint8_t *src = ((yp_uint8_t *)_src) + src_i;
-    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indicies/lengths must be >=0");
+    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
     for (/*len already set*/; len > 0; len--) {
         *dest = *src;
         dest++;
@@ -5524,7 +5524,7 @@ static void ypStringLib_elemcopy(int dest_sizeshift, void *dest, yp_ssize_t dest
         int src_sizeshift, const void *src, yp_ssize_t src_i, yp_ssize_t len)
 {
     yp_ASSERT(dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding");
-    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indicies/lengths must be >=0");
+    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
     if (dest_sizeshift == src_sizeshift) {
         // Huzzah!  We get to use the nice-and-quick memcpy
         memcpy(((yp_uint8_t *)dest) + (dest_i << dest_sizeshift),
@@ -7958,7 +7958,7 @@ static ypObject *bytes_count(
         return yp_None;
     }
 
-    // Adjust the indicies, then check for the empty array case: it "matches" every byte position,
+    // Adjust the indices, then check for the empty array case: it "matches" every byte position,
     // including the end of the slice, unless the unadjusted start value is larger than len(b)
     // (which is handled above)
     result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &b_rlen);
@@ -10539,7 +10539,7 @@ static void ypQuickIter_new_fromtuple(ypQuickIter_state *state, ypObject *tuple)
 
 static ypObject *ypQuickSeq_tuple_getindexX(ypQuickSeq_state *state, yp_ssize_t i)
 {
-    yp_ASSERT(i >= 0, "negative indicies not allowed in ypQuickSeq");
+    yp_ASSERT(i >= 0, "negative indices not allowed in ypQuickSeq");
     if (i >= ypTuple_LEN(state->obj)) return NULL;
     return ypTuple_ARRAY(state->obj)[i];
 }

@@ -614,12 +614,13 @@ ypAPI ypObject *yp_pop(ypObject **container);
 // yp_repeatC.  They are _not_ supported by frozenset and frozendict because those types do not
 // store their elements in any particular order.
 
-// Sequences are indexed origin zero.  Negative indicies are relative to the end of the sequence:
-// in effect, when i is negative it is substituted with len(s)+i.  The slice of s from i to j with
-// step k is the sequence of items with indices i, i+k, i+2*k, i+3*k and so on, stopping when j is
-// reached (but never including j); k cannot be zero.  A single index outside of
-// range(-len(s),len(s)) raises a yp_IndexError, but in a slice such an index gets clamped to the
-// bounds of the sequence.  See yp_SLICE_DEFAULT and yp_SLICE_USELEN below for more information.
+// Sequences are indexed origin zero.  Negative indices are relative to the end of the sequence: in
+// effect, when i is negative it is substituted with len(s)+i, and len(s)+j for negative j.  The
+// slice of s from i to j with step k is the sequence of items with indices i, i+k, i+2*k, i+3*k
+// and so on, stopping when j is reached (but never including j); k cannot be zero.  A single index
+// outside of range(-len(s),len(s)) raises a yp_IndexError, but in a slice such an index gets
+// clamped to the bounds of the sequence.  See yp_SLICE_DEFAULT and yp_SLICE_USELEN below for more
+// information.
 
 // Returns a new reference to the concatenation of sequence and x.
 ypAPI ypObject *yp_concat(ypObject *sequence, ypObject *x);
@@ -754,10 +755,10 @@ ypAPI void yp_sort(ypObject **sequence);
 
 // When an index in a slice is outside of range(-len(s),len(s)), it gets clamped to the bounds of
 // the sequence.  Specifically:
-//  - if i>=len(s) and k>0, or i<-len(s) and k<0, the slice is empty
+//  - if i>=len(s) and k>0, or i<-len(s) and k<0, the slice is empty, regardless of j
 //  - if i>=len(s) and k<0, the (reversed) slice starts with the last element
 //  - if i<-len(s) and k>0, the slice starts with the first element
-//  - if j>=len(s) and k<0, or j<-len(s) and k>0, the slice is empty
+//  - if j>=len(s) and k<0, or j<-len(s) and k>0, the slice is empty, regardless of i
 //  - if j>=len(s) and k>0, the slice ends after the last element
 //  - if j<-len(s) and k<0, the (reversed) slice ends after the first element
 
