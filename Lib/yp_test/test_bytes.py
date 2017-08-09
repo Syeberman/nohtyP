@@ -221,12 +221,12 @@ class BaseBytesTest:
                     self.assertEqual(b[start:stop:step], self.type2test(L[start:stop:step]))
 
     def test_extended_getslice(self):
-        # Sample just a few random indicies for each of start, stop, and step
+        # Sample just a few random indices for each of start, stop, and step
         self.check_extended_getslice(lambda x: random.sample(x,3))
 
     @yp_test.support.requires_resource('cpu')
     def test_extended_getslice_cpu(self):
-        # Check all indicies
+        # Check all indices
         self.check_extended_getslice(lambda x: x)
 
     @yp_unittest.skip("TODO Implement utf-16, etc in nohtyP")
@@ -1075,12 +1075,12 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
                     self.assertEqual(b, yp_bytearray(L))
 
     def test_extended_set_del_slice(self):
-        # Sample just a few random indicies for each of start, stop, and step
+        # Sample just a few random indices for each of start, stop, and step
         self.check_extended_set_del_slice(lambda x: random.sample(x,3))
 
     @yp_test.support.requires_resource('cpu')
     def test_extended_set_del_slice_cpu(self):
-        # Check all indicies
+        # Check all indices
         self.check_extended_set_del_slice(lambda x: x)
 
     def test_setslice_trap(self):
