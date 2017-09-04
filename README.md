@@ -20,11 +20,11 @@ Build Instructions
 In the simplest case, just add nohtyP.c and nohtyP.h to your C project, and
 call yp_initialize on start-up.  nohtyP also builds as a shared library.
 
-The Build directory contains a SCons makefile that supports various compilers
-and targets.  To build a shared library for your platform, run the following
-from the top-level directory:
+The Build directory contains an optional SCons makefile that supports various
+compilers and targets.  To build a shared library for your platform, run the
+following from the top-level directory:
 
-    scons -f Build/make.scons
+    Build/make
 
 This will build both a debug and a release version for your native OS and
 architecture, and will copy the binaries to Build/native. For more information,
@@ -60,7 +60,7 @@ output from the following command:
     python -m yp_test -v test_whatever
 
 This runs the test in verbose mode.  You can also obtain this output using the
-"test" target to Build/make.scons, which creates two yp_test.log files under
+"test" target to Build/make, which creates two yp_test.log files under
 Build/native and Build/native/debug.
 
 
