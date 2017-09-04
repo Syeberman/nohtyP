@@ -1,2 +1,2 @@
 @rem "-C" ensures SCons uses the top level project directory
-@scons -C %~dp0.. -f Build\make.scons %*
+@python %~dp0..\Tools\scons\scons.py -C %~dp0.. -f Build\make.scons %*
