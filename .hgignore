@@ -42,8 +42,8 @@ yacctab\.py$
 \.opensdf$
 /ipch/
 
-# VS Code files
-\.vscode/
+# Local VS Code files
+^.vscode/
 
 # OS generated files
 \.DS_Store$
