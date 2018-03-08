@@ -6,8 +6,7 @@ import SCons.Errors
 
 # Confirm that scons' top-level directory, the current directory, _is_ the project top
 if not os.path.exists("nohtyP.c"):
-    Exit("Run SCons from top project dir (or use make.bat, or scons -C)")
-
+    Exit("Run SCons from top project dir (or use Build/make, or scons -C)")
 
 # TODO Scripts to update version numbers in source, build scripts, etc
 RootEnv.Replace(NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0)
@@ -54,14 +53,14 @@ def nohtyP_checkapi(env):
 
     # TODO Have checkapi write directly to the file
     scripts = (Glob("#/Tools/checkapi/*.py"), )
-    checkapiLog = env.Command("$VTOP/checkapi.log", (preprocessed, scripts),
-                              "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET")
+    checkapiLog = env.Command(
+        "$VTOP/checkapi.log", (preprocessed, scripts),
+        "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET")
     return checkapiLog
 
 
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
 # "native" (ie the default target)
-# TODO Allow the user to specify what the "native" target should be
 compiler_names = ("msvs_140", "msvs_120", "gcc_48", "msvs_110", "gcc_46", "msvs_100", "msvs_90")
 oses = ("win32", "posix")
 archs = ("amd64", "x86")
@@ -79,15 +78,13 @@ else:
 nativeTargetsToCreate = set(("debug", "release"))
 
 python_3 = Tool("python_3")
-python_min34 = Tool("python_min34")   # yp_test requires at least Python 3.4
+python_min34 = Tool("python_min34")  # yp_test requires at least Python 3.4
 pclint = Tool("pclint")
 
-SconscriptLog.write( """
+SconscriptLog.write("""
 Native OS: {native_os}
 Native Arches: {native_archs}
-""".format( **locals() )
-)
-
+""".format(**locals()))
 
 # TODO support scons -h for build options
 
@@ -103,15 +100,18 @@ for compiler_name in compiler_names:
             "\n{compiler_name} {targ_os} {targ_arch} {configuration}\n".format(**locals()))
 
         # Maintain a separate directory for intermediate and target files, but don't copy source
-        variantEnv = RootEnv.Clone(COMPILER=compiler,
-                                   TARGET_OS=targ_os, TARGET_ARCH=targ_arch, CONFIGURATION=configuration)
-        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (
-            compiler_name, targ_os, targ_arch, configuration)
+        variantEnv = RootEnv.Clone(
+            COMPILER=compiler,
+            TARGET_OS=targ_os,
+            TARGET_ARCH=targ_arch,
+            CONFIGURATION=configuration)
+        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, targ_os,
+                                                     targ_arch, configuration)
         variantEnv.VariantDir("$VTOP", "#", duplicate=False)
 
         # Skip compilers that can't be found
         try:
-            compilerEnv = variantEnv.Clone(tools=[compiler, ])
+            compilerEnv = variantEnv.Clone(tools=[compiler])
         except (SCons.Errors.UserError, SCons.Errors.StopError):
             traceback.print_exc(file=SconscriptLog)
             continue
@@ -161,8 +161,8 @@ for compiler_name in compiler_names:
                 # Most developers only want to build or test with one variant on their host system.
                 # These aliases make this easy.
                 AliasIfNotEmpty(configuration, buildTargets)
-                AliasIfNotEmpty("test"+configuration, testTargets)
-                AliasIfNotEmpty("analyze"+configuration, analyzeTargets)
+                AliasIfNotEmpty("test" + configuration, testTargets)
+                AliasIfNotEmpty("analyze" + configuration, analyzeTargets)
                 AliasIfNotEmpty("native", buildTargets)
                 AliasIfNotEmpty("test", testTargets)
                 AliasIfNotEmpty("analyze", analyzeTargets)
@@ -176,9 +176,8 @@ for compiler_name in compiler_names:
         for heirarchyDepth in range(1, len(heirarchy)):
             heirarchyName = "_".join(heirarchy[:heirarchyDepth])
             AliasIfNotEmpty(heirarchyName, buildTargets)
-            AliasIfNotEmpty("test"+heirarchyName, testTargets)
-            AliasIfNotEmpty("analyze"+heirarchyName, analyzeTargets)
-
+            AliasIfNotEmpty("test" + heirarchyName, testTargets)
+            AliasIfNotEmpty("analyze" + heirarchyName, analyzeTargets)
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to
 # build just the native debug and release targets
