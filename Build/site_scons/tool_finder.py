@@ -48,7 +48,32 @@ if _platform_name in ("win32", "cygwin"):
                     yield exe_path
 
 else:
-    pass
+    def _get_dirs(posix_dirs):
+        # Use an OrderedDict to ensure uniqueness (values are ignored)
+        dir_paths = OrderedDict()
+
+        # Parse PATH, and use those paths to guess the drives where we'll find Program Files
+        # (for users that have installed programs on separate drives)
+        environ_paths = [Path(x) for x in os.environ.get('PATH', '').split(':') if x]
+
+        for environ_path in environ_paths:
+            try:
+                environ_path = environ_path.resolve()
+            except FileNotFoundError:
+                continue
+            dir_paths[environ_path] = None
+
+        for dir_glob in posix_dirs:
+            dir_paths.update((x, None) for x in prog_files_path.glob(dir_glob))
+
+        return dir_paths.keys()
+
+    def _iter_paths(win_dirs, posix_dirs, exe_globs):
+        for dir_path in _get_dirs(posix_dirs):
+            for exe_glob in exe_globs:
+                for exe_path in dir_path.glob(exe_glob):
+                    yield exe_path
+
 
 
 # TODO This, or something like it, should be in SCons
