@@ -17,10 +17,10 @@ def _version_detector(python):
     try:
         output = subprocess.check_output(
             [str(python), "-c", "import sys; print((sys.hexversion, sys.maxsize))"],
-            encoding='utf-8', stderr=subprocess.PIPE)
+            stderr=subprocess.PIPE).decode()
         hexversion, maxsize = ast.literal_eval(output.strip())
         return hexversion, maxsize
-    except Exception:
+    except subprocess.CalledProcessError:
         return None, None
 
 
