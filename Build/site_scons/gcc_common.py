@@ -29,9 +29,9 @@ def _version_detector(gcc):
     # Determine if the version's right, returning if it isn't
     try:
         dumpversion = subprocess.check_output(
-            [str(gcc), "-dumpversion"], encoding='utf-8', stderr=subprocess.PIPE
-        ).strip()
-    except Exception:
+            [str(gcc), "-dumpversion"], stderr=subprocess.PIPE
+        ).decode().strip()
+    except subprocess.CalledProcessError:
         return "", ()
 
     # A small C file we can use to test if command arguments are supported

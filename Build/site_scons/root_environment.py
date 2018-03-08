@@ -57,4 +57,5 @@ if not RootEnv["HOST_ARCH"]:
     RootEnv["HOST_ARCH"] = platform.machine()
 
 # Store compiler autodetection results in a file that the developer can modify
+# TODO OS-specific tools config, so same repo can build from Windows and Linux?
 RootEnv["TOOLS_CONFIG"] = ToolsConfig("Build/site_toolsconfig.py")
