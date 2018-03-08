@@ -9,9 +9,10 @@ implemented in one .c and one .h file for easy embedding in C projects.  The
 API is designed to compensate for C's weaknesses in handling "exceptions".
 nohtyP is tested against Python's test suite to ensure conformance.
 
-CI is run against both Linux [![][Linux badge]][Linux log] and Windows
-[![][Windows badge]][Windows log] with the generous support of [drone.io]
-and [AppVeyor].
+[![][AppVeyor badge]][AppVeyor log]
+
+CI is run against both Linux and Windows with the generous support of 
+[AppVeyor].
 
 
 Build Instructions
@@ -102,9 +103,6 @@ proprietary projects.
 All trademarks referenced herein are property of their respective holders.
 
 
-[Linux badge]: https://drone.io/bitbucket.org/Syeberman/nohtyp/status.png
-[Linux log]: https://drone.io/bitbucket.org/Syeberman/nohtyp/latest
-[Windows badge]: https://ci.appveyor.com/api/projects/status/qkcmpoclwe2wtfxm/branch/default?svg=true
-[Windows log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/default
-[drone.io]: http://drone.io
+[AppVeyor badge]: https://ci.appveyor.com/api/projects/status/qkcmpoclwe2wtfxm/branch/default?svg=true
+[AppVeyor log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/default
 [AppVeyor]: http://ci.appveyor.com
