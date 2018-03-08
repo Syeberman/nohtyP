@@ -46,8 +46,8 @@ def _test_pclint(pclint):
         output = _test_pclint_cache[pclint]
     except KeyError:
         try:
-            output = subprocess.check_output([pclint, "+b"])
-        except:
+            output = subprocess.check_output([pclint, "+b"]).decode()
+        except subprocess.CalledProcessError:
             output = ""
         output = output.strip()
         _test_pclint_cache[pclint] = output
