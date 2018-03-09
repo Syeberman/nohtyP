@@ -16,7 +16,7 @@ def _version_detector(python):
     """
     try:
         output = subprocess.check_output(
-            [str(python), "-c", "import sys; print((sys.hexversion, sys.maxsize))"],
+            [str(python), "-c", "import sys; print((str(sys.hexversion), str(sys.maxsize)))"],
             stderr=subprocess.PIPE).decode()
         hexversion, maxsize = ast.literal_eval(output.strip())
         return hexversion, maxsize
