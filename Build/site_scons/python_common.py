@@ -16,7 +16,7 @@ def _version_detector(python):
     """
     try:
         output = subprocess.check_output(
-            [str(python), "-c", "import sys; print((str(sys.hexversion), str(sys.maxsize)))"],
+            [str(python), "-c", "import sys; print('(%d, %d)' % (sys.hexversion, sys.maxsize))"],
             stderr=subprocess.PIPE).decode()
         hexversion, maxsize = ast.literal_eval(output.strip())
         return hexversion, maxsize
@@ -68,6 +68,9 @@ def DefinePythonToolFunctions(hexversions, tool_name):
     if tool_name == "__main__":
         raise ImportError("this tool module cannot be run as a script")
 
+    # FIXME If the right Python cannot be found, then each time we clone an environment we take a
+    # long time iterating in _find.  This takes a long time despite the caching in ToolFinder.
+    # Figure out why and optimize.
     def generate(env):
         if env["TARGET_OS"] != env["HOST_OS"]:
             raise SCons.Errors.StopError("can only run Python on the native OS")
