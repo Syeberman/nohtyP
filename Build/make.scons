@@ -61,7 +61,9 @@ def nohtyP_checkapi(env):
 
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
 # "native" (ie the default target)
-compiler_names = ("msvs_140", "gcc_54", "msvs_120", "gcc_48", "msvs_110", "gcc_46", "msvs_100", "msvs_90")
+# TODO If none of these compilers can be found, default to an "any" compiler (but still version the
+# output directory)
+compiler_names = ("msvs_150", "msvs_140", "gcc_54", "msvs_120", "gcc_48", "msvs_110", "gcc_46", "msvs_100", "msvs_90")
 oses = ("win32", "posix")
 archs = ("amd64", "x86")
 # TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
