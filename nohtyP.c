@@ -2539,8 +2539,8 @@ void yp_deepinvalidate(ypObject **x)
 // If you know that b is either yp_True, yp_False, or an exception, use this
 // XXX b should be a variable, _not_ an expression, as it's evaluated up to three times
 // clang-format off
-#define ypBool_NOT( b ) ( (b) == yp_True ? yp_False : \
-                         ((b) == yp_False ? yp_True : (b)))
+#define ypBool_NOT(b) ( (b) == yp_True ? yp_False : \
+                       ((b) == yp_False ? yp_True : (b)))
 // clang-format on
 
 ypObject *yp_not(ypObject *x)
@@ -10408,6 +10408,7 @@ static ypTypeObject ypTuple_Type = {
         MethodError_MappingMethods  // tp_as_mapping
 };
 
+static ypObject *list_sort(ypObject *, yp_sort_key_func_t, ypObject *);
 static ypSequenceMethods ypList_as_sequence = {
         tuple_concat,         // tp_concat
         tuple_repeat,         // tp_repeat
@@ -10425,7 +10426,7 @@ static ypSequenceMethods ypList_as_sequence = {
         list_insert,          // tp_insert
         list_popindex,        // tp_popindex
         list_reverse,         // tp_reverse
-        MethodError_sortfunc  // tp_sort
+        list_sort             // tp_sort
 };
 
 static ypTypeObject ypList_Type = {
@@ -10677,6 +10678,25 @@ ypObject *yp_list(ypObject *iterable)
     return _ypTuple(ypList_CODE, iterable);
 }
 
+ypObject *yp_sorted3(ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse)
+{
+    ypObject *result;
+    ypObject *newSq = yp_list(iterable);
+    if (yp_isexceptionC(newSq)) return newSq;
+
+    result = list_sort(newSq, key, reverse);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newSq);
+        return result;
+    }
+
+    return newSq;
+}
+
+ypObject *yp_sorted(ypObject *iterable) {
+    return yp_sorted3(iterable, NULL, yp_False);
+}
+
 static ypObject *_ypTuple_repeatCNV(int type, yp_ssize_t factor, int n, va_list args)
 {
     ypObject * newSq;
@@ -10735,6 +10755,7 @@ ypObject *yp_list_repeatCNV(yp_ssize_t factor, int n, va_list args)
  * Timsort - Sorting sequences of generic items
  * XXX This entire section is adapted from Python's listobject.c
  *************************************************************************************************/
+// FIXME Review this code carefully to ensure it's fully converted to nohtyP
 // clang-format off
 
 /* Lots of code for an adaptive, stable, natural mergesort.  There are many
@@ -10812,13 +10833,8 @@ sortslice_advance(sortslice *slice, yp_ssize_t n)
 // XXX In Python, this is a macro wrapping ypObject_RichCompareBool
 static int ISLT(ypObject *x, ypObject *y) {
     ypObject *result = yp_lt(x, y);
-    if (result == yp_True) {
-        return 1;
-    } else if (result == yp_False) {
-        return 0;
-    } else {
-        return -1;
-    }
+    if (yp_isexceptionC(result)) return -1;  // FIXME don't swallow exception!
+    return ypBool_IS_TRUE_C(result) ? 1 : 0;
 }
 
 /* Compare X to Y via "<".  Goto "fail" if the comparison raises an
@@ -11690,7 +11706,7 @@ reverse_sortslice(sortslice *s, yp_ssize_t n)
  * duplicated).
  */
 static ypObject *
-listsort(ypObject *self, ypObject *keyfunc, int reverse)
+list_sort(ypObject *self, yp_sort_key_func_t keyfunc, ypObject *_reverse)
 {
     MergeState ms;
     yp_ssize_t nremaining;
@@ -11700,25 +11716,29 @@ listsort(ypObject *self, ypObject *keyfunc, int reverse)
     ypObject **saved_ob_item;
     ypObject **final_ob_item;
     ypObject *result = yp_None;  // either yp_None, or an exception (both immortal)
+    int reverse;
     yp_ssize_t i;
     ypObject **keys;
 
-    yp_ASSERT1(self != NULL);
-    yp_ASSERT1(ypObject_TYPE_CODE(self) == ypList_CODE);
-    if (keyfunc == yp_None)
-        keyfunc = NULL;
+    // Convert arguments
+    {
+        ypObject *b = yp_bool(_reverse);
+        if (yp_isexceptionC(b)) return b;
+        reverse = ypBool_IS_TRUE_C(b);
+    }
 
     /* The list is temporarily made empty, so that mutations performed
      * by comparison functions can't affect the slice of memory we're
      * sorting (allowing mutations during sorting is a core-dump
      * factory, since ob_item may change).
      */
-    // FIXME Generic method to "pop-out" tuple data
+    // FIXME Generic method to "pop-out" tuple data, remembering we need to make a copy of any
+    // inline data.  But since that data is small, can allocate on stack.
     saved_ob_size = ypTuple_LEN(self);
     saved_ob_item = ypTuple_ARRAY(self);
     saved_allocated = ypTuple_ALLOCLEN(self);
     ypTuple_SET_LEN(self, 0);
-    ypTuple_ARRAY(self) = NULL;
+    self->ob_data = NULL;  // FIXME proper macro to set data ptr
     ypTuple_SET_ALLOCLEN(self, ypObject_LEN_INVALID); /* any operation will reset it to >= 0 */
 
     if (keyfunc == NULL) {
@@ -11840,10 +11860,12 @@ fail:
     merge_freemem(&ms);
 
 keyfunc_fail:
+    // FIXME Common function to "pop-out" and restore the array, remembering that if the data is
+    // inline we need to make a copy so it isn't overwritten.  It's small, so perhaps on stack?
     final_ob_item = ypTuple_ARRAY(self);
     i = ypTuple_LEN(self);
     ypTuple_SET_LEN(self, saved_ob_size);
-    ypTuple_ARRAY(self) = saved_ob_item;
+    self->ob_data = saved_ob_item;  // FIXME proper macro to set ob_data
     ypTuple_SET_ALLOCLEN(self, saved_allocated);
     if (final_ob_item != NULL) {
         /* we cannot use list_clear() for this because it does not
