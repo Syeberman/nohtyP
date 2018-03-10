@@ -424,8 +424,11 @@ yp_func(c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ))
 
 # typedef ypObject *(*yp_sort_key_func_t)( ypObject *x );
 # ypObject *yp_sorted3( ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse );
+yp_func(c_ypObject_p, "yp_sorted3", ((c_ypObject_pp, "iterable"), (c_void_p, "key"),
+                                     (c_ypObject_p, "reverse")))
 
 # ypObject *yp_sorted( ypObject *iterable );
+yp_func(c_ypObject_p, "yp_sorted", ((c_ypObject_pp, "iterable"), ))
 
 # ypObject *yp_frozensetN( int n, ... );
 # ypObject *yp_frozensetNV( int n, va_list args );
@@ -629,8 +632,11 @@ yp_func(c_void, "yp_remove", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")))
 yp_func(c_void, "yp_reverse", ((c_ypObject_pp, "sequence"), ))
 
 # void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse );
+yp_func(c_void, "yp_sort3", ((c_ypObject_pp, "sequence"), (c_void_p, "key"),
+                             (c_ypObject_p, "reverse")))
 
 # void yp_sort( ypObject **sequence );
+yp_func(c_void, "yp_sort", ((c_ypObject_pp, "sequence"), ))
 
 # define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
 _yp_SLICE_DEFAULT = _yp_SSIZE_T_MIN
@@ -1300,6 +1306,13 @@ class ypObject(c_ypObject_p):
     def insert(self, i, x): _yp_insertC(self, i, x)
 
     def reverse(self): _yp_reverse(self)
+
+    def sort(self, *, key=None, reverse=False):
+        if key is None and reverse is False:
+            _yp_sort(self)
+        else:
+            assert key is None, "key function not yet supported"
+            _yp_sort3(self, None, reverse)
 
     def isdisjoint(self, other):
         return _yp_isdisjoint(self, _yp_iterable(other))
@@ -2102,10 +2115,10 @@ _yp_tuple_empty = yp_tuple()
 class yp_list(_ypTuple):
     def __new__(cls, iterable=_yp_tuple_empty):
         return _yp_list(_yp_iterable(iterable))
-    # TODO When nohtyP supports str/repr, replace this faked-out version
 
     @reprlib.recursive_repr("[...]")
     def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
         return yp_str("[%s]" % ", ".join(repr(x) for x in self))
     _yp_repr = _yp_str
 
@@ -2129,10 +2142,17 @@ class yp_list(_ypTuple):
 
 
 def yp_sorted(x, *, key=None, reverse=False):
-    """Returns sorted( x ) of a ypObject as a yp_list"""
+    """Returns sorted(x) of a ypObject as a yp_list"""
     if not isinstance(x, (ypObject, _setlike_dictview, _values_dictview)):
         raise TypeError("expected ypObject in yp_sorted")
-    return yp_list(sorted(x, key=key, reverse=reverse))
+
+    if key is None and reverse is False:
+        return _yp_sorted(_yp_iterable(x))
+    elif key is not None:
+        # FIXME Figure out how to support passing key functions from Python
+        return yp_list(sorted(x, key=key, reverse=reverse))
+    else:
+        return _yp_sorted3(_yp_iterable(x), None, reverse)
 
 
 class _ypSet(ypObject):
