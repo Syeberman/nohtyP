@@ -34,6 +34,12 @@
 // versions as appropriate (like
 // https://gcc.gnu.org/onlinedocs/gcc/Integer-Overflow-Builtins.html).
 
+// TODO Use NotImplemented, instead of NotImplementedError, as per Python.
+
+// TODO Look for all the places yp_decref, yp_eq, and others might execute arbitrary code that
+// might modify the object being iterated over.  OR  Add some sort of universal flag to objects to
+// prevent modifications.
+
 
 #include "nohtyP.h"
 #include <float.h>
@@ -2657,6 +2663,7 @@ ypObject *yp_all(ypObject *iterable)
 
 // Defined here are yp_lt, yp_le, yp_eq, yp_ne, yp_ge, and yp_gt
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
+// TODO Here and elsewhere, the singleton NotImplemented should be used
 // TODO Comparison functions have the possibility of recursion; trap (also, add tests)
 extern ypObject *const yp_ComparisonNotImplemented;
 #define _ypBool_PUBLIC_CMP_FUNCTION(name, reflection, defval)                         \
@@ -7884,12 +7891,13 @@ static ypObject *bytearray_push(ypObject *b, ypObject *x)
 
 static ypObject *bytearray_clear(ypObject *b)
 {
+    // FIXME ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR would be better, if we asserted that
+    // inlinelen for bytes was >= 1
     void *oldptr =
             ypMem_REALLOC_CONTAINER_VARIABLE(b, ypBytesObject, 0 + 1, 0, ypBytes_ALLOCLEN_MAX);
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
     if (oldptr != NULL) ypMem_REALLOC_CONTAINER_FREE_OLDPTR(b, ypBytesObject, oldptr);
-    yp_ASSERT(
-            ypBytes_DATA(b) == ypBytes_INLINE_DATA(b), "bytearray_clear didn't allocate inline!");
+    yp_ASSERT(ypBytes_DATA(b) == ypBytes_INLINE_DATA(b), "bytearray_clear didn't allocate inline!");
     ypBytes_DATA(b)[0] = '\0';
     ypBytes_SET_LEN(b, 0);
     ypBytes_ASSERT_INVARIANTS(b);
@@ -9723,6 +9731,7 @@ static void _ypTuple_setslice_elemmove(
     yp_ssize_t i;
     yp_ASSERT(growBy >= -ypTuple_LEN(sq), "growBy cannot be less than -len(sq)");
     yp_ASSERT(ypTuple_LEN(sq) + growBy <= ypTuple_ALLOCLEN(sq), "must be enough space for move");
+    // FIXME What if yp_decref modifies sq?
     for (i = start; i < stop; i++) yp_decref(ypTuple_ARRAY(sq)[i]);
     ypTuple_ELEMMOVE(sq, stop + growBy, stop);
     ypTuple_SET_LEN(sq, ypTuple_LEN(sq) + growBy);
@@ -9751,6 +9760,7 @@ static ypObject *_ypTuple_setslice_grow(
             _ypTuple_setslice_elemmove(sq, start, stop, growBy);
         } else {
             // The data doesn't overlap, so use memcpy, remembering to discard sq[start:stop]
+            // FIXME What if yp_decref modifies sq?
             for (i = start; i < stop; i++) yp_decref(oldptr[i]);
             memcpy(ypTuple_ARRAY(sq), oldptr, start * yp_sizeof(ypObject *));
             memcpy(ypTuple_ARRAY(sq) + stop + growBy, oldptr + stop,
@@ -9799,6 +9809,7 @@ static ypObject *_ypTuple_setslice_from_tuple(
         if (ypTuple_LEN(x) != slicelength) return yp_ValueError;
         for (i = 0; i < slicelength; i++) {
             ypObject **dest = ypTuple_ARRAY(sq) + ypSlice_INDEX(start, step, i);
+            // FIXME What if yp_decref modifies sq?
             yp_decref(*dest);
             *dest = yp_incref(ypTuple_ARRAY(x)[i]);
         }
@@ -9982,6 +9993,7 @@ static ypObject *list_setindex(ypObject *sq, yp_ssize_t i, ypObject *x)
     if (!ypSequence_AdjustIndexC(ypTuple_LEN(sq), &i)) {
         return yp_IndexError;
     }
+    // FIXME What if yp_decref modifies sq?
     yp_decref(ypTuple_ARRAY(sq)[i]);
     ypTuple_ARRAY(sq)[i] = yp_incref(x);
     return yp_None;
@@ -10056,6 +10068,7 @@ static ypObject *list_delslice(ypObject *sq, yp_ssize_t start, yp_ssize_t stop, 
     if (slicelength < 1) return yp_None;  // no-op
 
     // First discard references, then shift the remaining pointers
+    // FIXME What if yp_decref modifies sq?
     for (i = 0; i < slicelength; i++) {
         yp_decref(ypTuple_ARRAY(sq)[ypSlice_INDEX(start, step, i)]);
     }
@@ -10278,6 +10291,7 @@ static ypObject *list_clear(ypObject *sq)
 {
     // XXX yp_decref _could_ run code that requires us to be in a good state, so pop items from the
     // end one-at-a-time
+    // FIXME If yp_decref **adds** to this list, we'll never stop looping
     while (ypTuple_LEN(sq) > 0) {
         ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
         yp_decref(ypTuple_ARRAY(sq)[ypTuple_LEN(sq)]);
@@ -10304,6 +10318,7 @@ static ypObject *list_remove(ypObject *sq, ypObject *x, ypObject *onmissing)
         if (yp_isexceptionC(result)) return result;
 
         // result must be yp_True, so we found a match to remove
+        // FIXME What if yp_decref modifies sq?
         yp_decref(ypTuple_ARRAY(sq)[i]);
         ypTuple_ELEMMOVE(sq, i, i + 1);
         ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
@@ -10315,6 +10330,7 @@ static ypObject *list_remove(ypObject *sq, ypObject *x, ypObject *onmissing)
 
 static ypObject *tuple_dealloc(ypObject *sq)
 {
+    // Nobody is referencing us, so yp_decref doesn't require us to be in a good state
     yp_ssize_t i;
     for (i = 0; i < ypTuple_LEN(sq); i++) {
         yp_decref(ypTuple_ARRAY(sq)[i]);
@@ -12441,6 +12457,7 @@ static ypObject *_ypSet_intersection_update_from_set(ypObject *so, ypObject *oth
         result = _ypSet_lookkey(other, keys[i].se_key, keys[i].se_hash, &other_loc);
         if (yp_isexceptionC(result)) return result;
         if (ypSet_ENTRY_USED(other_loc)) continue;  // if entry used, key is in other
+        // FIXME What if yp_decref modifies so?
         yp_decref(_ypSet_removekey(so, &keys[i]));
     }
     return yp_None;
@@ -12581,6 +12598,7 @@ static ypObject *_ypSet_symmetric_difference_update_from_set(ypObject *so, ypObj
             if (yp_isexceptionC(result)) return result;
         } else {
             // XXX spaceleft based on alloclen and fill, so doesn't change on deletions
+            // FIXME What if yp_decref modifies so?
             yp_decref(result);
         }
     }
@@ -13011,9 +13029,7 @@ static ypObject *set_clear(ypObject *so)
     if (ypSet_FILL(so) < 1) return yp_None;
 
     // Discard the old keys
-    // TODO yp_decref _could_ run code that requires us to be in a good state...but this isn't as
-    // easy as for a list.  Once we start accepting arbitrary dealloc code, we may be forced to
-    // use the safer _ypSet_removekey.
+    // FIXME What if yp_decref modifies so?
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&oldkeys[i])) continue;
         keysleft -= 1;
@@ -13572,6 +13588,7 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
     }
 
     // Free the old tables and swap-in the new ones
+    // FIXME What if yp_decref modifies mp?
     yp_decref(ypDict_KEYSET(mp));
     ypDict_KEYSET(mp) = newkeyset;
     if (oldvalues != ypDict_INLINE_DATA(mp)) yp_free(oldvalues);
@@ -13650,6 +13667,7 @@ static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int 
             ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
         } else {
             if (!override) return yp_False;
+            // FIXME What if yp_decref modifies mp?
             yp_decref(*value_loc);
             *value_loc = yp_incref(value);
         }
@@ -13931,9 +13949,7 @@ static ypObject *dict_clear(ypObject *mp)
             "expect alloclen of ypSet_ALLOCLEN_MIN for new keyset");
 
     // Discard the old values
-    // TODO yp_decref _could_ run code that requires us to be in a good state...but this isn't as
-    // easy as for a list.  Once we start accepting arbitrary dealloc code, we may be forced to
-    // keep ypDict_VALUES and ypDict_LEN up-to-date.
+    // FIXME What if yp_decref modifies mp?
     for (i = 0; valuesleft > 0; i++) {
         if (oldvalues[i] == NULL) continue;
         valuesleft -= 1;
@@ -13941,8 +13957,9 @@ static ypObject *dict_clear(ypObject *mp)
     }
 
     // Free memory
-    // TODO ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR would be better, if we could trust that alloclen
-    // was always ypSet_ALLOCLEN_MIN, and that inlinelen for dicts was >=ypSet_ALLOCLEN_MIN
+    // TODO ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR would be better, if we could trust that
+    // inlinelen for dicts was >=ypSet_ALLOCLEN_MIN
+    // FIXME What if yp_decref modifies mp?
     yp_decref(ypDict_KEYSET(mp));
     oldptr = ypMem_REALLOC_CONTAINER_VARIABLE(mp, ypDictObject, alloclen, 0, ypDict_ALLOCLEN_MAX);
     // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
