@@ -9590,6 +9590,87 @@ static ypObject *_ypTuple_new(int type, yp_ssize_t alloclen, int alloclen_fixed)
     }
 }
 
+typedef struct {
+    ypObject **array;
+    yp_ssize_t len;
+    yp_ssize_t alloclen;
+} ypTuple_detached;
+
+// Clears sq, placing the array of objects and other metadata in detached so that the array can be
+// reattached with _ypTuple_reattach_array.  This is used by sort and other methods that may
+// execute arbitrary code (i.e. yp_lt) while modifying the tuple/list, to prevent that arbitrary
+// code from also modifying the tuple/list.  Returns an exception on error, in which case sq is not
+// modified and detached is invalid.
+// TODO Would a flag on the object to prevent mutations work better?  Lots of code would need it...
+static ypObject *_ypTuple_detach_array(ypObject *sq, ypTuple_detached *detached) {
+    if (ypTuple_ARRAY(sq) == ypTuple_INLINE_DATA(sq)) {
+        // If the data is inline, we need to allocate a new buffer
+        yp_ssize_t size = ypTuple_LEN(sq) * sizeof(ypObject *);
+        yp_ssize_t allocsize;
+        detached->array = yp_malloc(&allocsize, size);
+        if (detached->array == NULL) return yp_MemoryError;
+
+        memcpy(detached->array, ypTuple_ARRAY(sq), size);
+        detached->len = ypTuple_LEN(sq);
+        detached->alloclen = allocsize / sizeof(ypObject *);
+        if (detached->alloclen > ypTuple_ALLOCLEN_MAX) detached->alloclen = ypTuple_ALLOCLEN_MAX;
+    } else {
+        // We can just detach the buffer from the object
+        detached->array = ypTuple_ARRAY(sq);
+        detached->len = ypTuple_LEN(sq);
+        detached->alloclen = ypTuple_ALLOCLEN(sq);
+    }
+
+    // Now that we've detached the array from sq we can clear it
+    ypTuple_ARRAY(sq) = ypTuple_INLINE_DATA(sq);
+    ypTuple_SET_LEN(sq, 0);
+    ypTuple_SET_ALLOCLEN(sq, ypMem_INLINELEN_CONTAINER_VARIABLE(sq, ypTupleObject));
+
+    return yp_None;
+}
+
+// Frees detached, reclaiming any memory returned by _ypTuple_detach_array.
+static void _ypTuple_free_detached(ypTuple_detached *detached) {
+    for (/*detached->len already set*/; detached->len > 0; detached->len--) {
+        yp_decref(detached->array[detached->len]);
+    }
+    yp_free(detached->array);
+}
+
+// Reverses the effect of _ypTuple_detach_array, re-attaching the array to sq and freeing detached.
+// If it is detected that sq was modified since being detached, sq will be cleared before
+// re-attachment and yp_ValueError will be raised.  (If clearing sq fails, which is very
+// unlikely, the contents of sq is undefined and a different exception may be raised.)
+static ypObject *_ypTuple_reattach_array(ypObject *sq, ypTuple_detached *detached) {
+    int wasModified;
+    ypTuple_detached modified;
+    ypObject *result;
+
+    // This won't detect if the tuple/list was modified and then cleared, but that's OK
+    wasModified = ypTuple_LEN(sq) > 0 || ypTuple_ARRAY(sq) != ypTuple_INLINE_DATA(sq);
+    if (wasModified) {
+        result = _ypTuple_detach_array(sq, &modified);
+        if (yp_isexceptionC(result)) {
+            // This is very unlikely to happen.  It breaks sort's "guarantee" that the list will be
+            // some permutation of its input state, even on error.
+            _ypTuple_free_detached(detached);
+            return result;
+        }
+    }
+
+    // Reattach the array to this object
+    ypTuple_ARRAY(sq) = detached->array;
+    ypTuple_SET_LEN(sq, detached->len);
+    ypTuple_SET_ALLOCLEN(sq, detached->alloclen);
+
+    if (wasModified) {
+        // Python's list_sort raises ValueError in this case, so we will too
+        _ypTuple_free_detached(&modified);
+        return yp_ValueError;  // TODO Something more specific?  yp_ConcurrentModification?
+    }
+    return yp_None;
+}
+
 // XXX Check for the "lazy shallow copy" and "_yp_tuple_empty" cases first
 static ypObject *_ypTuple_copy(int type, ypObject *x, int alloclen_fixed)
 {
@@ -11716,10 +11797,9 @@ reverse_sortslice(sortslice *s, yp_ssize_t n)
         _list_reverse_slice(s->values, &s->values[n]);
 }
 
-/* An adaptive, stable, natural mergesort.  See listsort.txt.
- * Returns yp_None on success, NULL on error.  Even in case of error, the
- * list will be some permutation of its input state (nothing is lost or
- * duplicated).
+/* An adaptive, stable, natural mergesort.  See listsort.txt.  Returns yp_None on success, exception
+ * on error.  Ignoring the most critical of errors (i.e. out of memory), the list will be some
+ * permutation of its input state (nothing is lost or duplicated).
  */
 static ypObject *
 list_sort(ypObject *self, yp_sort_key_func_t keyfunc, ypObject *_reverse)
@@ -11728,9 +11808,7 @@ list_sort(ypObject *self, yp_sort_key_func_t keyfunc, ypObject *_reverse)
     yp_ssize_t nremaining;
     yp_ssize_t minrun;
     sortslice lo;
-    yp_ssize_t saved_ob_size, saved_allocated;
-    ypObject **saved_ob_item;
-    ypObject **final_ob_item;
+    ypTuple_detached detached;
     ypObject *result = yp_None;  // either yp_None, or an exception (both immortal)
     int reverse;
     yp_ssize_t i;
@@ -11748,56 +11826,50 @@ list_sort(ypObject *self, yp_sort_key_func_t keyfunc, ypObject *_reverse)
      * sorting (allowing mutations during sorting is a core-dump
      * factory, since ob_item may change).
      */
-    // FIXME Generic method to "pop-out" tuple data, remembering we need to make a copy of any
-    // inline data.  But since that data is small, can allocate on stack.
-    saved_ob_size = ypTuple_LEN(self);
-    saved_ob_item = ypTuple_ARRAY(self);
-    saved_allocated = ypTuple_ALLOCLEN(self);
-    ypTuple_SET_LEN(self, 0);
-    self->ob_data = NULL;  // FIXME proper macro to set data ptr
-    ypTuple_SET_ALLOCLEN(self, ypObject_LEN_INVALID); /* any operation will reset it to >= 0 */
+    result = _ypTuple_detach_array(self, &detached);
+    if (yp_isexceptionC(result)) return result;
 
     if (keyfunc == NULL) {
         keys = NULL;
-        lo.keys = saved_ob_item;
+        lo.keys = detached.array;
         lo.values = NULL;
     }
     else {
         result = yp_NotImplementedError;
         goto keyfunc_fail;
 #if 0 // FIXME support keyfunc
-        if (saved_ob_size < MERGESTATE_TEMP_SIZE/2)
+        if (detached.len < MERGESTATE_TEMP_SIZE/2)
             /* Leverage stack space we allocated but won't otherwise use */
-            keys = &ms.temparray[saved_ob_size+1];
+            keys = &ms.temparray[detached.len+1];
         else {
             yp_ssize_t actual;
-            keys = PyMem_MALLOC(&actual, sizeof(ypObject *) * saved_ob_size);
+            keys = PyMem_MALLOC(&actual, sizeof(ypObject *) * detached.len);
             if (keys == NULL) {
                 result = yp_MemoryError;
                 goto keyfunc_fail;
             }
         }
 
-        for (i = 0; i < saved_ob_size ; i++) {
-            keys[i] = ypObject_CallFunctionObjArgs(keyfunc, saved_ob_item[i],
+        for (i = 0; i < detached.len ; i++) {
+            keys[i] = ypObject_CallFunctionObjArgs(keyfunc, detached.array[i],
                                                    NULL);
             if (keys[i] == NULL) {
                 for (i=i-1 ; i>=0 ; i--)
                     yp_decref(keys[i]);
-                if (saved_ob_size >= MERGESTATE_TEMP_SIZE/2)
+                if (detached.len >= MERGESTATE_TEMP_SIZE/2)
                     PyMem_FREE(keys);
                 goto keyfunc_fail;
             }
         }
 
         lo.keys = keys;
-        lo.values = saved_ob_item;
+        lo.values = detached.array;
 #endif
     }
 
-    merge_init(&ms, saved_ob_size, keys != NULL);
+    merge_init(&ms, detached.len, keys != NULL);
 
-    nremaining = saved_ob_size;
+    nremaining = detached.len;
     if (nremaining < 2)
         goto succeed;
 
@@ -11805,8 +11877,8 @@ list_sort(ypObject *self, yp_sort_key_func_t keyfunc, ypObject *_reverse)
     applying a stable forward sort, then reversing the final result. */
     if (reverse) {
         if (keys != NULL)
-            _list_reverse_slice(&keys[0], &keys[saved_ob_size]);
-        _list_reverse_slice(&saved_ob_item[0], &saved_ob_item[saved_ob_size]);
+            _list_reverse_slice(&keys[0], &keys[detached.len]);
+        _list_reverse_slice(&detached.array[0], &detached.array[detached.len]);
     }
 
     /* March over the array once, left to right, finding natural runs,
@@ -11847,50 +11919,33 @@ list_sort(ypObject *self, yp_sort_key_func_t keyfunc, ypObject *_reverse)
         goto fail;
     yp_ASSERT1(ms.n == 1);
     yp_ASSERT1(keys == NULL
-           ? ms.pending[0].base.keys == saved_ob_item
+           ? ms.pending[0].base.keys == detached.array
            : ms.pending[0].base.keys == &keys[0]);
-    yp_ASSERT1(ms.pending[0].len == saved_ob_size);
+    yp_ASSERT1(ms.pending[0].len == detached.len);
     lo = ms.pending[0].base;
 
 succeed:
     result = yp_None;
+
 fail:
     if (keys != NULL) {
-        for (i = 0; i < saved_ob_size; i++)
+        for (i = 0; i < detached.len; i++)
             yp_decref(keys[i]);
-        if (saved_ob_size >= MERGESTATE_TEMP_SIZE/2)
+        if (detached.len >= MERGESTATE_TEMP_SIZE/2)
             yp_free(keys);
     }
 
-    if (ypTuple_ALLOCLEN(self) != _ypObject_LEN_INVALID && result != yp_None) {
-        /* The user mucked with the list during the sort,
-         * and we don't already have another error to report.
-         */
-        // TODO PyErr_SetString(PyExc_ValueError, "list modified during sort");
-        result = yp_ValueError;
-    }
-
-    if (reverse && saved_ob_size > 1)
-        _list_reverse_slice(saved_ob_item, saved_ob_item + saved_ob_size);
+    if (reverse && detached.len > 1)
+        _list_reverse_slice(detached.array, detached.array + detached.len);
 
     merge_freemem(&ms);
 
 keyfunc_fail:
-    // FIXME Common function to "pop-out" and restore the array, remembering that if the data is
-    // inline we need to make a copy so it isn't overwritten.  It's small, so perhaps on stack?
-    final_ob_item = ypTuple_ARRAY(self);
-    i = ypTuple_LEN(self);
-    ypTuple_SET_LEN(self, saved_ob_size);
-    self->ob_data = saved_ob_item;  // FIXME proper macro to set ob_data
-    ypTuple_SET_ALLOCLEN(self, saved_allocated);
-    if (final_ob_item != NULL) {
-        /* we cannot use list_clear() for this because it does not
-           guarantee that the list is really empty when it returns */
-        while (--i >= 0) {
-            if (final_ob_item[i]) yp_decref(final_ob_item[i]);
-        }
-        yp_free(final_ob_item);
+    {
+        ypObject *reattachResult = _ypTuple_reattach_array(self, &detached);
+        if (yp_isexceptionC(reattachResult)) return reattachResult;
     }
+
     return result;
 }
 #undef IFLT
