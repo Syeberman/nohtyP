@@ -424,11 +424,11 @@ yp_func(c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ))
 
 # typedef ypObject *(*yp_sort_key_func_t)( ypObject *x );
 # ypObject *yp_sorted3( ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse );
-yp_func(c_ypObject_p, "yp_sorted3", ((c_ypObject_pp, "iterable"), (c_void_p, "key"),
+yp_func(c_ypObject_p, "yp_sorted3", ((c_ypObject_p, "iterable"), (c_void_p, "key"),
                                      (c_ypObject_p, "reverse")))
 
 # ypObject *yp_sorted( ypObject *iterable );
-yp_func(c_ypObject_p, "yp_sorted", ((c_ypObject_pp, "iterable"), ))
+yp_func(c_ypObject_p, "yp_sorted", ((c_ypObject_p, "iterable"), ))
 
 # ypObject *yp_frozensetN( int n, ... );
 # ypObject *yp_frozensetNV( int n, va_list args );
