@@ -1493,7 +1493,7 @@ void yp_decref(ypObject *x)
         ypObject *result;
         yp_DEBUG("decref (dealloc): %p", x);
         result = ypObject_TYPE(x)->tp_dealloc(x);
-        yp_ASSERT(!yp_isexceptionC(result), "tp_dealloc returned exception");
+        yp_ASSERT(!yp_isexceptionC(result), "tp_dealloc returned exception %p", result);
     } else {
         ypObject_REFCNT(x) -= 1;
         yp_DEBUG("decref: %p refcnt %d", x, ypObject_REFCNT(x));
@@ -1943,6 +1943,19 @@ yp_STATIC_ASSERT(yp_offsetof(ypIterObject, ob_inline_data) % yp_MAX_ALIGNMENT ==
 
 // Iterator methods
 
+static ypObject *_iter_send(ypObject *i, ypObject *value) {
+    ypObject *result;
+    yp_generator_func_t func = ypIter_FUNC(i);
+
+    yp_DEBUG("iter_send: func %p, i %p, value %d %p",
+            func, i, ypObject_TYPE_CODE(value), value);
+    result = func(i, value);
+    yp_DEBUG("iter_send: func %p, i %p, value %d %p, result %d %p",
+            func, i, ypObject_TYPE_CODE(value), value, ypObject_TYPE_CODE(result), result);
+
+    return result;
+}
+
 static ypObject *iter_traverse(ypObject *i, visitfunc visitor, void *memo)
 {
     ypObject ** p = (ypObject **)ypIter_STATE(i);
@@ -1971,7 +1984,7 @@ static ypObject *_iter_closed_generator(ypObject *i, ypObject *value) { return y
 static ypObject *iter_close(ypObject *i)
 {
     // Let the generator know we're closing
-    ypObject *result = ypIter_FUNC(i)(i, yp_GeneratorExit);
+    ypObject *result = _iter_send(i, yp_GeneratorExit);
 
     // Close off this iterator
     (void)iter_traverse(i, _iter_closing_visitor, NULL);  // never fails
@@ -2010,7 +2023,7 @@ static ypObject *iter_iter(ypObject *i) { return yp_incref(i); }
 
 static ypObject *iter_send(ypObject *i, ypObject *value)
 {
-    ypObject *result = ypIter_FUNC(i)(i, value);
+    ypObject *result = _iter_send(i, value);
 
     // As per Python, when a generator raises an exception, it can't continue to yield values, so
     // close it.  If iter_close fails just ignore it: result is already set to an exception.
@@ -4816,6 +4829,7 @@ yp_float_t yp_mulLF(yp_float_t x, yp_float_t y, ypObject **exc)
 
 yp_float_t yp_truedivLF(yp_float_t x, yp_float_t y, ypObject **exc)
 {
+    if (y == 0.0) return_yp_CEXC_ERR(0.0, exc, yp_ZeroDivisionError);
     return x / y;  // TODO overflow check
 }
 
@@ -4823,6 +4837,7 @@ yp_float_t yp_truedivLF(yp_float_t x, yp_float_t y, ypObject **exc)
 // the result is a float
 yp_float_t yp_floordivLF(yp_float_t x, yp_float_t y, ypObject **exc)
 {
+    if (y == 0.0) return_yp_CEXC_ERR(0.0, exc, yp_ZeroDivisionError);
     return_yp_CEXC_ERR(0, exc, yp_NotImplementedError);
 }
 
@@ -4835,7 +4850,7 @@ void yp_divmodLF(yp_float_t x, yp_float_t y, yp_float_t *_div, yp_float_t *_mod,
 {
     *_div = 0;
     *_mod = 0;
-    *exc = yp_NotImplementedError;
+    *exc = y == 0.0 ? yp_ZeroDivisionError : yp_NotImplementedError;
 }
 
 yp_float_t yp_powLF(yp_float_t x, yp_float_t y, ypObject **exc)

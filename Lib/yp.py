@@ -15,6 +15,7 @@ import weakref
 import operator
 import pickle
 import reprlib
+import traceback
 
 try:
     # Ideally this would work everywhere
@@ -1222,7 +1223,7 @@ class ypObject(c_ypObject_p):
     @classmethod
     def _frompython(cls, pyobj):
         """Default implementation for cls.frompython, which simply calls the constructor."""
-        # TODO if every class uses the default _frompython, then remove it, it's not needed
+        # TODO This isn't necessary: every class uses the default _frompython, so remove it
         return cls(pyobj)
 
     # __str__ and __repr__ must always return a Python str, but we want nohtyP-aware code to be
@@ -1310,8 +1311,14 @@ class ypObject(c_ypObject_p):
     def sort(self, *, key=None, reverse=False):
         if key is None and reverse is False:
             _yp_sort(self)
+        elif key is not None:
+            # FIXME Replace this faked-out version when nohtyP supports key
+            self_keyed = yp_list((key(x), x) for x in self)
+            _yp_sort3(self_keyed, None, reverse)
+            assert len(self) == len(self_keyed)
+            for i in range(len(self)):
+                self[i] = self_keyed[i][1]
         else:
-            assert key is None, "key function not yet supported"
             _yp_sort3(self, None, reverse)
 
     def isdisjoint(self, other):
@@ -1756,13 +1763,16 @@ class yp_iter(ypObject):
     def _pygenerator_func(self, yp_self, yp_value):
         try:
             if _yp_isexceptionC(yp_value):
-                result = yp_value  # yp_GeneratorExit, in particular
-            else:
-                py_result = next(self._pyiter)
-                result = ypObject.frompython(py_result)
-        except BaseException as e:
-            result = _pyExc2yp[type(e)]
-        return _yp_incref(result)
+                return _yp_incref(yp_value)  # yp_GeneratorExit, in particular
+            py_iter = self._pyiter
+            try:
+                py_result = next(py_iter)
+            except BaseException as e: # exceptions from the iterator get passed to nohtyP
+                return _yp_incref(_pyExc2yp[type(e)])
+            return _yp_incref(ypObject.frompython(py_result))
+        except BaseException as e: # ensure unexpected exceptions don't crash the program
+            traceback.print_exc()
+            return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
     def __new__(cls, object, sentinel=_yp_arg_missing):
         if sentinel is not _yp_arg_missing:
@@ -2138,8 +2148,6 @@ class yp_list(_ypTuple):
         _yp_irepeatC(self, factor)
         return self
 
-# TODO When nohtyP supports sorting, replace this faked-out version
-
 
 def yp_sorted(x, *, key=None, reverse=False):
     """Returns sorted(x) of a ypObject as a yp_list"""
@@ -2149,8 +2157,10 @@ def yp_sorted(x, *, key=None, reverse=False):
     if key is None and reverse is False:
         return _yp_sorted(_yp_iterable(x))
     elif key is not None:
-        # FIXME Figure out how to support passing key functions from Python
-        return yp_list(sorted(x, key=key, reverse=reverse))
+        # FIXME Replace this faked-out version when nohtyP supports key
+        x_keyed = _yp_sorted3(_yp_iterable((key(item), item) for item in x), None, reverse)
+        assert len(x) == len(x_keyed)
+        return yp_list(item[1] for item in x_keyed)
     else:
         return _yp_sorted3(_yp_iterable(x), None, reverse)
 

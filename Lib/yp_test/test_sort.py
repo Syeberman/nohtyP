@@ -17,7 +17,9 @@ def check(tag, expected, raw, compare=None):
 
     orig = raw[:]   # save input in case of error
     if compare:
-        raw.sort(key=cmp_to_key(compare))
+        # TODO Change back once nohtyP supports user-defined types and key functions
+        # raw.sort(key=cmp_to_key(compare))
+        raw = sorted(raw, key=cmp_to_key(compare))
     else:
         raw.sort()
 
@@ -41,7 +43,6 @@ def check(tag, expected, raw, compare=None):
             nerrors += 1
             return
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestBase(yp_unittest.TestCase):
     def testStressfully(self):
         # Try a variety of sizes at and around powers of 2, and at powers of 10.
@@ -79,7 +80,7 @@ class TestBase(yp_unittest.TestCase):
                 return "Stable(%d, %d)" % (self.key, self.index)
 
         for n in sizes:
-            x = list(range(n))
+            x = yp_list(yp_range(n))
             if verbose:
                 print("Testing size", n)
 
@@ -99,12 +100,13 @@ class TestBase(yp_unittest.TestCase):
             s = x[:]
             check("reversed via function", y, s, lambda a, b: (b>a)-(b<a))
 
-            if verbose:
-                print("    Checking against an insane comparison function.")
-                print("        If the implementation isn't careful, this may segfault.")
-            s = x[:]
-            s.sort(key=cmp_to_key(lambda a, b:  int(random.random() * 3) - 1))
-            check("an insane function left some permutation", x, s)
+            # FIXME REWORK: nohtyP lists don't store user-defined types (cmp_to_key)
+            # if verbose:
+            #     print("    Checking against an insane comparison function.")
+            #     print("        If the implementation isn't careful, this may segfault.")
+            # s = x[:]
+            # s.sort(key=cmp_to_key(lambda a, b:  int(random.random() * 3) - 1))
+            # check("an insane function left some permutation", x, s)
 
             if len(x) >= 2:
                 def bad_key(x):
@@ -112,30 +114,32 @@ class TestBase(yp_unittest.TestCase):
                 s = x[:]
                 self.assertRaises(RuntimeError, s.sort, key=bad_key)
 
-            x = [Complains(i) for i in x]
-            s = x[:]
-            random.shuffle(s)
-            Complains.maybe_complain = True
-            it_complained = False
-            try:
-                s.sort()
-            except RuntimeError:
-                it_complained = True
-            if it_complained:
-                Complains.maybe_complain = False
-                check("exception during sort left some permutation", x, s)
+            # FIXME REWORK: nohtyP lists don't store user-defined types (Complains)
+            # x = yp_list(Complains(i) for i in x)
+            # s = x[:]
+            # random.shuffle(s)
+            # Complains.maybe_complain = True
+            # it_complained = False
+            # try:
+            #     s.sort()
+            # except RuntimeError:
+            #     it_complained = True
+            # if it_complained:
+            #     Complains.maybe_complain = False
+            #     check("exception during sort left some permutation", x, s)
 
-            s = [Stable(random.randrange(10), i) for i in range(n)]
-            augmented = [(e, e.index) for e in s]
-            augmented.sort()    # forced stable because ties broken by index
-            x = [e for e, i in augmented] # a stable sort of s
-            check("stability", x, s)
+            # FIXME REWORK: nohtyP lists don't store user-defined types (Stable)
+            # s = yp_list(Stable(random.randrange(10), i) for i in range(n))
+            # augmented = yp_list((e, e.index) for e in s)
+            # augmented.sort()    # forced stable because ties broken by index
+            # x = yp_list(e for e, i in augmented) # a stable sort of s
+            # check("stability", x, s)
 
 #==============================================================================
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestBugs(yp_unittest.TestCase):
 
+    @yp_unittest.skip("TODO: nohtyP lists don't store user-defined types yet")
     def test_bug453523(self):
         # bug 453523 -- list.sort() crasher.
         # If this fails, the most likely outcome is a core dump.
@@ -149,31 +153,32 @@ class TestBugs(yp_unittest.TestCase):
                     L.append(3)
                 return random.random() < 0.5
 
-        L = [C() for i in range(50)]
+        L = yp_list(C() for i in range(50))
         self.assertRaises(ValueError, L.sort)
 
+    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types (cmp_to_key)")
     def test_undetected_mutation(self):
         # Python 2.4a1 did not always detect mutation
-        memorywaster = []
+        memorywaster = yp_list()
         for i in range(20):
             def mutating_cmp(x, y):
                 L.append(3)
                 L.pop()
                 return (x > y) - (x < y)
-            L = [1,2]
+            L = yp_list((1,2))
             self.assertRaises(ValueError, L.sort, key=cmp_to_key(mutating_cmp))
             def mutating_cmp(x, y):
                 L.append(3)
                 del L[:]
                 return (x > y) - (x < y)
             self.assertRaises(ValueError, L.sort, key=cmp_to_key(mutating_cmp))
-            memorywaster = [memorywaster]
+            memorywaster = yp_list((memorywaster, ))
 
 #==============================================================================
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
 class TestDecorateSortUndecorate(yp_unittest.TestCase):
 
+    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types (cmp_to_key)")
     def test_decorated(self):
         data = 'The quick Brown fox Jumped over The lazy Dog'.split()
         copy = data[:]
@@ -189,7 +194,7 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
         self.assertRaises(TypeError, data.sort, key=lambda x,y: 0)
 
     def test_stability(self):
-        data = [(random.randrange(100), i) for i in range(200)]
+        data = yp_list((random.randrange(100), i) for i in range(200))
         copy = data[:]
         data.sort(key=lambda t: t[0])   # sort on the random first field
         copy.sort()                     # sort using both fields
@@ -197,33 +202,36 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
 
     def test_key_with_exception(self):
         # Verify that the wrapper has been removed
-        data = list(range(-2, 2))
+        data = yp_list(yp_range(-2, 2))
         dup = data[:]
         self.assertRaises(ZeroDivisionError, data.sort, key=lambda x: 1/x)
         self.assertEqual(data, dup)
 
+    @yp_unittest.skip("TODO: nohtyP sort doesn't support key yet")
     def test_key_with_mutation(self):
-        data = list(range(10))
+        data = yp_list(yp_range(10))
         def k(x):
             del data[:]
-            data[:] = range(20)
+            data[:] = yp_range(20)
             return x
         self.assertRaises(ValueError, data.sort, key=k)
 
+    @yp_unittest.skip("TODO: nohtyP sort doesn't support key yet")
     def test_key_with_mutating_del(self):
-        data = list(range(10))
+        data = yp_list(yp_range(10))
         class SortKiller(object):
             def __init__(self, x):
                 pass
             def __del__(self):
                 del data[:]
-                data[:] = range(20)
+                data[:] = yp_range(20)
             def __lt__(self, other):
                 return id(self) < id(other)
         self.assertRaises(ValueError, data.sort, key=SortKiller)
 
+    @yp_unittest.skip("TODO: nohtyP sort doesn't support key yet")
     def test_key_with_mutating_del_and_exception(self):
-        data = list(range(10))
+        data = yp_list(yp_range(10))
         ## dup = data[:]
         class SortKiller(object):
             def __init__(self, x):
@@ -231,7 +239,7 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
                     raise RuntimeError
             def __del__(self):
                 del data[:]
-                data[:] = list(range(20))
+                data[:] = yp_list(yp_range(20))
         self.assertRaises(RuntimeError, data.sort, key=SortKiller)
         ## major honking subtlety: we *can't* do:
         ##
@@ -243,13 +251,14 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
         ## date (this cost some brain cells to figure out...).
 
     def test_reverse(self):
-        data = list(range(100))
+        data = yp_list(yp_range(100))
         random.shuffle(data)
         data.sort(reverse=True)
-        self.assertEqual(data, list(range(99,-1,-1)))
+        self.assertEqual(data, yp_list(yp_range(99,-1,-1)))
 
+    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types (cmp_to_key)")
     def test_reverse_stability(self):
-        data = [(random.randrange(100), i) for i in range(200)]
+        data = yp_list((random.randrange(100), i) for i in range(200))
         copy1 = data[:]
         copy2 = data[:]
         def my_cmp(x, y):
