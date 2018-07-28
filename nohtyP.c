@@ -321,8 +321,8 @@ typedef struct {
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
 
     // Object fundamentals
-    objproc      tp_dealloc;
-    traversefunc tp_traverse;  // call function for all accessible objects; return on exception
+    visitfunc    tp_dealloc;    // use yp_decref_fromdealloc(x, memo) to decref objects
+    traversefunc tp_traverse;   // call function for all accessible objects; return on exception
     // TODO str, repr have the possibility of recursion; trap & test
     objproc tp_str;
     objproc tp_repr;
@@ -1450,6 +1450,7 @@ static void _ypMem_free_container(ypObject *ob, yp_ssize_t offsetof_inline)
 /*************************************************************************************************
  * Object fundamentals
  *************************************************************************************************/
+// FIXME Review this section again
 
 // TODO What if these (and yp_isexceptionC) were macros in the header so they were force-inlined
 // by users of the API...even if through a DLL?
@@ -1457,7 +1458,7 @@ ypObject *yp_incref(ypObject *x)
 {
     if (ypObject_REFCNT(x) >= ypObject_REFCNT_IMMORTAL) return x;  // no-op
     ypObject_REFCNT(x) += 1;
-    yp_DEBUG("incref: %p refcnt %d", x, ypObject_REFCNT(x));
+    yp_DEBUG("incref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
     return x;
 }
 
@@ -1469,14 +1470,102 @@ void yp_increfN(int n, ...)
     va_end(args);
 }
 
-// TODO Python has Py_TRASHCAN_SAFE_BEGIN/END to prevent long deallocation chains from hosing the
-// stack.  Do we need something similar (without locking!) and, if so, are there other recursive
-// chains that we need to protect this way (aside from _yp_recursion_limit)?
-// TODO We could modify tp_dealloc to accept a memo, and create a yp_decref_from_dealloc, say, that
-// accepts it.  The memo would track the recursion depth and a pointer to a singly-linked list.
-// Once _yp_recursion_limit is hit, the object is added to the linked list and only freed once the
-// recursion depth is zero; ob_hash is abused to point to the next object (it shouldn't be used by
-// an object with no references).
+// FIXME This ypObject_dealloclist support should be available externally as part of nohtyP.h,
+// so that custom objects can also delay deallocation until the end of their methods.  Will need to
+// think hard about the names these should be given, and which parts of the API should be opaque.
+typedef struct {
+    ypObject *head;
+    ypObject *tail;
+} ypObject_dealloclist;
+
+#define ypObject_DEALLOCLIST_INIT() {0}
+
+static void _ypObject_dealloclist_push(ypObject_dealloclist *list, ypObject *x) {
+    yp_ASSERT1(list != NULL);
+    yp_ASSERT1(ypObject_REFCNT(x) == 1);
+
+    // We abuse ob_hash to form a linked list of objects to deallocate.  This is safe since we
+    // alone hold the last remaining reference, and as such no other code should access this field.
+    ypObject_CACHED_HASH(x) = (yp_hash_t)NULL;
+    if (list->head == NULL) {
+        yp_ASSERT1(list->tail == NULL);
+        list->head = x;
+        list->tail = x;
+    } else {
+        ypObject_CACHED_HASH(list->tail) = (yp_hash_t)x;
+        list->tail = x;
+    }
+}
+
+static ypObject *_ypObject_dealloclist_pop(ypObject_dealloclist *list) {
+    ypObject *x;
+
+    yp_ASSERT1(list != NULL);
+
+    x = list->head;
+    if (x == NULL) {
+        yp_ASSERT1(list->tail == NULL);
+        return NULL;
+    }
+
+    // We abuse ob_hash to form a linked list of objects to deallocate.  Because deallocating x
+    // will run arbitrary code that may depend on ob_hash, we invalidate ob_hash before returning.
+    if (x == list->tail) {
+        list->head = NULL;
+        list->tail = NULL;
+    } else {
+        list->head = (ypObject *)ypObject_CACHED_HASH(x);
+    }
+    ypObject_CACHED_HASH(x) = ypObject_HASH_INVALID;
+    yp_ASSERT1(ypObject_REFCNT(x) == 1);
+    return x;
+}
+
+static ypObject *_ypObject_dealloc(ypObject *x, ypObject_dealloclist *list) {
+    ypObject *result = yp_None;
+
+    yp_ASSERT1(x != NULL);
+    yp_ASSERT1(list != NULL);
+
+    while (x != NULL) {
+        ypObject *subresult;
+        yp_DEBUG("decref (dealloc): type %d %p", ypObject_TYPE_CODE(x), x);
+        yp_ASSERT1(ypObject_REFCNT(x) == 1);
+        subresult = ypObject_TYPE(x)->tp_dealloc(x, list);
+
+        yp_ASSERT(subresult == yp_None || yp_isexceptionC(subresult),
+            "tp_dealloc must return yp_None or an exception");
+        if (yp_isexceptionC(subresult)) result = subresult;
+
+        x = _ypObject_dealloclist_pop(list);
+    }
+
+    return result;
+}
+
+// If x's refcount is >1, discards a reference and returns false; otherwise, returns true and keeps
+// x's refcount at 1 (it's up to the caller to deallocate x).
+static int _ypObject_decref(ypObject *x, ypObject_dealloclist *list) {
+    if (ypObject_REFCNT(x) >= ypObject_REFCNT_IMMORTAL) return FALSE;  // no-op
+
+    if (ypObject_REFCNT(x) > 1) {
+        ypObject_REFCNT(x) -= 1;
+        yp_DEBUG("decref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
+        return FALSE;
+    }
+
+    yp_ASSERT1(ypObject_REFCNT(x) == 1);
+    return TRUE;
+}
+
+// FIXME Is there a better name to give this?
+static void yp_decref_fromdealloc(ypObject *x, void *memo) {
+    int deallocate = _ypObject_decref(x, NULL);
+    if (deallocate) {
+        _ypObject_dealloclist_push(memo, x);
+    }
+}
+
 // TODO A version of decref that returns exceptions.  Objects that could fail deallocation need to
 // ensure they are in a consistent state when returning...perhaps the deallocation can be attempted
 // again and it will skip over the part that failed?  Still need yp_decref to squelch errors, but
@@ -1487,16 +1576,11 @@ void yp_increfN(int n, ...)
 // the exception-returning version.
 void yp_decref(ypObject *x)
 {
-    if (ypObject_REFCNT(x) >= ypObject_REFCNT_IMMORTAL) return;  // no-op
-
-    if (ypObject_REFCNT(x) <= 1) {
-        ypObject *result;
-        yp_DEBUG("decref (dealloc): %p", x);
-        result = ypObject_TYPE(x)->tp_dealloc(x);
+    int deallocate = _ypObject_decref(x, NULL);
+    if (deallocate) {
+        ypObject_dealloclist dealloclist = ypObject_DEALLOCLIST_INIT();
+        ypObject *result = _ypObject_dealloc(x, &dealloclist);
         yp_ASSERT(!yp_isexceptionC(result), "tp_dealloc returned exception %p", result);
-    } else {
-        ypObject_REFCNT(x) -= 1;
-        yp_DEBUG("decref: %p refcnt %d", x, ypObject_REFCNT(x));
     }
 }
 
@@ -2038,8 +2122,10 @@ static ypObject *iter_send(ypObject *i, ypObject *value)
     return result;
 }
 
-static ypObject *iter_dealloc(ypObject *i)
+static ypObject *iter_dealloc(ypObject *i, void *memo)
 {
+    // FIXME Is there something better we can do to handle errors than just ignore them?
+    // TODO iter_close calls yp_decref.  Can we get it to call yp_decref_fromdealloc instead?
     (void)iter_close(i);  // ignore errors; discards all references
     ypMem_FREE_CONTAINER(i, ypIterObject);
     return yp_None;
@@ -2811,10 +2897,10 @@ static ypTypeObject ypInvalidated_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_objproc,  // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        MethodError_visitfunc,  // tp_dealloc  // FIXME implement
+        NoRefs_traversefunc,    // tp_traverse
+        NULL,                   // tp_str
+        NULL,                   // tp_repr
 
         // Freezing, copying, and invalidating
         InvalidatedError_objproc,       // tp_freeze
@@ -2893,10 +2979,10 @@ static ypTypeObject ypException_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_objproc,  // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        MethodError_visitfunc,  // tp_dealloc
+        NoRefs_traversefunc,    // tp_traverse
+        NULL,                   // tp_str
+        NULL,                   // tp_repr
 
         // Freezing, copying, and invalidating
         ExceptionMethod_objproc,       // tp_freeze
@@ -3110,10 +3196,10 @@ static ypTypeObject ypType_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_objproc,  // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        MethodError_visitfunc,  // tp_dealloc
+        NoRefs_traversefunc,    // tp_traverse
+        NULL,                   // tp_str
+        NULL,                   // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,   // tp_freeze
@@ -3199,10 +3285,10 @@ static ypTypeObject ypNoneType_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_objproc,  // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        MethodError_visitfunc,  // tp_dealloc
+        NoRefs_traversefunc,    // tp_traverse
+        NULL,                   // tp_str
+        NULL,                   // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,       // tp_freeze
@@ -3313,10 +3399,10 @@ static ypTypeObject ypBool_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_objproc,  // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        MethodError_visitfunc,  // tp_dealloc
+        NoRefs_traversefunc,    // tp_traverse
+        NULL,                   // tp_str
+        NULL,                   // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,   // tp_freeze
@@ -3564,7 +3650,7 @@ checkforintmin:
 
 // Public Methods
 
-static ypObject *int_dealloc(ypObject *i)
+static ypObject *int_dealloc(ypObject *i, void *memo)
 {
     ypMem_FREE_FIXED(i);
     return yp_None;
@@ -4624,7 +4710,7 @@ static yp_int_t yp_asint_exactC(ypObject *x, ypObject **exc)
 
 // ypFloatObject and ypFloat_VALUE are defined above for use by the int code
 
-static ypObject *float_dealloc(ypObject *f)
+static ypObject *float_dealloc(ypObject *f, void *memo)
 {
     ypMem_FREE_FIXED(f);
     return yp_None;
@@ -8188,7 +8274,7 @@ static ypObject *bytes_currenthash(
     return yp_None;
 }
 
-static ypObject *bytes_dealloc(ypObject *b)
+static ypObject *bytes_dealloc(ypObject *b, void *memo)
 {
     ypMem_FREE_CONTAINER(b, ypBytesObject);
     return yp_None;
@@ -8942,7 +9028,7 @@ static ypObject *str_currenthash(
 
 #define chrarray_clear NULL
 
-static ypObject *str_dealloc(ypObject *s)
+static ypObject *str_dealloc(ypObject *s, void *memo)
 {
     ypMem_FREE_CONTAINER(s, ypStrObject);
     return yp_None;
@@ -10435,12 +10521,11 @@ static ypObject *list_remove(ypObject *sq, ypObject *x, ypObject *onmissing)
     return onmissing;
 }
 
-static ypObject *tuple_dealloc(ypObject *sq)
+static ypObject *tuple_dealloc(ypObject *sq, void *memo)
 {
-    // Nobody is referencing us, so yp_decref doesn't require us to be in a good state
     yp_ssize_t i;
     for (i = 0; i < ypTuple_LEN(sq); i++) {
-        yp_decref(ypTuple_ARRAY(sq)[i]);
+        yp_decref_fromdealloc(ypTuple_ARRAY(sq)[i], memo);
     }
     ypMem_FREE_CONTAINER(sq, ypTupleObject);
     return yp_None;
@@ -13185,17 +13270,16 @@ static ypObject *set_remove(ypObject *so, ypObject *x, ypObject *onmissing)
     return yp_None;
 }
 
-static ypObject *frozenset_dealloc(ypObject *so)
+static ypObject *frozenset_dealloc(ypObject *so, void *memo)
 {
     ypSet_KeyEntry *keys = ypSet_TABLE(so);
     yp_ssize_t      keysleft = ypSet_LEN(so);
     yp_ssize_t      i;
 
-    // Nobody is referencing us, so yp_decref doesn't require us to be in a good state
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&keys[i])) continue;
         keysleft -= 1;
-        yp_decref(keys[i].se_key);
+        yp_decref_fromdealloc(keys[i].se_key, memo);
     }
     ypMem_FREE_CONTAINER(so, ypSetObject);
     return yp_None;
@@ -13510,7 +13594,7 @@ ypObject *yp_set(ypObject *iterable)
 #define ypDict_INLINE_DATA(mp) (((ypDictObject *)mp)->ob_inline_data)
 
 // XXX The dict's alloclen is always equal to the keyset alloclen, and we don't use the standard
-// ypMem_* macros to resize the dict, so we repurpose mp->ob_alloclen to be the search finger for
+// ypMem_* macros to resize the dict, so we abuse mp->ob_alloclen to be the search finger for
 // dict_popitem; if it gets corrupted, it's no big deal, because it's just a place to start
 // searching
 #define ypDict_POPITEM_FINGER ypObject_ALLOCLEN
@@ -13618,8 +13702,8 @@ static ypObject *_ypDict_deepcopy(
 
 // The tricky bit about resizing dicts is that we need both the old and new keysets and value
 // arrays to properly transfer the data, so ypMem_REALLOC_CONTAINER_VARIABLE is no help.
-// XXX If ever this is rewritten to use the ypMem_* macros, remember that mp->ob_alloclen is _not_
-// the allocation length: it has been repurposed (see ypDict_POPITEM_FINGER)
+// XXX If ever this is rewritten to use the ypMem_* macros, remember that mp->ob_alloclen has been
+// abused to hold a search finger (see ypDict_POPITEM_FINGER)
 // TODO Do we want to split minused into required and extra, like in other areas?
 yp_STATIC_ASSERT(
         ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof(ypObject *), ypDict_resize_cant_overflow);
@@ -14309,18 +14393,17 @@ static ypObject *frozendict_miniiter_lenhint(ypObject *mp, yp_uint64_t *state, y
     return yp_None;
 }
 
-static ypObject *frozendict_dealloc(ypObject *mp)
+static ypObject *frozendict_dealloc(ypObject *mp, void *memo)
 {
     ypObject **values = ypDict_VALUES(mp);
     yp_ssize_t valuesleft = ypDict_LEN(mp);
     yp_ssize_t i;
 
-    // Nobody is referencing us, so yp_decref doesn't require us to be in a good state
-    yp_decref(ypDict_KEYSET(mp));
+    yp_decref_fromdealloc(ypDict_KEYSET(mp), memo);
     for (i = 0; valuesleft > 0; i++) {
         if (values[i] == NULL) continue;
         valuesleft -= 1;
-        yp_decref(values[i]);
+        yp_decref_fromdealloc(values[i], memo);
     }
     ypMem_FREE_CONTAINER(mp, ypDictObject);
     return yp_None;
@@ -14931,7 +15014,7 @@ static ypObject *range_currenthash(
     return yp_None;
 }
 
-static ypObject *range_dealloc(ypObject *r)
+static ypObject *range_dealloc(ypObject *r, void *memo)
 {
     ypMem_FREE_FIXED(r);
     return yp_None;
