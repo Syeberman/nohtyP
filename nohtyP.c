@@ -123,9 +123,9 @@
 // Issues a breakpoint if the debugger is attached, on supported platforms
 // TODO Debug only, and use only at the point the error is "raised" (rename to yp_raise?)
 #if 0 && defined(_MSC_VER)
-static void yp_breakonerr( ypObject *err ) {
-    if( !IsDebuggerPresent( ) ) return;
-    DebugBreak( );
+static void yp_breakonerr(ypObject *err) {
+    if(!IsDebuggerPresent()) return;
+    DebugBreak();
 }
 #else
 #define yp_breakonerr(err)
@@ -431,26 +431,26 @@ yp_STATIC_ASSERT(_ypStr_CODE == ypStr_CODE, ypStr_CODE_matches);
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
 // clang-format off
-#define DEFINE_GENERIC_METHODS( name, retval ) \
-    static ypObject *name ## _objproc( ypObject *x ) { return retval; } \
-    static ypObject *name ## _objobjproc( ypObject *x, ypObject *y ) { return retval; } \
-    static ypObject *name ## _objobjobjproc( ypObject *x, ypObject *y, ypObject *z ) { return retval; } \
-    static ypObject *name ## _objssizeproc( ypObject *x, yp_ssize_t i ) { return retval; } \
-    static ypObject *name ## _objssizeobjproc( ypObject *x, yp_ssize_t i, ypObject *y ) { return retval; } \
-    static ypObject *name ## _objsliceproc( ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k ) { return retval; } \
-    static ypObject *name ## _objsliceobjproc( ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y ) { return retval; } \
-    static ypObject *name ## _objvalistproc( ypObject *x, int n, va_list args ) { return retval; } \
+#define DEFINE_GENERIC_METHODS(name, retval) \
+    static ypObject *name ## _objproc(ypObject *x) { return retval; } \
+    static ypObject *name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
+    static ypObject *name ## _objobjobjproc(ypObject *x, ypObject *y, ypObject *z) { return retval; } \
+    static ypObject *name ## _objssizeproc(ypObject *x, yp_ssize_t i) { return retval; } \
+    static ypObject *name ## _objssizeobjproc(ypObject *x, yp_ssize_t i, ypObject *y) { return retval; } \
+    static ypObject *name ## _objsliceproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k) { return retval; } \
+    static ypObject *name ## _objsliceobjproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y) { return retval; } \
+    static ypObject *name ## _objvalistproc(ypObject *x, int n, va_list args) { return retval; } \
     \
-    static ypObject *name ## _visitfunc( ypObject *x, void *memo ) { return retval; } \
-    static ypObject *name ## _traversefunc( ypObject *x, visitfunc visitor, void *memo ) { return retval; } \
-    static ypObject *name ## _hashfunc( ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash ) { return retval; } \
-    static ypObject *name ## _miniiterfunc( ypObject *x, yp_uint64_t *state ) { return retval; } \
-    static ypObject *name ## _miniiter_lenhfunc( ypObject *x, yp_uint64_t *state, yp_ssize_t *lenhint ) { return retval; } \
-    static ypObject *name ## _lenfunc( ypObject *x, yp_ssize_t *len ) { return retval; } \
-    static ypObject *name ## _countfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count ) { return retval; } \
-    static ypObject *name ## _findfunc( ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index ) { return retval; } \
-    static ypObject *name ## _sortfunc( ypObject *x, yp_sort_key_func_t key, ypObject *reverse ) { return retval; } \
-    static ypObject *name ## _popitemfunc( ypObject *x, ypObject **key, ypObject **value ) { return retval; } \
+    static ypObject *name ## _visitfunc(ypObject *x, void *memo) { return retval; } \
+    static ypObject *name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
+    static ypObject *name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
+    static ypObject *name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
+    static ypObject *name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *lenhint) { return retval; } \
+    static ypObject *name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
+    static ypObject *name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
+    static ypObject *name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; } \
+    static ypObject *name ## _sortfunc(ypObject *x, yp_sort_key_func_t key, ypObject *reverse) { return retval; } \
+    static ypObject *name ## _popitemfunc(ypObject *x, ypObject **key, ypObject **value) { return retval; } \
     \
     static ypNumberMethods name ## _NumberMethods[1] = { { \
         *name ## _objproc \
@@ -537,7 +537,7 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 
 
 // Functions that return nohtyP objects simply need to return the error object to "raise" it
-// Use this as "return_yp_ERR( x, yp_ValueError );" to return the error properly
+// Use this as "return_yp_ERR(x, yp_ValueError);" to return the error properly
 #define return_yp_ERR(_err)             \
     do {                                \
         ypObject *_yp_ERR_err = (_err); \
@@ -545,14 +545,14 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
     } while (0)
 
 // Functions that modify their inputs take a "ypObject **x".
-// Use this as "yp_INPLACE_ERR( x, yp_ValueError );" to discard x and set it to an exception
+// Use this as "yp_INPLACE_ERR(x, yp_ValueError);" to discard x and set it to an exception
 #define yp_INPLACE_ERR(ob, _err)        \
     do {                                \
         ypObject *_yp_ERR_err = (_err); \
         yp_decref(*(ob));               \
         *(ob) = (_yp_ERR_err);          \
     } while (0)
-// Use this as "return_yp_INPLACE_ERR( x, yp_ValueError );" to return the error properly
+// Use this as "return_yp_INPLACE_ERR(x, yp_ValueError);" to return the error properly
 #define return_yp_INPLACE_ERR(ob, _err) \
     do {                                \
         yp_INPLACE_ERR((ob), (_err));   \
@@ -574,13 +574,13 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 //  - it's some other type, so return yp_TypeError
 // TODO It'd be nice to remove a comparison from this, as a minor efficiency, but not sure how
 // clang-format off
-#define yp_BAD_TYPE( bad_ob ) ( \
-    ypObject_TYPE_PAIR_CODE( bad_ob ) == ypInvalidated_CODE ? \
+#define yp_BAD_TYPE(bad_ob) ( \
+    ypObject_TYPE_PAIR_CODE(bad_ob) == ypInvalidated_CODE ? \
         yp_InvalidatedError : \
-    ypObject_TYPE_PAIR_CODE( bad_ob ) == ypException_CODE ? \
+    ypObject_TYPE_PAIR_CODE(bad_ob) == ypException_CODE ? \
         (bad_ob) : \
     /* else */ \
-        yp_TypeError )
+        yp_TypeError)
 // clang-format on
 #define return_yp_BAD_TYPE(bad_ob) return_yp_ERR(yp_BAD_TYPE(bad_ob))
 #define return_yp_INPLACE_BAD_TYPE(ob, bad_ob) return_yp_INPLACE_ERR((ob), yp_BAD_TYPE(bad_ob))
@@ -609,7 +609,7 @@ yp_STATIC_ASSERT(yp_sizeof(size_t) == yp_sizeof(void *), uintptr_unnecessary);
 #define yp_IS_ALIGNED(p, a) (!((size_t)(p) & (size_t)((a)-1)))
 
 // For N functions (that take variable arguments); to be used as follows:
-//      return_yp_V_FUNC( ypObject *, yp_foobarV, (x, n, args), n )
+//      return_yp_V_FUNC(ypObject *, yp_foobarV, (x, n, args), n)
 // v_func_args must end in the identifier "args", which is declared internal to the macro.
 #define return_yp_V_FUNC(v_func_rettype, v_func, v_func_args, last_fixed) \
     do {                                                                  \
@@ -1321,7 +1321,7 @@ static yp_ssize_t _ypMem_inlinelen_container_variable(
 //  memcpy is necessary, as the buffer has not moved
 //  - Otherwise, updates ob_alloclen and returns oldptr (which is not freed); in this case, you
 //  will need to copy the data from oldptr, then free it with:
-//      ypMem_REALLOC_CONTAINER_FREE_OLDPTR( ob, obStruct, oldptr )
+//      ypMem_REALLOC_CONTAINER_FREE_OLDPTR(ob, obStruct, oldptr)
 // Required is the minimum ob_alloclen required; if required can fit inline, the inline buffer is
 // used.  extra is a hint as to how much the buffer should be over-allocated, which may be ignored.
 // This function will always resize the data, so first check to see if a resize is necessary.
@@ -2968,63 +2968,63 @@ static ypTypeObject ypException_Type = {
     _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, (ypObject *)&_##super##_struct)
 
 // clang-format off
-_yp_IMMORTAL_EXCEPTION_SUPERPTR( yp_BaseException, NULL );
-  _yp_IMMORTAL_EXCEPTION( yp_SystemExit, yp_BaseException );
-  _yp_IMMORTAL_EXCEPTION( yp_KeyboardInterrupt, yp_BaseException );
-  _yp_IMMORTAL_EXCEPTION( yp_GeneratorExit, yp_BaseException );
+_yp_IMMORTAL_EXCEPTION_SUPERPTR(yp_BaseException, NULL);
+  _yp_IMMORTAL_EXCEPTION(yp_SystemExit, yp_BaseException);
+  _yp_IMMORTAL_EXCEPTION(yp_KeyboardInterrupt, yp_BaseException);
+  _yp_IMMORTAL_EXCEPTION(yp_GeneratorExit, yp_BaseException);
 
-  _yp_IMMORTAL_EXCEPTION( yp_Exception, yp_BaseException );
-    _yp_IMMORTAL_EXCEPTION( yp_StopIteration, yp_Exception );
+  _yp_IMMORTAL_EXCEPTION(yp_Exception, yp_BaseException);
+    _yp_IMMORTAL_EXCEPTION(yp_StopIteration, yp_Exception);
 
-    _yp_IMMORTAL_EXCEPTION( yp_ArithmeticError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_FloatingPointError, yp_ArithmeticError );
-      _yp_IMMORTAL_EXCEPTION( yp_OverflowError, yp_ArithmeticError );
-      _yp_IMMORTAL_EXCEPTION( yp_ZeroDivisionError, yp_ArithmeticError );
+    _yp_IMMORTAL_EXCEPTION(yp_ArithmeticError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_FloatingPointError, yp_ArithmeticError);
+      _yp_IMMORTAL_EXCEPTION(yp_OverflowError, yp_ArithmeticError);
+      _yp_IMMORTAL_EXCEPTION(yp_ZeroDivisionError, yp_ArithmeticError);
 
-    _yp_IMMORTAL_EXCEPTION( yp_AssertionError, yp_Exception );
+    _yp_IMMORTAL_EXCEPTION(yp_AssertionError, yp_Exception);
 
-    _yp_IMMORTAL_EXCEPTION( yp_AttributeError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_MethodError, yp_AttributeError );
+    _yp_IMMORTAL_EXCEPTION(yp_AttributeError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_MethodError, yp_AttributeError);
 
-    _yp_IMMORTAL_EXCEPTION( yp_BufferError, yp_Exception );
-    _yp_IMMORTAL_EXCEPTION( yp_EOFError, yp_Exception );
-    _yp_IMMORTAL_EXCEPTION( yp_ImportError, yp_Exception );
+    _yp_IMMORTAL_EXCEPTION(yp_BufferError, yp_Exception);
+    _yp_IMMORTAL_EXCEPTION(yp_EOFError, yp_Exception);
+    _yp_IMMORTAL_EXCEPTION(yp_ImportError, yp_Exception);
 
-    _yp_IMMORTAL_EXCEPTION( yp_LookupError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_IndexError, yp_LookupError );
-      _yp_IMMORTAL_EXCEPTION( yp_KeyError, yp_LookupError );
+    _yp_IMMORTAL_EXCEPTION(yp_LookupError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_IndexError, yp_LookupError);
+      _yp_IMMORTAL_EXCEPTION(yp_KeyError, yp_LookupError);
 
-    _yp_IMMORTAL_EXCEPTION( yp_MemoryError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_MemorySizeOverflowError, yp_MemoryError );
+    _yp_IMMORTAL_EXCEPTION(yp_MemoryError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_MemorySizeOverflowError, yp_MemoryError);
 
-    _yp_IMMORTAL_EXCEPTION( yp_NameError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_UnboundLocalError, yp_NameError );
+    _yp_IMMORTAL_EXCEPTION(yp_NameError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_UnboundLocalError, yp_NameError);
 
-    _yp_IMMORTAL_EXCEPTION( yp_OSError, yp_Exception );
+    _yp_IMMORTAL_EXCEPTION(yp_OSError, yp_Exception);
       // TODO Many subexceptions missing here
 
-    _yp_IMMORTAL_EXCEPTION( yp_ReferenceError, yp_Exception );
+    _yp_IMMORTAL_EXCEPTION(yp_ReferenceError, yp_Exception);
 
-    _yp_IMMORTAL_EXCEPTION( yp_RuntimeError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_NotImplementedError, yp_RuntimeError );
-        _yp_IMMORTAL_EXCEPTION( yp_ComparisonNotImplemented, yp_NotImplementedError );
+    _yp_IMMORTAL_EXCEPTION(yp_RuntimeError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_NotImplementedError, yp_RuntimeError);
+        _yp_IMMORTAL_EXCEPTION(yp_ComparisonNotImplemented, yp_NotImplementedError);
       // TODO Document yp_CircularReferenceError and use
       // (Python raises RuntimeError on "maximum recursion depth exceeded", so this fits)
-      _yp_IMMORTAL_EXCEPTION( yp_CircularReferenceError, yp_RuntimeError );
+      _yp_IMMORTAL_EXCEPTION(yp_CircularReferenceError, yp_RuntimeError);
       // TODO Same with yp_RecursionLimitError
-      _yp_IMMORTAL_EXCEPTION( yp_RecursionLimitError, yp_RuntimeError );
+      _yp_IMMORTAL_EXCEPTION(yp_RecursionLimitError, yp_RuntimeError);
 
-    _yp_IMMORTAL_EXCEPTION( yp_SystemError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_SystemLimitationError, yp_SystemError );
+    _yp_IMMORTAL_EXCEPTION(yp_SystemError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_SystemLimitationError, yp_SystemError);
 
-    _yp_IMMORTAL_EXCEPTION( yp_TypeError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_InvalidatedError, yp_TypeError );
+    _yp_IMMORTAL_EXCEPTION(yp_TypeError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_InvalidatedError, yp_TypeError);
 
-    _yp_IMMORTAL_EXCEPTION( yp_ValueError, yp_Exception );
-      _yp_IMMORTAL_EXCEPTION( yp_UnicodeError, yp_ValueError );
-        _yp_IMMORTAL_EXCEPTION( yp_UnicodeEncodeError, yp_UnicodeError );
-        _yp_IMMORTAL_EXCEPTION( yp_UnicodeDecodeError, yp_UnicodeError );
-        _yp_IMMORTAL_EXCEPTION( yp_UnicodeTranslateError, yp_UnicodeError );
+    _yp_IMMORTAL_EXCEPTION(yp_ValueError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_UnicodeError, yp_ValueError);
+        _yp_IMMORTAL_EXCEPTION(yp_UnicodeEncodeError, yp_UnicodeError);
+        _yp_IMMORTAL_EXCEPTION(yp_UnicodeDecodeError, yp_UnicodeError);
+        _yp_IMMORTAL_EXCEPTION(yp_UnicodeTranslateError, yp_UnicodeError);
 // clang-format on
 
 // yp_isexceptionC defined above
@@ -3076,7 +3076,7 @@ int yp_isexceptionCNV(ypObject *x, int n, va_list args)
 
 
 // TODO Consider this:
-//  switch( yp_switchexceptionCN( x, 2, yp_StopIteration, yp_ValueError ) ) {
+//  switch(yp_switchexceptionCN(x, 2, yp_StopIteration, yp_ValueError)) {
 //      case 0: // yp_StopIteration
 //          break;
 //      case 1: // yp_ValueError
@@ -3087,9 +3087,9 @@ int yp_isexceptionCNV(ypObject *x, int n, va_list args)
 //          break;
 //  }
 // Even get fancy and do:
-//  #define yp_SWITCH_EXCEPTION( x, n, ... ) switch( yp_switchexceptionCN( x, n, ... ) )
+//  #define yp_SWITCH_EXCEPTION(x, n, ...) switch(yp_switchexceptionCN(x, n, ...))
 // Then, even fancier, a form of yp_ELSE_EXCEPT (et al) like yp_ELSE_SWITCH_EXCEPT
-// ypAPI int yp_switchexceptionCN( ypObject *x, int n, ... );
+// ypAPI int yp_switchexceptionCN(ypObject *x, int n, ...);
 
 
 /*************************************************************************************************
@@ -4431,26 +4431,26 @@ yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc)
 #define _ypInt_PREALLOC_START (-5)
 #define _ypInt_PREALLOC_END   (257)
 static ypIntObject _ypInt_pre_allocated[] = {
-    #define _ypInt_PREALLOC( value ) \
-        { yp_IMMORTAL_HEAD_INIT( ypInt_CODE, 0, NULL, ypObject_LEN_INVALID ), (value) }
-    _ypInt_PREALLOC( -5 ),
-    _ypInt_PREALLOC( -4 ),
-    _ypInt_PREALLOC( -3 ),
-    _ypInt_PREALLOC( -2 ),
-    _ypInt_PREALLOC( -1 ),
+    #define _ypInt_PREALLOC(value) \
+        { yp_IMMORTAL_HEAD_INIT(ypInt_CODE, 0, NULL, ypObject_LEN_INVALID), (value) }
+    _ypInt_PREALLOC(-5),
+    _ypInt_PREALLOC(-4),
+    _ypInt_PREALLOC(-3),
+    _ypInt_PREALLOC(-2),
+    _ypInt_PREALLOC(-1),
 
     // Allocates a range of 2, 4, etc starting at the given multiple of 2, 4, etc
-    #define _ypInt_PREALLOC002( v ) _ypInt_PREALLOC(    v ), _ypInt_PREALLOC(    (v) | 0x01 )
-    #define _ypInt_PREALLOC004( v ) _ypInt_PREALLOC002( v ), _ypInt_PREALLOC002( (v) | 0x02 )
-    #define _ypInt_PREALLOC008( v ) _ypInt_PREALLOC004( v ), _ypInt_PREALLOC004( (v) | 0x04 )
-    #define _ypInt_PREALLOC016( v ) _ypInt_PREALLOC008( v ), _ypInt_PREALLOC008( (v) | 0x08 )
-    #define _ypInt_PREALLOC032( v ) _ypInt_PREALLOC016( v ), _ypInt_PREALLOC016( (v) | 0x10 )
-    #define _ypInt_PREALLOC064( v ) _ypInt_PREALLOC032( v ), _ypInt_PREALLOC032( (v) | 0x20 )
-    #define _ypInt_PREALLOC128( v ) _ypInt_PREALLOC064( v ), _ypInt_PREALLOC064( (v) | 0x40 )
-    #define _ypInt_PREALLOC256( v ) _ypInt_PREALLOC128( v ), _ypInt_PREALLOC128( (v) | 0x80 )
-    _ypInt_PREALLOC256( 0 ), // pre-allocates range( 256 )
+    #define _ypInt_PREALLOC002(v) _ypInt_PREALLOC(   v), _ypInt_PREALLOC(   (v) | 0x01)
+    #define _ypInt_PREALLOC004(v) _ypInt_PREALLOC002(v), _ypInt_PREALLOC002((v) | 0x02)
+    #define _ypInt_PREALLOC008(v) _ypInt_PREALLOC004(v), _ypInt_PREALLOC004((v) | 0x04)
+    #define _ypInt_PREALLOC016(v) _ypInt_PREALLOC008(v), _ypInt_PREALLOC008((v) | 0x08)
+    #define _ypInt_PREALLOC032(v) _ypInt_PREALLOC016(v), _ypInt_PREALLOC016((v) | 0x10)
+    #define _ypInt_PREALLOC064(v) _ypInt_PREALLOC032(v), _ypInt_PREALLOC032((v) | 0x20)
+    #define _ypInt_PREALLOC128(v) _ypInt_PREALLOC064(v), _ypInt_PREALLOC064((v) | 0x40)
+    #define _ypInt_PREALLOC256(v) _ypInt_PREALLOC128(v), _ypInt_PREALLOC128((v) | 0x80)
+    _ypInt_PREALLOC256(0), // pre-allocates range(256)
 
-    _ypInt_PREALLOC( 256 ),
+    _ypInt_PREALLOC(256),
 };
 // clang-format on
 
@@ -4565,16 +4565,16 @@ yp_##name##_t yp_as##name##C(ypObject *x, ypObject **exc)                       
     \
 }
 // clang-format off
-_ypInt_PUBLIC_AS_C_FUNCTION( int8,   0xFF );
-_ypInt_PUBLIC_AS_C_FUNCTION( uint8,  0xFFu );
-_ypInt_PUBLIC_AS_C_FUNCTION( int16,  0xFFFF );
-_ypInt_PUBLIC_AS_C_FUNCTION( uint16, 0xFFFFu );
-_ypInt_PUBLIC_AS_C_FUNCTION( int32,  0xFFFFFFFF );
-_ypInt_PUBLIC_AS_C_FUNCTION( uint32, 0xFFFFFFFFu );
+_ypInt_PUBLIC_AS_C_FUNCTION(int8,   0xFF);
+_ypInt_PUBLIC_AS_C_FUNCTION(uint8,  0xFFu);
+_ypInt_PUBLIC_AS_C_FUNCTION(int16,  0xFFFF);
+_ypInt_PUBLIC_AS_C_FUNCTION(uint16, 0xFFFFu);
+_ypInt_PUBLIC_AS_C_FUNCTION(int32,  0xFFFFFFFF);
+_ypInt_PUBLIC_AS_C_FUNCTION(uint32, 0xFFFFFFFFu);
 #if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
-yp_STATIC_ASSERT( yp_sizeof( yp_ssize_t ) < yp_sizeof( yp_int_t ), sizeof_yp_ssize_lt_yp_int );
-_ypInt_PUBLIC_AS_C_FUNCTION( ssize,  (yp_ssize_t) 0xFFFFFFFF );
-_ypInt_PUBLIC_AS_C_FUNCTION( hash,   (yp_hash_t) 0xFFFFFFFF );
+yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) < yp_sizeof(yp_int_t), sizeof_yp_ssize_lt_yp_int);
+_ypInt_PUBLIC_AS_C_FUNCTION(ssize,  (yp_ssize_t) 0xFFFFFFFF);
+_ypInt_PUBLIC_AS_C_FUNCTION(hash,   (yp_hash_t) 0xFFFFFFFF);
 #endif
 // clang-format on
 
@@ -4599,7 +4599,7 @@ yp_hash_t yp_ashashC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 // toward zero.  An important property is that yp_int_exact(x) will equal x.
 // XXX Inspired by Python's Decimal.to_integral_exact; yp_ArithmeticError may be replaced with a
 // more-specific sub-exception in the future
-// ypObject *yp_int_exact( ypObject *x );
+// ypObject *yp_int_exact(ypObject *x);
 static yp_int_t yp_asint_exactLF(yp_float_t x, ypObject **exc);
 static yp_int_t yp_asint_exactC(ypObject *x, ypObject **exc)
 {
@@ -5210,7 +5210,7 @@ static ypObject *_ypSequence_delitem(ypObject *x, ypObject *key)
 // codec, as Python does
 
 typedef struct _yp_codecs_error_handler_params_t {
-    yp_ssize_t sizeof_struct;  // Set to sizeof( yp_codecs_error_handler_params_t ) on allocation
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_codecs_error_handler_params_t) on allocation
 
     // Details of the error.  All references, va_lists, and pointers are borrowed and should not be
     // replaced.
@@ -7029,7 +7029,7 @@ static ypObject *yp_codecs_lookup_alias(ypObject *alias)
 // TODO _yp_codecs_encoding2info
 // TODO Can we statically-allocate this dict?  Perhaps the standard encodings can fit in the
 // inline array, and if it grows past that then we allocate on the heap.
-// TODO static yp_codecs_codec_info_t yp_codecs_lookupE( ypObject *encoding, ypObject **exc )
+// TODO static yp_codecs_codec_info_t yp_codecs_lookupE(ypObject *encoding, ypObject **exc)
 // TODO deny replacing utf_8 codec with anything else, and give it a fast-path in the code
 // TODO Registered encoders/decoders should take a ypObject*typehint that identifies a particular
 // type for the return value, if possible, otherwise it's ignored and a "standard" type is returned
@@ -7343,7 +7343,7 @@ yp_STATIC_ASSERT(yp_offsetof(ypBytesObject, ob_inline_data) % yp_MAX_ALIGNMENT =
 #define ypBytes_ELEMMOVE(b, dest, src) \
     memmove(ypBytes_DATA(b) + (dest), ypBytes_DATA(b) + (src), ypBytes_LEN(b) - (src) + 1);
 
-// When byte arrays are accepted from C, a negative len indicates that strlen( source ) should be
+// When byte arrays are accepted from C, a negative len indicates that strlen(source) should be
 // used as the length.  This function updates *len accordingly.  Returns false if the final value
 // of *len would be larger than ypBytes_LEN_MAX, in which case *len is undefined and
 // yp_MemorySizeOverflowError should probably be returned.
@@ -14717,7 +14717,7 @@ typedef struct {
     (ypRange_LEN(r) == ypRange_LEN(x) && ypRange_START(r) == ypRange_START(x) && \
             ypRange_STEP(r) == ypRange_STEP(x))
 
-// Use yp_rangeC( 0 ) as the standard empty struct
+// Use yp_rangeC(0) as the standard empty struct
 static ypRangeObject _yp_range_empty_struct = {
         {ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0, ypObject_HASH_INVALID, NULL}, 0, 1};
 #define _yp_range_empty ((ypObject *)&_yp_range_empty_struct)
@@ -15822,18 +15822,18 @@ static const yp_initialize_kwparams_t _default_initialize = {
 // kwparams.  Returns the default value if kwparams is too small to hold the parameter, or if
 // the expression "kwparams->key default_cond" (ie "kwparams->yp_malloc ==NULL") evaluates to true.
 // clang-format off
-#define _yp_INIT_PARAM_END( key ) \
-    (yp_offsetof( yp_initialize_kwparams_t, key ) + yp_sizeof_member( yp_initialize_kwparams_t, key ))
-#define yp_INIT_PARAM2( key, default_cond ) \
-    ( kwparams->sizeof_struct < _yp_INIT_PARAM_END( key ) ? \
+#define _yp_INIT_PARAM_END(key) \
+    (yp_offsetof(yp_initialize_kwparams_t, key) + yp_sizeof_member(yp_initialize_kwparams_t, key))
+#define yp_INIT_PARAM2(key, default_cond) \
+    ( kwparams->sizeof_struct < _yp_INIT_PARAM_END(key) ? \
         _default_initialize.key : \
       kwparams->key default_cond ? \
         _default_initialize.key : \
       /* else */ \
         kwparams->key \
     )
-#define yp_INIT_PARAM1( key ) \
-    ( kwparams->sizeof_struct < _yp_INIT_PARAM_END( key ) ? \
+#define yp_INIT_PARAM1(key) \
+    ( kwparams->sizeof_struct < _yp_INIT_PARAM_END(key) ? \
         _default_initialize.key : \
       /* else */ \
         kwparams->key \
@@ -15878,7 +15878,7 @@ static void _yp_codecs_initialize(const yp_initialize_kwparams_t *kwparams)
     // The set of standard encodings
     // TODO This would be easier to maintain with a "yp_N" macro to count args
     // clang-format off
-    _yp_codecs_standard = yp_setN( 11,
+    _yp_codecs_standard = yp_setN(11,
         yp_s_ascii,     yp_s_latin_1,
         yp_s_utf_8,
         yp_s_utf_16,    yp_s_utf_16be,      yp_s_utf_16le,
@@ -15897,14 +15897,14 @@ static void _yp_codecs_initialize(const yp_initialize_kwparams_t *kwparams)
         yp_setitem(&_yp_codecs_alias2encoding, _alias_obj, (name)); \
     } while (0)
     // clang-format off
-    yp_codecs_init_ADD_ALIAS( "646",            yp_s_ascii );
-    yp_codecs_init_ADD_ALIAS( "ansi_x3.4_1968", yp_s_ascii );
-    yp_codecs_init_ADD_ALIAS( "ansi_x3_4_1968", yp_s_ascii );
-    yp_codecs_init_ADD_ALIAS( "ansi_x3.4_1986", yp_s_ascii );
-    yp_codecs_init_ADD_ALIAS( "cp367",          yp_s_ascii );
-    yp_codecs_init_ADD_ALIAS( "csascii",        yp_s_ascii );
-    yp_codecs_init_ADD_ALIAS( "ibm367",         yp_s_ascii );
-    yp_codecs_init_ADD_ALIAS( "iso646_us",      yp_s_ascii );
+    yp_codecs_init_ADD_ALIAS("646",            yp_s_ascii);
+    yp_codecs_init_ADD_ALIAS("ansi_x3.4_1968", yp_s_ascii);
+    yp_codecs_init_ADD_ALIAS("ansi_x3_4_1968", yp_s_ascii);
+    yp_codecs_init_ADD_ALIAS("ansi_x3.4_1986", yp_s_ascii);
+    yp_codecs_init_ADD_ALIAS("cp367",          yp_s_ascii);
+    yp_codecs_init_ADD_ALIAS("csascii",        yp_s_ascii);
+    yp_codecs_init_ADD_ALIAS("ibm367",         yp_s_ascii);
+    yp_codecs_init_ADD_ALIAS("iso646_us",      yp_s_ascii);
     // TODO More ascii and other aliases below
     // yp_s_latin_1
     // yp_s_utf_8
@@ -15927,13 +15927,13 @@ static void _yp_codecs_initialize(const yp_initialize_kwparams_t *kwparams)
 #define yp_codecs_init_ADD_ERROR(name, func) \
     yp_o2i_setitemC(&_yp_codecs_errors2handler, (name), (yp_ssize_t)(func))
     // clang-format off
-    yp_codecs_init_ADD_ERROR( yp_s_strict,            yp_codecs_strict_errors );
-    yp_codecs_init_ADD_ERROR( yp_s_replace,           yp_codecs_replace_errors );
-    yp_codecs_init_ADD_ERROR( yp_s_ignore,            yp_codecs_ignore_errors );
-    yp_codecs_init_ADD_ERROR( yp_s_xmlcharrefreplace, yp_codecs_xmlcharrefreplace_errors );
-    yp_codecs_init_ADD_ERROR( yp_s_backslashreplace,  yp_codecs_backslashreplace_errors );
-    yp_codecs_init_ADD_ERROR( yp_s_surrogateescape,   yp_codecs_surrogateescape_errors );
-    yp_codecs_init_ADD_ERROR( yp_s_surrogatepass,     yp_codecs_surrogatepass_errors );
+    yp_codecs_init_ADD_ERROR(yp_s_strict,            yp_codecs_strict_errors);
+    yp_codecs_init_ADD_ERROR(yp_s_replace,           yp_codecs_replace_errors);
+    yp_codecs_init_ADD_ERROR(yp_s_ignore,            yp_codecs_ignore_errors);
+    yp_codecs_init_ADD_ERROR(yp_s_xmlcharrefreplace, yp_codecs_xmlcharrefreplace_errors);
+    yp_codecs_init_ADD_ERROR(yp_s_backslashreplace,  yp_codecs_backslashreplace_errors);
+    yp_codecs_init_ADD_ERROR(yp_s_surrogateescape,   yp_codecs_surrogateescape_errors);
+    yp_codecs_init_ADD_ERROR(yp_s_surrogatepass,     yp_codecs_surrogatepass_errors);
     // clang-format on
 }
 
