@@ -169,7 +169,7 @@ class c_ypObject_pp(c_ypObject_p*1):
             self[0] = yp_None
         except:
             pass
-        # super( ).__del__( self ) # no __del__ method?!
+        # super().__del__(self) # no __del__ method?!
 
     def __getitem__(self, key):
         item = super().__getitem__(key)
@@ -189,88 +189,88 @@ c_multiN_ypObject_p = (c_int, "n", 0)
 c_multiK_ypObject_p = (c_int, "n", 0)
 assert c_multiN_ypObject_p is not c_multiK_ypObject_p
 
-# void yp_initialize( yp_initialize_kwparams *kwparams );
+# void yp_initialize(yp_initialize_kwparams *kwparams);
 
-# ypObject *yp_incref( ypObject *x );
+# ypObject *yp_incref(ypObject *x);
 yp_func(c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False)
 
-# void yp_increfN( int n, ... );
-# void yp_increfNV( int n, va_list args );
+# void yp_increfN(int n, ...);
+# void yp_increfNV(int n, va_list args);
 
-# void yp_decref( ypObject *x );
+# void yp_decref(ypObject *x);
 yp_func(c_void, "yp_decref", ((c_ypObject_p, "x"), ), errcheck=False)
 
-# void yp_decrefN( int n, ... );
-# void yp_decrefNV( int n, va_list args );
+# void yp_decrefN(int n, ...);
+# void yp_decrefNV(int n, va_list args);
 
-# int yp_isexceptionC( ypObject *x );
+# int yp_isexceptionC(ypObject *x);
 yp_func(c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False)
 
-# void yp_freeze( ypObject **x );
+# void yp_freeze(ypObject **x);
 yp_func(c_void, "yp_freeze", ((c_ypObject_pp, "x"), ))
 
-# void yp_deepfreeze( ypObject **x );
+# void yp_deepfreeze(ypObject **x);
 yp_func(c_void, "yp_deepfreeze", ((c_ypObject_pp, "x"), ))
 
-# ypObject *yp_unfrozen_copy( ypObject *x );
+# ypObject *yp_unfrozen_copy(ypObject *x);
 yp_func(c_ypObject_p, "yp_unfrozen_copy", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_unfrozen_deepcopy( ypObject *x );
+# ypObject *yp_unfrozen_deepcopy(ypObject *x);
 yp_func(c_ypObject_p, "yp_unfrozen_deepcopy", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_frozen_copy( ypObject *x );
+# ypObject *yp_frozen_copy(ypObject *x);
 yp_func(c_ypObject_p, "yp_frozen_copy", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_frozen_deepcopy( ypObject *x );
+# ypObject *yp_frozen_deepcopy(ypObject *x);
 yp_func(c_ypObject_p, "yp_frozen_deepcopy", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_copy( ypObject *x );
+# ypObject *yp_copy(ypObject *x);
 yp_func(c_ypObject_p, "yp_copy", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_deepcopy( ypObject *x );
+# ypObject *yp_deepcopy(ypObject *x);
 yp_func(c_ypObject_p, "yp_deepcopy", ((c_ypObject_p, "x"), ))
 
-# void yp_invalidate( ypObject **x );
+# void yp_invalidate(ypObject **x);
 
-# void yp_deepinvalidate( ypObject **x );
+# void yp_deepinvalidate(ypObject **x);
 
 
 # ypObject *yp_True;
 # ypObject *yp_False;
 
-# ypObject *yp_bool( ypObject *x );
+# ypObject *yp_bool(ypObject *x);
 yp_func(c_ypObject_p, "yp_bool", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_not( ypObject *x );
+# ypObject *yp_not(ypObject *x);
 yp_func(c_ypObject_p, "yp_not", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_or( ypObject *x, ypObject *y );
+# ypObject *yp_or(ypObject *x, ypObject *y);
 
-# ypObject *yp_orN( int n, ... );
-# ypObject *yp_orNV( int n, va_list args );
+# ypObject *yp_orN(int n, ...);
+# ypObject *yp_orNV(int n, va_list args);
 
-# ypObject *yp_anyN( int n, ... );
-# ypObject *yp_anyNV( int n, va_list args );
+# ypObject *yp_anyN(int n, ...);
+# ypObject *yp_anyNV(int n, va_list args);
 
-# ypObject *yp_any( ypObject *iterable );
+# ypObject *yp_any(ypObject *iterable);
 
-# ypObject *yp_and( ypObject *x, ypObject *y );
+# ypObject *yp_and(ypObject *x, ypObject *y);
 
-# ypObject *yp_andN( int n, ... );
-# ypObject *yp_andNV( int n, va_list args );
+# ypObject *yp_andN(int n, ...);
+# ypObject *yp_andNV(int n, va_list args);
 
-# ypObject *yp_allN( int n, ... );
-# ypObject *yp_allNV( int n, va_list args );
+# ypObject *yp_allN(int n, ...);
+# ypObject *yp_allNV(int n, va_list args);
 
-# ypObject *yp_all( ypObject *iterable );
+# ypObject *yp_all(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_all", ((c_ypObject_p, "iterable"), ))
 
-# ypObject *yp_lt( ypObject *x, ypObject *y );
-# ypObject *yp_le( ypObject *x, ypObject *y );
-# ypObject *yp_eq( ypObject *x, ypObject *y );
-# ypObject *yp_ne( ypObject *x, ypObject *y );
-# ypObject *yp_ge( ypObject *x, ypObject *y );
-# ypObject *yp_gt( ypObject *x, ypObject *y );
+# ypObject *yp_lt(ypObject *x, ypObject *y);
+# ypObject *yp_le(ypObject *x, ypObject *y);
+# ypObject *yp_eq(ypObject *x, ypObject *y);
+# ypObject *yp_ne(ypObject *x, ypObject *y);
+# ypObject *yp_ge(ypObject *x, ypObject *y);
+# ypObject *yp_gt(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_lt", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
 yp_func(c_ypObject_p, "yp_le", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
 yp_func(c_ypObject_p, "yp_eq", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
@@ -302,341 +302,341 @@ c_yp_int_t = c_int64
 # typedef yp_float64_t    yp_float_t;
 c_yp_float_t = c_yp_float64_t
 
-# typedef ypObject *(*yp_generator_func_t)( ypObject *self, ypObject *value );
+# typedef ypObject *(*yp_generator_func_t)(ypObject *self, ypObject *value);
 # XXX The return value needs to be a c_void_p to prevent addresses-as-ints from being converted to
 # a yp_int
 c_yp_generator_func_t = CFUNCTYPE(c_void_p, c_ypObject_p, c_ypObject_p)
 
-# ypObject *yp_intC( yp_int_t value );
+# ypObject *yp_intC(yp_int_t value);
 yp_func(c_ypObject_p, "yp_intC", ((c_yp_int_t, "value"), ))
-# ypObject *yp_intstoreC( yp_int_t value );
+# ypObject *yp_intstoreC(yp_int_t value);
 
-# ypObject *yp_int_baseC( ypObject *x, yp_int_t base );
+# ypObject *yp_int_baseC(ypObject *x, yp_int_t base);
 yp_func(c_ypObject_p, "yp_int_baseC", ((c_ypObject_p, "x"), (c_yp_int_t, "base")))
-# ypObject *yp_intstore_baseC( ypObject *x, yp_int_t base );
+# ypObject *yp_intstore_baseC(ypObject *x, yp_int_t base);
 
-# ypObject *yp_int( ypObject *x );
+# ypObject *yp_int(ypObject *x);
 yp_func(c_ypObject_p, "yp_int", ((c_ypObject_p, "x"), ))
-# ypObject *yp_intstore( ypObject *x );
+# ypObject *yp_intstore(ypObject *x);
 
-# ypObject *yp_floatCF( yp_float_t value );
+# ypObject *yp_floatCF(yp_float_t value);
 yp_func(c_ypObject_p, "yp_floatCF", ((c_yp_float_t, "value"), ))
-# ypObject *yp_floatstoreCF( yp_float_t value );
+# ypObject *yp_floatstoreCF(yp_float_t value);
 
-# ypObject *yp_float_strC( const char *string );
-# ypObject *yp_floatstore_strC( const char *string );
+# ypObject *yp_float_strC(const char *string);
+# ypObject *yp_floatstore_strC(const char *string);
 
-# ypObject *yp_float( ypObject *x );
+# ypObject *yp_float(ypObject *x);
 yp_func(c_ypObject_p, "yp_float", ((c_ypObject_p, "x"), ))
-# ypObject *yp_floatstore( ypObject *x );
+# ypObject *yp_floatstore(ypObject *x);
 
-# ypObject *yp_iter( ypObject *x );
+# ypObject *yp_iter(ypObject *x);
 yp_func(c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, ... );
-# ypObject *yp_generatorCNV( yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args );
+# ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t lenhint, int n, ...);
+# ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args);
 
-# ypObject *yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint,
-#         void *state, yp_ssize_t size, int n, ... );
-# ypObject *yp_generator_fromstructCNV( yp_generator_func_t func, yp_ssize_t lenhint,
-#         void *state, yp_ssize_t size, int n, va_list args );
+# ypObject *yp_generator_fromstructCN(yp_generator_func_t func, yp_ssize_t lenhint,
+#         void *state, yp_ssize_t size, int n, ...);
+# ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t lenhint,
+#         void *state, yp_ssize_t size, int n, va_list args);
 yp_func(c_ypObject_p, "yp_generator_fromstructCN",
         ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"),
          (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p))
 
-# ypObject *yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );
+# ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step);
 yp_func(c_ypObject_p, "yp_rangeC3",
         ((c_yp_int_t, "start"), (c_yp_int_t, "stop"), (c_yp_int_t, "step")))
-# ypObject *yp_rangeC( yp_int_t stop );
+# ypObject *yp_rangeC(yp_int_t stop);
 yp_func(c_ypObject_p, "yp_rangeC", ((c_yp_int_t, "stop"), ))
 
-# ypObject *yp_bytesC( const yp_uint8_t *source, yp_ssize_t len );
+# ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
 yp_func(c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
-# ypObject *yp_bytearrayC( const yp_uint8_t *source, yp_ssize_t len );
+# ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len);
 yp_func(c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
 
-# ypObject *yp_bytes3( ypObject *source, ypObject *encoding, ypObject *errors );
+# ypObject *yp_bytes3(ypObject *source, ypObject *encoding, ypObject *errors);
 yp_func(c_ypObject_p, "yp_bytes3", ((c_ypObject_p, "source"),
                                     (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
-# ypObject *yp_bytearray3( ypObject *source, ypObject *encoding, ypObject *errors );
+# ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *errors);
 yp_func(c_ypObject_p, "yp_bytearray3", ((c_ypObject_p, "source"),
                                         (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 
-# ypObject *yp_bytes( ypObject *source );
+# ypObject *yp_bytes(ypObject *source);
 yp_func(c_ypObject_p, "yp_bytes", ((c_ypObject_p, "source"), ))
-# ypObject *yp_bytearray( ypObject *source );
+# ypObject *yp_bytearray(ypObject *source);
 yp_func(c_ypObject_p, "yp_bytearray", ((c_ypObject_p, "source"), ))
 
-# ypObject *yp_bytes0( void );
+# ypObject *yp_bytes0(void);
 yp_func(c_ypObject_p, "yp_bytes0", ())
-# ypObject *yp_bytearray0( void );
+# ypObject *yp_bytearray0(void);
 yp_func(c_ypObject_p, "yp_bytearray0", ())
 
-# ypObject *yp_str_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
-#         ypObject *encoding, ypObject *errors );
+# ypObject *yp_str_frombytesC4(const yp_uint8_t *source, yp_ssize_t len,
+#         ypObject *encoding, ypObject *errors);
 yp_func(c_ypObject_p, "yp_str_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
                                              (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
-# ypObject *yp_chrarray_frombytesC4( const yp_uint8_t *source, yp_ssize_t len,
-#         ypObject *encoding, ypObject *errors );
+# ypObject *yp_chrarray_frombytesC4(const yp_uint8_t *source, yp_ssize_t len,
+#         ypObject *encoding, ypObject *errors);
 yp_func(c_ypObject_p, "yp_chrarray_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
                                                   (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 
-# ypObject *yp_str_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
+# ypObject *yp_str_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
 yp_func(c_ypObject_p, "yp_str_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
-# ypObject *yp_chrarray_frombytesC2( const yp_uint8_t *source, yp_ssize_t len );
+# ypObject *yp_chrarray_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
 yp_func(c_ypObject_p, "yp_chrarray_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
 
-# ypObject *yp_str3( ypObject *object, ypObject *encoding, ypObject *errors );
+# ypObject *yp_str3(ypObject *object, ypObject *encoding, ypObject *errors);
 yp_func(c_ypObject_p, "yp_str3", ((c_ypObject_p, "object"),
                                   (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
-# ypObject *yp_chrarray3( ypObject *object, ypObject *encoding, ypObject *errors );
+# ypObject *yp_chrarray3(ypObject *object, ypObject *encoding, ypObject *errors);
 yp_func(c_ypObject_p, "yp_chrarray3", ((c_ypObject_p, "object"),
                                        (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 
-# ypObject *yp_str( ypObject *object );
+# ypObject *yp_str(ypObject *object);
 yp_func(c_ypObject_p, "yp_str", ((c_ypObject_p, "object"), ))
-# ypObject *yp_chrarray( ypObject *object );
+# ypObject *yp_chrarray(ypObject *object);
 yp_func(c_ypObject_p, "yp_chrarray", ((c_ypObject_p, "object"), ))
 
-# ypObject *yp_str0( void );
+# ypObject *yp_str0(void);
 yp_func(c_ypObject_p, "yp_str0", ())
-# ypObject *yp_chrarray0( void );
+# ypObject *yp_chrarray0(void);
 yp_func(c_ypObject_p, "yp_chrarray0", ())
 
-# ypObject *yp_chrC( yp_int_t i );
+# ypObject *yp_chrC(yp_int_t i);
 yp_func(c_ypObject_p, "yp_chrC", ((c_yp_int_t, "i"), ))
 
-# ypObject *yp_tupleN( int n, ... );
+# ypObject *yp_tupleN(int n, ...);
 yp_func(c_ypObject_p, "yp_tupleN", (c_multiN_ypObject_p, ))
 
-# ypObject *yp_tupleNV( int n, va_list args );
-# ypObject *yp_listN( int n, ... );
-# ypObject *yp_listNV( int n, va_list args );
+# ypObject *yp_tupleNV(int n, va_list args);
+# ypObject *yp_listN(int n, ...);
+# ypObject *yp_listNV(int n, va_list args);
 
-# ypObject *yp_tuple_repeatCN( yp_ssize_t factor, int n, ... );
-# ypObject *yp_tuple_repeatCNV( yp_ssize_t factor, int n, va_list args );
-# ypObject *yp_list_repeatCN( yp_ssize_t factor, int n, ... );
-# ypObject *yp_list_repeatCNV( yp_ssize_t factor, int n, va_list args );
+# ypObject *yp_tuple_repeatCN(yp_ssize_t factor, int n, ...);
+# ypObject *yp_tuple_repeatCNV(yp_ssize_t factor, int n, va_list args);
+# ypObject *yp_list_repeatCN(yp_ssize_t factor, int n, ...);
+# ypObject *yp_list_repeatCNV(yp_ssize_t factor, int n, va_list args);
 
-# ypObject *yp_tuple( ypObject *iterable );
+# ypObject *yp_tuple(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_tuple", ((c_ypObject_p, "iterable"), ))
-# ypObject *yp_list( ypObject *iterable );
+# ypObject *yp_list(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ))
 
-# typedef ypObject *(*yp_sort_key_func_t)( ypObject *x );
-# ypObject *yp_sorted3( ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse );
+# typedef ypObject *(*yp_sort_key_func_t)(ypObject *x);
+# ypObject *yp_sorted3(ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse);
 yp_func(c_ypObject_p, "yp_sorted3", ((c_ypObject_p, "iterable"), (c_void_p, "key"),
                                      (c_ypObject_p, "reverse")))
 
-# ypObject *yp_sorted( ypObject *iterable );
+# ypObject *yp_sorted(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_sorted", ((c_ypObject_p, "iterable"), ))
 
-# ypObject *yp_frozensetN( int n, ... );
-# ypObject *yp_frozensetNV( int n, va_list args );
+# ypObject *yp_frozensetN(int n, ...);
+# ypObject *yp_frozensetNV(int n, va_list args);
 yp_func(c_ypObject_p, "yp_frozensetN", (c_multiN_ypObject_p, ))
-# ypObject *yp_setN( int n, ... );
-# ypObject *yp_setNV( int n, va_list args );
+# ypObject *yp_setN(int n, ...);
+# ypObject *yp_setNV(int n, va_list args);
 yp_func(c_ypObject_p, "yp_setN", (c_multiN_ypObject_p, ))
 
-# ypObject *yp_frozenset( ypObject *iterable );
+# ypObject *yp_frozenset(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_frozenset", ((c_ypObject_p, "iterable"), ))
-# ypObject *yp_set( ypObject *iterable );
+# ypObject *yp_set(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_set", ((c_ypObject_p, "iterable"), ))
 
-# ypObject *yp_frozendictK( int n, ... );
-# ypObject *yp_frozendictKV( int n, va_list args );
-# ypObject *yp_dictK( int n, ... );
-# ypObject *yp_dictKV( int n, va_list args );
+# ypObject *yp_frozendictK(int n, ...);
+# ypObject *yp_frozendictKV(int n, va_list args);
+# ypObject *yp_dictK(int n, ...);
+# ypObject *yp_dictKV(int n, va_list args);
 yp_func(c_ypObject_p, "yp_dictK", (c_multiK_ypObject_p, ))
 
-# ypObject *yp_frozendict_fromkeysN( ypObject *value, int n, ... );
-# ypObject *yp_frozendict_fromkeysNV( ypObject *value, int n, va_list args );
-# ypObject *yp_dict_fromkeysN( ypObject *value, int n, ... );
-# ypObject *yp_dict_fromkeysNV( ypObject *value, int n, va_list args );
+# ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...);
+# ypObject *yp_frozendict_fromkeysNV(ypObject *value, int n, va_list args);
+# ypObject *yp_dict_fromkeysN(ypObject *value, int n, ...);
+# ypObject *yp_dict_fromkeysNV(ypObject *value, int n, va_list args);
 yp_func(c_ypObject_p, "yp_dict_fromkeysN", ((c_ypObject_p, "value"), c_multiN_ypObject_p))
 
-# ypObject *yp_frozendict( ypObject *x );
+# ypObject *yp_frozendict(ypObject *x);
 yp_func(c_ypObject_p, "yp_frozendict", ((c_ypObject_p, "x"), ))
-# ypObject *yp_dict( ypObject *x );
+# ypObject *yp_dict(ypObject *x);
 yp_func(c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ))
 
 # XXX The file type will be added in a future version
 
 
-# yp_hash_t yp_hashC( ypObject *x, ypObject **exc );
+# yp_hash_t yp_hashC(ypObject *x, ypObject **exc);
 yp_func(c_yp_hash_t, "yp_hashC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
 
-# yp_hash_t yp_currenthashC( ypObject *x, ypObject **exc );
+# yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 
 
-# ypObject *yp_send( ypObject *iterator, ypObject *value );
+# ypObject *yp_send(ypObject *iterator, ypObject *value);
 
-# ypObject *yp_next( ypObject *iterator );
+# ypObject *yp_next(ypObject *iterator);
 yp_func(c_ypObject_p, "yp_next", ((c_ypObject_pp, "iterator"), ))
 
-# ypObject *yp_next2( ypObject *iterator, ypObject *defval );
+# ypObject *yp_next2(ypObject *iterator, ypObject *defval);
 
-# ypObject *yp_throw( ypObject *iterator, ypObject *exc );
+# ypObject *yp_throw(ypObject *iterator, ypObject *exc);
 
-# yp_ssize_t yp_iter_lenhintC( ypObject *iterator, ypObject **exc );
+# yp_ssize_t yp_iter_lenhintC(ypObject *iterator, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc))
 
-# ypObject *yp_iter_stateCX( ypObject *iterator, void **state, yp_ssize_t *size );
+# ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
-# void yp_close( ypObject **iterator );
+# void yp_close(ypObject **iterator);
 
-# typedef ypObject *(*yp_filter_function_t)( ypObject *x );
-# ypObject *yp_filter( yp_filter_function_t function, ypObject *iterable );
+# typedef ypObject *(*yp_filter_function_t)(ypObject *x);
+# ypObject *yp_filter(yp_filter_function_t function, ypObject *iterable);
 
-# ypObject *yp_filterfalse( yp_filter_function_t function, ypObject *iterable );
+# ypObject *yp_filterfalse(yp_filter_function_t function, ypObject *iterable);
 
-# ypObject *yp_max_keyN( yp_sort_key_func_t key, int n, ... );
-# ypObject *yp_max_keyNV( yp_sort_key_func_t key, int n, va_list args );
-# ypObject *yp_min_keyN( yp_sort_key_func_t key, int n, ... );
-# ypObject *yp_min_keyNV( yp_sort_key_func_t key, int n, va_list args );
+# ypObject *yp_max_keyN(yp_sort_key_func_t key, int n, ...);
+# ypObject *yp_max_keyNV(yp_sort_key_func_t key, int n, va_list args);
+# ypObject *yp_min_keyN(yp_sort_key_func_t key, int n, ...);
+# ypObject *yp_min_keyNV(yp_sort_key_func_t key, int n, va_list args);
 
-# ypObject *yp_maxN( int n, ... );
-# ypObject *yp_maxNV( int n, va_list args );
-# ypObject *yp_minN( int n, ... );
-# ypObject *yp_minNV( int n, va_list args );
+# ypObject *yp_maxN(int n, ...);
+# ypObject *yp_maxNV(int n, va_list args);
+# ypObject *yp_minN(int n, ...);
+# ypObject *yp_minNV(int n, va_list args);
 
-# ypObject *yp_max_key( ypObject *iterable, yp_sort_key_func_t key );
-# ypObject *yp_min_key( ypObject *iterable, yp_sort_key_func_t key );
+# ypObject *yp_max_key(ypObject *iterable, yp_sort_key_func_t key);
+# ypObject *yp_min_key(ypObject *iterable, yp_sort_key_func_t key);
 
-# ypObject *yp_max( ypObject *iterable );
-# ypObject *yp_min( ypObject *iterable );
+# ypObject *yp_max(ypObject *iterable);
+# ypObject *yp_min(ypObject *iterable);
 
-# ypObject *yp_reversed( ypObject *seq );
+# ypObject *yp_reversed(ypObject *seq);
 yp_func(c_ypObject_p, "yp_reversed", ((c_ypObject_p, "seq"), ))
 
-# ypObject *yp_zipN( int n, ... );
-# ypObject *yp_zipNV( int n, va_list args );
+# ypObject *yp_zipN(int n, ...);
+# ypObject *yp_zipNV(int n, va_list args);
 
 
-# ypObject *yp_contains( ypObject *container, ypObject *x );
+# ypObject *yp_contains(ypObject *container, ypObject *x);
 yp_func(c_ypObject_p, "yp_contains", ((c_ypObject_p, "container"), (c_ypObject_p, "x")))
-# ypObject *yp_in( ypObject *x, ypObject *container );
+# ypObject *yp_in(ypObject *x, ypObject *container);
 yp_func(c_ypObject_p, "yp_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")))
 
-# ypObject *yp_not_in( ypObject *x, ypObject *container );
+# ypObject *yp_not_in(ypObject *x, ypObject *container);
 yp_func(c_ypObject_p, "yp_not_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")))
 
-# yp_ssize_t yp_lenC( ypObject *container, ypObject **exc );
+# yp_ssize_t yp_lenC(ypObject *container, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc),
         errcheck=False)
 
-# void yp_push( ypObject **container, ypObject *x );
+# void yp_push(ypObject **container, ypObject *x);
 yp_func(c_void, "yp_push", ((c_ypObject_pp, "container"), (c_ypObject_p, "x")))
 
-# void yp_clear( ypObject **container );
+# void yp_clear(ypObject **container);
 yp_func(c_void, "yp_clear", ((c_ypObject_pp, "container"), ))
 
-# ypObject *yp_pop( ypObject **container );
+# ypObject *yp_pop(ypObject **container);
 yp_func(c_ypObject_p, "yp_pop", ((c_ypObject_pp, "container"), ))
 
 
-# ypObject *yp_concat( ypObject *sequence, ypObject *x );
+# ypObject *yp_concat(ypObject *sequence, ypObject *x);
 yp_func(c_ypObject_p, "yp_concat", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x")))
 
-# ypObject *yp_repeatC( ypObject *sequence, yp_ssize_t factor );
+# ypObject *yp_repeatC(ypObject *sequence, yp_ssize_t factor);
 yp_func(c_ypObject_p, "yp_repeatC", ((c_ypObject_p, "sequence"), (c_yp_ssize_t, "factor")))
 
-# ypObject *yp_getindexC( ypObject *sequence, yp_ssize_t i );
+# ypObject *yp_getindexC(ypObject *sequence, yp_ssize_t i);
 yp_func(c_ypObject_p, "yp_getindexC", ((c_ypObject_p, "sequence"), (c_yp_ssize_t, "i")))
 
-# ypObject *yp_getsliceC4( ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+# ypObject *yp_getsliceC4(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k);
 yp_func(c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
                                         (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k")))
 
-# ypObject *yp_getitem( ypObject *sequence, ypObject *key );
+# ypObject *yp_getitem(ypObject *sequence, ypObject *key);
 
-# yp_ssize_t yp_findC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-#         ypObject **exc );
+# yp_ssize_t yp_findC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+#         ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_findC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
 
-# yp_ssize_t yp_findC( ypObject *sequence, ypObject *x, ypObject **exc );
+# yp_ssize_t yp_findC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_findC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                    c_ypObject_pp_exc))
 
-# yp_ssize_t yp_indexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-#         ypObject **exc );
+# yp_ssize_t yp_indexC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+#         ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_indexC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                      (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
-# yp_ssize_t yp_indexC( ypObject *sequence, ypObject *x, ypObject **exc );
+# yp_ssize_t yp_indexC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_indexC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                     c_ypObject_pp_exc))
 
-# yp_ssize_t yp_rfindC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-#         ypObject **exc );
+# yp_ssize_t yp_rfindC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+#         ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_rfindC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                      (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
-# yp_ssize_t yp_rfindC( ypObject *sequence, ypObject *x, ypObject **exc );
+# yp_ssize_t yp_rfindC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_rfindC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                     c_ypObject_pp_exc))
-# yp_ssize_t yp_rindexC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-#         ypObject **exc );
+# yp_ssize_t yp_rindexC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+#         ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_rindexC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                       (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
-# yp_ssize_t yp_rindexC( ypObject *sequence, ypObject *x, ypObject **exc );
+# yp_ssize_t yp_rindexC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_rindexC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                      c_ypObject_pp_exc))
 
-# yp_ssize_t yp_countC4( ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
-#        ypObject **exc );
+# yp_ssize_t yp_countC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+#        ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_countC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                      (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
 
-# yp_ssize_t yp_countC( ypObject *sequence, ypObject *x, ypObject **exc );
+# yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_countC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                     c_ypObject_pp_exc))
 
-# void yp_setindexC( ypObject **sequence, yp_ssize_t i, ypObject *x );
+# void yp_setindexC(ypObject **sequence, yp_ssize_t i, ypObject *x);
 
-# void yp_setsliceC5( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x );
+# void yp_setsliceC5(ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x);
 yp_func(c_void, "yp_setsliceC5", ((c_ypObject_pp, "sequence"),
                                   (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k"), (c_ypObject_p, "x")))
 
-# void yp_setitem( ypObject **sequence, ypObject *key, ypObject *x );
+# void yp_setitem(ypObject **sequence, ypObject *key, ypObject *x);
 
-# void yp_delindexC( ypObject **sequence, yp_ssize_t i );
+# void yp_delindexC(ypObject **sequence, yp_ssize_t i);
 
-# void yp_delsliceC4( ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+# void yp_delsliceC4(ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k);
 yp_func(c_void, "yp_delsliceC4", ((c_ypObject_pp, "sequence"),
                                   (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k")))
 
-# void yp_delitem( ypObject **sequence, ypObject *key );
+# void yp_delitem(ypObject **sequence, ypObject *key);
 
-# void yp_append( ypObject **sequence, ypObject *x );
-# void yp_push( ypObject **sequence, ypObject *x );
+# void yp_append(ypObject **sequence, ypObject *x);
+# void yp_push(ypObject **sequence, ypObject *x);
 yp_func(c_void, "yp_append", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")))
 
-# void yp_extend( ypObject **sequence, ypObject *t );
+# void yp_extend(ypObject **sequence, ypObject *t);
 yp_func(c_void, "yp_extend", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "t")))
 
-# void yp_irepeatC( ypObject **sequence, yp_ssize_t factor );
+# void yp_irepeatC(ypObject **sequence, yp_ssize_t factor);
 yp_func(c_void, "yp_irepeatC", ((c_ypObject_pp, "sequence"), (c_yp_ssize_t, "factor")))
 
-# void yp_insertC( ypObject **sequence, yp_ssize_t i, ypObject *x );
+# void yp_insertC(ypObject **sequence, yp_ssize_t i, ypObject *x);
 yp_func(c_void, "yp_insertC", ((c_ypObject_pp, "sequence"),
                                (c_yp_ssize_t, "i"), (c_ypObject_p, "x")))
 
-# ypObject *yp_popindexC( ypObject **sequence, yp_ssize_t i );
+# ypObject *yp_popindexC(ypObject **sequence, yp_ssize_t i);
 yp_func(c_ypObject_p, "yp_popindexC", ((c_ypObject_pp, "sequence"), (c_yp_ssize_t, "i")))
 
-# ypObject *yp_pop( ypObject **sequence );
+# ypObject *yp_pop(ypObject **sequence);
 
-# void yp_remove( ypObject **sequence, ypObject *x );
+# void yp_remove(ypObject **sequence, ypObject *x);
 yp_func(c_void, "yp_remove", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")))
 
-# void yp_reverse( ypObject **sequence );
+# void yp_reverse(ypObject **sequence);
 yp_func(c_void, "yp_reverse", ((c_ypObject_pp, "sequence"), ))
 
-# void yp_sort3( ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse );
+# void yp_sort3(ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse);
 yp_func(c_void, "yp_sort3", ((c_ypObject_pp, "sequence"), (c_void_p, "key"),
                              (c_ypObject_p, "reverse")))
 
-# void yp_sort( ypObject **sequence );
+# void yp_sort(ypObject **sequence);
 yp_func(c_void, "yp_sort", ((c_ypObject_pp, "sequence"), ))
 
 # define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
@@ -644,105 +644,105 @@ _yp_SLICE_DEFAULT = _yp_SSIZE_T_MIN
 # define yp_SLICE_USELEN  yp_SSIZE_T_MAX
 _yp_SLICE_USELEN = _yp_SSIZE_T_MAX
 
-# ypObject *yp_isdisjoint( ypObject *set, ypObject *x );
+# ypObject *yp_isdisjoint(ypObject *set, ypObject *x);
 yp_func(c_ypObject_p, "yp_isdisjoint", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
-# ypObject *yp_issubset( ypObject *set, ypObject *x );
+# ypObject *yp_issubset(ypObject *set, ypObject *x);
 yp_func(c_ypObject_p, "yp_issubset", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
-# ypObject *yp_lt( ypObject *set, ypObject *x );
+# ypObject *yp_lt(ypObject *set, ypObject *x);
 
-# ypObject *yp_issuperset( ypObject *set, ypObject *x );
+# ypObject *yp_issuperset(ypObject *set, ypObject *x);
 yp_func(c_ypObject_p, "yp_issuperset", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
-# ypObject *yp_gt( ypObject *set, ypObject *x );
+# ypObject *yp_gt(ypObject *set, ypObject *x);
 
-# ypObject *yp_unionN( ypObject *set, int n, ... );
-# ypObject *yp_unionNV( ypObject *set, int n, va_list args );
+# ypObject *yp_unionN(ypObject *set, int n, ...);
+# ypObject *yp_unionNV(ypObject *set, int n, va_list args);
 yp_func(c_ypObject_p, "yp_unionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p))
 
-# ypObject *yp_intersectionN( ypObject *set, int n, ... );
-# ypObject *yp_intersectionNV( ypObject *set, int n, va_list args );
+# ypObject *yp_intersectionN(ypObject *set, int n, ...);
+# ypObject *yp_intersectionNV(ypObject *set, int n, va_list args);
 yp_func(c_ypObject_p, "yp_intersectionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p))
 
-# ypObject *yp_differenceN( ypObject *set, int n, ... );
-# ypObject *yp_differenceNV( ypObject *set, int n, va_list args );
+# ypObject *yp_differenceN(ypObject *set, int n, ...);
+# ypObject *yp_differenceNV(ypObject *set, int n, va_list args);
 yp_func(c_ypObject_p, "yp_differenceN", ((c_ypObject_p, "set"), c_multiN_ypObject_p))
 
-# ypObject *yp_symmetric_difference( ypObject *set, ypObject *x );
+# ypObject *yp_symmetric_difference(ypObject *set, ypObject *x);
 yp_func(c_ypObject_p, "yp_symmetric_difference", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
-# void yp_updateN( ypObject **set, int n, ... );
-# void yp_updateNV( ypObject **set, int n, va_list args );
+# void yp_updateN(ypObject **set, int n, ...);
+# void yp_updateNV(ypObject **set, int n, va_list args);
 yp_func(c_void, "yp_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p))
 
-# void yp_intersection_updateN( ypObject **set, int n, ... );
-# void yp_intersection_updateNV( ypObject **set, int n, va_list args );
+# void yp_intersection_updateN(ypObject **set, int n, ...);
+# void yp_intersection_updateNV(ypObject **set, int n, va_list args);
 yp_func(c_void, "yp_intersection_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p))
 
-# void yp_difference_updateN( ypObject **set, int n, ... );
-# void yp_difference_updateNV( ypObject **set, int n, va_list args );
+# void yp_difference_updateN(ypObject **set, int n, ...);
+# void yp_difference_updateNV(ypObject **set, int n, va_list args);
 yp_func(c_void, "yp_difference_updateN", ((c_ypObject_pp, "set"), c_multiN_ypObject_p))
 
-# void yp_symmetric_difference_update( ypObject **set, ypObject *x );
+# void yp_symmetric_difference_update(ypObject **set, ypObject *x);
 yp_func(c_void, "yp_symmetric_difference_update", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")))
 
-# void yp_push( ypObject **set, ypObject *x );
-# void yp_set_add( ypObject **set, ypObject *x );
+# void yp_push(ypObject **set, ypObject *x);
+# void yp_set_add(ypObject **set, ypObject *x);
 yp_func(c_void, "yp_set_add", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")))
 
-# ypObject *yp_pushuniqueE( ypObject **set, ypObject *x );
+# ypObject *yp_pushuniqueE(ypObject **set, ypObject *x);
 yp_func(c_void, "yp_pushuniqueE", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")))
 
-# void yp_remove( ypObject **set, ypObject *x );
+# void yp_remove(ypObject **set, ypObject *x);
 # (declared above)
 
-# void yp_discard( ypObject **set, ypObject *x );
+# void yp_discard(ypObject **set, ypObject *x);
 yp_func(c_void, "yp_discard", ((c_ypObject_pp, "set"), (c_ypObject_p, "x")))
 
-# ypObject *yp_pop( ypObject **set );
+# ypObject *yp_pop(ypObject **set);
 
 
-# ypObject *yp_getitem( ypObject *mapping, ypObject *key );
+# ypObject *yp_getitem(ypObject *mapping, ypObject *key);
 yp_func(c_ypObject_p, "yp_getitem", ((c_ypObject_p, "mapping"), (c_ypObject_p, "key")))
 
-# void yp_setitem( ypObject **mapping, ypObject *key, ypObject *x );
+# void yp_setitem(ypObject **mapping, ypObject *key, ypObject *x);
 yp_func(c_void, "yp_setitem",
         ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "x")))
 
-# void yp_delitem( ypObject **mapping, ypObject *key );
+# void yp_delitem(ypObject **mapping, ypObject *key);
 yp_func(c_void, "yp_delitem", ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key")))
 
-# ypObject *yp_getdefault( ypObject *mapping, ypObject *key, ypObject *defval );
+# ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *defval);
 yp_func(c_ypObject_p, "yp_getdefault",
         ((c_ypObject_p, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")))
 
-# ypObject *yp_iter_items( ypObject *mapping );
+# ypObject *yp_iter_items(ypObject *mapping);
 yp_func(c_ypObject_p, "yp_iter_items", ((c_ypObject_p, "mapping"), ))
 
-# ypObject *yp_iter_keys( ypObject *mapping );
+# ypObject *yp_iter_keys(ypObject *mapping);
 yp_func(c_ypObject_p, "yp_iter_keys", ((c_ypObject_p, "mapping"), ))
 
-# ypObject *yp_popvalue3( ypObject **mapping, ypObject *key, ypObject *defval );
+# ypObject *yp_popvalue3(ypObject **mapping, ypObject *key, ypObject *defval);
 yp_func(c_ypObject_p, "yp_popvalue3", ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"),
                                        (c_ypObject_p, "defval")))
 
-# void yp_popitem( ypObject **mapping, ypObject **key, ypObject **value );
+# void yp_popitem(ypObject **mapping, ypObject **key, ypObject **value);
 yp_func(c_void, "yp_popitem", ((c_ypObject_pp, "mapping"), (c_ypObject_pp, "key"),
                                (c_ypObject_pp, "value")))
 
-# ypObject *yp_setdefault( ypObject **mapping, ypObject *key, ypObject *defval );
+# ypObject *yp_setdefault(ypObject **mapping, ypObject *key, ypObject *defval);
 yp_func(c_ypObject_p, "yp_setdefault",
         ((c_ypObject_pp, "mapping"), (c_ypObject_p, "key"), (c_ypObject_p, "defval")))
 
-# void yp_updateK( ypObject **mapping, int n, ... );
-# void yp_updateKV( ypObject **mapping, int n, va_list args );
+# void yp_updateK(ypObject **mapping, int n, ...);
+# void yp_updateKV(ypObject **mapping, int n, va_list args);
 yp_func(c_void, "yp_updateK", ((c_ypObject_pp, "mapping"), c_multiK_ypObject_p))
 
-# void yp_updateN( ypObject **mapping, int n, ... );
-# void yp_updateNV( ypObject **mapping, int n, va_list args );
+# void yp_updateN(ypObject **mapping, int n, ...);
+# void yp_updateNV(ypObject **mapping, int n, va_list args);
 
-# ypObject *yp_iter_values( ypObject *mapping );
+# ypObject *yp_iter_values(ypObject *mapping);
 yp_func(c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ))
 
 
@@ -760,292 +760,292 @@ yp_func(c_ypObject_p, "yp_iter_values", ((c_ypObject_p, "mapping"), ))
 # ypObject *yp_s_ignore;    // "ignore"
 # ypObject *yp_s_replace;   // "replace"
 
-# ypObject *yp_isalnum( ypObject *s );
+# ypObject *yp_isalnum(ypObject *s);
 yp_func(c_ypObject_p, "yp_isalnum", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_isalpha( ypObject *s );
+# ypObject *yp_isalpha(ypObject *s);
 yp_func(c_ypObject_p, "yp_isalpha", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_isdecimal( ypObject *s );
+# ypObject *yp_isdecimal(ypObject *s);
 yp_func(c_ypObject_p, "yp_isdecimal", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_isdigit( ypObject *s );
+# ypObject *yp_isdigit(ypObject *s);
 yp_func(c_ypObject_p, "yp_isdigit", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_isidentifier( ypObject *s );
+# ypObject *yp_isidentifier(ypObject *s);
 yp_func(c_ypObject_p, "yp_isidentifier", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_islower( ypObject *s );
+# ypObject *yp_islower(ypObject *s);
 yp_func(c_ypObject_p, "yp_islower", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_isnumeric( ypObject *s );
+# ypObject *yp_isnumeric(ypObject *s);
 yp_func(c_ypObject_p, "yp_isnumeric", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_isprintable( ypObject *s );
+# ypObject *yp_isprintable(ypObject *s);
 yp_func(c_ypObject_p, "yp_isprintable", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_isspace( ypObject *s );
+# ypObject *yp_isspace(ypObject *s);
 yp_func(c_ypObject_p, "yp_isspace", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_isupper( ypObject *s );
+# ypObject *yp_isupper(ypObject *s);
 yp_func(c_ypObject_p, "yp_isupper", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_startswithC4( ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end );
-# ypObject *yp_startswithC( ypObject *s, ypObject *prefix );
+# ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
+# ypObject *yp_startswithC(ypObject *s, ypObject *prefix);
 yp_func(c_ypObject_p, "yp_startswithC4", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix"),
                                           (c_yp_ssize_t, "start"), (c_yp_ssize_t, "end")))
 yp_func(c_ypObject_p, "yp_startswithC", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix")))
 
-# ypObject *yp_endswithC4( ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end );
-# ypObject *yp_endswithC( ypObject *s, ypObject *suffix );
+# ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end);
+# ypObject *yp_endswithC(ypObject *s, ypObject *suffix);
 yp_func(c_ypObject_p, "yp_endswithC4", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix"),
                                         (c_yp_ssize_t, "start"), (c_yp_ssize_t, "end")))
 yp_func(c_ypObject_p, "yp_endswithC", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix")))
 
-# ypObject *yp_lower( ypObject *s );
+# ypObject *yp_lower(ypObject *s);
 yp_func(c_ypObject_p, "yp_lower", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_upper( ypObject *s );
+# ypObject *yp_upper(ypObject *s);
 yp_func(c_ypObject_p, "yp_upper", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_casefold( ypObject *s );
+# ypObject *yp_casefold(ypObject *s);
 yp_func(c_ypObject_p, "yp_casefold", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_swapcase( ypObject *s );
+# ypObject *yp_swapcase(ypObject *s);
 yp_func(c_ypObject_p, "yp_swapcase", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_capitalize( ypObject *s );
+# ypObject *yp_capitalize(ypObject *s);
 yp_func(c_ypObject_p, "yp_capitalize", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_ljustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
-# ypObject *yp_ljustC( ypObject *s, yp_ssize_t width );
+# ypObject *yp_ljustC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+# ypObject *yp_ljustC(ypObject *s, yp_ssize_t width);
 yp_func(c_ypObject_p, "yp_ljustC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
                                      (c_yp_int_t, "ord_fillchar")))
 yp_func(c_ypObject_p, "yp_ljustC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")))
 
-# ypObject *yp_rjustC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
-# ypObject *yp_rjustC( ypObject *s, yp_ssize_t width );
+# ypObject *yp_rjustC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+# ypObject *yp_rjustC(ypObject *s, yp_ssize_t width);
 yp_func(c_ypObject_p, "yp_rjustC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
                                      (c_yp_int_t, "ord_fillchar")))
 yp_func(c_ypObject_p, "yp_rjustC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")))
 
-# ypObject *yp_centerC3( ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar );
-# ypObject *yp_centerC( ypObject *s, yp_ssize_t width );
+# ypObject *yp_centerC3(ypObject *s, yp_ssize_t width, yp_int_t ord_fillchar);
+# ypObject *yp_centerC(ypObject *s, yp_ssize_t width);
 yp_func(c_ypObject_p, "yp_centerC3", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width"),
                                       (c_yp_int_t, "ord_fillchar")))
 yp_func(c_ypObject_p, "yp_centerC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "width")))
 
-# ypObject *yp_expandtabsC( ypObject *s, yp_ssize_t tabsize );
+# ypObject *yp_expandtabsC(ypObject *s, yp_ssize_t tabsize);
 yp_func(c_ypObject_p, "yp_expandtabsC", ((c_ypObject_p, "s"), (c_yp_ssize_t, "tabsize")))
 
-# ypObject *yp_replaceC4( ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count );
-# ypObject *yp_replace( ypObject *s, ypObject *oldsub, ypObject *newsub );
+# ypObject *yp_replaceC4(ypObject *s, ypObject *oldsub, ypObject *newsub, yp_ssize_t count);
+# ypObject *yp_replace(ypObject *s, ypObject *oldsub, ypObject *newsub);
 yp_func(c_ypObject_p, "yp_replaceC4", ((c_ypObject_p, "s"),
                                        (c_ypObject_p, "oldsub"), (c_ypObject_p, "newsub"), (c_yp_ssize_t, "count")))
 yp_func(c_ypObject_p, "yp_replace", ((c_ypObject_p, "s"),
                                      (c_ypObject_p, "oldsub"), (c_ypObject_p, "newsub")))
 
-# ypObject *yp_lstrip2( ypObject *s, ypObject *chars );
-# ypObject *yp_lstrip( ypObject *s );
+# ypObject *yp_lstrip2(ypObject *s, ypObject *chars);
+# ypObject *yp_lstrip(ypObject *s);
 yp_func(c_ypObject_p, "yp_lstrip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")))
 yp_func(c_ypObject_p, "yp_lstrip", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_rstrip2( ypObject *s, ypObject *chars );
-# ypObject *yp_rstrip( ypObject *s );
+# ypObject *yp_rstrip2(ypObject *s, ypObject *chars);
+# ypObject *yp_rstrip(ypObject *s);
 yp_func(c_ypObject_p, "yp_rstrip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")))
 yp_func(c_ypObject_p, "yp_rstrip", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_strip2( ypObject *s, ypObject *chars );
-# ypObject *yp_strip( ypObject *s );
+# ypObject *yp_strip2(ypObject *s, ypObject *chars);
+# ypObject *yp_strip(ypObject *s);
 yp_func(c_ypObject_p, "yp_strip2", ((c_ypObject_p, "s"), (c_ypObject_p, "chars")))
 yp_func(c_ypObject_p, "yp_strip", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_join( ypObject *s, ypObject *iterable );
+# ypObject *yp_join(ypObject *s, ypObject *iterable);
 yp_func(c_ypObject_p, "yp_join", ((c_ypObject_p, "s"), (c_ypObject_p, "iterable")))
 
-# ypObject *yp_joinN( ypObject *s, int n, ... );
-# ypObject *yp_joinNV( ypObject *s, int n, va_list args );
+# ypObject *yp_joinN(ypObject *s, int n, ...);
+# ypObject *yp_joinNV(ypObject *s, int n, va_list args);
 yp_func(c_ypObject_p, "yp_joinN", ((c_ypObject_p, "s"), c_multiN_ypObject_p))
 
-# void yp_partition( ypObject *s, ypObject *sep,
-#        ypObject **part0, ypObject **part1, ypObject **part2 );
+# void yp_partition(ypObject *s, ypObject *sep,
+#        ypObject **part0, ypObject **part1, ypObject **part2);
 
-# void yp_rpartition( ypObject *s, ypObject *sep,
-#        ypObject **part0, ypObject **part1, ypObject **part2 );
+# void yp_rpartition(ypObject *s, ypObject *sep,
+#        ypObject **part0, ypObject **part1, ypObject **part2);
 
-# ypObject *yp_splitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
-# ypObject *yp_split2( ypObject *s, ypObject *sep );
+# ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
+# ypObject *yp_split2(ypObject *s, ypObject *sep);
 yp_func(c_ypObject_p, "yp_splitC3", ((c_ypObject_p, "s"), (c_ypObject_p, "sep"),
                                      (c_yp_ssize_t, "maxsplit")))
 yp_func(c_ypObject_p, "yp_split2", ((c_ypObject_p, "s"), (c_ypObject_p, "sep")))
 
-# ypObject *yp_split( ypObject *s );
+# ypObject *yp_split(ypObject *s);
 yp_func(c_ypObject_p, "yp_split", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_rsplitC3( ypObject *s, ypObject *sep, yp_ssize_t maxsplit );
+# ypObject *yp_rsplitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 yp_func(c_ypObject_p, "yp_rsplitC3", ((c_ypObject_p, "s"), (c_ypObject_p, "sep"),
                                       (c_yp_ssize_t, "maxsplit")))
 
-# ypObject *yp_splitlines2( ypObject *s, ypObject *keepends );
+# ypObject *yp_splitlines2(ypObject *s, ypObject *keepends);
 yp_func(c_ypObject_p, "yp_splitlines2", ((c_ypObject_p, "s"), (c_ypObject_p, "keepends")))
 
-# ypObject *yp_encode3( ypObject *s, ypObject *encoding, ypObject *errors );
-# ypObject *yp_encode( ypObject *s );
+# ypObject *yp_encode3(ypObject *s, ypObject *encoding, ypObject *errors);
+# ypObject *yp_encode(ypObject *s);
 yp_func(c_ypObject_p, "yp_encode3", ((c_ypObject_p, "s"),
                                      (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 yp_func(c_ypObject_p, "yp_encode", ((c_ypObject_p, "s"), ))
 
-# ypObject *yp_decode3( ypObject *b, ypObject *encoding, ypObject *errors );
-# ypObject *yp_decode( ypObject *b );
+# ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors);
+# ypObject *yp_decode(ypObject *b);
 yp_func(c_ypObject_p, "yp_decode3", ((c_ypObject_p, "b"),
                                      (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 yp_func(c_ypObject_p, "yp_decode", ((c_ypObject_p, "b"), ))
 
 
-# ypObject *yp_add( ypObject *x, ypObject *y );
+# ypObject *yp_add(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_add", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_sub( ypObject *x, ypObject *y );
+# ypObject *yp_sub(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_sub", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_mul( ypObject *x, ypObject *y );
+# ypObject *yp_mul(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_mul", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_truediv( ypObject *x, ypObject *y );
+# ypObject *yp_truediv(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_truediv", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_floordiv( ypObject *x, ypObject *y );
+# ypObject *yp_floordiv(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_floordiv", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_mod( ypObject *x, ypObject *y );
+# ypObject *yp_mod(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_mod", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# void yp_divmod( ypObject *x, ypObject *y, ypObject **div, ypObject **mod );
+# void yp_divmod(ypObject *x, ypObject *y, ypObject **div, ypObject **mod);
 yp_func(c_void, "yp_divmod", ((c_ypObject_p, "x"), (c_ypObject_p, "y"),
                               (c_ypObject_pp, "div"), (c_ypObject_pp, "mod")))
-# ypObject *yp_pow( ypObject *x, ypObject *y );
+# ypObject *yp_pow(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_pow", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_pow3( ypObject *x, ypObject *y, ypObject *z );
-# ypObject *yp_lshift( ypObject *x, ypObject *y );
+# ypObject *yp_pow3(ypObject *x, ypObject *y, ypObject *z);
+# ypObject *yp_lshift(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_lshift", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_rshift( ypObject *x, ypObject *y );
+# ypObject *yp_rshift(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_rshift", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_amp( ypObject *x, ypObject *y );
+# ypObject *yp_amp(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_amp", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_xor( ypObject *x, ypObject *y );
+# ypObject *yp_xor(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_xor", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_bar( ypObject *x, ypObject *y );
+# ypObject *yp_bar(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_bar", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
-# ypObject *yp_neg( ypObject *x );
+# ypObject *yp_neg(ypObject *x);
 yp_func(c_ypObject_p, "yp_neg", ((c_ypObject_p, "x"), ))
-# ypObject *yp_pos( ypObject *x );
+# ypObject *yp_pos(ypObject *x);
 yp_func(c_ypObject_p, "yp_pos", ((c_ypObject_p, "x"), ))
-# ypObject *yp_abs( ypObject *x );
+# ypObject *yp_abs(ypObject *x);
 yp_func(c_ypObject_p, "yp_abs", ((c_ypObject_p, "x"), ))
-# ypObject *yp_invert( ypObject *x );
+# ypObject *yp_invert(ypObject *x);
 yp_func(c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ))
 
-# void yp_iadd( ypObject **x, ypObject *y );
-# void yp_isub( ypObject **x, ypObject *y );
-# void yp_imul( ypObject **x, ypObject *y );
-# void yp_itruediv( ypObject **x, ypObject *y );
-# void yp_ifloordiv( ypObject **x, ypObject *y );
-# void yp_imod( ypObject **x, ypObject *y );
-# void yp_ipow( ypObject **x, ypObject *y );
-# void yp_ipow3( ypObject **x, ypObject *y, ypObject *z );
-# void yp_ilshift( ypObject **x, ypObject *y );
-# void yp_irshift( ypObject **x, ypObject *y );
-# void yp_iamp( ypObject **x, ypObject *y );
-# void yp_ixor( ypObject **x, ypObject *y );
-# void yp_ibar( ypObject **x, ypObject *y );
-# void yp_ineg( ypObject **x );
-# void yp_ipos( ypObject **x );
-# void yp_iabs( ypObject **x );
-# void yp_iinvert( ypObject **x );
+# void yp_iadd(ypObject **x, ypObject *y);
+# void yp_isub(ypObject **x, ypObject *y);
+# void yp_imul(ypObject **x, ypObject *y);
+# void yp_itruediv(ypObject **x, ypObject *y);
+# void yp_ifloordiv(ypObject **x, ypObject *y);
+# void yp_imod(ypObject **x, ypObject *y);
+# void yp_ipow(ypObject **x, ypObject *y);
+# void yp_ipow3(ypObject **x, ypObject *y, ypObject *z);
+# void yp_ilshift(ypObject **x, ypObject *y);
+# void yp_irshift(ypObject **x, ypObject *y);
+# void yp_iamp(ypObject **x, ypObject *y);
+# void yp_ixor(ypObject **x, ypObject *y);
+# void yp_ibar(ypObject **x, ypObject *y);
+# void yp_ineg(ypObject **x);
+# void yp_ipos(ypObject **x);
+# void yp_iabs(ypObject **x);
+# void yp_iinvert(ypObject **x);
 
-# void yp_iaddC( ypObject **x, yp_int_t y );
-# void yp_isubC( ypObject **x, yp_int_t y );
-# void yp_imulC( ypObject **x, yp_int_t y );
-# void yp_itruedivC( ypObject **x, yp_int_t y );
-# void yp_ifloordivC( ypObject **x, yp_int_t y );
-# void yp_imodC( ypObject **x, yp_int_t y );
-# void yp_ipowC( ypObject **x, yp_int_t y );
-# void yp_ipowC3( ypObject **x, yp_int_t y, yp_int_t z );
-# void yp_ilshiftC( ypObject **x, yp_int_t y );
-# void yp_irshiftC( ypObject **x, yp_int_t y );
-# void yp_iampC( ypObject **x, yp_int_t y );
-# void yp_ixorC( ypObject **x, yp_int_t y );
-# void yp_ibarC( ypObject **x, yp_int_t y );
+# void yp_iaddC(ypObject **x, yp_int_t y);
+# void yp_isubC(ypObject **x, yp_int_t y);
+# void yp_imulC(ypObject **x, yp_int_t y);
+# void yp_itruedivC(ypObject **x, yp_int_t y);
+# void yp_ifloordivC(ypObject **x, yp_int_t y);
+# void yp_imodC(ypObject **x, yp_int_t y);
+# void yp_ipowC(ypObject **x, yp_int_t y);
+# void yp_ipowC3(ypObject **x, yp_int_t y, yp_int_t z);
+# void yp_ilshiftC(ypObject **x, yp_int_t y);
+# void yp_irshiftC(ypObject **x, yp_int_t y);
+# void yp_iampC(ypObject **x, yp_int_t y);
+# void yp_ixorC(ypObject **x, yp_int_t y);
+# void yp_ibarC(ypObject **x, yp_int_t y);
 
-# void yp_iaddCF( ypObject **x, yp_float_t y );
-# void yp_isubCF( ypObject **x, yp_float_t y );
-# void yp_imulCF( ypObject **x, yp_float_t y );
-# void yp_itruedivCF( ypObject **x, yp_float_t y );
-# void yp_ifloordivCF( ypObject **x, yp_float_t y );
-# void yp_imodCF( ypObject **x, yp_float_t y );
-# void yp_ipowCF( ypObject **x, yp_float_t y );
-# void yp_ilshiftCF( ypObject **x, yp_float_t y );
-# void yp_irshiftCF( ypObject **x, yp_float_t y );
-# void yp_iampCF( ypObject **x, yp_float_t y );
-# void yp_ixorCF( ypObject **x, yp_float_t y );
-# void yp_ibarCF( ypObject **x, yp_float_t y );
+# void yp_iaddCF(ypObject **x, yp_float_t y);
+# void yp_isubCF(ypObject **x, yp_float_t y);
+# void yp_imulCF(ypObject **x, yp_float_t y);
+# void yp_itruedivCF(ypObject **x, yp_float_t y);
+# void yp_ifloordivCF(ypObject **x, yp_float_t y);
+# void yp_imodCF(ypObject **x, yp_float_t y);
+# void yp_ipowCF(ypObject **x, yp_float_t y);
+# void yp_ilshiftCF(ypObject **x, yp_float_t y);
+# void yp_irshiftCF(ypObject **x, yp_float_t y);
+# void yp_iampCF(ypObject **x, yp_float_t y);
+# void yp_ixorCF(ypObject **x, yp_float_t y);
+# void yp_ibarCF(ypObject **x, yp_float_t y);
 
-# yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_floordivL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject **exc );
-# void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc );
-# yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc );
-# yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_rshiftL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_ampL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_xorL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject **exc );
-# yp_int_t yp_negL( yp_int_t x, ypObject **exc );
-# yp_int_t yp_posL( yp_int_t x, ypObject **exc );
-# yp_int_t yp_absL( yp_int_t x, ypObject **exc );
-# yp_int_t yp_invertL( yp_int_t x, ypObject **exc );
+# yp_int_t yp_addL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_subL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_mulL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_truedivL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_floordivL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_modL(yp_int_t x, yp_int_t y, ypObject **exc);
+# void yp_divmodL(yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc);
+# yp_int_t yp_powL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_powL3(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc);
+# yp_int_t yp_lshiftL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_rshiftL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_ampL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_xorL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_barL(yp_int_t x, yp_int_t y, ypObject **exc);
+# yp_int_t yp_negL(yp_int_t x, ypObject **exc);
+# yp_int_t yp_posL(yp_int_t x, ypObject **exc);
+# yp_int_t yp_absL(yp_int_t x, ypObject **exc);
+# yp_int_t yp_invertL(yp_int_t x, ypObject **exc);
 
-# yp_float_t yp_addLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_subLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_mulLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_truedivLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_floordivLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_modLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# void yp_divmodLF( yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc );
-# yp_float_t yp_powLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_lshiftLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_rshiftLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_ampLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_xorLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_barLF( yp_float_t x, yp_float_t y, ypObject **exc );
-# yp_float_t yp_negLF( yp_float_t x, ypObject **exc );
-# yp_float_t yp_posLF( yp_float_t x, ypObject **exc );
-# yp_float_t yp_absLF( yp_float_t x, ypObject **exc );
-# yp_float_t yp_invertLF( yp_float_t x, ypObject **exc );
+# yp_float_t yp_addLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_subLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_mulLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_truedivLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_floordivLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_modLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# void yp_divmodLF(yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc);
+# yp_float_t yp_powLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_lshiftLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_rshiftLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_ampLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_xorLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_barLF(yp_float_t x, yp_float_t y, ypObject **exc);
+# yp_float_t yp_negLF(yp_float_t x, ypObject **exc);
+# yp_float_t yp_posLF(yp_float_t x, ypObject **exc);
+# yp_float_t yp_absLF(yp_float_t x, ypObject **exc);
+# yp_float_t yp_invertLF(yp_float_t x, ypObject **exc);
 
-# yp_int_t yp_asintC( ypObject *x, ypObject **exc );
+# yp_int_t yp_asintC(ypObject *x, ypObject **exc);
 yp_func(c_yp_int_t, "yp_asintC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
-# yp_int8_t yp_asint8C( ypObject *x, ypObject **exc );
-# yp_uint8_t yp_asuint8C( ypObject *x, ypObject **exc );
-# yp_int16_t yp_asint16C( ypObject *x, ypObject **exc );
-# yp_uint16_t yp_asuint16C( ypObject *x, ypObject **exc );
-# yp_int32_t yp_asint32C( ypObject *x, ypObject **exc );
-# yp_uint32_t yp_asuint32C( ypObject *x, ypObject **exc );
-# yp_int64_t yp_asint64C( ypObject *x, ypObject **exc );
-# yp_uint64_t yp_asuint64C( ypObject *x, ypObject **exc );
-# yp_float_t yp_asfloatC( ypObject *x, ypObject **exc );
+# yp_int8_t yp_asint8C(ypObject *x, ypObject **exc);
+# yp_uint8_t yp_asuint8C(ypObject *x, ypObject **exc);
+# yp_int16_t yp_asint16C(ypObject *x, ypObject **exc);
+# yp_uint16_t yp_asuint16C(ypObject *x, ypObject **exc);
+# yp_int32_t yp_asint32C(ypObject *x, ypObject **exc);
+# yp_uint32_t yp_asuint32C(ypObject *x, ypObject **exc);
+# yp_int64_t yp_asint64C(ypObject *x, ypObject **exc);
+# yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc);
+# yp_float_t yp_asfloatC(ypObject *x, ypObject **exc);
 yp_func(c_yp_float_t, "yp_asfloatC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
-# yp_float32_t yp_asfloat32C( ypObject *x, ypObject **exc );
-# yp_float64_t yp_asfloat64C( ypObject *x, ypObject **exc );
-# yp_float_t yp_asfloatL( yp_int_t x, ypObject **exc );
-# yp_int_t yp_asintLF( yp_float_t x, ypObject **exc );
+# yp_float32_t yp_asfloat32C(ypObject *x, ypObject **exc);
+# yp_float64_t yp_asfloat64C(ypObject *x, ypObject **exc);
+# yp_float_t yp_asfloatL(yp_int_t x, ypObject **exc);
+# yp_int_t yp_asintLF(yp_float_t x, ypObject **exc);
 
-# ypObject *yp_roundC( ypObject *x, int ndigits );
+# ypObject *yp_roundC(ypObject *x, int ndigits);
 
-# ypObject *yp_sumN( int n, ... );
-# ypObject *yp_sumNV( int n, va_list args );
+# ypObject *yp_sumN(int n, ...);
+# ypObject *yp_sumNV(int n, va_list args);
 
-# ypObject *yp_sum( ypObject *iterable );
+# ypObject *yp_sum(ypObject *iterable);
 
-# yp_int_t yp_int_bit_lengthC( ypObject *x, ypObject **exc );
+# yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc);
 yp_func(c_yp_int_t, "yp_int_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_exc))
 
 # ypObject * const yp_sys_maxint;
@@ -1057,7 +1057,7 @@ yp_func(c_yp_int_t, "yp_int_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_ex
 # ypObject * const yp_i_two;
 
 
-# ypObject *yp_type( ypObject *object );
+# ypObject *yp_type(ypObject *object);
 yp_func(c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ))
 
 # ypObject * const yp_type_invalidated;
@@ -1083,17 +1083,17 @@ yp_func(c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ))
 # ypObject * const yp_type_range;
 
 
-# ypObject *yp_asbytesCX( ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len );
+# ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len);
 yp_func(c_ypObject_p, "yp_asbytesCX", ((c_ypObject_p, "seq"),
                                        (c_char_pp, "bytes"), (c_yp_ssize_t_p, "len")), errcheck=False)
 
-# ypObject *yp_asencodedCX( ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
-#        ypObject * *encoding );
+# ypObject *yp_asencodedCX(ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
+#        ypObject * *encoding);
 yp_func(c_ypObject_p, "yp_asencodedCX", ((c_ypObject_p, "seq"),
                                          (c_char_pp, "encoded"), (c_yp_ssize_t_p, "size"), (c_ypObject_pp, "encoding")),
         errcheck=False)
 
-# ypObject *yp_itemarrayCX( ypObject *seq, ypObject * const * *array, yp_ssize_t *len );
+# ypObject *yp_itemarrayCX(ypObject *seq, ypObject * const * *array, yp_ssize_t *len);
 
 
 _ypExc2py = {}
@@ -1150,10 +1150,10 @@ ypObject_p_exception("yp_SystemLimitationError", SystemError, one_to_one=False)
 # Raised when an invalidated object is passed to a function; subexception of yp_TypeError
 ypObject_p_exception("yp_InvalidatedError", TypeError, one_to_one=False)
 
-# int yp_isexceptionC2( ypObject *x, ypObject *exc );
+# int yp_isexceptionC2(ypObject *x, ypObject *exc);
 yp_func(c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc")))
 
-# int yp_isexceptionCN( ypObject *x, int n, ... );
+# int yp_isexceptionCN(ypObject *x, int n, ...);
 
 # typedef struct _yp_initialize_kwparams {...} yp_initialize_kwparams;
 
@@ -1166,7 +1166,7 @@ class c_yp_initialize_kwparams(Structure):
         ("yp_free", c_void_p),
         ("everything_immortal", c_int),
     ]
-# void yp_initialize( yp_initialize_kwparams *kwparams );
+# void yp_initialize(yp_initialize_kwparams *kwparams);
 yp_func(c_void, "yp_initialize", ((POINTER(c_yp_initialize_kwparams), "kwparams"), ),
         errcheck=False)
 
@@ -1807,7 +1807,7 @@ def _yp_iterable(iterable):
 
 
 def yp_reversed(x):
-    """Returns reversed( x ) of a ypObject as a yp_iter"""
+    """Returns reversed(x) of a ypObject as a yp_iter"""
     if not isinstance(x, ypObject):
         raise TypeError("expected ypObject in yp_reversed")
     return _yp_reversed(x)
@@ -1841,17 +1841,17 @@ ypObject_LEN_MAX = yp_int(0x7FFFFFFF)
 
 
 def yp_len(x):
-    """Returns len( x ) of a ypObject as a yp_int"""
+    """Returns len(x) of a ypObject as a yp_int"""
     if not isinstance(x, ypObject):
         raise TypeError("expected ypObject in yp_len")
     return yp_int(len(x))
 
 
 def yp_hash(x):
-    """Returns hash( x ) of a ypObject as a yp_int"""
+    """Returns hash(x) of a ypObject as a yp_int"""
     if not isinstance(x, ypObject):
         raise TypeError("expected ypObject in yp_hash")
-    return yp_int(_yp_hashC(x, yp_None))
+    return yp_int(_yp_hashC(x, yp_None))  # FIXME return yp_int(hash(x))?
 
 
 @pytype(yp_type_float, float)
@@ -1926,7 +1926,7 @@ class yp_bytes(_ypBytes):
     def _yp_errcheck(self):
         data, size = super()._yp_errcheck()
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if size < 1 and "_yp_bytes_empty" in globals( ):
+        # if size < 1 and "_yp_bytes_empty" in globals():
         #    assert self is _yp_bytes_empty, "an empty bytes should be _yp_bytes_empty"
 
     def decode(self, encoding="utf-8", errors="strict"):
@@ -2014,7 +2014,7 @@ class yp_str(ypObject):
             pass  # TODO ensure string contains at least one >0xFFFF character
         assert encoded[size] == 0, "missing null terminator"
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if size < 1 and "_yp_str_empty" in globals( ):
+        # if size < 1 and "_yp_str_empty" in globals():
         #    assert self is _yp_str_empty, "an empty str should be _yp_str_empty"
 
     # Just as yp_bool.__bool__ must return a bool, so too must this return a str
@@ -2074,7 +2074,7 @@ yp_s_False = yp_str("False")
 
 
 def yp_repr(object):
-    """Returns repr( object ) of a ypObject as a yp_str"""
+    """Returns repr(object) of a ypObject as a yp_str"""
     if isinstance(object, str):
         object = yp_str(object)
     if not isinstance(object, ypObject):
@@ -2111,7 +2111,7 @@ class yp_tuple(_ypTuple):
     def _yp_errcheck(self):
         super()._yp_errcheck()
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if len( self ) < 1 and "_yp_tuple_empty" in globals( ):
+        # if len(self) < 1 and "_yp_tuple_empty" in globals():
         #    assert self is _yp_tuple_empty, "an empty tuple should be _yp_tuple_empty"
     # TODO When nohtyP supports str/repr, replace this faked-out version
 
@@ -2246,7 +2246,7 @@ class yp_frozenset(_ypSet):
     def _yp_errcheck(self):
         super()._yp_errcheck()
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if len( self ) < 1 and "_yp_frozenset_empty" in globals( ):
+        # if len(self) < 1 and "_yp_frozenset_empty" in globals():
         #    assert self is _yp_frozenset_empty, "an empty frozenset should be _yp_frozenset_empty"
 _yp_frozenset_empty = yp_frozenset()
 
@@ -2416,4 +2416,4 @@ _yp_range_empty = yp_range(0)
 
 # TODO Integrate ypExamples.c somehow with this unittest suite
 #import os
-#os.system( "ypExamples.exe" )
+#os.system("ypExamples.exe")
