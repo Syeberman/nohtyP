@@ -15151,7 +15151,51 @@ ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step)
     ypRange_ASSERT_NORMALIZED(newR);
     return newR;
 }
+
 ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
+
+
+/*************************************************************************************************
+ * Functions as objects
+ *************************************************************************************************/
+
+// TODO Ideas:
+//  - identify signature of functions similar to Python, i.e. OOO or maybe even OiO, etc.
+//  - functions that take the function object as the first argument use format code F or something
+//  first...OR require that all C functions take self (or func_self) as first parameter
+//  - remember that bound functions also have a "self" as the first positional argument (it'd be
+//  the argument after func_self if we go that route), so the name "self" is going to get confusing
+//  - or ditch the Python-like syntax altogether and go with something that works well for kw args
+//  like "arg1,arg2,arg3=None" etc
+//  - Have direct support for the types of functions nohtyP recognizes, i.e. key, which is one arg
+//  one return. Func objects can support two calling styles: arg/kwarg (with a default
+//  implementation that unpacks arg/kwarg and calls the underlying function...although this presumes
+//  the names of the arguments! which is more proof that "arg1,arg2,arg3=None" is a better way to
+//  match to ensure the proper function is called) or "ypObject *func(ypObject*, ypObject*)" (in
+//  which case a separate wrapper can convert from arg/kwarg to the other one).
+//  - Pull out the generator's "state" code into something common we can use here, because all that
+//  "fromstruct" stuff will be the same (that's that func_self object we need).
+
+
+// A verify function (perhaps only called once) that ensures:
+//  - all names are strings
+//  - required args come first, no flags
+//  - with defaults next
+//  - *args next, no default
+//  - kw-only args next
+//  - **kwargs to finish
+// TODO Ensure the above is correct with Python
+typedef struct {
+    ypObject *name; // must be a str (i.e. FROM_LATIN1)
+    ypObject *default_; // NULL for required argument
+    yp_int16 flags; // flag for *args, kw-only, **kwargs
+    // TODO a flag for non-kw args (i.e. x from int can't be kw)?
+    yp_int16 _reserved16;   // must be zero
+    yp_int32 _reserved32;   // must be zero
+    // important 32- and 64-bit aligned here
+} yp_func_parameter;
+// TODO Compare against Python API
+
 
 
 /*************************************************************************************************
