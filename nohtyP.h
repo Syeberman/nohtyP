@@ -22,11 +22,11 @@
  * If you don't want the modified object discarded on error, use the 'E' version of the function.
  * Such functions accept a ypObject** that is set to the exception; it is set _only_ on error,
  * and existing values are not discarded, so the variable should first be initialized to an
- * immortal:
+ * immortal like yp_None:
  *      ypObject *exc = yp_None;
  *      yp_setitemE(dict, key, value, &exc);
  *      if(yp_isexceptionC(exc)) printf("unhashable key, dict not modified");
- * This method is also used for functions that return C values:
+ * This scheme is also used for functions that return C values:
  *      ypObject *exc = yp_None;
  *      len = yp_lenC(x, &exc);
  *      if(yp_isexceptionC(exc)) printf("x isn't a container");
@@ -189,13 +189,13 @@ typedef yp_int64_t yp_int_t;
 #define yp_INT_T_MIN LLONG_MIN
 typedef yp_float64_t yp_float_t;
 
-// The signature of a function that can be wrapped up in a generator.  Called by yp_send, yp_throw,
-// and similar functions.  self is the iterator object; use yp_iter_stateCX to retrieve any state
-// variables.  value is the object that is sent into the function by yp_send, or the exception sent
-// in by yp_throw; it may also be yp_GeneratorExit if yp_close is called, or another exception.
-// The return value must be a new reference, yp_StopIteration if the generator is exhausted, or
-// another exception.  The generator will be closed with yp_close if it returns an exception
-// (resulting in one last call with yp_GeneratorExit).
+// The signature of a function that can be wrapped up in a generator iterator.  Called by yp_send,
+// yp_throw, and similar methods.  self is the iterator object; use yp_iter_stateCX to retrieve any
+// state variables.  value is the object that is sent into the function by yp_send, or the exception
+// sent in by yp_throw; it may also be yp_GeneratorExit if yp_close is called, or another exception.
+// The return value must be a new or immortal reference, yp_StopIteration if the iterator is
+// exhausted, or another exception.  The iterator will be closed with yp_close if it returns an
+// exception (resulting in one last call with yp_GeneratorExit).
 typedef ypObject *(*yp_generator_func_t)(ypObject *self, ypObject *value);
 
 
@@ -239,22 +239,26 @@ ypAPI ypObject *yp_floatstore(ypObject *x);
 // being iterated over.
 ypAPI ypObject *yp_iter(ypObject *x);
 
-// Returns a new reference to a generator-iterator object using the given func.  The function will
-// be passed the given n objects as state on each call (the objects will form an array).  lenhint
-// is a clue to consumers of the generator how many items will be yielded; use zero if this is not
-// known.
+// Returns a new reference to a generator iterator object using the given func.  The given n objects
+// will be made available to func via yp_iter_stateCX as an array.  lenhint is a clue to consumers
+// of the iterator how many items will be yielded; use zero if this is not known.
 ypAPI ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t lenhint, int n, ...);
 ypAPI ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args);
 
-// Similar to yp_generatorCN, but accepts an arbitrary structure (or array) of the given
-// size which will be copied into the iterator and maintained as state.  If state contains any
-// objects, their offsets must be given as the variable arguments; new references to these objects
-// will be created.  (Note that these objects cannot be contained in a union; if they exist in
-// an array you must list _each_ _individual_ offset.)
+// Similar to yp_generatorCN, but accepts an arbitrary structure (or array) of the given size which
+// will be copied into the iterator and made available to func via yp_iter_stateCX.  If state
+// contains any objects, their offsets must be given as the variable arguments; new references to
+// these objects will be created, and those references will be discarded when the iterator is
+// deallocated.
 //  Ex: typedef struct { int x; int y; ypObject *obj1; ypObject *obj2 } mystruct;
-//      mystruct state = { 20, 40, yp_None, yp_False };
+//      ypObject *obj1 = yp_dictK(0);
+//      mystruct state = { 20, 40, obj1, yp_False };
 //      gen = yp_generator_fromstructCN(mygenfunc, 0, &state, sizeof(mystruct),
 //                  2, offsetof(mystruct, obj1), offsetof(mystruct, obj2));
+//      yp_decref(obj1);  // the iterator has its own reference, so discard ours
+// Objects in state cannot be part of a union, because nohtyP cannot know which union member is the
+// "active" one.  If state contains objects in an array you must list _each_ _individual_ offset.
+// state _can_ contain exceptions.
 ypAPI ypObject *yp_generator_fromstructCN(
         yp_generator_func_t func, yp_ssize_t lenhint, void *state, yp_ssize_t size, int n, ...);
 ypAPI ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t lenhint,
@@ -280,7 +284,7 @@ ypAPI ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *er
 //  - integer: the array will have that size and be initialized with null bytes
 //  - iterable: it must be an iterable of integers in range(256) used to initialize the array (this
 //  includes bytes and bytearray objects)
-// Use yp_bytes3 if source is a string; nohtyP does not currently support a "buffer interface".
+// Use yp_bytes3 if source is a string.  nohtyP does not currently support a "buffer interface".
 ypAPI ypObject *yp_bytes(ypObject *source);
 ypAPI ypObject *yp_bytearray(ypObject *source);
 
@@ -299,7 +303,7 @@ ypAPI ypObject *yp_chrarray_frombytesC4(
 
 // Equivalent to yp_str3(yp_bytesC(source, len), yp_s_utf_8, yp_s_strict). Note that in Python,
 // omitting encoding and errors would normally return the string representation of the bytes object
-// ("b'Zoot!'"), however this function decodes it ("Zoot!").
+// ("b'Zoot!'"), however this constructor decodes it ("Zoot!").
 ypAPI ypObject *yp_str_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
 ypAPI ypObject *yp_chrarray_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
 
@@ -309,7 +313,7 @@ ypAPI ypObject *yp_str3(ypObject *source, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray3(ypObject *source, ypObject *encoding, ypObject *errors);
 
 // Returns a new reference to the "informal" or nicely-printable string representation of object,
-// as a str/chrarray.  As in Python, passing a bytes object to this function returns the string
+// as a str/chrarray.  As in Python, passing a bytes object to this constructor returns the string
 // representation ("b'Zoot!'"); to decode the bytes, use yp_str3.
 ypAPI ypObject *yp_str(ypObject *object);
 ypAPI ypObject *yp_chrarray(ypObject *object);
@@ -483,8 +487,8 @@ ypAPI yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 
 // An "iterator" is an object that implements yp_next, while an "iterable" is an object that
 // implements yp_iter.  Examples of iterables include range, bytes, str, tuple, set, and dict;
-// examples of iterators include files and generators.  It is usually unwise to modify an object
-// being iterated over.
+// examples of iterators include files and generator iterators.  It is usually unwise to modify an
+// object being iterated over.
 
 // "Sends" a value into *iterator and returns a new reference to the next yielded value, or an
 // exception.  The value may be ignored by the iterator.  value cannot be an exception.  When the
@@ -511,19 +515,20 @@ ypAPI ypObject *yp_throw(ypObject **iterator, ypObject *exc);
 // on the underlying type: most containers know their lengths exactly, but some generators may not.
 // A hint of zero could mean that the iterator is exhausted, that the length is unknown, or that
 // the iterator will yield infinite values.  Returns zero and sets *exc on error.
-ypAPI yp_ssize_t yp_iter_lenhintC(ypObject *iterator, ypObject **exc);
+// FIXME Compare against Python's __length_hint__ now that it's official.
+ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
 
 // Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
-// internal generator state buffer and its size in bytes, and returns the immortal yp_None.  The
-// structure and initial values of *state are determined by the call to the generator constructor;
-// the function cannot change the size after creation, and any ypObject*s in *state should be
-// considered *borrowed* (it is safe to replace them with new references).  Sets *state to NULL,
+// internal iterator state buffer and its size in bytes, and returns the immortal yp_None.  The
+// structure and initial values of *state are determined by the call to iterator's constructor; the
+// function cannot change the size after creation, and any ypObject*s in *state should be considered
+// *borrowed* (it is safe to replace them with new or immortal references).  Sets *state to NULL,
 // *size to zero, and returns an exception on error.
 ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
 // "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_StopIteration or
 // yp_GeneratorExit is returned by yp_throw, *iterator is not discarded; on any other error,
-// *iterator is discarded and set to an exception.  The behaviour of this function for other
+// *iterator is discarded and set to an exception.  The behaviour of this method for other
 // types, in particular files, is documented elsewhere.
 ypAPI void yp_close(ypObject **iterator);
 
@@ -1143,7 +1148,7 @@ ypAPI ypObject *yp_formatKV(ypObject *s, int n, va_list args);
 // to ignore that particular argument.
 ypAPI ypObject *yp_format_seq_map(ypObject *s, ypObject *sequence, ypObject *mapping);
 
-// Convenience functions for yp_format_seq_map(s, sequence, yp_None) and
+// Convenience methods for yp_format_seq_map(s, sequence, yp_None) and
 // yp_format_seq_map(s, yp_None, mapping), respectively.
 ypAPI ypObject *yp_format_seq(ypObject *s, ypObject *sequence);
 ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
@@ -1155,7 +1160,7 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 
 // The numeric types include ints and floats (and their mutable counterparts, of course).
 
-// Each of these functions return new reference(s) to the result of the given numeric operation;
+// Each of these methods return new reference(s) to the result of the given numeric operation;
 // for example, yp_add returns the result of adding x and y together.  If the given operands do not
 // support the operation, yp_TypeError is returned.  Additional notes:
 //  - yp_divmod returns two objects via *div and *mod; on error, they are both set to an exception
@@ -1320,12 +1325,12 @@ ypAPI ypObject *const yp_i_two;
  * Freezing, "Unfreezing", and Invalidating
  */
 
-// All objects support a one-way freeze function that makes them immutable, an unfrozen_copy
-// function that returns a mutable copy, and a one-way invalidate function that renders the object
-// useless; there are also deep variants to these functions.  Supplying an invalidated object to a
+// All objects support a one-way freeze method that makes them immutable, an unfrozen_copy
+// method that returns a mutable copy, and a one-way invalidate method that renders the object
+// useless; there are also deep variants to these methods.  Supplying an invalidated object to a
 // function results in yp_InvalidatedError.  Freezing and invalidating are two examples of object
 // transmutation, where the type of the object is converted to a different type.  Unlike Python,
-// most objects are copied in memory, even immutables, as copying is one method for maintaining
+// most objects are copied in memory, even immutables, as copying is one strategy to maintain
 // threadsafety.
 
 // Transmutes *x to its associated immutable type.  If *x is already immutable this is a no-op.
@@ -1361,7 +1366,7 @@ ypAPI ypObject *yp_deepcopy(ypObject *x);
 ypAPI void yp_invalidate(ypObject **x);
 
 // Invalidates *x and, recursively, all contained objects.  As nohtyP does not currently detect
-// reference cycles during garbage collection, this is an effective method to break cycles and free
+// reference cycles during garbage collection, this is an effective way to break cycles and free
 // memory.
 ypAPI void yp_deepinvalidate(ypObject **x);
 
@@ -1402,11 +1407,13 @@ ypAPI ypObject *const yp_type_range;
  * Mini Iterators
  */
 
-// yp_iter usually returns a newly-allocated object.  Many types support the "mini iterator"
-// protocol, to avoid allocating a separate iterator object.  The object returned by yp_miniiter
-// must be used in a very specific manner: you should only call yp_miniiter_* and yp_decref on it
-// (yp_incref is also safe, but is usually unnecessary).  The behaviour of any other function is
-// undefined and may or may not raise exceptions.  Example:
+// The "mini iterator" API is an alternative to the standard iterator API (yp_iter et al) that can
+// in most cases avoid allocating a separate iterator object.  This makes it the preferred API to
+// loop over an iterable, although there are restrictions: the mini iterator returned by yp_miniiter
+// is opaque and can only be used with the yp_miniiter_* methods and yp_decref.  So, as an example,
+// if you need to store an iterator in a list, stick with yp_iter.
+//
+// The restrictions on how mini iterators are used means you'll typically write the following:
 //      yp_uint64_t mi_state;
 //      ypObject *mi = yp_miniiter(list, &mi_state);
 //      while(1) {
@@ -1416,17 +1423,20 @@ ypAPI ypObject *const yp_type_range;
 //          yp_decref(item);
 //      }
 //      yp_decref(mi);
-
-// For convenience, all iterables can be used with yp_miniiter, even if they do not actually
-// support the mini iterator protocol: yp_miniiter simply returns a newly-allocated iterator
-// object.  Additionally, types that do support the protocol may yet return a separate iterator
+//
+// All iterables can be used with yp_miniiter, even if they do not specifically support the mini
+// iterator protocol.  Additionally, types that do support the protocol may yet allocate a separate
 // object under certain conditions (if a yp_uint64_t is too small to hold the necessary state,
-// perhaps).  It is for this reason that the object returned by yp_miniiter be used in a very
-// specific manner: the type of the returned object may not be consistent.
+// perhaps).  It is for this reason that mini iterator objects be treated as opaque: the type of the
+// returned object may not be consistent.  These restrictions on using mini iterators are not
+// enforced: the behaviour of a mini iterator with any other other function is undefined and may or
+// may not raise an exception.
 
-// Returns a new reference to a mini iterator for object x and initializes *state to the iterator's
-// starting state.  *state is opaque: you must *not* modify it directly.  It is usually unwise to
-// modify an object being iterated over.
+// FIXME Would this be clearer if mini iterators were opaque structures containing obj and state?
+
+// Returns a new reference to an opaque mini iterator for object x and initializes *state to the
+// iterator's starting state.  *state is also opaque: you must *not* modify it directly.  It is
+// usually unwise to modify an object being iterated over.
 ypAPI ypObject *yp_miniiter(ypObject *x, yp_uint64_t *state);
 
 // Returns a new reference to the next yielded value from the mini iterator, or an exception.
@@ -1598,8 +1608,8 @@ ypAPI ypObject *const yp_SystemLimitationError;
 ypAPI ypObject *const yp_InvalidatedError;
 
 // Returns true (non-zero) if x is an exception that matches exc, else false.  This takes into
-// account the exception heirarchy, so is the preferred method of testing for specific exceptions.
-// Always succeeds.
+// account the exception heirarchy, so is the preferred way to test for specific exceptions.  Always
+// succeeds.
 ypAPI int yp_isexceptionC2(ypObject *x, ypObject *exc);
 
 // A convenience function to compare x against n possible exceptions.  Returns false if n is zero.
