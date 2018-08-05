@@ -2200,9 +2200,10 @@ static ypTypeObject ypIter_Type = {
 
 // Public functions
 
-yp_ssize_t yp_iter_length_hintC(ypObject *i, ypObject **exc)
+yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
 {
     yp_ssize_t length_hint;
+    // FIXME Make a tp_length_hint slot
     if (ypObject_TYPE_PAIR_CODE(i) != ypFrozenIter_CODE) {
         return_yp_CEXC_BAD_TYPE(0, exc, i);
     }
@@ -8573,7 +8574,7 @@ static ypObject *_ypBytes(int type, ypObject *source)
         yp_ssize_t length_hint = yp_lenC(source, &exc);
         if (yp_isexceptionC(exc)) {
             // Ignore errors determining length_hint; it just means we can't pre-allocate
-            length_hint = yp_iter_length_hintC(source, &exc);
+            length_hint = yp_length_hintC(source, &exc);
             if (length_hint > ypBytes_LEN_MAX) length_hint = ypBytes_LEN_MAX;
         } else if (length_hint < 1) {
             // yp_lenC reports an empty iterable, so we can shortcut _ypBytes_extend
@@ -10031,7 +10032,7 @@ static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_iter_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &exc);
         if (length_hint > iterable_maxLen) length_hint = iterable_maxLen;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
@@ -10850,7 +10851,7 @@ static ypObject *_ypTuple(int type, ypObject *iterable)
     yp_ssize_t length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_iter_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &exc);
         if (length_hint > ypTuple_LEN_MAX) length_hint = ypTuple_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
@@ -13538,7 +13539,7 @@ static ypObject *_ypSet(int type, ypObject *iterable)
     yp_ssize_t length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_iter_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &exc);
         if (length_hint > ypSet_LEN_MAX) length_hint = ypSet_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypSet_update
@@ -13926,7 +13927,7 @@ static ypObject *_ypDict_update_from_iter(ypObject *mp, ypObject **itemiter)
     ypObject * key;
     ypObject * value;
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
-    yp_ssize_t length_hint = yp_iter_length_hintC(*itemiter, &exc);  // zero on error
+    yp_ssize_t length_hint = yp_length_hintC(*itemiter, &exc);  // zero on error
 
     while (1) {
         _ypDict_iter_items_next(itemiter, &key, &value);  // new refs: key, value
@@ -14618,7 +14619,7 @@ static ypObject *_ypDict(int type, ypObject *x)
     yp_ssize_t length_hint = yp_lenC(x, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_iter_length_hintC(x, &exc);
+        length_hint = yp_length_hintC(x, &exc);
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update
@@ -14719,7 +14720,7 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     yp_ssize_t  length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_iter_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &exc);
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_push

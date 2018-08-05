@@ -478,8 +478,8 @@ yp_func(c_ypObject_p, "yp_next", ((c_ypObject_pp, "iterator"), ))
 
 # ypObject *yp_throw(ypObject *iterator, ypObject *exc);
 
-# yp_ssize_t yp_iter_length_hintC(ypObject *iterator, ypObject **exc);
-yp_func(c_yp_ssize_t, "yp_iter_length_hintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc))
+# yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
+yp_func(c_yp_ssize_t, "yp_length_hintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc))
 
 # ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
