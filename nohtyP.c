@@ -318,6 +318,7 @@ typedef struct {
 // Type objects hold pointers to each type's methods.
 typedef struct {
     ypObject_HEAD;
+    // FIXME Fill tp_name and use in DEBUG statements
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
 
     // Object fundamentals
@@ -15176,9 +15177,8 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 //  - Pull out the generator's "state" code into something common we can use here, because all that
 //  "fromstruct" stuff will be the same (that's that func_self object we need).
 
-
 // A verify function (perhaps only called once) that ensures:
-//  - all names are strings
+//  - all names are strings AND UNIQUE!
 //  - required args come first, no flags
 //  - with defaults next
 //  - *args next, no default
@@ -15195,6 +15195,24 @@ typedef struct {
     yp_int32 _reserved32;   // must be zero
     // important 32- and 64-bit aligned here
 } yp_func_parameter;
+
+
+// TODO If a function constructor call supplies only tp_call, do not allow the yp_func_parameter to
+// contain *args or **kwargs.  yp_callN(c, 3, a, b, c) should be equivalent to c(a, b, c)...that is,
+// here and everywhere the idea of `int n, ...` is shorthand for constructing a tuple in its place.
+// Similarly, raise a yp_SystemLimitationError if there are too many parameters to such a
+// construction, because converting from tp_call_stars to tp_call involves a big switch statement of
+// function calls with different numbers of arguments.
+
+typedef struct {
+    objobjobjproc tp_call_stars;    // i.e. yp_call_stars
+    objvalistproc tp_call;          // i.e. yp_callN
+    objobjproc tp_call2;            // i.e. yp_call2
+    objproc tp_call1:               // i.e. yp_call1
+} tp_as_callable;
+
+
+
 #endif
 // TODO Compare against Python API
 
