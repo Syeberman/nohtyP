@@ -333,15 +333,15 @@ yp_func(c_ypObject_p, "yp_float", ((c_ypObject_p, "x"), ))
 # ypObject *yp_iter(ypObject *x);
 yp_func(c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t lenhint, int n, ...);
-# ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args);
+# ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t length_hint, int n, ...);
+# ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t length_hint, int n, va_list args);
 
-# ypObject *yp_generator_fromstructCN(yp_generator_func_t func, yp_ssize_t lenhint,
+# ypObject *yp_generator_fromstructCN(yp_generator_func_t func, yp_ssize_t length_hint,
 #         void *state, yp_ssize_t size, int n, ...);
-# ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t lenhint,
+# ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint,
 #         void *state, yp_ssize_t size, int n, va_list args);
 yp_func(c_ypObject_p, "yp_generator_fromstructCN",
-        ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"),
+        ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "length_hint"),
          (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p))
 
 # ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step);
@@ -478,8 +478,8 @@ yp_func(c_ypObject_p, "yp_next", ((c_ypObject_pp, "iterator"), ))
 
 # ypObject *yp_throw(ypObject *iterator, ypObject *exc);
 
-# yp_ssize_t yp_iter_lenhintC(ypObject *iterator, ypObject **exc);
-yp_func(c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc))
+# yp_ssize_t yp_iter_length_hintC(ypObject *iterator, ypObject **exc);
+yp_func(c_yp_ssize_t, "yp_iter_length_hintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc))
 
 # ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
@@ -1782,16 +1782,16 @@ class yp_iter(ypObject):
         if isinstance(object, (_setlike_dictview, _values_dictview)):
             return iter(object)
 
-        lenhint = operator.length_hint(object)
+        length_hint = operator.length_hint(object)
         self = super().__new__(cls)
         self._pyiter = iter(object)
         self._pycallback = c_yp_generator_func_t(self._pygenerator_func)
-        self.value = _yp_incref(_yp_generator_fromstructCN(self._pycallback, lenhint, 0, 0))
+        self.value = _yp_incref(_yp_generator_fromstructCN(self._pycallback, length_hint, 0, 0))
         return self
 
     def __iter__(self): return self
 
-    def __length_hint__(self): return _yp_iter_lenhintC(self, yp_None)
+    def __length_hint__(self): return _yp_iter_length_hintC(self, yp_None)
 
 
 def _yp_iterable(iterable):
