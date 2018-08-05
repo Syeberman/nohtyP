@@ -5315,7 +5315,7 @@ typedef struct _yp_codecs_error_handler_params_t {
         struct {              // The source data; ptr and/or type may be NULL iff object isn't
             ypObject *type;   // An indication of the type of data pointed to:
                               //  - str-like: set to encoding name as per yp_asencodedCX
-                              //  - bytes-like: set to yp_type_bytes
+                              //  - bytes-like: set to yp_t_bytes
                               //  - other codecs may set this to other objects
             const void *ptr;  // Pointer to the source data
             yp_ssize_t  len;  // Length of source data
@@ -6118,7 +6118,7 @@ static ypObject *ypStringLib_decode_call_errorhandler(yp_codecs_error_handler_fu
     params.encoding = encoding;
     // TODO pass the reason along
     // TODO pass the object along, if appropriate?
-    params.source.data.type = yp_type_bytes;
+    params.source.data.type = yp_t_bytes;
     params.source.data.ptr = source;
     params.source.data.len = source_len;
     params.start = errStart;
@@ -7311,7 +7311,7 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode(
     yp_uint16_t  ch;
 
     // Of course, our source must be a bytes object
-    if (params->source.data.type != yp_type_bytes) return yp_TypeError;
+    if (params->source.data.type != yp_t_bytes) return yp_TypeError;
     source_data = (yp_uint8_t *)params->source.data.ptr;
 
     if (encoding == yp_s_utf_8) {
@@ -15185,6 +15185,7 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 //  - kw-only args next
 //  - **kwargs to finish
 // TODO Ensure the above is correct with Python
+#if 0
 typedef struct {
     ypObject *name; // must be a str (i.e. FROM_LATIN1)
     ypObject *default_; // NULL for required argument
@@ -15194,6 +15195,7 @@ typedef struct {
     yp_int32 _reserved32;   // must be zero
     // important 32- and 64-bit aligned here
 } yp_func_parameter;
+#endif
 // TODO Compare against Python API
 
 
@@ -15909,27 +15911,27 @@ static ypTypeObject *ypTypeTable[255] = {
 ypObject *yp_type(ypObject *object) { return (ypObject *)ypObject_TYPE(object); }
 
 // The immortal type objects
-ypObject *const yp_type_invalidated = (ypObject *)&ypInvalidated_Type;
-ypObject *const yp_type_exception = (ypObject *)&ypException_Type;
-ypObject *const yp_type_type = (ypObject *)&ypType_Type;
-ypObject *const yp_type_NoneType = (ypObject *)&ypNoneType_Type;
-ypObject *const yp_type_bool = (ypObject *)&ypBool_Type;
-ypObject *const yp_type_int = (ypObject *)&ypInt_Type;
-ypObject *const yp_type_intstore = (ypObject *)&ypIntStore_Type;
-ypObject *const yp_type_float = (ypObject *)&ypFloat_Type;
-ypObject *const yp_type_floatstore = (ypObject *)&ypFloatStore_Type;
-ypObject *const yp_type_iter = (ypObject *)&ypIter_Type;
-ypObject *const yp_type_bytes = (ypObject *)&ypBytes_Type;
-ypObject *const yp_type_bytearray = (ypObject *)&ypByteArray_Type;
-ypObject *const yp_type_str = (ypObject *)&ypStr_Type;
-ypObject *const yp_type_chrarray = (ypObject *)&ypChrArray_Type;
-ypObject *const yp_type_tuple = (ypObject *)&ypTuple_Type;
-ypObject *const yp_type_list = (ypObject *)&ypList_Type;
-ypObject *const yp_type_frozenset = (ypObject *)&ypFrozenSet_Type;
-ypObject *const yp_type_set = (ypObject *)&ypSet_Type;
-ypObject *const yp_type_frozendict = (ypObject *)&ypFrozenDict_Type;
-ypObject *const yp_type_dict = (ypObject *)&ypDict_Type;
-ypObject *const yp_type_range = (ypObject *)&ypRange_Type;
+ypObject *const yp_t_invalidated = (ypObject *)&ypInvalidated_Type;
+ypObject *const yp_t_exception = (ypObject *)&ypException_Type;
+ypObject *const yp_t_type = (ypObject *)&ypType_Type;
+ypObject *const yp_t_NoneType = (ypObject *)&ypNoneType_Type;
+ypObject *const yp_t_bool = (ypObject *)&ypBool_Type;
+ypObject *const yp_t_int = (ypObject *)&ypInt_Type;
+ypObject *const yp_t_intstore = (ypObject *)&ypIntStore_Type;
+ypObject *const yp_t_float = (ypObject *)&ypFloat_Type;
+ypObject *const yp_t_floatstore = (ypObject *)&ypFloatStore_Type;
+ypObject *const yp_t_iter = (ypObject *)&ypIter_Type;
+ypObject *const yp_t_bytes = (ypObject *)&ypBytes_Type;
+ypObject *const yp_t_bytearray = (ypObject *)&ypByteArray_Type;
+ypObject *const yp_t_str = (ypObject *)&ypStr_Type;
+ypObject *const yp_t_chrarray = (ypObject *)&ypChrArray_Type;
+ypObject *const yp_t_tuple = (ypObject *)&ypTuple_Type;
+ypObject *const yp_t_list = (ypObject *)&ypList_Type;
+ypObject *const yp_t_frozenset = (ypObject *)&ypFrozenSet_Type;
+ypObject *const yp_t_set = (ypObject *)&ypSet_Type;
+ypObject *const yp_t_frozendict = (ypObject *)&ypFrozenDict_Type;
+ypObject *const yp_t_dict = (ypObject *)&ypDict_Type;
+ypObject *const yp_t_range = (ypObject *)&ypRange_Type;
 
 
 /*************************************************************************************************

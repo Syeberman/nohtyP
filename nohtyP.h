@@ -1375,32 +1375,34 @@ ypAPI void yp_deepinvalidate(ypObject **x);
  * Type Operations
  */
 
-// Return the immortal type of object.  If object is an exception, yp_type_exception is returned;
-// if it is invalidated, yp_type_invalidated is returned.
+// Return the immortal type of object.  If object is an exception, yp_t_exception is returned;
+// if it is invalidated, yp_t_invalidated is returned.
+// TODO Reconsider the behaviour of exceptions.  Python returns `type`.  If we ever want to support
+// creating instances of exceptions, we should do the same.
 ypAPI ypObject *yp_type(ypObject *object);
 
 // The immortal type objects.
-ypAPI ypObject *const yp_type_invalidated;
-ypAPI ypObject *const yp_type_exception;
-ypAPI ypObject *const yp_type_type;
-ypAPI ypObject *const yp_type_NoneType;
-ypAPI ypObject *const yp_type_bool;
-ypAPI ypObject *const yp_type_int;
-ypAPI ypObject *const yp_type_intstore;
-ypAPI ypObject *const yp_type_float;
-ypAPI ypObject *const yp_type_floatstore;
-ypAPI ypObject *const yp_type_iter;
-ypAPI ypObject *const yp_type_bytes;
-ypAPI ypObject *const yp_type_bytearray;
-ypAPI ypObject *const yp_type_str;
-ypAPI ypObject *const yp_type_chrarray;
-ypAPI ypObject *const yp_type_tuple;
-ypAPI ypObject *const yp_type_list;
-ypAPI ypObject *const yp_type_frozenset;
-ypAPI ypObject *const yp_type_set;
-ypAPI ypObject *const yp_type_frozendict;
-ypAPI ypObject *const yp_type_dict;
-ypAPI ypObject *const yp_type_range;
+ypAPI ypObject *const yp_t_invalidated;
+ypAPI ypObject *const yp_t_exception;
+ypAPI ypObject *const yp_t_type;
+ypAPI ypObject *const yp_t_NoneType;
+ypAPI ypObject *const yp_t_bool;
+ypAPI ypObject *const yp_t_int;
+ypAPI ypObject *const yp_t_intstore;
+ypAPI ypObject *const yp_t_float;
+ypAPI ypObject *const yp_t_floatstore;
+ypAPI ypObject *const yp_t_iter;
+ypAPI ypObject *const yp_t_bytes;
+ypAPI ypObject *const yp_t_bytearray;
+ypAPI ypObject *const yp_t_str;
+ypAPI ypObject *const yp_t_chrarray;
+ypAPI ypObject *const yp_t_tuple;
+ypAPI ypObject *const yp_t_list;
+ypAPI ypObject *const yp_t_frozenset;
+ypAPI ypObject *const yp_t_set;
+ypAPI ypObject *const yp_t_frozendict;
+ypAPI ypObject *const yp_t_dict;
+ypAPI ypObject *const yp_t_range;
 
 
 /*
