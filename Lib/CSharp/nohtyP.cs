@@ -634,7 +634,7 @@ namespace nohtyP
         internal static extern ypObject_p yp_throw( ypObject_p iterator, ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_ssize_t yp_iter_length_hintC( ypObject_p iterator, ref ypObject_p exc );
+        internal static extern yp_ssize_t yp_length_hintC( ypObject_p iterator, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_iter_stateCX( ypObject_p iterator, out UIntPtr state, out yp_ssize_t size );

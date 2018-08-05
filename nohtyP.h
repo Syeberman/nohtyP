@@ -1448,7 +1448,7 @@ ypAPI ypObject *yp_miniiter(ypObject *x, yp_uint64_t *state);
 // to an exception, _and_ an exception is returned.
 ypAPI ypObject *yp_miniiter_next(ypObject **mi, yp_uint64_t *state);
 
-// Returns a hint as to how many items are left to be yielded.  See yp_iter_length_hintC for
+// Returns a hint as to how many items are left to be yielded.  See yp_length_hintC for
 // additional information.  state must point to the same data returned by the previous yp_miniiter*
 // call.  Returns zero and sets *exc on error.
 ypAPI yp_ssize_t yp_miniiter_length_hintC(ypObject *mi, yp_uint64_t *state, ypObject **exc);
