@@ -360,7 +360,7 @@ namespace nohtyP
 #if NOTDEFINED
         // TODO Allow casts between @object and specific types?
         public static explicit operator yp_int( @object x ) {
-            if( yp_type( x.self ) != yp_type_int ) throw new ArgumentException; // TODO yp_TypeError?
+            if( yp_type( x.self ) != yp_t_int ) throw new ArgumentException; // TODO yp_TypeError?
             return yp_int( x.self );
         }
 #endif
@@ -1073,27 +1073,27 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_type( ypObject_p @object );
 
-        internal static ypObject_p yp_type_invalidated = DllImportData( "yp_type_invalidated" );
-        internal static ypObject_p yp_type_exception = DllImportData( "yp_type_exception" );
-        internal static ypObject_p yp_type_type = DllImportData( "yp_type_type" );
-        internal static ypObject_p yp_type_NoneType = DllImportData( "yp_type_NoneType" );
-        internal static ypObject_p yp_type_bool = DllImportData( "yp_type_bool" );
-        internal static ypObject_p yp_type_int = DllImportData( "yp_type_int" );
-        internal static ypObject_p yp_type_intstore = DllImportData( "yp_type_intstore" );
-        internal static ypObject_p yp_type_float = DllImportData( "yp_type_float" );
-        internal static ypObject_p yp_type_floatstore = DllImportData( "yp_type_floatstore" );
-        internal static ypObject_p yp_type_iter = DllImportData( "yp_type_iter" );
-        internal static ypObject_p yp_type_bytes = DllImportData( "yp_type_bytes" );
-        internal static ypObject_p yp_type_bytearray = DllImportData( "yp_type_bytearray" );
-        internal static ypObject_p yp_type_str = DllImportData( "yp_type_str" );
-        internal static ypObject_p yp_type_chrarray = DllImportData( "yp_type_chrarray" );
-        internal static ypObject_p yp_type_tuple = DllImportData( "yp_type_tuple" );
-        internal static ypObject_p yp_type_list = DllImportData( "yp_type_list" );
-        internal static ypObject_p yp_type_frozenset = DllImportData( "yp_type_frozenset" );
-        internal static ypObject_p yp_type_set = DllImportData( "yp_type_set" );
-        internal static ypObject_p yp_type_frozendict = DllImportData( "yp_type_frozendict" );
-        internal static ypObject_p yp_type_dict = DllImportData( "yp_type_dict" );
-        internal static ypObject_p yp_type_range = DllImportData( "yp_type_range" );
+        internal static ypObject_p yp_t_invalidated = DllImportData( "yp_t_invalidated" );
+        internal static ypObject_p yp_t_exception = DllImportData( "yp_t_exception" );
+        internal static ypObject_p yp_t_type = DllImportData( "yp_t_type" );
+        internal static ypObject_p yp_t_NoneType = DllImportData( "yp_t_NoneType" );
+        internal static ypObject_p yp_t_bool = DllImportData( "yp_t_bool" );
+        internal static ypObject_p yp_t_int = DllImportData( "yp_t_int" );
+        internal static ypObject_p yp_t_intstore = DllImportData( "yp_t_intstore" );
+        internal static ypObject_p yp_t_float = DllImportData( "yp_t_float" );
+        internal static ypObject_p yp_t_floatstore = DllImportData( "yp_t_floatstore" );
+        internal static ypObject_p yp_t_iter = DllImportData( "yp_t_iter" );
+        internal static ypObject_p yp_t_bytes = DllImportData( "yp_t_bytes" );
+        internal static ypObject_p yp_t_bytearray = DllImportData( "yp_t_bytearray" );
+        internal static ypObject_p yp_t_str = DllImportData( "yp_t_str" );
+        internal static ypObject_p yp_t_chrarray = DllImportData( "yp_t_chrarray" );
+        internal static ypObject_p yp_t_tuple = DllImportData( "yp_t_tuple" );
+        internal static ypObject_p yp_t_list = DllImportData( "yp_t_list" );
+        internal static ypObject_p yp_t_frozenset = DllImportData( "yp_t_frozenset" );
+        internal static ypObject_p yp_t_set = DllImportData( "yp_t_set" );
+        internal static ypObject_p yp_t_frozendict = DllImportData( "yp_t_frozendict" );
+        internal static ypObject_p yp_t_dict = DllImportData( "yp_t_dict" );
+        internal static ypObject_p yp_t_range = DllImportData( "yp_t_range" );
 
         internal static ypObject_p yp_BaseException = DllImportData( "yp_BaseException" );
         internal static ypObject_p yp_Exception = DllImportData( "yp_Exception" );

@@ -233,9 +233,9 @@ EXAMPLE( Sets, BriefDemonstration )
 /* Taken from Python's tutorial */
 EXAMPLE( Dictionaries, SmallExample )
 {
-    /* Defining immortal int objects is usually not necessary; they are used in this example 
-     * as the values of a dict, although they could just as easily be mortal ints.  (Of course, 
-     * if you _do_ use immortal ints in your code, you'd be wise to give them better names than 
+    /* Defining immortal int objects is usually not necessary; they are used in this example
+     * as the values of a dict, although they could just as easily be mortal ints.  (Of course,
+     * if you _do_ use immortal ints in your code, you'd be wise to give them better names than
      * "i_4098".) */
     yp_IMMORTAL_INT( i_4098, 4098 );
     yp_IMMORTAL_INT( i_4139, 4139 );
@@ -255,7 +255,7 @@ EXAMPLE( Dictionaries, SmallExample )
     yp_setitem( &tel, b_guido, i_4127 );
     ExpectEqual( 3, yp_lenC( tel, &exc ) );
 
-    /* Retrieving a key from the dict returns a new reference that you must remember to 
+    /* Retrieving a key from the dict returns a new reference that you must remember to
      * discard; commenting the calls that yield new references can help in this. */
     result = yp_getitem( tel, b_jack ); // new ref
     ExpectEqual( 4098, yp_asintC( result, &exc ) );
@@ -309,7 +309,7 @@ EXAMPLE( ConditionalStatements, ELIF )
     } yp_ELSE {
         ExpectUnreachable( );  // Will not be executed, as cond2 was true
     } yp_ELSE_EXCEPT_AS( e ) {
-        // Executed on error in cond1 or cond2, with e defined and set to exception object; 
+        // Executed on error in cond1 or cond2, with e defined and set to exception object;
         // unlike Python, this is *not* executed when yp_getindexC fails
         ExpectUnreachable( );
     } yp_ENDIF
@@ -379,7 +379,7 @@ EXAMPLE( LoopStatements, FOR_ELSE )
     yp_FOR( byte, bytes ) {
         // A new value is assigned to byte every time through the loop; previous values in byte are
         // automatically discarded
-        ExpectEqual( yp_type( byte ), yp_type_int );
+        ExpectEqual( yp_type( byte ), yp_t_int );
     } yp_FOR_ELSE {
         // Just like in Python, if yp_FOR loops over all values successfully, then the else clause
         // is executed
