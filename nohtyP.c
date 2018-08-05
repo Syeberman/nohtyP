@@ -8605,6 +8605,7 @@ static ypTypeObject ypByteArray_Type = {
 static ypObject *_yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len)
 {
     if (ypObject_TYPE_PAIR_CODE(seq) != ypBytes_CODE) return_yp_BAD_TYPE(seq);
+
     *bytes = ypBytes_DATA(seq);
     if (len == NULL) {
         if ((yp_ssize_t)strlen(*bytes) != ypBytes_LEN(seq)) return yp_TypeError;
@@ -9443,6 +9444,7 @@ static ypObject *_yp_asencodedCX(
         ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding)
 {
     if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_BAD_TYPE(s);
+
     ypStr_ASSERT_INVARIANTS(s);
     *encoded = ypStr_DATA(s);
     if (size == NULL) {
@@ -10947,6 +10949,18 @@ static ypTypeObject ypList_Type = {
         // Mapping operations
         MethodError_MappingMethods  // tp_as_mapping
 };
+
+ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_t *len)
+{
+    if (ypObject_TYPE_PAIR_CODE(seq) != ypTuple_CODE) {
+        *array = NULL;
+        *len = 0;
+        return_yp_BAD_TYPE(seq);
+    }
+    *array = ypTuple_ARRAY(seq);
+    *len = ypTuple_LEN(seq);
+    return yp_None;
+}
 
 
 // Custom ypQuickIter support
@@ -15475,6 +15489,78 @@ typedef struct {
 // TODO Compare against Python API
 
 #pragma endregion function
+
+#if 0
+static ypObject *_ypFunction_callN(ypObject *self, int n, ...) {
+    va_list args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = ypFunction_FUNC_NV(self)(self, n, args);
+    va_end(args);
+
+    return result;
+}
+
+// FIXME Raise a yp_SystemLimitationError as early as we can if this function will fail.
+// FIXME Tests for every amount of args to ensure proper order
+// FIXME Could we make this a generic macro to take a tuple and unpack it into C var args?
+static _ypFunction_callN_fromtuple(ypObject *s, ypObject *args)
+{
+    ypObject *(*f)(ypObject *, int, ...) = _ypFunction_callN;  // shorter name
+    ypObject *const *a;
+    yp_ssize_t len;
+    ypObject *result = yp_itemarrayCX(args, &a, &len);
+    // TODO Make this an assert?  Or skip yp_itemarrayCX and use tuple's macros directly?
+    if (yp_isexceptionC(result)) return result;  // should not happen: args should always be a tuple
+
+    yp_ASSERT1(len >= 0);
+    switch(len) {
+        case 0:
+            return f(s, 0);
+        case 1:
+            return f(s, 1, a[0]);
+        case 2:
+            return f(s, 2, a[0], a[1]);
+        case 3:
+            return f(s, 3, a[0], a[1], a[2]);
+        case 4:
+            return f(s, 4, a[0], a[1], a[2], a[3]);
+        case 5:
+            return f(s, 5, a[0], a[1], a[2], a[3], a[4]);
+        case 6:
+            return f(s, 6, a[0], a[1], a[2], a[3], a[4], a[5]);
+        case 7:
+            return f(s, 7, a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
+        case 8:
+            return f(s, 8, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+        case 9:
+            return f(s, 9, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
+        case 10:
+            return f(s, 10, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
+        case 11:
+            return f(s, 11, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]);
+        case 12:
+            return f(s, 12, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
+                a[11]);
+        case 13:
+            return f(s, 13, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
+                a[11], a[12]);
+        case 14:
+            return f(s, 14, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
+                a[11], a[12], a[13]);
+        case 15:
+            return f(s, 15, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
+                a[11], a[12], a[13], a[14]);
+        case 16:
+            return f(s, 16, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
+                a[11], a[12], a[13], a[14], a[15]);
+        default:
+            return yp_SystemLimitationError;
+    }
+}
+#endif
+
 
 
 /*************************************************************************************************

@@ -518,14 +518,6 @@ ypAPI ypObject *yp_throw(ypObject **iterator, ypObject *exc);
 // FIXME Compare against Python's __length_hint__ now that it's official.
 ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
 
-// Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
-// internal iterator state buffer and its size in bytes, and returns the immortal yp_None.  The
-// structure and initial values of *state are determined by the call to iterator's constructor; the
-// function cannot change the size after creation, and any ypObject*s in *state should be considered
-// *borrowed* (it is safe to replace them with new or immortal references).  Sets *state to NULL,
-// *size to zero, and returns an exception on error.
-ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
-
 // "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_throw returns
 // yp_StopIteration or yp_GeneratorExit, it is not treated as an error; if yp_throw returns any
 // other exception, *iterator is discarded and set to that exception.  The behaviour of this method
@@ -1752,6 +1744,14 @@ typedef struct _yp_initialize_parameters_t {
 
 // XXX The "X" in these names is a reminder that the function is returning internal memory, and
 // as such should be used with caution.
+
+// Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
+// internal iterator state buffer and its size in bytes, and returns the immortal yp_None.  The
+// structure and initial values of *state are determined by the call to iterator's constructor; the
+// function cannot change the size after creation, and any ypObject*s in *state should be considered
+// *borrowed* (it is safe to replace them with new or immortal references).  Sets *state to NULL,
+// *size to zero, and returns an exception on error.
+ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
 // For sequences that store their elements as an array of bytes (bytes and bytearray), sets *bytes
 // to the beginning of that array, *len to the length of the sequence, and returns the immortal
