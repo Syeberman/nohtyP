@@ -333,15 +333,15 @@ yp_func(c_ypObject_p, "yp_float", ((c_ypObject_p, "x"), ))
 # ypObject *yp_iter(ypObject *x);
 yp_func(c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t lenhint, int n, ...);
-# ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args);
+# ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t length_hint, int n, ...);
+# ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t length_hint, int n, va_list args);
 
-# ypObject *yp_generator_fromstructCN(yp_generator_func_t func, yp_ssize_t lenhint,
+# ypObject *yp_generator_fromstructCN(yp_generator_func_t func, yp_ssize_t length_hint,
 #         void *state, yp_ssize_t size, int n, ...);
-# ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t lenhint,
+# ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint,
 #         void *state, yp_ssize_t size, int n, va_list args);
 yp_func(c_ypObject_p, "yp_generator_fromstructCN",
-        ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "lenhint"),
+        ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "length_hint"),
          (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p))
 
 # ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step);
@@ -478,8 +478,8 @@ yp_func(c_ypObject_p, "yp_next", ((c_ypObject_pp, "iterator"), ))
 
 # ypObject *yp_throw(ypObject *iterator, ypObject *exc);
 
-# yp_ssize_t yp_iter_lenhintC(ypObject *iterator, ypObject **exc);
-yp_func(c_yp_ssize_t, "yp_iter_lenhintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc))
+# yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
+yp_func(c_yp_ssize_t, "yp_length_hintC", ((c_ypObject_p, "iterator"), c_ypObject_pp_exc))
 
 # ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
@@ -1060,27 +1060,27 @@ yp_func(c_yp_int_t, "yp_int_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_ex
 # ypObject *yp_type(ypObject *object);
 yp_func(c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ))
 
-# ypObject * const yp_type_invalidated;
-# ypObject * const yp_type_exception;
-# ypObject * const yp_type_type;
-# ypObject * const yp_type_NoneType;
-# ypObject * const yp_type_bool;
-# ypObject * const yp_type_int;
-# ypObject * const yp_type_intstore;
-# ypObject * const yp_type_float;
-# ypObject * const yp_type_floatstore;
-# ypObject * const yp_type_iter;
-# ypObject * const yp_type_bytes;
-# ypObject * const yp_type_bytearray;
-# ypObject * const yp_type_str;
-# ypObject * const yp_type_chrarray;
-# ypObject * const yp_type_tuple;
-# ypObject * const yp_type_list;
-# ypObject * const yp_type_frozenset;
-# ypObject * const yp_type_set;
-# ypObject * const yp_type_frozendict;
-# ypObject * const yp_type_dict;
-# ypObject * const yp_type_range;
+# ypObject * const yp_t_invalidated;
+# ypObject * const yp_t_exception;
+# ypObject * const yp_t_type;
+# ypObject * const yp_t_NoneType;
+# ypObject * const yp_t_bool;
+# ypObject * const yp_t_int;
+# ypObject * const yp_t_intstore;
+# ypObject * const yp_t_float;
+# ypObject * const yp_t_floatstore;
+# ypObject * const yp_t_iter;
+# ypObject * const yp_t_bytes;
+# ypObject * const yp_t_bytearray;
+# ypObject * const yp_t_str;
+# ypObject * const yp_t_chrarray;
+# ypObject * const yp_t_tuple;
+# ypObject * const yp_t_list;
+# ypObject * const yp_t_frozenset;
+# ypObject * const yp_t_set;
+# ypObject * const yp_t_frozendict;
+# ypObject * const yp_t_dict;
+# ypObject * const yp_t_range;
 
 
 # ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len);
@@ -1584,47 +1584,47 @@ def pytype(yptype, pytypes):
         return cls
     return _pytype
 
-# There's a circular reference between yp_type_type and yp_type we need to dance around
-yp_type_type = c_ypObject_p.in_dll(ypdll, "yp_type_type")
+# There's a circular reference between yp_t_type and yp_type we need to dance around
+yp_t_type = c_ypObject_p.in_dll(ypdll, "yp_t_type")
 
 
 class yp_type(ypObject):
-    _yp_type = yp_type_type
+    _yp_type = yp_t_type
 
     def __new__(cls, object):
         if not isinstance(object, ypObject):
             raise TypeError("expected ypObject in yp_type")
         return object._yp_type
-yp_type_type.__class__ = yp_type
-_yp_pyobj_cache[yp_type_type.value] = yp_type_type
+yp_t_type.__class__ = yp_type
+_yp_pyobj_cache[yp_t_type.value] = yp_t_type
 ypObject._pytype2yp[type] = yp_type
-ypObject._yptype2yp[yp_type_type.value] = yp_type
+ypObject._yptype2yp[yp_t_type.value] = yp_type
 
 # Now that the "type(type) is type" issue has been dealt with, we can import the other type
 # objects as normal
-c_ypObject_p_value("yp_type_invalidated")
-c_ypObject_p_value("yp_type_exception")
-c_ypObject_p_value("yp_type_NoneType")
-c_ypObject_p_value("yp_type_bool")
-c_ypObject_p_value("yp_type_int")
-c_ypObject_p_value("yp_type_intstore")
-c_ypObject_p_value("yp_type_float")
-c_ypObject_p_value("yp_type_floatstore")
-c_ypObject_p_value("yp_type_iter")
-c_ypObject_p_value("yp_type_bytes")
-c_ypObject_p_value("yp_type_bytearray")
-c_ypObject_p_value("yp_type_str")
-c_ypObject_p_value("yp_type_chrarray")
-c_ypObject_p_value("yp_type_tuple")
-c_ypObject_p_value("yp_type_list")
-c_ypObject_p_value("yp_type_frozenset")
-c_ypObject_p_value("yp_type_set")
-c_ypObject_p_value("yp_type_frozendict")
-c_ypObject_p_value("yp_type_dict")
-c_ypObject_p_value("yp_type_range")
+c_ypObject_p_value("yp_t_invalidated")
+c_ypObject_p_value("yp_t_exception")
+c_ypObject_p_value("yp_t_NoneType")
+c_ypObject_p_value("yp_t_bool")
+c_ypObject_p_value("yp_t_int")
+c_ypObject_p_value("yp_t_intstore")
+c_ypObject_p_value("yp_t_float")
+c_ypObject_p_value("yp_t_floatstore")
+c_ypObject_p_value("yp_t_iter")
+c_ypObject_p_value("yp_t_bytes")
+c_ypObject_p_value("yp_t_bytearray")
+c_ypObject_p_value("yp_t_str")
+c_ypObject_p_value("yp_t_chrarray")
+c_ypObject_p_value("yp_t_tuple")
+c_ypObject_p_value("yp_t_list")
+c_ypObject_p_value("yp_t_frozenset")
+c_ypObject_p_value("yp_t_set")
+c_ypObject_p_value("yp_t_frozendict")
+c_ypObject_p_value("yp_t_dict")
+c_ypObject_p_value("yp_t_range")
 
 
-@pytype(yp_type_exception, BaseException)
+@pytype(yp_t_exception, BaseException)
 class yp_BaseException(ypObject):
     def __new__(cls, *args, **kwargs):
         raise NotImplementedError("can't instantiate yp_BaseException directly")
@@ -1641,7 +1641,7 @@ class yp_BaseException(ypObject):
             raise pyExc(name)
 
 
-@pytype(yp_type_NoneType, type(None))
+@pytype(yp_t_NoneType, type(None))
 class yp_NoneType(ypObject):
     def __new__(cls, *args, **kwargs):
         raise NotImplementedError("can't instantiate yp_NoneType directly")
@@ -1657,7 +1657,7 @@ class yp_NoneType(ypObject):
 c_ypObject_p_value("yp_None")
 
 
-@pytype(yp_type_bool, bool)
+@pytype(yp_t_bool, bool)
 class yp_bool(ypObject):
     def __new__(cls, x=False):
         if isinstance(x, ypObject):
@@ -1758,7 +1758,7 @@ c_ypObject_p_value("yp_True")
 c_ypObject_p_value("yp_False")
 
 
-@pytype(yp_type_iter, (iter, type(x for x in ())))
+@pytype(yp_t_iter, (iter, type(x for x in ())))
 class yp_iter(ypObject):
     def _pygenerator_func(self, yp_self, yp_value):
         try:
@@ -1782,16 +1782,16 @@ class yp_iter(ypObject):
         if isinstance(object, (_setlike_dictview, _values_dictview)):
             return iter(object)
 
-        lenhint = operator.length_hint(object)
+        length_hint = operator.length_hint(object)
         self = super().__new__(cls)
         self._pyiter = iter(object)
         self._pycallback = c_yp_generator_func_t(self._pygenerator_func)
-        self.value = _yp_incref(_yp_generator_fromstructCN(self._pycallback, lenhint, 0, 0))
+        self.value = _yp_incref(_yp_generator_fromstructCN(self._pycallback, length_hint, 0, 0))
         return self
 
     def __iter__(self): return self
 
-    def __length_hint__(self): return _yp_iter_lenhintC(self, yp_None)
+    def __length_hint__(self): return _yp_length_hintC(self, yp_None)
 
 
 def _yp_iterable(iterable):
@@ -1813,7 +1813,7 @@ def yp_reversed(x):
     return _yp_reversed(x)
 
 
-@pytype(yp_type_int, int)
+@pytype(yp_t_int, int)
 class yp_int(ypObject):
     def __new__(cls, x=0, base=_yp_arg_missing):
         if base is _yp_arg_missing:
@@ -1854,7 +1854,7 @@ def yp_hash(x):
     return yp_int(_yp_hashC(x, yp_None))  # FIXME return yp_int(hash(x))?
 
 
-@pytype(yp_type_float, float)
+@pytype(yp_t_float, float)
 class yp_float(ypObject):
     def __new__(cls, x=0.0):
         if isinstance(x, float):
@@ -1913,7 +1913,7 @@ class _ypBytes(ypObject):
         return _yp_repeatC(self, factor)
 
 
-@pytype(yp_type_bytes, bytes)
+@pytype(yp_t_bytes, bytes)
 class yp_bytes(_ypBytes):
     _ypBytes_constructorC = _yp_bytesC
     _ypBytes_constructor3 = _yp_bytes3
@@ -1934,7 +1934,7 @@ class yp_bytes(_ypBytes):
 _yp_bytes_empty = yp_bytes()
 
 
-@pytype(yp_type_bytearray, bytearray)
+@pytype(yp_t_bytearray, bytearray)
 class yp_bytearray(_ypBytes):
     _ypBytes_constructorC = _yp_bytearrayC
     _ypBytes_constructor3 = _yp_bytearray3
@@ -1971,7 +1971,7 @@ class yp_bytearray(_ypBytes):
 # TODO Just generally move more of this logic into nohtyP, when available
 
 
-@pytype(yp_type_str, str)
+@pytype(yp_t_str, str)
 class yp_str(ypObject):
     def __new__(cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
@@ -2101,7 +2101,7 @@ class _ypTuple(ypObject):
         return _yp_repeatC(self, factor)
 
 
-@pytype(yp_type_tuple, tuple)
+@pytype(yp_t_tuple, tuple)
 class yp_tuple(_ypTuple):
     def __new__(cls, iterable=_yp_arg_missing):
         if iterable is _yp_arg_missing:
@@ -2121,7 +2121,7 @@ class yp_tuple(_ypTuple):
 _yp_tuple_empty = yp_tuple()
 
 
-@pytype(yp_type_list, list)
+@pytype(yp_t_list, list)
 class yp_list(_ypTuple):
     def __new__(cls, iterable=_yp_tuple_empty):
         return _yp_list(_yp_iterable(iterable))
@@ -2239,7 +2239,7 @@ class _ypSet(ypObject):
     def add(self, elem): _yp_set_add(self, elem)
 
 
-@pytype(yp_type_frozenset, frozenset)
+@pytype(yp_t_frozenset, frozenset)
 class yp_frozenset(_ypSet):
     _ypSet_constructor = _yp_frozenset
 
@@ -2251,7 +2251,7 @@ class yp_frozenset(_ypSet):
 _yp_frozenset_empty = yp_frozenset()
 
 
-@pytype(yp_type_set, set)
+@pytype(yp_t_set, set)
 class yp_set(_ypSet):
     _ypSet_constructor = _yp_set
 
@@ -2340,7 +2340,7 @@ class _items_dictview(_setlike_dictview):
 # between list/tuple and set/frozenset (ie the singleton empty frozendict, etc)
 
 
-@pytype(yp_type_dict, dict)
+@pytype(yp_t_dict, dict)
 class yp_dict(ypObject):
     def __new__(cls, *args, **kwargs):
         if len(args) == 0:
@@ -2382,7 +2382,7 @@ class yp_dict(ypObject):
             _yp_updateK(self, *_yp_flatten_dict(kwargs))
 
 
-@pytype(yp_type_range, range)
+@pytype(yp_t_range, range)
 class yp_range(ypObject):
     @staticmethod
     def _new_range(start, stop, step=1):

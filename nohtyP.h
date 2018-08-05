@@ -240,10 +240,11 @@ ypAPI ypObject *yp_floatstore(ypObject *x);
 ypAPI ypObject *yp_iter(ypObject *x);
 
 // Returns a new reference to a generator iterator object using the given func.  The given n objects
-// will be made available to func via yp_iter_stateCX as an array.  lenhint is a clue to consumers
-// of the iterator how many items will be yielded; use zero if this is not known.
-ypAPI ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t lenhint, int n, ...);
-ypAPI ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t lenhint, int n, va_list args);
+// will be made available to func via yp_iter_stateCX as an array.  length_hint is a clue to
+// consumers of the iterator how many items will be yielded; use zero if this is not known.
+ypAPI ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t length_hint, int n, ...);
+ypAPI ypObject *yp_generatorCNV(
+        yp_generator_func_t func, yp_ssize_t length_hint, int n, va_list args);
 
 // Similar to yp_generatorCN, but accepts an arbitrary structure (or array) of the given size which
 // will be copied into the iterator and made available to func via yp_iter_stateCX.  If state
@@ -260,8 +261,8 @@ ypAPI ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t lenhint, in
 // "active" one.  If state contains objects in an array you must list _each_ _individual_ offset.
 // state _can_ contain exceptions.
 ypAPI ypObject *yp_generator_fromstructCN(
-        yp_generator_func_t func, yp_ssize_t lenhint, void *state, yp_ssize_t size, int n, ...);
-ypAPI ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t lenhint,
+        yp_generator_func_t func, yp_ssize_t length_hint, void *state, yp_ssize_t size, int n, ...);
+ypAPI ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint,
         void *state, yp_ssize_t size, int n, va_list args);
 
 // Returns a new reference to a range object. yp_rangeC is equivalent to yp_rangeC3(0, stop, 1).
@@ -1519,10 +1520,10 @@ ypAPI ypObject *yp_miniiter(ypObject *x, yp_uint64_t *state);
 // to an exception, _and_ an exception is returned.
 ypAPI ypObject *yp_miniiter_next(ypObject **mi, yp_uint64_t *state);
 
-// Returns a hint as to how many items are left to be yielded.  See yp_iter_lenhintC for additional
-// information.  state must point to the same data returned by the previous yp_miniiter* call.
-// Returns zero and sets *exc on error.
-ypAPI yp_ssize_t yp_miniiter_lenhintC(ypObject *mi, yp_uint64_t *state, ypObject **exc);
+// Returns a hint as to how many items are left to be yielded.  See yp_length_hintC for
+// additional information.  state must point to the same data returned by the previous yp_miniiter*
+// call.  Returns zero and sets *exc on error.
+ypAPI yp_ssize_t yp_miniiter_length_hintC(ypObject *mi, yp_uint64_t *state, ypObject **exc);
 
 // Mini iterator versions of yp_iter_keys and yp_iter_values.  Otherwise behaves as yp_miniiter.
 ypAPI ypObject *yp_miniiter_keys(ypObject *x, yp_uint64_t *state);

@@ -48,81 +48,81 @@ namespace nohtyP
             return new @object( _dll.yp_intC( value ) );
         }
         public static @object @int( @object x, long @base ) {
-            return new @object( _dll.yp_int_baseC( x.self, @base ) ); 
+            return new @object( _dll.yp_int_baseC( x.self, @base ) );
         }
         public static @object @int( @object x ) {
-            return new @object( _dll.yp_int( x.self ) ); 
+            return new @object( _dll.yp_int( x.self ) );
         }
 
         public static @object intstore( long value=0 ) {
-            return new @object( _dll.yp_intstoreC( value ) ); 
+            return new @object( _dll.yp_intstoreC( value ) );
         }
         public static @object intstore( @object x, long @base ) {
-            return new @object( _dll.yp_intstore_baseC( x.self, @base ) ); 
+            return new @object( _dll.yp_intstore_baseC( x.self, @base ) );
         }
         public static @object intstore( @object x ) {
-            return new @object( _dll.yp_intstore( x.self ) ); 
+            return new @object( _dll.yp_intstore( x.self ) );
         }
 
         public static @object @float( double value=0.0 ) {
-            return new @object( _dll.yp_floatCF( value ) ); 
+            return new @object( _dll.yp_floatCF( value ) );
         }
         public static @object @float( @object x ) {
-            return new @object( _dll.yp_float( x.self ) ); 
+            return new @object( _dll.yp_float( x.self ) );
         }
-            
+
         public static @object floatstore( double value=0.0 ) {
-            return new @object( _dll.yp_floatstoreCF( value ) ); 
+            return new @object( _dll.yp_floatstoreCF( value ) );
         }
         public static @object floatstore( @object x ) {
-            return new @object( _dll.yp_floatstore( x.self ) ); 
+            return new @object( _dll.yp_floatstore( x.self ) );
         }
 
         public static @object iter( @object x ) {
-            return new @object( _dll.yp_iter( x.self ) ); 
+            return new @object( _dll.yp_iter( x.self ) );
         }
         // TODO yp_generatorCN, etc, supporting a callback
 
         public static @object range( long start, long stop, long step=1 ) {
-            return new @object( _dll.yp_rangeC3( start, stop, step ) ); 
+            return new @object( _dll.yp_rangeC3( start, stop, step ) );
         }
         public static @object range( long stop ) {
-            return new @object( _dll.yp_rangeC( stop ) ); 
+            return new @object( _dll.yp_rangeC( stop ) );
         }
 
         public static @object bytes( long source ) {
-            return new @object( _dll.yp_bytesC( null, (yp_ssize_t) source ) ); 
+            return new @object( _dll.yp_bytesC( null, (yp_ssize_t) source ) );
         }
         public static @object bytes( byte[] source ) {
-            return new @object( _dll.yp_bytesC( source, (yp_ssize_t) source.Length ) ); 
+            return new @object( _dll.yp_bytesC( source, (yp_ssize_t) source.Length ) );
         }
         public static @object bytes( @object source, @object encoding, @object errors ) {
-            return new @object( _dll.yp_bytes3( source.self, encoding.self, errors.self ) ); 
+            return new @object( _dll.yp_bytes3( source.self, encoding.self, errors.self ) );
         }
         public static @object bytes( @object source, @object encoding ) {
-            return bytes( source, encoding, s_strict ); 
+            return bytes( source, encoding, s_strict );
         }
         public static @object bytes( @object source ) {
-            return new @object( _dll.yp_bytes( source.self ) ); 
+            return new @object( _dll.yp_bytes( source.self ) );
         }
         public static @object bytes() {
             return new @object( _dll.yp_bytesC( null, (yp_ssize_t) 0 ) ); // TODO yp_bytes0
         }
 
         public static @object bytearray( long source ) {
-            return new @object( _dll.yp_bytearrayC( null, (yp_ssize_t) source ) ); 
+            return new @object( _dll.yp_bytearrayC( null, (yp_ssize_t) source ) );
         }
         public static @object bytearray( byte[] source ) {
-            return new @object( _dll.yp_bytearrayC( source, (yp_ssize_t) source.Length ) ); 
+            return new @object( _dll.yp_bytearrayC( source, (yp_ssize_t) source.Length ) );
         }
         public static @object bytearray( @object source, @object encoding, @object errors ) {
-            return new @object( _dll.yp_bytearray3( source.self, encoding.self, errors.self ) ); 
+            return new @object( _dll.yp_bytearray3( source.self, encoding.self, errors.self ) );
         }
         public static @object bytearray( @object source, @object encoding ) {
-            return bytearray( source, encoding, s_strict ); 
+            return bytearray( source, encoding, s_strict );
         }
         public static @object bytearray( @object source ) {
-            return new @object( _dll.yp_bytearray( source.self ) ); 
+            return new @object( _dll.yp_bytearray( source.self ) );
         }
         public static @object bytearray() {
             return new @object( _dll.yp_bytearrayC( null, (yp_ssize_t) 0 ) ); // TODO yp_bytearray0
@@ -133,24 +133,24 @@ namespace nohtyP
             return _dll.yp_str_frombytesC2( encoded, (yp_ssize_t) encoded.Length );
         }
         public static @object str( string source ) {
-            return new @object( _str( source ) ); 
+            return new @object( _str( source ) );
         }
         // TODO default values? Perhaps just for errors
         public static @object str( byte[] source, @object encoding, @object errors ) {
             return new @object( _dll.yp_str_frombytesC4( source, (yp_ssize_t) source.Length,
-                encoding.self, errors.self ) ); 
+                encoding.self, errors.self ) );
         }
         public static @object str( @object @object, @object encoding, @object errors ) {
-            return new @object( _dll.yp_str3( @object.self, encoding.self, errors.self ) ); 
+            return new @object( _dll.yp_str3( @object.self, encoding.self, errors.self ) );
         }
         public static @object str( @object @object, @object encoding ) {
-            return str( @object, encoding, s_strict ); 
+            return str( @object, encoding, s_strict );
         }
         public static @object str( @object @object ) {
-            return new @object( _dll.yp_str( @object.self ) ); 
+            return new @object( _dll.yp_str( @object.self ) );
         }
         public static @object str() {
-            return new @object( _dll.yp_str0() ); 
+            return new @object( _dll.yp_str0() );
         }
 
         public static @object chr( long i ) {
@@ -162,43 +162,43 @@ namespace nohtyP
             return _dll.yp_str_frombytesC2( encoded, (yp_ssize_t) encoded.Length );
         }
         public static @object chrarray( string source ) {
-            return new @object( _chrarray( source ) ); 
+            return new @object( _chrarray( source ) );
         }
         // TODO default values? Perhaps just for errors
         public static @object chrarray( byte[] source, @object encoding, @object errors ) {
             return new @object( _dll.yp_chrarray_frombytesC4( source, (yp_ssize_t) source.Length,
-                encoding.self, errors.self ) ); 
+                encoding.self, errors.self ) );
         }
         public static @object chrarray( @object @object, @object encoding, @object errors ) {
-            return new @object( _dll.yp_chrarray3( @object.self, encoding.self, errors.self ) ); 
+            return new @object( _dll.yp_chrarray3( @object.self, encoding.self, errors.self ) );
         }
         public static @object chrarray( @object @object, @object encoding ) {
-            return chrarray( @object, encoding, s_strict ); 
+            return chrarray( @object, encoding, s_strict );
         }
         public static @object chrarray( @object @object ) {
-            return new @object( _dll.yp_chrarray( @object.self ) ); 
+            return new @object( _dll.yp_chrarray( @object.self ) );
         }
         public static @object chrarray() {
-            return new @object( _dll.yp_chrarray0() ); 
+            return new @object( _dll.yp_chrarray0() );
         }
 
-        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good length_hint.)
         private static ypObject_p _tuple( IList<@object> objects ) {
             var result = _list( objects );
             _dll.yp_freeze( ref result );   // convert to tuple
             return result;  // or exception on error
         }
         public static @object tuple( IList<@object> objects ) {
-            return new @object( _tuple( objects ) ); 
+            return new @object( _tuple( objects ) );
         }
         public static @object tuple( @object iterable ) {
-            return new @object( _dll.yp_tuple( iterable.self ) ); 
+            return new @object( _dll.yp_tuple( iterable.self ) );
         }
         public static @object tuple() {
-            return new @object( _dll.yp_tupleN( 0 ) ); 
+            return new @object( _dll.yp_tupleN( 0 ) );
         }
 
-        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good length_hint.)
         private static ypObject_p _list( IList<@object> objects )
         {
             // Pre-allocate a list of the required size, then add the items.  If Count lies we
@@ -211,13 +211,13 @@ namespace nohtyP
             return result;  // or exception on error
         }
         public static @object list( IList<@object> objects ) {
-            return new @object( _list( objects ) ); 
+            return new @object( _list( objects ) );
         }
         public static @object list( @object iterable ) {
-            return new @object( _dll.yp_list( iterable.self ) ); 
+            return new @object( _dll.yp_list( iterable.self ) );
         }
         public static @object list() {
-            return new @object( _dll.yp_listN( 0 ) ); 
+            return new @object( _dll.yp_listN( 0 ) );
         }
 
         public static @object sorted( @object iterable, Func<@object, @object> key=null, bool reverse=false ) {
@@ -233,7 +233,7 @@ namespace nohtyP
         // TODO Expose yp_setN et al as a C# method that accepts variable arguments?  Python doesn't do
         // this, but it can simplify yp.set(yp.tuple(...)) into just yp.setN(...)
 
-        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good length_hint.)
         private static ypObject_p _frozenset( IEnumerable<@object> objects )
         {
             var result = _set( objects );
@@ -250,11 +250,11 @@ namespace nohtyP
             return new @object( _dll.yp_frozensetN( 0 ) );
         }
 
-        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
-        // TODO Really do need a good lenhint...or a "yp_set_fromlenhint" function
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good length_hint.)
+        // TODO Really do need a good length_hint...or a "yp_set_fromlength_hint" function
         private static ypObject_p _set( IEnumerable<@object> objects )
         {
-            // TODO We should immediately wrap this (and others) in @object to take advantage of 
+            // TODO We should immediately wrap this (and others) in @object to take advantage of
             // auto-decref on exception
             var result = _dll.yp_setN( 0 );
             foreach( var item in objects ) {
@@ -272,7 +272,7 @@ namespace nohtyP
             return new @object( _dll.yp_setN( 0 ) );
         }
 
-        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good length_hint.)
         private static ypObject_p _frozendict( IEnumerable<IList<@object>> objects )
         {
             var result = _dict( objects );
@@ -289,12 +289,12 @@ namespace nohtyP
             return new @object( _dll.yp_frozendictK( 0 ) );
         }
 
-        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good lenhint.)
+        // TODO Or would a yp_iter wrapper for IEnumerable work better?  (With a good length_hint.)
         // TODO Another version that takes IEnumerable<@object>, where the @objects are supposedly
         // already 2-tuples or similar
         private static ypObject_p _dict( IEnumerable<IList<@object>> objects )
         {
-            // TODO We should immediately wrap this (and others) in @object to take advantage of 
+            // TODO We should immediately wrap this (and others) in @object to take advantage of
             // auto-decref on exception
             var result = _dll.yp_dictK( 0 );
             foreach( var item in objects ) {
@@ -322,7 +322,7 @@ namespace nohtyP
             return value ? yp.True : yp.False;
         }
         public static @object @bool( @object x ) {
-            return new @object( _dll.yp_bool( x.self ) ); 
+            return new @object( _dll.yp_bool( x.self ) );
         }
 
 
@@ -360,7 +360,7 @@ namespace nohtyP
 #if NOTDEFINED
         // TODO Allow casts between @object and specific types?
         public static explicit operator yp_int( @object x ) {
-            if( yp_type( x.self ) != yp_type_int ) throw new ArgumentException; // TODO yp_TypeError?
+            if( yp_type( x.self ) != yp_t_int ) throw new ArgumentException; // TODO yp_TypeError?
             return yp_int( x.self );
         }
 #endif
@@ -457,10 +457,10 @@ namespace nohtyP
         internal static extern ypObject_p yp_iter( ypObject_p x );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_generatorCN( yp_generator_func_t func, yp_ssize_t lenhint, int n, params ypObject_p[] args );
+        internal static extern ypObject_p yp_generatorCN( yp_generator_func_t func, yp_ssize_t length_hint, int n, params ypObject_p[] args );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t lenhint,
+        internal static extern ypObject_p yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t length_hint,
                 void* state, yp_ssize_t size, int n, params ypObject_p[] args );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
@@ -634,7 +634,7 @@ namespace nohtyP
         internal static extern ypObject_p yp_throw( ypObject_p iterator, ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_ssize_t yp_iter_lenhintC( ypObject_p iterator, ref ypObject_p exc );
+        internal static extern yp_ssize_t yp_length_hintC( ypObject_p iterator, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_iter_stateCX( ypObject_p iterator, out UIntPtr state, out yp_ssize_t size );
@@ -1073,27 +1073,27 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_type( ypObject_p @object );
 
-        internal static ypObject_p yp_type_invalidated = DllImportData( "yp_type_invalidated" );
-        internal static ypObject_p yp_type_exception = DllImportData( "yp_type_exception" );
-        internal static ypObject_p yp_type_type = DllImportData( "yp_type_type" );
-        internal static ypObject_p yp_type_NoneType = DllImportData( "yp_type_NoneType" );
-        internal static ypObject_p yp_type_bool = DllImportData( "yp_type_bool" );
-        internal static ypObject_p yp_type_int = DllImportData( "yp_type_int" );
-        internal static ypObject_p yp_type_intstore = DllImportData( "yp_type_intstore" );
-        internal static ypObject_p yp_type_float = DllImportData( "yp_type_float" );
-        internal static ypObject_p yp_type_floatstore = DllImportData( "yp_type_floatstore" );
-        internal static ypObject_p yp_type_iter = DllImportData( "yp_type_iter" );
-        internal static ypObject_p yp_type_bytes = DllImportData( "yp_type_bytes" );
-        internal static ypObject_p yp_type_bytearray = DllImportData( "yp_type_bytearray" );
-        internal static ypObject_p yp_type_str = DllImportData( "yp_type_str" );
-        internal static ypObject_p yp_type_chrarray = DllImportData( "yp_type_chrarray" );
-        internal static ypObject_p yp_type_tuple = DllImportData( "yp_type_tuple" );
-        internal static ypObject_p yp_type_list = DllImportData( "yp_type_list" );
-        internal static ypObject_p yp_type_frozenset = DllImportData( "yp_type_frozenset" );
-        internal static ypObject_p yp_type_set = DllImportData( "yp_type_set" );
-        internal static ypObject_p yp_type_frozendict = DllImportData( "yp_type_frozendict" );
-        internal static ypObject_p yp_type_dict = DllImportData( "yp_type_dict" );
-        internal static ypObject_p yp_type_range = DllImportData( "yp_type_range" );
+        internal static ypObject_p yp_t_invalidated = DllImportData( "yp_t_invalidated" );
+        internal static ypObject_p yp_t_exception = DllImportData( "yp_t_exception" );
+        internal static ypObject_p yp_t_type = DllImportData( "yp_t_type" );
+        internal static ypObject_p yp_t_NoneType = DllImportData( "yp_t_NoneType" );
+        internal static ypObject_p yp_t_bool = DllImportData( "yp_t_bool" );
+        internal static ypObject_p yp_t_int = DllImportData( "yp_t_int" );
+        internal static ypObject_p yp_t_intstore = DllImportData( "yp_t_intstore" );
+        internal static ypObject_p yp_t_float = DllImportData( "yp_t_float" );
+        internal static ypObject_p yp_t_floatstore = DllImportData( "yp_t_floatstore" );
+        internal static ypObject_p yp_t_iter = DllImportData( "yp_t_iter" );
+        internal static ypObject_p yp_t_bytes = DllImportData( "yp_t_bytes" );
+        internal static ypObject_p yp_t_bytearray = DllImportData( "yp_t_bytearray" );
+        internal static ypObject_p yp_t_str = DllImportData( "yp_t_str" );
+        internal static ypObject_p yp_t_chrarray = DllImportData( "yp_t_chrarray" );
+        internal static ypObject_p yp_t_tuple = DllImportData( "yp_t_tuple" );
+        internal static ypObject_p yp_t_list = DllImportData( "yp_t_list" );
+        internal static ypObject_p yp_t_frozenset = DllImportData( "yp_t_frozenset" );
+        internal static ypObject_p yp_t_set = DllImportData( "yp_t_set" );
+        internal static ypObject_p yp_t_frozendict = DllImportData( "yp_t_frozendict" );
+        internal static ypObject_p yp_t_dict = DllImportData( "yp_t_dict" );
+        internal static ypObject_p yp_t_range = DllImportData( "yp_t_range" );
 
         internal static ypObject_p yp_BaseException = DllImportData( "yp_BaseException" );
         internal static ypObject_p yp_Exception = DllImportData( "yp_Exception" );

@@ -266,8 +266,8 @@ class BoolTest(yp_unittest.TestCase):
     def test_types(self):
         # types are always true.
         # TODO complex? object? other nohtyP types?
-        for t in [yp_type_bool, yp_type_dict, yp_type_float, yp_type_int, yp_type_list,
-                  yp_type_set, yp_type_str, yp_type_tuple, yp_type_type]:
+        for t in [yp_t_bool, yp_t_dict, yp_t_float, yp_t_int, yp_t_list,
+                  yp_t_set, yp_t_str, yp_t_tuple, yp_t_type]:
             self.assertIs(yp_bool(t), yp_True)
 
     @yp_unittest.skip("Not applicable to nohtyP")
