@@ -362,10 +362,17 @@ typedef struct {
     objproc       tp_iter_values;
 } ypMappingMethods;
 
+typedef struct {
+    int tp_iscallable;
+    objobjobjproc tp_call_stars;
+    objvalistproc tp_callN;
+} ypCallableMethods;
+
 // Type objects hold pointers to each type's methods.
 typedef struct {
     ypObject_HEAD;
     // FIXME Fill tp_name and use in DEBUG statements
+    // FIXME Rename to qualname to follow Python?
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
 
     // Object fundamentals
@@ -428,6 +435,9 @@ typedef struct {
 
     // Mapping operations
     ypMappingMethods *tp_as_mapping;
+
+    // Callable operations
+    ypCallableMethods *tp_as_callable;
 } ypTypeObject;
 
 // The type table is defined at the bottom of this file
@@ -470,6 +480,10 @@ static ypTypeObject *ypTypeTable[255];
 
 #define ypRange_CODE                ( 26u)
 // no mutable ypRange type          ( 27u)
+
+#define ypFrozenFunction_CODE       ( 28u)  // FIXME ummm, what to do here?
+#define ypFunction_CODE             ( 29u)
+
 // clang-format on
 
 yp_STATIC_ASSERT(_ypInt_CODE == ypInt_CODE, ypInt_CODE_matches);
@@ -479,6 +493,7 @@ yp_STATIC_ASSERT(_ypStr_CODE == ypStr_CODE, ypStr_CODE_matches);
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
 // clang-format off
+static int _isnotcallable(ypObject *x) { return FALSE; }
 #define DEFINE_GENERIC_METHODS(name, retval) \
     static ypObject *name ## _objproc(ypObject *x) { return retval; } \
     static ypObject *name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
@@ -546,6 +561,11 @@ yp_STATIC_ASSERT(_ypStr_CODE == ypStr_CODE, ypStr_CODE_matches);
         *name ## _objvalistproc, \
         *name ## _miniiterfunc, \
         *name ## _objproc \
+    } }; \
+    static ypCallableMethods name ## _CallableMethods[1] = { { \
+        FALSE, \
+        *name ## _objobjobjproc, \
+        *name ## _objvalistproc \
     } };
 // clang-format on
 
@@ -2274,7 +2294,10 @@ static ypTypeObject ypIter_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 // Public functions
@@ -2549,13 +2572,12 @@ static ypObject *_ypSequence_miniiter_lenh(
  * Freezing, "unfreezing", and invalidating
  *************************************************************************************************/
 #pragma region transmute
+// TODO Rethink what we delegate to the tp_* functions: we should probably give them more control.
 
 // TODO If len==0, replace it with the immortal "zero-version" of the type
 //  WAIT! I can't do that, because that won't freeze the original and others might be referencing
 //  the original so won't see it as frozen now.
 //  SO! Still freeze the original, but then also replace it with the zero-version
-// TODO rethink what we do generically in this function, and what we delegate to tp_freeze, and
-// also when we call tp_freeze
 static ypObject *_yp_freeze(ypObject *x)
 {
     int           oldCode = ypObject_TYPE_CODE(x);
@@ -2569,6 +2591,10 @@ static ypObject *_yp_freeze(ypObject *x)
     yp_ASSERT(newType != NULL, "all types should have an immutable counterpart");
 
     // Freeze the object, possibly reduce memory usage, etc
+    // FIXME Support unfreezable objects (like function). Let tp_freeze set the type code as
+    // appropriate, then inspect it after to see if it worked. (Or return yp_NotImplemented.)
+    // Perhaps return an exception if the top-level freeze doesn't freeze, but in the case of
+    // deep freeze allow deeper objects to silently fail to freeze.
     exc = newType->tp_freeze(x);
     if (yp_isexceptionC(exc)) return exc;
     ypObject_SET_TYPE_CODE(x, newCode);
@@ -3045,7 +3071,10 @@ static ypTypeObject ypInvalidated_Type = {
         InvalidatedError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        InvalidatedError_MappingMethods  // tp_as_mapping
+        InvalidatedError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        InvalidatedError_CallableMethods  // tp_as_callable
 };
 
 #pragma endregion invalidated
@@ -3130,7 +3159,10 @@ static ypTypeObject ypException_Type = {
         ExceptionMethod_SetMethods,  // tp_as_set
 
         // Mapping operations
-        ExceptionMethod_MappingMethods  // tp_as_mapping
+        ExceptionMethod_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        ExceptionMethod_CallableMethods  // tp_as_callable
 };
 
 // No constructors for exceptions; all such objects are immortal
@@ -3350,7 +3382,10 @@ static ypTypeObject ypType_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 #pragma endregion type
@@ -3442,7 +3477,10 @@ static ypTypeObject ypNoneType_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 // No constructors for nonetypes; there is exactly one, immortal object
@@ -3559,7 +3597,10 @@ static ypTypeObject ypBool_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 
@@ -3872,7 +3913,10 @@ static ypTypeObject ypInt_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypTypeObject ypIntStore_Type = {
@@ -3937,7 +3981,10 @@ static ypTypeObject ypIntStore_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 // XXX Adapted from Python 2.7's int_add
@@ -4939,7 +4986,10 @@ static ypTypeObject ypFloat_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypTypeObject ypFloatStore_Type = {
@@ -5004,7 +5054,10 @@ static ypTypeObject ypFloatStore_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 yp_float_t yp_addLF(yp_float_t x, yp_float_t y, ypObject **exc)
@@ -8514,7 +8567,10 @@ static ypTypeObject ypBytes_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypSequenceMethods ypByteArray_as_sequence = {
@@ -8599,7 +8655,10 @@ static ypTypeObject ypByteArray_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypObject *_yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len)
@@ -9352,7 +9411,10 @@ static ypTypeObject ypStr_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypSequenceMethods ypChrArray_as_sequence = {
@@ -9437,7 +9499,10 @@ static ypTypeObject ypChrArray_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypObject *_yp_asencodedCX(
@@ -10860,7 +10925,10 @@ static ypTypeObject ypTuple_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypObject *list_sort(ypObject *, yp_sort_key_func_t, ypObject *);
@@ -10947,7 +11015,10 @@ static ypTypeObject ypList_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_t *len)
@@ -13628,7 +13699,10 @@ static ypTypeObject ypFrozenSet_Type = {
         &ypFrozenSet_as_set,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypSetMethods ypSet_as_set = {
@@ -13710,7 +13784,10 @@ static ypTypeObject ypSet_Type = {
         &ypSet_as_set,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 
@@ -14751,7 +14828,10 @@ static ypTypeObject ypFrozenDict_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        &ypFrozenDict_as_mapping  // tp_as_mapping
+        &ypFrozenDict_as_mapping,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 static ypMappingMethods ypDict_as_mapping = {
@@ -14829,7 +14909,10 @@ static ypTypeObject ypDict_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        &ypDict_as_mapping  // tp_as_mapping
+        &ypDict_as_mapping,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 // Constructors
@@ -15372,7 +15455,10 @@ static ypTypeObject ypRange_Type = {
         MethodError_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods  // tp_as_mapping
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
 };
 
 // XXX Adapted from Python's get_len_of_range
@@ -15476,12 +15562,13 @@ typedef struct {
 // construction, because converting from tp_call_stars to tp_call involves a big switch statement of
 // function calls with different numbers of arguments.
 
-typedef struct {
-    objobjobjproc tp_call_stars;    // i.e. yp_call_stars
-    objvalistproc tp_call;          // i.e. yp_callN
-    objobjproc tp_call2;            // i.e. yp_call2
-    objproc tp_call1:               // i.e. yp_call1
-} tp_as_callable;
+
+// Additions to ypTypeObject
+ypObject *tp_new;   // A function object implementing __new__.  The first argument is cls, i.e. the
+                    // exact subclass that is being instantiated (remember subclasses!).
+objproc tp_new_exact1;  // Shortcut for when the object being constructed is exactly this type
+                        // (i.e. not a subclass).  Will be set to functions like yp_int, yp_bytes,
+                        // yp_dict, etc.
 
 
 
@@ -15505,16 +15592,17 @@ static ypObject *_ypFunction_callN(ypObject *self, int n, ...) {
 // FIXME Raise a yp_SystemLimitationError as early as we can if this function will fail.
 // FIXME Tests for every amount of args to ensure proper order
 // FIXME Could we make this a generic macro to take a tuple and unpack it into C var args?
+// FIXME Can we add a linter for this code?
 static _ypFunction_callN_fromtuple(ypObject *s, ypObject *args)
 {
     ypObject *(*f)(ypObject *, int, ...) = _ypFunction_callN;  // shorter name
     ypObject *const *a;
     yp_ssize_t len;
     ypObject *result = yp_itemarrayCX(args, &a, &len);
+    yp_ASSERT1(len >= 0);
     // TODO Make this an assert?  Or skip yp_itemarrayCX and use tuple's macros directly?
     if (yp_isexceptionC(result)) return result;  // should not happen: args should always be a tuple
 
-    yp_ASSERT1(len >= 0);
     switch(len) {
         case 0:
             return f(s, 0);
@@ -15559,8 +15647,26 @@ static _ypFunction_callN_fromtuple(ypObject *s, ypObject *args)
             return yp_SystemLimitationError;
     }
 }
-#endif
 
+static _ypFunction_call_stars_tocallN(ypObject *self, ypObject *args, ypObject *kwargs)
+{
+    if (yp_not(kwargs)) {
+        return _ypFunction_callN_fromtuple(args);
+    }
+
+    ypObject *altogether = _ypFunction_stars_totuple(self, args, kwargs);
+    if (yp_isexceptionC(altogether)) return altogether;
+
+    ypObject *result = _ypFunction_callN_fromtuple(altogether);
+    yp_decref(altogether);
+    return result;
+}
+
+// Example of helpers for tp_callN?
+static _ypFunction_callN_example(ypObject *self, int n, va_list args) {
+}
+
+#endif
 
 
 /*************************************************************************************************

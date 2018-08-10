@@ -1155,12 +1155,12 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 
 
 /*
- * Callable operations
+ * Callable Operations
  */
 // XXX This section is a work-in-progress
 
-// C functions can be wrapped up into function objects and called.  It's also possible to call certain
-// other objects: for example, calling a type object constructs an object of that type.
+// C functions can be wrapped up into function objects and called.  It's also possible to call
+// certain other objects: for example, calling a type object constructs an object of that type.
 
 // XXX Yes, the proper name for this is `function`
 
@@ -1171,15 +1171,17 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 
 // TODO move to consturctors
 
+
+// Returns true (non-zero) if x appears callable, else false.  If this returns true, it is still
+// possible that a call fails, but if it is false, calling x will always raise yp_TypeError.
+// Always succeeds; if x is an exception false is returned.
+// TODO Python just calls this "callable"
+ypAPI int yp_iscallableC(ypObject *x);
+
 // Calls c with n positional arguments, returning the result of the call (which may be a new
 // refrence or an exception).  Returns yp_TypeError if c is not callable.
 ypAPI ypObject *yp_callN(ypObject *c, int n, ...);
 ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
-
-// Equivalent to yp_callN(c, 0) and yp_callN(c, 1, arg).  Certain objects may slightly optimize
-// for these call signatures.
-ypAPI ypObject *yp_call1(ypObject *c);
-ypAPI ypObject *yp_call2(ypObject *c, ypObject *arg);
 
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
 // result of the call (which may be a new refrence or an exception).  Returns yp_TypeError if c is
@@ -1192,7 +1194,6 @@ ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 // is, you'd expect yp_call2 to take an iterable of positional arguments.  It might be best to avoid
 // the name yp_call altogether.  (Then again, yp_call2 is confusing because it's two arguments to
 // yp_call2, but **one** argument to the callable.)
-
 
 // TODO Yup, python allows any iterable for f(*arg) calls, just as it does for unpacking.
 // TODO In Python, when calling a function, * can be any iterable and ** any mapping.  However,
