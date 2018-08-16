@@ -527,10 +527,10 @@ ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
 // *size to zero, and returns an exception on error.
 ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
-// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_StopIteration or
-// yp_GeneratorExit is returned by yp_throw, *iterator is not discarded; on any other error,
-// *iterator is discarded and set to an exception.  The behaviour of this method for other
-// types, in particular files, is documented elsewhere.
+// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_throw returns
+// yp_StopIteration or yp_GeneratorExit, it is not treated as an error; if yp_throw returns any
+// other exception, *iterator is discarded and set to that exception.  The behaviour of this method
+// for other types, in particular files, is documented elsewhere.
 ypAPI void yp_close(ypObject **iterator);
 
 // Sets the given n ypObject**s to new references for the values yielded from iterable.  Iterable
