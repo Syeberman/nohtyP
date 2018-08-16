@@ -1171,7 +1171,6 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 
 // TODO move to consturctors
 
-
 // Returns true (non-zero) if x appears callable, else false.  If this returns true, it is still
 // possible that a call fails, but if it is false, calling x will always raise yp_TypeError.
 // Always succeeds; if x is an exception false is returned.
@@ -1200,17 +1199,7 @@ ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 // when the arguments are passed to `def a(*p, **k)`, p is _always_ a tuple and k _always_ a dict.
 // TODO However, unlike Python, use a frozendict for kwargs.
 
-
 // Immortal functions representing , for convience with yp_str_frombytesC4 et al.
-
-
-
-// TODO stuttering: function_func?
-// TODO function1...one...but it takes two arguments. have to explain why self isn't counted.
-typedef ypObject *(*yp_function1_func_t)(ypObject *self, ypObject *a);
-typedef ypObject *(*yp_function2_func_t)(ypObject *self, ypObject *a, ypObject *b);
-typedef ypObject *(*yp_function3_func_t)(ypObject *self, ypObject *a, ypObject *b, ypObject *c);
-// etc
 
 // TODO starargs is from the grammar, but do people know it? does the "star" and "args" together imply
 // just `*args` (read it out, it's "star args"), or would people knoow it's **kwargs too
@@ -1218,7 +1207,7 @@ typedef ypObject *(*yp_function3_func_t)(ypObject *self, ypObject *a, ypObject *
 // TODO What about yp_function_
 typedef ypObject *(*yp_function_starargs_func_t)(ypObject *self, ypObject *a, ypObject *b);
 
-//
+// TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
 
 
 /*

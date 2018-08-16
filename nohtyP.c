@@ -2083,6 +2083,54 @@ static int ypQuickSeq_new_fromiterable_builtins(
 
 
 /*************************************************************************************************
+ * Dynamic Object State (i.e. yp_generator_fromstructCN, yp_function_fromstructCN)
+ *************************************************************************************************/
+// FIXME rename most things here
+
+static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc visitor, void *memo)
+{
+    ypObject ** p = (ypObject **)state;
+    ypObject *  result;
+
+    while (objlocs) {  // while there are still more objects to be found...
+        if (objlocs & 0x1u) {
+            result = visitor(*p, memo);
+            if (yp_isexceptionC(result)) return result;
+        }
+        p += 1;
+        objlocs >>= 1;
+    }
+    return yp_None;
+}
+
+// objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state.  On error,
+// *objlocs is undefined.
+// FIXME is this the order of parameters we want?
+static ypObject *_ypState_objlocs_fromstructCNV(
+    yp_uint32_t *objlocs, yp_ssize_t struct_size, int n, va_list args)
+{
+    yp_ssize_t objoffset;
+    yp_ssize_t objloc_index;
+
+    // Determine the location of the objects.  There are a few errors the user could make:
+    //  - an offset for a ypObject* that is at least partially outside of state
+    //  - an unaligned ypObject*, which isn't currently allowed and should never happen
+    //  - a larger offset than we can represent with objlocs: a current limitation of nohtyP
+    *objlocs = 0x0u;
+    for (/*n already set*/; n > 0; n--) {
+        objoffset = va_arg(args, yp_ssize_t);
+        if (objoffset < 0) return yp_ValueError;
+        if (objoffset > struct_size - yp_sizeof(ypObject *)) return yp_ValueError;
+        if (objoffset % yp_sizeof(ypObject *) != 0) return yp_SystemLimitationError;
+        objloc_index = objoffset / yp_sizeof(ypObject *);
+        if (objloc_index > 31) return yp_SystemLimitationError;
+        *objlocs |= (0x1u << objloc_index);
+    }
+    return yp_None;
+}
+
+
+/*************************************************************************************************
  * Iterators
  *************************************************************************************************/
 #pragma region iter
@@ -2140,21 +2188,8 @@ static ypObject *_iter_send(ypObject *i, ypObject *value)
     return result;
 }
 
-static ypObject *iter_traverse(ypObject *i, visitfunc visitor, void *memo)
-{
-    ypObject ** p = (ypObject **)ypIter_STATE(i);
-    yp_uint32_t locs = ypIter_OBJLOCS(i);
-    ypObject *  result;
-
-    while (locs) {  // while there are still more objects to be found...
-        if (locs & 0x1u) {
-            result = visitor(*p, memo);
-            if (yp_isexceptionC(result)) return result;
-        }
-        p += 1;
-        locs >>= 1;
-    }
-    return yp_None;
+static ypObject *iter_traverse(ypObject *i, visitfunc visitor, void *memo) {
+    return _ypState_traverse(ypIter_STATE(i), ypIter_OBJLOCS(i), visitor, memo);
 }
 
 // Decrements the reference count of the visited object
@@ -2412,27 +2447,15 @@ ypObject *yp_generator_fromstructCN(
 ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint, void *state,
         yp_ssize_t size, int n, va_list args)
 {
+    ypObject *  result;
     ypObject *  i;
-    yp_uint32_t objlocs = 0x0u;
-    yp_ssize_t  objoffset;
-    yp_ssize_t  objloc_index;
+    yp_uint32_t objlocs;
 
     if (size < 0) return yp_ValueError;
     if (size > ypIter_STATE_SIZE_MAX) return yp_MemorySizeOverflowError;
 
-    // Determine the location of the objects.  There are a few errors the user could make:
-    //  - an offset for a ypObject* that is at least partially outside of state; ignore these
-    //  - an unaligned ypObject*, which isn't currently allowed and should never happen
-    //  - a larger offset than we can represent with objlocs: a current limitation of nohtyP
-    for (/*n already set*/; n > 0; n--) {
-        objoffset = va_arg(args, yp_ssize_t);
-        if (objoffset < 0) continue;
-        if (objoffset > size - yp_sizeof(ypObject *)) continue;
-        if (objoffset % yp_sizeof(ypObject *) != 0) return yp_SystemLimitationError;
-        objloc_index = objoffset / yp_sizeof(ypObject *);
-        if (objloc_index > 31) return yp_SystemLimitationError;
-        objlocs |= (0x1u << objloc_index);
-    }
+    result = _ypState_objlocs_fromstructCNV(&objlocs, size, n, args);
+    if (yp_isexceptionC(result)) return result;
 
     // Allocate the iterator
     i = ypMem_MALLOC_CONTAINER_INLINE(ypIterObject, ypIter_CODE, size, ypIter_STATE_SIZE_MAX);
