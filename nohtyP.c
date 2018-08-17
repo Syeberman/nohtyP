@@ -2169,7 +2169,7 @@ static ypObject *iter_send(ypObject *i, ypObject *value)
     // As per Python, when a generator raises an exception, it can't continue to yield values, so
     // close it.  If iter_close fails just ignore it: result is already set to an exception.
     // TODO Don't hide errors from iter_close; instead, use Python's "while handling this
-    // exception, another occured" style of reporting
+    // exception, another occurred" style of reporting
     if (yp_isexceptionC(result)) {
         (void)iter_close(i);
         return result;
@@ -15290,21 +15290,14 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
  *************************************************************************************************/
 
 // TODO Ideas:
-//  - identify signature of functions similar to Python, i.e. OOO or maybe even OiO, etc.
-//  - functions that take the function object as the first argument use format code F or something
-//  first...OR require that all C functions take self (or func_self) as first parameter
 //  - remember that bound functions also have a "self" as the first positional argument (it'd be
 //  the argument after func_self if we go that route), so the name "self" is going to get confusing
-//  - or ditch the Python-like syntax altogether and go with something that works well for kw args
-//  like "arg1,arg2,arg3=None" etc
 //  - Have direct support for the types of functions nohtyP recognizes, i.e. key, which is one arg
 //  one return. Func objects can support two calling styles: arg/kwarg (with a default
 //  implementation that unpacks arg/kwarg and calls the underlying function...although this presumes
 //  the names of the arguments! which is more proof that "arg1,arg2,arg3=None" is a better way to
 //  match to ensure the proper function is called) or "ypObject *func(ypObject*, ypObject*)" (in
 //  which case a separate wrapper can convert from arg/kwarg to the other one).
-//  - Pull out the generator's "state" code into something common we can use here, because all that
-//  "fromstruct" stuff will be the same (that's that func_self object we need).
 
 // A verify function (perhaps only called once) that ensures:
 //  - all names are strings AND UNIQUE!
@@ -15316,13 +15309,9 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 // TODO Ensure the above is correct with Python
 #if 0
 typedef struct {
-    ypObject *name; // must be a str (i.e. FROM_LATIN1)
+    ypObject *name; // must be a str (i.e. FROM_LATIN1), NULL for positional-only
     ypObject *default_; // NULL for required argument
-    yp_int16 flags; // flag for *args, kw-only, **kwargs
-    // TODO a flag for non-kw args (i.e. x from int can't be kw)?
-    yp_int16 _reserved16;   // must be zero
-    yp_int32 _reserved32;   // must be zero
-    // important 32- and 64-bit aligned here
+    // important? 32- and 64-bit aligned here
 } yp_func_parameter;
 
 
@@ -15340,8 +15329,6 @@ ypObject *tp_new;   // A function object implementing __new__.  The first argume
 objproc tp_new_exact1;  // Shortcut for when the object being constructed is exactly this type
                         // (i.e. not a subclass).  Will be set to functions like yp_int, yp_bytes,
                         // yp_dict, etc.
-
-
 
 #endif
 // TODO Compare against Python API
@@ -15437,6 +15424,120 @@ static _ypFunction_callN_example(ypObject *self, int n, va_list args) {
 }
 
 #endif
+
+typedef struct {
+    ypObject_HEAD;
+    yp_uint32_t ob_objlocs;
+    objobjobjproc ob_func_stars;
+    objvalistproc ob_funcN;
+    yp_INLINE_DATA(yp_uint8_t);
+} ypFunctionObject;
+
+#define ypFunction_STATE(i) (((ypObject *)i)->ob_data)
+#define ypFunction_STATE_SIZE ypObject_ALLOCLEN
+#define ypFunction_SET_STATE_SIZE ypObject_SET_ALLOCLEN
+// ob_objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state
+#define ypFunction_OBJLOCS(i) (((ypFunctionObject *)i)->ob_objlocs)
+#define ypFunction_FUNCN(i) (((ypFunctionObject *)i)->ob_funcN)
+#define ypFunction_FUNC_STARS(i) (((ypFunctionObject *)i)->ob_func_stars)
+
+// Function methods
+
+static ypObject *function_traverse(ypObject *i, visitfunc visitor, void *memo) {
+    return _ypState_traverse(ypFunction_STATE(i), ypFunction_OBJLOCS(i), visitor, memo);
+}
+
+// Decrements the reference count of the visited object
+static ypObject *_function_decref_visitor(ypObject *x, void *memo)
+{
+    // TODO Call yp_decref_fromdealloc instead?
+    yp_decref(x);
+    return yp_None;
+}
+
+static ypObject *function_dealloc(ypObject *i, void *memo)
+{
+    // FIXME Is there something better we can do to handle errors than just ignore them?
+    (void)function_traverse(i, _function_decref_visitor, NULL);  // never fails
+    ypMem_FREE_CONTAINER(i, ypFunctionObject);
+    return yp_None;
+}
+
+// FIXME A frozen function behaves like...what?
+// FIXME Review that correct exceptions returned for not supported methods
+static ypTypeObject ypFunction_Type = {
+        yp_TYPE_HEAD_INIT,
+        NULL,  // tp_name
+
+        // Object fundamentals
+        function_dealloc,   // tp_dealloc
+        function_traverse,  // tp_traverse
+        NULL,           // tp_str
+        NULL,           // tp_repr
+
+        // Freezing, copying, and invalidating
+        MethodError_objproc,       // tp_freeze
+        MethodError_objproc,       // tp_unfrozen_copy
+        MethodError_objproc,       // tp_frozen_copy
+        MethodError_traversefunc,  // tp_unfrozen_deepcopy
+        MethodError_traversefunc,  // tp_frozen_deepcopy
+        MethodError_objproc,       // tp_invalidate
+
+        // Boolean operations and comparisons
+        MethodError_objproc,         // tp_bool
+        NotImplemented_comparefunc,  // tp_lt
+        NotImplemented_comparefunc,  // tp_le
+        NotImplemented_comparefunc,  // tp_eq
+        NotImplemented_comparefunc,  // tp_ne
+        NotImplemented_comparefunc,  // tp_ge
+        NotImplemented_comparefunc,  // tp_gt
+
+        // Generic object operations
+        MethodError_hashfunc,  // tp_currenthash
+        MethodError_objproc,   // tp_close
+
+        // Number operations
+        MethodError_NumberMethods,  // tp_as_number
+
+        // Iterator operations
+        TypeError_miniiterfunc,         // tp_miniiter
+        TypeError_miniiterfunc,         // tp_miniiter_reversed
+        MethodError_miniiterfunc,       // tp_miniiter_next  // FIXME Should be type error?
+        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,              // tp_iter
+        TypeError_objproc,              // tp_iter_reversed
+        TypeError_objobjproc,           // tp_send
+
+        // Container operations
+        MethodError_objobjproc,     // tp_contains
+        TypeError_lenfunc,          // tp_len
+        MethodError_objobjproc,     // tp_push
+        MethodError_objproc,        // tp_clear
+        MethodError_objproc,        // tp_pop
+        MethodError_objobjobjproc,  // tp_remove
+        MethodError_objobjobjproc,  // tp_getdefault
+        MethodError_objobjobjproc,  // tp_setitem
+        MethodError_objobjproc,     // tp_delitem
+        MethodError_objvalistproc,  // tp_update
+
+        // Sequence operations
+        MethodError_SequenceMethods,  // tp_as_sequence
+
+        // Set operations
+        MethodError_SetMethods,  // tp_as_set
+
+        // Mapping operations
+        MethodError_MappingMethods,  // tp_as_mapping
+
+        // Callable operations
+        TypeError_CallableMethods  // tp_as_callable
+};
+
+// Public functions
+
+// FIXME
+
+
 
 
 /*************************************************************************************************
@@ -16144,6 +16245,10 @@ static ypTypeObject *ypTypeTable[255] = {
 
     &ypRange_Type,      // ypRange_CODE                ( 26u)
     &ypRange_Type,      //                             ( 27u)
+
+    // FIXME Functions (and iters and files and...) are hashable, despite arguably being "mutable"
+    &ypFunction_Type,   // ypFrozenFunction_CODE       ( 28u)
+    &ypFunction_Type,   // ypFunction_CODE             ( 29u)
 };
 // clang-format on
 
