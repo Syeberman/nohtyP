@@ -80,6 +80,7 @@
 /*************************************************************************************************
  * Debug control
  *************************************************************************************************/
+#pragma region debug
 
 // yp_DEBUG_LEVEL controls how aggressively nohtyP should debug itself at runtime:
 //  - 0: no debugging (default)
@@ -152,10 +153,13 @@ static void yp_breakonerr(ypObject *err) {
 // We always perform static asserts: they don't affect runtime
 #define yp_STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
 
+#pragma endregion debug
+
 
 /*************************************************************************************************
  * Static assertions for nohtyP.h
  *************************************************************************************************/
+#pragma region assertions
 
 yp_STATIC_ASSERT(sizeof(yp_int8_t) == 1, sizeof_int8);
 yp_STATIC_ASSERT(sizeof(yp_uint8_t) == 1, sizeof_uint8);
@@ -177,10 +181,13 @@ yp_STATIC_ASSERT(sizeof(struct _ypObject) == 16 + (2 * sizeof(void *)), sizeof_y
 
 yp_STATIC_ASSERT(sizeof("abcd") == 5, sizeof_str_includes_null);
 
+#pragma endregion assertions
+
 
 /*************************************************************************************************
  * Internal structures and types, and related macros
  *************************************************************************************************/
+#pragma region fundamentals
 
 typedef size_t yp_uhash_t;
 
@@ -545,10 +552,13 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
     return yp_None;
 }
 
+#pragma endregion fundamentals
+
 
 /*************************************************************************************************
  * Helpful functions and macros
  *************************************************************************************************/
+#pragma region utilities
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -807,11 +817,14 @@ static yp_hash_t yp_HashBytes(yp_uint8_t *p, yp_ssize_t len)
 // TODO Make this configurable via yp_initialize, and/or dynamically
 static yp_ssize_t _yp_recursion_limit = 1000;
 
+#pragma endregion utilities
+
 
 /*************************************************************************************************
  * Locale-independent ctype.h-like macros
  * XXX This entire section is adapted from Python's pyctype.c and pyctype.h
  *************************************************************************************************/
+#pragma region ctype_like
 // clang-format off
 
 #define _yp_CTF_LOWER  0x01
@@ -1048,11 +1061,13 @@ const yp_uint8_t _yp_ctype_toupper[256] = {
 };
 
 // clang-format on
+#pragma endregion ctype_like
 
 
 /*************************************************************************************************
  * nohtyP memory allocations
  *************************************************************************************************/
+#pragma region malloc
 
 // The standard C malloc/realloc are inefficient in a couple of ways:
 //  - realloc has the potential to copy large amounts of data between buffers, data which may be
@@ -1169,10 +1184,13 @@ static void _default_yp_free(void *p)
 }
 #endif
 
+#pragma endregion malloc
+
 
 /*************************************************************************************************
  * nohtyP object allocations
  *************************************************************************************************/
+#pragma region object_malloc
 
 // This should be one of exactly two possible values, 1 (the default) or ypObject_REFCNT_IMMORTAL,
 // depending on yp_initialize's everything_immortal parameter
@@ -1469,10 +1487,13 @@ static void _ypMem_free_container(ypObject *ob, yp_ssize_t offsetof_inline)
 #define ypMem_FREE_CONTAINER(ob, obStruct) \
     _ypMem_free_container(ob, yp_offsetof(obStruct, ob_inline_data))
 
+#pragma endregion object_malloc
+
 
 /*************************************************************************************************
- * Object fundamentals
+ * Object Reference Counting
  *************************************************************************************************/
+#pragma region references
 // FIXME Review this section again
 
 // TODO What if these (and yp_isexceptionC) were macros in the header so they were force-inlined
@@ -1615,11 +1636,14 @@ void yp_decrefN(int n, ...)
     va_end(args);
 }
 
+#pragma endregion references
+
 
 /*************************************************************************************************
  * ypQuickIter: iterator-like abstraction over va_lists of ypObject*s, and iterables
  * XXX Internal use only!
  *************************************************************************************************/
+#pragma region ypQuickIter
 
 // TODO I'm having second thoughts about the utility of this API.  This isn't even used below!
 // It really comes down to how much benefit we have sharing the va_list code with the iterable
@@ -1795,11 +1819,14 @@ static ypObject *ypQuickIter_new_fromiterable(
     }
 }
 
+#pragma endregion ypQuickIter
+
 
 /*************************************************************************************************
  * ypQuickSeq: sequence-like abstraction over va_lists of ypObject*s and iterables
  * XXX Internal use only!
  *************************************************************************************************/
+#pragma region ypQuickSeq
 
 // This API exists to reduce duplication of code where variants of a method accept va_lists of
 // ypObject*s, or a general-purpose sequence.  This code intends to be a light-weight abstraction
@@ -2006,6 +2033,8 @@ static int ypQuickSeq_new_fromiterable_builtins(
     // TODO Like tuples, sets and dicts can return borrowed references and can be supported here
 }
 
+#pragma endregion ypQuickSeq
+
 
 /*************************************************************************************************
  * Dynamic Object State (i.e. yp_generator_fromstructCN, yp_function_fromstructCN)
@@ -2061,6 +2090,7 @@ static ypObject *_ypState_objlocs_fromstructCNV(
 /*************************************************************************************************
  * Iterators
  *************************************************************************************************/
+#pragma region iter
 
 typedef yp_int32_t _yp_iter_length_hint_t;
 #define ypIter_LENHINT_MAX ((yp_ssize_t)0x7FFFFFFF)
@@ -2515,10 +2545,13 @@ static ypObject *_ypSequence_miniiter_lenh(
     return yp_None;
 }
 
+#pragma endregion iter
+
 
 /*************************************************************************************************
  * Freezing, "unfreezing", and invalidating
  *************************************************************************************************/
+#pragma region transmute
 // TODO Rethink what we delegate to the tp_* functions: we should probably give them more control.
 
 // TODO If len==0, replace it with the immortal "zero-version" of the type
@@ -2697,10 +2730,13 @@ void yp_deepinvalidate(ypObject **x)
     // TODO implement
 }
 
+#pragma endregion transmute
+
 
 /*************************************************************************************************
  * Boolean operations, comparisons, and generic object operations
  *************************************************************************************************/
+#pragma region comparison
 
 // Returns 1 if the bool object is true, else 0; only valid on bool objects!  The return can also
 // be interpreted as the value of the boolean.
@@ -2945,10 +2981,13 @@ yp_ssize_t yp_lenC(ypObject *x, ypObject **exc)
     return len;
 }
 
+#pragma endregion comparison
+
 
 /*************************************************************************************************
  * Invalidated Objects
  *************************************************************************************************/
+#pragma region invalidated
 
 static ypTypeObject ypInvalidated_Type = {
         yp_TYPE_HEAD_INIT,
@@ -3018,10 +3057,13 @@ static ypTypeObject ypInvalidated_Type = {
         InvalidatedError_CallableMethods  // tp_as_callable
 };
 
+#pragma endregion invalidated
+
 
 /*************************************************************************************************
  * Exceptions
  *************************************************************************************************/
+#pragma region exception
 
 // TODO A nohtyP.h macro to get exception info as a string, include file/line info of the place
 // the macro is checked.  Something to make reporting exceptions easier for the user of nohtyP.
@@ -3241,10 +3283,13 @@ int yp_isexceptionCNV(ypObject *x, int n, va_list args)
 // Then, even fancier, a form of yp_ELSE_EXCEPT (et al) like yp_ELSE_SWITCH_EXCEPT
 // ypAPI int yp_switchexceptionCN(ypObject *x, int n, ...);
 
+#pragma endregion exception
+
 
 /*************************************************************************************************
  * Types
  *************************************************************************************************/
+#pragma region type
 
 static ypObject *type_frozen_copy(ypObject *t) { return yp_incref(t); }
 
@@ -3323,10 +3368,13 @@ static ypTypeObject ypType_Type = {
         TypeError_CallableMethods  // tp_as_callable
 };
 
+#pragma endregion type
+
 
 /*************************************************************************************************
  * None
  *************************************************************************************************/
+#pragma region None
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
@@ -3419,10 +3467,13 @@ static ypTypeObject ypNoneType_Type = {
 static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, NULL, 0);
 ypObject *const yp_None = &_yp_None_struct;
 
+#pragma endregion None
+
 
 /*************************************************************************************************
  * Bools
  *************************************************************************************************/
+#pragma region bool
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
@@ -3542,10 +3593,13 @@ ypObject *const     yp_True = (ypObject *)&_yp_True_struct;
 static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 0};
 ypObject *const     yp_False = (ypObject *)&_yp_False_struct;
 
+#pragma endregion bool
+
 
 /*************************************************************************************************
  * Integers
  *************************************************************************************************/
+#pragma region int
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
@@ -4780,10 +4834,13 @@ static yp_int_t yp_asint_exactC(ypObject *x, ypObject **exc)
     return_yp_CEXC_BAD_TYPE(0, exc, x);
 }
 
+#pragma endregion int
+
 
 /*************************************************************************************************
  * Floats
  *************************************************************************************************/
+#pragma region float
 
 // TODO Python has PyFPE_START_PROTECT; we should be doing the same
 
@@ -5208,10 +5265,13 @@ static yp_int_t yp_asint_exactLF(yp_float_t x, ypObject **exc)
     return_yp_CEXC_ERR(0, exc, yp_OverflowError);
 }
 
+#pragma endregion float
+
 
 /*************************************************************************************************
  * Common sequence functions
  *************************************************************************************************/
+#pragma region sequence
 
 // Using the given length, adjusts negative indices to positive.  Returns false if the adjusted
 // index is out-of-bounds, else true.
@@ -5370,10 +5430,13 @@ static ypObject *_ypSequence_delitem(ypObject *x, ypObject *key)
     return type->tp_as_sequence->tp_delindex(x, index);
 }
 
+#pragma endregion sequence
+
 
 /*************************************************************************************************
  * In-development API for Codec registry and base classes
  *************************************************************************************************/
+#pragma region codecs
 
 // XXX Patterned after the codecs module in Python
 // TODO This will eventually be exposed in nohtyP.h; review and improve before this happens
@@ -5440,10 +5503,13 @@ static ypObject *yp_codecs_register_error(
 // be the _registered_ "strict" handler.)
 static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, ypObject **exc);
 
+#pragma endregion codecs
+
 
 /*************************************************************************************************
  * String manipulation library (for bytes and str)
  *************************************************************************************************/
+#pragma region strings
 
 // The prefix ypStringLib_* is used for bytes and str, while ypStr_* is strictly the str type
 
@@ -7071,10 +7137,13 @@ static ypObject *ypStringLib_encode_utf_8(int type, ypObject *source, ypObject *
     }
 }
 
+#pragma endregion strings
+
 
 /*************************************************************************************************
  * Codec registry and base classes
  *************************************************************************************************/
+#pragma region codec_registry
 
 // XXX Patterned after the codecs module in Python
 // TODO codecs.register to register functions for encode/decode ...also codecs.lookup
@@ -7479,10 +7548,13 @@ onerror:
     return;
 }
 
+#pragma endregion codec_registry
+
 
 /*************************************************************************************************
  * Sequence of bytes
  *************************************************************************************************/
+#pragma region bytes
 
 // ypBytesObject is declared in the StringLib section
 // XXX Since bytes are likely to be used to store arbitrary structures, make sure our alignment is
@@ -8702,10 +8774,13 @@ ypObject *yp_bytearray0(void)
     return newB;
 }
 
+#pragma endregion bytes
+
 
 /*************************************************************************************************
  * Sequence of unicode characters
  *************************************************************************************************/
+#pragma region str
 
 // TODO http://www.python.org/dev/peps/pep-0393/ (flexible string representations)
 
@@ -9477,10 +9552,13 @@ yp_IMMORTAL_STR_LATIN_1(yp_s_backslashreplace, "backslashreplace");
 yp_IMMORTAL_STR_LATIN_1(yp_s_surrogateescape, "surrogateescape");
 yp_IMMORTAL_STR_LATIN_1(yp_s_surrogatepass, "surrogatepass");
 
+#pragma endregion str
+
 
 /*************************************************************************************************
  * String (str, bytes, etc) methods
  *************************************************************************************************/
+#pragma region string_methods
 
 // XXX Since it's not likely that anything other than str and bytes will need to implement these
 // methods, they are left out of the type's method table.  This may change in the future.
@@ -9745,10 +9823,13 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
     _ypStringLib_REDIRECT1(s, splitlines, (s, keepends));
 }
 
+#pragma endregion string_methods
+
 
 /*************************************************************************************************
  * Sequence of generic items
  *************************************************************************************************/
+#pragma region list
 
 typedef struct {
     ypObject_HEAD;
@@ -11076,11 +11157,14 @@ ypObject *yp_list_repeatCNV(yp_ssize_t factor, int n, va_list args)
     return _ypTuple_repeatCNV(ypList_CODE, factor, n, args);
 }
 
+#pragma endregion list
+
 
 /*************************************************************************************************
  * Timsort - Sorting sequences of generic items
  * XXX This entire section is adapted from Python's listobject.c
  *************************************************************************************************/
+#pragma region timsort
 // FIXME Review this code carefully to ensure it's fully converted to nohtyP
 // clang-format off
 
@@ -12181,11 +12265,13 @@ keyfunc_fail:
 // #undef ISLT
 
 // clang-format on
+#pragma endregion timsort
 
 
 /*************************************************************************************************
  * Sets
  *************************************************************************************************/
+#pragma region set
 
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
@@ -13698,10 +13784,13 @@ ypObject *yp_set(ypObject *iterable)
     return _ypSet(ypSet_CODE, iterable);
 }
 
+#pragma endregion set
+
 
 /*************************************************************************************************
  * Mappings
  *************************************************************************************************/
+#pragma region dict
 
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
@@ -14896,10 +14985,13 @@ ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value)
     return _ypDict_fromkeys(ypDict_CODE, iterable, value);
 }
 
+#pragma endregion dict
+
 
 /*************************************************************************************************
  * Immutable "start + i*step" sequence of integers
  *************************************************************************************************/
+#pragma region range
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
@@ -15289,10 +15381,13 @@ ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step)
 
 ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 
+#pragma endregion range
+
 
 /*************************************************************************************************
  * Functions as objects
  *************************************************************************************************/
+#pragma region function
 
 // TODO Ideas:
 //  - remember that bound functions also have a "self" as the first positional argument (it'd be
@@ -15332,6 +15427,7 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
 #endif
 // TODO Compare against Python API
 
+#pragma endregion function
 
 #if 0
 static ypObject *_ypFunction_callN(ypObject *self, int n, ...) {
@@ -15587,6 +15683,7 @@ static ypTypeObject ypFunction_Type = {
 /*************************************************************************************************
  * Common object methods
  *************************************************************************************************/
+#pragma region methods
 
 // These are the functions that simply redirect to object methods; more complex public functions
 // are found elsewhere.
@@ -16091,10 +16188,13 @@ yp_ssize_t yp_miniiter_length_hintC(ypObject *mi, yp_uint64_t *state, ypObject *
     return length_hint < 0 ? 0 : length_hint;
 }
 
+#pragma endregion methods
+
 
 /*************************************************************************************************
  * C-to-C container operations
  *************************************************************************************************/
+#pragma region c2c_containers
 
 // XXX You could spend *weeks* adding all sorts of nifty combinations to this section: DON'T.
 // Let's restrain ourselves and limit them to functions we actually find useful (and can test) in
@@ -16245,10 +16345,13 @@ void yp_s2i_setitemC4(
     yp_decref(key);
 }
 
+#pragma endregion c2c_containers
+
 
 /*************************************************************************************************
  * The type table, and related public functions and variables
  *************************************************************************************************/
+#pragma region type_table
 // XXX Make sure this corresponds with ypInvalidated_CODE et al!
 
 // Recall that C helpfully sets missing array elements to NULL
@@ -16321,10 +16424,13 @@ ypObject *const yp_t_frozendict = (ypObject *)&ypFrozenDict_Type;
 ypObject *const yp_t_dict = (ypObject *)&ypDict_Type;
 ypObject *const yp_t_range = (ypObject *)&ypRange_Type;
 
+#pragma endregion type_table
+
 
 /*************************************************************************************************
  * Initialization
  *************************************************************************************************/
+#pragma region initialization
 
 // TODO A script to ensure the comments on the line match the structure member
 static const yp_initialize_kwparams_t _default_initialize = {
@@ -16472,3 +16578,5 @@ void yp_initialize(const yp_initialize_kwparams_t *kwparams)
     _ypMem_initialize(kwparams);
     _yp_codecs_initialize(kwparams);
 }
+
+#pragma endregion initialization
