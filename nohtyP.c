@@ -2010,6 +2010,7 @@ static int ypQuickSeq_new_fromiterable_builtins(
  *************************************************************************************************/
 // FIXME rename most things here
 
+// Returns the immortal yp_None, or an exception if visitor returns an exception.
 static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc visitor, void *memo)
 {
     ypObject ** p = (ypObject **)state;
@@ -2019,6 +2020,8 @@ static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc v
         if (objlocs & 0x1u) {
             result = visitor(*p, memo);
             if (yp_isexceptionC(result)) return result;
+            // FIXME Should we be discarding result here and elsewhere we call a visitfunc?  visitor
+            // is not something we expose currently, but when we do we might get arbitrary values.
         }
         p += 1;
         objlocs >>= 1;
@@ -15308,12 +15311,6 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 //  - **kwargs to finish
 // TODO Ensure the above is correct with Python
 #if 0
-typedef struct {
-    ypObject *name; // must be a str (i.e. FROM_LATIN1), NULL for positional-only
-    ypObject *default_; // NULL for required argument
-    // important? 32- and 64-bit aligned here
-} yp_func_parameter;
-
 
 // TODO If a function constructor call supplies only tp_call, do not allow the yp_func_parameter to
 // contain *args or **kwargs.  yp_callN(c, 3, a, b, c) should be equivalent to c(a, b, c)...that is,
@@ -15425,26 +15422,71 @@ static _ypFunction_callN_example(ypObject *self, int n, va_list args) {
 
 #endif
 
+// FIXME be usre I'm using "parameter" and "argument" in the right places
+// FIXME ypFunctionObject doesn't need ob_data, etc (i.e. it can be smaller like int)
+
+typedef struct {
+    // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in data
+    yp_uint32_t objlocs;
+    yp_int32_t size;
+    // Note that we are 8-byte aligned here on both 32- and 64-bit systems
+    yp_uint8_t data[];
+} ypFunctionState;
+yp_STATIC_ASSERT(yp_offsetof(ypFunctionState, data) % yp_MAX_ALIGNMENT == 0,
+        alignof_function_state_data);
+
+typedef struct {
+    ypObject *name;     // must be a str (i.e. FROM_LATIN1), NULL for positional-only
+    ypObject *default_; // NULL for required argument
+} ypFunctionParam;
+
 typedef struct {
     ypObject_HEAD;
-    yp_uint32_t ob_objlocs;
     objobjobjproc ob_func_stars;
     objvalistproc ob_funcN;
-    yp_INLINE_DATA(yp_uint8_t);
+    ypFunctionState *ob_state;  // NULL if no extra state
+    yp_INLINE_DATA(ypFunctionParam);
 } ypFunctionObject;
 
-#define ypFunction_STATE(i) (((ypObject *)i)->ob_data)
-#define ypFunction_STATE_SIZE ypObject_ALLOCLEN
-#define ypFunction_SET_STATE_SIZE ypObject_SET_ALLOCLEN
-// ob_objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state
-#define ypFunction_OBJLOCS(i) (((ypFunctionObject *)i)->ob_objlocs)
-#define ypFunction_FUNCN(i) (((ypFunctionObject *)i)->ob_funcN)
-#define ypFunction_FUNC_STARS(i) (((ypFunctionObject *)i)->ob_func_stars)
+#define ypFunction_STATE(f) (((ypFunctionObject *)f)->ob_state)
+#define ypFunction_PARAMS(f) ((ypFunctionParam **)((ypObject *)f)->ob_data)
+#define ypFunction_PARAMS_LEN ypObject_ALLOCLEN
+#define ypFunction_SET_PARAMS_LEN ypObject_SET_ALLOCLEN
+#define ypFunction_FUNC_STARS(f) (((ypFunctionObject *)f)->ob_func_stars)
+#define ypFunction_FUNCN(f) (((ypFunctionObject *)f)->ob_funcN)
+
+// The maximum possible size of a function's state
+#define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
+
+// The maximum possible length of a function's parameter list
+#define ypFunction_PARAMS_LEN_MAX \
+    ((yp_ssize_t)MIN(yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject), ypObject_LEN_MAX))
 
 // Function methods
 
-static ypObject *function_traverse(ypObject *i, visitfunc visitor, void *memo) {
-    return _ypState_traverse(ypFunction_STATE(i), ypFunction_OBJLOCS(i), visitor, memo);
+static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo) {
+    yp_ssize_t i;
+    ypObject *result;
+    ypFunctionState *state = ypFunction_STATE(f);
+
+    if (state != NULL) {
+        result = _ypState_traverse(state->data, state->objlocs, visitor, memo);
+        if (yp_isexceptionC(result)) return result;
+    }
+
+    for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
+        ypFunctionParam *param = ypFunction_PARAMS(f)[i];
+        if (param->name != NULL) {
+            result = visitor(param->name, memo);
+            if (yp_isexceptionC(result)) return result;
+        }
+        if (param->default_ != NULL) {
+            result = visitor(param->default_, memo);
+            if (yp_isexceptionC(result)) return result;
+        }
+    }
+
+    return yp_None;
 }
 
 // Decrements the reference count of the visited object
@@ -15455,11 +15497,11 @@ static ypObject *_function_decref_visitor(ypObject *x, void *memo)
     return yp_None;
 }
 
-static ypObject *function_dealloc(ypObject *i, void *memo)
+static ypObject *function_dealloc(ypObject *f, void *memo)
 {
     // FIXME Is there something better we can do to handle errors than just ignore them?
-    (void)function_traverse(i, _function_decref_visitor, NULL);  // never fails
-    ypMem_FREE_CONTAINER(i, ypFunctionObject);
+    (void)function_traverse(f, _function_decref_visitor, NULL);  // never fails
+    ypMem_FREE_CONTAINER(f, ypFunctionObject);
     return yp_None;
 }
 
