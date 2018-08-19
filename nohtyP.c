@@ -171,7 +171,9 @@ yp_STATIC_ASSERT(sizeof(yp_ssize_t) == sizeof(size_t), sizeof_ssize);
 yp_STATIC_ASSERT(yp_SSIZE_T_MAX == (SIZE_MAX / 2), ssize_max);
 #define yp_MAX_ALIGNMENT (8)  // The maximum possible required alignment of any entity
 
-yp_STATIC_ASSERT(sizeof(struct _ypObject) == 16 + (2 * sizeof(void *)), sizeof_ypObject);
+// struct _ypObject must be 8-byte aligned in size, and must not have padding bytes
+yp_STATIC_ASSERT(sizeof(struct _ypObject) % yp_MAX_ALIGNMENT == 0, sizeof_ypObject_1);
+yp_STATIC_ASSERT(sizeof(struct _ypObject) == 16 + (2 * sizeof(void *)), sizeof_ypObject_2);
 
 yp_STATIC_ASSERT(sizeof("abcd") == 5, sizeof_str_includes_null);
 
@@ -2022,7 +2024,7 @@ yp_STATIC_ASSERT(yp_offsetof(ypIterObject, ob_inline_data) % yp_MAX_ALIGNMENT ==
 #define ypIter_OBJLOCS(i) (((ypIterObject *)i)->ob_objlocs)
 #define ypIter_FUNC(i) (((ypIterObject *)i)->ob_func)
 
-// The maximum possible length of an iter
+// The maximum possible size of an iter's state
 #define ypIter_STATE_SIZE_MAX \
     ((yp_ssize_t)MIN(yp_SSIZE_T_MAX - yp_sizeof(ypIterObject), ypObject_LEN_MAX))
 
@@ -2113,7 +2115,7 @@ static ypObject *iter_send(ypObject *i, ypObject *value)
     // As per Python, when a generator raises an exception, it can't continue to yield values, so
     // close it.  If iter_close fails just ignore it: result is already set to an exception.
     // TODO Don't hide errors from iter_close; instead, use Python's "while handling this
-    // exception, another occured" style of reporting
+    // exception, another occurred" style of reporting
     if (yp_isexceptionC(result)) {
         (void)iter_close(i);
         return result;
@@ -2266,7 +2268,7 @@ void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
         if (yp_isexceptionC2(x, yp_StopIteration)) {
             x = yp_None;  // success!
         } else if (yp_isexceptionC(x)) {
-            // some other exception occured
+            // some other exception occurred
         } else {
             // If the iterable is too long, raise yp_ValueError
             yp_decref(x);
@@ -2274,7 +2276,7 @@ void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
         }
     }
 
-    // If an error occured above, then we need to discard the previously-yielded values and set
+    // If an error occurred above, then we need to discard the previously-yielded values and set
     // all dests to the exception; otherwise, we're successful, so return
     if (yp_isexceptionC(x)) {
         va_copy(args, args_orig);
@@ -2598,7 +2600,7 @@ static ypObject *yp_deepcopy2(ypObject *x, void *_memo)
         return result;  // we've already made a copy of this object; return it
     } else if (!yp_isexceptionC2(result, yp_KeyError)) {
         yp_decref(id);
-        return result;  // some (unexpected) error occured
+        return result;  // some (unexpected) error occurred
     }
 
     // If we get here, then this is the first time visiting this object
@@ -4001,7 +4003,7 @@ void yp_divmodL(yp_int_t x, yp_int_t y, yp_int_t *_div, yp_int_t *_mod, ypObject
     }
 
     xdivy = x / y;
-    /* xdiv*y can overflow on platforms where x/y gives floor(x/y)
+    /* xdivy*y can overflow on platforms where x/y gives floor(x/y)
      * for x and y with differing signs. (This is unusual
      * behaviour, and C99 prohibits it, but it's allowed by C89;
      * for an example of overflow, take x = LONG_MIN, y = 5 or x =
@@ -7476,7 +7478,7 @@ static ypObject *_ypBytes_new(int type, yp_ssize_t requiredLen, int alloclen_fix
     return newB;
 }
 
-// XXX Check for the possiblity of a lazy shallow copy before calling this function
+// XXX Check for the possibility of a lazy shallow copy before calling this function
 // XXX Check for the _yp_bytes_empty case first
 static ypObject *_ypBytes_copy(int type, ypObject *b, int alloclen_fixed)
 {
@@ -8688,7 +8690,7 @@ static ypObject *_ypStr_new_ucs_4(int type, yp_ssize_t requiredLen, int alloclen
     return _ypStr_new5(type, requiredLen, alloclen_fixed, ypStringLib_ENC_UCS_4, 4);
 }
 
-// XXX Check for the possiblity of a lazy shallow copy before calling this function
+// XXX Check for the possibility of a lazy shallow copy before calling this function
 // XXX Check for the _yp_str_empty case first
 static ypObject *_ypStr_copy(int type, ypObject *s, int alloclen_fixed)
 {
@@ -12586,7 +12588,7 @@ static ypObject *_ypSet_update_from_iter(ypObject *so, ypObject **mi, yp_uint64_
 
 // Adds the keys yielded from iterable to the set.  If the set has enough space to hold all the
 // keys, the set is not resized (important, as yp_setN et al pre-allocate the necessary space).
-// Requires that iterables's items are immutable; unavoidable as they are to be added to the set.
+// Requires that iterable's items are immutable; unavoidable as they are to be added to the set.
 // XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_update(ypObject *so, ypObject *iterable)
 {
