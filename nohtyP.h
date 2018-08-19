@@ -1162,7 +1162,7 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 // modify anything.
 // TODO Or we just document this as a special type of object that can't be frozen.
 
-// TODO move to consturctors
+// TODO move to constructors
 
 // Returns true (non-zero) if x appears callable, else false.  If this returns true, it is still
 // possible that a call fails, but if it is false, calling x will always raise yp_TypeError.
@@ -1171,12 +1171,12 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 ypAPI int yp_iscallableC(ypObject *x);
 
 // Calls c with n positional arguments, returning the result of the call (which may be a new
-// refrence or an exception).  Returns yp_TypeError if c is not callable.
+// reference or an exception).  Returns yp_TypeError if c is not callable.
 ypAPI ypObject *yp_callN(ypObject *c, int n, ...);
 ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
-// result of the call (which may be a new refrence or an exception).  Returns yp_TypeError if c is
+// result of the call (which may be a new reference or an exception).  Returns yp_TypeError if c is
 // not callable.  Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
 // TODO Reconsider this name.  Consider if we want only-positional or only-kw versions?
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
@@ -1195,7 +1195,7 @@ ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 // Immortal functions representing , for convience with yp_str_frombytesC4 et al.
 
 // TODO starargs is from the grammar, but do people know it? does the "star" and "args" together imply
-// just `*args` (read it out, it's "star args"), or would people knoow it's **kwargs too
+// just `*args` (read it out, it's "star args"), or would people know it's **kwargs too
 // TODO same signature as above. Does it really help to name them differently?
 // TODO What about yp_function_
 typedef ypObject *(*yp_function_starargs_func_t)(ypObject *self, ypObject *a, ypObject *b);
