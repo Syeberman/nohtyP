@@ -168,17 +168,15 @@ typedef float              yp_float32_t;
 typedef double             yp_float64_t;
 
 // Size- and length-related C types
-#ifdef SSIZE_MAX
+#if defined(SSIZE_MAX)
 typedef ssize_t yp_ssize_t;
 #define yp_SSIZE_T_MAX SSIZE_MAX
-#else
-#if SIZE_MAX == 0xFFFFFFFFu
+#elif SIZE_MAX == 0xFFFFFFFFu
 typedef yp_int32_t    yp_ssize_t;
 #define yp_SSIZE_T_MAX (0x7FFFFFFF)
 #else
 typedef yp_int64_t yp_ssize_t;
 #define yp_SSIZE_T_MAX (0x7FFFFFFFFFFFFFFFLL)
-#endif
 #endif
 #define yp_SSIZE_T_MIN (-yp_SSIZE_T_MAX - 1)
 typedef yp_ssize_t yp_hash_t;
@@ -1550,7 +1548,7 @@ ypAPI void yp_s2i_setitemC4(
 //      yp_IMMORTAL_STR_LATIN_1(name, value);
 
 // The default immortal "constructor" macros declare variables as "ypObject * const".  This means
-// imortals defined outside of a function will be extern.  It also means you should *not*
+// immortals defined outside of a function will be extern.  It also means you should *not*
 // use these macros in a function, as the variable will be "deallocated" when the function returns,
 // and immortals should never be deallocated.  The following macros work as above, except the
 // variables are declared as "static ypObject * const".
