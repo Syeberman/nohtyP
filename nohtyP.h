@@ -416,13 +416,14 @@ ypAPI ypObject *yp_bool(ypObject *x);
 // Returns the immortal yp_True if x is considered false, otherwise yp_False.
 ypAPI ypObject *yp_not(ypObject *x);
 
-// Returns a *new* reference to y if x is false, otherwise to x.  Unlike Python, both arguments
-// are always evaluated.  You may find yp_anyN more convenient, as it returns an immortal.
+// Returns a *new* reference to y if x is false, otherwise to x.  Unlike Python, both arguments are
+// always evaluated (there is no short-circuiting).  You may find yp_anyN more convenient, as it
+// returns an immortal.
 ypAPI ypObject *yp_or(ypObject *x, ypObject *y);
 
-// A convenience function to "or" n objects.  Returns yp_False if n is zero, and the first object
-// if n is one.  Returns a *new* reference; you may find yp_anyN more convenient, as it returns an
-// immortal.
+// A convenience function to "or" n objects, returning a *new* reference.  Returns yp_False if n is
+// zero, and the first object if n is one.  Unlike Python, all arguments are always evaluated (there
+// is no short-circuiting).  You may find yp_anyN more convenient, as it returns an immortal.
 ypAPI ypObject *yp_orN(int n, ...);
 ypAPI ypObject *yp_orNV(int n, va_list args);
 
@@ -434,14 +435,14 @@ ypAPI ypObject *yp_anyNV(int n, va_list args);
 // returns yp_False.  Stops iterating at the first true element.
 ypAPI ypObject *yp_any(ypObject *iterable);
 
-// Returns a *new* reference to x if x is false, otherwise to y.  Unlike Python, both
-// arguments are always evaluated.  You may find yp_allN more convenient, as it returns an
-// immortal.
+// Returns a *new* reference to x if x is false, otherwise to y.  Unlike Python, both arguments are
+// always evaluated (there is no short-circuiting).  You may find yp_allN more convenient, as it
+// returns an immortal.
 ypAPI ypObject *yp_and(ypObject *x, ypObject *y);
 
-// A convenience function to "and" n objects.  Returns yp_True if n is zero, and the first object
-// if n is one.  Returns a *new* reference; you may find yp_allN more convenient, as it returns an
-// immortal.
+// A convenience function to "and" n objects, returning a *new* reference.  Returns yp_True if n is
+// zero, and the first object if n is one.  Unlike Python, all arguments are always evaluated (there
+// is no short-circuiting).  You may find yp_allN more convenient, as it returns an immortal.
 ypAPI ypObject *yp_andN(int n, ...);
 ypAPI ypObject *yp_andNV(int n, va_list args);
 
@@ -517,18 +518,10 @@ ypAPI ypObject *yp_throw(ypObject **iterator, ypObject *exc);
 // FIXME Compare against Python's __length_hint__ now that it's official.
 ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
 
-// Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
-// internal iterator state buffer and its size in bytes, and returns the immortal yp_None.  The
-// structure and initial values of *state are determined by the call to iterator's constructor; the
-// function cannot change the size after creation, and any ypObject*s in *state should be considered
-// *borrowed* (it is safe to replace them with new or immortal references).  Sets *state to NULL,
-// *size to zero, and returns an exception on error.
-ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
-
-// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_throw returns
-// yp_StopIteration or yp_GeneratorExit, it is not treated as an error; if yp_throw returns any
-// other exception, *iterator is discarded and set to that exception.  The behaviour of this method
-// for other types, in particular files, is documented elsewhere.
+// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_StopIteration or
+// yp_GeneratorExit is returned by yp_throw, *iterator is not discarded; on any other error,
+// *iterator is discarded and set to an exception.  The behaviour of this method for other
+// types, in particular files, is documented elsewhere.
 ypAPI void yp_close(ypObject **iterator);
 
 // Sets the given n ypObject**s to new references for the values yielded from iterable.  Iterable
@@ -1145,12 +1138,69 @@ ypAPI ypObject *yp_formatKV(ypObject *s, int n, va_list args);
 // Similar to yp_formatN, except each replacement field can contain either the numeric index of an
 // item in sequence, or the name of a key from mapping.  Either sequence or mapping can be yp_None
 // to ignore that particular argument.
+// TODO Reconsider use of yp_None: perhaps expose yp_tuple_empty and yp_frozendict_empty
 ypAPI ypObject *yp_format_seq_map(ypObject *s, ypObject *sequence, ypObject *mapping);
 
 // Convenience methods for yp_format_seq_map(s, sequence, yp_None) and
 // yp_format_seq_map(s, yp_None, mapping), respectively.
 ypAPI ypObject *yp_format_seq(ypObject *s, ypObject *sequence);
 ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
+
+
+/*
+ * Callable Operations
+ */
+// XXX This section is a work-in-progress
+
+// C functions can be wrapped up into function objects and called.  It's also possible to call
+// certain other objects: for example, calling a type object constructs an object of that type.
+
+// XXX Yes, the proper name for this is `function`
+
+// TODO Functions are mutable because we will provide state that they can modify. But then how do
+// we freeze? Perhaps we leave it up to the C implementations to check their own type and not
+// modify anything.
+// TODO Or we just document this as a special type of object that can't be frozen.
+
+// TODO move to consturctors
+
+// Returns true (non-zero) if x appears callable, else false.  If this returns true, it is still
+// possible that a call fails, but if it is false, calling x will always raise yp_TypeError.
+// Always succeeds; if x is an exception false is returned.
+// TODO Python just calls this "callable"
+ypAPI int yp_iscallableC(ypObject *x);
+
+// Calls c with n positional arguments, returning the result of the call (which may be a new
+// refrence or an exception).  Returns yp_TypeError if c is not callable.
+ypAPI ypObject *yp_callN(ypObject *c, int n, ...);
+ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
+
+// Calls c with positional arguments from args and keyword arguments from kwargs, returning the
+// result of the call (which may be a new refrence or an exception).  Returns yp_TypeError if c is
+// not callable.  Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
+// TODO Reconsider this name.  Consider if we want only-positional or only-kw versions?
+ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
+
+// TODO Should we have a yp_call?  That would probably be yp_call_stars (renamed), but then yp_call2
+// would be confusing because you'd expect it to be yp_call_stars just with one less argument.  That
+// is, you'd expect yp_call2 to take an iterable of positional arguments.  It might be best to avoid
+// the name yp_call altogether.  (Then again, yp_call2 is confusing because it's two arguments to
+// yp_call2, but **one** argument to the callable.)
+
+// TODO Yup, python allows any iterable for f(*arg) calls, just as it does for unpacking.
+// TODO In Python, when calling a function, * can be any iterable and ** any mapping.  However,
+// when the arguments are passed to `def a(*p, **k)`, p is _always_ a tuple and k _always_ a dict.
+// TODO However, unlike Python, use a frozendict for kwargs.
+
+// Immortal functions representing , for convience with yp_str_frombytesC4 et al.
+
+// TODO starargs is from the grammar, but do people know it? does the "star" and "args" together imply
+// just `*args` (read it out, it's "star args"), or would people knoow it's **kwargs too
+// TODO same signature as above. Does it really help to name them differently?
+// TODO What about yp_function_
+typedef ypObject *(*yp_function_starargs_func_t)(ypObject *self, ypObject *a, ypObject *b);
+
+// TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
 
 
 /*
@@ -1314,6 +1364,9 @@ ypAPI ypObject *const yp_sys_maxint;
 ypAPI ypObject *const yp_sys_minint;
 
 // Immortal ints representing common values, for convenience.
+// TODO Rename to yp_int_*?  I'm OK with yp_s_* because strs are going to be used more often and
+// will likely have long names already (i.e. they'll be named like the string they represent), but
+// there won't be many of these, their names are short, and they're infrequently used.
 ypAPI ypObject *const yp_i_neg_one;
 ypAPI ypObject *const yp_i_zero;
 ypAPI ypObject *const yp_i_one;
@@ -1374,13 +1427,14 @@ ypAPI void yp_deepinvalidate(ypObject **x);
  * Type Operations
  */
 
-// Return the immortal type of object.  If object is an exception, yp_t_exception is returned;
-// if it is invalidated, yp_t_invalidated is returned.
+// Returns a new reference to the type of object.  If object is an exception, yp_t_exception is
+// returned; if it is invalidated, yp_t_invalidated is returned.
 // TODO Reconsider the behaviour of exceptions.  Python returns `type`.  If we ever want to support
 // creating instances of exceptions, we should do the same.
 ypAPI ypObject *yp_type(ypObject *object);
 
-// The immortal type objects.
+// The immortal type objects.  Calling a type object (i.e. yp_call_TODO) constructs an object of
+// that type.
 ypAPI ypObject *const yp_t_invalidated;
 ypAPI ypObject *const yp_t_exception;
 ypAPI ypObject *const yp_t_type;
@@ -1673,6 +1727,14 @@ typedef struct _yp_initialize_kwparams_t {
 
 // XXX The "X" in these names is a reminder that the function is returning internal memory, and
 // as such should be used with caution.
+
+// Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
+// internal iterator state buffer and its size in bytes, and returns the immortal yp_None.  The
+// structure and initial values of *state are determined by the call to iterator's constructor; the
+// function cannot change the size after creation, and any ypObject*s in *state should be considered
+// *borrowed* (it is safe to replace them with new or immortal references).  Sets *state to NULL,
+// *size to zero, and returns an exception on error.
+ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
 // For sequences that store their elements as an array of bytes (bytes and bytearray), sets *bytes
 // to the beginning of that array, *len to the length of the sequence, and returns the immortal
