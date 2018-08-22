@@ -2788,14 +2788,16 @@ void yp_deepinvalidate(ypObject **x)
  *************************************************************************************************/
 #pragma region comparison
 
-// Returns 1 if the bool object is true, else 0; only valid on bool objects!  The return can also
-// be interpreted as the value of the boolean.
-// XXX This assumes that yp_True and yp_False are the only two bools
+// Returns 1 if the object is yp_True, else 0.  b must be a bool or an exception.
 #define ypBool_IS_TRUE_C(b) ((b) == yp_True)
 
+// Returns 1 if the object is yp_False, else 0.  b must be a bool or an exception.
+#define ypBool_IS_FALSE_C(b) ((b) == yp_False)
+
+// Returns yp_True if cond is true (non-zero), else yp_False.
 #define ypBool_FROM_C(cond) ((cond) ? yp_True : yp_False)
 
-// If you know that b is either yp_True, yp_False, or an exception, use this
+// yp_not as a macro.  b must be a bool or an exception.
 // XXX b should be a variable, _not_ an expression, as it's evaluated up to three times
 // clang-format off
 #define ypBool_NOT(b) ( (b) == yp_True ? yp_False : \
@@ -15708,7 +15710,7 @@ typedef struct {
 #define ypFunction_PARAMS_LEN ypObject_ALLOCLEN
 #define ypFunction_SET_PARAMS_LEN ypObject_SET_ALLOCLEN
 #define ypFunction_FUNC_STARS(f) (((ypFunctionObject *)f)->ob_func_stars)
-#define ypFunction_FUNCN(f) (((ypFunctionObject *)f)->ob_funcN)
+#define ypFunction_FUNC_N(f) (((ypFunctionObject *)f)->ob_funcN)
 
 // The maximum possible size of a function's state
 #define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
@@ -15750,12 +15752,58 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
     return _function_traverse_params(f, visitor, memo);
 }
 
-static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwargs)
+static ypObject *_function_call_stars_to_callN(ypObject *f, ypObject *args, ypObject *kwargs)
 {
-    return yp_NotImplementedError;
+    ypObject *has_kwargs = yp_bool(kwargs);
+    if (!ypBool_IS_FALSE_C(has_kwargs)) {
+        if (yp_isexceptionC(has_kwargs)) return has_kwargs;  // FIXME Catch?  This shouldn't happen.
+        return yp_TypeError;                                 // "got unexpected keyword arguments"
+    }
+
+    return yp_NotImplementedError;  // FIXME implement
 }
 
-static ypObject *function_callN(ypObject *f, int n, va_list args) { return yp_NotImplementedError; }
+// FIXME Where should we coerce args/kwargs to tuple/frozendict?  Here, or in yp_call_stars?  If
+// here, then every callable will need to do their own coersion.
+static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwargs)
+{
+    // FIXME Should we assert, or raise an error, if called with incorrect types?  i.e. Do we
+    // assume these are the correct types?
+    yp_ASSERT1(ypObject_TYPE_CODE(args) == ypTuple_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
+
+    // FIXME We can either check for NULL, or ensure it's always set to a valid function.  BUT!
+    // The functions we would link to would be dynamic (via DLL), making the latter tricky!
+    if (ypFunction_FUNC_STARS(f) != NULL) {
+        return ypFunction_FUNC_STARS(f)(f, args, kwargs);
+    } else if (ypFunction_FUNC_N(f) != NULL) {
+        return _function_call_stars_to_callN(f, args, kwargs);
+    } else {
+        return yp_SystemError;  // should never occur
+    }
+}
+
+static ypObject *_function_callN_to_call_stars(ypObject *f, int n, va_list args)
+{
+    ypObject *result;
+    ypObject *args_astuple = yp_tupleNV(n, args);  // new ref
+    if (yp_isexceptionC(args_astuple)) return args_astuple;
+
+    result = ypFunction_FUNC_STARS(f)(f, args_astuple, _yp_frozendict_empty);
+    yp_decref(args_astuple);
+    return result;
+}
+
+static ypObject *function_callN(ypObject *f, int n, va_list args)
+{
+    if (ypFunction_FUNC_N(f) != NULL) {
+        return ypFunction_FUNC_N(f)(f, n, args);
+    } else if (ypFunction_FUNC_STARS(f) != NULL) {
+        return _function_callN_to_call_stars(f, n, args);
+    } else {
+        return yp_SystemError;  // should never occur
+    }
+}
 
 // Decrements the reference count of the visited object
 static ypObject *_function_decref_visitor(ypObject *x, void *memo)
