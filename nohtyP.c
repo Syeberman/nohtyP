@@ -363,7 +363,7 @@ typedef struct {
 } ypMappingMethods;
 
 typedef struct {
-    int tp_iscallable;
+    int           tp_iscallable;
     objobjobjproc tp_call_stars;
     objvalistproc tp_callN;
 } ypCallableMethods;
@@ -2085,13 +2085,14 @@ static int ypQuickSeq_new_fromiterable_builtins(
 /*************************************************************************************************
  * Dynamic Object State (i.e. yp_generator_fromstructCN, yp_function_fromstructCN)
  *************************************************************************************************/
+#pragma region state
 // FIXME rename most things here
 
 // Returns the immortal yp_None, or an exception if visitor returns an exception.
 static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc visitor, void *memo)
 {
-    ypObject ** p = (ypObject **)state;
-    ypObject *  result;
+    ypObject **p = (ypObject **)state;
+    ypObject * result;
 
     while (objlocs) {  // while there are still more objects to be found...
         if (objlocs & 0x1u) {
@@ -2110,7 +2111,7 @@ static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc v
 // *objlocs is undefined.
 // FIXME is this the order of parameters we want?
 static ypObject *_ypState_objlocs_fromstructCNV(
-    yp_uint32_t *objlocs, yp_ssize_t struct_size, int n, va_list args)
+        yp_uint32_t *objlocs, yp_ssize_t struct_size, int n, va_list args)
 {
     yp_ssize_t objoffset;
     yp_ssize_t objloc_index;
@@ -2131,6 +2132,8 @@ static ypObject *_ypState_objlocs_fromstructCNV(
     }
     return yp_None;
 }
+
+#pragma endregion state
 
 
 /*************************************************************************************************
@@ -2191,7 +2194,8 @@ static ypObject *_iter_send(ypObject *i, ypObject *value)
     return result;
 }
 
-static ypObject *iter_traverse(ypObject *i, visitfunc visitor, void *memo) {
+static ypObject *iter_traverse(ypObject *i, visitfunc visitor, void *memo)
+{
     return _ypState_traverse(ypIter_STATE(i), ypIter_OBJLOCS(i), visitor, memo);
 }
 
@@ -15582,8 +15586,6 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
 #endif
 // TODO Compare against Python API
 
-#pragma endregion function
-
 #if 0
 static ypObject *_ypFunction_callN(ypObject *self, int n, ...) {
     va_list args;
@@ -15675,28 +15677,28 @@ static _ypFunction_callN_example(ypObject *self, int n, va_list args) {
 
 #endif
 
-// FIXME be usre I'm using "parameter" and "argument" in the right places
+// FIXME be sure I'm using "parameter" and "argument" in the right places
 // FIXME ypFunctionObject doesn't need ob_data, etc (i.e. it can be smaller like int)
 
 typedef struct {
     // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in data
     yp_uint32_t objlocs;
-    yp_int32_t size;
+    yp_int32_t  size;
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
     yp_uint8_t data[];
 } ypFunctionState;
-yp_STATIC_ASSERT(yp_offsetof(ypFunctionState, data) % yp_MAX_ALIGNMENT == 0,
-        alignof_function_state_data);
+yp_STATIC_ASSERT(
+        yp_offsetof(ypFunctionState, data) % yp_MAX_ALIGNMENT == 0, alignof_function_state_data);
 
 typedef struct {
-    ypObject *name;     // must be a str (i.e. FROM_LATIN1), NULL for positional-only
-    ypObject *default_; // NULL for required argument
+    ypObject *name;      // must be a str (i.e. FROM_LATIN1), NULL for positional-only
+    ypObject *default_;  // NULL for required argument
 } ypFunctionParam;
 
 typedef struct {
     ypObject_HEAD;
-    objobjobjproc ob_func_stars;
-    objvalistproc ob_funcN;
+    objobjobjproc    ob_func_stars;
+    objvalistproc    ob_funcN;
     ypFunctionState *ob_state;  // NULL if no extra state
     yp_INLINE_DATA(ypFunctionParam);
 } ypFunctionObject;
@@ -15717,30 +15719,43 @@ typedef struct {
 
 // Function methods
 
-static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo) {
-    yp_ssize_t i;
-    ypObject *result;
+static ypObject *_function_traverse_state(ypObject *f, visitfunc visitor, void *memo)
+{
     ypFunctionState *state = ypFunction_STATE(f);
+    if (state == NULL) return yp_None;
+    return _ypState_traverse(state->data, state->objlocs, visitor, memo);
+}
 
-    if (state != NULL) {
-        result = _ypState_traverse(state->data, state->objlocs, visitor, memo);
-        if (yp_isexceptionC(result)) return result;
-    }
-
+static ypObject *_function_traverse_params(ypObject *f, visitfunc visitor, void *memo)
+{
+    yp_ssize_t i;
     for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
         ypFunctionParam *param = ypFunction_PARAMS(f)[i];
         if (param->name != NULL) {
-            result = visitor(param->name, memo);
+            ypObject *result = visitor(param->name, memo);
             if (yp_isexceptionC(result)) return result;
         }
         if (param->default_ != NULL) {
-            result = visitor(param->default_, memo);
+            ypObject *result = visitor(param->default_, memo);
             if (yp_isexceptionC(result)) return result;
         }
     }
-
     return yp_None;
 }
+
+static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
+{
+    ypObject *result = _function_traverse_state(f, visitor, memo);
+    if (yp_isexceptionC(result)) return result;
+    return _function_traverse_params(f, visitor, memo);
+}
+
+static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwargs)
+{
+    return yp_NotImplementedError;
+}
+
+static ypObject *function_callN(ypObject *f, int n, va_list args) { return yp_NotImplementedError; }
 
 // Decrements the reference count of the visited object
 static ypObject *_function_decref_visitor(ypObject *x, void *memo)
@@ -15760,6 +15775,12 @@ static ypObject *function_dealloc(ypObject *f, void *memo)
 
 // FIXME A frozen function behaves like...what?
 // FIXME Review that correct exceptions returned for not supported methods
+static ypCallableMethods ypFunction_as_callable = {
+        TRUE,                 // tp_iscallable
+        function_call_stars,  // tp_call_stars
+        function_callN        // tp_callN
+};
+
 static ypTypeObject ypFunction_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
@@ -15767,8 +15788,8 @@ static ypTypeObject ypFunction_Type = {
         // Object fundamentals
         function_dealloc,   // tp_dealloc
         function_traverse,  // tp_traverse
-        NULL,           // tp_str
-        NULL,           // tp_repr
+        NULL,               // tp_str
+        NULL,               // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,       // tp_freeze
@@ -15825,14 +15846,14 @@ static ypTypeObject ypFunction_Type = {
         MethodError_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        &ypFunction_as_callable  // tp_as_callable
 };
 
 // Public functions
 
 // FIXME
 
-
+#pragma endregion function
 
 
 /*************************************************************************************************
