@@ -667,6 +667,12 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 #define yp_offsetof(structType, member) ((yp_ssize_t)offsetof(structType, member))
 #define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
 
+// Length of an array.  Only call for arrays of fixed size that haven't been coerced to pointers.
+#define yp_lenof_array(x) (yp_sizeof(x) / yp_sizeof(x[0]))
+
+// Length of an array in a structure.  Only call for arrays of fixed size.
+#define yp_lenof_array_member(structType, member) yp_lenof_array(((structType *)0)->member)
+
 // XXX Adapted from _Py_SIZE_ROUND_DOWN et al
 // Below "a" is a power of 2.  Round down size "n" to be a multiple of "a".
 #define yp_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a)-1))
@@ -15569,14 +15575,12 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 //  - **kwargs to finish
 // TODO Ensure the above is correct with Python
 #if 0
-
 // TODO If a function constructor call supplies only tp_call, do not allow the yp_func_parameter to
 // contain *args or **kwargs.  yp_callN(c, 3, a, b, c) should be equivalent to c(a, b, c)...that is,
 // here and everywhere the idea of `int n, ...` is shorthand for constructing a tuple in its place.
 // Similarly, raise a yp_SystemLimitationError if there are too many parameters to such a
 // construction, because converting from tp_call_stars to tp_call involves a big switch statement of
 // function calls with different numbers of arguments.
-
 
 // Additions to ypTypeObject
 ypObject *tp_new;   // A function object implementing __new__.  The first argument is cls, i.e. the
@@ -15587,98 +15591,6 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
 
 #endif
 // TODO Compare against Python API
-
-#if 0
-static ypObject *_ypFunction_callN(ypObject *self, int n, ...) {
-    va_list args;
-    ypObject *result;
-
-    va_start(args, n);
-    result = ypFunction_FUNC_NV(self)(self, n, args);
-    va_end(args);
-
-    return result;
-}
-
-// FIXME Raise a yp_SystemLimitationError as early as we can if this function will fail.
-// FIXME Tests for every amount of args to ensure proper order
-// FIXME Could we make this a generic macro to take a tuple and unpack it into C var args?
-// FIXME Can we add a linter for this code?
-static _ypFunction_callN_fromtuple(ypObject *s, ypObject *args)
-{
-    ypObject *(*f)(ypObject *, int, ...) = _ypFunction_callN;  // shorter name
-    ypObject *const *a;
-    yp_ssize_t len;
-    ypObject *result = yp_itemarrayCX(args, &a, &len);
-    yp_ASSERT1(len >= 0);
-    // TODO Make this an assert?  Or skip yp_itemarrayCX and use tuple's macros directly?
-    if (yp_isexceptionC(result)) return result;  // should not happen: args should always be a tuple
-
-    switch(len) {
-        case 0:
-            return f(s, 0);
-        case 1:
-            return f(s, 1, a[0]);
-        case 2:
-            return f(s, 2, a[0], a[1]);
-        case 3:
-            return f(s, 3, a[0], a[1], a[2]);
-        case 4:
-            return f(s, 4, a[0], a[1], a[2], a[3]);
-        case 5:
-            return f(s, 5, a[0], a[1], a[2], a[3], a[4]);
-        case 6:
-            return f(s, 6, a[0], a[1], a[2], a[3], a[4], a[5]);
-        case 7:
-            return f(s, 7, a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
-        case 8:
-            return f(s, 8, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
-        case 9:
-            return f(s, 9, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
-        case 10:
-            return f(s, 10, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
-        case 11:
-            return f(s, 11, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]);
-        case 12:
-            return f(s, 12, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
-                a[11]);
-        case 13:
-            return f(s, 13, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
-                a[11], a[12]);
-        case 14:
-            return f(s, 14, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
-                a[11], a[12], a[13]);
-        case 15:
-            return f(s, 15, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
-                a[11], a[12], a[13], a[14]);
-        case 16:
-            return f(s, 16, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10],
-                a[11], a[12], a[13], a[14], a[15]);
-        default:
-            return yp_SystemLimitationError;
-    }
-}
-
-static _ypFunction_call_stars_tocallN(ypObject *self, ypObject *args, ypObject *kwargs)
-{
-    if (yp_not(kwargs)) {
-        return _ypFunction_callN_fromtuple(args);
-    }
-
-    ypObject *altogether = _ypFunction_stars_totuple(self, args, kwargs);
-    if (yp_isexceptionC(altogether)) return altogether;
-
-    ypObject *result = _ypFunction_callN_fromtuple(altogether);
-    yp_decref(altogether);
-    return result;
-}
-
-// Example of helpers for tp_callN?
-static _ypFunction_callN_example(ypObject *self, int n, va_list args) {
-}
-
-#endif
-
 // FIXME be sure I'm using "parameter" and "argument" in the right places
 // FIXME ypFunctionObject doesn't need ob_data, etc (i.e. it can be smaller like int)
 
@@ -15719,6 +15631,17 @@ typedef struct {
 #define ypFunction_PARAMS_LEN_MAX \
     ((yp_ssize_t)MIN(yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject), ypObject_LEN_MAX))
 
+// FIXME Also normalize n<0 to 0 in yp_callN (likely).
+static ypObject *_yp_function_callN(ypObject *f, int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+    va_start(args, n);
+    result = ypFunction_FUNC_N(f)(f, n, args);
+    va_end(args);
+    return result;
+}
+
 // Function methods
 
 static ypObject *_function_traverse_state(ypObject *f, visitfunc visitor, void *memo)
@@ -15752,21 +15675,66 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
     return _function_traverse_params(f, visitor, memo);
 }
 
+static ypObject *_function_call_stars_to_callN_no_kwargs(
+        ypObject *f, ypObject *args, yp_ssize_t dest_len, int *n, ypObject **dest)
+{
+    *n = 0;
+    return yp_NotImplementedError;
+}
+
+static ypObject *_function_call_stars_to_callN_kwargs(
+        ypObject *f, ypObject *args, ypObject *kwargs, yp_ssize_t dest_len, int *n, ypObject **dest)
+{
+    *n = 0;
+    return yp_NotImplementedError;
+}
+
 static ypObject *_function_call_stars_to_callN(ypObject *f, ypObject *args, ypObject *kwargs)
 {
-    ypObject *has_kwargs = yp_bool(kwargs);
-    if (!ypBool_IS_FALSE_C(has_kwargs)) {
-        if (yp_isexceptionC(has_kwargs)) return has_kwargs;  // FIXME Catch?  This shouldn't happen.
-        return yp_TypeError;                                 // "got unexpected keyword arguments"
+    int       n;
+    ypObject *a[16];
+    ypObject *result;
+    int       i;
+
+    yp_ASSERT1(ypObject_TYPE_CODE(args) == ypTuple_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
+
+    if (ypDict_LEN(kwargs) < 1) {
+        result = _function_call_stars_to_callN_no_kwargs(f, args, yp_lenof_array(a), &n, a);
+    } else {
+        result = _function_call_stars_to_callN_kwargs(f, args, kwargs, yp_lenof_array(a), &n, a);
     }
 
-    return yp_NotImplementedError;  // FIXME implement
+    if (!yp_isexceptionC(result)) {
+        // If len(a) changes, this call to _yp_function_callN must also change
+        yp_STATIC_ASSERT(yp_lenof_array(a) == 16, lenof_stars_to_n_array);
+        // TODO Need tests explicitly for this list
+        result = _yp_function_callN(f, n, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8],
+                a[9], a[10], a[11], a[12], a[13], a[14], a[15]);
+    }
+
+    for (i = 0; i < n; i++) {
+        yp_decref(a[i]);
+    }
+
+    return result;
 }
 
 // FIXME Where should we coerce args/kwargs to tuple/frozendict?  Here, or in yp_call_stars?  If
 // here, then every callable will need to do their own coersion.
 static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwargs)
 {
+    // FIXME args or kwargs aren't completely immutable: remember yp_invalidate. So we can't just
+    // pass along borrowed references from these two objects, because the refs _could_ be discarded.
+    // Does that mean we always have to make copies? Would we do this in yp_call_stars, or
+    // tp_call_stars?  If we _do_ make copies, then kwargs might as well be a dict (common to pop
+    // arguments off), and maybe even just make args a list?  I'd really like to avoid making
+    // copies...perhaps it's OK to pass the original args/kwargs refs along for
+    // ypFunction_FUNC_STARS...which then means we should _not_ make the copy in yp_call_stars!
+
+    // FIXME Look for other places we use a borrowed reference from an object and then call
+    // arbitrary code: that code could invalidate and thus discard the reference.
+
     // FIXME Should we assert, or raise an error, if called with incorrect types?  i.e. Do we
     // assume these are the correct types?
     yp_ASSERT1(ypObject_TYPE_CODE(args) == ypTuple_CODE);
