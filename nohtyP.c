@@ -626,10 +626,10 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 #define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
 
 // Length of an array.  Only call for arrays of fixed size that haven't been coerced to pointers.
-#define yp_lenof_array(x) (yp_sizeof(x) / yp_sizeof(x[0]))
+#define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof(x[0]))
 
 // Length of an array in a structure.  Only call for arrays of fixed size.
-#define yp_lenof_array_member(structType, member) yp_lenof_array(((structType *)0)->member)
+#define yp_lengthof_array_member(structType, member) yp_lengthof_array(((structType *)0)->member)
 
 // XXX Adapted from _Py_SIZE_ROUND_DOWN et al
 // Below "a" is a power of 2.  Round down size "n" to be a multiple of "a".
@@ -3221,6 +3221,10 @@ _yp_IMMORTAL_EXCEPTION_SUPERPTR(yp_BaseException, NULL);
       _yp_IMMORTAL_EXCEPTION(yp_CircularReferenceError, yp_RuntimeError);
       // TODO Same with yp_RecursionLimitError
       _yp_IMMORTAL_EXCEPTION(yp_RecursionLimitError, yp_RuntimeError);
+
+    // FIXME Expose and document in nohtyP.h
+    _yp_IMMORTAL_EXCEPTION(yp_SyntaxError, yp_Exception);
+      _yp_IMMORTAL_EXCEPTION(yp_ParameterSyntaxError, yp_SyntaxError);
 
     _yp_IMMORTAL_EXCEPTION(yp_SystemError, yp_Exception);
       _yp_IMMORTAL_EXCEPTION(yp_SystemLimitationError, yp_SystemError);
@@ -9052,6 +9056,9 @@ static ypObject *str_isupper(ypObject *s) { return yp_NotImplementedError; }
 
 static ypObject *str_startswith(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
 {
+    // Because we are called directly (i.e. ypFunction), ensure we're called correctly
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(s) == ypStr_CODE);
+
     return yp_NotImplementedError;
 }
 
@@ -14378,6 +14385,9 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
     ypObject *      result = yp_None;
     ypObject *      value;
 
+    // Because we are called directly (i.e. ypFunction), ensure we're called correctly
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(mp) == ypFrozenDict_CODE);
+
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
     hash = yp_currenthashC(key, &result);
@@ -15441,6 +15451,11 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
 // TODO Compare against Python API
 // FIXME be sure I'm using "parameter" and "argument" in the right places
 // FIXME ypFunctionObject doesn't need ob_data, etc (i.e. it can be smaller like int)
+// TODO Inspect and consider where yp_ssize_t is used vs int (as in `int n`)
+// FIXME Positional-only arguments are a CPython internal detail and should not be part of nohtyP.
+// (i.e. int now allows int(x=5)).  Kill them with fire.
+// TODO Make sub exceptions of yp_TypeError for each type of argument error (perhaps all grouped
+// under yp_ArgumentError or yp_CallArgumentError or something).
 
 typedef struct {
     // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in data
@@ -15453,7 +15468,7 @@ yp_STATIC_ASSERT(
         yp_offsetof(ypFunctionState, data) % yp_MAX_ALIGNMENT == 0, alignof_function_state_data);
 
 typedef struct {
-    ypObject *name;      // must be a str (i.e. FROM_LATIN1), NULL for positional-only
+    ypObject *name;      // must be a str (i.e. FROM_LATIN1)
     ypObject *default_;  // NULL for required argument
 } ypFunctionParam;
 
@@ -15479,8 +15494,38 @@ typedef struct {
 #define ypFunction_PARAMS_LEN_MAX \
     ((yp_ssize_t)MIN(yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject), ypObject_LEN_MAX))
 
+// For use internally to detect when a key is missing from a dict.
+yp_IMMORTAL_INVALIDATED(ypFunction_key_missing);
+
+// "*" as a str.
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");
+
+// Counts the number of parameter slots that can be filled directly from positional arguments.  In
+// other words, this counts the number of parameters before the first of *, *args, **kwargs, or the
+// end of the parameter list.  Recall that you can supply more positional arguments than there are
+// positional parameter slots if the parameter list contains *args.
+static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_t *max)
+{
+    ypObject * result;
+    yp_ssize_t i;
+    for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
+        ypFunctionParam *param = ypFunction_PARAMS(f)[i];
+
+        // Parameter names must be strings
+        if (ypObject_TYPE_CODE(param->name) != ypStr_CODE) return yp_ParameterSyntaxError;
+
+        // FIXME Implement startswith
+        result = str_startswith(param->name, yp_s_star, 0, yp_SLICE_USELEN);
+        if (yp_isexceptionC(result)) return result;
+        if (ypBool_IS_TRUE_C(result)) break;  // either `*` or `**`, so end of positional slots
+    }
+
+    *max = i;
+    return yp_None;
+}
+
 // FIXME Also normalize n<0 to 0 in yp_callN (likely).
-static ypObject *_yp_function_callN(ypObject *f, int n, ...)
+static ypObject *_ypFunction_callN(ypObject *f, int n, ...)
 {
     va_list   args;
     ypObject *result;
@@ -15526,15 +15571,97 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
 static ypObject *_function_call_stars_to_callN_no_kwargs(
         ypObject *f, ypObject *args, yp_ssize_t dest_len, int *n, ypObject **dest)
 {
-    *n = 0;
-    return yp_NotImplementedError;
+    yp_ssize_t i;
+
+    yp_ASSERT1(ypObject_TYPE_CODE(args) == ypTuple_CODE);
+    yp_ASSERT1(ypTuple_LEN(args) >= 0);
+
+    if (ypTuple_LEN(args) > dest_len) {
+        *n = 0;
+        return yp_SystemLimitationError;  // not enough space in dest to unpack args
+    }
+
+    *n = ypTuple_LEN(args);
+    memcpy(dest, ypTuple_ARRAY(args), ypTuple_LEN(args) * yp_sizeof(ypObject *));
+    for (i = 0; i < ypTuple_LEN(args); i++) {
+        yp_incref(dest[i]);
+    }
+    return yp_None;
 }
 
 static ypObject *_function_call_stars_to_callN_kwargs(
         ypObject *f, ypObject *args, ypObject *kwargs, yp_ssize_t dest_len, int *n, ypObject **dest)
 {
-    *n = 0;
-    return yp_NotImplementedError;
+    yp_ssize_t positional_slots;
+    ypObject * result;
+    yp_ssize_t kwargs_remaining;
+    yp_ssize_t i;
+
+    yp_ASSERT1(ypObject_TYPE_CODE(args) == ypTuple_CODE);
+    yp_ASSERT1(ypTuple_LEN(args) >= 0);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
+    yp_ASSERT1(ypDict_LEN(kwargs) >= 1);  // only call this function if there's >=1 kw args
+
+    result = _ypFunction_count_positional_param_slots(f, &positional_slots);
+    if (yp_isexceptionC(result)) {
+        *n = 0;
+        return result;
+    }
+
+    // If there are more arguments than there are positional slots, it means we have unknown keyword
+    // arguments or duplicated arguments between positional and keyword.  Both of these cases raise
+    // TypeError in Python.  (It's also possible that a keyword-only parameter was specified, but
+    // recall that functions with only callN shouldn't have kw-only parameters.)
+    // FIXME Verify at creation that callN-only functions don't have kw-only parameters.
+    if (ypTuple_LEN(args) + ypDict_LEN(kwargs) > positional_slots) {
+        *n = 0;
+        return yp_TypeError;
+    }
+
+    // We know from the positional_slots check above that we don't have more positional arguments
+    // than we do positional parameter slots.  So we can copy the positional args wholesale (there's
+    // a memcpy), then tack on the keyword arguments in the right places.  Afterwards, we detect the
+    // case where an argument is duplicated between positional and keyword.
+    result = _function_call_stars_to_callN_no_kwargs(f, args, dest_len, n, dest);
+    if (yp_isexceptionC(result)) return result;  // *n is initialized
+
+    // Because parameter names should all be unique, we can count how many unused keyword arguments
+    // exist in kwargs and use that count to detect unknown keyword arguments or duplicated
+    // arguments between positional and keyword.  This is preferable to allocating an unfrozen copy
+    // of kwargs.
+    kwargs_remaining = ypDict_LEN(kwargs);
+    for (i = *n; i < positional_slots; i++) {
+        ypObject *       arg;
+        ypFunctionParam *param = ypFunction_PARAMS(f)[i];
+
+        arg = frozendict_getdefault(kwargs, param->name, ypFunction_key_missing);  // new ref
+        if (yp_isexceptionC(arg)) return arg;
+        if (arg != ypFunction_key_missing) {
+            kwargs_remaining--;  // one less unused kwarg
+        } else if (param->default_ != NULL) {
+            arg = yp_incref(param->default_);
+        } else {
+            // Recall arg is the immortal ypFunction_key_missing
+            return yp_TypeError;  // "missing required positional argument"
+        }
+
+        if (*n >= dest_len) return yp_SystemLimitationError;
+        dest[i] = arg;
+        (*n)++;
+
+        // We can stop once we've placed all the keyword arguments
+        if (kwargs_remaining < 1) break;
+    }
+
+    if (kwargs_remaining > 0) {
+        // "got an unexpected keyword argument" or "got multiple values for argument".  (It's also
+        // possible that a keyword-only parameter was specified, but recall that functions with only
+        // callN shouldn't have kw-only parameters.)
+        return yp_TypeError;
+    }
+
+    // We've coerced all arguments into positional arguments, so we're done.
+    return yp_None;
 }
 
 static ypObject *_function_call_stars_to_callN(ypObject *f, ypObject *args, ypObject *kwargs)
@@ -15547,18 +15674,20 @@ static ypObject *_function_call_stars_to_callN(ypObject *f, ypObject *args, ypOb
     yp_ASSERT1(ypObject_TYPE_CODE(args) == ypTuple_CODE);
     yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
 
+    // Both of these functions should keep n up-to-date, even on exception, so that if an exception
+    // _does_ occur we can clean up any new references in a.
     if (ypDict_LEN(kwargs) < 1) {
-        result = _function_call_stars_to_callN_no_kwargs(f, args, yp_lenof_array(a), &n, a);
+        result = _function_call_stars_to_callN_no_kwargs(f, args, yp_lengthof_array(a), &n, a);
     } else {
-        result = _function_call_stars_to_callN_kwargs(f, args, kwargs, yp_lenof_array(a), &n, a);
+        result = _function_call_stars_to_callN_kwargs(f, args, kwargs, yp_lengthof_array(a), &n, a);
     }
 
     if (!yp_isexceptionC(result)) {
-        // If len(a) changes, this call to _yp_function_callN must also change
-        yp_STATIC_ASSERT(yp_lenof_array(a) == 16, lenof_stars_to_n_array);
+        // If len(a) changes, this call to _ypFunction_callN must also change
+        yp_STATIC_ASSERT(yp_lengthof_array(a) == 16, lenof_stars_to_n_array);
         // TODO Need tests explicitly for this list
-        result = _yp_function_callN(f, n, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8],
-                a[9], a[10], a[11], a[12], a[13], a[14], a[15]);
+        result = _ypFunction_callN(f, n, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9],
+                a[10], a[11], a[12], a[13], a[14], a[15]);
     }
 
     for (i = 0; i < n; i++) {
