@@ -8220,36 +8220,30 @@ static ypObject *_bytes_tailmatch(
     return ypBool_FROM_C(memcmp_result == 0);
 }
 
-static ypObject *bytes_startswith(ypObject *b, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
+static ypObject *_bytes_startswith_or_endswith(
+        ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
     // FIXME Also support lists?  Python requires a tuple here...
-    if (ypObject_TYPE_CODE(prefix) == ypTuple_CODE) {
+    if (ypObject_TYPE_CODE(x) == ypTuple_CODE) {
         yp_ssize_t i;
-        for (i = 0; i < ypTuple_LEN(prefix); i++) {
-            ypObject *result =
-                    _bytes_tailmatch(b, ypTuple_ARRAY(prefix)[i], start, end, yp_FIND_FORWARD);
+        for (i = 0; i < ypTuple_LEN(x); i++) {
+            ypObject *result = _bytes_tailmatch(b, ypTuple_ARRAY(x)[i], start, end, direction);
             if (result != yp_False) return result;  // yp_True or an exception
         }
         return yp_False;
     } else {
-        return _bytes_tailmatch(b, prefix, start, end, yp_FIND_FORWARD);
+        return _bytes_tailmatch(b, x, start, end, direction);
     }
+}
+
+static ypObject *bytes_startswith(ypObject *b, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
+{
+    return _bytes_startswith_or_endswith(b, prefix, start, end, yp_FIND_FORWARD);
 }
 
 static ypObject *bytes_endswith(ypObject *b, ypObject *suffix, yp_ssize_t start, yp_ssize_t end)
 {
-    // FIXME Also support lists?  Python requires a tuple here...
-    if (ypObject_TYPE_CODE(suffix) == ypTuple_CODE) {
-        yp_ssize_t i;
-        for (i = 0; i < ypTuple_LEN(suffix); i++) {
-            ypObject *result =
-                    _bytes_tailmatch(b, ypTuple_ARRAY(suffix)[i], start, end, yp_FIND_REVERSE);
-            if (result != yp_False) return result;  // yp_True or an exception
-        }
-        return yp_False;
-    } else {
-        return _bytes_tailmatch(b, suffix, start, end, yp_FIND_REVERSE);
-    }
+    return _bytes_startswith_or_endswith(b, suffix, start, end, yp_FIND_REVERSE);
 }
 
 static ypObject *bytes_lower(ypObject *b) { return yp_NotImplementedError; }
@@ -9052,40 +9046,33 @@ static ypObject *_str_tailmatch(
     }
 }
 
-// FIXME Share more code between startswith and endswith?
-static ypObject *str_startswith(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
+static ypObject *_str_startswith_or_endswith(
+        ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
     // Because we are called directly (i.e. ypFunction), ensure we're called correctly
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(s) == ypStr_CODE);
 
     // FIXME Also support lists?  Python requires a tuple here...
-    if (ypObject_TYPE_CODE(prefix) == ypTuple_CODE) {
+    if (ypObject_TYPE_CODE(x) == ypTuple_CODE) {
         yp_ssize_t i;
-        for (i = 0; i < ypTuple_LEN(prefix); i++) {
-            ypObject *result =
-                    _str_tailmatch(s, ypTuple_ARRAY(prefix)[i], start, end, yp_FIND_FORWARD);
+        for (i = 0; i < ypTuple_LEN(x); i++) {
+            ypObject *result = _str_tailmatch(s, ypTuple_ARRAY(x)[i], start, end, direction);
             if (result != yp_False) return result;  // yp_True or an exception
         }
         return yp_False;
     } else {
-        return _str_tailmatch(s, prefix, start, end, yp_FIND_FORWARD);
+        return _str_tailmatch(s, x, start, end, direction);
     }
+}
+
+static ypObject *str_startswith(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
+{
+    return _str_startswith_or_endswith(s, prefix, start, end, yp_FIND_FORWARD);
 }
 
 static ypObject *str_endswith(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end)
 {
-    // FIXME Also support lists?  Python requires a tuple here...
-    if (ypObject_TYPE_CODE(suffix) == ypTuple_CODE) {
-        yp_ssize_t i;
-        for (i = 0; i < ypTuple_LEN(suffix); i++) {
-            ypObject *result =
-                    _str_tailmatch(s, ypTuple_ARRAY(suffix)[i], start, end, yp_FIND_REVERSE);
-            if (result != yp_False) return result;  // yp_True or an exception
-        }
-        return yp_False;
-    } else {
-        return _str_tailmatch(s, suffix, start, end, yp_FIND_REVERSE);
-    }
+    return _str_startswith_or_endswith(s, suffix, start, end, yp_FIND_REVERSE);
 }
 
 static ypObject *str_lower(ypObject *s) { return yp_NotImplementedError; }
