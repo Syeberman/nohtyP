@@ -1276,29 +1276,29 @@ class ypObject(c_ypObject_p):
 
     def pop(self): return _yp_pop(self)
 
-    def _sliceSearch(self, func2, func4, x, i, j):
+    def _sliceSearch(self, func2, func4, x, i, j, *extra):
         if i is None and j is None:
-            return yp_int(func2(self, x, yp_None))
+            return func2(self, x, *extra)
         if i is None:
             i = 0
         if j is None:
             j = _yp_SLICE_USELEN
-        return yp_int(func4(self, x, i, j, yp_None))
+        return func4(self, x, i, j, *extra)
 
     def find(self, x, i=None, j=None):
-        return self._sliceSearch(_yp_findC, _yp_findC4, x, i, j)
+        return yp_int(self._sliceSearch(_yp_findC, _yp_findC4, x, i, j, yp_None))
 
     def index(self, x, i=None, j=None):
-        return self._sliceSearch(_yp_indexC, _yp_indexC4, x, i, j)
+        return yp_int(self._sliceSearch(_yp_indexC, _yp_indexC4, x, i, j, yp_None))
 
     def rfind(self, x, i=None, j=None):
-        return self._sliceSearch(_yp_rfindC, _yp_rfindC4, x, i, j)
+        return yp_int(self._sliceSearch(_yp_rfindC, _yp_rfindC4, x, i, j, yp_None))
 
     def rindex(self, x, i=None, j=None):
-        return self._sliceSearch(_yp_rindexC, _yp_rindexC4, x, i, j)
+        return yp_int(self._sliceSearch(_yp_rindexC, _yp_rindexC4, x, i, j, yp_None))
 
     def count(self, x, i=None, j=None):
-        return self._sliceSearch(_yp_countC, _yp_countC4, x, i, j)
+        return yp_int(self._sliceSearch(_yp_countC, _yp_countC4, x, i, j, yp_None))
 
     def append(self, x): _yp_append(self, x)
 

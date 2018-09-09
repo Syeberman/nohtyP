@@ -411,7 +411,6 @@ class BaseBytesTest:
         self.assertEqual(b.count(i, 1, 3), 1)
         self.assertEqual(b.count(p, 7, 9), 1)
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_startswith(self):
         b = self.type2test(b'hello')
         self.assertFalse(self.type2test().startswith(b"anything"))
@@ -422,14 +421,15 @@ class BaseBytesTest:
         self.assertFalse(b.startswith(b"ha"))
         with self.assertRaises(TypeError) as cm:
             b.startswith([b'h'])
-        exc = str(cm.exception)
-        self.assertIn('bytes', exc)
-        self.assertIn('tuple', exc)
+        # Not applicable to nohtyP (no exception strings)
+        # exc = str(cm.exception)
+        # self.assertIn('bytes', exc)
+        # self.assertIn('tuple', exc)
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_endswith(self):
         b = self.type2test(b'hello')
-        self.assertFalse(yp_bytearray().endswith(b"anything"))
+        # TODO Python's test suite uses bytearray here, not type2test: fix Python
+        self.assertFalse(self.type2test().endswith(b"anything"))
         self.assertTrue(b.endswith(b"hello"))
         self.assertTrue(b.endswith(b"llo"))
         self.assertTrue(b.endswith(b"o"))
@@ -437,9 +437,10 @@ class BaseBytesTest:
         self.assertFalse(b.endswith(b"no"))
         with self.assertRaises(TypeError) as cm:
             b.endswith([b'o'])
-        exc = str(cm.exception)
-        self.assertIn('bytes', exc)
-        self.assertIn('tuple', exc)
+        # Not applicable to nohtyP (no exception strings)
+        # exc = str(cm.exception)
+        # self.assertIn('bytes', exc)
+        # self.assertIn('tuple', exc)
 
     def test_find(self):
         b = self.type2test(b'mississippi')
@@ -769,6 +770,14 @@ class BaseBytesTest:
         self.assertEqual(1, b.count(l, -2, None))
         self.assertEqual(1, b.count(l, None, -2))
         self.assertEqual(0, b.count(x, None, None))
+
+    def test_none_arguments_startswith_endswith(self):
+        # issue 11828
+        b = self.type2test(b'hello')
+        l = self.type2test(b'l')
+        h = self.type2test(b'h')
+        x = self.type2test(b'x')
+        o = self.type2test(b'o')
 
         self.assertEqual(True, b.endswith(o, None))
         self.assertEqual(True, b.endswith(o, -2, None))
