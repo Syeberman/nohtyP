@@ -117,13 +117,16 @@ class BaseTest:
         self.checkequal(0, 'aaa', 'count', 'a', 0, -10)
         self.checkequal(3, 'aaa', 'count', '', 1)
         self.checkequal(1, 'aaa', 'count', '', 3)
-        self.checkequal(0, 'aaa', 'count', '', 10)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(1, 'aaa', 'count', '', 10)
         self.checkequal(2, 'aaa', 'count', '', -1)
         self.checkequal(4, 'aaa', 'count', '', -10)
 
         self.checkequal(1, '', 'count', '')
-        self.checkequal(0, '', 'count', '', 1, 1)
-        self.checkequal(0, '', 'count', '', sys.maxsize, 0)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(1, '', 'count', '', 1, 1)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(1, '', 'count', '', sys.maxsize, 0)
 
         self.checkequal(0, '', 'count', 'xx')
         self.checkequal(0, '', 'count', 'xx', 1, 1)
@@ -200,7 +203,7 @@ class BaseTest:
         # issue 7458
         # XXX Not applicable to nohtyP: ints don't go up that high
         #self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
-   
+
     @support.requires_resource('cpu')
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_find_combinations(self):
@@ -1014,102 +1017,99 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'abc', 'splitlines', 42, 42)
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_startswith(self):
-        self.checkequal(True, 'hello', 'startswith', 'he')
-        self.checkequal(True, 'hello', 'startswith', 'hello')
-        self.checkequal(False, 'hello', 'startswith', 'hello world')
-        self.checkequal(True, 'hello', 'startswith', '')
-        self.checkequal(False, 'hello', 'startswith', 'ello')
-        self.checkequal(True, 'hello', 'startswith', 'ello', 1)
-        self.checkequal(True, 'hello', 'startswith', 'o', 4)
-        self.checkequal(False, 'hello', 'startswith', 'o', 5)
-        self.checkequal(True, 'hello', 'startswith', '', 5)
-        self.checkequal(False, 'hello', 'startswith', 'lo', 6)
-        self.checkequal(True, 'helloworld', 'startswith', 'lowo', 3)
-        self.checkequal(True, 'helloworld', 'startswith', 'lowo', 3, 7)
-        self.checkequal(False, 'helloworld', 'startswith', 'lowo', 3, 6)
+        self.checkequal(True, yp_str('hello'), 'startswith', 'he')
+        self.checkequal(True, yp_str('hello'), 'startswith', 'hello')
+        self.checkequal(False, yp_str('hello'), 'startswith', 'hello world')
+        self.checkequal(True, yp_str('hello'), 'startswith', '')
+        self.checkequal(False, yp_str('hello'), 'startswith', 'ello')
+        self.checkequal(True, yp_str('hello'), 'startswith', 'ello', 1)
+        self.checkequal(True, yp_str('hello'), 'startswith', 'o', 4)
+        self.checkequal(False, yp_str('hello'), 'startswith', 'o', 5)
+        self.checkequal(True, yp_str('hello'), 'startswith', '', 5)
+        self.checkequal(False, yp_str('hello'), 'startswith', 'lo', 6)
+        self.checkequal(True, yp_str('helloworld'), 'startswith', 'lowo', 3)
+        self.checkequal(True, yp_str('helloworld'), 'startswith', 'lowo', 3, 7)
+        self.checkequal(False, yp_str('helloworld'), 'startswith', 'lowo', 3, 6)
 
         # test negative indices
-        self.checkequal(True, 'hello', 'startswith', 'he', 0, -1)
-        self.checkequal(True, 'hello', 'startswith', 'he', -53, -1)
-        self.checkequal(False, 'hello', 'startswith', 'hello', 0, -1)
-        self.checkequal(False, 'hello', 'startswith', 'hello world', -1, -10)
-        self.checkequal(False, 'hello', 'startswith', 'ello', -5)
-        self.checkequal(True, 'hello', 'startswith', 'ello', -4)
-        self.checkequal(False, 'hello', 'startswith', 'o', -2)
-        self.checkequal(True, 'hello', 'startswith', 'o', -1)
-        self.checkequal(True, 'hello', 'startswith', '', -3, -3)
-        self.checkequal(False, 'hello', 'startswith', 'lo', -9)
+        self.checkequal(True, yp_str('hello'), 'startswith', 'he', 0, -1)
+        self.checkequal(True, yp_str('hello'), 'startswith', 'he', -53, -1)
+        self.checkequal(False, yp_str('hello'), 'startswith', 'hello', 0, -1)
+        self.checkequal(False, yp_str('hello'), 'startswith', 'hello world', -1, -10)
+        self.checkequal(False, yp_str('hello'), 'startswith', 'ello', -5)
+        self.checkequal(True, yp_str('hello'), 'startswith', 'ello', -4)
+        self.checkequal(False, yp_str('hello'), 'startswith', 'o', -2)
+        self.checkequal(True, yp_str('hello'), 'startswith', 'o', -1)
+        self.checkequal(True, yp_str('hello'), 'startswith', '', -3, -3)
+        self.checkequal(False, yp_str('hello'), 'startswith', 'lo', -9)
 
-        self.checkraises(TypeError, 'hello', 'startswith')
-        self.checkraises(TypeError, 'hello', 'startswith', 42)
+        self.checkraises(TypeError, yp_str('hello'), 'startswith')
+        self.checkraises(TypeError, yp_str('hello'), 'startswith', 42)
 
         # test tuple arguments
-        self.checkequal(True, 'hello', 'startswith', ('he', 'ha'))
-        self.checkequal(False, 'hello', 'startswith', ('lo', 'llo'))
-        self.checkequal(True, 'hello', 'startswith', ('hellox', 'hello'))
-        self.checkequal(False, 'hello', 'startswith', ())
-        self.checkequal(True, 'helloworld', 'startswith', ('hellowo',
+        self.checkequal(True, yp_str('hello'), 'startswith', ('he', 'ha'))
+        self.checkequal(False, yp_str('hello'), 'startswith', ('lo', 'llo'))
+        self.checkequal(True, yp_str('hello'), 'startswith', ('hellox', 'hello'))
+        self.checkequal(False, yp_str('hello'), 'startswith', ())
+        self.checkequal(True, yp_str('helloworld'), 'startswith', ('hellowo',
                                                            'rld', 'lowo'), 3)
-        self.checkequal(False, 'helloworld', 'startswith', ('hellowo', 'ello',
+        self.checkequal(False, yp_str('helloworld'), 'startswith', ('hellowo', 'ello',
                                                             'rld'), 3)
-        self.checkequal(True, 'hello', 'startswith', ('lo', 'he'), 0, -1)
-        self.checkequal(False, 'hello', 'startswith', ('he', 'hel'), 0, 1)
-        self.checkequal(True, 'hello', 'startswith', ('he', 'hel'), 0, 2)
+        self.checkequal(True, yp_str('hello'), 'startswith', ('lo', 'he'), 0, -1)
+        self.checkequal(False, yp_str('hello'), 'startswith', ('he', 'hel'), 0, 1)
+        self.checkequal(True, yp_str('hello'), 'startswith', ('he', 'hel'), 0, 2)
 
-        self.checkraises(TypeError, 'hello', 'startswith', (42,))
+        self.checkraises(TypeError, yp_str('hello'), 'startswith', (42,))
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_endswith(self):
-        self.checkequal(True, 'hello', 'endswith', 'lo')
-        self.checkequal(False, 'hello', 'endswith', 'he')
-        self.checkequal(True, 'hello', 'endswith', '')
-        self.checkequal(False, 'hello', 'endswith', 'hello world')
-        self.checkequal(False, 'helloworld', 'endswith', 'worl')
-        self.checkequal(True, 'helloworld', 'endswith', 'worl', 3, 9)
-        self.checkequal(True, 'helloworld', 'endswith', 'world', 3, 12)
-        self.checkequal(True, 'helloworld', 'endswith', 'lowo', 1, 7)
-        self.checkequal(True, 'helloworld', 'endswith', 'lowo', 2, 7)
-        self.checkequal(True, 'helloworld', 'endswith', 'lowo', 3, 7)
-        self.checkequal(False, 'helloworld', 'endswith', 'lowo', 4, 7)
-        self.checkequal(False, 'helloworld', 'endswith', 'lowo', 3, 8)
-        self.checkequal(False, 'ab', 'endswith', 'ab', 0, 1)
-        self.checkequal(False, 'ab', 'endswith', 'ab', 0, 0)
+        self.checkequal(True, yp_str('hello'), 'endswith', 'lo')
+        self.checkequal(False, yp_str('hello'), 'endswith', 'he')
+        self.checkequal(True, yp_str('hello'), 'endswith', '')
+        self.checkequal(False, yp_str('hello'), 'endswith', 'hello world')
+        self.checkequal(False, yp_str('helloworld'), 'endswith', 'worl')
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'worl', 3, 9)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'world', 3, 12)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', 1, 7)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', 2, 7)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', 3, 7)
+        self.checkequal(False, yp_str('helloworld'), 'endswith', 'lowo', 4, 7)
+        self.checkequal(False, yp_str('helloworld'), 'endswith', 'lowo', 3, 8)
+        self.checkequal(False, yp_str('ab'), 'endswith', 'ab', 0, 1)
+        self.checkequal(False, yp_str('ab'), 'endswith', 'ab', 0, 0)
 
         # test negative indices
-        self.checkequal(True, 'hello', 'endswith', 'lo', -2)
-        self.checkequal(False, 'hello', 'endswith', 'he', -2)
-        self.checkequal(True, 'hello', 'endswith', '', -3, -3)
-        self.checkequal(False, 'hello', 'endswith', 'hello world', -10, -2)
-        self.checkequal(False, 'helloworld', 'endswith', 'worl', -6)
-        self.checkequal(True, 'helloworld', 'endswith', 'worl', -5, -1)
-        self.checkequal(True, 'helloworld', 'endswith', 'worl', -5, 9)
-        self.checkequal(True, 'helloworld', 'endswith', 'world', -7, 12)
-        self.checkequal(True, 'helloworld', 'endswith', 'lowo', -99, -3)
-        self.checkequal(True, 'helloworld', 'endswith', 'lowo', -8, -3)
-        self.checkequal(True, 'helloworld', 'endswith', 'lowo', -7, -3)
-        self.checkequal(False, 'helloworld', 'endswith', 'lowo', 3, -4)
-        self.checkequal(False, 'helloworld', 'endswith', 'lowo', -8, -2)
+        self.checkequal(True, yp_str('hello'), 'endswith', 'lo', -2)
+        self.checkequal(False, yp_str('hello'), 'endswith', 'he', -2)
+        self.checkequal(True, yp_str('hello'), 'endswith', '', -3, -3)
+        self.checkequal(False, yp_str('hello'), 'endswith', 'hello world', -10, -2)
+        self.checkequal(False, yp_str('helloworld'), 'endswith', 'worl', -6)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'worl', -5, -1)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'worl', -5, 9)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'world', -7, 12)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', -99, -3)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', -8, -3)
+        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', -7, -3)
+        self.checkequal(False, yp_str('helloworld'), 'endswith', 'lowo', 3, -4)
+        self.checkequal(False, yp_str('helloworld'), 'endswith', 'lowo', -8, -2)
 
-        self.checkraises(TypeError, 'hello', 'endswith')
-        self.checkraises(TypeError, 'hello', 'endswith', 42)
+        self.checkraises(TypeError, yp_str('hello'), 'endswith')
+        self.checkraises(TypeError, yp_str('hello'), 'endswith', 42)
 
         # test tuple arguments
-        self.checkequal(False, 'hello', 'endswith', ('he', 'ha'))
-        self.checkequal(True, 'hello', 'endswith', ('lo', 'llo'))
-        self.checkequal(True, 'hello', 'endswith', ('hellox', 'hello'))
-        self.checkequal(False, 'hello', 'endswith', ())
-        self.checkequal(True, 'helloworld', 'endswith', ('hellowo',
+        self.checkequal(False, yp_str('hello'), 'endswith', ('he', 'ha'))
+        self.checkequal(True, yp_str('hello'), 'endswith', ('lo', 'llo'))
+        self.checkequal(True, yp_str('hello'), 'endswith', ('hellox', 'hello'))
+        self.checkequal(False, yp_str('hello'), 'endswith', ())
+        self.checkequal(True, yp_str('helloworld'), 'endswith', ('hellowo',
                                                            'rld', 'lowo'), 3)
-        self.checkequal(False, 'helloworld', 'endswith', ('hellowo', 'ello',
+        self.checkequal(False, yp_str('helloworld'), 'endswith', ('hellowo', 'ello',
                                                             'rld'), 3, -1)
-        self.checkequal(True, 'hello', 'endswith', ('hell', 'ell'), 0, -1)
-        self.checkequal(False, 'hello', 'endswith', ('he', 'hel'), 0, 1)
-        self.checkequal(True, 'hello', 'endswith', ('he', 'hell'), 0, 4)
+        self.checkequal(True, yp_str('hello'), 'endswith', ('hell', 'ell'), 0, -1)
+        self.checkequal(False, yp_str('hello'), 'endswith', ('he', 'hel'), 0, 1)
+        self.checkequal(True, yp_str('hello'), 'endswith', ('he', 'hell'), 0, 4)
 
-        self.checkraises(TypeError, 'hello', 'endswith', (42,))
+        self.checkraises(TypeError, yp_str('hello'), 'endswith', (42,))
 
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test___contains__(self):
@@ -1345,7 +1345,7 @@ class MixinStrUnicodeUserStringTest:
     @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_none_arguments(self):
         # issue 11828
-        s = 'hello'
+        s = yp_str('hello')
         self.checkequal(2, s, 'find', 'l', None)
         self.checkequal(3, s, 'find', 'l', -2, None)
         self.checkequal(2, s, 'find', 'l', None, -2)
@@ -1371,6 +1371,9 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(1, s, 'count', 'l', None, -2)
         self.checkequal(0, s, 'count', 'x', None, None)
 
+    def test_none_arguments_startswith_endswith(self):
+        # issue 11828
+        s = yp_str('hello')
         self.checkequal(True, s, 'endswith', 'o', None)
         self.checkequal(True, s, 'endswith', 'lo', -2, None)
         self.checkequal(True, s, 'endswith', 'l', None, -2)

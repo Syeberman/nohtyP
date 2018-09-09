@@ -549,6 +549,10 @@ static ypObject *NotImplemented_comparefunc(ypObject *x, ypObject *y)
 // For use when an object contains no references to other objects
 static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo) { return yp_None; }
 
+// list/tuple internals that are shared among other types
+#define ypTuple_ARRAY(sq) ((ypObject **)((ypObject *)sq)->ob_data)
+#define ypTuple_LEN ypObject_CACHED_LEN
+
 #pragma endregion fundamentals
 
 
@@ -7912,6 +7916,7 @@ static ypObject *bytes_frozen_deepcopy(ypObject *b, visitfunc copy_visitor, void
 
 static ypObject *bytes_bool(ypObject *b) { return ypBool_FROM_C(ypBytes_LEN(b)); }
 
+// FIXME Replace with the faster find implementation from Python.
 static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *i)
 {
@@ -7926,17 +7931,9 @@ static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize
     result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
     if (yp_isexceptionC(result)) return result;
 
-    // XXX start and stop are _almost_ like slice notation, except in the case of len(x)==0
-    // and (unadjusted) start>len(b).  While we're at it, we can short-cut a b_rlen==0 case.
-    if (start >= ypBytes_LEN(b)) {
-        if (x_len < 1) {
-            *i = (start == ypBytes_LEN(b) ? ypBytes_LEN(b) : -1);
-        } else {
-            *i = -1;
-        }
-        return yp_None;
-    }
-
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
+    // https://bugs.python.org/issue24243.
     result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &b_rlen);
     if (yp_isexceptionC(result)) return result;
     if (direction == yp_FIND_FORWARD) {
@@ -8241,22 +8238,13 @@ static ypObject *bytes_count(
     result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
     if (yp_isexceptionC(result)) return result;
 
-    // XXX start and stop are _almost_ like slice notation, except in the case of len(x)==0
-    // and (unadjusted) start>len(b).  While we're at it, we can short-cut a b_rlen==0 case.
-    if (start >= ypBytes_LEN(b)) {
-        if (x_len < 1) {
-            *n = (start == ypBytes_LEN(b) ? 1 : 0);
-        } else {
-            *n = 0;
-        }
-        return yp_None;
-    }
-
-    // Adjust the indices, then check for the empty array case: it "matches" every byte position,
-    // including the end of the slice, unless the unadjusted start value is larger than len(b)
-    // (which is handled above)
+    // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
+    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings.  See
+    // https://bugs.python.org/issue24243.
     result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &b_rlen);
     if (yp_isexceptionC(result)) return result;
+
+    // The empty string "matches" every byte position, including the end of the slice
     if (x_len < 1) {
         *n = b_rlen + 1;
         return yp_None;
@@ -8298,14 +8286,60 @@ static ypObject *bytes_isspace(ypObject *b) { return yp_NotImplementedError; }
 
 static ypObject *bytes_isupper(ypObject *b) { return yp_NotImplementedError; }
 
+static ypObject *_bytes_tailmatch(
+        ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
+{
+    yp_ssize_t step = 1;
+    yp_ssize_t slice_len;
+    ypObject * result;
+    yp_ssize_t cmp_start;
+    int        memcmp_result;
+
+    if (ypObject_TYPE_PAIR_CODE(x) != ypBytes_CODE) return yp_TypeError;
+
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
+    // https://bugs.python.org/issue24243.
+    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &end, &step, &slice_len);
+    if (yp_isexceptionC(result)) return result;
+
+    // If the prefix is longer than the slice, the slice can't possibly start with it
+    if (ypBytes_LEN(x) > slice_len) return yp_False;
+
+    if (direction == yp_FIND_REVERSE) {
+        cmp_start = end - ypBytes_LEN(x);  // endswith
+    } else {
+        cmp_start = start;  // startswith
+    }
+
+    memcmp_result = memcmp(ypBytes_DATA(b) + cmp_start, ypBytes_DATA(x), ypBytes_LEN(x));
+    return ypBool_FROM_C(memcmp_result == 0);
+}
+
+static ypObject *_bytes_startswith_or_endswith(
+        ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
+{
+    // FIXME Also support lists?  Python requires a tuple here...
+    if (ypObject_TYPE_CODE(x) == ypTuple_CODE) {
+        yp_ssize_t i;
+        for (i = 0; i < ypTuple_LEN(x); i++) {
+            ypObject *result = _bytes_tailmatch(b, ypTuple_ARRAY(x)[i], start, end, direction);
+            if (result != yp_False) return result;  // yp_True or an exception
+        }
+        return yp_False;
+    } else {
+        return _bytes_tailmatch(b, x, start, end, direction);
+    }
+}
+
 static ypObject *bytes_startswith(ypObject *b, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
 {
-    return yp_NotImplementedError;
+    return _bytes_startswith_or_endswith(b, prefix, start, end, yp_FIND_FORWARD);
 }
 
 static ypObject *bytes_endswith(ypObject *b, ypObject *suffix, yp_ssize_t start, yp_ssize_t end)
 {
-    return yp_NotImplementedError;
+    return _bytes_startswith_or_endswith(b, suffix, start, end, yp_FIND_REVERSE);
 }
 
 static ypObject *bytes_lower(ypObject *b) { return yp_NotImplementedError; }
@@ -9028,6 +9062,24 @@ static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
     return yp_chrC(ypStringLib_ENC(s)->getindexX(ypStr_DATA(s), i));
 }
 
+static ypObject *str_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+        findfunc_direction direction, yp_ssize_t *i)
+{
+    // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
+    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings.  See
+    // https://bugs.python.org/issue24243.
+    return yp_NotImplementedError;
+}
+
+static ypObject *str_count(
+        ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *n)
+{
+    // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
+    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings.  See
+    // https://bugs.python.org/issue24243.
+    return yp_NotImplementedError;
+}
+
 static ypObject *str_len(ypObject *s, yp_ssize_t *len)
 {
     *len = ypStr_LEN(s);
@@ -9054,17 +9106,76 @@ static ypObject *str_isspace(ypObject *s) { return yp_NotImplementedError; }
 
 static ypObject *str_isupper(ypObject *s) { return yp_NotImplementedError; }
 
-static ypObject *str_startswith(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
+static ypObject *_str_tailmatch(
+        ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
+{
+    yp_ssize_t step = 1;
+    yp_ssize_t slice_len;
+    ypObject * result;
+    yp_ssize_t cmp_start;
+
+    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_TypeError;
+
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
+    // https://bugs.python.org/issue24243.
+    result = ypSlice_AdjustIndicesC(ypStr_LEN(s), &start, &end, &step, &slice_len);
+    if (yp_isexceptionC(result)) return result;
+
+    // If the prefix is longer than the slice, the slice can't possibly start with it
+    if (ypStr_LEN(x) > slice_len) return yp_False;
+
+    if (direction == yp_FIND_REVERSE) {
+        cmp_start = end - ypStr_LEN(x);  // endswith
+    } else {
+        cmp_start = start;  // startswith
+    }
+
+    if (ypStringLib_ENC_CODE(s) == ypStringLib_ENC_CODE(x)) {
+        yp_ssize_t sizeshift = ypStringLib_ENC(x)->sizeshift;
+
+        int memcmp_result = memcmp(((yp_uint8_t *)ypStr_DATA(s)) + (cmp_start << sizeshift),
+                ypStr_DATA(x), ypStr_LEN(x) << sizeshift);
+        return ypBool_FROM_C(memcmp_result == 0);
+    } else {
+        ypStringLib_getindexXfunc s_getindexX = ypStringLib_ENC(s)->getindexX;
+        ypStringLib_getindexXfunc x_getindexX = ypStringLib_ENC(x)->getindexX;
+
+        yp_ssize_t i;
+        for (i = 0; i < ypStr_LEN(x); i++) {
+            if (s_getindexX(s, cmp_start + i) != x_getindexX(x, i)) return yp_False;
+        }
+        return yp_True;
+    }
+}
+
+static ypObject *_str_startswith_or_endswith(
+        ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
     // Because we are called directly (i.e. ypFunction), ensure we're called correctly
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(s) == ypStr_CODE);
 
-    return yp_NotImplementedError;
+    // FIXME Also support lists?  Python requires a tuple here...
+    if (ypObject_TYPE_CODE(x) == ypTuple_CODE) {
+        yp_ssize_t i;
+        for (i = 0; i < ypTuple_LEN(x); i++) {
+            ypObject *result = _str_tailmatch(s, ypTuple_ARRAY(x)[i], start, end, direction);
+            if (result != yp_False) return result;  // yp_True or an exception
+        }
+        return yp_False;
+    } else {
+        return _str_tailmatch(s, x, start, end, direction);
+    }
+}
+
+static ypObject *str_startswith(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end)
+{
+    return _str_startswith_or_endswith(s, prefix, start, end, yp_FIND_FORWARD);
 }
 
 static ypObject *str_endswith(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end)
 {
-    return yp_NotImplementedError;
+    return _str_startswith_or_endswith(s, suffix, start, end, yp_FIND_REVERSE);
 }
 
 static ypObject *str_lower(ypObject *s) { return yp_NotImplementedError; }
@@ -9227,8 +9338,8 @@ static ypSequenceMethods ypStr_as_sequence = {
         str_repeat,                   // tp_repeat
         str_getindex,                 // tp_getindex
         MethodError_objsliceproc,     // tp_getslice
-        MethodError_findfunc,         // tp_find
-        MethodError_countfunc,        // tp_count
+        str_find,                     // tp_find
+        str_count,                    // tp_count
         MethodError_objssizeobjproc,  // tp_setindex
         MethodError_objsliceobjproc,  // tp_setslice
         MethodError_objssizeproc,     // tp_delindex
@@ -9857,9 +9968,9 @@ typedef struct {
     ypObject_HEAD;
     yp_INLINE_DATA(ypObject *);
 } ypTupleObject;
-#define ypTuple_ARRAY(sq) ((ypObject **)((ypObject *)sq)->ob_data)
+// ypTuple_ARRAY is defined above
 #define ypTuple_SET_ARRAY(sq, array) (((ypObject *)sq)->ob_data = array)
-#define ypTuple_LEN ypObject_CACHED_LEN
+// ypTuple_LEN is defined above
 #define ypTuple_SET_LEN ypObject_SET_CACHED_LEN
 #define ypTuple_ALLOCLEN ypObject_ALLOCLEN
 #define ypTuple_SET_ALLOCLEN ypObject_SET_ALLOCLEN

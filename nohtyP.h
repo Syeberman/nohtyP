@@ -283,7 +283,7 @@ ypAPI ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *er
 //  - integer: the array will have that size and be initialized with null bytes
 //  - iterable: it must be an iterable of integers in range(256) used to initialize the array (this
 //  includes bytes and bytearray objects)
-// Use yp_bytes3 if source is a string.  nohtyP does not currently support a "buffer interface".
+// Raises yp_TypeError if source is a str/chrarray; instead, use yp_bytes3/yp_bytearray3.
 ypAPI ypObject *yp_bytes(ypObject *source);
 ypAPI ypObject *yp_bytearray(ypObject *source);
 
@@ -909,15 +909,22 @@ ypAPI void yp_updateNV(ypObject **mapping, int n, va_list args);
 
 
 /*
- * Bytes & String Operations
+ * String Operations
  */
 
+// These methods are supported by bytes and str (and their mutable counterparts, of course).
 // Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return ints
-// for these types, and will only accept ints for yp_setindexC.  The individual elements of strs
-// and chrarrays are single-character strs.
+// for these types, and will only accept ints for yp_setindexC.  The individual elements of strs and
+// chrarrays are single-character strs.  Using bytes/bytearray arguments on a str/chrarray method,
+// or str/chrarray arguments on a bytes/bytearray method, raises yp_TypeError (unless otherwise
+// documented).
 
 // Slicing an object always returns an object of the same type, so yp_getsliceC4 on a bytearray
 // will return a bytearray, while a slice of a str is another str, and so forth.
+
+// Unlike Python, the arguments start/end (yp_startswithC4 et al) and i/j (yp_findC4 et al) are
+// always treated as in slice notation.  Python behaves peculiarly when end<start in certain edge
+// cases involving empty strings (compare "foo"[5:0].startswith("") to "foo".startswith("", 5, 0)).
 
 // Immortal strs representing common encodings, for convience with yp_str_frombytesC4 et al.
 ypAPI ypObject *const yp_s_ascii;     // "ascii"
@@ -993,8 +1000,9 @@ ypAPI ypObject *yp_isspace(ypObject *s);
 ypAPI ypObject *yp_isupper(ypObject *s);
 
 // Returns the immortal yp_True if s[start:end] starts with the specified prefix, otherwise
-// yp_False.  prefix can also be a tuple of prefixes for which to look.  yp_startswithC considers
-// the entire string (as if start is 0 and end is yp_SLICE_USELEN).
+// yp_False.  prefix can also be a tuple of prefix strings for which to look.  If a prefix string
+// is empty, returns yp_True.  yp_startswithC considers the entire string (as if start is 0 and end
+// is yp_SLICE_USELEN).
 ypAPI ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
 ypAPI ypObject *yp_startswithC(ypObject *s, ypObject *prefix);
 
@@ -1062,8 +1070,7 @@ ypAPI ypObject *yp_strip2(ypObject *s, ypObject *chars);
 ypAPI ypObject *yp_strip(ypObject *s);
 
 // Returns a new reference to the concatenation of the strings in iterable, using s as the
-// separator between elements.  Raises yp_TypeError if there are any non-string values, including
-// bytes objects.
+// separator between elements.  Raises yp_TypeError if there are any non-string values.
 ypAPI ypObject *yp_join(ypObject *s, ypObject *iterable);
 
 // Equivalent to yp_join(s, yp_tupleN(n, ...)).
@@ -1118,7 +1125,7 @@ ypAPI ypObject *yp_decode(ypObject *b);
 
 
 /*
- * Bytes & String Formatting Operations
+ * String Formatting Operations
  */
 
 // The syntax of format strings can be found in Python's documentation:
@@ -1533,7 +1540,7 @@ ypAPI void yp_miniiter_items_next(
 // when dealing with containers.  Keep in mind, though, that many of these functions create
 // short-lived objects internally, so excessive use may impact execution time.
 
-// For functions that deal with strings, if encoding is missing yp_s_utf_8 (which is compatible
+// For functions that deal with strs, if encoding is missing yp_s_utf_8 (which is compatible
 // with ascii) is assumed, while if errors is missing yp_s_strict is assumed.  yp_*_containsC
 // returns false and sets *exc on exception.
 
@@ -1544,7 +1551,7 @@ ypAPI yp_int_t yp_o2i_popC(ypObject **container, ypObject **exc);
 ypAPI yp_int_t yp_o2i_getitemC(ypObject *container, ypObject *key, ypObject **exc);
 ypAPI void yp_o2i_setitemC(ypObject **container, ypObject *key, yp_int_t x);
 
-// Operations on containers that map objects to strings
+// Operations on containers that map objects to strs
 // yp_o2s_getitemCX is documented below, and must be used carefully!
 ypAPI void yp_o2s_setitemC4(
         ypObject **container, ypObject *key, const yp_uint8_t *x, yp_ssize_t x_len);
@@ -1558,12 +1565,12 @@ ypAPI void yp_i2o_setitemC(ypObject **container, yp_int_t key, ypObject *x);
 ypAPI yp_int_t yp_i2i_getitemC(ypObject *container, yp_int_t key, ypObject **exc);
 ypAPI void yp_i2i_setitemC(ypObject **container, yp_int_t key, yp_int_t x);
 
-// Operations on containers that map integers to strings
+// Operations on containers that map integers to strs
 // yp_i2s_getitemCX is documented below, and must be used carefully!
 ypAPI void yp_i2s_setitemC4(
         ypObject **container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len);
 
-// Operations on containers that map strings to objects.  Note that if the value of the string is
+// Operations on containers that map strs to objects.  Note that if the value of the str is
 // known at compile-time, as in:
 //      value = yp_s2o_getitemC3(o, "mykey", -1);
 // it is more-efficient to use yp_IMMORTAL_STR_LATIN_1 (also compatible with ascii), as in:
@@ -1573,7 +1580,7 @@ ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *key, yp_
 ypAPI void yp_s2o_setitemC4(
         ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject *x);
 
-// Operations on containers that map strings to integers
+// Operations on containers that map strs to integers
 ypAPI yp_int_t yp_s2i_getitemC3(
         ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject **exc);
 ypAPI void yp_s2i_setitemC4(
@@ -1765,13 +1772,13 @@ ypAPI ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
 //  yp_asencodedCX(yp_getitem(container, key), encoded, size, encoding)
 // For all other types, this raises yp_TypeError, and sets the outputs accordingly.  *encoded
-// will point into internal object memory which MUST NOT be modified; furthermore, the string
+// will point into internal object memory which MUST NOT be modified; furthermore, the str
 // itself must neither be modified nor removed from the container while using the array.
 ypAPI ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t **encoded,
         yp_ssize_t *size, ypObject **encoding);
 
 // Similar to yp_o2s_getitemCX, except key is a yp_int_t.  *encoded will point into internal object
-// memory which MUST NOT be modified; furthermore, the string itself must neither be modified nor
+// memory which MUST NOT be modified; furthermore, the str itself must neither be modified nor
 // removed from the container while using the array.
 ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uint8_t **encoded,
         yp_ssize_t *size, ypObject **encoding);
