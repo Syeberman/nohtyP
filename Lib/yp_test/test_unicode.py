@@ -1287,14 +1287,15 @@ class UnicodeTest(string_tests.CommonTest,
         with self.assertRaises(ValueError):
             result = format_string % 2.34
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
     def test_startswith_endswith_errors(self):
         for meth in ('foo'.startswith, 'foo'.endswith):
             with self.assertRaises(TypeError) as cm:
                 meth(['f'])
-            exc = yp_str(cm.exception)
-            self.assertIn('str', exc)
-            self.assertIn('tuple', exc)
+
+            # Not applicable to nohtyP (no exception strings)
+            # exc = yp_str(cm.exception)
+            # self.assertIn('str', exc)
+            # self.assertIn('tuple', exc)
 
     @support.run_with_locale('LC_ALL', 'de_DE', 'fr_FR')
     @yp_unittest.skip("TODO Implement formatting in nohtyP")
