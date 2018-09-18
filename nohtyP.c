@@ -104,20 +104,19 @@
 #define _yp_S_(x) _yp_S(x)
 #define _yp_S__LINE__ _yp_S_(__LINE__)
 
-// FIXME Test these changes
-#define _yp_FATAL(s_file, s_line, line_of_code, ...)                                            \
-    do {                                                                                        \
-        (void)fflush(NULL);                                                                     \
-        fprintf(stderr, "%s", "\n  File " s_file ", line " s_line "\n    " #line_of_code "\n"); \
-        fprintf(stderr, "FATAL ERROR:" __VA_ARGS__);                                            \
-        fprintf(stderr, "\n");                                                                  \
-        abort();                                                                                \
+#define _yp_FATAL(s_file, s_line, line_of_code, ...)                                 \
+    do {                                                                             \
+        (void)fflush(NULL);                                                          \
+        fprintf(stderr, "%s", "Traceback (most recent call last):\n  File \"" s_file \
+                              "\", line " s_line "\n    " line_of_code "\n");        \
+        fprintf(stderr, "FATAL ERROR: " __VA_ARGS__);                                \
+        fprintf(stderr, "\n");                                                       \
+        abort();                                                                     \
     } while (0)
 #define yp_FATAL(fmt, ...) \
-    _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL(" #fmt ", " #__VA_ARGS__ ")", fmt, __VA_ARGS__)
-#define yp_FATAL1(msg) _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL1(" #msg ")", "%s", msg)
+    _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL(" #fmt ", " #__VA_ARGS__ ");", fmt, __VA_ARGS__)
+#define yp_FATAL1(msg) _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL1(" #msg ");", msg)
 
-// FIXME Test these changes
 #if yp_DEBUG_LEVEL >= 1
 #define _yp_ASSERT(expr, s_file, s_line, line_of_code, ...)                \
     do {                                                                   \
@@ -126,11 +125,11 @@
 #else
 #define _yp_ASSERT(...)
 #endif
-#define yp_ASSERT(expr, ...)                                                              \
-    _yp_ASSERT(expr, "nohtyP.c", _yp_S__LINE__, "yp_ASSERT(" #expr ", " #__VA_ARGS__ ")", \
+#define yp_ASSERT(expr, ...)                                                               \
+    _yp_ASSERT(expr, "nohtyP.c", _yp_S__LINE__, "yp_ASSERT(" #expr ", " #__VA_ARGS__ ");", \
             __VA_ARGS__)
 #define yp_ASSERT1(expr) \
-    _yp_ASSERT(expr, "nohtyP.c", _yp_S__LINE__, "yp_ASSERT1(" #expr ")", "%s", "assertion failed")
+    _yp_ASSERT(expr, "nohtyP.c", _yp_S__LINE__, "yp_ASSERT1(" #expr ");", "assertion failed")
 
 // Issues a breakpoint if the debugger is attached, on supported platforms
 // TODO Debug only, and use only at the point the error is "raised" (rename to yp_raise?)
