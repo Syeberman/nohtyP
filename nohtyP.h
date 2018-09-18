@@ -196,6 +196,41 @@ typedef yp_float64_t yp_float_t;
 // returns an exception (resulting in one last call with yp_GeneratorExit).
 typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
 
+// The signature of one or more C functions that can be wrapped up in a function object.
+// TODO Rename?  Maybe impl?  Or funcC?
+// TODO Rename other func_t to code_t or funcC_t?  i.e. Does "code" now mean a C function?
+typedef struct _yp_function_code_t {
+    // FIXME valueerror if sizeof isn't a minimum?  Should we do that in initialize as well?
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_function_code_t) on allocation
+
+    // Called by the yp_call* methods, particularly yp_callN and yp_callNV.  function is the
+    // function object; use yp_function_stateCX to retrieve any state variables.  args are the n
+    // positional arguments.  The return value must be a new or immortal reference, or an exception.
+    // If funcNV is NULL, yp_callN/yp_callNV will create a temporary tuple from the n args and use
+    // it to call func_stars.
+    // FIXME funcN or funcNV?  Or codeN or callN or just N, or...
+    // FIXME document how to parse the args
+    ypObject *(*funcNV)(ypObject *function, int n, va_list args);
+
+    // Called by the yp_call* methods, particularly yp_call_stars.  function is the function object;
+    // use yp_function_stateCX to retrieve any state variables.  args is a tuple of positional
+    // arguments, and kwargs is a frozendict of keyword arguments.  The return value must be a new
+    // or immortal reference, or an exception.  If func_stars is NULL, yp_call_stars will attempt to
+    // coerce any keyword arguments into positional arguments and call funcNV.
+    // XXX Unlike Python, kwargs is a frozendict, not a dict.
+    // FIXME stars?  Or code_stars or...
+    // FIXME can we guarantee the types of args/kwargs?
+    // FIXME document how to parse the args
+    ypObject *(*func_stars)(ypObject *function, ypObject *args, ypObject *kwargs);
+} yp_function_code_t;
+
+// Describes one parameter of a function object.
+typedef struct _yp_function_parameter_t {
+    //
+    ypObject *name;      // must be a str (i.e. FROM_LATIN1)
+    ypObject *default_;  // NULL for required argument
+} yp_function_parameter_t;
+
 
 /*
  * Constructors
@@ -1188,6 +1223,8 @@ ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 // TODO Reconsider this name.  Consider if we want only-positional or only-kw versions?
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 
+// TODO "If func_stars is null, your parameters cannot contain keyword-only or **kwargs."
+
 // TODO Should we have a yp_call?  That would probably be yp_call_stars (renamed), but then yp_call2
 // would be confusing because you'd expect it to be yp_call_stars just with one less argument.  That
 // is, you'd expect yp_call2 to take an iterable of positional arguments.  It might be best to avoid
@@ -1201,7 +1238,8 @@ ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 
 // Immortal functions representing , for convience with yp_str_frombytesC4 et al.
 
-// TODO starargs is from the grammar, but do people know it? does the "star" and "args" together imply
+// TODO starargs is from the grammar, but do people know it? does the "star" and "args" together
+// imply
 // just `*args` (read it out, it's "star args"), or would people know it's **kwargs too
 // TODO same signature as above. Does it really help to name them differently?
 // TODO What about yp_function_

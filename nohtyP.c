@@ -120,6 +120,7 @@
 #define _yp_S_(x) _yp_S(x)
 #define _yp_S__LINE__ _yp_S_(__LINE__)
 
+// FIXME Test these changes
 #define _yp_FATAL(s_file, s_line, line_of_code, ...)                                 \
     do {                                                                             \
         (void)fflush(NULL);                                                          \
@@ -133,6 +134,7 @@
     _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL(" #fmt ", " #__VA_ARGS__ ");", fmt, __VA_ARGS__)
 #define yp_FATAL1(msg) _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL1(" #msg ");", msg)
 
+// FIXME Test these changes
 #if yp_DEBUG_LEVEL >= 1
 #define _yp_ASSERT(expr, s_file, s_line, line_of_code, ...)                \
     do {                                                                   \
@@ -15617,20 +15619,15 @@ yp_STATIC_ASSERT(
         yp_offsetof(ypFunctionState, data) % yp_MAX_ALIGNMENT == 0, alignof_function_state_data);
 
 typedef struct {
-    ypObject *name;      // must be a str (i.e. FROM_LATIN1)
-    ypObject *default_;  // NULL for required argument
-} ypFunctionParam;
-
-typedef struct {
     ypObject_HEAD;
     objobjobjproc    ob_func_stars;
     objvalistproc    ob_funcN;
     ypFunctionState *ob_state;  // NULL if no extra state
-    yp_INLINE_DATA(ypFunctionParam);
+    yp_INLINE_DATA(yp_function_parameter_t);
 } ypFunctionObject;
 
 #define ypFunction_STATE(f) (((ypFunctionObject *)f)->ob_state)
-#define ypFunction_PARAMS(f) ((ypFunctionParam **)((ypObject *)f)->ob_data)
+#define ypFunction_PARAMS(f) ((yp_function_parameter_t **)((ypObject *)f)->ob_data)
 #define ypFunction_PARAMS_LEN ypObject_ALLOCLEN
 #define ypFunction_SET_PARAMS_LEN ypObject_SET_ALLOCLEN
 #define ypFunction_FUNC_STARS(f) (((ypFunctionObject *)f)->ob_func_stars)
@@ -15658,12 +15655,11 @@ static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_
     ypObject * result;
     yp_ssize_t i;
     for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
-        ypFunctionParam *param = ypFunction_PARAMS(f)[i];
+        yp_function_parameter_t *param = ypFunction_PARAMS(f)[i];
 
         // Parameter names must be strings
         if (ypObject_TYPE_CODE(param->name) != ypStr_CODE) return yp_ParameterSyntaxError;
 
-        // FIXME Implement startswith
         result = str_startswith(param->name, yp_s_star, 0, yp_SLICE_USELEN);
         if (yp_isexceptionC(result)) return result;
         if (ypBool_IS_TRUE_C(result)) break;  // either `*` or `**`, so end of positional slots
@@ -15697,13 +15693,13 @@ static ypObject *_function_traverse_params(ypObject *f, visitfunc visitor, void 
 {
     yp_ssize_t i;
     for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
-        ypFunctionParam *param = ypFunction_PARAMS(f)[i];
-        if (param->name != NULL) {
-            ypObject *result = visitor(param->name, memo);
-            if (yp_isexceptionC(result)) return result;
-        }
+        yp_function_parameter_t *param = ypFunction_PARAMS(f)[i];
+
+        ypObject *result = visitor(param->name, memo);
+        if (yp_isexceptionC(result)) return result;
+
         if (param->default_ != NULL) {
-            ypObject *result = visitor(param->default_, memo);
+            result = visitor(param->default_, memo);
             if (yp_isexceptionC(result)) return result;
         }
     }
@@ -15757,10 +15753,11 @@ static ypObject *_function_call_stars_to_callN_kwargs(
         return result;
     }
 
-    // If there are more arguments than there are positional slots, it means we have unknown keyword
-    // arguments or duplicated arguments between positional and keyword.  Both of these cases raise
-    // TypeError in Python.  (It's also possible that a keyword-only parameter was specified, but
-    // recall that functions with only callN shouldn't have kw-only parameters.)
+    // If there are more arguments than there are positional slots, it means we have too many
+    // positional arguments, unknown keyword arguments, or duplicated arguments between positional
+    // and keyword.  All of these cases raise TypeError in Python.  (It's also possible that a
+    // keyword-only parameter was specified, but recall that functions with only callN shouldn't
+    // have kw-only parameters.)
     // FIXME Verify at creation that callN-only functions don't have kw-only parameters.
     if (ypTuple_LEN(args) + ypDict_LEN(kwargs) > positional_slots) {
         *n = 0;
@@ -15780,8 +15777,8 @@ static ypObject *_function_call_stars_to_callN_kwargs(
     // of kwargs.
     kwargs_remaining = ypDict_LEN(kwargs);
     for (i = *n; i < positional_slots; i++) {
-        ypObject *       arg;
-        ypFunctionParam *param = ypFunction_PARAMS(f)[i];
+        ypObject *               arg;
+        yp_function_parameter_t *param = ypFunction_PARAMS(f)[i];
 
         arg = frozendict_getdefault(kwargs, param->name, ypFunction_key_missing);  // new ref
         if (yp_isexceptionC(arg)) return arg;
@@ -15830,9 +15827,10 @@ static ypObject *_function_call_stars_to_callN(ypObject *f, ypObject *args, ypOb
     } else {
         result = _function_call_stars_to_callN_kwargs(f, args, kwargs, yp_lengthof_array(a), &n, a);
     }
+    yp_ASSERT1(n >= 0 && n <= yp_lengthof_array(a));
 
     if (!yp_isexceptionC(result)) {
-        // If len(a) changes, this call to _ypFunction_callN must also change
+        // If yp_lengthof_array(a) changes, this call to _ypFunction_callN must also change
         yp_STATIC_ASSERT(yp_lengthof_array(a) == 16, lenof_stars_to_n_array);
         // TODO Need tests explicitly for this list
         result = _ypFunction_callN(f, n, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9],
@@ -15852,7 +15850,7 @@ static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwar
 {
     // FIXME args or kwargs aren't completely immutable: remember yp_invalidate. So we can't just
     // pass along borrowed references from these two objects, because the refs _could_ be discarded.
-    // Does that mean we always have to make copies? Would we do this in yp_call_stars, or
+    // Does that mean we always have to make copies?  Would we do this in yp_call_stars, or
     // tp_call_stars?  If we _do_ make copies, then kwargs might as well be a dict (common to pop
     // arguments off), and maybe even just make args a list?  I'd really like to avoid making
     // copies...perhaps it's OK to pass the original args/kwargs refs along for
