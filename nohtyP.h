@@ -187,50 +187,6 @@ typedef yp_int64_t yp_int_t;
 #define yp_INT_T_MIN LLONG_MIN
 typedef yp_float64_t yp_float_t;
 
-// The signature of a function that can be wrapped up in a generator iterator.  Called by yp_send,
-// yp_throw, and similar methods.  iterator is the iterator object; use yp_iter_stateCX to retrieve
-// any state variables.  value is the object that is sent into the function by yp_send, or the
-// exception sent in by yp_throw; it may also be yp_GeneratorExit if yp_close is called, or another
-// exception.  The return value must be a new or immortal reference, yp_StopIteration if the
-// iterator is exhausted, or another exception.  The iterator will be closed with yp_close if it
-// returns an exception (resulting in one last call with yp_GeneratorExit).
-typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
-
-// The signature of one or more C functions that can be wrapped up in a function object.
-// TODO Rename?  Maybe impl?  Or funcC?
-// TODO Rename other func_t to code_t or funcC_t?  i.e. Does "code" now mean a C function?
-typedef struct _yp_function_code_t {
-    // FIXME valueerror if sizeof isn't a minimum?  Should we do that in initialize as well?
-    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_function_code_t) on allocation
-
-    // Called by the yp_call* methods, particularly yp_callN and yp_callNV.  function is the
-    // function object; use yp_function_stateCX to retrieve any state variables.  args are the n
-    // positional arguments.  The return value must be a new or immortal reference, or an exception.
-    // If funcNV is NULL, yp_callN/yp_callNV will create a temporary tuple from the n args and use
-    // it to call func_stars.
-    // FIXME funcN or funcNV?  Or codeN or callN or just N, or...
-    // FIXME document how to parse the args
-    ypObject *(*funcNV)(ypObject *function, int n, va_list args);
-
-    // Called by the yp_call* methods, particularly yp_call_stars.  function is the function object;
-    // use yp_function_stateCX to retrieve any state variables.  args is a tuple of positional
-    // arguments, and kwargs is a frozendict of keyword arguments.  The return value must be a new
-    // or immortal reference, or an exception.  If func_stars is NULL, yp_call_stars will attempt to
-    // coerce any keyword arguments into positional arguments and call funcNV.
-    // XXX Unlike Python, kwargs is a frozendict, not a dict.
-    // FIXME stars?  Or code_stars or...
-    // FIXME can we guarantee the types of args/kwargs?
-    // FIXME document how to parse the args
-    ypObject *(*func_stars)(ypObject *function, ypObject *args, ypObject *kwargs);
-} yp_function_code_t;
-
-// Describes one parameter of a function object.
-typedef struct _yp_function_parameter_t {
-    //
-    ypObject *name;      // must be a str (i.e. FROM_LATIN1)
-    ypObject *default_;  // NULL for required argument
-} yp_function_parameter_t;
-
 
 /*
  * Constructors
@@ -273,8 +229,11 @@ ypAPI ypObject *yp_floatstore(ypObject *x);
 ypAPI ypObject *yp_iter(ypObject *x);
 
 // Returns a new reference to a generator iterator object using the given func.  The given n objects
-// will be made available to func via yp_iter_stateCX as an array.  length_hint is a clue to
-// consumers of the iterator how many items will be yielded; use zero if this is not known.
+// will be made available to func via yp_iter_stateCX as an array; new references to these objects
+// will be created, and those references will be discarded when the iterator is deallocated.
+// length_hint is a clue to consumers of the iterator how many items will be yielded; use zero if
+// this is not known.  Further documentation for yp_generator_func_t can be found below.
+typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
 ypAPI ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t length_hint, int n, ...);
 ypAPI ypObject *yp_generatorCNV(
         yp_generator_func_t func, yp_ssize_t length_hint, int n, va_list args);
@@ -430,6 +389,57 @@ ypAPI ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value);
 // retained.
 ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
+
+// Returns a new reference to a function object whose implementation comes from code and whose
+// inputs are described by parameters.  Raises yp_FIXME if code contains no implementations,
+// and yp_FIXME if parameters fails validation.  Further documentation for yp_function_code_t and
+// yp_function_parameters_t can be found below.
+
+// FIXME Should parameters==NULL be a shortcut for something?  No parameters?  `*args, **kwargs`?
+// FIXME What about code==NULL?
+// FIXME Really think hard about which inputs to bury in typedefs and which to surface as C params.
+typedef struct _yp_function_code_t yp_function_code_t;
+typedef struct _yp_function_parameters_t yp_function_parameters_t;
+ypAPI ypObject *yp_function(yp_function_code_t *code, yp_function_parameters_t *parameters);
+
+// Returns a new reference to a generator iterator object using the given func.  The given n objects
+// will be made available to func via yp_iter_stateCX as an array; new references to these objects
+// will be created, and those references will be discarded when the iterator is deallocated.
+// length_hint is a clue to consumers of the iterator how many items will be yielded; use zero if
+// this is not known.  Further documentation for yp_generator_func_t can be found below.
+// FIXME Rename yp_generator to match?
+// FIXME Is the C suffix applicable here?
+// FIXME Really think hard about the symmetry between these and yp_generator*.  Perhaps they should
+// all use a standard set of typedefs...i.e. remove some C params and make them structs.
+ypAPI ypObject *yp_function_withstateCN(
+        yp_function_code_t *code, yp_function_parameters_t *parameters, int n, ...);
+ypAPI ypObject *yp_function_withstateCNV(
+        yp_function_code_t *code, yp_function_parameters_t *parameters, int n, va_list args);
+
+// Similar to yp_functionCN, but accepts an arbitrary structure (or array) of the given size which
+// will be copied into the iterator and made available to func via yp_iter_stateCX.  If state
+// contains any objects, their offsets must be given as the variable arguments; new references to
+// these objects will be created, and those references will be discarded when the iterator is
+// deallocated.
+//  Ex: typedef struct { int x; int y; ypObject *obj1; ypObject *obj2 } mystruct;
+//      ypObject *obj1 = yp_dictK(0);
+//      mystruct state = { 20, 40, obj1, yp_False };
+//      gen = yp_function_fromstructCN(mygenfunc, 0, &state, sizeof(mystruct),
+//                  2, offsetof(mystruct, obj1), offsetof(mystruct, obj2));
+//      yp_decref(obj1);  // the iterator has its own reference, so discard ours
+// Objects in state cannot be part of a union, because nohtyP cannot know which union member is the
+// "active" one.  If state contains objects in an array you must list _each_ _individual_ offset.
+// state _can_ contain exceptions.
+// FIXME Is the C suffix applicable here?
+ypAPI ypObject *yp_function_withstatestructCN(
+        yp_function_code_t *code, yp_function_parameters_t *parameters, void *state, yp_ssize_t size, int n, ...);
+ypAPI ypObject *yp_function_withstatestructCNV(yp_function_code_t *code, yp_function_parameters_t *parameters,
+        void *state, yp_ssize_t size, int n, va_list args);
+
+
+// FIXME What about creating a function object that always returns a particular value?
+// FIXME Partial functions, created from other functions?
+
 
 // XXX The file type will be added in a future version
 
@@ -602,6 +612,15 @@ ypAPI ypObject *yp_reversed(ypObject *sequence);
 // Returns a new reference to an iterator that aggregates elements from each of the n iterables.
 ypAPI ypObject *yp_zipN(int n, ...);
 ypAPI ypObject *yp_zipNV(int n, va_list args);
+
+// The signature of a function that can be wrapped up in a generator iterator.  Called by yp_send,
+// yp_throw, and similar methods.  iterator is the iterator object; use yp_iter_stateCX to retrieve
+// any state variables.  value is the object that is sent into the function by yp_send, or the
+// exception sent in by yp_throw; it may also be yp_GeneratorExit if yp_close is called, or another
+// exception.  The return value must be a new or immortal reference, yp_StopIteration if the
+// iterator is exhausted, or another exception.  The iterator will be closed with yp_close if it
+// returns an exception (resulting in one last call with yp_GeneratorExit).
+typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
 
 // You may also be interested in yp_FOR for working with iterables; see below.
 
@@ -1222,6 +1241,53 @@ ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 // not callable.  Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
 // TODO Reconsider this name.  Consider if we want only-positional or only-kw versions?
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
+
+// FIXME Stay consistent: https://docs.python.org/3/library/inspect.html#inspect.signature
+
+// The signature of one or more C functions that can be wrapped up in a function object.
+// TODO Rename?  Maybe impl?  Or funcC?
+// TODO Rename other func_t to code_t or funcC_t?  i.e. Does "code" now mean a C function?
+typedef struct _yp_function_code_t {
+    // FIXME valueerror if sizeof isn't a minimum?
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_function_code_t) on allocation
+
+    // Called by the yp_call* methods, particularly yp_callN and yp_callNV.  function is the
+    // function object; use yp_function_stateCX to retrieve any state variables.  args are the n
+    // positional arguments.  The return value must be a new or immortal reference, or an exception.
+    // If funcNV is NULL, yp_callN/yp_callNV will create a temporary tuple from the n args and use
+    // it to call func_stars.
+    // FIXME funcN or funcNV?  Or codeN or callN or just N, or...
+    // FIXME document how to parse the args
+    ypObject *(*funcNV)(ypObject *function, int n, va_list args);
+
+    // Called by the yp_call* methods, particularly yp_call_stars.  function is the function object;
+    // use yp_function_stateCX to retrieve any state variables.  args is a tuple of positional
+    // arguments, and kwargs is a frozendict of keyword arguments.  The return value must be a new
+    // or immortal reference, or an exception.  If func_stars is NULL, yp_call_stars will attempt to
+    // coerce any keyword arguments into positional arguments and call funcNV.
+    // XXX Unlike Python, kwargs is a frozendict, not a dict.
+    // FIXME stars?  Or code_stars or...
+    // FIXME can we guarantee the types of args/kwargs?
+    // FIXME document how to parse the args
+    ypObject *(*func_stars)(ypObject *function, ypObject *args, ypObject *kwargs);
+} yp_function_code_t;
+
+// Describes one parameter of a function object.
+typedef struct _yp_function_parameter_t {
+    // The name of the parameter as a str (perhaps created via yp_IMMORTAL_STR_LATIN_1).  The name
+    // must be a valid Python identifier.
+    // FIXME Also verify that the name is a valid Python identifier.
+    ypObject *name;
+
+    //
+    ypObject *default_;  // NULL for required argument
+} yp_function_parameter_t;
+
+typedef struct _yp_function_parameters_t {
+    // The number of parameters for this function, aka the length of the parameters array.
+    yp_ssize_t count;
+    yp_function_parameter_t parameters[];
+} yp_function_parameters_t;
 
 // TODO "If func_stars is null, your parameters cannot contain keyword-only or **kwargs."
 

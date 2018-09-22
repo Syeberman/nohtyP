@@ -15577,6 +15577,7 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
 // (i.e. int now allows int(x=5)).  Kill them with fire.
 // TODO Make sub exceptions of yp_TypeError for each type of argument error (perhaps all grouped
 // under yp_ArgumentError or yp_CallArgumentError or something).
+// FIXME Stay consistent: https://docs.python.org/3/library/inspect.html#inspect.signature
 
 typedef struct {
     // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in data
@@ -15598,16 +15599,16 @@ typedef struct {
 
 #define ypFunction_STATE(f) (((ypFunctionObject *)f)->ob_state)
 #define ypFunction_PARAMS(f) ((yp_function_parameter_t **)((ypObject *)f)->ob_data)
-#define ypFunction_PARAMS_LEN ypObject_ALLOCLEN
-#define ypFunction_SET_PARAMS_LEN ypObject_SET_ALLOCLEN
+#define ypFunction_PARAMS_COUNT ypObject_ALLOCLEN
+#define ypFunction_SET_PARAMS_COUNT ypObject_SET_ALLOCLEN
 #define ypFunction_FUNC_STARS(f) (((ypFunctionObject *)f)->ob_func_stars)
 #define ypFunction_FUNC_N(f) (((ypFunctionObject *)f)->ob_funcN)
 
 // The maximum possible size of a function's state
 #define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
 
-// The maximum possible length of a function's parameter list
-#define ypFunction_PARAMS_LEN_MAX \
+// The maximum possible number of parameters for a function
+#define ypFunction_PARAMS_COUNT_MAX \
     ((yp_ssize_t)MIN(yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject), ypObject_LEN_MAX))
 
 // For use internally to detect when a key is missing from a dict.
@@ -15624,7 +15625,7 @@ static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_
 {
     ypObject * result;
     yp_ssize_t i;
-    for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
+    for (i = 0; i < ypFunction_PARAMS_COUNT(f); i++) {
         yp_function_parameter_t *param = ypFunction_PARAMS(f)[i];
 
         // Parameter names must be strings
@@ -15662,7 +15663,7 @@ static ypObject *_function_traverse_state(ypObject *f, visitfunc visitor, void *
 static ypObject *_function_traverse_params(ypObject *f, visitfunc visitor, void *memo)
 {
     yp_ssize_t i;
-    for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
+    for (i = 0; i < ypFunction_PARAMS_COUNT(f); i++) {
         yp_function_parameter_t *param = ypFunction_PARAMS(f)[i];
 
         ypObject *result = visitor(param->name, memo);
