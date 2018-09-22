@@ -70,7 +70,7 @@
 // on the compiler.
 // TODO Inline any of these that are 100% cross-platform
 #define PRIint "I64d"  // for use with yp_int_t
-#if SIZE_MAX == 0xFFFFFFFFu
+#if yp_SSIZE_T_MAX == 0x7FFFFFFF
 #define PRIssize "d"  // for use with yp_ssize_t
 #else
 #define PRIssize PRIint  // for use with yp_ssize_t
