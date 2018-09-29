@@ -68,12 +68,10 @@
 
 // Similar to PRIi64 defined in intttypes.h, this chooses the appropriate format string depending
 // on the compiler.
-// TODO Inline any of these that are 100% cross-platform
-#define PRIint "I64d"  // for use with yp_int_t
 #if yp_SSIZE_T_MAX == 0x7FFFFFFF
 #define PRIssize "d"  // for use with yp_ssize_t
 #else
-#define PRIssize PRIint  // for use with yp_ssize_t
+#define PRIssize "I64d"  // for use with yp_ssize_t
 #endif
 
 
@@ -4722,7 +4720,7 @@ ypObject *yp_intC(yp_int_t value)
         ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypInt_CODE);
         if (yp_isexceptionC(i)) return i;
         ypInt_VALUE(i) = value;
-        yp_DEBUG("yp_intC: %p value %" PRIint, i, value);
+        yp_DEBUG("yp_intC: %p value %I64d", i, value);
         return i;
     }
 }
@@ -4732,7 +4730,7 @@ ypObject *yp_intstoreC(yp_int_t value)
     ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypIntStore_CODE);
     if (yp_isexceptionC(i)) return i;
     ypInt_VALUE(i) = value;
-    yp_DEBUG("yp_intstoreC: %p value %" PRIint, i, value);
+    yp_DEBUG("yp_intstoreC: %p value %I64d", i, value);
     return i;
 }
 
