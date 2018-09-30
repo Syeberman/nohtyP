@@ -76,7 +76,7 @@ gcc_finder = ToolFinder(
         'win-builds*\\bin', 'win-builds*\\*\\bin',
     ),
     posix_dirs=(),  # rely on the environment's path for now
-    exe_globs=("gcc-[0-9].[0-9]", "gcc"),
+    exe_globs=("gcc-[0-9].[0-9]", "gcc-[0-9]", "gcc"),
     version_detector=_version_detector
 )
 

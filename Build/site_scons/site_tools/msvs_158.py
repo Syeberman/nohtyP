@@ -1,6 +1,4 @@
 import msvs_common
-# FIXME It seems MS is using the minor version as more of a build number now, so we should just
-# accept any "version 15" Visual Studio we find.
 _generate, _exists = msvs_common.DefineMSVSToolFunctions(15.8, ("15.8", ))
 
 
