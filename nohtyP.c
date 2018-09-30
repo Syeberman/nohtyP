@@ -49,15 +49,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _MSC_VER  // MSVC
+#if defined(_MSC_VER)  // MSVC
 #include <Windows.h>
+#if _MSC_VER >= 1800
+#include <inttypes.h>
+#endif
 #ifndef va_copy
 #define va_copy(d, s) ((d) = (s))
 #endif
 #endif
 
-#ifdef __GNUC__  // GCC
+#if defined(__GNUC__)  // GCC
 #define GCC_VER (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+#include <inttypes.h>
 #include <stdint.h>
 #endif
 
@@ -66,12 +70,26 @@
 #define FALSE (0 == 1)
 #endif
 
-// Similar to PRIi64 defined in intttypes.h, this chooses the appropriate format string depending
-// on the compiler.
-#if yp_SSIZE_T_MAX == 0x7FFFFFFF
-#define PRIssize "d"  // for use with yp_ssize_t
+// Defines exactly one of yp_ARCH_32_BIT or yp_ARCH_64_BIT.
+#if yp_SSIZE_T_MAX == 0x7FFFFFFFFFFFFFFF
+#define yp_ARCH_64_BIT 1
 #else
-#define PRIssize "I64d"  // for use with yp_ssize_t
+#define yp_ARCH_32_BIT 1
+#endif
+
+// Similar to PRId64 defined in intttypes.h, this chooses the appropriate format string depending
+// on the compiler.
+//  PRIint: for use with yp_int_t
+//  PRIssize: for use with yp_ssize_t
+#if defined(PRId64)
+#define PRIint PRId64
+#else
+#define PRIint "I64d"
+#endif
+#if defined(yp_ARCH_32_BIT)
+#define PRIssize "d"
+#else
+#define PRIssize PRIint
 #endif
 
 
@@ -169,6 +187,17 @@ static void yp_breakonerr(ypObject *err) {
  *************************************************************************************************/
 #pragma region assertions
 
+#if defined(yp_ARCH_32_BIT)
+#if defined(yp_ARCH_64_BIT)
+#error yp_ARCH_32_BIT and yp_ARCH_64_BIT cannot both be defined.
+#endif
+yp_STATIC_ASSERT(sizeof(void *) == 4, sizeof_pointer);
+#elif defined(yp_ARCH_64_BIT)
+yp_STATIC_ASSERT(sizeof(void *) == 8, sizeof_pointer);
+#else
+#error Exactly one of yp_ARCH_32_BIT or yp_ARCH_64_BIT must be defined.
+#endif
+
 yp_STATIC_ASSERT(sizeof(yp_int8_t) == 1, sizeof_int8);
 yp_STATIC_ASSERT(sizeof(yp_uint8_t) == 1, sizeof_uint8);
 yp_STATIC_ASSERT(sizeof(yp_int16_t) == 2, sizeof_int16);
@@ -181,6 +210,7 @@ yp_STATIC_ASSERT(sizeof(yp_float32_t) == 4, sizeof_float32);
 yp_STATIC_ASSERT(sizeof(yp_float64_t) == 8, sizeof_float64);
 yp_STATIC_ASSERT(sizeof(yp_ssize_t) == sizeof(size_t), sizeof_ssize);
 yp_STATIC_ASSERT(yp_SSIZE_T_MAX == (SIZE_MAX / 2), ssize_max);
+
 #define yp_MAX_ALIGNMENT (8)  // The maximum possible required alignment of any entity
 
 // struct _ypObject must be 8-byte aligned in size, and must not have padding bytes
@@ -709,7 +739,7 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 // Parameters used for the numeric hash implementation.  Numeric hashes are based on reduction
 // modulo the prime 2**_PyHASH_BITS - 1.
 // XXX Adapted from Python's pyport.h
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu
+#if defined(yp_ARCH_32_BIT)
 #define _ypHASH_BITS 31
 #else
 #define _ypHASH_BITS 61
@@ -1114,7 +1144,7 @@ static void (*yp_free)(void *p) = _dummy_yp_free;
 
 // Microsoft gives a couple options for heaps; let's stick with the standard malloc/free plus
 // _msize and _expand
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #include <malloc.h>
 static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
@@ -1290,7 +1320,7 @@ static ypObject *_ypMem_malloc_container_inline(int type, yp_ssize_t alloclen,
 // TODO Make this configurable via yp_initialize
 // TODO 64-bit PyDictObject is 128 bytes...we are larger!
 // TODO Static asserts to ensure that certain-sized objects fit with one allocation, then optimize
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu  // 32-bit (or less) platform
+#if defined(yp_ARCH_32_BIT)
 #define _ypMem_ideal_size_DEFAULT ((yp_ssize_t)128)
 #else
 #define _ypMem_ideal_size_DEFAULT ((yp_ssize_t)256)
@@ -2129,7 +2159,7 @@ typedef yp_int32_t _yp_iter_length_hint_t;
 // To ensure that ob_inline_data is aligned properly, we need to pad on some platforms
 // TODO If we use ob_len to store the length_hint, yp_lenC would have to always call tp_len, but
 // then we could trim 8 bytes off all iterators
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu  // 32-bit (or less) platform
+#if defined(yp_ARCH_32_BIT)
 #define _ypIterObject_HEAD         \
     _ypIterObject_HEAD_NO_PADDING; \
     void *_ob_padding /* force use of semi-colon */
@@ -4720,7 +4750,7 @@ ypObject *yp_intC(yp_int_t value)
         ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypInt_CODE);
         if (yp_isexceptionC(i)) return i;
         ypInt_VALUE(i) = value;
-        yp_DEBUG("yp_intC: %p value %I64d", i, value);
+        yp_DEBUG("yp_intC: %p value %" PRIint, i, value);
         return i;
     }
 }
@@ -4730,7 +4760,7 @@ ypObject *yp_intstoreC(yp_int_t value)
     ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypIntStore_CODE);
     if (yp_isexceptionC(i)) return i;
     ypInt_VALUE(i) = value;
-    yp_DEBUG("yp_intstoreC: %p value %I64d", i, value);
+    yp_DEBUG("yp_intstoreC: %p value %" PRIint, i, value);
     return i;
 }
 
@@ -4822,7 +4852,7 @@ _ypInt_PUBLIC_AS_C_FUNCTION(int16,  0xFFFF);
 _ypInt_PUBLIC_AS_C_FUNCTION(uint16, 0xFFFFu);
 _ypInt_PUBLIC_AS_C_FUNCTION(int32,  0xFFFFFFFF);
 _ypInt_PUBLIC_AS_C_FUNCTION(uint32, 0xFFFFFFFFu);
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
+#if defined(yp_ARCH_32_BIT)
 yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) < yp_sizeof(yp_int_t), sizeof_yp_ssize_lt_yp_int);
 _ypInt_PUBLIC_AS_C_FUNCTION(ssize,  (yp_ssize_t) 0xFFFFFFFF);
 _ypInt_PUBLIC_AS_C_FUNCTION(hash,   (yp_hash_t) 0xFFFFFFFF);
@@ -4839,7 +4869,7 @@ yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc)
     return (yp_uint64_t)asint;
 }
 
-#if yp_SSIZE_T_MAX > 0x7FFFFFFFu  // 64-bit (or more) platform
+#if defined(yp_ARCH_64_BIT)
 yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) == yp_sizeof(yp_int_t), sizeof_yp_ssize_eq_yp_int);
 yp_ssize_t yp_asssizeC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 yp_hash_t yp_ashashC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
