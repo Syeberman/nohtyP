@@ -391,9 +391,9 @@ ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
 
 // Returns a new reference to a function object whose implementation comes from code and whose
-// inputs are described by parameters.  Raises yp_FIXME if code contains no implementations,
-// and yp_FIXME if parameters fails validation.  Further documentation for yp_function_code_t and
-// yp_function_parameters_t can be found below.
+// inputs are described by parameters.  Raises yp_FIXME if code contains no implementations, and
+// yp_ParameterSyntaxError if parameters fails validation.  Further documentation for
+// yp_function_code_t and yp_function_parameters_t can be found below.
 
 // FIXME Should parameters==NULL be a shortcut for something?  No parameters?  `*args, **kwargs`?
 // FIXME What about code==NULL?
