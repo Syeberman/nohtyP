@@ -30,7 +30,7 @@ that the whichdb.whichdb() implementstation in the various 2.X versions of
 Python won't blow up even if dbm wasn't compiled in.
 """
 
-__revision__ = "src/engine/SCons/compat/_scons_dbm.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/compat/_scons_dbm.py  2018/09/30 19:25:33 Sye"
 
 class error(Exception):
     pass

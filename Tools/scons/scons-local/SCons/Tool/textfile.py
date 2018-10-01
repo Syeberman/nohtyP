@@ -44,7 +44,7 @@ Textfile/Substfile builder for SCons.
     is unpredictable whether the expansion will occur.
 """
 
-__revision__ = "src/engine/SCons/Tool/textfile.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/textfile.py  2018/09/30 19:25:33 Sye"
 
 import SCons
 

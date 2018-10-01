@@ -31,7 +31,7 @@ selection method.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/g77.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/g77.py  2018/09/30 19:25:33 Sye"
 
 import SCons.Util
 from SCons.Tool.FortranCommon import add_all_to_env, add_f77_to_env

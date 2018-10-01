@@ -33,7 +33,7 @@ that can be used by scripts or modules looking for the canonical default.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 from __future__ import print_function
 
-__revision__ = "src/engine/SCons/Node/FS.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Node/FS.py  2018/09/30 19:25:33 Sye"
 
 import fnmatch
 import os
@@ -132,7 +132,10 @@ def initialize_do_splitdrive():
     global do_splitdrive
     global has_unc
     drive, path = os.path.splitdrive('X:/foo')
-    has_unc = hasattr(os.path, 'splitunc')
+    # splitunc is removed from python 3.7 and newer  
+    # so we can also just test if splitdrive works with UNC
+    has_unc = (hasattr(os.path, 'splitunc') 
+        or os.path.splitdrive(r'\\split\drive\test')[0] == r'\\split\drive')
 
     do_splitdrive = not not drive or has_unc
 
@@ -328,7 +331,12 @@ Unlink = SCons.Action.Action(UnlinkFunc, None)
 
 def MkdirFunc(target, source, env):
     t = target[0]
-    if not t.exists():
+    # This os.path.exists test looks redundant, but it's possible
+    # when using Install() to install multiple dirs outside the
+    # source tree to get a case where t.exists() is true but
+    # the path does already exist, so this prevents spurious
+    # build failures in that case. See test/Install/multi-dir.
+    if not t.exists() and not os.path.exists(t.get_abspath()):
         t.fs.mkdir(t.get_abspath())
     return 0
 

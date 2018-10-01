@@ -5,8 +5,6 @@ files.
 
 """
 
-from __future__ import print_function
-
 #
 # Copyright (c) 2001 - 2017 The SCons Foundation
 #
@@ -29,7 +27,7 @@ from __future__ import print_function
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Script/SConscript.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Script/SConscript.py  2018/09/30 19:25:33 Sye"
 
 import SCons
 import SCons.Action
@@ -46,12 +44,15 @@ import SCons.Script.Main
 import SCons.Tool
 import SCons.Util
 
+from . import Main
+
 import collections
 import os
 import os.path
 import re
 import sys
 import traceback
+import time
 
 class SConscriptReturn(Exception):
     pass
@@ -152,6 +153,35 @@ def Return(*vars, **kw):
 
 stack_bottom = '% Stack boTTom %' # hard to define a variable w/this name :)
 
+def handle_missing_SConscript(f, must_exist=None):
+    """Take appropriate action on missing file in SConscript() call.
+
+    Print a warning or raise an exception on missing file.
+    On first warning, print a deprecation message.
+
+    Args:
+        f (str): path of missing configuration file
+        must_exist (bool): raise exception if file does not exist
+
+    Raises:
+        UserError if 'must_exist' is True or if global
+          SCons.Script._no_missing_sconscript is True.
+    """
+
+    if must_exist or (SCons.Script._no_missing_sconscript and must_exist is not False):
+        msg = "Fatal: missing SConscript '%s'" % f.get_internal_path()
+        raise SCons.Errors.UserError(msg)
+
+    if SCons.Script._warn_missing_sconscript_deprecated:
+        msg = "Calling missing SConscript without error is deprecated.\n" + \
+              "Transition by adding must_exist=0 to SConscript calls.\n" + \
+              "Missing SConscript '%s'" % f.get_internal_path()
+        SCons.Warnings.warn(SCons.Warnings.MissingSConscriptWarning, msg)
+        SCons.Script._warn_missing_sconscript_deprecated = False
+    else:
+        msg = "Ignoring missing SConscript '%s'" % f.get_internal_path()
+        SCons.Warnings.warn(SCons.Warnings.MissingSConscriptWarning, msg)
+
 def _SConscript(fs, *files, **kw):
     top = fs.Top
     sd = fs.SConstruct_dir.rdir()
@@ -249,16 +279,21 @@ def _SConscript(fs, *files, **kw):
                     try:
                         try:
 #                            _file_ = SCons.Util.to_str(_file_)
+                            if Main.print_time:
+                                time1 = time.time()
                             exec(compile(_file_.read(), _file_.name, 'exec'),
                                  call_stack[-1].globals)
                         except SConscriptReturn:
                             pass
                     finally:
+                        if Main.print_time:
+                            time2 = time.time()
+                            print('SConscript:%s  took %0.3f ms' % (f.get_abspath(), (time2 - time1) * 1000.0))
+
                         if old_file is not None:
                             call_stack[-1].globals.update({__file__:old_file})
                 else:
-                    SCons.Warnings.warn(SCons.Warnings.MissingSConscriptWarning,
-                             "Ignoring missing SConscript '%s'" % f.get_internal_path())
+                    handle_missing_SConscript(f, kw.get('must_exist', None))
 
         finally:
             SCons.Script.sconscript_reading = SCons.Script.sconscript_reading - 1
@@ -516,6 +551,31 @@ class SConsEnvironment(SCons.Environment.Base):
             raise SCons.Errors.UserError("Import of non-existent variable '%s'"%x)
 
     def SConscript(self, *ls, **kw):
+        """Execute SCons configuration files.
+
+        Parameters:
+            *ls (str or list): configuration file(s) to execute.
+
+        Keyword arguments:
+            dirs (list): execute SConscript in each listed directory.
+            name (str): execute script 'name' (used only with 'dirs').
+            exports (list or dict): locally export variables the
+              called script(s) can import.
+            variant_dir (str): mirror sources needed for the build in
+             a variant directory to allow building in it.
+            duplicate (bool): physically duplicate sources instead of just
+              adjusting paths of derived files (used only with 'variant_dir')
+              (default is True).
+            must_exist (bool): fail if a requested script is missing
+              (default is False, default is deprecated).
+
+        Returns:
+            list of variables returned by the called script
+
+        Raises:
+            UserError: a script is not found and such exceptions are enabled.
+        """
+
         if 'build_dir' in kw:
             msg = """The build_dir keyword has been deprecated; use the variant_dir keyword instead."""
             SCons.Warnings.warn(SCons.Warnings.DeprecatedBuildDirWarning, msg)

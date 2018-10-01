@@ -24,7 +24,7 @@ Used by several tools of `gettext` toolset.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/GettextCommon.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/GettextCommon.py  2018/09/30 19:25:33 Sye"
 
 import SCons.Warnings
 import re
@@ -447,7 +447,7 @@ def _detect_msgfmt(env):
     """ Detects *msgmfmt(1)* program. """
     if 'MSGFMT' in env:
         return env['MSGFMT']
-    msgfmt = env.Detect('msgfmt');
+    msgfmt = env.Detect('msgfmt')
     if msgfmt:
         return msgfmt
     raise SCons.Errors.StopError(MsgfmtNotFound, "Could not detect msgfmt")

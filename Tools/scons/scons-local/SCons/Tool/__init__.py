@@ -35,7 +35,7 @@ tool definition.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/__init__.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/__init__.py  2018/09/30 19:25:33 Sye"
 
 import imp
 import importlib
@@ -222,8 +222,10 @@ class Tool(object):
 
             # Don't reload a tool we already loaded.
             sys_modules_value = sys.modules.get(found_name,False)
+
+            found_module = None
             if sys_modules_value and sys_modules_value.__file__ == spec.origin:
-                return sys.modules[found_name]
+                found_module = sys.modules[found_name]
             else:
                 # Not sure what to do in the case that there already
                 # exists sys.modules[self.name] but the source file is
@@ -235,7 +237,11 @@ class Tool(object):
                     # If we found it in SCons.Tool, then add it to the module
                     setattr(SCons.Tool, self.name, module)
 
-                return module
+                found_module = module
+            
+            if found_module is not None:
+                sys.path = oldpythonpath
+                return found_module
 
 
         sys.path = oldpythonpath
@@ -907,8 +913,16 @@ def createCFileBuilders(env):
 #  Create common Java builders
 
 def CreateJarBuilder(env):
+    """The Jar builder expects a list of class files
+    which it can package into a jar file.
+
+    The jar tool provides an interface for passing other types
+    of java files such as .java, directories or swig interfaces
+    and will build them to class files in which it can package
+    into the jar.
+    """
     try:
-        java_jar = env['BUILDERS']['Jar']
+        java_jar = env['BUILDERS']['JarFile']
     except KeyError:
         fs = SCons.Node.FS.get_default_fs()
         jar_com = SCons.Action.Action('$JARCOM', '$JARCOMSTR')
@@ -917,7 +931,7 @@ def CreateJarBuilder(env):
                                          src_suffix = '$JAVACLASSSUFFIX',
                                          src_builder = 'JavaClassFile',
                                          source_factory = fs.Entry)
-        env['BUILDERS']['Jar'] = java_jar
+        env['BUILDERS']['JarFile'] = java_jar
     return java_jar
 
 def CreateJavaHBuilder(env):
@@ -1232,6 +1246,35 @@ def tool_list(platform, env):
              + other_tools)
 
     return [x for x in tools if x]
+
+
+def find_program_path(env, key_program, default_paths=[]):
+    """
+    Find the location of key_program and then return the path it was located at.
+    Checking the default install locations.
+    Mainly for windows where tools aren't all installed in /usr/bin,etc
+    :param env: Current Environment()
+    :param key_program: Program we're using to locate the directory to add to PATH.
+    """
+    # First search in the SCons path
+    path=env.WhereIs(key_program)
+    if (path):
+        return path
+    # then the OS path:
+    path=SCons.Util.WhereIs(key_program)
+    if (path):
+        return path
+
+    # If that doesn't work try default location for mingw
+    save_path = env['ENV']['PATH']
+    for p in default_paths:
+        env.AppendENVPath('PATH',p)
+    path = env.WhereIs(key_program)
+    if not path:
+        env['ENV']['PATH']=save_path
+    return path
+
+
 
 # Local Variables:
 # tab-width:4

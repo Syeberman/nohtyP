@@ -30,10 +30,19 @@ selection method.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Platform/cygwin.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Platform/cygwin.py  2018/09/30 19:25:33 Sye"
+
+import sys
 
 from . import posix
 from SCons.Platform import TempFileMunge
+
+CYGWIN_DEFAULT_PATHS = []
+if sys.platform == 'win32':
+    CYGWIN_DEFAULT_PATHS = [
+        r'C:\cygwin64\bin',
+        r'C:\cygwin\bin'
+    ]
 
 def generate(env):
     posix.generate(env)

@@ -1,6 +1,6 @@
 """SCons.Tool.Packaging.tarbz2
 
-The tarbz2 SRC packager.
+The tarbz2 packager.
 """
 
 #
@@ -26,13 +26,13 @@ The tarbz2 SRC packager.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/packaging/tarbz2.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/packaging/tarbz2.py  2018/09/30 19:25:33 Sye"
 
 from SCons.Tool.packaging import stripinstallbuilder, putintopackageroot
 
 def package(env, target, source, PACKAGEROOT, **kw):
     bld = env['BUILDERS']['Tar']
-    bld.set_suffix('.tar.gz')
+    bld.set_suffix('.tar.bz2')
     target, source = putintopackageroot(target, source, env, PACKAGEROOT)
     target, source = stripinstallbuilder(target, source, env)
     return bld(env, target, source, TARFLAGS='-jc')

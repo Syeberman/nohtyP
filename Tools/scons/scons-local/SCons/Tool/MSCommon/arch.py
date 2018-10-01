@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/arch.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/MSCommon/arch.py  2018/09/30 19:25:33 Sye"
 
 __doc__ = """Module to define supported Windows chip architectures.
 """
@@ -37,22 +37,22 @@ class ArchDefinition(object):
         self.synonyms = synonyms
 
 SupportedArchitectureList = [
-    ArchitectureDefinition(
+    ArchDefinition(
         'x86',
         ['i386', 'i486', 'i586', 'i686'],
     ),
 
-    ArchitectureDefinition(
+    ArchDefinition(
         'x86_64',
         ['AMD64', 'amd64', 'em64t', 'EM64T', 'x86_64'],
     ),
 
-    ArchitectureDefinition(
+    ArchDefinition(
         'ia64',
         ['IA64'],
     ),
     
-    ArchitectureDefinition(
+    ArchDefinition(
         'arm',
         ['ARM'],
     ),

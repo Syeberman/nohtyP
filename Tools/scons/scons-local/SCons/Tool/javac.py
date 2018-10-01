@@ -30,10 +30,11 @@ selection method.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/javac.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/javac.py  2018/09/30 19:25:33 Sye"
 
 import os
 import os.path
+from collections import OrderedDict
 
 import SCons.Action
 import SCons.Builder
@@ -70,7 +71,7 @@ def emit_java_classes(target, source, env):
         if isinstance(entry, SCons.Node.FS.File):
             slist.append(entry)
         elif isinstance(entry, SCons.Node.FS.Dir):
-            result = SCons.Util.OrderedDict()
+            result = OrderedDict()
             dirnode = entry.rdir()
             def find_java_files(arg, dirpath, filenames):
                 java_files = sorted([n for n in filenames

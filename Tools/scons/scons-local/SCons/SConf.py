@@ -35,7 +35,7 @@ libraries are installed, if some command line options are supported etc.
 #
 from __future__ import print_function
 
-__revision__ = "src/engine/SCons/SConf.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/SConf.py  2018/09/30 19:25:33 Sye"
 
 import SCons.compat
 
@@ -609,7 +609,7 @@ class SConfBase(object):
         ok = self.TryBuild(self.env.SConfActionBuilder, text, extension)
         del self.env['BUILDERS']['SConfActionBuilder']
         if ok:
-            outputStr = self.lastTarget.get_contents().decode()
+            outputStr = self.lastTarget.get_text_contents()
             return (1, outputStr)
         return (0, "")
 

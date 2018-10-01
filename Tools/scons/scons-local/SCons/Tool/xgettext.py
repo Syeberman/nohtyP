@@ -24,7 +24,7 @@ Tool specific initialization of `xgettext` tool.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/xgettext.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/xgettext.py  2018/09/30 19:25:33 Sye"
 
 
 #############################################################################
@@ -288,9 +288,21 @@ def _POTUpdateBuilder(env, **kw):
 #############################################################################
 def generate(env, **kw):
     """ Generate `xgettext` tool """
+    import sys
+    import os
     import SCons.Util
+    import SCons.Tool
     from SCons.Tool.GettextCommon import RPaths, _detect_xgettext
+    from SCons.Platform.mingw import MINGW_DEFAULT_PATHS
+    from SCons.Platform.cygwin import CYGWIN_DEFAULT_PATHS
 
+    if sys.platform == 'win32':
+        xgettext = SCons.Tool.find_program_path(env, 'xgettext', default_paths=MINGW_DEFAULT_PATHS + CYGWIN_DEFAULT_PATHS )
+        if xgettext:
+            xgettext_bin_dir = os.path.dirname(xgettext)
+            env.AppendENVPath('PATH', xgettext_bin_dir)
+        else:
+            SCons.Warnings.Warning('xgettext tool requested, but binary not found in ENV PATH')
     try:
         env['XGETTEXT'] = _detect_xgettext(env)
     except:

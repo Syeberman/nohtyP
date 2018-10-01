@@ -31,7 +31,7 @@ selection method.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/applelink.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/applelink.py  2018/09/30 19:25:33 Sye"
 
 import SCons.Util
 
@@ -39,13 +39,15 @@ import SCons.Util
 # the -rpath option, so we use the "link" tool instead of "gnulink".
 from . import link
 
+
 def generate(env):
     """Add Builders and construction variables for applelink to an
     Environment."""
     link.generate(env)
 
     env['FRAMEWORKPATHPREFIX'] = '-F'
-    env['_FRAMEWORKPATH'] = '${_concat(FRAMEWORKPATHPREFIX, FRAMEWORKPATH, "", __env__)}'
+    env['_FRAMEWORKPATH'] = '${_concat(FRAMEWORKPATHPREFIX, FRAMEWORKPATH, "", __env__, RDirs)}'
+
     env['_FRAMEWORKS'] = '${_concat("-framework ", FRAMEWORKS, "", __env__)}'
     env['LINKCOM'] = env['LINKCOM'] + ' $_FRAMEWORKPATH $_FRAMEWORKS $FRAMEWORKSFLAGS'
     env['SHLINKFLAGS'] = SCons.Util.CLVar('$LINKFLAGS -dynamiclib')
@@ -66,8 +68,6 @@ def generate(env):
     env['LDMODULESUFFIX'] = '' 
     env['LDMODULEFLAGS'] = SCons.Util.CLVar('$LINKFLAGS -bundle')
     env['LDMODULECOM'] = '$LDMODULE -o ${TARGET} $LDMODULEFLAGS $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $_FRAMEWORKPATH $_FRAMEWORKS $FRAMEWORKSFLAGS'
-
-
 
 def exists(env):
     return env['PLATFORM'] == 'darwin'
