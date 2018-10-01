@@ -57,7 +57,7 @@ function defined below loads the module as the "real" name (without the
 rest of our code will find our pre-loaded compatibility module.
 """
 
-__revision__ = "src/engine/SCons/compat/__init__.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/compat/__init__.py  2018/09/30 19:25:33 Sye"
 
 import os
 import sys
@@ -96,6 +96,8 @@ rename_module('pickle', 'cPickle')
 # Negative numbers choose the highest available protocol.
 import pickle
 
+# Was pickle.HIGHEST_PROTOCOL
+# Changed to 2 so py3.5+'s pickle will be compatible with py2.7.
 PICKLE_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
 # TODO: FIXME

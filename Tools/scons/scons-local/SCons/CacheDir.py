@@ -21,12 +21,13 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/CacheDir.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/CacheDir.py  2018/09/30 19:25:33 Sye"
 
 __doc__ = """
 CacheDir support
 """
 
+import hashlib
 import json
 import os
 import stat
@@ -55,6 +56,10 @@ def CacheRetrieveFunc(target, source, env):
             fs.symlink(fs.readlink(cachefile), t.get_internal_path())
         else:
             env.copy_from_cache(cachefile, t.get_internal_path())
+            try:
+                os.utime(cachefile, None)
+            except OSError:
+                pass
         st = fs.stat(cachefile)
         fs.chmod(t.get_internal_path(), stat.S_IMODE(st[stat.ST_MODE]) | stat.S_IWRITE)
     return 0
@@ -134,12 +139,6 @@ warned = dict()
 class CacheDir(object):
 
     def __init__(self, path):
-        try:
-            import hashlib
-        except ImportError:
-            msg = "No hashlib or MD5 module available, CacheDir() not supported"
-            SCons.Warnings.warn(SCons.Warnings.NoMD5ModuleWarning, msg)
-            path = None
         self.path = path
         self.current_cache_debug = None
         self.debugFP = None

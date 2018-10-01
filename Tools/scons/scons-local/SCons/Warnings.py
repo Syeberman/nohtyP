@@ -27,7 +27,7 @@ This file implements the warnings framework for SCons.
 
 """
 
-__revision__ = "src/engine/SCons/Warnings.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Warnings.py  2018/09/30 19:25:33 Sye"
 
 import sys
 
@@ -72,12 +72,6 @@ class MisleadingKeywordsWarning(WarningOnByDefault):
     pass
 
 class MissingSConscriptWarning(WarningOnByDefault):
-    pass
-
-class NoMD5ModuleWarning(WarningOnByDefault):
-    pass
-
-class NoMetaclassSupportWarning(WarningOnByDefault):
     pass
 
 class NoObjectCountWarning(WarningOnByDefault):
@@ -153,6 +147,9 @@ class DeprecatedSigModuleWarning(MandatoryDeprecatedWarning):
 class DeprecatedBuilderKeywordsWarning(MandatoryDeprecatedWarning):
     pass
 
+class DeprecatedMissingSConscriptWarning(DeprecatedWarning):
+    pass
+
 
 # The below is a list of 2-tuples.  The first element is a class object.
 # The second element is true if that class is enabled, false if it is disabled.
@@ -185,8 +182,8 @@ def warn(clazz, *args):
     global _enabled, _warningAsException, _warningOut
 
     warning = clazz(args)
-    for clazz, flag in _enabled:
-        if isinstance(warning, clazz):
+    for cls, flag in _enabled:
+        if isinstance(warning, cls):
             if flag:
                 if _warningAsException:
                     raise warning

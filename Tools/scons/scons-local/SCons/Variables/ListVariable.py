@@ -46,7 +46,7 @@ Usage example::
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Variables/ListVariable.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Variables/ListVariable.py  2018/09/30 19:25:33 Sye"
 
 # Known Bug: This should behave like a Set-Type, but does not really,
 # since elements can occur twice.

@@ -1,4 +1,4 @@
-"""SCons.Tool.Packaging.tarbz2
+"""SCons.Tool.Packaging.src_tarbz2
 
 The tarbz2 SRC packager.
 """
@@ -26,7 +26,7 @@ The tarbz2 SRC packager.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/packaging/src_tarbz2.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/packaging/src_tarbz2.py  2018/09/30 19:25:33 Sye"
 
 from SCons.Tool.packaging import putintopackageroot
 

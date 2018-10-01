@@ -26,10 +26,11 @@ customizable variables to an SCons build.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Variables/__init__.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Variables/__init__.py  2018/09/30 19:25:33 Sye"
 
 import os.path
 import sys
+from functools import cmp_to_key
 
 import SCons.Environment
 import SCons.Errors
@@ -287,9 +288,13 @@ class Variables(object):
 
         env - an environment that is used to get the current values
               of the options.
+        cmp - Either a function as follows: The specific sort function should take two arguments and return -1, 0 or 1 
+              or a boolean to indicate if it should be sorted.
         """
 
-        if sort:
+        if callable(sort):
+            options = sorted(self.options, key=cmp_to_key(lambda x,y: sort(x.key,y.key)))
+        elif sort is True:
             options = sorted(self.options, key=lambda x: x.key)
         else:
             options = self.options

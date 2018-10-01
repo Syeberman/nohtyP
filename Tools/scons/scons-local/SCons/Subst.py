@@ -26,7 +26,7 @@ SCons string substitution.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Subst.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Subst.py  2018/09/30 19:25:33 Sye"
 
 import collections
 import re
@@ -85,6 +85,9 @@ class Literal(object):
 
     def __neq__(self, other):
         return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.lstr)
 
 class SpecialAttrWrapper(object):
     """This is a wrapper for what we call a 'Node special attribute.'
@@ -338,7 +341,10 @@ SUBST_RAW = 1
 SUBST_SIG = 2
 
 _rm = re.compile(r'\$[()]')
-_rm_split = re.compile(r'(\$[()])')
+
+# Note the pattern below only matches $( or $) when there is no
+# preceeding $. (Thus the (?<!\$))
+_rm_split = re.compile(r'(?<!\$)(\$[()])')
 
 # Indexed by the SUBST_* constants above.
 _regex_remove = [ _rm, None, _rm_split ]
@@ -437,7 +443,11 @@ def scons_subst(strSubst, env, mode=SUBST_RAW, target=None, source=None, gvars={
                 if s0 != '$':
                     return s
                 if s1 == '$':
-                    return '$'
+                    # In this case keep the double $'s which we'll later
+                    # swap for a single dollar sign as we need to retain
+                    # this information to properly avoid matching "$("" when
+                    # the actual text was "$$(""  (or "$)"" when "$$)"" )
+                    return '$$'
                 elif s1 in '()':
                     return s
                 else:
@@ -583,6 +593,12 @@ def scons_subst(strSubst, env, mode=SUBST_RAW, target=None, source=None, gvars={
             # Compress strings of white space characters into
             # a single space.
             result = _space_sep.sub(' ', result).strip()
+
+        # Now replace escaped $'s currently "$$"
+        # This is needed because we now retain $$ instead of
+        # replacing them during substition to avoid
+        # improperly trying to escape "$$(" as being "$("
+        result = result.replace('$$','$')
     elif is_Sequence(result):
         remove = _list_remove[mode]
         if remove:

@@ -21,7 +21,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/msgfmt.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/msgfmt.py  2018/09/30 19:25:33 Sye"
 
 from SCons.Builder import BuilderBase
 #############################################################################
@@ -75,8 +75,22 @@ def _create_mo_file_builder(env, **kw):
 #############################################################################
 def generate(env,**kw):
   """ Generate `msgfmt` tool """
+  import sys
+  import os
   import SCons.Util
+  import SCons.Tool
   from SCons.Tool.GettextCommon import _detect_msgfmt
+  from SCons.Platform.mingw import MINGW_DEFAULT_PATHS
+  from SCons.Platform.cygwin import CYGWIN_DEFAULT_PATHS
+
+  if sys.platform == 'win32':
+      msgfmt = SCons.Tool.find_program_path(env, 'msgfmt', default_paths=MINGW_DEFAULT_PATHS + CYGWIN_DEFAULT_PATHS )
+      if msgfmt:
+          msgfmt_bin_dir = os.path.dirname(msgfmt)
+          env.AppendENVPath('PATH', msgfmt_bin_dir)
+      else:
+          SCons.Warnings.Warning('msgfmt tool requested, but binary not found in ENV PATH')
+
   try:
     env['MSGFMT'] = _detect_msgfmt(env)
   except:

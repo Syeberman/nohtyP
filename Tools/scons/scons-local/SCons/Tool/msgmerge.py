@@ -24,7 +24,7 @@ Tool specific initialization for `msgmerge` tool.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/msgmerge.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/msgmerge.py  2018/09/30 19:25:33 Sye"
 
 #############################################################################
 def _update_or_init_po_files(target, source, env):
@@ -68,8 +68,21 @@ def _POUpdateBuilderWrapper(env, target=None, source=_null, **kw):
 
 #############################################################################
 def generate(env,**kw):
-  """ Generate the `xgettext` tool """
+  """ Generate the `msgmerge` tool """
+  import sys
+  import os
+  import SCons.Tool
   from SCons.Tool.GettextCommon import _detect_msgmerge
+  from SCons.Platform.mingw import MINGW_DEFAULT_PATHS
+  from SCons.Platform.cygwin import CYGWIN_DEFAULT_PATHS
+
+  if sys.platform == 'win32':
+      msgmerge = SCons.Tool.find_program_path(env, 'msgmerge', default_paths=MINGW_DEFAULT_PATHS + CYGWIN_DEFAULT_PATHS )
+      if msgmerge:
+          msgmerge_bin_dir = os.path.dirname(msgmerge)
+          env.AppendENVPath('PATH', msgmerge_bin_dir)
+      else:
+          SCons.Warnings.Warning('msgmerge tool requested, but binary not found in ENV PATH')
   try:
     env['MSGMERGE'] = _detect_msgmerge(env)
   except:

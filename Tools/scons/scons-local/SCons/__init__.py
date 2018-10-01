@@ -27,15 +27,15 @@ The main package for the SCons software construction utility.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/__init__.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/__init__.py  2018/09/30 19:25:33 Sye"
 
-__version__ = "3.0.0.alpha.20170821"
+__version__ = "3.1.0.alpha.yyyymmdd"
 
 __build__ = ""
 
 __buildsys__ = "SyesYoga"
 
-__date__ = "2017/09/03 20:58:15"
+__date__ = "2018/09/30 19:25:33"
 
 __developer__ = "Sye"
 

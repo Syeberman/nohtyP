@@ -32,7 +32,7 @@ selection method.
 #
 from __future__ import print_function
 
-__revision__ = "src/engine/SCons/Tool/mslink.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/mslink.py  2018/09/30 19:25:33 Sye"
 
 import os.path
 

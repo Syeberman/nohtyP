@@ -98,7 +98,7 @@ There are the following methods for internal use within this module:
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Builder.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Builder.py  2018/09/30 19:25:33 Sye"
 
 import collections
 
@@ -291,7 +291,14 @@ def _node_errors(builder, env, tlist, slist):
         if t.side_effect:
             raise UserError("Multiple ways to build the same target were specified for: %s" % t)
         if t.has_explicit_builder():
-            if not t.env is None and not t.env is env:
+            # Check for errors when the environments are different
+            # No error if environments are the same Environment instance
+            if (not t.env is None and not t.env is env and
+                    # Check OverrideEnvironment case - no error if wrapped Environments
+                    # are the same instance, and overrides lists match
+                    not (getattr(t.env, '__subject', 0) is getattr(env, '__subject', 1) and
+                         getattr(t.env, 'overrides', 0) == getattr(env, 'overrides', 1) and
+                         not builder.multi)):
                 action = t.builder.action
                 t_contents = t.builder.action.get_contents(tlist, slist, t.env)
                 contents = builder.action.get_contents(tlist, slist, env)
@@ -300,7 +307,10 @@ def _node_errors(builder, env, tlist, slist):
                     msg = "Two different environments were specified for target %s,\n\tbut they appear to have the same action: %s" % (t, action.genstring(tlist, slist, t.env))
                     SCons.Warnings.warn(SCons.Warnings.DuplicateEnvironmentWarning, msg)
                 else:
-                    msg = "Two environments with different actions were specified for the same target: %s\n(action 1: %s)\n(action 2: %s)" % (t,t_contents.decode('utf-8'),contents.decode('utf-8'))
+                    try:
+                        msg = "Two environments with different actions were specified for the same target: %s\n(action 1: %s)\n(action 2: %s)" % (t,t_contents.decode('utf-8'),contents.decode('utf-8'))
+                    except UnicodeDecodeError as e:
+                        msg = "Two environments with different actions were specified for the same target: %s"%t
                     raise UserError(msg)
             if builder.multi:
                 if t.builder != builder:
