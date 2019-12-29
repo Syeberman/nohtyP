@@ -51,31 +51,6 @@ def find_framework_root():
 
     return froot
 
-def query_versions():
-    froot = find_framework_root()
-    if froot:
-        contents = os.listdir(froot)
-
-        l = re.compile('v[0-9]+.*')
-        versions = [e for e in contents if l.match(e)]
-
-        def versrt(a,b):
-            # since version numbers aren't really floats...
-            aa = a[1:]
-            bb = b[1:]
-            aal = aa.split('.')
-            bbl = bb.split('.')
-            # sequence comparison in python is lexicographical
-            # which is exactly what we want.
-            # Note we sort backwards so the highest version is first.
-            return cmp(bbl,aal)
-
-        versions.sort(versrt)
-    else:
-        versions = []
-
-    return versions
-
 # Local Variables:
 # tab-width:4
 # indent-tabs-mode:nil
