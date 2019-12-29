@@ -47,8 +47,7 @@ from SCons.Tool.MSCommon.vc import msvc_exists, \
 from SCons.Tool.MSCommon.vs import get_default_version, \
                                    get_vs_by_version, \
                                    merge_default_version, \
-                                   msvs_exists, \
-                                   query_versions
+                                   msvs_exists
 
 # Local Variables:
 # tab-width:4

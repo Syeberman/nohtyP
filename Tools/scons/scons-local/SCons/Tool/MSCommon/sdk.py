@@ -368,7 +368,7 @@ def mssdk_setup_env(env):
         if not msvs:
             debug('sdk.py:mssdk_setup_env: no VS version detected, bailingout:%s'%msvs)
             return
-        sdk_version = msvs.sdk_version
+        sdk_version = msvs.sdk_version  # FIXME another way to get sdk version?
         debug('sdk.py:msvs.sdk_version is %s'%sdk_version)
         if not sdk_version:
             return
