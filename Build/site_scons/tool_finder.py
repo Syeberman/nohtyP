@@ -17,6 +17,7 @@ if _platform_name in ("win32", "cygwin"):
 
         # Parse PATH, and use those paths to guess the drives where we'll find Program Files
         # (for users that have installed programs on separate drives)
+        # TODO Windows allows path parts to be surrounded by quotes, I think?
         environ_paths = [Path(x) for x in os.environ.get('PATH', '').split(';') if x]
         drives.update((Path(x.anchor), None) for x in environ_paths if x.drive)
 
