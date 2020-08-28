@@ -1,7 +1,7 @@
 /*
  * ypExamples.c - Contains a number of nohtyP examples
  *      http://bitbucket.org/Syeberman/nohtyp   [v0.1.0 $Change$]
- *      Copyright © 2001-2013 Python Software Foundation; All Rights Reserved
+ *      Copyright (c) 2001-2020 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  */
 

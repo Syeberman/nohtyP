@@ -1,8 +1,7 @@
 This is nohtyP version 0.5.0
 ============================
 
-Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-2012, 2013, 2014, 2015 Python Software Foundation.  All rights reserved.
+Copyright (c) 2001-2020 Python Software Foundation.  All rights reserved.
 
 nohtyP is a pure-C implementation of the Python 3.x built-in library.  It is
 implemented in one .c and one .h file for easy embedding in C projects.  The
@@ -11,7 +10,7 @@ nohtyP is tested against Python's test suite to ensure conformance.
 
 [![][AppVeyor badge]][AppVeyor log]
 
-CI is run against both Linux and Windows with the generous support of 
+CI is run against both Linux and Windows with the generous support of
 [AppVeyor].
 
 
@@ -68,9 +67,9 @@ Build/native and Build/native/debug.
 Issue Tracker and Mailing List
 ------------------------------
 
-Bitbucket is used to track bug reports and feature requests:
+GitHub is used to track bug reports and feature requests:
 
-> http://bitbucket.org/Syeberman/nohtyp/issues
+> https://github.com/Syeberman/nohtyP/issues
 
 Feedback is extremely welcome, as are pull requests.
 
@@ -81,8 +80,7 @@ Copyright and License Information
 As a derivative work of Python, nohtyP shares the same copyrights and
 licenses.
 
-Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-2012, 2013, 2014, 2015 Python Software Foundation.  All rights reserved.
+Copyright (c) 2001-2020 Python Software Foundation.  All rights reserved.
 
 Copyright (c) 2000 BeOpen.com.  All rights reserved.
 
@@ -103,6 +101,6 @@ proprietary projects.
 All trademarks referenced herein are property of their respective holders.
 
 
-[AppVeyor badge]: https://ci.appveyor.com/api/projects/status/qkcmpoclwe2wtfxm/branch/default?svg=true
-[AppVeyor log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/default
+[AppVeyor badge]: https://ci.appveyor.com/api/projects/status/8t43r157h40vmfu6/branch/master?svg=true
+[AppVeyor log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/master
 [AppVeyor]: http://ci.appveyor.com
