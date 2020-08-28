@@ -19,7 +19,7 @@ import traceback
 
 try:
     # Ideally this would work everywhere
-    ypdll = cdll.nohtyP
+    ypdll = CDLL("nohtyP", winmode=0)
 except OSError:
     # Perhaps we're on Linux?
     ypdll = CDLL("libnohtyP.so")
