@@ -390,23 +390,26 @@ ypAPI ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value);
 ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
 
+// FIXME Rewrite docs.
 // Returns a new reference to a function object whose implementation comes from code and whose
 // inputs are described by parameters.  Raises yp_FIXME if code contains no implementations, and
 // yp_ParameterSyntaxError if parameters fails validation.  Further documentation for
 // yp_function_code_t and yp_function_parameters_t can be found below.
-
 // FIXME Should parameters==NULL be a shortcut for something?  No parameters?  `*args, **kwargs`?
 // FIXME What about code==NULL?
 // FIXME Really think hard about which inputs to bury in typedefs and which to surface as C params.
+// For example, should code and parameters be in the same struct?
 typedef struct _yp_function_code_t yp_function_code_t;
 typedef struct _yp_function_parameters_t yp_function_parameters_t;
 ypAPI ypObject *yp_function(yp_function_code_t *code, yp_function_parameters_t *parameters);
 
-// Returns a new reference to a generator iterator object using the given func.  The given n objects
-// will be made available to func via yp_iter_stateCX as an array; new references to these objects
+// FIXME Rewrite docs.
+// Returns a new reference to a generator iterator object using the given code.  The given n objects
+// will be made available to code via yp_iter_stateCX as an array; new references to these objects
 // will be created, and those references will be discarded when the iterator is deallocated.
 // length_hint is a clue to consumers of the iterator how many items will be yielded; use zero if
 // this is not known.  Further documentation for yp_generator_func_t can be found below.
+// FIXME A version of yp_iter_stateCX for functions
 // FIXME Rename yp_generator to match?
 // FIXME Is the C suffix applicable here?
 // FIXME Really think hard about the symmetry between these and yp_generator*.  Perhaps they should
@@ -416,8 +419,9 @@ ypAPI ypObject *yp_function_withstateCN(
 ypAPI ypObject *yp_function_withstateCNV(
         yp_function_code_t *code, yp_function_parameters_t *parameters, int n, va_list args);
 
+// FIXME Rewrite docs.
 // Similar to yp_functionCN, but accepts an arbitrary structure (or array) of the given size which
-// will be copied into the iterator and made available to func via yp_iter_stateCX.  If state
+// will be copied into the iterator and made available to code via yp_iter_stateCX.  If state
 // contains any objects, their offsets must be given as the variable arguments; new references to
 // these objects will be created, and those references will be discarded when the iterator is
 // deallocated.
@@ -1239,7 +1243,8 @@ ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
 // result of the call (which may be a new reference or an exception).  Returns yp_TypeError if c is
 // not callable.  Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
-// TODO Reconsider this name.  Consider if we want only-positional or only-kw versions?
+// TODO Reconsider this name.  Consider if we want only-positional or only-kw versions? Or, as
+// suggested elsewhere, we could expose yp_tuple_empty and yp_frozendict_empty.
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 
 // FIXME Stay consistent: https://docs.python.org/3/library/inspect.html#inspect.signature
@@ -1283,6 +1288,7 @@ typedef struct _yp_function_parameter_t {
     ypObject *default_;  // NULL for required argument
 } yp_function_parameter_t;
 
+// FIXME Support positional-only arguments (a new Python feature).
 typedef struct _yp_function_parameters_t {
     // The number of parameters for this function, aka the length of the parameters array.
     yp_ssize_t count;
@@ -1305,8 +1311,7 @@ typedef struct _yp_function_parameters_t {
 // Immortal functions representing , for convience with yp_str_frombytesC4 et al.
 
 // TODO starargs is from the grammar, but do people know it? does the "star" and "args" together
-// imply
-// just `*args` (read it out, it's "star args"), or would people know it's **kwargs too
+// imply just `*args` (read it out, it's "star args"), or would people know it's **kwargs too
 // TODO same signature as above. Does it really help to name them differently?
 // TODO What about yp_function_
 typedef ypObject *(*yp_function_starargs_func_t)(ypObject *self, ypObject *a, ypObject *b);

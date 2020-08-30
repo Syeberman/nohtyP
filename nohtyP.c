@@ -15603,8 +15603,7 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
 // FIXME be sure I'm using "parameter" and "argument" in the right places
 // FIXME ypFunctionObject doesn't need ob_data, etc (i.e. it can be smaller like int)
 // TODO Inspect and consider where yp_ssize_t is used vs int (as in `int n`)
-// FIXME Positional-only arguments are a CPython internal detail and should not be part of nohtyP.
-// (i.e. int now allows int(x=5)).  Kill them with fire.
+// FIXME Positional-only arguments are now supported by CPython; we should too.
 // TODO Make sub exceptions of yp_TypeError for each type of argument error (perhaps all grouped
 // under yp_ArgumentError or yp_CallArgumentError or something).
 // FIXME Stay consistent: https://docs.python.org/3/library/inspect.html#inspect.signature
