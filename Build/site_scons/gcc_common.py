@@ -213,7 +213,14 @@ def ApplyGCCOptions(env, version):
         )
     # Disable frame-pointer omission (ie frame pointers will be available on all builds)
     # XXX Must come after any other optimization compiler options
-    addCcFlags("-fno-omit-frame-pointer")
+    if env["HOST_OS"] == "win32" and version == 8.1 and env["TARGET_ARCH"] == "amd64":
+        # MinGW-W64 for gcc 8.1 crashes with -fno-omit-frame-pointer:
+        #   nohtyP.c: In function 'MethodError_objsliceobjproc':
+        #   nohtyP.c:572:1: internal compiler error: in based_loc_descr, at dwarf2out.c:14264
+        #    DEFINE_GENERIC_METHODS(MethodError, yp_MethodError);
+        pass
+    else:
+        addCcFlags("-fno-omit-frame-pointer")
     # Ensure SCons knows to clean .s, etc
     _updateCcEmitters(env)
 
