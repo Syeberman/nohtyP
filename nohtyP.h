@@ -567,10 +567,10 @@ ypAPI ypObject *yp_throw(ypObject **iterator, ypObject *exc);
 // FIXME Compare against Python's __length_hint__ now that it's official.
 ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
 
-// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_throw returns
-// yp_StopIteration or yp_GeneratorExit, it is not treated as an error; if yp_throw returns any
-// other exception, *iterator is discarded and set to that exception.  The behaviour of this method
-// for other types, in particular files, is documented elsewhere.
+// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_StopIteration or
+// yp_GeneratorExit is returned by yp_throw, *iterator is not discarded; on any other error,
+// *iterator is discarded and set to an exception.  The behaviour of this method for other
+// types, in particular files, is documented elsewhere.
 ypAPI void yp_close(ypObject **iterator);
 
 // Sets the given n ypObject**s to new references for the values yielded from iterable.  Iterable
