@@ -31,13 +31,16 @@ selection method.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/yacc.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/yacc.py  2018/09/30 19:25:33 Sye"
 
 import os.path
+import sys
 
 import SCons.Defaults
 import SCons.Tool
 import SCons.Util
+from SCons.Platform.mingw import MINGW_DEFAULT_PATHS
+from SCons.Platform.cygwin import CYGWIN_DEFAULT_PATHS
 
 YaccAction = SCons.Action.Action("$YACCCOM", "$YACCCOMSTR")
 
@@ -112,6 +115,14 @@ def generate(env):
     # C++
     cxx_file.add_action('.yy', YaccAction)
     cxx_file.add_emitter('.yy', yyEmitter)
+
+    if sys.platform == 'win32':
+        bison = SCons.Tool.find_program_path(env, 'bison', default_paths=MINGW_DEFAULT_PATHS + CYGWIN_DEFAULT_PATHS )
+        if bison:
+            bison_bin_dir = os.path.dirname(bison)
+            env.AppendENVPath('PATH', bison_bin_dir)
+        else:
+            SCons.Warnings.Warning('yacc tool requested, but bison binary not found in ENV PATH')
 
     env['YACC']      = env.Detect('bison') or 'yacc'
     env['YACCFLAGS'] = SCons.Util.CLVar('')

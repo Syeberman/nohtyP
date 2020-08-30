@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/vs.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/MSCommon/vs.py  2018/09/30 19:25:33 Sye"
 
 __doc__ = """Module to detect Visual Studio and/or Visual C/C++
 """
@@ -52,23 +52,11 @@ class VisualStudio(object):
         self.__dict__.update(kw)
         self._cache = {}
 
-    def find_batch_file(self):
-        vs_dir = self.get_vs_dir()
-        if not vs_dir:
-            debug('find_executable():  no vs_dir')
-            return None
-        batch_file = os.path.join(vs_dir, self.batch_file_path)
-        batch_file = os.path.normpath(batch_file)
-        if not os.path.isfile(batch_file):
-            debug('find_batch_file():  %s not on file system' % batch_file)
-            return None
-        return batch_file
-
     def find_vs_dir_by_vc(self):
         SCons.Tool.MSCommon.vc.get_installed_vcs()
         dir = SCons.Tool.MSCommon.vc.find_vc_pdir(self.vc_version)
         if not dir:
-            debug('find_vs_dir():  no installed VC %s' % self.vc_version)
+            debug('find_vs_dir_by_vc():  no installed VC %s' % self.vc_version)
             return None
         return dir
 
@@ -94,11 +82,9 @@ class VisualStudio(object):
         """ Can use registry or location of VC to find vs dir
         First try to find by registry, and if that fails find via VC dir
         """
-
-
+        # FIXME
         if True:
-            vs_dir=self.find_vs_dir_by_reg()
-            return vs_dir
+            return self.find_vs_dir_by_reg()
         else:
             return self.find_vs_dir_by_vc()
 
@@ -113,14 +99,6 @@ class VisualStudio(object):
             debug('find_executable():  {} not on file system'.format(executable))
             return None
         return executable
-
-    def get_batch_file(self):
-        try:
-            return self._cache['batch_file']
-        except KeyError:
-            batch_file = self.find_batch_file()
-            self._cache['batch_file'] = batch_file
-            return batch_file
 
     def get_executable(self):
         try:
@@ -199,25 +177,21 @@ class VisualStudio(object):
 # Tool/MSCommon/vc.py, and the MSVC_VERSION documentation in Tool/msvc.xml.
 
 SupportedVSList = [
-    # Visual Studio 2017
-    VisualStudio('14.1',
-                 vc_version='14.1',
-                 sdk_version='10.0A',
-                 hkeys=[],
-                 common_tools_var='VS150COMNTOOLS',
-                 executable_path=r'Common7\IDE\devenv.com',
-                 batch_file_path=r'VC\Auxiliary\Build\vsvars32.bat',
-                 supported_arch=['x86', 'amd64', "arm"],
-                 ),
+    # FIXME Better way to support VS 2017 without listing every version?
+    #   vc_version: find_vs_dir_by_vc
+    #   sdk_version: mssdk_setup_env
+    #   hkeys: find_vs_dir_by_reg
+    #   common_tools_var: msvs_setup_env FIXME unused!
+    #   executable_path: find_executable
+    #   batch_file_path: find_batch_file FIXME unused!
+    #   supported_arch: get_supported_arch
 
     # Visual Studio 2015
     VisualStudio('14.0',
                  vc_version='14.0',
                  sdk_version='10.0',
                  hkeys=[r'Microsoft\VisualStudio\14.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS140COMNTOOLS',
                  executable_path=r'Common7\IDE\devenv.com',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64', "arm"],
     ),
 
@@ -226,9 +200,7 @@ SupportedVSList = [
                  vc_version='14.0',
                  sdk_version='10.0A',
                  hkeys=[r'Microsoft\VisualStudio\14.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS140COMNTOOLS',
                  executable_path=r'Common7\IDE\WDExpress.exe',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64', "arm"],
     ),
 
@@ -237,9 +209,7 @@ SupportedVSList = [
                  vc_version='12.0',
                  sdk_version='8.1A',
                  hkeys=[r'Microsoft\VisualStudio\12.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS120COMNTOOLS',
                  executable_path=r'Common7\IDE\devenv.com',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64'],
     ),
 
@@ -248,9 +218,7 @@ SupportedVSList = [
                  vc_version='12.0',
                  sdk_version='8.1A',
                  hkeys=[r'Microsoft\VisualStudio\12.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS120COMNTOOLS',
                  executable_path=r'Common7\IDE\WDExpress.exe',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64'],
     ),
 
@@ -258,9 +226,7 @@ SupportedVSList = [
     VisualStudio('11.0',
                  sdk_version='8.0A',
                  hkeys=[r'Microsoft\VisualStudio\11.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS110COMNTOOLS',
                  executable_path=r'Common7\IDE\devenv.com',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64'],
     ),
 
@@ -269,9 +235,7 @@ SupportedVSList = [
                  vc_version='11.0',
                  sdk_version='8.0A',
                  hkeys=[r'Microsoft\VisualStudio\11.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS110COMNTOOLS',
                  executable_path=r'Common7\IDE\WDExpress.exe',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64'],
     ),
 
@@ -279,9 +243,7 @@ SupportedVSList = [
     VisualStudio('10.0',
                  sdk_version='7.0A',
                  hkeys=[r'Microsoft\VisualStudio\10.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS100COMNTOOLS',
                  executable_path=r'Common7\IDE\devenv.com',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64'],
     ),
 
@@ -290,9 +252,7 @@ SupportedVSList = [
                  vc_version='10.0',
                  sdk_version='7.0A',
                  hkeys=[r'Microsoft\VCExpress\10.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS100COMNTOOLS',
                  executable_path=r'Common7\IDE\VCExpress.exe',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86'],
     ),
 
@@ -300,9 +260,7 @@ SupportedVSList = [
     VisualStudio('9.0',
                  sdk_version='6.0A',
                  hkeys=[r'Microsoft\VisualStudio\9.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS90COMNTOOLS',
                  executable_path=r'Common7\IDE\devenv.com',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64'],
     ),
 
@@ -311,9 +269,7 @@ SupportedVSList = [
                  vc_version='9.0',
                  sdk_version='6.0A',
                  hkeys=[r'Microsoft\VCExpress\9.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS90COMNTOOLS',
                  executable_path=r'Common7\IDE\VCExpress.exe',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86'],
     ),
 
@@ -321,10 +277,7 @@ SupportedVSList = [
     VisualStudio('8.0',
                  sdk_version='6.0A',
                  hkeys=[r'Microsoft\VisualStudio\8.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS80COMNTOOLS',
                  executable_path=r'Common7\IDE\devenv.com',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
-                 default_dirname='Microsoft Visual Studio 8',
                  supported_arch=['x86', 'amd64'],
     ),
 
@@ -333,10 +286,7 @@ SupportedVSList = [
                  vc_version='8.0Exp',
                  sdk_version='6.0A',
                  hkeys=[r'Microsoft\VCExpress\8.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS80COMNTOOLS',
                  executable_path=r'Common7\IDE\VCExpress.exe',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
-                 default_dirname='Microsoft Visual Studio 8',
                  supported_arch=['x86'],
     ),
 
@@ -344,10 +294,7 @@ SupportedVSList = [
     VisualStudio('7.1',
                  sdk_version='6.0',
                  hkeys=[r'Microsoft\VisualStudio\7.1\Setup\VS\ProductDir'],
-                 common_tools_var='VS71COMNTOOLS',
                  executable_path=r'Common7\IDE\devenv.com',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
-                 default_dirname='Microsoft Visual Studio .NET 2003',
                  supported_arch=['x86'],
     ),
 
@@ -355,10 +302,7 @@ SupportedVSList = [
     VisualStudio('7.0',
                  sdk_version='2003R2',
                  hkeys=[r'Microsoft\VisualStudio\7.0\Setup\VS\ProductDir'],
-                 common_tools_var='VS70COMNTOOLS',
                  executable_path=r'IDE\devenv.com',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
-                 default_dirname='Microsoft Visual Studio .NET',
                  supported_arch=['x86'],
     ),
 
@@ -367,14 +311,12 @@ SupportedVSList = [
                  sdk_version='2003R1',
                  hkeys=[r'Microsoft\VisualStudio\6.0\Setup\Microsoft Visual Studio\ProductDir',
                         'use_dir'],
-                 common_tools_var='VS60COMNTOOLS',
                  executable_path=r'Common\MSDev98\Bin\MSDEV.COM',
-                 batch_file_path=r'Common7\Tools\vsvars32.bat',
-                 default_dirname='Microsoft Visual Studio',
                  supported_arch=['x86'],
     ),
 ]
 
+# FIXME
 SupportedVSMap = {}
 for vs in SupportedVSList:
     SupportedVSMap[vs.version] = vs
@@ -389,6 +331,7 @@ for vs in SupportedVSList:
 InstalledVSList = None
 InstalledVSMap  = None
 
+# FIXME If we can get rid of this, we can get rid of get_executable.
 def get_installed_visual_studios():
     global InstalledVSList
     global InstalledVSMap
@@ -455,7 +398,14 @@ def get_vs_by_version(msvs):
     global InstalledVSMap
     global SupportedVSMap
 
+    # FIXME
     debug('vs.py:get_vs_by_version()')
+
+    #msvs_tuple = SCons.Tool.MSCommon.vc.msvc_version_to_maj_min(msvs)
+    #if msvs_tuple >= (14, 1):
+
+
+
     if msvs not in SupportedVSMap:
         msg = "Visual Studio version %s is not supported" % repr(msvs)
         raise SCons.Errors.UserError(msg)
@@ -497,6 +447,7 @@ def get_default_version(env):
         if versions:
             env['MSVS_VERSION'] = versions[0] #use highest version by default
         else:
+            # FIXME
             debug('get_default_version: WARNING: no installed versions found, '
                   'using first in SupportedVSList (%s)'%SupportedVSList[0].version)
             env['MSVS_VERSION'] = SupportedVSList[0].version
@@ -530,41 +481,6 @@ def get_default_arch(env):
 def merge_default_version(env):
     version = get_default_version(env)
     arch = get_default_arch(env)
-
-def msvs_setup_env(env):
-    batfilename = msvs.get_batch_file()
-    msvs = get_vs_by_version(version)
-    if msvs is None:
-        return
-
-    # XXX: I think this is broken. This will silently set a bogus tool instead
-    # of failing, but there is no other way with the current scons tool
-    # framework
-    if batfilename is not None:
-
-        vars = ('LIB', 'LIBPATH', 'PATH', 'INCLUDE')
-
-        msvs_list = get_installed_visual_studios()
-        vscommonvarnames = [vs.common_tools_var for vs in msvs_list]
-        save_ENV = env['ENV']
-        nenv = normalize_env(env['ENV'],
-                             ['COMSPEC'] + vscommonvarnames,
-                             force=True)
-        try:
-            output = get_output(batfilename, arch, env=nenv)
-        finally:
-            env['ENV'] = save_ENV
-        vars = parse_output(output, vars)
-
-        for k, v in vars.items():
-            env.PrependENVPath(k, v, delete_existing=1)
-
-def query_versions():
-    """Query the system to get available versions of VS. A version is
-    considered when a batfile is found."""
-    msvs_list = get_installed_visual_studios()
-    versions = [msvs.version for msvs in msvs_list]
-    return versions
 
 # Local Variables:
 # tab-width:4

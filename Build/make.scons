@@ -25,7 +25,8 @@ def nohtyP_SharedLibrary(env):
             "yp_BUILD_CORE",
             "yp_DEBUG_LEVEL=%s" % ("1" if env["CONFIGURATION"] == "debug" else "0"),
         ],
-        PDB="$VTOP/nohtyP.pdb", LIBS="",
+        PDB="$VTOP/nohtyP.pdb",
+        LIBS="",
     )
     return (env.SharedLibrary("$VTOP/nohtyP", source="$VTOP/nohtyP.c"), )
 
@@ -36,8 +37,9 @@ def nohtyP_yp_test(env, sharedLib):
     env.PrependENVPath("PATH", sharedLibDir)  # Windows
     env.PrependENVPath("LD_LIBRARY_PATH", sharedLibDir)  # Linux
     scripts = ("#/Lib/yp.py", Glob("#/Lib/yp_test/*.py"), Glob("#/Lib/yp_test/*.txt"))
-    testLog = env.Command("$VTOP/yp_test.log", (sharedLib, scripts),
-                          "$PYTHON -m yp_test -v > $TARGET")
+    testLog = env.Command(
+        "$VTOP/yp_test.log", (sharedLib, scripts), "$PYTHON -m yp_test -v > $TARGET"
+    )
     Clean(sharedLib, testLog)
     return testLog
 
@@ -47,15 +49,17 @@ def nohtyP_checkapi(env):
     # only recognizes .c (etc) files so we make a copy with that extension.  Use dummy versions
     # of standard headers that work well with pycparser.
     env.PrependUnique(CPPPATH=["#", "#/Include/fake_libc_include"], PDB="", LIBS="")
-    headerDotC = env.Command("$VTOP/checkapi/nohtyP_h.c", "$VTOP/nohtyP.h",
-                             Copy("$TARGET", "$SOURCE"))
+    headerDotC = env.Command(
+        "$VTOP/checkapi/nohtyP_h.c", "$VTOP/nohtyP.h", Copy("$TARGET", "$SOURCE")
+    )
     preprocessed = env.Preprocessed("$VTOP/checkapi/nohtyP_h", source=headerDotC)
 
     # TODO Have checkapi write directly to the file
     scripts = (Glob("#/Tools/checkapi/*.py"), )
     checkapiLog = env.Command(
         "$VTOP/checkapi.log", (preprocessed, scripts),
-        "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET")
+        "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET"
+    )
     return checkapiLog
 
 
@@ -63,8 +67,13 @@ def nohtyP_checkapi(env):
 # "native" (ie the default target)
 # TODO If none of these compilers can be found, default to an "any" compiler (but still version the
 # output directory)
-# FIXME msvs_150 isn't being picked up by AppVeyor
-compiler_names = ("msvs_150", "msvs_140", "gcc_54", "msvs_120", "gcc_48", "msvs_110", "gcc_46", "msvs_100", "msvs_90")
+# TODO Would love to make this more dynamic, finding any known compiler, and then trimming.
+# FIXME msvs
+compiler_names = (
+    "msvs_158", "gcc_93", "gcc_92", "gcc_84", "gcc_82", "gcc_81", "gcc_75", "gcc_73", "msvs_140",
+    "gcc_65", "gcc_64", "gcc_55", "gcc_54", "msvs_120", "gcc_49", "gcc_48", "msvs_110", "gcc_47",
+    "gcc_46", "msvs_100", "msvs_90"
+)
 oses = ("win32", "posix")
 archs = ("amd64", "x86")
 # TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
@@ -100,16 +109,15 @@ for compiler_name in compiler_names:
             continue
 
         SconscriptLog.write(
-            "\n{compiler_name} {targ_os} {targ_arch} {configuration}\n".format(**locals()))
+            "\n{compiler_name} {targ_os} {targ_arch} {configuration}\n".format(**locals())
+        )
 
         # Maintain a separate directory for intermediate and target files, but don't copy source
         variantEnv = RootEnv.Clone(
-            COMPILER=compiler,
-            TARGET_OS=targ_os,
-            TARGET_ARCH=targ_arch,
-            CONFIGURATION=configuration)
-        variantEnv["VTOP"] = "#Build/%s/%s_%s_%s" % (compiler_name, targ_os,
-                                                     targ_arch, configuration)
+            COMPILER=compiler, TARGET_OS=targ_os, TARGET_ARCH=targ_arch, CONFIGURATION=configuration
+        )
+        variantEnv["VTOP"
+                   ] = "#Build/%s/%s_%s_%s" % (compiler_name, targ_os, targ_arch, configuration)
         variantEnv.VariantDir("$VTOP", "#", duplicate=False)
 
         # Skip compilers that can't be found
@@ -132,8 +140,9 @@ for compiler_name in compiler_names:
         buildTargets.append(sharedLib)
 
         try:
-            analyzeTargets.append(
-                nohtyP_checkapi(compilerEnv.Clone(tools=[python_3, ])))
+            analyzeTargets.append(nohtyP_checkapi(compilerEnv.Clone(tools=[
+                python_3,
+            ])))
         except (SCons.Errors.UserError, SCons.Errors.StopError):
             traceback.print_exc(file=SconscriptLog)
 
@@ -143,8 +152,10 @@ for compiler_name in compiler_names:
             # in testTargets so that "testrelease" will pull them into the native directory.
             try:
                 testTargets.extend((
-                    nohtyP_yp_test(variantEnv.Clone(tools=[python_min34, ]), sharedLib),
-                    sharedLib))
+                    nohtyP_yp_test(variantEnv.Clone(tools=[
+                        python_min34,
+                    ]), sharedLib), sharedLib
+                ))
             except (SCons.Errors.UserError, SCons.Errors.StopError):
                 traceback.print_exc(file=SconscriptLog)
 
@@ -156,7 +167,7 @@ for compiler_name in compiler_names:
                 if configuration == "release":
                     native_dest = "#Build/native"
                 else:
-                    native_dest = "#Build/native/"+configuration
+                    native_dest = "#Build/native/" + configuration
                 buildTargets.append(variantEnv.Install(native_dest, buildTargets))
                 testTargets.append(variantEnv.Install(native_dest, testTargets))
                 analyzeTargets.append(variantEnv.Install(native_dest, analyzeTargets))

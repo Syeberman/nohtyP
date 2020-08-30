@@ -106,10 +106,10 @@ extern "C" {
  */
 
 // Must be called once before any other function; subsequent calls are a no-op.  If a fatal error
-// occurs abort() is called.  kwparams can be NULL to accept all defaults; further documentation
+// occurs abort() is called.  args can be NULL to accept all defaults; further documentation
 // on these parameters can be found below.
-typedef struct _yp_initialize_kwparams_t yp_initialize_kwparams_t;
-ypAPI void yp_initialize(const yp_initialize_kwparams_t *kwparams);
+typedef struct _yp_initialize_parameters_t yp_initialize_parameters_t;
+ypAPI void yp_initialize(const yp_initialize_parameters_t *args);
 
 
 /*
@@ -188,13 +188,13 @@ typedef yp_int64_t yp_int_t;
 typedef yp_float64_t yp_float_t;
 
 // The signature of a function that can be wrapped up in a generator iterator.  Called by yp_send,
-// yp_throw, and similar methods.  self is the iterator object; use yp_iter_stateCX to retrieve any
-// state variables.  value is the object that is sent into the function by yp_send, or the exception
-// sent in by yp_throw; it may also be yp_GeneratorExit if yp_close is called, or another exception.
-// The return value must be a new or immortal reference, yp_StopIteration if the iterator is
-// exhausted, or another exception.  The iterator will be closed with yp_close if it returns an
-// exception (resulting in one last call with yp_GeneratorExit).
-typedef ypObject *(*yp_generator_func_t)(ypObject *self, ypObject *value);
+// yp_throw, and similar methods.  iterator is the iterator object; use yp_iter_stateCX to retrieve
+// any state variables.  value is the object that is sent into the function by yp_send, or the
+// exception sent in by yp_throw; it may also be yp_GeneratorExit if yp_close is called, or another
+// exception.  The return value must be a new or immortal reference, yp_StopIteration if the
+// iterator is exhausted, or another exception.  The iterator will be closed with yp_close if it
+// returns an exception (resulting in one last call with yp_GeneratorExit).
+typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
 
 
 /*
@@ -1632,8 +1632,8 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 // yp_initialize accepts a number of parameters to customize nohtyP behaviour.
 // XXX Offsets will not change between versions: members from this struct will never be deleted,
 // only deprecated.
-typedef struct _yp_initialize_kwparams_t {
-    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_initialize_kwparams_t) on allocation
+typedef struct _yp_initialize_parameters_t {
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_initialize_parameters_t) on allocation
 
     // yp_malloc, yp_malloc_resize, and yp_free allow you to specify custom memory allocation APIs.
     // It is recommended to set these to NULL to use nohtyP's internal defaults.  Any functions you
@@ -1671,7 +1671,7 @@ typedef struct _yp_initialize_kwparams_t {
     // XXX Use this option carefully, and profile to ensure it actually provides a benefit!
     int everything_immortal;
 
-} yp_initialize_kwparams_t;
+} yp_initialize_parameters_t;
 
 
 /*

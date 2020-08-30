@@ -20,7 +20,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/netframework.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/MSCommon/netframework.py  2018/09/30 19:25:33 Sye"
 
 __doc__ = """
 """
@@ -50,31 +50,6 @@ def find_framework_root():
         return None
 
     return froot
-
-def query_versions():
-    froot = find_framework_root()
-    if froot:
-        contents = os.listdir(froot)
-
-        l = re.compile('v[0-9]+.*')
-        versions = [e for e in contents if l.match(e)]
-
-        def versrt(a,b):
-            # since version numbers aren't really floats...
-            aa = a[1:]
-            bb = b[1:]
-            aal = aa.split('.')
-            bbl = bb.split('.')
-            # sequence comparison in python is lexicographical
-            # which is exactly what we want.
-            # Note we sort backwards so the highest version is first.
-            return cmp(bbl,aal)
-
-        versions.sort(versrt)
-    else:
-        versions = []
-
-    return versions
 
 # Local Variables:
 # tab-width:4

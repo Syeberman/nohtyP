@@ -32,9 +32,10 @@ from __future__ import print_function
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/swig.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/swig.py  2018/09/30 19:25:33 Sye"
 
 import os.path
+import sys
 import re
 import subprocess
 
@@ -168,6 +169,17 @@ def generate(env):
 
     java_file.add_action('.i', SwigAction)
     java_file.add_emitter('.i', _swigEmitter)
+
+    from SCons.Platform.mingw import MINGW_DEFAULT_PATHS
+    from SCons.Platform.cygwin import CYGWIN_DEFAULT_PATHS
+
+    if sys.platform == 'win32':
+        swig = SCons.Tool.find_program_path(env, 'swig', default_paths=MINGW_DEFAULT_PATHS + CYGWIN_DEFAULT_PATHS + [r'C:\ProgramData\chocolatey\bin'] )
+        if swig:
+            swig_bin_dir = os.path.dirname(swig)
+            env.AppendENVPath('PATH', swig_bin_dir)
+        else:
+            SCons.Warnings.Warning('swig tool requested, but binary not found in ENV PATH')
 
     if 'SWIG' not in env:
         env['SWIG'] = env.Detect(swigs) or swigs[0]

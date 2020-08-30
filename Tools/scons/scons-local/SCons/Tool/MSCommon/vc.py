@@ -30,7 +30,7 @@
 #   * test on 64 bits XP +  VS 2005 (and VS 6 if possible)
 #   * SDK
 #   * Assembly
-__revision__ = "src/engine/SCons/Tool/MSCommon/vc.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/MSCommon/vc.py  2018/09/30 19:25:33 Sye"
 
 __doc__ = """Module for Visual C/C++ detection and configuration.
 """
@@ -43,6 +43,7 @@ import platform
 from string import digits as string_digits
 
 import SCons.Warnings
+from SCons.Tool import find_program_path
 
 from . import common
 
@@ -136,11 +137,10 @@ def get_host_target(env):
 
 # If you update this, update SupportedVSList in Tool/MSCommon/vs.py, and the
 # MSVC_VERSION documentation in Tool/msvc.xml.
-_VCVER = ["14.1", "14.0", "14.0Exp", "12.0", "12.0Exp", "11.0", "11.0Exp", "10.0", "10.0Exp", "9.0", "9.0Exp","8.0", "8.0Exp","7.1", "7.0", "6.0"]
+# FIXME
+_VCVER = ["14.0", "14.0Exp", "12.0", "12.0Exp", "11.0", "11.0Exp", "10.0", "10.0Exp", "9.0", "9.0Exp","8.0", "8.0Exp","7.1", "7.0", "6.0"]
 
 _VCVER_TO_PRODUCT_DIR = {
-    '14.1' : [
-        (SCons.Util.HKEY_LOCAL_MACHINE, r'')], # Visual Studio 2017 doesn't set this registry key anymore
     '14.0' : [
         (SCons.Util.HKEY_LOCAL_MACHINE, r'Microsoft\VisualStudio\14.0\Setup\VC\ProductDir')],
     '14.0Exp' : [
@@ -187,6 +187,8 @@ _VCVER_TO_PRODUCT_DIR = {
         ]
 }
 
+# FIXME make applicable for msvs also
+# FIXME optimize
 def msvc_version_to_maj_min(msvc_version):
     msvc_version_numeric = ''.join([x for  x in msvc_version if x in string_digits + '.'])
 
@@ -263,11 +265,17 @@ def find_vc_pdir(msvc_version):
     If for some reason the requested version could not be found, an
     exception which inherits from VisualCException will be raised."""
     root = 'Software\\'
-    try:
-        hkeys = _VCVER_TO_PRODUCT_DIR[msvc_version]
-    except KeyError:
-        debug("Unknown version of MSVC: %s" % msvc_version)
-        raise UnsupportedVersion("Unknown version %s" % msvc_version)
+
+    msvc_version_tuple = msvc_version_to_maj_min(msvc_version)
+    if msvc_version_tuple >= (14, 1):
+        # Starting with Visual Studio 2017, use vswhere.exe to locate the installation.
+        hkeys = ('', '')
+    else:
+        try:
+            hkeys = _VCVER_TO_PRODUCT_DIR[msvc_version]
+        except KeyError:
+            debug("Unknown version of MSVC: %s" % msvc_version)
+            raise UnsupportedVersion("Unknown version %s" % msvc_version)
 
     for hkroot, key in hkeys:
         try:
@@ -354,12 +362,19 @@ def cached_get_installed_vcs():
 
 def get_installed_vcs():
     installed_versions = []
+    # FIXME
     for ver in _VCVER:
         debug('trying to find VC %s' % ver)
         try:
-            if find_vc_pdir(ver):
+            VC_DIR = find_vc_pdir(ver)
+            if VC_DIR:
                 debug('found VC %s' % ver)
-                installed_versions.append(ver)
+                # check to see if the x86 or 64 bit compiler is in the bin dir
+                if (os.path.exists(os.path.join(VC_DIR, r'bin\cl.exe'))
+                    or os.path.exists(os.path.join(VC_DIR, r'bin\amd64\cl.exe'))):
+                    installed_versions.append(ver)
+                else:
+                    debug('find_vc_pdir no cl.exe found %s' % ver)
             else:
                 debug('find_vc_pdir return None for ver %s' % ver)
         except VisualCException as e:
@@ -474,7 +489,7 @@ def msvc_find_valid_batch_script(env,version):
                 (host_target, version)
             SCons.Warnings.warn(SCons.Warnings.VisualCMissingWarning, warn_msg)
         arg = _HOST_TARGET_ARCH_TO_BAT_ARCH[host_target]
-        
+
         # Get just version numbers
         maj, min = msvc_version_to_maj_min(version)
         # VS2015+
@@ -545,7 +560,6 @@ def msvc_setup_env(env):
     env['MSVS_VERSION'] = version
     env['MSVS'] = {}
 
-
     use_script = env.get('MSVC_USE_SCRIPT', True)
     if SCons.Util.is_String(use_script):
         debug('vc.py:msvc_setup_env() use_script 1 %s\n' % repr(use_script))
@@ -565,6 +579,12 @@ def msvc_setup_env(env):
     for k, v in d.items():
         debug('vc.py:msvc_setup_env() env:%s -> %s'%(k,v))
         env.PrependENVPath(k, v, delete_existing=True)
+
+    # final check to issue a warning if the compiler is not present
+    msvc_cl = find_program_path(env, 'cl')
+    if not msvc_cl:
+        SCons.Warnings.warn(SCons.Warnings.VisualCMissingWarning,
+            "Could not find MSVC compiler 'cl.exe', it may need to be installed separately with Visual Studio")
 
 def msvc_exists(version=None):
     vcs = cached_get_installed_vcs()

@@ -49,15 +49,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _MSC_VER  // MSVC
+#if defined(_MSC_VER)  // MSVC
 #include <Windows.h>
+#if _MSC_VER >= 1800
+#include <inttypes.h>
+#endif
 #ifndef va_copy
 #define va_copy(d, s) ((d) = (s))
 #endif
 #endif
 
-#ifdef __GNUC__  // GCC
+#if defined(__GNUC__)  // GCC
 #define GCC_VER (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+#include <inttypes.h>
 #include <stdint.h>
 #endif
 
@@ -66,14 +70,26 @@
 #define FALSE (0 == 1)
 #endif
 
-// Similar to PRIi64 defined in intttypes.h, this chooses the appropriate format string depending
-// on the compiler.
-// TODO Inline any of these that are 100% cross-platform
-#define PRIint "I64d"  // for use with yp_int_t
-#if SIZE_MAX == 0xFFFFFFFFu
-#define PRIssize "d"  // for use with yp_ssize_t
+// Defines exactly one of yp_ARCH_32_BIT or yp_ARCH_64_BIT.
+#if yp_SSIZE_T_MAX == 0x7FFFFFFFFFFFFFFF
+#define yp_ARCH_64_BIT 1
 #else
-#define PRIssize PRIint  // for use with yp_ssize_t
+#define yp_ARCH_32_BIT 1
+#endif
+
+// Similar to PRId64 defined in intttypes.h, this chooses the appropriate format string depending
+// on the compiler.
+//  PRIint: for use with yp_int_t
+//  PRIssize: for use with yp_ssize_t
+#if defined(PRId64)
+#define PRIint PRId64
+#else
+#define PRIint "I64d"
+#endif
+#if defined(yp_ARCH_32_BIT)
+#define PRIssize "d"
+#else
+#define PRIssize PRIint
 #endif
 
 
@@ -104,22 +120,32 @@
 #define _yp_S_(x) _yp_S(x)
 #define _yp_S__LINE__ _yp_S_(__LINE__)
 
+#define _yp_FATAL(s_file, s_line, line_of_code, ...)                                 \
+    do {                                                                             \
+        (void)fflush(NULL);                                                          \
+        fprintf(stderr, "%s", "Traceback (most recent call last):\n  File \"" s_file \
+                              "\", line " s_line "\n    " line_of_code "\n");        \
+        fprintf(stderr, "FATAL ERROR: " __VA_ARGS__);                                \
+        fprintf(stderr, "\n");                                                       \
+        abort();                                                                     \
+    } while (0)
+#define yp_FATAL(fmt, ...) \
+    _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL(" #fmt ", " #__VA_ARGS__ ");", fmt, __VA_ARGS__)
+#define yp_FATAL1(msg) _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL1(" #msg ");", msg)
+
 #if yp_DEBUG_LEVEL >= 1
-#define _yp_ASSERT(s_file, s_line, expr, ...)                                               \
-    do {                                                                                    \
-        if (!(expr)) {                                                                      \
-            (void)fflush(NULL);                                                             \
-            fprintf(stderr, "%s", "\n  File " s_file ", line " s_line "\n    " #expr "\n"); \
-            fprintf(stderr, "yp_ASSERT: " __VA_ARGS__);                                     \
-            fprintf(stderr, "\n");                                                          \
-            abort();                                                                        \
-        }                                                                                   \
+#define _yp_ASSERT(expr, s_file, s_line, line_of_code, ...)                \
+    do {                                                                   \
+        if (!(expr)) _yp_FATAL(s_file, s_line, line_of_code, __VA_ARGS__); \
     } while (0)
 #else
 #define _yp_ASSERT(...)
 #endif
-#define yp_ASSERT(expr, ...) _yp_ASSERT("nohtyP.c", _yp_S__LINE__, expr, __VA_ARGS__)
-#define yp_ASSERT1(expr) yp_ASSERT(expr, "assertion failed")
+#define yp_ASSERT(expr, ...)                                                               \
+    _yp_ASSERT(expr, "nohtyP.c", _yp_S__LINE__, "yp_ASSERT(" #expr ", " #__VA_ARGS__ ");", \
+            __VA_ARGS__)
+#define yp_ASSERT1(expr) \
+    _yp_ASSERT(expr, "nohtyP.c", _yp_S__LINE__, "yp_ASSERT1(" #expr ");", "assertion failed")
 
 // Issues a breakpoint if the debugger is attached, on supported platforms
 // TODO Debug only, and use only at the point the error is "raised" (rename to yp_raise?)
@@ -161,6 +187,17 @@ static void yp_breakonerr(ypObject *err) {
  *************************************************************************************************/
 #pragma region assertions
 
+#if defined(yp_ARCH_32_BIT)
+#if defined(yp_ARCH_64_BIT)
+#error yp_ARCH_32_BIT and yp_ARCH_64_BIT cannot both be defined.
+#endif
+yp_STATIC_ASSERT(sizeof(void *) == 4, sizeof_pointer);
+#elif defined(yp_ARCH_64_BIT)
+yp_STATIC_ASSERT(sizeof(void *) == 8, sizeof_pointer);
+#else
+#error Exactly one of yp_ARCH_32_BIT or yp_ARCH_64_BIT must be defined.
+#endif
+
 yp_STATIC_ASSERT(sizeof(yp_int8_t) == 1, sizeof_int8);
 yp_STATIC_ASSERT(sizeof(yp_uint8_t) == 1, sizeof_uint8);
 yp_STATIC_ASSERT(sizeof(yp_int16_t) == 2, sizeof_int16);
@@ -173,6 +210,7 @@ yp_STATIC_ASSERT(sizeof(yp_float32_t) == 4, sizeof_float32);
 yp_STATIC_ASSERT(sizeof(yp_float64_t) == 8, sizeof_float64);
 yp_STATIC_ASSERT(sizeof(yp_ssize_t) == sizeof(size_t), sizeof_ssize);
 yp_STATIC_ASSERT(yp_SSIZE_T_MAX == (SIZE_MAX / 2), ssize_max);
+
 #define yp_MAX_ALIGNMENT (8)  // The maximum possible required alignment of any entity
 
 // struct _ypObject must be 8-byte aligned in size, and must not have padding bytes
@@ -674,7 +712,7 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 // Parameters used for the numeric hash implementation.  Numeric hashes are based on reduction
 // modulo the prime 2**_PyHASH_BITS - 1.
 // XXX Adapted from Python's pyport.h
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu
+#if defined(yp_ARCH_32_BIT)
 #define _ypHASH_BITS 31
 #else
 #define _ypHASH_BITS 61
@@ -1067,19 +1105,19 @@ static void *_dummy_yp_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t siz
 }
 static void _dummy_yp_free(void *p) {}
 
-// See docs for yp_initialize_kwparams_t.yp_malloc in nohtyP.h
+// See docs for yp_initialize_parameters_t.yp_malloc in nohtyP.h
 static void *(*yp_malloc)(yp_ssize_t *actual, yp_ssize_t size) = _dummy_yp_malloc;
 
-// See docs for yp_initialize_kwparams_t.yp_malloc_resize in nohtyP.h
+// See docs for yp_initialize_parameters_t.yp_malloc_resize in nohtyP.h
 static void *(*yp_malloc_resize)(
         yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra) = _dummy_yp_malloc_resize;
 
-// See docs for yp_initialize_kwparams_t.yp_free in nohtyP.h
+// See docs for yp_initialize_parameters_t.yp_free in nohtyP.h
 static void (*yp_free)(void *p) = _dummy_yp_free;
 
 // Microsoft gives a couple options for heaps; let's stick with the standard malloc/free plus
 // _msize and _expand
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #include <malloc.h>
 static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
@@ -1255,7 +1293,7 @@ static ypObject *_ypMem_malloc_container_inline(int type, yp_ssize_t alloclen,
 // TODO Make this configurable via yp_initialize
 // TODO 64-bit PyDictObject is 128 bytes...we are larger!
 // TODO Static asserts to ensure that certain-sized objects fit with one allocation, then optimize
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu  // 32-bit (or less) platform
+#if defined(yp_ARCH_32_BIT)
 #define _ypMem_ideal_size_DEFAULT ((yp_ssize_t)128)
 #else
 #define _ypMem_ideal_size_DEFAULT ((yp_ssize_t)256)
@@ -2040,7 +2078,7 @@ typedef yp_int32_t _yp_iter_length_hint_t;
 // To ensure that ob_inline_data is aligned properly, we need to pad on some platforms
 // TODO If we use ob_len to store the length_hint, yp_lenC would have to always call tp_len, but
 // then we could trim 8 bytes off all iterators
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu  // 32-bit (or less) platform
+#if defined(yp_ARCH_32_BIT)
 #define _ypIterObject_HEAD         \
     _ypIterObject_HEAD_NO_PADDING; \
     void *_ob_padding /* force use of semi-colon */
@@ -4724,7 +4762,7 @@ _ypInt_PUBLIC_AS_C_FUNCTION(int16,  0xFFFF);
 _ypInt_PUBLIC_AS_C_FUNCTION(uint16, 0xFFFFu);
 _ypInt_PUBLIC_AS_C_FUNCTION(int32,  0xFFFFFFFF);
 _ypInt_PUBLIC_AS_C_FUNCTION(uint32, 0xFFFFFFFFu);
-#if yp_SSIZE_T_MAX <= 0x7FFFFFFFu // 32-bit (or less) platform
+#if defined(yp_ARCH_32_BIT)
 yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) < yp_sizeof(yp_int_t), sizeof_yp_ssize_lt_yp_int);
 _ypInt_PUBLIC_AS_C_FUNCTION(ssize,  (yp_ssize_t) 0xFFFFFFFF);
 _ypInt_PUBLIC_AS_C_FUNCTION(hash,   (yp_hash_t) 0xFFFFFFFF);
@@ -4741,7 +4779,7 @@ yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc)
     return (yp_uint64_t)asint;
 }
 
-#if yp_SSIZE_T_MAX > 0x7FFFFFFFu  // 64-bit (or more) platform
+#if defined(yp_ARCH_64_BIT)
 yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) == yp_sizeof(yp_int_t), sizeof_yp_ssize_eq_yp_int);
 yp_ssize_t yp_asssizeC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 yp_hash_t yp_ashashC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
@@ -9049,7 +9087,7 @@ static ypObject *_str_tailmatch(
 static ypObject *_str_startswith_or_endswith(
         ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t end, findfunc_direction direction)
 {
-    // Because we are called directly (i.e. ypFunction), ensure we're called correctly
+    // We're called directly (ypFunction calls str_startswith), so ensure we're called correctly
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(s) == ypStr_CODE);
 
     // FIXME Also support lists?  Python requires a tuple here...
@@ -16169,46 +16207,46 @@ ypObject *const yp_t_range = (ypObject *)&ypRange_Type;
 #pragma region initialization
 
 // TODO A script to ensure the comments on the line match the structure member
-static const yp_initialize_kwparams_t _default_initialize = {
-        yp_sizeof(yp_initialize_kwparams_t),  // sizeof_struct
-        _default_yp_malloc,                   // yp_malloc
-        _default_yp_malloc_resize,            // yp_malloc_resize
-        _default_yp_free,                     // yp_free
-        FALSE,                                // everything_immortal
+static const yp_initialize_parameters_t _default_initialize = {
+        yp_sizeof(yp_initialize_parameters_t),  // sizeof_struct
+        _default_yp_malloc,                     // yp_malloc
+        _default_yp_malloc_resize,              // yp_malloc_resize
+        _default_yp_free,                       // yp_free
+        FALSE,                                  // everything_immortal
 };
 
-// Helpful macro, for use only by yp_initialize and friends, to retrieve a parameter from
-// kwparams.  Returns the default value if kwparams is too small to hold the parameter, or if
-// the expression "kwparams->key default_cond" (ie "kwparams->yp_malloc ==NULL") evaluates to true.
+// Helpful macro, for use only by yp_initialize and friends, to retrieve an argument from args.
+// Returns the default value if args is too small to hold the argument, or if the expression
+// "args->key default_cond" (ie "args->yp_malloc ==NULL") evaluates to true.
 // clang-format off
-#define _yp_INIT_PARAM_END(key) \
-    (yp_offsetof(yp_initialize_kwparams_t, key) + yp_sizeof_member(yp_initialize_kwparams_t, key))
-#define yp_INIT_PARAM2(key, default_cond) \
-    ( kwparams->sizeof_struct < _yp_INIT_PARAM_END(key) ? \
+#define _yp_INIT_ARG_END(key) \
+    (yp_offsetof(yp_initialize_parameters_t, key) + yp_sizeof_member(yp_initialize_parameters_t, key))
+#define yp_INIT_ARG2(key, default_cond) \
+    ( args->sizeof_struct < _yp_INIT_ARG_END(key) ? \
         _default_initialize.key : \
-      kwparams->key default_cond ? \
+      args->key default_cond ? \
         _default_initialize.key : \
       /* else */ \
-        kwparams->key \
+        args->key \
     )
-#define yp_INIT_PARAM1(key) \
-    ( kwparams->sizeof_struct < _yp_INIT_PARAM_END(key) ? \
+#define yp_INIT_ARG1(key) \
+    ( args->sizeof_struct < _yp_INIT_ARG_END(key) ? \
         _default_initialize.key : \
       /* else */ \
-        kwparams->key \
+        args->key \
     )
 // clang-format on
 
 // Called *exactly* *once* by yp_initialize to set up memory management.  Further, setting
 // yp_malloc here helps ensure that yp_initialize is called before anything else in the library
 // (because otherwise all mallocs result in yp_MemoryError).
-static void _ypMem_initialize(const yp_initialize_kwparams_t *kwparams)
+static void _ypMem_initialize(const yp_initialize_parameters_t *args)
 {
-    yp_malloc = yp_INIT_PARAM2(yp_malloc, == NULL);
-    yp_malloc_resize = yp_INIT_PARAM2(yp_malloc_resize, == NULL);
-    yp_free = yp_INIT_PARAM2(yp_free, == NULL);
+    yp_malloc = yp_INIT_ARG2(yp_malloc, == NULL);
+    yp_malloc_resize = yp_INIT_ARG2(yp_malloc_resize, == NULL);
+    yp_free = yp_INIT_ARG2(yp_free, == NULL);
 
-    if (yp_INIT_PARAM1(everything_immortal)) {
+    if (yp_INIT_ARG1(everything_immortal)) {
         // All objects will be created immortal
         _ypMem_starting_refcnt = ypObject_REFCNT_IMMORTAL;
     } else {
@@ -16232,7 +16270,7 @@ static void _ypMem_initialize(const yp_initialize_kwparams_t *kwparams)
 // Called *exactly* *once* by yp_initialize to set up the codecs module.  Errors are largely
 // ignored: calling code will fail gracefully later on.
 // TODO Instead, fail with an ASSERT on any exceptions
-static void _yp_codecs_initialize(const yp_initialize_kwparams_t *kwparams)
+static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
 {
     // The set of standard encodings
     // TODO This would be easier to maintain with a "yp_N" macro to count args
@@ -16296,9 +16334,17 @@ static void _yp_codecs_initialize(const yp_initialize_kwparams_t *kwparams)
     // clang-format on
 }
 
-void yp_initialize(const yp_initialize_kwparams_t *kwparams)
+void yp_initialize(const yp_initialize_parameters_t *args)
 {
     static int initialized = FALSE;
+
+    // Ensure sizeof_struct was initialized appropriately: the earliest version of this struct
+    // contained everything_immortal, so sizeof_struct should be at least that size.
+    if (args != NULL && args->sizeof_struct < _yp_INIT_ARG_END(everything_immortal)) {
+        yp_FATAL("yp_initialize_parameters_t.sizeof_struct (%" PRIssize
+                 ") smaller than minimum (%" PRIssize ")",
+                args->sizeof_struct, _yp_INIT_ARG_END(everything_immortal));
+    }
 
     // yp_initialize can only be called once
     if (initialized) {
@@ -16308,11 +16354,11 @@ void yp_initialize(const yp_initialize_kwparams_t *kwparams)
     initialized = TRUE;
 
     // The caller can pass NULL if it just wants the defaults
-    if (kwparams == NULL) kwparams = &_default_initialize;
+    if (args == NULL) args = &_default_initialize;
 
     // Now initialize the modules one-by-one
-    _ypMem_initialize(kwparams);
-    _yp_codecs_initialize(kwparams);
+    _ypMem_initialize(args);
+    _yp_codecs_initialize(args);
 }
 
 #pragma endregion initialization

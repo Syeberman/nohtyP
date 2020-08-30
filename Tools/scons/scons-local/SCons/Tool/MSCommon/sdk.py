@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/sdk.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/MSCommon/sdk.py  2018/09/30 19:25:33 Sye"
 
 __doc__ = """Module to detect the Platform/Windows SDK
 
@@ -368,7 +368,7 @@ def mssdk_setup_env(env):
         if not msvs:
             debug('sdk.py:mssdk_setup_env: no VS version detected, bailingout:%s'%msvs)
             return
-        sdk_version = msvs.sdk_version
+        sdk_version = msvs.sdk_version  # FIXME another way to get sdk version?
         debug('sdk.py:msvs.sdk_version is %s'%sdk_version)
         if not sdk_version:
             return

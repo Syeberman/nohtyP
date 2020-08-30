@@ -31,7 +31,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 from __future__ import division, print_function
 
-__revision__ = "src/script/scons-time.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/script/scons-time.py  2018/09/30 19:25:33 Sye"
 
 import getopt
 import glob

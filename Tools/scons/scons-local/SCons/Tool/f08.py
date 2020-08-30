@@ -1,3 +1,15 @@
+"""engine.SCons.Tool.f08
+
+Tool-specific initialization for the generic Posix f08 Fortran compiler.
+
+There normally shouldn't be any need to import this module directly.
+It will usually be imported through the generic SCons.Tool.Tool()
+selection method.
+
+"""
+
+from __future__ import absolute_import
+
 #
 # Copyright (c) 2001 - 2017 The SCons Foundation
 #
@@ -21,27 +33,30 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Options/ListOption.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/f08.py  2018/09/30 19:25:33 Sye"
 
-__doc__ = """Place-holder for the old SCons.Options module hierarchy
+import SCons.Defaults
+import SCons.Tool
+import SCons.Util
+from . import fortran
+from SCons.Tool.FortranCommon import add_all_to_env, add_f08_to_env
 
-This is for backwards compatibility.  The new equivalent is the Variables/
-class hierarchy.  These will have deprecation warnings added (some day),
-and will then be removed entirely (some day).
-"""
+compilers = ['f08']
 
-import SCons.Variables
-import SCons.Warnings
+def generate(env):
+    add_all_to_env(env)
+    add_f08_to_env(env)
 
-warned = False
+    fcomp = env.Detect(compilers) or 'f08'
+    env['F08']  = fcomp
+    env['SHF08']  = fcomp
 
-def ListOption(*args, **kw):
-    global warned
-    if not warned:
-        msg = "The ListOption() function is deprecated; use the ListVariable() function instead."
-        SCons.Warnings.warn(SCons.Warnings.DeprecatedOptionsWarning, msg)
-        warned = True
-    return SCons.Variables.ListVariable(*args, **kw)
+    env['FORTRAN']  = fcomp
+    env['SHFORTRAN']  = fcomp
+
+
+def exists(env):
+    return env.Detect(compilers)
 
 # Local Variables:
 # tab-width:4

@@ -24,7 +24,7 @@ Various utility functions go here.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Util.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Util.py  2018/09/30 19:25:33 Sye"
 
 import os
 import sys
@@ -37,21 +37,18 @@ import pprint
 PY3 = sys.version_info[0] == 3
 
 try:
+    from collections import UserDict, UserList, UserString
+except ImportError:
     from UserDict import UserDict
-except ImportError as e:
-    from collections import UserDict
-
-try:
     from UserList import UserList
-except ImportError as e:
-    from collections import UserList
-
-from collections import Iterable
+    from UserString import UserString
 
 try:
-    from UserString import UserString
-except ImportError as e:
-    from collections import UserString
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
+
+from collections import OrderedDict
 
 # Don't "from types import ..." these because we need to get at the
 # types module later to look for UnicodeType.
@@ -63,7 +60,7 @@ MethodType      = types.MethodType
 FunctionType    = types.FunctionType
 
 try:
-    unicode
+    _ = type(unicode)
 except NameError:
     UnicodeType = str
 else:
@@ -481,10 +478,7 @@ def to_String_for_subst(s,
     if isinstance(s, BaseStringTypes):
         return s
     elif isinstance(s, SequenceTypes):
-        l = []
-        for e in s:
-            l.append(to_String_for_subst(e))
-        return ' '.join( s )
+        return ' '.join([to_String_for_subst(e) for e in s])
     elif isinstance(s, UserString):
         # s.data can only be either a unicode or a regular
         # string. Please see the UserString initializer.
@@ -1032,64 +1026,9 @@ class CLVar(UserList):
         return UserList.__add__(self, CLVar(other))
     def __radd__(self, other):
         return UserList.__radd__(self, CLVar(other))
-    def __coerce__(self, other):
-        return (self, CLVar(other))
     def __str__(self):
         return ' '.join(self.data)
 
-# A dictionary that preserves the order in which items are added.
-# Submitted by David Benjamin to ActiveState's Python Cookbook web site:
-#     http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/107747
-# Including fixes/enhancements from the follow-on discussions.
-class OrderedDict(UserDict):
-    def __init__(self, dict = None):
-        self._keys = []
-        UserDict.__init__(self, dict)
-
-    def __delitem__(self, key):
-        UserDict.__delitem__(self, key)
-        self._keys.remove(key)
-
-    def __setitem__(self, key, item):
-        UserDict.__setitem__(self, key, item)
-        if key not in self._keys: self._keys.append(key)
-
-    def clear(self):
-        UserDict.clear(self)
-        self._keys = []
-
-    def copy(self):
-        dict = OrderedDict()
-        dict.update(self)
-        return dict
-
-    def items(self):
-        return list(zip(self._keys, list(self.values())))
-
-    def keys(self):
-        return self._keys[:]
-
-    def popitem(self):
-        try:
-            key = self._keys[-1]
-        except IndexError:
-            raise KeyError('dictionary is empty')
-
-        val = self[key]
-        del self[key]
-
-        return (key, val)
-
-    def setdefault(self, key, failobj = None):
-        UserDict.setdefault(self, key, failobj)
-        if key not in self._keys: self._keys.append(key)
-
-    def update(self, dict):
-        for (key, val) in dict.items():
-            self.__setitem__(key, val)
-
-    def values(self):
-        return list(map(self.get, self._keys))
 
 class Selector(OrderedDict):
     """A callable ordered dictionary that maps file suffixes to
@@ -1612,15 +1551,34 @@ class NullSeq(Null):
 
 del __revision__
 
-def to_bytes (s):
-    if isinstance (s, (bytes, bytearray)) or bytes is str:
-        return s
-    return bytes (s, 'utf-8')
 
-def to_str (s):
+def to_bytes(s):
+    if s is None:
+        return b'None'
+    if not PY3 and isinstance(s, UnicodeType):
+        # PY2, must encode unicode
+        return bytearray(s, 'utf-8')
+    if isinstance (s, (bytes, bytearray)) or bytes is str:
+        # Above case not covered here as py2 bytes and strings are the same
+        return s
+    return bytes(s, 'utf-8')
+
+
+def to_str(s):
+    if s is None:
+        return 'None'
     if bytes is str or is_String(s):
         return s
     return str (s, 'utf-8')
+
+
+def cmp(a, b):
+    """
+    Define cmp because it's no longer available in python3
+    Works under python 2 as well
+    """
+    return (a > b) - (a < b)
+
 
 # Local Variables:
 # tab-width:4

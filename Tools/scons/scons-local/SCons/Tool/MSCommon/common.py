@@ -25,7 +25,7 @@ Common helper functions for working with the Microsoft tool chain.
 #
 from __future__ import print_function
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/common.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/MSCommon/common.py  2018/09/30 19:25:33 Sye"
 
 import copy
 import os
@@ -150,9 +150,9 @@ def get_output(vcbat, args = None, env = None):
 
     # TODO:  This is a hard-coded list of the variables that (may) need
     # to be imported from os.environ[] for v[sc]*vars*.bat file
-    # execution to work.  This list should really be either directly
-    # controlled by vc.py, or else derived from the common_tools_var
-    # settings in vs.py.
+    # execution to work.  This list should really be directly
+    # controlled by vc.py.
+    # FIXME list of variables
     vs_vc_vars = [
         'COMSPEC',
         # VS100 and VS110: Still set, but modern MSVC setup scripts will

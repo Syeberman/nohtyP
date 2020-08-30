@@ -28,7 +28,7 @@ and user errors in SCons.
 
 """
 
-__revision__ = "src/engine/SCons/Errors.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Errors.py  2018/09/30 19:25:33 Sye"
 
 import shutil
 import SCons.Util
@@ -95,7 +95,7 @@ class BuildError(Exception):
 
         # py3: errstr should be string and not bytes.
 
-        self.errstr = SCons.Util.to_str(errstr)
+        self.errstr = SCons.Util.to_String(errstr)
         self.status = status
         self.exitstatus = exitstatus
         self.filename = filename
@@ -176,8 +176,8 @@ def convert_to_BuildError(status, exc_info=None):
             filename = status.filename
         except AttributeError:
             filename = None
-        
-        buildError = BuildError( 
+
+        buildError = BuildError(
             errstr=status.args[0],
             status=status.errno,
             exitstatus=2,
@@ -190,14 +190,13 @@ def convert_to_BuildError(status, exc_info=None):
         # error, which might be different from the target being built
         # (for example, failure to create the directory in which the
         # target file will appear).
-        try:
-            filename = status.filename
-        except AttributeError:
-            filename = None
+        filename = getattr(status, 'filename', None)
+        strerror = getattr(status, 'strerror', str(status))
+        errno = getattr(status, 'errno', 2)
 
-        buildError = BuildError( 
-            errstr=status.strerror,
-            status=status.errno,
+        buildError = BuildError(
+            errstr=strerror,
+            status=errno,
             exitstatus=2,
             filename=filename,
             exc_info=exc_info)
@@ -217,7 +216,7 @@ def convert_to_BuildError(status, exc_info=None):
             errstr="Error %s" % status,
             status=status,
             exitstatus=2)
-    
+
     #import sys
     #sys.stderr.write("convert_to_BuildError: status %s => (errstr %s, status %s)\n"%(status,buildError.errstr, buildError.status))
     return buildError

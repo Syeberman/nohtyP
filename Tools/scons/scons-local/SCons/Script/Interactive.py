@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 from __future__ import print_function
 
-__revision__ = "src/engine/SCons/Script/Interactive.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Script/Interactive.py  2018/09/30 19:25:33 Sye"
 
 __doc__ = """
 SCons interactive mode

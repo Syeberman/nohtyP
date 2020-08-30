@@ -32,7 +32,7 @@ selection method.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/gfortran.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/gfortran.py  2018/09/30 19:25:33 Sye"
 
 import SCons.Util
 
@@ -53,6 +53,8 @@ def generate(env):
 
         env['INC%sPREFIX' % dialect] = "-I"
         env['INC%sSUFFIX' % dialect] = ""
+
+    env['FORTRANMODDIRPREFIX'] = "-J"
 
 def exists(env):
     return env.Detect('gfortran')

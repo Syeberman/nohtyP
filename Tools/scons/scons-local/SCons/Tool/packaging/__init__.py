@@ -25,18 +25,23 @@ SCons Packaging Tool.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/packaging/__init__.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/packaging/__init__.py  2018/09/30 19:25:33 Sye"
 
+import SCons.Defaults
 import SCons.Environment
 from SCons.Variables import *
 from SCons.Errors import *
 from SCons.Util import is_List, make_path_relative
 from SCons.Warnings import warn, Warning
 
-import os, imp
-import SCons.Defaults
+import os
+import imp
 
-__all__ = [ 'src_targz', 'src_tarbz2', 'src_zip', 'tarbz2', 'targz', 'zip', 'rpm', 'msi', 'ipk' ]
+__all__ = [
+    'src_targz', 'src_tarbz2', 'src_xz', 'src_zip',
+    'targz', 'tarbz2', 'xz', 'zip',
+    'rpm', 'msi', 'ipk',
+]
 
 #
 # Utility and Builder function
@@ -163,15 +168,22 @@ def Package(env, target=None, source=None, **kw):
         # this exception means that a needed argument for the packager is
         # missing. As our packagers get their "tags" as named function
         # arguments we need to find out which one is missing.
-        from inspect import getargspec
-        args,varargs,varkw,defaults=getargspec(packager.package)
-        if defaults!=None:
-            args=args[:-len(defaults)] # throw away arguments with default values
+        #TODO: getargspec deprecated in Py3. cleanup when Py2.7 dropped.
+        try:
+            from inspect import getfullargspec
+            argspec = getfullargspec(packager.package)
+        except ImportError:
+            from inspect import getargspec
+            argspec = getargspec(packager.package)
+        args = argspec.args
+        if argspec.defaults:
+            # throw away arguments with default values
+            args = args[:-len(argspec.defaults)]
         args.remove('env')
         args.remove('target')
         args.remove('source')
         # now remove any args for which we have a value in kw.
-        args=[x for x in args if x not in kw]
+        args = [x for x in args if x not in kw]
 
         if len(args)==0:
             raise # must be a different error, so re-raise

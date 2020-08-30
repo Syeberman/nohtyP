@@ -24,7 +24,7 @@ Tool specific initialization of msginit tool.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/msginit.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/msginit.py  2018/09/30 19:25:33 Sye"
 
 import SCons.Warnings
 import SCons.Builder
@@ -77,8 +77,22 @@ def _POInitBuilderWrapper(env, target=None, source=_null, **kw):
 #############################################################################
 def generate(env,**kw):
   """ Generate the `msginit` tool """
+  import sys
+  import os
   import SCons.Util
+  import SCons.Tool
   from SCons.Tool.GettextCommon import _detect_msginit
+  from SCons.Platform.mingw import MINGW_DEFAULT_PATHS
+  from SCons.Platform.cygwin import CYGWIN_DEFAULT_PATHS
+
+  if sys.platform == 'win32':
+      msginit = SCons.Tool.find_program_path(env, 'msginit', default_paths=MINGW_DEFAULT_PATHS + CYGWIN_DEFAULT_PATHS )
+      if msginit:
+          msginit_bin_dir = os.path.dirname(msginit)
+          env.AppendENVPath('PATH', msginit_bin_dir)
+      else:
+          SCons.Warnings.Warning('msginit tool requested, but binary not found in ENV PATH')
+
   try:
     env['MSGINIT'] = _detect_msginit(env)
   except:

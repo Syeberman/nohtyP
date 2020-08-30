@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/__init__.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/MSCommon/__init__.py  2018/09/30 19:25:33 Sye"
 
 __doc__ = """
 Common functions for Microsoft Visual Studio and Visual C/C++.
@@ -47,8 +47,7 @@ from SCons.Tool.MSCommon.vc import msvc_exists, \
 from SCons.Tool.MSCommon.vs import get_default_version, \
                                    get_vs_by_version, \
                                    merge_default_version, \
-                                   msvs_exists, \
-                                   query_versions
+                                   msvs_exists
 
 # Local Variables:
 # tab-width:4

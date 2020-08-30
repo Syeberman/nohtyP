@@ -1,3 +1,8 @@
+"""SCons.Tool.Packaging.src_tarxz
+
+The tarxz SRC packager.
+"""
+
 #
 # Copyright (c) 2001 - 2017 The SCons Foundation
 #
@@ -21,27 +26,15 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Options/EnumOption.py  2017/09/03 20:58:15 Sye"
+__revision__ = "src/engine/SCons/Tool/packaging/src_tarxz.py  2018/09/30 19:25:33 Sye"
 
-__doc__ = """Place-holder for the old SCons.Options module hierarchy
+from SCons.Tool.packaging import putintopackageroot
 
-This is for backwards compatibility.  The new equivalent is the Variables/
-class hierarchy.  These will have deprecation warnings added (some day),
-and will then be removed entirely (some day).
-"""
-
-import SCons.Variables
-import SCons.Warnings
-
-warned = False
-
-def EnumOption(*args, **kw):
-    global warned
-    if not warned:
-        msg = "The EnumOption() function is deprecated; use the EnumVariable() function instead."
-        SCons.Warnings.warn(SCons.Warnings.DeprecatedOptionsWarning, msg)
-        warned = True
-    return SCons.Variables.EnumVariable(*args, **kw)
+def package(env, target, source, PACKAGEROOT, **kw):
+    bld = env['BUILDERS']['Tar']
+    bld.set_suffix('.tar.xz')
+    target, source = putintopackageroot(target, source, env, PACKAGEROOT, honor_install_location=0)
+    return bld(env, target, source, TARFLAGS='-Jc')
 
 # Local Variables:
 # tab-width:4
