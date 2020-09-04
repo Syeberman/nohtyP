@@ -51,7 +51,7 @@ def _version_detector(gcc):
             gcc_args, cwd=_test_gcc_temp_dir, stdout=SconscriptLog, stderr=SconscriptLog, env=env
         )
         SconscriptLog.flush()
-        SconscriptLog.write("gcc returned %r\n" % gcc_result)
+        SconscriptLog.write("gcc %r returned %r\n" % (dumpversion, gcc_result))
         if gcc_result == 0:  # gcc returns zero on success
             supportedArchs.append(arch)
 
