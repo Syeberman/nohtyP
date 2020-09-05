@@ -27,7 +27,8 @@ def _version_detector(gcc):
 
     # Determine if the version's right, returning if it isn't
     try:
-        dumpversion = subprocess.check_output([str(gcc), "-dumpversion"],
+        # They changed -dumpverion: https://stackoverflow.com/a/47410010
+        dumpversion = subprocess.check_output([str(gcc), " -dumpfullversion", "-dumpversion"],
                                               stderr=subprocess.PIPE).decode().strip()
     except subprocess.CalledProcessError:
         return "", ()
