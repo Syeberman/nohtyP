@@ -1,7 +1,5 @@
-# Visual Studio 2010
-
-import msvs_common
-_generate, _exists = msvs_common.DefineMSVSToolFunctions(10.0, ("10.0", "10.0Exp"))
+import gcc_common
+_generate, _exists = gcc_common.DefineGCCToolFunctions(5, major=5)
 
 
 # Define new functions so that we remain in any stack traces involving these functions

@@ -1,3 +1,5 @@
+# Visual Studio 2017
+
 import msvs_common
 # FIXME SCons needs to be updated to the new VS version detection scheme.
 _generate, _exists = msvs_common.DefineMSVSToolFunctions(15.8, ("15.8", ))
