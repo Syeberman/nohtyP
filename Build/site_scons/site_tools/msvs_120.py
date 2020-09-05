@@ -1,3 +1,5 @@
+# Visual Studio 2013
+
 import msvs_common
 _generate, _exists = msvs_common.DefineMSVSToolFunctions( 12.0, ("12.0", "12.0Exp") )
 # Define new functions so that we remain in any stack traces involving these functions

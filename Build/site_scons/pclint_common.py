@@ -1,4 +1,3 @@
-
 # XXX This supports both PC-lint and FlexeLint by Gimpel Software
 
 import os
@@ -14,8 +13,9 @@ import SCons.Platform
 import SCons.Tool
 import SCons.Warnings
 
-_tool_name = __name__   # ie "pclint"
+_tool_name = __name__  # ie "pclint"
 
+# TODO Update to use ToolFinder
 _platform_name = SCons.Platform.Platform().name
 if _platform_name in ("win32", "cygwin"):
     # Try some known, and unknown-but-logical, default locations for PC-lint
@@ -26,13 +26,13 @@ if _platform_name in ("win32", "cygwin"):
         "C:\\PC-Lint\\",
         "C:\\Program Files\\PC-Lint",
         "C:\\Program Files (x86)\\PC-Lint",
-        )
+    )
     _pclint_paths_found = [
-        pclintDir for pattern in _pclint_path_globs for pclintDir in glob.iglob(pattern)]
+        pclintDir for pattern in _pclint_path_globs for pclintDir in glob.iglob(pattern)
+    ]
     _pclint_exename = "lint-nt"
 else:
-    _pclint_paths_found = []   # rely on the environment's path for now
-
+    _pclint_paths_found = []  # rely on the environment's path for now
 
 _re_pclint_version = re.compile(r"Vers\. (\d+)\.(\d+)([a-z])\,")
 _test_pclint_cache = {}
@@ -59,6 +59,7 @@ def _test_pclint(pclint):
         return None
     return (int(match.group(1)), int(match.group(2)), match.group(3))
 
+
 # TODO This, or something like it, should be in SCons
 
 
@@ -76,8 +77,8 @@ def _find(env):
         pclints.append((pclint_version, pclint))
     if not pclints:
         return None
-    pclints.sort()         # sort by version
-    return pclints[-1][1]   # return the path with the largest version
+    pclints.sort()  # sort by version
+    return pclints[-1][1]  # return the path with the largest version
 
 
 def DefinePClintToolFunctions():
