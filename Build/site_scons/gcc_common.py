@@ -21,9 +21,15 @@ _arch2opts = {
 }
 _test_gcc_temp_dir = None
 
+re_gcc_stem = re.compile(r"gcc(-[0-9.]+)?")
+
 
 def _version_detector(gcc):
     """Returns (version, archs), where archs is a tuple of supported architectures."""
+
+    # Our exe_globs picks up related tools
+    if not re_gcc_stem.fullmatch(gcc.stem):
+        return "", ()
 
     # Determine if the version's right, returning if it isn't
     try:
@@ -214,7 +220,7 @@ def ApplyGCCOptions(env, version):
         )
     # Disable frame-pointer omission (ie frame pointers will be available on all builds)
     # XXX Must come after any other optimization compiler options
-    if _platform_name == "win32" and version == 8.1 and env["TARGET_ARCH"] == "amd64":
+    if _platform_name == "win32" and version == 8 and env["TARGET_ARCH"] == "amd64":
         # MinGW-W64 for gcc 8.1 crashes with -fno-omit-frame-pointer:
         #   nohtyP.c: In function 'MethodError_objsliceobjproc':
         #   nohtyP.c:572:1: internal compiler error: in based_loc_descr, at dwarf2out.c:14264

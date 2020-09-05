@@ -3,6 +3,7 @@
 import ast
 import os
 import os.path
+import re
 import subprocess
 import SCons.Errors
 import SCons.Platform
@@ -10,10 +11,17 @@ import SCons.Tool
 import SCons.Warnings
 from tool_finder import ToolFinder
 
+re_python_stem = re.compile(r"python([0-9.]+)?")
+
 
 def _version_detector(python):
     """Returns (hexversion, maxsize) for the given Python executable, or (None, None) on error.
     """
+
+    # Our exe_globs picks up related tools
+    if not re_python_stem.fullmatch(python.stem):
+        return None, None
+
     try:
         output = subprocess.check_output([
             str(python), "-c", "import sys; print('(%d, %d)' % (sys.hexversion, sys.maxsize))"
