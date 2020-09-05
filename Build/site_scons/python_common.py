@@ -18,7 +18,7 @@ re_python_stem = re.compile(r"python([0-9.]+)?")
 def _version_detector(python):
     """Returns (hexversion, maxsize) for the given Python executable, or (None, None) on error.
     """
-    SconscriptLog.write(f"Detecting version of {python}")
+    SconscriptLog.write(f"Detecting version of {python}\n")
 
     # Our exe_globs picks up related tools
     if not re_python_stem.fullmatch(python.stem):

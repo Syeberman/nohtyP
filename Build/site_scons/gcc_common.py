@@ -25,7 +25,7 @@ re_gcc_stem = re.compile(r"gcc(-[0-9.]+)?")
 
 def _version_detector(gcc):
     """Returns (version, archs), where archs is a tuple of supported architectures."""
-    SconscriptLog.write(f"Detecting version of {gcc}")
+    SconscriptLog.write(f"Detecting version of {gcc}\n")
 
     # Our exe_globs picks up related tools
     if not re_gcc_stem.fullmatch(gcc.stem):
