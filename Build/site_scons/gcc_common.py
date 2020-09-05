@@ -105,7 +105,7 @@ def _find(env, re_version):
         raise SCons.Errors.StopError("not yet supporting cross-OS compile in GCC")
 
     for gcc, (version, archs) in gcc_finder:
-        if re_version.match(version) and env["TARGET_ARCH"] in archs:
+        if re_version.fullmatch(version) and env["TARGET_ARCH"] in archs:
             return str(gcc)  # TODO would be nice to use Path everywhere
     return None
 
@@ -291,12 +291,12 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         if minor is not None:
             raise ValueError("minor is invalid for major>=5")
         gcc_name = f"gcc {major}"
-        re_version = re.compile(rf"^{major}(\.\d+)*$")
+        re_version = re.compile(rf"{major}(\.\d+)*")
     else:
         if minor is None:
             raise ValueError("minor is required for major<5")
         gcc_name = f"gcc {major}.{minor}"
-        re_version = re.compile(rf"^{major}\.{minor}(\.\d+)*$")
+        re_version = re.compile(rf"{major}\.{minor}(\.\d+)*")
 
     def generate(env):
         if env["CONFIGURATION"] not in ("release", "debug"):
@@ -335,7 +335,7 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
 
         def check_version(env, output):
             output = output.strip()
-            if re_version.search(output) is None:
+            if re_version.fullmatch(output) is None:
                 raise SCons.Errors.StopError(f"tried finding {gcc_name}, found {output} instead")
 
         env.ParseConfig("$CC -dumpfullversion -dumpversion", check_version)
