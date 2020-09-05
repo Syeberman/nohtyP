@@ -205,7 +205,7 @@ def ApplyGCCOptions(env, version):
             "-Og" if version >= 4.8 else "-O0",
             # Runtime checks: int overflow, stack overflow,
             "-ftrapv",
-            "-fstack-check",
+            "-fstack-clash-protection" if version >= 8 else "-fstack-check",
             # Runtime check: buffer overflow (needs -fmudflap to linker)
             # TODO Not supported on MinGW/Windows, apparently
             #"-fmudflapth",
