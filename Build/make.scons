@@ -68,7 +68,9 @@ def nohtyP_checkapi(env):
 # TODO If none of these compilers can be found, default to an "any" compiler (but still version the
 # output directory)
 # TODO Would love to make this more dynamic, finding any known compiler, and then trimming.
-# FIXME msvs
+# TODO Visual Studio 2019, 2017 support
+# TODO Clang/LLVM support
+# TODO GCC 6 can't be found on AppVeyor's Ubuntu1604
 compiler_names = (
     "msvs_158", "gcc_10", "gcc_9", "gcc_8", "gcc_7", "msvs_140", "gcc_6", "gcc_5", "msvs_120",
     "gcc_49", "gcc_48", "msvs_110", "gcc_47", "gcc_46", "msvs_100", "msvs_90"

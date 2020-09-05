@@ -1,3 +1,5 @@
+# Visual Studio 2008
+
 import msvs_common
 _generate, _exists = msvs_common.DefineMSVSToolFunctions(9.0, ("9.0", "9.0Exp"))
 

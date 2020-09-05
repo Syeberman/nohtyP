@@ -1,5 +1,4 @@
 # XXX NOT a SCons tool module; instead, a library for the gcc_* tool modules
-# TODO Add at least 3.4.6 (2006), 4.2.4 (2007+), 4.4.7 (2009+), 4.6.4 (2011+)
 
 import os
 import os.path
@@ -26,6 +25,7 @@ re_gcc_stem = re.compile(r"gcc(-[0-9.]+)?")
 
 def _version_detector(gcc):
     """Returns (version, archs), where archs is a tuple of supported architectures."""
+    SconscriptLog.write(f"Detecting version of {gcc}")
 
     # Our exe_globs picks up related tools
     if not re_gcc_stem.fullmatch(gcc.stem):
@@ -203,7 +203,8 @@ def ApplyGCCOptions(env, version):
         addCcFlags(
             # Disable (non-debuggable) optimizations
             "-Og" if version >= 4.8 else "-O0",
-            # Runtime checks: int overflow, stack overflow,
+            # Runtime checks: int overflow, stack overflow
+            # TODO Stack overflow detection should possibly always be enabled.
             "-ftrapv",
             "-fstack-clash-protection" if version >= 8 else "-fstack-check",
             # Runtime check: buffer overflow (needs -fmudflap to linker)

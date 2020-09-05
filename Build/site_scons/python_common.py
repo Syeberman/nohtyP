@@ -9,6 +9,7 @@ import SCons.Errors
 import SCons.Platform
 import SCons.Tool
 import SCons.Warnings
+from root_environment import SconscriptLog
 from tool_finder import ToolFinder
 
 re_python_stem = re.compile(r"python([0-9.]+)?")
@@ -17,6 +18,7 @@ re_python_stem = re.compile(r"python([0-9.]+)?")
 def _version_detector(python):
     """Returns (hexversion, maxsize) for the given Python executable, or (None, None) on error.
     """
+    SconscriptLog.write(f"Detecting version of {python}")
 
     # Our exe_globs picks up related tools
     if not re_python_stem.fullmatch(python.stem):
