@@ -1,5 +1,5 @@
 import gcc_common
-_generate, _exists = gcc_common.DefineGCCToolFunctions(8.2, major=8, minor=2)
+_generate, _exists = gcc_common.DefineGCCToolFunctions(7, major=7)
 
 
 # Define new functions so that we remain in any stack traces involving these functions

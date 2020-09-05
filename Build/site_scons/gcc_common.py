@@ -23,13 +23,13 @@ _test_gcc_temp_dir = None
 
 
 def _version_detector(gcc):
-    """Returns (dumpversion, archs), where archs is a tuple of supported architectures."""
+    """Returns (version, archs), where archs is a tuple of supported architectures."""
 
     # Determine if the version's right, returning if it isn't
     try:
         # They changed -dumpverion: https://stackoverflow.com/a/47410010
-        dumpversion = subprocess.check_output([str(gcc), " -dumpfullversion", "-dumpversion"],
-                                              stderr=subprocess.PIPE).decode().strip()
+        version = subprocess.check_output([str(gcc), "-dumpfullversion", "-dumpversion"],
+                                          stderr=subprocess.PIPE).decode().strip()
     except subprocess.CalledProcessError:
         return "", ()
 
@@ -52,11 +52,11 @@ def _version_detector(gcc):
             gcc_args, cwd=_test_gcc_temp_dir, stdout=SconscriptLog, stderr=SconscriptLog, env=env
         )
         SconscriptLog.flush()
-        SconscriptLog.write("gcc %r returned %r\n" % (dumpversion, gcc_result))
+        SconscriptLog.write("gcc %r returned %r\n" % (version, gcc_result))
         if gcc_result == 0:  # gcc returns zero on success
             supportedArchs.append(arch)
 
-    return dumpversion, tuple(supportedArchs)
+    return version, tuple(supportedArchs)
 
 
 # Try some known, and unknown-but-logical, default locations for mingw
@@ -78,7 +78,7 @@ gcc_finder = ToolFinder(
         'win-builds*\\*\\bin',
     ),
     posix_dirs=(),  # rely on the environment's path for now
-    exe_globs=("gcc-[0-9].[0-9]", "gcc-[0-9]", "gcc"),
+    exe_globs=("gcc-*.*", "gcc-*", "gcc"),  # prefer specificity
     version_detector=_version_detector
 )
 
@@ -93,13 +93,13 @@ else:
 
 
 # TODO This, or something like it, should be in SCons
-def _find(env, re_dumpversion):
+def _find(env, re_version):
     """Find a gcc executable that can build our target OS and arch, returning the path or None."""
     if env["TARGET_OS"] != env["HOST_OS"]:
         raise SCons.Errors.StopError("not yet supporting cross-OS compile in GCC")
 
-    for gcc, (dumpversion, archs) in gcc_finder:
-        if re_dumpversion.match(dumpversion) and env["TARGET_ARCH"] in archs:
+    for gcc, (version, archs) in gcc_finder:
+        if re_version.match(version) and env["TARGET_ARCH"] in archs:
             return str(gcc)  # TODO would be nice to use Path everywhere
     return None
 
@@ -275,10 +275,22 @@ def ApplyGCCOptions(env, version):
     _updateLinkEmitters(env, version)
 
 
-def DefineGCCToolFunctions(numericVersion, major, minor):
+def DefineGCCToolFunctions(numericVersion, major, minor=None):
     """Returns (generate, exists), suitable for use as the SCons tool module functions."""
 
-    re_dumpversion = re.compile(r"^%s\.%s(\.\d+)?$" % (major, minor))
+    # Major numbers started incrementing faster with GCC 5, and patch numbers were dropped. It was
+    # 10 years between 4.0.0 and 5.1, and 4.x saw 54 releases in that time. In contrast, only one
+    # year separates 5.1 and 6.1, and 5.x saw just 5 releases.
+    if major >= 5:
+        if minor is not None:
+            raise ValueError("minor is invalid for major>=5")
+        gcc_name = f"gcc {major}"
+        re_version = re.compile(rf"^{major}(\.\d+)*$")
+    else:
+        if minor is None:
+            raise ValueError("minor is required for major<5")
+        gcc_name = f"gcc {major}.{minor}"
+        re_version = re.compile(rf"^{major}\.{minor}(\.\d+)*$")
 
     def generate(env):
         if env["CONFIGURATION"] not in ("release", "debug"):
@@ -286,23 +298,20 @@ def DefineGCCToolFunctions(numericVersion, major, minor):
                 "GCC doesn't support the %r configuration (yet)" % env["CONFIGURATION"]
             )
 
+        gcc_name_arch = f"{gcc_name} ({env['TARGET_ARCH']})"
+
         # See if site_toolsconfig.py already knows where to find this gcc version
         toolsConfig = env["TOOLS_CONFIG"]
         gcc_siteName = "%s_%s" % (env["COMPILER"].name.upper(), env["TARGET_ARCH"].upper())
         gcc_path = toolsConfig.get(gcc_siteName, "")
         if gcc_path is None:
-            raise SCons.Errors.StopError(
-                "gcc %s.%s (%r) disabled in %s" %
-                (major, minor, env["TARGET_ARCH"], toolsConfig.basename)
-            )
+            raise SCons.Errors.StopError(f"{gcc_name_arch} disabled in {toolsConfig.basename}")
 
         # If site_toolsconfig.py came up empty, find a gcc that supports our target, then update
         if not gcc_path:
-            gcc_path = _find(env, re_dumpversion)
+            gcc_path = _find(env, re_version)
             if not gcc_path:
-                raise SCons.Errors.StopError(
-                    "gcc %s.%s (%r) detection failed" % (major, minor, env["TARGET_ARCH"])
-                )
+                raise SCons.Errors.StopError(f"{gcc_name_arch} detection failed")
             toolsConfig.update({gcc_siteName: gcc_path})
 
         # TODO Update SCons to skip autodetection when requested
@@ -316,18 +325,14 @@ def DefineGCCToolFunctions(numericVersion, major, minor):
         env["CC"] = os.path.basename(gcc_path)
         del env["CXX"]  # TODO provide proper path when we need it
         if not env.WhereIs("$CC"):
-            raise SCons.Errors.StopError(
-                "gcc %s.%s (%r) configuration failed" % (major, minor, env["TARGET_ARCH"])
-            )
+            raise SCons.Errors.StopError(f"{gcc_name_arch} configuration failed")
 
         def check_version(env, output):
             output = output.strip()
-            if re_dumpversion.search(output) is None:
-                raise SCons.Errors.StopError(
-                    "tried finding gcc %s.%s, found %r instead" % (major, minor, output)
-                )
+            if re_version.search(output) is None:
+                raise SCons.Errors.StopError(f"tried finding {gcc_name}, found {output} instead")
 
-        env.ParseConfig("$CC -dumpversion", check_version)
+        env.ParseConfig("$CC -dumpfullversion -dumpversion", check_version)
 
         ApplyGCCOptions(env, numericVersion)
 
