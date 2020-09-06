@@ -1633,9 +1633,9 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 // in calculating its hash value does not change after creation. However, it is permissable for that
 // object to contain additional data that _can_ change after creation.
 //
-// The clearest example of this is the reference count, which nohtyP stores for all objects in the
-// object iself. While reference counts are mutable, they are not involved in the calculation of any
-// hash value, making it permissible to change the reference count of immutable objects.
+// The clearest example of this is the reference count, which nohtyP stores in the object itself.
+// While reference counts are mutable, they are not involved in the calculation of any hash value,
+// making it permissible to change the reference count of an immutable object.
 //
 // This is why types such as iterators, callables, and files are considered immutable, despite
 // containing mostly mutable data: their hash is based solely on their identity, the only portion of
