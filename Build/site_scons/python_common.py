@@ -97,11 +97,11 @@ def DefinePythonToolFunctions(hexversions, tool_name):
         # If site_toolsconfig.py came up empty, find a Python that supports our target, then update
         if not python_path:
             python_path = _find(env, hexversions)
+            toolsConfig.update({python_siteName: python_path})
             if not python_path:
                 raise SCons.Errors.StopError(
                     "%s (%r) detection failed" % (tool_name, env["TARGET_ARCH"])
                 )
-            toolsConfig.update({python_siteName: python_path})
 
         # Now, prepend it to the path
         path, python = os.path.split(python_path)

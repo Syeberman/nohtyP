@@ -92,9 +92,9 @@ def DefinePClintToolFunctions():
         # target, then update
         if not pclint_path:
             pclint_path = _find(env)
+            toolsConfig.update({pclint_siteName: pclint_path})
             if not pclint_path:
                 raise SCons.Errors.StopError("%s detection failed" % _tool_name)
-            toolsConfig.update({pclint_siteName: pclint_path})
 
         # Now, prepend it to the path
         path, pclint = os.path.split(pclint_path)

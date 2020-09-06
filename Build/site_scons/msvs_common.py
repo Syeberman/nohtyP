@@ -9,7 +9,6 @@ import SCons.Tool.MSCommon.vs
 import SCons.Warnings
 import msvs_preprocessed
 
-
 # Disables "MSVC_USE_SCRIPT set to False" warnings.  Unfortunately, also disables "No version of
 # Visual Studio compiler found" et al, but these are actually errors and they're trapped
 # separately.
@@ -27,6 +26,7 @@ def _crtRequiresManifest(version):
     """Manifest files were required for the CRT starting with MSVS 2005, and ending with 2010."""
     return 8.0 <= version < 10.0
 
+
 # It's a lot of work to add target files to a compilation!
 # TODO Just add native .asm, .map, etc support to SCons
 
@@ -39,7 +39,7 @@ def _ccEmitter(target, source, env, parent_emitter):
     assert os.path.splitext(target[0].path)[1] == ".obj"
     s_base = os.path.splitext(source[0].path)[0]
     for ext in (".asm", ):
-        env.Clean(target[0], s_base+ext)
+        env.Clean(target[0], s_base + ext)
     return target, source
 
 
@@ -49,7 +49,8 @@ def _updateCcEmitters(env):
     for builder in builders:
         for source_suffix, parent_emitter in builder.emitter.items():
             builder.emitter[source_suffix] = functools.partial(
-                _ccEmitter, parent_emitter=parent_emitter)
+                _ccEmitter, parent_emitter=parent_emitter
+            )
 
 
 def _linkEmitter(target, source, env):
@@ -57,45 +58,61 @@ def _linkEmitter(target, source, env):
     # TODO Remove these asserts once we've gotten this right
     assert t_ext in (".dll", ".exe")
     for ext in (".map", ):
-        env.Clean(target[0], t_base+ext)
+        env.Clean(target[0], t_base + ext)
     return target, source
 
 
 def _updateLinkEmitters(env, version):
-    env.Append(PROGEMITTER=[_linkEmitter, ], SHLIBEMITTER=[_linkEmitter, ],
-               LDMODULEEMITTER=[_linkEmitter, ])
+    env.Append(
+        PROGEMITTER=[
+            _linkEmitter,
+        ], SHLIBEMITTER=[
+            _linkEmitter,
+        ], LDMODULEEMITTER=[
+            _linkEmitter,
+        ]
+    )
 
 
 # TODO Any new options in VS 14.0 (aka 2015) that we can take advantage of?
 def ApplyMSVSOptions(env, version):
     """Updates env with MSVS-specific compiler options for nohtyP.  version is numeric (ie 12.0).
     """
-    def addCcFlags(*args): env.AppendUnique(CCFLAGS=list(args))
+    def addCcFlags(*args):
+        env.AppendUnique(CCFLAGS=list(args))
+
     # TODO /analyze? (enable /Wall, disable /WX, supress individual warnings)
     addCcFlags(
         # Warning level 3, warnings-as-errors
-        "/W3", "/WX",
+        "/W3",
+        "/WX",
         # Security compile- and runtime-checks (for all builds); /sdl implies /GS
         "/sdl" if version >= 11.0 else "/GS",
         # Function-level linking, disable minimal rebuild, disable runtime type info
-        "/Gy", "/Gm-", "/GR-",
+        "/Gy",
+        "/Gm-",
+        "/GR-",
         # Source/assembly listing (.asm), exception handling model
-        "/FAs", "/Fa${TARGET.dir}"+os.sep, "/EHsc",
-        )
+        "/FAs",
+        "/Fa${TARGET.dir}" + os.sep,
+        "/EHsc",
+    )
     if env["CONFIGURATION"] == "debug":
         addCcFlags(
             # Runtime checks, disable optimizations
-            "/RTCcsu", "/Od",
+            "/RTCcsu",
+            "/Od",
             # Debug multithread and DLL MSVCRT
             "/MDd",
-            )
+        )
     else:
         addCcFlags(
             # Optimize: Whole program, full speed; /GL requires /LTCG link flag
-            "/GL", "/Ox",
+            "/GL",
+            "/Ox",
             # Multithreaded and DLL MSVCRT
             "/MD",
-            )
+        )
     # Disable frame-pointer omission (ie frame pointers will be available on all builds)
     # XXX Must come after any other optimization compiler options
     addCcFlags("/Oy-")
@@ -105,13 +122,17 @@ def ApplyMSVSOptions(env, version):
     # Ensure SCons knows to clean .asm, etc
     _updateCcEmitters(env)
 
-    def addCppDefines(*args): env.AppendUnique(CPPDEFINES=list(args))
+    def addCppDefines(*args):
+        env.AppendUnique(CPPDEFINES=list(args))
+
     if env["CONFIGURATION"] == "debug":
         addCppDefines("_DEBUG")
     else:
         addCppDefines("NDEBUG")
 
-    def addLinkFlags(*args): env.AppendUnique(LINKFLAGS=list(args))
+    def addLinkFlags(*args):
+        env.AppendUnique(LINKFLAGS=list(args))
+
     addLinkFlags(
         # Warnings-as-errors
         "/WX",
@@ -120,24 +141,27 @@ def ApplyMSVSOptions(env, version):
         # Disable incremental linking
         "/INCREMENTAL:NO",
         # Create a mapfile (.map), include exported functions
-        "/MAP", "/MAPINFO:EXPORTS",
+        "/MAP",
+        "/MAPINFO:EXPORTS",
         # Version stamp
         "/VERSION:${NOHTYP_MAJOR}.${NOHTYP_MINOR}"
-        )
+    )
     if env["CONFIGURATION"] == "debug":
         addLinkFlags(
             # Disable optimizations
-            "/OPT:NOREF", "/OPT:NOICF",
+            "/OPT:NOREF",
+            "/OPT:NOICF",
             # Add DebuggableAttribute (because I don't know?)
             "/ASSEMBLYDEBUG",
-            )
+        )
     else:
         addLinkFlags(
             # Eliminate unreferenced funcs/data, fold identical COMDATs
-            "/OPT:REF", "/OPT:ICF",
+            "/OPT:REF",
+            "/OPT:ICF",
             # Link-time code generation; required by /GL cc flag
             "/LTCG",
-            )
+        )
     # If the CRT for this MSVC version needs a manifest, make sure it's embedded
     if _crtRequiresManifest(version):
         env["WINDOWS_EMBED_MANIFEST"] = True
@@ -161,15 +185,14 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
 
     def generate(env):
         if version is None:
-            raise SCons.Errors.UserError(
-                "Visual Studio %r is not installed" % supportedVersions[0])
+            raise SCons.Errors.UserError("Visual Studio %r is not installed" % supportedVersions[0])
         if env["TARGET_OS"] != "win32":
-            raise SCons.Errors.StopError(
-                "Visual Studio doesn't build for OS %r" % env["TARGET_OS"])
+            raise SCons.Errors.StopError("Visual Studio doesn't build for OS %r" % env["TARGET_OS"])
         # TARGET_ARCH is verified by vcvars*.bat
         if env["CONFIGURATION"] not in ("release", "debug"):
             raise SCons.Errors.StopError(
-                "Visual Studio doesn't support the %r configuration (yet)" % env["CONFIGURATION"])
+                "Visual Studio doesn't support the %r configuration (yet)" % env["CONFIGURATION"]
+            )
         env["MSVC_VERSION"] = version
 
         # Caching INCLUDE, LIB, etc in site_toolsconfig.py bypasses the slow vcvars*.bat calls on
@@ -180,8 +203,10 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         compilerEnv_name = "%s_%s_ENV" % (compilerName.upper(), env["TARGET_ARCH"].upper())
         compilerEnv = toolsConfig.get(compilerEnv_name, {})
         if compilerEnv is None:
-            raise SCons.Errors.StopError("Visual Studio %r (%r) disabled in %s" % (
-                supportedVersions[0], env["TARGET_ARCH"], toolsConfig.basename))
+            raise SCons.Errors.StopError(
+                "Visual Studio %r (%r) disabled in %s" %
+                (supportedVersions[0], env["TARGET_ARCH"], toolsConfig.basename)
+            )
 
         # If there was an entry in site_toolsconfig.py, then explicitly use that environment
         if compilerEnv:
@@ -195,8 +220,11 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         _mslinkTool.generate(env)
         msvs_preprocessed.generate_PreprocessedBuilder(env)
         if not env.WhereIs("$CC"):
-            raise SCons.Errors.StopError("Visual Studio %r (%r) configuration failed" % (
-                supportedVersions[0], env["TARGET_ARCH"]))
+            toolsConfig.update({compilerEnv_name: None})
+            raise SCons.Errors.StopError(
+                "Visual Studio %r (%r) configuration failed" %
+                (supportedVersions[0], env["TARGET_ARCH"])
+            )
 
         # Add an entry for this compiler in site_toolsconfig.py if it doesn't already exist
         if not compilerEnv:
