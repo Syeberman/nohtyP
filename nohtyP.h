@@ -203,8 +203,7 @@ typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
 
 // Unlike Python, most nohtyP types have both mutable and immutable versions.  An "intstore" is a
 // mutable int (it "stores" an int); similar for floatstore.  The mutable str is called a
-// "chrarray", while a "frozendict" is an immutable dict.  There are no useful immutable types for
-// iters or files: attempting to freeze such types will close them.
+// "chrarray", while a "frozendict" is an immutable dict.
 
 // Returns a new reference to an int/intstore with the given value.
 ypAPI ypObject *yp_intC(yp_int_t value);
@@ -470,8 +469,8 @@ ypAPI ypObject *yp_gt(ypObject *x, ypObject *y);
  * Generic Object Operations
  */
 
-// Returns the hash value of x; x must be immutable and cannot contain mutable objects.  Returns -1
-// and sets *exc on error.
+// Returns the hash value of x; x must be immutable and must not contain mutable objects.  Returns
+// -1 and sets *exc on error.
 ypAPI yp_hash_t yp_hashC(ypObject *x, ypObject **exc);
 
 // Returns the _current_ hash value of x; this value may change between calls. Returns -1 and sets
@@ -1331,13 +1330,14 @@ ypAPI ypObject *const yp_i_two;
  * Freezing, "Unfreezing", and Invalidating
  */
 
-// All objects support a one-way freeze method that makes them immutable, an unfrozen_copy
-// method that returns a mutable copy, and a one-way invalidate method that renders the object
-// useless; there are also deep variants to these methods.  Supplying an invalidated object to a
-// function results in yp_InvalidatedError.  Freezing and invalidating are two examples of object
-// transmutation, where the type of the object is converted to a different type.  Unlike Python,
-// most objects are copied in memory, even immutables, as copying is one strategy to maintain
-// threadsafety.
+// All objects support a one-way freeze method that makes them immutable, an unfrozen_copy method
+// that returns a mutable copy, and a one-way invalidate method that renders the object useless;
+// there are also deep variants to these methods. Supplying an invalidated object to a function
+// raises yp_InvalidatedError. Invalidating an object stored in a container may cause some
+// operations on that container to raise yp_InvalidatedError. Freezing and invalidating are two
+// examples of object transmutation, where the type of the object is converted to a different type.
+// Unlike Python, most objects are copied in memory, even immutables, as copying is one strategy to
+// maintain threadsafety.
 
 // Transmutes *x to its associated immutable type.  If *x is already immutable this is a no-op.
 ypAPI void yp_freeze(ypObject **x);
@@ -1346,21 +1346,21 @@ ypAPI void yp_freeze(ypObject **x);
 ypAPI void yp_deepfreeze(ypObject **x);
 
 // Returns a new reference to a mutable shallow copy of x.  If x has no associated mutable type an
-// immutable copy is returned.  May also return yp_MemoryError.
+// immutable copy is returned.
 ypAPI ypObject *yp_unfrozen_copy(ypObject *x);
 
 // Creates a mutable copy of x and, recursively, all contained objects, returning a new reference.
 ypAPI ypObject *yp_unfrozen_deepcopy(ypObject *x);
 
 // Returns a new reference to an immutable shallow copy of x.  If x has no associated immutable
-// type a new, invalidated object is returned.  May also return yp_MemoryError.
+// type a new, invalidated object is returned.
 ypAPI ypObject *yp_frozen_copy(ypObject *x);
 
 // Creates an immutable copy of x and, recursively, all contained objects, returning a new
 // reference.
 ypAPI ypObject *yp_frozen_deepcopy(ypObject *x);
 
-// Returns a new reference to an exact, shallow copy of x.  May also return yp_MemoryError.
+// Returns a new reference to an exact, shallow copy of x.
 ypAPI ypObject *yp_copy(ypObject *x);
 
 // Creates an exact copy of x and, recursively, all contained objects, returning a new reference.
@@ -1626,6 +1626,23 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 
 
 /*
+ * Mutability and Hashability
+ */
+
+// In nohtyP, just as in Python, an object is considered immutable if the portion of data involved
+// in calculating its hash value does not change after creation. However, it is permissable for that
+// object to contain additional data that _can_ change after creation.
+//
+// The clearest example of this is the reference count, which nohtyP stores for all objects in the
+// object iself. While reference counts are mutable, they are not involved in the calculation of any
+// hash value, making it permissible to change the reference count of immutable objects.
+//
+// This is why types such as iterators, callables, and files are considered immutable, despite
+// containing mostly mutable data: their hash is based solely on their identity, the only portion of
+// data that doesn't change.
+
+
+/*
  * Initialization Parameters
  */
 
@@ -1736,7 +1753,7 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 //          // branch1
 //      } yp_ELIF(condition2) {   // optional; multiple yp_ELIFs allowed
 //          // branch2
-//      } yp_ELSE {                 // optional
+//      } yp_ELSE {               // optional
 //          // else-branch
 //      } yp_ELSE_EXCEPT_AS(e) {  // optional; can also use yp_ELSE_EXCEPT
 //          // exception-branch
@@ -1758,7 +1775,7 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 // strictly as follows (including braces):
 //      yp_WHILE(condition) {
 //          // suite
-//      } yp_WHILE_ELSE {           // optional
+//      } yp_WHILE_ELSE {         // optional
 //          // else-suite
 //      } yp_WHILE_EXCEPT_AS(e) { // optional; can also use yp_WHILE_EXCEPT
 //          // exception-suite
@@ -1785,7 +1802,7 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 //          // suite
 //      } yp_FOR_ELSE {             // optional
 //          // else-suite
-//      } yp_FOR_EXCEPT_AS(e) {   // optional; can also use yp_FOR_EXCEPT
+//      } yp_FOR_EXCEPT_AS(e) {     // optional; can also use yp_FOR_EXCEPT
 //          // exception-suite
 //      } yp_ENDFOR
 // C's break and continue statements work as you'd expect; however, use yp_FOR_return instead of
