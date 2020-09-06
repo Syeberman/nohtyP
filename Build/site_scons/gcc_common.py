@@ -317,9 +317,9 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         # If site_toolsconfig.py came up empty, find a gcc that supports our target, then update
         if not gcc_path:
             gcc_path = _find(env, re_version)
+            toolsConfig.update({gcc_siteName: gcc_path})
             if not gcc_path:
                 raise SCons.Errors.StopError(f"{gcc_name_arch} detection failed")
-            toolsConfig.update({gcc_siteName: gcc_path})
 
         # TODO Update SCons to skip autodetection when requested
         for tool in _tools:
