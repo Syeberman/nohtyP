@@ -464,8 +464,8 @@ static ypTypeObject *ypTypeTable[255];
 #define ypFloat_CODE                ( 12u)
 #define ypFloatStore_CODE           ( 13u)
 
-#define ypFrozenIter_CODE           ( 14u) // behaves like a closed iter
-#define ypIter_CODE                 ( 15u)
+#define ypIter_CODE                 ( 14u)
+// no mutable ypIter type           ( 15u)
 
 #define ypBytes_CODE                ( 16u)
 #define ypByteArray_CODE            ( 17u)
@@ -2281,7 +2281,6 @@ static ypObject *iter_dealloc(ypObject *i, void *memo)
     return yp_None;
 }
 
-// A frozen iter behaves like a closed iter; as such, they share the same method table
 static ypTypeObject ypIter_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
@@ -2356,7 +2355,7 @@ yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
 {
     yp_ssize_t length_hint;
     // FIXME Make a tp_length_hint slot
-    if (ypObject_TYPE_PAIR_CODE(i) != ypFrozenIter_CODE) {
+    if (ypObject_TYPE_PAIR_CODE(i) != ypIter_CODE) {
         return_yp_CEXC_BAD_TYPE(0, exc, i);
     }
     length_hint = ypIter_LENHINT(i);
@@ -2366,7 +2365,7 @@ yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
 // TODO what if the requested size was an input that we checked against the size of state
 ypObject *yp_iter_stateCX(ypObject *i, void **state, yp_ssize_t *size)
 {
-    if (ypObject_TYPE_PAIR_CODE(i) != ypFrozenIter_CODE) {
+    if (ypObject_TYPE_PAIR_CODE(i) != ypIter_CODE) {
         *state = NULL;
         *size = 0;
         return_yp_BAD_TYPE(i);
@@ -16689,8 +16688,8 @@ static ypTypeObject *ypTypeTable[255] = {
     &ypFloat_Type,      // ypFloat_CODE                ( 12u)
     &ypFloatStore_Type, // ypFloatStore_CODE           ( 13u)
 
-    &ypIter_Type,       // ypFrozenIter_CODE           ( 14u)
-    &ypIter_Type,       // ypIter_CODE                 ( 15u)
+    &ypIter_Type,       // ypIter_CODE                 ( 14u)
+    &ypIter_Type,       //                             ( 15u)
 
     &ypBytes_Type,      // ypBytes_CODE                ( 16u)
     &ypByteArray_Type,  // ypByteArray_CODE            ( 17u)
