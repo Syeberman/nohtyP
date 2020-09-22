@@ -434,6 +434,8 @@ ypAPI ypObject *yp_function_withstateCNV(
 // "active" one.  If state contains objects in an array you must list _each_ _individual_ offset.
 // state _can_ contain exceptions.
 // FIXME Is the C suffix applicable here?
+// FIXME Combine size, n, and args into a single structure that can be allocated statically
+// (here and in generators). A structure's definition is static, so why not its description?
 ypAPI ypObject *yp_function_withstatestructCN(
         yp_function_code_t *code, yp_function_parameters_t *parameters, void *state, yp_ssize_t size, int n, ...);
 ypAPI ypObject *yp_function_withstatestructCNV(yp_function_code_t *code, yp_function_parameters_t *parameters,
@@ -442,6 +444,9 @@ ypAPI ypObject *yp_function_withstatestructCNV(yp_function_code_t *code, yp_func
 
 // FIXME What about creating a function object that always returns a particular value?
 // FIXME Partial functions, created from other functions?
+// FIXME Statically-allocated immortal functions a la yp_IMMORTAL_STR_LATIN_1? And if we can do
+// that, then all other *_func_t arguments should be objects. But if we do that, how will we catch
+// errors in the function definition (i.e. required parameters after default parameters)?
 
 
 // XXX The file type will be added in a future version
@@ -1221,13 +1226,6 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 
 // XXX Yes, the proper name for this is `function`
 
-// TODO Functions are mutable because we will provide state that they can modify. But then how do
-// we freeze? Perhaps we leave it up to the C implementations to check their own type and not
-// modify anything.
-// TODO Or we just document this as a special type of object that can't be frozen.
-
-// TODO move to constructors
-
 // Returns true (non-zero) if x appears callable, else false.  If this returns true, it is still
 // possible that a call fails, but if it is false, calling x will always raise yp_TypeError.
 // Always succeeds; if x is an exception false is returned.
@@ -1312,7 +1310,6 @@ typedef struct _yp_function_parameters_t {
 // TODO starargs is from the grammar, but do people know it? does the "star" and "args" together
 // imply just `*args` (read it out, it's "star args"), or would people know it's **kwargs too
 // TODO same signature as above. Does it really help to name them differently?
-// TODO What about yp_function_
 typedef ypObject *(*yp_function_starargs_func_t)(ypObject *self, ypObject *a, ypObject *b);
 
 // TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
@@ -1604,6 +1601,7 @@ ypAPI ypObject *const yp_t_range;
 // may not raise an exception.
 
 // FIXME Would this be clearer if mini iterators were opaque structures containing obj and state?
+// Yes, yes it would.
 
 // Returns a new reference to an opaque mini iterator for object x and initializes *state to the
 // iterator's starting state.  *state is also opaque: you must *not* modify it directly.  It is
@@ -1661,7 +1659,7 @@ ypAPI yp_int_t yp_o2i_getitemC(ypObject *container, ypObject *key, ypObject **ex
 ypAPI void yp_o2i_setitemC(ypObject **container, ypObject *key, yp_int_t x);
 
 // Operations on containers that map objects to strs
-// yp_o2s_getitemCX is documented below, and must be used carefully!
+// yp_o2s_getitemCX is documented below, as it must be used carefully.
 ypAPI void yp_o2s_setitemC4(
         ypObject **container, ypObject *key, const yp_uint8_t *x, yp_ssize_t x_len);
 
@@ -1675,7 +1673,9 @@ ypAPI yp_int_t yp_i2i_getitemC(ypObject *container, yp_int_t key, ypObject **exc
 ypAPI void yp_i2i_setitemC(ypObject **container, yp_int_t key, yp_int_t x);
 
 // Operations on containers that map integers to strs
-// yp_i2s_getitemCX is documented below, and must be used carefully!
+// yp_i2s_getitemCX is documented below, as it must be used carefully.
+// FIXME yp_uint8_t* is confusing; make a yp_char_t, or yp_str_t (a pointer typedef...but we avoid
+// those)? Or stick with C-standard char, warts and all.
 ypAPI void yp_i2s_setitemC4(
         ypObject **container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len);
 
@@ -2093,7 +2093,6 @@ struct _ypStrObject {
         type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, len, _ypObject_LEN_INVALID, \
                 _ypObject_HASH_INVALID, data                                        \
     }
-#define _yp_NOQUAL  // Used in place of static or extern for qual
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID), (value)}; \
@@ -2112,6 +2111,7 @@ struct _ypStrObject {
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force use of semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
+#define _yp_NOQUAL  // Used in place of static or extern for qual
 #define yp_IMMORTAL_INT(name, value) _yp_IMMORTAL_INT(_yp_NOQUAL, name, value)
 #define yp_IMMORTAL_BYTES(name, value) _yp_IMMORTAL_BYTES(_yp_NOQUAL, name, value)
 #define yp_IMMORTAL_STR_LATIN_1(name, value) _yp_IMMORTAL_STR_LATIN_1(_yp_NOQUAL, name, value)
