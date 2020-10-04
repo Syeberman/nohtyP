@@ -338,14 +338,13 @@ ypAPI ypObject *yp_list_repeatCNV(yp_ssize_t factor, int n, va_list args);
 ypAPI ypObject *yp_tuple(ypObject *iterable);
 ypAPI ypObject *yp_list(ypObject *iterable);
 
-// Returns a new reference to a sorted list from the items in iterable.  key is a function that
-// returns new or immortal references that are used as comparison keys; to compare the elements
-// directly, use NULL.  If reverse is true, the list elements are sorted as if each comparison were
-// reversed.
-typedef ypObject *(*yp_sort_key_func_t)(ypObject *x);
-ypAPI ypObject *yp_sorted3(ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse);
+// Returns a new reference to a sorted list from the items in iterable.  key is a one-argument
+// function used to extract a comparison key from each element in iterable; to compare the elements
+// directly, use yp_None.  If reverse is true, the list elements are sorted as if each comparison
+// were reversed.
+ypAPI ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse);
 
-// Equivalent to yp_sorted3(iterable, NULL, yp_False).
+// Equivalent to yp_sorted3(iterable, yp_None, yp_False).
 ypAPI ypObject *yp_sorted(ypObject *iterable);
 
 // Returns a new reference to a frozenset/set containing the given n objects; the length will be n,
@@ -584,33 +583,31 @@ ypAPI void yp_unpackN(ypObject *iterable, int n, ...);
 ypAPI void yp_unpackNV(ypObject *iterable, int n, va_list args);
 
 // Returns a new reference to an iterator that yields values from iterable for which function
-// returns true.  The given function must return new or immortal references, as each returned
-// value will be discarded; to inspect the elements directly, use NULL.
-typedef ypObject *(*yp_filter_func_t)(ypObject *x);
-ypAPI ypObject *yp_filter(yp_filter_func_t function, ypObject *iterable);
+// returns true; to compare the elements directly, set function to yp_None.
+ypAPI ypObject *yp_filter(ypObject *function, ypObject *iterable);
 
 // Similar to yp_filter, but yields values for which function returns false.
-ypAPI ypObject *yp_filterfalse(yp_filter_func_t function, ypObject *iterable);
+ypAPI ypObject *yp_filterfalse(ypObject *function, ypObject *iterable);
 
-// Returns a new reference to the largest/smallest of the given n objects.  key is a function that
-// returns new or immortal references that are used as comparison keys; to compare the elements
-// directly, use NULL.
-ypAPI ypObject *yp_max_keyN(yp_sort_key_func_t key, int n, ...);
-ypAPI ypObject *yp_max_keyNV(yp_sort_key_func_t key, int n, va_list args);
-ypAPI ypObject *yp_min_keyN(yp_sort_key_func_t key, int n, ...);
-ypAPI ypObject *yp_min_keyNV(yp_sort_key_func_t key, int n, va_list args);
+// Returns a new reference to the largest/smallest of the given n objects.  key is a one-argument
+// function used to extract a comparison key from each element in iterable; to compare the elements
+// directly, use yp_None.
+ypAPI ypObject *yp_max_keyN(ypObject *key, int n, ...);
+ypAPI ypObject *yp_max_keyNV(ypObject *key, int n, va_list args);
+ypAPI ypObject *yp_min_keyN(ypObject *key, int n, ...);
+ypAPI ypObject *yp_min_keyNV(ypObject *key, int n, va_list args);
 
-// Equivalent to yp_max_keyN(NULL, n, ...) and yp_min_keyN(NULL, n, ...).
+// Equivalent to yp_max_keyN(yp_None, n, ...) and yp_min_keyN(yp_None, n, ...).
 ypAPI ypObject *yp_maxN(int n, ...);
 ypAPI ypObject *yp_maxNV(int n, va_list args);
 ypAPI ypObject *yp_minN(int n, ...);
 ypAPI ypObject *yp_minNV(int n, va_list args);
 
 // Returns a new reference to the largest/smallest element in iterable.  key is as in yp_max_keyN.
-ypAPI ypObject *yp_max_key(ypObject *iterable, yp_sort_key_func_t key);
-ypAPI ypObject *yp_min_key(ypObject *iterable, yp_sort_key_func_t key);
+ypAPI ypObject *yp_max_key(ypObject *iterable, ypObject *key);
+ypAPI ypObject *yp_min_key(ypObject *iterable, ypObject *key);
 
-// Equivalent to yp_max_key(iterable, NULL) and yp_min_key(iterable, NULL).
+// Equivalent to yp_max_key(iterable, yp_None) and yp_min_key(iterable, yp_None).
 ypAPI ypObject *yp_max(ypObject *iterable);
 ypAPI ypObject *yp_min(ypObject *iterable);
 
@@ -790,13 +787,13 @@ ypAPI void yp_discard(ypObject **sequence, ypObject *x);
 // exception.
 ypAPI void yp_reverse(ypObject **sequence);
 
-// Sorts the items of *sequence in-place.  key is a function that returns new or immortal
-// references that are used as comparison keys; to compare the elements directly, use NULL.  If
+// Sorts the items of *sequence in-place.  key is a one-argument function used to extract a
+// comparison key from each element in iterable; to compare the elements directly, use yp_None.  If
 // reverse is true, the list elements are sorted as if each comparison were reversed.  On error,
 // *sequence is discarded and set to an exception.
-ypAPI void yp_sort3(ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse);
+ypAPI void yp_sort3(ypObject **sequence, ypObject *key, ypObject *reverse);
 
-// Equivalent to yp_sort3(sequence, NULL, yp_False).
+// Equivalent to yp_sort3(sequence, yp_None, yp_False).
 ypAPI void yp_sort(ypObject **sequence);
 
 // When given to a slice-like start/stop C argument, signals that the default "end" value be

@@ -304,7 +304,6 @@ typedef ypObject *(*countfunc)(ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, y
 typedef enum { yp_FIND_FORWARD, yp_FIND_REVERSE } findfunc_direction;
 typedef ypObject *(*findfunc)(
         ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, findfunc_direction, yp_ssize_t *);
-typedef ypObject *(*sortfunc)(ypObject *, yp_sort_key_func_t, ypObject *);
 typedef ypObject *(*popitemfunc)(ypObject *, ypObject **, ypObject **);
 
 // Suite of number methods.  A placeholder for now, as the current implementation doesn't allow
@@ -330,7 +329,7 @@ typedef struct {
     objssizeobjproc tp_insert;
     objssizeproc    tp_popindex;
     objproc         tp_reverse;
-    sortfunc        tp_sort;
+    objobjobjproc   tp_sort;
 } ypSequenceMethods;
 
 typedef struct {
@@ -514,7 +513,6 @@ static int _isnotcallable(ypObject *x) { return FALSE; }
     static ypObject *name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
     static ypObject *name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
     static ypObject *name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; } \
-    static ypObject *name ## _sortfunc(ypObject *x, yp_sort_key_func_t key, ypObject *reverse) { return retval; } \
     static ypObject *name ## _popitemfunc(ypObject *x, ypObject **key, ypObject **value) { return retval; } \
     \
     static ypNumberMethods name ## _NumberMethods[1] = { { \
@@ -537,7 +535,7 @@ static int _isnotcallable(ypObject *x) { return FALSE; }
         *name ## _objssizeobjproc, \
         *name ## _objssizeproc, \
         *name ## _objproc, \
-        *name ## _sortfunc \
+        *name ## _objobjobjproc \
     } }; \
     static ypSetMethods name ## _SetMethods[1] = { { \
         *name ## _objobjproc, \
@@ -8545,7 +8543,7 @@ static ypSequenceMethods ypBytes_as_sequence = {
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
-        MethodError_sortfunc          // tp_sort
+        MethodError_objobjobjproc     // tp_sort
 };
 
 static ypTypeObject ypBytes_Type = {
@@ -8617,23 +8615,23 @@ static ypTypeObject ypBytes_Type = {
 };
 
 static ypSequenceMethods ypByteArray_as_sequence = {
-        bytes_concat,         // tp_concat
-        bytes_repeat,         // tp_repeat
-        bytes_getindex,       // tp_getindex
-        bytes_getslice,       // tp_getslice
-        bytes_find,           // tp_find
-        bytes_count,          // tp_count
-        bytearray_setindex,   // tp_setindex
-        bytearray_setslice,   // tp_setslice
-        bytearray_delindex,   // tp_delindex
-        bytearray_delslice,   // tp_delslice
-        bytearray_push,       // tp_append
-        bytearray_extend,     // tp_extend
-        bytearray_irepeat,    // tp_irepeat
-        bytearray_insert,     // tp_insert
-        bytearray_popindex,   // tp_popindex
-        bytearray_reverse,    // tp_reverse
-        MethodError_sortfunc  // tp_sort
+        bytes_concat,              // tp_concat
+        bytes_repeat,              // tp_repeat
+        bytes_getindex,            // tp_getindex
+        bytes_getslice,            // tp_getslice
+        bytes_find,                // tp_find
+        bytes_count,               // tp_count
+        bytearray_setindex,        // tp_setindex
+        bytearray_setslice,        // tp_setslice
+        bytearray_delindex,        // tp_delindex
+        bytearray_delslice,        // tp_delslice
+        bytearray_push,            // tp_append
+        bytearray_extend,          // tp_extend
+        bytearray_irepeat,         // tp_irepeat
+        bytearray_insert,          // tp_insert
+        bytearray_popindex,        // tp_popindex
+        bytearray_reverse,         // tp_reverse
+        MethodError_objobjobjproc  // tp_sort
 };
 
 static ypTypeObject ypByteArray_Type = {
@@ -9389,7 +9387,7 @@ static ypSequenceMethods ypStr_as_sequence = {
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
-        MethodError_sortfunc          // tp_sort
+        MethodError_objobjobjproc     // tp_sort
 };
 
 static ypTypeObject ypStr_Type = {
@@ -9477,7 +9475,7 @@ static ypSequenceMethods ypChrArray_as_sequence = {
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
-        MethodError_sortfunc          // tp_sort
+        MethodError_objobjobjproc     // tp_sort
 };
 
 static ypTypeObject ypChrArray_Type = {
@@ -10903,7 +10901,7 @@ static ypSequenceMethods ypTuple_as_sequence = {
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
-        MethodError_sortfunc          // tp_sort
+        MethodError_objobjobjproc     // tp_sort
 };
 
 static ypTypeObject ypTuple_Type = {
@@ -10974,7 +10972,7 @@ static ypTypeObject ypTuple_Type = {
         TypeError_CallableMethods  // tp_as_callable
 };
 
-static ypObject *list_sort(ypObject *, yp_sort_key_func_t, ypObject *);
+static ypObject *list_sort(ypObject *, ypObject *, ypObject *);
 
 static ypSequenceMethods ypList_as_sequence = {
         tuple_concat,    // tp_concat
@@ -11261,7 +11259,7 @@ ypObject *yp_list(ypObject *iterable)
     return _ypTuple(ypList_CODE, iterable);
 }
 
-ypObject *yp_sorted3(ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse)
+ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse)
 {
     ypObject *result;
     ypObject *newSq = yp_list(iterable);
@@ -11276,7 +11274,7 @@ ypObject *yp_sorted3(ypObject *iterable, yp_sort_key_func_t key, ypObject *rever
     return newSq;
 }
 
-ypObject *yp_sorted(ypObject *iterable) { return yp_sorted3(iterable, NULL, yp_False); }
+ypObject *yp_sorted(ypObject *iterable) { return yp_sorted3(iterable, yp_None, yp_False); }
 
 static ypObject *_ypTuple_repeatCNV(int type, yp_ssize_t factor, int n, va_list args)
 {
@@ -12289,7 +12287,7 @@ reverse_sortslice(sortslice *s, yp_ssize_t n)
  * permutation of its input state (nothing is lost or duplicated).
  */
 static ypObject *
-list_sort(ypObject *self, yp_sort_key_func_t keyfunc, ypObject *_reverse)
+list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
 {
     MergeState ms;
     yp_ssize_t nremaining;
@@ -12316,7 +12314,7 @@ list_sort(ypObject *self, yp_sort_key_func_t keyfunc, ypObject *_reverse)
     result = _ypTuple_detach_array(self, &detached);
     if (yp_isexceptionC(result)) return result;
 
-    if (keyfunc == NULL) {
+    if (keyfunc == yp_None) {
         keys = NULL;
         lo.keys = detached.array;
         lo.values = NULL;
@@ -15436,7 +15434,7 @@ static ypSequenceMethods ypRange_as_sequence = {
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
-        MethodError_sortfunc          // tp_sort
+        MethodError_objobjobjproc     // tp_sort
 };
 
 static ypTypeObject ypRange_Type = {
@@ -16308,14 +16306,14 @@ void yp_reverse(ypObject **sequence)
     _yp_INPLACE2(sequence, tp_as_sequence, tp_reverse, (*sequence));
 }
 
-void yp_sort3(ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse)
+void yp_sort3(ypObject **sequence, ypObject *key, ypObject *reverse)
 {
     _yp_INPLACE2(sequence, tp_as_sequence, tp_sort, (*sequence, key, reverse));
 }
 
 void yp_sort(ypObject **sequence)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_sort, (*sequence, NULL, yp_False));
+    _yp_INPLACE2(sequence, tp_as_sequence, tp_sort, (*sequence, yp_None, yp_False));
 }
 
 ypObject *yp_isdisjoint(ypObject *set, ypObject *x)

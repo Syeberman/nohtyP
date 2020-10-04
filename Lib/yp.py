@@ -422,10 +422,11 @@ yp_func(c_ypObject_p, "yp_tuple", ((c_ypObject_p, "iterable"), ))
 # ypObject *yp_list(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ))
 
-# typedef ypObject *(*yp_sort_key_func_t)(ypObject *x);
-# ypObject *yp_sorted3(ypObject *iterable, yp_sort_key_func_t key, ypObject *reverse);
-yp_func(c_ypObject_p, "yp_sorted3", ((c_ypObject_p, "iterable"), (c_void_p, "key"),
-                                     (c_ypObject_p, "reverse")))
+# ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse);
+yp_func(
+    c_ypObject_p, "yp_sorted3",
+    ((c_ypObject_p, "iterable"), (c_ypObject_p, "key"), (c_ypObject_p, "reverse"))
+)
 
 # ypObject *yp_sorted(ypObject *iterable);
 yp_func(c_ypObject_p, "yp_sorted", ((c_ypObject_p, "iterable"), ))
@@ -489,18 +490,18 @@ yp_func(c_yp_ssize_t, "yp_length_hintC", ((c_ypObject_p, "iterator"), c_ypObject
 
 # ypObject *yp_filterfalse(yp_filter_function_t function, ypObject *iterable);
 
-# ypObject *yp_max_keyN(yp_sort_key_func_t key, int n, ...);
-# ypObject *yp_max_keyNV(yp_sort_key_func_t key, int n, va_list args);
-# ypObject *yp_min_keyN(yp_sort_key_func_t key, int n, ...);
-# ypObject *yp_min_keyNV(yp_sort_key_func_t key, int n, va_list args);
+# ypObject *yp_max_keyN(ypObject *key, int n, ...);
+# ypObject *yp_max_keyNV(ypObject *key, int n, va_list args);
+# ypObject *yp_min_keyN(ypObject *key, int n, ...);
+# ypObject *yp_min_keyNV(ypObject *key, int n, va_list args);
 
 # ypObject *yp_maxN(int n, ...);
 # ypObject *yp_maxNV(int n, va_list args);
 # ypObject *yp_minN(int n, ...);
 # ypObject *yp_minNV(int n, va_list args);
 
-# ypObject *yp_max_key(ypObject *iterable, yp_sort_key_func_t key);
-# ypObject *yp_min_key(ypObject *iterable, yp_sort_key_func_t key);
+# ypObject *yp_max_key(ypObject *iterable, ypObject *key);
+# ypObject *yp_min_key(ypObject *iterable, ypObject *key);
 
 # ypObject *yp_max(ypObject *iterable);
 # ypObject *yp_min(ypObject *iterable);
@@ -631,9 +632,11 @@ yp_func(c_void, "yp_remove", ((c_ypObject_pp, "sequence"), (c_ypObject_p, "x")))
 # void yp_reverse(ypObject **sequence);
 yp_func(c_void, "yp_reverse", ((c_ypObject_pp, "sequence"), ))
 
-# void yp_sort3(ypObject **sequence, yp_sort_key_func_t key, ypObject *reverse);
-yp_func(c_void, "yp_sort3", ((c_ypObject_pp, "sequence"), (c_void_p, "key"),
-                             (c_ypObject_p, "reverse")))
+# void yp_sort3(ypObject **sequence, ypObject *key, ypObject *reverse);
+yp_func(
+    c_void, "yp_sort3",
+    ((c_ypObject_pp, "sequence"), (c_ypObject_p, "key"), (c_ypObject_p, "reverse"))
+)
 
 # void yp_sort(ypObject **sequence);
 yp_func(c_void, "yp_sort", ((c_ypObject_pp, "sequence"), ))
