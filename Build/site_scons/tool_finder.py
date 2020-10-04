@@ -48,7 +48,7 @@ if _platform_name in ("win32", "cygwin"):
 
     def _iter_paths(win_dirs, posix_dirs, exe_globs):
         path_exts = [
-            ext for ext in os.environ.get('PATHEXT', '.COM;.EXE;.BAT;.CMD').split(';')
+            ext for ext in os.environ.get('PATHEXT', '.COM;.EXE;.BAT;.CMD').lower().split(';')
             if ext.startswith(".")
         ]
         exe_ext_globs = [name + ext for name in exe_globs for ext in path_exts]
