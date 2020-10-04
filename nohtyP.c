@@ -482,8 +482,8 @@ static ypTypeObject *ypTypeTable[255];
 #define ypRange_CODE                ( 26u)
 // no mutable ypRange type          ( 27u)
 
-#define ypFrozenFunction_CODE       ( 28u)  // FIXME ummm, what to do here?
-#define ypFunction_CODE             ( 29u)
+#define ypFunction_CODE             ( 28u)
+// no mutable ypFunction type       ( 29u)
 
 // clang-format on
 
@@ -494,7 +494,6 @@ yp_STATIC_ASSERT(_ypStr_CODE == ypStr_CODE, ypStr_CODE_matches);
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
 // clang-format off
-static int _isnotcallable(ypObject *x) { return FALSE; }
 #define DEFINE_GENERIC_METHODS(name, retval) \
     static ypObject *name ## _objproc(ypObject *x) { return retval; } \
     static ypObject *name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
@@ -16705,9 +16704,8 @@ static ypTypeObject *ypTypeTable[255] = {
     &ypRange_Type,      // ypRange_CODE                ( 26u)
     &ypRange_Type,      //                             ( 27u)
 
-    // FIXME Functions (and iters and files and...) are hashable, despite arguably being "mutable"
-    &ypFunction_Type,   // ypFrozenFunction_CODE       ( 28u)
-    &ypFunction_Type,   // ypFunction_CODE             ( 29u)
+    &ypFunction_Type,   // ypFunction_CODE             ( 28u)
+    &ypFunction_Type,   //                             ( 29u)
 };
 // clang-format on
 

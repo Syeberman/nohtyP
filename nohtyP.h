@@ -840,23 +840,23 @@ ypAPI ypObject *yp_issuperset(ypObject *set, ypObject *x);
 // else yp_False.
 ypAPI ypObject *yp_gt(ypObject *set, ypObject *x);
 
-// Returns a new reference to a set (or frozenset if set is immutable) containing all the elements
-// from set and all n objects.
+// Returns a new reference to an object of the same type as set containing all the elements from set
+// and all n objects.
 ypAPI ypObject *yp_unionN(ypObject *set, int n, ...);
 ypAPI ypObject *yp_unionNV(ypObject *set, int n, va_list args);
 
-// Returns a new reference to a set (or frozenset if set is immutable) containing all the elements
-// common to the set and all n objects.
+// Returns a new reference to an object of the same type as set containing all the elements common
+// to the set and all n objects.
 ypAPI ypObject *yp_intersectionN(ypObject *set, int n, ...);
 ypAPI ypObject *yp_intersectionNV(ypObject *set, int n, va_list args);
 
-// Returns a new reference to a set (or frozenset if set is immutable) containing all the elements
-// from set that are not in the n objects.
+// Returns a new reference to an object of the same type as set containing all the elements from set
+// that are not in the n objects.
 ypAPI ypObject *yp_differenceN(ypObject *set, int n, ...);
 ypAPI ypObject *yp_differenceNV(ypObject *set, int n, va_list args);
 
-// Returns a new reference to a set (or frozenset if set is immutable) containing all the elements
-// in either set or x but not both.
+// Returns a new reference to an object of the same type as set containing all the elements in
+// either set or x but not both.
 ypAPI ypObject *yp_symmetric_difference(ypObject *set, ypObject *x);
 
 // Add the elements from the n objects to *set.  On error, *set is discarded and set to an
@@ -1800,6 +1800,8 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 // This is why types such as iterators, callables, and files are considered immutable, despite
 // containing mostly mutable data: their hash is based solely on their identity, the only portion of
 // data that doesn't change.
+
+// FIXME Should we call it "callables" above, or "functions"? Callable is the "ABC", right?
 
 
 /*
