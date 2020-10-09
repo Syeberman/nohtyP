@@ -121,14 +121,15 @@
 #define _yp_S__LINE__ _yp_S_(__LINE__)
 
 // FIXME Test these changes
-#define _yp_FATAL(s_file, s_line, line_of_code, ...)                                 \
-    do {                                                                             \
-        (void)fflush(NULL);                                                          \
-        fprintf(stderr, "%s", "Traceback (most recent call last):\n  File \"" s_file \
-                              "\", line " s_line "\n    " line_of_code "\n");        \
-        fprintf(stderr, "FATAL ERROR: " __VA_ARGS__);                                \
-        fprintf(stderr, "\n");                                                       \
-        abort();                                                                     \
+#define _yp_FATAL(s_file, s_line, line_of_code, ...)                                      \
+    do {                                                                                  \
+        (void)fflush(NULL);                                                               \
+        fprintf(stderr, "%s",                                                             \
+                "Traceback (most recent call last):\n  File \"" s_file "\", line " s_line \
+                "\n    " line_of_code "\n");                                              \
+        fprintf(stderr, "FATAL ERROR: " __VA_ARGS__);                                     \
+        fprintf(stderr, "\n");                                                            \
+        abort();                                                                          \
     } while (0)
 #define yp_FATAL(fmt, ...) \
     _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL(" #fmt ", " #__VA_ARGS__ ");", fmt, __VA_ARGS__)
@@ -490,6 +491,7 @@ static ypTypeObject *ypTypeTable[255];
 yp_STATIC_ASSERT(_ypInt_CODE == ypInt_CODE, ypInt_CODE_matches);
 yp_STATIC_ASSERT(_ypBytes_CODE == ypBytes_CODE, ypBytes_CODE_matches);
 yp_STATIC_ASSERT(_ypStr_CODE == ypStr_CODE, ypStr_CODE_matches);
+yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
 
 // Generic versions of the methods above to return errors, usually; every method function pointer
 // needs to point to a valid function (as opposed to constantly checking for NULL)
@@ -577,7 +579,9 @@ DEFINE_GENERIC_METHODS(InvalidatedError, yp_InvalidatedError);  // for Invalidat
 DEFINE_GENERIC_METHODS(ExceptionMethod, x);  // for exception objects; returns "self"
 
 // For use when an object doesn't support a particular comparison operation
+// FIXME Python has NotImplemented singleton instead
 extern ypObject *const yp_ComparisonNotImplemented;
+
 static ypObject *NotImplemented_comparefunc(ypObject *x, ypObject *y)
 {
     return yp_ComparisonNotImplemented;
@@ -1991,10 +1995,9 @@ static void ypQuickSeq_new_fromvar(ypQuickSeq_state *state, int n, va_list args)
 // TODO A bytes object can return immortal ints in range(256)
 
 
-// These are implemented in the tuple section
-static void ypQuickSeq_tuple_close(ypQuickSeq_state *state);
+static void                     ypQuickSeq_tuple_close(ypQuickSeq_state *state);
 static const ypQuickSeq_methods ypQuickSeq_tuple_methods;
-static void ypQuickSeq_new_fromtuple(ypQuickSeq_state *state, ypObject *tuple);
+static void                     ypQuickSeq_new_fromtuple(ypQuickSeq_state *state, ypObject *tuple);
 
 
 static ypObject *ypQuickSeq_seq_getindex(ypQuickSeq_state *state, yp_ssize_t i)
@@ -2953,6 +2956,7 @@ _ypBool_PUBLIC_CMP_FUNCTION(gt, lt, yp_TypeError);
 yp_STATIC_ASSERT(ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one);
 
 extern ypObject *const yp_RecursionLimitError;
+
 static ypObject *_yp_hash_visitor(ypObject *x, void *_memo, yp_hash_t *hash)
 {
     yp_ssize_t recursion_depth = (yp_ssize_t)_memo;
@@ -3683,11 +3687,11 @@ typedef yp_int_t (*unaryLfunc)(yp_int_t, ypObject **);
 typedef yp_float_t (*unaryLFfunc)(yp_float_t, ypObject **);
 
 // Bitwise operations on floats aren't supported, so these functions simply raise yp_TypeError
-static void yp_ilshiftCF(ypObject **x, yp_float_t y);
-static void yp_irshiftCF(ypObject **x, yp_float_t y);
-static void yp_iampCF(ypObject **x, yp_float_t y);
-static void yp_ixorCF(ypObject **x, yp_float_t y);
-static void yp_ibarCF(ypObject **x, yp_float_t y);
+static void       yp_ilshiftCF(ypObject **x, yp_float_t y);
+static void       yp_irshiftCF(ypObject **x, yp_float_t y);
+static void       yp_iampCF(ypObject **x, yp_float_t y);
+static void       yp_ixorCF(ypObject **x, yp_float_t y);
+static void       yp_ibarCF(ypObject **x, yp_float_t y);
 static yp_float_t yp_lshiftLF(yp_float_t x, yp_float_t y, ypObject **exc);
 static yp_float_t yp_rshiftLF(yp_float_t x, yp_float_t y, ypObject **exc);
 static yp_float_t yp_ampLF(yp_float_t x, yp_float_t y, ypObject **exc);
@@ -3728,8 +3732,9 @@ unsigned char _ypInt_digit_value[256] = {
 };
 // clang-format on
 
-// XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
 static yp_int_t _yp_mulL_posints(yp_int_t x, yp_int_t y);
+
+// XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
 static ypObject *_ypInt_from_ascii(
         ypObject *(*allocator)(yp_int_t), const yp_uint8_t *bytes, yp_int_t base)
 {
@@ -4446,7 +4451,7 @@ _ypInt_PUBLIC_ARITH_FUNCTION(pow);
 _ypInt_PUBLIC_ARITH_FUNCTION(lshift);
 _ypInt_PUBLIC_ARITH_FUNCTION(rshift);
 _ypInt_PUBLIC_ARITH_FUNCTION(amp);
-_ypInt_PUBLIC_ARITH_FUNCTION (xor);
+_ypInt_PUBLIC_ARITH_FUNCTION(xor);
 _ypInt_PUBLIC_ARITH_FUNCTION(bar);
 
 void yp_itruedivC(ypObject **x, yp_int_t y)
@@ -4664,8 +4669,8 @@ static ypObject *unaryoperation(ypObject *x, unaryLfunc intop, unaryLFfunc float
 }
 
 // Defined here are yp_ineg (et al), and yp_neg (et al)
-#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                                             \
-    void yp_i##name(ypObject **x) { iunaryoperation(x, yp_##name##L, yp_##name##LF); } \
+#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                                                  \
+    void      yp_i##name(ypObject **x) { iunaryoperation(x, yp_##name##L, yp_##name##LF); } \
     ypObject *yp_##name(ypObject *x) { return unaryoperation(x, yp_##name##L, yp_##name##LF); }
 _ypInt_PUBLIC_UNARY_FUNCTION(neg);
 _ypInt_PUBLIC_UNARY_FUNCTION(pos);
@@ -4834,15 +4839,13 @@ yp_int_t yp_asintC(ypObject *x, ypObject **exc)
 // errors.
 // TODO review http://blog.reverberate.org/2012/12/testing-for-integer-overflow-in-c-and-c.html
 #define _ypInt_PUBLIC_AS_C_FUNCTION(name, mask)                                           \
-    \
-yp_##name##_t yp_as##name##C(ypObject *x, ypObject **exc)                                 \
+    yp_##name##_t yp_as##name##C(ypObject *x, ypObject **exc)                             \
     {                                                                                     \
         yp_int_t      asint = yp_asintC(x, exc);                                          \
         yp_##name##_t retval = (yp_##name##_t)(asint & (mask));                           \
         if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_OverflowError); \
         return retval;                                                                    \
-    \
-}
+    }
 // clang-format off
 _ypInt_PUBLIC_AS_C_FUNCTION(int8,   0xFF);
 _ypInt_PUBLIC_AS_C_FUNCTION(uint8,  0xFFu);
@@ -4859,7 +4862,9 @@ _ypInt_PUBLIC_AS_C_FUNCTION(hash,   (yp_hash_t) 0xFFFFFFFF);
 
 // The functions below assume/assert that yp_int_t is 64 bits
 yp_STATIC_ASSERT(yp_sizeof(yp_int_t) == 8, sizeof_yp_int);
+
 yp_int64_t yp_asint64C(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
+
 yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc)
 {
     yp_int_t asint = yp_asintC(x, exc);
@@ -4869,7 +4874,9 @@ yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc)
 
 #if defined(yp_ARCH_64_BIT)
 yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) == yp_sizeof(yp_int_t), sizeof_yp_ssize_eq_yp_int);
+
 yp_ssize_t yp_asssizeC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
+
 yp_hash_t yp_ashashC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 #endif
 
@@ -7281,6 +7288,7 @@ convert:
 
 // TODO Move these to nohtyP.h...eventually
 ypAPI void yp_setitemE(ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc);
+
 static ypObject *yp_set_getintern(ypObject *set, ypObject *x);
 
 static ypObject *_yp_codecs_register_alias_norm(ypObject *alias_norm, ypObject *encoding_norm)
@@ -9652,7 +9660,9 @@ ypObject *yp_decode(ypObject *b)
 }
 
 static ypObject *_ypStr(int type, ypObject *object) { return yp_NotImplementedError; }
+
 ypObject *yp_str(ypObject *object) { return _ypStr(ypStr_CODE, object); }
+
 ypObject *yp_chrarray(ypObject *object) { return _ypStr(ypChrArray_CODE, object); }
 
 ypObject *yp_str0(void)
@@ -15614,13 +15624,12 @@ typedef struct {
 yp_STATIC_ASSERT(
         yp_offsetof(ypFunctionState, data) % yp_MAX_ALIGNMENT == 0, alignof_function_state_data);
 
-typedef struct {
+struct _ypFunctionObject {
     ypObject_HEAD;
-    objobjobjproc    ob_func_stars;
-    objvalistproc    ob_funcN;
-    ypFunctionState *ob_state;  // NULL if no extra state
-    yp_INLINE_DATA(yp_function_parameter_t);
-} ypFunctionObject;
+    ypFunctionState *        ob_state;  // NULL if no extra state
+    yp_function_definition_t ob_def;
+};
+typedef struct _ypFunctionObject ypFunctionObject;
 
 #define ypFunction_STATE(f) (((ypFunctionObject *)f)->ob_state)
 #define ypFunction_PARAMS(f) ((yp_function_parameter_t **)((ypObject *)f)->ob_data)
@@ -15639,13 +15648,14 @@ typedef struct {
 // For use internally to detect when a key is missing from a dict.
 yp_IMMORTAL_INVALIDATED(ypFunction_key_missing);
 
-// "*" as a str.
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");  // Preceeding arguments positional-only
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");           // Remaining arguments keyword-only
 
 // Counts the number of parameter slots that can be filled directly from positional arguments.  In
 // other words, this counts the number of parameters before the first of *, *args, **kwargs, or the
 // end of the parameter list.  Recall that you can supply more positional arguments than there are
 // positional parameter slots if the parameter list contains *args.
+// FIXME also count positional-only
 static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_t *max)
 {
     ypObject * result;
@@ -15668,12 +15678,12 @@ static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_
 // FIXME Also normalize n<0 to 0 in yp_callN (likely).
 static ypObject *_ypFunction_callN(ypObject *f, int n, ...)
 {
-    va_list   args;
-    ypObject *result;
-    va_start(args, n);
-    result = ypFunction_FUNC_N(f)(f, n, args);
-    va_end(args);
-    return result;
+    // va_list   args;
+    // ypObject *result;
+    // va_start(args, n);
+    // result = ypFunction_FUNC_N(f)(f, n, args);
+    // va_end(args);
+    return yp_NotImplementedError;
 }
 
 // Function methods
@@ -15862,35 +15872,37 @@ static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwar
 
     // FIXME We can either check for NULL, or ensure it's always set to a valid function.  BUT!
     // The functions we would link to would be dynamic (via DLL), making the latter tricky!
-    if (ypFunction_FUNC_STARS(f) != NULL) {
-        return ypFunction_FUNC_STARS(f)(f, args, kwargs);
-    } else if (ypFunction_FUNC_N(f) != NULL) {
-        return _function_call_stars_to_callN(f, args, kwargs);
-    } else {
-        return yp_SystemError;  // should never occur
-    }
+    // if (ypFunction_FUNC_STARS(f) != NULL) {
+    //     return ypFunction_FUNC_STARS(f)(f, args, kwargs);
+    // } else if (ypFunction_FUNC_N(f) != NULL) {
+    //     return _function_call_stars_to_callN(f, args, kwargs);
+    // } else {
+    //     return yp_SystemError;  // should never occur
+    // }
+    return _function_call_stars_to_callN(f, args, kwargs);
 }
 
-static ypObject *_function_callN_to_call_stars(ypObject *f, int n, va_list args)
-{
-    ypObject *result;
-    ypObject *args_astuple = yp_tupleNV(n, args);  // new ref
-    if (yp_isexceptionC(args_astuple)) return args_astuple;
+// static ypObject *_function_callN_to_call_stars(ypObject *f, int n, va_list args)
+// {
+//     ypObject *result;
+//     ypObject *args_astuple = yp_tupleNV(n, args);  // new ref
+//     if (yp_isexceptionC(args_astuple)) return args_astuple;
 
-    result = ypFunction_FUNC_STARS(f)(f, args_astuple, _yp_frozendict_empty);
-    yp_decref(args_astuple);
-    return result;
-}
+//     result = ypFunction_FUNC_STARS(f)(f, args_astuple, _yp_frozendict_empty);
+//     yp_decref(args_astuple);
+//     return result;
+// }
 
 static ypObject *function_callN(ypObject *f, int n, va_list args)
 {
-    if (ypFunction_FUNC_N(f) != NULL) {
-        return ypFunction_FUNC_N(f)(f, n, args);
-    } else if (ypFunction_FUNC_STARS(f) != NULL) {
-        return _function_callN_to_call_stars(f, n, args);
-    } else {
-        return yp_SystemError;  // should never occur
-    }
+    // if (ypFunction_FUNC_N(f) != NULL) {
+    //     return ypFunction_FUNC_N(f)(f, n, args);
+    // } else if (ypFunction_FUNC_STARS(f) != NULL) {
+    //     return _function_callN_to_call_stars(f, n, args);
+    // } else {
+    //     return yp_SystemError;  // should never occur
+    // }
+    return yp_NotImplementedError;
 }
 
 // Decrements the reference count of the visited object
@@ -15905,7 +15917,7 @@ static ypObject *function_dealloc(ypObject *f, void *memo)
 {
     // FIXME Is there something better we can do to handle errors than just ignore them?
     (void)function_traverse(f, _function_decref_visitor, NULL);  // never fails
-    ypMem_FREE_CONTAINER(f, ypFunctionObject);
+    ypMem_FREE_FIXED(f);
     return yp_None;
 }
 
@@ -16657,6 +16669,69 @@ void yp_s2i_setitemC4(
 }
 
 #pragma endregion c2c_containers
+
+
+/*************************************************************************************************
+ * nohtyP functions (not methods) as objects
+ *************************************************************************************************/
+#pragma region functions_as_objects
+
+// yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");  // Preceeding arguments positional-only
+// yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");           // Remaining arguments keyword-only
+
+#define _yp_IMMORTAL_FUNCTION(qual, name, definition)                                        \
+    static struct _ypFunctionObject _##name##_struct = {                                     \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, definition, _ypObject_LEN_INVALID)}; \
+    qual ypObject *const name = (ypObject *)&_##name##_struct /* force use of semi-colon */
+
+#define yp_IMMORTAL_FUNCTION(name, definition) _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, definition)
+#define yp_IMMORTAL_FUNCTION_static(name, definition) \
+    _yp_IMMORTAL_FUNCTION(static, name, definition)
+
+// FIXME support yp_NO_VARIADIC_MACROS?
+// FIXME should name be the pointer or the yp_function_definition_t? The parameters are inlined...
+#define _yp_DEF(qual, name, code, ...)                                                            \
+    static yp_function_definition_t _##name##_struct = {code, NULL, {__VA_ARGS__, {NULL, NULL}}}; \
+    qual yp_function_definition_t *const name = &_##name##_struct /* force use of semi-colon */
+
+#define yp_DEF_PARAM(name, default) \
+    {                               \
+        name, default               \
+    }
+
+// FIXME Use these, or just use the structure directly?
+#define yp_DEF(name, code, ...) _yp_DEF(_yp_NOQUAL, name, code, __VA_ARGS__)
+#define yp_DEF_static(name, code, ...) _yp_DEF(static, name, code, __VA_ARGS__)
+
+
+// FIXME We could have ways to wrap some common function signatures, perhaps function state has
+// pointer to the C function... (although how to set defaults?)
+
+// FIXME yes, I like the word "code" for the C implementation
+static ypObject *yp_func_hash_code(ypObject *function, int n, va_list args)
+{
+    ypObject *exc = yp_None;
+    yp_hash_t hash;
+
+    if (n != 1) {
+        return yp_TypeError;  // FIXME This would actually be an error in the parameter defs.
+    }
+
+    hash = yp_hashC(va_arg(args, ypObject *), &exc);  // FIXME inline?
+    if (yp_isexceptionC(exc)) {
+        return exc;
+    }
+
+    return yp_intC(hash);
+};
+
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_object, "object");
+
+yp_DEF_static(yp_hash_definition, yp_func_hash_code, yp_DEF_PARAM(yp_s_object, NULL));
+
+yp_IMMORTAL_FUNCTION_static(yp_func_hash, yp_hash_definition);
+
+#pragma endregion functions_as_objects
 
 
 /*************************************************************************************************

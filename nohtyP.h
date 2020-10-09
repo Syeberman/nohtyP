@@ -13,36 +13,47 @@
  * Most functions borrow inputs, create their own references, and output new references.  Errors
  * are handled in one of three ways.  Functions that return objects simply return an appropriate
  * exception object on error:
+ *
  *      value = yp_getitem(dict, key);
  *      if(yp_isexceptionC(value)) printf("unknown key");
+ *
  * Functions that modify objects accept a ypObject* by reference and replace that object with an
  * exception on error, discarding the original reference:
+ *
  *      yp_setitem(&dict, key, value);
  *      if(yp_isexceptionC(dict)) printf("unhashable key, dict discarded");
+ *
  * If you don't want the modified object discarded on error, use the 'E' version of the function.
  * Such functions accept a ypObject** that is set to the exception; it is set _only_ on error,
  * and existing values are not discarded, so the variable should first be initialized to an
  * immortal like yp_None:
+ *
  *      ypObject *exc = yp_None;
  *      yp_setitemE(dict, key, value, &exc);
  *      if(yp_isexceptionC(exc)) printf("unhashable key, dict not modified");
+ *
  * This scheme is also used for functions that return C values:
+ *
  *      ypObject *exc = yp_None;
  *      len = yp_lenC(x, &exc);
  *      if(yp_isexceptionC(exc)) printf("x isn't a container");
+ *
  * Unless explicitly documented as "always succeeds", _any_ function can return an exception.
  *
  * These error handling methods are designed for a specific purpose: to allow combining multiple
  * function calls without checking for errors in-between.  When an exception object is used as
  * input to a function, it is immediately returned, allowing you to check for errors only at the
  * end of a block of code:
+ *
  *      newdict = yp_dictK(0);            // newdict might be yp_MemoryError
  *      value = yp_getitem(olddict, key); // value could be yp_KeyError
  *      yp_iaddC(&value, 5);              // possibly replaces value with yp_TypeError
  *      yp_setitem(&newdict, key, value); // if value is an exception, newdict will be too
  *      yp_decref(value);                 // a no-op if value is an exception
  *      if(yp_isexceptionC(newdict)) abort();
+ *
  * Similarly, for 'E' and 'C' functions:
+ *
  *      ypObject *exc = yp_None;                // ensure exc is initialized to an immortal
  *      value = yp_getitem(dict, key);          // value could be yp_KeyError
  *      lenC = yp_lenC(obj, &exc);              // possibly sets exc to yp_TypeError
@@ -56,6 +67,7 @@
  * Sharing immutable, immortal objects is always safe.
  *
  * Certain functions are given postfixes to highlight their unique behaviour:
+ *
  *  C - C native types are accepted and returned where appropriate
  *  L - Library routines that operate strictly on C types
  *  F - A version of "C" or "L" that accepts floats in place of ints
@@ -105,11 +117,12 @@ extern "C" {
  * Initialization
  */
 
+typedef struct _yp_initialize_parameters_t yp_initialize_parameters_t;
+
 // Must be called once before any other function; subsequent calls are a no-op.  If a fatal error
 // occurs abort() is called.  args can be NULL to accept all defaults; further documentation
 // on these parameters can be found below.
-typedef struct _yp_initialize_parameters_t yp_initialize_parameters_t;
-ypAPI void yp_initialize(const yp_initialize_parameters_t *args);
+ypAPI void                                 yp_initialize(const yp_initialize_parameters_t *args);
 
 
 /*
@@ -388,18 +401,19 @@ ypAPI ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value);
 ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
 
+// FIXME Move these forward defs to one location?
+typedef struct _yp_function_definition_t yp_function_definition_t;
+
 // FIXME Rewrite docs.
 // Returns a new reference to a function object whose implementation comes from code and whose
 // inputs are described by parameters.  Raises yp_FIXME if code contains no implementations, and
 // yp_ParameterSyntaxError if parameters fails validation.  Further documentation for
-// yp_function_code_t and yp_function_parameters_t can be found below.
+// yp_function_definition_t and yp_function_parameters_t can be found below.
 // FIXME Should parameters==NULL be a shortcut for something?  No parameters?  `*args, **kwargs`?
 // FIXME What about code==NULL?
 // FIXME Really think hard about which inputs to bury in typedefs and which to surface as C params.
 // For example, should code and parameters be in the same struct?
-typedef struct _yp_function_code_t yp_function_code_t;
-typedef struct _yp_function_parameters_t yp_function_parameters_t;
-ypAPI ypObject *yp_function(yp_function_code_t *code, yp_function_parameters_t *parameters);
+ypAPI ypObject *yp_function(yp_function_definition_t *definition);
 
 // FIXME Rewrite docs.
 // Returns a new reference to a generator iterator object using the given code.  The given n objects
@@ -412,10 +426,8 @@ ypAPI ypObject *yp_function(yp_function_code_t *code, yp_function_parameters_t *
 // FIXME Is the C suffix applicable here?
 // FIXME Really think hard about the symmetry between these and yp_generator*.  Perhaps they should
 // all use a standard set of typedefs...i.e. remove some C params and make them structs.
-ypAPI ypObject *yp_function_withstateCN(
-        yp_function_code_t *code, yp_function_parameters_t *parameters, int n, ...);
-ypAPI ypObject *yp_function_withstateCNV(
-        yp_function_code_t *code, yp_function_parameters_t *parameters, int n, va_list args);
+ypAPI ypObject *yp_function_withstateCN(yp_function_definition_t *definition, int n, ...);
+ypAPI ypObject *yp_function_withstateCNV(yp_function_definition_t *definition, int n, va_list args);
 
 // FIXME Rewrite docs.
 // Similar to yp_functionCN, but accepts an arbitrary structure (or array) of the given size which
@@ -436,16 +448,15 @@ ypAPI ypObject *yp_function_withstateCNV(
 // FIXME Combine size, n, and args into a single structure that can be allocated statically
 // (here and in generators). A structure's definition is static, so why not its description?
 ypAPI ypObject *yp_function_withstatestructCN(
-        yp_function_code_t *code, yp_function_parameters_t *parameters, void *state, yp_ssize_t size, int n, ...);
-ypAPI ypObject *yp_function_withstatestructCNV(yp_function_code_t *code, yp_function_parameters_t *parameters,
-        void *state, yp_ssize_t size, int n, va_list args);
+        yp_function_definition_t *definition, void *state, yp_ssize_t size, int n, ...);
+ypAPI ypObject *yp_function_withstatestructCNV(
+        yp_function_definition_t *definition, void *state, yp_ssize_t size, int n, va_list args);
 
 
 // FIXME What about creating a function object that always returns a particular value?
 // FIXME Partial functions, created from other functions?
-// FIXME Statically-allocated immortal functions a la yp_IMMORTAL_STR_LATIN_1? And if we can do
-// that, then all other *_func_t arguments should be objects. But if we do that, how will we catch
-// errors in the function definition (i.e. required parameters after default parameters)?
+// FIXME Statically-allocated immortal functions a la yp_IMMORTAL_STR_LATIN_1. Although, how to
+// catch errors in the function definition (i.e. required parameters after default parameters)?
 
 
 // XXX The file type will be added in a future version
@@ -455,7 +466,7 @@ ypAPI ypObject *yp_function_withstatestructCNV(yp_function_code_t *code, yp_func
  * Boolean Operations and Comparisons
  */
 
-// Unlike Python, bools do not (currently) support arithmetic.
+// Unlike Python, bools do not support arithmetic.
 
 // There are exactly two boolean values, both immortal: yp_True and yp_False.
 ypAPI ypObject *const yp_True;
@@ -1239,16 +1250,38 @@ ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 // not callable.  Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
 // TODO Reconsider this name.  Consider if we want only-positional or only-kw versions? Or, as
 // suggested elsewhere, we could expose yp_tuple_empty and yp_frozendict_empty.
+// FIXME Ideally we could be efficient about how we populate default
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 
 // FIXME Stay consistent: https://docs.python.org/3/library/inspect.html#inspect.signature
 
+
+// Describes one parameter of a function object.
+typedef struct _yp_function_parameter_t {
+    // The name of the parameter as a str (perhaps created via yp_IMMORTAL_STR_LATIN_1).  The name
+    // must be a valid Python identifier.
+    // FIXME Also verify that the name is a valid Python identifier.
+    // FIXME required (cannot be null)
+    // FIXME Also /, *, *args, or **kwargs
+    // FIXME If we are putting *args and **kwargs in here, then maybe all we need is codeNV?
+    ypObject *name;
+
+    // The default value for the parameter, or NULL if there is no default value.
+    ypObject *default_;
+
+    // FIXME Annotation...or at least a placeholder for that (if we are inlined, we can't grow).
+} yp_function_parameter_t;
+
 // The signature of one or more C functions that can be wrapped up in a function object.
 // TODO Rename?  Maybe impl?  Or funcC?
 // TODO Rename other func_t to code_t or funcC_t?  i.e. Does "code" now mean a C function?
-typedef struct _yp_function_code_t {
+typedef struct _yp_function_definition_t {
     // FIXME valueerror if sizeof isn't a minimum?
-    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_function_code_t) on allocation
+    // FIXME ...or just remove, because I don't track this for other immortals.
+    //     yp_ssize_t sizeof_struct;  // Set to sizeof(yp_function_definition_t) on allocation
+
+    // FIXME Flags to describe what's next in this struct (is it NV, stars, bytecode? Are there
+    // annotations?)
 
     // Called by the yp_call* methods, particularly yp_callN and yp_callNV.  function is the
     // function object; use yp_function_stateCX to retrieve any state variables.  args are the n
@@ -1257,7 +1290,9 @@ typedef struct _yp_function_code_t {
     // it to call func_stars.
     // FIXME funcN or funcNV?  Or codeN or callN or just N, or...
     // FIXME document how to parse the args
-    ypObject *(*funcNV)(ypObject *function, int n, va_list args);
+    // FIXME Perhaps this is the "preferred" method: when called with yp_callN it just passes args,
+    // and when called with yp_call_stars you don't have to handle all the args/kwargs rules.
+    ypObject *(*codeNV)(ypObject *function, int n, va_list args);
 
     // Called by the yp_call* methods, particularly yp_call_stars.  function is the function object;
     // use yp_function_stateCX to retrieve any state variables.  args is a tuple of positional
@@ -1268,26 +1303,13 @@ typedef struct _yp_function_code_t {
     // FIXME stars?  Or code_stars or...
     // FIXME can we guarantee the types of args/kwargs?
     // FIXME document how to parse the args
-    ypObject *(*func_stars)(ypObject *function, ypObject *args, ypObject *kwargs);
-} yp_function_code_t;
+    // FIXME Or maybe this should be removed, or be a union with codeNV. Why would one function want
+    // both?
+    ypObject *(*code_stars)(ypObject *function, ypObject *args, ypObject *kwargs);
 
-// Describes one parameter of a function object.
-typedef struct _yp_function_parameter_t {
-    // The name of the parameter as a str (perhaps created via yp_IMMORTAL_STR_LATIN_1).  The name
-    // must be a valid Python identifier.
-    // FIXME Also verify that the name is a valid Python identifier.
-    ypObject *name;
-
-    //
-    ypObject *default_;  // NULL for required argument
-} yp_function_parameter_t;
-
-// FIXME Support positional-only arguments (a new Python feature).
-typedef struct _yp_function_parameters_t {
-    // The number of parameters for this function, aka the length of the parameters array.
-    yp_ssize_t count;
+    // name==null, default==null terminated
     yp_function_parameter_t parameters[];
-} yp_function_parameters_t;
+} yp_function_definition_t;
 
 // TODO "If func_stars is null, your parameters cannot contain keyword-only or **kwargs."
 
@@ -1302,12 +1324,8 @@ typedef struct _yp_function_parameters_t {
 // when the arguments are passed to `def a(*p, **k)`, p is _always_ a tuple and k _always_ a dict.
 // TODO However, unlike Python, use a frozendict for kwargs.
 
-// Immortal functions representing , for convience with yp_str_frombytesC4 et al.
-
 // TODO starargs is from the grammar, but do people know it? does the "star" and "args" together
 // imply just `*args` (read it out, it's "star args"), or would people know it's **kwargs too
-// TODO same signature as above. Does it really help to name them differently?
-typedef ypObject *(*yp_function_starargs_func_t)(ypObject *self, ypObject *a, ypObject *b);
 
 // TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
 
@@ -1333,7 +1351,7 @@ ypAPI ypObject *yp_mul(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_truediv(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_floordiv(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_mod(ypObject *x, ypObject *y);
-ypAPI void yp_divmod(ypObject *x, ypObject *y, ypObject **div, ypObject **mod);
+ypAPI void      yp_divmod(ypObject *x, ypObject *y, ypObject **div, ypObject **mod);
 ypAPI ypObject *yp_pow(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_pow3(ypObject *x, ypObject *y, ypObject *z);
 ypAPI ypObject *yp_neg(ypObject *x);
@@ -1400,24 +1418,24 @@ ypAPI void yp_ipowCF(ypObject **x, yp_float_t y);
 //  - If z is 0, yp_powL3 returns x to the power y, otherwise x to the power y modulo z
 //  - If y is negative, yp_powL and yp_powL3 raise yp_ValueError, as the result should be a
 //  floating-point number; use yp_powLF for negative exponents instead
-ypAPI yp_int_t yp_addL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_subL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_mulL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_addL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_subL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_mulL(yp_int_t x, yp_int_t y, ypObject **exc);
 ypAPI yp_float_t yp_truedivL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_floordivL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_modL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI void yp_divmodL(yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc);
-ypAPI yp_int_t yp_powL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_powL3(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc);
-ypAPI yp_int_t yp_negL(yp_int_t x, ypObject **exc);
-ypAPI yp_int_t yp_posL(yp_int_t x, ypObject **exc);
-ypAPI yp_int_t yp_absL(yp_int_t x, ypObject **exc);
-ypAPI yp_int_t yp_lshiftL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_rshiftL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_ampL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_xorL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_barL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t yp_invertL(yp_int_t x, ypObject **exc);
+ypAPI yp_int_t   yp_floordivL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_modL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI void       yp_divmodL(yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc);
+ypAPI yp_int_t   yp_powL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_powL3(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc);
+ypAPI yp_int_t   yp_negL(yp_int_t x, ypObject **exc);
+ypAPI yp_int_t   yp_posL(yp_int_t x, ypObject **exc);
+ypAPI yp_int_t   yp_absL(yp_int_t x, ypObject **exc);
+ypAPI yp_int_t   yp_lshiftL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_rshiftL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_ampL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_xorL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_barL(yp_int_t x, yp_int_t y, ypObject **exc);
+ypAPI yp_int_t   yp_invertL(yp_int_t x, ypObject **exc);
 
 // Library routines for nohtyP floating-point operations on C types.  Returns zero and sets *exc
 // on error.
@@ -1427,8 +1445,8 @@ ypAPI yp_float_t yp_mulLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_truedivLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_floordivLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_modLF(yp_float_t x, yp_float_t y, ypObject **exc);
-ypAPI void yp_divmodLF(
-        yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc);
+ypAPI void       yp_divmodLF(
+              yp_float_t x, yp_float_t y, yp_float_t *div, yp_float_t *mod, ypObject **exc);
 ypAPI yp_float_t yp_powLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_negLF(yp_float_t x, ypObject **exc);
 ypAPI yp_float_t yp_posLF(yp_float_t x, ypObject **exc);
@@ -1437,22 +1455,22 @@ ypAPI yp_float_t yp_absLF(yp_float_t x, ypObject **exc);
 // Conversion routines from C types or objects to C types.  Returns a reasonable value and sets
 // *exc on error; "reasonable" usually means "truncated".  Converting a float to an int truncates
 // toward zero but is not an error.
-ypAPI yp_int_t yp_asintC(ypObject *x, ypObject **exc);
-ypAPI yp_int8_t yp_asint8C(ypObject *x, ypObject **exc);
-ypAPI yp_uint8_t yp_asuint8C(ypObject *x, ypObject **exc);
-ypAPI yp_int16_t yp_asint16C(ypObject *x, ypObject **exc);
-ypAPI yp_uint16_t yp_asuint16C(ypObject *x, ypObject **exc);
-ypAPI yp_int32_t yp_asint32C(ypObject *x, ypObject **exc);
-ypAPI yp_uint32_t yp_asuint32C(ypObject *x, ypObject **exc);
-ypAPI yp_int64_t yp_asint64C(ypObject *x, ypObject **exc);
-ypAPI yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc);
-ypAPI yp_float_t yp_asfloatC(ypObject *x, ypObject **exc);
+ypAPI yp_int_t     yp_asintC(ypObject *x, ypObject **exc);
+ypAPI yp_int8_t    yp_asint8C(ypObject *x, ypObject **exc);
+ypAPI yp_uint8_t   yp_asuint8C(ypObject *x, ypObject **exc);
+ypAPI yp_int16_t   yp_asint16C(ypObject *x, ypObject **exc);
+ypAPI yp_uint16_t  yp_asuint16C(ypObject *x, ypObject **exc);
+ypAPI yp_int32_t   yp_asint32C(ypObject *x, ypObject **exc);
+ypAPI yp_uint32_t  yp_asuint32C(ypObject *x, ypObject **exc);
+ypAPI yp_int64_t   yp_asint64C(ypObject *x, ypObject **exc);
+ypAPI yp_uint64_t  yp_asuint64C(ypObject *x, ypObject **exc);
+ypAPI yp_float_t   yp_asfloatC(ypObject *x, ypObject **exc);
 ypAPI yp_float32_t yp_asfloat32C(ypObject *x, ypObject **exc);
 ypAPI yp_float64_t yp_asfloat64C(ypObject *x, ypObject **exc);
-ypAPI yp_ssize_t yp_asssizeC(ypObject *x, ypObject **exc);
-ypAPI yp_hash_t yp_ashashC(ypObject *x, ypObject **exc);
-ypAPI yp_float_t yp_asfloatL(yp_int_t x, ypObject **exc);
-ypAPI yp_int_t yp_asintLF(yp_float_t x, ypObject **exc);
+ypAPI yp_ssize_t   yp_asssizeC(ypObject *x, ypObject **exc);
+ypAPI yp_hash_t    yp_ashashC(ypObject *x, ypObject **exc);
+ypAPI yp_float_t   yp_asfloatL(yp_int_t x, ypObject **exc);
+ypAPI yp_int_t     yp_asintLF(yp_float_t x, ypObject **exc);
 
 // Return a new reference to x rounded to ndigits after the decimal point.
 ypAPI ypObject *yp_roundC(ypObject *x, int ndigits);
@@ -1649,11 +1667,11 @@ ypAPI void yp_miniiter_items_next(
 // returns false and sets *exc on exception.
 
 // Operations on containers that map objects to integers
-ypAPI int yp_o2i_containsC(ypObject *container, yp_int_t x, ypObject **exc);
-ypAPI void yp_o2i_pushC(ypObject **container, yp_int_t x);
+ypAPI int      yp_o2i_containsC(ypObject *container, yp_int_t x, ypObject **exc);
+ypAPI void     yp_o2i_pushC(ypObject **container, yp_int_t x);
 ypAPI yp_int_t yp_o2i_popC(ypObject **container, ypObject **exc);
 ypAPI yp_int_t yp_o2i_getitemC(ypObject *container, ypObject *key, ypObject **exc);
-ypAPI void yp_o2i_setitemC(ypObject **container, ypObject *key, yp_int_t x);
+ypAPI void     yp_o2i_setitemC(ypObject **container, ypObject *key, yp_int_t x);
 
 // Operations on containers that map objects to strs
 // yp_o2s_getitemCX is documented below, as it must be used carefully.
@@ -1663,11 +1681,11 @@ ypAPI void yp_o2s_setitemC4(
 // Operations on containers that map integers to objects.  Note that if the container is known
 // at compile-time to be a sequence, then yp_getindexC et al are better choices.
 ypAPI ypObject *yp_i2o_getitemC(ypObject *container, yp_int_t key);
-ypAPI void yp_i2o_setitemC(ypObject **container, yp_int_t key, ypObject *x);
+ypAPI void      yp_i2o_setitemC(ypObject **container, yp_int_t key, ypObject *x);
 
 // Operations on containers that map integers to integers
 ypAPI yp_int_t yp_i2i_getitemC(ypObject *container, yp_int_t key, ypObject **exc);
-ypAPI void yp_i2i_setitemC(ypObject **container, yp_int_t key, yp_int_t x);
+ypAPI void     yp_i2i_setitemC(ypObject **container, yp_int_t key, yp_int_t x);
 
 // Operations on containers that map integers to strs
 // yp_i2s_getitemCX is documented below, as it must be used carefully.
@@ -1683,8 +1701,8 @@ ypAPI void yp_i2s_setitemC4(
 //      yp_IMMORTAL_STR_LATIN_1(s_mykey, "mykey");
 //      value = yp_getitem(o, s_mykey);
 ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len);
-ypAPI void yp_s2o_setitemC4(
-        ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject *x);
+ypAPI void      yp_s2o_setitemC4(
+             ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject *x);
 
 // Operations on containers that map strs to integers
 ypAPI yp_int_t yp_s2i_getitemC3(
@@ -1797,11 +1815,9 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 // While reference counts are mutable, they are not involved in the calculation of any hash value,
 // making it permissible to change the reference count of an immutable object.
 //
-// This is why types such as iterators, callables, and files are considered immutable, despite
+// This is why types such as iterators, functions, and files are considered immutable, despite
 // containing mostly mutable data: their hash is based solely on their identity, the only portion of
 // data that doesn't change.
-
-// FIXME Should we call it "callables" above, or "functions"? Callable is the "ABC", right?
 
 
 /*
@@ -2085,6 +2101,7 @@ struct _ypStrObject {
 #define _ypInt_CODE (10u)
 #define _ypBytes_CODE (16u)
 #define _ypStr_CODE (18u)
+#define _ypFunction_CODE (28u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
 #define _yp_IMMORTAL_HEAD_INIT(type, type_flags, data, len)                         \
@@ -2221,7 +2238,7 @@ struct _ypStrObject {
 #ifdef yp_NO_VARIADIC_MACROS
 #define yp yp2
 #else
-#define yp(self, method, ...) yp_##method(self, _VA_ARGS_)
+#define yp(self, method, ...) yp_##method(self, __VA_ARGS__)
 #endif
 #define yp3(self, method, a1, a2) yp_##method(self, a1, a2)
 #define yp4(self, method, a1, a2, a3) yp_##method(self, a1, a2, a3)
