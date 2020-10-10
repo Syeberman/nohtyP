@@ -15629,16 +15629,18 @@ yp_STATIC_ASSERT(
 struct _ypFunctionObject {
     ypObject_HEAD;
     ypFunctionState *        ob_state;  // NULL if no extra state
-    yp_function_definition_t ob_def;
+    yp_function_definition_t ob_def; // FIXME Variable size, not needed if ob_data
 };
 typedef struct _ypFunctionObject ypFunctionObject;
 
 #define ypFunction_STATE(f) (((ypFunctionObject *)f)->ob_state)
-#define ypFunction_PARAMS(f) ((yp_function_parameter_t **)((ypObject *)f)->ob_data)
-#define ypFunction_PARAMS_COUNT ypObject_ALLOCLEN
-#define ypFunction_SET_PARAMS_COUNT ypObject_SET_ALLOCLEN
-#define ypFunction_FUNC_STARS(f) (((ypFunctionObject *)f)->ob_func_stars)
-#define ypFunction_FUNC_N(f) (((ypFunctionObject *)f)->ob_funcN)
+#define ypFunction_DEFINITION(f) ((yp_function_definition_t *) ((ypObject *)f)->ob_data)
+#define ypFunction_PARAMS(f) (ypFunction_DEFINITION(f)->parameters)
+// FIXME Remove?
+// #define ypFunction_PARAMS_COUNT ypObject_ALLOCLEN
+// #define ypFunction_SET_PARAMS_COUNT ypObject_SET_ALLOCLEN
+#define ypFunction_CODE_NV(f) (ypFunction_DEFINITION(f)->codeNV)
+// #define ypFunction_CODE_STARS(f) (ypFunction_DEFINITION(f)->code_stars)
 
 // The maximum possible size of a function's state
 #define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
@@ -15658,17 +15660,19 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");           // Remaining arguments
 // end of the parameter list.  Recall that you can supply more positional arguments than there are
 // positional parameter slots if the parameter list contains *args.
 // FIXME also count positional-only
+// FIXME Cache these counts (limit to 64 or 128? or 256?)
 static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_t *max)
 {
     ypObject * result;
     yp_ssize_t i;
-    for (i = 0; i < ypFunction_PARAMS_COUNT(f); i++) {
-        yp_function_parameter_t *param = ypFunction_PARAMS(f)[i];
+    for (i = 0; /* null-terminated */; i++) {
+        yp_function_parameter_t param = ypFunction_PARAMS(f)[i];
+        if (param.name == NULL) break;
 
         // Parameter names must be strings
-        if (ypObject_TYPE_CODE(param->name) != ypStr_CODE) return yp_ParameterSyntaxError;
+        if (ypObject_TYPE_CODE(param.name) != ypStr_CODE) return yp_ParameterSyntaxError;
 
-        result = str_startswith(param->name, yp_s_star, 0, yp_SLICE_USELEN);
+        result = str_startswith(param.name, yp_s_star, 0, yp_SLICE_USELEN);
         if (yp_isexceptionC(result)) return result;
         if (ypBool_IS_TRUE_C(result)) break;  // either `*` or `**`, so end of positional slots
     }
@@ -15677,15 +15681,16 @@ static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_
     return yp_None;
 }
 
-// FIXME Also normalize n<0 to 0 in yp_callN (likely).
 static ypObject *_ypFunction_callN(ypObject *f, int n, ...)
 {
-    // va_list   args;
-    // ypObject *result;
-    // va_start(args, n);
-    // result = ypFunction_FUNC_N(f)(f, n, args);
-    // va_end(args);
-    return yp_NotImplementedError;
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = ypFunction_CODE_NV(f)(f, n, args);
+    va_end(args);
+
+    return result;
 }
 
 // Function methods
@@ -15700,14 +15705,15 @@ static ypObject *_function_traverse_state(ypObject *f, visitfunc visitor, void *
 static ypObject *_function_traverse_params(ypObject *f, visitfunc visitor, void *memo)
 {
     yp_ssize_t i;
-    for (i = 0; i < ypFunction_PARAMS_COUNT(f); i++) {
-        yp_function_parameter_t *param = ypFunction_PARAMS(f)[i];
+    for (i = 0; /* null-terminated */; i++) {
+        yp_function_parameter_t param = ypFunction_PARAMS(f)[i];
+        if (param.name == NULL) break;
 
-        ypObject *result = visitor(param->name, memo);
+        ypObject *result = visitor(param.name, memo);
         if (yp_isexceptionC(result)) return result;
 
-        if (param->default_ != NULL) {
-            result = visitor(param->default_, memo);
+        if (param.default_ != NULL) {
+            result = visitor(param.default_, memo);
             if (yp_isexceptionC(result)) return result;
         }
     }
@@ -15739,6 +15745,10 @@ static ypObject *_function_call_stars_to_callN_no_kwargs(
     for (i = 0; i < ypTuple_LEN(args); i++) {
         yp_incref(dest[i]);
     }
+
+    // FIXME But Wait! We should also populate any defaults that were requested. A lot of this code
+    // was written with the idea that callN would just pass through, but that's not the case.
+
     return yp_None;
 }
 
@@ -15763,10 +15773,7 @@ static ypObject *_function_call_stars_to_callN_kwargs(
 
     // If there are more arguments than there are positional slots, it means we have too many
     // positional arguments, unknown keyword arguments, or duplicated arguments between positional
-    // and keyword.  All of these cases raise TypeError in Python.  (It's also possible that a
-    // keyword-only parameter was specified, but recall that functions with only callN shouldn't
-    // have kw-only parameters.)
-    // FIXME Verify at creation that callN-only functions don't have kw-only parameters.
+    // and keyword.  All of these cases raise TypeError in Python.
     if (ypTuple_LEN(args) + ypDict_LEN(kwargs) > positional_slots) {
         *n = 0;
         return yp_TypeError;
@@ -15776,6 +15783,7 @@ static ypObject *_function_call_stars_to_callN_kwargs(
     // than we do positional parameter slots.  So we can copy the positional args wholesale (there's
     // a memcpy), then tack on the keyword arguments in the right places.  Afterwards, we detect the
     // case where an argument is duplicated between positional and keyword.
+    // FIXME _function_call_stars_to_callN_no_kwargs may start doing more than we need here.
     result = _function_call_stars_to_callN_no_kwargs(f, args, dest_len, n, dest);
     if (yp_isexceptionC(result)) return result;  // *n is initialized
 
@@ -15785,15 +15793,15 @@ static ypObject *_function_call_stars_to_callN_kwargs(
     // of kwargs.
     kwargs_remaining = ypDict_LEN(kwargs);
     for (i = *n; i < positional_slots; i++) {
-        ypObject *               arg;
-        yp_function_parameter_t *param = ypFunction_PARAMS(f)[i];
+        ypObject *              arg;
+        yp_function_parameter_t param = ypFunction_PARAMS(f)[i];
 
-        arg = frozendict_getdefault(kwargs, param->name, ypFunction_key_missing);  // new ref
+        arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing);  // new ref
         if (yp_isexceptionC(arg)) return arg;
         if (arg != ypFunction_key_missing) {
             kwargs_remaining--;  // one less unused kwarg
-        } else if (param->default_ != NULL) {
-            arg = yp_incref(param->default_);
+        } else if (param.default_ != NULL) {
+            arg = yp_incref(param.default_);
         } else {
             // Recall arg is the immortal ypFunction_key_missing
             return yp_TypeError;  // "missing required positional argument"
@@ -15808,9 +15816,7 @@ static ypObject *_function_call_stars_to_callN_kwargs(
     }
 
     if (kwargs_remaining > 0) {
-        // "got an unexpected keyword argument" or "got multiple values for argument".  (It's also
-        // possible that a keyword-only parameter was specified, but recall that functions with only
-        // callN shouldn't have kw-only parameters.)
+        // "got an unexpected keyword argument" or "got multiple values for argument".
         return yp_TypeError;
     }
 
@@ -15860,7 +15866,7 @@ static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwar
     // tp_call_stars?  If we _do_ make copies, then kwargs might as well be a dict (common to pop
     // arguments off), and maybe even just make args a list?  I'd really like to avoid making
     // copies...perhaps it's OK to pass the original args/kwargs refs along for
-    // ypFunction_FUNC_STARS...which then means we should _not_ make the copy in yp_call_stars!
+    // ypFunction_CODE_STARS...which then means we should _not_ make the copy in yp_call_stars!
 
     // FIXME Look for other places we use a borrowed reference from an object and then call
     // arbitrary code: that code could invalidate and thus discard the reference.
@@ -15872,9 +15878,9 @@ static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwar
 
     // FIXME We can either check for NULL, or ensure it's always set to a valid function.  BUT!
     // The functions we would link to would be dynamic (via DLL), making the latter tricky!
-    // if (ypFunction_FUNC_STARS(f) != NULL) {
-    //     return ypFunction_FUNC_STARS(f)(f, args, kwargs);
-    // } else if (ypFunction_FUNC_N(f) != NULL) {
+    // if (ypFunction_CODE_STARS(f) != NULL) {
+    //     return ypFunction_CODE_STARS(f)(f, args, kwargs);
+    // } else if (ypFunction_CODE_NV(f) != NULL) {
     //     return _function_call_stars_to_callN(f, args, kwargs);
     // } else {
     //     return yp_SystemError;  // should never occur
@@ -15888,16 +15894,16 @@ static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwar
 //     ypObject *args_astuple = yp_tupleNV(n, args);  // new ref
 //     if (yp_isexceptionC(args_astuple)) return args_astuple;
 
-//     result = ypFunction_FUNC_STARS(f)(f, args_astuple, _yp_frozendict_empty);
+//     result = ypFunction_CODE_STARS(f)(f, args_astuple, _yp_frozendict_empty);
 //     yp_decref(args_astuple);
 //     return result;
 // }
 
 static ypObject *function_callN(ypObject *f, int n, va_list args)
 {
-    // if (ypFunction_FUNC_N(f) != NULL) {
-    //     return ypFunction_FUNC_N(f)(f, n, args);
-    // } else if (ypFunction_FUNC_STARS(f) != NULL) {
+    // if (ypFunction_CODE_NV(f) != NULL) {
+    //     return ypFunction_CODE_NV(f)(f, n, args);
+    // } else if (ypFunction_CODE_STARS(f) != NULL) {
     //     return _function_callN_to_call_stars(f, n, args);
     // } else {
     //     return yp_SystemError;  // should never occur
@@ -16491,7 +16497,8 @@ ypObject *yp_callN(ypObject *c, int n, ...)
 
 ypObject *yp_callNV(ypObject *c, int n, va_list args)
 {
-     _yp_REDIRECT2(c, tp_as_callable, tp_callN, (c, n, args));
+    if (n < 0) n = 0;
+    _yp_REDIRECT2(c, tp_as_callable, tp_callN, (c, n, args));
 }
 
 ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)

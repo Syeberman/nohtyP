@@ -1289,7 +1289,6 @@ typedef struct _yp_function_definition_t {
     // positional arguments.  The return value must be a new or immortal reference, or an exception.
     // If funcNV is NULL, yp_callN/yp_callNV will create a temporary tuple from the n args and use
     // it to call func_stars.
-    // FIXME funcN or funcNV?  Or codeN or callN or just N, or...
     // FIXME document how to parse the args
     // FIXME Perhaps this is the "preferred" method: when called with yp_callN it just passes args,
     // and when called with yp_call_stars you don't have to handle all the args/kwargs rules.

@@ -1512,7 +1512,8 @@ class ypObject(c_ypObject_p):
         return self._encdec(_yp_decode, _yp_decode3, encoding, errors)
 
     def __call__(self, *args, **kwargs):
-        # FIXME Use _yp_callN if no kwargs (so we test them both)
+        # FIXME How to test _yp_callN? We can't just call if no kwargs, because _stars has special
+        # handling in that case too.
         return _yp_call_stars(self, args, kwargs)
 
     # Python requires arithmetic methods to _return_ NotImplemented
