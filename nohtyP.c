@@ -364,6 +364,8 @@ typedef struct {
     objproc       tp_iter_values;
 } ypMappingMethods;
 
+// Callable objects must define _both_ tp_call_stars and tp_callN.
+// TODO Create helper methods so types only really need to define one.
 typedef struct {
     int           tp_iscallable;
     objobjobjproc tp_call_stars;
@@ -15850,8 +15852,6 @@ static ypObject *_function_call_stars_to_callN(ypObject *f, ypObject *args, ypOb
     return result;
 }
 
-// FIXME Where should we coerce args/kwargs to tuple/frozendict?  Here, or in yp_call_stars?  If
-// here, then every callable will need to do their own coersion.
 static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwargs)
 {
     // FIXME args or kwargs aren't completely immutable: remember yp_invalidate. So we can't just
@@ -15921,7 +15921,6 @@ static ypObject *function_dealloc(ypObject *f, void *memo)
     return yp_None;
 }
 
-// FIXME A frozen function behaves like...what?
 // FIXME Review that correct exceptions returned for not supported methods
 static ypCallableMethods ypFunction_as_callable = {
         TRUE,                 // tp_iscallable
@@ -16480,6 +16479,45 @@ void yp_updateKV(ypObject **mapping, int n, va_list args)
     _yp_INPLACE2(mapping, tp_as_mapping, tp_updateK, (*mapping, n, args));
 }
 
+int yp_iscallableC(ypObject *x)
+{
+    return ypObject_TYPE(x)->tp_as_callable->tp_iscallable;
+}
+
+ypObject *yp_callN(ypObject *c, int n, ...)
+{
+    return_yp_V_FUNC(ypObject *, yp_callNV, (c, n, args), n);
+}
+
+ypObject *yp_callNV(ypObject *c, int n, va_list args)
+{
+     _yp_REDIRECT2(c, tp_as_callable, tp_callN, (c, n, args));
+}
+
+ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)
+{
+    ypObject *coerced_args;
+    ypObject *coerced_kwargs;
+    ypObject *result;
+
+    coerced_args = yp_tuple(args);
+    if(yp_isexceptionC(coerced_args)) {
+        return coerced_args;
+    }
+
+    coerced_kwargs = yp_frozendict(kwargs);
+    if(yp_isexceptionC(coerced_kwargs)) {
+        yp_decref(coerced_args);
+        return coerced_kwargs;
+    }
+
+    result = ypObject_TYPE(c)->tp_as_callable->tp_call_stars(c, coerced_args, coerced_kwargs);
+
+    yp_decref(coerced_kwargs);
+    yp_decref(coerced_args);
+    return result;
+}
+
 ypObject *yp_iter_values(ypObject *mapping)
 {
     _yp_REDIRECT2(mapping, tp_as_mapping, tp_iter_values, (mapping));
@@ -16725,11 +16763,12 @@ static ypObject *yp_func_hash_code(ypObject *function, int n, va_list args)
     return yp_intC(hash);
 };
 
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_object, "object");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
 
-yp_DEF_static(yp_hash_definition, yp_func_hash_code, yp_DEF_PARAM(yp_s_object, NULL));
+// TODO The first parameter is positional-only.
+yp_DEF_static(yp_hash_definition, yp_func_hash_code, yp_DEF_PARAM(yp_s_obj, NULL));
 
-yp_IMMORTAL_FUNCTION_static(yp_func_hash, yp_hash_definition);
+yp_IMMORTAL_FUNCTION(yp_func_hash, yp_hash_definition);
 
 #pragma endregion functions_as_objects
 
@@ -16808,6 +16847,7 @@ ypObject *const yp_t_set = (ypObject *)&ypSet_Type;
 ypObject *const yp_t_frozendict = (ypObject *)&ypFrozenDict_Type;
 ypObject *const yp_t_dict = (ypObject *)&ypDict_Type;
 ypObject *const yp_t_range = (ypObject *)&ypRange_Type;
+ypObject *const yp_t_function = (ypObject *)&ypFunction_Type;
 
 #pragma endregion type_table
 

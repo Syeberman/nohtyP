@@ -903,6 +903,18 @@ yp_func(c_ypObject_p, "yp_decode3", ((c_ypObject_p, "b"),
                                      (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 yp_func(c_ypObject_p, "yp_decode", ((c_ypObject_p, "b"), ))
 
+# FIXME String Formatting Operations
+
+# int yp_iscallableC(ypObject *x);
+yp_func(c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), ))
+
+# ypObject *yp_callN(ypObject *c, int n, ...);
+# ypObject *yp_callNV(ypObject *c, int n, va_list args);
+yp_func(c_ypObject_p, "yp_callN", ((c_ypObject_p, "c"), c_multiN_ypObject_p))
+
+# ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
+yp_func(c_ypObject_p, "yp_call_stars", ((c_ypObject_p, "c"),
+                                        (c_ypObject_p, "args"), (c_ypObject_p, "kwargs")))
 
 # ypObject *yp_add(ypObject *x, ypObject *y);
 yp_func(c_ypObject_p, "yp_add", ((c_ypObject_p, "x"), (c_ypObject_p, "y")))
@@ -1499,6 +1511,10 @@ class ypObject(c_ypObject_p):
     def decode(self, encoding=None, errors=None):
         return self._encdec(_yp_decode, _yp_decode3, encoding, errors)
 
+    def __call__(self, *args, **kwargs):
+        # FIXME Use _yp_callN if no kwargs (so we test them both)
+        return _yp_call_stars(self, args, kwargs)
+
     # Python requires arithmetic methods to _return_ NotImplemented
     @staticmethod
     def _arithmetic(func, *args):
@@ -1624,6 +1640,7 @@ c_ypObject_p_value("yp_t_set")
 c_ypObject_p_value("yp_t_frozendict")
 c_ypObject_p_value("yp_t_dict")
 c_ypObject_p_value("yp_t_range")
+c_ypObject_p_value("yp_t_function")
 
 
 @pytype(yp_t_exception, BaseException)
@@ -1853,7 +1870,9 @@ def yp_hash(x):
     """Returns hash(x) of a ypObject as a yp_int"""
     if not isinstance(x, ypObject):
         raise TypeError("expected ypObject in yp_hash")
-    return yp_int(_yp_hashC(x, yp_None))  # FIXME return yp_int(hash(x))?
+    # FIXME Placing this here to test function objects
+    return yp_func_hash(x)
+    # return yp_int(_yp_hashC(x, yp_None))  # FIXME return yp_int(hash(x))?
 
 
 @pytype(yp_t_float, float)
@@ -2415,6 +2434,16 @@ class yp_range(ypObject):
         return yp_str("range(%d, %d, %d)" % (self_start, self_end, self_step))
     _yp_repr = _yp_str
 _yp_range_empty = yp_range(0)
+
+
+@pytype(yp_t_function, type(lambda: 1))
+class yp_function(ypObject):
+    # FIXME What should this class even implement? `function` isn't even a built-in in Python, and
+    # the constructor takes a code object.
+    def __new__(cls, *args, **kwargs):
+        raise TypeError("cannot instantiate yp_function this way")
+c_ypObject_p_value("yp_func_hash")
+
 
 # TODO Integrate ypExamples.c somehow with this unittest suite
 #import os

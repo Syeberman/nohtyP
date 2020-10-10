@@ -122,7 +122,7 @@ typedef struct _yp_initialize_parameters_t yp_initialize_parameters_t;
 // Must be called once before any other function; subsequent calls are a no-op.  If a fatal error
 // occurs abort() is called.  args can be NULL to accept all defaults; further documentation
 // on these parameters can be found below.
-ypAPI void                                 yp_initialize(const yp_initialize_parameters_t *args);
+ypAPI void yp_initialize(const yp_initialize_parameters_t *args);
 
 
 /*
@@ -1073,6 +1073,7 @@ ypAPI ypObject *yp_isupper(ypObject *s);
 // yp_False.  prefix can also be a tuple of prefix strings for which to look.  If a prefix string
 // is empty, returns yp_True.  yp_startswithC considers the entire string (as if start is 0 and end
 // is yp_SLICE_USELEN).
+// FIXME There's nothing "C" about yp_startswithC. (A linter should check "C" functions.)
 ypAPI ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
 ypAPI ypObject *yp_startswithC(ypObject *s, ypObject *prefix);
 
@@ -1329,6 +1330,8 @@ typedef struct _yp_function_definition_t {
 
 // TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
 
+ypAPI ypObject *const yp_func_hash;
+
 
 /*
  * Numeric Operations
@@ -1563,6 +1566,7 @@ ypAPI ypObject *yp_type(ypObject *object);
 
 // The immortal type objects.  Calling a type object (i.e. yp_call_TODO) constructs an object of
 // that type.
+// FIXME yp_t_* could also be for tuples. Perhaps change to yp_type_*?
 ypAPI ypObject *const yp_t_invalidated;
 ypAPI ypObject *const yp_t_exception;
 ypAPI ypObject *const yp_t_type;
@@ -1584,6 +1588,7 @@ ypAPI ypObject *const yp_t_set;
 ypAPI ypObject *const yp_t_frozendict;
 ypAPI ypObject *const yp_t_dict;
 ypAPI ypObject *const yp_t_range;
+ypAPI ypObject *const yp_t_function;
 
 
 /*
