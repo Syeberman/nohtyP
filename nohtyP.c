@@ -40,6 +40,9 @@
 // might modify the object being iterated over.  OR  Add some sort of universal flag to objects to
 // prevent modifications.
 
+// TODO Look for places we use a borrowed reference from an object and then call arbitrary code:
+// that code could invalidate and thus discard the reference.
+
 
 #include "nohtyP.h"
 #include <float.h>
@@ -15640,7 +15643,6 @@ typedef struct _ypFunctionObject ypFunctionObject;
 // #define ypFunction_PARAMS_COUNT ypObject_ALLOCLEN
 // #define ypFunction_SET_PARAMS_COUNT ypObject_SET_ALLOCLEN
 #define ypFunction_CODE_NV(f) (ypFunction_DEFINITION(f)->codeNV)
-// #define ypFunction_CODE_STARS(f) (ypFunction_DEFINITION(f)->code_stars)
 
 // The maximum possible size of a function's state
 #define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
@@ -15860,54 +15862,16 @@ static ypObject *_function_call_stars_to_callN(ypObject *f, ypObject *args, ypOb
 
 static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwargs)
 {
-    // FIXME args or kwargs aren't completely immutable: remember yp_invalidate. So we can't just
-    // pass along borrowed references from these two objects, because the refs _could_ be discarded.
-    // Does that mean we always have to make copies?  Would we do this in yp_call_stars, or
-    // tp_call_stars?  If we _do_ make copies, then kwargs might as well be a dict (common to pop
-    // arguments off), and maybe even just make args a list?  I'd really like to avoid making
-    // copies...perhaps it's OK to pass the original args/kwargs refs along for
-    // ypFunction_CODE_STARS...which then means we should _not_ make the copy in yp_call_stars!
-
-    // FIXME Look for other places we use a borrowed reference from an object and then call
-    // arbitrary code: that code could invalidate and thus discard the reference.
-
     // FIXME Should we assert, or raise an error, if called with incorrect types?  i.e. Do we
     // assume these are the correct types?
     yp_ASSERT1(ypObject_TYPE_CODE(args) == ypTuple_CODE);
     yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
 
-    // FIXME We can either check for NULL, or ensure it's always set to a valid function.  BUT!
-    // The functions we would link to would be dynamic (via DLL), making the latter tricky!
-    // if (ypFunction_CODE_STARS(f) != NULL) {
-    //     return ypFunction_CODE_STARS(f)(f, args, kwargs);
-    // } else if (ypFunction_CODE_NV(f) != NULL) {
-    //     return _function_call_stars_to_callN(f, args, kwargs);
-    // } else {
-    //     return yp_SystemError;  // should never occur
-    // }
     return _function_call_stars_to_callN(f, args, kwargs);
 }
 
-// static ypObject *_function_callN_to_call_stars(ypObject *f, int n, va_list args)
-// {
-//     ypObject *result;
-//     ypObject *args_astuple = yp_tupleNV(n, args);  // new ref
-//     if (yp_isexceptionC(args_astuple)) return args_astuple;
-
-//     result = ypFunction_CODE_STARS(f)(f, args_astuple, _yp_frozendict_empty);
-//     yp_decref(args_astuple);
-//     return result;
-// }
-
 static ypObject *function_callN(ypObject *f, int n, va_list args)
 {
-    // if (ypFunction_CODE_NV(f) != NULL) {
-    //     return ypFunction_CODE_NV(f)(f, n, args);
-    // } else if (ypFunction_CODE_STARS(f) != NULL) {
-    //     return _function_callN_to_call_stars(f, n, args);
-    // } else {
-    //     return yp_SystemError;  // should never occur
-    // }
     return yp_NotImplementedError;
 }
 
@@ -16503,6 +16467,11 @@ ypObject *yp_callNV(ypObject *c, int n, va_list args)
 
 ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)
 {
+    // FIXME Let's avoid making new objects, but let's also avoid sending args and kwargs to the
+    // type, to protect against bad custom types accidentally modifying them. What about a
+    // tp_parameters that returns the parameters to use, then yp_callNV and yp_call_stars does all
+    // the "parsing" and tp_call is just one standard function.
+
     ypObject *coerced_args;
     ypObject *coerced_kwargs;
     ypObject *result;
@@ -16736,7 +16705,7 @@ void yp_s2i_setitemC4(
 // FIXME support yp_NO_VARIADIC_MACROS?
 // FIXME should name be the pointer or the yp_function_definition_t? The parameters are inlined...
 #define _yp_DEF(qual, name, code, ...)                                                            \
-    static yp_function_definition_t _##name##_struct = {code, NULL, {__VA_ARGS__, {NULL, NULL}}}; \
+    static yp_function_definition_t _##name##_struct = {code, {__VA_ARGS__, {NULL, NULL}}}; \
     qual yp_function_definition_t *const name = &_##name##_struct /* force use of semi-colon */
 
 #define yp_DEF_PARAM(name, default) \

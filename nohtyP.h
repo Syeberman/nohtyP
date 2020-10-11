@@ -1238,7 +1238,7 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 // Returns true (non-zero) if x appears callable, else false.  If this returns true, it is still
 // possible that a call fails, but if it is false, calling x will always raise yp_TypeError.
 // Always succeeds; if x is an exception false is returned.
-// TODO Python just calls this "callable"
+// TODO Python just calls this "callable()"
 ypAPI int yp_iscallableC(ypObject *x);
 
 // Calls c with n positional arguments, returning the result of the call (which may be a new
@@ -1249,9 +1249,7 @@ ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
 // result of the call (which may be a new reference or an exception).  Returns yp_TypeError if c is
 // not callable.  Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
-// TODO Reconsider this name.  Consider if we want only-positional or only-kw versions? Or, as
-// suggested elsewhere, we could expose yp_tuple_empty and yp_frozendict_empty.
-// FIXME Ideally we could be efficient about how we populate default
+// TODO Expose yp_tuple_empty and yp_frozendict_empty.
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 
 // FIXME Stay consistent: https://docs.python.org/3/library/inspect.html#inspect.signature
@@ -1284,48 +1282,22 @@ typedef struct _yp_function_definition_t {
     // FIXME Flags to describe what's next in this struct (is it NV, stars, bytecode? Are there
     // annotations?)
 
-    // Called by the yp_call* methods, particularly yp_callN and yp_callNV.  function is the
-    // function object; use yp_function_stateCX to retrieve any state variables.  args are the n
-    // positional arguments.  The return value must be a new or immortal reference, or an exception.
-    // If funcNV is NULL, yp_callN/yp_callNV will create a temporary tuple from the n args and use
-    // it to call func_stars.
+    // Called by the yp_call* methods.  function is the function object; use yp_function_stateCX to
+    // retrieve any state variables.  args are the n positional arguments.  The return value must be
+    // a new or immortal reference, or an exception.
     // FIXME document how to parse the args
     // FIXME Perhaps this is the "preferred" method: when called with yp_callN it just passes args,
     // and when called with yp_call_stars you don't have to handle all the args/kwargs rules.
     ypObject *(*codeNV)(ypObject *function, int n, va_list args);
 
-    // Called by the yp_call* methods, particularly yp_call_stars.  function is the function object;
-    // use yp_function_stateCX to retrieve any state variables.  args is a tuple of positional
-    // arguments, and kwargs is a frozendict of keyword arguments.  The return value must be a new
-    // or immortal reference, or an exception.  If func_stars is NULL, yp_call_stars will attempt to
-    // coerce any keyword arguments into positional arguments and call funcNV.
-    // XXX Unlike Python, kwargs is a frozendict, not a dict.
-    // FIXME stars?  Or code_stars or...
-    // FIXME can we guarantee the types of args/kwargs?
-    // FIXME document how to parse the args
-    // FIXME Or maybe this should be removed, or be a union with codeNV. Why would one function want
-    // both?
-    ypObject *(*code_stars)(ypObject *function, ypObject *args, ypObject *kwargs);
-
     // name==null, default==null terminated
     yp_function_parameter_t parameters[];
 } yp_function_definition_t;
-
-// TODO "If func_stars is null, your parameters cannot contain keyword-only or **kwargs."
-
-// TODO Should we have a yp_call?  That would probably be yp_call_stars (renamed), but then yp_call2
-// would be confusing because you'd expect it to be yp_call_stars just with one less argument.  That
-// is, you'd expect yp_call2 to take an iterable of positional arguments.  It might be best to avoid
-// the name yp_call altogether.  (Then again, yp_call2 is confusing because it's two arguments to
-// yp_call2, but **one** argument to the callable.)
 
 // TODO Yup, python allows any iterable for f(*arg) calls, just as it does for unpacking.
 // TODO In Python, when calling a function, * can be any iterable and ** any mapping.  However,
 // when the arguments are passed to `def a(*p, **k)`, p is _always_ a tuple and k _always_ a dict.
 // TODO However, unlike Python, use a frozendict for kwargs.
-
-// TODO starargs is from the grammar, but do people know it? does the "star" and "args" together
-// imply just `*args` (read it out, it's "star args"), or would people know it's **kwargs too
 
 // TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
 
