@@ -183,7 +183,11 @@ static void yp_breakonerr(ypObject *err) {
 #endif
 
 // We always perform static asserts: they don't affect runtime
+#if defined(GCC_VER) && GCC_VER >= 40600
+#define yp_STATIC_ASSERT(cond, tag) _Static_assert(cond, #tag)
+#else
 #define yp_STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
+#endif
 
 #pragma endregion debug
 
@@ -284,7 +288,7 @@ typedef size_t yp_uhash_t;
 #define yp_IMMORTAL_INVALIDATED(name)                                                   \
     static struct _ypObject _##name##_struct =                                          \
             _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID); \
-    ypObject *const name = &_##name##_struct /* force use of semi-colon */
+    ypObject *const name = &_##name##_struct /* force semi-colon */
 
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)(ypObject *);
@@ -1883,7 +1887,7 @@ static ypObject *ypQuickIter_new_fromiterable(
 
 
 /*************************************************************************************************
- * ypQuickSeq: sequence-like abstraction over va_lists of ypObject*s and iterables
+ * ypQuickSeq: sequence-like abstraction over va_lists of ypObject*s, and iterables
  * XXX Internal use only!
  *************************************************************************************************/
 #pragma region ypQuickSeq
@@ -2162,14 +2166,14 @@ typedef yp_int32_t _yp_iter_length_hint_t;
     ypObject_HEAD;                         \
     _yp_iter_length_hint_t ob_length_hint; \
     yp_uint32_t            ob_objlocs;     \
-    yp_generator_func_t    ob_func /* force use of semi-colon */
+    yp_generator_func_t    ob_func /* force semi-colon */
 // To ensure that ob_inline_data is aligned properly, we need to pad on some platforms
 // TODO If we use ob_len to store the length_hint, yp_lenC would have to always call tp_len, but
 // then we could trim 8 bytes off all iterators
 #if defined(yp_ARCH_32_BIT)
 #define _ypIterObject_HEAD         \
     _ypIterObject_HEAD_NO_PADDING; \
-    void *_ob_padding /* force use of semi-colon */
+    void *_ob_padding /* force semi-colon */
 #else
 #define _ypIterObject_HEAD _ypIterObject_HEAD_NO_PADDING
 #endif
@@ -3220,7 +3224,7 @@ static ypTypeObject ypException_Type = {
     static ypExceptionObject _##name##_struct = {                \
             yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, NULL, 0), \
             (ypObject *)&_##name##_name_struct, (superptr)};     \
-    ypObject *const name = (ypObject *)&_##name##_struct /* force use of semi-colon */
+    ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_EXCEPTION(name, super) \
     _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, (ypObject *)&_##super##_struct)
 
@@ -15631,25 +15635,26 @@ yp_STATIC_ASSERT(
 
 struct _ypFunctionObject {
     ypObject_HEAD;
-    ypFunctionState *        ob_state;  // NULL if no extra state
-    yp_function_definition_t ob_def; // FIXME Variable size, not needed if ob_data
+    // FIXME Move ob_state into yp_function_definition_t?
+    ypFunctionState *ob_state;  // NULL if no extra state
+    // XXX ob_def.parameters may or may not contain the parameters, so only access via ob_data.
+    yp_function_definition_t ob_def;
 };
 typedef struct _ypFunctionObject ypFunctionObject;
 
 #define ypFunction_STATE(f) (((ypFunctionObject *)f)->ob_state)
-#define ypFunction_DEFINITION(f) ((yp_function_definition_t *) ((ypObject *)f)->ob_data)
-#define ypFunction_PARAMS(f) (ypFunction_DEFINITION(f)->parameters)
-// FIXME Remove?
-// #define ypFunction_PARAMS_COUNT ypObject_ALLOCLEN
-// #define ypFunction_SET_PARAMS_COUNT ypObject_SET_ALLOCLEN
+#define ypFunction_DEFINITION(f) (&(((ypFunctionObject *)f)->ob_def))
+#define ypFunction_PARAMS(f) ((yp_function_parameter_t *)((ypObject *)f)->ob_data)
+#define ypFunction_PARAMS_LEN ypObject_CACHED_LEN
+#define ypFunction_SET_PARAMS_LEN ypObject_SET_CACHED_LEN
 #define ypFunction_CODE_NV(f) (ypFunction_DEFINITION(f)->codeNV)
 
 // The maximum possible size of a function's state
-#define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
+// #define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
 
 // The maximum possible number of parameters for a function
-#define ypFunction_PARAMS_COUNT_MAX \
-    ((yp_ssize_t)MIN(yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject), ypObject_LEN_MAX))
+// #define ypFunction_PARAMS_COUNT_MAX
+//     ((yp_ssize_t)MIN(yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject), ypObject_LEN_MAX))
 
 // For use internally to detect when a key is missing from a dict.
 yp_IMMORTAL_INVALIDATED(ypFunction_key_missing);
@@ -15667,9 +15672,8 @@ static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_
 {
     ypObject * result;
     yp_ssize_t i;
-    for (i = 0; /* null-terminated */; i++) {
+    for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
         yp_function_parameter_t param = ypFunction_PARAMS(f)[i];
-        if (param.name == NULL) break;
 
         // Parameter names must be strings
         if (ypObject_TYPE_CODE(param.name) != ypStr_CODE) return yp_ParameterSyntaxError;
@@ -15707,9 +15711,8 @@ static ypObject *_function_traverse_state(ypObject *f, visitfunc visitor, void *
 static ypObject *_function_traverse_params(ypObject *f, visitfunc visitor, void *memo)
 {
     yp_ssize_t i;
-    for (i = 0; /* null-terminated */; i++) {
+    for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
         yp_function_parameter_t param = ypFunction_PARAMS(f)[i];
-        if (param.name == NULL) break;
 
         ypObject *result = visitor(param.name, memo);
         if (yp_isexceptionC(result)) return result;
@@ -15870,10 +15873,7 @@ static ypObject *function_call_stars(ypObject *f, ypObject *args, ypObject *kwar
     return _function_call_stars_to_callN(f, args, kwargs);
 }
 
-static ypObject *function_callN(ypObject *f, int n, va_list args)
-{
-    return yp_NotImplementedError;
-}
+static ypObject *function_callN(ypObject *f, int n, va_list args) { return yp_NotImplementedError; }
 
 // Decrements the reference count of the visited object
 static ypObject *_function_decref_visitor(ypObject *x, void *memo)
@@ -16449,10 +16449,7 @@ void yp_updateKV(ypObject **mapping, int n, va_list args)
     _yp_INPLACE2(mapping, tp_as_mapping, tp_updateK, (*mapping, n, args));
 }
 
-int yp_iscallableC(ypObject *x)
-{
-    return ypObject_TYPE(x)->tp_as_callable->tp_iscallable;
-}
+int yp_iscallableC(ypObject *x) { return ypObject_TYPE(x)->tp_as_callable->tp_iscallable; }
 
 ypObject *yp_callN(ypObject *c, int n, ...)
 {
@@ -16477,12 +16474,12 @@ ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)
     ypObject *result;
 
     coerced_args = yp_tuple(args);
-    if(yp_isexceptionC(coerced_args)) {
+    if (yp_isexceptionC(coerced_args)) {
         return coerced_args;
     }
 
     coerced_kwargs = yp_frozendict(kwargs);
-    if(yp_isexceptionC(coerced_kwargs)) {
+    if (yp_isexceptionC(coerced_kwargs)) {
         yp_decref(coerced_args);
         return coerced_kwargs;
     }
@@ -16693,35 +16690,36 @@ void yp_s2i_setitemC4(
 // yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");  // Preceeding arguments positional-only
 // yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");           // Remaining arguments keyword-only
 
-#define _yp_IMMORTAL_FUNCTION(qual, name, definition)                                        \
-    static struct _ypFunctionObject _##name##_struct = {                                     \
-            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, definition, _ypObject_LEN_INVALID)}; \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force use of semi-colon */
+#define _yp_DEF_UNPACK(...) __VA_ARGS__
 
-#define yp_IMMORTAL_FUNCTION(name, definition) _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, definition)
-#define yp_IMMORTAL_FUNCTION_static(name, definition) \
-    _yp_IMMORTAL_FUNCTION(static, name, definition)
-
-// FIXME support yp_NO_VARIADIC_MACROS?
+// FIXME support yp_NO_VARIADIC_MACROS? (Or remove non-variadic support, since it's ubiquitous.)
 // FIXME should name be the pointer or the yp_function_definition_t? The parameters are inlined...
-#define _yp_DEF(qual, name, code, ...)                                                            \
-    static yp_function_definition_t _##name##_struct = {code, {__VA_ARGS__, {NULL, NULL}}}; \
-    qual yp_function_definition_t *const name = &_##name##_struct /* force use of semi-colon */
-
-#define yp_DEF_PARAM(name, default) \
-    {                               \
-        name, default               \
-    }
+// FIXME We may want the name in C to be different than __name__.
+#define _yp_DEF(qual, name, code, parameters)                                               \
+    static yp_function_definition_t _##name##_struct = {code, {_yp_DEF_UNPACK parameters}}; \
+    qual yp_function_definition_t *const name = &_##name##_struct /* force semi-colon */
 
 // FIXME Use these, or just use the structure directly?
-#define yp_DEF(name, code, ...) _yp_DEF(_yp_NOQUAL, name, code, __VA_ARGS__)
-#define yp_DEF_static(name, code, ...) _yp_DEF(static, name, code, __VA_ARGS__)
+// FIXME These names are too cute...
+#define yp_DEF(name, code, parameters) _yp_DEF(_yp_NOQUAL, name, code, parameters)
+#define yp_DEF_static(name, code, parameters) _yp_DEF(static, name, code, parameters)
 
+#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                               \
+    static yp_function_parameter_t  _##name##_parameters[] = {_yp_DEF_UNPACK parameters}; \
+    static struct _ypFunctionObject _##name##_struct = {                                  \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, _##name##_parameters,             \
+                    yp_lengthof_array(_##name##_parameters)),                             \
+            NULL, {code}};                                                                      \
+    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+
+#define yp_IMMORTAL_FUNCTION(name, code, parameters) \
+    _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, code, parameters)
+#define yp_IMMORTAL_FUNCTION_static(name, code, parameters) \
+    _yp_IMMORTAL_FUNCTION(static, name, code, parameters)
 
 // FIXME We could have ways to wrap some common function signatures, perhaps function state has
 // pointer to the C function... (although how to set defaults?)
 
-// FIXME yes, I like the word "code" for the C implementation
 static ypObject *yp_func_hash_code(ypObject *function, int n, va_list args)
 {
     ypObject *exc = yp_None;
@@ -16742,9 +16740,7 @@ static ypObject *yp_func_hash_code(ypObject *function, int n, va_list args)
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
 
 // TODO The first parameter is positional-only.
-yp_DEF_static(yp_hash_definition, yp_func_hash_code, yp_DEF_PARAM(yp_s_obj, NULL));
-
-yp_IMMORTAL_FUNCTION(yp_func_hash, yp_hash_definition);
+yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code, ({(ypObject *)&_yp_s_obj_struct, NULL}));
 
 #pragma endregion functions_as_objects
 

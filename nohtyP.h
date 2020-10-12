@@ -1260,9 +1260,7 @@ typedef struct _yp_function_parameter_t {
     // The name of the parameter as a str (perhaps created via yp_IMMORTAL_STR_LATIN_1).  The name
     // must be a valid Python identifier.
     // FIXME Also verify that the name is a valid Python identifier.
-    // FIXME required (cannot be null)
-    // FIXME Also /, *, *args, or **kwargs
-    // FIXME If we are putting *args and **kwargs in here, then maybe all we need is codeNV?
+    // FIXME Also /, *, *args, or **kwargs...so "name" may not be strictly correct.
     ypObject *name;
 
     // The default value for the parameter, or NULL if there is no default value.
@@ -1288,9 +1286,13 @@ typedef struct _yp_function_definition_t {
     // FIXME document how to parse the args
     // FIXME Perhaps this is the "preferred" method: when called with yp_callN it just passes args,
     // and when called with yp_call_stars you don't have to handle all the args/kwargs rules.
+    // FIXME Should the first param be specifically the function, or the object on which yp_callN
+    // was invoked?
     ypObject *(*codeNV)(ypObject *function, int n, va_list args);
 
-    // name==null, default==null terminated
+    // FIXME doc, name/qualname, state, return annotation, module....
+
+    // TODO Insert new parameters above (flags imply where the offset is)
     yp_function_parameter_t parameters[];
 } yp_function_definition_t;
 
@@ -2034,7 +2036,7 @@ struct _ypObject {
 };
 
 // ypObject_HEAD defines the initial segment of every ypObject; it must be followed by a semicolon
-#define _ypObject_HEAD ypObject ob_base /* force use of semi-colon */
+#define _ypObject_HEAD ypObject ob_base /* force semi-colon */
 // Declares the ob_inline_data array for container object structures
 #define _yp_INLINE_DATA(elemType) elemType ob_inline_data[]
 
@@ -2088,21 +2090,25 @@ struct _ypStrObject {
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID), (value)}; \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force use of semi-colon */
+    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_BYTES(qual, name, value)                                              \
     static const char            _##name##_data[] = value;                                 \
     static struct _ypBytesObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
             _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};  \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force use of semi-colon */
+    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+// FIXME If we populate name->utf_8 on immortals, we are leaking memory. Either don't, or
+// pre-allocate an immortal bytes that we populate later?
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                                               \
     static const char          _##name##_data[] = value;                                          \
     static struct _ypStrObject _##name##_struct = {                                               \
             _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_LATIN_1, (void *)_##name##_data, \
                     sizeof(_##name##_data) - 1),                                                  \
             NULL};                                                                                \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force use of semi-colon */
+    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
+// FIXME Instead of _yp_NOQUAL, should we force extern? We really don't want yp_IMMORTAL_* placed
+// on the stack... And maybe flip around so static is default and _extern is option (as per Python).
 #define _yp_NOQUAL  // Used in place of static or extern for qual
 #define yp_IMMORTAL_INT(name, value) _yp_IMMORTAL_INT(_yp_NOQUAL, name, value)
 #define yp_IMMORTAL_BYTES(name, value) _yp_IMMORTAL_BYTES(_yp_NOQUAL, name, value)
