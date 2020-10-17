@@ -657,6 +657,7 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 //  - it's an exception, so return it
 //  - it's some other type, so return yp_TypeError
 // TODO It'd be nice to remove a comparison from this, as a minor efficiency, but not sure how
+// TODO Ensure we are using yp_BAD_TYPE in place of yp_TypeError in all the right places
 // clang-format off
 #define yp_BAD_TYPE(bad_ob) ( \
     ypObject_TYPE_PAIR_CODE(bad_ob) == ypInvalidated_CODE ? \
@@ -15583,12 +15584,6 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 // TODO Ideas:
 //  - remember that bound functions also have a "self" as the first positional argument (it'd be
 //  the argument after func_self if we go that route), so the name "self" is going to get confusing
-//  - Have direct support for the types of functions nohtyP recognizes, i.e. key, which is one arg
-//  one return. Func objects can support two calling styles: arg/kwarg (with a default
-//  implementation that unpacks arg/kwarg and calls the underlying function...although this presumes
-//  the names of the arguments! which is more proof that "arg1,arg2,arg3=None" is a better way to
-//  match to ensure the proper function is called) or "ypObject *func(ypObject*, ypObject*)" (in
-//  which case a separate wrapper can convert from arg/kwarg to the other one).
 
 // A verify function (perhaps only called once) that ensures:
 //  - all names are strings AND UNIQUE!
@@ -15598,6 +15593,7 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 //  - kw-only args next
 //  - **kwargs to finish
 // TODO Ensure the above is correct with Python
+
 #if 0
 // TODO If a function constructor call supplies only tp_call, do not allow the yp_func_parameter to
 // contain *args or **kwargs.  yp_callN(c, 3, a, b, c) should be equivalent to c(a, b, c)...that is,
@@ -15614,14 +15610,21 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
                         // yp_dict, etc.
 
 #endif
-// TODO Compare against Python API
+
 // FIXME be sure I'm using "parameter" and "argument" in the right places
 // FIXME ypFunctionObject doesn't need ob_data, etc (i.e. it can be smaller like int)
 // TODO Inspect and consider where yp_ssize_t is used vs int (as in `int n`)
-// FIXME Positional-only arguments are now supported by CPython; we should too.
 // TODO Make sub exceptions of yp_TypeError for each type of argument error (perhaps all grouped
 // under yp_ArgumentError or yp_CallArgumentError or something).
 // FIXME Stay consistent: https://docs.python.org/3/library/inspect.html#inspect.signature
+
+// We can optimize certain types of calls to certain type of functions.
+#define ypFunction_KIND_UNKNOWN (0u)  // _ypFunction_validate_parameters still needs to be called
+#define ypFunction_KIND_UNOPTIMIZABLE (1u)        // No optimizations exist for this function
+#define ypFunction_KIND_ALL_POSITIONAL (1u)       // No /, *, *args, or **kwargs parameters
+#define ypFunction_KIND_ONLY_VAR_POSITIONAL (2u)  // One parameter: *args
+#define ypFunction_KIND_ONLY_VAR_KEYWORD (3u)     // One parameter: **kwargs
+#define ypFunction_KIND_ONLY_VAR_POS_VAR_KW (4u)  // Two parameters: *args, **kwargs
 
 typedef struct {
     // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in data
@@ -15642,12 +15645,13 @@ struct _ypFunctionObject {
 };
 typedef struct _ypFunctionObject ypFunctionObject;
 
+#define ypFunction_KIND(f) (((ypObject *)(f))->ob_type_flags)
 #define ypFunction_STATE(f) (((ypFunctionObject *)f)->ob_state)
 #define ypFunction_DEFINITION(f) (&(((ypFunctionObject *)f)->ob_def))
 #define ypFunction_PARAMS(f) ((yp_function_parameter_t *)((ypObject *)f)->ob_data)
 #define ypFunction_PARAMS_LEN ypObject_CACHED_LEN
 #define ypFunction_SET_PARAMS_LEN ypObject_SET_CACHED_LEN
-#define ypFunction_CODE_NV(f) (ypFunction_DEFINITION(f)->codeNV)
+#define ypFunction_CODE_FUNC(f) (ypFunction_DEFINITION(f)->code)
 
 // The maximum possible size of a function's state
 // #define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
@@ -15659,8 +15663,154 @@ typedef struct _ypFunctionObject ypFunctionObject;
 // For use internally to detect when a key is missing from a dict.
 yp_IMMORTAL_INVALIDATED(ypFunction_key_missing);
 
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");  // Preceeding arguments positional-only
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");           // Remaining arguments keyword-only
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_args, "*args");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_star_kwargs, "**kwargs");
+
+
+// Returns an immortal representing the kind of parameter according to yp_function_parameter_t.name,
+// or an exception. Performs only minimal validation; in particular, this does not validate that the
+// parameter name is a proper identifier. Use _ypFunction_validate_parameters to fully validate the
+// parameter list.
+static ypObject *_ypFunction_parameter_kind(ypObject *name)
+{
+    yp_ssize_t                len;
+    ypStringLib_getindexXfunc getindexX;
+
+    if (ypObject_TYPE_CODE(name) != ypStr_CODE) {
+        return_yp_BAD_TYPE(name);
+    }
+
+    len = ypStr_LEN(name);
+    getindexX = ypStringLib_ENC(name)->getindexX;
+    if (len < 1) {
+        return yp_ParameterSyntaxError;
+    } else if (len == 1) {
+        yp_uint32_t ch = getindexX(name, 0);
+        if (ch == '/') {
+            return yp_s_forward_slash;
+        } else if (ch == '*') {
+            return yp_s_star;
+        } else {
+            return yp_None;  // just a regular parameter
+        }
+    } else {
+        // TODO Python allows `* args` and `** kwargs`. However, we can probably reject this.
+        if (getindexX(name, 0) != '*') {
+            return yp_None;  // just a regular parameter
+        } else if (getindexX(name, 1) != '*') {
+            return yp_s_star_args;
+        } else {
+            return yp_s_star_star_kwargs;
+        }
+    }
+}
+
+// FIXME provide a way for code to trigger this during their initialization, before calling the obj.
+static ypObject *_ypFunction_validate_parameters(ypObject *f)
+{
+    yp_ssize_t params_len = ypFunction_PARAMS_LEN(f);
+    yp_ssize_t i;
+
+    int has_positional_only = FALSE;
+    int has_positional_or_keyword = FALSE;
+    int has_var_positional = FALSE;
+    int has_keyword_only = FALSE;
+    int has_var_keyword = FALSE;
+
+    int remaining_are_keyword_only = FALSE;  // all after * or *args are kw-only
+    int must_have_default = FALSE;           // if a parameter has a default, all until * must also
+
+    yp_ASSERT1(ypFunction_KIND(f) == ypFunction_KIND_UNKNOWN);  // need only be called once on f
+
+    if (params_len < 1) {
+        ypFunction_KIND(f) = ypFunction_KIND_ALL_POSITIONAL;  // all zero parameters are positional
+        return yp_None;
+    }
+
+    for (i = 0; i < params_len; i++) {
+        yp_function_parameter_t param = ypFunction_PARAMS(f)[i];
+        ypObject *              param_kind = _ypFunction_parameter_kind(param.name);
+        if (yp_isexceptionC(param_kind)) return param_kind;
+
+        if (param_kind == yp_s_forward_slash) {
+            if (!has_positional_or_keyword || has_positional_only || remaining_are_keyword_only) {
+                // Invalid: (/), (a, /, /), (*, /), (*args, /)
+                return yp_ParameterSyntaxError;
+            } else if (param.default_ != NULL) {
+                return yp_ParameterSyntaxError;
+            }
+            // The previous positional-or-keyword arguments were actually positional-only.
+            has_positional_or_keyword = FALSE;
+            has_positional_only = TRUE;
+        } else if (param_kind == yp_s_star || param_kind == yp_s_star_args) {
+            if (remaining_are_keyword_only) {
+                // Invalid: (*, *), (*args, *), (*, *args), (*args, *args)
+                return yp_ParameterSyntaxError;
+            } else if (param.default_ != NULL) {
+                return yp_ParameterSyntaxError;
+            }
+            remaining_are_keyword_only = TRUE;
+            must_have_default = FALSE;
+            if (param_kind == yp_s_star_args) {
+                // FIXME Validate that remaining is an identifier.
+                has_var_positional = TRUE;
+            }
+        } else if (param_kind == yp_s_star_star_kwargs) {
+            if (i != params_len - 1) {
+                // Invalid: (**kwargs, a), (**kwargs, /), (**kwargs, *), (**kwargs, *args),
+                // (**kwargs, **kwargs)
+                return yp_ParameterSyntaxError;
+            } else if (param.default_ != NULL) {
+                return yp_ParameterSyntaxError;
+            }
+            // FIXME Validate that remaining is an identifier.
+            has_var_keyword = TRUE;
+        } else {
+            yp_ASSERT(param_kind == yp_None, "unexpected return from _ypFunction_parameter_kind");
+            // FIXME validate that the name is an identifier.
+            if (must_have_default) {
+                if (param.default_ == NULL) {
+                    return yp_ParameterSyntaxError;
+                }
+            } else if (param.default_ != NULL) {
+                must_have_default = TRUE;
+            }
+            if (remaining_are_keyword_only) {
+                has_keyword_only = TRUE;
+            } else {
+                has_positional_or_keyword = TRUE;
+            }
+        }
+    }
+
+    if (remaining_are_keyword_only && !has_var_positional && !has_keyword_only) {
+        // Invalid: (*), (*, **kwargs) (named arguments must follow bare *)
+        return yp_ParameterSyntaxError;
+    }
+
+    if (has_positional_only || has_keyword_only) {
+        ypFunction_KIND(f) = ypFunction_KIND_UNOPTIMIZABLE;
+    } else if (has_positional_or_keyword) {
+        if (has_var_positional || has_var_keyword) {
+            ypFunction_KIND(f) = ypFunction_KIND_UNOPTIMIZABLE;
+        } else {
+            ypFunction_KIND(f) = ypFunction_KIND_ALL_POSITIONAL;
+        }
+    } else if (has_var_positional) {
+        if (has_var_keyword) {
+            ypFunction_KIND(f) = ypFunction_KIND_ONLY_VAR_POS_VAR_KW;
+        } else {
+            ypFunction_KIND(f) = ypFunction_KIND_ONLY_VAR_POSITIONAL;
+        }
+    } else {
+        yp_ASSERT1(has_var_keyword);  // The params_len < 1 shortcut makes this impossible.
+        ypFunction_KIND(f) = ypFunction_KIND_ONLY_VAR_KEYWORD;
+    }
+
+    return yp_None;
+}
 
 // Counts the number of parameter slots that can be filled directly from positional arguments.  In
 // other words, this counts the number of parameters before the first of *, *args, **kwargs, or the
@@ -15689,14 +15839,17 @@ static ypObject *_ypFunction_count_positional_param_slots(ypObject *f, yp_ssize_
 
 static ypObject *_ypFunction_callN(ypObject *f, int n, ...)
 {
-    va_list   args;
-    ypObject *result;
+    // FIXME
+    return yp_NotImplementedError;
 
-    va_start(args, n);
-    result = ypFunction_CODE_NV(f)(f, n, args);
-    va_end(args);
+    // va_list   args;
+    // ypObject *result;
 
-    return result;
+    // va_start(args, n);
+    // result = ypFunction_CODE_FUNC(f)(f, n, args);
+    // va_end(args);
+
+    // return result;
 }
 
 // Function methods
@@ -16709,7 +16862,7 @@ void yp_s2i_setitemC4(
     static struct _ypFunctionObject _##name##_struct = {                                  \
             _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, _##name##_parameters,             \
                     yp_lengthof_array(_##name##_parameters)),                             \
-            NULL, {code}};                                                                      \
+            NULL, {code}};                                                                \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 
 #define yp_IMMORTAL_FUNCTION(name, code, parameters) \
@@ -16720,7 +16873,7 @@ void yp_s2i_setitemC4(
 // FIXME We could have ways to wrap some common function signatures, perhaps function state has
 // pointer to the C function... (although how to set defaults?)
 
-static ypObject *yp_func_hash_code(ypObject *function, int n, va_list args)
+static ypObject *yp_func_hash_code(ypObject *function, int n, ypObject *const *argarray)
 {
     ypObject *exc = yp_None;
     yp_hash_t hash;
@@ -16729,7 +16882,7 @@ static ypObject *yp_func_hash_code(ypObject *function, int n, va_list args)
         return yp_TypeError;  // FIXME This would actually be an error in the parameter defs.
     }
 
-    hash = yp_hashC(va_arg(args, ypObject *), &exc);  // FIXME inline?
+    hash = yp_hashC(argarray[0], &exc);  // FIXME inline?
     if (yp_isexceptionC(exc)) {
         return exc;
     }

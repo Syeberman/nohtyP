@@ -1280,19 +1280,22 @@ typedef struct _yp_function_definition_t {
     // FIXME Flags to describe what's next in this struct (is it NV, stars, bytecode? Are there
     // annotations?)
 
-    // Called by the yp_call* methods.  function is the function object; use yp_function_stateCX to
-    // retrieve any state variables.  args are the n positional arguments.  The return value must be
-    // a new or immortal reference, or an exception.
+    // Called by the yp_call* methods. c is the callable (i.e. the first argument to yp_call*).
+    // argarray is an array of n arguments corresponding to the callable's n parameters, with
+    // default values in place of missing arguments; this array includes any keyword-only
+    // parameters, in the order they are specified in parameters. The return value must be a new or
+    // immortal reference, or an exception.
+
     // FIXME document how to parse the args
     // FIXME Perhaps this is the "preferred" method: when called with yp_callN it just passes args,
     // and when called with yp_call_stars you don't have to handle all the args/kwargs rules.
-    // FIXME Should the first param be specifically the function, or the object on which yp_callN
-    // was invoked?
-    ypObject *(*codeNV)(ypObject *function, int n, va_list args);
+    // FIXME use yp_function_stateCX to retrieve any state variables
+    ypObject *(*code)(ypObject *c, int n, ypObject *const *argarray);
 
     // FIXME doc, name/qualname, state, return annotation, module....
 
     // TODO Insert new parameters above (flags imply where the offset is)
+    // FIXME We need a length here, but in the object that length is stored in ob_len....
     yp_function_parameter_t parameters[];
 } yp_function_definition_t;
 
