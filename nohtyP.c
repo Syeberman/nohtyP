@@ -1708,11 +1708,8 @@ void yp_decrefN(int n, ...)
  *************************************************************************************************/
 #pragma region ypQuickIter
 
-// TODO I'm having second thoughts about the utility of this API.  This isn't even used below!
-// It really comes down to how much benefit we have sharing the va_list code with the iterable
-// code...and last time there wasn't that much benefit.  ypQuickSeq might be a better choice.
-// TODO Regardless, inspect all uses of va_arg, yp_miniiter_next, and yp_next below and see if we
-// can consolidate or simplify some code by using this API
+// TODO Inspect all uses of va_arg, yp_miniiter_next, and yp_next below and see if we can
+// consolidate or simplify some code by using this API
 
 // This API exists to reduce duplication of code where variants of a method accept va_lists of
 // ypObject*s, or a general-purpose iterable.  This code intends to be a light-weight abstraction
@@ -1754,6 +1751,7 @@ typedef struct {
     // undefined.
     // TODO Do like Python, and instead of *isexact accept a default hint that is returned?
     // There's also the idea of a ypObject_MIN_LENHINT...
+    // FIXME Instead, return an error, take a pointer to the hint.
     yp_ssize_t (*length_hint)(ypQuickIter_state *state, int *isexact, ypObject **exc);
 
     // Closes the ypQuickIter.  Any further operations on state will be undefined.
@@ -1764,6 +1762,7 @@ typedef struct {
 
 static ypObject *ypQuickIter_var_nextX(ypQuickIter_state *state)
 {
+    yp_ASSERT(state->var.n >= 0, "state->var.n should not be negative");
     if (state->var.n <= 0) return NULL;
     state->var.n -= 1;
     return va_arg(state->var.args, ypObject *);  // borrowed
@@ -1780,7 +1779,7 @@ static yp_ssize_t ypQuickIter_var_length_hint(
 {
     yp_ASSERT(state->var.n >= 0, "state->var.n should not be negative");
     *isexact = TRUE;
-    return state->var.n;
+    return MAX(state->var.n, 0);
 }
 
 static void ypQuickIter_var_close(ypQuickIter_state *state) { va_end(state->var.args); }
@@ -1797,7 +1796,7 @@ static const ypQuickIter_methods ypQuickIter_var_methods = {
 static void ypQuickIter_new_fromvar(ypQuickIter_state *state, int n, va_list args)
 {
     state->var.n = n;
-    va_copy(state->var.args, args);
+    va_copy(state->var.args, args);  // FIXME What if we didn't va_copy/va_end?
 }
 
 
@@ -1814,7 +1813,7 @@ static void ypQuickIter_new_fromtuple(ypQuickIter_state *state, ypObject *tuple)
 
 static ypObject *ypQuickIter_mi_next(ypQuickIter_state *state)
 {
-    // TODO What if we were to store tp_miniiter_next?
+    // TODO What if we were to store tp_miniiter_next? (What if miniiter did?)
     ypObject *x = yp_miniiter_next(&(state->mi.iter), &(state->mi.state));  // new ref
     if (yp_isexceptionC2(x, yp_StopIteration)) return NULL;
     if (state->mi.len >= 0) state->mi.len -= 1;
@@ -15018,9 +15017,10 @@ ypObject *yp_dictKV(int n, va_list args)
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
 static ypObject *_ypDict(int type, ypObject *x)
 {
-    ypObject * exc = yp_None;
-    ypObject * newMp;
-    ypObject * result;
+    ypObject *exc = yp_None;
+    ypObject *newMp;
+    ypObject *result;
+    // We could just check yp_length_hintC if it returned an "is exact length" flag.
     yp_ssize_t length_hint = yp_lenC(x, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
@@ -15624,6 +15624,11 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
 #define ypFunction_FLAG_HAS_KW_ONLY (1u << 4)    // Has * parameter (keyword-only params)
 #define ypFunction_FLAG_HAS_VAR_KW (1u << 5)     // Has **kwargs parameter
 
+// The ypFunction_FLAGS that summarize the parameters.
+#define ypFunction_PARAM_FLAGS                                                                    \
+    (ypFunction_FLAG_HAS_POS_ONLY | ypFunction_FLAG_HAS_POS_OR_KW | ypFunction_FLAG_HAS_VAR_POS | \
+            ypFunction_FLAG_HAS_KW_ONLY | ypFunction_FLAG_HAS_VAR_KW)
+
 typedef struct {
     // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in data
     yp_uint32_t objlocs;
@@ -15650,12 +15655,6 @@ typedef struct _ypFunctionObject ypFunctionObject;
 #define ypFunction_PARAMS_LEN ypObject_CACHED_LEN
 #define ypFunction_SET_PARAMS_LEN ypObject_SET_CACHED_LEN
 #define ypFunction_CODE_FUNC(f) (ypFunction_DEFINITION(f)->code)
-
-// The ypFunction_FLAGS that summarize the parameters.
-#define ypFunction_PARAM_FLAGS(f)                                                               \
-    (ypFunction_FLAGS(f) && (ypFunction_FLAG_HAS_POS_ONLY | ypFunction_FLAG_HAS_POS_OR_KW |     \
-                                    ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_KW_ONLY | \
-                                    ypFunction_FLAG_HAS_VAR_KW))
 
 // The maximum possible size of a function's state
 // #define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
@@ -15742,7 +15741,6 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
         yp_function_parameter_t param = ypFunction_PARAMS(f)[i];
         ypObject *              param_kind = _ypFunction_parameter_kind(param.name);
         // ypObject *              param_name = NULL;  // actual name, stripping leading * or **
-        if (yp_isexceptionC(param_kind)) return param_kind;
 
         if (param_kind == yp_s_forward_slash) {
             if (!has_positional_or_keyword || has_positional_only || remaining_are_keyword_only) {
@@ -15777,8 +15775,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             }
             has_var_keyword = TRUE;
             // param_name = string_getslice(param.name, 2, yp_SLICE_USELEN, 1);
-        } else {
-            yp_ASSERT(param_kind == yp_None, "unexpected return from _ypFunction_parameter_kind");
+        } else if (param_kind == yp_None) {
             // FIXME validate that the name is an identifier.
             if (must_have_default) {
                 if (param.default_ == NULL) {
@@ -15793,6 +15790,9 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
                 has_positional_or_keyword = TRUE;
             }
             // param_name = yp_incref(param.name);
+        } else {
+            yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
+            return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
         }
 
         // FIXME: Implement str_isidentifier, string_getslice, then enable this.
@@ -15834,21 +15834,120 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     return yp_None;
 }
 
-// Helper for ypFunction_call_QuickIter to place keyword arguments in the presense of a **kwargs
-// parameter. kwargs must be a dict; it will be modified, frozen, incref'd, and placed in argarray.
-static ypObject *_ypFunction_call_kwargs_with_var_kw(
-        ypObject *f, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
+// Helper for ypFunction_call_QuickIter. Places the positional arguments in argarray. Keeps *n
+// up-to-date with the number of references in argarray, so they can be deallocated by
+// ypFunction_call_QuickIter after the call.
+static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_methods *iter,
+        ypQuickIter_state *args, yp_ssize_t *n, ypObject **argarray)
 {
-    yp_ssize_t placed_kwargs = 0;  // tracks if we hit a / after filling a keyword argument
-
-    yp_ASSERT(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW,
-            "use _ypFunction_call_kwargs_no_var_kw instead");
-    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
+    ypObject *arg;
 
     while (*n < ypFunction_PARAMS_LEN(f)) {
         yp_function_parameter_t param = ypFunction_PARAMS(f)[*n];
         ypObject *              param_kind = _ypFunction_parameter_kind(param.name);
+
+        if (param_kind == yp_s_forward_slash) {
+            argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
+            (*n)++;               // consume the / parameter
+        } else if (param_kind == yp_s_star) {
+            argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
+            (*n)++;               // consume the * parameter
+            break;                // will ensure no remaining positional arguments
+        } else if (param_kind == yp_s_star_args) {
+            // FIXME Update tuple code to take a QuickIter
+            return yp_NotImplementedError;
+        } else if (param_kind == yp_s_star_star_kwargs) {
+            // do *not* consume the **kwargs parameter
+            break;  // will ensure no remaining positional arguments
+        } else if (param_kind == yp_None) {
+            arg = iter->next(args);
+            if (arg == NULL) {
+                // End of positional arguments. Do *not* consume the parameter: it may be in kwargs.
+                break;
+            } else if (yp_isexceptionC(arg)) {
+                return arg;
+            } else {
+                argarray[*n] = yp_incref(arg);
+                (*n)++;  // consume the parameter
+            }
+        } else {
+            yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
+            return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
+        }
+    }
+
+    // Ensure we have exhausted all the positional arguments.
+    arg = iter->nextX(args);
+    if (arg != NULL) {
+        return yp_isexceptionC(arg) ? arg : yp_TypeError;
+    }
+
+    return yp_None;
+}
+
+// Helper for ypFunction_call_QuickIter. Determines **kwargs by modifying kwargs, first dropping
+// keyword arguments we've already placed, freezing it, and returning a new reference.
+static ypObject *_ypFunction_call_make_var_kwargs(
+        ypObject *f, yp_ssize_t first_kwarg, ypObject *kwargs)
+{
+    yp_function_parameter_t param;
+    ypObject *              param_kind;
+    ypObject *              arg;
+    yp_ssize_t              i = 0;
+
+    yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
+
+    // Skip any positional-only parameters. (If present, they are always at the start.)
+    if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY) {
+        while (i < ypFunction_PARAMS_LEN(f)) {
+            param = ypFunction_PARAMS(f)[i];
+            param_kind = _ypFunction_parameter_kind(param.name);
+            if (yp_isexceptionC(param_kind)) return param_kind;
+
+            i++;  // consume the parameter
+            if (param_kind == yp_s_forward_slash) break;
+        }
+        yp_ASSERT1(i < ypFunction_PARAMS_LEN(f));
+    }
+
+    for (/*i already set*/; i < ypFunction_PARAMS_LEN(f); i++) {
+        param = ypFunction_PARAMS(f)[i];
+        param_kind = _ypFunction_parameter_kind(param.name);
         if (yp_isexceptionC(param_kind)) return param_kind;
+        if (param_kind != yp_None) continue;  // skip *, *args, and **kwargs (/ already skipped)
+
+        arg = dict_popvalue(kwargs, param.name, ypFunction_key_missing);
+        if (arg == ypFunction_key_missing) continue;
+        if (yp_isexceptionC(arg)) return arg;
+        yp_decref(arg);
+
+        // We found a matching keyword argument. Ensure this wasn't also a positional argument.
+        // Without a **kwargs, _ypFunction_call_place_kwargs uses placed_kwargs to detect this case.
+        if (i < first_kwarg) return yp_TypeError;
+    }
+
+    // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
+    return yp_frozendict(kwargs);
+}
+
+// Helper for ypFunction_call_QuickIter. Places the keyword arguments in argarray. Keeps *n
+// up-to-date with the number of references in argarray, so they can be deallocated by
+// ypFunction_call_QuickIter after the call. kwargs must be a dict/frozendict; additonally, if
+// we have a **kwargs parameter, kwargs must be a dict, and it will be modified, frozen, and
+// placed in argarray.
+static ypObject *_ypFunction_call_place_kwargs(
+        ypObject *f, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
+{
+    ypObject * arg;
+    yp_ssize_t first_kwarg = *n;   // remembers the position of the first param filled by us
+    yp_ssize_t placed_kwargs = 0;  // counts how many arguments in kwargs we have consumed
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
+
+    while (*n < ypFunction_PARAMS_LEN(f)) {
+        yp_function_parameter_t param = ypFunction_PARAMS(f)[*n];
+        ypObject *              param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_forward_slash) {
             if (placed_kwargs > 0) {
@@ -15866,12 +15965,13 @@ static ypObject *_ypFunction_call_kwargs_with_var_kw(
         } else if (param_kind == yp_s_star_star_kwargs) {
             yp_ASSERT(*n == ypFunction_PARAMS_LEN(f) - 1,
                     "_ypFunction_validate_parameters didn't ensure that **kwargs came last");
-            // Because this is the last parameter, we can freeze kwargs in-place.
-            // FIXME Implement frozendict_freeze.
-            return yp_NotImplementedError;
-        } else {
-            ypObject *arg = dict_popvalue(kwargs, param.name, ypFunction_key_missing);
-            yp_ASSERT(param_kind == yp_None, "unexpected return from _ypFunction_parameter_kind");
+            arg = _ypFunction_call_make_var_kwargs(f, first_kwarg, kwargs);
+            if (yp_isexceptionC(arg)) return arg;
+            argarray[*n] = arg;
+            (*n)++;          // consume the parameter
+            return yp_None;  // **kwarg, if present, is always last
+        } else if (param_kind == yp_None) {
+            arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing);
             if (yp_isexceptionC(arg)) return arg;
             if (arg != ypFunction_key_missing) {
                 argarray[*n] = arg;
@@ -15884,64 +15984,15 @@ static ypObject *_ypFunction_call_kwargs_with_var_kw(
                 // A parameter without a matching argument or a default.
                 return yp_TypeError;
             }
+        } else {
+            yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
+            return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
         }
     }
-
-    yp_ASSERT(FALSE, "ypFunction_FLAG_HAS_VAR_KW was set but **kwargs doesn't exist");
-    return yp_SystemError;
-}
-
-// Helper for ypFunction_call_QuickIter to place keyword arguments without copying the kwargs
-// object. f must not have a **kwargs parameter and kwargs must be a dict/frozendict.
-static ypObject *_ypFunction_call_kwargs_no_var_kw(
-        ypObject *f, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
-{
-    yp_ssize_t placed_kwargs = 0;  // counts how many arguments in kwargs we have consumed
 
     yp_ASSERT1(!(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW));
-    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
-
-    while (*n < ypFunction_PARAMS_LEN(f)) {
-        yp_function_parameter_t param = ypFunction_PARAMS(f)[*n];
-        ypObject *              param_kind = _ypFunction_parameter_kind(param.name);
-        if (yp_isexceptionC(param_kind)) return param_kind;
-
-        if (param_kind == yp_s_forward_slash) {
-            if (placed_kwargs > 0) {
-                // A positional-only parameter was filled using a keyword argument.
-                return yp_TypeError;
-            }
-            argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
-            (*n)++;               // consume the / parameter
-        } else if (param_kind == yp_s_star) {
-            argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
-            (*n)++;               // consume the * parameter
-        } else if (param_kind == yp_s_star_args) {
-            argarray[*n] = _yp_tuple_empty;  // there must not have been any more positional args
-            (*n)++;                          // consume the *args parameter
-        } else if (param_kind == yp_s_star_star_kwargs) {
-            yp_ASSERT(FALSE, "**kwargs exists but ypFunction_FLAG_HAS_VAR_KW was not set");
-            return yp_SystemError;
-        } else {
-            ypObject *arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing);
-            yp_ASSERT(param_kind == yp_None, "unexpected return from _ypFunction_parameter_kind");
-            if (yp_isexceptionC(arg)) return arg;
-            if (arg != ypFunction_key_missing) {
-                argarray[*n] = arg;
-                (*n)++;  // consume the parameter
-                placed_kwargs += 1;
-            } else if (param.default_ != NULL) {
-                argarray[*n] = yp_incref(param.default_);
-                (*n)++;  // consume the parameter
-            } else {
-                // A parameter without a matching argument or a default.
-                return yp_TypeError;
-            }
-        }
-    }
-
     if (placed_kwargs != ypDict_LEN(kwargs)) {
-        // Unexpected keyword arguments.
+        // Unexpected keyword arguments, or an argument was both positional and keyword.
         return yp_TypeError;
     }
 
@@ -15954,71 +16005,41 @@ static ypObject *_ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
         const ypQuickIter_methods *iter, ypQuickIter_state *args, ypObject *kwargs, yp_ssize_t *n,
         ypObject **argarray)
 {
+    ypObject *result;
+
     // We have this here for the benefit of function immortals, to initialize values we cannot
     // compute at compile time.
-    if(!(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED)) {
-        ypObject *result = _ypFunction_validate_parameters(f);
+    if (!(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED)) {
+        result = _ypFunction_validate_parameters(f);
         if (yp_isexceptionC(result)) return result;
     }
 
     // Positional arguments are placed first.
-    while (*n < ypFunction_PARAMS_LEN(f)) {
-        yp_function_parameter_t param = ypFunction_PARAMS(f)[*n];
-        ypObject *              param_kind = _ypFunction_parameter_kind(param.name);
-        if (yp_isexceptionC(param_kind)) return param_kind;
+    result = _ypFunction_call_place_args(f, iter, args, n, argarray);
+    if (yp_isexceptionC(result)) return result;
 
-        if (param_kind == yp_s_forward_slash) {
-            argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
-            (*n)++;               // consume the / parameter
-        } else if (param_kind == yp_s_star) {
-            argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
-            (*n)++;               // consume the * parameter
-            break;                // will ensure no remaining positional arguments
-        } else if (param_kind == yp_s_star_args) {
-            // FIXME Update tuple code to take a QuickIter (will likely consolidate a bit of code)
-            return yp_NotImplementedError;
-        } else if (param_kind == yp_s_star_star_kwargs) {
-            // do *not* consume the **kwargs parameter
-            break;  // will ensure no remaining positional arguments
-        } else {
-            ypObject *arg = iter->next(args);
-            yp_ASSERT(param_kind == yp_None, "unexpected return from _ypFunction_parameter_kind");
-            if (arg == NULL) {
-                // do *not* consume the parameter: perhaps its in kwargs
-                break;
-            } else if (yp_isexceptionC(arg)) {
-                return arg;
-            } else {
-                argarray[*n] = yp_incref(arg);
-                (*n)++;  // consume the parameter
-            }
-        }
-    }
-
-    // Ensure we have exhausted all the positional arguments.
-    {
-        ypObject *arg = iter->nextX(args);
-        if (arg != NULL) {
-            return yp_isexceptionC(arg) ? arg : yp_TypeError;
-        }
-    }
-
+    // FIXME Make sure we are detecting where an arg is both positional and keyword! Even when
+    // **kwargs is present!
+    // FIXME Function (a, /, **k) can be called like (1, a=33)!
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW) {
-        ypObject *kwargs_copy = yp_dict(kwargs); // modified by _with_var_kw
-        ypObject *result = _ypFunction_call_kwargs_with_var_kw(f, kwargs_copy, n, argarray);
+        ypObject *kwargs_copy = yp_dict(kwargs);  // modified by _ypFunction_call_place_kwargs
+        result = _ypFunction_call_place_kwargs(f, kwargs_copy, n, argarray);
         yp_decref(kwargs_copy);
         if (yp_isexceptionC(result)) return result;
     } else if (ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE) {
-        ypObject *result = _ypFunction_call_kwargs_no_var_kw(f, kwargs, n, argarray);
+        result = _ypFunction_call_place_kwargs(f, kwargs, n, argarray);
         if (yp_isexceptionC(result)) return result;
     } else {
+        // We can't trust user-defined mapping types here (and neither does Python). Consider a
+        // case-insensitive mapping {'a': 1} with a function (a, A). Even though the mapping
+        // contains just one entry, it would match both arguments.
         ypObject *kwargs_asfrozendict = yp_frozendict(kwargs);
-        ypObject *result = _ypFunction_call_kwargs_no_var_kw(f, kwargs_asfrozendict, n, argarray);
+        result = _ypFunction_call_place_kwargs(f, kwargs_asfrozendict, n, argarray);
         yp_decref(kwargs_asfrozendict);
         if (yp_isexceptionC(result)) return result;
     }
 
-    yp_ASSERT(*n == ypFunction_PARAMS_LEN(f), "we are dropping params somewhere");
+    yp_ASSERT1(*n == ypFunction_PARAMS_LEN(f));
     return ypFunction_CODE_FUNC(f)(callable, *n, argarray);
 }
 
@@ -16028,10 +16049,9 @@ static ypObject *ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
     yp_ssize_t n = 0;
     ypObject **argarray = alloca(ypFunction_PARAMS_LEN(f));
     ypObject * result = _ypFunction_call_QuickIter(f, callable, iter, args, kwargs, &n, argarray);
-    while (n > 0) {
+    for (/* n already set*/; n > 0; n--) {
         ypObject *arg = argarray[n - 1];
-        if (arg != NULL) yp_decref(arg);  // / and * store in NULL in argarray
-        n--;
+        if (arg != NULL) yp_decref(arg);  // / and * store NULL in argarray
     }
     return result;
 }
@@ -16044,20 +16064,26 @@ static ypObject *ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
 static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_list args)
 {
     ypObject * result;
-    yp_uint8_t param_flags = ypFunction_PARAM_FLAGS(f);
+    yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
 
-    if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
+    if (ypFunction_PARAMS_LEN(f) < 1) {
+        if (n > 0) return yp_TypeError;
+        return ypFunction_CODE_FUNC(f)(callable, 0, NULL);
+
+    } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
         ypObject *argarray[] = {yp_tupleNV(n, args), _yp_frozendict_empty};
         if (yp_isexceptionC(argarray[0])) return argarray[0];
         result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
         yp_decref(argarray[0]);
         return result;
+
     } else if (param_flags == ypFunction_FLAG_HAS_VAR_POS) {
         ypObject *argarray[] = {yp_tupleNV(n, args)};
         if (yp_isexceptionC(argarray[0])) return argarray[0];
         result = ypFunction_CODE_FUNC(f)(callable, 1, argarray);
         yp_decref(argarray[0]);
         return result;
+
     } else {
         ypQuickIter_state state;
         ypQuickIter_new_fromvar(&state, n, args);
@@ -16072,11 +16098,17 @@ static ypObject *ypFunction_call_stars(
         ypObject *f, ypObject *callable, ypObject *args, ypObject *kwargs)
 {
     ypObject * result;
-    yp_uint8_t param_flags = ypFunction_PARAM_FLAGS(f);
+    yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
 
     // FIXME Optimize for all-positional params (copy args tuple into array)
 
-    if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
+    if (ypFunction_PARAMS_LEN(f) < 1) {
+        ypObject *exc = yp_None;
+        if (yp_lenC(args, &exc) > 0 || yp_lenC(kwargs, &exc) > 0) return yp_TypeError;
+        if (yp_isexceptionC(exc)) return exc;
+        return ypFunction_CODE_FUNC(f)(callable, 0, NULL);
+
+    } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
         ypObject *argarray[] = {yp_tuple(args), yp_frozendict(args)};
         if (yp_isexceptionC(argarray[0])) {
             yp_decref(argarray[1]);
@@ -16089,16 +16121,21 @@ static ypObject *ypFunction_call_stars(
         yp_decref(argarray[1]);
         yp_decref(argarray[0]);
         return result;
+
     } else if (param_flags == ypFunction_FLAG_HAS_VAR_KW) {
         // FIXME assert args empty, coerce kwargs to frozendict
         return yp_NotImplementedError;
+
     } else if (param_flags == ypFunction_FLAG_HAS_VAR_POS) {
         // FIXME assert kwargs empty, coerce kwargs to tuple
         return yp_NotImplementedError;
+
     } else {
-        ypQuickIter_state state;
-        ypQuickIter_new_fromtuple(&state, args);
-        result = ypFunction_call_QuickIter(f, callable, &ypQuickIter_tuple_methods, &state, kwargs);
+        const ypQuickIter_methods *iter;
+        ypQuickIter_state          state;
+        result = ypQuickIter_new_fromiterable(&iter, &state, args);
+        if (yp_isexceptionC(result)) return result;
+        result = ypFunction_call_QuickIter(f, callable, iter, &state, kwargs);
         ypQuickIter_var_close(&state);
         return result;
     }

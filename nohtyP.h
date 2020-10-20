@@ -1290,6 +1290,7 @@ typedef struct _yp_function_definition_t {
     // FIXME Perhaps this is the "preferred" method: when called with yp_callN it just passes args,
     // and when called with yp_call_stars you don't have to handle all the args/kwargs rules.
     // FIXME use yp_function_stateCX to retrieve any state variables
+    // FIXME "if n is zero, argarray is NULL"
     ypObject *(*code)(ypObject *c, yp_ssize_t n, ypObject *const *argarray);
 
     // FIXME doc, name/qualname, state, return annotation, module....
