@@ -17074,6 +17074,10 @@ void yp_s2i_setitemC4(
 // FIXME We could have ways to wrap some common function signatures, perhaps function state has
 // pointer to the C function... (although how to set defaults?)
 
+
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
+
+
 static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
 {
     ypObject *exc = yp_None;
@@ -17089,14 +17093,30 @@ static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *c
     return yp_intC(hash);
 };
 
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
-
 // FIXME Technically, the parameter is positional-only, however that makes it difficult to optimize
 // for the common case we call yp_call_argarray(yp_func_hash, 1, {arg}), because we would have to
 // copy to a new array with a trailing NULL. Is positional-only important enough? Can we special
 // case functions that have only positional-only arguments (perhaps document that n will be one less
 // than expected?)
 yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code, ({yp_CONST_REF(yp_s_obj), NULL}));
+
+static ypObject *yp_func_len_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
+{
+    ypObject *exc = yp_None;
+    yp_ssize_t len;
+
+    if (n != 1) return yp_SystemError;  // have the number of params changed?
+
+    len = yp_lenC(argarray[0], &exc);
+    if (yp_isexceptionC(exc)) {
+        return exc;
+    }
+
+    return yp_intC(len);
+};
+
+// FIXME Technically, the parameter is positional-only....
+yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code, ({yp_CONST_REF(yp_s_obj), NULL}));
 
 #pragma endregion functions_as_objects
 

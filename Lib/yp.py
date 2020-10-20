@@ -1860,20 +1860,18 @@ c_ypObject_p_value("yp_i_two")
 ypObject_LEN_MAX = yp_int(0x7FFFFFFF)
 
 
-def yp_len(x):
-    """Returns len(x) of a ypObject as a yp_int"""
-    if not isinstance(x, ypObject):
+def yp_len(obj, /):
+    """Returns len(obj) of a ypObject as a yp_int"""
+    if not isinstance(obj, ypObject):
         raise TypeError("expected ypObject in yp_len")
-    return yp_int(len(x))
+    return yp_func_len(obj)
 
 
-def yp_hash(x):
-    """Returns hash(x) of a ypObject as a yp_int"""
-    if not isinstance(x, ypObject):
+def yp_hash(obj, /):
+    """Returns hash(obj) of a ypObject as a yp_int"""
+    if not isinstance(obj, ypObject):
         raise TypeError("expected ypObject in yp_hash")
-    # FIXME Placing this here to test function objects
-    return yp_func_hash(x)
-    # return yp_int(_yp_hashC(x, yp_None))  # FIXME return yp_int(hash(x))?
+    return yp_func_hash(obj)
 
 
 @pytype(yp_t_float, float)
@@ -2444,6 +2442,7 @@ class yp_function(ypObject):
     def __new__(cls, *args, **kwargs):
         raise TypeError("cannot instantiate yp_function this way")
 c_ypObject_p_value("yp_func_hash")
+c_ypObject_p_value("yp_func_len")
 
 
 # TODO Integrate ypExamples.c somehow with this unittest suite
