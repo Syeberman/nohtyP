@@ -283,12 +283,17 @@ typedef size_t yp_uhash_t;
 // Base "constructor" for immortal objects
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
+// Older compilers don't recognize that `ypObject *const name` is known at compile-time, so use this
+// to initialize when a compiler requires a constant. name must refer to an already-defined
+// immortal.
+#define yp_CONST_REF(name) ((ypObject *)&_##name##_struct)
+
 // Base "constructor" for immortal type objects
 #define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT(ypType_CODE, 0, NULL, ypObject_LEN_INVALID)
 #define yp_IMMORTAL_INVALIDATED(name)                                                   \
     static struct _ypObject _##name##_struct =                                          \
             _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID); \
-    ypObject *const name = &_##name##_struct /* force semi-colon */
+    ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)(ypObject *);
@@ -3221,10 +3226,10 @@ static ypTypeObject ypException_Type = {
     yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                 \
     static ypExceptionObject _##name##_struct = {                \
             yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, NULL, 0), \
-            (ypObject *)&_##name##_name_struct, (superptr)};     \
-    ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+            yp_CONST_REF(name##_name), (superptr)};     \
+    ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_EXCEPTION(name, super) \
-    _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, (ypObject *)&_##super##_struct)
+    _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, yp_CONST_REF(super))
 
 // clang-format off
 _yp_IMMORTAL_EXCEPTION_SUPERPTR(yp_BaseException, NULL);
@@ -3536,7 +3541,7 @@ static ypTypeObject ypNoneType_Type = {
 
 // No constructors for nonetypes; there is exactly one, immortal object
 static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, NULL, 0);
-ypObject *const yp_None = &_yp_None_struct;
+ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 #pragma endregion None
 
@@ -3660,9 +3665,9 @@ static ypTypeObject ypBool_Type = {
 // There are exactly two bool objects
 // TODO Could initialize ypObject_CACHED_HASH here
 static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 1};
-ypObject *const     yp_True = (ypObject *)&_yp_True_struct;
+ypObject *const     yp_True = yp_CONST_REF(yp_True);
 static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 0};
-ypObject *const     yp_False = (ypObject *)&_yp_False_struct;
+ypObject *const     yp_False = yp_CONST_REF(yp_False);
 
 #pragma endregion bool
 
@@ -5649,16 +5654,18 @@ typedef struct _ypStrObject ypStrObject;
     } while (0)
 
 // Empty bytes can be represented by this, immortal object
+// FIXME Make yp_bytes_empty a proper variable.
 static ypBytesObject _yp_bytes_empty_struct = {{ypBytes_CODE, 0, ypStringLib_ENC_BYTES,
         ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, ""}};
-#define _yp_bytes_empty ((ypObject *)&_yp_bytes_empty_struct)
+#define _yp_bytes_empty yp_CONST_REF(yp_bytes_empty)
 
 // Empty strs can be represented by this, immortal object
+// FIXME Make yp_str_empty a proper variable
 static ypStrObject _yp_str_empty_struct = {
         {ypStr_CODE, 0, ypStringLib_ENC_LATIN_1, ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID,
                 ypObject_HASH_INVALID, ""},
         _yp_bytes_empty};
-#define _yp_str_empty ((ypObject *)&_yp_str_empty_struct)
+#define _yp_str_empty yp_CONST_REF(yp_str_empty)
 
 // Gets the ordinal at src[src_i].  src_i must be in range(len): no bounds checking is performed.
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
@@ -9773,7 +9780,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 1,                                  // elemsize
                 0xFFu,                              // max_char
                 ypStringLib_ENC_LATIN_1,            // code
-                (ypObject *)&_yp_s_latin_1_struct,  // name
+                yp_CONST_REF(yp_s_latin_1),  // name
                 _yp_str_empty,                      // empty_immutable
                 yp_chrarray0,                       // empty_mutable
                 ypStringLib_getindexX_1byte,        // getindexX
@@ -9789,7 +9796,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 2,                                // elemsize
                 0xFFFFu,                          // max_char
                 ypStringLib_ENC_UCS_2,            // code
-                (ypObject *)&_yp_s_ucs_2_struct,  // name
+                yp_CONST_REF(yp_s_ucs_2),  // name
                 _yp_str_empty,                    // empty_immutable
                 yp_chrarray0,                     // empty_mutable
                 ypStringLib_getindexX_2bytes,     // getindexX
@@ -9805,7 +9812,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 4,                                // elemsize
                 0xFFFFFFFFu,                      // max_char
                 ypStringLib_ENC_UCS_4,            // code
-                (ypObject *)&_yp_s_ucs_4_struct,  // name
+                yp_CONST_REF(yp_s_ucs_4),  // name
                 _yp_str_empty,                    // empty_immutable
                 yp_chrarray0,                     // empty_mutable
                 ypStringLib_getindexX_4bytes,     // getindexX
@@ -10037,10 +10044,11 @@ typedef struct {
 
 // Empty tuples can be represented by this, immortal object
 // TODO Can we use this in more places...anywhere we'd return a possibly-empty tuple?
+// FIXME Make yp_tuple_empty an exported variable
 static ypObject *    _yp_tuple_empty_data[1] = {NULL};
 static ypTupleObject _yp_tuple_empty_struct = {{ypTuple_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0,
         ypObject_HASH_INVALID, _yp_tuple_empty_data}};
-#define _yp_tuple_empty ((ypObject *)&_yp_tuple_empty_struct)
+#define _yp_tuple_empty yp_CONST_REF(yp_tuple_empty)
 
 // Moves the elements from [src:] to the index dest; this can be used when deleting items (they
 // must be discarded first), or inserting (the new space is uninitialized).  Assumes enough space
@@ -12514,12 +12522,13 @@ yp_STATIC_ASSERT((_ypMem_ideal_size_DEFAULT - yp_offsetof(ypSetObject, ob_inline
 yp_IMMORTAL_INVALIDATED(ypSet_dummy);
 
 // Empty frozensets can be represented by this, immortal object
+// FIXME Make yp_frozenset_empty a proper variable.
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject    _yp_frozenset_empty_struct = {
         {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
                 ypObject_HASH_INVALID, _yp_frozenset_empty_data},
         0};
-#define _yp_frozenset_empty ((ypObject *)&_yp_frozenset_empty_struct)
+#define _yp_frozenset_empty yp_CONST_REF(yp_frozenset_empty)
 
 // Returns true if the given ypSet_KeyEntry contains a valid key
 #define ypSet_ENTRY_USED(loc) ((loc)->se_key != NULL && (loc)->se_key != ypSet_dummy)
@@ -14018,12 +14027,13 @@ yp_STATIC_ASSERT(
         ypDict_alloclen_max_not_smaller_than_set_alloclen_max);
 
 // Empty frozendicts can be represented by this, immortal object
+// FIXME Make yp_frozendict_empty a proper variable
 static ypObject     _yp_frozendict_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypDictObject _yp_frozendict_empty_struct = {
         {ypFrozenDict_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
                 ypObject_HASH_INVALID, _yp_frozendict_empty_data},
         _yp_frozenset_empty};
-#define _yp_frozendict_empty ((ypObject *)&_yp_frozendict_empty_struct)
+#define _yp_frozendict_empty yp_CONST_REF(yp_frozendict_empty)
 
 // Returns a new, empty dict or frozendict object to hold minused entries
 // XXX Check for the _yp_frozendict_empty case first
@@ -15215,9 +15225,10 @@ typedef struct {
             ypRange_STEP(r) == ypRange_STEP(x))
 
 // Use yp_rangeC(0) as the standard empty struct
+// FIXME Make yp_range_empty a proper variable
 static ypRangeObject _yp_range_empty_struct = {
         {ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0, ypObject_HASH_INVALID, NULL}, 0, 1};
-#define _yp_range_empty ((ypObject *)&_yp_range_empty_struct)
+#define _yp_range_empty yp_CONST_REF(yp_range_empty)
 
 // Determines the index in r for the given object x, or -1 if it isn't in the range
 // XXX If using *index as an actual index, ensure it doesn't overflow yp_ssize_t
@@ -16018,6 +16029,9 @@ static ypObject *_ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
     result = _ypFunction_call_place_args(f, iter, args, n, argarray);
     if (yp_isexceptionC(result)) return result;
 
+    // FIXME If the only thing left here is **kwargs, we don't need to copy to a yp_dict, we could
+    // go straight to frozendict (but would still have to verify like make_var_kwargs).
+
     // FIXME Make sure we are detecting where an arg is both positional and keyword! Even when
     // **kwargs is present!
     // FIXME Function (a, /, **k) can be called like (1, a=33)!
@@ -16047,7 +16061,7 @@ static ypObject *ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
         const ypQuickIter_methods *iter, ypQuickIter_state *args, ypObject *kwargs)
 {
     yp_ssize_t n = 0;
-    ypObject **argarray = alloca(ypFunction_PARAMS_LEN(f));
+    ypObject **argarray = alloca(ypFunction_PARAMS_LEN(f)); // FIXME use malloc for large arrays
     ypObject * result = _ypFunction_call_QuickIter(f, callable, iter, args, kwargs, &n, argarray);
     for (/* n already set*/; n > 0; n--) {
         ypObject *arg = argarray[n - 1];
@@ -16055,6 +16069,9 @@ static ypObject *ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
     }
     return result;
 }
+
+// TODO ypFunction_call_argarray (or something)
+
 
 // TODO Make a linter to enforce the pattern of name that's allowed to be used in other types. i.e.
 // is ypFunction* the signifier that it's used directly in other types? When do I use ypFunction_ vs
@@ -16094,6 +16111,28 @@ static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_li
     }
 }
 
+static ypObject *_ypFunction_call_stars_coerce(ypObject *args, int allowargs, ypObject *kwargs, int allowkwargs, ypObject **argarray) {
+    argarray[0] = yp_tuple(args);
+    if(yp_isexceptionC(argarray[0])) return argarray[0];
+    if(!allowargs && ypTuple_LEN(argarray[0]) > 0) {
+        yp_decref(argarray[0]);
+        return yp_TypeError;
+    }
+
+    argarray[1] = yp_frozendict(kwargs);
+    if(yp_isexceptionC(argarray[1])) {
+        yp_decref(argarray[0]);
+        return argarray[1];
+    }
+    if(!allowkwargs && ypDict_LEN(argarray[1]) > 0) {
+        yp_decref(argarray[1]);
+        yp_decref(argarray[0]);
+        return yp_TypeError;
+    }
+
+    return yp_None;
+}
+
 static ypObject *ypFunction_call_stars(
         ypObject *f, ypObject *callable, ypObject *args, ypObject *kwargs)
 {
@@ -16102,33 +16141,42 @@ static ypObject *ypFunction_call_stars(
 
     // FIXME Optimize for all-positional params (copy args tuple into array)
 
+    // FIXME Always ensure args and kwargs are the right type (i.e. in the no-params case)
+
     if (ypFunction_PARAMS_LEN(f) < 1) {
-        ypObject *exc = yp_None;
-        if (yp_lenC(args, &exc) > 0 || yp_lenC(kwargs, &exc) > 0) return yp_TypeError;
-        if (yp_isexceptionC(exc)) return exc;
+        ypObject *argarray[2];
+        result = _ypFunction_call_stars_coerce(args, FALSE, kwargs, FALSE, argarray);
+        if(yp_isexceptionC(result)) return result;
+        yp_decref(argarray[1]);
+        yp_decref(argarray[0]);
         return ypFunction_CODE_FUNC(f)(callable, 0, NULL);
 
     } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
-        ypObject *argarray[] = {yp_tuple(args), yp_frozendict(args)};
-        if (yp_isexceptionC(argarray[0])) {
-            yp_decref(argarray[1]);
-            return argarray[0];
-        } else if (yp_isexceptionC(argarray[1])) {
-            yp_decref(argarray[0]);
-            return argarray[1];
-        }
+        ypObject *argarray[2];
+        result = _ypFunction_call_stars_coerce(args, TRUE, kwargs, TRUE, argarray);
+        if(yp_isexceptionC(result)) return result;
         result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
         yp_decref(argarray[1]);
         yp_decref(argarray[0]);
         return result;
 
-    } else if (param_flags == ypFunction_FLAG_HAS_VAR_KW) {
-        // FIXME assert args empty, coerce kwargs to frozendict
-        return yp_NotImplementedError;
-
     } else if (param_flags == ypFunction_FLAG_HAS_VAR_POS) {
-        // FIXME assert kwargs empty, coerce kwargs to tuple
-        return yp_NotImplementedError;
+        ypObject *argarray[2];
+        result = _ypFunction_call_stars_coerce(args, TRUE, kwargs, FALSE, argarray);
+        if(yp_isexceptionC(result)) return result;
+        result = ypFunction_CODE_FUNC(f)(callable, 1, argarray);
+        yp_decref(argarray[1]);
+        yp_decref(argarray[0]);
+        return result;
+
+    } else if (param_flags == ypFunction_FLAG_HAS_VAR_KW) {
+        ypObject *argarray[2];
+        result = _ypFunction_call_stars_coerce(args, FALSE, kwargs, TRUE, argarray);
+        if(yp_isexceptionC(result)) return result;
+        result = ypFunction_CODE_FUNC(f)(callable, 1, &(argarray[1]));
+        yp_decref(argarray[1]);
+        yp_decref(argarray[0]);
+        return result;
 
     } else {
         const ypQuickIter_methods *iter;
@@ -16187,7 +16235,6 @@ static ypObject *_function_decref_visitor(ypObject *x, void *memo)
 
 static ypObject *function_dealloc(ypObject *f, void *memo)
 {
-    // FIXME Is there something better we can do to handle errors than just ignore them?
     (void)function_traverse(f, _function_decref_visitor, NULL);  // never fails
     ypMem_FREE_FIXED(f);
     return yp_None;
@@ -16986,19 +17033,8 @@ void yp_s2i_setitemC4(
 // yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");  // Preceeding arguments positional-only
 // yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");           // Remaining arguments keyword-only
 
+// FIXME rename?
 #define _yp_DEF_UNPACK(...) __VA_ARGS__
-
-// FIXME support yp_NO_VARIADIC_MACROS? (Or remove non-variadic support, since it's ubiquitous.)
-// FIXME should name be the pointer or the yp_function_definition_t? The parameters are inlined...
-// FIXME We may want the name in C to be different than __name__.
-#define _yp_DEF(qual, name, code, parameters)                                               \
-    static yp_function_definition_t _##name##_struct = {code, {_yp_DEF_UNPACK parameters}}; \
-    qual yp_function_definition_t *const name = &_##name##_struct /* force semi-colon */
-
-// FIXME Use these, or just use the structure directly?
-// FIXME These names are too cute...
-#define yp_DEF(name, code, parameters) _yp_DEF(_yp_NOQUAL, name, code, parameters)
-#define yp_DEF_static(name, code, parameters) _yp_DEF(static, name, code, parameters)
 
 #define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                               \
     static yp_function_parameter_t  _##name##_parameters[] = {_yp_DEF_UNPACK parameters}; \
@@ -17006,7 +17042,7 @@ void yp_s2i_setitemC4(
             _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, _##name##_parameters,             \
                     yp_lengthof_array(_##name##_parameters)),                             \
             NULL, {code}};                                                                \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 
 #define yp_IMMORTAL_FUNCTION(name, code, parameters) \
     _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, code, parameters)
@@ -17016,16 +17052,14 @@ void yp_s2i_setitemC4(
 // FIXME We could have ways to wrap some common function signatures, perhaps function state has
 // pointer to the C function... (although how to set defaults?)
 
-static ypObject *yp_func_hash_code(ypObject *function, int n, ypObject *const *argarray)
+static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
 {
     ypObject *exc = yp_None;
     yp_hash_t hash;
 
-    if (n != 1) {
-        return yp_TypeError;  // FIXME This would actually be an error in the parameter defs.
-    }
+    if (n != 1) return yp_SystemError;  // have the number of params changed?
 
-    hash = yp_hashC(argarray[0], &exc);  // FIXME inline?
+    hash = yp_hashC(argarray[0], &exc);
     if (yp_isexceptionC(exc)) {
         return exc;
     }
@@ -17035,8 +17069,15 @@ static ypObject *yp_func_hash_code(ypObject *function, int n, ypObject *const *a
 
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
 
-// TODO The first parameter is positional-only.
-yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code, ({(ypObject *)&_yp_s_obj_struct, NULL}));
+yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code, (
+    {yp_CONST_REF(yp_s_obj), NULL}
+    // FIXME Technically, the parameter is positional-only, however that makes it difficult to
+    // optimize for the common case we call yp_call_argarray(yp_func_hash, 1, {arg}), because we
+    // would have to copy to a new array with a trailing NULL. Is positional-only important enough?
+    // Can we special case functions that have only positional-only arguments (perhaps document
+    // that n will be one less than expected?)
+    // {yp_CONST_REF(yp_s_forward_slash), NULL}
+));
 
 #pragma endregion functions_as_objects
 
