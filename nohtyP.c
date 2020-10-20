@@ -1162,6 +1162,7 @@ static void (*yp_free)(void *p) = _dummy_yp_free;
 // _msize and _expand
 #if defined(_MSC_VER)
 #include <malloc.h>
+// FIXME Be consistent: should output pointers come first, or last, throughout this file?
 static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
@@ -3222,11 +3223,11 @@ static ypTypeObject ypException_Type = {
 // The immortal exception objects; this should match Python's hierarchy:
 //  http://docs.python.org/3/library/exceptions.html
 
-#define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)          \
-    yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                 \
-    static ypExceptionObject _##name##_struct = {                \
-            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, NULL, 0), \
-            yp_CONST_REF(name##_name), (superptr)};     \
+#define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                                     \
+    yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                            \
+    static ypExceptionObject _##name##_struct = {                                           \
+            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, NULL, 0), yp_CONST_REF(name##_name), \
+            (superptr)};                                                                    \
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_EXCEPTION(name, super) \
     _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, yp_CONST_REF(super))
@@ -16060,18 +16061,35 @@ static ypObject *_ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
 static ypObject *ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
         const ypQuickIter_methods *iter, ypQuickIter_state *args, ypObject *kwargs)
 {
-    yp_ssize_t n = 0;
-    ypObject **argarray = alloca(ypFunction_PARAMS_LEN(f)); // FIXME use malloc for large arrays
-    ypObject * result = _ypFunction_call_QuickIter(f, callable, iter, args, kwargs, &n, argarray);
-    for (/* n already set*/; n > 0; n--) {
-        ypObject *arg = argarray[n - 1];
-        if (arg != NULL) yp_decref(arg);  // / and * store NULL in argarray
+    const yp_ssize_t max_on_stack = 32;
+    yp_ssize_t       params_len = ypFunction_PARAMS_LEN(f);
+    yp_ssize_t       n = 0;
+    ypObject *       result;
+
+    if (params_len <= max_on_stack) {
+        ypObject *argarray[max_on_stack];
+        result = _ypFunction_call_QuickIter(f, callable, iter, args, kwargs, &n, argarray);
+        for (/* n already set*/; n > 0; n--) {
+            ypObject *arg = argarray[n - 1];
+            if (arg != NULL) yp_decref(arg);  // / and * store NULL in argarray
+        }
+
+    } else {
+        yp_ssize_t allocsize;  // unused
+        ypObject **argarray = yp_malloc(&allocsize, params_len * yp_sizeof(ypObject *));
+        if (argarray == NULL) return yp_MemoryError;
+
+        result = _ypFunction_call_QuickIter(f, callable, iter, args, kwargs, &n, argarray);
+        for (/* n already set*/; n > 0; n--) {
+            ypObject *arg = argarray[n - 1];
+            if (arg != NULL) yp_decref(arg);  // / and * store NULL in argarray
+        }
+
+        yp_free(argarray);
     }
+
     return result;
 }
-
-// TODO ypFunction_call_argarray (or something)
-
 
 // TODO Make a linter to enforce the pattern of name that's allowed to be used in other types. i.e.
 // is ypFunction* the signifier that it's used directly in other types? When do I use ypFunction_ vs
@@ -16111,20 +16129,22 @@ static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_li
     }
 }
 
-static ypObject *_ypFunction_call_stars_coerce(ypObject *args, int allowargs, ypObject *kwargs, int allowkwargs, ypObject **argarray) {
+static ypObject *_ypFunction_call_stars_coerce(
+        ypObject *args, int allowargs, ypObject *kwargs, int allowkwargs, ypObject **argarray)
+{
     argarray[0] = yp_tuple(args);
-    if(yp_isexceptionC(argarray[0])) return argarray[0];
-    if(!allowargs && ypTuple_LEN(argarray[0]) > 0) {
+    if (yp_isexceptionC(argarray[0])) return argarray[0];
+    if (!allowargs && ypTuple_LEN(argarray[0]) > 0) {
         yp_decref(argarray[0]);
         return yp_TypeError;
     }
 
     argarray[1] = yp_frozendict(kwargs);
-    if(yp_isexceptionC(argarray[1])) {
+    if (yp_isexceptionC(argarray[1])) {
         yp_decref(argarray[0]);
         return argarray[1];
     }
-    if(!allowkwargs && ypDict_LEN(argarray[1]) > 0) {
+    if (!allowkwargs && ypDict_LEN(argarray[1]) > 0) {
         yp_decref(argarray[1]);
         yp_decref(argarray[0]);
         return yp_TypeError;
@@ -16146,7 +16166,7 @@ static ypObject *ypFunction_call_stars(
     if (ypFunction_PARAMS_LEN(f) < 1) {
         ypObject *argarray[2];
         result = _ypFunction_call_stars_coerce(args, FALSE, kwargs, FALSE, argarray);
-        if(yp_isexceptionC(result)) return result;
+        if (yp_isexceptionC(result)) return result;
         yp_decref(argarray[1]);
         yp_decref(argarray[0]);
         return ypFunction_CODE_FUNC(f)(callable, 0, NULL);
@@ -16154,7 +16174,7 @@ static ypObject *ypFunction_call_stars(
     } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
         ypObject *argarray[2];
         result = _ypFunction_call_stars_coerce(args, TRUE, kwargs, TRUE, argarray);
-        if(yp_isexceptionC(result)) return result;
+        if (yp_isexceptionC(result)) return result;
         result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
         yp_decref(argarray[1]);
         yp_decref(argarray[0]);
@@ -16163,7 +16183,7 @@ static ypObject *ypFunction_call_stars(
     } else if (param_flags == ypFunction_FLAG_HAS_VAR_POS) {
         ypObject *argarray[2];
         result = _ypFunction_call_stars_coerce(args, TRUE, kwargs, FALSE, argarray);
-        if(yp_isexceptionC(result)) return result;
+        if (yp_isexceptionC(result)) return result;
         result = ypFunction_CODE_FUNC(f)(callable, 1, argarray);
         yp_decref(argarray[1]);
         yp_decref(argarray[0]);
@@ -16172,7 +16192,7 @@ static ypObject *ypFunction_call_stars(
     } else if (param_flags == ypFunction_FLAG_HAS_VAR_KW) {
         ypObject *argarray[2];
         result = _ypFunction_call_stars_coerce(args, FALSE, kwargs, TRUE, argarray);
-        if(yp_isexceptionC(result)) return result;
+        if (yp_isexceptionC(result)) return result;
         result = ypFunction_CODE_FUNC(f)(callable, 1, &(argarray[1]));
         yp_decref(argarray[1]);
         yp_decref(argarray[0]);
@@ -16188,6 +16208,8 @@ static ypObject *ypFunction_call_stars(
         return result;
     }
 }
+
+// TODO ypFunction_call_argarray (or something)
 
 
 // Function methods
@@ -17069,15 +17091,12 @@ static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *c
 
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
 
-yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code, (
-    {yp_CONST_REF(yp_s_obj), NULL}
-    // FIXME Technically, the parameter is positional-only, however that makes it difficult to
-    // optimize for the common case we call yp_call_argarray(yp_func_hash, 1, {arg}), because we
-    // would have to copy to a new array with a trailing NULL. Is positional-only important enough?
-    // Can we special case functions that have only positional-only arguments (perhaps document
-    // that n will be one less than expected?)
-    // {yp_CONST_REF(yp_s_forward_slash), NULL}
-));
+// FIXME Technically, the parameter is positional-only, however that makes it difficult to optimize
+// for the common case we call yp_call_argarray(yp_func_hash, 1, {arg}), because we would have to
+// copy to a new array with a trailing NULL. Is positional-only important enough? Can we special
+// case functions that have only positional-only arguments (perhaps document that n will be one less
+// than expected?)
+yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code, ({yp_CONST_REF(yp_s_obj), NULL}));
 
 #pragma endregion functions_as_objects
 
