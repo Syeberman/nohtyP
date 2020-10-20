@@ -17075,9 +17075,25 @@ void yp_s2i_setitemC4(
 // pointer to the C function... (although how to set defaults?)
 
 
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_i, "i");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
 
+
+static ypObject *yp_func_chr_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
+{
+    ypObject *exc = yp_None;
+    yp_int_t i;
+
+    if (n != 1) return yp_SystemError;  // have the number of params changed?
+    i = yp_asintC(argarray[0], &exc);
+    if (yp_isexceptionC(exc)) return exc;
+
+    return yp_chrC(i);
+};
+
+// FIXME Technically, the parameter is positional-only....
+yp_IMMORTAL_FUNCTION(yp_func_chr, yp_func_chr_code, ({yp_CONST_REF(yp_s_i), NULL}));
 
 static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -17087,9 +17103,7 @@ static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *c
     if (n != 1) return yp_SystemError;  // have the number of params changed?
 
     hash = yp_hashC(argarray[0], &exc);
-    if (yp_isexceptionC(exc)) {
-        return exc;
-    }
+    if (yp_isexceptionC(exc)) return exc;
 
     return yp_intC(hash);
 };
@@ -17109,9 +17123,7 @@ static ypObject *yp_func_len_code(ypObject *function, yp_ssize_t n, ypObject *co
     if (n != 1) return yp_SystemError;  // have the number of params changed?
 
     len = yp_lenC(argarray[0], &exc);
-    if (yp_isexceptionC(exc)) {
-        return exc;
-    }
+    if (yp_isexceptionC(exc)) return exc;
 
     return yp_intC(len);
 };

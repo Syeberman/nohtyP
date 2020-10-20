@@ -2102,10 +2102,6 @@ def yp_repr(object):
     return object._yp_repr()
 
 
-def yp_chr(i):
-    return _yp_chrC(i)
-
-
 class _ypTuple(ypObject):
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__(self, other): return _yp_concat(self, other)
@@ -2441,6 +2437,9 @@ class yp_function(ypObject):
     # the constructor takes a code object.
     def __new__(cls, *args, **kwargs):
         raise TypeError("cannot instantiate yp_function this way")
+c_ypObject_p_value("yp_func_chr")
 c_ypObject_p_value("yp_func_hash")
 c_ypObject_p_value("yp_func_len")
 c_ypObject_p_value("yp_func_reversed")
+
+yp_chr = yp_func_chr

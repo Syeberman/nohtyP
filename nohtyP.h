@@ -1307,6 +1307,7 @@ typedef struct _yp_function_definition_t {
 
 // TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
 
+ypAPI ypObject *const yp_func_chr;
 ypAPI ypObject *const yp_func_hash;
 ypAPI ypObject *const yp_func_len;
 ypAPI ypObject *const yp_func_reversed;
