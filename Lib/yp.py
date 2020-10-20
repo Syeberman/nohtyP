@@ -2165,20 +2165,21 @@ class yp_list(_ypTuple):
         return self
 
 
-def yp_sorted(x, *, key=None, reverse=False):
-    """Returns sorted(x) of a ypObject as a yp_list"""
-    if not isinstance(x, (ypObject, _setlike_dictview, _values_dictview)):
+# FIXME Implement and use yp_func_sorted
+def yp_sorted(iterable, /, *, key=None, reverse=False):
+    """Returns sorted(iterable) of a ypObject as a yp_list"""
+    if not isinstance(iterable, (ypObject, _setlike_dictview, _values_dictview)):
         raise TypeError("expected ypObject in yp_sorted")
 
     if key is None and reverse is False:
-        return _yp_sorted(_yp_iterable(x))
+        return _yp_sorted(_yp_iterable(iterable))
     elif key is not None:
         # FIXME Replace this faked-out version when nohtyP supports key
-        x_keyed = _yp_sorted3(_yp_iterable((key(item), item) for item in x), None, reverse)
-        assert len(x) == len(x_keyed)
+        x_keyed = _yp_sorted3(_yp_iterable((key(item), item) for item in iterable), None, reverse)
+        assert len(iterable) == len(x_keyed)
         return yp_list(item[1] for item in x_keyed)
     else:
-        return _yp_sorted3(_yp_iterable(x), None, reverse)
+        return _yp_sorted3(_yp_iterable(iterable), None, reverse)
 
 
 class _ypSet(ypObject):
