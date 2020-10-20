@@ -1309,6 +1309,7 @@ typedef struct _yp_function_definition_t {
 
 ypAPI ypObject *const yp_func_hash;
 ypAPI ypObject *const yp_func_len;
+ypAPI ypObject *const yp_func_reversed;
 
 
 /*

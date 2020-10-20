@@ -1826,11 +1826,11 @@ def _yp_iterable(iterable):
     return yp_iter(iterable)
 
 
-def yp_reversed(x):
-    """Returns reversed(x) of a ypObject as a yp_iter"""
-    if not isinstance(x, ypObject):
+def yp_reversed(sequence, /):
+    """Returns reversed(sequence) of a ypObject as a yp_iter"""
+    if not isinstance(sequence, ypObject):
         raise TypeError("expected ypObject in yp_reversed")
-    return _yp_reversed(x)
+    return yp_func_reversed(sequence)
 
 
 @pytype(yp_t_int, int)
@@ -2443,8 +2443,4 @@ class yp_function(ypObject):
         raise TypeError("cannot instantiate yp_function this way")
 c_ypObject_p_value("yp_func_hash")
 c_ypObject_p_value("yp_func_len")
-
-
-# TODO Integrate ypExamples.c somehow with this unittest suite
-#import os
-#os.system("ypExamples.exe")
+c_ypObject_p_value("yp_func_reversed")

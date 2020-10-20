@@ -17076,6 +17076,7 @@ void yp_s2i_setitemC4(
 
 
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
 
 
 static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
@@ -17117,6 +17118,15 @@ static ypObject *yp_func_len_code(ypObject *function, yp_ssize_t n, ypObject *co
 
 // FIXME Technically, the parameter is positional-only....
 yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code, ({yp_CONST_REF(yp_s_obj), NULL}));
+
+static ypObject *yp_func_reversed_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
+{
+    if (n != 1) return yp_SystemError;  // have the number of params changed?
+    return yp_reversed(argarray[0]);
+};
+
+// FIXME Technically, the parameter is positional-only....
+yp_IMMORTAL_FUNCTION(yp_func_reversed, yp_func_reversed_code, ({yp_CONST_REF(yp_s_sequence), NULL}));
 
 #pragma endregion functions_as_objects
 
