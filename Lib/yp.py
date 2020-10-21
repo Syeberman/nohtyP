@@ -1226,18 +1226,14 @@ class ypObject(c_ypObject_p):
         """ypObject.frompython is a factory that returns the correct yp_* object based on the type
         of pyobj.  All other .frompython class methods always return that exact type.
         """
+        if pyobj is None:
+            return yp_None
         if isinstance(pyobj, ypObject):
             return pyobj
         if isinstance(pyobj, type) and issubclass(pyobj, ypObject):
             return pyobj._yp_type
         if cls is ypObject:
             cls = cls._pytype2yp[type(pyobj)]
-        return cls._frompython(pyobj)
-
-    @classmethod
-    def _frompython(cls, pyobj):
-        """Default implementation for cls.frompython, which simply calls the constructor."""
-        # TODO This isn't necessary: every class uses the default _frompython, so remove it
         return cls(pyobj)
 
     # __str__ and __repr__ must always return a Python str, but we want nohtyP-aware code to be
@@ -1666,10 +1662,6 @@ class yp_NoneType(ypObject):
     def __new__(cls, *args, **kwargs):
         raise NotImplementedError("can't instantiate yp_NoneType directly")
 
-    @classmethod
-    def _frompython(cls, pyobj):
-        assert pyobj is None
-        return yp_None
     # TODO When nohtyP has str/repr, use it instead of this faked-out version
 
     def _yp_str(self): return yp_s_None
@@ -2368,8 +2360,6 @@ class yp_dict(ypObject):
         if len(kwargs) > 0:
             _yp_updateK(self, *_yp_flatten_dict(kwargs))
         return self
-    # TODO A version of yp_dict_fromkeys that accepts a fellow mapping (use only that mapping's
-    # keys) or an iterable (each yielded item is a key)...actually I just said the same thing twice
 
     @classmethod
     def fromkeys(cls, seq, value=None): return _yp_dict_fromkeysN(value, *seq)
@@ -2434,8 +2424,6 @@ _yp_range_empty = yp_range(0)
 
 @pytype(yp_t_function, type(lambda: 1))
 class yp_function(ypObject):
-    # FIXME What should this class even implement? `function` isn't even a built-in in Python, and
-    # the constructor takes a code object.
     def __new__(cls, *args, **kwargs):
         raise TypeError("cannot instantiate yp_function this way")
 c_ypObject_p_value("yp_func_chr")

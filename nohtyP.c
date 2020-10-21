@@ -379,6 +379,7 @@ typedef struct {
 // Callable objects defer to the function object returned by tp_function to parse the arguments.
 // TODO: This still feels incomplete to me. Should types have direct overload access to yp_call*?
 typedef struct {
+    // FIXME Move this to a tp_flags, and perhaps move tp_function top-level?
     int     tp_iscallable;
     objproc tp_function;
 } ypCallableMethods;
@@ -16129,12 +16130,17 @@ static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_li
     }
 }
 
-static ypObject *_ypFunction_call_stars_coerce(
-        ypObject *args, int allowargs, ypObject *kwargs, int allowkwargs, ypObject **argarray)
+// Helper for ypFunction_call_stars when f has zero args, or exactly one or both of *args and
+// **kwargs.
+static ypObject *_ypFunction_call_stars_only_vars(ypObject *f, ypObject *callable, ypObject *args,
+        int has_var_pos, ypObject *kwargs, int has_var_kw)
 {
+    ypObject *result;
+    ypObject *argarray[2];
+
     argarray[0] = yp_tuple(args);
     if (yp_isexceptionC(argarray[0])) return argarray[0];
-    if (!allowargs && ypTuple_LEN(argarray[0]) > 0) {
+    if (!has_var_pos && ypTuple_LEN(argarray[0]) > 0) {
         yp_decref(argarray[0]);
         return yp_TypeError;
     }
@@ -16144,19 +16150,34 @@ static ypObject *_ypFunction_call_stars_coerce(
         yp_decref(argarray[0]);
         return argarray[1];
     }
-    if (!allowkwargs && ypDict_LEN(argarray[1]) > 0) {
+    if (!has_var_kw && ypDict_LEN(argarray[1]) > 0) {
         yp_decref(argarray[1]);
         yp_decref(argarray[0]);
         return yp_TypeError;
     }
 
-    return yp_None;
+    if (has_var_pos) {
+        if (has_var_kw) {
+            result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
+        } else {
+            result = ypFunction_CODE_FUNC(f)(callable, 1, argarray);
+        }
+    } else {
+        if (has_var_kw) {
+            result = ypFunction_CODE_FUNC(f)(callable, 1, &(argarray[1]));
+        } else {
+            result = ypFunction_CODE_FUNC(f)(callable, 0, NULL);
+        }
+    }
+
+    yp_decref(argarray[1]);
+    yp_decref(argarray[0]);
+    return result;
 }
 
 static ypObject *ypFunction_call_stars(
         ypObject *f, ypObject *callable, ypObject *args, ypObject *kwargs)
 {
-    ypObject * result;
     yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
 
     // FIXME Optimize for all-positional params (copy args tuple into array)
@@ -16164,44 +16185,18 @@ static ypObject *ypFunction_call_stars(
     // FIXME Always ensure args and kwargs are the right type (i.e. in the no-params case)
 
     if (ypFunction_PARAMS_LEN(f) < 1) {
-        ypObject *argarray[2];
-        result = _ypFunction_call_stars_coerce(args, FALSE, kwargs, FALSE, argarray);
-        if (yp_isexceptionC(result)) return result;
-        yp_decref(argarray[1]);
-        yp_decref(argarray[0]);
-        return ypFunction_CODE_FUNC(f)(callable, 0, NULL);
-
+        return _ypFunction_call_stars_only_vars(f, callable, args, FALSE, kwargs, FALSE);
     } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
-        ypObject *argarray[2];
-        result = _ypFunction_call_stars_coerce(args, TRUE, kwargs, TRUE, argarray);
-        if (yp_isexceptionC(result)) return result;
-        result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
-        yp_decref(argarray[1]);
-        yp_decref(argarray[0]);
-        return result;
-
+        return _ypFunction_call_stars_only_vars(f, callable, args, TRUE, kwargs, TRUE);
     } else if (param_flags == ypFunction_FLAG_HAS_VAR_POS) {
-        ypObject *argarray[2];
-        result = _ypFunction_call_stars_coerce(args, TRUE, kwargs, FALSE, argarray);
-        if (yp_isexceptionC(result)) return result;
-        result = ypFunction_CODE_FUNC(f)(callable, 1, argarray);
-        yp_decref(argarray[1]);
-        yp_decref(argarray[0]);
-        return result;
-
+        return _ypFunction_call_stars_only_vars(f, callable, args, TRUE, kwargs, FALSE);
     } else if (param_flags == ypFunction_FLAG_HAS_VAR_KW) {
-        ypObject *argarray[2];
-        result = _ypFunction_call_stars_coerce(args, FALSE, kwargs, TRUE, argarray);
-        if (yp_isexceptionC(result)) return result;
-        result = ypFunction_CODE_FUNC(f)(callable, 1, &(argarray[1]));
-        yp_decref(argarray[1]);
-        yp_decref(argarray[0]);
-        return result;
+        return _ypFunction_call_stars_only_vars(f, callable, args, FALSE, kwargs, TRUE);
 
     } else {
         const ypQuickIter_methods *iter;
         ypQuickIter_state          state;
-        result = ypQuickIter_new_fromiterable(&iter, &state, args);
+        ypObject *                 result = ypQuickIter_new_fromiterable(&iter, &state, args);
         if (yp_isexceptionC(result)) return result;
         result = ypFunction_call_QuickIter(f, callable, iter, &state, kwargs);
         ypQuickIter_var_close(&state);
@@ -16209,7 +16204,7 @@ static ypObject *ypFunction_call_stars(
     }
 }
 
-// TODO ypFunction_call_argarray (or something)
+// TODO yp_call_array
 
 
 // Function methods
@@ -17083,7 +17078,7 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
 static ypObject *yp_func_chr_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
 {
     ypObject *exc = yp_None;
-    yp_int_t i;
+    yp_int_t  i;
 
     if (n != 1) return yp_SystemError;  // have the number of params changed?
     i = yp_asintC(argarray[0], &exc);
@@ -17117,7 +17112,7 @@ yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code, ({yp_CONST_REF(yp_s_obj), 
 
 static ypObject *yp_func_len_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
 {
-    ypObject *exc = yp_None;
+    ypObject * exc = yp_None;
     yp_ssize_t len;
 
     if (n != 1) return yp_SystemError;  // have the number of params changed?
@@ -17138,7 +17133,8 @@ static ypObject *yp_func_reversed_code(ypObject *function, yp_ssize_t n, ypObjec
 };
 
 // FIXME Technically, the parameter is positional-only....
-yp_IMMORTAL_FUNCTION(yp_func_reversed, yp_func_reversed_code, ({yp_CONST_REF(yp_s_sequence), NULL}));
+yp_IMMORTAL_FUNCTION(
+        yp_func_reversed, yp_func_reversed_code, ({yp_CONST_REF(yp_s_sequence), NULL}));
 
 #pragma endregion functions_as_objects
 

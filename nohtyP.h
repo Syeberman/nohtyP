@@ -413,6 +413,8 @@ typedef struct _yp_function_definition_t yp_function_definition_t;
 // FIXME What about code==NULL?
 // FIXME Really think hard about which inputs to bury in typedefs and which to surface as C params.
 // For example, should code and parameters be in the same struct?
+// FIXME Should this be yp_functionC? yp_function should make a function object out of other
+// objects, right...? (We need a linter to ensure correct use of C suffix.)
 ypAPI ypObject *yp_function(yp_function_definition_t *definition);
 
 // FIXME Rewrite docs.
@@ -426,6 +428,7 @@ ypAPI ypObject *yp_function(yp_function_definition_t *definition);
 // FIXME Is the C suffix applicable here?
 // FIXME Really think hard about the symmetry between these and yp_generator*.  Perhaps they should
 // all use a standard set of typedefs...i.e. remove some C params and make them structs.
+// FIXME Generator names this _fromstate...be consistent
 ypAPI ypObject *yp_function_withstateCN(yp_function_definition_t *definition, int n, ...);
 ypAPI ypObject *yp_function_withstateCNV(yp_function_definition_t *definition, int n, va_list args);
 
@@ -1246,6 +1249,11 @@ ypAPI int yp_iscallableC(ypObject *x);
 ypAPI ypObject *yp_callN(ypObject *c, int n, ...);
 ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 
+// Similar to yp_callN, except the arguments are stored in an array. args cannot be modified until
+// yp_call_array returns.
+// FIXME Document the optimization here?
+ypAPI ypObject *yp_call_array(ypObject *c, int n, ypObject *const *args);
+
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
 // result of the call (which may be a new reference or an exception).  Returns yp_TypeError if c is
 // not callable.  Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
@@ -1261,6 +1269,15 @@ typedef struct _yp_function_parameter_t {
     // must be a valid Python identifier.
     // FIXME Also verify that the name is a valid Python identifier.
     // FIXME Also /, *, *args, or **kwargs...so "name" may not be strictly correct.
+
+    // Name can be /, in which case the preceeding parameters are positional-only. / cannot be
+    // first. If / is in the middle, the corresponding argarray element will be NULL. If / is last,
+    // it is dropped from argarray: thus, n will be one less than the number of parameters.
+
+    // FIXME test /-at-end behaviour thoroughly.
+
+    // Name can be *, in which case the following parameters are keyword-only. If * is first or in
+    // the middle, the corresponding argarray element will be NULL. * cannot be last.
     ypObject *name;
 
     // The default value for the parameter, or NULL if there is no default value.
@@ -1281,16 +1298,13 @@ typedef struct _yp_function_definition_t {
     // annotations?)
 
     // Called by the yp_call* methods. c is the callable (i.e. the first argument to yp_call*).
-    // argarray is an array of n arguments corresponding to the callable's n parameters, with
-    // default values in place of missing arguments; this array includes any keyword-only
-    // parameters, in the order they are specified in parameters. The return value must be a new or
-    // immortal reference, or an exception.
+    // argarray is an array of n arguments, where argarray[i] corresponds to parameters[i]. The
+    // return value must be a new or immortal reference, or an exception.
 
-    // FIXME document how to parse the args
-    // FIXME Perhaps this is the "preferred" method: when called with yp_callN it just passes args,
-    // and when called with yp_call_stars you don't have to handle all the args/kwargs rules.
+    // FIXME Specify what happens to keyword-only, *args, and **kwargs.
     // FIXME use yp_function_stateCX to retrieve any state variables
     // FIXME "if n is zero, argarray is NULL"
+    // FIXME argarray is read-only: do not modify.
     ypObject *(*code)(ypObject *c, yp_ssize_t n, ypObject *const *argarray);
 
     // FIXME doc, name/qualname, state, return annotation, module....
