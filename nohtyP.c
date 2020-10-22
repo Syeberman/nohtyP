@@ -1730,6 +1730,11 @@ typedef union {
         yp_ssize_t n;     // Number of variable arguments remaining
         va_list    args;  // Current state of variable arguments ("owned")
     } var;
+    struct {                     // State for ypQuickIter_array_*
+        yp_ssize_t       i;      // Index of next value to yield
+        yp_ssize_t       n;      // Number of objects in array
+        ypObject *const *array;  // The tuple or list object being iterated over ("borrowed")
+    } array;
     struct {             // State for ypQuickIter_tuple_*
         yp_ssize_t i;    // Index of next value to yield
         ypObject * obj;  // The tuple or list object being iterated over (borrowed)
@@ -1786,7 +1791,7 @@ static yp_ssize_t ypQuickIter_var_length_hint(
 {
     yp_ASSERT(state->var.n >= 0, "state->var.n should not be negative");
     *isexact = TRUE;
-    return MAX(state->var.n, 0);
+    return state->var.n;
 }
 
 static void ypQuickIter_var_close(ypQuickIter_state *state) { va_end(state->var.args); }
@@ -1802,8 +1807,54 @@ static const ypQuickIter_methods ypQuickIter_var_methods = {
 // ypQuickIter_var_methods as the method table.  The QuickIter is only valid so long as args is.
 static void ypQuickIter_new_fromvar(ypQuickIter_state *state, int n, va_list args)
 {
+    yp_ASSERT1(n >= 0);
     state->var.n = n;
     va_copy(state->var.args, args);  // FIXME What if we didn't va_copy/va_end?
+}
+
+
+static ypObject *ypQuickIter_array_nextX(ypQuickIter_state *state)
+{
+    ypObject *x;
+    if (state->array.i >= state->array.n) return NULL;
+    x = state->array.array[state->array.i];  // borrowed
+    state->array.i += 1;
+    return x;
+}
+
+static ypObject *ypQuickIter_array_next(ypQuickIter_state *state)
+{
+    ypObject *x = ypQuickIter_array_nextX(state);
+    return x == NULL ? NULL : yp_incref(x);
+}
+
+static yp_ssize_t ypQuickIter_array_length_hint(
+        ypQuickIter_state *state, int *isexact, ypObject **exc)
+{
+    yp_ASSERT(state->array.i >= 0 && state->array.i <= state->array.n,
+            "state->array.i should be in range(n+1)");
+    *isexact = TRUE;
+    return state->array.n - state->array.i;
+}
+
+static void ypQuickIter_array_close(ypQuickIter_state *state) {}
+
+static const ypQuickIter_methods ypQuickIter_array_methods = {
+        ypQuickIter_array_nextX,        // nextX
+        ypQuickIter_array_next,         // next
+        ypQuickIter_array_length_hint,  // length_hint
+        ypQuickIter_array_close         // close
+};
+
+// Initializes state with the given array containing n ypObject*s. Always succeeds.  Use
+// ypQuickIter_array_methods as the method table. The QuickIter is only valid so long as array is.
+static void ypQuickIter_new_fromarray(
+        ypQuickIter_state *state, yp_ssize_t n, ypObject *const *array)
+{
+    yp_ASSERT1(n >= 0);
+    state->array.i = 0;
+    state->array.n = n;
+    state->array.array = array;
 }
 
 
@@ -10070,6 +10121,7 @@ static ypObject *_ypTuple_new(int type, yp_ssize_t alloclen, int alloclen_fixed)
     yp_ASSERT(alloclen >= 0, "alloclen cannot be negative");
     yp_ASSERT(alloclen <= ypTuple_ALLOCLEN_MAX, "alloclen cannot be >max");
     if (alloclen_fixed && type == ypTuple_CODE) {
+        yp_ASSERT(alloclen > 0, "missed a _yp_tuple_empty optimization");
         return ypMem_MALLOC_CONTAINER_INLINE(
                 ypTupleObject, ypTuple_CODE, alloclen, ypTuple_ALLOCLEN_MAX);
     } else {
@@ -10163,14 +10215,15 @@ static ypObject *_ypTuple_reattach_array(ypObject *sq, ypTuple_detached *detache
 }
 
 // XXX Check for the "lazy shallow copy" and "_yp_tuple_empty" cases first
-static ypObject *_ypTuple_copy(int type, ypObject *x, int alloclen_fixed)
+static ypObject *_ypTuple_new_from_array(
+        int type, yp_ssize_t n, ypObject *const *array, int alloclen_fixed)
 {
     yp_ssize_t i;
-    ypObject * sq = _ypTuple_new(type, ypTuple_LEN(x), alloclen_fixed);
+    ypObject * sq = _ypTuple_new(type, n, alloclen_fixed);
     if (yp_isexceptionC(sq)) return sq;
-    memcpy(ypTuple_ARRAY(sq), ypTuple_ARRAY(x), ypTuple_LEN(x) * yp_sizeof(ypObject *));
-    for (i = 0; i < ypTuple_LEN(x); i++) yp_incref(ypTuple_ARRAY(sq)[i]);
-    ypTuple_SET_LEN(sq, ypTuple_LEN(x));
+    memcpy(ypTuple_ARRAY(sq), array, n * yp_sizeof(ypObject *));
+    for (i = 0; i < n; i++) yp_incref(ypTuple_ARRAY(sq)[i]);
+    ypTuple_SET_LEN(sq, n);
     return sq;
 }
 
@@ -10412,7 +10465,8 @@ static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend
         if (ypObject_TYPE_CODE(sq) == ypTuple_CODE) return yp_incref(sq);
-        return _ypTuple_copy(ypList_CODE, sq, /*alloclen_fixed=*/FALSE);
+        return _ypTuple_new_from_array(
+                ypList_CODE, ypTuple_LEN(sq), ypTuple_ARRAY(sq), /*alloclen_fixed=*/FALSE);
     } else if (length_hint > iterable_maxLen) {
         // yp_lenC reports that we don't have room to add their elements
         return yp_MemorySizeOverflowError;
@@ -10713,7 +10767,8 @@ static ypObject *tuple_traverse(ypObject *sq, visitfunc visitor, void *memo)
 
 static ypObject *tuple_unfrozen_copy(ypObject *sq)
 {
-    return _ypTuple_copy(ypList_CODE, sq, /*alloclen_fixed=*/FALSE);
+    return _ypTuple_new_from_array(
+            ypList_CODE, ypTuple_LEN(sq), ypTuple_ARRAY(sq), /*alloclen_fixed=*/FALSE);
 }
 
 static ypObject *tuple_frozen_copy(ypObject *sq)
@@ -10721,7 +10776,8 @@ static ypObject *tuple_frozen_copy(ypObject *sq)
     if (ypTuple_LEN(sq) < 1) return _yp_tuple_empty;
     // A shallow copy of a tuple to a tuple doesn't require an actual copy
     if (ypObject_TYPE_CODE(sq) == ypTuple_CODE) return yp_incref(sq);
-    return _ypTuple_copy(ypTuple_CODE, sq, /*alloclen_fixed=*/TRUE);
+    return _ypTuple_new_from_array(
+            ypTuple_CODE, ypTuple_LEN(sq), ypTuple_ARRAY(sq), /*alloclen_fixed=*/TRUE);
 }
 
 static ypObject *tuple_unfrozen_deepcopy(ypObject *sq, visitfunc copy_visitor, void *copy_memo)
@@ -11272,7 +11328,8 @@ ypObject *yp_tuple(ypObject *iterable)
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypTuple_CODE) {
         if (ypTuple_LEN(iterable) < 1) return _yp_tuple_empty;
         if (ypObject_TYPE_CODE(iterable) == ypTuple_CODE) return yp_incref(iterable);
-        return _ypTuple_copy(ypTuple_CODE, iterable, /*alloclen_fixed=*/TRUE);
+        return _ypTuple_new_from_array(ypTuple_CODE, ypTuple_LEN(iterable), ypTuple_ARRAY(iterable),
+                /*alloclen_fixed=*/TRUE);
     }
     return _ypTuple(ypTuple_CODE, iterable);
 }
@@ -11280,9 +11337,19 @@ ypObject *yp_tuple(ypObject *iterable)
 ypObject *yp_list(ypObject *iterable)
 {
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypTuple_CODE) {
-        return _ypTuple_copy(ypList_CODE, iterable, /*alloclen_fixed=*/FALSE);
+        return _ypTuple_new_from_array(ypList_CODE, ypTuple_LEN(iterable), ypTuple_ARRAY(iterable),
+                /*alloclen_fixed=*/FALSE);
     }
     return _ypTuple(ypList_CODE, iterable);
+}
+
+// Used by yp_call_array/etc to convert array to a tuple (i.e. for *args).
+// TODO: This _could_ be something we expose publically, but I don't want to create array versions
+// of all va_list functions, so keep private for now.
+static ypObject *yp_tuple_fromarray(yp_ssize_t n, ypObject *const *array)
+{
+    if (n < 1) return _yp_tuple_empty;
+    return _ypTuple_new_from_array(ypTuple_CODE, n, array, /*alloclen_fixed=*/TRUE);
 }
 
 ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse)
@@ -12460,7 +12527,7 @@ keyfunc_fail:
     return result;
 }
 #undef IFLT
-// #undef ISLT
+#undef ISLT
 
 // clang-format on
 #pragma endregion timsort
@@ -15637,7 +15704,7 @@ objproc tp_new_exact1;  // Shortcut for when the object being constructed is exa
 #define ypFunction_FLAG_HAS_KW_ONLY (1u << 4)    // Has * parameter (keyword-only params)
 #define ypFunction_FLAG_HAS_VAR_KW (1u << 5)     // Has **kwargs parameter
 
-// The ypFunction_FLAGS that summarize the parameters.
+// The ypFunction_FLAGS that summarize the behaviour of the parameters.
 #define ypFunction_PARAM_FLAGS                                                                    \
     (ypFunction_FLAG_HAS_POS_ONLY | ypFunction_FLAG_HAS_POS_OR_KW | ypFunction_FLAG_HAS_VAR_POS | \
             ypFunction_FLAG_HAS_KW_ONLY | ypFunction_FLAG_HAS_VAR_KW)
@@ -15743,7 +15810,6 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     yp_ASSERT1(!(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED));  // need only be called once
 
     if (params_len < 1) {
-        // FIXME Ensure we optimize the no-parameter case where we can.
         ypFunction_FLAGS(f) |= ypFunction_FLAG_VALIDATED;
         return yp_None;
     }
@@ -15842,9 +15908,18 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     if (has_var_positional) ypFunction_FLAGS(f) |= ypFunction_FLAG_HAS_VAR_POS;
     if (has_keyword_only) ypFunction_FLAGS(f) |= ypFunction_FLAG_HAS_KW_ONLY;
     if (has_var_keyword) ypFunction_FLAGS(f) |= ypFunction_FLAG_HAS_VAR_KW;
-    ypFunction_FLAGS(f) |= ypFunction_FLAG_VALIDATED;
 
+    ypFunction_FLAGS(f) |= ypFunction_FLAG_VALIDATED;
     return yp_None;
+}
+
+// Calls yp_decref on the n objects in argarray, skipping nulls.
+static void _ypFunction_call_decref_argarray(yp_ssize_t n, ypObject **argarray)
+{
+    for (/* n already set*/; n > 0; n--) {
+        ypObject *arg = argarray[n - 1];
+        if (arg != NULL) yp_decref(arg);  // / and * store NULL in argarray
+    }
 }
 
 // Helper for ypFunction_call_QuickIter. Places the positional arguments in argarray. Keeps *n
@@ -15911,7 +15986,7 @@ static ypObject *_ypFunction_call_make_var_kwargs(
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW);
     yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
 
-    // Skip any positional-only parameters. (If present, they are always at the start.)
+    // Skip any positional-only parameters: function (a, /, **kwargs) can be called like (1, a=33).
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY) {
         while (i < ypFunction_PARAMS_LEN(f)) {
             param = ypFunction_PARAMS(f)[i];
@@ -16031,12 +16106,6 @@ static ypObject *_ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
     result = _ypFunction_call_place_args(f, iter, args, n, argarray);
     if (yp_isexceptionC(result)) return result;
 
-    // FIXME If the only thing left here is **kwargs, we don't need to copy to a yp_dict, we could
-    // go straight to frozendict (but would still have to verify like make_var_kwargs).
-
-    // FIXME Make sure we are detecting where an arg is both positional and keyword! Even when
-    // **kwargs is present!
-    // FIXME Function (a, /, **k) can be called like (1, a=33)!
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW) {
         ypObject *kwargs_copy = yp_dict(kwargs);  // modified by _ypFunction_call_place_kwargs
         result = _ypFunction_call_place_kwargs(f, kwargs_copy, n, argarray);
@@ -16056,39 +16125,42 @@ static ypObject *_ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
     }
 
     yp_ASSERT1(*n == ypFunction_PARAMS_LEN(f));
-    return ypFunction_CODE_FUNC(f)(callable, *n, argarray);
+    if (*n > 0 && argarray[*n - 1] == NULL) {
+        // Drop the trailing null. This only happens if / is the last entry, which would mean all
+        // params are positional-only.
+        yp_ASSERT1(_ypFunction_parameter_kind(ypFunction_PARAMS(f)[*n - 1].name) ==
+                   yp_s_forward_slash);
+        yp_ASSERT1((ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS) == ypFunction_FLAG_HAS_POS_ONLY);
+        yp_ASSERT1(*n > 1 && argarray[*n - 2] != NULL);
+        (*n)--;
+    }
+
+    return ypFunction_CODE_FUNC(f)(callable, *n, *n > 0 ? argarray : NULL);
 }
 
 static ypObject *ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
         const ypQuickIter_methods *iter, ypQuickIter_state *args, ypObject *kwargs)
 {
-    const yp_ssize_t max_on_stack = 32;
-    yp_ssize_t       params_len = ypFunction_PARAMS_LEN(f);
-    yp_ssize_t       n = 0;
-    ypObject *       result;
+    yp_ssize_t params_len = ypFunction_PARAMS_LEN(f);
+    yp_ssize_t n = 0;
+    ypObject * storage[32];
+    ypObject **argarray;
+    ypObject * result;
 
-    if (params_len <= max_on_stack) {
-        ypObject *argarray[max_on_stack];
-        result = _ypFunction_call_QuickIter(f, callable, iter, args, kwargs, &n, argarray);
-        for (/* n already set*/; n > 0; n--) {
-            ypObject *arg = argarray[n - 1];
-            if (arg != NULL) yp_decref(arg);  // / and * store NULL in argarray
-        }
-
+    if (params_len <= yp_lengthof_array(storage)) {
+        argarray = storage;
     } else {
         yp_ssize_t allocsize;  // unused
-        ypObject **argarray = yp_malloc(&allocsize, params_len * yp_sizeof(ypObject *));
+        argarray = yp_malloc(&allocsize, params_len * yp_sizeof(ypObject *));
         if (argarray == NULL) return yp_MemoryError;
-
-        result = _ypFunction_call_QuickIter(f, callable, iter, args, kwargs, &n, argarray);
-        for (/* n already set*/; n > 0; n--) {
-            ypObject *arg = argarray[n - 1];
-            if (arg != NULL) yp_decref(arg);  // / and * store NULL in argarray
-        }
-
-        yp_free(argarray);
     }
 
+    result = _ypFunction_call_QuickIter(f, callable, iter, args, kwargs, &n, argarray);
+    _ypFunction_call_decref_argarray(n, argarray);
+
+    if (argarray != storage) {
+        yp_free(argarray);
+    }
     return result;
 }
 
@@ -16100,11 +16172,23 @@ static ypObject *ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
 static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_list args)
 {
     ypObject * result;
+    yp_ssize_t params_len = ypFunction_PARAMS_LEN(f);
     yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
 
-    if (ypFunction_PARAMS_LEN(f) < 1) {
+    // XXX Resist temptation: only add special cases when it's easy AND common.
+    if (params_len < 1) {
         if (n > 0) return yp_TypeError;
         return ypFunction_CODE_FUNC(f)(callable, 0, NULL);
+
+    } else if (param_flags == ypFunction_FLAG_HAS_POS_ONLY && params_len == 2 && n == 1) {
+        ypObject *arg = va_arg(args, ypObject *);  // borrowed
+        result = ypFunction_CODE_FUNC(f)(callable, 1, &arg);
+        return result;
+
+    } else if (param_flags == ypFunction_FLAG_HAS_POS_OR_KW && params_len == 1 && n == 1) {
+        ypObject *arg = va_arg(args, ypObject *);  // borrowed
+        result = ypFunction_CODE_FUNC(f)(callable, 1, &arg);
+        return result;
 
     } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
         ypObject *argarray[] = {yp_tupleNV(n, args), _yp_frozendict_empty};
@@ -16113,16 +16197,9 @@ static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_li
         yp_decref(argarray[0]);
         return result;
 
-    } else if (param_flags == ypFunction_FLAG_HAS_VAR_POS) {
-        ypObject *argarray[] = {yp_tupleNV(n, args)};
-        if (yp_isexceptionC(argarray[0])) return argarray[0];
-        result = ypFunction_CODE_FUNC(f)(callable, 1, argarray);
-        yp_decref(argarray[0]);
-        return result;
-
     } else {
         ypQuickIter_state state;
-        ypQuickIter_new_fromvar(&state, n, args);
+        ypQuickIter_new_fromvar(&state, MAX(n, 0), args);
         result = ypFunction_call_QuickIter(
                 f, callable, &ypQuickIter_var_methods, &state, _yp_frozendict_empty);
         ypQuickIter_var_close(&state);
@@ -16130,73 +16207,36 @@ static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_li
     }
 }
 
-// Helper for ypFunction_call_stars when f has zero args, or exactly one or both of *args and
-// **kwargs.
-static ypObject *_ypFunction_call_stars_only_vars(ypObject *f, ypObject *callable, ypObject *args,
-        int has_var_pos, ypObject *kwargs, int has_var_kw)
-{
-    ypObject *result;
-    ypObject *argarray[2];
-
-    argarray[0] = yp_tuple(args);
-    if (yp_isexceptionC(argarray[0])) return argarray[0];
-    if (!has_var_pos && ypTuple_LEN(argarray[0]) > 0) {
-        yp_decref(argarray[0]);
-        return yp_TypeError;
-    }
-
-    argarray[1] = yp_frozendict(kwargs);
-    if (yp_isexceptionC(argarray[1])) {
-        yp_decref(argarray[0]);
-        return argarray[1];
-    }
-    if (!has_var_kw && ypDict_LEN(argarray[1]) > 0) {
-        yp_decref(argarray[1]);
-        yp_decref(argarray[0]);
-        return yp_TypeError;
-    }
-
-    if (has_var_pos) {
-        if (has_var_kw) {
-            result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
-        } else {
-            result = ypFunction_CODE_FUNC(f)(callable, 1, argarray);
-        }
-    } else {
-        if (has_var_kw) {
-            result = ypFunction_CODE_FUNC(f)(callable, 1, &(argarray[1]));
-        } else {
-            result = ypFunction_CODE_FUNC(f)(callable, 0, NULL);
-        }
-    }
-
-    yp_decref(argarray[1]);
-    yp_decref(argarray[0]);
-    return result;
-}
-
+// f is the function object, while callable is first argument to yp_call (which may also be f).
 static ypObject *ypFunction_call_stars(
         ypObject *f, ypObject *callable, ypObject *args, ypObject *kwargs)
 {
     yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
+    ypObject * result;
 
-    // FIXME Optimize for all-positional params (copy args tuple into array)
+    // XXX Resist temptation: only add special cases when it's easy AND common.
+    if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
+        ypObject *argarray[2];
 
-    // FIXME Always ensure args and kwargs are the right type (i.e. in the no-params case)
+        argarray[0] = yp_tuple(args);
+        if (yp_isexceptionC(argarray[0])) return argarray[0];
 
-    if (ypFunction_PARAMS_LEN(f) < 1) {
-        return _ypFunction_call_stars_only_vars(f, callable, args, FALSE, kwargs, FALSE);
-    } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
-        return _ypFunction_call_stars_only_vars(f, callable, args, TRUE, kwargs, TRUE);
-    } else if (param_flags == ypFunction_FLAG_HAS_VAR_POS) {
-        return _ypFunction_call_stars_only_vars(f, callable, args, TRUE, kwargs, FALSE);
-    } else if (param_flags == ypFunction_FLAG_HAS_VAR_KW) {
-        return _ypFunction_call_stars_only_vars(f, callable, args, FALSE, kwargs, TRUE);
+        argarray[1] = yp_frozendict(kwargs);
+        if (yp_isexceptionC(argarray[1])) {
+            yp_decref(argarray[0]);
+            return argarray[1];
+        }
+
+        result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
+
+        yp_decref(argarray[1]);
+        yp_decref(argarray[0]);
+        return result;
 
     } else {
         const ypQuickIter_methods *iter;
         ypQuickIter_state          state;
-        ypObject *                 result = ypQuickIter_new_fromiterable(&iter, &state, args);
+        result = ypQuickIter_new_fromiterable(&iter, &state, args);
         if (yp_isexceptionC(result)) return result;
         result = ypFunction_call_QuickIter(f, callable, iter, &state, kwargs);
         ypQuickIter_var_close(&state);
@@ -16204,7 +16244,42 @@ static ypObject *ypFunction_call_stars(
     }
 }
 
-// TODO yp_call_array
+// f is the function object, while callable is first argument to yp_call (which may also be f).
+static ypObject *ypFunction_call_array(
+        ypObject *f, ypObject *callable, yp_ssize_t n, ypObject *const *args)
+{
+    ypObject * result;
+    yp_ssize_t params_len = ypFunction_PARAMS_LEN(f);
+    yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
+
+    // XXX Resist temptation: only add special cases when it's easy AND common.
+    if (params_len < 1) {
+        if (n > 0) return yp_TypeError;
+        return ypFunction_CODE_FUNC(f)(callable, 0, NULL);
+
+    } else if (param_flags == ypFunction_FLAG_HAS_POS_ONLY && n == params_len - 1) {
+        // This is why call_array exists: we can just pass the array on through.
+        return ypFunction_CODE_FUNC(f)(callable, n, args);
+
+    } else if (param_flags == ypFunction_FLAG_HAS_POS_OR_KW && n == params_len) {
+        return ypFunction_CODE_FUNC(f)(callable, n, args);
+
+    } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
+        ypObject *argarray[] = {yp_tuple_fromarray(n, args), _yp_frozendict_empty};
+        if (yp_isexceptionC(argarray[0])) return argarray[0];
+        result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
+        yp_decref(argarray[0]);
+        return result;
+
+    } else {
+        ypQuickIter_state state;
+        ypQuickIter_new_fromarray(&state, MAX(n, 0), args);
+        result = ypFunction_call_QuickIter(
+                f, callable, &ypQuickIter_array_methods, &state, _yp_frozendict_empty);
+        ypQuickIter_array_close(&state);
+        return result;
+    }
+}
 
 
 // Function methods
@@ -16829,7 +16904,6 @@ ypObject *yp_callNV(ypObject *c, int n, va_list args)
         ypObject *result;
         ypObject *f = ypObject_TYPE(c)->tp_as_callable->tp_function(c);
         if (yp_isexceptionC(f)) return f;
-
         result = ypFunction_callNV(f, c, n, args);
         yp_decref(f);
         return result;
@@ -16844,8 +16918,21 @@ ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)
         ypObject *result;
         ypObject *f = ypObject_TYPE(c)->tp_as_callable->tp_function(c);
         if (yp_isexceptionC(f)) return f;
-
         result = ypFunction_call_stars(f, c, args, kwargs);
+        yp_decref(f);
+        return result;
+    }
+}
+
+ypObject *yp_call_array(ypObject *c, yp_ssize_t n, ypObject *const *args)
+{
+    if (ypObject_TYPE_CODE(c) == ypFunction_CODE) {
+        return ypFunction_call_array(c, c, n, args);
+    } else {
+        ypObject *result;
+        ypObject *f = ypObject_TYPE(c)->tp_as_callable->tp_function(c);
+        if (yp_isexceptionC(f)) return f;
+        result = ypFunction_call_array(f, c, n, args);
         yp_decref(f);
         return result;
     }
@@ -17087,8 +17174,8 @@ static ypObject *yp_func_chr_code(ypObject *function, yp_ssize_t n, ypObject *co
     return yp_chrC(i);
 };
 
-// FIXME Technically, the parameter is positional-only....
-yp_IMMORTAL_FUNCTION(yp_func_chr, yp_func_chr_code, ({yp_CONST_REF(yp_s_i), NULL}));
+yp_IMMORTAL_FUNCTION(yp_func_chr, yp_func_chr_code,
+        ({yp_CONST_REF(yp_s_i), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
 static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -17103,12 +17190,8 @@ static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *c
     return yp_intC(hash);
 };
 
-// FIXME Technically, the parameter is positional-only, however that makes it difficult to optimize
-// for the common case we call yp_call_argarray(yp_func_hash, 1, {arg}), because we would have to
-// copy to a new array with a trailing NULL. Is positional-only important enough? Can we special
-// case functions that have only positional-only arguments (perhaps document that n will be one less
-// than expected?)
-yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code, ({yp_CONST_REF(yp_s_obj), NULL}));
+yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code,
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
 static ypObject *yp_func_len_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -17123,8 +17206,8 @@ static ypObject *yp_func_len_code(ypObject *function, yp_ssize_t n, ypObject *co
     return yp_intC(len);
 };
 
-// FIXME Technically, the parameter is positional-only....
-yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code, ({yp_CONST_REF(yp_s_obj), NULL}));
+yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code,
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
 static ypObject *yp_func_reversed_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -17132,9 +17215,8 @@ static ypObject *yp_func_reversed_code(ypObject *function, yp_ssize_t n, ypObjec
     return yp_reversed(argarray[0]);
 };
 
-// FIXME Technically, the parameter is positional-only....
-yp_IMMORTAL_FUNCTION(
-        yp_func_reversed, yp_func_reversed_code, ({yp_CONST_REF(yp_s_sequence), NULL}));
+yp_IMMORTAL_FUNCTION(yp_func_reversed, yp_func_reversed_code,
+        ({yp_CONST_REF(yp_s_sequence), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
 #pragma endregion functions_as_objects
 

@@ -1250,9 +1250,9 @@ ypAPI ypObject *yp_callN(ypObject *c, int n, ...);
 ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 
 // Similar to yp_callN, except the arguments are stored in an array. args cannot be modified until
-// yp_call_array returns.
+// yp_call_array returns (FIXME do I need to say this?).
 // FIXME Document the optimization here?
-ypAPI ypObject *yp_call_array(ypObject *c, int n, ypObject *const *args);
+ypAPI ypObject *yp_call_array(ypObject *c, yp_ssize_t n, ypObject *const *args);
 
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
 // result of the call (which may be a new reference or an exception).  Returns yp_TypeError if c is
@@ -1272,12 +1272,12 @@ typedef struct _yp_function_parameter_t {
 
     // Name can be /, in which case the preceeding parameters are positional-only. / cannot be
     // first. If / is in the middle, the corresponding argarray element will be NULL. If / is last,
-    // it is dropped from argarray: thus, n will be one less than the number of parameters.
+    // it is not included in argarray: thus, n will be one less than the number of parameters.
 
     // FIXME test /-at-end behaviour thoroughly.
 
-    // Name can be *, in which case the following parameters are keyword-only. If * is first or in
-    // the middle, the corresponding argarray element will be NULL. * cannot be last.
+    // Name can be *, in which case subsequent parameters are keyword-only. If * is first or in the
+    // middle, the corresponding argarray element will be NULL. * cannot be last.
     ypObject *name;
 
     // The default value for the parameter, or NULL if there is no default value.
@@ -1305,6 +1305,8 @@ typedef struct _yp_function_definition_t {
     // FIXME use yp_function_stateCX to retrieve any state variables
     // FIXME "if n is zero, argarray is NULL"
     // FIXME argarray is read-only: do not modify.
+    // FIXME "If exceptions were passed to yp_call*, argarray _may_ contain those exceptions." This
+    // is an optimization so that chains of function calls aren't continuously checking.
     ypObject *(*code)(ypObject *c, yp_ssize_t n, ypObject *const *argarray);
 
     // FIXME doc, name/qualname, state, return annotation, module....
