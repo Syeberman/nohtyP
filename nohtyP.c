@@ -15759,6 +15759,7 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_star_kwargs, "**kwargs");
 static ypObject *_ypFunction_parameter_kind(ypObject *name)
 {
     yp_ssize_t                len;
+    const void* name_data;
     ypStringLib_getindexXfunc getindexX;
 
     if (ypObject_TYPE_CODE(name) != ypStr_CODE) {
@@ -15766,11 +15767,12 @@ static ypObject *_ypFunction_parameter_kind(ypObject *name)
     }
 
     len = ypStr_LEN(name);
+    name_data = ypStr_DATA(name);
     getindexX = ypStringLib_ENC(name)->getindexX;
     if (len < 1) {
         return yp_ParameterSyntaxError;
     } else if (len == 1) {
-        yp_uint32_t ch = getindexX(name, 0);
+        yp_uint32_t ch = getindexX(name_data, 0);
         if (ch == '/') {
             return yp_s_forward_slash;
         } else if (ch == '*') {
@@ -15780,9 +15782,9 @@ static ypObject *_ypFunction_parameter_kind(ypObject *name)
         }
     } else {
         // TODO Python allows `* args` and `** kwargs`. However, we can probably reject this.
-        if (getindexX(name, 0) != '*') {
+        if (getindexX(name_data, 0) != '*') {
             return yp_None;  // just a regular parameter
-        } else if (getindexX(name, 1) != '*') {
+        } else if (getindexX(name_data, 1) != '*') {
             return yp_s_star_args;
         } else {
             return yp_s_star_star_kwargs;
@@ -15948,14 +15950,14 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
             // do *not* consume the **kwargs parameter
             break;  // will ensure no remaining positional arguments
         } else if (param_kind == yp_None) {
-            arg = iter->next(args);
+            arg = iter->next(args); // new ref
             if (arg == NULL) {
                 // End of positional arguments. Do *not* consume the parameter: it may be in kwargs.
-                break;
+                return yp_None;
             } else if (yp_isexceptionC(arg)) {
                 return arg;
             } else {
-                argarray[*n] = yp_incref(arg);
+                argarray[*n] = arg;
                 (*n)++;  // consume the parameter
             }
         } else {
@@ -16059,7 +16061,7 @@ static ypObject *_ypFunction_call_place_kwargs(
             (*n)++;          // consume the parameter
             return yp_None;  // **kwarg, if present, is always last
         } else if (param_kind == yp_None) {
-            arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing);
+            arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing); // new ref
             if (yp_isexceptionC(arg)) return arg;
             if (arg != ypFunction_key_missing) {
                 argarray[*n] = arg;
@@ -16108,6 +16110,7 @@ static ypObject *_ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
 
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW) {
         ypObject *kwargs_copy = yp_dict(kwargs);  // modified by _ypFunction_call_place_kwargs
+        if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
         result = _ypFunction_call_place_kwargs(f, kwargs_copy, n, argarray);
         yp_decref(kwargs_copy);
         if (yp_isexceptionC(result)) return result;
@@ -16119,6 +16122,7 @@ static ypObject *_ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
         // case-insensitive mapping {'a': 1} with a function (a, A). Even though the mapping
         // contains just one entry, it would match both arguments.
         ypObject *kwargs_asfrozendict = yp_frozendict(kwargs);
+        if (yp_isexceptionC(kwargs_asfrozendict)) return kwargs_asfrozendict;
         result = _ypFunction_call_place_kwargs(f, kwargs_asfrozendict, n, argarray);
         yp_decref(kwargs_asfrozendict);
         if (yp_isexceptionC(result)) return result;
