@@ -558,6 +558,9 @@ ypAPI yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 // examples of iterators include files and generator iterators.  It is usually unwise to modify an
 // object being iterated over.
 
+// FIXME Now that iterators are considered "immutable", should we discard it on _next/etc? i.e.
+// should we turn ypObject **iterator into just ypObject *iterator?
+
 // "Sends" a value into *iterator and returns a new reference to the next yielded value, or an
 // exception.  The value may be ignored by the iterator.  value cannot be an exception.  When the
 // iterator is exhausted yp_StopIteration is returned; on any other error, *iterator is discarded
@@ -1620,6 +1623,9 @@ ypAPI ypObject *const yp_t_function;
 
 // FIXME Would this be clearer if mini iterators were opaque structures containing obj and state?
 // Yes, yes it would.
+
+// FIXME Now that iterators are considered "immutable", should we discard it on _next/etc? i.e.
+// should we turn ypObject **iterator into just ypObject *iterator?
 
 // Returns a new reference to an opaque mini iterator for object x and initializes *state to the
 // iterator's starting state.  *state is also opaque: you must *not* modify it directly.  It is
