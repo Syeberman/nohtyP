@@ -283,17 +283,8 @@ typedef size_t yp_uhash_t;
 // Base "constructor" for immortal objects
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
-// Older compilers don't recognize that `ypObject *const name` is known at compile-time, so use this
-// to initialize when a compiler requires a constant. name must refer to an already-defined
-// immortal.
-#define yp_CONST_REF(name) ((ypObject *)&_##name##_struct)
-
 // Base "constructor" for immortal type objects
 #define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT(ypType_CODE, 0, NULL, ypObject_LEN_INVALID)
-#define yp_IMMORTAL_INVALIDATED(name)                                                   \
-    static struct _ypObject _##name##_struct =                                          \
-            _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID); \
-    ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)(ypObject *);
@@ -377,12 +368,19 @@ typedef struct {
 } ypMappingMethods;
 
 // Callable objects defer to the function object returned by tp_function to parse the arguments.
-// TODO: This still feels incomplete to me. Should types have direct overload access to yp_call*?
 typedef struct {
     // FIXME Move this to a tp_flags, and perhaps move tp_function top-level?
     int     tp_iscallable;
-    objproc tp_function;
+    objproc tp_function;  // returns the function called when an instance of this type is called
 } ypCallableMethods;
+
+// TODO I'm not convinced that the separation of __new__ and __init__ has borne fruit. I searched
+// Python's source and didn't see many places where tp_new was called without tp_init. It's
+// confusing for new users to know which to use (other languages don't have this distinction). It's
+// surprising that __init__ is sometimes called and sometimes not. __new__ and __init__ each have to
+// parse/verify their argument lists. Not to mention we aren't currently implementing inheritance
+// anyway. I'm going to side-step this issue for now and give the types direct control over what
+// happens when they are called with yp_type_function.
 
 // Type objects hold pointers to each type's methods.
 typedef struct {
@@ -392,8 +390,9 @@ typedef struct {
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
 
     // Object fundamentals
-    visitfunc    tp_dealloc;   // use yp_decref_fromdealloc(x, memo) to decref objects
-    traversefunc tp_traverse;  // call function for all accessible objects; return on exception
+    ypObject *   tp_type_function;  // the function called when this type is called
+    visitfunc    tp_dealloc;        // use yp_decref_fromdealloc(x, memo) to decref objects
+    traversefunc tp_traverse;
     // TODO str, repr have the possibility of recursion; trap & test
     objproc tp_str;
     objproc tp_repr;
@@ -880,6 +879,102 @@ static yp_hash_t yp_HashBytes(yp_uint8_t *p, yp_ssize_t len)
 static yp_ssize_t _yp_recursion_limit = 1000;
 
 #pragma endregion utilities
+
+/*************************************************************************************************
+ * Common immortals, both internal and external to nohtyP.c
+ *************************************************************************************************/
+#pragma region common_immortals
+
+// Older compilers don't recognize that `ypObject *const name` is known at compile-time, so use this
+// to initialize when a compiler requires a constant. name must refer to an already-defined
+// immortal.
+#define yp_CONST_REF(name) ((ypObject *)&_##name##_struct)
+
+
+#define yp_IMMORTAL_INVALIDATED(name)                                                   \
+    static struct _ypObject _##name##_struct =                                          \
+            _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID); \
+    ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
+
+
+static struct _ypBoolObject _yp_True_struct;
+ypObject *const             yp_True;
+static struct _ypBoolObject _yp_False_struct;
+ypObject *const             yp_False;
+
+
+#define _ypInt_PREALLOC_START (-5)
+#define _ypInt_PREALLOC_END (257)
+static struct _ypIntObject _ypInt_pre_allocated[];
+
+// XXX Careful! Do not use ypInt_CONST_REF with a value that is not preallocated.
+#define ypInt_CONST_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i)-_ypInt_PREALLOC_START]))
+
+
+yp_IMMORTAL_STR_LATIN_1(yp_s_ascii, "ascii");
+yp_IMMORTAL_STR_LATIN_1(yp_s_latin_1, "latin-1");
+yp_IMMORTAL_STR_LATIN_1(yp_s_utf_8, "utf-8");
+yp_IMMORTAL_STR_LATIN_1(yp_s_utf_16, "utf-16");
+yp_IMMORTAL_STR_LATIN_1(yp_s_utf_16be, "utf-16be");
+yp_IMMORTAL_STR_LATIN_1(yp_s_utf_16le, "utf-16le");
+yp_IMMORTAL_STR_LATIN_1(yp_s_utf_32, "utf-32");
+yp_IMMORTAL_STR_LATIN_1(yp_s_utf_32be, "utf-32be");
+yp_IMMORTAL_STR_LATIN_1(yp_s_utf_32le, "utf-32le");
+yp_IMMORTAL_STR_LATIN_1(yp_s_ucs_2, "ucs-2");
+yp_IMMORTAL_STR_LATIN_1(yp_s_ucs_4, "ucs-4");
+
+yp_IMMORTAL_STR_LATIN_1(yp_s_strict, "strict");
+yp_IMMORTAL_STR_LATIN_1(yp_s_replace, "replace");
+yp_IMMORTAL_STR_LATIN_1(yp_s_ignore, "ignore");
+yp_IMMORTAL_STR_LATIN_1(yp_s_xmlcharrefreplace, "xmlcharrefreplace");
+yp_IMMORTAL_STR_LATIN_1(yp_s_backslashreplace, "backslashreplace");
+yp_IMMORTAL_STR_LATIN_1(yp_s_surrogateescape, "surrogateescape");
+yp_IMMORTAL_STR_LATIN_1(yp_s_surrogatepass, "surrogatepass");
+
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_args, "*args");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_star_kwargs, "**kwargs");
+
+// Parameter names of the built-in functions.
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_base, "base");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_i, "i");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_iterable, "iterable");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_object, "object");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_x, "x");
+
+
+// FIXME Immortal functions will eventually be moved to nohtyP.h
+struct _ypFunctionObject {
+    ypObject_HEAD;
+    // FIXME Move ob_state into yp_function_definition_t?
+    void *ob_state;  // NULL if no extra state
+    // XXX ob_def.parameters may or may not contain the parameters, so only access via ob_data.
+    yp_function_definition_t ob_def;
+};
+#define _yp_DEF_UNPACK(...) __VA_ARGS__  // FIXME rename?
+#define _yp_IMMORTAL_FUNCTION_OBJECT(qual, name, code, parameters_len, parameters)         \
+    static struct _ypFunctionObject _##name##_struct = {                                   \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters, parameters_len), NULL, \
+            {code}};                                                                       \
+    qual ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
+#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                              \
+    static yp_function_parameter_t _##name##_parameters[] = {_yp_DEF_UNPACK parameters}; \
+    _yp_IMMORTAL_FUNCTION_OBJECT(                                                        \
+            qual, name, code, yp_lengthof_array(_##name##_parameters), _##name##_parameters)
+
+#define yp_IMMORTAL_FUNCTION(name, code, parameters) \
+    _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, code, parameters)
+#define yp_IMMORTAL_FUNCTION_static(name, code, parameters) \
+    _yp_IMMORTAL_FUNCTION(static, name, code, parameters)
+#define yp_IMMORTAL_FUNCTION2(name, code) \
+    _yp_IMMORTAL_FUNCTION_OBJECT(_yp_NOQUAL, name, code, 0, NULL)
+#define yp_IMMORTAL_FUNCTION2_static(name, code) \
+    _yp_IMMORTAL_FUNCTION_OBJECT(static, name, code, 0, NULL)
+
+#pragma endregion common_immortals
 
 
 /*************************************************************************************************
@@ -2346,15 +2441,26 @@ static ypObject *iter_dealloc(ypObject *i, void *memo)
     return yp_None;
 }
 
+static ypObject *iter_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    return yp_iter(argarray[0]);
+}
+
+// FIXME There's also a (callable, sentinel) form
+yp_IMMORTAL_FUNCTION_static(iter_type_function, iter_type_function_code,
+        ({yp_CONST_REF(yp_s_iterable), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
 static ypTypeObject ypIter_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
 
         // Object fundamentals
-        iter_dealloc,   // tp_dealloc
-        iter_traverse,  // tp_traverse
-        NULL,           // tp_str
-        NULL,           // tp_repr
+        yp_CONST_REF(iter_type_function),  // tp_type_function
+        iter_dealloc,                      // tp_dealloc
+        iter_traverse,                     // tp_traverse
+        NULL,                              // tp_str
+        NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,       // tp_freeze
@@ -3114,15 +3220,25 @@ yp_ssize_t yp_lenC(ypObject *x, ypObject **exc)
  *************************************************************************************************/
 #pragma region invalidated
 
+static ypObject *invalidated_type_function_code(
+        ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    return yp_NotImplementedError;
+}
+
+yp_IMMORTAL_FUNCTION_static(invalidated_type_function, invalidated_type_function_code,
+        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
 static ypTypeObject ypInvalidated_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_visitfunc,  // tp_dealloc  // FIXME implement
-        NoRefs_traversefunc,    // tp_traverse
-        NULL,                   // tp_str
-        NULL,                   // tp_repr
+        yp_CONST_REF(invalidated_type_function),  // tp_type_function
+        MethodError_visitfunc,                    // tp_dealloc  // FIXME implement
+        NoRefs_traversefunc,                      // tp_traverse
+        NULL,                                     // tp_str
+        NULL,                                     // tp_repr
 
         // Freezing, copying, and invalidating
         InvalidatedError_objproc,       // tp_freeze
@@ -3202,15 +3318,24 @@ typedef struct {
 #define _ypException_NAME(e) (((ypExceptionObject *)e)->name)
 #define _ypException_SUPER(e) (((ypExceptionObject *)e)->super)
 
+static ypObject *exception_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    return yp_NotImplementedError;
+}
+
+yp_IMMORTAL_FUNCTION_static(exception_type_function, exception_type_function_code,
+        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
 static ypTypeObject ypException_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_visitfunc,  // tp_dealloc
-        NoRefs_traversefunc,    // tp_traverse
-        NULL,                   // tp_str
-        NULL,                   // tp_repr
+        yp_CONST_REF(exception_type_function),  // tp_type_function
+        MethodError_visitfunc,                  // tp_dealloc
+        NoRefs_traversefunc,                    // tp_traverse
+        NULL,                                   // tp_str
+        NULL,                                   // tp_repr
 
         // Freezing, copying, and invalidating
         ExceptionMethod_objproc,       // tp_freeze
@@ -3429,15 +3554,33 @@ static ypObject *type_frozen_deepcopy(ypObject *t, visitfunc copy_visitor, void 
 
 static ypObject *type_bool(ypObject *t) { return yp_True; }
 
+static ypObject *type_function(ypObject *t) { return ((ypTypeObject *)t)->tp_type_function; }
+
+static ypObject *type_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    // FIXME Are we asserting that all types are immortal?
+    return yp_incref((ypObject *)ypObject_TYPE(argarray[0]));
+}
+
+yp_IMMORTAL_FUNCTION_static(type_type_function, type_type_function_code,
+        ({yp_CONST_REF(yp_s_object), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
+static ypCallableMethods ypType_as_callable = {
+        TRUE,          // tp_iscallable
+        type_function  // tp_function
+};
+
 static ypTypeObject ypType_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_visitfunc,  // tp_dealloc
-        NoRefs_traversefunc,    // tp_traverse
-        NULL,                   // tp_str
-        NULL,                   // tp_repr
+        yp_CONST_REF(type_type_function),  // tp_type_function
+        MethodError_visitfunc,             // tp_dealloc
+        NoRefs_traversefunc,               // tp_traverse
+        NULL,                              // tp_str
+        NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,   // tp_freeze
@@ -3494,7 +3637,7 @@ static ypTypeObject ypType_Type = {
         MethodError_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        &ypType_as_callable  // tp_as_callable
 };
 
 #pragma endregion type
@@ -3524,15 +3667,24 @@ static ypObject *nonetype_currenthash(
     return yp_None;
 }
 
+static ypObject *nonetype_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 0, "unexpected argarray of length %d", n);
+    return yp_None;
+}
+
+yp_IMMORTAL_FUNCTION2_static(nonetype_type_function, nonetype_type_function_code);
+
 static ypTypeObject ypNoneType_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_visitfunc,  // tp_dealloc
-        NoRefs_traversefunc,    // tp_traverse
-        NULL,                   // tp_str
-        NULL,                   // tp_repr
+        yp_CONST_REF(nonetype_type_function),  // tp_type_function
+        MethodError_visitfunc,                 // tp_dealloc
+        NoRefs_traversefunc,                   // tp_traverse
+        NULL,                                  // tp_str
+        NULL,                                  // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,       // tp_freeze
@@ -3606,7 +3758,7 @@ ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
-typedef struct {
+typedef struct _ypBoolObject {
     ypObject_HEAD;
     char value;
 } ypBoolObject;
@@ -3644,15 +3796,25 @@ static ypObject *bool_currenthash(
     return yp_None;
 }
 
+static ypObject *bool_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    return yp_bool(argarray[0]);
+}
+
+yp_IMMORTAL_FUNCTION_static(bool_type_function, bool_type_function_code,
+        ({yp_CONST_REF(yp_s_x), yp_CONST_REF(yp_False)}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
 static ypTypeObject ypBool_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
 
         // Object fundamentals
-        MethodError_visitfunc,  // tp_dealloc
-        NoRefs_traversefunc,    // tp_traverse
-        NULL,                   // tp_str
-        NULL,                   // tp_repr
+        yp_CONST_REF(bool_type_function),  // tp_type_function
+        MethodError_visitfunc,             // tp_dealloc
+        NoRefs_traversefunc,               // tp_traverse
+        NULL,                              // tp_str
+        NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,   // tp_freeze
@@ -3961,15 +4123,52 @@ static ypObject *int_currenthash(
     return yp_None;
 }
 
+static ypObject *int_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 3, "unexpected argarray of length %d", n);
+
+    if (argarray[2] == yp_None) {
+        return yp_int(argarray[0]);
+    } else {
+        // FIXME Move to a new yp_int_base (i.e. a version of yp_int_baseC that takes an object)
+        ypObject *exc = yp_None;
+        yp_int_t base = yp_asintC(argarray[2], &exc);
+        if(yp_isexceptionC(exc)) return exc;
+        return yp_int_baseC(argarray[0], base);
+    }
+}
+
+// FIXME In Python, None is not applicable for base; document the difference?
+yp_IMMORTAL_FUNCTION_static(int_type_function, int_type_function_code,
+        ({yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, {yp_CONST_REF(yp_s_forward_slash), NULL},
+                {yp_CONST_REF(yp_s_base), yp_CONST_REF(yp_None)}));
+
+static ypObject *intstore_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 3, "unexpected argarray of length %d", n);
+
+    if (argarray[2] == yp_None) {
+        return yp_intstore(argarray[0]);
+    } else {
+        // FIXME Need a yp_int_base (i.e. a non-yp_int_t base)
+        return yp_NotImplementedError;
+    }
+}
+
+yp_IMMORTAL_FUNCTION_static(intstore_type_function, intstore_type_function_code,
+        ({yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, {yp_CONST_REF(yp_s_forward_slash), NULL},
+                {yp_CONST_REF(yp_s_base), yp_CONST_REF(yp_None)}));
+
 static ypTypeObject ypInt_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
 
         // Object fundamentals
-        int_dealloc,          // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(int_type_function),  // tp_type_function
+        int_dealloc,                      // tp_dealloc
+        NoRefs_traversefunc,              // tp_traverse
+        NULL,                             // tp_str
+        NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,    // tp_freeze
@@ -4034,10 +4233,11 @@ static ypTypeObject ypIntStore_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        int_dealloc,          // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(intstore_type_function),  // tp_type_function
+        int_dealloc,                           // tp_dealloc
+        NoRefs_traversefunc,                   // tp_traverse
+        NULL,                                  // tp_str
+        NULL,                                  // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,    // tp_freeze
@@ -4777,8 +4977,6 @@ yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc)
 
 // This pre-allocates an array of immortal ints for yp_intC to return
 // clang-format off
-#define _ypInt_PREALLOC_START (-5)
-#define _ypInt_PREALLOC_END   (257)
 static ypIntObject _ypInt_pre_allocated[] = {
     #define _ypInt_PREALLOC(value) \
         { yp_IMMORTAL_HEAD_INIT(ypInt_CODE, 0, NULL, ypObject_LEN_INVALID), (value) }
@@ -4803,12 +5001,10 @@ static ypIntObject _ypInt_pre_allocated[] = {
 };
 // clang-format on
 
-// clang-format off
-ypObject * const yp_i_neg_one = (ypObject *) &(_ypInt_pre_allocated[-1 - _ypInt_PREALLOC_START]);
-ypObject * const yp_i_zero    = (ypObject *) &(_ypInt_pre_allocated[ 0 - _ypInt_PREALLOC_START]);
-ypObject * const yp_i_one     = (ypObject *) &(_ypInt_pre_allocated[ 1 - _ypInt_PREALLOC_START]);
-ypObject * const yp_i_two     = (ypObject *) &(_ypInt_pre_allocated[ 2 - _ypInt_PREALLOC_START]);
-// clang-format on
+ypObject *const yp_i_neg_one = ypInt_CONST_REF(-1);
+ypObject *const yp_i_zero = ypInt_CONST_REF(0);
+ypObject *const yp_i_one = ypInt_CONST_REF(1);
+ypObject *const yp_i_two = ypInt_CONST_REF(2);
 
 ypObject *yp_intC(yp_int_t value)
 {
@@ -5036,15 +5232,34 @@ static ypObject *float_currenthash(
     return yp_None;
 }
 
+static ypObject *float_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    return yp_float(argarray[0]);
+}
+
+yp_IMMORTAL_FUNCTION_static(float_type_function, float_type_function_code,
+        ({yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
+static ypObject *floatstore_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    return yp_floatstore(argarray[0]);
+}
+
+yp_IMMORTAL_FUNCTION_static(floatstore_type_function, floatstore_type_function_code,
+        ({yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
 static ypTypeObject ypFloat_Type = {
         yp_TYPE_HEAD_INIT,
         NULL,  // tp_name
 
         // Object fundamentals
-        float_dealloc,        // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(float_type_function),  // tp_type_function
+        float_dealloc,                      // tp_dealloc
+        NoRefs_traversefunc,                // tp_traverse
+        NULL,                               // tp_str
+        NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,      // tp_freeze
@@ -5109,10 +5324,11 @@ static ypTypeObject ypFloatStore_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        float_dealloc,        // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(floatstore_type_function),  // tp_type_function
+        float_dealloc,                           // tp_dealloc
+        NoRefs_traversefunc,                     // tp_traverse
+        NULL,                                    // tp_str
+        NULL,                                    // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,      // tp_freeze
@@ -8600,6 +8816,22 @@ static ypObject *bytes_dealloc(ypObject *b, void *memo)
     return yp_None;
 }
 
+static ypObject *bytes_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    return yp_NotImplementedError;
+}
+
+yp_IMMORTAL_FUNCTION_static(bytes_type_function, bytes_type_function_code,
+        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
+static ypObject *bytearray_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    return yp_NotImplementedError;
+}
+
+yp_IMMORTAL_FUNCTION_static(bytearray_type_function, bytearray_type_function_code,
+        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
 static ypSequenceMethods ypBytes_as_sequence = {
         bytes_concat,                 // tp_concat
         bytes_repeat,                 // tp_repeat
@@ -8625,10 +8857,11 @@ static ypTypeObject ypBytes_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        bytes_dealloc,        // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(bytes_type_function),  // tp_type_function
+        bytes_dealloc,                      // tp_dealloc
+        NoRefs_traversefunc,                // tp_traverse
+        NULL,                               // tp_str
+        NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,      // tp_freeze
@@ -8713,10 +8946,11 @@ static ypTypeObject ypByteArray_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        bytes_dealloc,        // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(bytearray_type_function),  // tp_type_function
+        bytes_dealloc,                          // tp_dealloc
+        NoRefs_traversefunc,                    // tp_traverse
+        NULL,                                   // tp_str
+        NULL,                                   // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,      // tp_freeze
@@ -9444,6 +9678,22 @@ static ypObject *str_dealloc(ypObject *s, void *memo)
     return yp_None;
 }
 
+static ypObject *str_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    return yp_NotImplementedError;
+}
+
+yp_IMMORTAL_FUNCTION_static(str_type_function, str_type_function_code,
+        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
+static ypObject *chrarray_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    return yp_NotImplementedError;
+}
+
+yp_IMMORTAL_FUNCTION_static(chrarray_type_function, chrarray_type_function_code,
+        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
 static ypSequenceMethods ypStr_as_sequence = {
         str_concat,                   // tp_concat
         str_repeat,                   // tp_repeat
@@ -9469,10 +9719,11 @@ static ypTypeObject ypStr_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        str_dealloc,          // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(str_type_function),  // tp_type_function
+        str_dealloc,                      // tp_dealloc
+        NoRefs_traversefunc,              // tp_traverse
+        NULL,                             // tp_str
+        NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,    // tp_freeze
@@ -9557,10 +9808,11 @@ static ypTypeObject ypChrArray_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        str_dealloc,          // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(chrarray_type_function),  // tp_type_function
+        str_dealloc,                           // tp_dealloc
+        NoRefs_traversefunc,                   // tp_traverse
+        NULL,                                  // tp_str
+        NULL,                                  // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,    // tp_freeze
@@ -9775,28 +10027,6 @@ static ypObject *_yp_chrC(int type, yp_int_t i)
 }
 ypObject *yp_chrC(yp_int_t i) { return _yp_chrC(ypStr_CODE, i); }
 
-// Immortal constants
-
-yp_IMMORTAL_STR_LATIN_1(yp_s_ascii, "ascii");
-yp_IMMORTAL_STR_LATIN_1(yp_s_latin_1, "latin-1");
-yp_IMMORTAL_STR_LATIN_1(yp_s_utf_8, "utf-8");
-yp_IMMORTAL_STR_LATIN_1(yp_s_utf_16, "utf-16");
-yp_IMMORTAL_STR_LATIN_1(yp_s_utf_16be, "utf-16be");
-yp_IMMORTAL_STR_LATIN_1(yp_s_utf_16le, "utf-16le");
-yp_IMMORTAL_STR_LATIN_1(yp_s_utf_32, "utf-32");
-yp_IMMORTAL_STR_LATIN_1(yp_s_utf_32be, "utf-32be");
-yp_IMMORTAL_STR_LATIN_1(yp_s_utf_32le, "utf-32le");
-yp_IMMORTAL_STR_LATIN_1(yp_s_ucs_2, "ucs-2");
-yp_IMMORTAL_STR_LATIN_1(yp_s_ucs_4, "ucs-4");
-
-yp_IMMORTAL_STR_LATIN_1(yp_s_strict, "strict");
-yp_IMMORTAL_STR_LATIN_1(yp_s_replace, "replace");
-yp_IMMORTAL_STR_LATIN_1(yp_s_ignore, "ignore");
-yp_IMMORTAL_STR_LATIN_1(yp_s_xmlcharrefreplace, "xmlcharrefreplace");
-yp_IMMORTAL_STR_LATIN_1(yp_s_backslashreplace, "backslashreplace");
-yp_IMMORTAL_STR_LATIN_1(yp_s_surrogateescape, "surrogateescape");
-yp_IMMORTAL_STR_LATIN_1(yp_s_surrogatepass, "surrogatepass");
-
 #pragma endregion str
 
 
@@ -9808,7 +10038,6 @@ yp_IMMORTAL_STR_LATIN_1(yp_s_surrogatepass, "surrogatepass");
 // XXX Since it's not likely that anything other than str and bytes will need to implement these
 // methods, they are left out of the type's method table.  This may change in the future.
 
-// XXX Setting name requires knowing what yp_IMMORTAL_STR_LATIN_1 calls its struct
 // clang-format off
 static ypStringLib_encinfo ypStringLib_encs[4] = {
         {
@@ -10966,6 +11195,24 @@ static ypObject *tuple_dealloc(ypObject *sq, void *memo)
     return yp_None;
 }
 
+static ypObject *tuple_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    return yp_tuple(argarray[0]);
+}
+
+yp_IMMORTAL_FUNCTION_static(tuple_type_function, tuple_type_function_code,
+        ({yp_CONST_REF(yp_s_iterable), _yp_tuple_empty}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
+static ypObject *list_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    return yp_list(argarray[0]);
+}
+
+yp_IMMORTAL_FUNCTION_static(list_type_function, list_type_function_code,
+        ({yp_CONST_REF(yp_s_iterable), _yp_tuple_empty}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
 static ypSequenceMethods ypTuple_as_sequence = {
         tuple_concat,                 // tp_concat
         tuple_repeat,                 // tp_repeat
@@ -10991,10 +11238,11 @@ static ypTypeObject ypTuple_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        tuple_dealloc,   // tp_dealloc
-        tuple_traverse,  // tp_traverse
-        NULL,            // tp_str
-        NULL,            // tp_repr
+        yp_CONST_REF(tuple_type_function),  // tp_type_function
+        tuple_dealloc,                      // tp_dealloc
+        tuple_traverse,                     // tp_traverse
+        NULL,                               // tp_str
+        NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,      // tp_freeze
@@ -11081,10 +11329,11 @@ static ypTypeObject ypList_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        tuple_dealloc,   // tp_dealloc
-        tuple_traverse,  // tp_traverse
-        NULL,            // tp_str
-        NULL,            // tp_repr
+        yp_CONST_REF(list_type_function),  // tp_type_function
+        tuple_dealloc,                     // tp_dealloc
+        tuple_traverse,                    // tp_traverse
+        NULL,                              // tp_str
+        NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,      // tp_freeze
@@ -13755,6 +14004,26 @@ static ypObject *frozenset_dealloc(ypObject *so, void *memo)
     return yp_None;
 }
 
+static ypObject *frozenset_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    return yp_frozenset(argarray[0]);
+}
+
+yp_IMMORTAL_FUNCTION_static(frozenset_type_function, frozenset_type_function_code,
+        ({yp_CONST_REF(yp_s_iterable), _yp_frozenset_empty},
+                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
+static ypObject *set_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    return yp_set(argarray[0]);
+}
+
+yp_IMMORTAL_FUNCTION_static(set_type_function, set_type_function_code,
+        ({yp_CONST_REF(yp_s_iterable), _yp_frozenset_empty},
+                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
 static ypSetMethods ypFrozenSet_as_set = {
         frozenset_isdisjoint,  // tp_isdisjoint
         frozenset_issubset,    // tp_issubset
@@ -13777,10 +14046,11 @@ static ypTypeObject ypFrozenSet_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        frozenset_dealloc,   // tp_dealloc
-        frozenset_traverse,  // tp_traverse
-        NULL,                // tp_str
-        NULL,                // tp_repr
+        yp_CONST_REF(frozenset_type_function),  // tp_type_function
+        frozenset_dealloc,                      // tp_dealloc
+        frozenset_traverse,                     // tp_traverse
+        NULL,                                   // tp_str
+        NULL,                                   // tp_repr
 
         // Freezing, copying, and invalidating
         frozenset_freeze,             // tp_freeze
@@ -13862,10 +14132,11 @@ static ypTypeObject ypSet_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        frozenset_dealloc,   // tp_dealloc
-        frozenset_traverse,  // tp_traverse
-        NULL,                // tp_str
-        NULL,                // tp_repr
+        yp_CONST_REF(set_type_function),  // tp_type_function
+        frozenset_dealloc,                // tp_dealloc
+        frozenset_traverse,               // tp_traverse
+        NULL,                             // tp_str
+        NULL,                             // tp_repr
 
         // Freezing, copying, and invalidating
         frozenset_freeze,             // tp_freeze
@@ -14892,6 +15163,46 @@ static ypObject *frozendict_dealloc(ypObject *mp, void *memo)
     return yp_None;
 }
 
+static ypObject *frozendict_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 3, "unexpected argarray of length %d", n);
+
+    yp_ASSERT1(ypObject_TYPE_CODE(argarray[2]) == ypFrozenDict_CODE);
+    if (argarray[0] == _yp_frozendict_empty) {  // the default value
+        return yp_frozendict(argarray[2]);
+    } else if (ypDict_LEN(argarray[2]) < 1) {  // no keyword args
+        return yp_frozendict(argarray[0]);
+    } else {
+        // FIXME Need a yp_frozendict that merges multiple objects (yp_frozendictN?)
+        return yp_NotImplementedError;
+    }
+}
+
+yp_IMMORTAL_FUNCTION_static(frozendict_type_function, frozendict_type_function_code,
+        ({yp_CONST_REF(yp_s_object), _yp_frozendict_empty},
+                {yp_CONST_REF(yp_s_forward_slash), NULL},
+                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
+static ypObject *dict_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 3, "unexpected argarray of length %d", n);
+
+    yp_ASSERT1(ypObject_TYPE_CODE(argarray[2]) == ypFrozenDict_CODE);
+    if (argarray[0] == _yp_frozendict_empty) {  // the default value
+        return yp_dict(argarray[2]);
+    } else if (ypDict_LEN(argarray[2]) < 1) {  // no keyword args
+        return yp_dict(argarray[0]);
+    } else {
+        // FIXME Need a yp_dict that merges multiple objects (yp_dictN?)
+        return yp_NotImplementedError;
+    }
+}
+
+yp_IMMORTAL_FUNCTION_static(dict_type_function, dict_type_function_code,
+        ({yp_CONST_REF(yp_s_object), _yp_frozendict_empty},
+                {yp_CONST_REF(yp_s_forward_slash), NULL},
+                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
 static ypMappingMethods ypFrozenDict_as_mapping = {
         frozendict_miniiter_items,   // tp_miniiter_items
         frozendict_iter_items,       // tp_iter_items
@@ -14910,10 +15221,11 @@ static ypTypeObject ypFrozenDict_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        frozendict_dealloc,   // tp_dealloc
-        frozendict_traverse,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(frozendict_type_function),  // tp_type_function
+        frozendict_dealloc,                      // tp_dealloc
+        frozendict_traverse,                     // tp_traverse
+        NULL,                                    // tp_str
+        NULL,                                    // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,           // tp_freeze
@@ -14991,10 +15303,11 @@ static ypTypeObject ypDict_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        frozendict_dealloc,   // tp_dealloc
-        frozendict_traverse,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(dict_type_function),  // tp_type_function
+        frozendict_dealloc,                // tp_dealloc
+        frozendict_traverse,               // tp_traverse
+        NULL,                              // tp_str
+        NULL,                              // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,       // tp_freeze
@@ -15514,6 +15827,43 @@ static ypObject *range_dealloc(ypObject *r, void *memo)
     return yp_None;
 }
 
+static ypObject *range_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    // FIXME Bust this out to a `yp_range`, `yp_range3` that takes objects directly?
+    yp_ssize_t args_len = ypTuple_LEN(argarray[0]);
+    ypObject **args = ypTuple_ARRAY(argarray[0]);
+    ypObject * exc = yp_None;
+    yp_int_t   start;
+    yp_int_t   stop;
+    yp_int_t   step;
+
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(ypObject_TYPE_CODE(args) == ypTuple_CODE);
+
+    if (args_len == 1) {
+        start = 0;
+        stop = yp_asintC(args[0], &exc);
+        step = 1;
+    } else if (args_len == 2) {
+        start = yp_asintC(args[0], &exc);
+        stop = yp_asintC(args[1], &exc);
+        step = 1;
+    } else if (args_len == 3) {
+        start = yp_asintC(args[0], &exc);
+        stop = yp_asintC(args[1], &exc);
+        step = yp_asintC(args[2], &exc);
+    } else {
+        return yp_TypeError;
+    }
+    if (yp_isexceptionC(exc)) return exc;
+
+    return yp_rangeC3(start, stop, step);
+}
+
+// FIXME Do we want to special-case this call signature after all?
+yp_IMMORTAL_FUNCTION_static(
+        range_type_function, range_type_function_code, ({yp_CONST_REF(yp_s_star_args), NULL}));
+
 static ypSequenceMethods ypRange_as_sequence = {
         MethodError_objobjproc,       // tp_concat
         MethodError_objssizeproc,     // tp_repeat
@@ -15539,10 +15889,11 @@ static ypTypeObject ypRange_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        range_dealloc,        // tp_dealloc
-        NoRefs_traversefunc,  // tp_traverse
-        NULL,                 // tp_str
-        NULL,                 // tp_repr
+        yp_CONST_REF(range_type_function),  // tp_type_function
+        range_dealloc,                      // tp_dealloc
+        NoRefs_traversefunc,                // tp_traverse
+        NULL,                               // tp_str
+        NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,    // tp_freeze
@@ -15719,17 +16070,10 @@ typedef struct {
 yp_STATIC_ASSERT(
         yp_offsetof(ypFunctionState, data) % yp_MAX_ALIGNMENT == 0, alignof_function_state_data);
 
-struct _ypFunctionObject {
-    ypObject_HEAD;
-    // FIXME Move ob_state into yp_function_definition_t?
-    ypFunctionState *ob_state;  // NULL if no extra state
-    // XXX ob_def.parameters may or may not contain the parameters, so only access via ob_data.
-    yp_function_definition_t ob_def;
-};
 typedef struct _ypFunctionObject ypFunctionObject;
 
 #define ypFunction_FLAGS(f) (((ypObject *)(f))->ob_type_flags)
-#define ypFunction_STATE(f) (((ypFunctionObject *)f)->ob_state)
+#define ypFunction_STATE(f) ((ypFunctionState *)((ypFunctionObject *)f)->ob_state)
 #define ypFunction_DEFINITION(f) (&(((ypFunctionObject *)f)->ob_def))
 #define ypFunction_PARAMS(f) ((yp_function_parameter_t *)((ypObject *)f)->ob_data)
 #define ypFunction_PARAMS_LEN ypObject_CACHED_LEN
@@ -15746,11 +16090,6 @@ typedef struct _ypFunctionObject ypFunctionObject;
 // For use internally to detect when a key is missing from a dict.
 yp_IMMORTAL_INVALIDATED(ypFunction_key_missing);
 
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_args, "*args");
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_star_kwargs, "**kwargs");
-
 
 // Returns an immortal representing the kind of parameter according to yp_function_parameter_t.name,
 // or an exception. Performs only minimal validation; in particular, this does not validate that the
@@ -15759,7 +16098,7 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_star_kwargs, "**kwargs");
 static ypObject *_ypFunction_parameter_kind(ypObject *name)
 {
     yp_ssize_t                len;
-    const void* name_data;
+    const void *              name_data;
     ypStringLib_getindexXfunc getindexX;
 
     if (ypObject_TYPE_CODE(name) != ypStr_CODE) {
@@ -15950,7 +16289,7 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
             // do *not* consume the **kwargs parameter
             break;  // will ensure no remaining positional arguments
         } else if (param_kind == yp_None) {
-            arg = iter->next(args); // new ref
+            arg = iter->next(args);  // new ref
             if (arg == NULL) {
                 // End of positional arguments. Do *not* consume the parameter: it may be in kwargs.
                 return yp_None;
@@ -16061,7 +16400,7 @@ static ypObject *_ypFunction_call_place_kwargs(
             (*n)++;          // consume the parameter
             return yp_None;  // **kwarg, if present, is always last
         } else if (param_kind == yp_None) {
-            arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing); // new ref
+            arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing);  // new ref
             if (yp_isexceptionC(arg)) return arg;
             if (arg != ypFunction_key_missing) {
                 argarray[*n] = arg;
@@ -16151,6 +16490,8 @@ static ypObject *ypFunction_call_QuickIter(ypObject *f, ypObject *callable,
     ypObject **argarray;
     ypObject * result;
 
+    yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
+
     if (params_len <= yp_lengthof_array(storage)) {
         argarray = storage;
     } else {
@@ -16179,6 +16520,8 @@ static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_li
     yp_ssize_t params_len = ypFunction_PARAMS_LEN(f);
     yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
 
+    yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
+
     // XXX Resist temptation: only add special cases when it's easy AND common.
     if (params_len < 1) {
         if (n > 0) return yp_TypeError;
@@ -16195,7 +16538,7 @@ static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_li
         return result;
 
     } else if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
-        ypObject *argarray[] = {yp_tupleNV(n, args), _yp_frozendict_empty};
+        ypObject *argarray[] = {yp_tupleNV(n, args), _yp_frozendict_empty};  // new ref
         if (yp_isexceptionC(argarray[0])) return argarray[0];
         result = ypFunction_CODE_FUNC(f)(callable, 2, argarray);
         yp_decref(argarray[0]);
@@ -16217,6 +16560,8 @@ static ypObject *ypFunction_call_stars(
 {
     yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
     ypObject * result;
+
+    yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
 
     // XXX Resist temptation: only add special cases when it's easy AND common.
     if (param_flags == (ypFunction_FLAG_HAS_VAR_POS | ypFunction_FLAG_HAS_VAR_KW)) {
@@ -16255,6 +16600,8 @@ static ypObject *ypFunction_call_array(
     ypObject * result;
     yp_ssize_t params_len = ypFunction_PARAMS_LEN(f);
     yp_uint8_t param_flags = ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS;
+
+    yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
 
     // XXX Resist temptation: only add special cases when it's easy AND common.
     if (params_len < 1) {
@@ -16336,7 +16683,14 @@ static ypObject *function_dealloc(ypObject *f, void *memo)
     return yp_None;
 }
 
-// FIXME Review that correct exceptions returned for not supported methods
+static ypObject *function_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    return yp_NotImplementedError;
+}
+
+yp_IMMORTAL_FUNCTION_static(function_type_function, function_type_function_code,
+        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+
 static ypCallableMethods ypFunction_as_callable = {
         TRUE,              // tp_iscallable
         function_function  // tp_function
@@ -16347,10 +16701,11 @@ static ypTypeObject ypFunction_Type = {
         NULL,  // tp_name
 
         // Object fundamentals
-        function_dealloc,   // tp_dealloc
-        function_traverse,  // tp_traverse
-        NULL,               // tp_str
-        NULL,               // tp_repr
+        yp_CONST_REF(function_type_function),  // tp_type_function
+        function_dealloc,                      // tp_dealloc
+        function_traverse,                     // tp_traverse
+        NULL,                                  // tp_str
+        NULL,                                  // tp_repr
 
         // Freezing, copying, and invalidating
         MethodError_objproc,       // tp_freeze
@@ -16907,7 +17262,7 @@ ypObject *yp_callNV(ypObject *c, int n, va_list args)
     } else {
         ypObject *result;
         ypObject *f = ypObject_TYPE(c)->tp_as_callable->tp_function(c);
-        if (yp_isexceptionC(f)) return f;
+        if (ypObject_TYPE_CODE(f) != ypFunction_CODE) return_yp_BAD_TYPE(f);
         result = ypFunction_callNV(f, c, n, args);
         yp_decref(f);
         return result;
@@ -16921,7 +17276,7 @@ ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)
     } else {
         ypObject *result;
         ypObject *f = ypObject_TYPE(c)->tp_as_callable->tp_function(c);
-        if (yp_isexceptionC(f)) return f;
+        if (ypObject_TYPE_CODE(f) != ypFunction_CODE) return_yp_BAD_TYPE(f);
         result = ypFunction_call_stars(f, c, args, kwargs);
         yp_decref(f);
         return result;
@@ -16935,7 +17290,7 @@ ypObject *yp_call_array(ypObject *c, yp_ssize_t n, ypObject *const *args)
     } else {
         ypObject *result;
         ypObject *f = ypObject_TYPE(c)->tp_as_callable->tp_function(c);
-        if (yp_isexceptionC(f)) return f;
+        if (ypObject_TYPE_CODE(f) != ypFunction_CODE) return_yp_BAD_TYPE(f);
         result = ypFunction_call_array(f, c, n, args);
         yp_decref(f);
         return result;
@@ -17138,40 +17493,13 @@ void yp_s2i_setitemC4(
  *************************************************************************************************/
 #pragma region functions_as_objects
 
-// yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");  // Preceeding arguments positional-only
-// yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");           // Remaining arguments keyword-only
-
-// FIXME rename?
-#define _yp_DEF_UNPACK(...) __VA_ARGS__
-
-#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                               \
-    static yp_function_parameter_t  _##name##_parameters[] = {_yp_DEF_UNPACK parameters}; \
-    static struct _ypFunctionObject _##name##_struct = {                                  \
-            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, _##name##_parameters,             \
-                    yp_lengthof_array(_##name##_parameters)),                             \
-            NULL, {code}};                                                                \
-    qual ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
-
-#define yp_IMMORTAL_FUNCTION(name, code, parameters) \
-    _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, code, parameters)
-#define yp_IMMORTAL_FUNCTION_static(name, code, parameters) \
-    _yp_IMMORTAL_FUNCTION(static, name, code, parameters)
-
-// FIXME We could have ways to wrap some common function signatures, perhaps function state has
-// pointer to the C function... (although how to set defaults?)
-
-
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_i, "i");
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
-
-
-static ypObject *yp_func_chr_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
+static ypObject *yp_func_chr_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
     ypObject *exc = yp_None;
     yp_int_t  i;
 
-    if (n != 1) return yp_SystemError;  // have the number of params changed?
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+
     i = yp_asintC(argarray[0], &exc);
     if (yp_isexceptionC(exc)) return exc;
 
@@ -17181,12 +17509,12 @@ static ypObject *yp_func_chr_code(ypObject *function, yp_ssize_t n, ypObject *co
 yp_IMMORTAL_FUNCTION(yp_func_chr, yp_func_chr_code,
         ({yp_CONST_REF(yp_s_i), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
-static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
+static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
     ypObject *exc = yp_None;
     yp_hash_t hash;
 
-    if (n != 1) return yp_SystemError;  // have the number of params changed?
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
 
     hash = yp_hashC(argarray[0], &exc);
     if (yp_isexceptionC(exc)) return exc;
@@ -17197,12 +17525,12 @@ static ypObject *yp_func_hash_code(ypObject *function, yp_ssize_t n, ypObject *c
 yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code,
         ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
-static ypObject *yp_func_len_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
+static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
     ypObject * exc = yp_None;
     yp_ssize_t len;
 
-    if (n != 1) return yp_SystemError;  // have the number of params changed?
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
 
     len = yp_lenC(argarray[0], &exc);
     if (yp_isexceptionC(exc)) return exc;
@@ -17213,9 +17541,9 @@ static ypObject *yp_func_len_code(ypObject *function, yp_ssize_t n, ypObject *co
 yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code,
         ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
-static ypObject *yp_func_reversed_code(ypObject *function, yp_ssize_t n, ypObject *const *argarray)
+static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    if (n != 1) return yp_SystemError;  // have the number of params changed?
+    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
     return yp_reversed(argarray[0]);
 };
 

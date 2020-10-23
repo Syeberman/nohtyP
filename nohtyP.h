@@ -277,6 +277,7 @@ ypAPI ypObject *yp_rangeC(yp_int_t stop);
 // source is NULL it is considered as having all null bytes; if len is negative source is
 // considered null terminated (and, therefore, will not contain the null byte).
 //  Ex: pre-allocate a bytearray of length 50: yp_bytearrayC(NULL, 50)
+// FIXME Shouldn't len go first?! Are we consistent with (len, array) everywhere?
 ypAPI ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
 ypAPI ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len);
 
@@ -301,6 +302,7 @@ ypAPI ypObject *yp_bytearray0(void);
 // in yp_bytesC.  The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
 // ascii-encoded source), while for errors it is yp_s_strict.  Equivalent to:
 //  yp_str3(yp_bytesC(source, len), encoding, errors)
+// FIXME Shouldn't len go first?!
 ypAPI ypObject *yp_str_frombytesC4(
         const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray_frombytesC4(
@@ -1564,7 +1566,7 @@ ypAPI ypObject *yp_type(ypObject *object);
 // that type.
 // FIXME yp_t_* could also be for tuples. Perhaps change to yp_type_*?
 ypAPI ypObject *const yp_t_invalidated;
-ypAPI ypObject *const yp_t_exception;
+ypAPI ypObject *const yp_t_exception; // FIXME Rename to yp_t_BaseException?
 ypAPI ypObject *const yp_t_type;
 ypAPI ypObject *const yp_t_NoneType;
 ypAPI ypObject *const yp_t_bool;

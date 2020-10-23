@@ -129,7 +129,7 @@ class c_ypObject_p(c_void_p):
     def from_param(cls, val):
         if isinstance(val, c_ypObject_p):
             return val
-        return ypObject.frompython(val)
+        return ypObject._from_python(val)
 
     def _yp_errcheck(self): pass
 
@@ -406,11 +406,12 @@ yp_func(c_ypObject_p, "yp_chrarray0", ())
 yp_func(c_ypObject_p, "yp_chrC", ((c_yp_int_t, "i"), ))
 
 # ypObject *yp_tupleN(int n, ...);
+# ypObject *yp_tupleNV(int n, va_list args);
 yp_func(c_ypObject_p, "yp_tupleN", (c_multiN_ypObject_p, ))
 
-# ypObject *yp_tupleNV(int n, va_list args);
 # ypObject *yp_listN(int n, ...);
 # ypObject *yp_listNV(int n, va_list args);
+yp_func(c_ypObject_p, "yp_listN", (c_multiN_ypObject_p, ))
 
 # ypObject *yp_tuple_repeatCN(yp_ssize_t factor, int n, ...);
 # ypObject *yp_tuple_repeatCNV(yp_ssize_t factor, int n, va_list args);
@@ -1196,10 +1197,11 @@ _yp_initialize(_yp_initparams)
 
 
 class ypObject(c_ypObject_p):
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         if cls is ypObject:
             raise NotImplementedError("can't instantiate ypObject directly")
-        return super().__new__(cls)
+
+        return _yp_call_stars(cls._yp_type, args, kwargs)
 
     def __init__(self, *args, **kwargs): pass
 
@@ -1222,10 +1224,12 @@ class ypObject(c_ypObject_p):
     _yptype2yp = {}
 
     @classmethod
-    def frompython(cls, pyobj):
-        """ypObject.frompython is a factory that returns the correct yp_* object based on the type
-        of pyobj.  All other .frompython class methods always return that exact type.
+    def _from_python(cls, pyobj):
+        """ypObject._from_python is a factory that returns the correct yp_* object based on the type
+        of pyobj.  All other _from_python class methods always return that exact type.
         """
+        if cls is not ypObject:
+            raise NotImplementedError(f'{cls.__name__}._from_python')
         if pyobj is None:
             return yp_None
         if isinstance(pyobj, ypObject):
@@ -1234,7 +1238,7 @@ class ypObject(c_ypObject_p):
             return pyobj._yp_type
         if cls is ypObject:
             cls = cls._pytype2yp[type(pyobj)]
-        return cls(pyobj)
+        return cls._from_python(pyobj)
 
     # __str__ and __repr__ must always return a Python str, but we want nohtyP-aware code to be
     # able to get the original yp_str object via _yp_str/_yp_repr
@@ -1262,6 +1266,8 @@ class ypObject(c_ypObject_p):
     def __ge__(self, other): return _yp_ge(self, other)
 
     def __gt__(self, other): return _yp_gt(self, other)
+
+    def _yp_iter(self): return _yp_iter(self)
 
     def __iter__(self): return _yp_iter(self)
 
@@ -1584,7 +1590,7 @@ class ypObject(c_ypObject_p):
         return (div_p[0], mod_p[0])
 
     def __rdivmod__(self, other):
-        return ypObject.frompython(other).__divmod__(self)
+        return ypObject._from_python(other).__divmod__(self)
 
 
 def pytype(yptype, pytypes):
@@ -1671,12 +1677,16 @@ c_ypObject_p_value("yp_None")
 
 @pytype(yp_t_bool, bool)
 class yp_bool(ypObject):
-    def __new__(cls, x=False):
+    def __new__(cls, x=False, /):
         if isinstance(x, ypObject):
-            return _yp_bool(x)
+            return _yp_callN(yp_t_bool, x)
         if isinstance(x, bool):
             return yp_True if x else yp_False
         raise TypeError("expected ypObject or bool in yp_bool")
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        return yp_True if pyobj else yp_False
 
     def _as_int(self): return yp_i_one if self.value == yp_True.value else yp_i_zero
 
@@ -1686,6 +1696,7 @@ class yp_bool(ypObject):
 
     def __bool__(self): return self.value == yp_True.value
 
+    # FIXME Remove these comparison overrides
     def __lt__(self, other): return bool(self) < other
 
     def __le__(self, other): return bool(self) <= other
@@ -1698,7 +1709,7 @@ class yp_bool(ypObject):
 
     def __gt__(self, other): return bool(self) > other
 
-    # TODO If/when nohtyP supports arithmetic on bool, remove these _as_int hacks
+    # TODO If/when nohtyP supports arithmetic on bool, remove these _as_int/_arithmetic hacks
     @staticmethod
     def _arithmetic(left, op, right):
         if isinstance(left, yp_bool):
@@ -1781,22 +1792,25 @@ class yp_iter(ypObject):
                 py_result = next(py_iter)
             except BaseException as e: # exceptions from the iterator get passed to nohtyP
                 return _yp_incref(_pyExc2yp[type(e)])
-            return _yp_incref(ypObject.frompython(py_result))
+            return _yp_incref(ypObject._from_python(py_result))
         except BaseException as e: # ensure unexpected exceptions don't crash the program
             traceback.print_exc()
             return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
-    def __new__(cls, object, sentinel=_yp_arg_missing):
+    def __new__(cls, object, sentinel=_yp_arg_missing, /):
         if sentinel is not _yp_arg_missing:
-            object = iter(object, sentinel)
-        if isinstance(object, ypObject):
-            return _yp_iter(object)
-        if isinstance(object, (_setlike_dictview, _values_dictview)):
-            return iter(object)
+            object = iter(object, sentinel) # FIXME Support in nohtyP
 
-        length_hint = operator.length_hint(object)
-        self = super().__new__(cls)
-        self._pyiter = iter(object)
+        if hasattr(object, "_yp_iter"):
+            return object._yp_iter()
+        else:
+            return yp_iter._from_python(object)
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        length_hint = operator.length_hint(pyobj)
+        self = c_ypObject_p.__new__(cls)
+        self._pyiter = iter(pyobj)
         self._pycallback = c_yp_generator_func_t(self._pygenerator_func)
         self.value = _yp_incref(_yp_generator_fromstructCN(self._pycallback, length_hint, 0, 0))
         return self
@@ -1809,11 +1823,11 @@ class yp_iter(ypObject):
 def _yp_iterable(iterable):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
-    # TODO As elsewhere, be strict here an only accept nohtyP types (make
-    # conversions explicit in tests)
-    if isinstance(iterable, c_ypObject_p):
+    # TODO As elsewhere, be strict here and only accept nohtyP types (make conversions explicit in
+    # tests)
+    if isinstance(iterable, c_ypObject_p): # FIXME Confirm where we ref ypObject vs c_ypObject_p
         return iterable
-    if isinstance(iterable, str):
+    if isinstance(iterable, str): # FIXME lookup all known Python types
         return yp_str(iterable)
     return yp_iter(iterable)
 
@@ -1827,13 +1841,9 @@ def yp_reversed(sequence, /):
 
 @pytype(yp_t_int, int)
 class yp_int(ypObject):
-    def __new__(cls, x=0, base=_yp_arg_missing):
-        if base is _yp_arg_missing:
-            if isinstance(x, int):
-                return _yp_intC(x)
-            return _yp_int(x)
-        else:
-            return _yp_int_baseC(x, base)
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_intC(pyobj)
 
     def _asint(self): return _yp_asintC(self, yp_None)
     # TODO When nohtyP has str/repr, use it instead of this faked-out version
@@ -1849,7 +1859,7 @@ c_ypObject_p_value("yp_i_neg_one")
 c_ypObject_p_value("yp_i_zero")
 c_ypObject_p_value("yp_i_one")
 c_ypObject_p_value("yp_i_two")
-ypObject_LEN_MAX = yp_int(0x7FFFFFFF)
+ypObject_LEN_MAX = _yp_intC(0x7FFFFFFF)
 
 
 def yp_len(obj, /):
@@ -1868,10 +1878,9 @@ def yp_hash(obj, /):
 
 @pytype(yp_t_float, float)
 class yp_float(ypObject):
-    def __new__(cls, x=0.0):
-        if isinstance(x, float):
-            return _yp_floatCF(x)
-        return _yp_float(x)
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_floatCF(pyobj)
 
     def _asfloat(self): return _yp_asfloatC(self, yp_None)
     # TODO When nohtyP has str/repr, use it instead of this faked-out version
@@ -1882,7 +1891,7 @@ class yp_float(ypObject):
 
 
 class _ypBytes(ypObject):
-    def __new__(cls, source=0, encoding=None, errors=None):
+    def __new__(cls, source=0, encoding=None, errors=None): # FIXME
         # TODO Seem to be missing yp_str, yp_bytes, etc
         if isinstance(source, str):
             return cls._ypBytes_constructor3(source, encoding, errors)
@@ -1930,6 +1939,11 @@ class yp_bytes(_ypBytes):
     _ypBytes_constructorC = _yp_bytesC
     _ypBytes_constructor3 = _yp_bytes3
     _ypBytes_constructor = _yp_bytes
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_bytesC(pyobj, len(pyobj))
+
     # TODO When nohtyP has str/repr, use it instead of this faked-out version
 
     def _yp_str(self): return yp_str(str(self._asbytes()))
@@ -1943,7 +1957,7 @@ class yp_bytes(_ypBytes):
 
     def decode(self, encoding="utf-8", errors="strict"):
         return _yp_str3(self, encoding, errors)
-_yp_bytes_empty = yp_bytes()
+_yp_bytes_empty = _yp_bytes0()
 
 
 @pytype(yp_t_bytearray, bytearray)
@@ -1952,6 +1966,10 @@ class yp_bytearray(_ypBytes):
     _ypBytes_constructor3 = _yp_bytearray3
     _ypBytes_constructor = _yp_bytearray
     # TODO When nohtyP has str/repr, use it instead of this faked-out version
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_bytearrayC(pyobj, len(pyobj))
 
     def _yp_str(self): return yp_str("bytearray(%r)" % self._asbytes())
     _yp_repr = _yp_str
@@ -1981,10 +1999,9 @@ class yp_bytearray(_ypBytes):
 
 # TODO When nohtyP has types that have string representations, update this
 # TODO Just generally move more of this logic into nohtyP, when available
-
-
 @pytype(yp_t_str, str)
 class yp_str(ypObject):
+    # FIXME Update to call in to type object
     def __new__(cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
             if object is _yp_arg_missing:
@@ -1992,9 +2009,7 @@ class yp_str(ypObject):
             if isinstance(object, ypObject):
                 return object._yp_str()
             if isinstance(object, str):
-                encoded = object.encode("utf-8", "surrogatepass")
-                return _yp_str_frombytesC4(encoded, len(encoded),
-                                           yp_s_utf_8, yp_s_surrogatepass)
+                return yp_str._from_python(object)
             raise TypeError("expected ypObject or str in yp_str")
         else:
             if object is _yp_arg_missing:
@@ -2006,6 +2021,11 @@ class yp_str(ypObject):
             if not isinstance(object, (bytes, bytearray, yp_bytes, yp_bytearray)):
                 raise TypeError("expected yp_bytes or yp_bytearray in yp_str (decoding)")
             return _yp_str3(object, encoding, errors)
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        encoded = pyobj.encode("utf-8", "surrogatepass")
+        return _yp_str_frombytesC4(encoded, len(encoded), yp_s_utf_8, yp_s_surrogatepass)
 
     def _get_encoded_size_encoding(self):
         encoded = c_char_pp(c_char_p())
@@ -2079,10 +2099,10 @@ _yp_str_enc2type = {
     yp_s_latin_1.value: (POINTER(c_uint8),  1),
     yp_s_ucs_2.value:   (POINTER(c_uint16), 2),
     yp_s_ucs_4.value:   (POINTER(c_uint32), 4)}
-_yp_str_empty = yp_str()
-yp_s_None = yp_str("None")
-yp_s_True = yp_str("True")
-yp_s_False = yp_str("False")
+_yp_str_empty = _yp_str0()
+yp_s_None = _yp_str_frombytesC2(b"None", 4)
+yp_s_True = _yp_str_frombytesC2(b"True", 4)
+yp_s_False = _yp_str_frombytesC2(b"False", 5)
 
 
 def yp_repr(object):
@@ -2111,10 +2131,14 @@ class _ypTuple(ypObject):
 
 @pytype(yp_t_tuple, tuple)
 class yp_tuple(_ypTuple):
-    def __new__(cls, iterable=_yp_arg_missing):
+    def __new__(cls, iterable=_yp_arg_missing, /):
         if iterable is _yp_arg_missing:
-            return _yp_tupleN()
-        return _yp_tuple(_yp_iterable(iterable))
+            return _yp_callN(yp_t_tuple)
+        return _yp_callN(yp_t_tuple, _yp_iterable(iterable))
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_tupleN(*pyobj)
 
     def _yp_errcheck(self):
         super()._yp_errcheck()
@@ -2126,13 +2150,17 @@ class yp_tuple(_ypTuple):
     def _yp_str(self):
         return yp_str("(%s)" % ", ".join(repr(x) for x in self))
     _yp_repr = _yp_str
-_yp_tuple_empty = yp_tuple()
+_yp_tuple_empty = _yp_tupleN()
 
 
 @pytype(yp_t_list, list)
 class yp_list(_ypTuple):
-    def __new__(cls, iterable=_yp_tuple_empty):
-        return _yp_list(_yp_iterable(iterable))
+    def __new__(cls, iterable=_yp_tuple_empty, /):
+        return _yp_callN(yp_t_list, _yp_iterable(iterable))
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_listN(*pyobj)
 
     @reprlib.recursive_repr("[...]")
     def _yp_str(self):
@@ -2175,8 +2203,8 @@ def yp_sorted(iterable, /, *, key=None, reverse=False):
 
 
 class _ypSet(ypObject):
-    def __new__(cls, iterable=_yp_tuple_empty):
-        return cls._ypSet_constructor(_yp_iterable(iterable))
+    def __new__(cls, iterable=_yp_tuple_empty, /):
+        return _yp_callN(cls._yp_type, _yp_iterable(iterable))
 
     @staticmethod
     def _bad_other(other): return not isinstance(other, (_ypSet, frozenset, set))
@@ -2250,30 +2278,32 @@ class _ypSet(ypObject):
 
 @pytype(yp_t_frozenset, frozenset)
 class yp_frozenset(_ypSet):
-    _ypSet_constructor = _yp_frozenset
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_frozensetN(*pyobj)
 
     def _yp_errcheck(self):
         super()._yp_errcheck()
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         # if len(self) < 1 and "_yp_frozenset_empty" in globals():
         #    assert self is _yp_frozenset_empty, "an empty frozenset should be _yp_frozenset_empty"
-_yp_frozenset_empty = yp_frozenset()
+_yp_frozenset_empty = _yp_frozensetN()
 
 
 @pytype(yp_t_set, set)
 class yp_set(_ypSet):
-    _ypSet_constructor = _yp_set
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_setN(*pyobj)
+
 
 # Python dict objects need to be passed through this then sent to the "K" version of the function;
 # all other objects can be converted to nohtyP and passed in thusly
-
-
 def _yp_flatten_dict(args):
-    keys = args.keys()
     retval = []
-    for key in keys:
+    for key, value in args.items():
         retval.append(key)
-        retval.append(args[key])
+        retval.append(value)
     return retval
 
 
@@ -2293,9 +2323,9 @@ def _yp_dict_iterable(iterable):
 class _setlike_dictview:
     def __init__(self, mp): self._mp = mp
 
-    def __iter__(self): return self._iter_func(self._mp)
+    def __iter__(self): return self._yp_iter()
 
-    def _as_set(self): return yp_set(self._iter_func(self._mp))
+    def _as_set(self): return yp_set(self._yp_iter())
 
     @staticmethod
     def _conv_other(other):
@@ -2333,17 +2363,23 @@ class _setlike_dictview:
 
 
 class _keys_dictview(_setlike_dictview):
-    _iter_func = staticmethod(_yp_iter_keys)
+    def _yp_iter(self):
+        return _yp_iter_keys(self._mp)
 
 
 class _values_dictview:
     def __init__(self, mp): self._mp = mp
 
-    def __iter__(self): return _yp_iter_values(self._mp)
+    def _yp_iter(self):
+        return _yp_iter_values(self._mp)
+
+    __iter__ = _yp_iter
 
 
 class _items_dictview(_setlike_dictview):
-    _iter_func = staticmethod(_yp_iter_items)
+    def _yp_iter(self):
+        return _yp_iter_items(self._mp)
+
 
 # TODO Adapt the Python test suite to test for frozendict, adding in tests similar to those found
 # between list/tuple and set/frozenset (ie the singleton empty frozendict, etc)
@@ -2351,7 +2387,7 @@ class _items_dictview(_setlike_dictview):
 
 @pytype(yp_t_dict, dict)
 class yp_dict(ypObject):
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs): # FIXME
         if len(args) == 0:
             return _yp_dictK(*_yp_flatten_dict(kwargs))
         if len(args) > 1:
@@ -2360,6 +2396,10 @@ class yp_dict(ypObject):
         if len(kwargs) > 0:
             _yp_updateK(self, *_yp_flatten_dict(kwargs))
         return self
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_dictK(*_yp_flatten_dict(pyobj))
 
     @classmethod
     def fromkeys(cls, seq, value=None): return _yp_dict_fromkeysN(value, *seq)
@@ -2391,14 +2431,9 @@ class yp_dict(ypObject):
 
 @pytype(yp_t_range, range)
 class yp_range(ypObject):
-    @staticmethod
-    def _new_range(start, stop, step=1):
-        return _yp_rangeC3(start, stop, step)
-
-    def __new__(cls, *args):
-        if len(args) == 1:
-            return _yp_rangeC(args[0])
-        return cls._new_range(*args)
+    @classmethod
+    def _from_python(cls, pyobj):
+        return _yp_rangeC3(pyobj.start, pyobj.stop, pyobj.step)
 
     def _yp_errcheck(self):
         super()._yp_errcheck()
@@ -2419,7 +2454,7 @@ class yp_range(ypObject):
             return yp_str("range(%d, %d)" % (self_start, self_end))
         return yp_str("range(%d, %d, %d)" % (self_start, self_end, self_step))
     _yp_repr = _yp_str
-_yp_range_empty = yp_range(0)
+_yp_range_empty = _yp_rangeC(0)
 
 
 @pytype(yp_t_function, type(lambda: 1))
