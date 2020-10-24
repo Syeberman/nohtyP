@@ -883,7 +883,7 @@ static yp_ssize_t _yp_recursion_limit = 1000;
 #pragma endregion utilities
 
 /*************************************************************************************************
- * Common immortals, both internal and external to nohtyP.c
+ * Common immortals, both internal-only and exported
  *************************************************************************************************/
 #pragma region common_immortals
 
@@ -899,15 +899,27 @@ static yp_ssize_t _yp_recursion_limit = 1000;
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 
 
-static struct _ypBoolObject _yp_True_struct;
-ypObject *const             yp_True;
-static struct _ypBoolObject _yp_False_struct;
-ypObject *const             yp_False;
+static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, NULL, 0);
+ypObject *const yp_None = yp_CONST_REF(yp_None);
+
+
+typedef struct _ypBoolObject {
+    ypObject_HEAD;
+    char value;
+} ypBoolObject;
+
+// There are exactly two bool objects
+// TODO Could initialize ypObject_CACHED_HASH here...in fact our value could be in CACHED_HASH.
+static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 1};
+ypObject *const     yp_True = yp_CONST_REF(yp_True);
+static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 0};
+ypObject *const     yp_False = yp_CONST_REF(yp_False);
 
 
 #define _ypInt_PREALLOC_START (-5)
 #define _ypInt_PREALLOC_END (257)
-static struct _ypIntObject _ypInt_pre_allocated[];
+typedef struct _ypIntObject ypIntObject;
+static ypIntObject          _ypInt_pre_allocated[_ypInt_PREALLOC_END - _ypInt_PREALLOC_START];
 
 // XXX Careful! Do not use ypInt_CONST_REF with a value that is not preallocated.
 #define ypInt_CONST_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i)-_ypInt_PREALLOC_START]))
@@ -1823,9 +1835,9 @@ void yp_decrefN(int n, ...)
 // Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
 
 typedef union {
-    struct {              // State for ypQuickIter_var_*
-        yp_ssize_t n;     // Number of variable arguments remaining
-        va_list    args;  // Current state of variable arguments ("owned")
+    struct {           // State for ypQuickIter_var_*
+        int     n;     // Number of variable arguments remaining
+        va_list args;  // Current state of variable arguments ("owned")
     } var;
     struct {                     // State for ypQuickIter_array_*
         yp_ssize_t       i;      // Index of next value to yield
@@ -3781,8 +3793,6 @@ static ypTypeObject ypNoneType_Type = {
 };
 
 // No constructors for nonetypes; there is exactly one, immortal object
-static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, NULL, 0);
-ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 #pragma endregion None
 
@@ -3794,10 +3804,7 @@ ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 
-typedef struct _ypBoolObject {
-    ypObject_HEAD;
-    char value;
-} ypBoolObject;
+// TODO Could store in ypObject_CACHED_HASH instead
 #define _ypBool_VALUE(b) (((ypBoolObject *)b)->value)
 
 static ypObject *bool_frozen_copy(ypObject *b) { return b; }
@@ -3912,13 +3919,6 @@ static ypTypeObject ypBool_Type = {
 
 
 // No constructors for bools; there are exactly two objects, and they are immortal
-
-// There are exactly two bool objects
-// TODO Could initialize ypObject_CACHED_HASH here
-static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 1};
-ypObject *const     yp_True = yp_CONST_REF(yp_True);
-static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 0};
-ypObject *const     yp_False = yp_CONST_REF(yp_False);
 
 #pragma endregion bool
 
@@ -8093,7 +8093,7 @@ static yp_uint8_t _ypBytes_asuint8C(ypObject *x, ypObject **exc)
     yp_uint8_t retval;
 
     asint = yp_index_asintC(x, &subexc);
-    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(retval, exc, subexc);
+    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(0, exc, subexc);
     retval = (yp_uint8_t)(asint & 0xFFu);
     if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_ValueError);
     return retval;
@@ -10687,7 +10687,6 @@ static ypObject *_ypTuple_new_from_miniiter(
 static ypObject *_ypTuple_new_from_iterable(int type, ypObject *iterable)
 {
     ypObject *  exc = yp_None;
-    ypObject *  newSq;
     ypObject *  result;
     yp_ssize_t  length_hint;
     yp_uint64_t mi_state;

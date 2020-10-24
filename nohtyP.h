@@ -1569,7 +1569,7 @@ ypAPI ypObject *yp_type(ypObject *object);
 // that type.
 // FIXME yp_t_* could also be for tuples. Perhaps change to yp_type_*?
 ypAPI ypObject *const yp_t_invalidated;
-ypAPI ypObject *const yp_t_exception; // FIXME Rename to yp_t_BaseException?
+ypAPI ypObject *const yp_t_exception;  // FIXME Rename to yp_t_BaseException?
 ypAPI ypObject *const yp_t_type;
 ypAPI ypObject *const yp_t_NoneType;
 ypAPI ypObject *const yp_t_bool;
