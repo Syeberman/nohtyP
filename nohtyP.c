@@ -268,7 +268,9 @@ typedef size_t yp_uhash_t;
 #define ypObject_LEN_INVALID _ypObject_LEN_INVALID
 
 // The largest length that can be stored in ob_len and ob_alloclen
+// TODO In the C unit tests, override this value to something very small, to test overflow handling
 #define ypObject_LEN_MAX ((yp_ssize_t)0x7FFFFFFF)
+yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_fits_in_ob_len);
 
 // The length, and allocated length, of the object
 // XXX Do not set a length >ypObject_LEN_MAX, or a negative length !=ypObject_LEN_INVALID
@@ -1942,8 +1944,8 @@ static ypObject *ypQuickIter_array_remaining_as_tuple(ypQuickIter_state *state)
     yp_ASSERT(state->array.i >= 0 && state->array.i <= state->array.n,
             "state->array.i should be in range(n+1)");
     result = yp_tuple_fromarray(
-            state->array.n - state->array.i, state->array.array + state->array.i));
-    state->array.i = state->array.n;
+            state->array.n - state->array.i, state->array.array + state->array.i);
+    state->array.i = state->array.n;  // yes, even on error
     return result;
 }
 
@@ -2476,7 +2478,7 @@ static ypObject *iter_dealloc(ypObject *i, void *memo)
 
 static ypObject *iter_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_iter(argarray[0]);
 }
 
@@ -3235,6 +3237,7 @@ yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc)
 
 yp_ssize_t yp_lenC(ypObject *x, ypObject **exc)
 {
+    // FIXME Rethink these "cached len/hash" optimizations: should we always call the method?
     yp_ssize_t len = ypObject_CACHED_LEN(x);
     ypObject * result;
 
@@ -3591,7 +3594,7 @@ static ypObject *type_function(ypObject *t) { return ((ypTypeObject *)t)->tp_typ
 
 static ypObject *type_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     // FIXME Are we asserting that all types are immortal?
     return yp_incref((ypObject *)ypObject_TYPE(argarray[0]));
 }
@@ -3702,7 +3705,7 @@ static ypObject *nonetype_currenthash(
 
 static ypObject *nonetype_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 0, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 0, "unexpected argarray of length %" PRIssize, n);
     return yp_None;
 }
 
@@ -3831,7 +3834,7 @@ static ypObject *bool_currenthash(
 
 static ypObject *bool_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_bool(argarray[0]);
 }
 
@@ -4158,7 +4161,7 @@ static ypObject *int_currenthash(
 
 static ypObject *int_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 3, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 3, "unexpected argarray of length %" PRIssize, n);
 
     if (argarray[2] == yp_None) {
         return yp_int(argarray[0]);
@@ -4178,7 +4181,7 @@ yp_IMMORTAL_FUNCTION_static(int_type_function, int_type_function_code,
 
 static ypObject *intstore_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 3, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 3, "unexpected argarray of length %" PRIssize, n);
 
     if (argarray[2] == yp_None) {
         return yp_intstore(argarray[0]);
@@ -5267,7 +5270,7 @@ static ypObject *float_currenthash(
 
 static ypObject *float_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_float(argarray[0]);
 }
 
@@ -5276,7 +5279,7 @@ yp_IMMORTAL_FUNCTION_static(float_type_function, float_type_function_code,
 
 static ypObject *floatstore_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_floatstore(argarray[0]);
 }
 
@@ -10375,7 +10378,7 @@ static ypTupleObject _yp_tuple_empty_struct = {{ypTuple_CODE, 0, 0, ypObject_REF
 // Return a new tuple/list object with the given alloclen.  If type is immutable and
 // alloclen_fixed is true (indicating the object will never grow), the data is placed inline
 // with one allocation.
-// XXX Check for the _yp_tuple_empty case first
+// XXX Check for the _yp_tuple_empty and ypTuple_ALLOCLEN_MAX cases first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypTuple_new(int type, yp_ssize_t alloclen, int alloclen_fixed)
@@ -10476,7 +10479,7 @@ static ypObject *_ypTuple_reattach_array(ypObject *sq, ypTuple_detached *detache
     return yp_None;
 }
 
-// XXX Check for the "_yp_tuple_empty" case first
+// XXX Check for the "_yp_tuple_empty" and ypTuple_ALLOCLEN_MAX cases first
 static ypObject *_ypTuple_new_from_array(int type, yp_ssize_t n, ypObject *const *array)
 {
     yp_ssize_t i;
@@ -10552,8 +10555,7 @@ static ypObject *_ypTuple_push(ypObject *sq, ypObject *x, yp_ssize_t growhint)
     ypObject *result;
     if (ypTuple_LEN(sq) > ypTuple_LEN_MAX - 1) return yp_MemorySizeOverflowError;
     if (ypTuple_ALLOCLEN(sq) < ypTuple_LEN(sq) + 1) {
-        if (growhint < 0) growhint = 0;
-        result = _ypTuple_extend_grow(sq, ypTuple_LEN(sq) + 1, growhint);
+        result = _ypTuple_extend_grow(sq, ypTuple_LEN(sq) + 1, MAX(growhint, 0));
         if (yp_isexceptionC(result)) return result;
     }
     ypTuple_ARRAY(sq)[ypTuple_LEN(sq)] = yp_incref(x);
@@ -10607,25 +10609,25 @@ static ypObject *_ypTuple_extend_from_miniiter(
 }
 
 // XXX Check for the "fellow tuple/list" case _before_ calling this function
-static ypObject *_ypTuple_extend_from_iterable(ypObject *sq, ypObject *iterable)
+static ypObject *_ypTuple_extend_from_iterable(
+        ypObject *sq, yp_ssize_t length_hint, ypObject *iterable)
 {
     ypObject *  exc = yp_None;
     ypObject *  result;
     yp_uint64_t mi_state;
     ypObject *  mi;
-    yp_ssize_t  length_hint;
 
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypTuple_CODE,
             "missed a 'fellow tuple/list' optimization");
 
-    mi = yp_miniiter(iterable, &mi_state);                        // new ref
-    length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc);  // zero on error
+    mi = yp_miniiter(iterable, &mi_state);  // new ref
     if (yp_isexceptionC(mi)) return mi;
     result = _ypTuple_extend_from_miniiter(sq, length_hint, &mi, &mi_state);
     yp_decref(mi);
     return result;
 }
 
+// Check for the ypTuple_ALLOCLEN_MAX case first
 static ypObject *_ypTuple_new_from_miniiter(
         int type, yp_ssize_t length_hint, ypObject **mi, yp_uint64_t *mi_state)
 {
@@ -10650,18 +10652,20 @@ static ypObject *_ypTuple_new_from_iterable(int type, ypObject *iterable)
     ypObject *  exc = yp_None;
     ypObject *  newSq;
     ypObject *  result;
-    yp_ssize_t  length_hint = yp_lenC(iterable, &exc);
+    yp_ssize_t  length_hint;
     yp_uint64_t mi_state;
     ypObject *  mi;
 
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypTuple_CODE,
             "missed a 'fellow tuple/list' optimization");
 
+    length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(iterable, &exc);
-        if (length_hint > ypTuple_LEN_MAX) length_hint = ypTuple_LEN_MAX;
+        if (length_hint > ypTuple_ALLOCLEN_MAX) length_hint = ypTuple_ALLOCLEN_MAX;
     } else if (length_hint < 1) {
+        // FIXME Should we be trusting len this much?
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_new_from_miniiter
         if (type == ypTuple_CODE) return _yp_tuple_empty;
         return _ypTuple_new(ypList_CODE, 0, /*alloclen_fixed=*/FALSE);
@@ -10693,8 +10697,9 @@ static ypObject *_ypTuple_concat_from_tuple(ypObject *sq, ypObject *x)
             return _ypTuple_new(ypList_CODE, 0, /*alloclen_fixed=*/FALSE);
         } else {
             // The concatenation is equal to x.
-            if (sq_type == ypTuple_CODE && ypObject_TYPE_CODE(x) == ypTuple_CODE)
+            if (sq_type == ypTuple_CODE && ypObject_TYPE_CODE(x) == ypTuple_CODE) {
                 return yp_incref(x);
+            }
             return _ypTuple_copy(sq_type, x);
         }
     } else if (ypTuple_LEN(x) < 1) {
@@ -10714,8 +10719,8 @@ static ypObject *_ypTuple_concat_from_tuple(ypObject *sq, ypObject *x)
             ypTuple_LEN(x) * yp_sizeof(ypObject *));
     for (i = 0; i < newLen; i++) yp_incref(ypTuple_ARRAY(newSq)[i]);
 
-    ypTuple_SET_LEN(sq, newLen);
-    return yp_None;
+    ypTuple_SET_LEN(newSq, newLen);
+    return newSq;
 }
 
 // Called by setslice to discard the items at sq[start:stop] and shift the items at sq[stop:] to
@@ -10845,14 +10850,15 @@ static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
 
     newSq = _ypTuple_new(sq_type, ypTuple_LEN(sq) + length_hint, /*alloclen_fixed=*/FALSE);
     if (yp_isexceptionC(newSq)) return newSq;
-    result = _ypTuple_extend_from_tuple(newSq, sq);
+    result = _ypTuple_extend_from_tuple(newSq, sq);  // FIXME We don't need extend's alloclen check
     if (!yp_isexceptionC(result)) {
-        result = _ypTuple_extend_from_iterable(newSq, iterable);
+        result = _ypTuple_extend_from_iterable(newSq, length_hint, iterable);
     }
     if (yp_isexceptionC(result)) {
         yp_decref(newSq);
         return result;
     }
+
     return newSq;
 }
 
@@ -10920,6 +10926,7 @@ static ypObject *tuple_getslice(ypObject *sq, yp_ssize_t start, yp_ssize_t stop,
         // If the result will be an exact copy, let the code below make that copy
     }
 
+    // No need to check ypTuple_LEN_MAX: the slice can't be larger than sq is already
     newSq = _ypTuple_new(sq_type, newLen, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newSq)) return newSq;
 
@@ -11079,9 +11086,11 @@ static ypObject *list_extend(ypObject *sq, ypObject *iterable)
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypTuple_CODE) {
         if (ypTuple_LEN(iterable) < 1) return yp_None;  // no change
         return _ypTuple_extend_from_tuple(sq, iterable);
+    } else {
+        ypObject * exc = yp_None;
+        yp_ssize_t length_hint = yp_length_hintC(iterable, &exc);
+        return _ypTuple_extend_from_iterable(sq, length_hint, iterable);
     }
-
-    return _ypTuple_extend_from_iterable(sq, iterable);
 }
 
 static ypObject *list_clear(ypObject *sq);
@@ -11341,7 +11350,7 @@ static ypObject *tuple_dealloc(ypObject *sq, void *memo)
 
 static ypObject *tuple_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_tuple(argarray[0]);
 }
 
@@ -11350,7 +11359,7 @@ yp_IMMORTAL_FUNCTION_static(tuple_type_function, tuple_type_function_code,
 
 static ypObject *list_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_list(argarray[0]);
 }
 
@@ -11569,7 +11578,19 @@ static ypObject *ypQuickIter_tuple_next(ypQuickIter_state *state)
 
 static ypObject *ypQuickIter_tuple_remaining_as_tuple(ypQuickIter_state *state)
 {
-    return yp_NotImplementedError;  // FIXME Implement
+    ypObject * sq = state->tuple.obj;
+    yp_ssize_t start = state->tuple.i;
+
+    state->tuple.i = ypTuple_LEN(sq);  // exhaust the QuickIter, even on error
+
+    if (start >= ypTuple_LEN(sq)) {
+        return _yp_tuple_empty;
+    } else if (start < 1 && ypObject_TYPE_CODE(sq) == ypTuple_CODE) {
+        return yp_incref(sq);
+    } else {
+        return _ypTuple_new_from_array(
+                ypTuple_CODE, ypTuple_LEN(sq) - start, ypTuple_ARRAY(sq) + start);
+    }
 }
 
 static yp_ssize_t ypQuickIter_tuple_length_hint(
@@ -14133,7 +14154,7 @@ static ypObject *frozenset_dealloc(ypObject *so, void *memo)
 
 static ypObject *frozenset_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_frozenset(argarray[0]);
 }
 
@@ -14143,7 +14164,7 @@ yp_IMMORTAL_FUNCTION_static(frozenset_type_function, frozenset_type_function_cod
 
 static ypObject *set_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_set(argarray[0]);
 }
 
@@ -15292,7 +15313,7 @@ static ypObject *frozendict_dealloc(ypObject *mp, void *memo)
 
 static ypObject *frozendict_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 3, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 3, "unexpected argarray of length %" PRIssize, n);
 
     yp_ASSERT1(ypObject_TYPE_CODE(argarray[2]) == ypFrozenDict_CODE);
     if (argarray[0] == _yp_frozendict_empty) {  // the default value
@@ -15312,7 +15333,7 @@ yp_IMMORTAL_FUNCTION_static(frozendict_type_function, frozendict_type_function_c
 
 static ypObject *dict_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 3, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 3, "unexpected argarray of length %" PRIssize, n);
 
     yp_ASSERT1(ypObject_TYPE_CODE(argarray[2]) == ypFrozenDict_CODE);
     if (argarray[0] == _yp_frozendict_empty) {  // the default value
@@ -15964,8 +15985,8 @@ static ypObject *range_type_function_code(ypObject *c, yp_ssize_t n, ypObject *c
     yp_int_t   stop;
     yp_int_t   step;
 
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
-    yp_ASSERT(ypObject_TYPE_CODE(args) == ypTuple_CODE);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
+    yp_ASSERT(ypObject_TYPE_CODE(argarray[0]) == ypTuple_CODE);
 
     if (args_len == 1) {
         start = 0;
@@ -17628,7 +17649,7 @@ static ypObject *yp_func_chr_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
     ypObject *exc = yp_None;
     yp_int_t  i;
 
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
 
     i = yp_asintC(argarray[0], &exc);
     if (yp_isexceptionC(exc)) return exc;
@@ -17644,7 +17665,7 @@ static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *a
     ypObject *exc = yp_None;
     yp_hash_t hash;
 
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
 
     hash = yp_hashC(argarray[0], &exc);
     if (yp_isexceptionC(exc)) return exc;
@@ -17660,7 +17681,7 @@ static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
     ypObject * exc = yp_None;
     yp_ssize_t len;
 
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
 
     len = yp_lenC(argarray[0], &exc);
     if (yp_isexceptionC(exc)) return exc;
@@ -17673,7 +17694,7 @@ yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code,
 
 static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 1, "unexpected argarray of length %d", n);
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
     return yp_reversed(argarray[0]);
 };
 

@@ -85,7 +85,7 @@ def yp_func_errcheck(result, func, args):
     return result
 
 
-def yp_func(retval, name, paramtuple, errcheck=True):
+def yp_func(retval, name, paramtuple, *, errcheck=True):
     """Defines a function in globals() that wraps the given C yp_* function."""
     # Gather all the information that ctypes needs
     params = tuple(yp_param(*x) for x in paramtuple)
