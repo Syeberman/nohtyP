@@ -4159,6 +4159,7 @@ static ypObject *int_currenthash(
     return yp_None;
 }
 
+static yp_int_t  yp_index_asintC(ypObject *x, ypObject **exc);
 static ypObject *int_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
     yp_ASSERT(n == 3, "unexpected argarray of length %" PRIssize, n);
@@ -4168,7 +4169,7 @@ static ypObject *int_type_function_code(ypObject *c, yp_ssize_t n, ypObject *con
     } else {
         // FIXME Move to a new yp_int_base (i.e. a version of yp_int_baseC that takes an object)
         ypObject *exc = yp_None;
-        yp_int_t  base = yp_asintC(argarray[2], &exc);
+        yp_int_t  base = yp_index_asintC(argarray[2], &exc);
         if (yp_isexceptionC(exc)) return exc;
         return yp_int_baseC(argarray[0], base);
     }
@@ -5130,30 +5131,49 @@ yp_int_t yp_asintC(ypObject *x, ypObject **exc)
     return_yp_CEXC_BAD_TYPE(0, exc, x);
 }
 
+// TODO Make this a public API? (all the yp_index_* functions.)
+// TODO Be consistent with Python's __index__.
+// Losslessly converts the integral object to a C integer. Raises yp_TypeError if x is not an
+// integral; in particular, a float will raise yp_TypeError.
+static yp_int_t yp_index_asintC(ypObject *x, ypObject **exc)
+{
+    int x_pair = ypObject_TYPE_PAIR_CODE(x);
+
+    if (x_pair == ypInt_CODE) {
+        return ypInt_VALUE(x);
+    } else if (x_pair == ypBool_CODE) {
+        return ypBool_IS_TRUE_C(x);
+    }
+    return_yp_CEXC_BAD_TYPE(0, exc, x);
+}
+
 // Defines the conversion functions.  Overflow checking is done by first truncating the value then
 // seeing if it equals the stored value.  Note that when yp_asintC raises an exception, it returns
 // zero, which can be represented in every integer type, so we won't override any yp_TypeError
 // errors.
 // TODO review http://blog.reverberate.org/2012/12/testing-for-integer-overflow-in-c-and-c.html
-#define _ypInt_PUBLIC_AS_C_FUNCTION(name, mask)                                           \
-    yp_##name##_t yp_as##name##C(ypObject *x, ypObject **exc)                             \
+#define _ypInt_PUBLIC_AS_C_FUNCTION(qual, index, name, mask)                              \
+    qual yp_##name##_t yp##index##_as##name##C(ypObject *x, ypObject **exc)               \
     {                                                                                     \
-        yp_int_t      asint = yp_asintC(x, exc);                                          \
+        yp_int_t      asint = yp##index##_asintC(x, exc);                                 \
         yp_##name##_t retval = (yp_##name##_t)(asint & (mask));                           \
         if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_OverflowError); \
         return retval;                                                                    \
     }
+#define _ypInt_PUBLIC_AS_C_FUNCTIONS(name, mask) \
+    _ypInt_PUBLIC_AS_C_FUNCTION(, , name, mask)  \
+            _ypInt_PUBLIC_AS_C_FUNCTION(static, _index, name, mask)
 // clang-format off
-_ypInt_PUBLIC_AS_C_FUNCTION(int8,   0xFF);
-_ypInt_PUBLIC_AS_C_FUNCTION(uint8,  0xFFu);
-_ypInt_PUBLIC_AS_C_FUNCTION(int16,  0xFFFF);
-_ypInt_PUBLIC_AS_C_FUNCTION(uint16, 0xFFFFu);
-_ypInt_PUBLIC_AS_C_FUNCTION(int32,  0xFFFFFFFF);
-_ypInt_PUBLIC_AS_C_FUNCTION(uint32, 0xFFFFFFFFu);
+_ypInt_PUBLIC_AS_C_FUNCTIONS(int8,   0xFF);
+_ypInt_PUBLIC_AS_C_FUNCTIONS(uint8,  0xFFu);
+_ypInt_PUBLIC_AS_C_FUNCTIONS(int16,  0xFFFF);
+_ypInt_PUBLIC_AS_C_FUNCTIONS(uint16, 0xFFFFu);
+_ypInt_PUBLIC_AS_C_FUNCTIONS(int32,  0xFFFFFFFF);
+_ypInt_PUBLIC_AS_C_FUNCTIONS(uint32, 0xFFFFFFFFu);
 #if defined(yp_ARCH_32_BIT)
 yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) < yp_sizeof(yp_int_t), sizeof_yp_ssize_lt_yp_int);
-_ypInt_PUBLIC_AS_C_FUNCTION(ssize,  (yp_ssize_t) 0xFFFFFFFF);
-_ypInt_PUBLIC_AS_C_FUNCTION(hash,   (yp_hash_t) 0xFFFFFFFF);
+_ypInt_PUBLIC_AS_C_FUNCTIONS(ssize,  (yp_ssize_t) 0xFFFFFFFF);
+_ypInt_PUBLIC_AS_C_FUNCTIONS(hash,   (yp_hash_t) 0xFFFFFFFF);
 #endif
 // clang-format on
 
@@ -5162,9 +5182,18 @@ yp_STATIC_ASSERT(yp_sizeof(yp_int_t) == 8, sizeof_yp_int);
 
 yp_int64_t yp_asint64C(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 
+static yp_int64_t yp_index_asint64C(ypObject *x, ypObject **exc) { return yp_index_asintC(x, exc); }
+
 yp_uint64_t yp_asuint64C(ypObject *x, ypObject **exc)
 {
     yp_int_t asint = yp_asintC(x, exc);
+    if (asint < 0) return_yp_CEXC_ERR((yp_uint64_t)asint, exc, yp_OverflowError);
+    return (yp_uint64_t)asint;
+}
+
+static yp_uint64_t yp_index_asuint64C(ypObject *x, ypObject **exc)
+{
+    yp_int_t asint = yp_index_asintC(x, exc);
     if (asint < 0) return_yp_CEXC_ERR((yp_uint64_t)asint, exc, yp_OverflowError);
     return (yp_uint64_t)asint;
 }
@@ -5174,7 +5203,11 @@ yp_STATIC_ASSERT(yp_sizeof(yp_ssize_t) == yp_sizeof(yp_int_t), sizeof_yp_ssize_e
 
 yp_ssize_t yp_asssizeC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 
+static yp_ssize_t yp_index_asssizeC(ypObject *x, ypObject **exc) { return yp_index_asintC(x, exc); }
+
 yp_hash_t yp_ashashC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
+
+static yp_hash_t yp_index_ashashC(ypObject *x, ypObject **exc) { return yp_index_asintC(x, exc); }
 #endif
 
 // TODO Make this a public API?
@@ -5182,6 +5215,8 @@ yp_hash_t yp_ashashC(ypObject *x, ypObject **exc) { return yp_asintC(x, exc); }
 // toward zero.  An important property is that yp_int_exact(x) will equal x.
 // XXX Inspired by Python's Decimal.to_integral_exact; yp_ArithmeticError may be replaced with a
 // more-specific sub-exception in the future
+// FIXME Decimal.to_integral_exact doesn't raise an error: it rounds! Python is tricky as to where
+// it is lossy and not, making it hard to come up with a name that is consistent with Python.
 // ypObject *yp_int_exact(ypObject *x);
 static yp_int_t yp_asint_exactLF(yp_float_t x, ypObject **exc);
 static yp_int_t yp_asint_exactC(ypObject *x, ypObject **exc)
@@ -5791,7 +5826,7 @@ static ypObject *_ypSequence_getdefault(ypObject *x, ypObject *key, ypObject *de
 {
     ypObject *    exc = yp_None;
     ypTypeObject *type = ypObject_TYPE(x);
-    yp_ssize_t    index = yp_asssizeC(key, &exc);
+    yp_ssize_t    index = yp_index_asssizeC(key, &exc);
     if (yp_isexceptionC(exc)) return exc;
     return type->tp_as_sequence->tp_getindex(x, index, defval);
 }
@@ -5800,7 +5835,7 @@ static ypObject *_ypSequence_setitem(ypObject *x, ypObject *key, ypObject *value
 {
     ypObject *    exc = yp_None;
     ypTypeObject *type = ypObject_TYPE(x);
-    yp_ssize_t    index = yp_asssizeC(key, &exc);
+    yp_ssize_t    index = yp_index_asssizeC(key, &exc);
     if (yp_isexceptionC(exc)) return exc;
     return type->tp_as_sequence->tp_setindex(x, index, value);
 }
@@ -5809,7 +5844,7 @@ static ypObject *_ypSequence_delitem(ypObject *x, ypObject *key)
 {
     ypObject *    exc = yp_None;
     ypTypeObject *type = ypObject_TYPE(x);
-    yp_ssize_t    index = yp_asssizeC(key, &exc);
+    yp_ssize_t    index = yp_index_asssizeC(key, &exc);
     if (yp_isexceptionC(exc)) return exc;
     return type->tp_as_sequence->tp_delindex(x, index);
 }
@@ -7684,7 +7719,7 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
     ypObject *result = yp_getitem(_yp_codecs_errors2handler, name);  // new ref
 
     yp_codecs_error_handler_func_t error_handler =
-            (yp_codecs_error_handler_func_t)yp_asssizeC(result, &exc);
+            (yp_codecs_error_handler_func_t)yp_index_asssizeC(result, &exc);
     yp_decref(result);
     if (yp_isexceptionC(exc)) {
         *_exc = exc;
@@ -8050,14 +8085,15 @@ static ypObject *_ypBytes_grow_onextend(
     return yp_None;
 }
 
-// As yp_asuint8C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
+// As yp_index_asuint8C, but raises yp_ValueError when out of range.
 static yp_uint8_t _ypBytes_asuint8C(ypObject *x, ypObject **exc)
 {
+    ypObject * subexc = yp_None;
     yp_int_t   asint;
     yp_uint8_t retval;
 
-    if (ypObject_TYPE_PAIR_CODE(x) != ypInt_CODE) return_yp_CEXC_BAD_TYPE(0, exc, x);
-    asint = yp_asintC(x, exc);
+    asint = yp_index_asintC(x, &subexc);
+    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(retval, exc, subexc);
     retval = (yp_uint8_t)(asint & 0xFFu);
     if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_ValueError);
     return retval;
@@ -9154,7 +9190,7 @@ static ypObject *_ypBytes(int type, ypObject *source)
         }
         return _ypBytes_copy(type, source, /*alloclen_fixed=*/TRUE);
     } else if (source_pair == ypInt_CODE) {
-        yp_ssize_t len = yp_asssizeC(source, &exc);
+        yp_ssize_t len = yp_index_asssizeC(source, &exc);
         if (yp_isexceptionC(exc)) return exc;
         if (len < 0) return yp_ValueError;
         return _ypBytesC(type, NULL, len);
@@ -9338,14 +9374,15 @@ static ypObject *_ypStr_grow_onextend(
     return yp_None;
 }
 
-// As yp_asuint32C, but raises yp_ValueError when value out of range and yp_TypeError if not an int
+// As yp_index_asuint32C, but raises yp_ValueError when out of range.
 static yp_uint32_t _ypStr_asuint32C(ypObject *x, ypObject **exc)
 {
+    ypObject *  subexc = yp_None;
     yp_int_t    asint;
     yp_uint32_t retval;
 
-    if (ypObject_TYPE_PAIR_CODE(x) != ypInt_CODE) return_yp_CEXC_BAD_TYPE(0, exc, x);
-    asint = yp_asintC(x, exc);
+    asint = yp_index_asintC(x, &subexc);
+    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(retval, exc, subexc);
     retval = (yp_uint32_t)(asint & 0xFFFFFFFFu);
     if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_ValueError);
     return retval;
@@ -15990,16 +16027,16 @@ static ypObject *range_type_function_code(ypObject *c, yp_ssize_t n, ypObject *c
 
     if (args_len == 1) {
         start = 0;
-        stop = yp_asintC(args[0], &exc);
+        stop = yp_index_asintC(args[0], &exc);
         step = 1;
     } else if (args_len == 2) {
-        start = yp_asintC(args[0], &exc);
-        stop = yp_asintC(args[1], &exc);
+        start = yp_index_asintC(args[0], &exc);
+        stop = yp_index_asintC(args[1], &exc);
         step = 1;
     } else if (args_len == 3) {
-        start = yp_asintC(args[0], &exc);
-        stop = yp_asintC(args[1], &exc);
-        step = yp_asintC(args[2], &exc);
+        start = yp_index_asintC(args[0], &exc);
+        stop = yp_index_asintC(args[1], &exc);
+        step = yp_index_asintC(args[2], &exc);
     } else {
         return yp_TypeError;
     }
@@ -17510,7 +17547,7 @@ void yp_o2i_pushC(ypObject **container, yp_int_t xC)
 yp_int_t yp_o2i_popC(ypObject **container, ypObject **exc)
 {
     ypObject *x = yp_pop(container);
-    yp_int_t  xC = yp_asintC(x, exc);
+    yp_int_t  xC = yp_index_asintC(x, exc);
     yp_decref(x);
     return xC;
 }
@@ -17518,7 +17555,7 @@ yp_int_t yp_o2i_popC(ypObject **container, ypObject **exc)
 yp_int_t yp_o2i_getitemC(ypObject *container, ypObject *key, ypObject **exc)
 {
     ypObject *x = yp_getitem(container, key);
-    yp_int_t  xC = yp_asintC(x, exc);
+    yp_int_t  xC = yp_index_asintC(x, exc);
     yp_decref(x);
     return xC;
 }
@@ -17651,7 +17688,7 @@ static ypObject *yp_func_chr_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
 
     yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
 
-    i = yp_asintC(argarray[0], &exc);
+    i = yp_index_asintC(argarray[0], &exc);
     if (yp_isexceptionC(exc)) return exc;
 
     return yp_chrC(i);
