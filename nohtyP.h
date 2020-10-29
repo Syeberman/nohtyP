@@ -283,7 +283,7 @@ ypAPI ypObject *yp_rangeC(yp_int_t stop);
 // source is NULL it is considered as having all null bytes; if len is negative source is
 // considered null terminated (and, therefore, will not contain the null byte).
 //  Ex: pre-allocate a bytearray of length 50: yp_bytearrayC(NULL, 50)
-// FIXME Shouldn't len go first?! Are we consistent with (len, array) everywhere?
+// FIXME Let's be consistent and always put "len" params before the thing they are sizing.
 ypAPI ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
 ypAPI ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len);
 
@@ -307,7 +307,7 @@ ypAPI ypObject *yp_bytearray0(void);
 // in yp_bytesC.  The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
 // ascii-encoded source), while for errors it is yp_s_strict.  Equivalent to:
 //  yp_str3(yp_bytesC(source, len), encoding, errors)
-// FIXME Shouldn't len go first?!
+// FIXME Let's be consistent and always put "len" params before the thing they are sizing.
 ypAPI ypObject *yp_str_frombytesC4(
         const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray_frombytesC4(
@@ -461,12 +461,7 @@ ypAPI ypObject *yp_function_withstatestructCN(
 ypAPI ypObject *yp_function_withstatestructCNV(
         yp_def_function_t *definition, void *state, yp_ssize_t size, int n, va_list args);
 
-
-// FIXME What about creating a function object that always returns a particular value?
 // FIXME Partial functions, created from other functions?
-// FIXME Statically-allocated immortal functions a la yp_IMMORTAL_STR_LATIN_1. Although, how to
-// catch errors in the function definition (i.e. required parameters after default parameters)?
-
 
 // XXX The file type will be added in a future version
 
@@ -841,8 +836,9 @@ ypAPI void yp_sort(ypObject **sequence);
 //  - if j>=len(s) and k>0, the slice ends after the last element
 //  - if j<-len(s) and k<0, the (reversed) slice ends after the first element
 
-// Immortal empty tuple object.
+// Immortal empty tuple and range objects.
 ypAPI ypObject *const yp_tuple_empty;
+ypAPI ypObject *const yp_range_empty;
 
 
 /*
@@ -927,6 +923,9 @@ ypAPI void yp_discard(ypObject **set, ypObject *x);
 // of yp_push calls on sets to determine the order of yp_pop'ped elements.
 ypAPI ypObject *yp_pop(ypObject **set);
 
+// Immortal empty frozenset object.
+ypAPI ypObject *const yp_frozenset_empty;
+
 
 /*
  * Mapping Operations
@@ -991,6 +990,9 @@ ypAPI void yp_updateKV(ypObject **mapping, int n, va_list args);
 // error, *mapping is discarded and set to an exception.
 ypAPI void yp_updateN(ypObject **mapping, int n, ...);
 ypAPI void yp_updateNV(ypObject **mapping, int n, va_list args);
+
+// Immortal empty frozendict object.
+ypAPI ypObject *const yp_frozendict_empty;
 
 
 /*
@@ -1221,27 +1223,23 @@ ypAPI ypObject *const yp_str_empty;
 // The syntax of format strings can be found in Python's documentation:
 //  https://docs.python.org/3/library/string.html#format-string-syntax
 
-// Returns a new reference to the result of the string formatting operation.  s can contain literal
-// text or replacement fields delimited by braces ("{" and "}").  Each replacement field contains
-// the numeric index of a positional argument.
+// Returns a new reference to the result of the string formatting operation. s can contain literal
+// text or replacement fields delimited by braces ("{" and "}"). Each replacement field contains the
+// numeric index of a positional argument. (Implementation note: this function is optimized for
+// in-order replacement field indices.)
 ypAPI ypObject *yp_formatN(ypObject *s, int n, ...);
 ypAPI ypObject *yp_formatNV(ypObject *s, int n, va_list args);
 
 // Similar to yp_formatN, except each replacement field contains the name of one of the n key/value
-// pairs (for a total of 2*n objects).
+// pairs (for a total of 2*n objects). (Implementation note: this function is optimized for
+// in-order replacement field names.)
 ypAPI ypObject *yp_formatK(ypObject *s, int n, ...);
 ypAPI ypObject *yp_formatKV(ypObject *s, int n, va_list args);
 
 // Similar to yp_formatN, except each replacement field can contain either the numeric index of an
-// item in sequence, or the name of a key from mapping.  Either sequence or mapping can be yp_None
-// to ignore that particular argument.
-// TODO Reconsider use of yp_None: perhaps expose yp_tuple_empty and yp_frozendict_empty
-ypAPI ypObject *yp_format_seq_map(ypObject *s, ypObject *sequence, ypObject *mapping);
-
-// Convenience methods for yp_format_seq_map(s, sequence, yp_None) and
-// yp_format_seq_map(s, yp_None, mapping), respectively.
-ypAPI ypObject *yp_format_seq(ypObject *s, ypObject *sequence);
-ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
+// item in sequence, or the name of a key from mapping. The Python-equivalent default for sequence
+// is yp_tuple_empty, while for mapping it is yp_frozendict_empty.
+ypAPI ypObject *yp_format(ypObject *s, ypObject *sequence, ypObject *mapping);
 
 
 /*
@@ -1271,8 +1269,8 @@ ypAPI ypObject *yp_call_array(ypObject *c, yp_ssize_t n, ypObject *const *args);
 
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
 // result of the call (which may be a new reference or an exception). Raises yp_TypeError if c is
-// not callable. Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
-// TODO Expose yp_tuple_empty and yp_frozendict_empty.
+// not callable. Equivalent to c(*args, **kwargs) in Python (hence the name "stars"). The
+// Python-equivalent default for args is yp_tuple_empty, while for kwargs it is yp_frozendict_empty.
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 
 // Describes one parameter of a function object.
@@ -1716,8 +1714,7 @@ ypAPI void     yp_i2i_setitemC(ypObject **container, yp_int_t key, yp_int_t x);
 
 // Operations on containers that map integers to strs
 // yp_i2s_getitemCX is documented below, as it must be used carefully.
-// FIXME yp_uint8_t* is confusing; make a yp_char_t, or yp_str_t (a pointer typedef...but we avoid
-// those)? Or stick with C-standard char, warts and all.
+// FIXME yp_uint8_t* is confusing; make a yp_char_t (here and everywhere).
 ypAPI void yp_i2s_setitemC4(
         ypObject **container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len);
 

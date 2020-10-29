@@ -2281,9 +2281,9 @@ class yp_frozenset(_ypSet):
     def _yp_errcheck(self):
         super()._yp_errcheck()
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if len(self) < 1 and "_yp_frozenset_empty" in globals():
-        #    assert self is _yp_frozenset_empty, "an empty frozenset should be _yp_frozenset_empty"
-_yp_frozenset_empty = _yp_frozensetN()
+        # if len(self) < 1 and "yp_frozenset_empty" in globals():
+        #    assert self is yp_frozenset_empty, "an empty frozenset should be yp_frozenset_empty"
+c_ypObject_p_value("yp_frozenset_empty")
 
 
 @pytype(yp_t_set, set)
@@ -2433,8 +2433,8 @@ class yp_range(ypObject):
 
     def _yp_errcheck(self):
         super()._yp_errcheck()
-        if len(self) < 1 and "_yp_range_empty" in globals():
-            assert self is _yp_range_empty, "an empty range should be _yp_range_empty"
+        if len(self) < 1 and "yp_range_empty" in globals():
+            assert self is yp_range_empty, "an empty range should be yp_range_empty"
     # TODO When nohtyP has str/repr, use it instead of this faked-out version
 
     def _yp_str(self):
@@ -2450,7 +2450,7 @@ class yp_range(ypObject):
             return yp_str("range(%d, %d)" % (self_start, self_end))
         return yp_str("range(%d, %d, %d)" % (self_start, self_end, self_step))
     _yp_repr = _yp_str
-_yp_range_empty = _yp_rangeC(0)
+c_ypObject_p_value("yp_range_empty")
 
 
 @pytype(yp_t_function, type(lambda: 1))

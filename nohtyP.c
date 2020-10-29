@@ -1037,6 +1037,11 @@ static ypIntObject _ypInt_pre_allocated[_ypInt_PREALLOC_END - _ypInt_PREALLOC_ST
 // XXX Careful! Do not use ypInt_CONST_REF with a value that is not preallocated.
 #define ypInt_CONST_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i)-_ypInt_PREALLOC_START]))
 
+ypObject *const yp_i_neg_one = ypInt_CONST_REF(-1);
+ypObject *const yp_i_zero = ypInt_CONST_REF(0);
+ypObject *const yp_i_one = ypInt_CONST_REF(1);
+ypObject *const yp_i_two = ypInt_CONST_REF(2);
+
 
 // Macros on ob_type_flags for string objects (bytes and str), used to index into
 // ypStringLib_encs.
@@ -5162,10 +5167,6 @@ static ypIntObject _ypInt_pre_allocated[] = {
 };
 // clang-format on
 
-ypObject *const yp_i_neg_one = ypInt_CONST_REF(-1);
-ypObject *const yp_i_zero = ypInt_CONST_REF(0);
-ypObject *const yp_i_one = ypInt_CONST_REF(1);
-ypObject *const yp_i_two = ypInt_CONST_REF(2);
 
 ypObject *yp_intC(yp_int_t value)
 {
@@ -16802,6 +16803,8 @@ static ypObject *ypFunction_callNV(ypObject *f, ypObject *callable, int n, va_li
 }
 
 // f is the function object, while callable is first argument to yp_call (which may also be f).
+// TODO Python has str.format_map because str.format will always create a new dict; what if instead
+// functions could be configured to accept any object for args/kwargs and pass through unchanged?
 static ypObject *ypFunction_call_stars(
         ypObject *f, ypObject *callable, ypObject *args, ypObject *kwargs)
 {
