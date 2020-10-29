@@ -366,8 +366,6 @@ yp_func(c_ypObject_p, "yp_bytes", ((c_ypObject_p, "source"), ))
 # ypObject *yp_bytearray(ypObject *source);
 yp_func(c_ypObject_p, "yp_bytearray", ((c_ypObject_p, "source"), ))
 
-# ypObject *yp_bytes0(void);
-yp_func(c_ypObject_p, "yp_bytes0", ())
 # ypObject *yp_bytearray0(void);
 yp_func(c_ypObject_p, "yp_bytearray0", ())
 
@@ -397,8 +395,6 @@ yp_func(c_ypObject_p, "yp_str", ((c_ypObject_p, "object"), ))
 # ypObject *yp_chrarray(ypObject *object);
 yp_func(c_ypObject_p, "yp_chrarray", ((c_ypObject_p, "object"), ))
 
-# ypObject *yp_str0(void);
-yp_func(c_ypObject_p, "yp_str0", ())
 # ypObject *yp_chrarray0(void);
 yp_func(c_ypObject_p, "yp_chrarray0", ())
 
@@ -1952,12 +1948,12 @@ class yp_bytes(_ypBytes):
     def _yp_errcheck(self):
         data, size = super()._yp_errcheck()
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if size < 1 and "_yp_bytes_empty" in globals():
-        #    assert self is _yp_bytes_empty, "an empty bytes should be _yp_bytes_empty"
+        # if size < 1 and "yp_bytes_empty" in globals():
+        #    assert self is yp_bytes_empty, "an empty bytes should be yp_bytes_empty"
 
     def decode(self, encoding="utf-8", errors="strict"):
         return _yp_str3(self, encoding, errors)
-_yp_bytes_empty = _yp_bytes0()
+c_ypObject_p_value("yp_bytes_empty")
 
 
 @pytype(yp_t_bytearray, bytearray)
@@ -2005,7 +2001,7 @@ class yp_str(ypObject):
     def __new__(cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing):
         if encoding is _yp_arg_missing and errors is _yp_arg_missing:
             if object is _yp_arg_missing:
-                return _yp_str0()
+                return yp_str_empty
             if isinstance(object, ypObject):
                 return object._yp_str()
             if isinstance(object, str):
@@ -2013,7 +2009,7 @@ class yp_str(ypObject):
             raise TypeError("expected ypObject or str in yp_str")
         else:
             if object is _yp_arg_missing:
-                object = _yp_bytes_empty
+                object = yp_bytes_empty
             if encoding is _yp_arg_missing:
                 encoding = yp_s_utf_8
             if errors is _yp_arg_missing:
@@ -2046,8 +2042,8 @@ class yp_str(ypObject):
             pass  # TODO ensure string contains at least one >0xFFFF character
         assert encoded[size] == 0, "missing null terminator"
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if size < 1 and "_yp_str_empty" in globals():
-        #    assert self is _yp_str_empty, "an empty str should be _yp_str_empty"
+        # if size < 1 and "yp_str_empty" in globals():
+        #    assert self is yp_str_empty, "an empty str should be yp_str_empty"
 
     # Just as yp_bool.__bool__ must return a bool, so too must this return a str
     def __str__(self): return self.encode()._asbytes().decode()
@@ -2099,7 +2095,7 @@ _yp_str_enc2type = {
     yp_s_latin_1.value: (POINTER(c_uint8),  1),
     yp_s_ucs_2.value:   (POINTER(c_uint16), 2),
     yp_s_ucs_4.value:   (POINTER(c_uint32), 4)}
-_yp_str_empty = _yp_str0()
+c_ypObject_p_value("yp_str_empty")
 yp_s_None = _yp_str_frombytesC2(b"None", 4)
 yp_s_True = _yp_str_frombytesC2(b"True", 4)
 yp_s_False = _yp_str_frombytesC2(b"False", 5)
@@ -2143,19 +2139,19 @@ class yp_tuple(_ypTuple):
     def _yp_errcheck(self):
         super()._yp_errcheck()
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if len(self) < 1 and "_yp_tuple_empty" in globals():
-        #    assert self is _yp_tuple_empty, "an empty tuple should be _yp_tuple_empty"
+        # if len(self) < 1 and "yp_tuple_empty" in globals():
+        #    assert self is yp_tuple_empty, "an empty tuple should be yp_tuple_empty"
     # TODO When nohtyP supports str/repr, replace this faked-out version
 
     def _yp_str(self):
         return yp_str("(%s)" % ", ".join(repr(x) for x in self))
     _yp_repr = _yp_str
-_yp_tuple_empty = _yp_tupleN()
+c_ypObject_p_value("yp_tuple_empty")
 
 
 @pytype(yp_t_list, list)
 class yp_list(_ypTuple):
-    def __new__(cls, iterable=_yp_tuple_empty, /):
+    def __new__(cls, iterable=yp_tuple_empty, /):
         return _yp_callN(yp_t_list, _yp_iterable(iterable))
 
     @classmethod
@@ -2203,7 +2199,7 @@ def yp_sorted(iterable, /, *, key=None, reverse=False):
 
 
 class _ypSet(ypObject):
-    def __new__(cls, iterable=_yp_tuple_empty, /):
+    def __new__(cls, iterable=yp_tuple_empty, /):
         return _yp_callN(cls._yp_type, _yp_iterable(iterable))
 
     @staticmethod

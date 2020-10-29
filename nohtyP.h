@@ -42,8 +42,8 @@
  *
  * These error handling methods are designed for a specific purpose: to allow combining multiple
  * function calls without checking for errors in-between.  When an exception object is used as
- * input to a function, it is immediately returned, allowing you to check for errors only at the
- * end of a block of code:
+ * input to a function, that function must return an exception, allowing you to check for errors
+ * only at the end of a block of code:
  *
  *      newdict = yp_dictK(0);            // newdict might be yp_MemoryError
  *      value = yp_getitem(olddict, key); // value could be yp_KeyError
@@ -73,13 +73,18 @@
  *  F - A version of "C" or "L" that accepts floats in place of ints
  *  N - n variable positional arguments follow
  *  K - n key/value arguments follow (for a total of n*2 arguments)
- *  V - A version of "N" or "K" that accepts a va_list in place of ...
+ *  NV, KV - A version of "N" or "K" that accepts a va_list in place of ...
  *  E - Errors modifying an object do not discard the object: instead, errors set *exc
  *  D - Discard after use (ie yp_IFd)
  *  X - Direct access to internal memory or borrowed objects; tread carefully!
  *  # (number) - A function with # inputs that otherwise shares the same name as another function
  */
 
+// FIXME Idea: This discard-on-error ypObject** idea is weird, and it can be easily misused if you
+// are modifying a borrowed reference (i.e you get a ypObject* parameter and use it directly). But
+// it may still be useful while building a new object. Should we call this our "builder pattern"
+// (postfix B)? Or, we could mimic __iadd__/etc and make it the "in-place" pattern (postfix I). In
+// either case, we'd drop the E and make &exc the default.
 
 /*
  * Header Prerequisites
@@ -245,6 +250,7 @@ ypAPI ypObject *yp_iter(ypObject *x);
 // will be created, and those references will be discarded when the iterator is deallocated.
 // length_hint is a clue to consumers of the iterator how many items will be yielded; use zero if
 // this is not known.  Further documentation for yp_generator_func_t can be found below.
+// FIXME Rename to yp_def_generator_t, to mirror yp_def_function_t, and include state/etc?
 typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
 ypAPI ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t length_hint, int n, ...);
 ypAPI ypObject *yp_generatorCNV(
@@ -294,8 +300,7 @@ ypAPI ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *er
 ypAPI ypObject *yp_bytes(ypObject *source);
 ypAPI ypObject *yp_bytearray(ypObject *source);
 
-// Returns a new reference to an empty bytes/bytearray.
-ypAPI ypObject *yp_bytes0(void);
+// Returns a new reference to an empty bytearray. (An empty bytes is exported as yp_bytes_empty.)
 ypAPI ypObject *yp_bytearray0(void);
 
 // Returns a new reference to a str/chrarray decoded from the given bytes.  source and len are as
@@ -325,8 +330,7 @@ ypAPI ypObject *yp_chrarray3(ypObject *source, ypObject *encoding, ypObject *err
 ypAPI ypObject *yp_str(ypObject *object);
 ypAPI ypObject *yp_chrarray(ypObject *object);
 
-// Returns a new reference to an empty str/chrarray.
-ypAPI ypObject *yp_str0(void);
+// Returns a new reference to an empty chrarray. (An empty str is exported as yp_str_empty.)
 ypAPI ypObject *yp_chrarray0(void);
 
 // Returns a new reference to the str representing a character whose Unicode codepoint is the
@@ -404,20 +408,20 @@ ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
 
 // FIXME Move these forward defs to one location?
-typedef struct _yp_function_definition_t yp_function_definition_t;
+typedef struct _yp_def_function_t yp_def_function_t;
 
 // FIXME Rewrite docs.
 // Returns a new reference to a function object whose implementation comes from code and whose
 // inputs are described by parameters.  Raises yp_FIXME if code contains no implementations, and
 // yp_ParameterSyntaxError if parameters fails validation.  Further documentation for
-// yp_function_definition_t and yp_function_parameters_t can be found below.
+// yp_def_function_t and yp_function_parameters_t can be found below.
 // FIXME Should parameters==NULL be a shortcut for something?  No parameters?  `*args, **kwargs`?
 // FIXME What about code==NULL?
 // FIXME Really think hard about which inputs to bury in typedefs and which to surface as C params.
 // For example, should code and parameters be in the same struct?
 // FIXME Should this be yp_functionC? yp_function should make a function object out of other
 // objects, right...? (We need a linter to ensure correct use of C suffix.)
-ypAPI ypObject *yp_function(yp_function_definition_t *definition);
+ypAPI ypObject *yp_function(yp_def_function_t *definition);
 
 // FIXME Rewrite docs.
 // Returns a new reference to a generator iterator object using the given code.  The given n objects
@@ -431,8 +435,8 @@ ypAPI ypObject *yp_function(yp_function_definition_t *definition);
 // FIXME Really think hard about the symmetry between these and yp_generator*.  Perhaps they should
 // all use a standard set of typedefs...i.e. remove some C params and make them structs.
 // FIXME Generator names this _fromstate...be consistent
-ypAPI ypObject *yp_function_withstateCN(yp_function_definition_t *definition, int n, ...);
-ypAPI ypObject *yp_function_withstateCNV(yp_function_definition_t *definition, int n, va_list args);
+ypAPI ypObject *yp_function_withstateCN(yp_def_function_t *definition, int n, ...);
+ypAPI ypObject *yp_function_withstateCNV(yp_def_function_t *definition, int n, va_list args);
 
 // FIXME Rewrite docs.
 // Similar to yp_functionCN, but accepts an arbitrary structure (or array) of the given size which
@@ -453,9 +457,9 @@ ypAPI ypObject *yp_function_withstateCNV(yp_function_definition_t *definition, i
 // FIXME Combine size, n, and args into a single structure that can be allocated statically
 // (here and in generators). A structure's definition is static, so why not its description?
 ypAPI ypObject *yp_function_withstatestructCN(
-        yp_function_definition_t *definition, void *state, yp_ssize_t size, int n, ...);
+        yp_def_function_t *definition, void *state, yp_ssize_t size, int n, ...);
 ypAPI ypObject *yp_function_withstatestructCNV(
-        yp_function_definition_t *definition, void *state, yp_ssize_t size, int n, va_list args);
+        yp_def_function_t *definition, void *state, yp_ssize_t size, int n, va_list args);
 
 
 // FIXME What about creating a function object that always returns a particular value?
@@ -837,6 +841,9 @@ ypAPI void yp_sort(ypObject **sequence);
 //  - if j>=len(s) and k>0, the slice ends after the last element
 //  - if j<-len(s) and k<0, the (reversed) slice ends after the first element
 
+// Immortal empty tuple object.
+ypAPI ypObject *const yp_tuple_empty;
+
 
 /*
  * Set Operations
@@ -1202,6 +1209,10 @@ ypAPI ypObject *yp_encode(ypObject *s);
 ypAPI ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_decode(ypObject *b);
 
+// Immortal empty bytes and str objects.
+ypAPI ypObject *const yp_bytes_empty;
+ypAPI ypObject *const yp_str_empty;
+
 
 /*
  * String Formatting Operations
@@ -1236,97 +1247,104 @@ ypAPI ypObject *yp_format_map(ypObject *s, ypObject *mapping);
 /*
  * Callable Operations
  */
+
 // XXX This section is a work-in-progress
 
-// C functions can be wrapped up into function objects and called.  It's also possible to call
-// certain other objects: for example, calling a type object constructs an object of that type.
+// C functions can be wrapped up into objects and called. It's also possible to call certain other
+// objects: for example, calling a type object generally constructs an object of that type.
 
-// XXX Yes, the proper name for this is `function`
+// FIXME "The type objects are also callable" give a better example.
 
-// Returns true (non-zero) if x appears callable, else false.  If this returns true, it is still
-// possible that a call fails, but if it is false, calling x will always raise yp_TypeError.
-// Always succeeds; if x is an exception false is returned.
-// TODO Python just calls this "callable()"
+// Returns true (non-zero) if x appears callable, else false. If this returns true, it is still
+// possible that a call fails, but if it is false, calling x will always raise yp_TypeError. Always
+// succeeds: if x is an exception false is returned. Equivalent to callable(x) in Python.
 ypAPI int yp_iscallableC(ypObject *x);
 
 // Calls c with n positional arguments, returning the result of the call (which may be a new
-// reference or an exception).  Returns yp_TypeError if c is not callable.
+// reference or an exception). Raises yp_TypeError if c is not callable.
 ypAPI ypObject *yp_callN(ypObject *c, int n, ...);
 ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 
-// Similar to yp_callN, except the arguments are stored in an array. args cannot be modified until
-// yp_call_array returns (FIXME do I need to say this?).
-// FIXME Document the optimization here?
+// Similar to yp_callN, except the arguments are stored in an array. args must not be modified until
+// yp_call_array returns.
 ypAPI ypObject *yp_call_array(ypObject *c, yp_ssize_t n, ypObject *const *args);
 
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
-// result of the call (which may be a new reference or an exception).  Returns yp_TypeError if c is
-// not callable.  Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
+// result of the call (which may be a new reference or an exception). Raises yp_TypeError if c is
+// not callable. Equivalent to c(*args, **kwargs) in Python (hence the name "stars").
 // TODO Expose yp_tuple_empty and yp_frozendict_empty.
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 
-// FIXME Stay consistent: https://docs.python.org/3/library/inspect.html#inspect.signature
-
-
 // Describes one parameter of a function object.
-typedef struct _yp_function_parameter_t {
-    // The name of the parameter as a str (perhaps created via yp_IMMORTAL_STR_LATIN_1).  The name
-    // must be a valid Python identifier.
-    // FIXME Also verify that the name is a valid Python identifier.
-    // FIXME Also /, *, *args, or **kwargs...so "name" may not be strictly correct.
-
-    // Name can be /, in which case the preceeding parameters are positional-only. / cannot be
-    // first. If / is in the middle, the corresponding argarray element will be NULL. If / is last,
-    // it is not included in argarray: thus, n will be one less than the number of parameters.
-
-    // FIXME test /-at-end behaviour thoroughly.
-
-    // Name can be *, in which case subsequent parameters are keyword-only. If * is first or in the
-    // middle, the corresponding argarray element will be NULL. * cannot be last.
+typedef struct _yp_def_parameter_t {
+    // The name of the parameter as a str. name must be a valid Python identifier, or one of the
+    // following special forms.
+    //
+    // If name is /, the preceeding parameters are positional-only. / cannot be the first parameter.
+    // If / is in the middle, the corresponding argarray element will be NULL. If / is last, it is
+    // not included in argarray, and n will be one less than the number of parameters. / cannot come
+    // after *, *args, or **kwargs.
+    //
+    // If name is *, the subsequent parameters are keyword-only. If * is first or in the middle, the
+    // corresponding argarray element will be NULL. * cannot be last, and cannot be immediately
+    // followed by **kwargs. At most one of * or *args may be present.
+    //
+    // If name starts with a single *, the corresponding argarray element will be a (possibly empty)
+    // tuple receiving any excess positional arguments. Any subsequent parameters are keyword-only.
+    // The string after * must be a valid Python identifier. Conventionally named *args.
+    //
+    // If name starts with **, the corresponding argarray element will be a (possibly empty)
+    // frozendict receiving any excess keyword arguments. If present, this parameter must be last.
+    // The string after ** must be a valid Python identifier. Conventionally named **kwargs.
+    //
+    // TODO Mention yp_s_forward_slash and friends here?
     ypObject *name;
 
-    // The default value for the parameter, or NULL if there is no default value.
+    // The default value for the parameter, or NULL if there is no default. Any subsequent
+    // positional parameters must also have defaults. Must be NULL for /, *, *args, and **kwargs.
+    // default_ _can_ be an exception.
     ypObject *default_;
+} yp_def_parameter_t;
 
-    // FIXME Annotation...or at least a placeholder for that (if we are inlined, we can't grow).
-} yp_function_parameter_t;
-
-// The signature of one or more C functions that can be wrapped up in a function object.
-// TODO Rename?  Maybe impl?  Or funcC?
-// TODO Rename other func_t to code_t or funcC_t?  i.e. Does "code" now mean a C function?
-typedef struct _yp_function_definition_t {
-    // FIXME valueerror if sizeof isn't a minimum?
-    // FIXME ...or just remove, because I don't track this for other immortals.
-    //     yp_ssize_t sizeof_struct;  // Set to sizeof(yp_function_definition_t) on allocation
+// Describes the interface and implementation of a function object.
+typedef struct _yp_def_function_t {
+    // Called by the yp_call* methods. c is the callable (i.e. the first argument to yp_call*).
+    // argarray is an array of n arguments, where argarray[i] corresponds to parameters[i]; argarray
+    // must not be modified. The return value must be a new or immortal reference, or an exception.
+    //
+    // In nohtyP, when an exception object is used as input to a function, the function must return
+    // an exception. Additionally, exceptions can be used as parameter defaults. As such, argarray
+    // might contain exceptions. This generally requires no special handling: any functions called
+    // from code must themselves handle exceptions this way, so code need only check the result of
+    // those function calls and return exceptions as appropriate.
+    ypObject *(*code)(ypObject *c, yp_ssize_t n, ypObject *const *argarray);
 
     // FIXME Flags to describe what's next in this struct (is it NV, stars, bytecode? Are there
     // annotations?)
+    // FIXME No unknown flags; flag for (*args), (**kwargs), and (*args, **kwargs)
+    // FIXME future flags to enable annotations
+    yp_uint32_t flags;
 
-    // Called by the yp_call* methods. c is the callable (i.e. the first argument to yp_call*).
-    // argarray is an array of n arguments, where argarray[i] corresponds to parameters[i]. The
-    // return value must be a new or immortal reference, or an exception.
+    // The number of elements in the parameters array.
+    yp_int32_t parameters_len;
 
-    // FIXME Specify what happens to keyword-only, *args, and **kwargs.
-    // FIXME use yp_function_stateCX to retrieve any state variables
-    // FIXME "if n is zero, argarray is NULL"
-    // FIXME argarray is read-only: do not modify.
-    // FIXME "If exceptions were passed to yp_call*, argarray _may_ contain those exceptions." This
-    // is an optimization so that chains of function calls aren't continuously checking.
-    ypObject *(*code)(ypObject *c, yp_ssize_t n, ypObject *const *argarray);
+    // Array of parameters. Errors in this array generally raise yp_ParameterSyntaxError.
+    yp_def_parameter_t *parameters;
 
-    // FIXME doc, name/qualname, state, return annotation, module....
+    // FIXME name/qualname, for sure (NULL for anonymous?)
 
-    // TODO Insert new parameters above (flags imply where the offset is)
-    // FIXME We need a length here, but in the object that length is stored in ob_len....
-    yp_function_parameter_t parameters[];
-} yp_function_definition_t;
-
-// TODO Yup, python allows any iterable for f(*arg) calls, just as it does for unpacking.
-// TODO In Python, when calling a function, * can be any iterable and ** any mapping.  However,
-// when the arguments are passed to `def a(*p, **k)`, p is _always_ a tuple and k _always_ a dict.
-// TODO However, unlike Python, use a frozendict for kwargs.
+    // FIXME doc, state, module....
+} yp_def_function_t;
 
 // TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
+
+// FIXME A convenience function to decref all objects in yp_def_function_t/yp_def_generator_t/etc,
+// but warn that it cannot contain borrowed references (as they would be stolen/decref'ed).
+
+// FIXME use yp_function_stateCX to retrieve any state variables...but how to document how to
+// get the function argument? Perhaps we state that _stateCX only applies if the callable is
+// a function.....hmmm.....or document for tp_function that code is not called with the func. Or
+// we need to add `ypObject *f` to code...
 
 ypAPI ypObject *const yp_func_chr;
 ypAPI ypObject *const yp_func_hash;
@@ -1746,7 +1764,7 @@ ypAPI void yp_s2i_setitemC4(
 // use these macros in a function, as the variable will be "deallocated" when the function returns,
 // and immortals should never be deallocated.  The following macros work as above, except the
 // variables are declared as "static ypObject * const".
-// FIXME Rename yp_IMMORTAL_INT to yp_IMMORTAL_INT_extern for clarity and consistency.
+// FIXME Make yp_IMMORTAL_INT/etc static, and yp_IMMORTAL_INT_extern extern. Remove NOQUAL.
 //      yp_IMMORTAL_INT_static(name, value);
 //      yp_IMMORTAL_BYTES_static(name, value);
 //      yp_IMMORTAL_STR_LATIN_1_static(name, value);
@@ -1761,42 +1779,45 @@ ypAPI void yp_s2i_setitemC4(
 
 // The exception objects that have direct Python counterparts.
 ypAPI ypObject *const yp_BaseException;
+ypAPI ypObject *const yp_SystemExit;
+ypAPI ypObject *const yp_KeyboardInterrupt;
+ypAPI ypObject *const yp_GeneratorExit;
 ypAPI ypObject *const yp_Exception;
 ypAPI ypObject *const yp_StopIteration;
-ypAPI ypObject *const yp_GeneratorExit;
 ypAPI ypObject *const yp_ArithmeticError;
-ypAPI ypObject *const yp_LookupError;
+ypAPI ypObject *const yp_FloatingPointError;
+ypAPI ypObject *const yp_OverflowError;
+ypAPI ypObject *const yp_ZeroDivisionError;
 ypAPI ypObject *const yp_AssertionError;
 ypAPI ypObject *const yp_AttributeError;
+ypAPI ypObject *const yp_BufferError;
 ypAPI ypObject *const yp_EOFError;
-ypAPI ypObject *const yp_FloatingPointError;
-ypAPI ypObject *const yp_OSError;
 ypAPI ypObject *const yp_ImportError;
+ypAPI ypObject *const yp_LookupError;
 ypAPI ypObject *const yp_IndexError;
 ypAPI ypObject *const yp_KeyError;
-ypAPI ypObject *const yp_KeyboardInterrupt;
 ypAPI ypObject *const yp_MemoryError;
 ypAPI ypObject *const yp_NameError;
-ypAPI ypObject *const yp_OverflowError;
+ypAPI ypObject *const yp_UnboundLocalError;
+ypAPI ypObject *const yp_OSError;
+ypAPI ypObject *const yp_ReferenceError;
 ypAPI ypObject *const yp_RuntimeError;
 ypAPI ypObject *const yp_NotImplementedError;
-ypAPI ypObject *const yp_ReferenceError;
+ypAPI ypObject *const yp_SyntaxError;
 ypAPI ypObject *const yp_SystemError;
-ypAPI ypObject *const yp_SystemExit;
 ypAPI ypObject *const yp_TypeError;
-ypAPI ypObject *const yp_UnboundLocalError;
+ypAPI ypObject *const yp_ValueError;
 ypAPI ypObject *const yp_UnicodeError;
 ypAPI ypObject *const yp_UnicodeEncodeError;
 ypAPI ypObject *const yp_UnicodeDecodeError;
 ypAPI ypObject *const yp_UnicodeTranslateError;
-ypAPI ypObject *const yp_ValueError;
-ypAPI ypObject *const yp_ZeroDivisionError;
-ypAPI ypObject *const yp_BufferError;
 
 // Raised when the object does not support the given method; subexception of yp_AttributeError.
 ypAPI ypObject *const yp_MethodError;
 // Raised when an allocation size calculation overflows; subexception of yp_MemoryError.
 ypAPI ypObject *const yp_MemorySizeOverflowError;
+// Raised on an error in a function's parameters definition; subexception of yp_SyntaxError.
+ypAPI ypObject *const yp_ParameterSyntaxError;
 // Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError.
 ypAPI ypObject *const yp_SystemLimitationError;
 // Raised when an invalidated object is passed to a function; subexception of yp_TypeError.
@@ -1837,7 +1858,7 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 // XXX Offsets will not change between versions: members from this struct will never be deleted,
 // only deprecated.
 typedef struct _yp_initialize_parameters_t {
-    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_initialize_parameters_t) on allocation
+    yp_ssize_t sizeof_struct;  // Set to sizeof(yp_initialize_parameters_t)
 
     // yp_malloc, yp_malloc_resize, and yp_free allow you to specify custom memory allocation APIs.
     // It is recommended to set these to NULL to use nohtyP's internal defaults.  Any functions you
