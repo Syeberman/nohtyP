@@ -43,6 +43,11 @@
 // TODO Look for places we use a borrowed reference from an object and then call arbitrary code:
 // that code could invalidate and thus discard the reference.
 
+// TODO Big, big difference in DLL sizes: 187 KB for MSVS 9.0 64-bit release to 1.6 MB for GCC 8
+// 64-bit release. What's using up so much space? Why are GCC release builds larger than debug?
+// Because we allow yp_malloc to be customized, can we lazy-load the malloc library? Are there other
+// libraries we can trim off.
+
 
 #include "nohtyP.h"
 #include <float.h>
@@ -1017,8 +1022,15 @@ typedef struct _ypFunctionObject {
             _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID); \
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 
+// For use internally as parameter defaults to detect when an argument was not supplied. yp_None
+// normally fills this purpose, but some functions need to reject None (i.e. yp_t_bytes must
+// reject None for encoding and errors.)
+// FIXME Could we just use NameError or some other exception?
+yp_IMMORTAL_INVALIDATED(yp_Arg_Missing);
 
-static ypObject _yp_None_struct = yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, NULL, 0);
+
+static ypObject _yp_None_struct =
+        yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, NULL, ypObject_LEN_INVALID);
 ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 
@@ -1103,6 +1115,8 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_star_kwargs, "**kwargs");
 
 // Parameter names of the built-in functions.
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_base, "base");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_encoding, "encoding");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_errors, "errors");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_i, "i");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_iterable, "iterable");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
@@ -7567,8 +7581,8 @@ static ypObject *_ypStringLib_encode_utf_8(int type, ypObject *source, ypObject 
     ypStringLib_ASSERT_INVARIANTS(source);
     yp_ASSERT(source_enc != ypStringLib_ENC_LATIN_1,
             "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings");
-    yp_ASSERT(source_len > 0,
-            "empty-string case should be handled before _ypStringLib_encode_utf_8");
+    yp_ASSERT(
+            source_len > 0, "empty-string case should be handled before _ypStringLib_encode_utf_8");
     maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 3 : 4;
 
     if (source_len > ypStringLib_LEN_MAX / maxCharSize) return yp_MemorySizeOverflowError;
@@ -8996,19 +9010,45 @@ static ypObject *bytes_dealloc(ypObject *b, void *memo)
 
 static ypObject *bytes_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    return yp_NotImplementedError;
+    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
+
+    if (argarray[2] != yp_Arg_Missing) {
+        ypObject *errors = argarray[3] == yp_Arg_Missing ? yp_s_strict : argarray[3];  // borrowed
+        return yp_bytes3(argarray[0], argarray[2], errors);
+    } else if (argarray[3] != yp_Arg_Missing) {
+        // Either "string argument without an encoding" or "errors without a string argument".
+        return yp_TypeError;
+    } else {
+        return yp_bytes(argarray[0]);
+    }
 }
 
 yp_IMMORTAL_FUNCTION_static(bytes_type_function, bytes_type_function_code,
-        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+        ({yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_bytes_empty)},
+                {yp_CONST_REF(yp_s_forward_slash), NULL},
+                {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},
+                {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)}));
 
 static ypObject *bytearray_type_function_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
-    return yp_NotImplementedError;
+    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
+
+    if (argarray[2] != yp_Arg_Missing) {
+        ypObject *errors = argarray[3] == yp_Arg_Missing ? yp_s_strict : argarray[3];  // borrowed
+        return yp_bytearray3(argarray[0], argarray[2], errors);
+    } else if (argarray[3] != yp_Arg_Missing) {
+        // Either "string argument without an encoding" or "errors without a string argument".
+        return yp_TypeError;
+    } else {
+        return yp_bytearray(argarray[0]);
+    }
 }
 
 yp_IMMORTAL_FUNCTION_static(bytearray_type_function, bytearray_type_function_code,
-        ({yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+        ({yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_bytes_empty)},
+                {yp_CONST_REF(yp_s_forward_slash), NULL},
+                {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},
+                {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)}));
 
 static ypSequenceMethods ypBytes_as_sequence = {
         bytes_concat,                 // tp_concat

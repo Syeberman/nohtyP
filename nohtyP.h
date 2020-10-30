@@ -289,6 +289,7 @@ ypAPI ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len);
 
 // Returns a new reference to a bytes/bytearray encoded from the given str or chrarray object.  The
 // Python-equivalent default for encoding is yp_s_utf_8, while for errors it is yp_s_strict.
+// FIXME Ensure None is rejected in both encoding and errors.
 ypAPI ypObject *yp_bytes3(ypObject *source, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *errors);
 

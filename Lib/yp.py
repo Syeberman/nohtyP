@@ -28,6 +28,9 @@ c_IN = 1
 c_OUT = 2
 c_INOUT = 3
 
+# There's a limit to the number of args in a ctypes call. ctypes doesn't export this.
+CTYPES_MAX_ARGCOUNT = 1024
+
 # Some standard C param/return types
 c_void = None  # only valid for return values
 c_char_pp = POINTER(c_char_p)
@@ -1220,9 +1223,10 @@ class ypObject(c_ypObject_p):
     _yptype2yp = {}
 
     @classmethod
-    def _from_python(cls, pyobj):
+    def _from_python(cls, pyobj, *, default=None):
         """ypObject._from_python is a factory that returns the correct yp_* object based on the type
-        of pyobj.  All other _from_python class methods always return that exact type.
+        of pyobj. All other _from_python class methods always return that exact type. If pyobj isn't
+        a known type then default is used (yp_iter, perhaps?).
         """
         if cls is not ypObject:
             raise NotImplementedError(f'{cls.__name__}._from_python')
@@ -1232,9 +1236,10 @@ class ypObject(c_ypObject_p):
             return pyobj
         if isinstance(pyobj, type) and issubclass(pyobj, ypObject):
             return pyobj._yp_type
-        if cls is ypObject:
-            cls = cls._pytype2yp[type(pyobj)]
-        return cls._from_python(pyobj)
+        subcls = ypObject._pytype2yp.get(type(pyobj), default)
+        if subcls is None:
+            raise NotImplementedError(f'no converters for {pyobj.__class__}')
+        return subcls._from_python(pyobj)
 
     # __str__ and __repr__ must always return a Python str, but we want nohtyP-aware code to be
     # able to get the original yp_str object via _yp_str/_yp_repr
@@ -1673,12 +1678,10 @@ c_ypObject_p_value("yp_None")
 
 @pytype(yp_t_bool, bool)
 class yp_bool(ypObject):
-    def __new__(cls, x=False, /):
-        if isinstance(x, ypObject):
-            return _yp_callN(yp_t_bool, x)
-        if isinstance(x, bool):
-            return yp_True if x else yp_False
-        raise TypeError("expected ypObject or bool in yp_bool")
+    def __new__(cls, *args, **kwargs):
+        if args and not isinstance(args[0], (ypObject, bool)):
+            raise TypeError("expected ypObject or bool in yp_bool")
+        return _yp_call_stars(cls._yp_type, args, kwargs)
 
     @classmethod
     def _from_python(cls, pyobj):
@@ -1819,13 +1822,7 @@ class yp_iter(ypObject):
 def _yp_iterable(iterable):
     """Returns a ypObject that nohtyP can iterate over directly, which may be iterable itself or a
     yp_iter based on iterable."""
-    # TODO As elsewhere, be strict here and only accept nohtyP types (make conversions explicit in
-    # tests)
-    if isinstance(iterable, c_ypObject_p): # FIXME Confirm where we ref ypObject vs c_ypObject_p
-        return iterable
-    if isinstance(iterable, str): # FIXME lookup all known Python types
-        return yp_str(iterable)
-    return yp_iter(iterable)
+    return ypObject._from_python(iterable, default=yp_iter)
 
 
 def yp_reversed(sequence, /):
@@ -1887,17 +1884,10 @@ class yp_float(ypObject):
 
 
 class _ypBytes(ypObject):
-    def __new__(cls, source=0, encoding=None, errors=None): # FIXME
-        # TODO Seem to be missing yp_str, yp_bytes, etc
-        if isinstance(source, str):
-            return cls._ypBytes_constructor3(source, encoding, errors)
-        elif isinstance(source, (int, yp_int)):
-            return cls._ypBytes_constructor(source)
-        elif isinstance(source, (bytes, bytearray)):
-            return cls._ypBytes_constructorC(source, len(source))
-        # else if it has the buffer interface
-        else:
-            return cls._ypBytes_constructor(_yp_iterable(source))
+    def __new__(cls, *args, **kwargs):
+        if args:
+            args = (_yp_iterable(args[0]), *args[1:])
+        return _yp_call_stars(cls._yp_type, args, kwargs)
 
     def _get_data_size(self):
         data = c_char_pp(c_char_p())
@@ -1932,10 +1922,6 @@ class _ypBytes(ypObject):
 
 @pytype(yp_t_bytes, bytes)
 class yp_bytes(_ypBytes):
-    _ypBytes_constructorC = _yp_bytesC
-    _ypBytes_constructor3 = _yp_bytes3
-    _ypBytes_constructor = _yp_bytes
-
     @classmethod
     def _from_python(cls, pyobj):
         return _yp_bytesC(pyobj, len(pyobj))
@@ -1958,9 +1944,6 @@ c_ypObject_p_value("yp_bytes_empty")
 
 @pytype(yp_t_bytearray, bytearray)
 class yp_bytearray(_ypBytes):
-    _ypBytes_constructorC = _yp_bytearrayC
-    _ypBytes_constructor3 = _yp_bytearray3
-    _ypBytes_constructor = _yp_bytearray
     # TODO When nohtyP has str/repr, use it instead of this faked-out version
 
     @classmethod
@@ -2111,6 +2094,11 @@ def yp_repr(object):
 
 
 class _ypTuple(ypObject):
+    def __new__(cls, *args, **kwargs):
+        if args:
+            args = (_yp_iterable(args[0]), *args[1:])
+        return _yp_call_stars(cls._yp_type, args, kwargs)
+
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__(self, other): return _yp_concat(self, other)
 
@@ -2127,13 +2115,10 @@ class _ypTuple(ypObject):
 
 @pytype(yp_t_tuple, tuple)
 class yp_tuple(_ypTuple):
-    def __new__(cls, iterable=_yp_arg_missing, /):
-        if iterable is _yp_arg_missing:
-            return _yp_callN(yp_t_tuple)
-        return _yp_callN(yp_t_tuple, _yp_iterable(iterable))
-
     @classmethod
     def _from_python(cls, pyobj):
+        if len(pyobj) > CTYPES_MAX_ARGCOUNT:
+            return _yp_tuple(yp_iter._from_python(pyobj))
         return _yp_tupleN(*pyobj)
 
     def _yp_errcheck(self):
@@ -2151,11 +2136,10 @@ c_ypObject_p_value("yp_tuple_empty")
 
 @pytype(yp_t_list, list)
 class yp_list(_ypTuple):
-    def __new__(cls, iterable=yp_tuple_empty, /):
-        return _yp_callN(yp_t_list, _yp_iterable(iterable))
-
     @classmethod
     def _from_python(cls, pyobj):
+        if len(pyobj) > CTYPES_MAX_ARGCOUNT:
+            return _yp_list(yp_iter._from_python(pyobj))
         return _yp_listN(*pyobj)
 
     @reprlib.recursive_repr("[...]")
@@ -2199,8 +2183,10 @@ def yp_sorted(iterable, /, *, key=None, reverse=False):
 
 
 class _ypSet(ypObject):
-    def __new__(cls, iterable=yp_tuple_empty, /):
-        return _yp_callN(cls._yp_type, _yp_iterable(iterable))
+    def __new__(cls, *args, **kwargs):
+        if args:
+            args = (_yp_iterable(args[0]), *args[1:])
+        return _yp_call_stars(cls._yp_type, args, kwargs)
 
     @staticmethod
     def _bad_other(other): return not isinstance(other, (_ypSet, frozenset, set))
@@ -2276,6 +2262,8 @@ class _ypSet(ypObject):
 class yp_frozenset(_ypSet):
     @classmethod
     def _from_python(cls, pyobj):
+        if len(pyobj) > CTYPES_MAX_ARGCOUNT:
+            return _yp_frozenset(yp_iter._from_python(pyobj))
         return _yp_frozensetN(*pyobj)
 
     def _yp_errcheck(self):
@@ -2290,6 +2278,8 @@ c_ypObject_p_value("yp_frozenset_empty")
 class yp_set(_ypSet):
     @classmethod
     def _from_python(cls, pyobj):
+        if len(pyobj) > CTYPES_MAX_ARGCOUNT:
+            return _yp_set(yp_iter._from_python(pyobj))
         return _yp_setN(*pyobj)
 
 
