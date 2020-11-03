@@ -1307,16 +1307,16 @@ typedef struct _yp_def_parameter_t {
 
 // Describes the interface and implementation of a function object.
 typedef struct _yp_def_function_t {
-    // Called by the yp_call* methods. c is the callable (i.e. the first argument to yp_call*).
-    // argarray is an array of n arguments, where argarray[i] corresponds to parameters[i]; argarray
-    // must not be modified. The return value must be a new or immortal reference, or an exception.
+    // Called by the yp_call* methods. f is the function object. argarray is an array of n
+    // arguments, where argarray[i] corresponds to parameters[i]; argarray must not be modified. The
+    // return value must be a new or immortal reference, or an exception.
     //
     // In nohtyP, when an exception object is used as input to a function, the function must return
     // an exception. Additionally, exceptions can be used as parameter defaults. As such, argarray
     // might contain exceptions. This generally requires no special handling: any functions called
     // from code must themselves handle exceptions this way, so code need only check the result of
     // those function calls and return exceptions as appropriate.
-    ypObject *(*code)(ypObject *c, yp_ssize_t n, ypObject *const *argarray);
+    ypObject *(*code)(ypObject *f, yp_ssize_t n, ypObject *const *argarray);
 
     // FIXME Flags to describe what's next in this struct (is it NV, stars, bytecode? Are there
     // annotations?)
@@ -1335,15 +1335,16 @@ typedef struct _yp_def_function_t {
     // FIXME doc, state, module....
 } yp_def_function_t;
 
+// FIXME Or...here's a weird idea: yp_call_method_array(ypObject *name, int n, ypObject **args) (and
+// NV and stars), where "self" is implied as args[0] (n as always includes args[0], always counts
+// entire array), so that we can still pass args directly.
+
 // TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
 
 // FIXME A convenience function to decref all objects in yp_def_function_t/yp_def_generator_t/etc,
 // but warn that it cannot contain borrowed references (as they would be stolen/decref'ed).
 
-// FIXME use yp_function_stateCX to retrieve any state variables...but how to document how to
-// get the function argument? Perhaps we state that _stateCX only applies if the callable is
-// a function.....hmmm.....or document for tp_function that code is not called with the func. Or
-// we need to add `ypObject *f` to code...
+// FIXME use yp_function_stateCX to retrieve any state variables
 
 ypAPI ypObject *const yp_func_chr;
 ypAPI ypObject *const yp_func_hash;
