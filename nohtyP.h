@@ -1264,10 +1264,6 @@ ypAPI int yp_iscallableC(ypObject *x);
 ypAPI ypObject *yp_callN(ypObject *c, int n, ...);
 ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 
-// Similar to yp_callN, except the arguments are stored in an array. args must not be modified until
-// yp_call_array returns.
-ypAPI ypObject *yp_call_array(ypObject *c, yp_ssize_t n, ypObject *const *args);
-
 // Calls c with positional arguments from args and keyword arguments from kwargs, returning the
 // result of the call (which may be a new reference or an exception). Raises yp_TypeError if c is
 // not callable. Equivalent to c(*args, **kwargs) in Python (hence the name "stars"). The
@@ -1929,6 +1925,7 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t
 // array.  As a special case, if size is NULL, the string must not contain null characters and
 // *encoded will point to a null-terminated string.  On error, sets *encoded to NULL, *size to
 // zero (if size is not NULL), *encoding to the exception, and returns the exception.
+// FIXME Can we document that encoding is an immortal?
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding);
 
@@ -1938,6 +1935,16 @@ ypAPI ypObject *yp_asencodedCX(
 // references and MUST NOT be replaced; furthermore, the sequence itself must not be modified while
 // using the array.  Sets *array to NULL, *len to zero, and returns an exception on error.
 ypAPI ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_t *len);
+
+// Similar to yp_callN, except the callable is at args[0] and the arguments start at args[1]. n is
+// the total length of the array; yp_TypeError is raised if n is less than 1. The array itself is
+// borrowed by yp_call_arrayX for the duration of the call and may be temporarily modified by it; as
+// such, args must not be read, modified, or deallocated until yp_call_arrayX returns. DO NOT call
+// this with yp_def_function_t.code's argarray, yp_itemarrayCX's array, or any other array that you
+// do not own. Any changes that yp_call_arrayX makes to args will be reverted before it returns.
+// Based on Python's vectorcall protocol.
+// FIXME Just call this "vectorcall"?
+ypAPI ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args);
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
 //  yp_asencodedCX(yp_getitem(container, key), encoded, size, encoding)
