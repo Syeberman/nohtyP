@@ -1032,6 +1032,8 @@ typedef struct _ypFunctionObject {
 // normally fills this purpose, but some functions need to reject None (i.e. yp_t_bytes must
 // reject None for encoding and errors.)
 // FIXME Could we just use NameError or some other exception?
+// FIXME Unlike Python, make this official, so docstrings show "this parameter is optional, but
+// doesn't have a default value".
 yp_IMMORTAL_INVALIDATED(yp_Arg_Missing);
 
 
@@ -1132,7 +1134,10 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_object, "object");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_self, "self");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_step, "step");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_x, "x");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_y, "y");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_z, "z");
 
 
 // Empty tuples can be represented by this, immortal object
@@ -16167,40 +16172,33 @@ static ypObject *range_dealloc(ypObject *r, void *memo)
 static ypObject *range_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     // FIXME Bust this out to a `yp_range`, `yp_range3` that takes objects directly?
-    yp_ssize_t args_len = ypTuple_LEN(argarray[1]);
-    ypObject **args = ypTuple_ARRAY(argarray[1]);
-    ypObject * exc = yp_None;
-    yp_int_t   start;
-    yp_int_t   stop;
-    yp_int_t   step;
+    ypObject *exc = yp_None;
+    yp_int_t  start;
+    yp_int_t  stop;
+    yp_int_t  step;
 
-    yp_ASSERT(n == 2, "unexpected argarray of length %" PRIssize, n);
+    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_range);
-    yp_ASSERT(ypObject_TYPE_CODE(argarray[1]) == ypTuple_CODE);
 
-    // FIXME Embed this in the params: (a, b=NoArg, step=1, /).
-    if (args_len == 1) {
+    if (argarray[2] == yp_Arg_Missing) {
         start = 0;
-        stop = yp_index_asintC(args[0], &exc);
-        step = 1;
-    } else if (args_len == 2) {
-        start = yp_index_asintC(args[0], &exc);
-        stop = yp_index_asintC(args[1], &exc);
-        step = 1;
-    } else if (args_len == 3) {
-        start = yp_index_asintC(args[0], &exc);
-        stop = yp_index_asintC(args[1], &exc);
-        step = yp_index_asintC(args[2], &exc);
+        stop = yp_index_asintC(argarray[1], &exc);
     } else {
-        return yp_TypeError;
+        start = yp_index_asintC(argarray[1], &exc);
+        stop = yp_index_asintC(argarray[2], &exc);
     }
+    step = yp_index_asintC(argarray[3], &exc);
     if (yp_isexceptionC(exc)) return exc;
 
     return yp_rangeC3(start, stop, step);
 }
 
+// If y is missing, start is 0 and stop is x; otherwise, start is x and stop is y.
 yp_IMMORTAL_FUNCTION_static(range_func_new, range_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL}));
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), NULL},
+                {yp_CONST_REF(yp_s_y), yp_CONST_REF(yp_Arg_Missing)},
+                {yp_CONST_REF(yp_s_step), ypInt_CONST_REF(1)},
+                {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
 static ypSequenceMethods ypRange_as_sequence = {
         MethodError_objobjproc,       // tp_concat
