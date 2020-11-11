@@ -14723,7 +14723,7 @@ yp_STATIC_ASSERT(
         ypDict_alloclen_max_not_smaller_than_set_alloclen_max);
 
 // Returns a new, empty dict or frozendict object to hold minused entries
-// XXX Check for the yp_frozendict_empty case first
+// XXX Check for the "yp_frozendict_empty" case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypDict_new(int type, yp_ssize_t minused, int alloclen_fixed)
@@ -14753,7 +14753,7 @@ static ypObject *_ypDict_new(int type, yp_ssize_t minused, int alloclen_fixed)
 }
 
 // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
-// XXX Check for the "lazy shallow copy" and "yp_frozendict_empty" cases first
+// XXX Check for the "lazy shallow copy" and "empty copy" cases first
 // TODO Is there a point where the original is so dirty that we'd be better spinning a new keyset?
 // TODO All these *_copy methods can also copy the hash over, if type is immutable.
 static ypObject *_ypDict_copy(int type, ypObject *x, int alloclen_fixed)
@@ -14764,6 +14764,9 @@ static ypObject *_ypDict_copy(int type, ypObject *x, int alloclen_fixed)
     ypObject **values;
     yp_ssize_t valuesleft;
     yp_ssize_t i;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenDict_CODE);
+    yp_ASSERT(ypDict_LEN(x) > 0, "missed an 'empty copy' optimization");
 
     // Share the keyset object with our fellow dict
     keyset = ypDict_KEYSET(x);
@@ -15103,6 +15106,7 @@ static ypObject *frozendict_traverse(ypObject *mp, visitfunc visitor, void *memo
 
 static ypObject *frozendict_unfrozen_copy(ypObject *x)
 {
+    if (ypDict_LEN(x) < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     return _ypDict_copy(ypDict_CODE, x, /*alloclen_fixed=*/FALSE);
 }
 
@@ -15830,6 +15834,7 @@ ypObject *yp_dict(ypObject *x)
 {
     // If x is a fellow dict then perform a copy so we can share keysets
     if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenDict_CODE) {
+        if (ypDict_LEN(x) < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
         return _ypDict_copy(ypDict_CODE, x, /*alloclen_fixed=*/FALSE);
     }
     return _ypDict(ypDict_CODE, x);

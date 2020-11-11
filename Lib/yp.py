@@ -2376,20 +2376,10 @@ class _items_dictview(_setlike_dictview):
 
 @pytype(yp_t_dict, dict)
 class yp_dict(ypObject):
-    def __new__(cls, *args, **kwargs): # FIXME
-        if len(args) == 0:
-            return _yp_dictK(*_yp_flatten_dict(kwargs))
-        if len(args) > 1:
-            raise TypeError("yp_dict expected at most 1 arguments, got %d" % len(args))
-        self = _yp_dict(_yp_dict_iterable(args[0]))
-        if len(kwargs) > 0:
-            _yp_updateK(self, *_yp_flatten_dict(kwargs))
-        return self
-
-    # def __new__(cls, *args, **kwargs): # FIXME
-    #     if args:
-    #         args = (_yp_dict_iterable(args[0]), *args[1:])
-    #     return _yp_call_stars(cls._yp_type, args, kwargs)
+    def __new__(cls, *args, **kwargs):
+        if args:
+            args = (_yp_dict_iterable(args[0]), *args[1:])
+        return _yp_call_stars(cls._yp_type, args, kwargs)
 
     @classmethod
     def _from_python(cls, pyobj):
