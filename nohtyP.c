@@ -2771,6 +2771,9 @@ ypObject *yp_iter_stateCX(ypObject *i, void **state, yp_ssize_t *size)
 
 // TODO Double-check and test the boundary conditions in this function
 // XXX Yes, Python also allows unpacking of non-sequence iterables: a,b,c={1,2,3} is valid
+// TODO It seems very suspect to allow unpack to work on non-sequences. Is this important enough to
+// break with Python? Then again, Python has ordered dicts by default, and because we share dict/set
+// code, our yp_sets will be ordered too. So perhaps this is OK again.
 void yp_unpackN(ypObject *iterable, int n, ...)
 {
     return_yp_V_FUNC_void(yp_unpackNV, (iterable, n, args), n);
@@ -4347,15 +4350,6 @@ static ypObject *int_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *a
     }
 }
 
-// FIXME In Python, None is not applicable for base; document the difference? Or use NoArg?
-// TODO I don't think it's a good idea to share type_function_code between the types, as if you
-// got the function object of one it'd equal the other, and most code would have to switch on the
-// type anyway. But maybe, with a macro, we can allow the param array to be shared between the two.
-yp_IMMORTAL_FUNCTION_static(int_func_new, int_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL},
-                {yp_CONST_REF(yp_s_base), yp_CONST_REF(yp_None)}));
-
 static ypObject *intstore_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
@@ -4372,10 +4366,14 @@ static ypObject *intstore_func_new_code(ypObject *f, yp_ssize_t n, ypObject *con
     }
 }
 
-yp_IMMORTAL_FUNCTION_static(intstore_func_new, intstore_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL},
-                {yp_CONST_REF(yp_s_base), yp_CONST_REF(yp_None)}));
+// FIXME In Python, None is not applicable for base; document the difference? Or use NoArg?
+// FIXME Do we want a way to share the array itself between two functions?
+#define _ypInt_FUNC_NEW_PARAMETERS                                               \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, \
+            {yp_CONST_REF(yp_s_forward_slash), NULL},                            \
+            {yp_CONST_REF(yp_s_base), yp_CONST_REF(yp_None)})
+yp_IMMORTAL_FUNCTION_static(int_func_new, int_func_new_code, _ypInt_FUNC_NEW_PARAMETERS);
+yp_IMMORTAL_FUNCTION_static(intstore_func_new, intstore_func_new_code, _ypInt_FUNC_NEW_PARAMETERS);
 
 static ypTypeObject ypInt_Type = {
         yp_TYPE_HEAD_INIT,
@@ -5487,11 +5485,6 @@ static ypObject *float_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const 
     return yp_float(argarray[1]);
 }
 
-yp_IMMORTAL_FUNCTION_static(float_func_new, float_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
-
-// FIXME Combine with above partially?
 static ypObject *floatstore_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     yp_ASSERT(n == 2, "unexpected argarray of length %" PRIssize, n);
@@ -5499,9 +5492,12 @@ static ypObject *floatstore_func_new_code(ypObject *f, yp_ssize_t n, ypObject *c
     return yp_floatstore(argarray[1]);
 }
 
-yp_IMMORTAL_FUNCTION_static(floatstore_func_new, floatstore_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+#define _ypFloat_FUNC_NEW_PARAMETERS                                             \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, \
+            {yp_CONST_REF(yp_s_forward_slash), NULL})
+yp_IMMORTAL_FUNCTION_static(float_func_new, float_func_new_code, _ypFloat_FUNC_NEW_PARAMETERS);
+yp_IMMORTAL_FUNCTION_static(
+        floatstore_func_new, floatstore_func_new_code, _ypFloat_FUNC_NEW_PARAMETERS);
 
 static ypTypeObject ypFloat_Type = {
         yp_TYPE_HEAD_INIT,
@@ -9050,50 +9046,43 @@ static ypObject *bytes_dealloc(ypObject *b, void *memo)
     return yp_None;
 }
 
+static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding, ypObject *errors);
+static ypObject *_ypBytes(int type, ypObject *source);
+static ypObject *_ypBytes_func_new_code(int type, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
+
+    if (argarray[3] != yp_Arg_Missing) {  // FIXME ...or just use None?
+        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
+        return _ypBytes_encode(type, argarray[1], argarray[3], errors);
+    } else if (argarray[4] != yp_Arg_Missing) {
+        // Either "string argument without an encoding" or "errors without a string argument".
+        return yp_TypeError;
+    } else {
+        return _ypBytes(type, argarray[1]);
+    }
+}
+
 static ypObject *bytes_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_bytes);
-
-    if (argarray[3] != yp_Arg_Missing) {  // FIXME ...or just use None?
-        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
-        return yp_bytes3(argarray[1], argarray[3], errors);
-    } else if (argarray[4] != yp_Arg_Missing) {
-        // Either "string argument without an encoding" or "errors without a string argument".
-        return yp_TypeError;
-    } else {
-        return yp_bytes(argarray[1]);
-    }
+    return _ypBytes_func_new_code(ypBytes_CODE, n, argarray);
 }
 
-yp_IMMORTAL_FUNCTION_static(bytes_func_new, bytes_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_bytes_empty)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL},
-                {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},
-                {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)}));
-
-// FIXME combine with above?
 static ypObject *bytearray_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_bytearray);
-
-    if (argarray[3] != yp_Arg_Missing) {  // FIXME ...or just use None?
-        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
-        return yp_bytearray3(argarray[1], argarray[3], errors);
-    } else if (argarray[4] != yp_Arg_Missing) {
-        // Either "string argument without an encoding" or "errors without a string argument".
-        return yp_TypeError;
-    } else {
-        return yp_bytearray(argarray[1]);
-    }
+    return _ypBytes_func_new_code(ypByteArray_CODE, n, argarray);
 }
 
-yp_IMMORTAL_FUNCTION_static(bytearray_func_new, bytearray_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_bytes_empty)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL},
-                {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},
-                {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)}));
+#define _ypBytes_FUNC_NEW_PARAMETERS                                                            \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_bytes_empty)}, \
+            {yp_CONST_REF(yp_s_forward_slash), NULL},                                           \
+            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},                        \
+            {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)})
+yp_IMMORTAL_FUNCTION_static(bytes_func_new, bytes_func_new_code, _ypBytes_FUNC_NEW_PARAMETERS);
+yp_IMMORTAL_FUNCTION_static(
+        bytearray_func_new, bytearray_func_new_code, _ypBytes_FUNC_NEW_PARAMETERS);
 
 static ypSequenceMethods ypBytes_as_sequence = {
         bytes_concat,                 // tp_concat
@@ -11573,12 +11562,6 @@ static ypObject *tuple_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const 
     return yp_tuple(argarray[1]);
 }
 
-yp_IMMORTAL_FUNCTION_static(tuple_func_new, tuple_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL},
-                {yp_CONST_REF(yp_s_iterable), yp_CONST_REF(yp_tuple_empty)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
-
-// FIXME combine with above?
 static ypObject *list_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     yp_ASSERT(n == 2, "unexpected argarray of length %" PRIssize, n);
@@ -11586,10 +11569,11 @@ static ypObject *list_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *
     return yp_list(argarray[1]);
 }
 
-yp_IMMORTAL_FUNCTION_static(list_func_new, list_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL},
-                {yp_CONST_REF(yp_s_iterable), yp_CONST_REF(yp_tuple_empty)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+#define _ypTuple_FUNC_NEW_PARAMETERS                                                              \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_iterable), yp_CONST_REF(yp_tuple_empty)}, \
+            {yp_CONST_REF(yp_s_forward_slash), NULL})
+yp_IMMORTAL_FUNCTION_static(tuple_func_new, tuple_func_new_code, _ypTuple_FUNC_NEW_PARAMETERS);
+yp_IMMORTAL_FUNCTION_static(list_func_new, list_func_new_code, _ypTuple_FUNC_NEW_PARAMETERS);
 
 static ypSequenceMethods ypTuple_as_sequence = {
         tuple_concat,                 // tp_concat
@@ -13356,8 +13340,9 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
     yp_ssize_t      i;
     ypSet_KeyEntry *loc;
     yp_ssize_t      inlinelen = ypMem_INLINELEN_CONTAINER_VARIABLE(so, ypSetObject);
-    yp_ASSERT(
-            inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN");
+
+    yp_ASSERT(inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small");
+    yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
 
     // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
     newalloclen = _ypSet_calc_alloclen(minused);
@@ -13459,6 +13444,8 @@ success:
 // XXX Adapted from Python's insertdict in dictobject.c
 static void _ypSet_movekey(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash)
 {
+    yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+
     if (loc->se_key == NULL) ypSet_FILL(so) += 1;
     loc->se_key = key;
     loc->se_hash = hash;
@@ -13477,6 +13464,8 @@ static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, yp
     size_t          mask = (size_t)ypSet_MASK(so);
     ypSet_KeyEntry *ep0 = ypSet_TABLE(so);
 
+    yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+
     i = hash & mask;
     (*ep) = &ep0[i];
     for (perturb = hash; (*ep)->se_key != NULL; perturb >>= ypSet_PERTURB_SHIFT) {
@@ -13493,6 +13482,8 @@ static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, yp
 // key's reference count is not modified).
 static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
 {
+    yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+
     ypObject *oldkey = loc->se_key;
     loc->se_key = ypSet_dummy;
     ypSet_SET_LEN(so, ypSet_LEN(so) - 1);
@@ -13617,6 +13608,9 @@ static ypObject *_ypSet_update_from_set(ypObject *so, ypObject *other)
     ypObject *      result;
     yp_ssize_t      i;
 
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
+    yp_ASSERT1(so != other);
+
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
@@ -13680,6 +13674,9 @@ static ypObject *_ypSet_intersection_update_from_set(ypObject *so, ypObject *oth
     yp_ssize_t      i;
     ypSet_KeyEntry *other_loc;
     ypObject *      result;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
+    yp_ASSERT1(so != other);
 
     // Since we're only removing keys from so, it won't be resized, so we can loop over it.  We
     // break once so is empty because we aren't expecting any errors from _ypSet_lookkey.
@@ -13755,6 +13752,9 @@ static ypObject *_ypSet_difference_update_from_set(ypObject *so, ypObject *other
     yp_ssize_t      i;
     ypSet_KeyEntry *loc;
 
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
+    yp_ASSERT1(so != other);
+
     // We break once so is empty because we aren't expecting any errors from _ypSet_lookkey
     for (i = 0; keysleft > 0; i++) {
         if (ypSet_LEN(so) < 1) break;
@@ -13819,6 +13819,9 @@ static ypObject *_ypSet_symmetric_difference_update_from_set(ypObject *so, ypObj
     ypSet_KeyEntry *otherkeys = ypSet_TABLE(other);
     ypObject *      result;
     yp_ssize_t      i;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
+    yp_ASSERT1(so != other);
 
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
@@ -14362,12 +14365,6 @@ static ypObject *frozenset_func_new_code(ypObject *f, yp_ssize_t n, ypObject *co
     return yp_frozenset(argarray[1]);
 }
 
-yp_IMMORTAL_FUNCTION_static(frozenset_func_new, frozenset_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL},
-                {yp_CONST_REF(yp_s_iterable), yp_CONST_REF(yp_frozenset_empty)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
-
-// FIXME combine with above?
 static ypObject *set_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     yp_ASSERT(n == 2, "unexpected argarray of length %" PRIssize, n);
@@ -14375,10 +14372,13 @@ static ypObject *set_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *a
     return yp_set(argarray[1]);
 }
 
-yp_IMMORTAL_FUNCTION_static(set_func_new, set_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL},
-                {yp_CONST_REF(yp_s_iterable), yp_CONST_REF(yp_frozenset_empty)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+#define _ypFrozenSet_FUNC_NEW_PARAMETERS                                     \
+    ({yp_CONST_REF(yp_s_cls), NULL},                                         \
+            {yp_CONST_REF(yp_s_iterable), yp_CONST_REF(yp_frozenset_empty)}, \
+            {yp_CONST_REF(yp_s_forward_slash), NULL})
+yp_IMMORTAL_FUNCTION_static(
+        frozenset_func_new, frozenset_func_new_code, _ypFrozenSet_FUNC_NEW_PARAMETERS);
+yp_IMMORTAL_FUNCTION_static(set_func_new, set_func_new_code, _ypFrozenSet_FUNC_NEW_PARAMETERS);
 
 static ypSetMethods ypFrozenSet_as_set = {
         frozenset_isdisjoint,  // tp_isdisjoint
@@ -14821,8 +14821,9 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
     ypObject *      value;
     ypSet_KeyEntry *newkey_loc;
     yp_ssize_t      inlinelen = ypMem_INLINELEN_CONTAINER_VARIABLE(mp, ypDictObject);
-    yp_ASSERT(
-            inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small for ypSet_ALLOCLEN_MIN");
+
+    yp_ASSERT(inlinelen >= ypSet_ALLOCLEN_MIN, "_ypMem_ideal_size too small");
+    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // If the data can't fit inline, or if it is currently inline, then we need a separate buffer
     newkeyset = _ypSet_new(ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE);
@@ -14876,6 +14877,8 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     ypObject * result;
     yp_ssize_t newlen;
 
+    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+
     // It's possible we can add the key without resizing
     if (*spaceleft >= 1) {
         _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash);
@@ -14918,6 +14921,8 @@ static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int 
     ypObject *      result = yp_None;
     ypObject **     value_loc;
 
+    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
+
     // Look for the appropriate entry in the hash table
     hash = yp_hashC(key, &result);
     if (yp_isexceptionC(result)) return result;  // also verifies key is not an exception
@@ -14955,6 +14960,8 @@ static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
     ypObject *      result = yp_None;
     ypObject **     value_loc;
     ypObject *      oldvalue;
+
+    yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
@@ -15000,6 +15007,9 @@ static ypObject *_ypDict_update_from_dict(ypObject *mp, ypObject *other)
     ypObject * other_value;
     ypObject * result;
 
+    yp_ASSERT(mp != other, "_ypDict_update_from_dict called with mp==other");
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenDict_CODE);
+
     // TODO If mp is empty, then we can clear mp, use other's keyset, and memcpy the array of
     // values.
 
@@ -15042,28 +15052,31 @@ static ypObject *_ypDict_update_from_iter(ypObject *mp, ypObject **itemiter)
 // Adds the key/value pairs yielded from either yp_iter_items or yp_iter to the dict.  If the dict
 // has enough space to hold all the items, the dict is not resized (important, as yp_dictK et al
 // pre-allocate the necessary space).
-// XXX Check for the mp==x case _before_ calling this function
+// XXX Check for the "fellow frozendict" case before calling this function.
 // TODO Could a special (key,value)-handling ypQuickIter consolidate this code or make it quicker?
-static ypObject *_ypDict_update(ypObject *mp, ypObject *x)
+static ypObject *_ypDict_update_from_iterable(ypObject *mp, ypObject *x)
 {
-    int       x_pair = ypObject_TYPE_PAIR_CODE(x);
     ypObject *itemiter;
     ypObject *result;
 
-    // If x is a fellow dict there are efficiencies we can exploit; otherwise, prefer yp_iter_items
-    // over yp_iter if supported.  Recall that type pairs are identified by the immutable type
-    // code.
-    if (x_pair == ypFrozenDict_CODE) {
-        return _ypDict_update_from_dict(mp, x);
-    } else {
-        // TODO replace with yp_miniiter_items once supported
-        itemiter = yp_iter_items(x);                                            // new ref
-        if (yp_isexceptionC2(itemiter, yp_MethodError)) itemiter = yp_iter(x);  // new ref
-        if (yp_isexceptionC(itemiter)) return itemiter;
-        result = _ypDict_update_from_iter(mp, &itemiter);
-        yp_decref(itemiter);
-        return result;
-    }
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
+
+    // Prefer yp_iter_items over yp_iter if supported.
+    // TODO replace with yp_miniiter_items once supported
+    // FIXME help(dict.update) states that it only looks for a .keys() method. This is probably
+    // better: while keys() requires an extra lookup, that's likely cheaper than creating all those
+    // 2-tuples...although, with yp_miniiter_items, we would get the best of both worlds, so perhaps
+    // this would be an area to break with Python (although, if/when we ever script, we're back to
+    // making 2-tuples...so what do we want to optimize? (but in those cases, we could define the
+    // tp_miniiter_items_next to do the .keys()/[key] thing.)).
+    itemiter = yp_iter_items(x);                                            // new ref
+    if (yp_isexceptionC2(itemiter, yp_MethodError)) itemiter = yp_iter(x);  // new ref
+    if (yp_isexceptionC(itemiter)) return itemiter;
+
+    result = _ypDict_update_from_iter(mp, &itemiter);
+
+    yp_decref(itemiter);
+    return result;
 }
 
 // Public methods
@@ -15385,8 +15398,12 @@ static ypObject *dict_update(ypObject *mp, int n, va_list args)
     ypObject *result;
     for (/*n already set*/; n > 0; n--) {
         ypObject *x = va_arg(args, ypObject *);  // borrowed
-        if (mp == x) continue;
-        result = _ypDict_update(mp, x);
+        if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenDict_CODE) {
+            if (mp == x) continue;
+            result = _ypDict_update_from_dict(mp, x);
+        } else {
+            result = _ypDict_update_from_iterable(mp, x);
+        }
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -15518,44 +15535,47 @@ static ypObject *frozendict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *c
     yp_ASSERT1(argarray[0] == yp_t_frozendict);
     yp_ASSERT1(ypObject_TYPE_CODE(argarray[3]) == ypFrozenDict_CODE);
 
-    if (argarray[1] == yp_frozendict_empty) {  // the default value
-        return yp_frozendict(argarray[3]);
-    } else if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
+    if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
         return yp_frozendict(argarray[1]);
+    } else if (argarray[1] == yp_frozendict_empty) {  // the default value
+        return yp_incref(argarray[3]);  // **kwargs is always a frozendict, so just return it
     } else {
         // FIXME Need a yp_frozendict that merges multiple objects (yp_frozendictN?)
         return yp_NotImplementedError;
     }
 }
 
-yp_IMMORTAL_FUNCTION_static(frozendict_func_new, frozendict_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL},
-                {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_frozendict_empty)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
-
-// FIXME combine with above?
 static ypObject *dict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_dict);
     yp_ASSERT1(ypObject_TYPE_CODE(argarray[3]) == ypFrozenDict_CODE);
 
-    if (argarray[1] == yp_frozendict_empty) {  // the default value
-        return yp_dict(argarray[3]);
-    } else if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
+    if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
         return yp_dict(argarray[1]);
+    } else if (argarray[1] == yp_frozendict_empty) {  // the default value
+        return _ypDict_copy(ypDict_CODE, argarray[3], /*alloclen_fixed=*/FALSE);
     } else {
-        // FIXME Need a yp_dict that merges multiple objects (yp_dictN?)
-        return yp_NotImplementedError;
+        // TODO Could improve this by pre-allocating.
+        ypObject *result;
+        ypObject *mp = yp_dict(argarray[1]);
+        if (yp_isexceptionC(mp)) return mp;
+        result = _ypDict_update_from_dict(mp, argarray[3]);
+        if (yp_isexceptionC(result)) {
+            yp_decref(mp);
+            return result;
+        }
+        return mp;
     }
 }
 
-yp_IMMORTAL_FUNCTION_static(dict_func_new, dict_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL},
-                {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_frozendict_empty)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+#define _ypFrozenDict_FUNC_NEW_PARAMETERS                                   \
+    ({yp_CONST_REF(yp_s_cls), NULL},                                        \
+            {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_frozendict_empty)}, \
+            {yp_CONST_REF(yp_s_forward_slash), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL})
+yp_IMMORTAL_FUNCTION_static(
+        frozendict_func_new, frozendict_func_new_code, _ypFrozenDict_FUNC_NEW_PARAMETERS);
+yp_IMMORTAL_FUNCTION_static(dict_func_new, dict_func_new_code, _ypFrozenDict_FUNC_NEW_PARAMETERS);
 
 static ypMappingMethods ypFrozenDict_as_mapping = {
         frozendict_miniiter_items,    // tp_miniiter_items
@@ -15760,12 +15780,16 @@ ypObject *yp_dictKV(int n, va_list args)
     return _ypDictKV(ypDict_CODE, n, args);
 }
 
+// XXX Handle the "fellow frozendict" case _before_ calling this function.
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
 static ypObject *_ypDict(int type, ypObject *x)
 {
     ypObject *exc = yp_None;
     ypObject *newMp;
     ypObject *result;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
+
     // We could just check yp_length_hintC if it returned an "is exact length" flag.
     yp_ssize_t length_hint = yp_lenC(x, &exc);
     if (yp_isexceptionC(exc)) {
@@ -15773,7 +15797,7 @@ static ypObject *_ypDict(int type, ypObject *x)
         length_hint = yp_length_hintC(x, &exc);
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
-        // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update
+        // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update_from_iterable
         if (type == ypFrozenDict_CODE) return yp_frozenset_empty;
         return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     } else if (length_hint > ypDict_LEN_MAX) {
@@ -15783,7 +15807,7 @@ static ypObject *_ypDict(int type, ypObject *x)
 
     newMp = _ypDict_new(type, length_hint, /*alloclen_fixed=*/FALSE);
     if (yp_isexceptionC(newMp)) return newMp;
-    result = _ypDict_update(newMp, x);
+    result = _ypDict_update_from_iterable(newMp, x);
     if (yp_isexceptionC(result)) {
         yp_decref(newMp);
         return result;

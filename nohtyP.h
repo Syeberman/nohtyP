@@ -405,6 +405,8 @@ ypAPI ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value);
 // mapping object (that supports yp_iter_items), or an iterable that yields exactly two items at a
 // time (ie (key, value)).  If a given key is seen more than once, the last value yielded is
 // retained.
+// FIXME help(dict.update) states that it only looks for a .keys() method. This is probably better:
+// while keys() requires an extra lookup, that's likely cheaper than creating all those 2-tuples.
 ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
 
@@ -1312,6 +1314,9 @@ typedef struct _yp_def_function_t {
     // might contain exceptions. This generally requires no special handling: any functions called
     // from code must themselves handle exceptions this way, so code need only check the result of
     // those function calls and return exceptions as appropriate.
+    //
+    // n is deterministic based solely on the parameters: it is either parameters_len, or
+    // parameters_len-1 if parameters ends in /.
     ypObject *(*code)(ypObject *f, yp_ssize_t n, ypObject *const *argarray);
 
     // FIXME Flags to describe what's next in this struct (is it NV, stars, bytecode? Are there

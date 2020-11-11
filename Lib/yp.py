@@ -1803,7 +1803,7 @@ class yp_iter(ypObject):
         if hasattr(object, "_yp_iter"):
             return object._yp_iter()
         else:
-            return yp_iter._from_python(object)
+            return cls._from_python(object)
 
     @classmethod
     def _from_python(cls, pyobj):
@@ -2117,7 +2117,7 @@ class _ypTuple(ypObject):
 class yp_tuple(_ypTuple):
     @classmethod
     def _from_python(cls, pyobj):
-        if len(pyobj) > CTYPES_MAX_ARGCOUNT:
+        if len(pyobj) > CTYPES_MAX_ARGCOUNT-1:
             return _yp_tuple(yp_iter._from_python(pyobj))
         return _yp_tupleN(*pyobj)
 
@@ -2138,7 +2138,7 @@ c_ypObject_p_value("yp_tuple_empty")
 class yp_list(_ypTuple):
     @classmethod
     def _from_python(cls, pyobj):
-        if len(pyobj) > CTYPES_MAX_ARGCOUNT:
+        if len(pyobj) > CTYPES_MAX_ARGCOUNT-1:
             return _yp_list(yp_iter._from_python(pyobj))
         return _yp_listN(*pyobj)
 
@@ -2262,7 +2262,7 @@ class _ypSet(ypObject):
 class yp_frozenset(_ypSet):
     @classmethod
     def _from_python(cls, pyobj):
-        if len(pyobj) > CTYPES_MAX_ARGCOUNT:
+        if len(pyobj) > CTYPES_MAX_ARGCOUNT-1:
             return _yp_frozenset(yp_iter._from_python(pyobj))
         return _yp_frozensetN(*pyobj)
 
@@ -2278,7 +2278,7 @@ c_ypObject_p_value("yp_frozenset_empty")
 class yp_set(_ypSet):
     @classmethod
     def _from_python(cls, pyobj):
-        if len(pyobj) > CTYPES_MAX_ARGCOUNT:
+        if len(pyobj) > CTYPES_MAX_ARGCOUNT-1:
             return _yp_set(yp_iter._from_python(pyobj))
         return _yp_setN(*pyobj)
 
@@ -2293,19 +2293,22 @@ def _yp_flatten_dict(args):
     return retval
 
 
+class _yp_item_iter(yp_iter):
+    @classmethod
+    def _from_python(cls, pyobj):
+        # help(dict.update) states that it only looks for a .keys() method
+        if hasattr(pyobj, "keys"):  # there's a test that only defines keys...
+            return super()._from_python((k, pyobj[k]) for k in pyobj.keys())
+        else:
+            return super()._from_python(pyobj)
+
+
 def _yp_dict_iterable(iterable):
     """Like _yp_iterable, but returns an "item iterator" if iterable is a mapping object."""
-    if isinstance(iterable, c_ypObject_p):
-        return iterable
-    if isinstance(iterable, str):
-        return yp_str(iterable)
-    if hasattr(iterable, "keys"):
-        return yp_iter((k, iterable[k]) for k in iterable.keys())
-    return yp_iter(iterable)
+    return ypObject._from_python(iterable, default=_yp_item_iter)
+
 
 # TODO If nohtyP ever supports "dict view" objects, replace these faked-out versions
-
-
 class _setlike_dictview:
     def __init__(self, mp): self._mp = mp
 
@@ -2383,8 +2386,15 @@ class yp_dict(ypObject):
             _yp_updateK(self, *_yp_flatten_dict(kwargs))
         return self
 
+    # def __new__(cls, *args, **kwargs): # FIXME
+    #     if args:
+    #         args = (_yp_dict_iterable(args[0]), *args[1:])
+    #     return _yp_call_stars(cls._yp_type, args, kwargs)
+
     @classmethod
     def _from_python(cls, pyobj):
+        if len(pyobj) > (CTYPES_MAX_ARGCOUNT-1) // 2:
+            return _yp_dict(_yp_item_iter._from_python(pyobj))
         return _yp_dictK(*_yp_flatten_dict(pyobj))
 
     @classmethod
@@ -2405,14 +2415,8 @@ class yp_dict(ypObject):
         _yp_popitem(self, key_p, value_p)
         return (key_p[0], value_p[0])
 
-    def update(self, *args, **kwargs):
-        if len(args) == 0:
-            return _yp_updateK(self, *_yp_flatten_dict(kwargs))
-        if len(args) > 1:
-            raise TypeError("update expected at most 1 arguments, got %d" % len(args))
-        _yp_updateN(self, _yp_dict_iterable(args[0]))
-        if len(kwargs) > 0:
-            _yp_updateK(self, *_yp_flatten_dict(kwargs))
+    def update(self, object=yp_tuple_empty, /, **kwargs):
+        _yp_updateN(self, _yp_dict_iterable(object), kwargs)
 
 
 @pytype(yp_t_range, range)
