@@ -1980,26 +1980,17 @@ class yp_bytearray(_ypBytes):
 # TODO Just generally move more of this logic into nohtyP, when available
 @pytype(yp_t_str, str)
 class yp_str(ypObject):
-    # FIXME Update to call in to type object
-    def __new__(cls, object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing):
-        if encoding is _yp_arg_missing and errors is _yp_arg_missing:
-            if object is _yp_arg_missing:
-                return yp_str_empty
-            if isinstance(object, ypObject):
-                return object._yp_str()
-            if isinstance(object, str):
-                return yp_str._from_python(object)
-            raise TypeError("expected ypObject or str in yp_str")
-        else:
-            if object is _yp_arg_missing:
-                object = yp_bytes_empty
-            if encoding is _yp_arg_missing:
-                encoding = yp_s_utf_8
-            if errors is _yp_arg_missing:
-                errors = yp_s_strict
-            if not isinstance(object, (bytes, bytearray, yp_bytes, yp_bytearray)):
-                raise TypeError("expected yp_bytes or yp_bytearray in yp_str (decoding)")
-            return _yp_str3(object, encoding, errors)
+    def __new__(cls, *args, **kwargs):
+        if yp_str._new_bypass_call_stars(*args, **kwargs):
+            return args[0]._yp_str()
+        return _yp_call_stars(cls._yp_type, args, kwargs)
+
+    @staticmethod
+    def _new_bypass_call_stars(object=_yp_arg_missing, encoding=_yp_arg_missing, errors=_yp_arg_missing):
+        """Returns True if we should return object._yp_str(). This is temporary until we add proper
+        str/repr functionality into nohtyP.
+        """
+        return isinstance(object, ypObject) and encoding is _yp_arg_missing and errors is _yp_arg_missing
 
     @classmethod
     def _from_python(cls, pyobj):

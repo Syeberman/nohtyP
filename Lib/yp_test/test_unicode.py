@@ -1388,16 +1388,17 @@ class UnicodeTest(string_tests.CommonTest,
 
     def test_constructor_defaults(self):
         """Check the constructor argument defaults."""
-        # The object argument defaults to '' or b''.
+        # Unlike Python, the object argument always defaults to '', never b''.
         self.assertEqual(yp_str(), '')
-        self.assertEqual(yp_str(errors='strict'), '')
+        self.assertRaises(TypeError, yp_str, errors='strict')
         utf8_cent = '¢'.encode('utf-8')
         # The encoding argument defaults to utf-8.
         self.assertEqual(yp_str(utf8_cent, errors='strict'), '¢')
 
     @yp_unittest.skip("TODO Implement more codecs in nohtyP")
-    def test_constructor_defaults_ascii(self):
+    def test_constructor_defaults_to_strict(self):
         # The errors argument defaults to strict.
+        utf8_cent = '¢'.encode('utf-8')
         self.assertRaises(UnicodeDecodeError, yp_str, utf8_cent, encoding='ascii')
 
     @yp_unittest.skip("TODO Implement more codecs in nohtyP")
@@ -1692,7 +1693,7 @@ class UnicodeTest(string_tests.CommonTest,
         padBytes = tuple( padBytes_1 * i for i in range( inlinelen_test_end ) )
         padStr   = tuple( padStr_1   * i for i in range( inlinelen_test_end ) )
 
-        # Verifies the precheck works in the usual cases.  We have to pad the test data so we 
+        # Verifies the precheck works in the usual cases.  We have to pad the test data so we
         # don't take the len(seq)<inlinelen shortcut, but otherwise we're ensuring the decoding
         # is working just as if the precheck wasn't there.
         for seq, result in sequences:
@@ -1709,7 +1710,7 @@ class UnicodeTest(string_tests.CommonTest,
                 seq    = padBytes[0].join( (latin1[0], padBytes[pad_len], surrBytes) )
                 result = padStr[0].join(   (latin1[1], padStr[pad_len],   surrChar)  )
                 self.assertEqual( seq.decode(), result )
-        
+
         # Debug builds check for unnecessary string resizes.  There was a bug in precheck that
         # resized the string when there was plenty of room left (i.e. the first estimate assumed
         # each byte was a char, but by the time the precheck was finished it determined most

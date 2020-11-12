@@ -1134,6 +1134,7 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_object, "object");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_self, "self");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_source, "source");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_step, "step");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_x, "x");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_y, "y");
@@ -9050,12 +9051,12 @@ static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding,
 static ypObject *_ypBytes(int type, ypObject *source);
 static ypObject *_ypBytes_func_new_code(int type, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
+    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
 
-    if (argarray[3] != yp_Arg_Missing) {  // FIXME ...or just use None?
-        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
-        return _ypBytes_encode(type, argarray[1], argarray[3], errors);
-    } else if (argarray[4] != yp_Arg_Missing) {
+    if (argarray[2] != yp_Arg_Missing) {  // FIXME ...or just use None?
+        ypObject *errors = argarray[3] == yp_Arg_Missing ? yp_s_strict : argarray[3];  // borrowed
+        return _ypBytes_encode(type, argarray[1], argarray[2], errors);
+    } else if (argarray[3] != yp_Arg_Missing) {
         // Either "string argument without an encoding" or "errors without a string argument".
         return yp_TypeError;
     } else {
@@ -9076,8 +9077,7 @@ static ypObject *bytearray_func_new_code(ypObject *f, yp_ssize_t n, ypObject *co
 }
 
 #define _ypBytes_FUNC_NEW_PARAMETERS                                                            \
-    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_bytes_empty)}, \
-            {yp_CONST_REF(yp_s_forward_slash), NULL},                                           \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_source), yp_CONST_REF(yp_bytes_empty)}, \
             {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},                        \
             {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)})
 yp_IMMORTAL_FUNCTION_static(bytes_func_new, bytes_func_new_code, _ypBytes_FUNC_NEW_PARAMETERS);
@@ -9361,11 +9361,10 @@ static ypObject *_ypBytes(int type, ypObject *source)
     int       source_pair = ypObject_TYPE_PAIR_CODE(source);
 
     if (source_pair == ypBytes_CODE) {
+        // TODO Like other types, move these optimizations up the call stack?
         if (type == ypBytes_CODE) {
             if (ypBytes_LEN(source) < 1) return yp_bytes_empty;
             if (ypObject_TYPE_CODE(source) == ypBytes_CODE) return yp_incref(source);
-        } else {
-            if (ypBytes_LEN(source) < 1) return yp_bytearray0();
         }
         return _ypBytes_copy(type, source, /*alloclen_fixed=*/TRUE);
     } else if (source_pair == ypInt_CODE) {
@@ -9926,24 +9925,44 @@ static ypObject *str_dealloc(ypObject *s, void *memo)
     return yp_None;
 }
 
+static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, ypObject *errors);
+static ypObject *_ypStr(int type, ypObject *object);
+static ypObject *_ypStr_func_new_code(int type, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
+
+    // As object defaults to yp_str_empty, and _ypStr_decode rejects strs, encoding-without-object
+    // is an error, just as with bytes (but unlike Python).
+    if (argarray[2] != yp_Arg_Missing) {  // FIXME ...or just use None?
+        ypObject *errors = argarray[3] == yp_Arg_Missing ? yp_s_strict : argarray[3];  // borrowed
+        return _ypStr_decode(type, argarray[1], argarray[2], errors);
+    } else if (argarray[3] != yp_Arg_Missing) {
+        // TODO In Python, sys.getdefaultencoding() is the default. Should we break with Python
+        // here? I certainly don't like global variables changing behaviour...
+        return _ypStr_decode(type, argarray[1], yp_s_utf_8, argarray[3]);
+    } else {
+        return _ypStr(type, argarray[1]);
+    }
+}
+
 static ypObject *str_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    return yp_NotImplementedError;
+    yp_ASSERT1(argarray[0] == yp_t_str);
+    return _ypStr_func_new_code(ypStr_CODE, n, argarray);
 }
 
-yp_IMMORTAL_FUNCTION_static(str_func_new, str_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
-
-// FIXME combine with above?
 static ypObject *chrarray_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    return yp_NotImplementedError;
+    yp_ASSERT1(argarray[0] == yp_t_chrarray);
+    return _ypStr_func_new_code(ypChrArray_CODE, n, argarray);
 }
 
-yp_IMMORTAL_FUNCTION_static(chrarray_func_new, chrarray_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+#define _ypStr_FUNC_NEW_PARAMETERS                                                            \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_str_empty)}, \
+            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},                      \
+            {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)})
+yp_IMMORTAL_FUNCTION_static(str_func_new, str_func_new_code, _ypStr_FUNC_NEW_PARAMETERS);
+yp_IMMORTAL_FUNCTION_static(chrarray_func_new, chrarray_func_new_code, _ypStr_FUNC_NEW_PARAMETERS);
 
 static ypSequenceMethods ypStr_as_sequence = {
         str_concat,                   // tp_concat
@@ -10195,9 +10214,13 @@ ypObject *yp_chrarray_frombytesC2(const yp_uint8_t *source, yp_ssize_t len)
 static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
 {
     ypObject *result;
+
+    // TODO When we open this up to other types with a buffer interface, make sure we continue
+    // to deny str/chrarray as source, as Python does.
     if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
 
     // XXX Not handling errors in yp_eq yet because this is just temporary
+    // TODO Python ignores "unknown encoding/errors" on empty buffer, but I'd rather raise error.
     if (yp_eq(encoding, yp_s_utf_8) != yp_True) return yp_NotImplementedError;
 
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
@@ -10229,7 +10252,19 @@ ypObject *yp_decode(ypObject *b)
             yp_s_strict);
 }
 
-static ypObject *_ypStr(int type, ypObject *object) { return yp_NotImplementedError; }
+static ypObject *_ypStr(int type, ypObject *object)
+{
+    if (ypObject_TYPE_PAIR_CODE(object) == ypStr_CODE) {
+        // TODO Like other types, move these optimizations up the call stack?
+        if (type == ypStr_CODE) {
+            if (ypStr_LEN(object) < 1) return yp_str_empty;
+            if (ypObject_TYPE_CODE(object) == ypStr_CODE) return yp_incref(object);
+        }
+        return _ypStr_copy(type, object, /*alloclen_fixed=*/TRUE);
+    }
+
+    return yp_NotImplementedError;
+}
 
 ypObject *yp_str(ypObject *object) { return _ypStr(ypStr_CODE, object); }
 
