@@ -13482,9 +13482,8 @@ static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, yp
 // key's reference count is not modified).
 static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
 {
-    yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
-
     ypObject *oldkey = loc->se_key;
+    yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
     loc->se_key = ypSet_dummy;
     ypSet_SET_LEN(so, ypSet_LEN(so) - 1);
     return oldkey;
@@ -15788,14 +15787,14 @@ ypObject *yp_dictKV(int n, va_list args)
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
 static ypObject *_ypDict(int type, ypObject *x)
 {
-    ypObject *exc = yp_None;
-    ypObject *newMp;
-    ypObject *result;
+    ypObject * exc = yp_None;
+    ypObject * newMp;
+    ypObject * result;
+    yp_ssize_t length_hint = yp_lenC(x, &exc);
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
 
     // We could just check yp_length_hintC if it returned an "is exact length" flag.
-    yp_ssize_t length_hint = yp_lenC(x, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(x, &exc);
@@ -16981,8 +16980,9 @@ static ypObject *ypFunction_callNV(ypObject *f, int n, va_list args)
 
     } else {
         ypQuickIter_state state;
+        ypObject *        result;
         ypQuickIter_new_fromvar(&state, MAX(n, 0), args);
-        ypObject *result = _ypFunction_call_QuickIter(
+        result = _ypFunction_call_QuickIter(
                 f, NULL, &ypQuickIter_var_methods, &state, yp_frozendict_empty);
         ypQuickIter_var_close(&state);
         return result;
@@ -17035,8 +17035,9 @@ static ypObject *ypFunction_callNV_withself(ypObject *f, ypObject *self, int n_a
 
     } else {
         ypQuickIter_state state;
+        ypObject *        result;
         ypQuickIter_new_fromvar(&state, n_args, args);
-        ypObject *result = _ypFunction_call_QuickIter(
+        result = _ypFunction_call_QuickIter(
                 f, self, &ypQuickIter_var_methods, &state, yp_frozendict_empty);
         ypQuickIter_var_close(&state);
         return result;
@@ -17204,8 +17205,9 @@ static ypObject *ypFunction_call_array(ypObject *f, yp_ssize_t n, ypObject *cons
 
     } else {
         ypQuickIter_state state;
+        ypObject *        result;
         ypQuickIter_new_fromarray(&state, MAX(n, 0), args);
-        ypObject *result = _ypFunction_call_QuickIter(
+        result = _ypFunction_call_QuickIter(
                 f, NULL, &ypQuickIter_array_methods, &state, yp_frozendict_empty);
         ypQuickIter_array_close(&state);
         return result;
