@@ -1354,6 +1354,7 @@ typedef struct _yp_def_function_t {
 
 ypAPI ypObject *const yp_func_chr;
 ypAPI ypObject *const yp_func_hash;
+ypAPI ypObject *const yp_func_iscallable;
 ypAPI ypObject *const yp_func_len;
 ypAPI ypObject *const yp_func_reversed;
 

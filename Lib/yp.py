@@ -2508,10 +2508,12 @@ class yp_function(ypObject):
 
 c_ypObject_p_value("yp_func_chr")
 c_ypObject_p_value("yp_func_hash")
+c_ypObject_p_value("yp_func_iscallable")
 c_ypObject_p_value("yp_func_len")
 c_ypObject_p_value("yp_func_reversed")
 
 yp_chr = yp_func_chr
+yp_iscallable = yp_func_iscallable
 
 
 def _yp_callable(callable):

@@ -2998,7 +2998,6 @@ static ypObject *_ypCallableIter_generator(ypObject *i, ypObject *value)
 ypObject *yp_iter2(ypObject *callable, ypObject *sentinel)
 {
     ypObject *i;
-    ypObject *result;
 
     // Allocate the iterator
     i = ypMem_MALLOC_FIXED(ypCallableIterObject, ypIter_CODE);
@@ -18281,6 +18280,15 @@ static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *a
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code,
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
+static ypObject *yp_func_iscallable_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 1, "unexpected argarray of length %" PRIssize, n);
+    return ypBool_FROM_C(yp_iscallableC(argarray[0]));
+};
+
+yp_IMMORTAL_FUNCTION(yp_func_iscallable, yp_func_iscallable_code,
         ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
 static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)

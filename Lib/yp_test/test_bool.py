@@ -190,10 +190,9 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(hasattr([], "append"), yp_True)
         self.assertIs(hasattr([], "wobble"), yp_False)
 
-    @yp_unittest.skip("Not applicable to nohtyP")
     def test_callable(self):
-        self.assertIs(callable(len), yp_True)
-        self.assertIs(callable(1), yp_False)
+        self.assertIs(yp_iscallable(yp_len), yp_True)
+        self.assertIs(yp_iscallable(yp_int(1)), yp_False)
 
     @yp_unittest.skip("Not applicable to nohtyP")
     def test_isinstance(self):
