@@ -23,7 +23,7 @@ def nohtyP_SharedLibrary(env):
         CPPDEFINES=[
             "yp_ENABLE_SHARED",
             "yp_BUILD_CORE",
-            "yp_DEBUG_LEVEL=%s" % ("1" if env["CONFIGURATION"] == "debug" else "0"),
+            "yp_DEBUG_LEVEL=%s" % ("10" if env["CONFIGURATION"] == "debug" else "0"),
         ],
         PDB="$VTOP/nohtyP.pdb",
         LIBS="",

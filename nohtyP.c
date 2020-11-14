@@ -110,6 +110,7 @@
 //  - 0: no debugging (default)
 //  - 1: yp_ASSERT (minimal debugging)
 //  - 10: yp_DEBUG (print debugging)
+//  - 20: yp_INFO (extra print debugging)
 #ifndef yp_DEBUG_LEVEL
 // Check for well-known debug defines; inspired from http://nothings.org/stb/stb_h.html
 #if defined(DEBUG) || defined(_DEBUG) || defined(DBG)
@@ -184,6 +185,14 @@ static void yp_breakonerr(ypObject *err) {
 #else
 #define yp_DEBUG0(fmt)
 #define yp_DEBUG(fmt, ...)
+#endif
+
+#if yp_DEBUG_LEVEL >= 20
+#define yp_INFO0 yp_DEBUG0
+#define yp_INFO yp_DEBUG
+#else
+#define yp_INFO0(fmt)
+#define yp_INFO(fmt, ...)
 #endif
 
 // We always perform static asserts: they don't affect runtime
@@ -936,6 +945,12 @@ typedef struct {
     yp_uint64_t mi_state;
 } ypMiIterObject;
 
+typedef struct {
+    _ypIterObject_HEAD;
+    ypObject *callable;
+    ypObject *sentinel;
+} ypCallableIterObject;
+
 
 // TODO: A "ypSmallObject" type for type codes < 8, say, to avoid wasting space for bool/int/float?
 typedef struct {
@@ -1128,11 +1143,13 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_encoding, "encoding");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_errors, "errors");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_i, "i");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_iterable, "iterable");
+// TODO Rename all obj to object? "object" is a Python keyword argument name (str(object='')). (This
+// would break with Python docstrings for some built-ins, but may be where Python is headed...but
+// oddly it conflicts with the object() built-in so I would expect obj like cls avoids class.)
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
-// FIXME Rename all object to obj? Like cls avoids class clash, we shouldn't clash with object().
-// (This would break with Python docstrings for some built-ins.)
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_object, "object");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_self, "self");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_sentinel, "sentinel");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_source, "source");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_step, "step");
@@ -1486,7 +1503,7 @@ static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
     if (p == NULL) return NULL;
     *actual = (yp_ssize_t)_msize(p);
     if (*actual < 0) *actual = yp_SSIZE_T_MAX;  // we were given more memory than we can use
-    yp_DEBUG("malloc: %p %" PRIssize " bytes", p, *actual);
+    yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
 static void *_default_yp_malloc_resize(
@@ -1506,12 +1523,12 @@ static void *_default_yp_malloc_resize(
     }
     *actual = (yp_ssize_t)_msize(newp);
     if (*actual < 0) *actual = yp_SSIZE_T_MAX;  // we were given more memory than we can use
-    yp_DEBUG("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
+    yp_INFO("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
 static void _default_yp_free(void *p)
 {
-    yp_DEBUG("free: %p", p);
+    yp_INFO("free: %p", p);
     free(p);
 }
 
@@ -1536,7 +1553,7 @@ static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_ASSERT(size >= 0, "size cannot be negative");
     *actual = _default_yp_malloc_good_size(size);
     p = malloc(*actual);
-    yp_DEBUG("malloc: %p %" PRIssize " bytes", p, *actual);
+    yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
 static void *_default_yp_malloc_resize(
@@ -1549,12 +1566,12 @@ static void *_default_yp_malloc_resize(
     if (size < 0) size = yp_SSIZE_T_MAX;  // addition overflowed; clamp to max
     *actual = _default_yp_malloc_good_size(size);
     newp = malloc(*actual);
-    yp_DEBUG("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
+    yp_INFO("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
 static void _default_yp_free(void *p)
 {
-    yp_DEBUG("free: %p", p);
+    yp_INFO("free: %p", p);
     free(p);
 }
 #endif
@@ -1597,7 +1614,7 @@ static ypObject *_ypMem_malloc_fixed(int type, yp_ssize_t sizeof_obStruct)
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = ypObject_LEN_INVALID;
-    yp_DEBUG("MALLOC_FIXED: type %d %p", type, ob);
+    yp_INFO("MALLOC_FIXED: type %d %p", type, ob);
     return ob;
 }
 #define ypMem_MALLOC_FIXED(obStruct, type) _ypMem_malloc_fixed((type), yp_sizeof(obStruct))
@@ -1633,7 +1650,7 @@ static ypObject *_ypMem_malloc_container_inline(int type, yp_ssize_t alloclen,
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
-    yp_DEBUG("MALLOC_CONTAINER_INLINE: type %d %p alloclen %" PRIssize, type, ob, alloclen);
+    yp_INFO("MALLOC_CONTAINER_INLINE: type %d %p alloclen %" PRIssize, type, ob, alloclen);
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_INLINE4(obStruct, type, alloclen, alloclen_max, elemsize) \
@@ -1701,7 +1718,7 @@ static ypObject *_ypMem_malloc_container_variable(int type, yp_ssize_t required,
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
-    yp_DEBUG("MALLOC_CONTAINER_VARIABLE: type %d %p alloclen %" PRIssize, type, ob, alloclen);
+    yp_INFO("MALLOC_CONTAINER_VARIABLE: type %d %p alloclen %" PRIssize, type, ob, alloclen);
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_VARIABLE5(obStruct, type, required, extra, alloclen_max, elemsize) \
@@ -1768,7 +1785,7 @@ static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required
         oldptr = ob->ob_data;  // might equal inlineptr
         ob->ob_data = inlineptr;
         ypObject_SET_ALLOCLEN(ob, inlinelen);
-        yp_DEBUG("REALLOC_CONTAINER_VARIABLE (to inline): %p alloclen %" PRIssize, ob,
+        yp_INFO("REALLOC_CONTAINER_VARIABLE (to inline): %p alloclen %" PRIssize, ob,
                 ypObject_ALLOCLEN(ob));
         return oldptr;
     }
@@ -1782,7 +1799,7 @@ static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required
         alloclen = size / elemsize;  // rounds down
         if (alloclen > alloclen_max) alloclen = alloclen_max;
         ypObject_SET_ALLOCLEN(ob, alloclen);
-        yp_DEBUG("REALLOC_CONTAINER_VARIABLE (from inline): %p alloclen %" PRIssize, ob, alloclen);
+        yp_INFO("REALLOC_CONTAINER_VARIABLE (from inline): %p alloclen %" PRIssize, ob, alloclen);
         return oldptr;
     }
 
@@ -1795,7 +1812,7 @@ static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required
     alloclen = size / elemsize;  // rounds down
     if (alloclen > alloclen_max) alloclen = alloclen_max;
     ypObject_SET_ALLOCLEN(ob, alloclen);
-    yp_DEBUG("REALLOC_CONTAINER_VARIABLE (malloc_resize): %p alloclen %" PRIssize, ob, alloclen);
+    yp_INFO("REALLOC_CONTAINER_VARIABLE (malloc_resize): %p alloclen %" PRIssize, ob, alloclen);
     return oldptr;
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE5(ob, obStruct, required, extra, alloclen_max, elemsize) \
@@ -1813,7 +1830,7 @@ static void _ypMem_realloc_container_free_oldptr(
         ypObject *ob, void *oldptr, yp_ssize_t offsetof_inline)
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
-    yp_DEBUG("REALLOC_CONTAINER_FREE_OLDPTR: %p", ob);
+    yp_INFO("REALLOC_CONTAINER_FREE_OLDPTR: %p", ob);
     if (oldptr != ob->ob_data && oldptr != inlineptr) yp_free(oldptr);
 }
 #define ypMem_REALLOC_CONTAINER_FREE_OLDPTR(ob, obStruct, oldptr) \
@@ -1836,7 +1853,7 @@ static void _ypMem_realloc_container_variable_clear(
         ob->ob_data = inlineptr;
         ypObject_SET_ALLOCLEN(ob, inlinelen);
     }
-    yp_DEBUG("REALLOC_CONTAINER_VARIABLE_CLEAR: %p alloclen %" PRIssize, ob, ypObject_ALLOCLEN(ob));
+    yp_INFO("REALLOC_CONTAINER_VARIABLE_CLEAR: %p alloclen %" PRIssize, ob, ypObject_ALLOCLEN(ob));
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR3(ob, obStruct, alloclen_max, elemsize) \
     _ypMem_realloc_container_variable_clear(                                          \
@@ -1852,7 +1869,7 @@ static void _ypMem_realloc_container_variable_clear(
 static void _ypMem_free_container(ypObject *ob, yp_ssize_t offsetof_inline)
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
-    yp_DEBUG("FREE_CONTAINER: %p", ob);
+    yp_INFO("FREE_CONTAINER: %p", ob);
     if (ob->ob_data != inlineptr) yp_free(ob->ob_data);
     yp_free(ob);
 }
@@ -1874,7 +1891,7 @@ ypObject *yp_incref(ypObject *x)
 {
     if (ypObject_REFCNT(x) >= ypObject_REFCNT_IMMORTAL) return x;  // no-op
     ypObject_REFCNT(x) += 1;
-    yp_DEBUG("incref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
+    yp_INFO("incref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
     return x;
 }
 
@@ -1951,7 +1968,7 @@ static ypObject *_ypObject_dealloc(ypObject *x, ypObject_dealloclist *list)
 
     while (x != NULL) {
         ypObject *subresult;
-        yp_DEBUG("decref (dealloc): type %d %p", ypObject_TYPE_CODE(x), x);
+        yp_INFO("decref (dealloc): type %d %p", ypObject_TYPE_CODE(x), x);
         yp_ASSERT1(ypObject_REFCNT(x) == 1);
         subresult = ypObject_TYPE(x)->tp_dealloc(x, list);
 
@@ -1973,7 +1990,7 @@ static int _ypObject_decref(ypObject *x, ypObject_dealloclist *list)
 
     if (ypObject_REFCNT(x) > 1) {
         ypObject_REFCNT(x) -= 1;
-        yp_DEBUG("decref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
+        yp_INFO("decref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
         return FALSE;
     }
 
@@ -2576,9 +2593,9 @@ static ypObject *_iter_send(ypObject *i, ypObject *value)
     ypObject *          result;
     yp_generator_func_t func = ypIter_FUNC(i);
 
-    yp_DEBUG("iter_send: func %p, i %p, value %d %p", func, i, ypObject_TYPE_CODE(value), value);
+    yp_INFO("iter_send: func %p, i %p, value %d %p", func, i, ypObject_TYPE_CODE(value), value);
     result = func(i, value);
-    yp_DEBUG("iter_send: func %p, i %p, value %d %p, result %d %p", func, i,
+    yp_INFO("iter_send: func %p, i %p, value %d %p, result %d %p", func, i,
             ypObject_TYPE_CODE(value), value, ypObject_TYPE_CODE(result), result);
 
     return result;
@@ -2663,16 +2680,21 @@ static ypObject *iter_dealloc(ypObject *i, void *memo)
     return yp_None;
 }
 
+// XXX This is a function, not a type, in Python. Should we do the same?
 static ypObject *iter_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 2, "unexpected argarray of length %" PRIssize, n);
+    yp_ASSERT(n == 3, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_iter);
-    return yp_iter(argarray[1]);
+    if (argarray[2] == yp_Arg_Missing) {
+        return yp_iter(argarray[1]);
+    } else {
+        return yp_iter2(argarray[1], argarray[2]);
+    }
 }
 
-// FIXME There's also a (callable, sentinel) form
 yp_IMMORTAL_FUNCTION_static(iter_func_new, iter_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_iterable), NULL},
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), NULL},
+                {yp_CONST_REF(yp_s_sentinel), yp_CONST_REF(yp_Arg_Missing)},
                 {yp_CONST_REF(yp_s_forward_slash), NULL}));
 
 static ypTypeObject ypIter_Type = {
@@ -2757,7 +2779,6 @@ yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
     return length_hint < 0 ? 0 : length_hint;
 }
 
-// TODO what if the requested size was an input that we checked against the size of state
 ypObject *yp_iter_stateCX(ypObject *i, void **state, yp_ssize_t *size)
 {
     if (ypObject_TYPE_PAIR_CODE(i) != ypIter_CODE) {
@@ -2779,6 +2800,7 @@ void yp_unpackN(ypObject *iterable, int n, ...)
 {
     return_yp_V_FUNC_void(yp_unpackNV, (iterable, n, args), n);
 }
+
 void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
 {
     yp_uint64_t mi_state;
@@ -2945,6 +2967,54 @@ static ypObject *_ypIter_from_miniiter(ypObject *x)
 static ypObject *_ypIter_from_miniiter_rev(ypObject *x)
 {
     return _ypMiIter_from_miniiter(x, ypObject_TYPE(x)->tp_miniiter_reversed);
+}
+
+
+// Iter Constructors from Iterator-From-Callable Types
+// (Allows full iter objects to be created from types that support the mini iterator protocol)
+
+#define ypCallableIter_CALLABLE(i) (((ypCallableIterObject *)i)->callable)
+#define ypCallableIter_SENTINEL(i) (((ypCallableIterObject *)i)->sentinel)
+
+static ypObject *_ypCallableIter_generator(ypObject *i, ypObject *value)
+{
+    ypObject *argarray[] = {ypCallableIter_CALLABLE(i)};
+    ypObject *call_result;
+    ypObject *eq_result;
+
+    if (yp_isexceptionC(value)) return value;  // yp_GeneratorExit, in particular
+
+    call_result = yp_call_arrayX(1, argarray);  // new ref
+    if (yp_isexceptionC(call_result)) return call_result;
+
+    eq_result = yp_eq(ypCallableIter_SENTINEL(i), call_result);
+    if (eq_result == yp_False) return call_result;  // success
+
+    // If we get here, we are returning an error, so discard call_result.
+    yp_decref(call_result);
+    return yp_isexceptionC(eq_result) ? eq_result : yp_StopIteration;
+}
+
+ypObject *yp_iter2(ypObject *callable, ypObject *sentinel)
+{
+    ypObject *i;
+    ypObject *result;
+
+    // Allocate the iterator
+    i = ypMem_MALLOC_FIXED(ypCallableIterObject, ypIter_CODE);
+    if (yp_isexceptionC(i)) return i;
+
+    // Set the attributes and return
+    i->ob_len = ypObject_LEN_INVALID;
+    ypIter_STATE(i) = &(ypCallableIter_CALLABLE(i));
+    ypIter_SET_STATE_SIZE(
+            i, yp_sizeof(ypCallableIterObject) - yp_offsetof(ypCallableIterObject, callable));
+    ypIter_FUNC(i) = _ypCallableIter_generator;
+    ypIter_OBJLOCS(i) = 0x3u;  // two objects: callable and sentinel
+    ypCallableIter_CALLABLE(i) = yp_incref(callable);
+    ypCallableIter_SENTINEL(i) = yp_incref(sentinel);
+    ypIter_LENHINT(i) = 0;  // it's not known how many values will be yielded
+    return i;
 }
 
 
@@ -5227,7 +5297,7 @@ ypObject *yp_intC(yp_int_t value)
         ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypInt_CODE);
         if (yp_isexceptionC(i)) return i;
         ypInt_VALUE(i) = value;
-        yp_DEBUG("yp_intC: %p value %" PRIint, i, value);
+        yp_INFO("yp_intC: %p value %" PRIint, i, value);
         return i;
     }
 }
@@ -5237,7 +5307,7 @@ ypObject *yp_intstoreC(yp_int_t value)
     ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypIntStore_CODE);
     if (yp_isexceptionC(i)) return i;
     ypInt_VALUE(i) = value;
-    yp_DEBUG("yp_intstoreC: %p value %" PRIint, i, value);
+    yp_INFO("yp_intstoreC: %p value %" PRIint, i, value);
     return i;
 }
 
@@ -13056,7 +13126,7 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
     else {
         result = yp_NotImplementedError;
         goto keyfunc_fail;
-#if 0 // FIXME support keyfunc
+#if 0 // FIXME support keyfunc as part of callables
         if (detached.len < MERGESTATE_TEMP_SIZE/2)
             /* Leverage stack space we allocated but won't otherwise use */
             keys = &ms.temparray[detached.len+1];
@@ -13408,7 +13478,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
         _ypSet_movekey_clean(so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc);
     }
     if (oldkeys != ypSet_INLINE_DATA(so)) yp_free(oldkeys);
-    yp_DEBUG("_ypSet_resize: %p table %p  (was %p)", so, newkeys, oldkeys);
+    yp_INFO("_ypSet_resize: %p table %p  (was %p)", so, newkeys, oldkeys);
     return yp_None;
 }
 
@@ -16409,19 +16479,6 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
  *************************************************************************************************/
 #pragma region function
 
-// TODO Ideas:
-//  - remember that bound functions also have a "self" as the first positional argument (it'd be
-//  the argument after func_self if we go that route), so the name "self" is going to get confusing
-
-// A verify function (perhaps only called once) that ensures:
-//  - all names are strings AND UNIQUE!
-//  - required args come first, no flags
-//  - with defaults next
-//  - *args next, no default
-//  - kw-only args next
-//  - **kwargs to finish
-// TODO Ensure the above is correct with Python
-
 // FIXME be sure I'm using "parameter" and "argument" in the right places
 // TODO Inspect and consider where yp_ssize_t is used vs int (as in `int n`)
 // TODO Make sub exceptions of yp_TypeError for each type of argument error (perhaps all grouped
@@ -16489,6 +16546,8 @@ yp_STATIC_ASSERT(
 
 #define ypFunction_FLAGS(f) (((ypObject *)(f))->ob_type_flags)
 #define ypFunction_STATE(f) ((ypFunctionState *)((ypFunctionObject *)(f))->ob_state)
+#define ypFunction_SET_STATE(f, state) \
+    (((ypFunctionObject *)(f))->ob_state = (ypFunctionState *)(state))
 #define ypFunction_PARAMS(f) ((yp_def_parameter_t *)((ypObject *)(f))->ob_data)
 #define ypFunction_PARAMS_LEN ypObject_CACHED_LEN
 #define ypFunction_SET_PARAMS_LEN ypObject_SET_CACHED_LEN
@@ -16498,8 +16557,12 @@ yp_STATIC_ASSERT(
 // #define ypFunction_STATE_SIZE_MAX ((yp_ssize_t)0x7FFFFFFF)
 
 // The maximum possible number of parameters for a function
-// #define ypFunction_PARAMS_COUNT_MAX
-//     ((yp_ssize_t)MIN(yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject), ypObject_LEN_MAX))
+// FIXME This alloclen_max/len_max separation is not useful for most types
+#define ypFunction_ALLOCLEN_MAX                                                             \
+    ((yp_ssize_t)MIN(                                                                       \
+            (yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject)) / yp_sizeof(yp_def_parameter_t), \
+            ypObject_LEN_MAX))
+#define ypFunction_LEN_MAX ypFunction_ALLOCLEN_MAX
 
 // The largest argarray that we will allocate on the stack.
 #define ypFunction_MAX_ARGS_ON_STACK 32
@@ -17391,7 +17454,38 @@ static ypTypeObject ypFunction_Type = {
 
 // Public functions
 
-// FIXME
+ypObject *yp_function(yp_def_function_t *definition)
+{
+    yp_int32_t parameters_len = MAX(definition->parameters_len, 0);
+    ypObject * newF;
+    yp_ssize_t i;
+    ypObject * result;
+
+    if (definition->flags != 0) return yp_ValueError;  // TODO Correct error?
+    if (parameters_len > ypFunction_LEN_MAX) return yp_MemorySizeOverflowError;
+
+    newF = ypMem_MALLOC_CONTAINER_INLINE(
+            ypFunctionObject, ypFunction_CODE, parameters_len, ypFunction_ALLOCLEN_MAX);
+    if (yp_isexceptionC(newF)) return newF;
+    ypFunction_CODE_FUNC(newF) = definition->code;
+    ypFunction_FLAGS(newF) = 0;
+    ypFunction_SET_STATE(newF, NULL);
+
+    for (i = 0; i < parameters_len; i++) {
+        ypObject *default_ = definition->parameters[i].default_;  // borrowed
+        ypFunction_PARAMS(newF)[i].name = yp_incref(definition->parameters[i].name);
+        ypFunction_PARAMS(newF)[i].default_ = default_ == NULL ? NULL : yp_incref(default_);
+    }
+    ypFunction_SET_PARAMS_LEN(newF, parameters_len);
+
+    result = _ypFunction_validate_parameters(newF);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newF);
+        return result;
+    }
+
+    return newF;
+}
 
 #pragma endregion function
 

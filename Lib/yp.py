@@ -43,15 +43,21 @@ _yp_arg_missing = object()
 _yp_pyobj_cache = weakref.WeakValueDictionary()
 
 
-def _yp_transmute_and_cache(obj):
+def _yp_transmute_and_cache(obj, *, steal):
+    """If steal is true, this function will steal the nohtyP reference to obj.
+    """
     if obj.value is None:
         raise ValueError
-    try:
-        return _yp_pyobj_cache[obj.value]  # try to use an existing object
-    except KeyError:
+
+    cached = _yp_pyobj_cache.get(obj.value)  # try to use an existing object
+    if cached is None:
+        if not steal: _yp_incref(obj)  # we need a ref while in the cache
         obj.__class__ = ypObject._yptype2yp[_yp_type(obj).value]
         _yp_pyobj_cache[obj.value] = obj
         return obj
+    else:
+        if steal: _yp_decref(obj)  # cached already has a ref: we don't need two
+        return cached
 
 
 class yp_param:
@@ -80,8 +86,8 @@ class yp_param:
 
 def yp_func_errcheck(result, func, args):
     if isinstance(result, c_ypObject_p):
-        result = _yp_transmute_and_cache(result)
         # Returned references are always new; no need to incref
+        result = _yp_transmute_and_cache(result, steal=True)
     getattr(result, "_yp_errcheck", int)()
     for arg in args:
         getattr(arg, "_yp_errcheck", int)()
@@ -141,15 +147,14 @@ class c_ypObject_p(c_void_p):
 
 def c_ypObject_p_value(name):
     value = c_ypObject_p.in_dll(ypdll, name)
-    value = _yp_transmute_and_cache(value)
-    # These values are all immortal; no need to incref
+    value = _yp_transmute_and_cache(value, steal=True)
     globals()[name] = value
 
 
 class c_ypObject_pp(c_ypObject_p*1):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        _yp_incref(self[0])
+        _yp_incref(self._item)
 
     @classmethod
     def from_param(cls, val):
@@ -158,28 +163,27 @@ class c_ypObject_pp(c_ypObject_p*1):
         obj = cls(c_ypObject_p.from_param(val))
         return obj
 
+    @property
+    def _item(self): return super().__getitem__(0)
+
     def _yp_errcheck(self):
-        self[0]._yp_errcheck()
+        self[0]._yp_errcheck()  # using our __getitem__ here for the transmute
 
     def __del__(self):
-        # TODO Make __del__ work during shutdown
-        try:
-            _yp_decref(self[0])
-        except:
-            pass
-        try:
-            self[0] = yp_None
-        except:
-            pass
-        # super().__del__(self) # no __del__ method?!
+        self[0] = yp_None
+        # super().__del__(self)  # no __del__ method?!
 
     def __getitem__(self, key):
-        item = super().__getitem__(key)
-        item_cached = _yp_transmute_and_cache(item)
-        # If our item was the one added to the cache, then we need to give it a new reference
-        if item is item_cached:
-            _yp_incref(item_cached)
-        return item_cached
+        if key != 0: raise IndexError
+        # We own _item's reference, so the cache needs to make its own.
+        return _yp_transmute_and_cache(self._item, steal=False)
+
+    def __setitem__(self, key, o):
+        if key != 0: raise IndexError
+        olditem = self._item
+        if olditem.value is not None: _yp_decref(olditem)
+        super().__setitem__(0, o)
+        _yp_incref(self._item)
 
     def __reduce__(self): raise pickle.PicklingError("can't pickle nohtyP types (yet)")
 
@@ -191,7 +195,7 @@ c_multiN_ypObject_p = (c_int, "n", 0)
 c_multiK_ypObject_p = (c_int, "n", 0)
 assert c_multiN_ypObject_p is not c_multiK_ypObject_p
 
-# void yp_initialize(yp_initialize_kwparams *kwparams);
+# void yp_initialize(yp_initialize_parameters_t *kwparams);
 
 # ypObject *yp_incref(ypObject *x);
 yp_func(c_void_p, "yp_incref", ((c_ypObject_p, "x"), ), errcheck=False)
@@ -305,9 +309,26 @@ c_yp_int_t = c_int64
 c_yp_float_t = c_yp_float64_t
 
 # typedef ypObject *(*yp_generator_func_t)(ypObject *self, ypObject *value);
-# XXX The return value needs to be a c_void_p to prevent addresses-as-ints from being converted to
-# a yp_int
+
+# XXX The return needs to be c_void_p to prevent addresses-as-ints being converted to yp_ints
 c_yp_generator_func_t = CFUNCTYPE(c_void_p, c_ypObject_p, c_ypObject_p)
+
+# typedef struct _yp_def_parameter_t {...} yp_def_parameter_t;
+class c_yp_def_parameter_t(Structure):
+    _fields_ = [
+        ("name", c_ypObject_p),
+        ("default", c_ypObject_p),
+    ]
+# typedef struct _yp_def_function_t {...} yp_def_function_t;
+# XXX The return needs to be c_void_p, else it gets converted to yp_int.
+c_yp_def_code_t = CFUNCTYPE(c_void_p, c_ypObject_p, c_yp_ssize_t, POINTER(c_ypObject_p))
+class c_yp_def_function_t(Structure):
+    _fields_ = [
+        ("code", c_yp_def_code_t),
+        ("flags", c_uint32),
+        ("parameters_len", c_int32),
+        ("parameters", POINTER(c_yp_def_parameter_t)),
+    ]
 
 # ypObject *yp_intC(yp_int_t value);
 yp_func(c_ypObject_p, "yp_intC", ((c_yp_int_t, "value"), ))
@@ -459,6 +480,15 @@ yp_func(c_ypObject_p, "yp_dict_fromkeysN", ((c_ypObject_p, "value"), c_multiN_yp
 yp_func(c_ypObject_p, "yp_frozendict", ((c_ypObject_p, "x"), ))
 # ypObject *yp_dict(ypObject *x);
 yp_func(c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ))
+
+# ypObject *yp_function(yp_def_function_t *definition);
+yp_func(c_ypObject_p, "yp_function", ((POINTER(c_yp_def_function_t), "definition"), ))
+
+# ypObject *yp_function_withstateCN(yp_def_function_t *definition, int n, ...);
+# ypObject *yp_function_withstateCNV(yp_def_function_t *definition, int n, va_list args);
+
+# ypObject *yp_function_withstatestructCN(yp_def_function_t *definition, void *state, yp_ssize_t size, int n, ...);
+# ypObject *yp_function_withstatestructCNV(yp_def_function_t *definition, void *state, yp_ssize_t size, int n, va_list args);
 
 # XXX The file type will be added in a future version
 
@@ -1123,42 +1153,45 @@ def ypObject_p_exception(name, pyExc, *, one_to_one=True):
     globals()["_"+name] = ypExc
 
 ypObject_p_exception("yp_BaseException", BaseException)
+ypObject_p_exception("yp_SystemExit", SystemExit)
+ypObject_p_exception("yp_KeyboardInterrupt", KeyboardInterrupt)
+ypObject_p_exception("yp_GeneratorExit", GeneratorExit)
 ypObject_p_exception("yp_Exception", Exception)
 ypObject_p_exception("yp_StopIteration", StopIteration)
-ypObject_p_exception("yp_GeneratorExit", GeneratorExit)
 ypObject_p_exception("yp_ArithmeticError", ArithmeticError)
-ypObject_p_exception("yp_LookupError", LookupError)
+ypObject_p_exception("yp_FloatingPointError", FloatingPointError)
+ypObject_p_exception("yp_OverflowError", OverflowError)
+ypObject_p_exception("yp_ZeroDivisionError", ZeroDivisionError)
 ypObject_p_exception("yp_AssertionError", AssertionError)
 ypObject_p_exception("yp_AttributeError", AttributeError)
+ypObject_p_exception("yp_BufferError", BufferError)
 ypObject_p_exception("yp_EOFError", EOFError)
-ypObject_p_exception("yp_FloatingPointError", FloatingPointError)
-ypObject_p_exception("yp_OSError", OSError)
 ypObject_p_exception("yp_ImportError", ImportError)
+ypObject_p_exception("yp_LookupError", LookupError)
 ypObject_p_exception("yp_IndexError", IndexError)
 ypObject_p_exception("yp_KeyError", KeyError)
-ypObject_p_exception("yp_KeyboardInterrupt", KeyboardInterrupt)
 ypObject_p_exception("yp_MemoryError", MemoryError)
 ypObject_p_exception("yp_NameError", NameError)
-ypObject_p_exception("yp_OverflowError", OverflowError)
+ypObject_p_exception("yp_UnboundLocalError", UnboundLocalError)
+ypObject_p_exception("yp_OSError", OSError)
+ypObject_p_exception("yp_ReferenceError", ReferenceError)
 ypObject_p_exception("yp_RuntimeError", RuntimeError)
 ypObject_p_exception("yp_NotImplementedError", NotImplementedError)
-ypObject_p_exception("yp_ReferenceError", ReferenceError)
+ypObject_p_exception("yp_SyntaxError", SyntaxError)
 ypObject_p_exception("yp_SystemError", SystemError)
-ypObject_p_exception("yp_SystemExit", SystemExit)
 ypObject_p_exception("yp_TypeError", TypeError)
-ypObject_p_exception("yp_UnboundLocalError", UnboundLocalError)
+ypObject_p_exception("yp_ValueError", ValueError)
 ypObject_p_exception("yp_UnicodeError", UnicodeError)
 ypObject_p_exception("yp_UnicodeEncodeError", UnicodeEncodeError)
 ypObject_p_exception("yp_UnicodeDecodeError", UnicodeDecodeError)
 ypObject_p_exception("yp_UnicodeTranslateError", UnicodeTranslateError)
-ypObject_p_exception("yp_ValueError", ValueError)
-ypObject_p_exception("yp_ZeroDivisionError", ZeroDivisionError)
-ypObject_p_exception("yp_BufferError", BufferError)
 
 # Raised when the object does not support the given method; subexception of yp_AttributeError
 ypObject_p_exception("yp_MethodError", AttributeError, one_to_one=False)
 # Raised when an allocation size calculation overflows; subexception of yp_MemoryError
 ypObject_p_exception("yp_MemorySizeOverflowError", MemoryError, one_to_one=False)
+# Raised on an error in a function's parameters definition; subexception of yp_SyntaxError.
+ypObject_p_exception("yp_ParameterSyntaxError", SyntaxError, one_to_one=False)
 # Indicates a limitation in the implementation of nohtyP; subexception of yp_SystemError
 ypObject_p_exception("yp_SystemLimitationError", SystemError, one_to_one=False)
 # Raised when an invalidated object is passed to a function; subexception of yp_TypeError
@@ -1169,10 +1202,8 @@ yp_func(c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc")))
 
 # int yp_isexceptionCN(ypObject *x, int n, ...);
 
-# typedef struct _yp_initialize_kwparams {...} yp_initialize_kwparams;
-
-
-class c_yp_initialize_kwparams(Structure):
+# typedef struct _yp_initialize_parameters_t {...} yp_initialize_parameters_t;
+class c_yp_initialize_parameters_t(Structure):
     _fields_ = [
         ("struct_size", c_yp_ssize_t),
         ("yp_malloc", c_void_p),
@@ -1180,13 +1211,13 @@ class c_yp_initialize_kwparams(Structure):
         ("yp_free", c_void_p),
         ("everything_immortal", c_int),
     ]
-# void yp_initialize(yp_initialize_kwparams *kwparams);
-yp_func(c_void, "yp_initialize", ((POINTER(c_yp_initialize_kwparams), "kwparams"), ),
+# void yp_initialize(yp_initialize_parameters_t *kwparams);
+yp_func(c_void, "yp_initialize", ((POINTER(c_yp_initialize_parameters_t), "kwparams"), ),
         errcheck=False)
 
 # Initialize nohtyP
-_yp_initparams = c_yp_initialize_kwparams(
-    struct_size=sizeof(c_yp_initialize_kwparams),
+_yp_initparams = c_yp_initialize_parameters_t(
+    struct_size=sizeof(c_yp_initialize_parameters_t),
     yp_malloc=None,
     yp_malloc_resize=None,
     yp_free=None,
@@ -1268,8 +1299,6 @@ class ypObject(c_ypObject_p):
 
     def __gt__(self, other): return _yp_gt(self, other)
 
-    def _yp_iter(self): return _yp_iter(self)
-
     def __iter__(self): return _yp_iter(self)
 
     def __hash__(self): return _yp_hashC(self, yp_None)
@@ -1329,7 +1358,7 @@ class ypObject(c_ypObject_p):
         if key is None and reverse is False:
             _yp_sort(self)
         elif key is not None:
-            # FIXME Replace this faked-out version when nohtyP supports key
+            # FIXME Replace this faked-out version as part of callables
             self_keyed = yp_list((key(x), x) for x in self)
             _yp_sort3(self_keyed, None, reverse)
             assert len(self) == len(self_keyed)
@@ -1782,13 +1811,22 @@ c_ypObject_p_value("yp_False")
 
 @pytype(yp_t_iter, (iter, type(x for x in ())))
 class yp_iter(ypObject):
-    def _pygenerator_func(self, yp_self, yp_value):
+    def __new__(cls, object, sentinel=_yp_arg_missing, /):
+        if sentinel is not _yp_arg_missing:
+            return _yp_callN(cls._yp_type, _yp_callable(object), sentinel)
+        elif isinstance(object, ypObject):
+            return _yp_callN(cls._yp_type, object)
+        elif hasattr(object, "_yp_iter"):
+            return object._yp_iter()
+        else:
+            return cls._from_python(object)
+
+    def _pyiter_wrapper(self, yp_self, yp_value):
         try:
             if _yp_isexceptionC(yp_value):
                 return _yp_incref(yp_value)  # yp_GeneratorExit, in particular
-            py_iter = self._pyiter
             try:
-                py_result = next(py_iter)
+                py_result = next(self._pyiter)
             except BaseException as e: # exceptions from the iterator get passed to nohtyP
                 return _yp_incref(_pyExc2yp[type(e)])
             return _yp_incref(ypObject._from_python(py_result))
@@ -1796,22 +1834,14 @@ class yp_iter(ypObject):
             traceback.print_exc()
             return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
-    def __new__(cls, object, sentinel=_yp_arg_missing, /):
-        if sentinel is not _yp_arg_missing:
-            object = iter(object, sentinel) # FIXME Support in nohtyP
-
-        if hasattr(object, "_yp_iter"):
-            return object._yp_iter()
-        else:
-            return cls._from_python(object)
-
     @classmethod
     def _from_python(cls, pyobj):
         length_hint = operator.length_hint(pyobj)
         self = c_ypObject_p.__new__(cls)
         self._pyiter = iter(pyobj)
-        self._pycallback = c_yp_generator_func_t(self._pygenerator_func)
-        self.value = _yp_incref(_yp_generator_fromstructCN(self._pycallback, length_hint, 0, 0))
+        self._ypfunc = c_yp_generator_func_t(self._pyiter_wrapper)
+        # FIXME Caling _yp_generator_fromstructCN also transmutes/caches a yp_iter, right?
+        self.value = _yp_incref(_yp_generator_fromstructCN(self._ypfunc, length_hint, 0, 0))
         return self
 
     def __iter__(self): return self
@@ -2073,6 +2103,8 @@ c_ypObject_p_value("yp_str_empty")
 yp_s_None = _yp_str_frombytesC2(b"None", 4)
 yp_s_True = _yp_str_frombytesC2(b"True", 4)
 yp_s_False = _yp_str_frombytesC2(b"False", 5)
+yp_s_star_args = _yp_str_frombytesC2(b"*args", 5)
+yp_s_star_star_kwargs = _yp_str_frombytesC2(b"**kwargs", 8)
 
 
 def yp_repr(object):
@@ -2165,7 +2197,7 @@ def yp_sorted(iterable, /, *, key=None, reverse=False):
     if key is None and reverse is False:
         return _yp_sorted(_yp_iterable(iterable))
     elif key is not None:
-        # FIXME Replace this faked-out version when nohtyP supports key
+        # FIXME Replace this faked-out version as part of callables
         x_keyed = _yp_sorted3(_yp_iterable((key(item), item) for item in iterable), None, reverse)
         assert len(iterable) == len(x_keyed)
         return yp_list(item[1] for item in x_keyed)
@@ -2365,8 +2397,7 @@ class _items_dictview(_setlike_dictview):
 # between list/tuple and set/frozenset (ie the singleton empty frozendict, etc)
 
 
-@pytype(yp_t_dict, dict)
-class yp_dict(ypObject):
+class _ypDict(ypObject):
     def __new__(cls, *args, **kwargs):
         if args:
             args = (_yp_dict_iterable(args[0]), *args[1:])
@@ -2400,6 +2431,24 @@ class yp_dict(ypObject):
         _yp_updateN(self, _yp_dict_iterable(object), kwargs)
 
 
+@pytype(yp_t_frozendict, ())
+class yp_frozendict(_ypDict):
+    @classmethod
+    def _from_python(cls, pyobj):
+        if len(pyobj) > (CTYPES_MAX_ARGCOUNT-1) // 2:
+            return _yp_frozendict(_yp_item_iter._from_python(pyobj))
+        return _yp_frozendictK(*_yp_flatten_dict(pyobj))
+
+
+@pytype(yp_t_dict, dict)
+class yp_dict(_ypDict):
+    @classmethod
+    def _from_python(cls, pyobj):
+        if len(pyobj) > (CTYPES_MAX_ARGCOUNT-1) // 2:
+            return _yp_dict(_yp_item_iter._from_python(pyobj))
+        return _yp_dictK(*_yp_flatten_dict(pyobj))
+
+
 @pytype(yp_t_range, range)
 class yp_range(ypObject):
     @classmethod
@@ -2431,10 +2480,41 @@ c_ypObject_p_value("yp_range_empty")
 @pytype(yp_t_function, type(lambda: 1))
 class yp_function(ypObject):
     def __new__(cls, *args, **kwargs):
-        raise TypeError("cannot instantiate yp_function this way")
+        raise NotImplementedError("can't instantiate yp_function directly")
+
+    def _pyfunction_wrapper(self, yp_self, n, argarray):
+        try:
+            args = _yp_transmute_and_cache(argarray[0], steal=False)
+            kwargs = _yp_transmute_and_cache(argarray[1], steal=False)
+            try:
+                py_result = self._pyfunction(*args, **kwargs)
+            except BaseException as e: # exceptions from the function get passed to nohtyP
+                return _yp_incref(_pyExc2yp[type(e)])
+            return _yp_incref(ypObject._from_python(py_result))
+        except BaseException as e: # ensure unexpected exceptions don't crash the program
+            traceback.print_exc()
+            return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        self = c_ypObject_p.__new__(cls)
+        self._pyfunction = pyobj
+        self._ypcode = c_yp_def_code_t(self._pyfunction_wrapper)
+        parameters = (c_yp_def_parameter_t * 2)((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
+        definition = c_yp_def_function_t(self._ypcode, 0, 2, parameters)
+        # FIXME Caling _yp_function also transmutes/caches a yp_function, right?
+        self.value = _yp_incref(_yp_function(definition))
+        return self
+
 c_ypObject_p_value("yp_func_chr")
 c_ypObject_p_value("yp_func_hash")
 c_ypObject_p_value("yp_func_len")
 c_ypObject_p_value("yp_func_reversed")
 
 yp_chr = yp_func_chr
+
+
+def _yp_callable(callable):
+    """Returns a ypObject that nohtyP can call directly, which may be callable itself or a
+    yp_function based on callable."""
+    return ypObject._from_python(callable, default=yp_function)

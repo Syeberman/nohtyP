@@ -245,6 +245,11 @@ ypAPI ypObject *yp_floatstore(ypObject *x);
 // being iterated over.
 ypAPI ypObject *yp_iter(ypObject *x);
 
+// Returns a new reference to an iterator that yields the values returned from repeatedly calling
+// callable, stopping when callable returns a value equal to sentinel. callable is called with no
+// arguments; the sentinel value is never yielded.
+ypAPI ypObject *yp_iter2(ypObject *callable, ypObject *sentinel);
+
 // Returns a new reference to a generator iterator object using the given func.  The given n objects
 // will be made available to func via yp_iter_stateCX as an array; new references to these objects
 // will be created, and those references will be discarded when the iterator is deallocated.
