@@ -1143,11 +1143,13 @@ yp_IMMORTAL_STR_LATIN_1_static(yp_s_encoding, "encoding");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_errors, "errors");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_i, "i");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_iterable, "iterable");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_key, "key");
 // TODO Rename all obj to object? "object" is a Python keyword argument name (str(object='')). (This
 // would break with Python docstrings for some built-ins, but may be where Python is headed...but
 // oddly it conflicts with the object() built-in so I would expect obj like cls avoids class.)
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_obj, "obj");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_object, "object");
+yp_IMMORTAL_STR_LATIN_1_static(yp_s_reverse, "reverse");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_self, "self");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_sentinel, "sentinel");
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_sequence, "sequence");
@@ -13123,36 +13125,33 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
         lo.values = NULL;
     }
     else {
-        result = yp_NotImplementedError;
-        goto keyfunc_fail;
-#if 0 // FIXME support keyfunc as part of callables
         if (detached.len < MERGESTATE_TEMP_SIZE/2)
             /* Leverage stack space we allocated but won't otherwise use */
             keys = &ms.temparray[detached.len+1];
         else {
             yp_ssize_t actual;
-            keys = PyMem_MALLOC(&actual, sizeof(ypObject *) * detached.len);
+            keys = yp_malloc(&actual, sizeof(ypObject *) * detached.len);
             if (keys == NULL) {
-                result = yp_MemoryError;
+                result = yp_MemoryError;  // returned by keyfunc_fail
                 goto keyfunc_fail;
             }
         }
 
         for (i = 0; i < detached.len ; i++) {
-            keys[i] = ypObject_CallFunctionObjArgs(keyfunc, detached.array[i],
-                                                   NULL);
-            if (keys[i] == NULL) {
+            ypObject *argarray[] = {keyfunc, detached.array[i]};  // borrowed
+            keys[i] = yp_call_arrayX(2, argarray);
+            if (yp_isexceptionC(keys[i])) {
+                result = keys[i];  // returned by keyfunc_fail
                 for (i=i-1 ; i>=0 ; i--)
                     yp_decref(keys[i]);
                 if (detached.len >= MERGESTATE_TEMP_SIZE/2)
-                    PyMem_FREE(keys);
+                    yp_free(keys);
                 goto keyfunc_fail;
             }
         }
 
         lo.keys = keys;
         lo.values = detached.array;
-#endif
     }
 
     merge_init(&ms, detached.len, keys != NULL);
@@ -18315,6 +18314,16 @@ static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *cons
 
 yp_IMMORTAL_FUNCTION(yp_func_reversed, yp_func_reversed_code,
         ({yp_CONST_REF(yp_s_sequence), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+
+static ypObject *yp_func_sorted_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
+{
+    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
+    return yp_sorted3(argarray[0], argarray[3], argarray[4]);
+};
+
+yp_IMMORTAL_FUNCTION(yp_func_sorted, yp_func_sorted_code,
+        ({yp_CONST_REF(yp_s_iterable), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}, {yp_CONST_REF(yp_s_star), NULL},
+        {yp_CONST_REF(yp_s_key), yp_CONST_REF(yp_None)}, {yp_CONST_REF(yp_s_reverse), yp_CONST_REF(yp_False)}));
 
 #pragma endregion functions_as_objects
 

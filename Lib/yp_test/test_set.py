@@ -1558,8 +1558,8 @@ class TestCopying:
 
     def test_copy(self):
         dup = self.set.copy()
-        dup_list = yp_sorted(dup, key=repr)
-        set_list = yp_sorted(self.set, key=repr)
+        dup_list = yp_sorted(dup, key=yp_repr)
+        set_list = yp_sorted(self.set, key=yp_repr)
         self.assertEqual(yp_len(dup_list), yp_len(set_list))
         for i in range(len(dup_list)):
             self.assertIs(dup_list[i], set_list[i])
@@ -1567,8 +1567,8 @@ class TestCopying:
     def test_deep_copy(self):
         dup = copy.deepcopy(self.set)
         ##print yp_type(dup), repr(dup)
-        dup_list = yp_sorted(dup, key=repr)
-        set_list = yp_sorted(self.set, key=repr)
+        dup_list = yp_sorted(dup, key=yp_repr)
+        set_list = yp_sorted(self.set, key=yp_repr)
         self.assertEqual(yp_len(dup_list), yp_len(set_list))
         for i in range(len(dup_list)):
             self.assertEqual(dup_list[i], set_list[i])
@@ -1732,7 +1732,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
         for cons in (yp_set, yp_frozenset):
             for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
                 for g in (G, I, Ig, S, L, R):
-                    self.assertEqual(yp_sorted(cons(g(s)), key=repr), sorted(g(s), key=repr))
+                    self.assertEqual(yp_sorted(cons(g(s)), key=yp_repr), sorted(g(s), key=repr))
                 self.assertRaises(TypeError, cons , X(s))
                 self.assertRaises(TypeError, cons , N(s))
                 self.assertRaises(ZeroDivisionError, cons , E(s))
@@ -1748,7 +1748,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
                     if isinstance(expected, yp_bool):
                         self.assertEqual(actual, expected)
                     else:
-                        self.assertEqual(yp_sorted(actual, key=repr), yp_sorted(expected, key=repr))
+                        self.assertEqual(yp_sorted(actual, key=yp_repr), yp_sorted(expected, key=yp_repr))
                 self.assertRaises(TypeError, meth, X(s))
                 self.assertRaises(TypeError, meth, N(s))
                 self.assertRaises(ZeroDivisionError, meth, E(s))
@@ -1763,7 +1763,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
                     t = s.copy()
                     getattr(s, methname)(list(g(data)))
                     getattr(t, methname)(g(data))
-                    self.assertEqual(yp_sorted(s, key=repr), yp_sorted(t, key=repr))
+                    self.assertEqual(yp_sorted(s, key=yp_repr), yp_sorted(t, key=yp_repr))
 
                 self.assertRaises(TypeError, getattr(yp_set('january'), methname), X(data))
                 self.assertRaises(TypeError, getattr(yp_set('january'), methname), N(data))

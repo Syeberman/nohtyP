@@ -213,22 +213,16 @@ yp_func(c_void, "yp_decref", ((c_ypObject_p, "x"), ), errcheck=False)
 yp_func(c_int, "yp_isexceptionC", ((c_ypObject_p, "x"), ), errcheck=False)
 
 # void yp_freeze(ypObject **x);
-yp_func(c_void, "yp_freeze", ((c_ypObject_pp, "x"), ))
 
 # void yp_deepfreeze(ypObject **x);
-yp_func(c_void, "yp_deepfreeze", ((c_ypObject_pp, "x"), ))
 
 # ypObject *yp_unfrozen_copy(ypObject *x);
-yp_func(c_ypObject_p, "yp_unfrozen_copy", ((c_ypObject_p, "x"), ))
 
 # ypObject *yp_unfrozen_deepcopy(ypObject *x);
-yp_func(c_ypObject_p, "yp_unfrozen_deepcopy", ((c_ypObject_p, "x"), ))
 
 # ypObject *yp_frozen_copy(ypObject *x);
-yp_func(c_ypObject_p, "yp_frozen_copy", ((c_ypObject_p, "x"), ))
 
 # ypObject *yp_frozen_deepcopy(ypObject *x);
-yp_func(c_ypObject_p, "yp_frozen_deepcopy", ((c_ypObject_p, "x"), ))
 
 # ypObject *yp_copy(ypObject *x);
 yp_func(c_ypObject_p, "yp_copy", ((c_ypObject_p, "x"), ))
@@ -269,7 +263,6 @@ yp_func(c_ypObject_p, "yp_not", ((c_ypObject_p, "x"), ))
 # ypObject *yp_allNV(int n, va_list args);
 
 # ypObject *yp_all(ypObject *iterable);
-yp_func(c_ypObject_p, "yp_all", ((c_ypObject_p, "iterable"), ))
 
 # ypObject *yp_lt(ypObject *x, ypObject *y);
 # ypObject *yp_le(ypObject *x, ypObject *y);
@@ -335,11 +328,9 @@ yp_func(c_ypObject_p, "yp_intC", ((c_yp_int_t, "value"), ))
 # ypObject *yp_intstoreC(yp_int_t value);
 
 # ypObject *yp_int_baseC(ypObject *x, yp_int_t base);
-yp_func(c_ypObject_p, "yp_int_baseC", ((c_ypObject_p, "x"), (c_yp_int_t, "base")))
 # ypObject *yp_intstore_baseC(ypObject *x, yp_int_t base);
 
 # ypObject *yp_int(ypObject *x);
-yp_func(c_ypObject_p, "yp_int", ((c_ypObject_p, "x"), ))
 # ypObject *yp_intstore(ypObject *x);
 
 # ypObject *yp_floatCF(yp_float_t value);
@@ -350,7 +341,6 @@ yp_func(c_ypObject_p, "yp_floatCF", ((c_yp_float_t, "value"), ))
 # ypObject *yp_floatstore_strC(const char *string);
 
 # ypObject *yp_float(ypObject *x);
-yp_func(c_ypObject_p, "yp_float", ((c_ypObject_p, "x"), ))
 # ypObject *yp_floatstore(ypObject *x);
 
 # ypObject *yp_iter(ypObject *x);
@@ -371,7 +361,6 @@ yp_func(c_ypObject_p, "yp_generator_fromstructCN",
 yp_func(c_ypObject_p, "yp_rangeC3",
         ((c_yp_int_t, "start"), (c_yp_int_t, "stop"), (c_yp_int_t, "step")))
 # ypObject *yp_rangeC(yp_int_t stop);
-yp_func(c_ypObject_p, "yp_rangeC", ((c_yp_int_t, "stop"), ))
 
 # ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
 yp_func(c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
@@ -379,19 +368,12 @@ yp_func(c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len"))
 yp_func(c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
 
 # ypObject *yp_bytes3(ypObject *source, ypObject *encoding, ypObject *errors);
-yp_func(c_ypObject_p, "yp_bytes3", ((c_ypObject_p, "source"),
-                                    (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 # ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *errors);
-yp_func(c_ypObject_p, "yp_bytearray3", ((c_ypObject_p, "source"),
-                                        (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 
 # ypObject *yp_bytes(ypObject *source);
-yp_func(c_ypObject_p, "yp_bytes", ((c_ypObject_p, "source"), ))
 # ypObject *yp_bytearray(ypObject *source);
-yp_func(c_ypObject_p, "yp_bytearray", ((c_ypObject_p, "source"), ))
 
 # ypObject *yp_bytearray0(void);
-yp_func(c_ypObject_p, "yp_bytearray0", ())
 
 # ypObject *yp_str_frombytesC4(const yp_uint8_t *source, yp_ssize_t len,
 #         ypObject *encoding, ypObject *errors);
@@ -399,31 +381,22 @@ yp_func(c_ypObject_p, "yp_str_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t
                                              (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 # ypObject *yp_chrarray_frombytesC4(const yp_uint8_t *source, yp_ssize_t len,
 #         ypObject *encoding, ypObject *errors);
-yp_func(c_ypObject_p, "yp_chrarray_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
-                                                  (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 
 # ypObject *yp_str_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
 yp_func(c_ypObject_p, "yp_str_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
 # ypObject *yp_chrarray_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
-yp_func(c_ypObject_p, "yp_chrarray_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
 
 # ypObject *yp_str3(ypObject *object, ypObject *encoding, ypObject *errors);
 yp_func(c_ypObject_p, "yp_str3", ((c_ypObject_p, "object"),
                                   (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 # ypObject *yp_chrarray3(ypObject *object, ypObject *encoding, ypObject *errors);
-yp_func(c_ypObject_p, "yp_chrarray3", ((c_ypObject_p, "object"),
-                                       (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 
 # ypObject *yp_str(ypObject *object);
-yp_func(c_ypObject_p, "yp_str", ((c_ypObject_p, "object"), ))
 # ypObject *yp_chrarray(ypObject *object);
-yp_func(c_ypObject_p, "yp_chrarray", ((c_ypObject_p, "object"), ))
 
 # ypObject *yp_chrarray0(void);
-yp_func(c_ypObject_p, "yp_chrarray0", ())
 
 # ypObject *yp_chrC(yp_int_t i);
-yp_func(c_ypObject_p, "yp_chrC", ((c_yp_int_t, "i"), ))
 
 # ypObject *yp_tupleN(int n, ...);
 # ypObject *yp_tupleNV(int n, va_list args);
@@ -444,13 +417,8 @@ yp_func(c_ypObject_p, "yp_tuple", ((c_ypObject_p, "iterable"), ))
 yp_func(c_ypObject_p, "yp_list", ((c_ypObject_p, "iterable"), ))
 
 # ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse);
-yp_func(
-    c_ypObject_p, "yp_sorted3",
-    ((c_ypObject_p, "iterable"), (c_ypObject_p, "key"), (c_ypObject_p, "reverse"))
-)
 
 # ypObject *yp_sorted(ypObject *iterable);
-yp_func(c_ypObject_p, "yp_sorted", ((c_ypObject_p, "iterable"), ))
 
 # ypObject *yp_frozensetN(int n, ...);
 # ypObject *yp_frozensetNV(int n, va_list args);
@@ -546,10 +514,8 @@ yp_func(c_ypObject_p, "yp_reversed", ((c_ypObject_p, "seq"), ))
 # ypObject *yp_contains(ypObject *container, ypObject *x);
 yp_func(c_ypObject_p, "yp_contains", ((c_ypObject_p, "container"), (c_ypObject_p, "x")))
 # ypObject *yp_in(ypObject *x, ypObject *container);
-yp_func(c_ypObject_p, "yp_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")))
 
 # ypObject *yp_not_in(ypObject *x, ypObject *container);
-yp_func(c_ypObject_p, "yp_not_in", ((c_ypObject_p, "x"), (c_ypObject_p, "container")))
 
 # yp_ssize_t yp_lenC(ypObject *container, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_lenC", ((c_ypObject_p, "container"), c_ypObject_pp_exc),
@@ -669,7 +635,6 @@ yp_func(
 )
 
 # void yp_sort(ypObject **sequence);
-yp_func(c_void, "yp_sort", ((c_ypObject_pp, "sequence"), ))
 
 # define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
 _yp_SLICE_DEFAULT = _yp_SSIZE_T_MIN
@@ -936,7 +901,6 @@ yp_func(c_ypObject_p, "yp_decode", ((c_ypObject_p, "b"), ))
 # FIXME String Formatting Operations
 
 # int yp_iscallableC(ypObject *x);
-yp_func(c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), ))
 
 # ypObject *yp_callN(ypObject *c, int n, ...);
 # ypObject *yp_callNV(ypObject *c, int n, va_list args);
@@ -1355,17 +1319,7 @@ class ypObject(c_ypObject_p):
     def reverse(self): _yp_reverse(self)
 
     def sort(self, *, key=None, reverse=False):
-        if key is None and reverse is False:
-            _yp_sort(self)
-        elif key is not None:
-            # FIXME Replace this faked-out version as part of callables
-            self_keyed = yp_list((key(x), x) for x in self)
-            _yp_sort3(self_keyed, None, reverse)
-            assert len(self) == len(self_keyed)
-            for i in range(len(self)):
-                self[i] = self_keyed[i][1]
-        else:
-            _yp_sort3(self, None, reverse)
+        _yp_sort3(self, key, reverse)
 
     def isdisjoint(self, other):
         return _yp_isdisjoint(self, _yp_iterable(other))
@@ -1855,13 +1809,6 @@ def _yp_iterable(iterable):
     return ypObject._from_python(iterable, default=yp_iter)
 
 
-def yp_reversed(sequence, /):
-    """Returns reversed(sequence) of a ypObject as a yp_iter"""
-    if not isinstance(sequence, ypObject):
-        raise TypeError("expected ypObject in yp_reversed")
-    return yp_func_reversed(sequence)
-
-
 @pytype(yp_t_int, int)
 class yp_int(ypObject):
     @classmethod
@@ -2107,6 +2054,7 @@ yp_s_star_args = _yp_str_frombytesC2(b"*args", 5)
 yp_s_star_star_kwargs = _yp_str_frombytesC2(b"**kwargs", 8)
 
 
+# FIXME Support repr, then make this a proper nohtyP function object.
 def yp_repr(object):
     """Returns repr(object) of a ypObject as a yp_str"""
     if isinstance(object, str):
@@ -2186,23 +2134,6 @@ class yp_list(_ypTuple):
             raise TypeError
         _yp_irepeatC(self, factor)
         return self
-
-
-# FIXME Implement and use yp_func_sorted
-def yp_sorted(iterable, /, *, key=None, reverse=False):
-    """Returns sorted(iterable) of a ypObject as a yp_list"""
-    if not isinstance(iterable, (ypObject, _setlike_dictview, _values_dictview)):
-        raise TypeError("expected ypObject in yp_sorted")
-
-    if key is None and reverse is False:
-        return _yp_sorted(_yp_iterable(iterable))
-    elif key is not None:
-        # FIXME Replace this faked-out version as part of callables
-        x_keyed = _yp_sorted3(_yp_iterable((key(item), item) for item in iterable), None, reverse)
-        assert len(iterable) == len(x_keyed)
-        return yp_list(item[1] for item in x_keyed)
-    else:
-        return _yp_sorted3(_yp_iterable(iterable), None, reverse)
 
 
 class _ypSet(ypObject):
@@ -2477,6 +2408,8 @@ class yp_range(ypObject):
 c_ypObject_p_value("yp_range_empty")
 
 
+# XXX Could also add type(repr) to this (builtins are a different type) but we want nohtyP versions
+# of the builtins, so the error is useful.
 @pytype(yp_t_function, type(lambda: 1))
 class yp_function(ypObject):
     def __new__(cls, *args, **kwargs):
@@ -2511,9 +2444,16 @@ c_ypObject_p_value("yp_func_hash")
 c_ypObject_p_value("yp_func_iscallable")
 c_ypObject_p_value("yp_func_len")
 c_ypObject_p_value("yp_func_reversed")
+c_ypObject_p_value("yp_func_sorted")
 
 yp_chr = yp_func_chr
 yp_iscallable = yp_func_iscallable
+yp_reversed = yp_func_reversed
+
+def yp_sorted(*args, **kwargs):
+    if args:
+        args = (_yp_iterable(args[0]), *args[1:])
+    return _yp_call_stars(yp_func_sorted, args, kwargs)
 
 
 def _yp_callable(callable):

@@ -1357,6 +1357,7 @@ ypAPI ypObject *const yp_func_hash;
 ypAPI ypObject *const yp_func_iscallable;
 ypAPI ypObject *const yp_func_len;
 ypAPI ypObject *const yp_func_reversed;
+ypAPI ypObject *const yp_func_sorted;
 
 
 /*
