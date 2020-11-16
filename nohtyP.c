@@ -10706,14 +10706,16 @@ typedef struct {
 } ypTuple_detached;
 
 // Clears sq, placing the array of objects and other metadata in detached so that the array can be
-// reattached with _ypTuple_reattach_array.  This is used by sort and other methods that may
-// execute arbitrary code (i.e. yp_lt) while modifying the tuple/list, to prevent that arbitrary
-// code from also modifying the tuple/list.  Returns an exception on error, in which case sq is not
-// modified and detached is invalid.
+// reattached with _ypTuple_reattach_array.  This is used by sort and other methods that may execute
+// arbitrary code (i.e. yp_lt) while modifying the list, to prevent that arbitrary code from also
+// modifying the list.  Returns an exception on error, in which case sq is not modified and detached
+// is invalid.
+// XXX Handle the "empty list" case before calling this function.
 // TODO Would a flag on the object to prevent mutations work better? We need it for iterating...
 static ypObject *_ypTuple_detach_array(ypObject *sq, ypTuple_detached *detached)
 {
     yp_ASSERT1(ypObject_TYPE_CODE(sq) == ypList_CODE);
+    yp_ASSERT1(ypTuple_LEN(sq) > 0);
 
     if (ypTuple_ARRAY(sq) == ypTuple_INLINE_DATA(sq)) {
         // If the data is inline, we need to allocate a new buffer
@@ -10745,7 +10747,7 @@ static ypObject *_ypTuple_detach_array(ypObject *sq, ypTuple_detached *detached)
 static void _ypTuple_free_detached(ypTuple_detached *detached)
 {
     for (/*detached->len already set*/; detached->len > 0; detached->len--) {
-        yp_decref(detached->array[detached->len]);
+        yp_decref(detached->array[detached->len-1]);
     }
     yp_free(detached->array);
 }
@@ -10768,8 +10770,8 @@ static ypObject *_ypTuple_reattach_array(ypObject *sq, ypTuple_detached *detache
         return yp_ValueError;  // TODO Something more specific?  yp_ConcurrentModification?
     }
 
-    // This won't detect if the tuple/list was modified and then cleared, but that's OK
-    wasModified = ypTuple_LEN(sq) > 0 || ypTuple_ARRAY(sq) != ypTuple_INLINE_DATA(sq);
+    // This won't detect if the list was modified and then cleared.
+    wasModified = ypTuple_LEN(sq) > 0;
     if (wasModified) {
         result = _ypTuple_detach_array(sq, &modified);
         if (yp_isexceptionC(result)) {
@@ -10778,6 +10780,10 @@ static ypObject *_ypTuple_reattach_array(ypObject *sq, ypTuple_detached *detache
             _ypTuple_free_detached(detached);
             return result;
         }
+    } else if (ypTuple_ARRAY(sq) != ypTuple_INLINE_DATA(sq)) {
+        // This indicates that the list was modified and then cleared with delindex(). We could make
+        // this an error, but that still wouldn't catch modified-then-clear(). So keep quiet.
+        yp_free(ypTuple_ARRAY(sq));
     }
 
     // Reattach the array to this object
@@ -13109,6 +13115,10 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
         ypObject *b = yp_bool(_reverse);
         if (yp_isexceptionC(b)) return b;
         reverse = ypBool_IS_TRUE_C(b);
+    }
+
+    if (ypTuple_LEN(self) < 1) {
+        return yp_None;
     }
 
     /* The list is temporarily made empty, so that mutations performed
@@ -17344,6 +17354,13 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
     return _function_traverse_params(f, visitor, memo);
 }
 
+static ypObject *function_currenthash(
+        ypObject *f, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+{
+    *hash = yp_HashPointer(f);  // functions are compared based on identity
+    return yp_None;
+}
+
 // XXX This shouldn't be directly called: yp_call* shortcuts if it sees callable is a function.
 static ypObject *function_call(ypObject *f, ypObject **function, ypObject **self)
 {
@@ -17410,7 +17427,7 @@ static ypTypeObject ypFunction_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
+        function_currenthash,  // tp_currenthash
         MethodError_objproc,   // tp_close
 
         // Number operations
