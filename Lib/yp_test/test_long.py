@@ -382,7 +382,7 @@ class LongTest(yp_unittest.TestCase):
             self.assertEqual(got, expected, msg)
             self.assertEqual(yp_int(got, 0), x, Frm('int("%s", 0) != %r', got, x))
 
-    @yp_unittest.skip("TODO Implement yp_str/yp_repr in nohtyP")
+    @yp_unittest.skip_str_repr
     def test_format(self):
         for x in special:
             self.check_format_1(x)
@@ -448,7 +448,7 @@ class LongTest(yp_unittest.TestCase):
             except OverflowError: pass
 
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_conversion(self):
         class JustLong:
             # test that __long__ no longer used in 3.x
@@ -481,7 +481,7 @@ class LongTest(yp_unittest.TestCase):
                "Got {}, expected {}.".format(n, actual, expected))
         self.assertEqual(actual, expected, msg)
 
-    @yp_unittest.skip("TODO: Implement floats in nohtyP")
+    @yp_unittest.skip_floats
     @support.requires_IEEE_754
     def test_float_conversion(self):
 
@@ -552,7 +552,7 @@ class LongTest(yp_unittest.TestCase):
             self.check_float_conversion(value)
             self.check_float_conversion(-value)
 
-    @yp_unittest.skip("TODO: Implement floats in nohtyP")
+    @yp_unittest.skip_floats
     def test_float_overflow(self):
         for x in -2.0, -1.0, 0.0, 1.0, 2.0:
             self.assertEqual(yp_float(yp_int(x)), x)
@@ -584,7 +584,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertNotEqual(yp_float(shuge), yp_int(shuge),
             "float(shuge) should not equal int(shuge)")
 
-    @yp_unittest.skip("TODO: Implement logs in nohtyP")
+    @yp_unittest.skip_math
     def test_logs(self):
         LOG10E = math.log10(math.e)
 
@@ -705,7 +705,7 @@ class LongTest(yp_unittest.TestCase):
                 eq(x > y, Rcmp > 0, Frm("%r > %r %d", x, y, Rcmp))
                 eq(x >= y, Rcmp >= 0, Frm("%r >= %r %d", x, y, Rcmp))
 
-    @yp_unittest.skip("TODO Implement yp_str/yp_repr in nohtyP")
+    @yp_unittest.skip_str_repr
     def test__format__(self):
         self.assertEqual(format(123456789, 'd'), '123456789')
         self.assertEqual(format(123456789, 'd'), '123456789')
@@ -772,13 +772,13 @@ class LongTest(yp_unittest.TestCase):
                 self.assertEqual(format(value, format_spec),
                                  format(yp_float(value), format_spec))
 
-    @yp_unittest.skip("TODO: Implement floats in nohtyP")
+    @yp_unittest.skip_floats
     def test_nan_inf(self):
         self.assertRaises(OverflowError, yp_int, yp_float('inf'))
         self.assertRaises(OverflowError, yp_int, yp_float('-inf'))
         self.assertRaises(ValueError, yp_int, yp_float('nan'))
 
-    @yp_unittest.skip("TODO: Implement true division in nohtyP")
+    @yp_unittest.skip_long_ints
     def test_true_division(self):
         huge = 1 << 40000
         mhuge = -huge
@@ -843,7 +843,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertEqual(expected, got, "Incorrectly rounded division {}/{}: "
                          "expected {}, got {}".format(a, b, expected, got))
 
-    @yp_unittest.skip("TODO: Implement true division in nohtyP")
+    @yp_unittest.skip_long_ints
     @support.requires_IEEE_754
     def test_correctly_rounded_true_division(self):
         # more stringent tests than those above, checking that the
@@ -999,7 +999,7 @@ class LongTest(yp_unittest.TestCase):
     def test_bit_length_cpu(self):
         self.check_bit_length(range(-65000, 65000))
 
-    @yp_unittest.skip("TODO: Implement floats in nohtyP")
+    @yp_unittest.skip_floats
     def test_round(self):
         # check round-half-even algorithm. For round to nearest ten;
         # rounding map is invariant under adding multiples of 20
@@ -1074,7 +1074,7 @@ class LongTest(yp_unittest.TestCase):
         for e in bad_exponents:
             self.assertRaises(TypeError, round, 3, e)
 
-    @yp_unittest.skip("TODO Implement to_bytes/from_bytes in nohtyP")
+    @yp_unittest.skip_int_to_bytes
     def test_to_bytes(self):
         def check(tests, byteorder, signed=False):
             for test, expected in tests.items():
@@ -1174,7 +1174,7 @@ class LongTest(yp_unittest.TestCase):
                          b'\xff\xff\xff\xff\xff')
         self.assertRaises(OverflowError, (1).to_bytes, 0, 'big')
 
-    @yp_unittest.skip("TODO Implement to_bytes/from_bytes in nohtyP")
+    @yp_unittest.skip_int_to_bytes
     def test_from_bytes(self):
         def check(tests, byteorder, signed=False):
             for test, expected in tests.items():
@@ -1322,7 +1322,7 @@ class LongTest(yp_unittest.TestCase):
         for n in map(yp_int, integers):
             self.assertEqual(n, 0)
 
-    @yp_unittest.skip("TODO Implement bool-as-number in nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_shift_bool(self):
         # Issue #21422: ensure that bool << int and bool >> int return int
         for value in (True, False):

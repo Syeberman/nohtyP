@@ -12,7 +12,7 @@ def bool( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bo
 
 class BoolTest(yp_unittest.TestCase):
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_subclass(self):
         try:
             class C(bool):
@@ -178,14 +178,14 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(yp_bool(yp_str("")), yp_False)
         self.assertIs(yp_bool(), yp_False)
 
-    @yp_unittest.skip("TODO: Enable when formatting supported in nohtyP")
+    @yp_unittest.skip_str_printf
     def test_format(self):
         self.assertEqual("%d" % yp_False, "0")
         self.assertEqual("%d" % yp_True, "1")
         self.assertEqual("%x" % yp_False, "0")
         self.assertEqual("%x" % yp_True, "1")
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_hasattr(self):
         self.assertIs(hasattr([], "append"), yp_True)
         self.assertIs(hasattr([], "wobble"), yp_False)
@@ -194,7 +194,7 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(yp_iscallable(yp_len), yp_True)
         self.assertIs(yp_iscallable(yp_int(1)), yp_False)
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_isinstance(self):
         self.assertIs(isinstance(yp_True, yp_bool), yp_True)
         self.assertIs(isinstance(yp_False, yp_bool), yp_True)
@@ -203,7 +203,7 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(isinstance(1, yp_bool), yp_False)
         self.assertIs(isinstance(0, yp_bool), yp_False)
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_issubclass(self):
         self.assertIs(issubclass(yp_bool, yp_int), yp_True)
         self.assertIs(issubclass(yp_int, yp_bool), yp_False)
@@ -212,7 +212,7 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(yp_dict( {} ).__contains__( 1 ), yp_False)
         self.assertIs(yp_dict( {1:1} ).__contains__( 1 ), yp_True)
 
-    @yp_unittest.skip("TODO: Enable when nohtyP has proper str type")
+    @yp_unittest.skip_str_unicode_db
     def test_string(self):
         self.assertIs(yp_str( "xyz" ).endswith("z"), yp_True)
         self.assertIs(yp_str( "xyz" ).endswith("x"), yp_False)
@@ -252,7 +252,7 @@ class BoolTest(yp_unittest.TestCase):
         self.assertNotIsInstance(yp_True ^ 1, yp_bool)
         self.assertIs(yp_True ^ yp_True, yp_False)
 
-    @yp_unittest.skip("TODO: Implement files in nohtyP")
+    @yp_unittest.skip_files
     def test_fileclosed(self):
         try:
             f = open(support.TESTFN, "w")
@@ -269,7 +269,7 @@ class BoolTest(yp_unittest.TestCase):
                   yp_t_set, yp_t_str, yp_t_tuple, yp_t_type]:
             self.assertIs(yp_bool(t), yp_True)
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_operator(self):
         import operator
         self.assertIs(operator.truth(0), yp_False)
@@ -285,13 +285,13 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(operator.is_not(yp_True, yp_True), yp_False)
         self.assertIs(operator.is_not(yp_True, yp_False), yp_True)
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_marshal(self):
         import marshal
         self.assertIs(marshal.loads(marshal.dumps(yp_True)), yp_True)
         self.assertIs(marshal.loads(marshal.dumps(yp_False)), yp_False)
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_pickle(self):
         import pickle
         self.assertIs(pickle.loads(pickle.dumps(yp_True)), yp_True)
@@ -299,7 +299,7 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(pickle.loads(pickle.dumps(yp_True, yp_True)), yp_True)
         self.assertIs(pickle.loads(pickle.dumps(yp_False, yp_True)), yp_False)
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_picklevalues(self):
         # Test for specific backwards-compatible pickle values
         import pickle
@@ -310,7 +310,7 @@ class BoolTest(yp_unittest.TestCase):
         self.assertEqual(pickle.dumps(yp_True, protocol=2), b'\x80\x02\x88.')
         self.assertEqual(pickle.dumps(yp_False, protocol=2), b'\x80\x02\x89.')
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_convert_to_bool(self):
         # Verify that TypeError occurs when bad things are returned
         # from __bool__().  This isn't really a bool test, but
@@ -342,7 +342,7 @@ class BoolTest(yp_unittest.TestCase):
                 return -1
         self.assertRaises(ValueError, yp_bool, Eggs())
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
         # this will start failing if __len__ changes assertions
@@ -358,7 +358,7 @@ class BoolTest(yp_unittest.TestCase):
                 except (Exception) as e_len:
                     self.assertEqual(str(e_bool), str(e_len))
 
-    @yp_unittest.skip("TODO: Implement real/imag/etc in nohtyP")
+    @yp_unittest.skip_num_attributes
     def test_real_and_imag(self):
         self.assertEqual(yp_True.real, 1)
         self.assertEqual(yp_True.imag, 0)

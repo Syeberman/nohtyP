@@ -40,7 +40,7 @@ class ClassWith__str__:
         return self.x
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class TestPrint(yp_unittest.TestCase):
     """Test correct operation of the print function."""
 

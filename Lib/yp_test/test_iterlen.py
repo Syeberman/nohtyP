@@ -98,7 +98,7 @@ class TestTemporarilyImmutable(TestInvariantWithoutMutations):
 
 ## ------- Concrete Type Tests -------
 
-@yp_unittest.skip("Not applicable to nohtyP")
+@yp_unittest.skip_not_applicable
 class TestRepeat(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
     def setUp(self):
@@ -121,7 +121,7 @@ class TestTuple(TestInvariantWithoutMutations, yp_unittest.TestCase):
 
 ## ------- Types that should not be mutated during iteration -------
 
-@yp_unittest.skip("Not applicable to nohtyP")
+@yp_unittest.skip_not_applicable
 class TestDeque(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
@@ -129,7 +129,7 @@ class TestDeque(TestTemporarilyImmutable, yp_unittest.TestCase):
         self.it = yp_iter(d)
         self.mutate = d.pop
 
-@yp_unittest.skip("Not applicable to nohtyP")
+@yp_unittest.skip_not_applicable
 class TestDequeReversed(TestTemporarilyImmutable, yp_unittest.TestCase):
 
     def setUp(self):
@@ -180,7 +180,7 @@ class TestList(TestInvariantWithoutMutations, yp_unittest.TestCase):
     def setUp(self):
         self.it = yp_iter(yp_list(yp_range(n)))
 
-    @yp_unittest.skip( "TODO: Support mutation in nohtyP same as Python?" )
+    @yp_unittest.skip_list_mutating_iteration
     def test_mutation(self):
         d = yp_list(yp_range(n))
         it = yp_iter(d)
@@ -214,7 +214,7 @@ class TestListReversed(TestInvariantWithoutMutations, yp_unittest.TestCase):
     def setUp(self):
         self.it = yp_reversed(yp_list(yp_range(n)))
 
-    @yp_unittest.skip( "TODO: Support mutation in nohtyP same as Python?" )
+    @yp_unittest.skip_list_mutating_iteration
     def test_mutation(self):
         d = yp_list(yp_range(n))
         it = yp_reversed(d)

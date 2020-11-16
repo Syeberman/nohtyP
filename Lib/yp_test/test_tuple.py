@@ -107,7 +107,7 @@ class TupleTest(seq_tests.CommonTest):
         gc.collect()
         self.assertTrue(gc.is_tracked(t), t)
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_track_literals(self):
         # Test GC-optimization of tuple literals
@@ -129,7 +129,7 @@ class TupleTest(seq_tests.CommonTest):
         self._tracked(yp_tuple((set(),)))
         self._tracked(yp_tuple((x, y, z)))
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def check_track_dynamic(self, tp, always_track):
         x, y, z = 1.5, "a", []
 
@@ -150,13 +150,13 @@ class TupleTest(seq_tests.CommonTest):
         self._tracked(tp(yp_tuple([obj]) for obj in [x, y, z]))
         self._tracked(yp_tuple(tp([obj]) for obj in [x, y, z]))
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_track_dynamic(self):
         # Test GC-optimization of dynamically constructed tuples.
         self.check_track_dynamic(yp_tuple, False)
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_track_subtypes(self):
         # Tuple subtypes must always be tracked
@@ -164,7 +164,7 @@ class TupleTest(seq_tests.CommonTest):
             pass
         self.check_track_dynamic(MyTuple, True)
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_bug7466(self):
         # Trying to untrack an unfinished tuple could crash Python
@@ -181,7 +181,7 @@ class TupleTest(seq_tests.CommonTest):
         check(10)       # check our checking code
         check(1000000)
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_iterator_pickle(self):
         # Userlist iterators don't support pickling yet since
         # they are based on generators.
@@ -197,7 +197,7 @@ class TupleTest(seq_tests.CommonTest):
         d = pickle.dumps(it)
         self.assertEqual(self.type2test(it), self.type2test(data)[1:])
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_reversed_pickle(self):
         data = self.type2test([4, 5, 6, 7])
         itorg = reversed(data)

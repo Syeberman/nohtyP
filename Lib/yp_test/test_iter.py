@@ -90,7 +90,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(res, seq)
 
     # Helper to check picklability
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def check_pickle(self, itorg, seq):
         d = pickle.dumps(itorg)
         it = pickle.loads(d)
@@ -271,7 +271,7 @@ class TestCase(yp_unittest.TestCase):
         self.check_for_loop(dict, yp_list(dict.keys()))
 
     # Test a file
-    @yp_unittest.skip("TODO: Implement file in nohtyP")
+    @yp_unittest.skip_files
     def test_iter_file(self):
         f = open(TESTFN, "w")
         try:
@@ -355,7 +355,7 @@ class TestCase(yp_unittest.TestCase):
                 pass
 
     # Test filter()'s use of iterators.
-    @yp_unittest.skip("TODO: Implement filter in nohtyP")
+    @yp_unittest.skip_filter
     def test_builtin_filter(self):
         self.assertEqual(yp_list(filter(None, SequenceClass(5))),
                          yp_list(range(1, 5)))
@@ -403,7 +403,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(yp_list(filter(lambda x: not x, yp_iter(seq))), [bFalse]*25)
 
     # Test max() and min()'s use of iterators.
-    @yp_unittest.skip("TODO: Implement min/max in nohtyP")
+    @yp_unittest.skip_min
     def test_builtin_max_min(self):
         self.assertEqual(max(SequenceClass(5)), 4)
         self.assertEqual(min(SequenceClass(5)), 0)
@@ -436,7 +436,7 @@ class TestCase(yp_unittest.TestCase):
                 pass
 
     # Test map()'s use of iterators.
-    @yp_unittest.skip("TODO: Implement map in nohtyP")
+    @yp_unittest.skip_map
     def test_builtin_map(self):
         self.assertEqual(yp_list(map(lambda x: x+1, SequenceClass(5))),
                          yp_list(range(1, 6)))
@@ -467,7 +467,7 @@ class TestCase(yp_unittest.TestCase):
                 pass
 
     # Test zip()'s use of iterators.
-    @yp_unittest.skip("TODO: Implement zip in nohtyP")
+    @yp_unittest.skip_zip
     def test_builtin_zip(self):
         self.assertEqual(yp_list(zip()), [])
         self.assertEqual(yp_list(zip(*yp_list())), [])
@@ -547,7 +547,7 @@ class TestCase(yp_unittest.TestCase):
             for y in NoGuessLen5(), Guess3Len5(), Guess30Len5():
                 self.assertEqual(lzip(x, y), expected)
 
-    @yp_unittest.skip("TODO Implement string methods in nohtyP")
+    @yp_unittest.skip_user_defined_types
     def test_unicode_join_endcase(self):
 
         # This class inserts a Unicode object into its argument's natural
@@ -632,24 +632,26 @@ class TestCase(yp_unittest.TestCase):
                 pass
 
     # Test iterators with operator.countOf (PySequence_Count).
-    @yp_unittest.skip("TODO: Implement countOf in nohtyP")
     def test_countOf(self):
         from operator import countOf
-        self.assertEqual(countOf(yp_list([1,2,2,3,2,5]), 2), 3)
-        self.assertEqual(countOf(yp_tuple((1,2,2,3,2,5)), 2), 3)
-        self.assertEqual(countOf(yp_str("122325"), "2"), 3)
-        self.assertEqual(countOf(yp_str("122325"), "6"), 0)
+        with self.nohtyPCheck(enabled=False):
+            self.assertEqual(countOf(yp_list([1,2,2,3,2,5]), 2), 3)
+            self.assertEqual(countOf(yp_tuple((1,2,2,3,2,5)), 2), 3)
+            self.assertEqual(countOf(yp_str("122325"), "2"), 3)
+            self.assertEqual(countOf(yp_str("122325"), "6"), 0)
 
-        self.assertRaises(TypeError, countOf, 42, 1)
-        self.assertRaises(TypeError, countOf, countOf, countOf)
+            self.assertRaises(TypeError, countOf, yp_int(42), 1)
+            self.assertRaises(TypeError, countOf, yp_func_chr, yp_func_chr)
 
-        d = yp_dict({"one": 3, "two": 3, "three": 3, 1j: 2j})
-        for k in d:
-            self.assertEqual(countOf(d, k), 1)
-        self.assertEqual(countOf(d.values(), 3), 3)
-        self.assertEqual(countOf(d.values(), 2j), 1)
-        self.assertEqual(countOf(d.values(), 1j), 0)
+            d = yp_dict({"one": 3, "two": 3, "three": 3, 1.1: 2.2})
+            for k in d:
+                self.assertEqual(countOf(d, k), 1)
+            self.assertEqual(countOf(d.values(), 3), 3)
+            self.assertEqual(countOf(d.values(), 2.2), 1)
+            self.assertEqual(countOf(d.values(), 1.1), 0)
 
+    @yp_unittest.skip_files
+    def test_countOf_file(self):
         f = open(TESTFN, "w")
         try:
             f.write("a\n" "b\n" "c\n" "b\n")
@@ -668,23 +670,25 @@ class TestCase(yp_unittest.TestCase):
                 pass
 
     # Test iterators with operator.indexOf (PySequence_Index).
-    @yp_unittest.skip("TODO: Implement indexOf in nohtyP")
     def test_indexOf(self):
         from operator import indexOf
-        self.assertEqual(indexOf(yp_list([1,2,2,3,2,5]), 1), 0)
-        self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 2), 1)
-        self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 3), 3)
-        self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 5), 5)
-        self.assertRaises(ValueError, indexOf, yp_tuple((1,2,2,3,2,5)), 0)
-        self.assertRaises(ValueError, indexOf, yp_tuple((1,2,2,3,2,5)), 6)
+        with self.nohtyPCheck(enabled=False):
+            self.assertEqual(indexOf(yp_list([1,2,2,3,2,5]), 1), 0)
+            self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 2), 1)
+            self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 3), 3)
+            self.assertEqual(indexOf(yp_tuple((1,2,2,3,2,5)), 5), 5)
+            self.assertRaises(ValueError, indexOf, yp_tuple((1,2,2,3,2,5)), 0)
+            self.assertRaises(ValueError, indexOf, yp_tuple((1,2,2,3,2,5)), 6)
 
-        self.assertEqual(indexOf(yp_str("122325"), "2"), 1)
-        self.assertEqual(indexOf(yp_str("122325"), "5"), 5)
-        self.assertRaises(ValueError, indexOf, yp_str("122325"), "6")
+            self.assertEqual(indexOf(yp_str("122325"), "2"), 1)
+            self.assertEqual(indexOf(yp_str("122325"), "5"), 5)
+            self.assertRaises(ValueError, indexOf, yp_str("122325"), "6")
 
-        self.assertRaises(TypeError, indexOf, yp_int(42), 1)
-        self.assertRaises(TypeError, indexOf, indexOf, indexOf)
+            self.assertRaises(TypeError, indexOf, yp_int(42), 1)
+            self.assertRaises(TypeError, indexOf, yp_func_chr, yp_func_chr)
 
+    @yp_unittest.skip_files
+    def test_indexOf_file(self):
         f = open(TESTFN, "w")
         try:
             f.write("a\n" "b\n" "c\n" "d\n" "e\n")
@@ -704,13 +708,15 @@ class TestCase(yp_unittest.TestCase):
             except OSError:
                 pass
 
+    @yp_unittest.skip_not_applicable
+    def test_indexOf_class(self):
         iclass = IteratingSequenceClass(3)
         for i in range(3):
             self.assertEqual(indexOf(iclass, i), i)
         self.assertRaises(ValueError, indexOf, iclass, -1)
 
     # Test iterators with file.writelines().
-    @yp_unittest.skip("TODO: Implement file in nohtyP")
+    @yp_unittest.skip_files
     def test_writelines(self):
         f = open(TESTFN, "w")
 
@@ -764,7 +770,7 @@ class TestCase(yp_unittest.TestCase):
 
 
     # Test iterators on RHS of unpacking assignments.
-    @yp_unittest.skip("REWORK Test nohtyP's yp_unpack here")
+    @yp_unittest.skip_not_applicable
     def test_unpack_iter(self):
         a, b = 1, 2
         self.assertEqual((a, b), (1, 2))
@@ -818,7 +824,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual((a, b, c), (0, 1, 42))
 
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     @cpython_only
     def test_ref_counting_behavior(self):
         class C(object):

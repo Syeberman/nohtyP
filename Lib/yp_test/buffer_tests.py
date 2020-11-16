@@ -5,6 +5,8 @@ from yp import *
 import struct
 import sys
 
+from yp_test import yp_unittest
+
 class MixinBytesBufferCommonTests(object):
     """Tests that work for both bytes and buffer objects.
     See PEP 3137.
@@ -14,6 +16,7 @@ class MixinBytesBufferCommonTests(object):
         """Convert x into the appropriate type for these tests."""
         raise RuntimeError('test class must provide a marshal method')
 
+    @yp_unittest.skip_str_case
     def test_islower(self):
         self.assertFalse(self.marshal(b'').islower())
         self.assertTrue(self.marshal(b'a').islower())
@@ -24,6 +27,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertTrue(self.marshal(b'abc\n').islower())
         self.assertRaises(TypeError, self.marshal(b'abc').islower, 42)
 
+    @yp_unittest.skip_str_case
     def test_isupper(self):
         self.assertFalse(self.marshal(b'').isupper())
         self.assertFalse(self.marshal(b'a').isupper())
@@ -34,6 +38,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertTrue(self.marshal(b'ABC\n').isupper())
         self.assertRaises(TypeError, self.marshal(b'abc').isupper, 42)
 
+    @yp_unittest.skip_str_case
     def test_istitle(self):
         self.assertFalse(self.marshal(b'').istitle())
         self.assertFalse(self.marshal(b'a').istitle())
@@ -48,6 +53,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertFalse(self.marshal(b'NOT').istitle())
         self.assertRaises(TypeError, self.marshal(b'abc').istitle, 42)
 
+    @yp_unittest.skip_str_space
     def test_isspace(self):
         self.assertFalse(self.marshal(b'').isspace())
         self.assertFalse(self.marshal(b'a').isspace())
@@ -59,6 +65,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertFalse(self.marshal(b' \t\r\na').isspace())
         self.assertRaises(TypeError, self.marshal(b'abc').isspace, 42)
 
+    @yp_unittest.skip_str_unicode_db
     def test_isalpha(self):
         self.assertFalse(self.marshal(b'').isalpha())
         self.assertTrue(self.marshal(b'a').isalpha())
@@ -69,6 +76,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertFalse(self.marshal(b'abc\n').isalpha())
         self.assertRaises(TypeError, self.marshal(b'abc').isalpha, 42)
 
+    @yp_unittest.skip_str_unicode_db
     def test_isalnum(self):
         self.assertFalse(self.marshal(b'').isalnum())
         self.assertTrue(self.marshal(b'a').isalnum())
@@ -80,6 +88,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertFalse(self.marshal(b'abc\n').isalnum())
         self.assertRaises(TypeError, self.marshal(b'abc').isalnum, 42)
 
+    @yp_unittest.skip_str_unicode_db
     def test_isdigit(self):
         self.assertFalse(self.marshal(b'').isdigit())
         self.assertFalse(self.marshal(b'a').isdigit())
@@ -89,16 +98,19 @@ class MixinBytesBufferCommonTests(object):
 
         self.assertRaises(TypeError, self.marshal(b'abc').isdigit, 42)
 
+    @yp_unittest.skip_str_case
     def test_lower(self):
         self.assertEqual(b'hello', self.marshal(b'HeLLo').lower())
         self.assertEqual(b'hello', self.marshal(b'hello').lower())
         self.assertRaises(TypeError, self.marshal(b'hello').lower, 42)
 
+    @yp_unittest.skip_str_case
     def test_upper(self):
         self.assertEqual(b'HELLO', self.marshal(b'HeLLo').upper())
         self.assertEqual(b'HELLO', self.marshal(b'HELLO').upper())
         self.assertRaises(TypeError, self.marshal(b'hello').upper, 42)
 
+    @yp_unittest.skip_str_case
     def test_capitalize(self):
         self.assertEqual(b' hello ', self.marshal(b' hello ').capitalize())
         self.assertEqual(b'Hello ', self.marshal(b'Hello ').capitalize())
@@ -108,6 +120,7 @@ class MixinBytesBufferCommonTests(object):
 
         self.assertRaises(TypeError, self.marshal(b'hello').capitalize, 42)
 
+    @yp_unittest.skip_str_space
     def test_ljust(self):
         self.assertEqual(b'abc       ', self.marshal(b'abc').ljust(10))
         self.assertEqual(b'abc   ', self.marshal(b'abc').ljust(6))
@@ -116,6 +129,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertEqual(b'abc*******', self.marshal(b'abc').ljust(10, b'*'))
         self.assertRaises(TypeError, self.marshal(b'abc').ljust)
 
+    @yp_unittest.skip_str_space
     def test_rjust(self):
         self.assertEqual(b'       abc', self.marshal(b'abc').rjust(10))
         self.assertEqual(b'   abc', self.marshal(b'abc').rjust(6))
@@ -124,6 +138,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertEqual(b'*******abc', self.marshal(b'abc').rjust(10, b'*'))
         self.assertRaises(TypeError, self.marshal(b'abc').rjust)
 
+    @yp_unittest.skip_str_space
     def test_center(self):
         self.assertEqual(b'   abc    ', self.marshal(b'abc').center(10))
         self.assertEqual(b' abc  ', self.marshal(b'abc').center(6))
@@ -132,12 +147,14 @@ class MixinBytesBufferCommonTests(object):
         self.assertEqual(b'***abc****', self.marshal(b'abc').center(10, b'*'))
         self.assertRaises(TypeError, self.marshal(b'abc').center)
 
+    @yp_unittest.skip_str_case
     def test_swapcase(self):
         self.assertEqual(b'hEllO CoMPuTErS',
             self.marshal(b'HeLLo cOmpUteRs').swapcase())
 
         self.assertRaises(TypeError, self.marshal(b'hello').swapcase, 42)
 
+    @yp_unittest.skip_str_zfill
     def test_zfill(self):
         self.assertEqual(b'123', self.marshal(b'123').zfill(2))
         self.assertEqual(b'123', self.marshal(b'123').zfill(3))
@@ -154,6 +171,7 @@ class MixinBytesBufferCommonTests(object):
 
         self.assertRaises(TypeError, self.marshal(b'123').zfill)
 
+    @yp_unittest.skip_str_space
     def test_expandtabs(self):
         self.assertEqual(b'abc\rab      def\ng       hi',
                          self.marshal(b'abc\rab\tdef\ng\thi').expandtabs())
@@ -183,6 +201,7 @@ class MixinBytesBufferCommonTests(object):
             self.assertRaises(OverflowError,
                               self.marshal(b'\ta\n\tb').expandtabs, sys.maxsize)
 
+    @yp_unittest.skip_str_case
     def test_title(self):
         self.assertEqual(b' Hello ', self.marshal(b' hello ').title())
         self.assertEqual(b'Hello ', self.marshal(b'hello ').title())
@@ -194,6 +213,7 @@ class MixinBytesBufferCommonTests(object):
         self.assertEqual(b'Getint', self.marshal(b'getInt').title())
         self.assertRaises(TypeError, self.marshal(b'hello').title, 42)
 
+    @yp_unittest.skip_str_split
     def test_splitlines(self):
         self.assertEqual([b'abc', b'def', b'', b'ghi'],
                          self.marshal(b'abc\ndef\n\rghi').splitlines())

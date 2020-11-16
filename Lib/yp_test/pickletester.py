@@ -500,7 +500,7 @@ def create_data():
     return x
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_pickling
 class AbstractPickleTests(yp_unittest.TestCase):
     # Subclass must define self.dumps, self.loads.
 
@@ -1639,7 +1639,7 @@ class AbstractPickleTests(yp_unittest.TestCase):
                     self.assertEqual(method(*args), unpickled(*args))
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_pickling
 class BigmemPickleTests(yp_unittest.TestCase):
 
     # Binary protocols can serialize longs of up to 2GB-1
@@ -1885,7 +1885,7 @@ class BadGetattr:
         self.foo
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_pickling
 class AbstractPickleModuleTests(yp_unittest.TestCase):
 
     def test_dump_closed_file(self):
@@ -1946,7 +1946,7 @@ class AbstractPickleModuleTests(yp_unittest.TestCase):
         self.assertRaises(EOFError, pickle.loads, s)
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_pickling
 class AbstractPersistentPicklerTests(yp_unittest.TestCase):
 
     # This class defines persistent_id() and persistent_load()
@@ -1987,7 +1987,7 @@ class AbstractPersistentPicklerTests(yp_unittest.TestCase):
             self.assertEqual(self.load_false_count, 1)
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_pickling
 class AbstractPicklerUnpicklerObjectTests(yp_unittest.TestCase):
 
     pickler_class = None
@@ -2152,7 +2152,7 @@ class AAA(object):
 class BBB(object):
     pass
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_pickling
 class AbstractDispatchTableTests(yp_unittest.TestCase):
 
     def test_default_dispatch_table(self):

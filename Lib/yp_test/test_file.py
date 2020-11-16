@@ -129,11 +129,11 @@ class AutoFileTests:
     def testReadWhenWriting(self):
         self.assertRaises(OSError, self.f.read)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class CAutoFileTests(AutoFileTests, yp_unittest.TestCase):
     open = io.open
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class PyAutoFileTests(AutoFileTests, yp_unittest.TestCase):
     open = staticmethod(pyio.open)
 
@@ -315,11 +315,11 @@ class OtherFileTests:
         finally:
             os.unlink(TESTFN)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class COtherFileTests(OtherFileTests, yp_unittest.TestCase):
     open = io.open
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class PyOtherFileTests(OtherFileTests, yp_unittest.TestCase):
     open = staticmethod(pyio.open)
 

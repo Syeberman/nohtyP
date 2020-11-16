@@ -139,7 +139,7 @@ class TestBase(yp_unittest.TestCase):
 
 class TestBugs(yp_unittest.TestCase):
 
-    @yp_unittest.skip("TODO: nohtyP lists don't store user-defined types yet")
+    @yp_unittest.skip_user_defined_types
     def test_bug453523(self):
         # bug 453523 -- list.sort() crasher.
         # If this fails, the most likely outcome is a core dump.
@@ -156,7 +156,7 @@ class TestBugs(yp_unittest.TestCase):
         L = yp_list(C() for i in range(50))
         self.assertRaises(ValueError, L.sort)
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types (cmp_to_key)")
+    @yp_unittest.skip_user_defined_types
     def test_undetected_mutation(self):
         # Python 2.4a1 did not always detect mutation
         memorywaster = yp_list()
@@ -178,7 +178,7 @@ class TestBugs(yp_unittest.TestCase):
 
 class TestDecorateSortUndecorate(yp_unittest.TestCase):
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types (cmp_to_key)")
+    @yp_unittest.skip_user_defined_types
     def test_decorated(self):
         data = 'The quick Brown fox Jumped over The lazy Dog'.split()
         copy = data[:]
@@ -207,7 +207,6 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
         self.assertRaises(ZeroDivisionError, data.sort, key=lambda x: 1/x)
         self.assertEqual(data, dup)
 
-    @yp_unittest.skip("TODO: nohtyP sort doesn't support key yet")
     def test_key_with_mutation(self):
         data = yp_list(yp_range(10))
         def k(x):
@@ -216,7 +215,7 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
             return x
         self.assertRaises(ValueError, data.sort, key=k)
 
-    @yp_unittest.skip("TODO: nohtyP sort doesn't support key yet")
+    @yp_unittest.skip_user_defined_types
     def test_key_with_mutating_del(self):
         data = yp_list(yp_range(10))
         class SortKiller(object):
@@ -229,7 +228,6 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
                 return id(self) < id(other)
         self.assertRaises(ValueError, data.sort, key=SortKiller)
 
-    @yp_unittest.skip("TODO: nohtyP sort doesn't support key yet")
     def test_key_with_mutating_del_and_exception(self):
         data = yp_list(yp_range(10))
         ## dup = data[:]
@@ -256,7 +254,7 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
         data.sort(reverse=True)
         self.assertEqual(data, yp_list(yp_range(99,-1,-1)))
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types (cmp_to_key)")
+    @yp_unittest.skip_user_defined_types
     def test_reverse_stability(self):
         data = yp_list((random.randrange(100), i) for i in range(200))
         copy1 = data[:]

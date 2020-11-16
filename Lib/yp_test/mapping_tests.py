@@ -611,7 +611,7 @@ class TestHashMappingProtocol(TestMappingProtocol):
         else:
             self.fail("changing dict size during iteration doesn't raise Error")
 
-    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip_str_repr
     def test_repr(self):
         d = self._empty_mapping()
         self.assertEqual(repr(d), '{}')
