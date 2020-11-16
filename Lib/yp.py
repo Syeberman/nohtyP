@@ -353,7 +353,7 @@ yp_func(c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ))
 #         void *state, yp_ssize_t size, int n, ...);
 # ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint,
 #         void *state, yp_ssize_t size, int n, va_list args);
-yp_func(c_ypObject_p, "yp_generator_fromstructCN",
+yp_func(c_void_p, "yp_generator_fromstructCN",
         ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "length_hint"),
          (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p))
 
@@ -450,7 +450,7 @@ yp_func(c_ypObject_p, "yp_frozendict", ((c_ypObject_p, "x"), ))
 yp_func(c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ))
 
 # ypObject *yp_function(yp_def_function_t *definition);
-yp_func(c_ypObject_p, "yp_function", ((POINTER(c_yp_def_function_t), "definition"), ))
+yp_func(c_void_p, "yp_function", ((POINTER(c_yp_def_function_t), "definition"), ))
 
 # ypObject *yp_function_withstateCN(yp_def_function_t *definition, int n, ...);
 # ypObject *yp_function_withstateCNV(yp_def_function_t *definition, int n, va_list args);
@@ -1498,8 +1498,6 @@ class ypObject(c_ypObject_p):
         return self._encdec(_yp_decode, _yp_decode3, encoding, errors)
 
     def __call__(self, *args, **kwargs):
-        # FIXME How to test _yp_callN? We can't just call if no kwargs, because _stars has special
-        # handling in that case too.
         return _yp_call_stars(self, args, kwargs)
 
     # Python requires arithmetic methods to _return_ NotImplemented
@@ -1678,7 +1676,7 @@ class yp_bool(ypObject):
 
     def __bool__(self): return self.value == yp_True.value
 
-    # FIXME Remove these comparison overrides
+    # TODO If/when nohtyP supports arithmetic on bool, remove these comparison hacks
     def __lt__(self, other): return bool(self) < other
 
     def __le__(self, other): return bool(self) <= other
@@ -1794,8 +1792,7 @@ class yp_iter(ypObject):
         self = c_ypObject_p.__new__(cls)
         self._pyiter = iter(pyobj)
         self._ypfunc = c_yp_generator_func_t(self._pyiter_wrapper)
-        # FIXME Caling _yp_generator_fromstructCN also transmutes/caches a yp_iter, right?
-        self.value = _yp_incref(_yp_generator_fromstructCN(self._ypfunc, length_hint, 0, 0))
+        self.value = _yp_generator_fromstructCN(self._ypfunc, length_hint, 0, 0)
         return self
 
     def __iter__(self): return self
@@ -2435,8 +2432,7 @@ class yp_function(ypObject):
         self._ypcode = c_yp_def_code_t(self._pyfunction_wrapper)
         parameters = (c_yp_def_parameter_t * 2)((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
         definition = c_yp_def_function_t(self._ypcode, 0, 2, parameters)
-        # FIXME Caling _yp_function also transmutes/caches a yp_function, right?
-        self.value = _yp_incref(_yp_function(definition))
+        self.value = _yp_function(definition)
         return self
 
 c_ypObject_p_value("yp_func_chr")
