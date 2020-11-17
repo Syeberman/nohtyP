@@ -788,16 +788,16 @@ yp_func(c_ypObject_p, "yp_isspace", ((c_ypObject_p, "s"), ))
 yp_func(c_ypObject_p, "yp_isupper", ((c_ypObject_p, "s"), ))
 
 # ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
-# ypObject *yp_startswithC(ypObject *s, ypObject *prefix);
+# ypObject *yp_startswith(ypObject *s, ypObject *prefix);
 yp_func(c_ypObject_p, "yp_startswithC4", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix"),
                                           (c_yp_ssize_t, "start"), (c_yp_ssize_t, "end")))
-yp_func(c_ypObject_p, "yp_startswithC", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix")))
+yp_func(c_ypObject_p, "yp_startswith", ((c_ypObject_p, "s"), (c_ypObject_p, "prefix")))
 
 # ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end);
-# ypObject *yp_endswithC(ypObject *s, ypObject *suffix);
+# ypObject *yp_endswith(ypObject *s, ypObject *suffix);
 yp_func(c_ypObject_p, "yp_endswithC4", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix"),
                                         (c_yp_ssize_t, "start"), (c_yp_ssize_t, "end")))
-yp_func(c_ypObject_p, "yp_endswithC", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix")))
+yp_func(c_ypObject_p, "yp_endswith", ((c_ypObject_p, "s"), (c_ypObject_p, "suffix")))
 
 # ypObject *yp_lower(ypObject *s);
 yp_func(c_ypObject_p, "yp_lower", ((c_ypObject_p, "s"), ))
@@ -1411,10 +1411,10 @@ class ypObject(c_ypObject_p):
     def isupper(self): return _yp_isupper(self)
 
     def startswith(self, prefix, start=None, end=None):
-        return self._sliceSearch(_yp_startswithC, _yp_startswithC4, prefix, start, end)
+        return self._sliceSearch(_yp_startswith, _yp_startswithC4, prefix, start, end)
 
     def endswith(self, suffix, start=None, end=None):
-        return self._sliceSearch(_yp_endswithC, _yp_endswithC4, suffix, start, end)
+        return self._sliceSearch(_yp_endswith, _yp_endswithC4, suffix, start, end)
 
     def lower(self): return _yp_lower(self)
 
@@ -2039,6 +2039,8 @@ c_ypObject_p_value("yp_s_xmlcharrefreplace")
 c_ypObject_p_value("yp_s_backslashreplace")
 c_ypObject_p_value("yp_s_surrogateescape")
 c_ypObject_p_value("yp_s_surrogatepass")
+c_ypObject_p_value("yp_s_star_args")
+c_ypObject_p_value("yp_s_star_star_kwargs")
 _yp_str_enc2type = {
     yp_s_latin_1.value: (POINTER(c_uint8),  1),
     yp_s_ucs_2.value:   (POINTER(c_uint16), 2),
@@ -2047,8 +2049,6 @@ c_ypObject_p_value("yp_str_empty")
 yp_s_None = _yp_str_frombytesC2(b"None", 4)
 yp_s_True = _yp_str_frombytesC2(b"True", 4)
 yp_s_False = _yp_str_frombytesC2(b"False", 5)
-yp_s_star_args = _yp_str_frombytesC2(b"*args", 5)
-yp_s_star_star_kwargs = _yp_str_frombytesC2(b"**kwargs", 8)
 
 
 # FIXME Support repr, then make this a proper nohtyP function object.

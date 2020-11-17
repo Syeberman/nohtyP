@@ -5,6 +5,12 @@
  *      License: http://docs.python.org/3/license.html
  */
 
+// TODO This discard-on-error ypObject** idea is weird, and it can be easily misused if you are
+// modifying a borrowed reference (i.e you get a ypObject* parameter and use it directly). But it
+// may still be useful while building a new object. Should we call this our "builder pattern"
+// (postfix B)? Or, we could mimic __iadd__/etc and make it the "in-place" pattern (postfix I). In
+// either case, we'd drop the E and make &exc the default.
+
 // TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
 // yp_sys_minint, or yp_sys_maxsize
 
@@ -409,8 +415,8 @@ typedef struct {
 // Type objects hold pointers to each type's methods.
 typedef struct {
     ypObject_HEAD;
-    // FIXME Fill tp_name and use in DEBUG statements
-    // FIXME Rename to qualname to follow Python?
+    // TODO Fill tp_name and use in DEBUG statements
+    // TODO Rename to qualname to follow Python?
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
 
     // Object fundamentals
@@ -1016,9 +1022,8 @@ typedef struct {
 // FIXME Immortal functions will eventually be moved to nohtyP.h
 typedef struct _ypFunctionObject {
     ypObject_HEAD;
-    // FIXME Move ob_state into yp_function_definition_t?
-    void *ob_state;  // NULL if no extra state
     ypObject *(*ob_code)(ypObject *, yp_ssize_t, ypObject *const *);
+    void *ob_state;  // NULL if no extra state
     // FIXME doc, name/qualname, state, return annotation, module....
     yp_INLINE_DATA(yp_def_parameter_t);
 } ypFunctionObject;
@@ -1049,6 +1054,7 @@ typedef struct _ypFunctionObject {
 // FIXME Could we just use NameError or some other exception?
 // FIXME Unlike Python, make this official, so docstrings show "this parameter is optional, but
 // doesn't have a default value".
+// FIXME ...or just use yp_None
 yp_IMMORTAL_INVALIDATED(yp_Arg_Missing);
 
 
@@ -1072,6 +1078,9 @@ static ypIntObject _ypInt_pre_allocated[_ypInt_PREALLOC_END - _ypInt_PREALLOC_ST
 // XXX Careful! Do not use ypInt_CONST_REF with a value that is not preallocated.
 #define ypInt_CONST_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i)-_ypInt_PREALLOC_START]))
 
+// TODO Rename to yp_int_*?  I'm OK with yp_s_* because strs are going to be used more often and
+// will likely have long names already (i.e. they'll be named like the string they represent), but
+// there won't be many of these, their names are short, and they're infrequently used.
 ypObject *const yp_i_neg_one = ypInt_CONST_REF(-1);
 ypObject *const yp_i_zero = ypInt_CONST_REF(0);
 ypObject *const yp_i_one = ypInt_CONST_REF(1);
@@ -1119,22 +1128,10 @@ yp_IMMORTAL_STR_LATIN_1(yp_s_backslashreplace, "backslashreplace");
 yp_IMMORTAL_STR_LATIN_1(yp_s_surrogateescape, "surrogateescape");
 yp_IMMORTAL_STR_LATIN_1(yp_s_surrogatepass, "surrogatepass");
 
-// FIXME Expose externally? Be careful on naming if so.
-// https://docs.python.org/3/library/token.html?highlight=star#token.STAR
-// https://docs.python.org/3/library/dis.html?highlight=star#opcode-IMPORT_STAR
-// https://docs.python.org/3/library/itertools.html?highlight=star#itertools.starmap
-// https://docs.python.org/3/reference/introduction.html?highlight=star#notation
-// https://docs.python.org/3/reference/expressions.html#expression-lists
-// https://docs.python.org/3/library/token.html?highlight=star#token.SLASH
-// https://docs.python.org/3/library/codecs.html?highlight=slash#codecs.backslashreplace_errors
-// https://docs.python.org/3/faq/programming.html#what-does-the-slash-in-the-parameter-list-of-a-function-mean
-// https://docs.python.org/3/library/os.path.html?highlight=slash#os.path.isabs
-// https://docs.python.org/3/library/os.path.html?highlight=slash#os.path.normcase
-// https://docs.python.org/3/howto/regex.html?highlight=slash#the-backslash-plague
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_forward_slash, "/");
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_star, "*");
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_args, "*args");
-yp_IMMORTAL_STR_LATIN_1_static(yp_s_star_star_kwargs, "**kwargs");
+yp_IMMORTAL_STR_LATIN_1(yp_s_slash, "/");
+yp_IMMORTAL_STR_LATIN_1(yp_s_star, "*");
+yp_IMMORTAL_STR_LATIN_1(yp_s_star_args, "*args");
+yp_IMMORTAL_STR_LATIN_1(yp_s_star_star_kwargs, "**kwargs");
 
 // Parameter names of the built-in functions.
 yp_IMMORTAL_STR_LATIN_1_static(yp_s_base, "base");
@@ -1195,7 +1192,7 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 
 #define _yp_IMMORTAL_FUNCTION_OBJECT(qual, name, code, parameters_len, parameters)                \
     static struct _ypFunctionObject _##name##_struct = {                                          \
-            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters, parameters_len), NULL, code}; \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters, parameters_len), code, NULL}; \
     qual ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                     \
     static yp_def_parameter_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
@@ -1495,7 +1492,8 @@ static void (*yp_free)(void *p) = _dummy_yp_free;
 // _msize and _expand
 #if defined(_MSC_VER)
 #include <malloc.h>
-// FIXME Be consistent: should output pointers come first, or last, throughout this file?
+// TODO Be consistent: should output pointers come first, or last, in all the functions? (What
+// is our nohtyP style guide for function signatures?)
 static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
@@ -2697,7 +2695,7 @@ static ypObject *iter_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *
 yp_IMMORTAL_FUNCTION_static(iter_func_new, iter_func_new_code,
         ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), NULL},
                 {yp_CONST_REF(yp_s_sentinel), yp_CONST_REF(yp_Arg_Missing)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+                {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypTypeObject ypIter_Type = {
         yp_TYPE_HEAD_INIT,
@@ -2770,6 +2768,7 @@ static ypTypeObject ypIter_Type = {
 
 // Public functions
 
+// FIXME Compare against Python's __length_hint__ now that it's official.
 yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
 {
     yp_ssize_t length_hint;
@@ -3860,7 +3859,7 @@ static ypObject *type_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *
 
 yp_IMMORTAL_FUNCTION_static(type_func_new, type_func_new_code,
         ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), NULL},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+                {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypCallableMethods ypType_as_callable = {
         TRUE,      // tp_iscallable
@@ -3971,7 +3970,7 @@ static ypObject *nonetype_func_new_code(ypObject *f, yp_ssize_t n, ypObject *con
 }
 
 yp_IMMORTAL_FUNCTION_static(nonetype_func_new, nonetype_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypTypeObject ypNoneType_Type = {
         yp_TYPE_HEAD_INIT,
@@ -4098,7 +4097,7 @@ static ypObject *bool_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *
 
 yp_IMMORTAL_FUNCTION_static(bool_func_new, bool_func_new_code,
         ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), yp_CONST_REF(yp_False)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+                {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypTypeObject ypBool_Type = {
         yp_TYPE_HEAD_INIT,
@@ -4442,8 +4441,7 @@ static ypObject *intstore_func_new_code(ypObject *f, yp_ssize_t n, ypObject *con
 // FIXME Do we want a way to share the array itself between two functions?
 #define _ypInt_FUNC_NEW_PARAMETERS                                               \
     ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, \
-            {yp_CONST_REF(yp_s_forward_slash), NULL},                            \
-            {yp_CONST_REF(yp_s_base), yp_CONST_REF(yp_None)})
+            {yp_CONST_REF(yp_s_slash), NULL}, {yp_CONST_REF(yp_s_base), yp_CONST_REF(yp_None)})
 yp_IMMORTAL_FUNCTION_static(int_func_new, int_func_new_code, _ypInt_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(intstore_func_new, intstore_func_new_code, _ypInt_FUNC_NEW_PARAMETERS);
 
@@ -5566,7 +5564,7 @@ static ypObject *floatstore_func_new_code(ypObject *f, yp_ssize_t n, ypObject *c
 
 #define _ypFloat_FUNC_NEW_PARAMETERS                                             \
     ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, \
-            {yp_CONST_REF(yp_s_forward_slash), NULL})
+            {yp_CONST_REF(yp_s_slash), NULL})
 yp_IMMORTAL_FUNCTION_static(float_func_new, float_func_new_code, _ypFloat_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(
         floatstore_func_new, floatstore_func_new_code, _ypFloat_FUNC_NEW_PARAMETERS);
@@ -9380,6 +9378,8 @@ static ypObject *_ypBytesC(int type, const yp_uint8_t *source, yp_ssize_t len)
     ypBytes_ASSERT_INVARIANTS(b);
     return b;
 }
+// TODO Be consistent and always put "len" params before the thing they are sizing. This breaks with
+// Python but, conceptually at least, you need the length of something before you use it.
 ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len)
 {
     if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
@@ -10261,6 +10261,8 @@ static ypObject *_ypStr_frombytes(
     ypStr_ASSERT_INVARIANTS(result);
     return result;
 }
+// TODO Be consistent and always put "len" params before the thing they are sizing. This breaks with
+// Python but, conceptually at least, you need the length of something before you use it.
 ypObject *yp_str_frombytesC4(
         const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors)
 {
@@ -10499,7 +10501,7 @@ ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ss
     _ypStringLib_REDIRECT1(s, startswith, (s, prefix, start, end));
 }
 
-ypObject *yp_startswithC(ypObject *s, ypObject *prefix)
+ypObject *yp_startswith(ypObject *s, ypObject *prefix)
 {
     return yp_startswithC4(s, prefix, 0, yp_SLICE_USELEN);
 }
@@ -10509,7 +10511,7 @@ ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssiz
     _ypStringLib_REDIRECT1(s, endswith, (s, suffix, start, end));
 }
 
-ypObject *yp_endswithC(ypObject *s, ypObject *suffix)
+ypObject *yp_endswith(ypObject *s, ypObject *suffix)
 {
     return yp_endswithC4(s, suffix, 0, yp_SLICE_USELEN);
 }
@@ -10747,7 +10749,7 @@ static ypObject *_ypTuple_detach_array(ypObject *sq, ypTuple_detached *detached)
 static void _ypTuple_free_detached(ypTuple_detached *detached)
 {
     for (/*detached->len already set*/; detached->len > 0; detached->len--) {
-        yp_decref(detached->array[detached->len-1]);
+        yp_decref(detached->array[detached->len - 1]);
     }
     yp_free(detached->array);
 }
@@ -11683,7 +11685,7 @@ static ypObject *list_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *
 
 #define _ypTuple_FUNC_NEW_PARAMETERS                                                              \
     ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_iterable), yp_CONST_REF(yp_tuple_empty)}, \
-            {yp_CONST_REF(yp_s_forward_slash), NULL})
+            {yp_CONST_REF(yp_s_slash), NULL})
 yp_IMMORTAL_FUNCTION_static(tuple_func_new, tuple_func_new_code, _ypTuple_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(list_func_new, list_func_new_code, _ypTuple_FUNC_NEW_PARAMETERS);
 
@@ -14487,7 +14489,7 @@ static ypObject *set_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *a
 #define _ypFrozenSet_FUNC_NEW_PARAMETERS                                     \
     ({yp_CONST_REF(yp_s_cls), NULL},                                         \
             {yp_CONST_REF(yp_s_iterable), yp_CONST_REF(yp_frozenset_empty)}, \
-            {yp_CONST_REF(yp_s_forward_slash), NULL})
+            {yp_CONST_REF(yp_s_slash), NULL})
 yp_IMMORTAL_FUNCTION_static(
         frozenset_func_new, frozenset_func_new_code, _ypFrozenSet_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(set_func_new, set_func_new_code, _ypFrozenSet_FUNC_NEW_PARAMETERS);
@@ -15178,7 +15180,7 @@ static ypObject *_ypDict_update_from_iterable(ypObject *mp, ypObject *x)
 
     // Prefer yp_iter_items over yp_iter if supported.
     // TODO replace with yp_miniiter_items once supported
-    // FIXME help(dict.update) states that it only looks for a .keys() method. This is probably
+    // TODO help(dict.update) states that it only looks for a .keys() method. This is probably
     // better: while keys() requires an extra lookup, that's likely cheaper than creating all those
     // 2-tuples...although, with yp_miniiter_items, we would get the best of both worlds, so perhaps
     // this would be an area to break with Python (although, if/when we ever script, we're back to
@@ -15688,7 +15690,7 @@ static ypObject *dict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *
 #define _ypFrozenDict_FUNC_NEW_PARAMETERS                                   \
     ({yp_CONST_REF(yp_s_cls), NULL},                                        \
             {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_frozendict_empty)}, \
-            {yp_CONST_REF(yp_s_forward_slash), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL})
+            {yp_CONST_REF(yp_s_slash), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL})
 yp_IMMORTAL_FUNCTION_static(
         frozendict_func_new, frozendict_func_new_code, _ypFrozenDict_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(dict_func_new, dict_func_new_code, _ypFrozenDict_FUNC_NEW_PARAMETERS);
@@ -16338,8 +16340,7 @@ static ypObject *range_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const 
 yp_IMMORTAL_FUNCTION_static(range_func_new, range_func_new_code,
         ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), NULL},
                 {yp_CONST_REF(yp_s_y), yp_CONST_REF(yp_Arg_Missing)},
-                {yp_CONST_REF(yp_s_step), ypInt_CONST_REF(1)},
-                {yp_CONST_REF(yp_s_forward_slash), NULL}));
+                {yp_CONST_REF(yp_s_step), ypInt_CONST_REF(1)}, {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypSequenceMethods ypRange_as_sequence = {
         MethodError_objobjproc,       // tp_concat
@@ -16601,7 +16602,7 @@ static ypObject *_ypFunction_parameter_kind(ypObject *name)
     } else if (len == 1) {
         yp_uint32_t ch = getindexX(name_data, 0);
         if (ch == '/') {
-            return yp_s_forward_slash;
+            return yp_s_slash;
         } else if (ch == '*') {
             return yp_s_star;
         } else {
@@ -16650,7 +16651,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
         ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
         // ypObject *              param_name = NULL;  // actual name, stripping leading * or **
 
-        if (param_kind == yp_s_forward_slash) {
+        if (param_kind == yp_s_slash) {
             if (n_positional_or_keyword < 1 || n_positional_only > 0 ||
                     remaining_are_keyword_only) {
                 // Invalid: (/), (a, /, /), (*, /), (*args, /)
@@ -16765,7 +16766,7 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
         yp_def_parameter_t param = ypFunction_PARAMS(f)[*n];
         ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
 
-        if (param_kind == yp_s_forward_slash) {
+        if (param_kind == yp_s_slash) {
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the / parameter
         } else if (param_kind == yp_s_star) {
@@ -16829,7 +16830,7 @@ static ypObject *_ypFunction_call_make_var_kwargs(
             if (yp_isexceptionC(param_kind)) return param_kind;
 
             i++;  // consume the parameter
-            if (param_kind == yp_s_forward_slash) break;
+            if (param_kind == yp_s_slash) break;
         }
         yp_ASSERT1(i < ypFunction_PARAMS_LEN(f));
     }
@@ -16872,7 +16873,7 @@ static ypObject *_ypFunction_call_place_kwargs(
         yp_def_parameter_t param = ypFunction_PARAMS(f)[*n];
         ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
 
-        if (param_kind == yp_s_forward_slash) {
+        if (param_kind == yp_s_slash) {
             if (placed_kwargs > 0) {
                 // A positional-only parameter was filled using a keyword argument.
                 return yp_TypeError;
@@ -16959,8 +16960,7 @@ static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter
     if (*n > 0 && argarray[*n - 1] == NULL) {
         // Drop the trailing null. This only happens if / is the last entry, which would mean all
         // params are positional-only.
-        yp_ASSERT1(_ypFunction_parameter_kind(ypFunction_PARAMS(f)[*n - 1].name) ==
-                   yp_s_forward_slash);
+        yp_ASSERT1(_ypFunction_parameter_kind(ypFunction_PARAMS(f)[*n - 1].name) == yp_s_slash);
         yp_ASSERT1(ypFunction_HAS_ONLY_POS_ONLY(ypFunction_FLAGS(f) & ypFunction_PARAM_FLAGS));
         yp_ASSERT1(*n > 1 && argarray[*n - 2] != NULL);
         (*n)--;
@@ -17476,7 +17476,7 @@ ypObject *yp_function(yp_def_function_t *definition)
     yp_ssize_t i;
     ypObject * result;
 
-    if (definition->flags != 0) return yp_ValueError;  // TODO Correct error?
+    if (definition->flags != 0) return yp_ValueError;
     if (parameters_len > ypFunction_LEN_MAX) return yp_MemorySizeOverflowError;
 
     newF = ypMem_MALLOC_CONTAINER_INLINE(
@@ -17485,6 +17485,7 @@ ypObject *yp_function(yp_def_function_t *definition)
     ypFunction_CODE_FUNC(newF) = definition->code;
     ypFunction_FLAGS(newF) = 0;
     ypFunction_SET_STATE(newF, NULL);
+    // TODO name/qualname, doc, state, module, annotations, ...
 
     for (i = 0; i < parameters_len; i++) {
         ypObject *default_ = definition->parameters[i].default_;  // borrowed
@@ -17501,6 +17502,11 @@ ypObject *yp_function(yp_def_function_t *definition)
 
     return newF;
 }
+
+// FIXME A convenience function to decref all objects in yp_def_function_t/yp_def_generator_t/etc,
+// but warn that it cannot contain borrowed references (as they would be stolen/decref'ed).
+
+// TODO As in Python, support a "partial" object that wraps a function with some pre-set arguments.
 
 #pragma endregion function
 
@@ -17596,6 +17602,8 @@ ypObject *yp_bool(ypObject *x) { _yp_REDIRECT_BOOL1(x, tp_bool, (x)); }
 
 ypObject *yp_iter(ypObject *x) { _yp_REDIRECT1(x, tp_iter, (x)); }
 
+// FIXME Now that iterators are considered "immutable", don't discard it on _next/etc. i.e.
+// turn ypObject **iterator into just ypObject *iterator.
 static ypObject *_yp_send(ypObject **iterator, ypObject *value)
 {
     ypTypeObject *type = ypObject_TYPE(*iterator);
@@ -17983,6 +17991,10 @@ void yp_updateKV(ypObject **mapping, int n, va_list args)
 
 int yp_iscallableC(ypObject *x) { return ypObject_TYPE(x)->tp_as_callable->tp_iscallable; }
 
+// TODO A version of yp_callN that also accepts keyword arguments. Could have yp_callK that _only_
+// accepts keyword arguments, but I'd rather it's combined. A yp_callNK would be like
+// yp_callNK(c, n_args, <args>, n_kwargs, <kwargs>), but would be tricky to call correctly (a
+// miscount would be disastrous).
 ypObject *yp_callN(ypObject *c, int n, ...)
 {
     return_yp_V_FUNC(ypObject *, yp_callNV, (c, n, args), n);
@@ -18038,6 +18050,11 @@ ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)
     }
 }
 
+// TODO Tempted to have a version of this that also accepts keyword arguments (either via K or a
+// dict), but the point of yp_call_arrayX is to have an array we can quickly pass along, and that's
+// likely impossible with keyword arguments (the values would have to be in the array, in exactly
+// the right order, and we'd have to yp_eq all the kwarg names to confirm that). Python supports
+// kwargs in vectorcall, but I don't see the overall benefit.
 ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args)
 {
     ypObject *c = args[0];  // borrowed
@@ -18075,11 +18092,15 @@ ypObject *yp_iter_values(ypObject *mapping)
     _yp_REDIRECT2(mapping, tp_as_mapping, tp_iter_values, (mapping));
 }
 
+// FIXME This would be clearer if mini iterators were opaque structures containing obj and state.
+// Less chance to accidentally misuse the object returned.
 ypObject *yp_miniiter(ypObject *x, yp_uint64_t *state)
 {
     _yp_REDIRECT1(x, tp_miniiter, (x, state));
 }
 
+// FIXME Now that iterators are considered "immutable", don't discard on _next/etc? i.e. turn
+// ypObject **mi into just ypObject *mi.
 ypObject *yp_miniiter_next(ypObject **mi, yp_uint64_t *state)
 {
     ypTypeObject *type = ypObject_TYPE(*mi);
@@ -18280,7 +18301,7 @@ static ypObject *yp_func_chr_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_chr, yp_func_chr_code,
-        ({yp_CONST_REF(yp_s_i), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+        ({yp_CONST_REF(yp_s_i), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -18296,7 +18317,7 @@ static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *a
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypObject *yp_func_iscallable_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -18305,7 +18326,7 @@ static ypObject *yp_func_iscallable_code(ypObject *c, yp_ssize_t n, ypObject *co
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_iscallable, yp_func_iscallable_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -18321,7 +18342,7 @@ static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -18330,7 +18351,7 @@ static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *cons
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_reversed, yp_func_reversed_code,
-        ({yp_CONST_REF(yp_s_sequence), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}));
+        ({yp_CONST_REF(yp_s_sequence), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypObject *yp_func_sorted_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -18339,8 +18360,9 @@ static ypObject *yp_func_sorted_code(ypObject *c, yp_ssize_t n, ypObject *const 
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_sorted, yp_func_sorted_code,
-        ({yp_CONST_REF(yp_s_iterable), NULL}, {yp_CONST_REF(yp_s_forward_slash), NULL}, {yp_CONST_REF(yp_s_star), NULL},
-        {yp_CONST_REF(yp_s_key), yp_CONST_REF(yp_None)}, {yp_CONST_REF(yp_s_reverse), yp_CONST_REF(yp_False)}));
+        ({yp_CONST_REF(yp_s_iterable), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+                {yp_CONST_REF(yp_s_star), NULL}, {yp_CONST_REF(yp_s_key), yp_CONST_REF(yp_None)},
+                {yp_CONST_REF(yp_s_reverse), yp_CONST_REF(yp_False)}));
 
 #pragma endregion functions_as_objects
 
@@ -18395,10 +18417,14 @@ static ypTypeObject *ypTypeTable[255] = {
 };
 // clang-format on
 
+// TODO Reconsider the behaviour of exceptions.  Python returns `type`.  If we ever want to support
+// creating instances of exceptions, we should do the same.
 ypObject *yp_type(ypObject *object) { return (ypObject *)ypObject_TYPE(object); }
 
 // The immortal type objects
+// TODO Rename to yp_type_*? We might want to use the 't' in yp_t_* with tuples....
 ypObject *const yp_t_invalidated = (ypObject *)&ypInvalidated_Type;
+// FIXME Rename to yp_t_BaseException...or is yp_t_exception closer to a metaclass?
 ypObject *const yp_t_exception = (ypObject *)&ypException_Type;
 ypObject *const yp_t_type = (ypObject *)&ypType_Type;
 ypObject *const yp_t_NoneType = (ypObject *)&ypNoneType_Type;

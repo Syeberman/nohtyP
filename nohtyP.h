@@ -80,12 +80,6 @@
  *  # (number) - A function with # inputs that otherwise shares the same name as another function
  */
 
-// FIXME Idea: This discard-on-error ypObject** idea is weird, and it can be easily misused if you
-// are modifying a borrowed reference (i.e you get a ypObject* parameter and use it directly). But
-// it may still be useful while building a new object. Should we call this our "builder pattern"
-// (postfix B)? Or, we could mimic __iadd__/etc and make it the "in-place" pattern (postfix I). In
-// either case, we'd drop the E and make &exc the default.
-
 /*
  * Header Prerequisites
  */
@@ -288,13 +282,11 @@ ypAPI ypObject *yp_rangeC(yp_int_t stop);
 // source is NULL it is considered as having all null bytes; if len is negative source is
 // considered null terminated (and, therefore, will not contain the null byte).
 //  Ex: pre-allocate a bytearray of length 50: yp_bytearrayC(NULL, 50)
-// FIXME Let's be consistent and always put "len" params before the thing they are sizing.
 ypAPI ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
 ypAPI ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len);
 
 // Returns a new reference to a bytes/bytearray encoded from the given str or chrarray object.  The
 // Python-equivalent default for encoding is yp_s_utf_8, while for errors it is yp_s_strict.
-// FIXME Ensure None is rejected in both encoding and errors.
 ypAPI ypObject *yp_bytes3(ypObject *source, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *errors);
 
@@ -313,7 +305,6 @@ ypAPI ypObject *yp_bytearray0(void);
 // in yp_bytesC.  The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
 // ascii-encoded source), while for errors it is yp_s_strict.  Equivalent to:
 //  yp_str3(yp_bytesC(source, len), encoding, errors)
-// FIXME Let's be consistent and always put "len" params before the thing they are sizing.
 ypAPI ypObject *yp_str_frombytesC4(
         const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray_frombytesC4(
@@ -410,8 +401,6 @@ ypAPI ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value);
 // mapping object (that supports yp_iter_items), or an iterable that yields exactly two items at a
 // time (ie (key, value)).  If a given key is seen more than once, the last value yielded is
 // retained.
-// FIXME help(dict.update) states that it only looks for a .keys() method. This is probably better:
-// while keys() requires an extra lookup, that's likely cheaper than creating all those 2-tuples.
 ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
 
@@ -468,8 +457,6 @@ ypAPI ypObject *yp_function_withstatestructCN(
         yp_def_function_t *definition, void *state, yp_ssize_t size, int n, ...);
 ypAPI ypObject *yp_function_withstatestructCNV(
         yp_def_function_t *definition, void *state, yp_ssize_t size, int n, va_list args);
-
-// FIXME Partial functions, created from other functions?
 
 // XXX The file type will be added in a future version
 
@@ -565,9 +552,6 @@ ypAPI yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 // examples of iterators include files and generator iterators.  It is usually unwise to modify an
 // object being iterated over.
 
-// FIXME Now that iterators are considered "immutable", should we discard it on _next/etc? i.e.
-// should we turn ypObject **iterator into just ypObject *iterator?
-
 // "Sends" a value into *iterator and returns a new reference to the next yielded value, or an
 // exception.  The value may be ignored by the iterator.  value cannot be an exception.  When the
 // iterator is exhausted yp_StopIteration is returned; on any other error, *iterator is discarded
@@ -593,7 +577,6 @@ ypAPI ypObject *yp_throw(ypObject **iterator, ypObject *exc);
 // on the underlying type: most containers know their lengths exactly, but some generators may not.
 // A hint of zero could mean that the iterator is exhausted, that the length is unknown, or that
 // the iterator will yield infinite values.  Returns zero and sets *exc on error.
-// FIXME Compare against Python's __length_hint__ now that it's official.
 ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
 
 // "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit).  If yp_StopIteration or
@@ -1096,15 +1079,14 @@ ypAPI ypObject *yp_isupper(ypObject *s);
 
 // Returns the immortal yp_True if s[start:end] starts with the specified prefix, otherwise
 // yp_False.  prefix can also be a tuple of prefix strings for which to look.  If a prefix string
-// is empty, returns yp_True.  yp_startswithC considers the entire string (as if start is 0 and end
+// is empty, returns yp_True.  yp_startswith considers the entire string (as if start is 0 and end
 // is yp_SLICE_USELEN).
-// FIXME There's nothing "C" about yp_startswithC. (A linter should check "C" functions.)
 ypAPI ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
-ypAPI ypObject *yp_startswithC(ypObject *s, ypObject *prefix);
+ypAPI ypObject *yp_startswith(ypObject *s, ypObject *prefix);
 
 // Similar to yp_startswithC4, except looks for the given suffix(es) at the end of s[start:end].
 ypAPI ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end);
-ypAPI ypObject *yp_endswithC(ypObject *s, ypObject *suffix);
+ypAPI ypObject *yp_endswith(ypObject *s, ypObject *suffix);
 
 // Returns a new reference to a lowercased copy of s.  The lowercasing algorithm is described in
 // section 3.13 of the Unicode Standard.
@@ -1254,12 +1236,8 @@ ypAPI ypObject *yp_format(ypObject *s, ypObject *sequence, ypObject *mapping);
  * Callable Operations
  */
 
-// XXX This section is a work-in-progress
-
 // C functions can be wrapped up into objects and called. It's also possible to call certain other
 // objects: for example, calling a type object generally constructs an object of that type.
-
-// FIXME "The type objects are also callable" give a better example.
 
 // Returns true (non-zero) if x appears callable, else false. If this returns true, it is still
 // possible that a call fails, but if it is false, calling x will always raise yp_TypeError. Always
@@ -1299,7 +1277,8 @@ typedef struct _yp_def_parameter_t {
     // frozendict receiving any excess keyword arguments. If present, this parameter must be last.
     // The string after ** must be a valid Python identifier. Conventionally named **kwargs.
     //
-    // TODO Mention yp_s_forward_slash and friends here?
+    // For convenience using these special forms, nohtyP exports the following immortal strs:
+    // yp_s_slash, yp_s_star, yp_s_star_args, yp_s_star_star_kwargs.
     ypObject *name;
 
     // The default value for the parameter, or NULL if there is no default. Any subsequent
@@ -1324,10 +1303,7 @@ typedef struct _yp_def_function_t {
     // parameters_len-1 if parameters ends in /.
     ypObject *(*code)(ypObject *f, yp_ssize_t n, ypObject *const *argarray);
 
-    // FIXME Flags to describe what's next in this struct (is it NV, stars, bytecode? Are there
-    // annotations?)
-    // FIXME No unknown flags; flag for (*args), (**kwargs), and (*args, **kwargs)
-    // FIXME future flags to enable annotations
+    // Reserved for future expansion: must be zero else yp_ValueError is raised.
     yp_uint32_t flags;
 
     // The number of elements in the parameters array.
@@ -1335,23 +1311,17 @@ typedef struct _yp_def_function_t {
 
     // Array of parameters. Errors in this array generally raise yp_ParameterSyntaxError.
     yp_def_parameter_t *parameters;
-
-    // FIXME name/qualname, for sure (NULL for anonymous?)
-
-    // FIXME doc, state, module....
 } yp_def_function_t;
 
-// FIXME Or...here's a weird idea: yp_call_method_array(ypObject *name, int n, ypObject **args) (and
-// NV and stars), where "self" is implied as args[0] (n as always includes args[0], always counts
-// entire array), so that we can still pass args directly.
-
-// TODO yp_function_fromstructCN, or maybe yp_def_fromstructCN?
-
-// FIXME A convenience function to decref all objects in yp_def_function_t/yp_def_generator_t/etc,
-// but warn that it cannot contain borrowed references (as they would be stolen/decref'ed).
+// Immortal strs for the special parameter name forms, for convenience.
+ypAPI ypObject *const yp_s_slash;             // "/"
+ypAPI ypObject *const yp_s_star;              // "*"
+ypAPI ypObject *const yp_s_star_args;         // "*args"
+ypAPI ypObject *const yp_s_star_star_kwargs;  // "**kwargs"
 
 // FIXME use yp_function_stateCX to retrieve any state variables
 
+// Immortal functions for the built-in nohtyP functions.
 ypAPI ypObject *const yp_func_chr;
 ypAPI ypObject *const yp_func_hash;
 ypAPI ypObject *const yp_func_iscallable;
@@ -1521,9 +1491,6 @@ ypAPI ypObject *const yp_sys_maxint;
 ypAPI ypObject *const yp_sys_minint;
 
 // Immortal ints representing common values, for convenience.
-// TODO Rename to yp_int_*?  I'm OK with yp_s_* because strs are going to be used more often and
-// will likely have long names already (i.e. they'll be named like the string they represent), but
-// there won't be many of these, their names are short, and they're infrequently used.
 ypAPI ypObject *const yp_i_neg_one;
 ypAPI ypObject *const yp_i_zero;
 ypAPI ypObject *const yp_i_one;
@@ -1587,15 +1554,12 @@ ypAPI void yp_deepinvalidate(ypObject **x);
 
 // Returns a new reference to the type of object.  If object is an exception, yp_t_exception is
 // returned; if it is invalidated, yp_t_invalidated is returned.
-// TODO Reconsider the behaviour of exceptions.  Python returns `type`.  If we ever want to support
-// creating instances of exceptions, we should do the same.
 ypAPI ypObject *yp_type(ypObject *object);
 
-// The immortal type objects.  Calling a type object (i.e. yp_call_TODO) constructs an object of
-// that type.
-// FIXME yp_t_* could also be for tuples. Perhaps change to yp_type_*?
+// The immortal type objects.  Calling a type object (i.e. with yp_callN) typically constructs an
+// object of that type.
 ypAPI ypObject *const yp_t_invalidated;
-ypAPI ypObject *const yp_t_exception;  // FIXME Rename to yp_t_BaseException?
+ypAPI ypObject *const yp_t_exception;
 ypAPI ypObject *const yp_t_type;
 ypAPI ypObject *const yp_t_NoneType;
 ypAPI ypObject *const yp_t_bool;
@@ -1646,12 +1610,6 @@ ypAPI ypObject *const yp_t_function;
 // returned object may not be consistent.  These restrictions on using mini iterators are not
 // enforced: the behaviour of a mini iterator with any other other function is undefined and may or
 // may not raise an exception.
-
-// FIXME Would this be clearer if mini iterators were opaque structures containing obj and state?
-// Yes, yes it would.
-
-// FIXME Now that iterators are considered "immutable", should we discard it on _next/etc? i.e.
-// should we turn ypObject **iterator into just ypObject *iterator?
 
 // Returns a new reference to an opaque mini iterator for object x and initializes *state to the
 // iterator's starting state.  *state is also opaque: you must *not* modify it directly.  It is
@@ -1724,14 +1682,13 @@ ypAPI void     yp_i2i_setitemC(ypObject **container, yp_int_t key, yp_int_t x);
 
 // Operations on containers that map integers to strs
 // yp_i2s_getitemCX is documented below, as it must be used carefully.
-// FIXME yp_uint8_t* is confusing; make a yp_char_t (here and everywhere).
 ypAPI void yp_i2s_setitemC4(
         ypObject **container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len);
 
 // Operations on containers that map strs to objects.  Note that if the value of the str is
 // known at compile-time, as in:
 //      value = yp_s2o_getitemC3(o, "mykey", -1);
-// it is more-efficient to use yp_IMMORTAL_STR_LATIN_1 (also compatible with ascii), as in:
+// it is more efficient to use yp_IMMORTAL_STR_LATIN_1 (also compatible with ascii), as in:
 //      yp_IMMORTAL_STR_LATIN_1(s_mykey, "mykey");
 //      value = yp_getitem(o, s_mykey);
 ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len);
@@ -1771,7 +1728,6 @@ ypAPI void yp_s2i_setitemC4(
 // use these macros in a function, as the variable will be "deallocated" when the function returns,
 // and immortals should never be deallocated.  The following macros work as above, except the
 // variables are declared as "static ypObject * const".
-// FIXME Make yp_IMMORTAL_INT/etc static, and yp_IMMORTAL_INT_extern extern. Remove NOQUAL.
 //      yp_IMMORTAL_INT_static(name, value);
 //      yp_IMMORTAL_BYTES_static(name, value);
 //      yp_IMMORTAL_STR_LATIN_1_static(name, value);
@@ -1937,7 +1893,6 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t
 // array.  As a special case, if size is NULL, the string must not contain null characters and
 // *encoded will point to a null-terminated string.  On error, sets *encoded to NULL, *size to
 // zero (if size is not NULL), *encoding to the exception, and returns the exception.
-// FIXME Can we document that encoding is an immortal?
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding);
 
@@ -1955,7 +1910,6 @@ ypAPI ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_
 // this with yp_def_function_t.code's argarray, yp_itemarrayCX's array, or any other array that you
 // do not own. Any changes that yp_call_arrayX makes to args will be reverted before it returns.
 // Based on Python's vectorcall protocol.
-// FIXME Just call this "vectorcall"?
 ypAPI ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args);
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
@@ -2167,7 +2121,7 @@ struct _ypStrObject {
             _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};  \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 // FIXME If we populate name->utf_8 on immortals, we are leaking memory. Either don't, or
-// pre-allocate an immortal bytes that we populate later?
+// pre-allocate an immortal bytes that we populate later? Or drop the name->utf_8 idea.
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                                               \
     static const char          _##name##_data[] = value;                                          \
     static struct _ypStrObject _##name##_struct = {                                               \
