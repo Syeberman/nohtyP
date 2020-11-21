@@ -9627,7 +9627,7 @@ static yp_uint32_t _ypStr_asuint32C(ypObject *x, ypObject **exc)
     yp_uint32_t retval;
 
     asint = yp_index_asintC(x, &subexc);
-    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(retval, exc, subexc);
+    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(0, exc, subexc);
     retval = (yp_uint32_t)(asint & 0xFFFFFFFFu);
     if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_ValueError);
     return retval;
