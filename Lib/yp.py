@@ -9,6 +9,7 @@ yp.py - Python wrapper for nohtyP
 
 from ctypes import *
 from ctypes import _SimpleCData
+import functools
 import sys
 import weakref
 import operator
@@ -353,7 +354,7 @@ yp_func(c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ))
 #         void *state, yp_ssize_t size, int n, ...);
 # ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint,
 #         void *state, yp_ssize_t size, int n, va_list args);
-yp_func(c_void_p, "yp_generator_fromstructCN",
+yp_func(c_ypObject_p, "yp_generator_fromstructCN",
         ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "length_hint"),
          (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p))
 
@@ -450,7 +451,7 @@ yp_func(c_ypObject_p, "yp_frozendict", ((c_ypObject_p, "x"), ))
 yp_func(c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ))
 
 # ypObject *yp_function(yp_def_function_t *definition);
-yp_func(c_void_p, "yp_function", ((POINTER(c_yp_def_function_t), "definition"), ))
+yp_func(c_ypObject_p, "yp_function", ((POINTER(c_yp_def_function_t), "definition"), ))
 
 # ypObject *yp_function_withstateCN(yp_def_function_t *definition, int n, ...);
 # ypObject *yp_function_withstateCNV(yp_def_function_t *definition, int n, va_list args);
@@ -1760,12 +1761,16 @@ class yp_bool(ypObject):
 c_ypObject_p_value("yp_True")
 c_ypObject_p_value("yp_False")
 
+keep_alive = []  # FIXME Temporary
 
 @pytype(yp_t_iter, (iter, type(x for x in ())))
 class yp_iter(ypObject):
     def __new__(cls, object, sentinel=_yp_arg_missing, /):
         if sentinel is not _yp_arg_missing:
-            return _yp_callN(cls._yp_type, _yp_callable(object), sentinel)
+            callable = _yp_callable(object)
+            self = _yp_callN(cls._yp_type, callable, sentinel)
+            self._callable = callable  # ctypes doesn't keep references to callbacks, so we must
+            return self
         elif isinstance(object, ypObject):
             return _yp_callN(cls._yp_type, object)
         elif hasattr(object, "_yp_iter"):
@@ -1773,12 +1778,13 @@ class yp_iter(ypObject):
         else:
             return cls._from_python(object)
 
-    def _pyiter_wrapper(self, yp_self, yp_value):
+    @staticmethod
+    def _pyiter_wrapper(pyiter, yp_self, yp_value):
         try:
             if _yp_isexceptionC(yp_value):
                 return _yp_incref(yp_value)  # yp_GeneratorExit, in particular
             try:
-                py_result = next(self._pyiter)
+                py_result = next(pyiter)
             except BaseException as e: # exceptions from the iterator get passed to nohtyP
                 return _yp_incref(_pyExc2yp[type(e)])
             return _yp_incref(ypObject._from_python(py_result))
@@ -1789,10 +1795,10 @@ class yp_iter(ypObject):
     @classmethod
     def _from_python(cls, pyobj):
         length_hint = operator.length_hint(pyobj)
-        self = c_ypObject_p.__new__(cls)
-        self._pyiter = iter(pyobj)
-        self._ypfunc = c_yp_generator_func_t(self._pyiter_wrapper)
-        self.value = _yp_generator_fromstructCN(self._ypfunc, length_hint, 0, 0)
+        ypfunc = c_yp_generator_func_t(functools.partial(cls._pyiter_wrapper, iter(pyobj)))
+        keep_alive.append(ypfunc)
+        self = _yp_generator_fromstructCN(ypfunc, length_hint, 0, 0)
+        self._ypfunc = ypfunc  # ctypes doesn't keep references to callbacks, so we must
         return self
 
     def __iter__(self): return self
@@ -2337,6 +2343,12 @@ class _ypDict(ypObject):
             return _yp_dict(_yp_item_iter._from_python(pyobj))
         return _yp_dictK(*_yp_flatten_dict(pyobj))
 
+    @reprlib.recursive_repr("{...}")
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        return yp_str("{%s}" % ", ".join(f"{k!r}: {v!r}" for k, v in self))
+    _yp_repr = _yp_str
+
     @classmethod
     def fromkeys(cls, seq, value=None): return _yp_dict_fromkeysN(value, *seq)
 
@@ -2412,12 +2424,17 @@ class yp_function(ypObject):
     def __new__(cls, *args, **kwargs):
         raise NotImplementedError("can't instantiate yp_function directly")
 
-    def _pyfunction_wrapper(self, yp_self, n, argarray):
+    @staticmethod
+    def _pyfunction_wrapper(pyfunction, yp_self, n, argarray):
+        # FIXME Make this a module function, then add a weak value dict to map a random integer, say
+        # to the ypObject (Python object), so that we get better errors to flag when the ypObject
+        # has been deallocated. Store this random integer in the state so we can lookup and at least
+        # fail gracefully rather than segfaulting.
         try:
             args = _yp_transmute_and_cache(argarray[0], steal=False)
             kwargs = _yp_transmute_and_cache(argarray[1], steal=False)
             try:
-                py_result = self._pyfunction(*args, **kwargs)
+                py_result = pyfunction(*args, **kwargs)
             except BaseException as e: # exceptions from the function get passed to nohtyP
                 return _yp_incref(_pyExc2yp[type(e)])
             return _yp_incref(ypObject._from_python(py_result))
@@ -2425,14 +2442,15 @@ class yp_function(ypObject):
             traceback.print_exc()
             return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
+    _def_parameters = (c_yp_def_parameter_t * 2)((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
+
     @classmethod
     def _from_python(cls, pyobj):
-        self = c_ypObject_p.__new__(cls)
-        self._pyfunction = pyobj
-        self._ypcode = c_yp_def_code_t(self._pyfunction_wrapper)
-        parameters = (c_yp_def_parameter_t * 2)((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
-        definition = c_yp_def_function_t(self._ypcode, 0, 2, parameters)
-        self.value = _yp_function(definition)
+        ypcode = c_yp_def_code_t(functools.partial(cls._pyfunction_wrapper, pyobj))
+        keep_alive.append(ypcode)
+        definition = c_yp_def_function_t(ypcode, 0, len(cls._def_parameters), cls._def_parameters)
+        self = _yp_function(definition)
+        self._ypcode = ypcode  # ctypes doesn't keep references to callbacks, so we must
         return self
 
 c_ypObject_p_value("yp_func_chr")
