@@ -191,7 +191,7 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(hasattr([], "wobble"), yp_False)
 
     def test_callable(self):
-        self.assertIs(yp_iscallable(yp_len), yp_True)
+        self.assertIs(yp_iscallable(yp_iscallable), yp_True)
         self.assertIs(yp_iscallable(yp_int(1)), yp_False)
 
     @yp_unittest.skip_not_applicable

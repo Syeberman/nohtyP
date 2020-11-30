@@ -10,6 +10,7 @@ yp.py - Python wrapper for nohtyP
 from ctypes import *
 from ctypes import _SimpleCData
 import functools
+import collections
 import sys
 import weakref
 import operator
@@ -1168,24 +1169,47 @@ yp_func(c_int, "yp_isexceptionC2", ((c_ypObject_p, "x"), (c_ypObject_p, "exc")))
 # int yp_isexceptionCN(ypObject *x, int n, ...);
 
 # typedef struct _yp_initialize_parameters_t {...} yp_initialize_parameters_t;
+c_yp_malloc_func_t = CFUNCTYPE(c_void_p, c_yp_ssize_t_p, c_yp_ssize_t)
+c_yp_malloc_resize_func_t = CFUNCTYPE(c_void_p, c_yp_ssize_t_p, c_void_p, c_yp_ssize_t, c_yp_ssize_t)
+c_yp_free_func_t = CFUNCTYPE(c_void, c_void_p)
 class c_yp_initialize_parameters_t(Structure):
     _fields_ = [
         ("struct_size", c_yp_ssize_t),
-        ("yp_malloc", c_void_p),
-        ("yp_malloc_resize", c_void_p),
-        ("yp_free", c_void_p),
+        ("yp_malloc", c_yp_malloc_func_t),
+        ("yp_malloc_resize", c_yp_malloc_resize_func_t),
+        ("yp_free", c_yp_free_func_t),
         ("everything_immortal", c_int),
     ]
+
 # void yp_initialize(yp_initialize_parameters_t *kwparams);
 yp_func(c_void, "yp_initialize", ((POINTER(c_yp_initialize_parameters_t), "kwparams"), ),
         errcheck=False)
 
+# void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
+_yp_default_malloc = c_yp_malloc_func_t(("yp_default_malloc", ypdll))
+# void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+_yp_default_malloc_resize = c_yp_malloc_resize_func_t(("yp_default_malloc_resize", ypdll))
+# void yp_default_free(void *p);
+_yp_default_free = c_yp_free_func_t(("yp_default_free", ypdll))
+
+
+# Some nohtyP objects need to hold references to Python objects; in particular, yp_iter and
+# yp_function must hold references to ctypes callback functions. References here are discarded after
+# the associated nohtyP object is discarded (see yp_free_hook).
+_yp_reverse_refs = collections.defaultdict(list)
+
+@c_yp_free_func_t
+def yp_free_hook(p):
+    _yp_default_free(p)
+    _yp_reverse_refs.pop(p, None)
+
+
 # Initialize nohtyP
 _yp_initparams = c_yp_initialize_parameters_t(
     struct_size=sizeof(c_yp_initialize_parameters_t),
-    yp_malloc=None,
-    yp_malloc_resize=None,
-    yp_free=None,
+    yp_malloc=_yp_default_malloc,
+    yp_malloc_resize=_yp_default_malloc_resize,
+    yp_free=yp_free_hook,
     everything_immortal=False
 )
 _yp_initialize(_yp_initparams)
@@ -1761,16 +1785,12 @@ class yp_bool(ypObject):
 c_ypObject_p_value("yp_True")
 c_ypObject_p_value("yp_False")
 
-keep_alive = []  # FIXME Temporary
 
 @pytype(yp_t_iter, (iter, type(x for x in ())))
 class yp_iter(ypObject):
     def __new__(cls, object, sentinel=_yp_arg_missing, /):
         if sentinel is not _yp_arg_missing:
-            callable = _yp_callable(object)
-            self = _yp_callN(cls._yp_type, callable, sentinel)
-            self._callable = callable  # ctypes doesn't keep references to callbacks, so we must
-            return self
+            return _yp_callN(cls._yp_type, _yp_callable(object), sentinel)
         elif isinstance(object, ypObject):
             return _yp_callN(cls._yp_type, object)
         elif hasattr(object, "_yp_iter"):
@@ -1796,9 +1816,8 @@ class yp_iter(ypObject):
     def _from_python(cls, pyobj):
         length_hint = operator.length_hint(pyobj)
         ypfunc = c_yp_generator_func_t(functools.partial(cls._pyiter_wrapper, iter(pyobj)))
-        keep_alive.append(ypfunc)
         self = _yp_generator_fromstructCN(ypfunc, length_hint, 0, 0)
-        self._ypfunc = ypfunc  # ctypes doesn't keep references to callbacks, so we must
+        _yp_reverse_refs[self.value].append(ypfunc)
         return self
 
     def __iter__(self): return self
@@ -2426,10 +2445,6 @@ class yp_function(ypObject):
 
     @staticmethod
     def _pyfunction_wrapper(pyfunction, yp_self, n, argarray):
-        # FIXME Make this a module function, then add a weak value dict to map a random integer, say
-        # to the ypObject (Python object), so that we get better errors to flag when the ypObject
-        # has been deallocated. Store this random integer in the state so we can lookup and at least
-        # fail gracefully rather than segfaulting.
         try:
             args = _yp_transmute_and_cache(argarray[0], steal=False)
             kwargs = _yp_transmute_and_cache(argarray[1], steal=False)
@@ -2447,10 +2462,9 @@ class yp_function(ypObject):
     @classmethod
     def _from_python(cls, pyobj):
         ypcode = c_yp_def_code_t(functools.partial(cls._pyfunction_wrapper, pyobj))
-        keep_alive.append(ypcode)
         definition = c_yp_def_function_t(ypcode, 0, len(cls._def_parameters), cls._def_parameters)
         self = _yp_function(definition)
-        self._ypcode = ypcode  # ctypes doesn't keep references to callbacks, so we must
+        _yp_reverse_refs[self.value].append(ypcode)
         return self
 
 c_ypObject_p_value("yp_func_chr")

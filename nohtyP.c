@@ -1494,7 +1494,7 @@ static void (*yp_free)(void *p) = _dummy_yp_free;
 #include <malloc.h>
 // TODO Be consistent: should output pointers come first, or last, in all the functions? (What
 // is our nohtyP style guide for function signatures?)
-static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
+void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1506,7 +1506,7 @@ static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
-static void *_default_yp_malloc_resize(
+void *yp_default_malloc_resize(
         yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newp;
@@ -1526,7 +1526,7 @@ static void *_default_yp_malloc_resize(
     yp_INFO("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
-static void _default_yp_free(void *p)
+void yp_default_free(void *p)
 {
     yp_INFO("free: %p", p);
     free(p);
@@ -1547,7 +1547,7 @@ static yp_ssize_t _default_yp_malloc_good_size(yp_ssize_t size)
     if (diff > 0) size += _yp_DEFAULT_MALLOC_ROUNDTO - diff;
     return size;
 }
-static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
+void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1556,7 +1556,7 @@ static void *_default_yp_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
-static void *_default_yp_malloc_resize(
+void *yp_default_malloc_resize(
         yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newp;
@@ -1569,7 +1569,7 @@ static void *_default_yp_malloc_resize(
     yp_INFO("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
-static void _default_yp_free(void *p)
+void yp_default_free(void *p)
 {
     yp_INFO("free: %p", p);
     free(p);
@@ -18458,9 +18458,9 @@ ypObject *const yp_t_function = (ypObject *)&ypFunction_Type;
 // TODO A script to ensure the comments on the line match the structure member
 static const yp_initialize_parameters_t _default_initialize = {
         yp_sizeof(yp_initialize_parameters_t),  // sizeof_struct
-        _default_yp_malloc,                     // yp_malloc
-        _default_yp_malloc_resize,              // yp_malloc_resize
-        _default_yp_free,                       // yp_free
+        yp_default_malloc,                     // yp_malloc
+        yp_default_malloc_resize,              // yp_malloc_resize
+        yp_default_free,                       // yp_free
         FALSE,                                  // everything_immortal
 };
 
@@ -18589,6 +18589,8 @@ void yp_initialize(const yp_initialize_parameters_t *args)
 
     // Ensure sizeof_struct was initialized appropriately: the earliest version of this struct
     // contained everything_immortal, so sizeof_struct should be at least that size.
+    // TODO Change everything_immortal to a field of bit flags: no sense wasting 32/64 bits on
+    // a single boolean!
     if (args != NULL && args->sizeof_struct < _yp_INIT_ARG_END(everything_immortal)) {
         yp_FATAL("yp_initialize_parameters_t.sizeof_struct (%" PRIssize
                  ") smaller than minimum (%" PRIssize ")",

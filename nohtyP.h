@@ -1823,10 +1823,10 @@ ypAPI int yp_isexceptionCNV(ypObject *x, int n, va_list args);
 typedef struct _yp_initialize_parameters_t {
     yp_ssize_t sizeof_struct;  // Set to sizeof(yp_initialize_parameters_t)
 
-    // yp_malloc, yp_malloc_resize, and yp_free allow you to specify custom memory allocation APIs.
-    // It is recommended to set these to NULL to use nohtyP's internal defaults.  Any functions you
-    // supply should behave exactly as documented, and you are encouraged to run the full suite of
-    // tests with your API.  (See _default_yp_malloc et al in nohtyP.c for examples.)
+    // yp_malloc, yp_malloc_resize, and yp_free allow you to specify a custom memory allocation API.
+    // It is recommended to set these to NULL to use nohtyP's defaults.  Any functions you supply
+    // should behave exactly as documented, and you are encouraged to run the full suite of tests
+    // with your API.  (See yp_default_malloc et al in nohtyP.c for examples.)
 
     // Allocates at least size bytes of memory, setting *actual to the actual amount of memory
     // allocated, and returning the pointer to the buffer.  On error, returns NULL, and *actual is
@@ -1860,6 +1860,12 @@ typedef struct _yp_initialize_parameters_t {
     int everything_immortal;
 
 } yp_initialize_parameters_t;
+
+// The default memory allocation APIs, exposed to allow them to be wrapped around custom hooks.
+// FIXME Rename. And what about the "initialize" idea?
+ypAPI void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
+ypAPI void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+ypAPI void yp_default_free(void *p);
 
 
 /*
