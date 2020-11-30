@@ -708,7 +708,7 @@ class TestCase(yp_unittest.TestCase):
             except OSError:
                 pass
 
-    @yp_unittest.skip_not_applicable
+    @yp_unittest.skip_user_defined_types
     def test_indexOf_class(self):
         iclass = IteratingSequenceClass(3)
         for i in range(3):
@@ -770,7 +770,7 @@ class TestCase(yp_unittest.TestCase):
 
 
     # Test iterators on RHS of unpacking assignments.
-    @yp_unittest.skip_not_applicable
+    @yp_unittest.skip_unpack
     def test_unpack_iter(self):
         a, b = 1, 2
         self.assertEqual((a, b), (1, 2))

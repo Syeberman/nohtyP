@@ -43,6 +43,7 @@ skip_str_split = skip("TODO: Implement yp_str.split/splitlines/partition/etc")
 skip_str_unicode_db = skip("TODO: Implement yp_str.isalpha/isdigit/etc")
 skip_str_zfill = skip("TODO: Implement yp_str.zfill")
 skip_string_module = skip("TODO: Implement string module in nohtyP?")
+skip_unpack = skip("TODO: Test yp_unpackN")  # TODO Just need the tests
 skip_user_defined_types = skip("TODO: Implement user-defined types in nohtyP")
 skip_weakref = skip("TODO: Import weakref in nohtyP")
 skip_zip = skip("TODO: Implement yp_zip")
