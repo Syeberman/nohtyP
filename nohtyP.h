@@ -1,17 +1,18 @@
 /*
  * nohtyP.h - A Python-like API for C, in one .c and one .h
- *      http://bitbucket.org/Syeberman/nohtyp   [v0.1.0 $Change$]
+ *
+ *      https://github.com/Syeberman/nohtyP   [v0.1.0 $Change$]
  *      Copyright (c) 2001-2020 Python Software Foundation; All Rights Reserved
  *      License: http://docs.python.org/3/license.html
  *
- * The goal of nohtyP is to enable Python-like code to be written in C.  It is patterned after
- * Python's built-in API, then adjusted for expected usage patterns.  It also borrows ideas from
- * Python's own C API.  To be as portable as possible, it is written in one .c and one .h file and
- * is tested against multiple compilers.  The documentation below is complete, but brief; more
- * detailed documentation can be found at http://docs.python.org/3/.
+ * The goal of nohtyP is to enable Python-like code to be written in C. It is patterned after
+ * Python's built-in API, then adjusted for expected usage patterns. It also borrows ideas from
+ * Python's own C API. To be as portable as possible, it is written in one .c and one .h file and is
+ * tested against multiple compilers. The documentation below is complete, but brief; more detailed
+ * documentation can be found at http://docs.python.org/3/.
  *
- * Most functions borrow inputs, create their own references, and output new references.  Errors
- * are handled in one of three ways.  Functions that return objects simply return an appropriate
+ * Most functions borrow inputs, create their own references, and output new references. Errors are
+ * handled in one of three ways. Functions that return objects simply return an appropriate
  * exception object on error:
  *
  *      value = yp_getitem(dict, key);
@@ -24,9 +25,9 @@
  *      if(yp_isexceptionC(dict)) printf("unhashable key, dict discarded");
  *
  * If you don't want the modified object discarded on error, use the 'E' version of the function.
- * Such functions accept a ypObject** that is set to the exception; it is set _only_ on error,
- * and existing values are not discarded, so the variable should first be initialized to an
- * immortal like yp_None:
+ * Such functions accept a ypObject** that is set to the exception; it is set _only_ on error, and
+ * existing values are not discarded, so the variable should first be initialized to an immortal
+ * like yp_None:
  *
  *      ypObject *exc = yp_None;
  *      yp_setitemE(dict, key, value, &exc);
@@ -41,9 +42,9 @@
  * Unless explicitly documented as "always succeeds", _any_ function can return an exception.
  *
  * These error handling methods are designed for a specific purpose: to allow combining multiple
- * function calls without checking for errors in-between.  When an exception object is used as
- * input to a function, that function must return an exception, allowing you to check for errors
- * only at the end of a block of code:
+ * function calls without checking for errors in-between. When an exception object is used as input
+ * to a function, that function must return an exception, allowing you to check for errors only at
+ * the end of a block of code:
  *
  *      newdict = yp_dictK(0);            // newdict might be yp_MemoryError
  *      value = yp_getitem(olddict, key); // value could be yp_KeyError
@@ -62,9 +63,9 @@
  *      if(yp_isexceptionC(exc)) abort();
  *
  * This API is threadsafe so long as no objects are modified while being accessed by multiple
- * threads; this includes modifying reference counts, so don't assume immutables are threadsafe!
- * One strategy to ensure safety is to deep copy objects before exchanging between threads.
- * Sharing immutable, immortal objects is always safe.
+ * threads; this includes modifying reference counts, so don't assume immutables are threadsafe! One
+ * strategy to ensure safety is to deep copy objects before exchanging between threads. Sharing
+ * immutable, immortal objects is always safe.
  *
  * Certain functions are given postfixes to highlight their unique behaviour:
  *
