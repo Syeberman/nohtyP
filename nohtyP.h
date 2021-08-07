@@ -1238,7 +1238,7 @@ typedef struct _yp_function_decl_t {
     // an exception. Additionally, exceptions can be used as parameter defaults. As such, argarray
     // might contain exceptions. This generally requires no special handling: any functions called
     // from code must themselves handle exceptions this way, so code need only check the result of
-    // those function calls and return exceptions as appropriate. (FIXME Reword?)
+    // those function calls and return exceptions as appropriate.
     //
     // n is deterministic based solely on the parameters: it is either parameters_len, or
     // parameters_len-1 if parameters ends in /.
@@ -1571,7 +1571,6 @@ typedef struct _yp_state_decl_t {
     // Objects in state cannot be part of a union, because nohtyP cannot know which union member is
     // the "active" one. yp_SystemLimitationError will be raised for offsets larger than
     // 31*sizeof(ypObject *), and for non-aligned offsets.
-    // FIXME force -1, fail on other negative values? So we have room to grow?
     yp_ssize_t offsets[];
 } yp_state_decl_t;
 
@@ -1820,7 +1819,7 @@ typedef struct _yp_initialize_parameters_t {
     // yp_malloc, yp_malloc_resize, and yp_free allow you to specify a custom memory allocation API.
     // It is recommended to set these to NULL to use nohtyP's defaults.  Any functions you supply
     // should behave exactly as documented, and you are encouraged to run the full suite of tests
-    // with your API.  (See yp_default_malloc et al in nohtyP.c for examples.)
+    // with your API.  (See yp_mem_default_malloc et al in nohtyP.c for examples.)
 
     // Allocates at least size bytes of memory, setting *actual to the actual amount of memory
     // allocated, and returning the pointer to the buffer.  On error, returns NULL, and *actual is
@@ -1855,11 +1854,10 @@ typedef struct _yp_initialize_parameters_t {
 
 } yp_initialize_parameters_t;
 
-// The default memory allocation APIs, exposed to allow them to be wrapped around custom hooks.
-// FIXME Rename. And what about the "initialize" idea?
-ypAPI void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
-ypAPI void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
-ypAPI void yp_default_free(void *p);
+// The default memory allocation APIs, exposed to allow them to be called by custom hooks.
+ypAPI void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
+ypAPI void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+ypAPI void yp_mem_default_free(void *p);
 
 
 /*
@@ -1918,7 +1916,6 @@ ypAPI ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_
 // this with yp_function_decl_t.code's argarray, yp_itemarrayCX's array, or any other array that you
 // do not own. Any changes that yp_call_arrayX makes to args will be reverted before it returns.
 // Based on Python's vectorcall protocol.
-// FIXME yp_TypeError on n<1? Or should be ValueError?
 ypAPI ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args);
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
@@ -2129,7 +2126,7 @@ struct _ypStrObject {
     static struct _ypBytesObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
             _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};  \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
-// FIXME If we populate name->utf_8 on immortals, we are leaking memory. Either don't, or
+// TODO If we populate name->utf_8 on immortals, we are leaking memory. Either don't, or
 // pre-allocate an immortal bytes that we populate later? Or drop the name->utf_8 idea.
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                                               \
     static const char          _##name##_data[] = value;                                          \
@@ -2140,7 +2137,7 @@ struct _ypStrObject {
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
-// FIXME Instead of _yp_NOQUAL, should we force extern? We really don't want yp_IMMORTAL_* placed
+// TODO Instead of _yp_NOQUAL, should we force extern? We really don't want yp_IMMORTAL_* placed
 // on the stack... And maybe flip around so static is default and _extern is option (as per Python).
 #define _yp_NOQUAL  // Used in place of static or extern for qual
 #define yp_IMMORTAL_INT(name, value) _yp_IMMORTAL_INT(_yp_NOQUAL, name, value)

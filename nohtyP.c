@@ -1497,7 +1497,7 @@ static void (*yp_free)(void *p) = _dummy_yp_free;
 #include <malloc.h>
 // TODO Be consistent: should output pointers come first, or last, in all the functions? (What
 // is our nohtyP style guide for function signatures?)
-void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
+void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1509,7 +1509,7 @@ void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
-void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newp;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1528,7 +1528,7 @@ void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_
     yp_INFO("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
-void yp_default_free(void *p)
+void yp_mem_default_free(void *p)
 {
     yp_INFO("free: %p", p);
     free(p);
@@ -1549,7 +1549,7 @@ static yp_ssize_t _default_yp_malloc_good_size(yp_ssize_t size)
     if (diff > 0) size += _yp_DEFAULT_MALLOC_ROUNDTO - diff;
     return size;
 }
-void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
+void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
 {
     void *p;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1558,7 +1558,7 @@ void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
-void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newp;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1570,7 +1570,7 @@ void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_
     yp_INFO("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
-void yp_default_free(void *p)
+void yp_mem_default_free(void *p)
 {
     yp_INFO("free: %p", p);
     free(p);
@@ -2549,7 +2549,7 @@ static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc v
 }
 
 // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state.  On error,
-// *objlocs is undefined.
+// *size and *objlocs are undefined.
 static ypObject *_ypState_fromdecl(yp_ssize_t *size, yp_uint32_t *objlocs, yp_state_decl_t *state_decl)
 {
     yp_ssize_t n;
@@ -2565,6 +2565,13 @@ static ypObject *_ypState_fromdecl(yp_ssize_t *size, yp_uint32_t *objlocs, yp_st
 
     if (state_decl->size < 0) return yp_ValueError;
     *size = state_decl->size;
+
+    // When offsets_len is -1, we interpret state as an array of ypObject*. Fail on all other
+    // negative values, so we have space to make other flags in the future.
+    if (state_decl->offsets_len == -1) {
+        return yp_NotImplementedError;  // FIXME Implement.
+    }
+    if (state_decl->offsets_len < 0) return yp_ValueError;
 
     // Determine the location of the objects.  There are a few errors the user could make:
     //  - an offset for a ypObject* that is at least partially outside of state
@@ -18497,9 +18504,9 @@ ypObject *const yp_t_function = (ypObject *)&ypFunction_Type;
 // TODO A script to ensure the comments on the line match the structure member
 static const yp_initialize_parameters_t _default_initialize = {
         yp_sizeof(yp_initialize_parameters_t),  // sizeof_struct
-        yp_default_malloc,                      // yp_malloc
-        yp_default_malloc_resize,               // yp_malloc_resize
-        yp_default_free,                        // yp_free
+        yp_mem_default_malloc,                      // yp_malloc
+        yp_mem_default_malloc_resize,               // yp_malloc_resize
+        yp_mem_default_free,                        // yp_free
         FALSE,                                  // everything_immortal
 };
 

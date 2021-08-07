@@ -1191,12 +1191,12 @@ class c_yp_initialize_parameters_t(Structure):
 yp_func(c_void, "yp_initialize", ((POINTER(c_yp_initialize_parameters_t), "kwparams"), ),
         errcheck=False)
 
-# void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
-_yp_default_malloc = c_yp_malloc_func_t(("yp_default_malloc", ypdll))
-# void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
-_yp_default_malloc_resize = c_yp_malloc_resize_func_t(("yp_default_malloc_resize", ypdll))
-# void yp_default_free(void *p);
-_yp_default_free = c_yp_free_func_t(("yp_default_free", ypdll))
+# void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
+_yp_mem_default_malloc = c_yp_malloc_func_t(("yp_mem_default_malloc", ypdll))
+# void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+_yp_mem_default_malloc_resize = c_yp_malloc_resize_func_t(("yp_mem_default_malloc_resize", ypdll))
+# void yp_mem_default_free(void *p);
+_yp_mem_default_free = c_yp_free_func_t(("yp_mem_default_free", ypdll))
 
 
 # Some nohtyP objects need to hold references to Python objects; in particular, yp_iter and
@@ -1206,15 +1206,15 @@ _yp_reverse_refs = collections.defaultdict(list)
 
 @c_yp_free_func_t
 def yp_free_hook(p):
-    _yp_default_free(p)
+    _yp_mem_default_free(p)
     _yp_reverse_refs.pop(p, None)
 
 
 # Initialize nohtyP
 _yp_initparams = c_yp_initialize_parameters_t(
     struct_size=sizeof(c_yp_initialize_parameters_t),
-    yp_malloc=_yp_default_malloc,
-    yp_malloc_resize=_yp_default_malloc_resize,
+    yp_malloc=_yp_mem_default_malloc,
+    yp_malloc_resize=_yp_mem_default_malloc_resize,
     yp_free=yp_free_hook,
     everything_immortal=False
 )
