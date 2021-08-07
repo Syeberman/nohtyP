@@ -303,26 +303,40 @@ c_yp_int_t = c_int64
 # typedef yp_float64_t    yp_float_t;
 c_yp_float_t = c_yp_float64_t
 
-# typedef ypObject *(*yp_generator_func_t)(ypObject *self, ypObject *value);
+# typedef struct _yp_state_decl_t {...} yp_state_decl_t;
+class c_yp_state_decl_t(Structure):
+    _fields_ = [
+        ("size", c_yp_ssize_t),
+        ("offsets_len", c_yp_ssize_t),
+        ("offsets", c_yp_ssize_t * 0),
+    ]
 
+# typedef struct _yp_generator_decl_t {...} yp_generator_decl_t;
 # XXX The return needs to be c_void_p to prevent addresses-as-ints being converted to yp_ints
 c_yp_generator_func_t = CFUNCTYPE(c_void_p, c_ypObject_p, c_ypObject_p)
+class c_yp_generator_decl_t(Structure):
+    _fields_ = [
+        ("func", c_yp_generator_func_t),
+        ("length_hint", c_yp_ssize_t),
+        ("state", c_void_p),
+        ("state_decl", POINTER(c_yp_state_decl_t)),
+    ]
 
-# typedef struct _yp_def_parameter_t {...} yp_def_parameter_t;
-class c_yp_def_parameter_t(Structure):
+# typedef struct _yp_parameter_decl_t {...} yp_parameter_decl_t;
+class c_yp_parameter_decl_t(Structure):
     _fields_ = [
         ("name", c_ypObject_p),
         ("default", c_ypObject_p),
     ]
-# typedef struct _yp_def_function_t {...} yp_def_function_t;
+# typedef struct _yp_function_decl_t {...} yp_function_decl_t;
 # XXX The return needs to be c_void_p, else it gets converted to yp_int.
-c_yp_def_code_t = CFUNCTYPE(c_void_p, c_ypObject_p, c_yp_ssize_t, POINTER(c_ypObject_p))
-class c_yp_def_function_t(Structure):
+c_yp_function_code_t = CFUNCTYPE(c_void_p, c_ypObject_p, c_yp_ssize_t, POINTER(c_ypObject_p))
+class c_yp_function_decl_t(Structure):
     _fields_ = [
-        ("code", c_yp_def_code_t),
+        ("code", c_yp_function_code_t),
         ("flags", c_uint32),
         ("parameters_len", c_int32),
-        ("parameters", POINTER(c_yp_def_parameter_t)),
+        ("parameters", POINTER(c_yp_parameter_decl_t)),
     ]
 
 # ypObject *yp_intC(yp_int_t value);
@@ -348,16 +362,8 @@ yp_func(c_ypObject_p, "yp_floatCF", ((c_yp_float_t, "value"), ))
 # ypObject *yp_iter(ypObject *x);
 yp_func(c_ypObject_p, "yp_iter", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t length_hint, int n, ...);
-# ypObject *yp_generatorCNV(yp_generator_func_t func, yp_ssize_t length_hint, int n, va_list args);
-
-# ypObject *yp_generator_fromstructCN(yp_generator_func_t func, yp_ssize_t length_hint,
-#         void *state, yp_ssize_t size, int n, ...);
-# ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint,
-#         void *state, yp_ssize_t size, int n, va_list args);
-yp_func(c_ypObject_p, "yp_generator_fromstructCN",
-        ((c_yp_generator_func_t, "func"), (c_yp_ssize_t, "length_hint"),
-         (c_void_p, "state"), (c_yp_ssize_t, "size"), c_multiN_ypObject_p))
+# ypObject *yp_generatorC(yp_generator_decl_t *declaration);
+yp_func(c_ypObject_p, "yp_generatorC", ((POINTER(c_yp_generator_decl_t), "declaration"), ))
 
 # ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step);
 yp_func(c_ypObject_p, "yp_rangeC3",
@@ -451,14 +457,14 @@ yp_func(c_ypObject_p, "yp_frozendict", ((c_ypObject_p, "x"), ))
 # ypObject *yp_dict(ypObject *x);
 yp_func(c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ))
 
-# ypObject *yp_function(yp_def_function_t *definition);
-yp_func(c_ypObject_p, "yp_function", ((POINTER(c_yp_def_function_t), "definition"), ))
+# ypObject *yp_functionC(yp_function_decl_t *declaration);
+yp_func(c_ypObject_p, "yp_functionC", ((POINTER(c_yp_function_decl_t), "declaration"), ))
 
-# ypObject *yp_function_withstateCN(yp_def_function_t *definition, int n, ...);
-# ypObject *yp_function_withstateCNV(yp_def_function_t *definition, int n, va_list args);
+# ypObject *yp_function_withstateCN(yp_function_decl_t *declaration, int n, ...);
+# ypObject *yp_function_withstateCNV(yp_function_decl_t *declaration, int n, va_list args);
 
-# ypObject *yp_function_withstatestructCN(yp_def_function_t *definition, void *state, yp_ssize_t size, int n, ...);
-# ypObject *yp_function_withstatestructCNV(yp_def_function_t *definition, void *state, yp_ssize_t size, int n, va_list args);
+# ypObject *yp_function_withstatestructCN(yp_function_decl_t *declaration, void *state, yp_ssize_t size, int n, ...);
+# ypObject *yp_function_withstatestructCNV(yp_function_decl_t *declaration, void *state, yp_ssize_t size, int n, va_list args);
 
 # XXX The file type will be added in a future version
 
@@ -1816,7 +1822,8 @@ class yp_iter(ypObject):
     def _from_python(cls, pyobj):
         length_hint = operator.length_hint(pyobj)
         ypfunc = c_yp_generator_func_t(functools.partial(cls._pyiter_wrapper, iter(pyobj)))
-        self = _yp_generator_fromstructCN(ypfunc, length_hint, 0, 0)
+        declaration = c_yp_generator_decl_t(ypfunc, length_hint)
+        self = _yp_generatorC(declaration)
         _yp_reverse_refs[self.value].append(ypfunc)
         return self
 
@@ -2457,13 +2464,13 @@ class yp_function(ypObject):
             traceback.print_exc()
             return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
-    _def_parameters = (c_yp_def_parameter_t * 2)((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
+    _parameters_decl = (c_yp_parameter_decl_t * 2)((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
 
     @classmethod
     def _from_python(cls, pyobj):
-        ypcode = c_yp_def_code_t(functools.partial(cls._pyfunction_wrapper, pyobj))
-        definition = c_yp_def_function_t(ypcode, 0, len(cls._def_parameters), cls._def_parameters)
-        self = _yp_function(definition)
+        ypcode = c_yp_function_code_t(functools.partial(cls._pyfunction_wrapper, pyobj))
+        declaration = c_yp_function_decl_t(ypcode, 0, len(cls._parameters_decl), cls._parameters_decl)
+        self = _yp_functionC(declaration)
         _yp_reverse_refs[self.value].append(ypcode)
         return self
 

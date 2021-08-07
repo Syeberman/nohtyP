@@ -80,6 +80,7 @@
  *  # (number) - A function with # inputs that otherwise shares the same name as another function
  */
 
+
 /*
  * Header Prerequisites
  */
@@ -111,12 +112,16 @@ extern "C" {
 #define ypAPI extern
 #endif
 
+// Forward declarations of various types.
+typedef struct _yp_initialize_parameters_t yp_initialize_parameters_t;
+typedef struct _yp_generator_decl_t yp_generator_decl_t;
+typedef struct _yp_function_decl_t yp_function_decl_t;
+typedef struct _yp_state_decl_t yp_state_decl_t;
+
 
 /*
  * Initialization
  */
-
-typedef struct _yp_initialize_parameters_t yp_initialize_parameters_t;
 
 // Must be called once before any other function; subsequent calls are a no-op.  If a fatal error
 // occurs abort() is called.  args can be NULL to accept all defaults; further documentation
@@ -244,35 +249,9 @@ ypAPI ypObject *yp_iter(ypObject *x);
 // arguments; the sentinel value is never yielded.
 ypAPI ypObject *yp_iter2(ypObject *callable, ypObject *sentinel);
 
-// Returns a new reference to a generator iterator object using the given func.  The given n objects
-// will be made available to func via yp_iter_stateCX as an array; new references to these objects
-// will be created, and those references will be discarded when the iterator is deallocated.
-// length_hint is a clue to consumers of the iterator how many items will be yielded; use zero if
-// this is not known.  Further documentation for yp_generator_func_t can be found below.
-// FIXME Rename to yp_def_generator_t, to mirror yp_def_function_t, and include state/etc?
-typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
-ypAPI ypObject *yp_generatorCN(yp_generator_func_t func, yp_ssize_t length_hint, int n, ...);
-ypAPI ypObject *yp_generatorCNV(
-        yp_generator_func_t func, yp_ssize_t length_hint, int n, va_list args);
-
-// Similar to yp_generatorCN, but accepts an arbitrary structure (or array) of the given size which
-// will be copied into the iterator and made available to func via yp_iter_stateCX.  If state
-// contains any objects, their offsets must be given as the variable arguments; new references to
-// these objects will be created, and those references will be discarded when the iterator is
-// deallocated.
-//  Ex: typedef struct { int x; int y; ypObject *obj1; ypObject *obj2 } mystruct;
-//      ypObject *obj1 = yp_dictK(0);
-//      mystruct state = { 20, 40, obj1, yp_False };
-//      gen = yp_generator_fromstructCN(mygenfunc, 0, &state, sizeof(mystruct),
-//                  2, offsetof(mystruct, obj1), offsetof(mystruct, obj2));
-//      yp_decref(obj1);  // the iterator has its own reference, so discard ours
-// Objects in state cannot be part of a union, because nohtyP cannot know which union member is the
-// "active" one.  If state contains objects in an array you must list _each_ _individual_ offset.
-// state _can_ contain exceptions.
-ypAPI ypObject *yp_generator_fromstructCN(
-        yp_generator_func_t func, yp_ssize_t length_hint, void *state, yp_ssize_t size, int n, ...);
-ypAPI ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint,
-        void *state, yp_ssize_t size, int n, va_list args);
+// Returns a new reference to a generator iterator object as described by declaration. See the
+// documentation for yp_generator_decl_t for more details.
+ypAPI ypObject *yp_generatorC(yp_generator_decl_t *declaration);
 
 // Returns a new reference to a range object. yp_rangeC is equivalent to yp_rangeC3(0, stop, 1).
 ypAPI ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step);
@@ -404,59 +383,9 @@ ypAPI ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value);
 ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
 
-// FIXME Move these forward defs to one location?
-typedef struct _yp_def_function_t yp_def_function_t;
-
-// FIXME Rewrite docs.
-// Returns a new reference to a function object whose implementation comes from code and whose
-// inputs are described by parameters.  Raises yp_FIXME if code contains no implementations, and
-// yp_ParameterSyntaxError if parameters fails validation.  Further documentation for
-// yp_def_function_t and yp_function_parameters_t can be found below.
-// FIXME Should parameters==NULL be a shortcut for something?  No parameters?  `*args, **kwargs`?
-// FIXME What about code==NULL?
-// FIXME Really think hard about which inputs to bury in typedefs and which to surface as C params.
-// For example, should code and parameters be in the same struct?
-// FIXME Should this be yp_functionC? yp_function should make a function object out of other
-// objects, right...? (We need a linter to ensure correct use of C suffix.)
-ypAPI ypObject *yp_function(yp_def_function_t *definition);
-
-// FIXME Rewrite docs.
-// Returns a new reference to a generator iterator object using the given code.  The given n objects
-// will be made available to code via yp_iter_stateCX as an array; new references to these objects
-// will be created, and those references will be discarded when the iterator is deallocated.
-// length_hint is a clue to consumers of the iterator how many items will be yielded; use zero if
-// this is not known.  Further documentation for yp_generator_func_t can be found below.
-// FIXME A version of yp_iter_stateCX for functions
-// FIXME Rename yp_generator to match?
-// FIXME Is the C suffix applicable here?
-// FIXME Really think hard about the symmetry between these and yp_generator*.  Perhaps they should
-// all use a standard set of typedefs...i.e. remove some C params and make them structs.
-// FIXME Generator names this _fromstate...be consistent
-ypAPI ypObject *yp_function_withstateCN(yp_def_function_t *definition, int n, ...);
-ypAPI ypObject *yp_function_withstateCNV(yp_def_function_t *definition, int n, va_list args);
-
-// FIXME Rewrite docs.
-// Similar to yp_functionCN, but accepts an arbitrary structure (or array) of the given size which
-// will be copied into the iterator and made available to code via yp_iter_stateCX.  If state
-// contains any objects, their offsets must be given as the variable arguments; new references to
-// these objects will be created, and those references will be discarded when the iterator is
-// deallocated.
-//  Ex: typedef struct { int x; int y; ypObject *obj1; ypObject *obj2 } mystruct;
-//      ypObject *obj1 = yp_dictK(0);
-//      mystruct state = { 20, 40, obj1, yp_False };
-//      gen = yp_function_fromstructCN(mygenfunc, 0, &state, sizeof(mystruct),
-//                  2, offsetof(mystruct, obj1), offsetof(mystruct, obj2));
-//      yp_decref(obj1);  // the iterator has its own reference, so discard ours
-// Objects in state cannot be part of a union, because nohtyP cannot know which union member is the
-// "active" one.  If state contains objects in an array you must list _each_ _individual_ offset.
-// state _can_ contain exceptions.
-// FIXME Is the C suffix applicable here?
-// FIXME Combine size, n, and args into a single structure that can be allocated statically
-// (here and in generators). A structure's definition is static, so why not its description?
-ypAPI ypObject *yp_function_withstatestructCN(
-        yp_def_function_t *definition, void *state, yp_ssize_t size, int n, ...);
-ypAPI ypObject *yp_function_withstatestructCNV(
-        yp_def_function_t *definition, void *state, yp_ssize_t size, int n, va_list args);
+// Returns a new reference to a function object as described by declaration. See the documentation
+// for yp_function_decl_t for more details.
+ypAPI ypObject *yp_functionC(yp_function_decl_t *declaration);
 
 // XXX The file type will be added in a future version
 
@@ -549,8 +478,8 @@ ypAPI yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 
 // An "iterator" is an object that implements yp_next, while an "iterable" is an object that
 // implements yp_iter.  Examples of iterables include range, bytes, str, tuple, set, and dict;
-// examples of iterators include files and generator iterators.  It is usually unwise to modify an
-// object being iterated over.
+// examples of iterators include files and generators.  It is usually unwise to modify an object
+// being iterated over.
 
 // "Sends" a value into *iterator and returns a new reference to the next yielded value, or an
 // exception.  The value may be ignored by the iterator.  value cannot be an exception.  When the
@@ -627,14 +556,26 @@ ypAPI ypObject *yp_reversed(ypObject *sequence);
 ypAPI ypObject *yp_zipN(int n, ...);
 ypAPI ypObject *yp_zipNV(int n, va_list args);
 
-// The signature of a function that can be wrapped up in a generator iterator.  Called by yp_send,
-// yp_throw, and similar methods.  iterator is the iterator object; use yp_iter_stateCX to retrieve
-// any state variables.  value is the object that is sent into the function by yp_send, or the
-// exception sent in by yp_throw; it may also be yp_GeneratorExit if yp_close is called, or another
-// exception.  The return value must be a new or immortal reference, yp_StopIteration if the
-// iterator is exhausted, or another exception.  The iterator will be closed with yp_close if it
-// returns an exception (resulting in one last call with yp_GeneratorExit).
-typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
+typedef struct _yp_generator_decl_t {
+    // Called by yp_send, yp_throw, and similar methods. g is the generator iterator object. value
+    // is the object that is sent into the function by yp_send, or the exception sent in by
+    // yp_throw; it may also be yp_GeneratorExit if yp_close is called, or another exception. The
+    // return value must be a new or immortal reference, yp_StopIteration if the generator is
+    // exhausted, or another exception. If an exception is returned by func, the generator will be
+    // closed with yp_close (resulting in one last call into func with yp_GeneratorExit).
+    ypObject *(*func)(ypObject *g, ypObject *value);
+
+    // A clue to consumers of the iterator how many items will be yielded; use zero if this is not
+    // known.
+    yp_ssize_t length_hint;
+
+    // Additional data that will be made available to func via yp_iter_stateCX. Can be NULL. See
+    // yp_state_decl_t for more details.
+    void *state;
+
+    // Describes the layout of state. If NULL, no state is copied into the object.
+    yp_state_decl_t *state_decl;
+} yp_generator_decl_t;
 
 // You may also be interested in yp_FOR for working with iterables; see below.
 
@@ -1256,7 +1197,7 @@ ypAPI ypObject *yp_callNV(ypObject *c, int n, va_list args);
 ypAPI ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs);
 
 // Describes one parameter of a function object.
-typedef struct _yp_def_parameter_t {
+typedef struct _yp_parameter_decl_t {
     // The name of the parameter as a str. name must be a valid Python identifier, or one of the
     // following special forms.
     //
@@ -1285,10 +1226,10 @@ typedef struct _yp_def_parameter_t {
     // positional parameters must also have defaults. Must be NULL for /, *, *args, and **kwargs.
     // default_ _can_ be an exception.
     ypObject *default_;
-} yp_def_parameter_t;
+} yp_parameter_decl_t;
 
 // Describes the interface and implementation of a function object.
-typedef struct _yp_def_function_t {
+typedef struct _yp_function_decl_t {
     // Called by the yp_call* methods. f is the function object. argarray is an array of n
     // arguments, where argarray[i] corresponds to parameters[i]; argarray must not be modified. The
     // return value must be a new or immortal reference, or an exception.
@@ -1297,7 +1238,7 @@ typedef struct _yp_def_function_t {
     // an exception. Additionally, exceptions can be used as parameter defaults. As such, argarray
     // might contain exceptions. This generally requires no special handling: any functions called
     // from code must themselves handle exceptions this way, so code need only check the result of
-    // those function calls and return exceptions as appropriate.
+    // those function calls and return exceptions as appropriate. (FIXME Reword?)
     //
     // n is deterministic based solely on the parameters: it is either parameters_len, or
     // parameters_len-1 if parameters ends in /.
@@ -1310,8 +1251,15 @@ typedef struct _yp_def_function_t {
     yp_int32_t parameters_len;
 
     // Array of parameters. Errors in this array generally raise yp_ParameterSyntaxError.
-    yp_def_parameter_t *parameters;
-} yp_def_function_t;
+    yp_parameter_decl_t *parameters;
+
+    // Additional data that will be made available to code via yp_function_stateCX. Can be NULL.
+    // See yp_state_decl_t for more details.
+    void *state;
+
+    // Describes the layout of state. If NULL, no state is copied into the object.
+    yp_state_decl_t *state_decl;
+} yp_function_decl_t;
 
 // Immortal strs for the special parameter name forms, for convenience.
 ypAPI ypObject *const yp_s_slash;             // "/"
@@ -1319,9 +1267,7 @@ ypAPI ypObject *const yp_s_star;              // "*"
 ypAPI ypObject *const yp_s_star_args;         // "*args"
 ypAPI ypObject *const yp_s_star_star_kwargs;  // "**kwargs"
 
-// FIXME use yp_function_stateCX to retrieve any state variables
-
-// Immortal functions for the built-in nohtyP functions.
+// Immortal built-in functions.
 ypAPI ypObject *const yp_func_chr;
 ypAPI ypObject *const yp_func_hash;
 ypAPI ypObject *const yp_func_iscallable;
@@ -1580,6 +1526,54 @@ ypAPI ypObject *const yp_t_frozendict;
 ypAPI ypObject *const yp_t_dict;
 ypAPI ypObject *const yp_t_range;
 ypAPI ypObject *const yp_t_function;
+
+
+/*
+ * Generator and Function State
+ */
+
+// Describes the layout of a struct (or other type) that is used as state for a generator or
+// function.
+//
+// When creating an object with state, the data is copied into the object, with new references
+// created for all objects (as identified by offsets). As a convenience, NULL object pointers will
+// be initialized to yp_None. As a further convenience, a NULL state will initialize all objects to
+// yp_None, all other pointers to NULL, and all other values to zero. state _can_ contain
+// exceptions.
+//
+// Example:
+//
+//  typedef struct {int x; int y; ypObject *obj1; ypObject *obj2} mystruct;
+//  yp_state_decl_t mystruct_decl = {
+//          sizeof(mystruct), 2, {offsetof(mystruct, obj1), offsetof(mystruct, obj2)}};
+//  ypObject *obj1 = yp_dictK(0);
+//  mystruct state = {20, 40, obj1, yp_False};
+//  yp_function_decl_t func_decl = {code, 0, 0, NULL, &state, &mystruct_decl};
+//  ypObject *func = yp_functionC(&func_decl);
+//  yp_decref(obj1);  // func has its own reference, discard ours
+typedef struct _yp_state_decl_t {
+    // The total size of state, in bytes.
+    yp_ssize_t size;
+
+    // The number of elements in the offsets array, or -1 to calculate the offsets (see offsets
+    // for details).
+    yp_ssize_t offsets_len;
+
+    // An array of offsets of the objects in state (i.e. the ypObject * members). Identifying these
+    // offsets allows nohtyP to manage reference counts for these objects. Leave empty and set
+    // offsets_len to 0 if state does not contain any objects.
+    //
+    // If state is an array of objects (i.e. ypObject *state[]), leave offsets empty and set
+    // offsets_len to -1: the offsets will be calculated based on the size of the array. If state is
+    // a struct that _includes_ arrays of objects, but also contains other data, you must instead
+    // list the offsets for each element of each array.
+    //
+    // Objects in state cannot be part of a union, because nohtyP cannot know which union member is
+    // the "active" one. yp_SystemLimitationError will be raised for offsets larger than
+    // 31*sizeof(ypObject *), and for non-aligned offsets.
+    // FIXME force -1, fail on other negative values? So we have room to grow?
+    yp_ssize_t offsets[];
+} yp_state_decl_t;
 
 
 /*
@@ -1875,13 +1869,21 @@ ypAPI void yp_default_free(void *p);
 // XXX The "X" in these names is a reminder that the function is returning internal memory, and
 // as such should be used with caution.
 
-// Typically only called from within yp_generator_func_t functions.  Sets *state and *size to the
-// internal iterator state buffer and its size in bytes, and returns the immortal yp_None.  The
-// structure and initial values of *state are determined by the call to iterator's constructor; the
-// function cannot change the size after creation, and any ypObject*s in *state should be considered
-// *borrowed* (it is safe to replace them with new or immortal references).  Sets *state to NULL,
-// *size to zero, and returns an exception on error.
+// Typically only called from within yp_generator_decl_t.func functions. Sets *state and *size to
+// the internal iterator state buffer and its size in bytes, and returns the immortal yp_None. The
+// structure and initial values of *state are determined when the iterator is created; the size
+// cannot change after creation, and any ypObject*s in *state should be considered *borrowed* (it is
+// safe to replace them with new or immortal references). Sets *state to NULL, *size to zero, and
+// returns an exception on error.
 ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
+
+// Typically only called from within yp_function_decl_t.code functions. Sets *state and *size to
+// the internal function state buffer and its size in bytes, and returns the immortal yp_None. The
+// structure and initial values of *state are determined when the function is created; the size
+// cannot change after creation, and any ypObject*s in *state should be considered *borrowed* (it is
+// safe to replace them with new or immortal references). Sets *state to NULL, *size to zero, and
+// returns an exception on error.
+ypAPI ypObject *yp_function_stateCX(ypObject *function, void **state, yp_ssize_t *size);
 
 // For sequences that store their elements as an array of bytes (bytes and bytearray), sets *bytes
 // to the beginning of that array, *len to the length of the sequence, and returns the immortal
@@ -1913,9 +1915,10 @@ ypAPI ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_
 // the total length of the array; yp_TypeError is raised if n is less than 1. The array itself is
 // borrowed by yp_call_arrayX for the duration of the call and may be temporarily modified by it; as
 // such, args must not be read, modified, or deallocated until yp_call_arrayX returns. DO NOT call
-// this with yp_def_function_t.code's argarray, yp_itemarrayCX's array, or any other array that you
+// this with yp_function_decl_t.code's argarray, yp_itemarrayCX's array, or any other array that you
 // do not own. Any changes that yp_call_arrayX makes to args will be reverted before it returns.
 // Based on Python's vectorcall protocol.
+// FIXME yp_TypeError on n<1? Or should be ValueError?
 ypAPI ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args);
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:

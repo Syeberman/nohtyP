@@ -711,6 +711,7 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
+// FIXME Does casting to signed hide errors? Would the compiler warn about too-large sizes?
 #define yp_sizeof(x) ((yp_ssize_t)sizeof(x))
 #define yp_offsetof(structType, member) ((yp_ssize_t)offsetof(structType, member))
 #define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
@@ -922,6 +923,8 @@ static yp_ssize_t _yp_recursion_limit = 1000;
 typedef yp_int32_t _yp_iter_length_hint_t;
 #define ypIter_LENHINT_MAX ((yp_ssize_t)0x7FFFFFFF)
 
+typedef ypObject *(*yp_generator_func_t)(ypObject *iterator, ypObject *value);
+
 // _ypIterObject_HEAD shared with friendly classes below
 #define _ypIterObject_HEAD_NO_PADDING      \
     ypObject_HEAD;                         \
@@ -1025,7 +1028,7 @@ typedef struct _ypFunctionObject {
     ypObject *(*ob_code)(ypObject *, yp_ssize_t, ypObject *const *);
     void *ob_state;  // NULL if no extra state
     // FIXME doc, name/qualname, state, return annotation, module....
-    yp_INLINE_DATA(yp_def_parameter_t);
+    yp_INLINE_DATA(yp_parameter_decl_t);
 } ypFunctionObject;
 
 
@@ -1195,7 +1198,7 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
             _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters, parameters_len), code, NULL}; \
     qual ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                     \
-    static yp_def_parameter_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
+    static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
     _yp_IMMORTAL_FUNCTION_OBJECT(                                               \
             qual, name, code, yp_lengthof_array(_##name##_parameters), _##name##_parameters)
 
@@ -1506,8 +1509,7 @@ void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
-void *yp_default_malloc_resize(
-        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newp;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -1556,8 +1558,7 @@ void *yp_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
-void *yp_default_malloc_resize(
-        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+void *yp_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
 {
     void *newp;
     yp_ASSERT(size >= 0, "size cannot be negative");
@@ -2516,54 +2517,98 @@ static int ypQuickSeq_new_fromiterable_builtins(
 
 
 /*************************************************************************************************
- * Dynamic Object State (i.e. yp_generator_fromstructCN, yp_function_fromstructCN)
+ * Dynamic Object State (i.e. yp_state_decl_t)
  *************************************************************************************************/
 #pragma region state
 // FIXME rename most things here
 
+// Modifies *state and *objlocs to loop through all objects in state.
+static ypObject **_ypState_nextobj(ypObject ***state, yp_uint32_t *objlocs) {
+    while (*objlocs) {  // while there are still more objects to be found...
+        ypObject **next = (*objlocs) & 0x1u ? *state : NULL;
+        *state += 1;
+        *objlocs >>= 1;
+        if (next != NULL) return next;
+    }
+    return NULL;
+}
+
 // Returns the immortal yp_None, or an exception if visitor returns an exception.
 static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc visitor, void *memo)
 {
-    ypObject **p = (ypObject **)state;
-    ypObject * result;
+    while (1) {
+        ypObject *result;
+        ypObject **next = _ypState_nextobj((ypObject ***) &state, &objlocs);
+        if (next == NULL) return yp_None;
 
-    while (objlocs) {  // while there are still more objects to be found...
-        if (objlocs & 0x1u) {
-            result = visitor(*p, memo);
-            if (yp_isexceptionC(result)) return result;
-            // FIXME Should we be discarding result here and elsewhere we call a visitfunc?  visitor
-            // is not something we expose currently, but when we do we might get arbitrary values.
-        }
-        p += 1;
-        objlocs >>= 1;
+        result = visitor(*next, memo);
+        if (yp_isexceptionC(result)) return result;
+        // FIXME Should we be discarding result here and elsewhere we call a visitfunc?  visitor
+        // is not something we expose currently, but when we do we might get arbitrary values.
     }
-    return yp_None;
 }
 
 // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state.  On error,
 // *objlocs is undefined.
-// FIXME is this the order of parameters we want?
-static ypObject *_ypState_objlocs_fromstructCNV(
-        yp_uint32_t *objlocs, yp_ssize_t struct_size, int n, va_list args)
+static ypObject *_ypState_fromdecl(yp_ssize_t *size, yp_uint32_t *objlocs, yp_state_decl_t *state_decl)
 {
+    yp_ssize_t n;
     yp_ssize_t objoffset;
     yp_ssize_t objloc_index;
+
+    // A NULL declaration means there is no state.
+    if (state_decl == NULL) {
+        *size = 0;
+        *objlocs = 0;
+        return yp_None;
+    }
+
+    if (state_decl->size < 0) return yp_ValueError;
+    *size = state_decl->size;
 
     // Determine the location of the objects.  There are a few errors the user could make:
     //  - an offset for a ypObject* that is at least partially outside of state
     //  - an unaligned ypObject*, which isn't currently allowed and should never happen
     //  - a larger offset than we can represent with objlocs: a current limitation of nohtyP
     *objlocs = 0x0u;
-    for (/*n already set*/; n > 0; n--) {
-        objoffset = va_arg(args, yp_ssize_t);
+    for (n = state_decl->offsets_len; n > 0; n--) {
+        objoffset = state_decl->offsets[n];
         if (objoffset < 0) return yp_ValueError;
-        if (objoffset > struct_size - yp_sizeof(ypObject *)) return yp_ValueError;
+        if (objoffset > state_decl->size - yp_sizeof(ypObject *)) return yp_ValueError;
         if (objoffset % yp_sizeof(ypObject *) != 0) return yp_SystemLimitationError;
         objloc_index = objoffset / yp_sizeof(ypObject *);
         if (objloc_index > 31) return yp_SystemLimitationError;
         *objlocs |= (0x1u << objloc_index);
     }
     return yp_None;
+}
+
+static void _ypState_copy(void *dest, void *src, yp_ssize_t size, yp_uint32_t objlocs) {
+    ypObject **objp;
+
+    // A NULL state initializes all objects to yp_None, all other pointers to NULL, and all other
+    // values to zero.
+    if (src == NULL) {
+        memset(dest, 0, size);
+        while (1) {
+            objp = _ypState_nextobj((ypObject ***) &dest, &objlocs);
+            if (objp == NULL) return;
+            *objp = yp_None;
+        }
+
+    } else {
+        memcpy(dest, src, size);
+        while (1) {
+            objp = _ypState_nextobj((ypObject ***) &dest, &objlocs);
+            if (objp == NULL) return;
+            // NULL object pointers are initialized to yp_None.
+            if (*objp == NULL) {
+                *objp = yp_None;
+            } else {
+                yp_incref(*objp);
+            }
+        }
+    }
 }
 
 #pragma endregion state
@@ -2866,45 +2911,30 @@ void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
 
 // Generator Constructors
 
-// Increments the reference count of the visited object
-static ypObject *_iter_constructing_visitor(ypObject *x, void *memo)
+ypObject *yp_generatorC(yp_generator_decl_t *declaration)
 {
-    yp_incref(x);
-    return yp_None;
-}
-
-ypObject *yp_generator_fromstructCN(
-        yp_generator_func_t func, yp_ssize_t length_hint, void *state, yp_ssize_t size, int n, ...)
-{
-    return_yp_V_FUNC(
-            ypObject *, yp_generator_fromstructCNV, (func, length_hint, state, size, n, args), n);
-}
-ypObject *yp_generator_fromstructCNV(yp_generator_func_t func, yp_ssize_t length_hint, void *state,
-        yp_ssize_t size, int n, va_list args)
-{
+    yp_ssize_t length_hint = declaration->length_hint;
     ypObject *  result;
     ypObject *  i;
-    yp_uint32_t objlocs;
+    yp_ssize_t state_size;
+    yp_uint32_t state_objlocs;
 
-    if (size < 0) return yp_ValueError;
-    if (size > ypIter_STATE_SIZE_MAX) return yp_MemorySizeOverflowError;
-
-    result = _ypState_objlocs_fromstructCNV(&objlocs, size, n, args);
+    result = _ypState_fromdecl(&state_size, &state_objlocs, declaration->state_decl);
     if (yp_isexceptionC(result)) return result;
+    if (state_size > ypIter_STATE_SIZE_MAX) return yp_MemorySizeOverflowError;
 
     // Allocate the iterator
-    i = ypMem_MALLOC_CONTAINER_INLINE(ypIterObject, ypIter_CODE, size, ypIter_STATE_SIZE_MAX);
+    i = ypMem_MALLOC_CONTAINER_INLINE(ypIterObject, ypIter_CODE, state_size, ypIter_STATE_SIZE_MAX);
     if (yp_isexceptionC(i)) return i;
 
     // Set attributes, increment reference counts, and return
     i->ob_len = ypObject_LEN_INVALID;
     if (length_hint > ypIter_LENHINT_MAX) length_hint = ypIter_LENHINT_MAX;
     ypIter_LENHINT(i) = (_yp_iter_length_hint_t)length_hint;
-    ypIter_FUNC(i) = func;
-    memcpy(ypIter_STATE(i), state, size);
-    ypIter_SET_STATE_SIZE(i, size);
-    ypIter_OBJLOCS(i) = objlocs;
-    (void)iter_traverse(i, _iter_constructing_visitor, NULL);  // never fails
+    ypIter_FUNC(i) = declaration->func;
+    _ypState_copy(ypIter_STATE(i), declaration->state, state_size, state_objlocs);
+    ypIter_SET_STATE_SIZE(i, state_size);
+    ypIter_OBJLOCS(i) = state_objlocs;
     return i;
 }
 
@@ -16557,7 +16587,7 @@ yp_STATIC_ASSERT(
 #define ypFunction_STATE(f) ((ypFunctionState *)((ypFunctionObject *)(f))->ob_state)
 #define ypFunction_SET_STATE(f, state) \
     (((ypFunctionObject *)(f))->ob_state = (ypFunctionState *)(state))
-#define ypFunction_PARAMS(f) ((yp_def_parameter_t *)((ypObject *)(f))->ob_data)
+#define ypFunction_PARAMS(f) ((yp_parameter_decl_t *)((ypObject *)(f))->ob_data)
 #define ypFunction_PARAMS_LEN ypObject_CACHED_LEN
 #define ypFunction_SET_PARAMS_LEN ypObject_SET_CACHED_LEN
 #define ypFunction_CODE_FUNC(f) (((ypFunctionObject *)(f))->ob_code)
@@ -16569,7 +16599,7 @@ yp_STATIC_ASSERT(
 // FIXME This alloclen_max/len_max separation is not useful for most types
 #define ypFunction_ALLOCLEN_MAX                                                             \
     ((yp_ssize_t)MIN(                                                                       \
-            (yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject)) / yp_sizeof(yp_def_parameter_t), \
+            (yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject)) / yp_sizeof(yp_parameter_decl_t), \
             ypObject_LEN_MAX))
 #define ypFunction_LEN_MAX ypFunction_ALLOCLEN_MAX
 
@@ -16580,7 +16610,7 @@ yp_STATIC_ASSERT(
 yp_IMMORTAL_INVALIDATED(ypFunction_key_missing);
 
 
-// Returns an immortal representing the kind of parameter according to yp_def_parameter_t.name,
+// Returns an immortal representing the kind of parameter according to yp_parameter_decl_t.name,
 // or an exception. Performs only minimal validation; in particular, this does not validate that the
 // parameter name is a proper identifier. Use _ypFunction_validate_parameters to fully validate the
 // parameter list.
@@ -16647,7 +16677,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     // FIXME We could give yp_set a hint as to how big this will be.
     // param_names = yp_setN(0);
     for (i = 0; i < params_len; i++) {
-        yp_def_parameter_t param = ypFunction_PARAMS(f)[i];
+        yp_parameter_decl_t param = ypFunction_PARAMS(f)[i];
         ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
         // ypObject *              param_name = NULL;  // actual name, stripping leading * or **
 
@@ -16763,7 +16793,7 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
     ypObject *arg;
 
     while (*n < ypFunction_PARAMS_LEN(f)) {
-        yp_def_parameter_t param = ypFunction_PARAMS(f)[*n];
+        yp_parameter_decl_t param = ypFunction_PARAMS(f)[*n];
         ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_slash) {
@@ -16813,7 +16843,7 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
 static ypObject *_ypFunction_call_make_var_kwargs(
         ypObject *f, yp_ssize_t first_kwarg, ypObject *kwargs)
 {
-    yp_def_parameter_t param;
+    yp_parameter_decl_t param;
     ypObject *         param_kind;
     ypObject *         arg;
     yp_ssize_t         i = 0;
@@ -16870,7 +16900,7 @@ static ypObject *_ypFunction_call_place_kwargs(
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
 
     while (*n < ypFunction_PARAMS_LEN(f)) {
-        yp_def_parameter_t param = ypFunction_PARAMS(f)[*n];
+        yp_parameter_decl_t param = ypFunction_PARAMS(f)[*n];
         ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_slash) {
@@ -17334,7 +17364,7 @@ static ypObject *_function_traverse_params(ypObject *f, visitfunc visitor, void 
 {
     yp_ssize_t i;
     for (i = 0; i < ypFunction_PARAMS_LEN(f); i++) {
-        yp_def_parameter_t param = ypFunction_PARAMS(f)[i];
+        yp_parameter_decl_t param = ypFunction_PARAMS(f)[i];
 
         ypObject *result = visitor(param.name, memo);
         if (yp_isexceptionC(result)) return result;
@@ -17469,27 +17499,31 @@ static ypTypeObject ypFunction_Type = {
 
 // Public functions
 
-ypObject *yp_function(yp_def_function_t *definition)
+ypObject *yp_functionC(yp_function_decl_t *declaration)
 {
-    yp_int32_t parameters_len = MAX(definition->parameters_len, 0);
+    yp_int32_t parameters_len = declaration->parameters_len;
+    yp_parameter_decl_t *parameters = declaration->parameters;
     ypObject * newF;
     yp_ssize_t i;
     ypObject * result;
 
-    if (definition->flags != 0) return yp_ValueError;
+    if (declaration->flags != 0) return yp_ValueError;
+    if (parameters_len < 0) return yp_ValueError;
     if (parameters_len > ypFunction_LEN_MAX) return yp_MemorySizeOverflowError;
+
+    // FIXME state
 
     newF = ypMem_MALLOC_CONTAINER_INLINE(
             ypFunctionObject, ypFunction_CODE, parameters_len, ypFunction_ALLOCLEN_MAX);
     if (yp_isexceptionC(newF)) return newF;
-    ypFunction_CODE_FUNC(newF) = definition->code;
+    ypFunction_CODE_FUNC(newF) = declaration->code;
     ypFunction_FLAGS(newF) = 0;
     ypFunction_SET_STATE(newF, NULL);
     // TODO name/qualname, doc, state, module, annotations, ...
 
     for (i = 0; i < parameters_len; i++) {
-        ypObject *default_ = definition->parameters[i].default_;  // borrowed
-        ypFunction_PARAMS(newF)[i].name = yp_incref(definition->parameters[i].name);
+        ypObject *default_ = parameters[i].default_;  // borrowed
+        ypFunction_PARAMS(newF)[i].name = yp_incref(parameters[i].name);
         ypFunction_PARAMS(newF)[i].default_ = default_ == NULL ? NULL : yp_incref(default_);
     }
     ypFunction_SET_PARAMS_LEN(newF, parameters_len);
@@ -17503,7 +17537,7 @@ ypObject *yp_function(yp_def_function_t *definition)
     return newF;
 }
 
-// FIXME A convenience function to decref all objects in yp_def_function_t/yp_def_generator_t/etc,
+// FIXME A convenience function to decref all objects in yp_function_decl_t/yp_def_generator_t/etc,
 // but warn that it cannot contain borrowed references (as they would be stolen/decref'ed).
 
 // TODO As in Python, support a "partial" object that wraps a function with some pre-set arguments.
@@ -18458,9 +18492,9 @@ ypObject *const yp_t_function = (ypObject *)&ypFunction_Type;
 // TODO A script to ensure the comments on the line match the structure member
 static const yp_initialize_parameters_t _default_initialize = {
         yp_sizeof(yp_initialize_parameters_t),  // sizeof_struct
-        yp_default_malloc,                     // yp_malloc
-        yp_default_malloc_resize,              // yp_malloc_resize
-        yp_default_free,                       // yp_free
+        yp_default_malloc,                      // yp_malloc
+        yp_default_malloc_resize,               // yp_malloc_resize
+        yp_default_free,                        // yp_free
         FALSE,                                  // everything_immortal
 };
 
