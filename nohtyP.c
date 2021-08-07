@@ -17525,7 +17525,7 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
 
     result = _ypState_fromdecl(&state_size, &state_objlocs, declaration->state_decl);
     if (yp_isexceptionC(result)) return result;
-    if (state_size > ypIter_STATE_SIZE_MAX) return yp_MemorySizeOverflowError;
+    // FIXME Check state_size for yp_MemorySizeOverflowError
     if (state_size > 0) return yp_NotImplementedError;  // FIXME Support state for functions.
 
     newF = ypMem_MALLOC_CONTAINER_INLINE(

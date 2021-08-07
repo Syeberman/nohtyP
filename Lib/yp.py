@@ -337,6 +337,8 @@ class c_yp_function_decl_t(Structure):
         ("flags", c_uint32),
         ("parameters_len", c_int32),
         ("parameters", POINTER(c_yp_parameter_decl_t)),
+        ("state", c_void_p),
+        ("state_decl", POINTER(c_yp_state_decl_t)),
     ]
 
 # ypObject *yp_intC(yp_int_t value);
