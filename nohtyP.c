@@ -115,8 +115,8 @@
 // yp_DEBUG_LEVEL controls how aggressively nohtyP should debug itself at runtime:
 //  - 0: no debugging (default)
 //  - 1: yp_ASSERT (minimal debugging)
-//  - 10: yp_DEBUG (print debugging)
-//  - 20: yp_INFO (extra print debugging)
+//  - 10: yp_INFO (print debugging)
+//  - 20: yp_DEBUG (extra print debugging)
 #ifndef yp_DEBUG_LEVEL
 // Check for well-known debug defines; inspired from http://nothings.org/stb/stb_h.html
 #if defined(DEBUG) || defined(_DEBUG) || defined(DBG)
@@ -176,29 +176,29 @@ static void yp_breakonerr(ypObject *err) {
 #endif
 
 #if yp_DEBUG_LEVEL >= 10
-#define yp_DEBUG0(fmt)             \
+#define yp_INFO0(fmt)             \
     do {                           \
         (void)fflush(NULL);        \
         fprintf(stderr, fmt "\n"); \
         (void)fflush(NULL);        \
     } while (0)
-#define yp_DEBUG(fmt, ...)                      \
+#define yp_INFO(fmt, ...)                      \
     do {                                        \
         (void)fflush(NULL);                     \
         fprintf(stderr, fmt "\n", __VA_ARGS__); \
         (void)fflush(NULL);                     \
     } while (0)
 #else
-#define yp_DEBUG0(fmt)
-#define yp_DEBUG(fmt, ...)
+#define yp_INFO0(fmt)
+#define yp_INFO(fmt, ...)
 #endif
 
 #if yp_DEBUG_LEVEL >= 20
-#define yp_INFO0 yp_DEBUG0
-#define yp_INFO yp_DEBUG
+#define yp_DEBUG0 yp_INFO0
+#define yp_DEBUG yp_INFO
 #else
-#define yp_INFO0(fmt)
-#define yp_INFO(fmt, ...)
+#define yp_DEBUG0(fmt)
+#define yp_DEBUG(fmt, ...)
 #endif
 
 // We always perform static asserts: they don't affect runtime
@@ -1506,7 +1506,7 @@ void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
     if (p == NULL) return NULL;
     *actual = (yp_ssize_t)_msize(p);
     if (*actual < 0) *actual = yp_SSIZE_T_MAX;  // we were given more memory than we can use
-    yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
+    yp_DEBUG("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
 void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
@@ -1525,12 +1525,12 @@ void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size,
     }
     *actual = (yp_ssize_t)_msize(newp);
     if (*actual < 0) *actual = yp_SSIZE_T_MAX;  // we were given more memory than we can use
-    yp_INFO("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
+    yp_DEBUG("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
 void yp_mem_default_free(void *p)
 {
-    yp_INFO("free: %p", p);
+    yp_DEBUG("free: %p", p);
     free(p);
 }
 
@@ -1555,7 +1555,7 @@ void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size)
     yp_ASSERT(size >= 0, "size cannot be negative");
     *actual = _default_yp_malloc_good_size(size);
     p = malloc(*actual);
-    yp_INFO("malloc: %p %" PRIssize " bytes", p, *actual);
+    yp_DEBUG("malloc: %p %" PRIssize " bytes", p, *actual);
     return p;
 }
 void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
@@ -1567,12 +1567,12 @@ void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size,
     if (size < 0) size = yp_SSIZE_T_MAX;  // addition overflowed; clamp to max
     *actual = _default_yp_malloc_good_size(size);
     newp = malloc(*actual);
-    yp_INFO("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
+    yp_DEBUG("malloc_resize: %p %" PRIssize " bytes  (was %p)", newp, *actual, p);
     return newp;
 }
 void yp_mem_default_free(void *p)
 {
-    yp_INFO("free: %p", p);
+    yp_DEBUG("free: %p", p);
     free(p);
 }
 #endif
@@ -1615,7 +1615,7 @@ static ypObject *_ypMem_malloc_fixed(int type, yp_ssize_t sizeof_obStruct)
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = ypObject_LEN_INVALID;
-    yp_INFO("MALLOC_FIXED: type %d %p", type, ob);
+    yp_DEBUG("MALLOC_FIXED: type %d %p", type, ob);
     return ob;
 }
 #define ypMem_MALLOC_FIXED(obStruct, type) _ypMem_malloc_fixed((type), yp_sizeof(obStruct))
@@ -1651,7 +1651,7 @@ static ypObject *_ypMem_malloc_container_inline(int type, yp_ssize_t alloclen,
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
-    yp_INFO("MALLOC_CONTAINER_INLINE: type %d %p alloclen %" PRIssize, type, ob, alloclen);
+    yp_DEBUG("MALLOC_CONTAINER_INLINE: type %d %p alloclen %" PRIssize, type, ob, alloclen);
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_INLINE4(obStruct, type, alloclen, alloclen_max, elemsize) \
@@ -1719,7 +1719,7 @@ static ypObject *_ypMem_malloc_container_variable(int type, yp_ssize_t required,
     ob->ob_refcnt = _ypMem_starting_refcnt;
     ob->ob_hash = ypObject_HASH_INVALID;
     ob->ob_len = 0;
-    yp_INFO("MALLOC_CONTAINER_VARIABLE: type %d %p alloclen %" PRIssize, type, ob, alloclen);
+    yp_DEBUG("MALLOC_CONTAINER_VARIABLE: type %d %p alloclen %" PRIssize, type, ob, alloclen);
     return ob;
 }
 #define ypMem_MALLOC_CONTAINER_VARIABLE5(obStruct, type, required, extra, alloclen_max, elemsize) \
@@ -1786,7 +1786,7 @@ static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required
         oldptr = ob->ob_data;  // might equal inlineptr
         ob->ob_data = inlineptr;
         ypObject_SET_ALLOCLEN(ob, inlinelen);
-        yp_INFO("REALLOC_CONTAINER_VARIABLE (to inline): %p alloclen %" PRIssize, ob,
+        yp_DEBUG("REALLOC_CONTAINER_VARIABLE (to inline): %p alloclen %" PRIssize, ob,
                 ypObject_ALLOCLEN(ob));
         return oldptr;
     }
@@ -1800,7 +1800,7 @@ static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required
         alloclen = size / elemsize;  // rounds down
         if (alloclen > alloclen_max) alloclen = alloclen_max;
         ypObject_SET_ALLOCLEN(ob, alloclen);
-        yp_INFO("REALLOC_CONTAINER_VARIABLE (from inline): %p alloclen %" PRIssize, ob, alloclen);
+        yp_DEBUG("REALLOC_CONTAINER_VARIABLE (from inline): %p alloclen %" PRIssize, ob, alloclen);
         return oldptr;
     }
 
@@ -1813,7 +1813,7 @@ static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required
     alloclen = size / elemsize;  // rounds down
     if (alloclen > alloclen_max) alloclen = alloclen_max;
     ypObject_SET_ALLOCLEN(ob, alloclen);
-    yp_INFO("REALLOC_CONTAINER_VARIABLE (malloc_resize): %p alloclen %" PRIssize, ob, alloclen);
+    yp_DEBUG("REALLOC_CONTAINER_VARIABLE (malloc_resize): %p alloclen %" PRIssize, ob, alloclen);
     return oldptr;
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE5(ob, obStruct, required, extra, alloclen_max, elemsize) \
@@ -1831,7 +1831,7 @@ static void _ypMem_realloc_container_free_oldptr(
         ypObject *ob, void *oldptr, yp_ssize_t offsetof_inline)
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
-    yp_INFO("REALLOC_CONTAINER_FREE_OLDPTR: %p", ob);
+    yp_DEBUG("REALLOC_CONTAINER_FREE_OLDPTR: %p", ob);
     if (oldptr != ob->ob_data && oldptr != inlineptr) yp_free(oldptr);
 }
 #define ypMem_REALLOC_CONTAINER_FREE_OLDPTR(ob, obStruct, oldptr) \
@@ -1854,7 +1854,7 @@ static void _ypMem_realloc_container_variable_clear(
         ob->ob_data = inlineptr;
         ypObject_SET_ALLOCLEN(ob, inlinelen);
     }
-    yp_INFO("REALLOC_CONTAINER_VARIABLE_CLEAR: %p alloclen %" PRIssize, ob, ypObject_ALLOCLEN(ob));
+    yp_DEBUG("REALLOC_CONTAINER_VARIABLE_CLEAR: %p alloclen %" PRIssize, ob, ypObject_ALLOCLEN(ob));
 }
 #define ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR3(ob, obStruct, alloclen_max, elemsize) \
     _ypMem_realloc_container_variable_clear(                                          \
@@ -1870,7 +1870,7 @@ static void _ypMem_realloc_container_variable_clear(
 static void _ypMem_free_container(ypObject *ob, yp_ssize_t offsetof_inline)
 {
     void *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
-    yp_INFO("FREE_CONTAINER: %p", ob);
+    yp_DEBUG("FREE_CONTAINER: %p", ob);
     if (ob->ob_data != inlineptr) yp_free(ob->ob_data);
     yp_free(ob);
 }
@@ -1892,7 +1892,7 @@ ypObject *yp_incref(ypObject *x)
 {
     if (ypObject_REFCNT(x) >= ypObject_REFCNT_IMMORTAL) return x;  // no-op
     ypObject_REFCNT(x) += 1;
-    yp_INFO("incref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
+    yp_DEBUG("incref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
     return x;
 }
 
@@ -1969,7 +1969,7 @@ static ypObject *_ypObject_dealloc(ypObject *x, ypObject_dealloclist *list)
 
     while (x != NULL) {
         ypObject *subresult;
-        yp_INFO("decref (dealloc): type %d %p", ypObject_TYPE_CODE(x), x);
+        yp_DEBUG("decref (dealloc): type %d %p", ypObject_TYPE_CODE(x), x);
         yp_ASSERT1(ypObject_REFCNT(x) == 1);
         subresult = ypObject_TYPE(x)->tp_dealloc(x, list);
 
@@ -1991,7 +1991,7 @@ static int _ypObject_decref(ypObject *x, ypObject_dealloclist *list)
 
     if (ypObject_REFCNT(x) > 1) {
         ypObject_REFCNT(x) -= 1;
-        yp_INFO("decref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
+        yp_DEBUG("decref: type %d %p refcnt %d", ypObject_TYPE_CODE(x), x, ypObject_REFCNT(x));
         return FALSE;
     }
 
@@ -2648,9 +2648,9 @@ static ypObject *_iter_send(ypObject *i, ypObject *value)
     ypObject *          result;
     yp_generator_func_t func = ypIter_FUNC(i);
 
-    yp_INFO("iter_send: func %p, i %p, value %d %p", func, i, ypObject_TYPE_CODE(value), value);
+    yp_DEBUG("iter_send: func %p, i %p, value %d %p", func, i, ypObject_TYPE_CODE(value), value);
     result = func(i, value);
-    yp_INFO("iter_send: func %p, i %p, value %d %p, result %d %p", func, i,
+    yp_DEBUG("iter_send: func %p, i %p, value %d %p, result %d %p", func, i,
             ypObject_TYPE_CODE(value), value, ypObject_TYPE_CODE(result), result);
 
     return result;
@@ -5336,7 +5336,7 @@ ypObject *yp_intC(yp_int_t value)
         ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypInt_CODE);
         if (yp_isexceptionC(i)) return i;
         ypInt_VALUE(i) = value;
-        yp_INFO("yp_intC: %p value %" PRIint, i, value);
+        yp_DEBUG("yp_intC: %p value %" PRIint, i, value);
         return i;
     }
 }
@@ -5346,7 +5346,7 @@ ypObject *yp_intstoreC(yp_int_t value)
     ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypIntStore_CODE);
     if (yp_isexceptionC(i)) return i;
     ypInt_VALUE(i) = value;
-    yp_INFO("yp_intstoreC: %p value %" PRIint, i, value);
+    yp_DEBUG("yp_intstoreC: %p value %" PRIint, i, value);
     return i;
 }
 
@@ -13528,7 +13528,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
         _ypSet_movekey_clean(so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc);
     }
     if (oldkeys != ypSet_INLINE_DATA(so)) yp_free(oldkeys);
-    yp_INFO("_ypSet_resize: %p table %p  (was %p)", so, newkeys, oldkeys);
+    yp_DEBUG("_ypSet_resize: %p table %p  (was %p)", so, newkeys, oldkeys);
     return yp_None;
 }
 
@@ -18648,7 +18648,7 @@ void yp_initialize(const yp_initialize_parameters_t *args)
 
     // yp_initialize can only be called once
     if (initialized) {
-        yp_DEBUG0("yp_initialize called multiple times; only first call is honoured");
+        yp_INFO0("yp_initialize called multiple times; only first call is honoured");
         return;
     }
     initialized = TRUE;
