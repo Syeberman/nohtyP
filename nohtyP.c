@@ -2914,10 +2914,10 @@ void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
 ypObject *yp_generatorC(yp_generator_decl_t *declaration)
 {
     yp_ssize_t length_hint = declaration->length_hint;
-    ypObject *  result;
-    ypObject *  i;
     yp_ssize_t state_size;
     yp_uint32_t state_objlocs;
+    ypObject *  result;
+    ypObject *  i;
 
     result = _ypState_fromdecl(&state_size, &state_objlocs, declaration->state_decl);
     if (yp_isexceptionC(result)) return result;
@@ -17503,15 +17503,20 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
 {
     yp_int32_t parameters_len = declaration->parameters_len;
     yp_parameter_decl_t *parameters = declaration->parameters;
+    yp_ssize_t state_size;
+    yp_uint32_t state_objlocs;
+    ypObject * result;
     ypObject * newF;
     yp_ssize_t i;
-    ypObject * result;
 
     if (declaration->flags != 0) return yp_ValueError;
     if (parameters_len < 0) return yp_ValueError;
     if (parameters_len > ypFunction_LEN_MAX) return yp_MemorySizeOverflowError;
 
-    // FIXME state
+    result = _ypState_fromdecl(&state_size, &state_objlocs, declaration->state_decl);
+    if (yp_isexceptionC(result)) return result;
+    if (state_size > ypIter_STATE_SIZE_MAX) return yp_MemorySizeOverflowError;
+    if (state_size > 0) return yp_NotImplementedError; // FIXME Support state for functions.
 
     newF = ypMem_MALLOC_CONTAINER_INLINE(
             ypFunctionObject, ypFunction_CODE, parameters_len, ypFunction_ALLOCLEN_MAX);
