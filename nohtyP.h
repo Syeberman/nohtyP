@@ -114,9 +114,9 @@ extern "C" {
 
 // Forward declarations of various types.
 typedef struct _yp_initialize_parameters_t yp_initialize_parameters_t;
-typedef struct _yp_generator_decl_t yp_generator_decl_t;
-typedef struct _yp_function_decl_t yp_function_decl_t;
-typedef struct _yp_state_decl_t yp_state_decl_t;
+typedef struct _yp_generator_decl_t        yp_generator_decl_t;
+typedef struct _yp_function_decl_t         yp_function_decl_t;
+typedef struct _yp_state_decl_t            yp_state_decl_t;
 
 
 /*
@@ -1856,7 +1856,8 @@ typedef struct _yp_initialize_parameters_t {
 
 // The default memory allocation APIs, exposed to allow them to be called by custom hooks.
 ypAPI void *yp_mem_default_malloc(yp_ssize_t *actual, yp_ssize_t size);
-ypAPI void *yp_mem_default_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+ypAPI void *yp_mem_default_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
 ypAPI void yp_mem_default_free(void *p);
 
 

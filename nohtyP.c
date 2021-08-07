@@ -1197,9 +1197,9 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
     static struct _ypFunctionObject _##name##_struct = {                                          \
             _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters, parameters_len), code, NULL}; \
     qual ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
-#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                     \
+#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
     static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
-    _yp_IMMORTAL_FUNCTION_OBJECT(                                               \
+    _yp_IMMORTAL_FUNCTION_OBJECT(                                                \
             qual, name, code, yp_lengthof_array(_##name##_parameters), _##name##_parameters)
 
 #define yp_IMMORTAL_FUNCTION(name, code, parameters) \
@@ -2523,7 +2523,8 @@ static int ypQuickSeq_new_fromiterable_builtins(
 // FIXME rename most things here
 
 // Modifies *state and *objlocs to loop through all objects in state.
-static ypObject **_ypState_nextobj(ypObject ***state, yp_uint32_t *objlocs) {
+static ypObject **_ypState_nextobj(ypObject ***state, yp_uint32_t *objlocs)
+{
     while (*objlocs) {  // while there are still more objects to be found...
         ypObject **next = (*objlocs) & 0x1u ? *state : NULL;
         *state += 1;
@@ -2537,8 +2538,8 @@ static ypObject **_ypState_nextobj(ypObject ***state, yp_uint32_t *objlocs) {
 static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc visitor, void *memo)
 {
     while (1) {
-        ypObject *result;
-        ypObject **next = _ypState_nextobj((ypObject ***) &state, &objlocs);
+        ypObject * result;
+        ypObject **next = _ypState_nextobj((ypObject ***)&state, &objlocs);
         if (next == NULL) return yp_None;
 
         result = visitor(*next, memo);
@@ -2550,7 +2551,8 @@ static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc v
 
 // objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state.  On error,
 // *size and *objlocs are undefined.
-static ypObject *_ypState_fromdecl(yp_ssize_t *size, yp_uint32_t *objlocs, yp_state_decl_t *state_decl)
+static ypObject *_ypState_fromdecl(
+        yp_ssize_t *size, yp_uint32_t *objlocs, yp_state_decl_t *state_decl)
 {
     yp_ssize_t n;
     yp_ssize_t objoffset;
@@ -2590,7 +2592,8 @@ static ypObject *_ypState_fromdecl(yp_ssize_t *size, yp_uint32_t *objlocs, yp_st
     return yp_None;
 }
 
-static void _ypState_copy(void *dest, void *src, yp_ssize_t size, yp_uint32_t objlocs) {
+static void _ypState_copy(void *dest, void *src, yp_ssize_t size, yp_uint32_t objlocs)
+{
     ypObject **objp;
 
     // A NULL state initializes all objects to yp_None, all other pointers to NULL, and all other
@@ -2598,7 +2601,7 @@ static void _ypState_copy(void *dest, void *src, yp_ssize_t size, yp_uint32_t ob
     if (src == NULL) {
         memset(dest, 0, size);
         while (1) {
-            objp = _ypState_nextobj((ypObject ***) &dest, &objlocs);
+            objp = _ypState_nextobj((ypObject ***)&dest, &objlocs);
             if (objp == NULL) return;
             *objp = yp_None;
         }
@@ -2606,7 +2609,7 @@ static void _ypState_copy(void *dest, void *src, yp_ssize_t size, yp_uint32_t ob
     } else {
         memcpy(dest, src, size);
         while (1) {
-            objp = _ypState_nextobj((ypObject ***) &dest, &objlocs);
+            objp = _ypState_nextobj((ypObject ***)&dest, &objlocs);
             if (objp == NULL) return;
             // NULL object pointers are initialized to yp_None.
             if (*objp == NULL) {
@@ -2920,8 +2923,8 @@ void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
 
 ypObject *yp_generatorC(yp_generator_decl_t *declaration)
 {
-    yp_ssize_t length_hint = declaration->length_hint;
-    yp_ssize_t state_size;
+    yp_ssize_t  length_hint = declaration->length_hint;
+    yp_ssize_t  state_size;
     yp_uint32_t state_objlocs;
     ypObject *  result;
     ypObject *  i;
@@ -16604,8 +16607,8 @@ yp_STATIC_ASSERT(
 
 // The maximum possible number of parameters for a function
 // FIXME This alloclen_max/len_max separation is not useful for most types
-#define ypFunction_ALLOCLEN_MAX                                                             \
-    ((yp_ssize_t)MIN(                                                                       \
+#define ypFunction_ALLOCLEN_MAX                                                              \
+    ((yp_ssize_t)MIN(                                                                        \
             (yp_SSIZE_T_MAX - yp_sizeof(ypFunctionObject)) / yp_sizeof(yp_parameter_decl_t), \
             ypObject_LEN_MAX))
 #define ypFunction_LEN_MAX ypFunction_ALLOCLEN_MAX
@@ -16685,7 +16688,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     // param_names = yp_setN(0);
     for (i = 0; i < params_len; i++) {
         yp_parameter_decl_t param = ypFunction_PARAMS(f)[i];
-        ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
+        ypObject *          param_kind = _ypFunction_parameter_kind(param.name);
         // ypObject *              param_name = NULL;  // actual name, stripping leading * or **
 
         if (param_kind == yp_s_slash) {
@@ -16801,7 +16804,7 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
 
     while (*n < ypFunction_PARAMS_LEN(f)) {
         yp_parameter_decl_t param = ypFunction_PARAMS(f)[*n];
-        ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
+        ypObject *          param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_slash) {
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
@@ -16851,9 +16854,9 @@ static ypObject *_ypFunction_call_make_var_kwargs(
         ypObject *f, yp_ssize_t first_kwarg, ypObject *kwargs)
 {
     yp_parameter_decl_t param;
-    ypObject *         param_kind;
-    ypObject *         arg;
-    yp_ssize_t         i = 0;
+    ypObject *          param_kind;
+    ypObject *          arg;
+    yp_ssize_t          i = 0;
 
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED);
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW);
@@ -16908,7 +16911,7 @@ static ypObject *_ypFunction_call_place_kwargs(
 
     while (*n < ypFunction_PARAMS_LEN(f)) {
         yp_parameter_decl_t param = ypFunction_PARAMS(f)[*n];
-        ypObject *         param_kind = _ypFunction_parameter_kind(param.name);
+        ypObject *          param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_slash) {
             if (placed_kwargs > 0) {
@@ -17508,13 +17511,13 @@ static ypTypeObject ypFunction_Type = {
 
 ypObject *yp_functionC(yp_function_decl_t *declaration)
 {
-    yp_int32_t parameters_len = declaration->parameters_len;
+    yp_int32_t           parameters_len = declaration->parameters_len;
     yp_parameter_decl_t *parameters = declaration->parameters;
-    yp_ssize_t state_size;
-    yp_uint32_t state_objlocs;
-    ypObject * result;
-    ypObject * newF;
-    yp_ssize_t i;
+    yp_ssize_t           state_size;
+    yp_uint32_t          state_objlocs;
+    ypObject *           result;
+    ypObject *           newF;
+    yp_ssize_t           i;
 
     if (declaration->flags != 0) return yp_ValueError;
     if (parameters_len < 0) return yp_ValueError;
@@ -17523,7 +17526,7 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
     result = _ypState_fromdecl(&state_size, &state_objlocs, declaration->state_decl);
     if (yp_isexceptionC(result)) return result;
     if (state_size > ypIter_STATE_SIZE_MAX) return yp_MemorySizeOverflowError;
-    if (state_size > 0) return yp_NotImplementedError; // FIXME Support state for functions.
+    if (state_size > 0) return yp_NotImplementedError;  // FIXME Support state for functions.
 
     newF = ypMem_MALLOC_CONTAINER_INLINE(
             ypFunctionObject, ypFunction_CODE, parameters_len, ypFunction_ALLOCLEN_MAX);
@@ -18504,9 +18507,9 @@ ypObject *const yp_t_function = (ypObject *)&ypFunction_Type;
 // TODO A script to ensure the comments on the line match the structure member
 static const yp_initialize_parameters_t _default_initialize = {
         yp_sizeof(yp_initialize_parameters_t),  // sizeof_struct
-        yp_mem_default_malloc,                      // yp_malloc
-        yp_mem_default_malloc_resize,               // yp_malloc_resize
-        yp_mem_default_free,                        // yp_free
+        yp_mem_default_malloc,                  // yp_malloc
+        yp_mem_default_malloc_resize,           // yp_malloc_resize
+        yp_mem_default_free,                    // yp_free
         FALSE,                                  // everything_immortal
 };
 
