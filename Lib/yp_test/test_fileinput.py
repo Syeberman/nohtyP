@@ -47,7 +47,7 @@ def remove_tempfiles(*names):
         if name:
             safe_unlink(name)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class BufferSizesTests(yp_unittest.TestCase):
     def test_buffer_sizes(self):
         # First, run the tests with default and teeny buffer size.
@@ -147,7 +147,7 @@ class UnconditionallyRaise:
         self.invoked = True
         raise self.exception_type()
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class FileInputTests(yp_unittest.TestCase):
 
     def test_zero_byte_files(self):
@@ -480,7 +480,7 @@ class MockFileInput:
         self.invocation_counts["isstdin"] += 1
         return self.return_values["isstdin"]
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class BaseFileInputGlobalMethodsTest(yp_unittest.TestCase):
     """Base class for unit tests for the global function of
        the fileinput module."""
@@ -783,7 +783,7 @@ class InvocationRecorder:
         self.invocation_count += 1
         self.last_invocation = (args, kwargs)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class Test_hook_compressed(yp_unittest.TestCase):
     """Unit tests for fileinput.hook_compressed()"""
 
@@ -846,7 +846,7 @@ class Test_hook_compressed(yp_unittest.TestCase):
         builtins.open = new_open_func
         return original_open
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class Test_hook_encoded(yp_unittest.TestCase):
     """Unit tests for fileinput.hook_encoded()"""
 

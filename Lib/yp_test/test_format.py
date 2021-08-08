@@ -48,7 +48,7 @@ def testformat(formatstr, args, output=None, limit=None, overflowok=False):
                 print('yes')
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_str_printf
 class FormatTest(yp_unittest.TestCase):
     def test_format(self):
         testformat("%.1d", (1,), "1")

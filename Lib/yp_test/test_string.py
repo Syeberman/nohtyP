@@ -4,7 +4,7 @@ import string
 from yp_test import support
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_string_module
 class ModuleTest(yp_unittest.TestCase):
 
     def test_attrs(self):

@@ -107,7 +107,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertRaises(SystemError, yp_range, 0, ypObject_LEN_MAX+1)
         self.assertRaises(SystemError, yp_range, 0, 1, yp_sys_minint)
 
-    @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
+    @yp_unittest.skip_long_ints
     def test_large_operands(self):
         x = yp_range(10**20, 10**20+10, 3)
         self.assertEqual(len(x), 4)
@@ -160,7 +160,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(seq[0], -a)
         self.assertEqual(seq[-1], -a-c)
 
-    @yp_unittest.skip("Not applicable to nohtyP (ob_len doesn't go that high)")
+    @yp_unittest.skip_long_ints
     def test_large_range(self):
         # Check long ranges (len > sys.maxsize)
         # len() is expected to fail due to limitations of the __len__ protocol
@@ -281,7 +281,7 @@ class RangeTest(yp_unittest.TestCase):
         class BadExc(Exception):
             pass
 
-    @yp_unittest.skip("nohtyP doesn't support custom user types")
+    @yp_unittest.skip_user_defined_types
     def test_index_badcmp(self):
         class BadCmp:
             def __eq__(self, other):
@@ -298,7 +298,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(yp_range(1, 10, 3).index(4), 1)
         self.assertEqual(yp_range(1, -10, -3).index(-5), 2)
 
-    @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
+    @yp_unittest.skip_long_ints
     def test_index_long_ints(self):
         self.assertEqual(yp_range(10**20).index(1), 1)
         self.assertEqual(yp_range(10**20).index(10**20 - 1), 10**20 - 1)
@@ -306,7 +306,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertRaises(ValueError, yp_range(1, 2**100, 2).index, 2**87)
         self.assertEqual(yp_range(1, 2**100, 2).index(2**87+1), 2**86)
 
-    @yp_unittest.skip("nohtyP doesn't support custom user types")
+    @yp_unittest.skip_user_defined_types
     def test_index_always_equal(self):
         class AlwaysEqual(object):
             def __eq__(self, other):
@@ -314,7 +314,7 @@ class RangeTest(yp_unittest.TestCase):
         always_equal = AlwaysEqual()
         self.assertEqual(yp_range(10).index(always_equal), 0)
 
-    @yp_unittest.skip("nohtyP doesn't support custom user types")
+    @yp_unittest.skip_user_defined_types
     def test_user_index_method(self):
         bignum = 2*sys.maxsize
         smallnum = 42
@@ -360,15 +360,15 @@ class RangeTest(yp_unittest.TestCase):
         #self.assertIs(type(yp_range(3).count(-1)), int)
         #self.assertIs(type(yp_range(3).count(1)), int)
 
-    @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
+    @yp_unittest.skip_long_ints
     def test_count_long_ints(self):
         self.assertEqual(yp_range(10**20).count(1), 1)
         self.assertEqual(yp_range(10**20).count(10**20), 0)
         self.assertEqual(yp_range(3).index(1), 1) # ? Why is this here...
         self.assertEqual(yp_range(1, 2**100, 2).count(2**87), 0)
         self.assertEqual(yp_range(1, 2**100, 2).count(2**87+1), 1)
-    
-    @yp_unittest.skip("nohtyP doesn't support custom user types")
+
+    @yp_unittest.skip_user_defined_types
     def test_count_always_equal(self):
         class AlwaysEqual(object):
             def __eq__(self, other):
@@ -386,7 +386,7 @@ class RangeTest(yp_unittest.TestCase):
         #self.assertEqual(yp_repr(yp_range(1, 2, 3)), 'range(1, 2, 3)')
         self.assertEqual(yp_repr(yp_range(1, 7, 3)), 'range(1, 7, 3)')
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_pickling(self):
         testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1),
                      (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
@@ -397,7 +397,7 @@ class RangeTest(yp_unittest.TestCase):
                     self.assertEqual(list(pickle.loads(pickle.dumps(r, proto))),
                                      list(r))
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_iterator_pickling(self):
         testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1),
                      (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
@@ -420,7 +420,7 @@ class RangeTest(yp_unittest.TestCase):
                 it = pickle.loads(d)
                 self.assertEqual(list(it), data[1:])
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_exhausted_iterator_pickling(self):
         r = yp_range(2**65, 2**65+2)
         i = yp_iter(r)
@@ -433,7 +433,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(yp_list(i), [])
         self.assertEqual(yp_list(i2), [])
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_large_exhausted_iterator_pickling(self):
         r = yp_range(20)
         i = yp_iter(r)
@@ -459,11 +459,11 @@ class RangeTest(yp_unittest.TestCase):
         self.assertIn(1.0, yp_range(3))
         self.assertIn(True, yp_range(3))
 
-    @yp_unittest.skip("nohtyP doesn't support complex numbers (yet)")
+    @yp_unittest.skip_complex
     def test_types_complex(self):
         self.assertIn(1+0j, yp_range(3))
 
-    @yp_unittest.skip("nohtyP doesn't support custom user types")
+    @yp_unittest.skip_user_defined_types
     def test_types_user_types(self):
         class C1:
             def __eq__(self, other): return True
@@ -648,7 +648,7 @@ class RangeTest(yp_unittest.TestCase):
         self.assertFalse(() == yp_range(0))
         self.assertFalse(yp_range(2) == [0, 1])
 
-    @yp_unittest.skip("Not applicable to nohtyP (yp_int_t doesn't go that high)")
+    @yp_unittest.skip_long_ints
     def test_comparison_long_ints(self):
         # Huge integers aren't a problem.
         self.assertEqual(yp_range(0, 2**100 - 1, 2),
@@ -676,7 +676,7 @@ class RangeTest(yp_unittest.TestCase):
             yp_range(0) >= yp_range(0)
 
 
-    @yp_unittest.skip("nohtyP does not (currently) store exact range attributes")
+    @yp_unittest.skip_range_attributes
     def test_attributes(self):
         # test the start, stop and step attributes of range objects
         self.assert_attrs(yp_range(0), 0, 0, 1)

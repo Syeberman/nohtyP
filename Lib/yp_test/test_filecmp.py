@@ -8,7 +8,7 @@ import unittest
 from yp_test import yp_unittest
 from yp_test import support
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class FileCompareTestCase(unittest.TestCase):
     def setUp(self):
         self.name = support.TESTFN
@@ -51,7 +51,7 @@ class FileCompareTestCase(unittest.TestCase):
         self.assertTrue(len(filecmp._cache) == 0,
                         "Cache not cleared after calling clear_cache")
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class DirCompareTestCase(yp_unittest.TestCase):
     def setUp(self):
         tmpdir = tempfile.gettempdir()

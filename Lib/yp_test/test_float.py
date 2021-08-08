@@ -23,7 +23,7 @@ requires_setformat = yp_unittest.skipUnless(hasattr(float, "__setformat__"),
 test_dir = os.path.dirname(__file__) or os.curdir
 format_testfile = os.path.join(test_dir, 'formatfloat_testcases.txt')
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 class GeneralFloatCases(yp_unittest.TestCase):
 
     def test_float(self):
@@ -424,7 +424,7 @@ class GeneralFloatCases(yp_unittest.TestCase):
             #self.assertTrue(0.0 > pow_op(-2.0, -1047) > -1e-315)
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 @requires_setformat
 class FormatFunctionsTestCase(yp_unittest.TestCase):
 
@@ -476,7 +476,7 @@ LE_FLOAT_NAN = bytes(reversed(BE_FLOAT_NAN))
 # on non-IEEE platforms, attempting to unpack a bit pattern
 # representing an infinity or a NaN should raise an exception.
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 @requires_setformat
 class UnknownFormatTestCase(yp_unittest.TestCase):
     def setUp(self):
@@ -509,7 +509,7 @@ class UnknownFormatTestCase(yp_unittest.TestCase):
 # is accident (today).
 # let's also try to guarantee that -0.0 and 0.0 don't get confused.
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 class IEEEFormatTestCase(yp_unittest.TestCase):
 
     @support.requires_IEEE_754
@@ -528,7 +528,7 @@ class IEEEFormatTestCase(yp_unittest.TestCase):
                           ('<f', LE_FLOAT_NAN)]:
             struct.unpack(fmt, data)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 class FormatTestCase(yp_unittest.TestCase):
 
     def test_format(self):
@@ -604,7 +604,7 @@ class FormatTestCase(yp_unittest.TestCase):
         self.assertEqual(format(1234.56, '.4'), '1.235e+03')
         self.assertEqual(format(12345.6, '.4'), '1.235e+04')
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 class ReprTestCase(yp_unittest.TestCase):
     def test_repr(self):
         floats_file = open(os.path.join(os.path.split(__file__)[0],
@@ -669,7 +669,7 @@ class ReprTestCase(yp_unittest.TestCase):
             self.assertEqual(repr(float(s)), str(float(s)))
             self.assertEqual(repr(float(negs)), str(float(negs)))
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 @support.requires_IEEE_754
 class RoundTestCase(yp_unittest.TestCase):
 
@@ -781,7 +781,7 @@ class RoundTestCase(yp_unittest.TestCase):
 
 # Beginning with Python 2.6 float has cross platform compatible
 # ways to create and represent inf and nan
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 class InfNanTest(yp_unittest.TestCase):
     def test_inf_from_str(self):
         self.assertTrue(isinf(float("inf")))
@@ -886,7 +886,7 @@ class InfNanTest(yp_unittest.TestCase):
 
 fromHex = float.fromhex
 toHex = float.hex
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_floats
 class HexFloatTestCase(yp_unittest.TestCase):
     MAX = fromHex('0x.fffffffffffff8p+1024')  # max normal
     MIN = fromHex('0x1p-1022')                # min normal

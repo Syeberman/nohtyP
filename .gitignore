@@ -56,6 +56,3 @@ Thumbs.db
 *.tmp
 *.orig
 *.rej
-
-# FIXME Move to personal .gitignore
-sye.*

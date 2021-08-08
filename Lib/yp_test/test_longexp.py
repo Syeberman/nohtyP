@@ -2,7 +2,7 @@ from yp import *
 from yp_test import yp_unittest
 from yp_test import support
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_not_applicable
 class LongExpText(yp_unittest.TestCase):
     def test_longexp(self):
         REPS = 65580

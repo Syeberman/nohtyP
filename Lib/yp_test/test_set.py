@@ -52,7 +52,7 @@ class TestJointOps:
         self.s = self.thetype(word)
         self.d = dict.fromkeys(word)
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_new_or_init(self):
         self.assertRaises(TypeError, self.thetype, [], 2)
         self.assertRaises(TypeError, yp_set().__init__, a=1)
@@ -236,7 +236,7 @@ class TestJointOps:
         self.assertFalse(yp_set('a').issubset('cbs'))
         self.assertFalse(yp_set('cbs').issuperset('a'))
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_pickling(self):
         for i in range(pickle.HIGHEST_PROTOCOL + 1):
             p = pickle.dumps(self.s, i)
@@ -248,7 +248,7 @@ class TestJointOps:
                 dup = pickle.loads(p)
                 self.assertEqual(self.s.x, dup.x)
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_iterator_pickling(self):
         itorg = iter(self.s)
         data = self.thetype(self.s)
@@ -269,7 +269,7 @@ class TestJointOps:
         it = pickle.loads(d)
         self.assertEqual(self.thetype(it), data - self.thetype((drop,)))
 
-    @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_deepcopy(self):
         class Tracer:
             def __init__(self, value):
@@ -287,7 +287,7 @@ class TestJointOps:
         self.assertIsNot(t, newt)
         self.assertEqual(t.value + 1, newt.value)
 
-    @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_gc(self):
         # Create a nest of cycles to exercise overall ref count check
         class A:
@@ -298,7 +298,7 @@ class TestJointOps:
             elem.sub = elem
             elem.set = yp_set([elem])
 
-    @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_subclass_with_custom_hash(self):
         # Bug #1257731
         class H(self.thetype):
@@ -312,7 +312,7 @@ class TestJointOps:
         f.add(s)
         f.discard(s)
 
-    @yp_unittest.skip("nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_badcmp(self):
         s = self.thetype([BadCmp()])
         # Detect comparison errors during insertion and lookup
@@ -324,7 +324,7 @@ class TestJointOps:
             self.assertRaises(RuntimeError, s.discard, BadCmp())
             self.assertRaises(RuntimeError, s.remove, BadCmp())
 
-    @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_cyclical_repr(self):
         w = ReprWrapper()
         s = self.thetype([w])
@@ -335,7 +335,7 @@ class TestJointOps:
             name = repr(s).partition('(')[0]    # strip class name
             self.assertEqual(repr(s), '%s({%s(...)})' % (name, name))
 
-    @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_cyclical_print(self):
         w = ReprWrapper()
         s = self.thetype([w])
@@ -350,7 +350,7 @@ class TestJointOps:
             fo.close()
             support.unlink(support.TESTFN)
 
-    @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_do_not_rehash_dict_keys(self):
         n = 10
         d = dict.fromkeys(map(HashCountingInt, range(n)))
@@ -370,7 +370,7 @@ class TestJointOps:
         self.assertEqual(sum(elem.hash_count for elem in d), n)
         self.assertEqual(d3, dict.fromkeys(d, 123))
 
-    @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_container_iterator(self):
         # Bug #3680: tp_traverse was not implemented for set iterator object
         class C(object):
@@ -387,7 +387,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
     thetype = yp_set
     basetype = yp_set
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_init(self):
         s = self.thetype()
         s.__init__(self.word)
@@ -456,7 +456,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         self.assertNotIn(self.thetype(self.word), s)
         self.assertRaises(KeyError, self.s.remove, self.thetype(self.word))
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_remove_keyerror_unpacking(self):
         # bug:  www.python.org/sf/1576657
         for v1 in ['Q', (1,)]:
@@ -468,7 +468,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
             else:
                 self.fail()
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_remove_keyerror_set(self):
         key = self.thetype([3, 4])
         try:
@@ -484,11 +484,11 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         self.s.discard('a')
         self.assertNotIn('a', self.s)
         self.s.discard('Q')
-        
+
         s = self.s.copy()
         s.discard([]) # nohtyP sets accept mutable types here
         self.assertEqual(s, self.s)
-        
+
         s = self.thetype([yp_frozenset(self.word)])
         self.assertIn(self.thetype(self.word), s)
         s.discard(self.thetype(self.word))
@@ -567,11 +567,11 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
             else:
                 self.assertNotIn(c, self.s)
         self.assertRaises(PassThru, self.s.difference_update, check_pass_thru())
-        
+
         s = self.s.copy()
         s.difference_update([[]]) # nohtyP sets accept mutable types here
         self.assertEqual(s, self.s)
-        
+
         for p, q in (('cdc', 'ab'), ('efgfe', 'abc'), ('ccb', 'a'), ('ef', 'abc')):
             for C in yp_set, yp_frozenset, dict.fromkeys, str, list, tuple:
                 s = self.thetype('abcba')
@@ -634,7 +634,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         t ^= t
         self.assertEqual(t, self.thetype())
 
-    @yp_unittest.skip( "TODO: Implement yp_weakref_proxy" )
+    @yp_unittest.skip_weakref
     def test_weakref(self):
         s = self.thetype('gallahad')
         p = weakref.proxy(s)
@@ -642,7 +642,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
         s = None
         self.assertRaises(ReferenceError, str, p)
 
-    @yp_unittest.skip("REWORK: nohtyP doesn't have user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_rich_compare(self):
         class TestRichSetCompare:
             def __gt__(self, some_set):
@@ -687,7 +687,7 @@ class TestSet(TestJointOps, yp_unittest.TestCase):
 class SetSubclass(yp_set):
     pass
 
-@yp_unittest.skip("Not applicable to nohtyP")
+@yp_unittest.skip_not_applicable
 class TestSetSubclass(TestSet):
     thetype = SetSubclass
     basetype = yp_set
@@ -696,10 +696,10 @@ class SetSubclassWithKeywordArgs(yp_set):
     def __init__(self, iterable=[], newarg=None):
         yp_set.__init__(self, iterable)
 
-@yp_unittest.skip("Not applicable to nohtyP")
+@yp_unittest.skip_not_applicable
 class TestSetSubclassWithKeywordArgs(TestSet):
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_keywords_in_subclass(self):
         'SF bug #1486663 -- this used to erroneously raise a TypeError'
         SetSubclassWithKeywordArgs(newarg=1)
@@ -708,7 +708,7 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
     thetype = yp_frozenset
     basetype = yp_frozenset
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_init(self):
         s = self.thetype(self.word)
         s.__init__(self.otherword)
@@ -772,7 +772,7 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
 class FrozenSetSubclass(yp_frozenset):
     pass
 
-@yp_unittest.skip("Not applicable to nohtyP")
+@yp_unittest.skip_not_applicable
 class TestFrozenSetSubclass(TestFrozenSet):
     thetype = FrozenSetSubclass
     basetype = yp_frozenset
@@ -810,12 +810,12 @@ empty_set = yp_set()
 
 class TestBasicOps:
 
-    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip_str_repr
     def test_repr(self):
         if self.repr is not None:
             self.assertEqual(repr(self.set), self.repr)
 
-    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip_str_repr
     def check_repr_against_values(self):
         text = repr(self.set)
         self.assertTrue(text.startswith('{'))
@@ -827,7 +827,7 @@ class TestBasicOps:
         sorted_repr_values.sort()
         self.assertEqual(result, sorted_repr_values)
 
-    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip_str_repr
     def test_print(self):
         try:
             fo = open(support.TESTFN, "w")
@@ -913,7 +913,7 @@ class TestBasicOps:
         setiter = iter(self.set)
         self.assertEqual(setiter.__length_hint__(), yp_len(self.set))
 
-    @yp_unittest.skip("TODO: Implement nohtyP pickling")
+    @yp_unittest.skip_pickling
     def test_pickling(self):
         p = pickle.dumps(self.set)
         copy = pickle.loads(p)
@@ -967,11 +967,10 @@ class TestBasicOpsTuple(TestBasicOps, yp_unittest.TestCase):
 
 #------------------------------------------------------------------------------
 
-@yp_unittest.skip("nohtyP sets don't store function objects")
 class TestBasicOpsTriple(TestBasicOps, yp_unittest.TestCase):
     def setUp(self):
         self.case   = "triple set"
-        self.values = [0, "zero", operator.add]
+        self.values = [0, "zero", yp_func_chr]
         self.set    = yp_set(self.values)
         self.dup    = yp_set(self.values)
         self.length = 3
@@ -987,7 +986,7 @@ class TestBasicOpsString(TestBasicOps, yp_unittest.TestCase):
         self.dup    = yp_set(self.values)
         self.length = 3
 
-    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip_str_repr
     def test_repr(self):
         self.check_repr_against_values()
 
@@ -1001,7 +1000,7 @@ class TestBasicOpsBytes(TestBasicOps, yp_unittest.TestCase):
         self.dup    = yp_set(self.values)
         self.length = 3
 
-    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip_str_repr
     def test_repr(self):
         self.check_repr_against_values()
 
@@ -1021,7 +1020,7 @@ class TestBasicOpsMixedStringBytes(TestBasicOps, yp_unittest.TestCase):
     def tearDown(self):
         self._warning_filters.__exit__(None, None, None)
 
-    @yp_unittest.skip( "TODO: Implement yp_str/yp_repr" )
+    @yp_unittest.skip_str_repr
     def test_repr(self):
         self.check_repr_against_values()
 
@@ -1049,7 +1048,7 @@ class TestExceptionPropagation(yp_unittest.TestCase):
         yp_set('abc')
         yp_set(gooditer())
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_changingSizeWhileIterating(self):
         s = yp_set([1,2,3])
         try:
@@ -1518,7 +1517,7 @@ class TestOnlySetsDict(TestOnlySetsInBinaryOps, yp_unittest.TestCase):
 
 #------------------------------------------------------------------------------
 
-@yp_unittest.skip("Not applicable to nohtyP")
+@yp_unittest.skip_not_applicable
 class TestOnlySetsOperator(TestOnlySetsInBinaryOps, yp_unittest.TestCase):
     def setUp(self):
         self.set   = yp_set((1, 2, 3))
@@ -1558,8 +1557,8 @@ class TestCopying:
 
     def test_copy(self):
         dup = self.set.copy()
-        dup_list = yp_sorted(dup, key=repr)
-        set_list = yp_sorted(self.set, key=repr)
+        dup_list = yp_sorted(dup, key=yp_repr)
+        set_list = yp_sorted(self.set, key=yp_repr)
         self.assertEqual(yp_len(dup_list), yp_len(set_list))
         for i in range(len(dup_list)):
             self.assertIs(dup_list[i], set_list[i])
@@ -1567,8 +1566,8 @@ class TestCopying:
     def test_deep_copy(self):
         dup = copy.deepcopy(self.set)
         ##print yp_type(dup), repr(dup)
-        dup_list = yp_sorted(dup, key=repr)
-        set_list = yp_sorted(self.set, key=repr)
+        dup_list = yp_sorted(dup, key=yp_repr)
+        set_list = yp_sorted(self.set, key=yp_repr)
         self.assertEqual(yp_len(dup_list), yp_len(set_list))
         for i in range(len(dup_list)):
             self.assertEqual(dup_list[i], set_list[i])
@@ -1732,7 +1731,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
         for cons in (yp_set, yp_frozenset):
             for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
                 for g in (G, I, Ig, S, L, R):
-                    self.assertEqual(yp_sorted(cons(g(s)), key=repr), sorted(g(s), key=repr))
+                    self.assertEqual(yp_sorted(cons(g(s)), key=yp_repr), sorted(g(s), key=repr))
                 self.assertRaises(TypeError, cons , X(s))
                 self.assertRaises(TypeError, cons , N(s))
                 self.assertRaises(ZeroDivisionError, cons , E(s))
@@ -1748,7 +1747,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
                     if isinstance(expected, yp_bool):
                         self.assertEqual(actual, expected)
                     else:
-                        self.assertEqual(yp_sorted(actual, key=repr), yp_sorted(expected, key=repr))
+                        self.assertEqual(yp_sorted(actual, key=yp_repr), yp_sorted(expected, key=yp_repr))
                 self.assertRaises(TypeError, meth, X(s))
                 self.assertRaises(TypeError, meth, N(s))
                 self.assertRaises(ZeroDivisionError, meth, E(s))
@@ -1763,7 +1762,7 @@ class TestVariousIteratorArgs(yp_unittest.TestCase):
                     t = s.copy()
                     getattr(s, methname)(list(g(data)))
                     getattr(t, methname)(g(data))
-                    self.assertEqual(yp_sorted(s, key=repr), yp_sorted(t, key=repr))
+                    self.assertEqual(yp_sorted(s, key=yp_repr), yp_sorted(t, key=yp_repr))
 
                 self.assertRaises(TypeError, getattr(yp_set('january'), methname), X(data))
                 self.assertRaises(TypeError, getattr(yp_set('january'), methname), N(data))
@@ -1787,7 +1786,7 @@ class bad_dict_clear:
         return 0
 
 class TestWeirdBugs(yp_unittest.TestCase):
-    @yp_unittest.skip("REWORK: nohtyP sets don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_8420_set_merge(self):
         # This used to segfault
         global be_bad, set2, dict2

@@ -22,7 +22,7 @@ from yp_test import yp_unittest
 from _io import FileIO
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 @yp_unittest.skipUnless(os.name == 'posix', 'tests requires a posix system.')
 class TestFileIOSignalInterrupt(yp_unittest.TestCase):
     def setUp(self):

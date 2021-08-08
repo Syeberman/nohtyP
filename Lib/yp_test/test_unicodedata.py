@@ -19,7 +19,7 @@ errors = 'surrogatepass'
 
 ### Run tests
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_str_unicode_db
 class UnicodeMethodsTest(yp_unittest.TestCase):
 
     # update this, if the database changes
@@ -68,7 +68,7 @@ class UnicodeMethodsTest(yp_unittest.TestCase):
         result = h.hexdigest()
         self.assertEqual(result, self.expectedchecksum)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_str_unicode_db
 class UnicodeDatabaseTest(yp_unittest.TestCase):
 
     def setUp(self):

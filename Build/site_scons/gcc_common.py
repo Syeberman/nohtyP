@@ -184,7 +184,8 @@ def ApplyGCCOptions(env, version):
         "-Wshadow" if version >= 4.8 else "",
         # Disable some warnings
         # TODO maybe-uninitialized would be good during analyze
-        "-Wno-unused",
+        "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
+        "-Wno-unused-variable",  # TODO Mark TypeError_MappingMethods/etc as unused (portably)?
         "-Wno-pointer-sign",
         "-Wno-unknown-pragmas",
         "-Wno-maybe-uninitialized" if version >= 4.8 else "-Wno-uninitialized",

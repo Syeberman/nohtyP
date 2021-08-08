@@ -10,7 +10,7 @@ import contextlib as _contextlib
 import yp as _yp
 
 # The danger of using Python's test suite to test nohtyP is that we might forget to convert an
-# object to nohtyP; this is designed 
+# object to nohtyP; this is designed
 def _checkFornohtyP(*objs):
     for obj in objs:
         if isinstance(obj, _yp.ypObject): return
@@ -76,7 +76,7 @@ class TestCase(_unittest.TestCase):
     def assertListEqual(self, list1, list2, msg=None):
         if self._nohtyPCheckEnabled: _checkFornohtyP(list1, list2)
         _unittest.TestCase.assertListEqual(self, list1, list2, msg)
-    
+
     def assertTupleEqual(self, tuple1, tuple2, msg=None):
         if self._nohtyPCheckEnabled: _checkFornohtyP(tuple1, tuple2)
         _unittest.TestCase.assertTupleEqual(self, tuple1, tuple2, msg)

@@ -13,7 +13,7 @@ from yp_test import support, seq_tests
 
 class CommonTest(seq_tests.CommonTest):
 
-    @yp_unittest.skip("Not applicable to nohtyP")
+    @yp_unittest.skip_not_applicable
     def test_init(self):
         # Iterable arg is optional
         self.assertEqual(self.type2test([]), self.type2test())
@@ -52,7 +52,7 @@ class CommonTest(seq_tests.CommonTest):
         self.assertEqual(yp_str(a2), "[0, 1, 2, [...], 3]")
         self.assertEqual(yp_repr(a2), "[0, 1, 2, [...], 3]")
 
-    @yp_unittest.skip("TODO Support repr in nohtyP")
+    @yp_unittest.skip_str_repr
     def test_repr_recursive(self):
         l0 = self.type2test()
         for i in range(sys.getrecursionlimit() + 100):
@@ -315,7 +315,7 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, a.remove)
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_remove_badobj_1(self):
         class BadExc(Exception):
             pass
@@ -338,7 +338,7 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(ValueError, d.remove, 'c')
         self.assertEqual(d, self.type2test('abdefghij'))
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_remove_badobj_2(self):
         class BadExc(Exception):
             pass
@@ -363,7 +363,7 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, a.count)
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_count_badobj(self):
         class BadExc(Exception):
             pass
@@ -393,7 +393,7 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, u.index)
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_index_badobj_1(self):
         class BadExc(Exception):
             pass
@@ -425,7 +425,7 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(ValueError, a.index, 2, 0, 4)
         self.assertEqual(a, self.type2test([-2, -1, 0, 1, 2]))
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types")
+    @yp_unittest.skip_user_defined_types
     def test_index_badobj_2(self):
         # Test modifying the list during index's iteration
         class EvilCmp:
@@ -501,7 +501,7 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, u.sort, 42, 42)
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types (cmp_to_key)")
+    @yp_unittest.skip_user_defined_types
     def test_sort_cmp_to_key_1(self):
         # This used to be one big test_sort test, but I had to split it up to disable parts
         u = self.type2test([2,1,0,-1,-2])
@@ -534,7 +534,7 @@ class CommonTest(seq_tests.CommonTest):
         z = self.type2test(range(12))
         self.assertRaises(TypeError, z.sort, 2)
 
-    @yp_unittest.skip("REWORK: nohtyP lists don't store user-defined types (cmp_to_key)")
+    @yp_unittest.skip_user_defined_types
     def test_sort_cmp_to_key_2(self):
         # This used to be one big test_sort test, but I had to split it up to disable parts
         z = self.type2test(range(12))
@@ -623,7 +623,7 @@ class CommonTest(seq_tests.CommonTest):
         a[::2] = tuple(range(5))
         self.assertEqual(a, self.type2test([0, 1, 1, 3, 2, 5, 3, 7, 4, 9]))
 
-    @yp_unittest.skip("Not applicable to nohtyP (yp_ssize_t doesn't go that high)")
+    @yp_unittest.skip_long_ints
     def test_extendedslicing_long_ints(self):
         # test issue7788
         a = self.type2test(range(10))

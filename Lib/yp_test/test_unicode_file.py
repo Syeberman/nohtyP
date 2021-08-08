@@ -21,7 +21,7 @@ def remove_if_exists(filename):
     if os.path.exists(filename):
         os.unlink(filename)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class TestUnicodeFiles(yp_unittest.TestCase):
     # The 'do_' functions are the actual tests.  They generally assume the
     # file already exists etc.

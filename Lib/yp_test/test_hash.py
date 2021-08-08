@@ -48,7 +48,7 @@ def skip_unless_internalhash(test):
     return test if ok else yp_unittest.skip(msg)(test)
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class HashEqualityTestCase(yp_unittest.TestCase):
 
     def same_hash(self, *objlist):
@@ -113,7 +113,7 @@ class InheritedHashWithInequality(FixedHash, OnlyInequality): pass
 class NoHash(object):
     __hash__ = None
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class HashInheritanceTestCase(yp_unittest.TestCase):
     default_expected = [object(),
                         DefaultHash(),
@@ -158,7 +158,7 @@ class DefaultIterSeq(object):
     def __getitem__(self, index):
         return self.seq[index]
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class HashBuiltinsTestCase(yp_unittest.TestCase):
     hashes_to_check = [enumerate(range(10)),
                        iter(DefaultIterSeq()),
@@ -279,7 +279,7 @@ class StringlikeHashRandomizationTests(HashRandomizationTests):
         self.assertEqual(self.get_hash(self.repr_long, seed=42), h)
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class StrHashRandomizationTests(StringlikeHashRandomizationTests,
                                 yp_unittest.TestCase):
     repr_ = repr('abc')
@@ -297,7 +297,7 @@ class StrHashRandomizationTests(StringlikeHashRandomizationTests,
         h = self.get_expected_hash(4, 6)
         self.assertEqual(self.get_hash(self.repr_ucs2, seed=42), h)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class BytesHashRandomizationTests(StringlikeHashRandomizationTests,
                                   yp_unittest.TestCase):
     repr_ = repr(b'abc')
@@ -307,7 +307,7 @@ class BytesHashRandomizationTests(StringlikeHashRandomizationTests,
     def test_empty_string(self):
         self.assertEqual(hash(b""), 0)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class MemoryviewHashRandomizationTests(StringlikeHashRandomizationTests,
                                        yp_unittest.TestCase):
     repr_ = "memoryview(b'abc')"
@@ -321,20 +321,20 @@ class DatetimeTests(HashRandomizationTests):
     def get_hash_command(self, repr_):
         return 'import datetime; print(hash(%s))' % repr_
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class DatetimeDateTests(DatetimeTests, yp_unittest.TestCase):
     repr_ = repr(datetime.date(1066, 10, 14))
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class DatetimeDatetimeTests(DatetimeTests, yp_unittest.TestCase):
     repr_ = repr(datetime.datetime(1, 2, 3, 4, 5, 6, 7))
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class DatetimeTimeTests(DatetimeTests, yp_unittest.TestCase):
     repr_ = repr(datetime.time(0))
 
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_hash
 class HashDistributionTestCase(yp_unittest.TestCase):
 
     def test_hash_distribution(self):

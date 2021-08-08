@@ -15,7 +15,7 @@ from collections import UserList
 
 from _io import FileIO as _FileIO
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class AutoFileTests(yp_unittest.TestCase):
     # file tests for which a test file is automatically set up
 
@@ -261,7 +261,7 @@ class AutoFileTests(yp_unittest.TestCase):
         a = array('b', b'x'*10)
         f.readinto(a)
 
-@yp_unittest.skip( "TODO: convert to yp.py" )
+@yp_unittest.skip_files
 class OtherFileTests(yp_unittest.TestCase):
 
     def testAbles(self):

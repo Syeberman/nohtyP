@@ -81,7 +81,7 @@ namespace nohtyP
         public static @object iter( @object x ) {
             return new @object( _dll.yp_iter( x.self ) );
         }
-        // TODO yp_generatorCN, etc, supporting a callback
+        // TODO yp_generatorC, etc, supporting a callback
 
         public static @object range( long start, long stop, long step=1 ) {
             return new @object( _dll.yp_rangeC3( start, stop, step ) );
@@ -455,13 +455,6 @@ namespace nohtyP
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_iter( ypObject_p x );
-
-        [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_generatorCN( yp_generator_func_t func, yp_ssize_t length_hint, int n, params ypObject_p[] args );
-
-        [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_generator_fromstructCN( yp_generator_func_t func, yp_ssize_t length_hint,
-                void* state, yp_ssize_t size, int n, params ypObject_p[] args );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_rangeC3( yp_int_t start, yp_int_t stop, yp_int_t step );

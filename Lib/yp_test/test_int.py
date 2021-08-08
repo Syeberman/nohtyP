@@ -220,7 +220,7 @@ class IntTestCases(yp_unittest.TestCase):
         self.assertEqual(yp_int('2br45qc', 35), 4294967297)
         self.assertEqual(yp_int('1z141z5', 36), 4294967297)
 
-    @yp_unittest.skip("TODO: Support full Unicode in nohtyP")
+    @yp_unittest.skip_int_fromunicode
     def test_basic_unicode(self):
         self.assertEqual(yp_int("\N{EM SPACE}-3\N{EN SPACE}"), -3)
 
@@ -489,19 +489,19 @@ class IntTestCases(yp_unittest.TestCase):
 
         msg = "operator.%s(%s)" % (op.__name__, ", ".join(repr(x) for x in py_args))
         yp_args = tuple(yp_int(x) for x in py_args)
-        
+
         # Any exception raised by Python should be raised by us
         try: py_result = op(*py_args)
         except BaseException as e:
             self.assertRaises(type(e), op, *yp_args)
             return
-        
+
         # Additionally, if the result doesn't fit a yp_int_t, we expect an overflow
         try: yp_result = yp_int(py_result)
-        except: 
+        except:
             self.assertRaises(OverflowError, op, *yp_args)
             return
-    
+
         # Finally, check that we calculate the same result
         self.assertEqual(op(*yp_args), yp_result, msg=msg)
 
@@ -522,7 +522,7 @@ class IntTestCases(yp_unittest.TestCase):
             for op in binaryOps:
                 self._yp_int_against_python(op, x, y)
 
-    @yp_unittest.skip("REWORK: nohtyP doesn't have user-defined types yet")
+    @yp_unittest.skip_user_defined_types
     def test_intconversion(self):
         # Test __int__()
         class ClassicMissingMethods:
@@ -600,7 +600,7 @@ class IntTestCases(yp_unittest.TestCase):
                 with self.assertRaises(TypeError):
                     yp_int(TruncReturnsBadInt())
 
-    @yp_unittest.skip("TODO Support error messages in nohtyP")
+    @yp_unittest.skip_exception_messages
     def test_error_message(self):
         def check(s, base=None):
             with self.assertRaises(ValueError,
