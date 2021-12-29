@@ -1765,6 +1765,12 @@ class yp_bool(ypObject):
 
     def __invert__(self): return ~self._as_int()
 
+    @property
+    def real(self): return self._as_int()
+
+    @property
+    def imag(self): return yp_i_zero
+
     @staticmethod
     def _boolean(left, op, right):
         result = yp_bool._arithmetic(left, op, right)
@@ -2460,13 +2466,12 @@ class yp_function(ypObject):
             return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
     @classmethod
-    # TODO A better name?
     def with_parameters(cls, pyfunction, parameters=()):
         """Creates a yp_function object where the parameters are parsed by nohtyP. pyfunction will
         be called with *argarray.
         """
         ypcode = c_yp_function_code_t(functools.partial(cls._pyfunction_wrapper, pyfunction))
-        declaration = c_yp_function_decl_t(ypcode, 0, len(parameters), (c_yp_parameter_decl_t * len(parameters))(parameters))
+        declaration = c_yp_function_decl_t(ypcode, 0, len(parameters), (c_yp_parameter_decl_t * len(parameters))(*parameters))
         self = _yp_functionC(declaration)
         _yp_reverse_refs[self.value].append(ypcode)
         return self

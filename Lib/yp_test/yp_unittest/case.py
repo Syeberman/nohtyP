@@ -11,7 +11,7 @@ import yp as _yp
 
 
 # The danger of using Python's test suite to test nohtyP is that we might forget to convert an
-# object to nohtyP. This function ensures all assertion arguments are nohtyP objects.
+# object to nohtyP. This function ensures at least one object is a nohtyP object.
 def _checkFornohtyP(*objs):
     for obj in objs:
         if isinstance(obj, _yp.ypObject): return
@@ -150,11 +150,9 @@ class TestCase(_unittest.TestCase):
         if self._nohtyPCheckEnabled: _checkFornohtyP(obj)
         _unittest.TestCase.assertNotIsInstance(self, obj, cls, msg)
 
-    def assertRaisesRegex(
-        self, expected_exception, expected_regex, callable_obj=None, *args, **kwargs
-    ):
-        # TODO: Support exception instances (with messages) in nohtyP (skip_exception_messages)
-        return _unittest.TestCase.assertRaises(expected_exception, callable_obj, *args, **kwargs)
+    def assertRaisesRegex(self, expected_exception, expected_regex, *args, **kwargs):
+        # TODO(skip_exception_messages) Support exception instances (with messages) in nohtyP
+        return _unittest.TestCase.assertRaises(self, expected_exception, *args, **kwargs)
 
     def assertRegex(self, text, expected_regex, msg=None):
         if self._nohtyPCheckEnabled: _checkFornohtyP(text)

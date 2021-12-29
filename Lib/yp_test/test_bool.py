@@ -25,10 +25,13 @@ class BoolTest(yp_unittest.TestCase):
         self.assertRaises(TypeError, int.__new__, yp_bool, 0)
 
     def test_repr(self):
-        self.assertEqual(repr(False), 'False')
-        self.assertEqual(repr(True), 'True')
-        self.assertIs(eval(repr(False)), False)
-        self.assertIs(eval(repr(True)), True)
+        self.assertEqual(yp_repr(yp_False), 'False')
+        self.assertEqual(yp_repr(yp_True), 'True')
+
+    @yp_unittest.skip_not_applicable
+    def test_repr_eval(self):
+        self.assertIs(eval(yp_repr(yp_False)), yp_False)
+        self.assertIs(eval(yp_repr(yp_True)), yp_True)
 
     def test_str(self):
         self.assertEqual(yp_str(yp_False), 'False')
@@ -91,14 +94,14 @@ class BoolTest(yp_unittest.TestCase):
         self.assertEqual(yp_False/1, 0)
         self.assertIsNot(yp_False/1, yp_False)
 
-        self.assertEqual(True%1, 0)
-        self.assertIsNot(True%1, False)
-        self.assertEqual(True%2, 1)
-        self.assertIsNot(True%2, True)
-        self.assertEqual(False%1, 0)
-        self.assertIsNot(False%1, False)
+        self.assertEqual(yp_True%1, 0)
+        self.assertIsNot(yp_True%1, yp_False)
+        self.assertEqual(yp_True%2, 1)
+        self.assertIsNot(yp_True%2, yp_True)
+        self.assertEqual(yp_False%1, 0)
+        self.assertIsNot(yp_False%1, yp_False)
 
-        for b in False, True:
+        for b in yp_False, yp_True:
             for i in 0, 1, 2:
                 self.assertEqual(b**i, yp_int(b)**i)
                 self.assertIsNot(b**i, yp_bool(yp_int(b)**i))
@@ -177,6 +180,7 @@ class BoolTest(yp_unittest.TestCase):
         with self.assertRaisesRegex(TypeError, 'keyword argument'):
             yp_bool(x=10)
 
+    @yp_unittest.skip_str_printf
     def test_format(self):
         self.assertEqual("%d" % yp_False, "0")
         self.assertEqual("%d" % yp_True, "1")
@@ -254,8 +258,8 @@ class BoolTest(yp_unittest.TestCase):
     def test_fileclosed(self):
         try:
             with open(os_helper.TESTFN, "w", encoding="utf-8") as f:
-                self.assertIs(f.closed, False)
-            self.assertIs(f.closed, True)
+                self.assertIs(f.closed, yp_False)
+            self.assertIs(f.closed, yp_True)
         finally:
             os.remove(os_helper.TESTFN)
 
@@ -292,8 +296,8 @@ class BoolTest(yp_unittest.TestCase):
     def test_pickle(self):
         import pickle
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
-            self.assertIs(pickle.loads(pickle.dumps(True, proto)), True)
-            self.assertIs(pickle.loads(pickle.dumps(False, proto)), False)
+            self.assertIs(pickle.loads(pickle.dumps(yp_True, proto)), yp_True)
+            self.assertIs(pickle.loads(pickle.dumps(yp_False, proto)), yp_False)
 
     @yp_unittest.skip_pickling
     def test_picklevalues(self):
@@ -338,10 +342,12 @@ class BoolTest(yp_unittest.TestCase):
                 return -1
         self.assertRaises(ValueError, yp_bool, Eggs())
 
+    @yp_unittest.skip_int_to_bytes
     def test_from_bytes(self):
-        self.assertIs(yp_bool.from_bytes(b'\x00'*8, 'big'), False)
-        self.assertIs(yp_bool.from_bytes(b'abcd', 'little'), True)
+        self.assertIs(yp_bool.from_bytes(b'\x00'*8, 'big'), yp_False)
+        self.assertIs(yp_bool.from_bytes(b'abcd', 'little'), yp_True)
 
+    @yp_unittest.skip_not_applicable
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
         # this will start failing if __len__ changes assertions
@@ -371,23 +377,24 @@ class BoolTest(yp_unittest.TestCase):
     def test_real_and_imag(self):
         self.assertEqual(yp_True.real, 1)
         self.assertEqual(yp_True.imag, 0)
-        self.assertIs(type(yp_True.real), int)
-        self.assertIs(type(yp_True.imag), int)
+        self.assertIs(type(yp_True.real), yp_int)
+        self.assertIs(type(yp_True.imag), yp_int)
         self.assertEqual(yp_False.real, 0)
         self.assertEqual(yp_False.imag, 0)
-        self.assertIs(type(yp_False.real), int)
-        self.assertIs(type(yp_False.imag), int)
+        self.assertIs(type(yp_False.real), yp_int)
+        self.assertIs(type(yp_False.imag), yp_int)
 
+    @yp_unittest.skip_not_applicable
     def test_bool_called_at_least_once(self):
         class X:
             def __init__(self):
                 self.count = 0
             def __bool__(self):
                 self.count += 1
-                return True
+                return yp_True
 
         def f(x):
-            if x or True:
+            if x or yp_True:
                 pass
 
         x = X()

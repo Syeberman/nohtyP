@@ -1,3 +1,4 @@
+from yp import *
 from yp_test import yp_unittest
 from yp_test.support import cpython_only
 try:
@@ -350,14 +351,20 @@ class TestCallingConventionsStatic(TestCallingConventions):
         self.expected_self = None
 
 
-# FIXME Make a nohtyP function
-def pyfunc(arg1, arg2):
-    return [arg1, arg2]
+# def pyfunc(arg1, arg2):
+#     return [arg1, arg2]
+pyfunc = yp_function.with_parameters(
+    lambda arg1, arg2: yp_list((arg1, arg2)),
+    parameters=((yp_str("arg1"), ), (yp_str("arg2"), ))
+)
 
 
-# FIXME Make a nohtyP function
 def pyfunc_noarg():
     return "noarg"
+pyfunc_noarg = yp_function.with_parameters(
+    lambda: "noarg",
+    parameters=()
+)
 
 
 class PythonClass:
@@ -401,7 +408,7 @@ class FastCallTests(yp_unittest.TestCase):
         # Python instance methods
         (PYTHON_INSTANCE.method, yp_tuple((1, 2)), yp_list([1, 2])),
         (PYTHON_INSTANCE.method_noarg, yp_tuple(), yp_str("noarg")),
-        (PYTHON_INSTANCE.class_method, yp_tuple(), yp_str("classmethod"),
+        (PYTHON_INSTANCE.class_method, yp_tuple(), yp_str("classmethod")),
         (PYTHON_INSTANCE.static_method, yp_tuple(), yp_str("staticmethod")),
 
         # C callables are added later
@@ -416,7 +423,7 @@ class FastCallTests(yp_unittest.TestCase):
         (pyfunc, yp_tuple(), yp_dict({'arg1': 1, 'arg2': 2}), yp_list([1, 2])),
 
         # Python instance methods
-        (PYTHON_INSTANCE.method, yp_tuple((1,)), yp_dict({'arg2': 2}), yp_list([1, 2]),
+        (PYTHON_INSTANCE.method, yp_tuple((1,)), yp_dict({'arg2': 2}), yp_list([1, 2])),
         (PYTHON_INSTANCE.method, yp_tuple(), yp_dict({'arg1': 1, 'arg2': 2}), yp_list([1, 2])),
 
         # C callables are added later
