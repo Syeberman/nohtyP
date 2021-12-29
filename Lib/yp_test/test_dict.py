@@ -16,7 +16,7 @@ import gc, weakref
 import pickle
 
 # Extra assurance that we're not accidentally testing Python's dict
-def dict( *args, **kwargs ): raise NotImplementedError( "convert script to yp_dict here" )
+def dict(*args, **kwargs): raise NotImplementedError("convert script to yp_dict here")
 
 
 class DictTest(yp_unittest.TestCase):

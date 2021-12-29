@@ -16,8 +16,8 @@ import array
 # Extra assurance that we're not accidentally testing Python's int or float...unless we mean to
 _int = int
 _float = float
-def int( *args, **kwargs ): raise NotImplementedError( "convert script to yp_int here" )
-def float( *args, **kwargs ): raise NotImplementedError( "convert script to yp_float here" )
+def int(*args, **kwargs): raise NotImplementedError("convert script to yp_int here")
+def float(*args, **kwargs): raise NotImplementedError("convert script to yp_float here")
 
 # SHIFT should match the value in longintrepr.h for best testing.
 SHIFT = sys.int_info.bits_per_digit

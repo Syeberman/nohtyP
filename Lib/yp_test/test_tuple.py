@@ -6,9 +6,8 @@ import gc
 import pickle
 
 # Extra assurance that we're not accidentally testing Python's tuple and list
-def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
-_list = list # ...because we actually need Python's list in a few places
-def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
+def tuple(*args, **kwargs): raise NotImplementedError("convert script to yp_tuple here")
+def list(*args, **kwargs): raise NotImplementedError("convert script to yp_list here")
 
 
 # For tuple hashes, we normally only run a test to ensure that we get

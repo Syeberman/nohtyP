@@ -11,9 +11,9 @@ import random
 
 # Extra assurance that we're not accidentally testing Python's types...unless we mean to
 _str = str
-def bytes( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytes here" )
-def bytearray( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytearray here" )
-def str( *args, **kwargs ): raise NotImplementedError( "convert script to yp_str here" )
+def bytes(*args, **kwargs): raise NotImplementedError("convert script to yp_bytes here")
+def bytearray(*args, **kwargs): raise NotImplementedError("convert script to yp_bytearray here")
+def str(*args, **kwargs): raise NotImplementedError("convert script to yp_str here")
 
 class Sequence:
     def __init__(self, seq='wxyz'): self.seq = seq

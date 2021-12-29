@@ -7,8 +7,7 @@ from yp_test import support
 from yp_test.test_grammar import (VALID_UNDERSCORE_LITERALS,
                                INVALID_UNDERSCORE_LITERALS)
 
-# Extra assurance that we're not accidentally testing Python's int...unless we mean to
-_int = int
+# Extra assurance that we're not accidentally testing Python's int
 def int(*args, **kwargs): raise NotImplementedError("convert script to yp_int here")
 
 L = [
@@ -33,7 +32,7 @@ L = [
         #("\u0200", ValueError)
 ]
 
-class IntSubclass(int):
+class IntSubclass(yp_int):
     pass
 
 class IntTestCases(yp_unittest.TestCase):

@@ -10,15 +10,15 @@ import pickle
 import collections.abc
 
 # Extra assurance that we're not accidentally testing Python's data types
-def iter( *args, **kwargs ): raise NotImplementedError( "convert script to yp_iter here" )
-def bytes( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytes here" )
-def bytearray( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytearray here" )
-def str( *args, **kwargs ): raise NotImplementedError( "convert script to yp_str here" )
-def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
-def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
-def frozenset( *args, **kwargs ): raise NotImplementedError( "convert script to yp_frozenset here" )
-def set( *args, **kwargs ): raise NotImplementedError( "convert script to yp_set here" )
-def dict( *args, **kwargs ): raise NotImplementedError( "convert script to yp_dict here" )
+def iter(*args, **kwargs): raise NotImplementedError("convert script to yp_iter here")
+def bytes(*args, **kwargs): raise NotImplementedError("convert script to yp_bytes here")
+def bytearray(*args, **kwargs): raise NotImplementedError("convert script to yp_bytearray here")
+def str(*args, **kwargs): raise NotImplementedError("convert script to yp_str here")
+def tuple(*args, **kwargs): raise NotImplementedError("convert script to yp_tuple here")
+def list(*args, **kwargs): raise NotImplementedError("convert script to yp_list here")
+def frozenset(*args, **kwargs): raise NotImplementedError("convert script to yp_frozenset here")
+def set(*args, **kwargs): raise NotImplementedError("convert script to yp_set here")
+def dict(*args, **kwargs): raise NotImplementedError("convert script to yp_dict here")
 # TODO same for yp_range, yp_min, yp_max, etc
 # TODO yp_iter(x) throws TypeError if x not a ypObject
 

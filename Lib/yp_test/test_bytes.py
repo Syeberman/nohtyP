@@ -26,8 +26,8 @@ from yp_test.support import bigaddrspacetest, MAX_Py_ssize_t
 from yp_test.support.script_helper import assert_python_failure
 
 # Extra assurance that we're not accidentally testing Python's bytes and bytearray
-def bytes( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytes here" )
-def bytearray( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytearray here" )
+def bytes(*args, **kwargs): raise NotImplementedError("convert script to yp_bytes here")
+def bytearray(*args, **kwargs): raise NotImplementedError("convert script to yp_bytearray here")
 
 
 if sys.flags.bytes_warning:

@@ -6,8 +6,8 @@ import pickle
 from yp_test import yp_unittest
 
 # Extra assurance that we're not accidentally testing Python's tuple and list
-def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
-def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
+def tuple(*args, **kwargs): raise NotImplementedError("convert script to yp_tuple here")
+def list(*args, **kwargs): raise NotImplementedError("convert script to yp_list here")
 
 class ListTest(list_tests.CommonTest):
     type2test = yp_list

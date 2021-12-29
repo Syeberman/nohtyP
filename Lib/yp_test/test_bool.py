@@ -8,14 +8,14 @@ import os
 
 # Extra assurance that we're not accidentally testing Python's bool; unfortunately we can't
 # redefine True/False because they are keywords
-def bool( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bool here" )
+def bool(*args, **kwargs): raise NotImplementedError("convert script to yp_bool here")
 
 class BoolTest(yp_unittest.TestCase):
 
     @yp_unittest.skip_not_applicable
     def test_subclass(self):
         try:
-            class C(bool):
+            class C(yp_bool):
                 pass
         except TypeError:
             pass

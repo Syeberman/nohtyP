@@ -1,11 +1,11 @@
 # Python test set -- part 1, grammar.
 # This just tests whether the parser accepts them all.
 
-from test.support import check_syntax_error
-from test.support import import_helper
-from test.support.warnings_helper import check_syntax_warning
+from yp_test.support import check_syntax_error
+from yp_test.support import import_helper
+from yp_test.support.warnings_helper import check_syntax_warning
 import inspect
-import unittest
+from yp_test import yp_unittest
 import sys
 import warnings
 # testing import *
@@ -13,11 +13,13 @@ from sys import *
 
 # different import patterns to check that __annotations__ does not interfere
 # with import machinery
-import test.ann_module as ann_module
+# XXX Not applicable to nohtyP
+# import yp_test.ann_module as ann_module
 import typing
 from collections import ChainMap
-from test import ann_module2
-import test
+# XXX Not applicable to nohtyP
+# from yp_test import ann_module2
+import yp_test
 
 # These are shared with test_tokenize and other test modules.
 #
@@ -101,9 +103,10 @@ INVALID_UNDERSCORE_LITERALS = [
 ]
 
 
-class TokenTests(unittest.TestCase):
+@yp_unittest.skip_not_applicable
+class TokenTests(yp_unittest.TestCase):
 
-    from test.support import check_syntax_error
+    from yp_test.support import check_syntax_error
 
     def test_backslash(self):
         # Backslash means line continuation:
@@ -364,11 +367,12 @@ class CNS:
         return self._dct[item]
 
 
-class GrammarTests(unittest.TestCase):
+@yp_unittest.skip_not_applicable
+class GrammarTests(yp_unittest.TestCase):
 
-    from test.support import check_syntax_error
-    from test.support.warnings_helper import check_syntax_warning
-    from test.support.warnings_helper import check_no_warnings
+    from yp_test.support import check_syntax_error
+    from yp_test.support.warnings_helper import check_syntax_warning
+    from yp_test.support.warnings_helper import check_no_warnings
 
     # single_input: NEWLINE | simple_stmt | compound_stmt NEWLINE
     # XXX can't test in a script -- this rule is only used when interactive
@@ -1288,7 +1292,7 @@ class GrammarTests(unittest.TestCase):
                       "raised an AssertionError")
 
     # these tests fail if python is run with -O, so check __debug__
-    @unittest.skipUnless(__debug__, "Won't work if __debug__ is False")
+    @yp_unittest.skipUnless(__debug__, "Won't work if __debug__ is False")
     def test_assert_failures(self):
         try:
             assert 0, "msg"
@@ -2004,4 +2008,4 @@ class GrammarTests(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    yp_unittest.main()

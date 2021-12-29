@@ -22,12 +22,12 @@ from yp_test import support, string_tests
 from yp_test.support.script_helper import assert_python_failure
 
 # Extra assurance that we're not accidentally testing Python's str
-def chr( *args, **kwargs ): raise NotImplementedError( "convert script to yp_chr here" )
-def str( *args, **kwargs ): raise NotImplementedError( "convert script to yp_str here" )
-def repr( *args, **kwargs ): raise NotImplementedError( "convert script to yp_repr here" )
+def chr(*args, **kwargs): raise NotImplementedError("convert script to yp_chr here")
+def str(*args, **kwargs): raise NotImplementedError("convert script to yp_str here")
+def repr(*args, **kwargs): raise NotImplementedError("convert script to yp_repr here")
 # TODO ord
-def bytes( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytes here" )
-def bytearray( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytearray here" )
+def bytes(*args, **kwargs): raise NotImplementedError("convert script to yp_bytes here")
+def bytearray(*args, **kwargs): raise NotImplementedError("convert script to yp_bytearray here")
 
 # Error handling (bad decoder return)
 def search_function(encoding):

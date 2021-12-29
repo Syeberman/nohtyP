@@ -14,8 +14,8 @@ import collections.abc
 import itertools
 
 # Extra assurance that we're not accidentally testing Python's frozenset and set
-def frozenset( *args, **kwargs ): raise NotImplementedError( "convert script to yp_frozenset here" )
-def set( *args, **kwargs ): raise NotImplementedError( "convert script to yp_set here" )
+def frozenset(*args, **kwargs): raise NotImplementedError("convert script to yp_frozenset here")
+def set(*args, **kwargs): raise NotImplementedError("convert script to yp_set here")
 
 # Choose an error unlikely to be confused with anything else in Python or nohtyP
 PassThru = OverflowError

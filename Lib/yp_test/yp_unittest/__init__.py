@@ -2,7 +2,6 @@
 from unittest import *
 from .case import TestCase
 
-
 # Easy-to-search "skip" decorators for various features we have yet to support.
 skip_bytes_fromhex = skip("TODO: Support yp_bytes.fromhex")
 skip_complex = skip("TODO: Implement yp_complex?")
