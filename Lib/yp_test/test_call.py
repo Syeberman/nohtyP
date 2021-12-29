@@ -362,7 +362,7 @@ pyfunc = yp_function.with_parameters(
 def pyfunc_noarg():
     return "noarg"
 pyfunc_noarg = yp_function.with_parameters(
-    lambda: "noarg",
+    lambda: yp_str("noarg"),
     parameters=()
 )
 

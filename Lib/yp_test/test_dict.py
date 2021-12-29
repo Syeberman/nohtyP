@@ -79,38 +79,6 @@ class DictTest(yp_unittest.TestCase):
         self.assertRaises(ValueError, a.__ior__, "BAD")
         self.assertEqual(a.__ior__(""), {0: 0, 1: 1, 2: 1})
 
-    def test_merge_operator(self):
-
-        a = {0: 0, 1: 1, 2: 1}
-        b = {1: 1, 2: 2, 3: 3}
-
-        c = a.copy()
-        c |= b
-
-        self.assertEqual(a | b, {0: 0, 1: 1, 2: 2, 3: 3})
-        self.assertEqual(c, {0: 0, 1: 1, 2: 2, 3: 3})
-
-        c = b.copy()
-        c |= a
-
-        self.assertEqual(b | a, {1: 1, 2: 1, 3: 3, 0: 0})
-        self.assertEqual(c, {1: 1, 2: 1, 3: 3, 0: 0})
-
-        c = a.copy()
-        c |= [(1, 1), (2, 2), (3, 3)]
-
-        self.assertEqual(c, {0: 0, 1: 1, 2: 2, 3: 3})
-
-        self.assertIs(a.__or__(None), NotImplemented)
-        self.assertIs(a.__or__(()), NotImplemented)
-        self.assertIs(a.__or__("BAD"), NotImplemented)
-        self.assertIs(a.__or__(""), NotImplemented)
-
-        self.assertRaises(TypeError, a.__ior__, None)
-        self.assertEqual(a.__ior__(()), {0: 0, 1: 1, 2: 1})
-        self.assertRaises(ValueError, a.__ior__, "BAD")
-        self.assertEqual(a.__ior__(""), {0: 0, 1: 1, 2: 1})
-
     def test_bool(self):
         self.assertFalse(yp_dict())
         self.assertTrue(yp_dict({1: 2}))
@@ -149,26 +117,6 @@ class DictTest(yp_unittest.TestCase):
         self.assertEqual(set(d.items()), {(1, 2)})
         self.assertRaises(TypeError, d.items, None)
         self.assertEqual(repr(yp_dict(a=1).items()), "dict_items([('a', 1)])")
-
-    def test_views_mapping(self):
-        mappingproxy = type(type.__dict__)
-        class Dict(dict):
-            pass
-        for cls in [dict, Dict]:
-            d = cls()
-            m1 = d.keys().mapping
-            m2 = d.values().mapping
-            m3 = d.items().mapping
-
-            for m in [m1, m2, m3]:
-                self.assertIsInstance(m, mappingproxy)
-                self.assertEqual(m, d)
-
-            d["foo"] = "bar"
-
-            for m in [m1, m2, m3]:
-                self.assertIsInstance(m, mappingproxy)
-                self.assertEqual(m, d)
 
     def test_views_mapping(self):
         mappingproxy = type(type.__dict__)

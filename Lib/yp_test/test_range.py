@@ -376,12 +376,16 @@ class RangeTest(yp_unittest.TestCase):
         # Not applicable to nohtyP
         #self.assertIs(type(yp_range(3).count(-1)), int)
         #self.assertIs(type(yp_range(3).count(1)), int)
+        self.assertEqual(range(10**20).count(1), 1)
+        self.assertEqual(range(10**20).count(10**20), 0)
+        self.assertEqual(range(3).index(1), 1)
+        self.assertEqual(range(1, 2**100, 2).count(2**87), 0)
+        self.assertEqual(range(1, 2**100, 2).count(2**87+1), 1)
 
     @yp_unittest.skip_user_defined_types
     def test_count_always_equal(self):
         self.assertEqual(range(10).count(ALWAYS_EQ), 10)
 
-        # ? Why is this here...
         self.assertEqual(len(yp_range(sys.maxsize, sys.maxsize+10)), 10)
 
     def test_repr(self):
@@ -487,6 +491,7 @@ class RangeTest(yp_unittest.TestCase):
         # to be contained in the range.
         self.assertIn(1.0, yp_range(3))
         self.assertIn(True, yp_range(3))
+        self.assertIn(1+0j, range(3))
 
         self.assertIn(ALWAYS_EQ, range(3))
 

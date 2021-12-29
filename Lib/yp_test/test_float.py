@@ -566,6 +566,13 @@ class GeneralFloatCases(yp_unittest.TestCase):
             #self.assertTrue(0.0 < pow_op(2.0, -1047) < 1e-315)
             #self.assertTrue(0.0 > pow_op(-2.0, -1047) > -1e-315)
 
+    def test_hash(self):
+        for x in range(-30, 30):
+            self.assertEqual(hash(float(x)), hash(x))
+        self.assertEqual(hash(float(sys.float_info.max)),
+                         hash(int(sys.float_info.max)))
+        self.assertEqual(hash(float('inf')), sys.hash_info.inf)
+        self.assertEqual(hash(float('-inf')), -sys.hash_info.inf)
 
     def test_hash_nan(self):
         value = float('nan')

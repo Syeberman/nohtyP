@@ -469,12 +469,6 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, u.sort, 42, 42)
 
-    @yp_unittest.skip_user_defined_types
-    def test_sort_cmp_to_key_1(self):
-        # This used to be one big test_sort test, but I had to split it up to disable parts
-        u = self.type2test([2,1,0,-1,-2])
-        u.sort()
-
         def revcmp(a, b):
             if a == b:
                 return 0
@@ -497,15 +491,7 @@ class CommonTest(seq_tests.CommonTest):
         z = self.type2test(range(12))
         z.sort(key=cmp_to_key(myComparison))
 
-    def test_sort_bad_args_1(self):
-        # This used to be one big test_sort test, but I had to split it up to disable parts
-        z = self.type2test(range(12))
         self.assertRaises(TypeError, z.sort, 2)
-
-    @yp_unittest.skip_user_defined_types
-    def test_sort_cmp_to_key_2(self):
-        # This used to be one big test_sort test, but I had to split it up to disable parts
-        z = self.type2test(range(12))
 
         def selfmodifyingComparison(x,y):
             z.append(1)
@@ -518,9 +504,6 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(ValueError, z.sort,
                           key=cmp_to_key(selfmodifyingComparison))
 
-    def test_sort_bad_args_2(self):
-        # This used to be one big test_sort test, but I had to split it up to disable parts
-        z = self.type2test(range(12))
         self.assertRaises(TypeError, z.sort, 42, 42, 42, 42)
 
     def test_slice(self):

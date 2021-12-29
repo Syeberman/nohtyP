@@ -425,6 +425,10 @@ class ReadTest(MixInCheckStateHandling):
                              before + after)
             self.assertEqual(test_sequence.decode(self.encoding, "replace"),
                              before + self.ill_formed_sequence_replace + after)
+            backslashreplace = ''.join('\\x%02x' % b
+                                       for b in self.ill_formed_sequence)
+            self.assertEqual(test_sequence.decode(self.encoding, "backslashreplace"),
+                             before + backslashreplace + after)
 
     def test_incremental_surrogatepass(self):
         # Test incremental decoder for surrogatepass handler:
@@ -898,6 +902,11 @@ class UTF8Test(ReadTest, yp_unittest.TestCase):
                 cases.append(prefix + suffix)
         cases.extend((b'\xE0\x80', b'\xE0\x9F', b'\xED\xA0\x80',
                       b'\xED\xBF\xBF', b'\xF0\x80', b'\xF0\x8F', b'\xF4\x90'))
+
+        for data in cases:
+            with self.subTest(data=data):
+                dec = codecs.getincrementaldecoder(self.encoding)()
+                self.assertRaises(UnicodeDecodeError, dec.decode, data)
 
     def test_encode(self):
         tests = [
@@ -2552,7 +2561,6 @@ class UnicodeEscapeTest(ReadTest, yp_unittest.TestCase):
             ]
         )
 
-
 @yp_unittest.skip_str_codecs
 class RawUnicodeEscapeTest(ReadTest, yp_unittest.TestCase):
     encoding = "raw-unicode-escape"
@@ -2607,6 +2615,34 @@ class RawUnicodeEscapeTest(ReadTest, yp_unittest.TestCase):
         self.assertEqual(decode(br"\U00110000", "ignore"), ("", 10))
         self.assertEqual(decode(br"\U00110000", "replace"), ("\ufffd", 10))
 
+    def test_partial(self):
+        self.check_partial(
+            "\x00\t\n\r\\\xff\uffff\U00010000",
+            [
+                '\x00',
+                '\x00\t',
+                '\x00\t\n',
+                '\x00\t\n\r',
+                '\x00\t\n\r',
+                '\x00\t\n\r\\\xff',
+                '\x00\t\n\r\\\xff',
+                '\x00\t\n\r\\\xff',
+                '\x00\t\n\r\\\xff',
+                '\x00\t\n\r\\\xff',
+                '\x00\t\n\r\\\xff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff',
+                '\x00\t\n\r\\\xff\uffff\U00010000',
+            ]
+        )
 
 
 class EscapeEncodeTest(yp_unittest.TestCase):

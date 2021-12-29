@@ -53,10 +53,6 @@ class ListTest(list_tests.CommonTest):
         with self.assertRaisesRegex(TypeError, 'keyword argument'):
             list(sequence=[])
 
-    def test_keyword_args(self):
-        with self.assertRaisesRegex(TypeError, 'keyword argument'):
-            list(sequence=[])
-
     def test_truth(self):
         super().test_truth()
         self.assertFalse(yp_list())

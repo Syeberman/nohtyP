@@ -16,9 +16,7 @@ def check(tag, expected, raw, compare=None):
 
     orig = raw[:]   # save input in case of error
     if compare:
-        # TODO Change back once nohtyP supports user-defined types and key functions
-        # raw.sort(key=cmp_to_key(compare))
-        raw = sorted(raw, key=cmp_to_key(compare))
+        raw.sort(key=cmp_to_key(compare))
     else:
         raw.sort()
 

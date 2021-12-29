@@ -886,6 +886,7 @@ class InvocationRecorder:
     def __call__(self, *args, **kwargs):
         self.invocation_count += 1
         self.last_invocation = (args, kwargs)
+        return io.BytesIO(b'some bytes')
 
 
 @yp_unittest.skip_files
@@ -911,7 +912,7 @@ class Test_hook_compressed(yp_unittest.TestCase):
             gzip.open = original_open
 
         self.assertEqual(self.fake_open.invocation_count, 1)
-        self.assertEqual(self.fake_open.last_invocation, (("test.gz", 3), {}))
+        self.assertEqual(self.fake_open.last_invocation, (("test.gz", "3"), {}))
 
     @yp_unittest.skipUnless(gzip, "Requires gzip and zlib")
     def test_gz_with_encoding_fake(self):

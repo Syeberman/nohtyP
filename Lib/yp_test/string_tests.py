@@ -260,9 +260,6 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'rfind', 42)
 
-    @support.requires_resource('cpu')
-    @yp_unittest.skip_str_find
-    def test_rfind_combinations(self):
         # For a variety of combinations,
         #    verify that str.rfind() matches __contains__
         #    and that the found substring is really at that location
@@ -287,8 +284,6 @@ class BaseTest:
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
-    @yp_unittest.skip_str_find
-    def test_rfind_issues(self):
         # issue 7458
         # XXX Not applicable to nohtyP: ints don't go up that high
         #self.checkequal(-1, 'ab', 'rfind', 'xxx', sys.maxsize + 1, 0)
