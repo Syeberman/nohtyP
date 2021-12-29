@@ -11,8 +11,8 @@ import py_compile
 import zipfile
 
 from importlib.util import source_from_cache
-from yp_test import support
-from yp_test.support.import_helper import make_legacy_pyc
+from test import support
+from test.support.import_helper import make_legacy_pyc
 
 
 # Cached result of the expensive test performed in the function below.
@@ -24,7 +24,7 @@ def interpreter_requires_environment():
     Returns True if our sys.executable interpreter requires environment
     variables in order to be able to run at all.
 
-    This is designed to be used with @yp_unittest.skipIf() to annotate tests
+    This is designed to be used with @unittest.skipIf() to annotate tests
     that need to use an assert_python*() function to launch an isolated
     mode (-I) or no environment mode (-E) sub-interpreter process.
 

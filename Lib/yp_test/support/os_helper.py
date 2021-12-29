@@ -6,7 +6,7 @@ import re
 import stat
 import sys
 import time
-from yp_test import yp_unittest
+import unittest
 import warnings
 
 
@@ -187,7 +187,7 @@ def skip_unless_symlink(test):
     """Skip decorator for tests that require functional symlink"""
     ok = can_symlink()
     msg = "Requires functional symlink implementation"
-    return test if ok else yp_unittest.skip(msg)(test)
+    return test if ok else unittest.skip(msg)(test)
 
 
 _can_xattr = None
@@ -230,7 +230,7 @@ def skip_unless_xattr(test):
     """Skip decorator for tests that require functional extended attributes"""
     ok = can_xattr()
     msg = "no non-broken extended attribute support"
-    return test if ok else yp_unittest.skip(msg)(test)
+    return test if ok else unittest.skip(msg)(test)
 
 
 def unlink(filename):
@@ -281,7 +281,7 @@ if sys.platform.startswith("win"):
         _waitfor(os.rmdir, dirname)
 
     def _rmtree(path):
-        from yp_test.support import _force_run
+        from test.support import _force_run
 
         def _rmtree_inner(path):
             for name in _force_run(path, os.listdir, path):
@@ -327,7 +327,7 @@ else:
             pass
 
         def _rmtree_inner(path):
-            from yp_test.support import _force_run
+            from test.support import _force_run
             for name in _force_run(path, os.listdir, path):
                 fullname = os.path.join(path, name)
                 try:

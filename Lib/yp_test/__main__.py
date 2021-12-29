@@ -1,2 +1,2 @@
-from yp_test.libregrtest import main
+from test.libregrtest import main
 main()

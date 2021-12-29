@@ -70,6 +70,10 @@ class UnicodeTest(string_tests.CommonTest,
         codecs.register(search_function)
         self.addCleanup(codecs.unregister, search_function)
 
+    def setUp(self):
+        codecs.register(search_function)
+        self.addCleanup(codecs.unregister, search_function)
+
     def checkequalnofix(self, result, object, methodname, *args):
         method = getattr(object, methodname)
         realresult = method(*args)
@@ -490,6 +494,13 @@ class UnicodeTest(string_tests.CommonTest,
         self.checkraises(TypeError, yp_str(' '), 'join', yp_list(['1', '2', '3', yp_bytes()]))
         self.checkraises(TypeError, yp_str(' '), 'join', yp_list([1, 2, 3]))
         self.checkraises(TypeError, yp_str(' '), 'join', yp_list(['1', '2', 3]))
+
+    @unittest.skipIf(sys.maxsize > 2**32,
+        'needs too much memory on a 64-bit platform')
+    def test_join_overflow(self):
+        size = int(sys.maxsize**0.5) + 1
+        seq = ('A' * size,) * size
+        self.assertRaises(OverflowError, ''.join, seq)
 
     def test_replace(self):
         string_tests.CommonTest.test_replace(self)

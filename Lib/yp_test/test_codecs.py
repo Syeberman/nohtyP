@@ -425,10 +425,6 @@ class ReadTest(MixInCheckStateHandling):
                              before + after)
             self.assertEqual(test_sequence.decode(self.encoding, "replace"),
                              before + self.ill_formed_sequence_replace + after)
-            backslashreplace = ''.join('\\x%02x' % b
-                                       for b in self.ill_formed_sequence)
-            self.assertEqual(test_sequence.decode(self.encoding, "backslashreplace"),
-                             before + backslashreplace + after)
 
     def test_incremental_surrogatepass(self):
         # Test incremental decoder for surrogatepass handler:
@@ -2611,34 +2607,6 @@ class RawUnicodeEscapeTest(ReadTest, yp_unittest.TestCase):
         self.assertEqual(decode(br"\U00110000", "ignore"), ("", 10))
         self.assertEqual(decode(br"\U00110000", "replace"), ("\ufffd", 10))
 
-    def test_partial(self):
-        self.check_partial(
-            "\x00\t\n\r\\\xff\uffff\U00010000",
-            [
-                '\x00',
-                '\x00\t',
-                '\x00\t\n',
-                '\x00\t\n\r',
-                '\x00\t\n\r',
-                '\x00\t\n\r\\\xff',
-                '\x00\t\n\r\\\xff',
-                '\x00\t\n\r\\\xff',
-                '\x00\t\n\r\\\xff',
-                '\x00\t\n\r\\\xff',
-                '\x00\t\n\r\\\xff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff',
-                '\x00\t\n\r\\\xff\uffff\U00010000',
-            ]
-        )
 
 
 class EscapeEncodeTest(yp_unittest.TestCase):
@@ -2931,7 +2899,14 @@ _TEST_CODECS = {}
 
 def _get_test_codec(codec_name):
     return _TEST_CODECS.get(codec_name)
+codecs.register(_get_test_codec) # Returns None, not usable as a decorator
 
+try:
+    # Issue #22166: Also need to clear the internal cache in CPython
+    from _codecs import _forget_codec
+except ImportError:
+    def _forget_codec(codec_name):
+        pass
 
 @yp_unittest.skip_str_codecs
 class ExceptionChainingTest(yp_unittest.TestCase):

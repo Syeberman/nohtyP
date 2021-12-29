@@ -244,6 +244,25 @@ class IntTestCases(yp_unittest.TestCase):
         self.assertRaises(ValueError, int, "1__00")
         self.assertRaises(ValueError, int, "100_")
 
+    def test_underscores(self):
+        for lit in VALID_UNDERSCORE_LITERALS:
+            if any(ch in lit for ch in '.eEjJ'):
+                continue
+            self.assertEqual(int(lit, 0), eval(lit))
+            self.assertEqual(int(lit, 0), int(lit.replace('_', ''), 0))
+        for lit in INVALID_UNDERSCORE_LITERALS:
+            if any(ch in lit for ch in '.eEjJ'):
+                continue
+            self.assertRaises(ValueError, int, lit, 0)
+        # Additional test cases with bases != 0, only for the constructor:
+        self.assertEqual(int("1_00", 3), 9)
+        self.assertEqual(int("0_100"), 100)  # not valid as a literal!
+        self.assertEqual(int(b"1_00"), 100)  # byte underscore
+        self.assertRaises(ValueError, int, "_100")
+        self.assertRaises(ValueError, int, "+_100")
+        self.assertRaises(ValueError, int, "1__00")
+        self.assertRaises(ValueError, int, "100_")
+
     @support.cpython_only
     def test_small_ints(self):
         # Bug #3236: Return small longs from PyLong_FromString
@@ -694,7 +713,7 @@ class IntTestCases(yp_unittest.TestCase):
 
                 class TruncReturnsNonInt(base):
                     def __trunc__(self):
-                        return Index()
+                        return Integral()
                 self.assertEqual(int(TruncReturnsNonInt()), 42)
 
                 class Intable(trunc_result_base):
@@ -735,6 +754,21 @@ class IntTestCases(yp_unittest.TestCase):
 
                 with self.assertRaises(TypeError):
                     yp_int(TruncReturnsBadInt())
+
+    def test_int_subclass_with_index(self):
+        class MyIndex(int):
+            def __index__(self):
+                return 42
+
+        class BadIndex(int):
+            def __index__(self):
+                return 42.0
+
+        my_int = MyIndex(7)
+        self.assertEqual(my_int, 7)
+        self.assertEqual(int(my_int), 7)
+
+        self.assertEqual(int(BadIndex()), 0)
 
     def test_int_subclass_with_int(self):
         class MyInt(int):

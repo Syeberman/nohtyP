@@ -31,6 +31,12 @@ class TupleTest(seq_tests.CommonTest):
         with self.assertRaisesRegex(TypeError, msg):
             t['a']
 
+    def test_getitem_error(self):
+        t = ()
+        msg = "tuple indices must be integers or slices"
+        with self.assertRaisesRegex(TypeError, msg):
+            t['a']
+
     def test_constructors(self):
         super().test_constructors()
         # calling built-in types without argument must return empty

@@ -1,6 +1,6 @@
 from collections import deque
-from yp_test import yp_unittest
-from yp_test.support import NEVER_EQ
+import unittest
+from test.support import NEVER_EQ
 
 
 class base_set:
@@ -15,7 +15,7 @@ class seq(base_set):
     def __getitem__(self, n):
         return [self.el][n]
 
-class TestContains(yp_unittest.TestCase):
+class TestContains(unittest.TestCase):
     def test_common_tests(self):
         a = base_set(1)
         b = myset(1)
@@ -106,4 +106,4 @@ class TestContains(yp_unittest.TestCase):
         self.assertRaises(TypeError, lambda: 0 in bc)
 
 if __name__ == '__main__':
-    yp_unittest.main()
+    unittest.main()

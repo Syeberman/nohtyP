@@ -7,9 +7,9 @@ import io
 import sys
 import time
 import traceback
-from yp_test import yp_unittest
+import unittest
 
-class RegressionTestResult(yp_unittest.TextTestResult):
+class RegressionTestResult(unittest.TextTestResult):
     USE_XML = False
 
     def __init__(self, stream, descriptions, verbosity):
@@ -142,7 +142,7 @@ class QuietRegressionTestRunner:
 
 def get_test_runner_class(verbosity, buffer=False):
     if verbosity:
-        return functools.partial(yp_unittest.TextTestRunner,
+        return functools.partial(unittest.TextTestRunner,
                                  resultclass=RegressionTestResult,
                                  buffer=buffer,
                                  verbosity=verbosity)
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     import xml.etree.ElementTree as ET
     RegressionTestResult.USE_XML = True
 
-    class TestTests(yp_unittest.TestCase):
+    class TestTests(unittest.TestCase):
         def test_pass(self):
             pass
 
@@ -172,8 +172,8 @@ if __name__ == '__main__':
             print('stderr', file=sys.stderr)
             raise RuntimeError('error message')
 
-    suite = yp_unittest.TestSuite()
-    suite.addTest(yp_unittest.makeSuite(TestTests))
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestTests))
     stream = io.StringIO()
     runner_cls = get_test_runner_class(sum(a == '-v' for a in sys.argv))
     runner = runner_cls(sys.stdout)

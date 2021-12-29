@@ -91,6 +91,13 @@ class BoolTest(yp_unittest.TestCase):
         self.assertEqual(yp_False/1, 0)
         self.assertIsNot(yp_False/1, yp_False)
 
+        self.assertEqual(True%1, 0)
+        self.assertIsNot(True%1, False)
+        self.assertEqual(True%2, 1)
+        self.assertIsNot(True%2, True)
+        self.assertEqual(False%1, 0)
+        self.assertIsNot(False%1, False)
+
         for b in False, True:
             for i in 0, 1, 2:
                 self.assertEqual(b**i, yp_int(b)**i)
@@ -165,6 +172,10 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(yp_bool(yp_str("hello")), yp_True)
         self.assertIs(yp_bool(yp_str("")), yp_False)
         self.assertIs(yp_bool(), yp_False)
+
+    def test_keyword_args(self):
+        with self.assertRaisesRegex(TypeError, 'keyword argument'):
+            bool(x=10)
 
     def test_format(self):
         self.assertEqual("%d" % yp_False, "0")
@@ -326,6 +337,10 @@ class BoolTest(yp_unittest.TestCase):
             def __len__(self):
                 return -1
         self.assertRaises(ValueError, yp_bool, Eggs())
+
+    def test_from_bytes(self):
+        self.assertIs(bool.from_bytes(b'\x00'*8, 'big'), False)
+        self.assertIs(bool.from_bytes(b'abcd', 'little'), True)
 
     def test_sane_len(self):
         # this test just tests our assumptions about __len__

@@ -2537,18 +2537,19 @@ class StatefulIncrementalDecoder(codecs.IncrementalDecoder):
 
     codecEnabled = False
 
+    @classmethod
+    def lookupTestDecoder(cls, name):
+        if cls.codecEnabled and name == 'test_decoder':
+            latin1 = codecs.lookup('latin-1')
+            return codecs.CodecInfo(
+                name='test_decoder', encode=latin1.encode, decode=None,
+                incrementalencoder=None,
+                streamreader=None, streamwriter=None,
+                incrementaldecoder=cls)
 
-# bpo-41919: This method is separated from StatefulIncrementalDecoder to avoid a resource leak
-# when registering codecs and cleanup functions.
-def lookupTestDecoder(name):
-    if StatefulIncrementalDecoder.codecEnabled and name == 'test_decoder':
-        latin1 = codecs.lookup('latin-1')
-        return codecs.CodecInfo(
-            name='test_decoder', encode=latin1.encode, decode=None,
-            incrementalencoder=None,
-            streamreader=None, streamwriter=None,
-            incrementaldecoder=StatefulIncrementalDecoder)
-
+# Register the previous decoder for testing.
+# Disabled by default, tests will enable it.
+codecs.register(StatefulIncrementalDecoder.lookupTestDecoder)
 
 @yp_unittest.skip_files
 class StatefulIncrementalDecoderTest(yp_unittest.TestCase):

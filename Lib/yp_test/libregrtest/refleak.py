@@ -3,9 +3,9 @@ import re
 import sys
 import warnings
 from inspect import isabstract
-from yp_test import support
-from yp_test.support import os_helper
-from yp_test.libregrtest.utils import clear_caches
+from test import support
+from test.support import os_helper
+from test.libregrtest.utils import clear_caches
 
 try:
     from _abc import _get_dump

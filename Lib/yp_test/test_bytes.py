@@ -120,6 +120,42 @@ class BaseBytesTest:
         b = self.type2test((1, 2, 3))
         self.assertEqual(b, b"\x01\x02\x03")
 
+    def test_from_iterable(self):
+        b = self.type2test(range(256))
+        self.assertEqual(len(b), 256)
+        self.assertEqual(list(b), list(range(256)))
+
+        # Non-sequence iterable.
+        b = self.type2test({42})
+        self.assertEqual(b, b"*")
+        b = self.type2test({43, 45})
+        self.assertIn(tuple(b), {(43, 45), (45, 43)})
+
+        # Iterator that has a __length_hint__.
+        b = self.type2test(iter(range(256)))
+        self.assertEqual(len(b), 256)
+        self.assertEqual(list(b), list(range(256)))
+
+        # Iterator that doesn't have a __length_hint__.
+        b = self.type2test(i for i in range(256) if i % 2)
+        self.assertEqual(len(b), 128)
+        self.assertEqual(list(b), list(range(256))[1::2])
+
+        # Sequence without __iter__.
+        class S:
+            def __getitem__(self, i):
+                return (1, 2, 3)[i]
+        b = self.type2test(S())
+        self.assertEqual(b, b"\x01\x02\x03")
+
+    def test_from_tuple(self):
+        # There is a special case for tuples.
+        b = self.type2test(tuple(range(256)))
+        self.assertEqual(len(b), 256)
+        self.assertEqual(list(b), list(range(256)))
+        b = self.type2test((1, 2, 3))
+        self.assertEqual(b, b"\x01\x02\x03")
+
     def test_from_list(self):
         # There is a special case for lists.
         b = self.type2test(list(range(256)))
@@ -823,7 +859,6 @@ class BaseBytesTest:
     @yp_unittest.skip_str_split
     def test_split_string_error(self):
         self.assertRaises(TypeError, self.type2test(b'a b').split, ' ')
-        self.assertRaises(TypeError, self.type2test(b'a b').rsplit, ' ')
 
     def test_split_int_error(self):
         self.assertRaises(TypeError, self.type2test(b'a b').split, 32)
@@ -898,9 +933,9 @@ class BaseBytesTest:
 
     @yp_unittest.skip_str_space
     def test_strip_string_error(self):
-        self.assertRaises(TypeError, self.type2test(b'abc').strip, 'ac')
-        self.assertRaises(TypeError, self.type2test(b'abc').lstrip, 'ac')
-        self.assertRaises(TypeError, self.type2test(b'abc').rstrip, 'ac')
+        self.assertRaises(TypeError, self.type2test(b'abc').strip, 'b')
+        self.assertRaises(TypeError, self.type2test(b'abc').lstrip, 'b')
+        self.assertRaises(TypeError, self.type2test(b'abc').rstrip, 'b')
 
     def test_strip_int_error(self):
         self.assertRaises(TypeError, self.type2test(b' abc ').strip, 32)
@@ -1031,9 +1066,6 @@ class BaseBytesTest:
         self.assertRaisesRegex(TypeError, r'\bendswith\b', b.endswith,
                                 x, None, None, None)
 
-    def test_free_after_iterating(self):
-        test.support.check_free_after_iterating(self, iter, self.type2test)
-        test.support.check_free_after_iterating(self, reversed, self.type2test)
 
     def test_translate(self):
         b = self.type2test(b'hello')
@@ -1078,6 +1110,12 @@ class BaseBytesTest:
 
 class BytesTest(BaseBytesTest, yp_unittest.TestCase):
     type2test = yp_bytes
+
+    def test_getitem_error(self):
+        b = b'python'
+        msg = "byte indices must be integers or slices"
+        with self.assertRaisesRegex(TypeError, msg):
+            b['a']
 
     def test_buffer_is_readonly(self):
         fd = os.open(__file__, os.O_RDONLY)
@@ -1227,11 +1265,6 @@ class BytesTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertRaises(OverflowError,
                           PyBytes_FromFormat, b'%c', c_int(256))
 
-        # Issue #33817: empty strings
-        self.assertEqual(PyBytes_FromFormat(b''),
-                         b'')
-        self.assertEqual(PyBytes_FromFormat(b'%s', b''),
-                         b'')
 
     def test_bytes_blocking(self):
         class IterationBlocked(list):
@@ -1288,6 +1321,18 @@ class BytesTest(BaseBytesTest, yp_unittest.TestCase):
 
 class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
     type2test = yp_bytearray
+
+    def test_getitem_error(self):
+        b = bytearray(b'python')
+        msg = "bytearray indices must be integers or slices"
+        with self.assertRaisesRegex(TypeError, msg):
+            b['a']
+
+    def test_setitem_error(self):
+        b = bytearray(b'python')
+        msg = "bytearray indices must be integers or slices"
+        with self.assertRaisesRegex(TypeError, msg):
+            b['a'] = "python"
 
     def test_getitem_error(self):
         b = bytearray(b'python')
@@ -1484,6 +1529,22 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertEqual(yp_list(b), yp_list(yp_range(10, 100)))
         b.extend(yp_range(100, 110))
         self.assertEqual(yp_list(b), yp_list(yp_range(10, 110)))
+
+    def test_fifo_overrun(self):
+        # Test for issue #23985, a buffer overrun when implementing a FIFO
+        # Build Python in pydebug mode for best results.
+        b = bytearray(10)
+        b.pop()        # Defeat expanding buffer off-by-one quirk
+        del b[:1]      # Advance start pointer without reallocating
+        b += bytes(2)  # Append exactly the number of deleted bytes
+        del b          # Free memory buffer, allowing pydebug verification
+
+    def test_del_expand(self):
+        # Reducing the size should not expand the buffer (issue #23985)
+        b = bytearray(10)
+        size = sys.getsizeof(b)
+        del b[:1]
+        self.assertLessEqual(sys.getsizeof(b), size)
 
     def test_extended_set_del_slice(self):
         # XXX ctypes truncates large ints, making them look valid in nohtyP tests
@@ -1745,10 +1806,6 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertRaises(BufferError, delslice)
         self.assertEqual(b, orig)
 
-    @test.support.cpython_only
-    def test_obsolete_write_lock(self):
-        from _testcapi import getbuffer_with_null_view
-        self.assertRaises(BufferError, getbuffer_with_null_view, bytearray())
 
     def test_iterator_pickling2(self):
         orig = bytearray(b'abc')
@@ -1823,6 +1880,15 @@ class AssortedBytesTest(yp_unittest.TestCase):
             self.assertEqual(f(yp_bytes(b"abc")), "b'abc'")
             self.assertEqual(f(yp_bytes(b"'")), '''b"'"''') # '''
             self.assertEqual(f(yp_bytes(b"'\"")), r"""b'\'"'""") # '
+
+    @check_bytes_warnings
+    def test_format(self):
+        for b in b'abc', bytearray(b'abc'):
+            self.assertEqual(format(b), str(b))
+            self.assertEqual(format(b, ''), str(b))
+            with self.assertRaisesRegex(TypeError,
+                                        r'\b%s\b' % re.escape(type(b).__name__)):
+                format(b, 's')
 
     @check_bytes_warnings
     def test_format(self):
@@ -2067,10 +2133,6 @@ class SubclassTest:
             self.assertEqual(type(a), type(b))
             self.assertEqual(type(a.y), type(b.y))
 
-    def test_fromhex(self):
-        b = self.type2test.fromhex('1a2B30')
-        self.assertEqual(b, b'\x1a\x2b\x30')
-        self.assertIs(type(b), self.type2test)
 
         class B1(self.basetype):
             def __new__(cls, value):

@@ -1,7 +1,7 @@
 import contextlib
 import errno
 import socket
-from yp_test import yp_unittest
+import unittest
 import sys
 
 from .. import support
@@ -119,7 +119,7 @@ def bind_unix_socket(sock, addr):
         sock.bind(addr)
     except PermissionError:
         sock.close()
-        raise yp_unittest.SkipTest('cannot bind AF_UNIX sockets')
+        raise unittest.SkipTest('cannot bind AF_UNIX sockets')
 
 def _is_ipv6_enabled():
     """Check whether IPv6 is enabled on this host."""
@@ -143,7 +143,7 @@ _bind_nix_socket_error = None
 def skip_unless_bind_unix_socket(test):
     """Decorator for tests requiring a functional bind() for unix sockets."""
     if not hasattr(socket, 'AF_UNIX'):
-        return yp_unittest.skip('No UNIX Sockets')(test)
+        return unittest.skip('No UNIX Sockets')(test)
     global _bind_nix_socket_error
     if _bind_nix_socket_error is None:
         from .os_helper import TESTFN, unlink
@@ -158,7 +158,7 @@ def skip_unless_bind_unix_socket(test):
                 unlink(path)
     if _bind_nix_socket_error:
         msg = 'Requires a functional unix bind(): %s' % _bind_nix_socket_error
-        return yp_unittest.skip(msg)(test)
+        return unittest.skip(msg)(test)
     else:
         return test
 

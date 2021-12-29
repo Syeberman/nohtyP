@@ -3,14 +3,14 @@ import faulthandler
 import os
 import signal
 import sys
-from yp_test import yp_unittest
-from yp_test import support
+import unittest
+from test import support
 try:
     import gc
 except ImportError:
     gc = None
 
-from yp_test.libregrtest.utils import (setup_unraisable_hook,
+from test.libregrtest.utils import (setup_unraisable_hook,
                                     setup_threading_excepthook)
 
 
@@ -66,7 +66,7 @@ def setup_tests(ns):
             module.__file__ = os.path.abspath(module.__file__)
 
     if ns.huntrleaks:
-        yp_unittest.BaseTestSuite._cleanup = False
+        unittest.BaseTestSuite._cleanup = False
         sys._deactivate_opcache()
 
     if ns.memlimit is not None:
@@ -100,7 +100,7 @@ def setup_tests(ns):
         support.LONG_TIMEOUT = min(support.LONG_TIMEOUT, ns.timeout)
 
     if ns.xmlpath:
-        from yp_test.support.testresult import RegressionTestResult
+        from test.support.testresult import RegressionTestResult
         RegressionTestResult.USE_XML = True
 
     # Ensure there's a non-ASCII character in env vars at all times to force

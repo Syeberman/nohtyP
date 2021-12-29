@@ -107,6 +107,19 @@ class RangeTest(yp_unittest.TestCase):
         self.assertRaises(SystemError, yp_range, 0, ypObject_LEN_MAX+1)
         self.assertRaises(SystemError, yp_range, 0, 1, yp_sys_minint)
 
+    def test_range_constructor_error_messages(self):
+        with self.assertRaisesRegex(
+                TypeError,
+                "range expected at least 1 argument, got 0"
+        ):
+            range()
+
+        with self.assertRaisesRegex(
+                TypeError,
+                "range expected at most 3 arguments, got 6"
+        ):
+            range(1, 2, 3, 4, 5, 6)
+
     def test_large_operands(self):
         x = yp_range(10**20, 10**20+10, 3)
         self.assertEqual(len(x), 4)
@@ -727,9 +740,6 @@ class RangeTest(yp_unittest.TestCase):
             del rangeobj.stop
         with self.assertRaises(AttributeError):
             del rangeobj.step
-
-def test_main():
-    test.support.run_unittest(RangeTest)
 
 if __name__ == "__main__":
     yp_unittest.main()

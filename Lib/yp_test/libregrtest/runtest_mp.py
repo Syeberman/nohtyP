@@ -11,15 +11,15 @@ import time
 import traceback
 from typing import NamedTuple, NoReturn, Literal, Any
 
-from yp_test import support
-from yp_test.support import os_helper
+from test import support
+from test.support import os_helper
 
-from yp_test.libregrtest.cmdline import Namespace
-from yp_test.libregrtest.main import Regrtest
-from yp_test.libregrtest.runtest import (
+from test.libregrtest.cmdline import Namespace
+from test.libregrtest.main import Regrtest
+from test.libregrtest.runtest import (
     runtest, is_failed, TestResult, Interrupted, Timeout, ChildError, PROGRESS_MIN_TIME)
-from yp_test.libregrtest.setup import setup_tests
-from yp_test.libregrtest.utils import format_duration, print_warning
+from test.libregrtest.setup import setup_tests
+from test.libregrtest.utils import format_duration, print_warning
 
 
 # Display the running tests if nothing happened last N seconds

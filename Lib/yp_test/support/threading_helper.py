@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 
-from yp_test import support
+from test import support
 
 
 #=======================================================================

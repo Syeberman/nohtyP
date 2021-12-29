@@ -417,9 +417,6 @@ class LongTest(yp_unittest.TestCase):
             try: self.assertRaises(ValueError, yp_int, '42', base)
             except OverflowError: pass
 
-        # Invalid unicode string
-        # See bpo-34087
-        self.assertRaises(ValueError, int, '\u3053\u3093\u306b\u3061\u306f')
 
 
     @yp_unittest.skip_not_applicable
@@ -778,6 +775,20 @@ class LongTest(yp_unittest.TestCase):
         self.assertRaises(OverflowError, yp_int, yp_float('inf'))
         self.assertRaises(OverflowError, yp_int, yp_float('-inf'))
         self.assertRaises(ValueError, yp_int, yp_float('nan'))
+
+    def test_mod_division(self):
+        with self.assertRaises(ZeroDivisionError):
+            _ = 1 % 0
+
+        self.assertEqual(13 % 10, 3)
+        self.assertEqual(-13 % 10, 7)
+        self.assertEqual(13 % -10, -7)
+        self.assertEqual(-13 % -10, -3)
+
+        self.assertEqual(12 % 4, 0)
+        self.assertEqual(-12 % 4, 0)
+        self.assertEqual(12 % -4, 0)
+        self.assertEqual(-12 % -4, 0)
 
     def test_true_division(self):
         huge = 1 << 40000
@@ -1381,6 +1392,23 @@ class LongTest(yp_unittest.TestCase):
         self.assertRaises(TypeError, myint.from_bytes, "\x00", 'big')
         self.assertRaises(TypeError, myint.from_bytes, 0, 'big')
         self.assertRaises(TypeError, yp_int.from_bytes, 0, 'big', True)
+
+        class myint2(int):
+            def __new__(cls, value):
+                return int.__new__(cls, value + 1)
+
+        i = myint2.from_bytes(b'\x01', 'big')
+        self.assertIs(type(i), myint2)
+        self.assertEqual(i, 2)
+
+        class myint3(int):
+            def __init__(self, value):
+                self.foo = 'bar'
+
+        i = myint3.from_bytes(b'\x01', 'big')
+        self.assertIs(type(i), myint3)
+        self.assertEqual(i, 1)
+        self.assertEqual(getattr(i, 'foo', 'none'), 'bar')
 
         class myint2(int):
             def __new__(cls, value):

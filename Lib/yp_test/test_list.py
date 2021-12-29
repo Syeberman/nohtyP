@@ -53,6 +53,10 @@ class ListTest(list_tests.CommonTest):
         with self.assertRaisesRegex(TypeError, 'keyword argument'):
             list(sequence=[])
 
+    def test_keyword_args(self):
+        with self.assertRaisesRegex(TypeError, 'keyword argument'):
+            list(sequence=[])
+
     def test_truth(self):
         super().test_truth()
         self.assertFalse(yp_list())
@@ -99,13 +103,10 @@ class ListTest(list_tests.CommonTest):
             self.assertEqual(type(it), type(itorig))
             self.assertEqual(list(it), data)
 
-            # running iterator
-            next(itorig)
-            d = pickle.dumps((itorig, orig), proto)
-            it, a = pickle.loads(d)
-            a[:] = data
-            self.assertEqual(type(it), type(itorig))
-            self.assertEqual(list(it), data[1:])
+        it = pickle.loads(d)
+        next(it)
+        d = pickle.dumps(it)
+        self.assertEqual(self.type2test(it), self.type2test(data)[1:])
 
             # empty iterator
             for i in range(1, len(orig)):

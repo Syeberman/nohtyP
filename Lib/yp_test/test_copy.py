@@ -6,14 +6,14 @@ import weakref
 import abc
 from operator import le, lt, ge, gt, eq, ne
 
-from yp_test import yp_unittest
-from yp_test import support
+import unittest
+from test import support
 
 order_comparisons = le, lt, ge, gt
 equality_comparisons = eq, ne
 comparisons = order_comparisons + equality_comparisons
 
-class TestCopy(yp_unittest.TestCase):
+class TestCopy(unittest.TestCase):
 
     # Attempt full line coverage of copy.py from top to bottom
 
@@ -878,4 +878,4 @@ class TestCopy(yp_unittest.TestCase):
 def global_foo(x, y): return x+y
 
 if __name__ == "__main__":
-    yp_unittest.main()
+    unittest.main()

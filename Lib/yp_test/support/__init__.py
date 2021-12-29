@@ -57,6 +57,8 @@ __all__ = [
     "LOOPBACK_TIMEOUT", "INTERNET_TIMEOUT", "SHORT_TIMEOUT", "LONG_TIMEOUT",
     ]
 
+class Error(Exception):
+    """Base class for regression test exceptions."""
 
 # Timeout in seconds for tests using a network server listening on the network
 # local loopback interface like 127.0.0.1.
@@ -75,13 +77,8 @@ if sys.platform == 'win32' and ' 32 bit (ARM)' in sys.version:
 elif sys.platform == 'vxworks':
     LOOPBACK_TIMEOUT = 10
 
-# Timeout in seconds for network requests going to the internet. The timeout is
-# short enough to prevent a test to wait for too long if the internet request
-# is blocked for whatever reason.
-#
-# Usually, a timeout using INTERNET_TIMEOUT should not mark a test as failed,
-# but skip the test instead: see transient_internet().
-INTERNET_TIMEOUT = 60.0
+class ResourceDenied(unittest.SkipTest):
+    """Test skipped because it requested a disallowed resource.
 
 # Timeout in seconds to mark a test as failed if the test takes "too long".
 #
@@ -91,42 +88,59 @@ INTERNET_TIMEOUT = 60.0
 # LONG_TIMEOUT instead.
 SHORT_TIMEOUT = 30.0
 
-# Timeout in seconds to detect when a test hangs.
-#
-# It is long enough to reduce the risk of test failure on the slowest Python
-# buildbots. It should not be used to mark a test as failed if the test takes
-# "too long". The timeout value depends on the regrtest --timeout command line
-# option.
-LONG_TIMEOUT = 5 * 60.0
+@contextlib.contextmanager
+def _ignore_deprecated_imports(ignore=True):
+    """Context manager to suppress package and module deprecation
+    warnings when importing them.
+
+    If ignore is False, this context manager has no effect.
+    """
+    if ignore:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", ".+ (module|package)",
+                                    DeprecationWarning)
+            yield
+    else:
+        yield
 
 
-class Error(Exception):
-    """Base class for regression test exceptions."""
+def import_module(name, deprecated=False, *, required_on=()):
+    """Import and return the module to be tested, raising SkipTest if
+    it is not available.
 
-class TestFailed(Error):
-    """Test failed."""
+    If deprecated is True, any module or package deprecation messages
+    will be suppressed. If a module is required on a platform but optional for
+    others, set required_on to an iterable of platform prefixes which will be
+    compared against sys.platform.
+    """
+    with _ignore_deprecated_imports(deprecated):
+        try:
+            return importlib.import_module(name)
+        except ImportError as msg:
+            if sys.platform.startswith(tuple(required_on)):
+                raise
+            raise unittest.SkipTest(str(msg))
 
-class TestFailedWithDetails(TestFailed):
-    """Test failed."""
-    def __init__(self, msg, errors, failures):
-        self.msg = msg
-        self.errors = errors
-        self.failures = failures
-        super().__init__(msg, errors, failures)
 
-    def __str__(self):
-        return self.msg
-
-class TestDidNotRun(Error):
-    """Test did not run any subtests."""
+def _save_and_remove_module(name, orig_modules):
+    """Helper function to save and remove a module from sys.modules
 
 class ResourceDenied(yp_unittest.SkipTest):
     """Test skipped because it requested a disallowed resource.
 
-    This is raised when a test calls requires() for a resource that
-    has not be enabled.  It is used to distinguish between expected
-    and unexpected skips.
+def _save_and_block_module(name, orig_modules):
+    """Helper function to save and block a module in sys.modules
+
+    Return True if the module was in sys.modules, False otherwise.
     """
+    saved = True
+    try:
+        orig_modules[name] = sys.modules[name]
+    except KeyError:
+        saved = False
+    sys.modules[name] = None
+    return saved
+
 
 def anticipate_failure(condition):
     """Decorator to mark a test that is known to be broken in some cases
@@ -1393,19 +1407,11 @@ class PythonSymlink:
                 if verbose:
                     print("failed to clean up {}: {}".format(link, ex))
 
-    def _call(self, python, args, env, returncode):
-        import subprocess
-        cmd = [python, *args]
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, env=env)
-        r = p.communicate()
-        if p.returncode != returncode:
-            if verbose:
-                print(repr(r[0]))
-                print(repr(r[1]), file=sys.stderr)
-            raise RuntimeError(
-                'unexpected return code: {0} (0x{0:08X})'.format(p.returncode))
-        return r
+def skip_unless_xattr(test):
+    """Skip decorator for tests that require functional extended attributes"""
+    ok = can_xattr()
+    msg = "no non-broken extended attribute support"
+    return test if ok else unittest.skip(msg)(test)
 
     def call_real(self, *args, returncode=0):
         return self._call(self.real, args, None, returncode)

@@ -8,18 +8,18 @@ import sys
 import sysconfig
 import tempfile
 import time
-from yp_test import yp_unittest
-from yp_test.libregrtest.cmdline import _parse_args
-from yp_test.libregrtest.runtest import (
+import unittest
+from test.libregrtest.cmdline import _parse_args
+from test.libregrtest.runtest import (
     findtests, runtest, get_abs_module, is_failed,
     STDTESTS, NOTTESTS, PROGRESS_MIN_TIME,
     Passed, Failed, EnvChanged, Skipped, ResourceDenied, Interrupted,
     ChildError, DidNotRun)
-from yp_test.libregrtest.setup import setup_tests
-from yp_test.libregrtest.pgo import setup_pgo_tests
-from yp_test.libregrtest.utils import removepy, count, format_duration, printlist
-from yp_test import support
-from yp_test.support import os_helper
+from test.libregrtest.setup import setup_tests
+from test.libregrtest.pgo import setup_pgo_tests
+from test.libregrtest.utils import removepy, count, format_duration, printlist
+from test import support
+from test.support import os_helper
 
 
 # bpo-38203: Maximum delay in seconds to exit Python (call Py_Finalize()).
@@ -178,7 +178,7 @@ class Regrtest:
 
         worker_args = ns.worker_args
         if worker_args is not None:
-            from yp_test.libregrtest.runtest_mp import parse_worker_args
+            from test.libregrtest.runtest_mp import parse_worker_args
             ns, test_name = parse_worker_args(ns.worker_args)
             ns.worker_args = worker_args
             self.worker_test_name = test_name
@@ -279,11 +279,11 @@ class Regrtest:
 
     def _list_cases(self, suite):
         for test in suite:
-            if isinstance(test, yp_unittest.loader._FailedTest):
+            if isinstance(test, unittest.loader._FailedTest):
                 continue
-            if isinstance(test, yp_unittest.TestSuite):
+            if isinstance(test, unittest.TestSuite):
                 self._list_cases(test)
-            elif isinstance(test, yp_unittest.TestCase):
+            elif isinstance(test, unittest.TestCase):
                 if support.match_test(test):
                     print(test.id())
 
@@ -294,9 +294,9 @@ class Regrtest:
         for test_name in self.selected:
             abstest = get_abs_module(self.ns, test_name)
             try:
-                suite = yp_unittest.defaultTestLoader.loadTestsFromName(abstest)
+                suite = unittest.defaultTestLoader.loadTestsFromName(abstest)
                 self._list_cases(suite)
-            except yp_unittest.SkipTest:
+            except unittest.SkipTest:
                 self.skipped.append(test_name)
 
         if self.skipped:
@@ -532,7 +532,7 @@ class Regrtest:
             self.test_count_width = len(self.test_count) - 1
 
         if self.ns.use_mp:
-            from yp_test.libregrtest.runtest_mp import run_tests_multiprocess
+            from test.libregrtest.runtest_mp import run_tests_multiprocess
             run_tests_multiprocess(self)
         else:
             self.run_tests_sequential()
@@ -674,7 +674,7 @@ class Regrtest:
 
     def _main(self, tests, kwargs):
         if self.worker_test_name is not None:
-            from yp_test.libregrtest.runtest_mp import run_tests_worker
+            from test.libregrtest.runtest_mp import run_tests_worker
             run_tests_worker(self.ns, self.worker_test_name)
 
         if self.ns.wait:
@@ -698,7 +698,7 @@ class Regrtest:
         # If we're on windows and this is the parent runner (not a worker),
         # track the load average.
         if sys.platform == 'win32' and self.worker_test_name is None:
-            from yp_test.libregrtest.win_utils import WindowsLoadTracker
+            from test.libregrtest.win_utils import WindowsLoadTracker
 
             try:
                 self.win_load_tracker = WindowsLoadTracker()
