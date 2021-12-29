@@ -5,6 +5,8 @@ Tests common to tuple, list and UserList.UserList
 import unittest
 import sys
 import pickle
+from test import support
+from test.support import ALWAYS_EQ, NEVER_EQ
 
 # Various iterables
 # This is used for checking the constructor (here and in test_deque.py)
@@ -85,6 +87,14 @@ def itermulti(seqn):
     'Test multiple tiers of iterators'
     return chain(map(lambda x:x, iterfunc(IterGen(Sequence(seqn)))))
 
+class LyingTuple(tuple):
+    def __iter__(self):
+        yield 1
+
+class LyingList(list):
+    def __iter__(self):
+        yield 1
+
 class CommonTest(unittest.TestCase):
     # The type to be tested
     type2test = None
@@ -130,6 +140,10 @@ class CommonTest(unittest.TestCase):
             self.assertRaises(TypeError, self.type2test, IterNextOnly(s))
             self.assertRaises(TypeError, self.type2test, IterNoNext(s))
             self.assertRaises(ZeroDivisionError, self.type2test, IterGenExc(s))
+
+        # Issue #23757
+        self.assertEqual(self.type2test(LyingTuple((2,))), self.type2test((1,)))
+        self.assertEqual(self.type2test(LyingList([2])), self.type2test([1]))
 
     def test_truth(self):
         self.assertFalse(self.type2test())
@@ -196,6 +210,7 @@ class CommonTest(unittest.TestCase):
         a = self.type2test([0,1,2,3,4])
         self.assertEqual(a[ -pow(2,128): 3 ], self.type2test([0,1,2]))
         self.assertEqual(a[ 3: pow(2,145) ], self.type2test([3,4]))
+        self.assertEqual(a[3::sys.maxsize], self.type2test([3]))
 
     def test_contains(self):
         u = self.type2test([0, 1, 2])
@@ -207,15 +222,15 @@ class CommonTest(unittest.TestCase):
         self.assertRaises(TypeError, u.__contains__)
 
     def test_contains_fake(self):
-        class AllEq:
-            # Sequences must use rich comparison against each item
-            # (unless "is" is true, or an earlier item answered)
-            # So instances of AllEq must be found in all non-empty sequences.
-            def __eq__(self, other):
-                return True
-            __hash__ = None # Can't meet hash invariant requirements
-        self.assertNotIn(AllEq(), self.type2test([]))
-        self.assertIn(AllEq(), self.type2test([1]))
+        # Sequences must use rich comparison against each item
+        # (unless "is" is true, or an earlier item answered)
+        # So ALWAYS_EQ must be found in all non-empty sequences.
+        self.assertNotIn(ALWAYS_EQ, self.type2test([]))
+        self.assertIn(ALWAYS_EQ, self.type2test([1]))
+        self.assertIn(1, self.type2test([ALWAYS_EQ]))
+        self.assertNotIn(NEVER_EQ, self.type2test([]))
+        self.assertNotIn(ALWAYS_EQ, self.type2test([NEVER_EQ]))
+        self.assertIn(NEVER_EQ, self.type2test([ALWAYS_EQ]))
 
     def test_contains_order(self):
         # Sequences must test in-order.  If a rich comparison has side
@@ -288,6 +303,8 @@ class CommonTest(unittest.TestCase):
         u = self.type2test([0, 1])
         u *= 3
         self.assertEqual(u, self.type2test([0, 1, 0, 1, 0, 1]))
+        u *= 0
+        self.assertEqual(u, self.type2test([]))
 
     def test_getitemoverwriteiter(self):
         # Verify that __getitem__ overrides are not recognized by __iter__
@@ -305,7 +322,6 @@ class CommonTest(unittest.TestCase):
             self.assertEqual(id(s), id(s*1))
 
     def test_bigrepeat(self):
-        import sys
         if sys.maxsize <= 2147483647:
             x = self.type2test([0])
             x *= 2**16
@@ -335,6 +351,11 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(a.count(1), 3)
         self.assertEqual(a.count(3), 0)
 
+        self.assertEqual(a.count(ALWAYS_EQ), 9)
+        self.assertEqual(self.type2test([ALWAYS_EQ, ALWAYS_EQ]).count(1), 2)
+        self.assertEqual(self.type2test([ALWAYS_EQ, ALWAYS_EQ]).count(NEVER_EQ), 2)
+        self.assertEqual(self.type2test([NEVER_EQ, NEVER_EQ]).count(ALWAYS_EQ), 0)
+
         self.assertRaises(TypeError, a.count)
 
         class BadExc(Exception):
@@ -362,6 +383,11 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(u.index(0, 3), 3)
         self.assertEqual(u.index(0, 3, 4), 3)
         self.assertRaises(ValueError, u.index, 2, 0, -10)
+
+        self.assertEqual(u.index(ALWAYS_EQ), 0)
+        self.assertEqual(self.type2test([ALWAYS_EQ, ALWAYS_EQ]).index(1), 0)
+        self.assertEqual(self.type2test([ALWAYS_EQ, ALWAYS_EQ]).index(NEVER_EQ), 0)
+        self.assertRaises(ValueError, self.type2test([NEVER_EQ, NEVER_EQ]).index, ALWAYS_EQ)
 
         self.assertRaises(TypeError, u.index)
 
@@ -392,6 +418,11 @@ class CommonTest(unittest.TestCase):
 
     def test_pickle(self):
         lst = self.type2test([4, 5, 6, 7])
-        lst2 = pickle.loads(pickle.dumps(lst))
-        self.assertEqual(lst2, lst)
-        self.assertNotEqual(id(lst2), id(lst))
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            lst2 = pickle.loads(pickle.dumps(lst, proto))
+            self.assertEqual(lst2, lst)
+            self.assertNotEqual(id(lst2), id(lst))
+
+    def test_free_after_iterating(self):
+        support.check_free_after_iterating(self, iter, self.type2test)
+        support.check_free_after_iterating(self, reversed, self.type2test)

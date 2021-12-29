@@ -1,7 +1,7 @@
 # Test properties of bool promised by PEP 285
 
 import unittest
-from test import support
+from test.support import os_helper
 
 import os
 
@@ -18,22 +18,11 @@ class BoolTest(unittest.TestCase):
 
         self.assertRaises(TypeError, int.__new__, bool, 0)
 
-    def test_print(self):
-        try:
-            fo = open(support.TESTFN, "w")
-            print(False, True, file=fo)
-            fo.close()
-            fo = open(support.TESTFN, "r")
-            self.assertEqual(fo.read(), 'False True\n')
-        finally:
-            fo.close()
-            os.remove(support.TESTFN)
-
     def test_repr(self):
         self.assertEqual(repr(False), 'False')
         self.assertEqual(repr(True), 'True')
-        self.assertEqual(eval(repr(False)), False)
-        self.assertEqual(eval(repr(True)), True)
+        self.assertIs(eval(repr(False)), False)
+        self.assertIs(eval(repr(True)), True)
 
     def test_str(self):
         self.assertEqual(str(False), 'False')
@@ -95,6 +84,13 @@ class BoolTest(unittest.TestCase):
         self.assertIsNot(True/1, True)
         self.assertEqual(False/1, 0)
         self.assertIsNot(False/1, False)
+
+        self.assertEqual(True%1, 0)
+        self.assertIsNot(True%1, False)
+        self.assertEqual(True%2, 1)
+        self.assertIsNot(True%2, True)
+        self.assertEqual(False%1, 0)
+        self.assertIsNot(False%1, False)
 
         for b in False, True:
             for i in 0, 1, 2:
@@ -162,6 +158,10 @@ class BoolTest(unittest.TestCase):
         self.assertIs(bool("hello"), True)
         self.assertIs(bool(""), False)
         self.assertIs(bool(), False)
+
+    def test_keyword_args(self):
+        with self.assertRaisesRegex(TypeError, 'keyword argument'):
+            bool(x=10)
 
     def test_format(self):
         self.assertEqual("%d" % False, "0")
@@ -234,12 +234,11 @@ class BoolTest(unittest.TestCase):
 
     def test_fileclosed(self):
         try:
-            f = open(support.TESTFN, "w")
-            self.assertIs(f.closed, False)
-            f.close()
+            with open(os_helper.TESTFN, "w", encoding="utf-8") as f:
+                self.assertIs(f.closed, False)
             self.assertIs(f.closed, True)
         finally:
-            os.remove(support.TESTFN)
+            os.remove(os_helper.TESTFN)
 
     def test_types(self):
         # types are always true.
@@ -269,10 +268,9 @@ class BoolTest(unittest.TestCase):
 
     def test_pickle(self):
         import pickle
-        self.assertIs(pickle.loads(pickle.dumps(True)), True)
-        self.assertIs(pickle.loads(pickle.dumps(False)), False)
-        self.assertIs(pickle.loads(pickle.dumps(True, True)), True)
-        self.assertIs(pickle.loads(pickle.dumps(False, True)), False)
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            self.assertIs(pickle.loads(pickle.dumps(True, proto)), True)
+            self.assertIs(pickle.loads(pickle.dumps(False, proto)), False)
 
     def test_picklevalues(self):
         # Test for specific backwards-compatible pickle values
@@ -315,6 +313,10 @@ class BoolTest(unittest.TestCase):
                 return -1
         self.assertRaises(ValueError, bool, Eggs())
 
+    def test_from_bytes(self):
+        self.assertIs(bool.from_bytes(b'\x00'*8, 'big'), False)
+        self.assertIs(bool.from_bytes(b'abcd', 'little'), True)
+
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
         # this will start failing if __len__ changes assertions
@@ -330,6 +332,17 @@ class BoolTest(unittest.TestCase):
                 except (Exception) as e_len:
                     self.assertEqual(str(e_bool), str(e_len))
 
+    def test_blocked(self):
+        class A:
+            __bool__ = None
+        self.assertRaises(TypeError, bool, A())
+
+        class B:
+            def __len__(self):
+                return 10
+            __bool__ = None
+        self.assertRaises(TypeError, bool, B())
+
     def test_real_and_imag(self):
         self.assertEqual(True.real, 1)
         self.assertEqual(True.imag, 0)
@@ -340,8 +353,22 @@ class BoolTest(unittest.TestCase):
         self.assertIs(type(False.real), int)
         self.assertIs(type(False.imag), int)
 
-def test_main():
-    support.run_unittest(BoolTest)
+    def test_bool_called_at_least_once(self):
+        class X:
+            def __init__(self):
+                self.count = 0
+            def __bool__(self):
+                self.count += 1
+                return True
+
+        def f(x):
+            if x or True:
+                pass
+
+        x = X()
+        f(x)
+        self.assertGreaterEqual(x.count, 1)
+
 
 if __name__ == "__main__":
-    test_main()
+    unittest.main()

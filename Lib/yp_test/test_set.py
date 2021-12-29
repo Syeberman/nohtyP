@@ -1,15 +1,16 @@
 import unittest
 from test import support
+from test.support import warnings_helper
 import gc
 import weakref
 import operator
 import copy
 import pickle
 from random import randrange, shuffle
-import sys
 import warnings
 import collections
 import collections.abc
+import itertools
 
 class PassThru(Exception):
     pass
@@ -231,29 +232,30 @@ class TestJointOps:
             self.assertEqual(self.s, dup, "%s != %s" % (self.s, dup))
             if type(self.s) not in (set, frozenset):
                 self.s.x = 10
-                p = pickle.dumps(self.s)
+                p = pickle.dumps(self.s, i)
                 dup = pickle.loads(p)
                 self.assertEqual(self.s.x, dup.x)
 
     def test_iterator_pickling(self):
-        itorg = iter(self.s)
-        data = self.thetype(self.s)
-        d = pickle.dumps(itorg)
-        it = pickle.loads(d)
-        # Set iterators unpickle as list iterators due to the
-        # undefined order of set items.
-        # self.assertEqual(type(itorg), type(it))
-        self.assertTrue(isinstance(it, collections.abc.Iterator))
-        self.assertEqual(self.thetype(it), data)
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            itorg = iter(self.s)
+            data = self.thetype(self.s)
+            d = pickle.dumps(itorg, proto)
+            it = pickle.loads(d)
+            # Set iterators unpickle as list iterators due to the
+            # undefined order of set items.
+            # self.assertEqual(type(itorg), type(it))
+            self.assertIsInstance(it, collections.abc.Iterator)
+            self.assertEqual(self.thetype(it), data)
 
-        it = pickle.loads(d)
-        try:
-            drop = next(it)
-        except StopIteration:
-            return
-        d = pickle.dumps(it)
-        it = pickle.loads(d)
-        self.assertEqual(self.thetype(it), data - self.thetype((drop,)))
+            it = pickle.loads(d)
+            try:
+                drop = next(it)
+            except StopIteration:
+                continue
+            d = pickle.dumps(it, proto)
+            it = pickle.loads(d)
+            self.assertEqual(self.thetype(it), data - self.thetype((drop,)))
 
     def test_deepcopy(self):
         class Tracer:
@@ -316,20 +318,6 @@ class TestJointOps:
             name = repr(s).partition('(')[0]    # strip class name
             self.assertEqual(repr(s), '%s({%s(...)})' % (name, name))
 
-    def test_cyclical_print(self):
-        w = ReprWrapper()
-        s = self.thetype([w])
-        w.value = s
-        fo = open(support.TESTFN, "w")
-        try:
-            fo.write(str(s))
-            fo.close()
-            fo = open(support.TESTFN, "r")
-            self.assertEqual(fo.read(), repr(s))
-        finally:
-            fo.close()
-            support.unlink(support.TESTFN)
-
     def test_do_not_rehash_dict_keys(self):
         n = 10
         d = dict.fromkeys(map(HashCountingInt, range(n)))
@@ -361,6 +349,9 @@ class TestJointOps:
         gc.collect()
         self.assertTrue(ref() is None, "Cycle was not collected")
 
+    def test_free_after_iterating(self):
+        support.check_free_after_iterating(self, iter, self.thetype)
+
 class TestSet(TestJointOps, unittest.TestCase):
     thetype = set
     basetype = set
@@ -371,8 +362,8 @@ class TestSet(TestJointOps, unittest.TestCase):
         self.assertEqual(s, set(self.word))
         s.__init__(self.otherword)
         self.assertEqual(s, set(self.otherword))
-        self.assertRaises(TypeError, s.__init__, s, 2);
-        self.assertRaises(TypeError, s.__init__, 1);
+        self.assertRaises(TypeError, s.__init__, s, 2)
+        self.assertRaises(TypeError, s.__init__, 1)
 
     def test_constructor_identity(self):
         s = self.thetype(range(3))
@@ -383,6 +374,21 @@ class TestSet(TestJointOps, unittest.TestCase):
         s = set([1,2,3])
         t = {1,2,3}
         self.assertEqual(s, t)
+
+    def test_set_literal_insertion_order(self):
+        # SF Issue #26020 -- Expect left to right insertion
+        s = {1, 1.0, True}
+        self.assertEqual(len(s), 1)
+        stored_value = s.pop()
+        self.assertEqual(type(stored_value), int)
+
+    def test_set_literal_evaluation_order(self):
+        # Expect left to right expression evaluation
+        events = []
+        def record(obj):
+            events.append(obj)
+        s = {record(1), record(2), record(3)}
+        self.assertEqual(events, [1, 2, 3])
 
     def test_hash(self):
         self.assertRaises(TypeError, hash, self.s)
@@ -587,6 +593,7 @@ class TestSet(TestJointOps, unittest.TestCase):
         p = weakref.proxy(s)
         self.assertEqual(str(p), str(s))
         s = None
+        support.gc_collect()  # For PyPy or other GCs.
         self.assertRaises(ReferenceError, str, p)
 
     def test_rich_compare(self):
@@ -656,15 +663,6 @@ class TestFrozenSet(TestJointOps, unittest.TestCase):
         s.__init__(self.otherword)
         self.assertEqual(s, set(self.word))
 
-    def test_singleton_empty_frozenset(self):
-        f = frozenset()
-        efs = [frozenset(), frozenset([]), frozenset(()), frozenset(''),
-               frozenset(), frozenset([]), frozenset(()), frozenset(''),
-               frozenset(range(0)), frozenset(frozenset()),
-               frozenset(f), f]
-        # All of the empty frozensets should have just one id()
-        self.assertEqual(len(set(map(id, efs))), 1)
-
     def test_constructor_identity(self):
         s = self.thetype(range(3))
         t = self.thetype(s)
@@ -709,6 +707,25 @@ class TestFrozenSet(TestJointOps, unittest.TestCase):
         for i in range(2**n):
             addhashvalue(hash(frozenset([e for e, m in elemmasks if m&i])))
         self.assertEqual(len(hashvalues), 2**n)
+
+        def zf_range(n):
+            # https://en.wikipedia.org/wiki/Set-theoretic_definition_of_natural_numbers
+            nums = [frozenset()]
+            for i in range(n-1):
+                num = frozenset(nums)
+                nums.append(num)
+            return nums[:n]
+
+        def powerset(s):
+            for i in range(len(s)+1):
+                yield from map(frozenset, itertools.combinations(s, i))
+
+        for n in range(18):
+            t = 2 ** n
+            mask = t - 1
+            for nums in (range, zf_range):
+                u = len({h & mask for h in map(hash, powerset(nums(n)))})
+                self.assertGreater(4*u, t)
 
 class FrozenSetSubclass(frozenset):
     pass
@@ -764,17 +781,6 @@ class TestBasicOps:
         sorted_repr_values = [repr(value) for value in self.values]
         sorted_repr_values.sort()
         self.assertEqual(result, sorted_repr_values)
-
-    def test_print(self):
-        try:
-            fo = open(support.TESTFN, "w")
-            fo.write(str(self.set))
-            fo.close()
-            fo = open(support.TESTFN, "r")
-            self.assertEqual(fo.read(), repr(self.set))
-        finally:
-            fo.close()
-            support.unlink(support.TESTFN)
 
     def test_length(self):
         self.assertEqual(len(self.set), self.length)
@@ -851,10 +857,17 @@ class TestBasicOps:
         self.assertEqual(setiter.__length_hint__(), len(self.set))
 
     def test_pickling(self):
-        p = pickle.dumps(self.set)
-        copy = pickle.loads(p)
-        self.assertEqual(self.set, copy,
-                         "%s != %s" % (self.set, copy))
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            p = pickle.dumps(self.set, proto)
+            copy = pickle.loads(p)
+            self.assertEqual(self.set, copy,
+                             "%s != %s" % (self.set, copy))
+
+    def test_issue_37219(self):
+        with self.assertRaises(TypeError):
+            set().difference(123)
+        with self.assertRaises(TypeError):
+            set().difference_update(123)
 
 #------------------------------------------------------------------------------
 
@@ -929,7 +942,7 @@ class TestBasicOpsString(TestBasicOps, unittest.TestCase):
 
 class TestBasicOpsBytes(TestBasicOps, unittest.TestCase):
     def setUp(self):
-        self.case   = "string set"
+        self.case   = "bytes set"
         self.values = [b"a", b"b", b"c"]
         self.set    = set(self.values)
         self.dup    = set(self.values)
@@ -942,7 +955,7 @@ class TestBasicOpsBytes(TestBasicOps, unittest.TestCase):
 
 class TestBasicOpsMixedStringBytes(TestBasicOps, unittest.TestCase):
     def setUp(self):
-        self._warning_filters = support.check_warnings()
+        self._warning_filters = warnings_helper.check_warnings()
         self._warning_filters.__enter__()
         warnings.simplefilter('ignore', BytesWarning)
         self.case   = "string and bytes set"
@@ -1729,6 +1742,30 @@ class TestWeirdBugs(unittest.TestCase):
         be_bad = True
         set1.symmetric_difference_update(dict2)
 
+    def test_iter_and_mutate(self):
+        # Issue #24581
+        s = set(range(100))
+        s.clear()
+        s.update(range(100))
+        si = iter(s)
+        s.clear()
+        a = list(range(100))
+        s.update(range(100))
+        list(si)
+
+    def test_merge_and_mutate(self):
+        class X:
+            def __hash__(self):
+                return hash(0)
+            def __eq__(self, o):
+                other.clear()
+                return False
+
+        other = set()
+        other = {X() for i in range(10)}
+        s = {0}
+        s.update(other)
+
 # Application tests (based on David Eppstein's graph recipes ====================================
 
 def powerset(U):
@@ -1807,7 +1844,7 @@ class TestGraphs(unittest.TestCase):
 
         # http://en.wikipedia.org/wiki/Cuboctahedron
         # 8 triangular faces and 6 square faces
-        # 12 indentical vertices each connecting a triangle and square
+        # 12 identical vertices each connecting a triangle and square
 
         g = cube(3)
         cuboctahedron = linegraph(g)            # V( --> {V1, V2, V3, V4}
