@@ -43,7 +43,6 @@ enumerate(iter('abc')).
 
 from yp import *
 from yp_test import yp_unittest
-from yp_test import support
 from itertools import repeat
 from collections import deque
 from operator import length_hint as _length_hint

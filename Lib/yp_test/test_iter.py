@@ -1,8 +1,11 @@
 # Test iterators.
 
 from yp import *
+import sys
 from yp_test import yp_unittest
-from yp_test.support import run_unittest, TESTFN, unlink, cpython_only
+from yp_test.support import cpython_only
+from yp_test.support.os_helper import TESTFN, unlink
+from yp_test.support import check_free_after_iterating, ALWAYS_EQ, NEVER_EQ
 import pickle
 import collections.abc
 
@@ -54,6 +57,14 @@ class IteratingSequenceClass:
     def __iter__(self):
         return BasicIterClass(self.n)
 
+class IteratorProxyClass:
+    def __init__(self, i):
+        self.i = i
+    def __next__(self):
+        return next(self.i)
+    def __iter__(self):
+        return self
+
 class SequenceClass:
     def __init__(self, n):
         self.n = yp_int(n)
@@ -62,6 +73,28 @@ class SequenceClass:
             return yp_int(i)
         else:
             raise IndexError
+
+class SequenceProxyClass:
+    def __init__(self, s):
+        self.s = s
+    def __getitem__(self, i):
+        return self.s[i]
+
+class UnlimitedSequenceClass:
+    def __getitem__(self, i):
+        return i
+
+class DefaultIterClass:
+    pass
+
+class NoIterClass:
+    def __getitem__(self, i):
+        return i
+    __iter__ = None
+
+class BadIterableClass:
+    def __iter__(self):
+        raise ZeroDivisionError
 
 # Main test suite
 
@@ -92,22 +125,23 @@ class TestCase(yp_unittest.TestCase):
     # Helper to check picklability
     @yp_unittest.skip_pickling
     def check_pickle(self, itorg, seq):
-        d = pickle.dumps(itorg)
-        it = pickle.loads(d)
-        # Cannot assert type equality because dict iterators unpickle as list
-        # iterators.
-        # self.assertEqual(type(itorg), type(it))
-        self.assertTrue(isinstance(it, collections.abc.Iterator))
-        self.assertEqual(yp_list(it), seq)
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            d = pickle.dumps(itorg, proto)
+            it = pickle.loads(d)
+            # Cannot assert type equality because dict iterators unpickle as list
+            # iterators.
+            # self.assertEqual(type(itorg), type(it))
+            self.assertTrue(isinstance(it, collections.abc.Iterator))
+            self.assertEqual(list(it), seq)
 
-        it = pickle.loads(d)
-        try:
-            next(it)
-        except StopIteration:
-            return
-        d = pickle.dumps(it)
-        it = pickle.loads(d)
-        self.assertEqual(yp_list(it), seq[1:])
+            it = pickle.loads(d)
+            try:
+                next(it)
+            except StopIteration:
+                continue
+            d = pickle.dumps(it, proto)
+            it = pickle.loads(d)
+            self.assertEqual(list(it), seq[1:])
 
     # Test basic use of iter() function
     def test_iter_basic(self):
@@ -162,6 +196,53 @@ class TestCase(yp_unittest.TestCase):
     # Test iter() on a sequence class without __iter__
     def test_seq_class_iter(self):
         self.check_iterator(yp_iter(SequenceClass(10)), yp_list(range(10)))
+
+    def test_mutating_seq_class_iter_pickle(self):
+        orig = SequenceClass(5)
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            # initial iterator
+            itorig = iter(orig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, seq = pickle.loads(d)
+            seq.n = 7
+            self.assertIs(type(it), type(itorig))
+            self.assertEqual(list(it), list(range(7)))
+
+            # running iterator
+            next(itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, seq = pickle.loads(d)
+            seq.n = 7
+            self.assertIs(type(it), type(itorig))
+            self.assertEqual(list(it), list(range(1, 7)))
+
+            # empty iterator
+            for i in range(1, 5):
+                next(itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, seq = pickle.loads(d)
+            seq.n = 7
+            self.assertIs(type(it), type(itorig))
+            self.assertEqual(list(it), list(range(5, 7)))
+
+            # exhausted iterator
+            self.assertRaises(StopIteration, next, itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, seq = pickle.loads(d)
+            seq.n = 7
+            self.assertTrue(isinstance(it, collections.abc.Iterator))
+            self.assertEqual(list(it), [])
+
+    def test_mutating_seq_class_exhausted_iter(self):
+        a = SequenceClass(5)
+        exhit = iter(a)
+        empit = iter(a)
+        for x in exhit:  # exhaust the iterator
+            next(empit)  # not exhausted
+        a.n = 7
+        self.assertEqual(list(exhit), [])
+        self.assertEqual(list(empit), [5, 6])
+        self.assertEqual(list(a), [0, 1, 2, 3, 4, 5, 6])
 
     # Test a new_style class with __iter__ but no next() method
     def test_new_style_iter_class(self):
@@ -273,13 +354,13 @@ class TestCase(yp_unittest.TestCase):
     # Test a file
     @yp_unittest.skip_files
     def test_iter_file(self):
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             for i in range(5):
                 f.write("%d\n" % i)
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             self.check_for_loop(f, ["0\n", "1\n", "2\n", "3\n", "4\n"], pickle=False)
             self.check_for_loop(f, [], pickle=False)
@@ -302,13 +383,13 @@ class TestCase(yp_unittest.TestCase):
         self.assertRaises(TypeError, yp_list, yp_list)
         self.assertRaises(TypeError, yp_list, 42)
 
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             for i in range(5):
                 f.write("%d\n" % i)
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             self.assertEqual(yp_list(f), ["0\n", "1\n", "2\n", "3\n", "4\n"])
             f.seek(0, 0)
@@ -335,13 +416,13 @@ class TestCase(yp_unittest.TestCase):
         self.assertRaises(TypeError, yp_tuple, yp_list)
         self.assertRaises(TypeError, yp_tuple, 42)
 
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             for i in range(5):
                 f.write("%d\n" % i)
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             self.assertEqual(yp_tuple(f), ("0\n", "1\n", "2\n", "3\n", "4\n"))
             f.seek(0, 0)
@@ -416,14 +497,14 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(max(d.values()), 3)
         self.assertEqual(min(yp_iter(d.values())), 1)
 
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             f.write("medium line\n")
             f.write("xtra large line\n")
             f.write("itty-bitty line\n")
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             self.assertEqual(min(f), "itty-bitty line\n")
             f.seek(0, 0)
@@ -450,13 +531,13 @@ class TestCase(yp_unittest.TestCase):
                      i < len(d) and dkeys[i] or None)
                     for i in range(3)]
 
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             for i in range(10):
                 f.write("xy" * i + "\n") # line i has len 2*i+1
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             self.assertEqual(yp_list(map(len, f)), yp_list(range(1, 21, 2)))
         finally:
@@ -498,12 +579,12 @@ class TestCase(yp_unittest.TestCase):
                 self.i = i+1
                 return i
 
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             f.write("a\n" "bbb\n" "cc\n")
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             self.assertEqual(yp_list(zip(IntsFrom(0), f, IntsFrom(-100))),
                              [(0, "a\n", -100),
@@ -567,13 +648,13 @@ class TestCase(yp_unittest.TestCase):
                     return yp_str("fooled you!")
                 return next(self.it)
 
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             f.write("a\n" + "b\n" + "c\n")
         finally:
             f.close()
 
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         # Nasty:  string.join(s) can't know whether unicode.join() is needed
         # until it's seen all of s's elements.  But in this case, f's
         # iterator cannot be restarted.  So what we're testing here is
@@ -598,8 +679,16 @@ class TestCase(yp_unittest.TestCase):
                     yp_list(), yp_dict({1: 1})):
                 self.assertNotIn(i, sc5)
 
+        self.assertIn(ALWAYS_EQ, IteratorProxyClass(iter([1])))
+        self.assertIn(ALWAYS_EQ, SequenceProxyClass([1]))
+        self.assertNotIn(ALWAYS_EQ, IteratorProxyClass(iter([NEVER_EQ])))
+        self.assertNotIn(ALWAYS_EQ, SequenceProxyClass([NEVER_EQ]))
+        self.assertIn(NEVER_EQ, IteratorProxyClass(iter([ALWAYS_EQ])))
+        self.assertIn(NEVER_EQ, SequenceProxyClass([ALWAYS_EQ]))
+
         self.assertRaises(TypeError, lambda: 3 in 12)
         self.assertRaises(TypeError, lambda: 3 not in map)
+        self.assertRaises(ZeroDivisionError, lambda: 3 in BadIterableClass())
 
         d = yp_dict({"one": 1, "two": 2, "three": 3, 1.1: 2.1})
         for k in d:
@@ -612,12 +701,12 @@ class TestCase(yp_unittest.TestCase):
             self.assertIn(yp_tuple((k, v)), d.items())
             self.assertNotIn(yp_tuple((v, k)), d.items())
 
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             f.write("a\n" "b\n" "c\n")
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             for chunk in yp_str("abc"):
                 f.seek(0, 0)
@@ -652,12 +741,12 @@ class TestCase(yp_unittest.TestCase):
 
     @yp_unittest.skip_files
     def test_countOf_file(self):
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             f.write("a\n" "b\n" "c\n" "b\n")
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             for letter, count in yp_tuple((("a", 1), ("b", 2), ("c", 1), ("d", 0))):
                 f.seek(0, 0)
@@ -684,17 +773,18 @@ class TestCase(yp_unittest.TestCase):
             self.assertEqual(indexOf(yp_str("122325"), "5"), 5)
             self.assertRaises(ValueError, indexOf, yp_str("122325"), "6")
 
-            self.assertRaises(TypeError, indexOf, yp_int(42), 1)
-            self.assertRaises(TypeError, indexOf, yp_func_chr, yp_func_chr)
+        self.assertRaises(TypeError, indexOf, yp_int(42), 1)
+        self.assertRaises(TypeError, indexOf, yp_func_chr, yp_func_chr)
+        self.assertRaises(ZeroDivisionError, indexOf, BadIterableClass(), 1)
 
     @yp_unittest.skip_files
     def test_indexOf_file(self):
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         try:
             f.write("a\n" "b\n" "c\n" "d\n" "e\n")
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             fiter = yp_iter(f)
             self.assertEqual(indexOf(fiter, "b\n"), 1)
@@ -718,7 +808,7 @@ class TestCase(yp_unittest.TestCase):
     # Test iterators with file.writelines().
     @yp_unittest.skip_files
     def test_writelines(self):
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
 
         try:
             self.assertRaises(TypeError, f.writelines, None)
@@ -757,7 +847,7 @@ class TestCase(yp_unittest.TestCase):
             f.writelines(Whatever(6, 6+2000))
             f.close()
 
-            f = open(TESTFN)
+            f = open(TESTFN, encoding="utf-8")
             expected = [yp_str(i) + "\n" for i in range(1, 2006)]
             self.assertEqual(yp_list(f), expected)
 
@@ -802,14 +892,14 @@ class TestCase(yp_unittest.TestCase):
         a, b, c = {1: 42, 2: 42, 3: 42}.values()
         self.assertEqual((a, b, c), (42, 42, 42))
 
-        f = open(TESTFN, "w")
+        f = open(TESTFN, "w", encoding="utf-8")
         lines = ("a\n", "bb\n", "ccc\n")
         try:
             for line in lines:
                 f.write(line)
         finally:
             f.close()
-        f = open(TESTFN, "r")
+        f = open(TESTFN, "r", encoding="utf-8")
         try:
             a, b, c = f
             self.assertEqual((a, b, c), lines)
@@ -954,10 +1044,34 @@ class TestCase(yp_unittest.TestCase):
         lst.extend(gen())
         self.assertEqual(yp_len(lst), 760)
 
+    @cpython_only
+    def test_iter_overflow(self):
+        # Test for the issue 22939
+        it = iter(UnlimitedSequenceClass())
+        # Manually set `it_index` to PY_SSIZE_T_MAX-2 without a loop
+        it.__setstate__(sys.maxsize - 2)
+        self.assertEqual(next(it), sys.maxsize - 2)
+        self.assertEqual(next(it), sys.maxsize - 1)
+        with self.assertRaises(OverflowError):
+            next(it)
+        # Check that Overflow error is always raised
+        with self.assertRaises(OverflowError):
+            next(it)
 
-def test_main():
-    run_unittest(TestCase)
+    def test_iter_neg_setstate(self):
+        it = iter(UnlimitedSequenceClass())
+        it.__setstate__(-42)
+        self.assertEqual(next(it), 0)
+        self.assertEqual(next(it), 1)
+
+    def test_free_after_iterating(self):
+        check_free_after_iterating(self, iter, SequenceClass, (0,))
+
+    def test_error_iter(self):
+        for typ in (DefaultIterClass, NoIterClass):
+            self.assertRaises(TypeError, iter, typ())
+        self.assertRaises(ZeroDivisionError, iter, BadIterableClass())
 
 
 if __name__ == "__main__":
-    test_main()
+    unittest.main()

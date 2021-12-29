@@ -2,7 +2,7 @@
 
 from yp import *
 from yp_test import yp_unittest
-from yp_test import support
+from yp_test.support import os_helper
 
 import os
 
@@ -24,23 +24,11 @@ class BoolTest(yp_unittest.TestCase):
 
         self.assertRaises(TypeError, int.__new__, bool, 0)
 
-    def test_print(self):
-        try:
-            fo = open(support.TESTFN, "w")
-            print(yp_False, yp_True, file=fo)
-            fo.close()
-            fo = open(support.TESTFN, "r")
-            with self.nohtyPCheck(False):
-                self.assertEqual(fo.read(), 'False True\n')
-        finally:
-            fo.close()
-            os.remove(support.TESTFN)
-
     def test_repr(self):
-        self.assertEqual(yp_repr(yp_False), 'False')
-        self.assertEqual(yp_repr(yp_True), 'True')
-        self.assertEqual(eval(repr(yp_False)), yp_False)
-        self.assertEqual(eval(repr(yp_True)), yp_True)
+        self.assertEqual(repr(False), 'False')
+        self.assertEqual(repr(True), 'True')
+        self.assertIs(eval(repr(False)), False)
+        self.assertIs(eval(repr(True)), True)
 
     def test_str(self):
         self.assertEqual(yp_str(yp_False), 'False')
@@ -103,7 +91,7 @@ class BoolTest(yp_unittest.TestCase):
         self.assertEqual(yp_False/1, 0)
         self.assertIsNot(yp_False/1, yp_False)
 
-        for b in yp_False, yp_True:
+        for b in False, True:
             for i in 0, 1, 2:
                 self.assertEqual(b**i, yp_int(b)**i)
                 self.assertIsNot(b**i, yp_bool(yp_int(b)**i))
@@ -178,7 +166,6 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(yp_bool(yp_str("")), yp_False)
         self.assertIs(yp_bool(), yp_False)
 
-    @yp_unittest.skip_str_printf
     def test_format(self):
         self.assertEqual("%d" % yp_False, "0")
         self.assertEqual("%d" % yp_True, "1")
@@ -255,12 +242,11 @@ class BoolTest(yp_unittest.TestCase):
     @yp_unittest.skip_files
     def test_fileclosed(self):
         try:
-            f = open(support.TESTFN, "w")
-            self.assertIs(f.closed, yp_False)
-            f.close()
-            self.assertIs(f.closed, yp_True)
+            with open(os_helper.TESTFN, "w", encoding="utf-8") as f:
+                self.assertIs(f.closed, False)
+            self.assertIs(f.closed, True)
         finally:
-            os.remove(support.TESTFN)
+            os.remove(os_helper.TESTFN)
 
     def test_types(self):
         # types are always true.
@@ -294,10 +280,9 @@ class BoolTest(yp_unittest.TestCase):
     @yp_unittest.skip_pickling
     def test_pickle(self):
         import pickle
-        self.assertIs(pickle.loads(pickle.dumps(yp_True)), yp_True)
-        self.assertIs(pickle.loads(pickle.dumps(yp_False)), yp_False)
-        self.assertIs(pickle.loads(pickle.dumps(yp_True, yp_True)), yp_True)
-        self.assertIs(pickle.loads(pickle.dumps(yp_False, yp_True)), yp_False)
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            self.assertIs(pickle.loads(pickle.dumps(True, proto)), True)
+            self.assertIs(pickle.loads(pickle.dumps(False, proto)), False)
 
     @yp_unittest.skip_pickling
     def test_picklevalues(self):
@@ -342,7 +327,6 @@ class BoolTest(yp_unittest.TestCase):
                 return -1
         self.assertRaises(ValueError, yp_bool, Eggs())
 
-    @yp_unittest.skip_not_applicable
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
         # this will start failing if __len__ changes assertions
@@ -358,7 +342,17 @@ class BoolTest(yp_unittest.TestCase):
                 except (Exception) as e_len:
                     self.assertEqual(str(e_bool), str(e_len))
 
-    @yp_unittest.skip_num_attributes
+    def test_blocked(self):
+        class A:
+            __bool__ = None
+        self.assertRaises(TypeError, bool, A())
+
+        class B:
+            def __len__(self):
+                return 10
+            __bool__ = None
+        self.assertRaises(TypeError, bool, B())
+
     def test_real_and_imag(self):
         self.assertEqual(yp_True.real, 1)
         self.assertEqual(yp_True.imag, 0)
@@ -369,8 +363,22 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(type(yp_False.real), int)
         self.assertIs(type(yp_False.imag), int)
 
-def test_main():
-    support.run_unittest(BoolTest)
+    def test_bool_called_at_least_once(self):
+        class X:
+            def __init__(self):
+                self.count = 0
+            def __bool__(self):
+                self.count += 1
+                return True
+
+        def f(x):
+            if x or True:
+                pass
+
+        x = X()
+        f(x)
+        self.assertGreaterEqual(x.count, 1)
+
 
 if __name__ == "__main__":
-    test_main()
+    unittest.main()

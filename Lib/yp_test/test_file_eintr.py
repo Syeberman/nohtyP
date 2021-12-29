@@ -14,17 +14,17 @@ import select
 import signal
 import subprocess
 import sys
-from yp_test.support import run_unittest
 import time
-from yp_test import yp_unittest
+from yp_test.support import run_unittest
 
 # Test import all of the things we're about to try testing up front.
-from _io import FileIO
+import _io
+import _pyio
 
 
 @yp_unittest.skip_files
-@yp_unittest.skipUnless(os.name == 'posix', 'tests requires a posix system.')
-class TestFileIOSignalInterrupt(yp_unittest.TestCase):
+@unittest.skipUnless(os.name == 'posix', 'tests requires a posix system.')
+class TestFileIOSignalInterrupt:
     def setUp(self):
         self._process = None
 
@@ -40,8 +40,9 @@ class TestFileIOSignalInterrupt(yp_unittest.TestCase):
 
         subclasseses should override this to test different IO objects.
         """
-        return ('import _io ;'
-                'infile = _io.FileIO(sys.stdin.fileno(), "rb")')
+        return ('import %s as io ;'
+                'infile = io.FileIO(sys.stdin.fileno(), "rb")' %
+                self.modname)
 
     def fail_with_process_info(self, why, stdout=b'', stderr=b'',
                                communicate=True):
@@ -181,11 +182,19 @@ class TestFileIOSignalInterrupt(yp_unittest.TestCase):
                         expected=b'hello\nworld!\n'))
 
 
+class CTestFileIOSignalInterrupt(TestFileIOSignalInterrupt, unittest.TestCase):
+    modname = '_io'
+
+class PyTestFileIOSignalInterrupt(TestFileIOSignalInterrupt, unittest.TestCase):
+    modname = '_pyio'
+
+
 class TestBufferedIOSignalInterrupt(TestFileIOSignalInterrupt):
     def _generate_infile_setup_code(self):
         """Returns the infile = ... line of code to make a BufferedReader."""
-        return ('infile = open(sys.stdin.fileno(), "rb") ;'
-                'import _io ;assert isinstance(infile, _io.BufferedReader)')
+        return ('import %s as io ;infile = io.open(sys.stdin.fileno(), "rb") ;'
+                'assert isinstance(infile, io.BufferedReader)' %
+                self.modname)
 
     def test_readall(self):
         """BufferedReader.read() must handle signals and not lose data."""
@@ -195,12 +204,20 @@ class TestBufferedIOSignalInterrupt(TestFileIOSignalInterrupt):
                         read_method_name='read',
                         expected=b'hello\nworld!\n'))
 
+class CTestBufferedIOSignalInterrupt(TestBufferedIOSignalInterrupt, unittest.TestCase):
+    modname = '_io'
+
+class PyTestBufferedIOSignalInterrupt(TestBufferedIOSignalInterrupt, unittest.TestCase):
+    modname = '_pyio'
+
 
 class TestTextIOSignalInterrupt(TestFileIOSignalInterrupt):
     def _generate_infile_setup_code(self):
         """Returns the infile = ... line of code to make a TextIOWrapper."""
-        return ('infile = open(sys.stdin.fileno(), "rt", newline=None) ;'
-                'import _io ;assert isinstance(infile, _io.TextIOWrapper)')
+        return ('import %s as io ;'
+                'infile = io.open(sys.stdin.fileno(), encoding="utf-8", newline=None) ;'
+                'assert isinstance(infile, io.TextIOWrapper)' %
+                self.modname)
 
     def test_readline(self):
         """readline() must handle signals and not lose data."""
@@ -226,13 +243,12 @@ class TestTextIOSignalInterrupt(TestFileIOSignalInterrupt):
                         read_method_name='read',
                         expected="hello\nworld!\n"))
 
+class CTestTextIOSignalInterrupt(TestTextIOSignalInterrupt, unittest.TestCase):
+    modname = '_io'
 
-def test_main():
-    test_cases = [
-            tc for tc in globals().values()
-            if isinstance(tc, type) and issubclass(tc, yp_unittest.TestCase)]
-    run_unittest(*test_cases)
+class PyTestTextIOSignalInterrupt(TestTextIOSignalInterrupt, unittest.TestCase):
+    modname = '_pyio'
 
 
 if __name__ == '__main__':
-    test_main()
+    yp_unittest.main()

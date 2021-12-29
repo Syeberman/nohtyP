@@ -4,7 +4,6 @@ This is complex because of changes due to PEP 237.
 """
 
 from yp_test import yp_unittest
-from yp_test import support
 
 @yp_unittest.skip_int_fromstr
 class TestHexOctBin(yp_unittest.TestCase):
@@ -141,8 +140,5 @@ class TestHexOctBin(yp_unittest.TestCase):
         self.assertEqual(-0b1000000000000000000000000000000000000000000000000000000000000000, -9223372036854775808)
         self.assertEqual(-0b1111111111111111111111111111111111111111111111111111111111111111, -18446744073709551615)
 
-def test_main():
-    support.run_unittest(TestHexOctBin)
-
 if __name__ == "__main__":
-    test_main()
+    unittest.main()

@@ -1,13 +1,13 @@
 from yp import *
 import sys
-from yp_test import support, list_tests
+from yp_test import list_tests
+from yp_test.support import cpython_only
 import pickle
 from yp_test import yp_unittest
 
 # Extra assurance that we're not accidentally testing Python's tuple and list
 def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
 def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
-
 
 class ListTest(list_tests.CommonTest):
     type2test = yp_list
@@ -24,6 +24,8 @@ class ListTest(list_tests.CommonTest):
         self.assertEqual(yp_list((0, 1, 2, 3)), yp_list([0, 1, 2, 3]))
         self.assertEqual(yp_list(''), yp_list())
         self.assertEqual(yp_list('spam'), yp_list(['s', 'p', 'a', 'm']))
+        self.assertEqual(yp_list(x for x in range(10) if x % 2),
+                         yp_list([1, 3, 5, 7, 9]))
 
         if sys.maxsize == 0x7fffffff:
             # This test can currently only work on 32-bit machines.
@@ -46,6 +48,10 @@ class ListTest(list_tests.CommonTest):
         x = yp_list()
         x.extend(-y for y in x)
         self.assertEqual(x, yp_list())
+
+    def test_keyword_args(self):
+        with self.assertRaisesRegex(TypeError, 'keyword argument'):
+            list(sequence=[])
 
     def test_truth(self):
         super().test_truth()
@@ -82,33 +88,82 @@ class ListTest(list_tests.CommonTest):
 
     @yp_unittest.skip_pickling
     def test_iterator_pickle(self):
-        # Userlist iterators don't support pickling yet since
-        # they are based on generators.
-        data = self.type2test([4, 5, 6, 7])
-        it = itorg = iter(data)
-        d = pickle.dumps(it)
-        it = pickle.loads(d)
-        self.assertEqual(type(itorg), type(it))
-        self.assertEqual(self.type2test(it), self.type2test(data))
+        orig = self.type2test([4, 5, 6, 7])
+        data = [10, 11, 12, 13, 14, 15]
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            # initial iterator
+            itorig = iter(orig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(type(it), type(itorig))
+            self.assertEqual(list(it), data)
 
-        it = pickle.loads(d)
-        next(it)
-        d = pickle.dumps(it)
-        self.assertEqual(self.type2test(it), self.type2test(data)[1:])
+            # running iterator
+            next(itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(type(it), type(itorig))
+            self.assertEqual(list(it), data[1:])
+
+            # empty iterator
+            for i in range(1, len(orig)):
+                next(itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(type(it), type(itorig))
+            self.assertEqual(list(it), data[len(orig):])
+
+            # exhausted iterator
+            self.assertRaises(StopIteration, next, itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(list(it), [])
 
     @yp_unittest.skip_pickling
     def test_reversed_pickle(self):
-        data = self.type2test([4, 5, 6, 7])
-        it = itorg = reversed(data)
-        d = pickle.dumps(it)
-        it = pickle.loads(d)
-        self.assertEqual(type(itorg), type(it))
-        self.assertEqual(self.type2test(it), self.type2test(reversed(data)))
+        orig = self.type2test([4, 5, 6, 7])
+        data = [10, 11, 12, 13, 14, 15]
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            # initial iterator
+            itorig = reversed(orig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(type(it), type(itorig))
+            self.assertEqual(list(it), data[len(orig)-1::-1])
 
-        it = pickle.loads(d)
-        next(it)
-        d = pickle.dumps(it)
-        self.assertEqual(self.type2test(it), self.type2test(reversed(data))[1:])
+            # running iterator
+            next(itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(type(it), type(itorig))
+            self.assertEqual(list(it), data[len(orig)-2::-1])
+
+            # empty iterator
+            for i in range(1, len(orig)):
+                next(itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(type(it), type(itorig))
+            self.assertEqual(list(it), [])
+
+            # exhausted iterator
+            self.assertRaises(StopIteration, next, itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(list(it), [])
+
+    def test_step_overflow(self):
+        a = [0, 1, 2, 3, 4]
+        a[1::sys.maxsize] = [0]
+        self.assertEqual(a[3::sys.maxsize], [3])
 
     def test_no_comdat_folding(self):
         # Issue 8847: In the PGO build, the MSVC linker's COMDAT folding
@@ -118,20 +173,71 @@ class ListTest(list_tests.CommonTest):
         with self.assertRaises(TypeError):
             (3,) + L([1,2])
 
-def test_main(verbose=None):
-    support.run_unittest(ListTest)
+    def test_equal_operator_modifying_operand(self):
+        # test fix for seg fault reported in bpo-38588 part 2.
+        class X:
+            def __eq__(self,other) :
+                list2.clear()
+                return NotImplemented
 
-    # verify reference counting
-    import sys
-    if verbose and hasattr(sys, "gettotalrefcount"):
-        import gc
-        counts = [None] * 5
-        for i in range(len(counts)):
-            support.run_unittest(ListTest)
-            gc.collect()
-            counts[i] = sys.gettotalrefcount()
-        print(counts)
+        class Y:
+            def __eq__(self, other):
+                list1.clear()
+                return NotImplemented
+
+        class Z:
+            def __eq__(self, other):
+                list3.clear()
+                return NotImplemented
+
+        list1 = [X()]
+        list2 = [Y()]
+        self.assertTrue(list1 == list2)
+
+        list3 = [Z()]
+        list4 = [1]
+        self.assertFalse(list3 == list4)
+
+    @cpython_only
+    def test_preallocation(self):
+        iterable = [0] * 10
+        iter_size = sys.getsizeof(iterable)
+
+        self.assertEqual(iter_size, sys.getsizeof(list([0] * 10)))
+        self.assertEqual(iter_size, sys.getsizeof(list(range(10))))
+
+    def test_count_index_remove_crashes(self):
+        # bpo-38610: The count(), index(), and remove() methods were not
+        # holding strong references to list elements while calling
+        # PyObject_RichCompareBool().
+        class X:
+            def __eq__(self, other):
+                lst.clear()
+                return NotImplemented
+
+        lst = [X()]
+        with self.assertRaises(ValueError):
+            lst.index(lst)
+
+        class L(list):
+            def __eq__(self, other):
+                str(other)
+                return NotImplemented
+
+        lst = L([X()])
+        lst.count(lst)
+
+        lst = L([X()])
+        with self.assertRaises(ValueError):
+            lst.remove(lst)
+
+        # bpo-39453: list.__contains__ was not holding strong references
+        # to list elements while calling PyObject_RichCompareBool().
+        lst = [X(), X()]
+        3 in lst
+        lst = [X(), X()]
+        X() in lst
 
 
 if __name__ == "__main__":
-    test_main(verbose=True)
+    unittest.main()
