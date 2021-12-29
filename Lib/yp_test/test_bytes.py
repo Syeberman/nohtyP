@@ -558,7 +558,7 @@ class BaseBytesTest:
         self.assertRaises(TypeError, self.type2test.hex)
         self.assertRaises(TypeError, self.type2test.hex, 1)
         self.assertEqual(self.type2test(b"").hex(), "")
-        self.assertEqual(bytearray([0x1a, 0x2b, 0x30]).hex(), '1a2b30')
+        self.assertEqual(yp_bytearray([0x1a, 0x2b, 0x30]).hex(), '1a2b30')
         self.assertEqual(self.type2test(b"\x1a\x2b\x30").hex(), '1a2b30')
         self.assertEqual(memoryview(b"\x1a\x2b\x30").hex(), '1a2b30')
 
@@ -743,7 +743,6 @@ class BaseBytesTest:
         self.assertEqual(b.find(i, 1, 3), 1)
         self.assertEqual(b.find(w, 1, 3), -1)
 
-    @yp_unittest.skip_not_applicable
     def test_find_raise_correct_exception_msg(self):
         for index in (-1, 256, sys.maxsize + 1):
             self.assertRaisesRegex(
@@ -1046,7 +1045,7 @@ class BaseBytesTest:
             self.assertRaises(ValueError, method, 256)
             self.assertRaises(ValueError, method, 9999)
 
-    @yp_unittest.skip_not_applicable
+    @yp_unittest.skip_str_find
     def test_find_etc_raise_correct_error_messages(self):
         # issue 11828
         b = self.type2test(b'hello')
@@ -1069,7 +1068,7 @@ class BaseBytesTest:
 
     def test_translate(self):
         b = self.type2test(b'hello')
-        rosetta = bytearray(range(256))
+        rosetta = yp_bytearray(range(256))
         rosetta[ord('o')] = ord('e')
 
         self.assertRaises(TypeError, b.translate)
@@ -1291,9 +1290,9 @@ class BytesTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertEqual(bytes(b'ab'), b'ab')
         self.assertRaises(TypeError, bytes, BytesSubclassBlocked(b'ab'))
 
-        class BufferBlocked(bytearray):
+        class BufferBlocked(yp_bytearray):
             __bytes__ = None
-        ba, bb = bytearray(b'ab'), BufferBlocked(b'ab')
+        ba, bb = yp_bytearray(b'ab'), BufferBlocked(b'ab')
         self.assertEqual(bytes(ba), b'ab')
         self.assertRaises(TypeError, bytes, bb)
 
@@ -1324,25 +1323,25 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
     type2test = yp_bytearray
 
     def test_getitem_error(self):
-        b = bytearray(b'python')
+        b = yp_bytearray(b'python')
         msg = "bytearray indices must be integers or slices"
         with self.assertRaisesRegex(TypeError, msg):
             b['a']
 
     def test_setitem_error(self):
-        b = bytearray(b'python')
+        b = yp_bytearray(b'python')
         msg = "bytearray indices must be integers or slices"
         with self.assertRaisesRegex(TypeError, msg):
             b['a'] = "python"
 
     def test_getitem_error(self):
-        b = bytearray(b'python')
+        b = yp_bytearray(b'python')
         msg = "bytearray indices must be integers or slices"
         with self.assertRaisesRegex(TypeError, msg):
             b['a']
 
     def test_setitem_error(self):
-        b = bytearray(b'python')
+        b = yp_bytearray(b'python')
         msg = "bytearray indices must be integers or slices"
         with self.assertRaisesRegex(TypeError, msg):
             b['a'] = "python"
@@ -1534,7 +1533,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
     def test_fifo_overrun(self):
         # Test for issue #23985, a buffer overrun when implementing a FIFO
         # Build Python in pydebug mode for best results.
-        b = bytearray(10)
+        b = yp_bytearray(10)
         b.pop()        # Defeat expanding buffer off-by-one quirk
         del b[:1]      # Advance start pointer without reallocating
         b += bytes(2)  # Append exactly the number of deleted bytes
@@ -1542,7 +1541,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
     def test_del_expand(self):
         # Reducing the size should not expand the buffer (issue #23985)
-        b = bytearray(10)
+        b = yp_bytearray(10)
         size = sys.getsizeof(b)
         del b[:1]
         self.assertLessEqual(sys.getsizeof(b), size)
@@ -1627,7 +1626,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
                 seq.append(alloc)
 
     def test_init_alloc(self):
-        b = bytearray()
+        b = yp_bytearray()
         def g():
             for i in range(1, 100):
                 yield i
@@ -1697,7 +1696,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertEqual(b, b'')
 
         # test values outside of the ascii range: (0, 127)
-        c = bytearray([126, 127, 128, 129])
+        c = yp_bytearray([126, 127, 128, 129])
         c.remove(127)
         self.assertEqual(c, bytes([126, 128, 129]))
         c.remove(129)
@@ -1745,11 +1744,11 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
     def test_copied(self):
         # Issue 4348.  Make sure that operations that don't mutate the array
         # copy the bytes.
-        b = bytearray(b'abc')
+        b = yp_bytearray(b'abc')
         self.assertIsNot(b, b.replace(b'abc', b'cde', 0))
 
-        t = bytearray([i for i in range(256)])
-        x = bytearray(b'')
+        t = yp_bytearray([i for i in range(256)])
+        x = yp_bytearray(b'')
         self.assertIsNot(x, x.translate(t))
 
     @yp_unittest.skip_str_split
@@ -1809,7 +1808,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
 
     def test_iterator_pickling2(self):
-        orig = bytearray(b'abc')
+        orig = yp_bytearray(b'abc')
         data = list(b'qwerty')
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             # initial iterator
@@ -1848,7 +1847,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
     def test_iterator_length_hint(self):
         # Issue 27443: __length_hint__ can return negative integer
-        ba = bytearray(b'ab')
+        ba = yp_bytearray(b'ab')
         it = iter(ba)
         next(it)
         ba.clear()
@@ -1857,7 +1856,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
 
     def test_repeat_after_setslice(self):
         # bpo-42924: * used to copy from the wrong memory location
-        b = bytearray(b'abc')
+        b = yp_bytearray(b'abc')
         b[:2] = b'x'
         b1 = b * 1
         b3 = b * 3
@@ -1884,7 +1883,7 @@ class AssortedBytesTest(yp_unittest.TestCase):
 
     @check_bytes_warnings
     def test_format(self):
-        for b in b'abc', bytearray(b'abc'):
+        for b in yp_bytes(b'abc'), yp_bytearray(b'abc'):
             self.assertEqual(format(b), str(b))
             self.assertEqual(format(b, ''), str(b))
             with self.assertRaisesRegex(TypeError,
@@ -1893,7 +1892,7 @@ class AssortedBytesTest(yp_unittest.TestCase):
 
     @check_bytes_warnings
     def test_format(self):
-        for b in b'abc', bytearray(b'abc'):
+        for b in yp_bytes(b'abc'), yp_bytearray(b'abc'):
             self.assertEqual(format(b), str(b))
             self.assertEqual(format(b, ''), str(b))
             with self.assertRaisesRegex(TypeError,
@@ -1993,13 +1992,13 @@ class AssortedBytesTest(yp_unittest.TestCase):
         with bytes_warning():
             '' != b''
         with bytes_warning():
-            bytearray(b'') == ''
+            yp_bytearray(b'') == ''
         with bytes_warning():
-            '' == bytearray(b'')
+            '' == yp_bytearray(b'')
         with bytes_warning():
-            bytearray(b'') != ''
+            yp_bytearray(b'') != ''
         with bytes_warning():
-            '' != bytearray(b'')
+            '' != yp_bytearray(b'')
         with bytes_warning():
             b'\0' == 0
         with bytes_warning():

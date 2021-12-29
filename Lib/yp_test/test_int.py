@@ -855,7 +855,6 @@ class IntTestCases(yp_unittest.TestCase):
         self.assertEqual(n, 1)
         self.assertIs(type(n), IntSubclass)
 
-    @yp_unittest.skip_exception_messages
     def test_error_message(self):
         def check(s, base=None):
             with self.assertRaises(ValueError,

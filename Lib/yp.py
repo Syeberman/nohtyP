@@ -462,12 +462,6 @@ yp_func(c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ))
 # ypObject *yp_functionC(yp_function_decl_t *declaration);
 yp_func(c_ypObject_p, "yp_functionC", ((POINTER(c_yp_function_decl_t), "declaration"), ))
 
-# ypObject *yp_function_withstateCN(yp_function_decl_t *declaration, int n, ...);
-# ypObject *yp_function_withstateCNV(yp_function_decl_t *declaration, int n, va_list args);
-
-# ypObject *yp_function_withstatestructCN(yp_function_decl_t *declaration, void *state, yp_ssize_t size, int n, ...);
-# ypObject *yp_function_withstatestructCNV(yp_function_decl_t *declaration, void *state, yp_ssize_t size, int n, va_list args);
-
 # XXX The file type will be added in a future version
 
 
@@ -2455,10 +2449,9 @@ class yp_function(ypObject):
     @staticmethod
     def _pyfunction_wrapper(pyfunction, yp_self, n, argarray):
         try:
-            args = _yp_transmute_and_cache(argarray[0], steal=False)
-            kwargs = _yp_transmute_and_cache(argarray[1], steal=False)
+            transmuted = tuple(_yp_transmute_and_cache(argarray[i], steal=False) for i in range(n))
             try:
-                py_result = pyfunction(*args, **kwargs)
+                py_result = pyfunction(*transmuted)
             except BaseException as e: # exceptions from the function get passed to nohtyP
                 return _yp_incref(_pyExc2yp[type(e)])
             return _yp_incref(ypObject._from_python(py_result))
@@ -2466,15 +2459,24 @@ class yp_function(ypObject):
             traceback.print_exc()
             return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
-    _parameters_decl = (c_yp_parameter_decl_t * 2)((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
-
     @classmethod
-    def _from_python(cls, pyobj):
-        ypcode = c_yp_function_code_t(functools.partial(cls._pyfunction_wrapper, pyobj))
-        declaration = c_yp_function_decl_t(ypcode, 0, len(cls._parameters_decl), cls._parameters_decl)
+    # TODO A better name?
+    def with_parameters(cls, pyfunction, parameters=()):
+        """Creates a yp_function object where the parameters are parsed by nohtyP. pyfunction will
+        be called with *argarray.
+        """
+        ypcode = c_yp_function_code_t(functools.partial(cls._pyfunction_wrapper, pyfunction))
+        declaration = c_yp_function_decl_t(ypcode, 0, len(parameters), (c_yp_parameter_decl_t * len(parameters))(parameters))
         self = _yp_functionC(declaration)
         _yp_reverse_refs[self.value].append(ypcode)
         return self
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        return cls.with_parameters(
+            lambda args, kwargs: pyobj(*args, **kwargs),
+            ((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
+        )
 
 c_ypObject_p_value("yp_func_chr")
 c_ypObject_p_value("yp_func_hash")

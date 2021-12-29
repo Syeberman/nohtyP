@@ -153,7 +153,8 @@ class TestCase(_unittest.TestCase):
     def assertRaisesRegex(
         self, expected_exception, expected_regex, callable_obj=None, *args, **kwargs
     ):
-        raise NotImplementedError("assertRaisesRegex not applicable to nohtyP")
+        # TODO: Support exception instances (with messages) in nohtyP (skip_exception_messages)
+        return _unittest.TestCase.assertRaises(expected_exception, callable_obj, *args, **kwargs)
 
     def assertRegex(self, text, expected_regex, msg=None):
         if self._nohtyPCheckEnabled: _checkFornohtyP(text)

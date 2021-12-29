@@ -349,6 +349,7 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'rindex', 42)
 
+    @yp_unittest.skip_str_find
     def test_find_periodic_pattern(self):
         """Cover the special path for periodic patterns."""
         def reference_find(p, s):
@@ -369,6 +370,7 @@ class BaseTest:
                 self.checkequal(reference_find(p, text),
                                 text, 'find', p)
 
+    @yp_unittest.skip_str_find
     def test_find_shift_table_overflow(self):
         """When the table of 8-bit shifts overflows."""
         N = 2**8 + 100

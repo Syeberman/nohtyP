@@ -10,6 +10,11 @@ import itertools
 import gc
 import contextlib
 
+# Extra assurance that we're not accidentally testing Python's data types
+def tuple(*args, **kwargs): raise NotImplementedError("convert script to yp_tuple here")
+def list(*args, **kwargs): raise NotImplementedError("convert script to yp_list here")
+def dict(*args, **kwargs): raise NotImplementedError("convert script to yp_dict here")
+
 
 class FunctionCalls(yp_unittest.TestCase):
 
@@ -345,10 +350,12 @@ class TestCallingConventionsStatic(TestCallingConventions):
         self.expected_self = None
 
 
+# FIXME Make a nohtyP function
 def pyfunc(arg1, arg2):
     return [arg1, arg2]
 
 
+# FIXME Make a nohtyP function
 def pyfunc_noarg():
     return "noarg"
 
@@ -382,20 +389,20 @@ class FastCallTests(yp_unittest.TestCase):
         # (func, args: tuple, result)
 
         # Python function with 2 arguments
-        (pyfunc, (1, 2), [1, 2]),
+        (pyfunc, yp_tuple((1, 2)), yp_list([1, 2])),
 
         # Python function without argument
-        (pyfunc_noarg, (), "noarg"),
+        (pyfunc_noarg, yp_tuple(), yp_str("noarg")),
 
         # Python class methods
-        (PythonClass.class_method, (), "classmethod"),
-        (PythonClass.static_method, (), "staticmethod"),
+        (PythonClass.class_method, yp_tuple(), yp_str("classmethod")),
+        (PythonClass.static_method, yp_tuple(), yp_str("staticmethod")),
 
         # Python instance methods
-        (PYTHON_INSTANCE.method, (1, 2), [1, 2]),
-        (PYTHON_INSTANCE.method_noarg, (), "noarg"),
-        (PYTHON_INSTANCE.class_method, (), "classmethod"),
-        (PYTHON_INSTANCE.static_method, (), "staticmethod"),
+        (PYTHON_INSTANCE.method, yp_tuple((1, 2)), yp_list([1, 2])),
+        (PYTHON_INSTANCE.method_noarg, yp_tuple(), yp_str("noarg")),
+        (PYTHON_INSTANCE.class_method, yp_tuple(), yp_str("classmethod"),
+        (PYTHON_INSTANCE.static_method, yp_tuple(), yp_str("staticmethod")),
 
         # C callables are added later
     ]
@@ -405,12 +412,12 @@ class FastCallTests(yp_unittest.TestCase):
         # (func, args: tuple, kwargs: dict, result)
 
         # Python function with 2 arguments
-        (pyfunc, (1,), {'arg2': 2}, [1, 2]),
-        (pyfunc, (), {'arg1': 1, 'arg2': 2}, [1, 2]),
+        (pyfunc, yp_tuple((1,)), yp_dict({'arg2': 2}), yp_list([1, 2])),
+        (pyfunc, yp_tuple(), yp_dict({'arg1': 1, 'arg2': 2}), yp_list([1, 2])),
 
         # Python instance methods
-        (PYTHON_INSTANCE.method, (1,), {'arg2': 2}, [1, 2]),
-        (PYTHON_INSTANCE.method, (), {'arg1': 1, 'arg2': 2}, [1, 2]),
+        (PYTHON_INSTANCE.method, yp_tuple((1,)), yp_dict({'arg2': 2}), yp_list([1, 2]),
+        (PYTHON_INSTANCE.method, yp_tuple(), yp_dict({'arg1': 1, 'arg2': 2}), yp_list([1, 2])),
 
         # C callables are added later
     ]
@@ -455,7 +462,7 @@ class FastCallTests(yp_unittest.TestCase):
     #     ])
 
     def check_result(self, result, expected):
-        if isinstance(expected, tuple) and expected[-1] is NULL_OR_EMPTY:
+        if isinstance(expected, yp_tuple) and expected[-1] is NULL_OR_EMPTY:
             if result[-1] in ({}, None):
                 expected = (*expected[:-1], result[-1])
         self.assertEqual(result, expected)
@@ -519,8 +526,8 @@ class FastCallTests(yp_unittest.TestCase):
 
         for func, args, kwargs, expected in self.CALLS_KWARGS:
             with self.subTest(func=func, args=args, kwargs=kwargs):
-                kwnames = tuple(kwargs.keys())
-                args = args + tuple(kwargs.values())
+                kwnames = yp_tuple(kwargs.keys())
+                args = args + yp_tuple(kwargs.values())
                 result = _testcapi.pyobject_vectorcall(func, args, kwnames)
                 self.check_result(result, expected)
 
@@ -597,7 +604,7 @@ class TestPEP590(yp_unittest.TestCase):
         # MethodDescriptorBase, which implements vectorcall. Since
         # MethodDescriptorNopGet returns the args tuple when called, we check
         # additionally that no new tuple is created for this call.
-        args = tuple(range(5))
+        args = yp_tuple(range(5))
         f = _testcapi.MethodDescriptorNopGet()
         self.assertIs(f(*args), args)
 
@@ -628,7 +635,7 @@ class TestPEP590(yp_unittest.TestCase):
 
         def vectorcall(func, args, kwargs):
             args = *args, *kwargs.values()
-            kwnames = tuple(kwargs)
+            kwnames = yp_tuple(kwargs)
             return pyobject_vectorcall(func, args, kwnames)
 
         for (func, args, kwargs, expected) in calls:

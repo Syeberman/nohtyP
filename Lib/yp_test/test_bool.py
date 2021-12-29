@@ -22,7 +22,7 @@ class BoolTest(yp_unittest.TestCase):
         else:
             self.fail("bool should not be subclassable")
 
-        self.assertRaises(TypeError, int.__new__, bool, 0)
+        self.assertRaises(TypeError, int.__new__, yp_bool, 0)
 
     def test_repr(self):
         self.assertEqual(repr(False), 'False')
@@ -175,7 +175,7 @@ class BoolTest(yp_unittest.TestCase):
 
     def test_keyword_args(self):
         with self.assertRaisesRegex(TypeError, 'keyword argument'):
-            bool(x=10)
+            yp_bool(x=10)
 
     def test_format(self):
         self.assertEqual("%d" % yp_False, "0")
@@ -339,8 +339,8 @@ class BoolTest(yp_unittest.TestCase):
         self.assertRaises(ValueError, yp_bool, Eggs())
 
     def test_from_bytes(self):
-        self.assertIs(bool.from_bytes(b'\x00'*8, 'big'), False)
-        self.assertIs(bool.from_bytes(b'abcd', 'little'), True)
+        self.assertIs(yp_bool.from_bytes(b'\x00'*8, 'big'), False)
+        self.assertIs(yp_bool.from_bytes(b'abcd', 'little'), True)
 
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
@@ -360,13 +360,13 @@ class BoolTest(yp_unittest.TestCase):
     def test_blocked(self):
         class A:
             __bool__ = None
-        self.assertRaises(TypeError, bool, A())
+        self.assertRaises(TypeError, yp_bool, A())
 
         class B:
             def __len__(self):
                 return 10
             __bool__ = None
-        self.assertRaises(TypeError, bool, B())
+        self.assertRaises(TypeError, yp_bool, B())
 
     def test_real_and_imag(self):
         self.assertEqual(yp_True.real, 1)
