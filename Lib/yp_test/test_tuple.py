@@ -498,4 +498,4 @@ class TupleTest(seq_tests.CommonTest):
 #            pileup 262,143 mean 8.0 coll 262,143 z +92683.6
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

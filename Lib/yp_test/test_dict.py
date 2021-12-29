@@ -1652,7 +1652,7 @@ class DictTest(yp_unittest.TestCase):
                 self.assertGreaterEqual(eq_count, 1)
 
 
-class CAPITest(unittest.TestCase):
+class CAPITest(yp_unittest.TestCase):
 
     # Test _PyDict_GetItem_KnownHash()
     @support.cpython_only

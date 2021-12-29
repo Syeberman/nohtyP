@@ -33,7 +33,7 @@ class OtherFloatSubclass(float):
     pass
 
 @yp_unittest.skip_floats
-class GeneralFloatCases(unittest.TestCase):
+class GeneralFloatCases(yp_unittest.TestCase):
 
     def test_float(self):
         self.assertEqual(float(3.14), 3.14)
@@ -697,7 +697,7 @@ class IEEEFormatTestCase(yp_unittest.TestCase):
         self.assertEqual(struct.pack("<f", -3.40282356e38), struct.pack("<f", -FLT_MAX))
 
 @yp_unittest.skip_floats
-class FormatTestCase(unittest.TestCase):
+class FormatTestCase(yp_unittest.TestCase):
 
     def test_format(self):
         # these should be rewritten to use both format(x, spec) and
@@ -792,7 +792,7 @@ class FormatTestCase(unittest.TestCase):
         self.assertEqual(format(-123.34, '00.10g'), '-123.34')
 
 @yp_unittest.skip_floats
-class ReprTestCase(unittest.TestCase):
+class ReprTestCase(yp_unittest.TestCase):
     def test_repr(self):
         with open(os.path.join(os.path.split(__file__)[0],
                   'floating_points.txt'), encoding="utf-8") as floats_file:
@@ -1533,4 +1533,4 @@ class HexFloatTestCase(yp_unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    yp_unittest.main()

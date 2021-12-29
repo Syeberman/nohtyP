@@ -206,7 +206,7 @@ class Mapping:
         return obj
 
 
-class TestTemplate(unittest.TestCase):
+class TestTemplate(yp_unittest.TestCase):
     def test_regular_templates(self):
         s = Template('$who likes to eat a bag of $what worth $$100')
         self.assertEqual(s.substitute(dict(who='tim', what='ham')),
@@ -479,4 +479,4 @@ class TestTemplate(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    yp_unittest.main()

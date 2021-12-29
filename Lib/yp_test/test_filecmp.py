@@ -3,14 +3,14 @@ import filecmp
 import os
 import shutil
 import tempfile
-import unittest
+from yp_test import yp_unittest
 
 from yp_test import yp_unittest
 from yp_test import support
 from yp_test.support import os_helper
 
 @yp_unittest.skip_files
-class FileCompareTestCase(unittest.TestCase):
+class FileCompareTestCase(yp_unittest.TestCase):
     def setUp(self):
         self.name = os_helper.TESTFN
         self.name_same = os_helper.TESTFN + '-same'
@@ -250,4 +250,4 @@ class DirCompareTestCase(yp_unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

@@ -2641,7 +2641,7 @@ class RawUnicodeEscapeTest(ReadTest, yp_unittest.TestCase):
         )
 
 
-class EscapeEncodeTest(unittest.TestCase):
+class EscapeEncodeTest(yp_unittest.TestCase):
 
     def test_escape_encode(self):
         tests = [
@@ -3302,7 +3302,7 @@ class CodePageTest(yp_unittest.TestCase):
         self.assertEqual(decoded[0][-11:], '56\ud1000123456\ud100')
 
 
-class ASCIITest(unittest.TestCase):
+class ASCIITest(yp_unittest.TestCase):
     def test_encode(self):
         self.assertEqual('abc123'.encode('ascii'), b'abc123')
 
@@ -3341,7 +3341,7 @@ class ASCIITest(unittest.TestCase):
                                  expected)
 
 
-class Latin1Test(unittest.TestCase):
+class Latin1Test(yp_unittest.TestCase):
     def test_encode(self):
         for data, expected in (
             ('abc', b'abc'),
@@ -3378,7 +3378,7 @@ class Latin1Test(unittest.TestCase):
                 self.assertEqual(data.decode('latin1'), expected)
 
 
-class StreamRecoderTest(unittest.TestCase):
+class StreamRecoderTest(yp_unittest.TestCase):
     def test_writelines(self):
         bio = io.BytesIO()
         codec = codecs.lookup('ascii')
@@ -3424,8 +3424,8 @@ class StreamRecoderTest(unittest.TestCase):
         self.assertEqual(sr.readline(), b'789\n')
 
 
-@unittest.skipIf(_testcapi is None, 'need _testcapi module')
-class LocaleCodecTest(unittest.TestCase):
+@yp_unittest.skipIf(_testcapi is None, 'need _testcapi module')
+class LocaleCodecTest(yp_unittest.TestCase):
     """
     Test indirectly _Py_DecodeUTF8Ex() and _Py_EncodeUTF8Ex().
     """
@@ -3538,7 +3538,7 @@ class LocaleCodecTest(unittest.TestCase):
         self.assertEqual(str(cm.exception), 'unsupported error handler')
 
 
-class Rot13Test(unittest.TestCase):
+class Rot13Test(yp_unittest.TestCase):
     """Test the educational ROT-13 codec."""
     def test_encode(self):
         ciphertext = codecs.encode("Caesar liked ciphers", 'rot-13')
@@ -3559,7 +3559,7 @@ class Rot13Test(unittest.TestCase):
         self.assertEqual(plaintext, 'green Nerf rail gun')
 
 
-class Rot13UtilTest(unittest.TestCase):
+class Rot13UtilTest(yp_unittest.TestCase):
     """Test the ROT-13 codec via rot13 function,
     i.e. the user has done something like:
     $ echo "Hello World" | python -m encodings.rot_13
@@ -3575,7 +3575,7 @@ class Rot13UtilTest(unittest.TestCase):
             'To be, or not to be, that is the question')
 
 
-class CodecNameNormalizationTest(unittest.TestCase):
+class CodecNameNormalizationTest(yp_unittest.TestCase):
     """Test codec name normalization"""
     def test_codecs_lookup(self):
         FOUND = (1, 2, 3, 4)

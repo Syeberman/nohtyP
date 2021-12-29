@@ -1074,4 +1074,4 @@ class TestCase(yp_unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

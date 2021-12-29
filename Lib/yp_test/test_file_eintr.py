@@ -23,7 +23,7 @@ import _pyio
 
 
 @yp_unittest.skip_files
-@unittest.skipUnless(os.name == 'posix', 'tests requires a posix system.')
+@yp_unittest.skipUnless(os.name == 'posix', 'tests requires a posix system.')
 class TestFileIOSignalInterrupt:
     def setUp(self):
         self._process = None
@@ -182,10 +182,10 @@ class TestFileIOSignalInterrupt:
                         expected=b'hello\nworld!\n'))
 
 
-class CTestFileIOSignalInterrupt(TestFileIOSignalInterrupt, unittest.TestCase):
+class CTestFileIOSignalInterrupt(TestFileIOSignalInterrupt, yp_unittest.TestCase):
     modname = '_io'
 
-class PyTestFileIOSignalInterrupt(TestFileIOSignalInterrupt, unittest.TestCase):
+class PyTestFileIOSignalInterrupt(TestFileIOSignalInterrupt, yp_unittest.TestCase):
     modname = '_pyio'
 
 
@@ -204,10 +204,10 @@ class TestBufferedIOSignalInterrupt(TestFileIOSignalInterrupt):
                         read_method_name='read',
                         expected=b'hello\nworld!\n'))
 
-class CTestBufferedIOSignalInterrupt(TestBufferedIOSignalInterrupt, unittest.TestCase):
+class CTestBufferedIOSignalInterrupt(TestBufferedIOSignalInterrupt, yp_unittest.TestCase):
     modname = '_io'
 
-class PyTestBufferedIOSignalInterrupt(TestBufferedIOSignalInterrupt, unittest.TestCase):
+class PyTestBufferedIOSignalInterrupt(TestBufferedIOSignalInterrupt, yp_unittest.TestCase):
     modname = '_pyio'
 
 
@@ -243,10 +243,10 @@ class TestTextIOSignalInterrupt(TestFileIOSignalInterrupt):
                         read_method_name='read',
                         expected="hello\nworld!\n"))
 
-class CTestTextIOSignalInterrupt(TestTextIOSignalInterrupt, unittest.TestCase):
+class CTestTextIOSignalInterrupt(TestTextIOSignalInterrupt, yp_unittest.TestCase):
     modname = '_io'
 
-class PyTestTextIOSignalInterrupt(TestTextIOSignalInterrupt, unittest.TestCase):
+class PyTestTextIOSignalInterrupt(TestTextIOSignalInterrupt, yp_unittest.TestCase):
     modname = '_pyio'
 
 

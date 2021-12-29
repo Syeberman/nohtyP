@@ -2741,7 +2741,7 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertEqual(proc.rc, 10, proc)
 
 
-class CAPITest(unittest.TestCase):
+class CAPITest(yp_unittest.TestCase):
 
     # Test PyUnicode_FromFormat()
     @yp_unittest.skip_not_applicable

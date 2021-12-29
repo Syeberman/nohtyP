@@ -45,7 +45,7 @@ except ImportError:
     np = None
 
 
-requires_32b = unittest.skipUnless(sys.maxsize < 2**32,
+requires_32b = yp_unittest.skipUnless(sys.maxsize < 2**32,
                                    "test is only meaningful on 32-bit builds")
 
 # Tests that try a number of pickle protocols should have a
@@ -2989,7 +2989,7 @@ class AbstractPickleTests:
             data_pickled = self.dumps(1, proto, buffer_callback=None)
             data = self.loads(data_pickled, buffers=None)
 
-    @unittest.skipIf(np is None, "Test needs Numpy")
+    @yp_unittest.skipIf(np is None, "Test needs Numpy")
     def test_buffers_numpy(self):
         def check_no_copy(x, y):
             np.testing.assert_equal(x, y)

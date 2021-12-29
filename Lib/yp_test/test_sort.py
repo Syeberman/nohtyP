@@ -299,7 +299,7 @@ def check_against_PyObject_RichCompareBool(self, L):
             self.assertIs(opt, ref)
             #note: not assertEqual! We want to ensure *identical* behavior.
 
-class TestOptimizedCompares(unittest.TestCase):
+class TestOptimizedCompares(yp_unittest.TestCase):
     def test_safe_object_compare(self):
         heterogeneous_lists = [[0, 'foo'],
                                [0.0, 'foo'],
@@ -392,4 +392,4 @@ class TestOptimizedCompares(unittest.TestCase):
 #==============================================================================
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

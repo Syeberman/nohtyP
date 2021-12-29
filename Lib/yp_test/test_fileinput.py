@@ -86,7 +86,7 @@ class LineReader:
     def close(self):
         pass
 
-class BufferSizesTests(BaseTests, unittest.TestCase):
+class BufferSizesTests(BaseTests, yp_unittest.TestCase):
     def test_buffer_sizes(self):
 
         t1 = self.writeTmp(''.join("Line %s of file 1\n" % (i+1) for i in range(15)))
@@ -914,7 +914,7 @@ class Test_hook_compressed(yp_unittest.TestCase):
         self.assertEqual(self.fake_open.invocation_count, 1)
         self.assertEqual(self.fake_open.last_invocation, (("test.gz", "3"), {}))
 
-    @unittest.skipUnless(gzip, "Requires gzip and zlib")
+    @yp_unittest.skipUnless(gzip, "Requires gzip and zlib")
     def test_gz_with_encoding_fake(self):
         original_open = gzip.open
         gzip.open = lambda filename, mode: io.BytesIO(b'Ex-binary string')
@@ -1028,7 +1028,7 @@ class Test_hook_encoded(yp_unittest.TestCase):
             check('rb', ['A\n', 'B\r\n', 'C\r', 'D\u20ac'])
 
 
-class MiscTest(unittest.TestCase):
+class MiscTest(yp_unittest.TestCase):
 
     def test_all(self):
         support.check__all__(self, fileinput)

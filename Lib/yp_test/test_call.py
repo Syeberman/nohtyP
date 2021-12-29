@@ -1,4 +1,4 @@
-import unittest
+import yp_unittest
 from test.support import cpython_only
 try:
     import _testcapi
@@ -11,7 +11,7 @@ import gc
 import contextlib
 
 
-class FunctionCalls(unittest.TestCase):
+class FunctionCalls(yp_unittest.TestCase):
 
     def test_kwargs_order(self):
         # bpo-34320:  **kwargs should preserve order of passed OrderedDict
@@ -28,7 +28,7 @@ class FunctionCalls(unittest.TestCase):
 
 
 @cpython_only
-class CFunctionCallsErrorMessages(unittest.TestCase):
+class CFunctionCallsErrorMessages(yp_unittest.TestCase):
 
     def test_varargs0(self):
         msg = r"__contains__\(\) takes exactly one argument \(0 given\)"
@@ -171,7 +171,7 @@ class CFunctionCallsErrorMessages(unittest.TestCase):
 
 
 
-class TestCallingConventions(unittest.TestCase):
+class TestCallingConventions(yp_unittest.TestCase):
     """Test calling using various C calling conventions (METH_*) from Python
 
     Subclasses test several kinds of functions (module-level, methods,
@@ -368,7 +368,7 @@ PYTHON_INSTANCE = PythonClass()
 
 NULL_OR_EMPTY = object()
 
-class FastCallTests(unittest.TestCase):
+class FastCallTests(yp_unittest.TestCase):
     """Test calling using various callables from C
     """
 
@@ -547,7 +547,7 @@ def testfunction_kw(self, *, kw):
     return self
 
 
-class TestPEP590(unittest.TestCase):
+class TestPEP590(yp_unittest.TestCase):
 
     def test_method_descriptor_flag(self):
         import functools
@@ -679,7 +679,7 @@ class A:
         pass
 
 @cpython_only
-class TestErrorMessagesUseQualifiedName(unittest.TestCase):
+class TestErrorMessagesUseQualifiedName(yp_unittest.TestCase):
 
     @contextlib.contextmanager
     def check_raises_type_error(self, message):
@@ -714,4 +714,4 @@ class TestErrorMessagesUseQualifiedName(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

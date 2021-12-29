@@ -33,7 +33,7 @@ except ImportError:
     has_c_implementation = False
 
 
-class PyPickleTests(AbstractPickleModuleTests, unittest.TestCase):
+class PyPickleTests(AbstractPickleModuleTests, yp_unittest.TestCase):
     dump = staticmethod(pickle._dump)
     dumps = staticmethod(pickle._dumps)
     load = staticmethod(pickle._load)
@@ -42,7 +42,7 @@ class PyPickleTests(AbstractPickleModuleTests, unittest.TestCase):
     Unpickler = pickle._Unpickler
 
 
-class PyUnpicklerTests(AbstractUnpickleTests, unittest.TestCase):
+class PyUnpicklerTests(AbstractUnpickleTests, yp_unittest.TestCase):
 
     unpickler = pickle._Unpickler
     bad_stack_errors = (IndexError,)
@@ -56,7 +56,7 @@ class PyUnpicklerTests(AbstractUnpickleTests, unittest.TestCase):
         return u.load()
 
 
-class PyPicklerTests(AbstractPickleTests, unittest.TestCase):
+class PyPicklerTests(AbstractPickleTests, yp_unittest.TestCase):
 
     pickler = pickle._Pickler
     unpickler = pickle._Unpickler
@@ -75,7 +75,7 @@ class PyPicklerTests(AbstractPickleTests, unittest.TestCase):
 
 
 class InMemoryPickleTests(AbstractPickleTests, AbstractUnpickleTests,
-                          BigmemPickleTests, unittest.TestCase):
+                          BigmemPickleTests, yp_unittest.TestCase):
 
     bad_stack_errors = (pickle.UnpicklingError, IndexError)
     truncated_errors = (pickle.UnpicklingError, EOFError,
@@ -112,14 +112,14 @@ class PersistentPicklerUnpicklerMixin(object):
 
 
 class PyPersPicklerTests(AbstractPersistentPicklerTests,
-                         PersistentPicklerUnpicklerMixin, unittest.TestCase):
+                         PersistentPicklerUnpicklerMixin, yp_unittest.TestCase):
 
     pickler = pickle._Pickler
     unpickler = pickle._Unpickler
 
 
 class PyIdPersPicklerTests(AbstractIdentityPersistentPicklerTests,
-                           PersistentPicklerUnpicklerMixin, unittest.TestCase):
+                           PersistentPicklerUnpicklerMixin, yp_unittest.TestCase):
 
     pickler = pickle._Pickler
     unpickler = pickle._Unpickler
@@ -185,13 +185,13 @@ class PyIdPersPicklerTests(AbstractIdentityPersistentPicklerTests,
         check(PersUnpickler)
 
 
-class PyPicklerUnpicklerObjectTests(AbstractPicklerUnpicklerObjectTests, unittest.TestCase):
+class PyPicklerUnpicklerObjectTests(AbstractPicklerUnpicklerObjectTests, yp_unittest.TestCase):
 
     pickler_class = pickle._Pickler
     unpickler_class = pickle._Unpickler
 
 
-class PyDispatchTableTests(AbstractDispatchTableTests, unittest.TestCase):
+class PyDispatchTableTests(AbstractDispatchTableTests, yp_unittest.TestCase):
 
     pickler_class = pickle._Pickler
 
@@ -199,7 +199,7 @@ class PyDispatchTableTests(AbstractDispatchTableTests, unittest.TestCase):
         return pickle.dispatch_table.copy()
 
 
-class PyChainDispatchTableTests(AbstractDispatchTableTests, unittest.TestCase):
+class PyChainDispatchTableTests(AbstractDispatchTableTests, yp_unittest.TestCase):
 
     pickler_class = pickle._Pickler
 
@@ -207,7 +207,7 @@ class PyChainDispatchTableTests(AbstractDispatchTableTests, unittest.TestCase):
         return collections.ChainMap({}, pickle.dispatch_table)
 
 
-class PyPicklerHookTests(AbstractHookTests, unittest.TestCase):
+class PyPicklerHookTests(AbstractHookTests, yp_unittest.TestCase):
     class CustomPyPicklerClass(pickle._Pickler,
                                AbstractCustomPicklerClass):
         pass
@@ -215,7 +215,7 @@ class PyPicklerHookTests(AbstractHookTests, unittest.TestCase):
 
 
 if has_c_implementation:
-    class CPickleTests(AbstractPickleModuleTests, unittest.TestCase):
+    class CPickleTests(AbstractPickleModuleTests, yp_unittest.TestCase):
         from _pickle import dump, dumps, load, loads, Pickler, Unpickler
 
     class CUnpicklerTests(PyUnpicklerTests):
@@ -243,7 +243,7 @@ if has_c_implementation:
         pickler = pickle._Pickler
         unpickler = _pickle.Unpickler
 
-    class CPicklerUnpicklerObjectTests(AbstractPicklerUnpicklerObjectTests, unittest.TestCase):
+    class CPicklerUnpicklerObjectTests(AbstractPicklerUnpicklerObjectTests, yp_unittest.TestCase):
         pickler_class = _pickle.Pickler
         unpickler_class = _pickle.Unpickler
 
@@ -256,23 +256,23 @@ if has_c_implementation:
                 unpickler.memo = {-1: None}
             unpickler.memo = {1: None}
 
-    class CDispatchTableTests(AbstractDispatchTableTests, unittest.TestCase):
+    class CDispatchTableTests(AbstractDispatchTableTests, yp_unittest.TestCase):
         pickler_class = pickle.Pickler
         def get_dispatch_table(self):
             return pickle.dispatch_table.copy()
 
-    class CChainDispatchTableTests(AbstractDispatchTableTests, unittest.TestCase):
+    class CChainDispatchTableTests(AbstractDispatchTableTests, yp_unittest.TestCase):
         pickler_class = pickle.Pickler
         def get_dispatch_table(self):
             return collections.ChainMap({}, pickle.dispatch_table)
 
-    class CPicklerHookTests(AbstractHookTests, unittest.TestCase):
+    class CPicklerHookTests(AbstractHookTests, yp_unittest.TestCase):
         class CustomCPicklerClass(_pickle.Pickler, AbstractCustomPicklerClass):
             pass
         pickler_class = CustomCPicklerClass
 
     @support.cpython_only
-    class SizeofTests(unittest.TestCase):
+    class SizeofTests(yp_unittest.TestCase):
         check_sizeof = support.check_sizeof
 
         def test_pickler(self):
@@ -396,7 +396,7 @@ def get_exceptions(mod):
         if isinstance(attr, type) and issubclass(attr, BaseException):
             yield name, attr
 
-class CompatPickleTests(unittest.TestCase):
+class CompatPickleTests(yp_unittest.TestCase):
     def test_import(self):
         modules = set(IMPORT_MAPPING.values())
         modules |= set(REVERSE_IMPORT_MAPPING)

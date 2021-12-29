@@ -12,7 +12,7 @@ import sys
 import sysconfig
 import time
 import types
-import unittest
+from yp_test import yp_unittest
 import warnings
 
 from .testresult import get_test_runner
@@ -120,7 +120,7 @@ class TestFailedWithDetails(TestFailed):
 class TestDidNotRun(Error):
     """Test did not run any subtests."""
 
-class ResourceDenied(unittest.SkipTest):
+class ResourceDenied(yp_unittest.SkipTest):
     """Test skipped because it requested a disallowed resource.
 
     This is raised when a test calls requires() for a resource that
@@ -313,7 +313,7 @@ def _requires_unix_version(sysname, min_version):
     else:
         skip = False
 
-    return unittest.skipIf(
+    return yp_unittest.skipIf(
         skip,
         f"{sysname} version {min_version_txt} or higher required, not "
         f"{version_txt}"
@@ -375,7 +375,7 @@ def system_must_validate_cert(f):
             f(*args, **kwargs)
         except OSError as e:
             if "CERTIFICATE_VERIFY_FAILED" in str(e):
-                raise unittest.SkipTest("system does not contain "
+                raise yp_unittest.SkipTest("system does not contain "
                                         "necessary certificates")
             raise
     return dec
@@ -404,30 +404,30 @@ def requires_zlib(reason='requires zlib'):
         import zlib
     except ImportError:
         zlib = None
-    return unittest.skipUnless(zlib, reason)
+    return yp_unittest.skipUnless(zlib, reason)
 
 def requires_gzip(reason='requires gzip'):
     try:
         import gzip
     except ImportError:
         gzip = None
-    return unittest.skipUnless(gzip, reason)
+    return yp_unittest.skipUnless(gzip, reason)
 
 def requires_bz2(reason='requires bz2'):
     try:
         import bz2
     except ImportError:
         bz2 = None
-    return unittest.skipUnless(bz2, reason)
+    return yp_unittest.skipUnless(bz2, reason)
 
 def requires_lzma(reason='requires lzma'):
     try:
         import lzma
     except ImportError:
         lzma = None
-    return unittest.skipUnless(lzma, reason)
+    return yp_unittest.skipUnless(lzma, reason)
 
-requires_legacy_unicode_capi = unittest.skipUnless(unicode_legacy_string,
+requires_legacy_unicode_capi = yp_unittest.skipUnless(unicode_legacy_string,
                         'requires legacy Unicode C API')
 
 is_jython = sys.platform.startswith('java')
@@ -976,7 +976,7 @@ def _filter_suite(suite, pred):
     suite._tests = newtests
 
 def _run_suite(suite):
-    """Run tests from a unittest.TestSuite-derived class."""
+    """Run tests from a yp_unittest.TestSuite-derived class."""
     runner = get_test_runner(sys.stdout,
                              verbosity=verbose,
                              capture_output=(junit_xml_list is not None))
@@ -1104,7 +1104,7 @@ def run_unittest(*classes):
         elif isinstance(cls, valid_types):
             suite.addTest(cls)
         else:
-            suite.addTest(unittest.makeSuite(cls))
+            suite.addTest(yp_unittest.makeSuite(cls))
     _filter_suite(suite, match_test)
     _run_suite(suite)
 
@@ -1330,7 +1330,7 @@ def skip_if_buggy_ucrt_strfptime(test):
             _buggy_ucrt = True
         else:
             _buggy_ucrt = False
-    return unittest.skip("buggy MSVC UCRT strptime/strftime")(test) if _buggy_ucrt else test
+    return yp_unittest.skip("buggy MSVC UCRT strptime/strftime")(test) if _buggy_ucrt else test
 
 class PythonSymlink:
     """Creates a symlink for the current Python executable"""
@@ -1418,7 +1418,7 @@ def skip_if_pgo_task(test):
     """Skip decorator for tests not run in (non-extended) PGO task"""
     ok = not PGO or PGO_EXTENDED
     msg = "Not run for (non-extended) PGO task"
-    return test if ok else unittest.skip(msg)(test)
+    return test if ok else yp_unittest.skip(msg)(test)
 
 
 def detect_api_mismatch(ref_api, other_api, *, ignore=()):
@@ -1460,14 +1460,14 @@ def check__all__(test_case, module, name_of_module=None, extra=(),
     Usage:
         import bar
         import foo
-        import unittest
+        from yp_test import yp_unittest
         from test import support
 
-        class MiscTestCase(unittest.TestCase):
+        class MiscTestCase(yp_unittest.TestCase):
             def test__all__(self):
                 support.check__all__(self, foo)
 
-        class OtherTestCase(unittest.TestCase):
+        class OtherTestCase(yp_unittest.TestCase):
             def test__all__(self):
                 extra = {'BAR_CONST', 'FOO_CONST'}
                 not_exported = {'baz'}  # Undocumented name.
@@ -2008,7 +2008,7 @@ def skip_if_broken_multiprocessing_synchronize():
             # a file in /dev/shm/ directory.
             synchronize.Lock(ctx=None)
         except OSError as exc:
-            raise unittest.SkipTest(f"broken multiprocessing SemLock: {exc!r}")
+            raise yp_unittest.SkipTest(f"broken multiprocessing SemLock: {exc!r}")
 
 
 @contextlib.contextmanager

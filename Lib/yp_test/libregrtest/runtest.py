@@ -7,7 +7,7 @@ import os
 import sys
 import time
 import traceback
-import unittest
+from yp_test import yp_unittest
 
 from test import support
 from test.support import os_helper
@@ -252,7 +252,7 @@ def runtest(ns: Namespace, test_name: str) -> TestResult:
 
 
 def _test_module(the_module):
-    loader = unittest.TestLoader()
+    loader = yp_unittest.TestLoader()
     tests = loader.loadTestsFromModule(the_module)
     for error in loader.errors:
         print(error, file=sys.stderr)
@@ -337,7 +337,7 @@ def _runtest_inner(
         if not ns.quiet and not ns.pgo:
             print(f"{test_name} skipped -- {msg}", flush=True)
         return ResourceDenied(test_name)
-    except unittest.SkipTest as msg:
+    except yp_unittest.SkipTest as msg:
         if not ns.quiet and not ns.pgo:
             print(f"{test_name} skipped -- {msg}", flush=True)
         return Skipped(test_name)

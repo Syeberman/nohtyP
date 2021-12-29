@@ -3,7 +3,7 @@ import faulthandler
 import os
 import signal
 import sys
-import unittest
+from yp_test import yp_unittest
 from test import support
 try:
     import gc
@@ -66,7 +66,7 @@ def setup_tests(ns):
             module.__file__ = os.path.abspath(module.__file__)
 
     if ns.huntrleaks:
-        unittest.BaseTestSuite._cleanup = False
+        yp_unittest.BaseTestSuite._cleanup = False
         sys._deactivate_opcache()
 
     if ns.memlimit is not None:

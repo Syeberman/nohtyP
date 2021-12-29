@@ -522,8 +522,8 @@ class InterningTestCase(yp_unittest.TestCase, HelperMixin):
         self.assertNotEqual(id(s2), id(s))
 
 @support.cpython_only
-@unittest.skipUnless(_testcapi, 'requires _testcapi')
-class CAPI_TestCase(unittest.TestCase, HelperMixin):
+@yp_unittest.skipUnless(_testcapi, 'requires _testcapi')
+class CAPI_TestCase(yp_unittest.TestCase, HelperMixin):
 
     def test_write_long_to_file(self):
         for v in range(marshal.version + 1):
@@ -605,4 +605,4 @@ class CAPI_TestCase(unittest.TestCase, HelperMixin):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

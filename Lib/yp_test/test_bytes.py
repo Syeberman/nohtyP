@@ -1912,7 +1912,7 @@ class AssortedBytesTest(yp_unittest.TestCase):
         b = yp_bytearray()
         self.assertIsNot(b.replace(b'', b''), b)
 
-    @unittest.skipUnless(sys.flags.bytes_warning,
+    @yp_unittest.skipUnless(sys.flags.bytes_warning,
                          "BytesWarning is needed for this test: use -bb option")
     def test_compare(self):
         def bytes_warning():
@@ -1957,7 +1957,7 @@ class AssortedBytesTest(yp_unittest.TestCase):
     # the rest that make sense (the code can be cleaned up to use modern
     # yp_unittest methods at the same time).
 
-class BytearrayPEP3137Test(unittest.TestCase):
+class BytearrayPEP3137Test(yp_unittest.TestCase):
     def marshal(self, x):
         return yp_bytearray(x)
 
@@ -1993,10 +1993,10 @@ class FixedStringTest(yp_test.string_tests.BaseTest):
 
     contains_bytes = True
 
-class ByteArrayAsStringTest(FixedStringTest, unittest.TestCase):
+class ByteArrayAsStringTest(FixedStringTest, yp_unittest.TestCase):
     type2test = yp_bytearray
 
-class BytesAsStringTest(FixedStringTest, unittest.TestCase):
+class BytesAsStringTest(FixedStringTest, yp_unittest.TestCase):
     type2test = yp_bytes
 
 
@@ -2102,7 +2102,7 @@ class BytesSubclass(yp_bytes):
     pass
 
 @yp_unittest.skip_not_applicable
-class ByteArraySubclassTest(SubclassTest, unittest.TestCase):
+class ByteArraySubclassTest(SubclassTest, yp_unittest.TestCase):
     basetype = yp_bytearray
     type2test = ByteArraySubclass
 
@@ -2118,7 +2118,7 @@ class ByteArraySubclassTest(SubclassTest, unittest.TestCase):
 
 
 @yp_unittest.skip_not_applicable
-class BytesSubclassTest(SubclassTest, unittest.TestCase):
+class BytesSubclassTest(SubclassTest, yp_unittest.TestCase):
     basetype = yp_bytes
     type2test = BytesSubclass
 

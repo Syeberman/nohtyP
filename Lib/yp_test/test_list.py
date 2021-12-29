@@ -240,4 +240,4 @@ class ListTest(list_tests.CommonTest):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

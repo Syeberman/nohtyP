@@ -141,4 +141,4 @@ class TestHexOctBin(yp_unittest.TestCase):
         self.assertEqual(-0b1111111111111111111111111111111111111111111111111111111111111111, -18446744073709551615)
 
 if __name__ == "__main__":
-    unittest.main()
+    yp_unittest.main()

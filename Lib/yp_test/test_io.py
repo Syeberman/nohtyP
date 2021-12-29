@@ -1044,7 +1044,7 @@ class PyIOTest(IOTest):
 
 
 @support.cpython_only
-class APIMismatchTest(unittest.TestCase):
+class APIMismatchTest(yp_unittest.TestCase):
 
     def test_RawIOBase_io_in_pyio_match(self):
         """Test that pyio RawIOBase class has all c RawIOBase methods"""
@@ -1075,7 +1075,7 @@ class CommonBufferedTests:
 
         self.assertEqual(42, bufio.fileno())
 
-    @unittest.skip('test having existential crisis')
+    @yp_unittest.skip('test having existential crisis')
     def test_no_fileno(self):
         # XXX will we always have fileno() function? If so, kill
         # this test. Else, write it.
@@ -1559,7 +1559,7 @@ class BufferedReaderTest(yp_unittest.TestCase, CommonBufferedTests):
 class CBufferedReaderTest(BufferedReaderTest, SizeofTest):
     tp = io.BufferedReader
 
-    @unittest.skipIf(MEMORY_SANITIZER or ADDRESS_SANITIZER, "sanitizer defaults to crashing "
+    @yp_unittest.skipIf(MEMORY_SANITIZER or ADDRESS_SANITIZER, "sanitizer defaults to crashing "
                      "instead of returning NULL for malloc failure.")
     def test_constructor(self):
         BufferedReaderTest.test_constructor(self)
@@ -1925,7 +1925,7 @@ class BufferedWriterTest(yp_unittest.TestCase, CommonBufferedTests):
 class CBufferedWriterTest(BufferedWriterTest, SizeofTest):
     tp = io.BufferedWriter
 
-    @unittest.skipIf(MEMORY_SANITIZER or ADDRESS_SANITIZER, "sanitizer defaults to crashing "
+    @yp_unittest.skipIf(MEMORY_SANITIZER or ADDRESS_SANITIZER, "sanitizer defaults to crashing "
                      "instead of returning NULL for malloc failure.")
     def test_constructor(self):
         BufferedWriterTest.test_constructor(self)
@@ -2425,7 +2425,7 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
 class CBufferedRandomTest(BufferedRandomTest, SizeofTest):
     tp = io.BufferedRandom
 
-    @unittest.skipIf(MEMORY_SANITIZER or ADDRESS_SANITIZER, "sanitizer defaults to crashing "
+    @yp_unittest.skipIf(MEMORY_SANITIZER or ADDRESS_SANITIZER, "sanitizer defaults to crashing "
                      "instead of returning NULL for malloc failure.")
     def test_constructor(self):
         BufferedRandomTest.test_constructor(self)
@@ -2729,7 +2729,7 @@ class TextIOWrapperTest(yp_unittest.TestCase):
         t.reconfigure(line_buffering=None)
         self.assertEqual(t.line_buffering, True)
 
-    @unittest.skipIf(sys.flags.utf8_mode, "utf-8 mode is enabled")
+    @yp_unittest.skipIf(sys.flags.utf8_mode, "utf-8 mode is enabled")
     def test_default_encoding(self):
         old_environ = dict(os.environ)
         try:
@@ -2751,7 +2751,7 @@ class TextIOWrapperTest(yp_unittest.TestCase):
             os.environ.update(old_environ)
 
     @support.cpython_only
-    @unittest.skipIf(sys.flags.utf8_mode, "utf-8 mode is enabled")
+    @yp_unittest.skipIf(sys.flags.utf8_mode, "utf-8 mode is enabled")
     def test_device_encoding(self):
         # Issue 15989
         import _testcapi
@@ -4165,7 +4165,7 @@ class MiscIOTest(yp_unittest.TestCase):
     def test_nonblock_pipe_write_smallbuf(self):
         self._test_nonblock_pipe_write(1024)
 
-    @unittest.skipUnless(hasattr(os, 'set_blocking'),
+    @yp_unittest.skipUnless(hasattr(os, 'set_blocking'),
                          'os.set_blocking() required for this test')
     def _test_nonblock_pipe_write(self, bufsize):
         sent = []

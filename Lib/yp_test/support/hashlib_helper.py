@@ -1,6 +1,6 @@
 import functools
 import hashlib
-import unittest
+from yp_test import yp_unittest
 
 try:
     import _hashlib
@@ -43,7 +43,7 @@ def requires_hashdigest(digestname, openssl=None, usedforsecurity=True):
                 else:
                     hashlib.new(digestname, usedforsecurity=usedforsecurity)
             except ValueError:
-                raise unittest.SkipTest(
+                raise yp_unittest.SkipTest(
                     f"hash digest '{digestname}' is not available."
                 )
             return func_or_class(*args, **kwargs)

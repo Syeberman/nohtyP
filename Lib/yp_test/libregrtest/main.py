@@ -8,7 +8,7 @@ import sys
 import sysconfig
 import tempfile
 import time
-import unittest
+from yp_test import yp_unittest
 from test.libregrtest.cmdline import _parse_args
 from test.libregrtest.runtest import (
     findtests, runtest, get_abs_module, is_failed,
@@ -279,11 +279,11 @@ class Regrtest:
 
     def _list_cases(self, suite):
         for test in suite:
-            if isinstance(test, unittest.loader._FailedTest):
+            if isinstance(test, yp_unittest.loader._FailedTest):
                 continue
-            if isinstance(test, unittest.TestSuite):
+            if isinstance(test, yp_unittest.TestSuite):
                 self._list_cases(test)
-            elif isinstance(test, unittest.TestCase):
+            elif isinstance(test, yp_unittest.TestCase):
                 if support.match_test(test):
                     print(test.id())
 
@@ -294,9 +294,9 @@ class Regrtest:
         for test_name in self.selected:
             abstest = get_abs_module(self.ns, test_name)
             try:
-                suite = unittest.defaultTestLoader.loadTestsFromName(abstest)
+                suite = yp_unittest.defaultTestLoader.loadTestsFromName(abstest)
                 self._list_cases(suite)
-            except unittest.SkipTest:
+            except yp_unittest.SkipTest:
                 self.skipped.append(test_name)
 
         if self.skipped:

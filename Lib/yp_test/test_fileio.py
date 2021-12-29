@@ -445,7 +445,7 @@ class OtherFileTests:
         finally:
             os.unlink(TESTFN)
 
-    @unittest.skipIf(sys.getfilesystemencoding() != 'utf-8',
+    @yp_unittest.skipIf(sys.getfilesystemencoding() != 'utf-8',
                      "test only works for utf-8 filesystems")
     def testUtf8BytesOpen(self):
         # Opening a UTF-8 bytes filename
@@ -572,7 +572,7 @@ class OtherFileTests:
         os.close(fd)  # should not raise OSError(EBADF)
 
 
-class COtherFileTests(OtherFileTests, unittest.TestCase):
+class COtherFileTests(OtherFileTests, yp_unittest.TestCase):
     FileIO = _io.FileIO
     modulename = '_io'
 
@@ -593,7 +593,7 @@ class COtherFileTests(OtherFileTests, unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
-class PyOtherFileTests(OtherFileTests, unittest.TestCase):
+class PyOtherFileTests(OtherFileTests, yp_unittest.TestCase):
     FileIO = _pyio.FileIO
     modulename = '_pyio'
 
@@ -618,4 +618,4 @@ def tearDownModule():
 
 
 if __name__ == '__main__':
-    unittest.main()
+    yp_unittest.main()

@@ -95,7 +95,7 @@ def test_exc_common(formatstr, args, exception, excmsg):
     test_exc(formatstr.encode('ascii'), args, exception, excmsg)
 
 @yp_unittest.skip_str_printf
-class FormatTest(unittest.TestCase):
+class FormatTest(yp_unittest.TestCase):
 
     def test_common_format(self):
         # test the format identifiers that work the same across
