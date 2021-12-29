@@ -8,7 +8,7 @@ import itertools
 from yp_test.support import ALWAYS_EQ
 
 # Extra assurance that we're not accidentally testing Python's range
-def range( *args, **kwargs ): raise NotImplementedError( "convert script to yp_range here" )
+def range(*args, **kwargs): raise NotImplementedError("convert script to yp_range here")
 
 # pure Python implementations (3 args only), for comparison
 def pyrange(start, stop, step):
@@ -535,7 +535,6 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(-1, r)
         self.assertNotIn(1, r)
 
-    @yp_test.support.requires_resource('cpu')
     def test_range_iterators(self):
         # exercise 'fast' iterators, that use a rangeiterobject internally.
         # see issue 7298

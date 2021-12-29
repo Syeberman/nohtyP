@@ -79,7 +79,7 @@ class ListTest(list_tests.CommonTest):
         self.assertRaises((MemoryError, OverflowError), mul, lst, n)
         self.assertRaises((MemoryError, OverflowError), imul, lst, n)
 
-    @support.requires_resource('cpu')
+    @yp_unittest.skip_str_repr
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):
@@ -103,10 +103,13 @@ class ListTest(list_tests.CommonTest):
             self.assertEqual(type(it), type(itorig))
             self.assertEqual(list(it), data)
 
-        it = pickle.loads(d)
-        next(it)
-        d = pickle.dumps(it)
-        self.assertEqual(self.type2test(it), self.type2test(data)[1:])
+            # running iterator
+            next(itorig)
+            d = pickle.dumps((itorig, orig), proto)
+            it, a = pickle.loads(d)
+            a[:] = data
+            self.assertEqual(type(it), type(itorig))
+            self.assertEqual(list(it), data[1:])
 
             # empty iterator
             for i in range(1, len(orig)):

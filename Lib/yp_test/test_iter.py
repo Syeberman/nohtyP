@@ -1111,6 +1111,7 @@ class TestCase(yp_unittest.TestCase):
         self.assertEqual(next(it), 0)
         self.assertEqual(next(it), 1)
 
+    @yp_unittest.skip_user_defined_types
     def test_free_after_iterating(self):
         check_free_after_iterating(self, iter, SequenceClass, (0,))
 

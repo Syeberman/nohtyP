@@ -91,7 +91,7 @@ else:
 nativeTargetsToCreate = set(("debug", "release"))
 
 python_3 = Tool("python_3")
-python_min34 = Tool("python_min34")  # yp_test requires at least Python 3.4
+python_min_310 = Tool("python_min_310")  # yp_test requires at least Python 3.10
 pclint = Tool("pclint")
 
 SconscriptLog.write("""
@@ -154,7 +154,7 @@ for compiler_name in compiler_names:
             try:
                 testTargets.extend((
                     nohtyP_yp_test(variantEnv.Clone(tools=[
-                        python_min34,
+                        python_min_310,
                     ]), sharedLib), sharedLib
                 ))
             except (SCons.Errors.UserError, SCons.Errors.StopError):

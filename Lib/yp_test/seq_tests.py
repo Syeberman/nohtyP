@@ -441,6 +441,7 @@ class CommonTest(yp_unittest.TestCase):
             self.assertEqual(lst2, lst)
             self.assertNotEqual(id(lst2), id(lst))
 
+    @yp_unittest.skip_user_defined_types
     def test_free_after_iterating(self):
         support.check_free_after_iterating(self, iter, self.type2test)
         support.check_free_after_iterating(self, reversed, self.type2test)

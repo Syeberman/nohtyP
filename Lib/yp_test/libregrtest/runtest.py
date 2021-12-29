@@ -122,16 +122,17 @@ PROGRESS_MIN_TIME = 30.0   # seconds
 # small set of tests to determine if we have a basically functioning interpreter
 # (i.e. if any of these fail, then anything else is likely to follow)
 STDTESTS = [
-    'test_grammar',
-    'test_opcodes',
-    'test_dict',
-    'test_builtin',
-    'test_exceptions',
-    'test_types',
-    'test_unittest',
-    'test_doctest',
-    'test_doctest2',
-    'test_support'
+    # XXX Only run the tests found in yp_test.
+    # 'test_grammar',
+    # 'test_opcodes',
+    # 'test_dict',
+    # 'test_builtin',
+    # 'test_exceptions',
+    # 'test_types',
+    # 'test_unittest',
+    # 'test_doctest',
+    # 'test_doctest2',
+    # 'test_support'
 ]
 
 # set of tests that we don't want to be executed when using regrtest
@@ -166,11 +167,11 @@ def findtests(testdir=None, stdtests=STDTESTS, nottests=NOTTESTS):
 
 
 def get_abs_module(ns: Namespace, test_name: str) -> str:
-    if test_name.startswith('test.') or ns.testdir:
+    if test_name.startswith('yp_test.') or ns.testdir:
         return test_name
     else:
-        # Import it from the test package
-        return 'test.' + test_name
+        # Import it from the yp_test package
+        return 'yp_test.' + test_name
 
 
 def _runtest(ns: Namespace, test_name: str) -> TestResult:

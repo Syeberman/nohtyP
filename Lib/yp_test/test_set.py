@@ -370,6 +370,7 @@ class TestJointOps:
         gc.collect()
         self.assertTrue(ref() is None, "Cycle was not collected")
 
+    @yp_unittest.skip_user_defined_types
     def test_free_after_iterating(self):
         support.check_free_after_iterating(self, iter, self.thetype)
 
@@ -785,7 +786,7 @@ class TestFrozenSet(TestJointOps, yp_unittest.TestCase):
                 u = len({h & mask for h in map(hash, powerset(nums(n)))})
                 self.assertGreater(4*u, t)
 
-class FrozenSetSubclass(frozenset):
+class FrozenSetSubclass(yp_frozenset):
     pass
 
 @yp_unittest.skip_not_applicable

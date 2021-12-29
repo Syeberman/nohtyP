@@ -171,6 +171,7 @@ class CFunctionCallsErrorMessages(yp_unittest.TestCase):
 
 
 
+@yp_unittest.skip_not_applicable
 class TestCallingConventions(yp_unittest.TestCase):
     """Test calling using various C calling conventions (METH_*) from Python
 
@@ -310,6 +311,7 @@ class TestCallingConventions(yp_unittest.TestCase):
         )
 
 
+@yp_unittest.skip_not_applicable
 class TestCallingConventionsInstance(TestCallingConventions):
     """Test calling instance methods using various calling conventions"""
 
@@ -317,6 +319,7 @@ class TestCallingConventionsInstance(TestCallingConventions):
         self.obj = self.expected_self = _testcapi.MethInstance()
 
 
+@yp_unittest.skip_not_applicable
 class TestCallingConventionsClass(TestCallingConventions):
     """Test calling class methods using various calling conventions"""
 
@@ -324,6 +327,7 @@ class TestCallingConventionsClass(TestCallingConventions):
         self.obj = self.expected_self = _testcapi.MethClass
 
 
+@yp_unittest.skip_not_applicable
 class TestCallingConventionsClassInstance(TestCallingConventions):
     """Test calling class methods on instance"""
 
@@ -332,6 +336,7 @@ class TestCallingConventionsClassInstance(TestCallingConventions):
         self.expected_self = _testcapi.MethClass
 
 
+@yp_unittest.skip_not_applicable
 class TestCallingConventionsStatic(TestCallingConventions):
     """Test calling static methods using various calling conventions"""
 
@@ -410,43 +415,44 @@ class FastCallTests(yp_unittest.TestCase):
         # C callables are added later
     ]
 
+    # XXX Not applicable to nohtyP
     # Add all the calling conventions and variants of C callables
-    _instance = _testcapi.MethInstance()
-    for obj, expected_self in (
-        (_testcapi, _testcapi),  # module-level function
-        (_instance, _instance),  # bound method
-        (_testcapi.MethClass, _testcapi.MethClass),  # class method on class
-        (_testcapi.MethClass(), _testcapi.MethClass),  # class method on inst.
-        (_testcapi.MethStatic, None),  # static method
-    ):
-        CALLS_POSARGS.extend([
-            (obj.meth_varargs, (1, 2), (expected_self, (1, 2))),
-            (obj.meth_varargs_keywords,
-                (1, 2), (expected_self, (1, 2), NULL_OR_EMPTY)),
-            (obj.meth_fastcall, (1, 2), (expected_self, (1, 2))),
-            (obj.meth_fastcall, (), (expected_self, ())),
-            (obj.meth_fastcall_keywords,
-                (1, 2), (expected_self, (1, 2), NULL_OR_EMPTY)),
-            (obj.meth_fastcall_keywords,
-                (), (expected_self, (), NULL_OR_EMPTY)),
-            (obj.meth_noargs, (), expected_self),
-            (obj.meth_o, (123, ), (expected_self, 123)),
-        ])
+    # _instance = _testcapi.MethInstance()
+    # for obj, expected_self in (
+    #     (_testcapi, _testcapi),  # module-level function
+    #     (_instance, _instance),  # bound method
+    #     (_testcapi.MethClass, _testcapi.MethClass),  # class method on class
+    #     (_testcapi.MethClass(), _testcapi.MethClass),  # class method on inst.
+    #     (_testcapi.MethStatic, None),  # static method
+    # ):
+    #     CALLS_POSARGS.extend([
+    #         (obj.meth_varargs, (1, 2), (expected_self, (1, 2))),
+    #         (obj.meth_varargs_keywords,
+    #             (1, 2), (expected_self, (1, 2), NULL_OR_EMPTY)),
+    #         (obj.meth_fastcall, (1, 2), (expected_self, (1, 2))),
+    #         (obj.meth_fastcall, (), (expected_self, ())),
+    #         (obj.meth_fastcall_keywords,
+    #             (1, 2), (expected_self, (1, 2), NULL_OR_EMPTY)),
+    #         (obj.meth_fastcall_keywords,
+    #             (), (expected_self, (), NULL_OR_EMPTY)),
+    #         (obj.meth_noargs, (), expected_self),
+    #         (obj.meth_o, (123, ), (expected_self, 123)),
+    #     ])
 
-        CALLS_KWARGS.extend([
-            (obj.meth_varargs_keywords,
-                (1, 2), {'x': 'y'}, (expected_self, (1, 2), {'x': 'y'})),
-            (obj.meth_varargs_keywords,
-                (), {'x': 'y'}, (expected_self, (), {'x': 'y'})),
-            (obj.meth_varargs_keywords,
-                (1, 2), {}, (expected_self, (1, 2), NULL_OR_EMPTY)),
-            (obj.meth_fastcall_keywords,
-                (1, 2), {'x': 'y'}, (expected_self, (1, 2), {'x': 'y'})),
-            (obj.meth_fastcall_keywords,
-                (), {'x': 'y'}, (expected_self, (), {'x': 'y'})),
-            (obj.meth_fastcall_keywords,
-                (1, 2), {}, (expected_self, (1, 2), NULL_OR_EMPTY)),
-        ])
+    #     CALLS_KWARGS.extend([
+    #         (obj.meth_varargs_keywords,
+    #             (1, 2), {'x': 'y'}, (expected_self, (1, 2), {'x': 'y'})),
+    #         (obj.meth_varargs_keywords,
+    #             (), {'x': 'y'}, (expected_self, (), {'x': 'y'})),
+    #         (obj.meth_varargs_keywords,
+    #             (1, 2), {}, (expected_self, (1, 2), NULL_OR_EMPTY)),
+    #         (obj.meth_fastcall_keywords,
+    #             (1, 2), {'x': 'y'}, (expected_self, (1, 2), {'x': 'y'})),
+    #         (obj.meth_fastcall_keywords,
+    #             (), {'x': 'y'}, (expected_self, (), {'x': 'y'})),
+    #         (obj.meth_fastcall_keywords,
+    #             (1, 2), {}, (expected_self, (1, 2), NULL_OR_EMPTY)),
+    #     ])
 
     def check_result(self, result, expected):
         if isinstance(expected, tuple) and expected[-1] is NULL_OR_EMPTY:
@@ -454,6 +460,7 @@ class FastCallTests(yp_unittest.TestCase):
                 expected = (*expected[:-1], result[-1])
         self.assertEqual(result, expected)
 
+    @yp_unittest.skip_not_applicable
     def test_fastcall(self):
         # Test _PyObject_FastCall()
 
@@ -467,6 +474,7 @@ class FastCallTests(yp_unittest.TestCase):
                     result = _testcapi.pyobject_fastcall(func, None)
                     self.check_result(result, expected)
 
+    @yp_unittest.skip_not_applicable
     def test_vectorcall_dict(self):
         # Test PyObject_VectorcallDict()
 
@@ -486,6 +494,7 @@ class FastCallTests(yp_unittest.TestCase):
                 result = _testcapi.pyobject_fastcalldict(func, args, kwargs)
                 self.check_result(result, expected)
 
+    @yp_unittest.skip_not_applicable
     def test_vectorcall(self):
         # Test PyObject_Vectorcall()
 
@@ -549,6 +558,7 @@ def testfunction_kw(self, *, kw):
 
 class TestPEP590(yp_unittest.TestCase):
 
+    @yp_unittest.skip_not_applicable
     def test_method_descriptor_flag(self):
         import functools
         cached = functools.lru_cache(1)(testfunction)
@@ -568,6 +578,7 @@ class TestPEP590(yp_unittest.TestCase):
             pass
         self.assertFalse(MethodDescriptorHeap.__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR)
 
+    @yp_unittest.skip_not_applicable
     def test_vectorcall_flag(self):
         self.assertTrue(_testcapi.MethodDescriptorBase.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
         self.assertTrue(_testcapi.MethodDescriptorDerived.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
@@ -579,6 +590,7 @@ class TestPEP590(yp_unittest.TestCase):
             pass
         self.assertFalse(MethodDescriptorHeap.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
 
+    @yp_unittest.skip_not_applicable
     def test_vectorcall_override(self):
         # Check that tp_call can correctly override vectorcall.
         # MethodDescriptorNopGet implements tp_call but it inherits from
@@ -589,6 +601,7 @@ class TestPEP590(yp_unittest.TestCase):
         f = _testcapi.MethodDescriptorNopGet()
         self.assertIs(f(*args), args)
 
+    @yp_unittest.skip_not_applicable
     def test_vectorcall(self):
         # Test a bunch of different ways to call objects:
         # 1. vectorcall using PyVectorcall_Call()

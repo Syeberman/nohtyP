@@ -1393,6 +1393,10 @@ class DictTest(yp_unittest.TestCase):
                 d.popitem()
         self.check_reentrant_insertion(mutate)
 
+    def test_merge_and_mutate(self):
+        class X:
+            def __hash__(self):
+                return 0
 
             def __eq__(self, o):
                 other.clear()
@@ -1404,6 +1408,7 @@ class DictTest(yp_unittest.TestCase):
         d = {X(): 0, 1: 1}
         self.assertRaises(RuntimeError, d.update, other)
 
+    @yp_unittest.skip_user_defined_types
     def test_free_after_iterating(self):
         support.check_free_after_iterating(self, iter, dict)
         support.check_free_after_iterating(self, lambda d: iter(d.keys()), dict)

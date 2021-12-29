@@ -3,7 +3,7 @@ import faulthandler
 import os
 import signal
 import sys
-import yp_unittest
+from yp_test import yp_unittest
 from yp_test import support
 try:
     import gc

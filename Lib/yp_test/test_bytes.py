@@ -1098,6 +1098,7 @@ class BaseBytesTest:
         c = b.translate(None, delete=b'e')
         self.assertEqual(c, b'hllo')
 
+    @yp_unittest.skip_not_applicable
     def test_sq_item(self):
         _testcapi = import_helper.import_module('_testcapi')
         obj = self.type2test((42,))
@@ -1843,7 +1844,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
             b[:] = data
             self.assertEqual(list(it), [])
 
-    test_exhausted_iterator = test.list_tests.CommonTest.test_exhausted_iterator
+    test_exhausted_iterator = yp_test.list_tests.CommonTest.test_exhausted_iterator
 
     def test_iterator_length_hint(self):
         # Issue 27443: __length_hint__ can return negative integer
@@ -2021,7 +2022,7 @@ class AssortedBytesTest(yp_unittest.TestCase):
 
     # I've started porting some of those into bytearray_tests.py, we should port
     # the rest that make sense (the code can be cleaned up to use modern
-    # yp_unittest methods at the same time).
+    # unittest methods at the same time).
 
 class BytearrayPEP3137Test(yp_unittest.TestCase):
     def marshal(self, x):

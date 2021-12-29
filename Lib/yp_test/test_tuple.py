@@ -351,7 +351,7 @@ class TupleTest(seq_tests.CommonTest):
         # Trying to untrack an unfinished tuple could crash Python
         self._not_tracked(yp_tuple(gc.collect() for i in range(101)))
 
-    @support.requires_resource('cpu')
+    @yp_unittest.skip_str_repr
     def test_repr_large(self):
         # Check the repr of large list objects
         def check(n):

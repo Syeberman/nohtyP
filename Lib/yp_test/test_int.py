@@ -9,7 +9,7 @@ from yp_test.test_grammar import (VALID_UNDERSCORE_LITERALS,
 
 # Extra assurance that we're not accidentally testing Python's int...unless we mean to
 _int = int
-def int( *args, **kwargs ): raise NotImplementedError( "convert script to yp_int here" )
+def int(*args, **kwargs): raise NotImplementedError("convert script to yp_int here")
 
 L = [
         ('0', yp_int(0)),

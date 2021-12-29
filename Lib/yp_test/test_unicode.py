@@ -56,7 +56,7 @@ def duplicate_string(text):
     """
     return text.encode().decode()
 
-class StrSubclass(str):
+class StrSubclass(yp_str):
     pass
 
 class UnicodeTest(string_tests.CommonTest,
@@ -65,10 +65,6 @@ class UnicodeTest(string_tests.CommonTest,
         yp_unittest.TestCase):
 
     type2test = yp_str
-
-    def setUp(self):
-        codecs.register(search_function)
-        self.addCleanup(codecs.unregister, search_function)
 
     def setUp(self):
         codecs.register(search_function)
@@ -2485,11 +2481,11 @@ class UnicodeTest(string_tests.CommonTest,
             def __str__(self):
                 return "foo"
 
-        class StrSubclassToStr(str):
+        class StrSubclassToStr(yp_str):
             def __str__(self):
                 return "foo"
 
-        class StrSubclassToStrSubclass(str):
+        class StrSubclassToStrSubclass(yp_str):
             def __new__(cls, content=""):
                 return yp_str.__new__(cls, 2*content)
             def __str__(self):
@@ -2687,6 +2683,7 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertTrue(astral >= bmp2)
         self.assertFalse(astral >= astral2)
 
+    @yp_unittest.skip_user_defined_types
     def test_free_after_iterating(self):
         support.check_free_after_iterating(self, iter, str)
         support.check_free_after_iterating(self, reversed, str)

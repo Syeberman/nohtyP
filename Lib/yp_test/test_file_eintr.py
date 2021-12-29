@@ -15,7 +15,7 @@ import signal
 import subprocess
 import sys
 import time
-from yp_test.support import run_unittest
+from yp_test import yp_unittest
 
 # Test import all of the things we're about to try testing up front.
 import _io
