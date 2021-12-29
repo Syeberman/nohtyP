@@ -2,7 +2,7 @@ import math
 import os.path
 import sys
 import textwrap
-from test import support
+from yp_test import support
 
 
 def format_duration(seconds):

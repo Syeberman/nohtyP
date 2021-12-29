@@ -9,17 +9,17 @@ import sysconfig
 import tempfile
 import time
 from yp_test import yp_unittest
-from test.libregrtest.cmdline import _parse_args
-from test.libregrtest.runtest import (
+from yp_test.libregrtest.cmdline import _parse_args
+from yp_test.libregrtest.runtest import (
     findtests, runtest, get_abs_module, is_failed,
     STDTESTS, NOTTESTS, PROGRESS_MIN_TIME,
     Passed, Failed, EnvChanged, Skipped, ResourceDenied, Interrupted,
     ChildError, DidNotRun)
-from test.libregrtest.setup import setup_tests
-from test.libregrtest.pgo import setup_pgo_tests
-from test.libregrtest.utils import removepy, count, format_duration, printlist
-from test import support
-from test.support import os_helper
+from yp_test.libregrtest.setup import setup_tests
+from yp_test.libregrtest.pgo import setup_pgo_tests
+from yp_test.libregrtest.utils import removepy, count, format_duration, printlist
+from yp_test import support
+from yp_test.support import os_helper
 
 
 # bpo-38203: Maximum delay in seconds to exit Python (call Py_Finalize()).
@@ -178,7 +178,7 @@ class Regrtest:
 
         worker_args = ns.worker_args
         if worker_args is not None:
-            from test.libregrtest.runtest_mp import parse_worker_args
+            from yp_test.libregrtest.runtest_mp import parse_worker_args
             ns, test_name = parse_worker_args(ns.worker_args)
             ns.worker_args = worker_args
             self.worker_test_name = test_name
@@ -532,7 +532,7 @@ class Regrtest:
             self.test_count_width = len(self.test_count) - 1
 
         if self.ns.use_mp:
-            from test.libregrtest.runtest_mp import run_tests_multiprocess
+            from yp_test.libregrtest.runtest_mp import run_tests_multiprocess
             run_tests_multiprocess(self)
         else:
             self.run_tests_sequential()
@@ -674,7 +674,7 @@ class Regrtest:
 
     def _main(self, tests, kwargs):
         if self.worker_test_name is not None:
-            from test.libregrtest.runtest_mp import run_tests_worker
+            from yp_test.libregrtest.runtest_mp import run_tests_worker
             run_tests_worker(self.ns, self.worker_test_name)
 
         if self.ns.wait:
@@ -698,7 +698,7 @@ class Regrtest:
         # If we're on windows and this is the parent runner (not a worker),
         # track the load average.
         if sys.platform == 'win32' and self.worker_test_name is None:
-            from test.libregrtest.win_utils import WindowsLoadTracker
+            from yp_test.libregrtest.win_utils import WindowsLoadTracker
 
             try:
                 self.win_load_tracker = WindowsLoadTracker()

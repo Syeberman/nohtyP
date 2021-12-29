@@ -4,13 +4,13 @@ import os
 import signal
 import sys
 from yp_test import yp_unittest
-from test import support
+from yp_test import support
 try:
     import gc
 except ImportError:
     gc = None
 
-from test.libregrtest.utils import (setup_unraisable_hook,
+from yp_test.libregrtest.utils import (setup_unraisable_hook,
                                     setup_threading_excepthook)
 
 
@@ -100,7 +100,7 @@ def setup_tests(ns):
         support.LONG_TIMEOUT = min(support.LONG_TIMEOUT, ns.timeout)
 
     if ns.xmlpath:
-        from test.support.testresult import RegressionTestResult
+        from yp_test.support.testresult import RegressionTestResult
         RegressionTestResult.USE_XML = True
 
     # Ensure there's a non-ASCII character in env vars at all times to force

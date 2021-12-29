@@ -5,7 +5,7 @@ from yp_test import yp_unittest
 import sys
 import pickle
 import itertools
-from test.support import ALWAYS_EQ
+from yp_test.support import ALWAYS_EQ
 
 # Extra assurance that we're not accidentally testing Python's range
 def range( *args, **kwargs ): raise NotImplementedError( "convert script to yp_range here" )

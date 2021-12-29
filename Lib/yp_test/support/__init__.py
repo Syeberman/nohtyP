@@ -1461,7 +1461,7 @@ def check__all__(test_case, module, name_of_module=None, extra=(),
         import bar
         import foo
         from yp_test import yp_unittest
-        from test import support
+        from yp_test import support
 
         class MiscTestCase(yp_unittest.TestCase):
             def test__all__(self):

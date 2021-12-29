@@ -4330,7 +4330,7 @@ class CMiscIOTest(MiscIOTest):
             import sys
             import time
             import threading
-            from test.support import SuppressCrashReport
+            from yp_test.support import SuppressCrashReport
 
             file = sys.{stream_name}
 

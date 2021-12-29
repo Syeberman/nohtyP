@@ -5,8 +5,8 @@ import os
 import subprocess
 import uuid
 import winreg
-from test.support import os_helper
-from test.libregrtest.utils import print_warning
+from yp_test.support import os_helper
+from yp_test.libregrtest.utils import print_warning
 
 
 # Max size of asynchronous reads

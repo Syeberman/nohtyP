@@ -281,7 +281,7 @@ if sys.platform.startswith("win"):
         _waitfor(os.rmdir, dirname)
 
     def _rmtree(path):
-        from test.support import _force_run
+        from yp_test.support import _force_run
 
         def _rmtree_inner(path):
             for name in _force_run(path, os.listdir, path):
@@ -327,7 +327,7 @@ else:
             pass
 
         def _rmtree_inner(path):
-            from test.support import _force_run
+            from yp_test.support import _force_run
             for name in _force_run(path, os.listdir, path):
                 fullname = os.path.join(path, name)
                 try:

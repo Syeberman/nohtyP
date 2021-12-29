@@ -1,6 +1,6 @@
 from collections import deque
 from yp_test import yp_unittest
-from test.support import NEVER_EQ
+from yp_test.support import NEVER_EQ
 
 
 class base_set:

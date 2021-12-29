@@ -1,5 +1,5 @@
 import yp_unittest
-from test.support import cpython_only
+from yp_test.support import cpython_only
 try:
     import _testcapi
 except ImportError:

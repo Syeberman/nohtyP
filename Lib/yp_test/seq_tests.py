@@ -6,8 +6,8 @@ from yp import *
 from yp_test import yp_unittest
 import sys
 import pickle
-from test import support
-from test.support import ALWAYS_EQ, NEVER_EQ
+from yp_test import support
+from yp_test.support import ALWAYS_EQ, NEVER_EQ
 
 # Various iterables
 # This is used for checking the constructor (here and in test_deque.py)
