@@ -1,12 +1,12 @@
 """bytecode_helper - support tools for testing correct bytecode generation"""
 
-import unittest
+from yp_test import yp_unittest
 import dis
 import io
 
 _UNSPECIFIED = object()
 
-class BytecodeTestCase(unittest.TestCase):
+class BytecodeTestCase(yp_unittest.TestCase):
     """Custom assertion methods for inspecting bytecode."""
 
     def get_disassembly_as_string(self, co):

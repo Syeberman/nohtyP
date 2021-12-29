@@ -8,8 +8,8 @@ import os
 from yp_test import yp_unittest
 from functools import cmp_to_key
 
-from test import support, seq_tests
-from test.support import ALWAYS_EQ, NEVER_EQ
+from yp_test import support, seq_tests
+from yp_test.support import ALWAYS_EQ, NEVER_EQ
 
 
 class CommonTest(seq_tests.CommonTest):

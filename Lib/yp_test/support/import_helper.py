@@ -3,7 +3,7 @@ import importlib
 import importlib.util
 import os
 import sys
-import unittest
+from yp_test import yp_unittest
 import warnings
 
 from .os_helper import unlink
@@ -77,7 +77,7 @@ def import_module(name, deprecated=False, *, required_on=()):
         except ImportError as msg:
             if sys.platform.startswith(tuple(required_on)):
                 raise
-            raise unittest.SkipTest(str(msg))
+            raise yp_unittest.SkipTest(str(msg))
 
 
 def _save_and_remove_modules(names):

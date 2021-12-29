@@ -495,7 +495,7 @@ class UnicodeTest(string_tests.CommonTest,
         self.checkraises(TypeError, yp_str(' '), 'join', yp_list([1, 2, 3]))
         self.checkraises(TypeError, yp_str(' '), 'join', yp_list(['1', '2', 3]))
 
-    @unittest.skipIf(sys.maxsize > 2**32,
+    @yp_unittest.skipIf(sys.maxsize > 2**32,
         'needs too much memory on a 64-bit platform')
     def test_join_overflow(self):
         size = int(sys.maxsize**0.5) + 1

@@ -77,7 +77,7 @@ if sys.platform == 'win32' and ' 32 bit (ARM)' in sys.version:
 elif sys.platform == 'vxworks':
     LOOPBACK_TIMEOUT = 10
 
-class ResourceDenied(unittest.SkipTest):
+class ResourceDenied(yp_unittest.SkipTest):
     """Test skipped because it requested a disallowed resource.
 
 # Timeout in seconds to mark a test as failed if the test takes "too long".
@@ -119,7 +119,7 @@ def import_module(name, deprecated=False, *, required_on=()):
         except ImportError as msg:
             if sys.platform.startswith(tuple(required_on)):
                 raise
-            raise unittest.SkipTest(str(msg))
+            raise yp_unittest.SkipTest(str(msg))
 
 
 def _save_and_remove_module(name, orig_modules):
@@ -1411,7 +1411,7 @@ def skip_unless_xattr(test):
     """Skip decorator for tests that require functional extended attributes"""
     ok = can_xattr()
     msg = "no non-broken extended attribute support"
-    return test if ok else unittest.skip(msg)(test)
+    return test if ok else yp_unittest.skip(msg)(test)
 
     def call_real(self, *args, returncode=0):
         return self._call(self.real, args, None, returncode)

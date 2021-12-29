@@ -1,8 +1,8 @@
 import argparse
 import os
 import sys
-from test import support
-from test.support import os_helper
+from yp_test import support
+from yp_test.support import os_helper
 
 
 USAGE = """\

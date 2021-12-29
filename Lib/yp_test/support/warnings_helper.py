@@ -8,7 +8,7 @@ import warnings
 def check_syntax_warning(testcase, statement, errtext='',
                          *, lineno=1, offset=None):
     # Test also that a warning is emitted only once.
-    from test.support import check_syntax_error
+    from yp_test.support import check_syntax_error
     with warnings.catch_warnings(record=True) as warns:
         warnings.simplefilter('always', SyntaxWarning)
         compile(statement, '<testcase>', 'exec')
@@ -112,7 +112,7 @@ def check_no_warnings(testcase, message='', category=Warning, force_gc=False):
 
     Other keyword arguments are passed to warnings.filterwarnings().
     """
-    from test.support import gc_collect
+    from yp_test.support import gc_collect
     with warnings.catch_warnings(record=True) as warns:
         warnings.filterwarnings('always',
                                 message=message,
