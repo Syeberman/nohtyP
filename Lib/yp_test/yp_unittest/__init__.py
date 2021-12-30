@@ -3,7 +3,7 @@ from unittest import *
 from .case import TestCase
 
 # Easy-to-search "skip" decorators for various features we have yet to support.
-skip_bytes_fromhex = skip("TODO: Support yp_bytes.fromhex")
+skip_bytes_hex = skip("TODO: Support yp_bytes.fromhex/hex")
 skip_complex = skip("TODO: Implement yp_complex?")
 skip_dict_mutating_iteration = skip("TODO: Support yp_dict iteration mutation detection")
 skip_exception_messages = skip("TODO: Support exception instances (with messages) in nohtyP")
@@ -42,6 +42,7 @@ skip_str_split = skip("TODO: Implement yp_str.split/splitlines/partition/etc")
 skip_str_unicode_db = skip("TODO: Implement yp_str.isalpha/isdigit/etc")
 skip_str_zfill = skip("TODO: Implement yp_str.zfill")
 skip_string_module = skip("TODO: Implement string module in nohtyP?")
+skip_sys_getsizeof = skip("TODO: Implement sys.getsizeof in nohtyP?")
 skip_unpack = skip("TODO: Test yp_unpackN")  # TODO Just need the tests
 skip_user_defined_types = skip("TODO: Implement user-defined types in nohtyP")
 skip_weakref = skip("TODO: Import weakref in nohtyP")

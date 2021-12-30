@@ -384,6 +384,7 @@ class BaseTest:
         self.checkequal(len(text2) - N*len("de") - len(pattern2),
                         text2, 'find', pattern2)
 
+    @yp_unittest.skip_str_case
     def test_lower(self):
         self.checkequal('hello', 'HeLLo', 'lower')
         self.checkequal('hello', 'hello', 'lower')
@@ -755,6 +756,7 @@ class BaseTest:
         self.checkraises(OverflowError, A2_16, "replace", "A", A2_16)
         self.checkraises(OverflowError, A2_16, "replace", "AA", A2_16+A2_16)
 
+    @yp_unittest.skip_str_replace
     def test_removeprefix(self):
         self.checkequal('am', 'spam', 'removeprefix', 'sp')
         self.checkequal('spamspam', 'spamspamspam', 'removeprefix', 'spam')
@@ -773,6 +775,7 @@ class BaseTest:
         self.checkraises(TypeError, 'hello', 'removeprefix', 'h', 42)
         self.checkraises(TypeError, 'hello', 'removeprefix', ("he", "l"))
 
+    @yp_unittest.skip_str_replace
     def test_removesuffix(self):
         self.checkequal('sp', 'spam', 'removesuffix', 'am')
         self.checkequal('spamspam', 'spamspamspam', 'removesuffix', 'spam')
@@ -791,6 +794,7 @@ class BaseTest:
         self.checkraises(TypeError, 'hello', 'removesuffix', 'h', 42)
         self.checkraises(TypeError, 'hello', 'removesuffix', ("lo", "l"))
 
+    @yp_unittest.skip_str_case
     def test_capitalize(self):
         self.checkequal(' hello ', ' hello ', 'capitalize')
         self.checkequal('Hello ', 'Hello ','capitalize')
@@ -896,6 +900,7 @@ class BaseTest:
         self.checkequal('   hello', '   hello   ', 'rstrip', None)
         self.checkequal('hello', 'hello', 'strip', None)
 
+    @yp_unittest.skip_str_space
     def test_strip(self):
         # strip/lstrip/rstrip with str arg
         self.checkequal('hello', 'xyzzyhelloxyzzy', 'strip', 'xyz')
@@ -1049,6 +1054,7 @@ class BaseTest:
             self.checkequal(True, ' '*p + '\x7f' + ' '*8, 'isascii')
             self.checkequal(False, ' '*p + '\x80' + ' '*8, 'isascii')
 
+    @yp_unittest.skip_str_unicode_db
     def test_isdigit(self):
         self.checkequal(False, '', 'isdigit')
         self.checkequal(False, 'a', 'isdigit')
