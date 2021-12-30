@@ -2645,6 +2645,7 @@ class RawUnicodeEscapeTest(ReadTest, yp_unittest.TestCase):
         )
 
 
+@yp_unittest.skip_str_codecs
 class EscapeEncodeTest(yp_unittest.TestCase):
 
     def test_escape_encode(self):
@@ -3313,6 +3314,7 @@ class CodePageTest(yp_unittest.TestCase):
         self.assertEqual(decoded[0][-11:], '56\ud1000123456\ud100')
 
 
+@yp_unittest.skip_str_codecs
 class ASCIITest(yp_unittest.TestCase):
     def test_encode(self):
         self.assertEqual('abc123'.encode('ascii'), b'abc123')
@@ -3352,6 +3354,7 @@ class ASCIITest(yp_unittest.TestCase):
                                  expected)
 
 
+@yp_unittest.skip_str_codecs
 class Latin1Test(yp_unittest.TestCase):
     def test_encode(self):
         for data, expected in (
@@ -3389,6 +3392,7 @@ class Latin1Test(yp_unittest.TestCase):
                 self.assertEqual(data.decode('latin1'), expected)
 
 
+@yp_unittest.skip_str_codecs
 class StreamRecoderTest(yp_unittest.TestCase):
     def test_writelines(self):
         bio = io.BytesIO()
@@ -3549,6 +3553,7 @@ class LocaleCodecTest(yp_unittest.TestCase):
         self.assertEqual(str(cm.exception), 'unsupported error handler')
 
 
+@yp_unittest.skip_str_codecs
 class Rot13Test(yp_unittest.TestCase):
     """Test the educational ROT-13 codec."""
     def test_encode(self):
@@ -3570,6 +3575,7 @@ class Rot13Test(yp_unittest.TestCase):
         self.assertEqual(plaintext, 'green Nerf rail gun')
 
 
+@yp_unittest.skip_str_codecs
 class Rot13UtilTest(yp_unittest.TestCase):
     """Test the ROT-13 codec via rot13 function,
     i.e. the user has done something like:
@@ -3586,6 +3592,7 @@ class Rot13UtilTest(yp_unittest.TestCase):
             'To be, or not to be, that is the question')
 
 
+@yp_unittest.skip_str_codecs
 class CodecNameNormalizationTest(yp_unittest.TestCase):
     """Test codec name normalization"""
     def test_codecs_lookup(self):

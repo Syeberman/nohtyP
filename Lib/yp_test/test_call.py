@@ -19,6 +19,7 @@ def dict(*args, **kwargs): raise NotImplementedError("convert script to yp_dict 
 
 class FunctionCalls(yp_unittest.TestCase):
 
+    @yp_unittest.skip_dict_order
     def test_kwargs_order(self):
         # bpo-34320:  **kwargs should preserve order of passed OrderedDict
         od = collections.OrderedDict([('a', 1), ('b', 2)])
@@ -538,6 +539,7 @@ class FastCallTests(yp_unittest.TestCase):
                 result = _testcapi.pyobject_vectorcall(func, args, kwnames)
                 self.check_result(result, expected)
 
+    @yp_unittest.skip_user_defined_types
     def test_fastcall_clearing_dict(self):
         # Test bpo-36907: the point of the test is just checking that this
         # does not crash.
@@ -705,6 +707,7 @@ class A:
     def positional_only(arg, /):
         pass
 
+@yp_unittest.skip_user_defined_types
 @cpython_only
 class TestErrorMessagesUseQualifiedName(yp_unittest.TestCase):
 

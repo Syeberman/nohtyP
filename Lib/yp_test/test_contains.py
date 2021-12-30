@@ -15,6 +15,7 @@ class seq(base_set):
     def __getitem__(self, n):
         return [self.el][n]
 
+@yp_unittest.skip_user_defined_types
 class TestContains(yp_unittest.TestCase):
     def test_common_tests(self):
         a = base_set(1)

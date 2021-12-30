@@ -6,6 +6,7 @@ from .case import TestCase
 skip_bytes_hex = skip("TODO: Support yp_bytes.fromhex/hex")
 skip_complex = skip("TODO: Implement yp_complex?")
 skip_dict_mutating_iteration = skip("TODO: Support yp_dict iteration mutation detection")
+skip_dict_order = skip("TODO: Support ordered yp_dict")
 skip_exception_messages = skip("TODO: Support exception instances (with messages) in nohtyP")
 skip_files = skip("TODO: Implement files in nohtyP")
 skip_filter = skip("TODO: Implement yp_filter")
