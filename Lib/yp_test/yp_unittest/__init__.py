@@ -4,7 +4,9 @@ from .case import TestCase
 
 # Easy-to-search "skip" decorators for various features we have yet to support.
 skip_bytes_hex = skip("TODO: Support yp_bytes.fromhex/hex")
+skip_cmp_recursion = skip("TODO: Implement protection against recursion in yp_eq/etc")
 skip_complex = skip("TODO: Implement yp_complex?")
+skip_deepcopy_memo = skip("TODO: Support memo argument in yp_deepcopy")
 skip_dict_mutating_iteration = skip("TODO: Support yp_dict iteration mutation detection")
 skip_dict_order = skip("TODO: Support ordered yp_dict")
 skip_exception_messages = skip("TODO: Support exception instances (with messages) in nohtyP")
@@ -46,5 +48,5 @@ skip_string_module = skip("TODO: Implement string module in nohtyP?")
 skip_sys_getsizeof = skip("TODO: Implement sys.getsizeof in nohtyP?")
 skip_unpack = skip("TODO: Test yp_unpackN")  # TODO Just need the tests
 skip_user_defined_types = skip("TODO: Implement user-defined types in nohtyP")
-skip_weakref = skip("TODO: Import weakref in nohtyP")
+skip_weakref = skip("TODO: Implement weakref in nohtyP")
 skip_zip = skip("TODO: Implement yp_zip")

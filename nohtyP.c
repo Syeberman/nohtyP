@@ -176,13 +176,13 @@ static void yp_breakonerr(ypObject *err) {
 #endif
 
 #if yp_DEBUG_LEVEL >= 10
-#define yp_INFO0(fmt)             \
+#define yp_INFO0(fmt)              \
     do {                           \
         (void)fflush(NULL);        \
         fprintf(stderr, fmt "\n"); \
         (void)fflush(NULL);        \
     } while (0)
-#define yp_INFO(fmt, ...)                      \
+#define yp_INFO(fmt, ...)                       \
     do {                                        \
         (void)fflush(NULL);                     \
         fprintf(stderr, fmt "\n", __VA_ARGS__); \
@@ -1078,16 +1078,18 @@ ypObject *const     yp_False = yp_CONST_REF(yp_False);
 #define _ypInt_PREALLOC_END (257)
 static ypIntObject _ypInt_pre_allocated[_ypInt_PREALLOC_END - _ypInt_PREALLOC_START];
 
-// XXX Careful! Do not use ypInt_CONST_REF with a value that is not preallocated.
-#define ypInt_CONST_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i)-_ypInt_PREALLOC_START]))
+#define ypInt_IS_PREALLOC(i) (_ypInt_PREALLOC_START <= i && i < _ypInt_PREALLOC_END)
+
+// XXX Careful! Do not use ypInt_PREALLOC_REF with a value that is not preallocated.
+#define ypInt_PREALLOC_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i)-_ypInt_PREALLOC_START]))
 
 // TODO Rename to yp_int_*?  I'm OK with yp_s_* because strs are going to be used more often and
 // will likely have long names already (i.e. they'll be named like the string they represent), but
 // there won't be many of these, their names are short, and they're infrequently used.
-ypObject *const yp_i_neg_one = ypInt_CONST_REF(-1);
-ypObject *const yp_i_zero = ypInt_CONST_REF(0);
-ypObject *const yp_i_one = ypInt_CONST_REF(1);
-ypObject *const yp_i_two = ypInt_CONST_REF(2);
+ypObject *const yp_i_neg_one = ypInt_PREALLOC_REF(-1);
+ypObject *const yp_i_zero = ypInt_PREALLOC_REF(0);
+ypObject *const yp_i_one = ypInt_PREALLOC_REF(1);
+ypObject *const yp_i_two = ypInt_PREALLOC_REF(2);
 
 
 // Macros on ob_type_flags for string objects (bytes and str), used to index into
@@ -3115,6 +3117,14 @@ static ypObject *_ypSequence_miniiter_lenh(
 #pragma region transmute
 // TODO Rethink what we delegate to the tp_* functions: we should probably give them more control.
 
+typedef struct _yp_deepcopy_memo_t {
+    yp_ssize_t recursion_depth;
+    ypObject * keep_alive;  // Ensure objects live at least as long as their IDs are stored.
+    ypObject * copies;      // Maps original object IDs to their copies.
+} yp_deepcopy_memo_t;
+
+extern ypObject *const yp_RecursionLimitError;
+
 // TODO If len==0, replace it with the immortal "zero-version" of the type
 //  WAIT! I can't do that, because that won't freeze the original and others might be referencing
 //  the original so won't see it as frozen now.
@@ -3181,24 +3191,120 @@ void yp_deepfreeze(ypObject **x)
     if (yp_isexceptionC(result)) return_yp_INPLACE_ERR(x, result);
 }
 
+// Returns the existing deepcopied object made from x, or yp_KeyError if no such copy has been made
+// yet.
+static ypObject *_yp_deepcopy_memo_getitem(void *_memo, ypObject *x)
+{
+    yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;
+    ypObject *          x_id;
+    ypObject *          result;
+
+    // We keep the objects in memo uninitialized until we need them.
+    if (memo->copies == NULL) return yp_KeyError;
+
+    // TODO It'd be nice if we didn't have to create this temporary int...
+    x_id = yp_intC((yp_ssize_t)x);  // new ref
+    result = yp_getitem(memo->copies, x_id);
+    yp_decref(x_id);
+    return result;
+}
+
+// Adds the new deepcopied object made from x to the memo.
+static ypObject *_yp_deepcopy_memo_setitem(void *_memo, ypObject *x, ypObject *x_copy)
+{
+    yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;
+    ypObject *          keep_alive;
+    ypObject *          copies;
+    ypObject *          x_id;
+
+    // We keep the objects in memo uninitialized until we need them.
+    if (memo->keep_alive == NULL) {
+        memo->keep_alive = yp_listN(0);
+        memo->copies = yp_dictK(0);
+    }
+
+    // Ensure x stays alive at least as long as we reference its ID.
+    // TODO I'm really disliking this discard-on-exception idea as the default.
+    keep_alive = yp_incref(memo->keep_alive);  // new ref
+    yp_append(&keep_alive, x);
+    if (yp_isexceptionC(keep_alive)) return keep_alive;
+    yp_decref(keep_alive);
+
+    // TODO It'd be nice if we didn't have to create this temporary int...
+    x_id = yp_intC((yp_ssize_t)x);  // new ref
+    if (yp_isexceptionC(x_id)) return x_id;
+
+    // TODO I'm really disliking this discard-on-exception idea as the default.
+    copies = yp_incref(memo->copies);  // new ref
+    yp_setitem(&copies, x_id, x_copy);
+    yp_decref(x_id);
+    if (yp_isexceptionC(copies)) return copies;
+    yp_decref(copies);
+    return yp_None;
+}
+
+// Common code for all the deepcopy visitors.
+// XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
+// maybe even those should be copied as well...or just those that contain other objects?
+// XXX This is contrary to in Python, where if immutables (tuple, frozenset, etc) contain the exact
+// same objects, it discards the copy and returns the original object (i.e. {1, 2, 3}).
+static ypObject *_yp_deepcopy_visitor(ypObject *x, visitfunc visitor, void *_memo, int freeze)
+{
+    yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;
+    ypObject *          result;
+
+    yp_DEBUG("deepcopy: %p type %d depth %d", x, ypObject_TYPE_CODE(x), memo->recursion_depth);
+
+    // Be efficient: reuse existing copies of objects. Also helps avoid recursion!
+    result = _yp_deepcopy_memo_getitem(memo, x);
+    if (!yp_isexceptionC2(result, yp_KeyError)) {
+        // We've either already made a copy of this object, or some (unexpected) error occurred.
+        return result;
+    }
+
+    // This is a failsafe: ideally, all types use _yp_deepcopy_memo_setitem to avoid recursion.
+    yp_ASSERT(memo->recursion_depth >= 0, "recursion_depth can't be negative");
+    if (memo->recursion_depth > _yp_recursion_limit) {
+        return yp_RecursionLimitError;
+    }
+
+    // If we get here, then this is the first time visiting this object. We leave it to the types to
+    // call _yp_deepcopy_memo_setitem as appropriate.
+    memo->recursion_depth += 1;
+    if (freeze) {
+        result = ypObject_TYPE(x)->tp_frozen_deepcopy(x, visitor, memo);
+    } else {
+        result = ypObject_TYPE(x)->tp_unfrozen_deepcopy(x, visitor, memo);
+    }
+    memo->recursion_depth -= 1;
+    return result;
+}
+
+static ypObject *_yp_deepcopy(ypObject *x, visitfunc visitor)
+{
+    yp_deepcopy_memo_t memo = {0};  // Avoid creating unnecessary objects: initialize to NULL.
+
+    ypObject *result = visitor(x, &memo);
+
+    if (memo.keep_alive != NULL) {
+        yp_decref(memo.copies);
+        yp_decref(memo.keep_alive);
+    }
+
+    return result;
+}
+
 ypObject *yp_unfrozen_copy(ypObject *x) { return ypObject_TYPE(x)->tp_unfrozen_copy(x); }
 
-// XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
-// maybe even those should be copied as well...or just those that contain other objects
-// TODO It'd be nice to share code with yp_deepcopy2
-static ypObject *yp_unfrozen_deepcopy2(ypObject *x, void *memo)
+// Use this as the visitor for "unfrozen" deep copies (i.e. yp_unfrozen_deepcopy).
+static ypObject *_yp_unfrozen_deepcopy_visitor(ypObject *x, void *memo)
 {
-    // TODO don't forget to discard the new objects on error
-    // TODO trap recursion & test
-    return yp_NotImplementedError;
+    return _yp_deepcopy_visitor(x, _yp_unfrozen_deepcopy_visitor, memo, FALSE);
 }
 
 ypObject *yp_unfrozen_deepcopy(ypObject *x)
 {
-    ypObject *memo = yp_dictK(0);
-    ypObject *result = yp_unfrozen_deepcopy2(x, memo);
-    yp_decref(memo);
-    return result;
+    return _yp_deepcopy(x, _yp_unfrozen_deepcopy_visitor);
 }
 
 ypObject *yp_frozen_copy(ypObject *x)
@@ -3207,72 +3313,26 @@ ypObject *yp_frozen_copy(ypObject *x)
     return ypObject_TYPE(x)->tp_frozen_copy(x);
 }
 
-// XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
-// maybe even those should be copied as well...or just those that contain other objects
-// TODO It'd be nice to share code with yp_deepcopy2
-static ypObject *yp_frozen_deepcopy2(ypObject *x, void *memo)
+// Use this as the visitor for "frozen" deep copies (i.e. yp_frozen_deepcopy).
+static ypObject *_yp_frozen_deepcopy_visitor(ypObject *x, void *memo)
 {
-    // TODO don't forget to discard the new objects on error
-    // TODO trap recursion & test
-    return yp_NotImplementedError;
+    return _yp_deepcopy_visitor(x, _yp_frozen_deepcopy_visitor, memo, TRUE);
 }
 
-ypObject *yp_frozen_deepcopy(ypObject *x)
-{
-    ypObject *memo = yp_dictK(0);
-    ypObject *result = yp_frozen_deepcopy2(x, memo);
-    yp_decref(memo);
-    return result;
-}
+ypObject *yp_frozen_deepcopy(ypObject *x) { return _yp_deepcopy(x, _yp_frozen_deepcopy_visitor); }
 
 ypObject *yp_copy(ypObject *x)
 {
     return ypObject_IS_MUTABLE(x) ? yp_unfrozen_copy(x) : yp_frozen_copy(x);
 }
 
-// Use this as the visitor for deep copies (copying exactly the same types)
-// XXX Remember: deep copies always copy everything except hashable (immutable) immortals...and
-// maybe even those should be copied as well...or just those that contain other objects
-static ypObject *yp_deepcopy2(ypObject *x, void *_memo)
+// Use this as the visitor for "same type" deep copies (i.e. yp_deepcopy).
+static ypObject *_yp_sametype_deepcopy_visitor(ypObject *x, void *memo)
 {
-    ypObject **memo = (ypObject **)_memo;
-    ypObject * id;
-    ypObject * result;
-
-    // Avoid recursion: we only make one copy of each object
-    id = yp_intC((yp_ssize_t)x);  // new ref
-    result = yp_getitem(*memo, id);
-    if (!yp_isexceptionC(result)) {
-        yp_decref(id);
-        return result;  // we've already made a copy of this object; return it
-    } else if (!yp_isexceptionC2(result, yp_KeyError)) {
-        yp_decref(id);
-        return result;  // some (unexpected) error occurred
-    }
-
-    // If we get here, then this is the first time visiting this object
-    if (ypObject_IS_MUTABLE(x)) {
-        result = ypObject_TYPE(x)->tp_unfrozen_deepcopy(x, yp_deepcopy2, memo);
-    } else {
-        result = ypObject_TYPE(x)->tp_frozen_deepcopy(x, yp_deepcopy2, memo);
-    }
-    if (yp_isexceptionC(result)) {
-        yp_decref(id);
-        return result;
-    }
-    yp_setitem(memo, id, result);
-    yp_decref(id);
-    if (yp_isexceptionC(*memo)) return *memo;
-    return result;
+    return _yp_deepcopy_visitor(x, _yp_sametype_deepcopy_visitor, memo, !ypObject_IS_MUTABLE(x));
 }
 
-ypObject *yp_deepcopy(ypObject *x)
-{
-    ypObject *memo = yp_dictK(0);
-    ypObject *result = yp_deepcopy2(x, &memo);
-    yp_decref(memo);
-    return result;
-}
+ypObject *yp_deepcopy(ypObject *x) { return _yp_deepcopy(x, _yp_sametype_deepcopy_visitor); }
 
 // TODO CONTAINER_INLINE objects won't release any of their memory on invalidation.  This is a
 // tradeoff in the interests of reducing individual allocations.  Perhaps there should be a limit
@@ -3458,8 +3518,6 @@ _ypBool_PUBLIC_CMP_FUNCTION(gt, lt, yp_TypeError);
 // TODO Need to decide whether to keep pre-computed hash in ypObject and, if so, if we can remove
 // the hash from ypSet's element table
 yp_STATIC_ASSERT(ypObject_HASH_INVALID == -1, hash_invalid_is_neg_one);
-
-extern ypObject *const yp_RecursionLimitError;
 
 static ypObject *_yp_hash_visitor(ypObject *x, void *_memo, yp_hash_t *hash)
 {
@@ -3878,6 +3936,9 @@ static ypObject *type_frozen_copy(ypObject *t) { return yp_incref(t); }
 
 static ypObject *type_frozen_deepcopy(ypObject *t, visitfunc copy_visitor, void *copy_memo)
 {
+    // TODO This assumes all types are statically allocated. deepcopy is used for thread safety as
+    // well, so consider how we should be copying these objects for thread safety. Perhaps all types
+    // should be immortal in the "interpreter"?
     return yp_incref(t);
 }
 
@@ -3989,7 +4050,7 @@ static ypObject *nonetype_frozen_copy(ypObject *n) { return yp_None; }
 
 static ypObject *nonetype_frozen_deepcopy(ypObject *n, visitfunc copy_visitor, void *copy_memo)
 {
-    return yp_None;
+    return yp_None;  // _yp_deepcopy_memo_setitem is not needed here.
 }
 
 static ypObject *nonetype_bool(ypObject *n) { return yp_False; }
@@ -4100,7 +4161,7 @@ static ypObject *bool_frozen_copy(ypObject *b) { return b; }
 
 static ypObject *bool_frozen_deepcopy(ypObject *b, visitfunc copy_visitor, void *copy_memo)
 {
-    return b;
+    return b;  // _yp_deepcopy_memo_setitem is not needed here.
 }
 
 static ypObject *bool_bool(ypObject *b) { return b; }
@@ -4282,6 +4343,20 @@ unsigned char _ypInt_digit_value[256] = {
 
 static yp_int_t _yp_mulL_posints(yp_int_t x, yp_int_t y);
 
+// Check for the ypInt_IS_PREALLOC optimization before calling.
+static ypObject *_ypInt_new(yp_int_t value, int type)
+{
+    ypObject *i;
+
+    yp_ASSERT1(type != ypInt_CODE || !ypInt_IS_PREALLOC(value));
+
+    i = ypMem_MALLOC_FIXED(ypIntObject, type);
+    if (yp_isexceptionC(i)) return i;
+    ypInt_VALUE(i) = value;
+    yp_DEBUG("_ypInt_new: %p type %d value %" PRIint, i, type, value);
+    return i;
+}
+
 // XXX Will fail if non-ascii bytes are passed in, so safe to call on latin-1 data
 static ypObject *_ypInt_from_ascii(
         ypObject *(*allocator)(yp_int_t), const yp_uint8_t *bytes, yp_int_t base)
@@ -4401,15 +4476,32 @@ static ypObject *int_unfrozen_copy(ypObject *i) { return yp_intstoreC(ypInt_VALU
 // FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
 static ypObject *int_frozen_copy(ypObject *i) { return yp_intC(ypInt_VALUE(i)); }
 
+// Check for the ypInt_IS_PREALLOC optimization before calling.
+static ypObject *_ypInt_deepcopy(int type, ypObject *i, void *copy_memo)
+{
+    ypObject *i_copy = _ypInt_new(ypInt_VALUE(i), type);
+    ypObject *result = _yp_deepcopy_memo_setitem(copy_memo, i, i_copy);
+    if (yp_isexceptionC(result)) {
+        yp_decref(i_copy);
+        return result;
+    }
+    return i_copy;
+}
+
 static ypObject *int_unfrozen_deepcopy(ypObject *i, visitfunc copy_visitor, void *copy_memo)
 {
-    return yp_intstoreC(ypInt_VALUE(i));
+    return _ypInt_deepcopy(ypIntStore_CODE, i, copy_memo);
 }
 
 // FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
 static ypObject *int_frozen_deepcopy(ypObject *i, visitfunc copy_visitor, void *copy_memo)
 {
-    return yp_intC(ypInt_VALUE(i));
+    // We don't need to memoize the preallocated integers.
+    if (ypInt_IS_PREALLOC(ypInt_VALUE(i))) {
+        return ypInt_PREALLOC_REF(ypInt_VALUE(i));
+    } else {
+        return _ypInt_deepcopy(ypInt_CODE, i, copy_memo);
+    }
 }
 
 static ypObject *int_bool(ypObject *i) { return ypBool_FROM_C(ypInt_VALUE(i)); }
@@ -4479,8 +4571,8 @@ static ypObject *intstore_func_new_code(ypObject *f, yp_ssize_t n, ypObject *con
 
 // FIXME In Python, None is not applicable for base; document the difference? Or use NoArg?
 // FIXME Do we want a way to share the array itself between two functions?
-#define _ypInt_FUNC_NEW_PARAMETERS                                               \
-    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, \
+#define _ypInt_FUNC_NEW_PARAMETERS                                                  \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_PREALLOC_REF(0)}, \
             {yp_CONST_REF(yp_s_slash), NULL}, {yp_CONST_REF(yp_s_base), yp_CONST_REF(yp_None)})
 yp_IMMORTAL_FUNCTION_static(int_func_new, int_func_new_code, _ypInt_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(intstore_func_new, intstore_func_new_code, _ypInt_FUNC_NEW_PARAMETERS);
@@ -5330,25 +5422,14 @@ static ypIntObject _ypInt_pre_allocated[] = {
 
 ypObject *yp_intC(yp_int_t value)
 {
-    if (_ypInt_PREALLOC_START <= value && value < _ypInt_PREALLOC_END) {
-        return (ypObject *)&(_ypInt_pre_allocated[value - _ypInt_PREALLOC_START]);
+    if (ypInt_IS_PREALLOC(value)) {
+        return ypInt_PREALLOC_REF(value);
     } else {
-        ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypInt_CODE);
-        if (yp_isexceptionC(i)) return i;
-        ypInt_VALUE(i) = value;
-        yp_DEBUG("yp_intC: %p value %" PRIint, i, value);
-        return i;
+        return _ypInt_new(value, ypInt_CODE);
     }
 }
 
-ypObject *yp_intstoreC(yp_int_t value)
-{
-    ypObject *i = ypMem_MALLOC_FIXED(ypIntObject, ypIntStore_CODE);
-    if (yp_isexceptionC(i)) return i;
-    ypInt_VALUE(i) = value;
-    yp_DEBUG("yp_intstoreC: %p value %" PRIint, i, value);
-    return i;
-}
+ypObject *yp_intstoreC(yp_int_t value) { return _ypInt_new(value, ypIntStore_CODE); }
 
 // base is ignored if x is not a bytes or string
 static ypObject *_ypInt(ypObject *(*allocator)(yp_int_t), ypObject *x, yp_int_t base)
@@ -5530,6 +5611,14 @@ static yp_int_t yp_asint_exactC(ypObject *x, ypObject **exc)
 
 // ypFloatObject and ypFloat_VALUE are defined above for use by the int code
 
+static ypObject *_ypFloat_new(yp_float_t value, int type)
+{
+    ypObject *f = ypMem_MALLOC_FIXED(ypFloatObject, type);
+    if (yp_isexceptionC(f)) return f;
+    ypFloat_VALUE(f) = value;
+    return f;
+}
+
 static ypObject *float_dealloc(ypObject *f, void *memo)
 {
     ypMem_FREE_FIXED(f);
@@ -5540,14 +5629,25 @@ static ypObject *float_unfrozen_copy(ypObject *f) { return yp_floatstoreCF(ypFlo
 
 static ypObject *float_frozen_copy(ypObject *f) { return yp_floatCF(ypFloat_VALUE(f)); }
 
+static ypObject *_ypFloat_deepcopy(int type, ypObject *f, void *copy_memo)
+{
+    ypObject *f_copy = _ypFloat_new(ypFloat_VALUE(f), type);
+    ypObject *result = _yp_deepcopy_memo_setitem(copy_memo, f, f_copy);
+    if (yp_isexceptionC(result)) {
+        yp_decref(f_copy);
+        return result;
+    }
+    return f_copy;
+}
+
 static ypObject *float_unfrozen_deepcopy(ypObject *f, visitfunc copy_visitor, void *copy_memo)
 {
-    return yp_floatstoreCF(ypFloat_VALUE(f));
+    return _ypFloat_deepcopy(ypFloatStore_CODE, f, copy_memo);
 }
 
 static ypObject *float_frozen_deepcopy(ypObject *f, visitfunc copy_visitor, void *copy_memo)
 {
-    return yp_floatCF(ypFloat_VALUE(f));
+    return _ypFloat_deepcopy(ypFloat_CODE, f, copy_memo);
 }
 
 static ypObject *float_bool(ypObject *f) { return ypBool_FROM_C(ypFloat_VALUE(f) != 0.0); }
@@ -5602,8 +5702,8 @@ static ypObject *floatstore_func_new_code(ypObject *f, yp_ssize_t n, ypObject *c
     return yp_floatstore(argarray[1]);
 }
 
-#define _ypFloat_FUNC_NEW_PARAMETERS                                             \
-    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_CONST_REF(0)}, \
+#define _ypFloat_FUNC_NEW_PARAMETERS                                                \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), ypInt_PREALLOC_REF(0)}, \
             {yp_CONST_REF(yp_s_slash), NULL})
 yp_IMMORTAL_FUNCTION_static(float_func_new, float_func_new_code, _ypFloat_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(
@@ -5881,21 +5981,9 @@ static yp_float_t yp_invertLF(yp_float_t x, ypObject **exc)
 
 // Public constructors
 
-ypObject *yp_floatCF(yp_float_t value)
-{
-    ypObject *f = ypMem_MALLOC_FIXED(ypFloatObject, ypFloat_CODE);
-    if (yp_isexceptionC(f)) return f;
-    ypFloat_VALUE(f) = value;
-    return f;
-}
+ypObject *yp_floatCF(yp_float_t value) { return _ypFloat_new(value, ypFloat_CODE); }
 
-ypObject *yp_floatstoreCF(yp_float_t value)
-{
-    ypObject *f = ypMem_MALLOC_FIXED(ypFloatObject, ypFloatStore_CODE);
-    if (yp_isexceptionC(f)) return f;
-    ypFloat_VALUE(f) = value;
-    return f;
-}
+ypObject *yp_floatstoreCF(yp_float_t value) { return _ypFloat_new(value, ypFloatStore_CODE); }
 
 static ypObject *_ypFloat(ypObject *(*allocator)(yp_float_t), ypObject *x)
 {
@@ -8570,15 +8658,27 @@ static ypObject *bytes_frozen_copy(ypObject *b)
     return _ypBytes_copy(ypBytes_CODE, b, /*alloclen_fixed=*/TRUE);
 }
 
+// XXX Check for the yp_bytes_empty case first
+static ypObject *_ypBytes_deepcopy(int type, ypObject *b, void *copy_memo)
+{
+    ypObject *b_copy = _ypBytes_copy(type, b, /*alloclen_fixed=*/TRUE);
+    ypObject *result = _yp_deepcopy_memo_setitem(copy_memo, b, b_copy);
+    if (yp_isexceptionC(result)) {
+        yp_decref(b_copy);
+        return result;
+    }
+    return b_copy;
+}
+
 static ypObject *bytes_unfrozen_deepcopy(ypObject *b, visitfunc copy_visitor, void *copy_memo)
 {
-    return _ypBytes_copy(ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE);
+    return _ypBytes_deepcopy(ypByteArray_CODE, b, copy_memo);
 }
 
 static ypObject *bytes_frozen_deepcopy(ypObject *b, visitfunc copy_visitor, void *copy_memo)
 {
     if (ypBytes_LEN(b) < 1) return yp_bytes_empty;
-    return _ypBytes_copy(ypBytes_CODE, b, /*alloclen_fixed=*/TRUE);
+    return _ypBytes_deepcopy(ypBytes_CODE, b, copy_memo);
 }
 
 static ypObject *bytes_bool(ypObject *b) { return ypBool_FROM_C(ypBytes_LEN(b)); }
@@ -9706,15 +9806,27 @@ static ypObject *str_frozen_copy(ypObject *s)
     return _ypStr_copy(ypStr_CODE, s, TRUE);
 }
 
+// XXX Check for the yp_str_empty case first
+static ypObject *_ypStr_deepcopy(int type, ypObject *s, void *copy_memo)
+{
+    ypObject *s_copy = _ypStr_copy(type, s, /*alloclen_fixed=*/TRUE);
+    ypObject *result = _yp_deepcopy_memo_setitem(copy_memo, s, s_copy);
+    if (yp_isexceptionC(result)) {
+        yp_decref(s_copy);
+        return result;
+    }
+    return s_copy;
+}
+
 static ypObject *str_unfrozen_deepcopy(ypObject *s, visitfunc copy_visitor, void *copy_memo)
 {
-    return _ypStr_copy(ypChrArray_CODE, s, TRUE);
+    return _ypStr_deepcopy(ypChrArray_CODE, s, copy_memo);
 }
 
 static ypObject *str_frozen_deepcopy(ypObject *s, visitfunc copy_visitor, void *copy_memo)
 {
     if (ypStr_LEN(s) < 1) return yp_str_empty;
-    return _ypStr_copy(ypStr_CODE, s, TRUE);
+    return _ypStr_deepcopy(ypStr_CODE, s, copy_memo);
 }
 
 static ypObject *str_bool(ypObject *s) { return ypBool_FROM_C(ypStr_LEN(s)); }
@@ -10721,6 +10833,12 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
     memmove(ypTuple_ARRAY(sq) + (dest), ypTuple_ARRAY(sq) + (src), \
             (ypTuple_LEN(sq) - (src)) * yp_sizeof(ypObject *));
 
+#define ypTuple_ASSERT_ALLOCLEN(alloclen)                                       \
+    do {                                                                        \
+        yp_ASSERT(alloclen >= 0, "alloclen cannot be negative");                \
+        yp_ASSERT(alloclen <= ypTuple_ALLOCLEN_MAX, "alloclen cannot be >max"); \
+    } while (0)
+
 // Return a new tuple/list object with the given alloclen.  If type is immutable and
 // alloclen_fixed is true (indicating the object will never grow), the data is placed inline
 // with one allocation.
@@ -10729,8 +10847,7 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypTuple_new(int type, yp_ssize_t alloclen, int alloclen_fixed)
 {
-    yp_ASSERT(alloclen >= 0, "alloclen cannot be negative");
-    yp_ASSERT(alloclen <= ypTuple_ALLOCLEN_MAX, "alloclen cannot be >max");
+    ypTuple_ASSERT_ALLOCLEN(alloclen);
     if (alloclen_fixed && type == ypTuple_CODE) {
         yp_ASSERT(alloclen > 0, "missed a yp_tuple_empty optimization");
         return ypMem_MALLOC_CONTAINER_INLINE(
@@ -10747,8 +10864,30 @@ typedef struct {
     yp_ssize_t alloclen;
 } ypTuple_detached;
 
+// Creates a new array of objects, placing it and other metadata in detached so that the array can
+// be attached to a tuple/list with _ypTuple_attach_array. This is used by deepcopy and other
+// constructors that may expose the object to arbitrary code while it is being created. Returns an
+// exception on error, in which case detached is invalid.
+// XXX Handle the "empty list" case before calling this function.
+// XXX The tuple/list that will attach must be created with ypMem_MALLOC_CONTAINER_VARIABLE.
+static ypObject *_ypTuple_new_detached_array(yp_ssize_t alloclen, ypTuple_detached *detached)
+{
+    yp_ssize_t allocsize;
+    ypTuple_ASSERT_ALLOCLEN(alloclen);
+    yp_ASSERT(alloclen > 0, "missed an empty tuple/list optimization");
+
+    detached->array = yp_malloc(&allocsize, alloclen * sizeof(ypObject *));
+    if (detached->array == NULL) return yp_MemoryError;
+
+    detached->len = 0;
+    detached->alloclen = allocsize / sizeof(ypObject *);
+    if (detached->alloclen > ypTuple_ALLOCLEN_MAX) detached->alloclen = ypTuple_ALLOCLEN_MAX;
+
+    return yp_None;
+}
+
 // Clears sq, placing the array of objects and other metadata in detached so that the array can be
-// reattached with _ypTuple_reattach_array.  This is used by sort and other methods that may execute
+// reattached with _ypTuple_attach_array.  This is used by sort and other methods that may execute
 // arbitrary code (i.e. yp_lt) while modifying the list, to prevent that arbitrary code from also
 // modifying the list.  Returns an exception on error, in which case sq is not modified and detached
 // is invalid.
@@ -10756,20 +10895,19 @@ typedef struct {
 // TODO Would a flag on the object to prevent mutations work better? We need it for iterating...
 static ypObject *_ypTuple_detach_array(ypObject *sq, ypTuple_detached *detached)
 {
+    ypObject *result;
+
     yp_ASSERT1(ypObject_TYPE_CODE(sq) == ypList_CODE);
+    yp_ASSERT1(ypObject_CACHED_HASH(sq) == ypObject_HASH_INVALID);
     yp_ASSERT1(ypTuple_LEN(sq) > 0);
 
     if (ypTuple_ARRAY(sq) == ypTuple_INLINE_DATA(sq)) {
         // If the data is inline, we need to allocate a new buffer
-        yp_ssize_t size = ypTuple_LEN(sq) * sizeof(ypObject *);
-        yp_ssize_t allocsize;
-        detached->array = yp_malloc(&allocsize, size);
-        if (detached->array == NULL) return yp_MemoryError;
-
-        memcpy(detached->array, ypTuple_ARRAY(sq), size);
+        yp_ASSERT1(ypTuple_ALLOCLEN(sq) == ypMem_INLINELEN_CONTAINER_VARIABLE(sq, ypTupleObject));
+        result = _ypTuple_new_detached_array(ypTuple_LEN(sq), detached);
+        if (yp_isexceptionC(result)) return result;
+        memcpy(detached->array, ypTuple_ARRAY(sq), ypTuple_LEN(sq) * sizeof(ypObject *));
         detached->len = ypTuple_LEN(sq);
-        detached->alloclen = allocsize / sizeof(ypObject *);
-        if (detached->alloclen > ypTuple_ALLOCLEN_MAX) detached->alloclen = ypTuple_ALLOCLEN_MAX;
     } else {
         // We can just detach the buffer from the object
         detached->array = ypTuple_ARRAY(sq);
@@ -10794,22 +10932,30 @@ static void _ypTuple_free_detached(ypTuple_detached *detached)
     yp_free(detached->array);
 }
 
-// Reverses the effect of _ypTuple_detach_array, re-attaching the array to sq and freeing detached.
+// Reverses the effect of _ypTuple_detach_array, reattaching the array to sq and freeing detached.
 // If it is detected that sq was modified since being detached, sq will be cleared before
 // re-attachment, and yp_ValueError will be raised.  (If clearing sq fails, which is very unlikely,
-// the contents of sq is undefined and a different exception may be raised.)
-static ypObject *_ypTuple_reattach_array(ypObject *sq, ypTuple_detached *detached)
+// the contents of sq is undefined and a different exception may be raised.) Also works to attach
+// arrays created by _ypTuple_new_detached_array.
+// XXX sq must have been created with ypMem_MALLOC_CONTAINER_VARIABLE (alloclen_fixed=FALSE);
+static ypObject *_ypTuple_attach_array(ypObject *sq, ypTuple_detached *detached)
 {
     int              wasModified;
     ypTuple_detached modified;
     ypObject *       result;
 
-    // The object was transmuted during the sort.
-    // FIXME There's likely lots of code that would fail miserably if stuff gets transumted while
-    // executing user code. That "prevent modifications" flag is looking better all the time...
-    if (ypObject_TYPE_CODE(sq) != ypList_CODE) {
+    // We don't memcpy in this function. If a large tuple was created with alloclen_fixed=TRUE, we
+    // are about to waste all that extra data by discarding ob_alloclen. As such, we assert that
+    // sq's inline alloclen is the standard alloclen.
+    yp_ASSERT1(ypTuple_ARRAY(sq) != ypTuple_INLINE_DATA(sq) ||
+               ypTuple_ALLOCLEN(sq) == ypMem_INLINELEN_CONTAINER_VARIABLE(sq, ypTupleObject));
+
+    // If sq was used in a context that expected a stable hash, we cannot modify it, so discard
+    // the detached array.
+    // XXX This is a good argument for keeping ob_hash, at least on complex objects.
+    if (ypObject_CACHED_HASH(sq) != ypObject_HASH_INVALID) {
         _ypTuple_free_detached(detached);
-        return yp_ValueError;  // TODO Something more specific?  yp_ConcurrentModification?
+        return yp_Exception;  // TODO Something more specific.
     }
 
     // This won't detect if the list was modified and then cleared.
@@ -10828,7 +10974,7 @@ static ypObject *_ypTuple_reattach_array(ypObject *sq, ypTuple_detached *detache
         yp_free(ypTuple_ARRAY(sq));
     }
 
-    // Reattach the array to this object
+    // Attach the array to this object
     ypTuple_SET_ARRAY(sq, detached->array);
     ypTuple_SET_LEN(sq, detached->len);
     ypTuple_SET_ALLOCLEN(sq, detached->alloclen);
@@ -10864,23 +11010,57 @@ static ypObject *_ypTuple_copy(int type, ypObject *x)
 // XXX Check for the yp_tuple_empty case first
 static ypObject *_ypTuple_deepcopy(int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
-    ypObject * sq;
-    yp_ssize_t i;
-    ypObject * item;
+    ypObject *       sq;
+    ypObject *       result;
+    ypTuple_detached detached;
+    yp_ssize_t       i;
+    ypObject *       item;
 
-    sq = _ypTuple_new(type, ypTuple_LEN(x), /*alloclen_fixed=*/TRUE);
+    yp_ASSERT(type != ypTuple_CODE || ypTuple_LEN(x) > 0, "missed a yp_tuple_empty optimization");
+
+    // Create with an alloclen of zero; _ypTuple_new_detached_array creates the right size buffer.
+    sq = _ypTuple_new(type, 0, /*alloclen_fixed=*/FALSE);
     if (yp_isexceptionC(sq)) return sq;
 
-    // Update sq's len on each item so yp_decref can clean up after mid-copy failures
+    // To avoid recursion we need to memoize before populating. This may expose an unfinished object
+    // to arbitrary code (i.e. a tuple whose hash will change): _ypTuple_attach_array protects
+    // against this.
+    result = _yp_deepcopy_memo_setitem(copy_memo, x, sq);
+    if (yp_isexceptionC(result)) {
+        yp_decref(sq);
+        return result;
+    }
+
+    // Optimization: if x is empty, we don't need to allocate a detached array.
+    if (ypTuple_LEN(x) < 1) return sq;
+
+    // Because we are executing arbitrary code via copy_visitor, we create the array outside of sq,
+    // then attach it at the end.
+    result = _ypTuple_new_detached_array(ypTuple_LEN(x), &detached);
+    if (yp_isexceptionC(result)) {
+        yp_decref(sq);
+        return result;
+    }
+
+    // Update detached.len on each item so _ypTuple_free_detached can clean up mid-copy failures.
     for (i = 0; i < ypTuple_LEN(x); i++) {
         item = copy_visitor(ypTuple_ARRAY(x)[i], copy_memo);
         if (yp_isexceptionC(item)) {
+            _ypTuple_free_detached(&detached);
             yp_decref(sq);
             return item;
         }
-        ypTuple_ARRAY(sq)[i] = item;
-        ypTuple_SET_LEN(sq, ypTuple_LEN(sq) + 1);
+
+        detached.array[i] = item;
+        detached.len += 1;
     }
+
+    result = _ypTuple_attach_array(sq, &detached);
+    if (yp_isexceptionC(result)) {
+        yp_decref(sq);
+        return result;
+    }
+
     return sq;
 }
 
@@ -13281,7 +13461,7 @@ fail:
 
 keyfunc_fail:
     {
-        ypObject *reattachResult = _ypTuple_reattach_array(self, &detached);
+        ypObject *reattachResult = _ypTuple_attach_array(self, &detached);
         if (yp_isexceptionC(reattachResult)) return reattachResult;
     }
 
@@ -14953,7 +15133,8 @@ static ypObject *_ypDict_copy(int type, ypObject *x, int alloclen_fixed)
 static ypObject *_ypDict_deepcopy(
         int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, int alloclen_fixed)
 {
-    // TODO We can't use copy_visitor to copy the keys, because it might be yp_unfrozen_deepcopy2!
+    // TODO We can't use copy_visitor to copy the keys, because it might be
+    // _yp_unfrozen_deepcopy_visitor!
     // ...or that just means we need to fail if yp_hash fails on the new key.
     return yp_NotImplementedError;
 }
@@ -16380,7 +16561,8 @@ static ypObject *range_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const 
 yp_IMMORTAL_FUNCTION_static(range_func_new, range_func_new_code,
         ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_x), NULL},
                 {yp_CONST_REF(yp_s_y), yp_CONST_REF(yp_Arg_Missing)},
-                {yp_CONST_REF(yp_s_step), ypInt_CONST_REF(1)}, {yp_CONST_REF(yp_s_slash), NULL}));
+                {yp_CONST_REF(yp_s_step), ypInt_PREALLOC_REF(1)},
+                {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypSequenceMethods ypRange_as_sequence = {
         MethodError_objobjproc,       // tp_concat

@@ -2466,7 +2466,8 @@ class yp_function(ypObject):
             return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
     @classmethod
-    def with_parameters(cls, pyfunction, parameters=()):
+    # TODO Get fancy: read the signature from pyobj and create the param decl from that?
+    def with_parameters(cls, pyfunction, parameters):
         """Creates a yp_function object where the parameters are parsed by nohtyP. pyfunction will
         be called with *argarray.
         """
