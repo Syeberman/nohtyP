@@ -13630,22 +13630,26 @@ static ypObject *_ypSet_copy(int type, ypObject *x, int alloclen_fixed)
 }
 
 // XXX Check for the yp_frozenset_empty case first
-// XXX We're trusting that copy_visitor will behave properly and return an object that has the same
-// hash as the original and that is unequal to anything else in the other set
+// FIXME We're trusting that copy_visitor will behave properly and return an object that has the
+// same hash as the original and that is unequal to anything else in the other set...bad assumption!
 static ypObject *_ypSet_deepcopy(
-        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, int alloclen_fixed)
+        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
+    // FIXME This will fail if x is modified during the copy: ypSet_LEN and ypSet_TABLE may change!
     yp_ssize_t      keysleft = ypSet_LEN(x);
     ypSet_KeyEntry *otherkeys = ypSet_TABLE(x);
     ypObject *      so;
     yp_ssize_t      i;
     ypObject *      key;
     ypSet_KeyEntry *loc;
+    ypObject *result;
 
-    so = _ypSet_new(type, keysleft, alloclen_fixed);
+    // XXX Unlike _ypTuple_deepcopy, we don't have to worry about sets that contain themselves,
+    // which simplifies this greatly.
+    so = _ypSet_new(type, keysleft, TRUE);
     if (yp_isexceptionC(so)) return so;
 
-    // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean
+    // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean.
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
@@ -13656,6 +13660,13 @@ static ypObject *_ypSet_deepcopy(
         }
         _ypSet_movekey_clean(so, key, otherkeys[i].se_hash, &loc);
     }
+
+    result = _yp_deepcopy_memo_setitem(copy_memo, x, so);
+    if (yp_isexceptionC(result)) {
+        yp_decref(so);
+        return result;
+    }
+
     return so;
 }
 
@@ -14216,13 +14227,15 @@ static ypObject *frozenset_frozen_copy(ypObject *so)
 
 static ypObject *frozenset_unfrozen_deepcopy(ypObject *so, visitfunc copy_visitor, void *copy_memo)
 {
-    return _ypSet_deepcopy(ypSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE);
+    // TODO Similar to the issue with dict keys, we need to use sametype_visitor, because
+    // copy_visitor may be unfrozen_visitor which can't be stored in a set!
+    return _ypSet_deepcopy(ypSet_CODE, so, copy_visitor, copy_memo);
 }
 
 static ypObject *frozenset_frozen_deepcopy(ypObject *so, visitfunc copy_visitor, void *copy_memo)
 {
     if (ypSet_LEN(so) < 1) return yp_frozenset_empty;
-    return _ypSet_deepcopy(ypFrozenSet_CODE, so, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE);
+    return _ypSet_deepcopy(ypFrozenSet_CODE, so, copy_visitor, copy_memo);
 }
 
 static ypObject *frozenset_bool(ypObject *so) { return ypBool_FROM_C(ypSet_LEN(so)); }
@@ -15131,7 +15144,7 @@ static ypObject *_ypDict_copy(int type, ypObject *x, int alloclen_fixed)
 // TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
 // either a) optimizing x first, or b) not sharing the keyset of this object
 static ypObject *_ypDict_deepcopy(
-        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo, int alloclen_fixed)
+        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
     // TODO We can't use copy_visitor to copy the keys, because it might be
     // _yp_unfrozen_deepcopy_visitor!
@@ -15455,13 +15468,13 @@ static ypObject *frozendict_frozen_copy(ypObject *x)
 
 static ypObject *frozendict_unfrozen_deepcopy(ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
-    return _ypDict_deepcopy(ypDict_CODE, x, copy_visitor, copy_memo, /*alloclen_fixed=*/FALSE);
+    return _ypDict_deepcopy(ypDict_CODE, x, copy_visitor, copy_memo);
 }
 
 static ypObject *frozendict_frozen_deepcopy(ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
     if (ypDict_LEN(x) < 1) return yp_frozendict_empty;
-    return _ypDict_deepcopy(ypFrozenDict_CODE, x, copy_visitor, copy_memo, /*alloclen_fixed=*/TRUE);
+    return _ypDict_deepcopy(ypFrozenDict_CODE, x, copy_visitor, copy_memo);
 }
 
 static ypObject *frozendict_bool(ypObject *mp) { return ypBool_FROM_C(ypDict_LEN(mp)); }
@@ -16368,14 +16381,23 @@ static ypObject *range_frozen_copy(ypObject *r) { return yp_incref(r); }
 static ypObject *range_frozen_deepcopy(ypObject *r, visitfunc copy_visitor, void *copy_memo)
 {
     ypObject *newR;
+    ypObject *result;
 
     if (ypRange_LEN(r) < 1) return yp_range_empty;
+
     newR = ypMem_MALLOC_FIXED(ypRangeObject, ypRange_CODE);
     if (yp_isexceptionC(newR)) return newR;
     ypRange_START(newR) = ypRange_START(r);
     ypRange_STEP(newR) = ypRange_STEP(r);
     ypRange_SET_LEN(newR, ypRange_LEN(r));
     ypRange_ASSERT_NORMALIZED(newR);
+
+    result = _yp_deepcopy_memo_setitem(copy_memo, r, newR);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newR);
+        return result;
+    }
+
     return newR;
 }
 
