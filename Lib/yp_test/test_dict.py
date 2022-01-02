@@ -23,9 +23,9 @@ class DictTest(yp_unittest.TestCase):
 
     @yp_unittest.skip_not_applicable
     def test_invalid_keyword_arguments(self):
-        class Custom(dict):
+        class Custom(yp_dict):
             pass
-        for invalid in {1 : 2}, Custom({1 : 2}):
+        for invalid in yp_dict({1 : 2}), Custom({1 : 2}):
             with self.assertRaises(TypeError):
                 yp_dict(**invalid)
             with self.assertRaises(TypeError):
@@ -36,48 +36,50 @@ class DictTest(yp_unittest.TestCase):
         self.assertEqual(yp_len(yp_dict()), 0)
         self.assertIsNot(yp_dict(), yp_dict())
 
+    @yp_unittest.skip_not_applicable
     def test_literal_constructor(self):
         # check literal constructor for different sized dicts
         # (to exercise the BUILD_MAP oparg).
         for n in (0, 1, 6, 256, 400):
             items = [(''.join(random.sample(string.ascii_letters, 8)), i)
-                     for i in range(n)]
+                     for i in yp_range(n)]
             random.shuffle(items)
             formatted_items = ('{!r}: {:d}'.format(k, v) for k, v in items)
             dictliteral = '{' + ', '.join(formatted_items) + '}'
             self.assertEqual(yp_dict(eval(dictliteral)), yp_dict(items))
 
+    @yp_unittest.skip_num_methods
     def test_merge_operator(self):
 
-        a = {0: 0, 1: 1, 2: 1}
-        b = {1: 1, 2: 2, 3: 3}
+        a = yp_dict({0: 0, 1: 1, 2: 1})
+        b = yp_dict({1: 1, 2: 2, 3: 3})
 
         c = a.copy()
         c |= b
 
-        self.assertEqual(a | b, {0: 0, 1: 1, 2: 2, 3: 3})
-        self.assertEqual(c, {0: 0, 1: 1, 2: 2, 3: 3})
+        self.assertEqual(a | b, yp_dict({0: 0, 1: 1, 2: 2, 3: 3}))
+        self.assertEqual(c, yp_dict({0: 0, 1: 1, 2: 2, 3: 3}))
 
         c = b.copy()
         c |= a
 
-        self.assertEqual(b | a, {1: 1, 2: 1, 3: 3, 0: 0})
-        self.assertEqual(c, {1: 1, 2: 1, 3: 3, 0: 0})
+        self.assertEqual(b | a, yp_dict({1: 1, 2: 1, 3: 3, 0: 0}))
+        self.assertEqual(c, yp_dict({1: 1, 2: 1, 3: 3, 0: 0}))
 
         c = a.copy()
-        c |= [(1, 1), (2, 2), (3, 3)]
+        c |= yp_list([(1, 1), (2, 2), (3, 3)])
 
-        self.assertEqual(c, {0: 0, 1: 1, 2: 2, 3: 3})
+        self.assertEqual(c, yp_dict({0: 0, 1: 1, 2: 2, 3: 3}))
 
-        self.assertIs(a.__or__(None), NotImplemented)
+        self.assertIs(a.__or__(yp_None), NotImplemented)
         self.assertIs(a.__or__(()), NotImplemented)
         self.assertIs(a.__or__("BAD"), NotImplemented)
         self.assertIs(a.__or__(""), NotImplemented)
 
-        self.assertRaises(TypeError, a.__ior__, None)
-        self.assertEqual(a.__ior__(()), {0: 0, 1: 1, 2: 1})
+        self.assertRaises(TypeError, a.__ior__, yp_None)
+        self.assertEqual(a.__ior__(()), yp_dict({0: 0, 1: 1, 2: 1}))
         self.assertRaises(ValueError, a.__ior__, "BAD")
-        self.assertEqual(a.__ior__(""), {0: 0, 1: 1, 2: 1})
+        self.assertEqual(a.__ior__(""), yp_dict({0: 0, 1: 1, 2: 1}))
 
     def test_bool(self):
         self.assertFalse(yp_dict())
@@ -88,41 +90,42 @@ class DictTest(yp_unittest.TestCase):
     @yp_unittest.skip_str_repr
     def test_keys(self):
         d = yp_dict()
-        self.assertEqual(set(d.keys()), set())
+        self.assertEqual(yp_set(d.keys()), yp_set())
         d = yp_dict({'a': 1, 'b': 2})
         k = d.keys()
-        self.assertEqual(yp_set(k), {'a', 'b'})
+        self.assertEqual(yp_set(k), yp_set({'a', 'b'}))
         self.assertIn('a', k)
         self.assertIn('b', k)
         self.assertIn('a', d)
         self.assertIn('b', d)
-        self.assertRaises(TypeError, d.keys, None)
+        self.assertRaises(TypeError, d.keys, yp_None)
         self.assertEqual(repr(yp_dict(a=1).keys()), "dict_keys(['a'])")
 
     @yp_unittest.skip_str_repr
     def test_values(self):
         d = yp_dict()
-        self.assertEqual(set(d.values()), set())
+        self.assertEqual(yp_set(d.values()), yp_set())
         d = yp_dict({1:2})
-        self.assertEqual(set(d.values()), {2})
-        self.assertRaises(TypeError, d.values, None)
+        self.assertEqual(yp_set(d.values()), yp_set({2}))
+        self.assertRaises(TypeError, d.values, yp_None)
         self.assertEqual(repr(yp_dict(a=1).values()), "dict_values([1])")
 
     @yp_unittest.skip_str_repr
     def test_items(self):
         d = yp_dict()
-        self.assertEqual(set(d.items()), set())
+        self.assertEqual(yp_set(d.items()), yp_set())
 
         d = yp_dict({1:2})
-        self.assertEqual(set(d.items()), {(1, 2)})
-        self.assertRaises(TypeError, d.items, None)
+        self.assertEqual(yp_set(d.items()), yp_set({(1, 2)}))
+        self.assertRaises(TypeError, d.items, yp_None)
         self.assertEqual(repr(yp_dict(a=1).items()), "dict_items([('a', 1)])")
 
+    @yp_unittest.skip_user_defined_types
     def test_views_mapping(self):
         mappingproxy = type(type.__dict__)
-        class Dict(dict):
+        class Dict(yp_dict):
             pass
-        for cls in [dict, Dict]:
+        for cls in [yp_dict, Dict]:
             d = cls()
             m1 = d.keys().mapping
             m2 = d.values().mapping
@@ -202,7 +205,7 @@ class DictTest(yp_unittest.TestCase):
         d.clear()
         self.assertEqual(d, yp_dict())
 
-        self.assertRaises(TypeError, d.clear, None)
+        self.assertRaises(TypeError, d.clear, yp_None)
 
     def test_update(self):
         d = yp_dict()
@@ -214,7 +217,7 @@ class DictTest(yp_unittest.TestCase):
         d.update()
         self.assertEqual(d, yp_dict({1:1, 2:2, 3:3}))
 
-        self.assertRaises((TypeError, AttributeError), d.update, None)
+        self.assertRaises((TypeError, AttributeError), d.update, yp_None)
 
         class SimpleUserDict:
             def __init__(self):
@@ -282,29 +285,29 @@ class DictTest(yp_unittest.TestCase):
         self.assertRaises(ValueError, yp_dict().update, [(1, 2, 3)])
 
     def test_fromkeys(self):
-        self.assertEqual(yp_dict.fromkeys('abc'), yp_dict({'a':None, 'b':None, 'c':None}))
+        self.assertEqual(yp_dict.fromkeys('abc'), yp_dict({'a':yp_None, 'b':yp_None, 'c':yp_None}))
         d = yp_dict()
         self.assertIsNot(d.fromkeys('abc'), d)
-        self.assertEqual(d.fromkeys('abc'), yp_dict({'a':None, 'b':None, 'c':None}))
+        self.assertEqual(d.fromkeys('abc'), yp_dict({'a':yp_None, 'b':yp_None, 'c':yp_None}))
         self.assertEqual(d.fromkeys((4,5),0), yp_dict({4:0, 5:0}))
-        self.assertEqual(d.fromkeys([]), yp_dict())
+        self.assertEqual(d.fromkeys(yp_list()), yp_dict())
         def g():
             yield 1
-        self.assertEqual(d.fromkeys(g()), yp_dict({1:None}))
+        self.assertEqual(d.fromkeys(g()), yp_dict({1:yp_None}))
         self.assertRaises(TypeError, yp_dict().fromkeys, 3)
 
     @yp_unittest.skip_user_defined_types
     def test_fromkeys_subclass1(self):
         class dictlike(yp_dict): pass
-        self.assertEqual(dictlike.fromkeys('a'), yp_dict({'a':None}))
-        self.assertEqual(dictlike().fromkeys('a'), yp_dict({'a':None}))
+        self.assertEqual(dictlike.fromkeys('a'), yp_dict({'a':yp_None}))
+        self.assertEqual(dictlike().fromkeys('a'), yp_dict({'a':yp_None}))
         self.assertIsInstance(dictlike.fromkeys('a'), dictlike)
         self.assertIsInstance(dictlike().fromkeys('a'), dictlike)
         class mydict(yp_dict):
             def __new__(cls):
                 return collections.UserDict()
         ud = mydict.fromkeys('ab')
-        self.assertEqual(ud, yp_dict({'a':None, 'b':None}))
+        self.assertEqual(ud, yp_dict({'a':yp_None, 'b':yp_None}))
         self.assertIsInstance(ud, collections.UserDict)
         self.assertRaises(TypeError, yp_dict.fromkeys)
 
@@ -339,17 +342,17 @@ class DictTest(yp_unittest.TestCase):
 
     def test_fromkeys_fastpath(self):
         # test fast path for dictionary inputs
-        d = yp_dict(zip(range(6), range(6)))
-        self.assertEqual(yp_dict.fromkeys(d, 0), yp_dict(zip(range(6), [0]*6)))
+        d = yp_dict(zip(yp_range(6), yp_range(6)))
+        self.assertEqual(yp_dict.fromkeys(d, 0), yp_dict(zip(yp_range(6), [0]*6)))
 
     @yp_unittest.skip_user_defined_types
     def test_fromkeys_fastpath_subclass(self):
         class baddict3(yp_dict):
             def __new__(cls):
                 return d
-        d = yp_dict({i : i for i in range(10)})
+        d = yp_dict({i : i for i in yp_range(10)})
         res = d.copy()
-        res.update(a=None, b=None, c=None)
+        res.update(a=yp_None, b=yp_None, c=yp_None)
         self.assertEqual(baddict3.fromkeys({"a", "b", "c"}), res)
 
     def test_copy(self):
@@ -362,16 +365,16 @@ class DictTest(yp_unittest.TestCase):
         d[4] = 4
         self.assertNotEqual(copy, d)
 
-        self.assertEqual({}.copy(), yp_dict())
-        self.assertRaises(TypeError, d.copy, None)
+        self.assertEqual(yp_dict().copy(), yp_dict())
+        self.assertRaises(TypeError, d.copy, yp_None)
 
     def test_copy_fuzz(self):
         for dict_size in [10, 100, 1000, 10000, 100000]:
             dict_size = random.randrange(
                 dict_size // 2, dict_size + dict_size // 2)
             with self.subTest(dict_size=dict_size):
-                d = {}
-                for i in range(dict_size):
+                d = yp_dict()
+                for i in yp_range(dict_size):
                     d[i] = i
 
                 d2 = d.copy()
@@ -379,15 +382,16 @@ class DictTest(yp_unittest.TestCase):
                 self.assertEqual(d, d2)
                 d2['key'] = 'value'
                 self.assertNotEqual(d, d2)
-                self.assertEqual(len(d2), len(d) + 1)
+                self.assertEqual(yp_len(d2), yp_len(d) + 1)
 
+    @yp_unittest.skip_user_defined_types
     def test_copy_maintains_tracking(self):
         class A:
             pass
 
         key = A()
 
-        for d in ({}, {'a': 1}, {key: 'val'}):
+        for d in (yp_dict(), yp_dict({'a': 1}), yp_dict({key: 'val'})):
             d2 = d.copy()
             self.assertEqual(gc.is_tracked(d), gc.is_tracked(d2))
 
@@ -398,8 +402,8 @@ class DictTest(yp_unittest.TestCase):
         # keys-space (to optimize memory footprint).
         # In this test we want to hit the slow/compacting
         # branch of dict.copy() and make sure it works OK.
-        d = {k: k for k in range(1000)}
-        for k in range(950):
+        d = yp_dict({k: k for k in yp_range(1000)})
+        for k in yp_range(950):
             del d[k]
         d2 = d.copy()
         self.assertEqual(d2, d)
@@ -414,17 +418,17 @@ class DictTest(yp_unittest.TestCase):
         self.assertEqual(d.get('a'), 1)
         self.assertEqual(d.get('a', 3), 1)
         self.assertRaises(TypeError, d.get)
-        self.assertRaises(TypeError, d.get, None, None, None)
+        self.assertRaises(TypeError, d.get, yp_None, yp_None, yp_None)
 
     def test_setdefault(self):
         # yp_dict.setdefault()
         d = yp_dict()
         self.assertIs(d.setdefault('key0'), yp_None)
-        d.setdefault('key0', [])
+        d.setdefault('key0', yp_list())
         self.assertIs(d.setdefault('key0'), yp_None)
-        d.setdefault('key', []).append(3)
+        d.setdefault('key', yp_list()).append(3)
         self.assertEqual(d['key'][0], 3)
-        d.setdefault('key', []).append(4)
+        d.setdefault('key', yp_list()).append(4)
         self.assertEqual(yp_len(d['key']), 2)
         self.assertRaises(TypeError, d.setdefault)
 
@@ -443,7 +447,7 @@ class DictTest(yp_unittest.TestCase):
         x = BadHash()
         d[x] = 42
         x.fail = True
-        self.assertRaises(Exc, d.setdefault, x, [])
+        self.assertRaises(Exc, d.setdefault, x, yp_list())
 
     @yp_unittest.skip_user_defined_types
     def test_setdefault_atomic(self):
@@ -461,7 +465,7 @@ class DictTest(yp_unittest.TestCase):
         hashed1 = Hashed()
         y = yp_dict({hashed1: 5})
         hashed2 = Hashed()
-        y.setdefault(hashed2, [])
+        y.setdefault(hashed2, yp_list())
         self.assertEqual(hashed1.hash_count, 1)
         self.assertEqual(hashed2.hash_count, 1)
         self.assertEqual(hashed1.eq_count + hashed2.eq_count, 1)
@@ -469,18 +473,18 @@ class DictTest(yp_unittest.TestCase):
     def test_setitem_resize_inline(self):
         # Ensure _ypDict_resize handles moving data back and forth from the inline buff
         # TODO Dip into the internals to ensure we're testing what we think
-        ints = yp_list(range((0x80*2)//3 - 1))
+        ints = yp_list(yp_range((0x80*2)//3 - 1))
         d = yp_dict()       # inline
         self.assertEqual(d, yp_dict())
-        d[-100] = None      # still inline
-        self.assertEqual(d, yp_dict({-100: None}))
-        for i in ints: d[i] = None  # now in seperate buff
-        self.assertEqual(yp_len(d), len(ints)+1)
+        d[-100] = yp_None      # still inline
+        self.assertEqual(d, yp_dict({-100: yp_None}))
+        for i in ints: d[i] = yp_None  # now in seperate buff
+        self.assertEqual(yp_len(d), yp_len(ints)+1)
         self.assertIn(-100, d)
         for i in ints: del d[i]     # still in same buff (no resize on remove)
-        self.assertEqual(d, yp_dict({-100: None}))
-        d[-101] = None      # back to inline
-        self.assertEqual(d, yp_dict({-100: None, -101: None}))
+        self.assertEqual(d, yp_dict({-100: yp_None}))
+        d[-101] = yp_None      # back to inline
+        self.assertEqual(d, yp_dict({-100: yp_None, -101: yp_None}))
 
     @yp_unittest.skip_user_defined_types
     def test_setitem_atomic_at_resize(self):
@@ -499,7 +503,7 @@ class DictTest(yp_unittest.TestCase):
         y = yp_dict({hashed1: 5, 0: 0, 1: 1, 2: 2, 3: 3})
         hashed2 = Hashed()
         # 6th item forces a resize
-        y[hashed2] = []
+        y[hashed2] = yp_list()
         self.assertEqual(hashed1.hash_count, 1)
         self.assertEqual(hashed2.hash_count, 1)
         self.assertEqual(hashed1.eq_count + hashed2.eq_count, 1)
@@ -513,17 +517,17 @@ class DictTest(yp_unittest.TestCase):
                 size = 2**log2size
                 a = yp_dict()
                 b = yp_dict()
-                for i in range(size):
+                for i in yp_range(size):
                     a[repr(i)] = i
                     if copymode < 0:
                         b[repr(i)] = i
                 if copymode > 0:
                     b = a.copy()
-                for i in range(size):
+                for i in yp_range(size):
                     ka, va = ta = a.popitem()
-                    self.assertEqual(va, int(str(ka)))
+                    self.assertEqual(va, yp_int(yp_str(ka)))
                     kb, vb = tb = b.popitem()
-                    self.assertEqual(vb, int(str(kb)))
+                    self.assertEqual(vb, yp_int(yp_str(kb)))
                     self.assertFalse(yp_bool(copymode < 0 and ta != tb))
                 self.assertFalse(a)
                 self.assertFalse(b)
@@ -532,11 +536,11 @@ class DictTest(yp_unittest.TestCase):
         self.assertRaises(KeyError, d.popitem)
 
     def test_popitem(self):
-        self.check_popitem(range(9))
+        self.check_popitem(yp_range(9))
 
     @support.requires_resource('cpu')
     def test_popitem_cpu(self):
-        self.check_popitem(range(9,12))
+        self.check_popitem(yp_range(9,12))
 
     def test_pop(self):
         # Tests for pop with specified key
@@ -558,6 +562,8 @@ class DictTest(yp_unittest.TestCase):
 
     @yp_unittest.skip_user_defined_types
     def test_pop_badobj(self):
+        d = yp_dict()
+
         class Exc(Exception): pass
 
         class BadHash(object):
@@ -585,7 +591,7 @@ class DictTest(yp_unittest.TestCase):
     @yp_unittest.skip_dict_mutating_iteration
     def test_mutating_iteration_delete(self):
         # change dict content during iteration
-        d = {}
+        d = yp_dict()
         d[0] = 0
         with self.assertRaises(RuntimeError):
             for i in d:
@@ -595,7 +601,7 @@ class DictTest(yp_unittest.TestCase):
     @yp_unittest.skip_dict_mutating_iteration
     def test_mutating_iteration_delete_over_values(self):
         # change dict content during iteration
-        d = {}
+        d = yp_dict()
         d[0] = 0
         with self.assertRaises(RuntimeError):
             for i in d.values():
@@ -605,7 +611,7 @@ class DictTest(yp_unittest.TestCase):
     @yp_unittest.skip_dict_mutating_iteration
     def test_mutating_iteration_delete_over_items(self):
         # change dict content during iteration
-        d = {}
+        d = yp_dict()
         d[0] = 0
         with self.assertRaises(RuntimeError):
             for i in d.items():
@@ -616,7 +622,7 @@ class DictTest(yp_unittest.TestCase):
     def test_mutating_lookup(self):
         # changing yp_dict during a lookup (issue #14417)
         class NastyKey:
-            mutate_dict = None
+            mutate_dict = yp_None
 
             def __init__(self, value):
                 self.value = value
@@ -628,7 +634,7 @@ class DictTest(yp_unittest.TestCase):
             def __eq__(self, other):
                 if NastyKey.mutate_dict:
                     mydict, key = NastyKey.mutate_dict
-                    NastyKey.mutate_dict = None
+                    NastyKey.mutate_dict = yp_None
                     del mydict[key]
                 return self.value == other.value
 
@@ -658,10 +664,11 @@ class DictTest(yp_unittest.TestCase):
         d = yp_dict({1: BadRepr()})
         self.assertRaises(Exc, repr, d)
 
+    @yp_unittest.skip_str_repr
     def test_repr_deep(self):
-        d = {}
-        for i in range(sys.getrecursionlimit() + 100):
-            d = {1: d}
+        d = yp_dict()
+        for i in yp_range(sys.getrecursionlimit() + 100):
+            d = yp_dict({1: d})
         self.assertRaises(RecursionError, repr, d)
 
     def test_eq(self):
@@ -684,6 +691,7 @@ class DictTest(yp_unittest.TestCase):
         with self.assertRaises(Exc):
             d1 == d2
 
+    @yp_unittest.skip_dict_views
     def test_keys_contained(self):
         self.helper_keys_contained(lambda x: x.keys())
         self.helper_keys_contained(lambda x: x.items())
@@ -755,57 +763,60 @@ class DictTest(yp_unittest.TestCase):
         with self.assertRaises(RuntimeError):
             d3.items() > d2.items()
 
+    @yp_unittest.skip_dict_views
     def test_dictview_set_operations_on_keys(self):
         k1 = yp_dict({1:1, 2:2}).keys()
         k2 = yp_dict({1:1, 2:2, 3:3}).keys()
         k3 = yp_dict({4:4}).keys()
 
-        self.assertEqual(k1 - k2, set())
-        self.assertEqual(k1 - k3, {1,2})
-        self.assertEqual(k2 - k1, {3})
-        self.assertEqual(k3 - k1, {4})
-        self.assertEqual(k1 & k2, {1,2})
-        self.assertEqual(k1 & k3, set())
-        self.assertEqual(k1 | k2, {1,2,3})
-        self.assertEqual(k1 ^ k2, {3})
-        self.assertEqual(k1 ^ k3, {1,2,4})
+        self.assertEqual(k1 - k2, yp_set())
+        self.assertEqual(k1 - k3, yp_set({1,2}))
+        self.assertEqual(k2 - k1, yp_set({3}))
+        self.assertEqual(k3 - k1, yp_set({4}))
+        self.assertEqual(k1 & k2, yp_set({1,2}))
+        self.assertEqual(k1 & k3, yp_set())
+        self.assertEqual(k1 | k2, yp_set({1,2,3}))
+        self.assertEqual(k1 ^ k2, yp_set({3}))
+        self.assertEqual(k1 ^ k3, yp_set({1,2,4}))
 
+    @yp_unittest.skip_dict_views
     def test_dictview_set_operations_on_items(self):
         k1 = yp_dict({1:1, 2:2}).items()
         k2 = yp_dict({1:1, 2:2, 3:3}).items()
         k3 = yp_dict({4:4}).items()
 
-        self.assertEqual(k1 - k2, set())
-        self.assertEqual(k1 - k3, {(1,1), (2,2)})
-        self.assertEqual(k2 - k1, {(3,3)})
-        self.assertEqual(k3 - k1, {(4,4)})
-        self.assertEqual(k1 & k2, {(1,1), (2,2)})
-        self.assertEqual(k1 & k3, set())
-        self.assertEqual(k1 | k2, {(1,1), (2,2), (3,3)})
-        self.assertEqual(k1 ^ k2, {(3,3)})
-        self.assertEqual(k1 ^ k3, {(1,1), (2,2), (4,4)})
+        self.assertEqual(k1 - k2, yp_set())
+        self.assertEqual(k1 - k3, yp_set({(1,1), (2,2)}))
+        self.assertEqual(k2 - k1, yp_set({(3,3)}))
+        self.assertEqual(k3 - k1, yp_set({(4,4)}))
+        self.assertEqual(k1 & k2, yp_set({(1,1), (2,2)}))
+        self.assertEqual(k1 & k3, yp_set())
+        self.assertEqual(k1 | k2, yp_set({(1,1), (2,2), (3,3)}))
+        self.assertEqual(k1 ^ k2, yp_set({(3,3)}))
+        self.assertEqual(k1 ^ k3, yp_set({(1,1), (2,2), (4,4)}))
 
     def test_items_symmetric_difference(self):
         rr = random.randrange
-        for _ in range(100):
-            left = {x:rr(3) for x in range(20) if rr(2)}
-            right = {x:rr(3) for x in range(20) if rr(2)}
+        for _ in yp_range(100):
+            left = yp_dict({x:rr(3) for x in yp_range(20) if rr(2)})
+            right = yp_dict({x:rr(3) for x in yp_range(20) if rr(2)})
             with self.subTest(left=left, right=right):
-                expected = set(left.items()) ^ set(right.items())
+                expected = yp_set(left.items()) ^ yp_set(right.items())
                 actual = left.items() ^ right.items()
                 self.assertEqual(actual, expected)
 
+    @yp_unittest.skip_dict_views
     def test_dictview_mixed_set_operations(self):
         # Just a few for .keys()
-        self.assertTrue(yp_dict({1:1}).keys() == {1})
-        self.assertTrue({1} == yp_dict({1:1}).keys())
-        self.assertEqual(yp_dict({1:1}).keys() | {2}, {1, 2})
-        self.assertEqual({2} | yp_dict({1:1}).keys(), {1, 2})
+        self.assertTrue(yp_dict({1:1}).keys() == yp_set({1}))
+        self.assertTrue(yp_set({1}) == yp_dict({1:1}).keys())
+        self.assertEqual(yp_dict({1:1}).keys() | yp_set({2}), yp_set({1, 2}))
+        self.assertEqual(yp_set({2}) | yp_dict({1:1}).keys(), yp_set({1, 2}))
         # And a few for .items()
-        self.assertTrue(yp_dict({1:1}).items() == {(1,1)})
-        self.assertTrue({(1,1)} == yp_dict({1:1}).items())
-        self.assertEqual(yp_dict({1:1}).items() | {2}, {(1,1), 2})
-        self.assertEqual({2} | yp_dict({1:1}).items(), {(1,1), 2})
+        self.assertTrue(yp_dict({1:1}).items() == yp_set({(1,1)}))
+        self.assertTrue(yp_set({(1,1)}) == yp_dict({1:1}).items())
+        self.assertEqual(yp_dict({1:1}).items() | yp_set({2}), yp_set({(1,1), 2}))
+        self.assertEqual(yp_set({2}) | yp_dict({1:1}).items(), yp_set({(1,1), 2}))
 
     @yp_unittest.skip_user_defined_types
     def test_missing(self):
@@ -838,7 +849,7 @@ class DictTest(yp_unittest.TestCase):
         class F(yp_dict):
             def __init__(self):
                 # An instance variable __missing__ should have no effect
-                self.__missing__ = lambda key: None
+                self.__missing__ = lambda key: yp_None
         f = F()
         with self.assertRaises(KeyError) as c:
             f[42]
@@ -866,7 +877,7 @@ class DictTest(yp_unittest.TestCase):
 
         class BadDictKey:
             def __hash__(self):
-                return hash(self.__class__)
+                return yp_hash(self.__class__)
 
             def __eq__(self, other):
                 if isinstance(other, self.__class__):
@@ -883,7 +894,7 @@ class DictTest(yp_unittest.TestCase):
                      'd.get(x2)',
                      'd.setdefault(x2, 42)',
                      'd.pop(x2)',
-                     'd.update({x2: 2})']:
+                     'd.update(yp_dict({x2: 2}))']:
             with self.assertRaises(CustomException):
                 exec(stmt, locals())
 
@@ -896,11 +907,11 @@ class DictTest(yp_unittest.TestCase):
         # that would be *likely* to hit a failing case in reasonable time.
 
         d = yp_dict()
-        for i in range(5):
+        for i in yp_range(5):
             d[i] = i
-        for i in range(5):
+        for i in yp_range(5):
             del d[i]
-        for i in range(5, 9):  # i==8 was the problem
+        for i in yp_range(5, 9):  # i==8 was the problem
             d[i] = i
 
     @yp_unittest.skip_user_defined_types
@@ -930,11 +941,11 @@ class DictTest(yp_unittest.TestCase):
         # Bug #3537: if an empty but presized yp_dict with a size larger
         # than 7 was in the freelist, it triggered an assertion failure
         with self.assertRaises(ZeroDivisionError):
-            d = yp_dict({'a': 1 // 0, 'b': None, 'c': None, 'd': None, 'e': None,
-                 'f': None, 'g': None, 'h': None})
+            d = yp_dict({'a': 1 // 0, 'b': yp_None, 'c': yp_None, 'd': yp_None, 'e': yp_None,
+                 'f': yp_None, 'g': yp_None, 'h': yp_None})
         d = yp_dict()
 
-    @yp_unittest.skip_not_applicable
+    @yp_unittest.skip_dict_views
     def test_container_iterator(self):
         # Bug #3680: tp_traverse was not implemented for dictiter and
         # dictview objects.
@@ -949,7 +960,7 @@ class DictTest(yp_unittest.TestCase):
             obj.x = iter(obj.v)
             del obj, container
             gc.collect()
-            self.assertIs(ref(), None, "Cycle was not collected")
+            self.assertIs(ref(), yp_None, "Cycle was not collected")
 
     def _not_tracked(self, t):
         # Nested containers can take several collections to untrack
@@ -967,20 +978,20 @@ class DictTest(yp_unittest.TestCase):
     @support.cpython_only
     def test_track_literals(self):
         # Test GC-optimization of yp_dict literals
-        x, y, z, w = 1.5, "a", (1, None), []
+        x, y, z, w = 1.5, "a", (1, yp_None), yp_list()
 
         self._not_tracked(yp_dict())
         self._not_tracked(yp_dict({x:(), y:x, z:1}))
         self._not_tracked(yp_dict({1: "a", "b": 2}))
-        self._not_tracked(yp_dict({1: 2, (None, True, False, ()): int}))
-        self._not_tracked(yp_dict({1: object()}))
+        self._not_tracked(yp_dict({1: 2, (yp_None, yp_True, yp_False, ()): yp_int}))
+        self._not_tracked(yp_dict({1: yp_object()}))
 
         # Dicts with mutable elements are always tracked, even if those
         # elements are not tracked right now.
-        self._tracked(yp_dict({1: []}))
-        self._tracked(yp_dict({1: ([],)}))
+        self._tracked(yp_dict({1: yp_list()}))
+        self._tracked(yp_dict({1: (yp_list(),)}))
         self._tracked(yp_dict({1: yp_dict()}))
-        self._tracked(yp_dict({1: set()}))
+        self._tracked(yp_dict({1: yp_set()}))
 
     @yp_unittest.skip_not_applicable
     @support.cpython_only
@@ -988,7 +999,7 @@ class DictTest(yp_unittest.TestCase):
         # Test GC-optimization of dynamically-created dicts
         class MyObject(object):
             pass
-        x, y, z, w, o = 1.5, "a", (1, object()), [], MyObject()
+        x, y, z, w, o = 1.5, "a", (1, object()), yp_list(), MyObject()
 
         d = yp_dict()
         self._not_tracked(d)
@@ -1002,7 +1013,7 @@ class DictTest(yp_unittest.TestCase):
         d[4] = w
         self._tracked(d)
         self._tracked(d.copy())
-        d[4] = None
+        d[4] = yp_None
         self._not_tracked(d)
         self._not_tracked(d.copy())
 
@@ -1059,14 +1070,15 @@ class DictTest(yp_unittest.TestCase):
         class C:
             pass
 
-        dicts = []
-        for i in range(n):
+        dicts = yp_list()
+        for i in yp_range(n):
             a = C()
             a.x, a.y, a.z = 1, 2, 3
             dicts.append(a.__dict__)
 
         return dicts
 
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_splittable_setdefault(self):
         """split table must be combined when setdefault()
@@ -1081,9 +1093,10 @@ class DictTest(yp_unittest.TestCase):
         b['a'] = 1
 
         self.assertGreater(size_b, size_a)
-        self.assertEqual(list(a), ['x', 'y', 'z', 'a', 'b'])
-        self.assertEqual(list(b), ['x', 'y', 'z', 'b', 'a'])
+        self.assertEqual(yp_list(a), ['x', 'y', 'z', 'a', 'b'])
+        self.assertEqual(yp_list(b), ['x', 'y', 'z', 'b', 'a'])
 
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_splittable_del(self):
         """split table must be combined when del d[k]"""
@@ -1096,14 +1109,15 @@ class DictTest(yp_unittest.TestCase):
             del a['y']
 
         self.assertGreater(sys.getsizeof(a), orig_size)
-        self.assertEqual(list(a), ['x', 'z'])
-        self.assertEqual(list(b), ['x', 'y', 'z'])
+        self.assertEqual(yp_list(a), ['x', 'z'])
+        self.assertEqual(yp_list(b), ['x', 'y', 'z'])
 
         # Two dicts have different insertion order.
         a['y'] = 42
-        self.assertEqual(list(a), ['x', 'z', 'y'])
-        self.assertEqual(list(b), ['x', 'y', 'z'])
+        self.assertEqual(yp_list(a), ['x', 'z', 'y'])
+        self.assertEqual(yp_list(b), ['x', 'y', 'z'])
 
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_splittable_pop(self):
         """split table must be combined when d.pop(k)"""
@@ -1116,14 +1130,15 @@ class DictTest(yp_unittest.TestCase):
             a.pop('y')
 
         self.assertGreater(sys.getsizeof(a), orig_size)
-        self.assertEqual(list(a), ['x', 'z'])
-        self.assertEqual(list(b), ['x', 'y', 'z'])
+        self.assertEqual(yp_list(a), ['x', 'z'])
+        self.assertEqual(yp_list(b), ['x', 'y', 'z'])
 
         # Two dicts have different insertion order.
         a['y'] = 42
-        self.assertEqual(list(a), ['x', 'z', 'y'])
-        self.assertEqual(list(b), ['x', 'y', 'z'])
+        self.assertEqual(yp_list(a), ['x', 'z', 'y'])
+        self.assertEqual(yp_list(b), ['x', 'y', 'z'])
 
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_splittable_pop_pending(self):
         """pop a pending key in a split table should not crash"""
@@ -1133,6 +1148,7 @@ class DictTest(yp_unittest.TestCase):
         with self.assertRaises(KeyError):
             b.pop('a')
 
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_splittable_popitem(self):
         """split table must be combined when d.popitem()"""
@@ -1146,9 +1162,10 @@ class DictTest(yp_unittest.TestCase):
             del a['z']
 
         self.assertGreater(sys.getsizeof(a), orig_size)
-        self.assertEqual(list(a), ['x', 'y'])
-        self.assertEqual(list(b), ['x', 'y', 'z'])
+        self.assertEqual(yp_list(a), ['x', 'y'])
+        self.assertEqual(yp_list(b), ['x', 'y', 'z'])
 
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_splittable_setattr_after_pop(self):
         """setattr() must not convert combined table into split table."""
@@ -1181,12 +1198,12 @@ class DictTest(yp_unittest.TestCase):
 
     @yp_unittest.skip_pickling
     def test_iterator_pickling(self):
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
-            data = {1:"a", 2:"b", 3:"c"}
+        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
+            data = yp_dict({1:"a", 2:"b", 3:"c"})
             it = iter(data)
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
-            self.assertEqual(list(it), list(data))
+            self.assertEqual(yp_list(it), yp_list(data))
 
             it = pickle.loads(d)
             try:
@@ -1196,12 +1213,12 @@ class DictTest(yp_unittest.TestCase):
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
             del data[drop]
-            self.assertEqual(list(it), list(data))
+            self.assertEqual(yp_list(it), yp_list(data))
 
     @yp_unittest.skip_pickling
     def test_itemiterator_pickling(self):
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
-            data = {1:"a", 2:"b", 3:"c"}
+        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
+            data = yp_dict({1:"a", 2:"b", 3:"c"})
             # dictviews aren't picklable, only their iterators
             itorg = iter(data.items())
             d = pickle.dumps(itorg, proto)
@@ -1212,39 +1229,40 @@ class DictTest(yp_unittest.TestCase):
             # the same objects as the original one.
             # self.assertEqual(type(itorg), type(it))
             self.assertIsInstance(it, collections.abc.Iterator)
-            self.assertEqual(dict(it), data)
+            self.assertEqual(yp_dict(it), data)
 
             it = pickle.loads(d)
             drop = next(it)
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
             del data[drop[0]]
-            self.assertEqual(dict(it), data)
+            self.assertEqual(yp_dict(it), data)
 
     @yp_unittest.skip_pickling
     def test_valuesiterator_pickling(self):
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
-            data = {1:"a", 2:"b", 3:"c"}
+        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
+            data = yp_dict({1:"a", 2:"b", 3:"c"})
             # data.values() isn't picklable, only its iterator
             it = iter(data.values())
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
-            self.assertEqual(list(it), list(data.values()))
+            self.assertEqual(yp_list(it), yp_list(data.values()))
 
             it = pickle.loads(d)
             drop = next(it)
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
-            values = list(it) + [drop]
-            self.assertEqual(sorted(values), sorted(list(data.values())))
+            values = yp_list(it) + [drop]
+            self.assertEqual(yp_sorted(values), yp_sorted(yp_list(data.values())))
 
+    @yp_unittest.skip_pickling
     def test_reverseiterator_pickling(self):
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
-            data = {1:"a", 2:"b", 3:"c"}
-            it = reversed(data)
+        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
+            data = yp_dict({1:"a", 2:"b", 3:"c"})
+            it = yp_reversed(data)
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
-            self.assertEqual(list(it), list(reversed(data)))
+            self.assertEqual(yp_list(it), yp_list(yp_reversed(data)))
 
             it = pickle.loads(d)
             try:
@@ -1254,13 +1272,14 @@ class DictTest(yp_unittest.TestCase):
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
             del data[drop]
-            self.assertEqual(list(it), list(reversed(data)))
+            self.assertEqual(yp_list(it), yp_list(yp_reversed(data)))
 
+    @yp_unittest.skip_pickling
     def test_reverseitemiterator_pickling(self):
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
-            data = {1:"a", 2:"b", 3:"c"}
+        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
+            data = yp_dict({1:"a", 2:"b", 3:"c"})
             # dictviews aren't picklable, only their iterators
-            itorg = reversed(data.items())
+            itorg = yp_reversed(data.items())
             d = pickle.dumps(itorg, proto)
             it = pickle.loads(d)
             # note that the type of the unpickled iterator
@@ -1269,29 +1288,30 @@ class DictTest(yp_unittest.TestCase):
             # the same objects as the original one.
             # self.assertEqual(type(itorg), type(it))
             self.assertIsInstance(it, collections.abc.Iterator)
-            self.assertEqual(dict(it), data)
+            self.assertEqual(yp_dict(it), data)
 
             it = pickle.loads(d)
             drop = next(it)
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
             del data[drop[0]]
-            self.assertEqual(dict(it), data)
+            self.assertEqual(yp_dict(it), data)
 
+    @yp_unittest.skip_pickling
     def test_reversevaluesiterator_pickling(self):
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
-            data = {1:"a", 2:"b", 3:"c"}
+        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
+            data = yp_dict({1:"a", 2:"b", 3:"c"})
             # data.values() isn't picklable, only its iterator
-            it = reversed(data.values())
+            it = yp_reversed(data.values())
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
-            self.assertEqual(list(it), list(reversed(data.values())))
+            self.assertEqual(yp_list(it), yp_list(yp_reversed(data.values())))
 
             it = pickle.loads(d)
             drop = next(it)
             d = pickle.dumps(it, proto)
             it = pickle.loads(d)
-            values = list(it) + [drop]
+            values = yp_list(it) + [drop]
             self.assertEqual(sorted(values), sorted(data.values()))
 
     @yp_unittest.skip_not_applicable
@@ -1321,10 +1341,11 @@ class DictTest(yp_unittest.TestCase):
             def __del__(self):
                 mutate(d)
 
-        d = {k: Mutating() for k in 'abcdefghijklmnopqr'}
-        for k in list(d):
+        d = yp_dict({k: Mutating() for k in 'abcdefghijklmnopqr'})
+        for k in yp_list(d):
             d[k] = k
 
+    @yp_unittest.skip_user_defined_types
     def test_reentrant_insertion(self):
         # Reentrant insertion shouldn't crash (see issue #22653)
         def mutate(d):
@@ -1341,6 +1362,7 @@ class DictTest(yp_unittest.TestCase):
                 d.popitem()
         self.check_reentrant_insertion(mutate)
 
+    @yp_unittest.skip_user_defined_types
     def test_merge_and_mutate(self):
         class X:
             def __hash__(self):
@@ -1350,19 +1372,20 @@ class DictTest(yp_unittest.TestCase):
                 other.clear()
                 return False
 
-        l = [(i,0) for i in range(1, 1337)]
-        other = dict(l)
+        l = [(i,0) for i in yp_range(1, 1337)]
+        other = yp_dict(l)
         other[X()] = 0
-        d = {X(): 0, 1: 1}
+        d = yp_dict({X(): 0, 1: 1})
         self.assertRaises(RuntimeError, d.update, other)
 
     @yp_unittest.skip_user_defined_types
     def test_free_after_iterating(self):
-        support.check_free_after_iterating(self, iter, dict)
-        support.check_free_after_iterating(self, lambda d: iter(d.keys()), dict)
-        support.check_free_after_iterating(self, lambda d: iter(d.values()), dict)
-        support.check_free_after_iterating(self, lambda d: iter(d.items()), dict)
+        support.check_free_after_iterating(self, iter, yp_dict)
+        support.check_free_after_iterating(self, lambda d: iter(d.keys()), yp_dict)
+        support.check_free_after_iterating(self, lambda d: iter(d.values()), yp_dict)
+        support.check_free_after_iterating(self, lambda d: iter(d.items()), yp_dict)
 
+    @yp_unittest.skip_user_defined_types
     def test_equal_operator_modifying_operand(self):
         # test fix for seg fault reported in bpo-27945 part 3.
         class X():
@@ -1376,8 +1399,8 @@ class DictTest(yp_unittest.TestCase):
             def __hash__(self):
                 return 13
 
-        dict_a = {X(): 0}
-        dict_b = {X(): X()}
+        dict_a = yp_dict({X(): 0})
+        dict_b = yp_dict({X(): X()})
         self.assertTrue(dict_a == dict_b)
 
         # test fix for seg fault reported in bpo-38588 part 1.
@@ -1386,55 +1409,59 @@ class DictTest(yp_unittest.TestCase):
                 dict_d.clear()
                 return True
 
-        dict_c = {0: Y()}
-        dict_d = {0: set()}
+        dict_c = yp_dict({0: Y()})
+        dict_d = yp_dict({0: yp_set()})
         self.assertTrue(dict_c == dict_d)
 
+    @yp_unittest.skip_user_defined_types
     def test_fromkeys_operator_modifying_dict_operand(self):
         # test fix for seg fault reported in issue 27945 part 4a.
-        class X(int):
+        class X(yp_int):
             def __hash__(self):
                 return 13
 
             def __eq__(self, other):
-                if len(d) > 1:
+                if yp_len(d) > 1:
                     d.clear()
                 return False
 
-        d = {}  # this is required to exist so that d can be constructed!
-        d = {X(1): 1, X(2): 2}
+        d = yp_dict()  # this is required to exist so that d can be constructed!
+        d = yp_dict({X(1): 1, X(2): 2})
         try:
-            dict.fromkeys(d)  # shouldn't crash
+            yp_dict.fromkeys(d)  # shouldn't crash
         except RuntimeError:  # implementation defined
             pass
 
+    @yp_unittest.skip_user_defined_types
     def test_fromkeys_operator_modifying_set_operand(self):
         # test fix for seg fault reported in issue 27945 part 4b.
-        class X(int):
+        class X(yp_int):
             def __hash__(self):
                 return 13
 
             def __eq__(self, other):
-                if len(d) > 1:
+                if yp_len(d) > 1:
                     d.clear()
                 return False
 
-        d = {}  # this is required to exist so that d can be constructed!
-        d = {X(1), X(2)}
+        d = yp_dict()  # this is required to exist so that d can be constructed!
+        d = yp_dict({X(1), X(2)})
         try:
-            dict.fromkeys(d)  # shouldn't crash
+            yp_dict.fromkeys(d)  # shouldn't crash
         except RuntimeError:  # implementation defined
             pass
 
+    @yp_unittest.skip_user_defined_types
     def test_dictitems_contains_use_after_free(self):
         class X:
             def __eq__(self, other):
                 d.clear()
                 return NotImplemented
 
-        d = {0: set()}
+        d = yp_dict({0: yp_set()})
         (0, X()) in d.items()
 
+    @yp_unittest.skip_user_defined_types
     def test_dict_contain_use_after_free(self):
         # bpo-40489
         class S(str):
@@ -1443,115 +1470,124 @@ class DictTest(yp_unittest.TestCase):
                 return NotImplemented
 
             def __hash__(self):
-                return hash('test')
+                return yp_hash('test')
 
-        d = {S(): 'value'}
+        d = yp_dict({S(): 'value'})
         self.assertFalse('test' in d)
 
+    @yp_unittest.skip_user_defined_types
     def test_init_use_after_free(self):
         class X:
             def __hash__(self):
-                pair[:] = []
+                pair[:] = yp_list()
                 return 13
 
         pair = [X(), 123]
-        dict([pair])
+        yp_dict([pair])
 
+    @yp_unittest.skip_user_defined_types
     def test_oob_indexing_dictiter_iternextitem(self):
-        class X(int):
+        class X(yp_int):
             def __del__(self):
                 d.clear()
 
-        d = {i: X(i) for i in range(8)}
+        d = yp_dict({i: X(i) for i in yp_range(8)})
 
         def iter_and_mutate():
             for result in d.items():
                 if result[0] == 2:
-                    d[2] = None # free d[2] --> X(2).__del__ was called
+                    d[2] = yp_None # free d[2] --> X(2).__del__ was called
 
         self.assertRaises(RuntimeError, iter_and_mutate)
 
+    @yp_unittest.skip_dict_order
     def test_reversed(self):
-        d = {"a": 1, "b": 2, "foo": 0, "c": 3, "d": 4}
+        d = yp_dict({"a": 1, "b": 2, "foo": 0, "c": 3, "d": 4})
         del d["foo"]
-        r = reversed(d)
-        self.assertEqual(list(r), list('dcba'))
+        r = yp_reversed(d)
+        self.assertEqual(yp_list(r), yp_list('dcba'))
         self.assertRaises(StopIteration, next, r)
 
+    @yp_unittest.skip_dict_order
     def test_reverse_iterator_for_empty_dict(self):
         # bpo-38525: reversed iterator should work properly
 
         # empty dict is directly used for reference count test
-        self.assertEqual(list(reversed({})), [])
-        self.assertEqual(list(reversed({}.items())), [])
-        self.assertEqual(list(reversed({}.values())), [])
-        self.assertEqual(list(reversed({}.keys())), [])
+        # self.assertEqual(yp_list(yp_reversed({})), yp_list())
+        # self.assertEqual(yp_list(yp_reversed({}.items())), yp_list())
+        # self.assertEqual(yp_list(yp_reversed({}.values())), yp_list())
+        # self.assertEqual(yp_list(yp_reversed({}.keys())), yp_list())
 
         # dict() and {} don't trigger the same code path
-        self.assertEqual(list(reversed(dict())), [])
-        self.assertEqual(list(reversed(dict().items())), [])
-        self.assertEqual(list(reversed(dict().values())), [])
-        self.assertEqual(list(reversed(dict().keys())), [])
+        self.assertEqual(yp_list(yp_reversed(yp_dict())), yp_list())
+        self.assertEqual(yp_list(yp_reversed(yp_dict().items())), yp_list())
+        self.assertEqual(yp_list(yp_reversed(yp_dict().values())), yp_list())
+        self.assertEqual(yp_list(yp_reversed(yp_dict().keys())), yp_list())
 
+    @yp_unittest.skip_dict_order
     def test_reverse_iterator_for_shared_shared_dicts(self):
         class A:
             def __init__(self, x, y):
                 if x: self.x = x
                 if y: self.y = y
 
-        self.assertEqual(list(reversed(A(1, 2).__dict__)), ['y', 'x'])
-        self.assertEqual(list(reversed(A(1, 0).__dict__)), ['x'])
-        self.assertEqual(list(reversed(A(0, 1).__dict__)), ['y'])
+        self.assertEqual(yp_list(yp_reversed(A(1, 2).__dict__)), ['y', 'x'])
+        self.assertEqual(yp_list(yp_reversed(A(1, 0).__dict__)), ['x'])
+        self.assertEqual(yp_list(yp_reversed(A(0, 1).__dict__)), ['y'])
 
+    @yp_unittest.skip_dict_order
     def test_dict_copy_order(self):
         # bpo-34320
         od = collections.OrderedDict([('a', 1), ('b', 2)])
         od.move_to_end('a')
-        expected = list(od.items())
+        expected = yp_list(od.items())
 
-        copy = dict(od)
-        self.assertEqual(list(copy.items()), expected)
+        copy = yp_dict(od)
+        self.assertEqual(yp_list(copy.items()), expected)
 
         # dict subclass doesn't override __iter__
-        class CustomDict(dict):
+        class CustomDict(yp_dict):
             pass
 
         pairs = [('a', 1), ('b', 2), ('c', 3)]
 
         d = CustomDict(pairs)
-        self.assertEqual(pairs, list(dict(d).items()))
+        self.assertEqual(pairs, yp_list(yp_dict(d).items()))
 
-        class CustomReversedDict(dict):
+        class CustomReversedDict(yp_dict):
             def keys(self):
-                return reversed(list(dict.keys(self)))
+                return yp_reversed(yp_list(yp_dict.keys(self)))
 
             __iter__ = keys
 
             def items(self):
-                return reversed(dict.items(self))
+                return yp_reversed(yp_dict.items(self))
 
         d = CustomReversedDict(pairs)
-        self.assertEqual(pairs[::-1], list(dict(d).items()))
+        self.assertEqual(pairs[::-1], yp_list(yp_dict(d).items()))
 
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_dict_items_result_gc(self):
         # bpo-42536: dict.items's tuple-reuse speed trick breaks the GC's
         # assumptions about what can be untracked. Make sure we re-track result
         # tuples whenever we reuse them.
-        it = iter({None: []}.items())
+        it = yp_iter(yp_dict({yp_None: yp_list()}).items())
         gc.collect()
         # That GC collection probably untracked the recycled internal result
         # tuple, which is initialized to (None, None). Make sure it's re-tracked
         # when it's mutated and returned from __next__:
         self.assertTrue(gc.is_tracked(next(it)))
 
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_dict_items_result_gc(self):
         # Same as test_dict_items_result_gc above, but reversed.
-        it = reversed({None: []}.items())
+        it = yp_reversed(yp_dict({yp_None: yp_list()}).items())
         gc.collect()
         self.assertTrue(gc.is_tracked(next(it)))
 
+    @yp_unittest.skip_user_defined_types
     def test_str_nonstr(self):
         # cpython uses a different lookup function if the dict only contains
         # `str` keys. Make sure the unoptimized path is used when a non-`str`
@@ -1564,7 +1600,7 @@ class DictTest(yp_unittest.TestCase):
         # This class compares equal to the string 'key3'
         class Key3:
             def __hash__(self):
-                return hash('key3')
+                return yp_hash('key3')
 
             def __eq__(self, other):
                 nonlocal eq_count
@@ -1577,7 +1613,7 @@ class DictTest(yp_unittest.TestCase):
         key3_2 = Key3()
         key3_3 = Key3()
 
-        dicts = []
+        dicts = yp_list()
 
         # Create dicts of the form `{'key1': 42, 'key2': 43, key3: 44}` in a
         # bunch of different ways. In all cases, `key3` is not of type `str`.
@@ -1588,23 +1624,23 @@ class DictTest(yp_unittest.TestCase):
             dicts.append({'key1': 42, 'key2': 43, key3: 44})
 
             # key3 inserted via `dict.__setitem__`
-            d = {'key1': 42, 'key2': 43}
+            d = yp_dict({'key1': 42, 'key2': 43})
             d[key3] = 44
             dicts.append(d)
 
             # key3 inserted via `dict.setdefault`
-            d = {'key1': 42, 'key2': 43}
+            d = yp_dict({'key1': 42, 'key2': 43})
             self.assertEqual(d.setdefault(key3, 44), 44)
             dicts.append(d)
 
             # key3 inserted via `dict.update`
-            d = {'key1': 42, 'key2': 43}
-            d.update({key3: 44})
+            d = yp_dict({'key1': 42, 'key2': 43})
+            d.update(yp_dict({key3: 44}))
             dicts.append(d)
 
             # key3 inserted via `dict.__ior__`
-            d = {'key1': 42, 'key2': 43}
-            d |= {key3: 44}
+            d = yp_dict({'key1': 42, 'key2': 43})
+            d |= yp_dict({key3: 44})
             dicts.append(d)
 
             # `dict(iterable)`
@@ -1612,7 +1648,7 @@ class DictTest(yp_unittest.TestCase):
                 yield ('key1', 42)
                 yield ('key2', 43)
                 yield (key3, 44)
-            d = dict(make_pairs())
+            d = yp_dict(make_pairs())
             dicts.append(d)
 
             # `dict.copy`
@@ -1620,7 +1656,7 @@ class DictTest(yp_unittest.TestCase):
             dicts.append(d)
 
             # dict comprehension
-            d = {key: 42 + i for i,key in enumerate(['key1', 'key2', key3])}
+            d = yp_dict({key: 42 + i for i,key in enumerate(['key1', 'key2', key3])})
             dicts.append(d)
 
         for d in dicts:
@@ -1656,19 +1692,20 @@ class DictTest(yp_unittest.TestCase):
 class CAPITest(yp_unittest.TestCase):
 
     # Test _PyDict_GetItem_KnownHash()
+    @yp_unittest.skip_not_applicable
     @support.cpython_only
     def test_getitem_knownhash(self):
         from _testcapi import dict_getitem_knownhash
 
-        d = {'x': 1, 'y': 2, 'z': 3}
-        self.assertEqual(dict_getitem_knownhash(d, 'x', hash('x')), 1)
-        self.assertEqual(dict_getitem_knownhash(d, 'y', hash('y')), 2)
-        self.assertEqual(dict_getitem_knownhash(d, 'z', hash('z')), 3)
+        d = yp_dict({'x': 1, 'y': 2, 'z': 3})
+        self.assertEqual(dict_getitem_knownhash(d, 'x', yp_hash('x')), 1)
+        self.assertEqual(dict_getitem_knownhash(d, 'y', yp_hash('y')), 2)
+        self.assertEqual(dict_getitem_knownhash(d, 'z', yp_hash('z')), 3)
 
         # not a dict
-        self.assertRaises(SystemError, dict_getitem_knownhash, [], 1, hash(1))
+        self.assertRaises(SystemError, dict_getitem_knownhash, yp_list(), 1, yp_hash(1))
         # key does not exist
-        self.assertRaises(KeyError, dict_getitem_knownhash, {}, 1, hash(1))
+        self.assertRaises(KeyError, dict_getitem_knownhash, yp_dict(), 1, yp_hash(1))
 
         class Exc(Exception): pass
         class BadEq:
@@ -1678,9 +1715,9 @@ class CAPITest(yp_unittest.TestCase):
                 return 7
 
         k1, k2 = BadEq(), BadEq()
-        d = {k1: 1}
-        self.assertEqual(dict_getitem_knownhash(d, k1, hash(k1)), 1)
-        self.assertRaises(Exc, dict_getitem_knownhash, d, k2, hash(k2))
+        d = yp_dict({k1: 1})
+        self.assertEqual(dict_getitem_knownhash(d, k1, yp_hash(k1)), 1)
+        self.assertRaises(Exc, dict_getitem_knownhash, d, k2, yp_hash(k2))
 
 
 from yp_test import mapping_tests
