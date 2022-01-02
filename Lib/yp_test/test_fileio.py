@@ -19,7 +19,6 @@ import _io  # C implementation of io
 import _pyio # Python implementation of io
 
 
-@yp_unittest.skip_files
 class AutoFileTests:
     # file tests for which a test file is automatically set up
 
@@ -572,6 +571,7 @@ class OtherFileTests:
         os.close(fd)  # should not raise OSError(EBADF)
 
 
+@yp_unittest.skip_files
 class COtherFileTests(OtherFileTests, yp_unittest.TestCase):
     FileIO = _io.FileIO
     modulename = '_io'
@@ -593,6 +593,7 @@ class COtherFileTests(OtherFileTests, yp_unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
+@yp_unittest.skip_files
 class PyOtherFileTests(OtherFileTests, yp_unittest.TestCase):
     FileIO = _pyio.FileIO
     modulename = '_pyio'

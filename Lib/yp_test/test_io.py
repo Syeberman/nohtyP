@@ -1043,6 +1043,7 @@ class PyIOTest(IOTest):
     pass
 
 
+@yp_unittest.skip_files
 @support.cpython_only
 class APIMismatchTest(yp_unittest.TestCase):
 

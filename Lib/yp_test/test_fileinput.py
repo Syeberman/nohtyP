@@ -86,6 +86,7 @@ class LineReader:
     def close(self):
         pass
 
+@yp_unittest.skip_files
 class BufferSizesTests(BaseTests, yp_unittest.TestCase):
     def test_buffer_sizes(self):
 
@@ -1028,6 +1029,7 @@ class Test_hook_encoded(yp_unittest.TestCase):
             check('rb', ['A\n', 'B\r\n', 'C\r', 'D\u20ac'])
 
 
+@yp_unittest.skip_files
 class MiscTest(yp_unittest.TestCase):
 
     def test_all(self):

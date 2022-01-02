@@ -132,6 +132,7 @@ class TestPrint(yp_unittest.TestCase):
         self.assertRaises(RuntimeError, print, 1, file=noflush(), flush=True)
 
 
+@yp_unittest.skip_not_applicable
 class TestPy2MigrationHint(yp_unittest.TestCase):
     """Test that correct hint is produced analogous to Python3 syntax,
     if print statement is executed as in Python 2.
