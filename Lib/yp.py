@@ -450,6 +450,7 @@ yp_func(c_ypObject_p, "yp_dictK", (c_multiK_ypObject_p, ))
 
 # ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...);
 # ypObject *yp_frozendict_fromkeysNV(ypObject *value, int n, va_list args);
+yp_func(c_ypObject_p, "yp_frozendict_fromkeysN", ((c_ypObject_p, "value"), c_multiN_ypObject_p))
 # ypObject *yp_dict_fromkeysN(ypObject *value, int n, ...);
 # ypObject *yp_dict_fromkeysNV(ypObject *value, int n, va_list args);
 yp_func(c_ypObject_p, "yp_dict_fromkeysN", ((c_ypObject_p, "value"), c_multiN_ypObject_p))
@@ -2377,9 +2378,6 @@ class _ypDict(ypObject):
         return yp_str("{%s}" % ", ".join(f"{k!r}: {v!r}" for k, v in self))
     _yp_repr = _yp_str
 
-    @classmethod
-    def fromkeys(cls, seq, value=None): return _yp_dict_fromkeysN(value, *seq)
-
     def keys(self): return _keys_dictview(self)
 
     def values(self): return _values_dictview(self)
@@ -2402,6 +2400,9 @@ class _ypDict(ypObject):
 @pytype(yp_t_frozendict, ())
 class yp_frozendict(_ypDict):
     @classmethod
+    def fromkeys(cls, seq, value=None): return _yp_frozendict_fromkeysN(value, *seq)
+
+    @classmethod
     def _from_python(cls, pyobj):
         if len(pyobj) > (CTYPES_MAX_ARGCOUNT-1) // 2:
             return _yp_frozendict(_yp_item_iter._from_python(pyobj))
@@ -2410,6 +2411,9 @@ class yp_frozendict(_ypDict):
 
 @pytype(yp_t_dict, dict)
 class yp_dict(_ypDict):
+    @classmethod
+    def fromkeys(cls, seq, value=None): return _yp_dict_fromkeysN(value, *seq)
+
     @classmethod
     def _from_python(cls, pyobj):
         if len(pyobj) > (CTYPES_MAX_ARGCOUNT-1) // 2:

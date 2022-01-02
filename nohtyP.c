@@ -13632,8 +13632,7 @@ static ypObject *_ypSet_copy(int type, ypObject *x, int alloclen_fixed)
 // XXX Check for the yp_frozenset_empty case first
 // FIXME We're trusting that copy_visitor will behave properly and return an object that has the
 // same hash as the original and that is unequal to anything else in the other set...bad assumption!
-static ypObject *_ypSet_deepcopy(
-        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
+static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
     // FIXME This will fail if x is modified during the copy: ypSet_LEN and ypSet_TABLE may change!
     yp_ssize_t      keysleft = ypSet_LEN(x);
@@ -13642,7 +13641,7 @@ static ypObject *_ypSet_deepcopy(
     yp_ssize_t      i;
     ypObject *      key;
     ypSet_KeyEntry *loc;
-    ypObject *result;
+    ypObject *      result;
 
     // XXX Unlike _ypTuple_deepcopy, we don't have to worry about sets that contain themselves,
     // which simplifies this greatly.
@@ -15143,8 +15142,7 @@ static ypObject *_ypDict_copy(int type, ypObject *x, int alloclen_fixed)
 // XXX Check for the yp_frozendict_empty case first
 // TODO If x contains quite a lot of waste vis-a-vis unused keys from the keyset, then consider
 // either a) optimizing x first, or b) not sharing the keyset of this object
-static ypObject *_ypDict_deepcopy(
-        int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
+static ypObject *_ypDict_deepcopy(int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
     // TODO We can't use copy_visitor to copy the keys, because it might be
     // _yp_unfrozen_deepcopy_visitor!
@@ -16036,12 +16034,12 @@ static ypTypeObject ypDict_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,       // tp_freeze
-        frozendict_unfrozen_copy,  // tp_unfrozen_copy
-        frozendict_frozen_copy,    // tp_frozen_copy
-        MethodError_traversefunc,  // tp_unfrozen_deepcopy
-        MethodError_traversefunc,  // tp_frozen_deepcopy
-        MethodError_objproc,       // tp_invalidate
+        MethodError_objproc,           // tp_freeze
+        frozendict_unfrozen_copy,      // tp_unfrozen_copy
+        frozendict_frozen_copy,        // tp_frozen_copy
+        frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
+        frozendict_frozen_deepcopy,    // tp_frozen_deepcopy
+        MethodError_objproc,           // tp_invalidate
 
         // Boolean operations and comparisons
         frozendict_bool,             // tp_bool

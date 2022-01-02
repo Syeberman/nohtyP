@@ -18,6 +18,7 @@ class TestCopy(yp_unittest.TestCase):
 
     # Attempt full line coverage of copy.py from top to bottom
 
+    @yp_unittest.skip_not_applicable
     def test_exceptions(self):
         self.assertIs(copy.Error, copy.error)
         self.assertTrue(issubclass(copy.Error, Exception))
@@ -111,11 +112,15 @@ class TestCopy(yp_unittest.TestCase):
         for x in tests:
             self.assertIs(copy.copy(x), x)
 
+    # yp_copy attempts lazy copies (returning the same object)
     def test_copy_atomic_builtins(self):
         tests = [yp_None,
-                 yp_int(42), yp_float(3.14), yp_True, yp_False,
+                 yp_int(42), yp_int(2022), yp_float(3.14), yp_True, yp_False,
+                 yp_dict,
                  yp_str("hello"), yp_str("hello\u1234"),
                  yp_bytes(b"world"), yp_bytes(yp_range(256)), yp_range(10),
+                 yp_tuple(yp_range(5)), yp_frozenset(yp_range(3)),
+                 yp_frozendict.fromkeys(yp_range(2)),
                  yp_chr]
         for x in tests:
             self.assertIs(copy.copy(x), x)
@@ -393,10 +398,10 @@ class TestCopy(yp_unittest.TestCase):
         for x in tests:
             self.assertIs(copy.deepcopy(x), x)
 
+    # yp_deepcopy copies most objects, but the statically-allocated objects are lazy copies.
     def test_deepcopy_atomic_builtins(self):
-        tests = [yp_None, yp_int(42), yp_float(3.14), yp_True, yp_False,
-                 yp_str("hello"), yp_str("hello\u1234"),
-                 yp_range(10), yp_chr]
+        tests = [yp_None, yp_int(42), yp_True, yp_False, yp_dict,
+                 yp_bytes(), yp_str(), yp_tuple(), yp_frozenset(), yp_frozendict(), yp_range(0)]
         for x in tests:
             self.assertIs(copy.deepcopy(x), x)
 
@@ -416,7 +421,7 @@ class TestCopy(yp_unittest.TestCase):
         #     self.assertRaises(RecursionError, op, y, x)
         self.assertIsNot(y, x)
         self.assertIs(y[0], y)
-        self.assertEqual(len(y), 1)
+        self.assertEqual(yp_len(y), 1)
 
     def test_deepcopy_empty_tuple(self):
         x = yp_tuple()
@@ -430,6 +435,9 @@ class TestCopy(yp_unittest.TestCase):
         self.assertIsNot(x, y)
         self.assertIsNot(x[0], y[0])
 
+    # yp_deepcopy copies most objects, as it's used in thread safety, where Python attempts to
+    # lazy copy tuples-of-immutables.
+    @yp_unittest.skip_not_applicable
     def test_deepcopy_tuple_of_immutables(self):
         x = yp_tuple(((1, 2), 3))
         y = copy.deepcopy(x)
@@ -446,6 +454,7 @@ class TestCopy(yp_unittest.TestCase):
         self.assertIsNot(y[0], x[0])
         self.assertIs(y[0][0], y)
 
+    @yp_unittest.skip_dict_deepcopy
     def test_deepcopy_dict(self):
         x = yp_dict({"foo": [1, 2], "bar": 3})
         y = copy.deepcopy(x)
@@ -453,6 +462,7 @@ class TestCopy(yp_unittest.TestCase):
         self.assertIsNot(x, y)
         self.assertIsNot(x["foo"], y["foo"])
 
+    @yp_unittest.skip_dict_deepcopy
     def test_deepcopy_reflexive_dict(self):
         x = yp_dict()
         x['foo'] = x
@@ -464,7 +474,7 @@ class TestCopy(yp_unittest.TestCase):
         #     self.assertRaises(RecursionError, op, y, x)
         self.assertIsNot(y, x)
         self.assertIs(y['foo'], y)
-        self.assertEqual(len(y), 1)
+        self.assertEqual(yp_len(y), 1)
 
     @yp_unittest.skip_deepcopy_memo
     def test_deepcopy_keepalive(self):
@@ -480,14 +490,14 @@ class TestCopy(yp_unittest.TestCase):
         y = copy.deepcopy(x, memo)
         self.assertEqual(y, x)
         # There's the entry for the new list, and the keep alive.
-        self.assertEqual(len(memo), 2)
+        self.assertEqual(yp_len(memo), 2)
 
         memo = {}
         x = [(1, 2)]
         y = copy.deepcopy(x, memo)
         self.assertEqual(y, x)
         # Tuples with immutable contents are immutable for deepcopy.
-        self.assertEqual(len(memo), 2)
+        self.assertEqual(yp_len(memo), 2)
 
     @yp_unittest.skip_user_defined_types
     def test_deepcopy_inst_vanilla(self):
@@ -828,6 +838,7 @@ class TestCopy(yp_unittest.TestCase):
                 raise ValueError("ain't got no stickin' state")
         self.assertRaises(ValueError, copy.copy, EvilState())
 
+    @yp_unittest.skip_function_deepcopy
     def test_copy_function(self):
         self.assertEqual(copy.copy(global_foo), global_foo)
         # def foo(x, y): return x+y
@@ -837,6 +848,7 @@ class TestCopy(yp_unittest.TestCase):
         bar = yp_function.with_parameters(lambda: None, ())
         self.assertEqual(copy.copy(bar), bar)
 
+    @yp_unittest.skip_function_deepcopy
     def test_deepcopy_function(self):
         self.assertEqual(copy.deepcopy(global_foo), global_foo)
         # def foo(x, y): return x+y
@@ -877,10 +889,10 @@ class TestCopy(yp_unittest.TestCase):
         self.assertEqual(v, u)
         self.assertEqual(v[a], b)
         self.assertEqual(v[c], d)
-        self.assertEqual(len(v), 2)
+        self.assertEqual(yp_len(v), 2)
         del c, d
         support.gc_collect()  # For PyPy or other GCs.
-        self.assertEqual(len(v), 1)
+        self.assertEqual(yp_len(v), 1)
         x, y = C(), C()
         # The underlying containers are decoupled
         v[x] = y
@@ -906,14 +918,14 @@ class TestCopy(yp_unittest.TestCase):
         # Keys aren't copied, values are
         v = copy.deepcopy(u)
         self.assertNotEqual(v, u)
-        self.assertEqual(len(v), 2)
+        self.assertEqual(yp_len(v), 2)
         self.assertIsNot(v[a], b)
         self.assertIsNot(v[c], d)
         self.assertEqual(v[a].i, b.i)
         self.assertEqual(v[c].i, d.i)
         del c
         support.gc_collect()  # For PyPy or other GCs.
-        self.assertEqual(len(v), 1)
+        self.assertEqual(yp_len(v), 1)
 
     @yp_unittest.skip_weakref
     def test_deepcopy_weakvaluedict(self):
@@ -927,7 +939,7 @@ class TestCopy(yp_unittest.TestCase):
         # Keys are copied, values aren't
         v = copy.deepcopy(u)
         self.assertNotEqual(v, u)
-        self.assertEqual(len(v), 2)
+        self.assertEqual(yp_len(v), 2)
         (x, y), (z, t) = sorted(v.items(), key=lambda pair: pair[0].i)
         self.assertIsNot(x, a)
         self.assertEqual(x.i, a.i)
@@ -938,7 +950,7 @@ class TestCopy(yp_unittest.TestCase):
         del x, y, z, t
         del d
         support.gc_collect()  # For PyPy or other GCs.
-        self.assertEqual(len(v), 1)
+        self.assertEqual(yp_len(v), 1)
 
     @yp_unittest.skip_user_defined_types
     def test_deepcopy_bound_method(self):
