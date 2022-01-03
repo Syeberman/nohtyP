@@ -4365,6 +4365,11 @@ static ypObject *_ypInt_from_ascii(
     yp_int_t result;
     yp_int_t digit;
 
+    // Verify base
+    if (base < 0 || base == 1 || base > 36) {
+        return yp_ValueError;
+    }
+
     // Skip leading whitespace
     while (1) {
         if (*bytes == '\0') return yp_ValueError;
@@ -4415,9 +4420,8 @@ static ypObject *_ypInt_from_ascii(
     }
     if (base == 0) {
         base = 10;  // a Python literal without a prefix is base 10
-    } else if (base < 2 || base > 36) {
-        return yp_ValueError;
     }
+    yp_ASSERT1(base >= 2 && base <= 36);
 
     // We could be pointing to anything; make sure there's at least one, valid digit.
     // _ypInt_digit_value[*bytes]>=base ensures we stop at the null-terminator, whitespace, and

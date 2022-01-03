@@ -54,7 +54,7 @@ class HashEqualityTestCase(yp_unittest.TestCase):
     def same_hash(self, *objlist):
         # Hash each object given and fail if
         # the hash values are not all the same.
-        hashed = list(map(hash, objlist))
+        hashed = list(map(yp_hash, objlist))
         for h in hashed[1:]:
             if h != hashed[0]:
                 self.fail("hashed values differ: %r" % (objlist,))
@@ -88,7 +88,7 @@ class HashEqualityTestCase(yp_unittest.TestCase):
             for j in range(16):
                 aligned = b[i:128+j]
                 unaligned = memoryview(b)[i:128+j]
-                self.assertEqual(hash(aligned), hash(unaligned))
+                self.assertEqual(yp_hash(aligned), yp_hash(unaligned))
 
 
 _default_hash = object.__hash__
@@ -129,15 +129,15 @@ class HashInheritanceTestCase(yp_unittest.TestCase):
 
     def test_default_hash(self):
         for obj in self.default_expected:
-            self.assertEqual(hash(obj), _default_hash(obj))
+            self.assertEqual(yp_hash(obj), _default_hash(obj))
 
     def test_fixed_hash(self):
         for obj in self.fixed_expected:
-            self.assertEqual(hash(obj), _FIXED_HASH_VALUE)
+            self.assertEqual(yp_hash(obj), _FIXED_HASH_VALUE)
 
     def test_error_hash(self):
         for obj in self.error_expected:
-            self.assertRaises(TypeError, hash, obj)
+            self.assertRaises(TypeError, yp_hash, obj)
 
     def test_hashable(self):
         objects = (self.default_expected +
@@ -168,7 +168,7 @@ class HashBuiltinsTestCase(yp_unittest.TestCase):
     def test_hashes(self):
         _default_hash = object.__hash__
         for obj in self.hashes_to_check:
-            self.assertEqual(hash(obj), _default_hash(obj))
+            self.assertEqual(yp_hash(obj), _default_hash(obj))
 
 class HashRandomizationTests:
 
@@ -176,7 +176,7 @@ class HashRandomizationTests:
     # an object to be tested
 
     def get_hash_command(self, repr_):
-        return 'print(hash(eval(%a)))' % repr_
+        return 'print(yp_hash(eval(%a)))' % repr_
 
     def get_hash(self, repr_, seed=None):
         env = os.environ.copy()
@@ -288,7 +288,7 @@ class StrHashRandomizationTests(StringlikeHashRandomizationTests,
 
     @skip_unless_internalhash
     def test_empty_string(self):
-        self.assertEqual(hash(""), 0)
+        self.assertEqual(yp_hash(""), 0)
 
     @skip_unless_internalhash
     def test_ucs2_string(self):
@@ -305,7 +305,7 @@ class BytesHashRandomizationTests(StringlikeHashRandomizationTests,
 
     @skip_unless_internalhash
     def test_empty_string(self):
-        self.assertEqual(hash(b""), 0)
+        self.assertEqual(yp_hash(b""), 0)
 
 @yp_unittest.skip_hash
 class MemoryviewHashRandomizationTests(StringlikeHashRandomizationTests,
@@ -315,11 +315,11 @@ class MemoryviewHashRandomizationTests(StringlikeHashRandomizationTests,
 
     @skip_unless_internalhash
     def test_empty_string(self):
-        self.assertEqual(hash(memoryview(b"")), 0)
+        self.assertEqual(yp_hash(memoryview(b"")), 0)
 
 class DatetimeTests(HashRandomizationTests):
     def get_hash_command(self, repr_):
-        return 'import datetime; print(hash(%s))' % repr_
+        return 'import datetime; print(yp_hash(%s))' % repr_
 
 @yp_unittest.skip_hash
 class DatetimeDateTests(DatetimeTests, yp_unittest.TestCase):
@@ -346,7 +346,7 @@ class HashDistributionTestCase(yp_unittest.TestCase):
                 s15 = set()
                 s255 = set()
                 for c in range(256):
-                    h = hash(prefix + chr(c))
+                    h = yp_hash(prefix + chr(c))
                     s15.add(h & 0xf)
                     s255.add(h & 0xff)
                 # SipHash24 distribution depends on key, usually > 60%

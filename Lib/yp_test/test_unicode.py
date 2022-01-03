@@ -613,7 +613,7 @@ class UnicodeTest(string_tests.CommonTest,
                 s2 = yp_str('\udb00\udfff')
                 test_lecmp(s, s2)
 
-            # TODO Python has an indentation bug here, contribute back
+            # TODO CPython has an indentation bug here, contribute back
             test_fixup(yp_str('\ue000'))
             test_fixup(yp_str('\uff61'))
 

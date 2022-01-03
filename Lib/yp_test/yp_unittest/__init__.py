@@ -3,6 +3,7 @@ from unittest import *
 from .case import TestCase
 
 # Easy-to-search "skip" decorators for various features we have yet to support.
+skip_array = skip("TODO: Support yp_array?")
 skip_bytes_hex = skip("TODO: Support yp_bytes.fromhex/hex")
 skip_cmp_recursion = skip("TODO: Implement protection against recursion in yp_eq/etc")
 skip_complex = skip("TODO: Implement yp_complex?")
@@ -18,17 +19,17 @@ skip_floats = skip("TODO: Implement yp_float methods")
 skip_func_ascii = skip("TODO: Implement ascii() in nohtyP?")
 skip_function_deepcopy = skip("TODO: Support yp_function.__deepcopy__")
 skip_hash = skip("TODO: Update to test yp_hash")  # TODO It's the tests that need updating
-skip_int_fromstr = skip("TODO: Update to test yp_int from yp_str")  # TODO It's the tests...
 skip_int_fromunicode = skip("TODO: Support non-latin-1 characters in yp_int-from-yp_str")
 skip_int_to_bytes = skip("TODO: Implement yp_int.to_bytes")
+skip_int_underscores = skip("TODO: Support underscores in yp_int")
 skip_list_mutating_iteration = skip("TODO: Support yp_list iteration mutation detection")
 skip_long_ints = skip("TODO: Support unbounded precision in yp_int")
 skip_map = skip("TODO: Implement yp_map")
 skip_marshal = skip("TODO: Implement marshal in nohtyP?")
 skip_math = skip("The math module is not supported in nohtyP")
+skip_memoryview = skip("TODO: Implement memoryview in nohtyP?")
 skip_min = skip("TODO: Implement yp_min/yp_max")
 skip_not_applicable = skip("Not applicable to nohtyP")  # TODO Verify these are truly non-nohtyP
-skip_num_attributes = skip("TODO: Implement real/imag/etc on nohtyP numbers")
 skip_num_methods = skip("TODO: Support overriding the number methods (yp_add/etc) for any object")
 skip_ord = skip("TODO: Support ord in nohtyP")  # TODO Really easy...
 skip_pickling = skip("TODO: Implement nohtyP pickling")

@@ -438,17 +438,17 @@ class TestCase(yp_unittest.TestCase):
     # Test filter()'s use of iterators.
     @yp_unittest.skip_filter
     def test_builtin_filter(self):
-        self.assertEqual(yp_list(filter(None, SequenceClass(5))),
+        self.assertEqual(yp_list(yp_filter(None, SequenceClass(5))),
                          yp_list(range(1, 5)))
-        self.assertEqual(yp_list(filter(None, SequenceClass(0))), [])
-        self.assertEqual(yp_list(filter(None, ())), [])
-        self.assertEqual(yp_list(filter(None, "abc")), ["a", "b", "c"])
+        self.assertEqual(yp_list(yp_filter(None, SequenceClass(0))), [])
+        self.assertEqual(yp_list(yp_filter(None, ())), [])
+        self.assertEqual(yp_list(yp_filter(None, "abc")), ["a", "b", "c"])
 
         d = yp_dict({"one": 1, "two": 2, "three": 3})
-        self.assertEqual(yp_list(filter(None, d)), yp_list(d.keys()))
+        self.assertEqual(yp_list(yp_filter(None, d)), yp_list(d.keys()))
 
-        self.assertRaises(TypeError, filter, None, yp_list)
-        self.assertRaises(TypeError, filter, None, 42)
+        self.assertRaises(TypeError, yp_filter, None, yp_list)
+        self.assertRaises(TypeError, yp_filter, None, 42)
 
         #class Boolean:
         #    def __init__(self, truth):
@@ -480,8 +480,8 @@ class TestCase(yp_unittest.TestCase):
                 return SeqIter(self.vals)
 
         seq = Seq(*([bTrue, bFalse] * 25))
-        self.assertEqual(yp_list(filter(lambda x: not x, seq)), [bFalse]*25)
-        self.assertEqual(yp_list(filter(lambda x: not x, yp_iter(seq))), [bFalse]*25)
+        self.assertEqual(yp_list(yp_filter(lambda x: not x, seq)), [bFalse]*25)
+        self.assertEqual(yp_list(yp_filter(lambda x: not x, yp_iter(seq))), [bFalse]*25)
 
     # Test max() and min()'s use of iterators.
     @yp_unittest.skip_min
@@ -519,11 +519,11 @@ class TestCase(yp_unittest.TestCase):
     # Test map()'s use of iterators.
     @yp_unittest.skip_map
     def test_builtin_map(self):
-        self.assertEqual(yp_list(map(lambda x: x+1, SequenceClass(5))),
+        self.assertEqual(yp_list(yp_map(lambda x: x+1, SequenceClass(5))),
                          yp_list(range(1, 6)))
 
         d = yp_dict({"one": 1, "two": 2, "three": 3})
-        self.assertEqual(yp_list(map(lambda k, d=d: (k, d[k]), d)),
+        self.assertEqual(yp_list(yp_map(lambda k, d=d: (k, d[k]), d)),
                          yp_list(d.items()))
         dkeys = yp_list(d.keys())
         expected = [(i < len(d) and dkeys[i] or None,
@@ -539,7 +539,7 @@ class TestCase(yp_unittest.TestCase):
             f.close()
         f = open(TESTFN, "r", encoding="utf-8")
         try:
-            self.assertEqual(yp_list(map(len, f)), yp_list(range(1, 21, 2)))
+            self.assertEqual(yp_list(yp_map(len, f)), yp_list(range(1, 21, 2)))
         finally:
             f.close()
             try:
