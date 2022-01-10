@@ -24,7 +24,7 @@ class ListTest(list_tests.CommonTest):
         self.assertEqual(yp_list((0, 1, 2, 3)), yp_list([0, 1, 2, 3]))
         self.assertEqual(yp_list(''), yp_list())
         self.assertEqual(yp_list('spam'), yp_list(['s', 'p', 'a', 'm']))
-        self.assertEqual(yp_list(x for x in range(10) if x % 2),
+        self.assertEqual(yp_list(x for x in yp_range(10) if x % 2),
                          yp_list([1, 3, 5, 7, 9]))
 
         if sys.maxsize == 0x7fffffff:
@@ -42,7 +42,7 @@ class ListTest(list_tests.CommonTest):
             # thread for the details:
 
             #     http://sources.redhat.com/ml/newlib/2002/msg00369.html
-            self.assertRaises(MemoryError, yp_list, range(sys.maxsize // 2))
+            self.assertRaises(MemoryError, yp_list, yp_range(sys.maxsize // 2))
 
         # This code used to segfault in Py2.4a3
         x = yp_list()
@@ -51,7 +51,7 @@ class ListTest(list_tests.CommonTest):
 
     def test_keyword_args(self):
         with self.assertRaisesRegex(TypeError, 'keyword argument'):
-            list(sequence=[])
+            yp_list(sequence=[])
 
     def test_truth(self):
         super().test_truth()
@@ -97,7 +97,7 @@ class ListTest(list_tests.CommonTest):
             it, a = pickle.loads(d)
             a[:] = data
             self.assertEqual(type(it), type(itorig))
-            self.assertEqual(list(it), data)
+            self.assertEqual(yp_list(it), data)
 
             # running iterator
             next(itorig)
@@ -105,7 +105,7 @@ class ListTest(list_tests.CommonTest):
             it, a = pickle.loads(d)
             a[:] = data
             self.assertEqual(type(it), type(itorig))
-            self.assertEqual(list(it), data[1:])
+            self.assertEqual(yp_list(it), data[1:])
 
             # empty iterator
             for i in range(1, len(orig)):
@@ -114,14 +114,14 @@ class ListTest(list_tests.CommonTest):
             it, a = pickle.loads(d)
             a[:] = data
             self.assertEqual(type(it), type(itorig))
-            self.assertEqual(list(it), data[len(orig):])
+            self.assertEqual(yp_list(it), data[len(orig):])
 
             # exhausted iterator
             self.assertRaises(StopIteration, next, itorig)
             d = pickle.dumps((itorig, orig), proto)
             it, a = pickle.loads(d)
             a[:] = data
-            self.assertEqual(list(it), [])
+            self.assertEqual(yp_list(it), [])
 
     @yp_unittest.skip_pickling
     def test_reversed_pickle(self):
@@ -134,7 +134,7 @@ class ListTest(list_tests.CommonTest):
             it, a = pickle.loads(d)
             a[:] = data
             self.assertEqual(type(it), type(itorig))
-            self.assertEqual(list(it), data[len(orig)-1::-1])
+            self.assertEqual(yp_list(it), data[len(orig)-1::-1])
 
             # running iterator
             next(itorig)
@@ -142,7 +142,7 @@ class ListTest(list_tests.CommonTest):
             it, a = pickle.loads(d)
             a[:] = data
             self.assertEqual(type(it), type(itorig))
-            self.assertEqual(list(it), data[len(orig)-2::-1])
+            self.assertEqual(yp_list(it), data[len(orig)-2::-1])
 
             # empty iterator
             for i in range(1, len(orig)):
@@ -151,17 +151,17 @@ class ListTest(list_tests.CommonTest):
             it, a = pickle.loads(d)
             a[:] = data
             self.assertEqual(type(it), type(itorig))
-            self.assertEqual(list(it), [])
+            self.assertEqual(yp_list(it), [])
 
             # exhausted iterator
             self.assertRaises(StopIteration, next, itorig)
             d = pickle.dumps((itorig, orig), proto)
             it, a = pickle.loads(d)
             a[:] = data
-            self.assertEqual(list(it), [])
+            self.assertEqual(yp_list(it), [])
 
     def test_step_overflow(self):
-        a = [0, 1, 2, 3, 4]
+        a = yp_list([0, 1, 2, 3, 4])
         a[1::sys.maxsize] = [0]
         self.assertEqual(a[3::sys.maxsize], [3])
 
@@ -173,6 +173,7 @@ class ListTest(list_tests.CommonTest):
         with self.assertRaises(TypeError):
             (3,) + L([1,2])
 
+    @yp_unittest.skip_user_defined_types
     def test_equal_operator_modifying_operand(self):
         # test fix for seg fault reported in bpo-38588 part 2.
         class X:
@@ -198,14 +199,16 @@ class ListTest(list_tests.CommonTest):
         list4 = [1]
         self.assertFalse(list3 == list4)
 
+    @yp_unittest.skip_sys_getsizeof
     @cpython_only
     def test_preallocation(self):
         iterable = [0] * 10
         iter_size = sys.getsizeof(iterable)
 
-        self.assertEqual(iter_size, sys.getsizeof(list([0] * 10)))
-        self.assertEqual(iter_size, sys.getsizeof(list(range(10))))
+        self.assertEqual(iter_size, sys.getsizeof(yp_list([0] * 10)))
+        self.assertEqual(iter_size, sys.getsizeof(yp_list(yp_range(10))))
 
+    @yp_unittest.skip_user_defined_types
     def test_count_index_remove_crashes(self):
         # bpo-38610: The count(), index(), and remove() methods were not
         # holding strong references to list elements while calling
@@ -219,7 +222,7 @@ class ListTest(list_tests.CommonTest):
         with self.assertRaises(ValueError):
             lst.index(lst)
 
-        class L(list):
+        class L(yp_list):
             def __eq__(self, other):
                 str(other)
                 return NotImplemented

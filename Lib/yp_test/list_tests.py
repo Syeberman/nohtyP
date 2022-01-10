@@ -11,6 +11,10 @@ from functools import cmp_to_key
 from yp_test import support, seq_tests
 from yp_test.support import ALWAYS_EQ, NEVER_EQ
 
+# Extra assurance that we're not accidentally testing Python's tuple and list
+def tuple(*args, **kwargs): raise NotImplementedError("convert script to yp_tuple here")
+def list(*args, **kwargs): raise NotImplementedError("convert script to yp_list here")
+
 
 class CommonTest(seq_tests.CommonTest):
 
@@ -73,7 +77,7 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(RecursionError, repr, a)
 
     def test_set_subscript(self):
-        a = self.type2test(range(20))
+        a = self.type2test(yp_range(20))
         self.assertRaises(ValueError, a.__setitem__, slice(0, 10, 0), [1,2,3])
         self.assertRaises(TypeError, a.__setitem__, slice(0, 10), 1)
         self.assertRaises(ValueError, a.__setitem__, slice(0, 10, 2), [1,2])
@@ -84,11 +88,11 @@ class CommonTest(seq_tests.CommonTest):
                                             16, 17, 18, 19]))
 
     def test_reversed(self):
-        a = self.type2test(range(20))
+        a = self.type2test(yp_range(20))
         r = reversed(a)
-        self.assertEqual(list(r), self.type2test(range(19, -1, -1)))
+        self.assertEqual(yp_list(r), self.type2test(yp_range(19, -1, -1)))
         self.assertRaises(StopIteration, next, r)
-        self.assertEqual(list(reversed(self.type2test())),
+        self.assertEqual(yp_list(reversed(self.type2test())),
                          self.type2test())
         # Bug 3689: make sure list-reversed-iterator doesn't have __len__
         self.assertRaises(TypeError, len, reversed([1,2,3]))
@@ -153,10 +157,10 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(TypeError, a.__delitem__)
 
     def test_setslice(self):
-        l = [0, 1]
+        l = yp_list([0, 1])
         a = self.type2test(l)
 
-        for i in range(-3, 4):
+        for i in yp_range(-3, 4):
             a[:i] = l[:i]
             self.assertEqual(a, l)
             a2 = a[:]
@@ -167,7 +171,7 @@ class CommonTest(seq_tests.CommonTest):
             a2 = a[:]
             a2[i:] = a[i:]
             self.assertEqual(a2, a)
-            for j in range(-3, 4):
+            for j in yp_range(-3, 4):
                 a[i:j] = l[i:j]
                 self.assertEqual(a, l)
                 a2 = a[:]
@@ -191,8 +195,8 @@ class CommonTest(seq_tests.CommonTest):
         self.assertEqual(a, self.type2test([1, 1, 2, 3, 4, 5, 5]))
 
         a = self.type2test([])
-        a[:] = tuple(range(10))
-        self.assertEqual(a, self.type2test(range(10)))
+        a[:] = yp_tuple(yp_range(10))
+        self.assertEqual(a, self.type2test(yp_range(10)))
 
         self.assertRaises(TypeError, a.__setitem__, slice(0, 1, 5))
 
@@ -200,7 +204,7 @@ class CommonTest(seq_tests.CommonTest):
 
     def test_setslice_large_growth(self):
         # Tests that _ypTuple_setslice_grow properly handles when a new buffer is allocated
-        a1 = yp_tuple(range(1000,2000))
+        a1 = yp_tuple(yp_range(1000,2000))
         a2 = yp_tuple((a1, ))
         a = yp_list(a2*4)   # data should be inline
         a[1:3] = a1         # data should have moved out, a[1] and a[2] discarded
@@ -271,7 +275,7 @@ class CommonTest(seq_tests.CommonTest):
 
         a = self.type2test("spam")
         a.extend("eggs")
-        self.assertEqual(a, list("spameggs"))
+        self.assertEqual(a, yp_list("spameggs"))
 
         self.assertRaises(TypeError, a.extend, None)
         self.assertRaises(TypeError, a.extend)
@@ -469,6 +473,8 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, u.sort, 42, 42)
 
+    @yp_unittest.skip_user_defined_types
+    def test_sort_cmp_to_key(self):
         def revcmp(a, b):
             if a == b:
                 return 0
@@ -488,11 +494,15 @@ class CommonTest(seq_tests.CommonTest):
                 return -1
             else: # xmod > ymod
                 return 1
-        z = self.type2test(range(12))
+        z = self.type2test(yp_range(12))
         z.sort(key=cmp_to_key(myComparison))
 
+    def test_sort_one_positional_arg(self):
+        z = self.type2test(yp_range(12))
         self.assertRaises(TypeError, z.sort, 2)
 
+    @yp_unittest.skip_user_defined_types
+    def test_sort_self_modifying(self):
         def selfmodifyingComparison(x,y):
             z.append(1)
             if x == y:
@@ -504,12 +514,14 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(ValueError, z.sort,
                           key=cmp_to_key(selfmodifyingComparison))
 
+    def test_sort_many_positional_args(self):
+        z = self.type2test(yp_range(12))
         self.assertRaises(TypeError, z.sort, 42, 42, 42, 42)
 
     def test_slice(self):
         u = self.type2test("spam")
         u[:2] = "h"
-        self.assertEqual(u, list("ham"))
+        self.assertEqual(u, yp_list("ham"))
 
     def test_iadd(self):
         super().test_iadd()
@@ -539,26 +551,26 @@ class CommonTest(seq_tests.CommonTest):
         #  deletion
         del a[::2]
         self.assertEqual(a, self.type2test([1,3]))
-        a = self.type2test(range(5))
+        a = self.type2test(yp_range(5))
         del a[1::2]
         self.assertEqual(a, self.type2test([0,2,4]))
-        a = self.type2test(range(5))
+        a = self.type2test(yp_range(5))
         del a[1::-2]
         self.assertEqual(a, self.type2test([0,2,3,4]))
-        a = self.type2test(range(10))
+        a = self.type2test(yp_range(10))
         del a[::1000]
         self.assertEqual(a, self.type2test([1, 2, 3, 4, 5, 6, 7, 8, 9]))
         #  assignment
-        a = self.type2test(range(10))
+        a = self.type2test(yp_range(10))
         a[::2] = [-1]*5
         self.assertEqual(a, self.type2test([-1, 1, -1, 3, -1, 5, -1, 7, -1, 9]))
-        a = self.type2test(range(10))
+        a = self.type2test(yp_range(10))
         a[::-4] = [10]*3
         self.assertEqual(a, self.type2test([0, 10, 2, 3, 4, 10, 6, 7, 8 ,10]))
-        a = self.type2test(range(4))
+        a = self.type2test(yp_range(4))
         a[::-1] = a
         self.assertEqual(a, self.type2test([3, 2, 1, 0]))
-        a = self.type2test(range(10))
+        a = self.type2test(yp_range(10))
         b = a[:]
         c = a[:]
         a[2:3] = self.type2test(["two", "elements"])
@@ -566,14 +578,14 @@ class CommonTest(seq_tests.CommonTest):
         c[2:3:] = self.type2test(["two", "elements"])
         self.assertEqual(a, b)
         self.assertEqual(a, c)
-        a = self.type2test(range(10))
-        a[::2] = tuple(range(5))
+        a = self.type2test(yp_range(10))
+        a[::2] = yp_tuple(yp_range(5))
         self.assertEqual(a, self.type2test([0, 1, 1, 3, 2, 5, 3, 7, 4, 9]))
 
     @yp_unittest.skip_long_ints
     def test_extendedslicing_long_ints(self):
         # test issue7788
-        a = self.type2test(range(10))
+        a = self.type2test(yp_range(10))
         del a[9::1<<333]
 
     def test_constructor_exception_handling(self):
@@ -581,7 +593,7 @@ class CommonTest(seq_tests.CommonTest):
         class F(object):
             def __iter__(self):
                 raise KeyboardInterrupt
-        self.assertRaises(KeyboardInterrupt, list, F())
+        self.assertRaises(KeyboardInterrupt, yp_list, F())
 
     def test_exhausted_iterator(self):
         a = self.type2test([1, 2, 3])

@@ -1855,6 +1855,9 @@ class yp_int(ypObject):
     def _yp_repr(self): return yp_str(repr(self._asint()))
 
     def bit_length(self): return yp_int(_yp_int_bit_lengthC(self, yp_None))
+
+    # TODO Implement yp_index
+    def __index__(self): return self._asint()
 c_ypObject_p_value("yp_sys_maxint")
 c_ypObject_p_value("yp_sys_minint")
 c_ypObject_p_value("yp_i_neg_one")

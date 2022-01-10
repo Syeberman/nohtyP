@@ -359,11 +359,15 @@ class CommonTest(yp_unittest.TestCase):
         self.assertEqual(a.count(1), 3)
         self.assertEqual(a.count(3), 0)
 
+    @yp_unittest.skip_user_defined_types
+    def test_count_always_never_eq(self):
         self.assertEqual(a.count(ALWAYS_EQ), 9)
         self.assertEqual(self.type2test([ALWAYS_EQ, ALWAYS_EQ]).count(1), 2)
         self.assertEqual(self.type2test([ALWAYS_EQ, ALWAYS_EQ]).count(NEVER_EQ), 2)
         self.assertEqual(self.type2test([NEVER_EQ, NEVER_EQ]).count(ALWAYS_EQ), 0)
 
+    def test_count_no_args(self):
+        a = self.type2test([0, 1, 2])*3
         self.assertRaises(TypeError, a.count)
 
     @yp_unittest.skip_user_defined_types
@@ -397,11 +401,15 @@ class CommonTest(yp_unittest.TestCase):
         self.assertEqual(u.index(0, -3, -2), 3)
         self.assertRaises(ValueError, u.index, 2, 0, -10)
 
+    @yp_unittest.skip_user_defined_types
+    def test_index_always_never_eq(self):
         self.assertEqual(u.index(ALWAYS_EQ), 0)
         self.assertEqual(self.type2test([ALWAYS_EQ, ALWAYS_EQ]).index(1), 0)
         self.assertEqual(self.type2test([ALWAYS_EQ, ALWAYS_EQ]).index(NEVER_EQ), 0)
         self.assertRaises(ValueError, self.type2test([NEVER_EQ, NEVER_EQ]).index, ALWAYS_EQ)
 
+    def test_index_no_args(self):
+        u = self.type2test([-2, -1, 0, 0, 1, 2])
         self.assertRaises(TypeError, u.index)
 
     @yp_unittest.skip_user_defined_types
