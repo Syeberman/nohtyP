@@ -386,6 +386,7 @@ def CollectObjectIDs(ids, obj):
             CollectObjectIDs(ids, v)
     return len(ids)
 
+@yp_unittest.skip_marshal
 class InstancingTestCase(yp_unittest.TestCase, HelperMixin):
     keys = (123, 1.2345, 'abc', (123, 'abc'), frozenset({123, 'abc'}))
 
@@ -482,6 +483,7 @@ class InstancingTestCase(yp_unittest.TestCase, HelperMixin):
         l.append(l)
         self.helper3(l, recursive=True)
 
+@yp_unittest.skip_marshal
 class CompatibilityTestCase(yp_unittest.TestCase):
     def _test(self, version):
         with open(__file__, "rb") as f:
@@ -503,6 +505,7 @@ class CompatibilityTestCase(yp_unittest.TestCase):
     def test3To3(self):
         self._test(3)
 
+@yp_unittest.skip_marshal
 class InterningTestCase(yp_unittest.TestCase, HelperMixin):
     strobj = "this is an interned string"
     strobj = sys.intern(strobj)
@@ -521,6 +524,7 @@ class InterningTestCase(yp_unittest.TestCase, HelperMixin):
         s2 = sys.intern(s)
         self.assertNotEqual(id(s2), id(s))
 
+@yp_unittest.skip_marshal
 @support.cpython_only
 @yp_unittest.skipUnless(_testcapi, 'requires _testcapi')
 class CAPI_TestCase(yp_unittest.TestCase, HelperMixin):
