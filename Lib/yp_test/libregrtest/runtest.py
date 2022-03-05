@@ -19,9 +19,9 @@ from yp_test.libregrtest.utils import clear_caches, format_duration, print_warni
 class TestResult:
     def __init__(
         self,
-        name: str,
-        duration_sec: float = 0.0,
-        xml_data: list[str] | None = None,
+        name,
+        duration_sec = 0.0,
+        xml_data = None,
     ) -> None:
         self.name = name
         self.duration_sec = duration_sec
@@ -41,9 +41,9 @@ class Failed(TestResult):
         self,
         name: str,
         duration_sec: float = 0.0,
-        xml_data: list[str] | None = None,
-        errors: list[tuple[str, str]] | None = None,
-        failures: list[tuple[str, str]] | None = None,
+        xml_data = None,
+        errors = None,
+        failures = None,
     ) -> None:
         super().__init__(name, duration_sec=duration_sec, xml_data=xml_data)
         self.errors = errors

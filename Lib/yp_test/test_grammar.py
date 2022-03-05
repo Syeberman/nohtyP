@@ -764,18 +764,18 @@ class GrammarTests(yp_unittest.TestCase):
         self.assertEqual(f.__annotations__, {'return': list})
 
         # Test expressions as decorators (PEP 614):
-        @False or null
-        def f(x): pass
-        @d := null
-        def f(x): pass
-        @lambda f: null(f)
-        def f(x): pass
-        @[..., null, ...][1]
-        def f(x): pass
-        @null(null)(null)
-        def f(x): pass
-        @[null][0].__call__.__call__
-        def f(x): pass
+        # @False or null
+        # def f(x): pass
+        # @d := null
+        # def f(x): pass
+        # @lambda f: null(f)
+        # def f(x): pass
+        # @[..., null, ...][1]
+        # def f(x): pass
+        # @null(null)(null)
+        # def f(x): pass
+        # @[null][0].__call__.__call__
+        # def f(x): pass
 
         # test closures with a variety of opargs
         closure = 1
@@ -1679,18 +1679,18 @@ class GrammarTests(yp_unittest.TestCase):
         class G: pass
 
         # Test expressions as decorators (PEP 614):
-        @False or class_decorator
-        class H: pass
-        @d := class_decorator
-        class I: pass
-        @lambda c: class_decorator(c)
-        class J: pass
-        @[..., class_decorator, ...][1]
-        class K: pass
-        @class_decorator(class_decorator)(class_decorator)
-        class L: pass
-        @[class_decorator][0].__call__.__call__
-        class M: pass
+        # @False or class_decorator
+        # class H: pass
+        # @d := class_decorator
+        # class I: pass
+        # @lambda c: class_decorator(c)
+        # class J: pass
+        # @[..., class_decorator, ...][1]
+        # class K: pass
+        # @class_decorator(class_decorator)(class_decorator)
+        # class L: pass
+        # @[class_decorator][0].__call__.__call__
+        # class M: pass
 
     def test_dictcomps(self):
         # dictorsetmaker: ( (test ':' test (comp_for |
@@ -1816,73 +1816,73 @@ class GrammarTests(yp_unittest.TestCase):
         self.assertEqual([x for x, in [(4,), (5,), (6,)]], [4, 5, 6])
         self.assertEqual(list(x for x, in [(7,), (8,), (9,)]), [7, 8, 9])
 
-    def test_with_statement(self):
-        class manager(object):
-            def __enter__(self):
-                return (1, 2)
-            def __exit__(self, *args):
-                pass
+    # def test_with_statement(self):
+    #     class manager(object):
+    #         def __enter__(self):
+    #             return (1, 2)
+    #         def __exit__(self, *args):
+    #             pass
 
-        with manager():
-            pass
-        with manager() as x:
-            pass
-        with manager() as (x, y):
-            pass
-        with manager(), manager():
-            pass
-        with manager() as x, manager() as y:
-            pass
-        with manager() as x, manager():
-            pass
+    #     with manager():
+    #         pass
+    #     with manager() as x:
+    #         pass
+    #     with manager() as (x, y):
+    #         pass
+    #     with manager(), manager():
+    #         pass
+    #     with manager() as x, manager() as y:
+    #         pass
+    #     with manager() as x, manager():
+    #         pass
 
-        with (
-            manager()
-        ):
-            pass
+    #     with (
+    #         manager()
+    #     ):
+    #         pass
 
-        with (
-            manager() as x
-        ):
-            pass
+    #     with (
+    #         manager() as x
+    #     ):
+    #         pass
 
-        with (
-            manager() as (x, y),
-            manager() as z,
-        ):
-            pass
+    #     with (
+    #         manager() as (x, y),
+    #         manager() as z,
+    #     ):
+    #         pass
 
-        with (
-            manager(),
-            manager()
-        ):
-            pass
+    #     with (
+    #         manager(),
+    #         manager()
+    #     ):
+    #         pass
 
-        with (
-            manager() as x,
-            manager() as y
-        ):
-            pass
+    #     with (
+    #         manager() as x,
+    #         manager() as y
+    #     ):
+    #         pass
 
-        with (
-            manager() as x,
-            manager()
-        ):
-            pass
+    #     with (
+    #         manager() as x,
+    #         manager()
+    #     ):
+    #         pass
 
-        with (
-            manager() as x,
-            manager() as y,
-            manager() as z,
-        ):
-            pass
+    #     with (
+    #         manager() as x,
+    #         manager() as y,
+    #         manager() as z,
+    #     ):
+    #         pass
 
-        with (
-            manager() as x,
-            manager() as y,
-            manager(),
-        ):
-            pass
+    #     with (
+    #         manager() as x,
+    #         manager() as y,
+    #         manager(),
+    #     ):
+    #         pass
 
     def test_if_else_expr(self):
         # Test ifelse expressions in various cases

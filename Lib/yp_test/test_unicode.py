@@ -68,7 +68,7 @@ class UnicodeTest(string_tests.CommonTest,
 
     def setUp(self):
         codecs.register(search_function)
-        self.addCleanup(codecs.unregister, search_function)
+        # self.addCleanup(codecs.unregister, search_function)
 
     def checkequalnofix(self, result, object, methodname, *args):
         method = getattr(object, methodname)
