@@ -54,6 +54,14 @@
 // Because we allow yp_malloc to be customized, can we lazy-load the malloc library? Are there other
 // libraries we can trim off.
 
+// TODO Invalidation is the only way immutable objects can be mutated. (Is "the only way" true?)
+// However, that breaks various optimizations, like holding a pointer to a tuple's array and looping
+// over it. Consider that while invalidating, the rest of the object's memory should still be in a
+// consistent state. What if invalidating changed the type, replaced all references with yp_None (to
+// break reference cycles, free memory as intended, etc), but otherwise left the memory entirely
+// intact. (If we're replacing with yp_None for tuple/etc, perhaps we replace other data with
+// zeroes, i.e. strs set to null bytes, ints to zero.)
+
 
 #include "nohtyP.h"
 #include <float.h>
@@ -433,7 +441,7 @@ typedef struct {
     objproc      tp_frozen_copy;
     traversefunc tp_unfrozen_deepcopy;
     traversefunc tp_frozen_deepcopy;
-    objproc      tp_invalidate;  // clear, then transmute self to ypInvalidated
+    objproc      tp_invalidate;
 
     // Boolean operations and comparisons
     objproc    tp_bool;
@@ -9193,7 +9201,7 @@ static int _ypBytes_relative_cmp(ypObject *b, ypObject *x)
     yp_ssize_t b_len = ypBytes_LEN(b);
     yp_ssize_t x_len = ypBytes_LEN(x);
     int        cmp = memcmp(ypBytes_DATA(b), ypBytes_DATA(x), MIN(b_len, x_len));
-    if (cmp == 0) cmp = b_len < x_len ? -1 : (b_len > x_len ? 1 : 0);
+    if (cmp == 0) cmp = b_len < x_len ? -1 : (b_len > x_len);
     return cmp;
 }
 static ypObject *bytes_lt(ypObject *b, ypObject *x)
@@ -10066,7 +10074,7 @@ static int _ypStr_relative_cmp(ypObject *s, ypObject *x)
     yp_ssize_t s_len = ypStr_LEN(s);
     yp_ssize_t x_len = ypStr_LEN(x);
     int        cmp = memcmp(ypStr_DATA(s), ypStr_DATA(x), MIN(s_len, x_len));
-    if (cmp == 0) cmp = s_len < x_len ? -1 : (s_len > x_len ? 1 : 0);
+    if (cmp == 0) cmp = s_len < x_len ? -1 : (s_len > x_len);
     return cmp;
 }
 static ypObject *str_lt(ypObject *s, ypObject *x)
@@ -12374,7 +12382,6 @@ ypObject *yp_list_repeatCNV(yp_ssize_t factor, int n, va_list args)
  * XXX This entire section is adapted from Python's listobject.c
  *************************************************************************************************/
 #pragma region timsort
-// FIXME Review this code carefully to ensure it's fully converted to nohtyP
 // clang-format off
 
 /* Lots of code for an adaptive, stable, natural mergesort.  There are many
@@ -12446,22 +12453,91 @@ sortslice_advance(sortslice *slice, yp_ssize_t n)
         slice->values += n;
 }
 
-/* Comparison function: ypObject_RichCompareBool with Py_LT.
+/* Comparison function: ms->key_compare, which is set at run-time in
+ * listsort_impl to optimize for various special cases.
  * Returns -1 on error, 1 if x < y, 0 if x >= y.
  */
-// XXX In Python, this is a macro wrapping ypObject_RichCompareBool
-static int ISLT(ypObject *x, ypObject *y) {
-    ypObject *result = yp_lt(x, y);
-    if (yp_isexceptionC(result)) return -1;  // FIXME don't swallow exception!
-    return ypBool_IS_TRUE_C(result) ? 1 : 0;
-}
+
+#define ISLT(X, Y) (*(ms->key_compare))(X, Y, ms)
 
 /* Compare X to Y via "<".  Goto "fail" if the comparison raises an
    error.  Else "k" is set to true iff X<Y, and an "if (k)" block is
-   started.  It makes more sense in context <wink>.  X and Y are ypObject*s.
+   started.  It makes more sense in context <wink>.  X and Y are PyObject*s.
 */
 #define IFLT(X, Y) if ((k = ISLT(X, Y)) < 0) goto fail;  \
            if (k)
+
+/* The maximum number of entries in a MergeState's pending-runs stack.
+ * This is enough to sort arrays of size up to about
+ *     32 * phi ** MAX_MERGE_PENDING
+ * where phi ~= 1.618.  85 is ridiculouslylarge enough, good for an array
+ * with 2**64 elements.
+ */
+#define MAX_MERGE_PENDING 85
+
+/* When we get into galloping mode, we stay there until both runs win less
+ * often than MIN_GALLOP consecutive times.  See listsort.txt for more info.
+ */
+#define MIN_GALLOP 7
+
+/* Avoid malloc for small temp arrays. */
+#define MERGESTATE_TEMP_SIZE 256
+
+/* One MergeState exists on the stack per invocation of mergesort.  It's just
+ * a convenient way to pass state around among the helper functions.
+ */
+struct s_slice {
+    sortslice base;
+    yp_ssize_t len;
+};
+
+typedef struct s_MergeState MergeState;
+struct s_MergeState {
+    /* This controls when we get *into* galloping mode.  It's initialized
+     * to MIN_GALLOP.  merge_lo and merge_hi tend to nudge it higher for
+     * random data, and lower for highly structured data.
+     */
+    yp_ssize_t min_gallop;
+
+    /* 'a' is temp storage to help with merges.  It contains room for
+     * alloced entries.
+     */
+    sortslice a;        /* may point to temparray below */
+    yp_ssize_t alloced;
+
+    /* A stack of n pending runs yet to be merged.  Run #i starts at
+     * address base[i] and extends for len[i] elements.  It's always
+     * true (so long as the indices are in bounds) that
+     *
+     *     pending[i].base + pending[i].len == pending[i+1].base
+     *
+     * so we could cut the storage for this, but it's a minor amount,
+     * and keeping all the info explicit simplifies the code.
+     */
+    int n;
+    struct s_slice pending[MAX_MERGE_PENDING];
+
+    /* 'a' points to this when possible, rather than muck with malloc. */
+    ypObject *temparray[MERGESTATE_TEMP_SIZE];
+
+    /* This is the function we will use to compare two keys,
+     * even when none of our special cases apply and we have to use
+     * safe_object_compare. */
+    int (*key_compare)(ypObject *, ypObject *, MergeState *);
+
+    /* This function is used by unsafe_object_compare to optimize comparisons
+     * when we know our list is type-homogeneous but we can't assume anything else.
+     * In the pre-sort check it is set equal to Py_TYPE(key)->tp_richcompare */
+    ypObject *(*key_lt)(ypObject *, ypObject *);
+
+    /* This function is used by unsafe_tuple_compare to compare the first elements
+     * of tuples. It may be set to safe_object_compare, but the idea is that hopefully
+     * we can assume more, and use one of the special-case compares. */
+    int (*tuple_elem_compare)(ypObject *, ypObject *, MergeState *);
+
+    /* Set on exception. */
+    ypObject *exc;
+};
 
 /* binarysort is the best method for sorting small arrays: it does
    few compares, but can do data movement quadratic in the number of
@@ -12475,7 +12551,7 @@ static int ISLT(ypObject *x, ypObject *y) {
    the input (nothing is lost or duplicated).
 */
 static int
-binarysort(sortslice lo, ypObject **hi, ypObject **start)
+binarysort(MergeState *ms, sortslice lo, ypObject **hi, ypObject **start)
 {
     yp_ssize_t k;
     ypObject **l, **p, **r;
@@ -12549,7 +12625,7 @@ elements to get out of order).
 Returns -1 in case of error.
 */
 static yp_ssize_t
-count_run(ypObject **lo, ypObject **hi, int *descending)
+count_run(MergeState *ms, ypObject **lo, ypObject **hi, int *descending)
 {
     yp_ssize_t k;
     yp_ssize_t n;
@@ -12604,7 +12680,7 @@ key, and the last n-k should follow key.
 Returns -1 on error.  See listsort.txt for info on the method.
 */
 static yp_ssize_t
-gallop_left(ypObject *key, ypObject **a, yp_ssize_t n, yp_ssize_t hint)
+gallop_left(MergeState *ms, ypObject *key, ypObject **a, yp_ssize_t n, yp_ssize_t hint)
 {
     yp_ssize_t ofs;
     yp_ssize_t lastofs;
@@ -12623,9 +12699,8 @@ gallop_left(ypObject *key, ypObject **a, yp_ssize_t n, yp_ssize_t hint)
         while (ofs < maxofs) {
             IFLT(a[ofs], key) {
                 lastofs = ofs;
+                yp_ASSERT1(ofs <= (yp_SSIZE_T_MAX - 1) / 2);
                 ofs = (ofs << 1) + 1;
-                if (ofs <= 0)                   /* int overflow */
-                    ofs = maxofs;
             }
             else                /* key <= a[hint + ofs] */
                 break;
@@ -12646,9 +12721,8 @@ gallop_left(ypObject *key, ypObject **a, yp_ssize_t n, yp_ssize_t hint)
                 break;
             /* key <= a[hint - ofs] */
             lastofs = ofs;
+            yp_ASSERT1(ofs <= (yp_SSIZE_T_MAX - 1) / 2);
             ofs = (ofs << 1) + 1;
-            if (ofs <= 0)               /* int overflow */
-                ofs = maxofs;
         }
         if (ofs > maxofs)
             ofs = maxofs;
@@ -12695,7 +12769,7 @@ we're sticking to "<" comparisons that it's much harder to follow if
 written as one routine with yet another "left or right?" flag.
 */
 static yp_ssize_t
-gallop_right(ypObject *key, ypObject **a, yp_ssize_t n, yp_ssize_t hint)
+gallop_right(MergeState *ms, ypObject *key, ypObject **a, yp_ssize_t n, yp_ssize_t hint)
 {
     yp_ssize_t ofs;
     yp_ssize_t lastofs;
@@ -12714,9 +12788,8 @@ gallop_right(ypObject *key, ypObject **a, yp_ssize_t n, yp_ssize_t hint)
         while (ofs < maxofs) {
             IFLT(key, *(a-ofs)) {
                 lastofs = ofs;
+                yp_ASSERT1(ofs <= (yp_SSIZE_T_MAX - 1) / 2);
                 ofs = (ofs << 1) + 1;
-                if (ofs <= 0)                   /* int overflow */
-                    ofs = maxofs;
             }
             else                /* a[hint - ofs] <= key */
                 break;
@@ -12738,9 +12811,8 @@ gallop_right(ypObject *key, ypObject **a, yp_ssize_t n, yp_ssize_t hint)
                 break;
             /* a[hint + ofs] <= key */
             lastofs = ofs;
+            yp_ASSERT1(ofs <= (yp_SSIZE_T_MAX - 1) / 2);
             ofs = (ofs << 1) + 1;
-            if (ofs <= 0)               /* int overflow */
-                ofs = maxofs;
         }
         if (ofs > maxofs)
             ofs = maxofs;
@@ -12771,59 +12843,6 @@ fail:
     return -1;
 }
 
-/* The maximum number of entries in a MergeState's pending-runs stack.
- * This is enough to sort arrays of size up to about
- *     32 * phi ** MAX_MERGE_PENDING
- * where phi ~= 1.618.  85 is ridiculouslylarge enough, good for an array
- * with 2**64 elements.
- */
-#define MAX_MERGE_PENDING 85
-
-/* When we get into galloping mode, we stay there until both runs win less
- * often than MIN_GALLOP consecutive times.  See listsort.txt for more info.
- */
-#define MIN_GALLOP 7
-
-/* Avoid malloc for small temp arrays. */
-#define MERGESTATE_TEMP_SIZE 256
-
-/* One MergeState exists on the stack per invocation of mergesort.  It's just
- * a convenient way to pass state around among the helper functions.
- */
-struct s_slice {
-    sortslice base;
-    yp_ssize_t len;
-};
-
-typedef struct s_MergeState {
-    /* This controls when we get *into* galloping mode.  It's initialized
-     * to MIN_GALLOP.  merge_lo and merge_hi tend to nudge it higher for
-     * random data, and lower for highly structured data.
-     */
-    yp_ssize_t min_gallop;
-
-    /* 'a' is temp storage to help with merges.  It contains room for
-     * alloced entries.
-     */
-    sortslice a;        /* may point to temparray below */
-    yp_ssize_t alloced;
-
-    /* A stack of n pending runs yet to be merged.  Run #i starts at
-     * address base[i] and extends for len[i] elements.  It's always
-     * true (so long as the indices are in bounds) that
-     *
-     *     pending[i].base + pending[i].len == pending[i+1].base
-     *
-     * so we could cut the storage for this, but it's a minor amount,
-     * and keeping all the info explicit simplifies the code.
-     */
-    int n;
-    struct s_slice pending[MAX_MERGE_PENDING];
-
-    /* 'a' points to this when possible, rather than muck with malloc. */
-    ypObject *temparray[MERGESTATE_TEMP_SIZE];
-} MergeState;
-
 /* Conceptually a MergeState's constructor. */
 static void
 merge_init(MergeState *ms, yp_ssize_t list_size, int has_keyfunc)
@@ -12851,6 +12870,7 @@ merge_init(MergeState *ms, yp_ssize_t list_size, int has_keyfunc)
     ms->a.keys = ms->temparray;
     ms->n = 0;
     ms->min_gallop = MIN_GALLOP;
+    ms->exc = yp_None;
 }
 
 /* Free all the temp memory owned by the MergeState.  This must be called
@@ -12866,9 +12886,9 @@ merge_freemem(MergeState *ms)
 }
 
 /* Ensure enough temp memory for 'need' array slots is available.
- * Returns yp_None on success and exception if the memory can't be gotten.
+ * Returns 0 on success and -1 if the memory can't be gotten.
  */
-static ypObject *
+static int
 merge_getmem(MergeState *ms, yp_ssize_t need)
 {
     int multiplier;
@@ -12886,7 +12906,8 @@ merge_getmem(MergeState *ms, yp_ssize_t need)
     // FIXME We can use nohtyP's custom realloc code here
     merge_freemem(ms);
     if ((size_t)need > yp_SSIZE_T_MAX / sizeof(ypObject*) / multiplier) {
-        return yp_MemorySizeOverflowError;
+        ms->exc = yp_MemoryError;
+        return -1;
     }
     ms->a.keys = (ypObject**)yp_malloc(&actual, multiplier * need * sizeof(ypObject *));
     if (ms->a.keys != NULL) {
@@ -12895,7 +12916,8 @@ merge_getmem(MergeState *ms, yp_ssize_t need)
             ms->a.values = &ms->a.keys[need];
         return 0;
     }
-    return yp_MemoryError;
+    ms->exc = yp_MemoryError;
+    return -1;
 }
 #define MERGE_GETMEM(MS, NEED) ((NEED) <= (MS)->alloced ? 0 :   \
                                 merge_getmem(MS, NEED))
@@ -12975,7 +12997,7 @@ merge_lo(MergeState *ms, sortslice ssa, yp_ssize_t na,
             yp_ASSERT1(na > 1 && nb > 0);
             min_gallop -= min_gallop > 1;
             ms->min_gallop = min_gallop;
-            k = gallop_right(ssb.keys[0], ssa.keys, na, 0);
+            k = gallop_right(ms, ssb.keys[0], ssa.keys, na, 0);
             acount = k;
             if (k) {
                 if (k < 0)
@@ -12998,7 +13020,7 @@ merge_lo(MergeState *ms, sortslice ssa, yp_ssize_t na,
             if (nb == 0)
                 goto Succeed;
 
-            k = gallop_left(ssa.keys[0], ssb.keys, nb, 0);
+            k = gallop_left(ms, ssa.keys[0], ssb.keys, nb, 0);
             bcount = k;
             if (k) {
                 if (k < 0)
@@ -13113,7 +13135,7 @@ merge_hi(MergeState *ms, sortslice ssa, yp_ssize_t na,
             yp_ASSERT1(na > 0 && nb > 1);
             min_gallop -= min_gallop > 1;
             ms->min_gallop = min_gallop;
-            k = gallop_right(ssb.keys[0], basea.keys, na, na-1);
+            k = gallop_right(ms, ssb.keys[0], basea.keys, na, na-1);
             if (k < 0)
                 goto Fail;
             k = na - k;
@@ -13131,7 +13153,7 @@ merge_hi(MergeState *ms, sortslice ssa, yp_ssize_t na,
             if (nb == 1)
                 goto CopyA;
 
-            k = gallop_left(ssa.keys[0], baseb.keys, nb, nb-1);
+            k = gallop_left(ms, ssa.keys[0], baseb.keys, nb, nb-1);
             if (k < 0)
                 goto Fail;
             k = nb - k;
@@ -13208,7 +13230,7 @@ merge_at(MergeState *ms, yp_ssize_t i)
     /* Where does b start in a?  Elements in a before that can be
      * ignored (already in place).
      */
-    k = gallop_right(*ssb.keys, ssa.keys, na, 0);
+    k = gallop_right(ms, *ssb.keys, ssa.keys, na, 0);
     if (k < 0)
         return -1;
     sortslice_advance(&ssa, k);
@@ -13219,7 +13241,7 @@ merge_at(MergeState *ms, yp_ssize_t i)
     /* Where does a end in b?  Elements in b after that can be
      * ignored (already in place).
      */
-    nb = gallop_left(ssa.keys[na-1], ssb.keys, nb, nb-1);
+    nb = gallop_left(ms, ssa.keys[na-1], ssb.keys, nb, nb-1);
     if (nb <= 0)
         return nb;
 
@@ -13258,8 +13280,8 @@ merge_collapse(MergeState *ms)
                 return -1;
         }
         else if (p[n].len <= p[n+1].len) {
-                 if (merge_at(ms, n) < 0)
-                        return -1;
+            if (merge_at(ms, n) < 0)
+                return -1;
         }
         else
             break;
@@ -13319,22 +13341,202 @@ reverse_sortslice(sortslice *s, yp_ssize_t n)
         _list_reverse_slice(s->values, &s->values[n]);
 }
 
-/* An adaptive, stable, natural mergesort.  See listsort.txt.  Returns yp_None on success, exception
- * on error.  Ignoring the most critical of errors (i.e. out of memory), the list will be some
- * permutation of its input state (nothing is lost or duplicated).
+/* Here we define custom comparison functions to optimize for the cases one commonly
+ * encounters in practice: homogeneous lists, often of one of the basic types. */
+
+/* This struct holds the comparison function and helper functions
+ * selected in the pre-sort check. */
+
+/* These are the special case compare functions.
+ * ms->key_compare will always point to one of these: */
+
+/* Heterogeneous compare: default, always safe to fall back on. */
+static int
+safe_object_compare(ypObject *v, ypObject *w, MergeState *ms)
+{
+    ypObject *result = yp_lt(v, w);
+    if (yp_isexceptionC(result)) {
+        ms->exc = result;
+        return -1;
+    }
+    return ypBool_IS_TRUE_C(result);
+}
+
+/* Homogeneous compare: safe for any two comparable objects of the same type.
+ * (ms->key_richcompare is set to ob_type->tp_richcompare in the
+ *  pre-sort check.)
  */
+// FIXME I don't think there's any advantage over safe_object_compare...remove
+static int
+unsafe_object_compare(ypObject *v, ypObject *w, MergeState *ms)
+{
+    ypObject *res_obj; int res;
+    ypObject *exc = yp_None;
+
+    /* No assumptions, because we check first: */
+    if (ypObject_TYPE(v)->tp_lt != ms->key_lt)
+        return safe_object_compare(v, w, ms);
+
+    yp_ASSERT1(ms->key_lt != NULL);
+    res_obj = (*(ms->key_lt))(v, w);
+
+    if (res_obj == yp_ComparisonNotImplemented) {
+        return safe_object_compare(v, w, ms);
+    }
+    if (yp_isexceptionC(res_obj)) {
+        ms->exc = res_obj;
+        return -1;
+    }
+
+    yp_ASSERT(ypObject_TYPE_CODE(res_obj) == ypBool_CODE,
+        "tp_lt must return yp_True, yp_False, or an exception");
+    res = ypBool_IS_TRUE_C(res_obj);
+
+    /* Note that we can't assert
+     *     res == PyObject_RichCompareBool(v, w, Py_LT);
+     * because of evil compare functions like this:
+     *     lambda a, b:  int(random.random() * 3) - 1)
+     * (which is actually in test_sort.py) */
+    return res;
+}
+
+/* Latin string compare: safe for any two latin (one byte per char) strings. */
+static int
+unsafe_latin_compare(ypObject *v, ypObject *w, MergeState *ms)
+{
+    yp_ssize_t len;
+    int res;
+
+    /* Modified from Objects/unicodeobject.c:unicode_compare, assuming: */
+    yp_ASSERT1(ypObject_TYPE_CODE(v) == ypStr_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(w) == ypStr_CODE);
+    yp_ASSERT1(ypStringLib_ENC_CODE(v) == ypStringLib_ENC_CODE(w));
+    yp_ASSERT1(ypStringLib_ENC_CODE(v) == ypStringLib_ENC_LATIN_1);
+
+    len = MIN(ypStringLib_LEN(v), ypStringLib_LEN(w));
+    res = memcmp(ypStringLib_DATA(v), ypStringLib_DATA(w), len);
+
+    res = (res != 0 ?
+           res < 0 :
+           ypStringLib_LEN(v) < ypStringLib_LEN(w));
+
+    yp_ASSERT1(res == safe_object_compare(v, w, ms));;
+    return res;
+}
+
+/* Bounded int compare: compare any two longs that fit in a single machine word. */
+static int
+unsafe_int_compare(ypObject *v, ypObject *w, MergeState *ms)
+{
+    yp_int_t v0, w0; int res;
+
+    /* Modified from Objects/longobject.c:long_compare, assuming: */
+    yp_ASSERT1(ypObject_TYPE_CODE(v) == ypInt_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(w) == ypInt_CODE);
+
+    v0 = ypInt_VALUE(v);
+    w0 = ypInt_VALUE(w);
+
+    res = v0 < w0;
+    yp_ASSERT1(res == safe_object_compare(v, w, ms));
+    return res;
+}
+
+/* Float compare: compare any two floats. */
+static int
+unsafe_float_compare(ypObject *v, ypObject *w, MergeState *ms)
+{
+    int res;
+
+    /* Modified from Objects/floatobject.c:float_richcompare, assuming: */
+    yp_ASSERT1(ypObject_TYPE_CODE(v) == ypFloat_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(w) == ypFloat_CODE);
+
+    res = ypFloat_VALUE(v) < ypFloat_VALUE(w);
+    yp_ASSERT1(res == safe_object_compare(v, w, ms));
+    return res;
+}
+
+/* Tuple compare: compare *any* two tuples, using
+ * ms->tuple_elem_compare to compare the first elements, which is set
+ * using the same pre-sort check as we use for ms->key_compare,
+ * but run on the list [x[0] for x in L]. This allows us to optimize compares
+ * on two levels (as long as [x[0] for x in L] is type-homogeneous.) The idea is
+ * that most tuple compares don't involve x[1:]. */
+static int
+unsafe_tuple_compare(ypObject *v, ypObject *w, MergeState *ms)
+{
+    yp_ssize_t i, vlen, wlen;
+    int k;
+
+    /* Modified from Objects/tupleobject.c:tuplerichcompare, assuming: */
+    yp_ASSERT1(ypObject_TYPE_CODE(v) == ypTuple_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(w) == ypTuple_CODE);
+    yp_ASSERT1(ypTuple_LEN(v) > 0);
+    yp_ASSERT1(ypTuple_LEN(w) > 0);
+
+    vlen = ypTuple_LEN(v);
+    wlen = ypTuple_LEN(w);
+
+    for (i = 0; i < vlen && i < wlen; i++) {
+        ypObject *result = yp_eq(ypTuple_ARRAY(v)[i], ypTuple_ARRAY(w)[i]);
+        if (yp_isexceptionC(result)) {
+            ms->exc = result;
+            return -1;
+        }
+        k = ypBool_IS_TRUE_C(result);
+        if (!k)
+            break;
+    }
+
+    if (i >= vlen || i >= wlen)
+        return vlen < wlen;
+
+    if (i == 0)
+        return ms->tuple_elem_compare(ypTuple_ARRAY(v)[i], ypTuple_ARRAY(w)[i], ms);
+    else
+        return safe_object_compare(ypTuple_ARRAY(v)[i], ypTuple_ARRAY(w)[i], ms);
+}
+
+/* An adaptive, stable, natural mergesort.  See listsort.txt.
+ * Returns Py_None on success, NULL on error.  Even in case of error, the
+ * list will be some permutation of its input state (nothing is lost or
+ * duplicated).
+ */
+/*[clinic input]
+list.sort
+
+    *
+    key as keyfunc: object = None
+    reverse: bool(accept={int}) = False
+
+Sort the list in ascending order and return None.
+
+The sort is in-place (i.e. the list itself is modified) and stable (i.e. the
+order of two equal elements is maintained).
+
+If a key function is given, apply it once to each list item and sort them,
+ascending or descending, according to their function values.
+
+The reverse flag can be set to sort in descending order.
+[clinic start generated code]*/
+
 static ypObject *
 list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
+/*[clinic end generated code: output=57b9f9c5e23fbe42 input=cb56cd179a713060]*/
 {
     MergeState ms;
     yp_ssize_t nremaining;
     yp_ssize_t minrun;
     sortslice lo;
     ypTuple_detached detached;
-    ypObject *result = yp_None;  // either yp_None, or an exception (both immortal)
+    ypObject *result;
     int reverse;
     yp_ssize_t i;
     ypObject **keys;
+
+    yp_ASSERT1(self != NULL);
+    yp_ASSERT1(ypObject_TYPE_CODE(self) == ypList_CODE);
 
     // Convert arguments
     {
@@ -13390,6 +13592,98 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
         lo.values = detached.array;
     }
 
+
+    /* The pre-sort check: here's where we decide which compare function to use.
+     * How much optimization is safe? We test for homogeneity with respect to
+     * several properties that are expensive to check at compare-time, and
+     * set ms appropriately. */
+    // TODO This strategy may not play well with transmutations (i.e. invalidation).
+    if (detached.len > 1) {
+        /* Assume the first element is representative of the whole list. */
+        int keys_are_in_tuples = (ypObject_TYPE_CODE(lo.keys[0]) == ypTuple_CODE &&
+                                  ypTuple_LEN(lo.keys[0]) > 0);
+
+        int key_type = (keys_are_in_tuples ?
+                                  ypObject_TYPE_CODE(ypTuple_ARRAY(lo.keys[0])[0]) :
+                                  ypObject_TYPE_CODE(lo.keys[0]));
+
+        int keys_are_all_same_type = 1;
+        int strings_are_latin = 1;
+
+        /* Prove that assumption by checking every key. */
+        for (i=0; i < detached.len; i++) {
+
+            if (keys_are_in_tuples &&
+                !(ypObject_TYPE_CODE(lo.keys[i]) == ypTuple_CODE && ypTuple_LEN(lo.keys[i]) != 0)) {
+                keys_are_in_tuples = 0;
+                keys_are_all_same_type = 0;
+                break;
+            }
+
+            /* Note: for lists of tuples, key is the first element of the tuple
+             * lo.keys[i], not lo.keys[i] itself! We verify type-homogeneity
+             * for lists of tuples in the if-statement directly above. */
+            ypObject *key = (keys_are_in_tuples ?
+                             ypTuple_ARRAY(lo.keys[i])[0] :
+                             lo.keys[i]);
+
+            if (ypObject_TYPE_CODE(key) != key_type) {
+                keys_are_all_same_type = 0;
+                /* If keys are in tuple we must loop over the whole list to make
+                   sure all items are tuples */
+                if (!keys_are_in_tuples) {
+                    break;
+                }
+            }
+
+            if (keys_are_all_same_type) {
+                if (key_type == ypStr_CODE &&
+                        strings_are_latin &&
+                        ypStringLib_ENC_CODE(key) != ypStringLib_ENC_LATIN_1) {
+
+                    strings_are_latin = 0;
+                }
+            }
+        }
+
+        /* Choose the best compare, given what we now know about the keys. */
+        if (keys_are_all_same_type) {
+
+            if (key_type == ypStr_CODE && strings_are_latin) {
+                ms.key_compare = unsafe_latin_compare;
+            }
+            else if (key_type == ypInt_CODE) {
+                ms.key_compare = unsafe_int_compare;
+            }
+            else if (key_type == ypFloat_CODE) {
+                ms.key_compare = unsafe_float_compare;
+            }
+            else if ((ms.key_lt = ypTypeTable[key_type]->tp_lt) != NULL) {
+                ms.key_compare = unsafe_object_compare;
+            }
+            else {
+                ms.key_compare = safe_object_compare;
+            }
+        }
+        else {
+            ms.key_compare = safe_object_compare;
+        }
+
+        if (keys_are_in_tuples) {
+            /* Make sure we're not dealing with tuples of tuples
+             * (remember: here, key_type refers list [key[0] for key in keys]) */
+            if (key_type == ypTuple_CODE) {
+                ms.tuple_elem_compare = safe_object_compare;
+            }
+            else {
+                ms.tuple_elem_compare = ms.key_compare;
+            }
+
+            ms.key_compare = unsafe_tuple_compare;
+        }
+    }
+    /* End of pre-sort check: ms is now set properly! */
+
     merge_init(&ms, detached.len, keys != NULL);
 
     nremaining = detached.len;
@@ -13413,7 +13707,7 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
         yp_ssize_t n;
 
         /* Identify next run. */
-        n = count_run(lo.keys, lo.keys + nremaining, &descending);
+        n = count_run(&ms, lo.keys, lo.keys + nremaining, &descending);
         if (n < 0)
             goto fail;
         if (descending)
@@ -13422,7 +13716,7 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
         if (n < minrun) {
             const yp_ssize_t force = nremaining <= minrun ?
                               nremaining : minrun;
-            if (binarysort(lo, lo.keys + force, lo.keys + n) < 0)
+            if (binarysort(&ms, lo, lo.keys + force, lo.keys + n) < 0)
                 goto fail;
             n = force;
         }
@@ -13451,6 +13745,9 @@ succeed:
     result = yp_None;
 
 fail:
+    yp_ASSERT1(yp_isexceptionC(ms.exc));
+    result = ms.exc;
+
     if (keys != NULL) {
         for (i = 0; i < detached.len; i++)
             yp_decref(keys[i]);
