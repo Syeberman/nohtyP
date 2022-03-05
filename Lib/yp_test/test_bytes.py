@@ -75,14 +75,14 @@ class BaseBytesTest:
         self.assertRaises(IndexError, lambda: b[0])
         self.assertRaises(IndexError, lambda: b[1])
         self.assertRaises(IndexError, lambda: b[sys.maxsize])
-        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        # TODO(skip_long_ints)
         #self.assertRaises(IndexError, lambda: b[sys.maxsize+1])
         #self.assertRaises(IndexError, lambda: b[10**100])
         self.assertRaises(IndexError, lambda: b[-1])
         self.assertRaises(IndexError, lambda: b[-2])
         self.assertRaises(IndexError, lambda: b[-sys.maxsize])
         self.assertRaises(IndexError, lambda: b[-sys.maxsize-1])
-        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        # TODO(skip_long_ints)
         #self.assertRaises(IndexError, lambda: b[-sys.maxsize-2])
         #self.assertRaises(IndexError, lambda: b[-10**100])
 
@@ -184,7 +184,8 @@ class BaseBytesTest:
     def test_from_ssize_not_actually_ssize(self):
         self.assertEqual(self.type2test('0', 'ascii'), b'0')
         self.assertEqual(self.type2test(b'0'), b'0')
-        self.assertRaises(OverflowError, self.type2test, sys.maxsize + 1)
+        # TODO(skip_long_ints)
+        #self.assertRaises(OverflowError, self.type2test, sys.maxsize + 1)
 
     def test_constructor_type_errors(self):
         self.assertRaises(TypeError, self.type2test, 0.0)
@@ -213,14 +214,14 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test, [-sys.maxsize])
         self.assertRaises(ValueError, self.type2test, [-sys.maxsize-1])
         self.assertRaises(ValueError, self.type2test, [yp_sys_minint])
-        # XXX nohtyP doesn't currently support long-style ints
+        # TODO(skip_long_ints) nohtyP doesn't currently support long-style ints
         #self.assertRaises(ValueError, self.type2test, [-sys.maxsize-2])
         #self.assertRaises(ValueError, self.type2test, [-10**100])
         self.assertRaises(ValueError, self.type2test, [256])
         self.assertRaises(ValueError, self.type2test, [257])
         self.assertRaises(ValueError, self.type2test, [sys.maxsize])
         self.assertRaises(ValueError, self.type2test, [yp_sys_maxint])
-        # XXX nohtyP doesn't currently support long-style ints
+        # TODO(skip_long_ints) nohtyP doesn't currently support long-style ints
         #self.assertRaises(ValueError, self.type2test, [sys.maxsize+1])
         #self.assertRaises(ValueError, self.type2test, [10**100])
 
@@ -472,7 +473,8 @@ class BaseBytesTest:
         self.assertNotIn(200, b)
         self.assertRaises(ValueError, lambda: 300 in b)
         self.assertRaises(ValueError, lambda: -1 in b)
-        self.assertRaises(ValueError, lambda: sys.maxsize+1 in b)
+        # TODO(skip_long_ints)
+        #self.assertRaises(ValueError, lambda: sys.maxsize+1 in b)
         self.assertRaises(TypeError, lambda: None in b)
         self.assertRaises(TypeError, lambda: float(ord('a')) in b)
         self.assertRaises(TypeError, lambda: "a" in b)
@@ -614,7 +616,7 @@ class BaseBytesTest:
 
         dot_join = self.type2test(b".:").join
         self.assertEqual(dot_join([b"ab", b"cd"]), b"ab.:cd")
-        # XXX memoryview not applicable in nohtyP
+        # TODO(skip_memoryview) memoryview not applicable in nohtyP
         #self.assertEqual(dot_join([memoryview(b"ab"), b"cd"]), b"ab.:cd")
         #self.assertEqual(dot_join([b"ab", memoryview(b"cd")]), b"ab.:cd")
         self.assertEqual(dot_join([yp_bytearray(b"ab"), b"cd"]), b"ab.:cd")
@@ -721,7 +723,7 @@ class BaseBytesTest:
         self.assertEqual(b.find(i, 1, 3), 1)
         self.assertEqual(b.find(w, 1, 3), -1)
 
-        for index in (-1, 256, sys.maxsize + 1):
+        for index in (-1, 256, 1<<63 - 1): # TODO(skip_long_ints)
             self.assertRaisesRegex(
                 ValueError, r'byte must be in range\(0, 256\)',
                 b.find, index)
@@ -1490,7 +1492,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b[3:4] = []
         self.assertEqual(b, yp_bytearray([102, 111, 111, 111, 111]))
 
-        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        # TODO(skip_long_ints)
         for elem in [5, -5, 0, 'str', 2.3, ['a', 'b'], [b'a', b'b'], [[]]]:
             with self.assertRaises(TypeError):
                 b[3:4] = elem
@@ -1534,7 +1536,7 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         self.assertLessEqual(sys.getsizeof(b), size)
 
     def check_extended_set_del_slice(self, sample):
-        # XXX ctypes truncates large ints, making them look valid in nohtyP tests
+        # TODO(skip_long_ints)
         indices = (0, None, 1, 3, 19, 300, -1, -2, -31, -300)
         for start in sample(indices):
             for stop in sample(indices):

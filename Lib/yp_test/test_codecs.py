@@ -2044,6 +2044,7 @@ class BasicUnicodeTest(yp_unittest.TestCase, MixInCheckStateHandling):
                                          "encoding=%r" % encoding)
 
     @support.cpython_only
+    @yp_unittest.skip_not_applicable
     def test_basics_capi(self):
         s = "abc123"  # all codecs should be able to encode these
         for encoding in all_unicode_encodings:
@@ -3440,6 +3441,7 @@ class StreamRecoderTest(yp_unittest.TestCase):
 
 
 @yp_unittest.skipIf(_testcapi is None, 'need _testcapi module')
+@yp_unittest.skip_not_applicable
 class LocaleCodecTest(yp_unittest.TestCase):
     """
     Test indirectly _Py_DecodeUTF8Ex() and _Py_EncodeUTF8Ex().

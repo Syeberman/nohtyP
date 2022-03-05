@@ -1022,7 +1022,8 @@ class LongTest(yp_unittest.TestCase):
         # Other implementations may have a different boundary for overflow,
         # or not raise at all.
         self.assertEqual(yp_int(0) << sys.maxsize, 0)
-        self.assertEqual(yp_int(0) << (sys.maxsize + 1), 0)
+        # TODO(skip_long_ints)
+        # self.assertEqual(yp_int(0) << (sys.maxsize + 1), 0)
 
     @support.cpython_only
     @support.bigmemtest(sys.maxsize + 1000, memuse=2/15 * 2, dry_run=False)
