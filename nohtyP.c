@@ -13619,6 +13619,7 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
 
         /* Prove that assumption by checking every key. */
         for (i=0; i < detached.len; i++) {
+            ypObject *key;
 
             if (keys_are_in_tuples &&
                 !(ypObject_TYPE_CODE(lo.keys[i]) == ypTuple_CODE && ypTuple_LEN(lo.keys[i]) != 0)) {
@@ -13630,7 +13631,7 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
             /* Note: for lists of tuples, key is the first element of the tuple
              * lo.keys[i], not lo.keys[i] itself! We verify type-homogeneity
              * for lists of tuples in the if-statement directly above. */
-            ypObject *key = (keys_are_in_tuples ?
+            key = (keys_are_in_tuples ?
                              ypTuple_ARRAY(lo.keys[i])[0] :
                              lo.keys[i]);
 
