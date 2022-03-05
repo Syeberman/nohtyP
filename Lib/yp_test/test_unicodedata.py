@@ -318,6 +318,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
                 self.assertEqual(len(lines), 1,
                                  r"\u%.4x should not be a linebreak" % i)
 
+@yp_unittest.skip_str_unicode_db
 class NormalizationTest(yp_unittest.TestCase):
     @staticmethod
     def check_version(testfile):
