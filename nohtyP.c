@@ -13362,11 +13362,13 @@ safe_object_compare(ypObject *v, ypObject *w, MergeState *ms)
     return ypBool_IS_TRUE_C(result);
 }
 
+// The unsafe_object_compare optimization is disabled because I doubt this provides any benefit in
+// nohtyP: yp_lt already contains a lot of these optimizations. (TODO But we could profile...)
+#if 0
 /* Homogeneous compare: safe for any two comparable objects of the same type.
  * (ms->key_richcompare is set to ob_type->tp_richcompare in the
  *  pre-sort check.)
  */
-// FIXME I don't think there's any advantage over safe_object_compare...remove
 static int
 unsafe_object_compare(ypObject *v, ypObject *w, MergeState *ms)
 {
@@ -13399,6 +13401,7 @@ unsafe_object_compare(ypObject *v, ypObject *w, MergeState *ms)
      * (which is actually in test_sort.py) */
     return res;
 }
+#endif
 
 /* Latin string compare: safe for any two latin (one byte per char) strings. */
 static int
@@ -13658,9 +13661,11 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
             else if (key_type == ypFloat_CODE) {
                 ms.key_compare = unsafe_float_compare;
             }
+#if 0
             else if ((ms.key_lt = ypTypeTable[key_type]->tp_lt) != NULL) {
                 ms.key_compare = unsafe_object_compare;
             }
+#endif
             else {
                 ms.key_compare = safe_object_compare;
             }
