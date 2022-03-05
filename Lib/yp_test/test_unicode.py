@@ -356,37 +356,37 @@ class UnicodeTest(string_tests.CommonTest,
 
         # various tests switching from ASCII to latin1 or the opposite;
         # same length, remove a letter, or replace with a longer string.
-        self.assertEqual("[a]".translate(str.maketrans('a', 'X')),
+        self.assertEqual("[a]".translate(yp_str.maketrans('a', 'X')),
                          "[X]")
-        self.assertEqual("[a]".translate(str.maketrans({'a': 'X'})),
+        self.assertEqual("[a]".translate(yp_str.maketrans({'a': 'X'})),
                          "[X]")
-        self.assertEqual("[a]".translate(str.maketrans({'a': None})),
+        self.assertEqual("[a]".translate(yp_str.maketrans({'a': None})),
                          "[]")
-        self.assertEqual("[a]".translate(str.maketrans({'a': 'XXX'})),
+        self.assertEqual("[a]".translate(yp_str.maketrans({'a': 'XXX'})),
                          "[XXX]")
-        self.assertEqual("[a]".translate(str.maketrans({'a': '\xe9'})),
+        self.assertEqual("[a]".translate(yp_str.maketrans({'a': '\xe9'})),
                          "[\xe9]")
-        self.assertEqual('axb'.translate(str.maketrans({'a': None, 'b': '123'})),
+        self.assertEqual('axb'.translate(yp_str.maketrans({'a': None, 'b': '123'})),
                          "x123")
-        self.assertEqual('axb'.translate(str.maketrans({'a': None, 'b': '\xe9'})),
+        self.assertEqual('axb'.translate(yp_str.maketrans({'a': None, 'b': '\xe9'})),
                          "x\xe9")
 
         # test non-ASCII (don't take the fast-path)
-        self.assertEqual("[a]".translate(str.maketrans({'a': '<\xe9>'})),
+        self.assertEqual("[a]".translate(yp_str.maketrans({'a': '<\xe9>'})),
                          "[<\xe9>]")
-        self.assertEqual("[\xe9]".translate(str.maketrans({'\xe9': 'a'})),
+        self.assertEqual("[\xe9]".translate(yp_str.maketrans({'\xe9': 'a'})),
                          "[a]")
-        self.assertEqual("[\xe9]".translate(str.maketrans({'\xe9': None})),
+        self.assertEqual("[\xe9]".translate(yp_str.maketrans({'\xe9': None})),
                          "[]")
-        self.assertEqual("[\xe9]".translate(str.maketrans({'\xe9': '123'})),
+        self.assertEqual("[\xe9]".translate(yp_str.maketrans({'\xe9': '123'})),
                          "[123]")
-        self.assertEqual("[a\xe9]".translate(str.maketrans({'a': '<\u20ac>'})),
+        self.assertEqual("[a\xe9]".translate(yp_str.maketrans({'a': '<\u20ac>'})),
                          "[<\u20ac>\xe9]")
 
         # invalid Unicode characters
         invalid_char = 0x10ffff+1
         for before in "a\xe9\u20ac\U0010ffff":
-            mapping = str.maketrans({before: invalid_char})
+            mapping = yp_str.maketrans({before: invalid_char})
             text = "[%s]" % before
             self.assertRaises(ValueError, text.translate, mapping)
 
@@ -485,7 +485,7 @@ class UnicodeTest(string_tests.CommonTest,
         self.checkequalnofix(yp_str('a b c d'),  yp_str(' '), 'join', yp_list(['a', 'b', 'c', 'd']))
         self.checkequalnofix(yp_str('abcd'),     yp_str(''),  'join', yp_tuple(('a', 'b', 'c', 'd')))
         self.checkequalnofix(yp_str('w x y z'),  yp_str(' '), 'join', string_tests.Sequence('wxyz'))
-        # XXX No subclasses in nohtyP (yet)
+        # TODO(skip_user_defined_types) No subclasses in nohtyP (yet)
         #self.checkraises(TypeError, yp_str(' '), 'join', yp_list(['1', '2', MyWrapper('foo')]))
         self.checkraises(TypeError, yp_str(' '), 'join', yp_list(['1', '2', '3', yp_bytes()]))
         self.checkraises(TypeError, yp_str(' '), 'join', yp_list([1, 2, 3]))
@@ -529,17 +529,20 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertIs(text.replace(pattern, pattern), text)
 
     def test_repeat_id_preserving(self):
-        a = '123abc1@'
-        b = '456zyx-+'
-        self.assertEqual(id(a), id(a))
-        self.assertNotEqual(id(a), id(b))
-        self.assertNotEqual(id(a), id(a * -4))
-        self.assertNotEqual(id(a), id(a * 0))
-        self.assertEqual(id(a), id(a * 1))
-        self.assertEqual(id(a), id(1 * a))
-        self.assertNotEqual(id(a), id(a * 2))
+        a = yp_str('123abc1@')
+        b = yp_str('456zyx-+')
+        with self.nohtyPCheck(enabled=False):
+            self.assertEqual(id(a), id(a))
+            self.assertNotEqual(id(a), id(b))
+            self.assertNotEqual(id(a), id(a * -4))
+            self.assertNotEqual(id(a), id(a * 0))
+            self.assertEqual(id(a), id(a * 1))
+            self.assertEqual(id(a), id(1 * a))
+            self.assertNotEqual(id(a), id(a * 2))
 
-        class SubStr(str):
+    @yp_unittest.skip_user_defined_types
+    def test_repeat_id_preserving_user_defined_types(self):
+        class SubStr(yp_str):
             pass
 
         s = SubStr('qwerty()')
@@ -783,6 +786,7 @@ class UnicodeTest(string_tests.CommonTest,
 
     @support.cpython_only
     @support.requires_legacy_unicode_capi
+    @yp_unittest.skip_not_applicable
     def test_isidentifier_legacy(self):
         import _testcapi
         u = '𝖀𝖓𝖎𝖈𝖔𝖉𝖊'
@@ -1541,7 +1545,7 @@ class UnicodeTest(string_tests.CommonTest,
             PI = 3.1415926
         class Int(enum.IntEnum):
             IDES = 15
-        class Str(str, enum.Enum):
+        class Str(yp_str, enum.Enum):
             ABC = 'abc'
         # Testing Unicode formatting strings...
         self.assertEqual("%s, %s" % (Str.ABC, Str.ABC),
@@ -1572,10 +1576,11 @@ class UnicodeTest(string_tests.CommonTest,
         with self.assertRaises(ValueError):
             result = format_string % 2.34
 
+    @yp_unittest.skip_user_defined_types
     def test_issue28598_strsubclass_rhs(self):
         # A subclass of str with an __rmod__ method should be able to hook
         # into the % operator
-        class SubclassedStr(str):
+        class SubclassedStr(yp_str):
             def __rmod__(self, other):
                 return 'Success, self.__rmod__({!r}) was called'.format(other)
         self.assertEqual('lhs %% %r' % SubclassedStr('rhs'),
@@ -1600,7 +1605,7 @@ class UnicodeTest(string_tests.CommonTest,
             with self.assertRaises(TypeError) as cm:
                 meth(['f'])
 
-            # Not applicable to nohtyP (no exception strings)
+            # TODO(skip_exception_messages) Not applicable to nohtyP
             # exc = yp_str(cm.exception)
             # self.assertIn('str', exc)
             # self.assertIn('tuple', exc)
@@ -1646,7 +1651,7 @@ class UnicodeTest(string_tests.CommonTest,
 
         # unicode(obj) is compatible to yp_str():
 
-        o = StringCompat('unicode(obj) is compatible to str()')
+        o = StringCompat('unicode(obj) is compatible to yp_str()')
         self.assertEqual(yp_str(o), 'unicode(obj) is compatible to yp_str()')
         self.assertEqual(yp_str(o), 'unicode(obj) is compatible to yp_str()')
 
@@ -2101,7 +2106,7 @@ class UnicodeTest(string_tests.CommonTest,
         ]
         FFFD = '\ufffd'
         for seq in sequences:
-            self.assertCorrectUTF8Decoding(bytes.fromhex(seq), '\ufffd',
+            self.assertCorrectUTF8Decoding(yp_bytes.fromhex(seq), '\ufffd',
                                            'unexpected end of data')
 
     def test_invalid_cb_for_2bytes_seq(self):
@@ -2123,7 +2128,7 @@ class UnicodeTest(string_tests.CommonTest,
             (yp_str('DF C0'), FFFDx2),              (yp_str('DF FF'), FFFDx2),
         ]
         for seq, res in sequences:
-            self.assertCorrectUTF8Decoding(bytes.fromhex(seq), res,
+            self.assertCorrectUTF8Decoding(yp_bytes.fromhex(seq), res,
                                            'invalid continuation byte')
 
     def test_invalid_cb_for_3bytes_seq(self):
@@ -2181,7 +2186,7 @@ class UnicodeTest(string_tests.CommonTest,
             ('EF BF C0', FFFDx2), ('EF BF FF', FFFDx2),
         ]
         for seq, res in sequences:
-            self.assertCorrectUTF8Decoding(bytes.fromhex(seq), res,
+            self.assertCorrectUTF8Decoding(yp_bytes.fromhex(seq), res,
                                            'invalid continuation byte')
 
     def test_invalid_cb_for_4bytes_seq(self):
@@ -2260,7 +2265,7 @@ class UnicodeTest(string_tests.CommonTest,
             ('F4 8F BF C0', FFFDx2), ('F4 8F BF FF', FFFDx2)
         ]
         for seq, res in sequences:
-            self.assertCorrectUTF8Decoding(bytes.fromhex(seq), res,
+            self.assertCorrectUTF8Decoding(yp_bytes.fromhex(seq), res,
                                            'invalid continuation byte')
 
     @yp_unittest.skip_str_codecs
@@ -2285,7 +2290,7 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertRaises(UnicodeError, yp_str, b'Andr\202 x', 'ascii', 'strict')
         self.assertEqual(yp_str(b'Andr\202 x', 'ascii', 'ignore'), "Andr x")
         self.assertEqual(yp_str(b'Andr\202 x', 'ascii', 'replace'), 'Andr\uFFFD x')
-        self.assertEqual(str(b'\202 x', 'ascii', 'replace'), '\uFFFD x')
+        self.assertEqual(yp_str(b'\202 x', 'ascii', 'replace'), '\uFFFD x')
 
         # Error handling (unknown character names)
         self.assertEqual(b"\\N{foo}xx".decode("unicode-escape", "ignore"), "xx")
@@ -2491,9 +2496,9 @@ class UnicodeTest(string_tests.CommonTest,
             def __str__(self):
                 return self
 
-        self.assertEqual(str(ObjectToStr()), "foo")
-        self.assertEqual(str(StrSubclassToStr("bar")), "foo")
-        s = str(StrSubclassToStrSubclass("foo"))
+        self.assertEqual(yp_str(ObjectToStr()), "foo")
+        self.assertEqual(yp_str(StrSubclassToStr("bar")), "foo")
+        s = yp_str(StrSubclassToStrSubclass("foo"))
         self.assertEqual(s, "foofoo")
         self.assertIs(type(s), StrSubclassToStrSubclass)
         s = StrSubclass(StrSubclassToStrSubclass("foo"))
@@ -2562,6 +2567,7 @@ class UnicodeTest(string_tests.CommonTest,
             self.assertRaises(MemoryError, alloc)
 
     @yp_unittest.skip_str_format
+    @yp_unittest.skip_user_defined_types
     def test_format_subclass(self):
         class S(yp_str):
             def __str__(self):
@@ -2570,20 +2576,22 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertEqual("%s" % s, '__str__ overridden')
         self.assertEqual("{}".format(s), '__str__ overridden')
 
+    @yp_unittest.skip_user_defined_types
     def test_subclass_add(self):
-        class S(str):
+        class S(yp_str):
             def __add__(self, o):
                 return "3"
         self.assertEqual(S("4") + S("5"), "3")
-        class S(str):
+        class S(yp_str):
             def __iadd__(self, o):
                 return "3"
         s = S("1")
         s += "4"
         self.assertEqual(s, "3")
 
+    @yp_unittest.skip_pickling
     def test_getnewargs(self):
-        text = 'abc'
+        text = yp_str('abc')
         args = text.__getnewargs__()
         self.assertIsNot(args[0], text)
         self.assertEqual(args[0], text)
@@ -2591,6 +2599,7 @@ class UnicodeTest(string_tests.CommonTest,
 
     @support.cpython_only
     @support.requires_legacy_unicode_capi
+    @yp_unittest.skip_not_applicable
     def test_resize(self):
         from _testcapi import getargs_u
         for length in range(1, 100, 7):
@@ -2612,82 +2621,87 @@ class UnicodeTest(string_tests.CommonTest,
     def test_compare(self):
         # Issue #17615
         N = 10
-        ascii = 'a' * N
-        ascii2 = 'z' * N
-        latin = '\x80' * N
-        latin2 = '\xff' * N
-        bmp = '\u0100' * N
-        bmp2 = '\uffff' * N
-        astral = '\U00100000' * N
-        astral2 = '\U0010ffff' * N
+        ascii = yp_str('a') * N
+        ascii2 = yp_str('z') * N
+        latin = yp_str('\x80') * N
+        latin2 = yp_str('\xff') * N
+        bmp = yp_str('\u0100') * N
+        bmp2 = yp_str('\uffff') * N
+        astral = yp_str('\U00100000') * N
+        astral2 = yp_str('\U0010ffff') * N
         strings = (
             ascii, ascii2,
             latin, latin2,
             bmp, bmp2,
             astral, astral2)
-        for text1, text2 in itertools.combinations(strings, 2):
-            equal = (text1 is text2)
-            self.assertEqual(text1 == text2, equal)
-            self.assertEqual(text1 != text2, not equal)
 
-            if equal:
-                self.assertTrue(text1 <= text2)
-                self.assertTrue(text1 >= text2)
+        with self.nohtyPCheck(enabled=False):
+            for text1, text2 in itertools.combinations(strings, 2):
+                equal = text1 is text2
+                self.assertEqual(text1 == text2, equal)
+                self.assertEqual(text1 != text2, not equal)
 
-                # text1 is text2: duplicate strings to skip the "str1 == str2"
-                # optimization in unicode_compare_eq() and really compare
-                # character per character
-                copy1 = duplicate_string(text1)
-                copy2 = duplicate_string(text2)
-                self.assertIsNot(copy1, copy2)
+                if equal:
+                    self.assertTrue(text1 <= text2)
+                    self.assertTrue(text1 >= text2)
 
-                self.assertTrue(copy1 == copy2)
-                self.assertFalse(copy1 != copy2)
+                    # text1 is text2: duplicate strings to skip the "str1 == str2"
+                    # optimization in unicode_compare_eq() and really compare
+                    # character per character
+                    copy1 = duplicate_string(text1)
+                    copy2 = duplicate_string(text2)
+                    self.assertIsNot(copy1, copy2)
 
-                self.assertTrue(copy1 <= copy2)
-                self.assertTrue(copy2 >= copy2)
+                    self.assertTrue(copy1 == copy2)
+                    self.assertFalse(copy1 != copy2)
 
-        self.assertTrue(ascii < ascii2)
-        self.assertTrue(ascii < latin)
-        self.assertTrue(ascii < bmp)
-        self.assertTrue(ascii < astral)
-        self.assertFalse(ascii >= ascii2)
-        self.assertFalse(ascii >= latin)
-        self.assertFalse(ascii >= bmp)
-        self.assertFalse(ascii >= astral)
+                    self.assertTrue(copy1 <= copy2)
+                    self.assertTrue(copy2 >= copy2)
 
-        self.assertFalse(latin < ascii)
-        self.assertTrue(latin < latin2)
-        self.assertTrue(latin < bmp)
-        self.assertTrue(latin < astral)
-        self.assertTrue(latin >= ascii)
-        self.assertFalse(latin >= latin2)
-        self.assertFalse(latin >= bmp)
-        self.assertFalse(latin >= astral)
+            # TODO(skip_str_big_chars) Some comparisons are not yet implemented
 
-        self.assertFalse(bmp < ascii)
-        self.assertFalse(bmp < latin)
-        self.assertTrue(bmp < bmp2)
-        self.assertTrue(bmp < astral)
-        self.assertTrue(bmp >= ascii)
-        self.assertTrue(bmp >= latin)
-        self.assertFalse(bmp >= bmp2)
-        self.assertFalse(bmp >= astral)
+            self.assertTrue(ascii < ascii2)
+            self.assertTrue(ascii < latin)
+            # self.assertTrue(ascii < bmp)
+            # self.assertTrue(ascii < astral)
+            self.assertFalse(ascii >= ascii2)
+            self.assertFalse(ascii >= latin)
+            # self.assertFalse(ascii >= bmp)
+            # self.assertFalse(ascii >= astral)
 
-        self.assertFalse(astral < ascii)
-        self.assertFalse(astral < latin)
-        self.assertFalse(astral < bmp2)
-        self.assertTrue(astral < astral2)
-        self.assertTrue(astral >= ascii)
-        self.assertTrue(astral >= latin)
-        self.assertTrue(astral >= bmp2)
-        self.assertFalse(astral >= astral2)
+            self.assertFalse(latin < ascii)
+            self.assertTrue(latin < latin2)
+            # self.assertTrue(latin < bmp)
+            # self.assertTrue(latin < astral)
+            self.assertTrue(latin >= ascii)
+            self.assertFalse(latin >= latin2)
+            # self.assertFalse(latin >= bmp)
+            # self.assertFalse(latin >= astral)
+
+            # self.assertFalse(bmp < ascii)
+            # self.assertFalse(bmp < latin)
+            # self.assertTrue(bmp < bmp2)
+            # self.assertTrue(bmp < astral)
+            # self.assertTrue(bmp >= ascii)
+            # self.assertTrue(bmp >= latin)
+            # self.assertFalse(bmp >= bmp2)
+            # self.assertFalse(bmp >= astral)
+
+            # self.assertFalse(astral < ascii)
+            # self.assertFalse(astral < latin)
+            # self.assertFalse(astral < bmp2)
+            # self.assertTrue(astral < astral2)
+            # self.assertTrue(astral >= ascii)
+            # self.assertTrue(astral >= latin)
+            # self.assertTrue(astral >= bmp2)
+            # self.assertFalse(astral >= astral2)
 
     @yp_unittest.skip_user_defined_types
     def test_free_after_iterating(self):
-        support.check_free_after_iterating(self, iter, str)
-        support.check_free_after_iterating(self, reversed, str)
+        support.check_free_after_iterating(self, iter, yp_str)
+        support.check_free_after_iterating(self, reversed, yp_str)
 
+    @yp_unittest.skip_not_applicable
     def test_check_encoding_errors(self):
         # bpo-37388: str(bytes) and str.decode() must check encoding and errors
         # arguments in dev mode
@@ -2699,14 +2713,14 @@ class UnicodeTest(string_tests.CommonTest,
 
             for data in (b'', b'short string'):
                 try:
-                    str(data, encoding={invalid!r})
+                    yp_str(data, encoding={invalid!r})
                 except LookupError:
                     pass
                 else:
                     sys.exit(21)
 
                 try:
-                    str(data, errors={invalid!r})
+                    yp_str(data, errors={invalid!r})
                 except LookupError:
                     pass
                 else:
@@ -2714,7 +2728,7 @@ class UnicodeTest(string_tests.CommonTest,
 
                 for encoding in encodings:
                     try:
-                        str(data, encoding, errors={invalid!r})
+                        yp_str(data, encoding, errors={invalid!r})
                     except LookupError:
                         pass
                     else:
@@ -2921,12 +2935,12 @@ class CAPITest(yp_unittest.TestCase):
         # test long output
         min_longlong = -(2 ** (8 * sizeof(c_longlong) - 1))
         max_longlong = -min_longlong - 1
-        check_format(str(min_longlong),
+        check_format(yp_str(min_longlong),
                      b'%lld', c_longlong(min_longlong))
-        check_format(str(max_longlong),
+        check_format(yp_str(max_longlong),
                      b'%lld', c_longlong(max_longlong))
         max_ulonglong = 2 ** (8 * sizeof(c_ulonglong)) - 1
-        check_format(str(max_ulonglong),
+        check_format(yp_str(max_ulonglong),
                      b'%llu', c_ulonglong(max_ulonglong))
         PyUnicode_FromFormat(b'%p', c_void_p(-1))
 
@@ -3059,6 +3073,7 @@ class CAPITest(yp_unittest.TestCase):
 
     # Test PyUnicode_AsUCS4()
     @support.cpython_only
+    @yp_unittest.skip_not_applicable
     def test_asucs4(self):
         from _testcapi import unicode_asucs4
         for s in ['abc', '\xa1\xa2', '\u4f60\u597d', 'a\U0001f600',
@@ -3076,6 +3091,7 @@ class CAPITest(yp_unittest.TestCase):
 
     # Test PyUnicode_AsUTF8()
     @support.cpython_only
+    @yp_unittest.skip_not_applicable
     def test_asutf8(self):
         from _testcapi import unicode_asutf8
 
@@ -3090,6 +3106,7 @@ class CAPITest(yp_unittest.TestCase):
 
     # Test PyUnicode_AsUTF8AndSize()
     @support.cpython_only
+    @yp_unittest.skip_not_applicable
     def test_asutf8andsize(self):
         from _testcapi import unicode_asutf8andsize
 
@@ -3104,6 +3121,7 @@ class CAPITest(yp_unittest.TestCase):
 
     # Test PyUnicode_FindChar()
     @support.cpython_only
+    @yp_unittest.skip_not_applicable
     def test_findchar(self):
         from _testcapi import unicode_findchar
 
@@ -3127,6 +3145,7 @@ class CAPITest(yp_unittest.TestCase):
 
     # Test PyUnicode_CopyCharacters()
     @support.cpython_only
+    @yp_unittest.skip_not_applicable
     def test_copycharacters(self):
         from _testcapi import unicode_copycharacters
 
@@ -3170,6 +3189,7 @@ class CAPITest(yp_unittest.TestCase):
 
     @support.cpython_only
     @support.requires_legacy_unicode_capi
+    @yp_unittest.skip_not_applicable
     def test_encode_decimal(self):
         from _testcapi import unicode_encodedecimal
         with warnings_helper.check_warnings():
@@ -3189,6 +3209,7 @@ class CAPITest(yp_unittest.TestCase):
 
     @support.cpython_only
     @support.requires_legacy_unicode_capi
+    @yp_unittest.skip_not_applicable
     def test_transform_decimal(self):
         from _testcapi import unicode_transformdecimaltoascii as transform_decimal
         with warnings_helper.check_warnings():
@@ -3203,6 +3224,7 @@ class CAPITest(yp_unittest.TestCase):
                              '123\u20ac')
 
     @support.cpython_only
+    @yp_unittest.skip_not_applicable
     def test_pep393_utf8_caching_bug(self):
         # Issue #25709: Problem with string concatenation and utf-8 cache
         from _testcapi import getargs_s_hash

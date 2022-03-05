@@ -1931,6 +1931,20 @@ class _ypBytes(ypObject):
             raise TypeError
         return _yp_repeatC(self, factor)
 
+    # TODO When nohtyP has hex/fromhex, use it instead of this faked-out version
+
+    @classmethod
+    def fromhex(cls, s):
+        if isinstance(s, yp_str):
+            s = str(s)
+        return cls(bytes.fromhex(s))
+
+    def hex(self, sep=_yp_arg_missing, bytes_per_sep=1, /):
+        # Python's default value for sep is NULL, i.e. the null pointer, which is not friendly
+        if sep is _yp_arg_missing:
+            return yp_str(self._asbytes().hex())
+        else:
+            return yp_str(self._asbytes().hex(sep, bytes_per_sep))
 
 @pytype(yp_t_bytes, bytes)
 class yp_bytes(_ypBytes):

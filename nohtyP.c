@@ -62,6 +62,10 @@
 // intact. (If we're replacing with yp_None for tuple/etc, perhaps we replace other data with
 // zeroes, i.e. strs set to null bytes, ints to zero.)
 
+// TODO yp_range is an easy, small type...but does it need to be part of core nohtyP.c? I think
+// everything else has a place here, because they are all foundational to all the other types. But
+// I don't want this file ballooning out of control, and I *do* want additional modules (like file,
+// codecs, etc) as optional components that can be loaded in. range fits that bill as well.
 
 #include "nohtyP.h"
 #include <float.h>

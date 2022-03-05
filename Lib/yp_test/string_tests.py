@@ -74,7 +74,7 @@ class BaseTest:
             result,
             realresult
         )
-        # XXX Not applicable to nohtyP
+        # TODO(skip_user_defined_types)
         # if the original is returned make sure that
         # this doesn't happen with subclasses
         #if obj is realresult:
@@ -94,8 +94,8 @@ class BaseTest:
         args = self.fixtype(args)
         with self.assertRaises(exc) as cm:
             getattr(obj, methodname)(*args)
-        # Not applicable to nohtyP
-        #self.assertNotEqual(str(cm.exception), '')
+        # TODO(skip_exception_messages)
+        #self.assertNotEqual(yp_str(cm.exception), '')
 
     # call obj.method(*args) without any checks
     def checkcall(self, obj, methodname, *args):
@@ -205,7 +205,7 @@ class BaseTest:
         self.checkequal(-1, '', 'find', 'xx', sys.maxsize, 0)
 
         # issue 7458
-        # XXX Not applicable to nohtyP: ints don't go up that high
+        # TODO(skip_long_ints)
         #self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
 
     @support.requires_resource('cpu')
@@ -285,7 +285,7 @@ class BaseTest:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
         # issue 7458
-        # XXX Not applicable to nohtyP: ints don't go up that high
+        # TODO(skip_long_ints)
         #self.checkequal(-1, 'ab', 'rfind', 'xxx', sys.maxsize + 1, 0)
 
         # issue #15534
@@ -1104,9 +1104,10 @@ class CommonTest(BaseTest):
         b = self.type2test('')
         for c in a:
             b += c
-            hash(b)
-        self.assertEqual(hash(a), hash(b))
+            yp_hash(b)
+        self.assertEqual(yp_hash(a), yp_hash(b))
 
+    @yp_unittest.skip_str_case
     def test_capitalize_nonascii(self):
         # check that titlecased chars are lowered correctly
         # \u1ffc is the titlecased char
@@ -1146,7 +1147,8 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(False, 'helloworld', 'startswith', 'lowo', 3, 6)
         self.checkequal(True, '', 'startswith', '', 0, 1)
         self.checkequal(True, '', 'startswith', '', 0, 0)
-        self.checkequal(False, '', 'startswith', '', 1, 0)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(True, '', 'startswith', '', 1, 0)
 
         # test negative indices
         self.checkequal(True, yp_str('hello'), 'startswith', 'he', 0, -1)
@@ -1195,7 +1197,8 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(False, 'ab', 'endswith', 'ab', 0, 0)
         self.checkequal(True, '', 'endswith', '', 0, 1)
         self.checkequal(True, '', 'endswith', '', 0, 0)
-        self.checkequal(False, '', 'endswith', '', 1, 0)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(True, '', 'endswith', '', 1, 0)
 
         # test negative indices
         self.checkequal(True, yp_str('hello'), 'endswith', 'lo', -2)
@@ -1327,7 +1330,7 @@ class MixinStrUnicodeUserStringTest:
             self.fixtype(' ').join(f())
         except TypeError as e:
             pass
-            # TODO Support exception messages in nohtyP
+            # TODO(skip_exception_messages)
             #if '+' not in _str(e):
             #    self.fail('join() ate exception message')
         else:

@@ -35,7 +35,7 @@ class TestCase(_unittest.TestCase):
         _unittest.TestCase.__init__(self, *args, **kwargs)
         self._nohtyPCheckEnabled = True
 
-    def nohtyPCheck(self, enabled):
+    def nohtyPCheck(self, *, enabled):
         """Use as a context manager to enable/disable checking for nohtyP types.
 
             with self.nohtyPCheck(enabled=False):

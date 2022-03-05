@@ -4,7 +4,6 @@ from .case import TestCase
 
 # Easy-to-search "skip" decorators for various features we have yet to support.
 skip_array = skip("TODO: Support yp_array?")
-skip_bytes_hex = skip("TODO: Support yp_bytes.fromhex/hex")
 skip_cmp_recursion = skip("TODO: Implement protection against recursion in yp_eq/etc")
 skip_complex = skip("TODO: Implement yp_complex?")
 skip_deepcopy_memo = skip("TODO: Support memo argument in yp_deepcopy")
