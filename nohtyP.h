@@ -2063,7 +2063,7 @@ struct _ypObject {
     _yp_ob_len_t ob_len;         // length of object
     _yp_ob_len_t ob_alloclen;    // allocated length
     yp_hash_t    ob_hash;        // cached hash for immutables
-    void *       ob_data;        // pointer to object data
+    void        *ob_data;        // pointer to object data
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
 
@@ -2127,7 +2127,7 @@ struct _ypStrObject {
     static const char            _##name##_data[] = value;                                 \
     static struct _ypBytesObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
             _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};  \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const         name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO If we populate name->utf_8 on immortals, we are leaking memory. Either don't, or
 // pre-allocate an immortal bytes that we populate later? Or drop the name->utf_8 idea.
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                                               \
