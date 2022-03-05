@@ -44,9 +44,9 @@ class TestBase(yp_unittest.TestCase):
     def testStressfully(self):
         # Try a variety of sizes at and around powers of 2, and at powers of 10.
         sizes = [0]
-        for power in range(1, 10):
+        for power in yp_range(1, 10):
             n = 2 ** power
-            sizes.extend(range(n-1, n+2))
+            sizes.extend(yp_range(n-1, n+2))
         sizes.extend([10, 100, 1000])
 
         class Complains(object):
@@ -92,26 +92,28 @@ class TestBase(yp_unittest.TestCase):
             random.shuffle(s)
             check("random permutation", x, s)
 
-            y = x[:]
-            y.reverse()
-            s = x[:]
-            check("reversed via function", y, s, lambda a, b: (b>a)-(b<a))
+            # TODO(skip_user_defined_types) nohtyP lists don't store user-defined types (cmp_to_key)
+            # y = x[:]
+            # y.reverse()
+            # s = x[:]
+            # check("reversed via function", y, s, lambda a, b: (b>a)-(b<a))
 
-            # FIXME REWORK: nohtyP lists don't store user-defined types (cmp_to_key)
+            # TODO(skip_user_defined_types) nohtyP lists don't store user-defined types (cmp_to_key)
             # if verbose:
             #     print("    Checking against an insane comparison function.")
             #     print("        If the implementation isn't careful, this may segfault.")
             # s = x[:]
-            # s.sort(key=cmp_to_key(lambda a, b:  int(random.random() * 3) - 1))
+            # s.sort(key=cmp_to_key(lambda a, b:  yp_int(random.random() * 3) - 1))
             # check("an insane function left some permutation", x, s)
 
-            if len(x) >= 2:
-                def bad_key(x):
-                    raise RuntimeError
-                s = x[:]
-                self.assertRaises(RuntimeError, s.sort, key=bad_key)
+            # TODO(skip_user_defined_types) nohtyP lists don't store user-defined types (bad_key)
+            # if len(x) >= 2:
+            #     def bad_key(x):
+            #         raise RuntimeError
+            #     s = x[:]
+            #     self.assertRaises(RuntimeError, s.sort, key=bad_key)
 
-            # FIXME REWORK: nohtyP lists don't store user-defined types (Complains)
+            # TODO(skip_user_defined_types) nohtyP lists don't store user-defined types (Complains)
             # x = yp_list(Complains(i) for i in x)
             # s = x[:]
             # random.shuffle(s)
@@ -125,8 +127,8 @@ class TestBase(yp_unittest.TestCase):
             #     Complains.maybe_complain = False
             #     check("exception during sort left some permutation", x, s)
 
-            # FIXME REWORK: nohtyP lists don't store user-defined types (Stable)
-            # s = yp_list(Stable(random.randrange(10), i) for i in range(n))
+            # TODO(skip_user_defined_types) nohtyP lists don't store user-defined types (Stable)
+            # s = yp_list(Stable(random.randrange(10), i) for i in yp_range(n))
             # augmented = yp_list((e, e.index) for e in s)
             # augmented.sort()    # forced stable because ties broken by index
             # x = yp_list(e for e, i in augmented) # a stable sort of s
@@ -150,14 +152,14 @@ class TestBugs(yp_unittest.TestCase):
                     L.append(3)
                 return random.random() < 0.5
 
-        L = yp_list(C() for i in range(50))
+        L = yp_list(C() for i in yp_range(50))
         self.assertRaises(ValueError, L.sort)
 
     @yp_unittest.skip_user_defined_types
     def test_undetected_mutation(self):
         # Python 2.4a1 did not always detect mutation
         memorywaster = yp_list()
-        for i in range(20):
+        for i in yp_range(20):
             def mutating_cmp(x, y):
                 L.append(3)
                 L.pop()
@@ -180,7 +182,7 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
         data = 'The quick Brown fox Jumped over The lazy Dog'.split()
         copy = data[:]
         random.shuffle(data)
-        data.sort(key=str.lower)
+        data.sort(key=yp_str.lower)
         def my_cmp(x, y):
             xlower, ylower = x.lower(), y.lower()
             return (xlower > ylower) - (xlower < ylower)
@@ -191,7 +193,7 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
         self.assertRaises(TypeError, data.sort, key=lambda x,y: 0)
 
     def test_stability(self):
-        data = yp_list((random.randrange(100), i) for i in range(200))
+        data = yp_list((random.randrange(100), i) for i in yp_range(200))
         copy = data[:]
         data.sort(key=lambda t: t[0])   # sort on the random first field
         copy.sort()                     # sort using both fields
@@ -253,7 +255,7 @@ class TestDecorateSortUndecorate(yp_unittest.TestCase):
 
     @yp_unittest.skip_user_defined_types
     def test_reverse_stability(self):
-        data = yp_list((random.randrange(100), i) for i in range(200))
+        data = yp_list((random.randrange(100), i) for i in yp_range(200))
         copy1 = data[:]
         copy2 = data[:]
         def my_cmp(x, y):
@@ -288,55 +290,56 @@ def check_against_PyObject_RichCompareBool(self, L):
     random.seed(0)
     random.shuffle(L)
     L_1 = L[:]
-    L_2 = [(x,) for x in L]
-    L_3 = [((x,),) for x in L]
+    L_2 = yp_list((x,) for x in L)
+    L_3 = yp_list(((x,),) for x in L)
     for L in [L_1, L_2, L_3]:
-        optimized = sorted(L)
-        reference = [y[1] for y in sorted([(0,x) for x in L])]
+        optimized = yp_sorted(L)
+        reference = yp_list(y[1] for y in yp_sorted(yp_list((0,x) for x in L)))
         for (opt, ref) in zip(optimized, reference):
             self.assertIs(opt, ref)
             #note: not assertEqual! We want to ensure *identical* behavior.
 
 class TestOptimizedCompares(yp_unittest.TestCase):
     def test_safe_object_compare(self):
-        heterogeneous_lists = [[0, 'foo'],
-                               [0.0, 'foo'],
-                               [('foo',), 'foo']]
+        heterogeneous_lists = [yp_list([0, 'foo']),
+                               yp_list([0.0, 'foo']),
+                               yp_list([('foo',), 'foo'])]
         for L in heterogeneous_lists:
             self.assertRaises(TypeError, L.sort)
-            self.assertRaises(TypeError, [(x,) for x in L].sort)
-            self.assertRaises(TypeError, [((x,),) for x in L].sort)
+            self.assertRaises(TypeError, yp_list((x,) for x in L).sort)
+            self.assertRaises(TypeError, yp_list(((x,),) for x in L).sort)
 
-        float_int_lists = [[1,1.1],
-                           [1<<70,1.1],
-                           [1.1,1],
-                           [1.1,1<<70]]
+        float_int_lists = [yp_list([1,1.1]),
+                           yp_list([1<<62,1.1]), # TODO(skip_long_ints)
+                           yp_list([1.1,1]),
+                           yp_list([1.1,1<<62])] # TODO(skip_long_ints)
         for L in float_int_lists:
             check_against_PyObject_RichCompareBool(self, L)
 
+    @yp_unittest.skip_user_defined_types
     def test_unsafe_object_compare(self):
 
         # This test is by ppperry. It ensures that unsafe_object_compare is
         # verifying ms->key_richcompare == tp->richcompare before comparing.
 
-        class WackyComparator(int):
+        class WackyComparator(yp_int):
             def __lt__(self, other):
                 elem.__class__ = WackyList2
-                return int.__lt__(self, other)
+                return yp_int.__lt__(self, other)
 
-        class WackyList1(list):
+        class WackyList1(yp_list):
             pass
 
-        class WackyList2(list):
+        class WackyList2(yp_list):
             def __lt__(self, other):
                 raise ValueError
 
-        L = [WackyList1([WackyComparator(i), i]) for i in range(10)]
+        L = [WackyList1([WackyComparator(i), i]) for i in yp_range(10)]
         elem = L[-1]
         with self.assertRaises(ValueError):
             L.sort()
 
-        L = [WackyList1([WackyComparator(i), i]) for i in range(10)]
+        L = [WackyList1([WackyComparator(i), i]) for i in yp_range(10)]
         elem = L[-1]
         with self.assertRaises(ValueError):
             [(x,) for x in L].sort()
@@ -352,25 +355,26 @@ class TestOptimizedCompares(yp_unittest.TestCase):
 
         # The following tests go through various types that would trigger
         # ms->key_compare = unsafe_object_compare
-        lists = [list(range(100)) + [(1<<70)],
-                 [str(x) for x in range(100)] + ['\uffff'],
-                 [bytes(x) for x in range(100)],
-                 [cmp_to_key(lambda x,y: x<y)(x) for x in range(100)]]
+        lists = [yp_list(yp_range(100)) + [(1<<70)],
+                 [yp_str(x) for x in yp_range(100)] + ['\uffff'],
+                 [yp_bytes(x) for x in yp_range(100)],
+                 [cmp_to_key(lambda x,y: x<y)(x) for x in yp_range(100)]]
         for L in lists:
             check_against_PyObject_RichCompareBool(self, L)
 
     def test_unsafe_latin_compare(self):
-        check_against_PyObject_RichCompareBool(self, [str(x) for
-                                                      x in range(100)])
+        check_against_PyObject_RichCompareBool(self, yp_list(yp_str(x) for
+                                                      x in yp_range(100)))
 
     def test_unsafe_long_compare(self):
-        check_against_PyObject_RichCompareBool(self, [x for
-                                                      x in range(100)])
+        check_against_PyObject_RichCompareBool(self, yp_list(x for
+                                                      x in yp_range(100)))
 
     def test_unsafe_float_compare(self):
-        check_against_PyObject_RichCompareBool(self, [float(x) for
-                                                      x in range(100)])
+        check_against_PyObject_RichCompareBool(self, yp_list(yp_float(x) for
+                                                      x in yp_range(100)))
 
+    @yp_unittest.skip_float_nan
     def test_unsafe_tuple_compare(self):
         # This test was suggested by Tim Peters. It verifies that the tuple
         # comparison respects the current tuple compare semantics, which do not
@@ -379,9 +383,9 @@ class TestOptimizedCompares(yp_unittest.TestCase):
         # Note that we don't have to put anything in tuples here, because
         # the check function does a tuple test automatically.
 
-        check_against_PyObject_RichCompareBool(self, [float('nan')]*100)
-        check_against_PyObject_RichCompareBool(self, [float('nan') for
-                                                      _ in range(100)])
+        check_against_PyObject_RichCompareBool(self, yp_list([float('nan')])*100)
+        check_against_PyObject_RichCompareBool(self, yp_list(float('nan') for
+                                                      _ in yp_range(100)))
 
     def test_not_all_tuples(self):
         self.assertRaises(TypeError, [(1.0, 1.0), (False, "A"), 6].sort)

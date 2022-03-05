@@ -13743,11 +13743,13 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
 
 succeed:
     result = yp_None;
+    goto exit;
 
 fail:
     yp_ASSERT1(yp_isexceptionC(ms.exc));
     result = ms.exc;
 
+exit:
     if (keys != NULL) {
         for (i = 0; i < detached.len; i++)
             yp_decref(keys[i]);
