@@ -206,6 +206,7 @@ class Mapping:
         return obj
 
 
+@yp_unittest.skip_template
 class TestTemplate(yp_unittest.TestCase):
     def test_regular_templates(self):
         s = Template('$who likes to eat a bag of $what worth $$100')
