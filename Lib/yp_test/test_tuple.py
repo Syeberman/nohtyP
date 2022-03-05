@@ -36,7 +36,7 @@ class TupleTest(seq_tests.CommonTest):
         self.assertEqual(yp_tuple(), yp_tuple())
         t0_3 = yp_tuple((0, 1, 2, 3))
         t0_3_bis = yp_tuple(t0_3)
-        self.assertTrue(t0_3 is t0_3_bis)
+        self.assertIs(t0_3, t0_3_bis)
         self.assertEqual(yp_tuple([]), yp_tuple(()))
         self.assertEqual(yp_tuple([0, 1, 2, 3]), yp_tuple((0, 1, 2, 3)))
         self.assertEqual(yp_tuple(''), yp_tuple())
