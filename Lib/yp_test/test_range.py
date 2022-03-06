@@ -381,8 +381,7 @@ class RangeTest(yp_unittest.TestCase):
     def test_count_long_ints(self):
         self.assertEqual(yp_range(10**20).count(1), 1)
         self.assertEqual(yp_range(10**20).count(10**20), 0)
-        # What's index doing here?
-        # self.assertEqual(yp_range(3).index(1), 1)
+        # self.assertEqual(yp_range(3).index(1), 1) # ? Why is this here...
         self.assertEqual(yp_range(1, 2**100, 2).count(2**87), 0)
         self.assertEqual(yp_range(1, 2**100, 2).count(2**87+1), 1)
 
@@ -390,7 +389,8 @@ class RangeTest(yp_unittest.TestCase):
     def test_count_always_equal(self):
         self.assertEqual(yp_range(10).count(ALWAYS_EQ), 10)
 
-        self.assertEqual(yp_len(yp_range(sys.maxsize, sys.maxsize+10)), 10)
+        # ? Why is this here...
+        # self.assertEqual(yp_len(yp_range(sys.maxsize, sys.maxsize+10)), 10)
 
     def test_repr(self):
         self.assertEqual(yp_repr(yp_range(1)), 'range(0, 1)')

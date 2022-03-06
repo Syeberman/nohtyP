@@ -13969,7 +13969,7 @@ static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, 
 
     // XXX Unlike _ypTuple_deepcopy, we don't have to worry about sets that contain themselves,
     // which simplifies this greatly.
-    so = _ypSet_new(type, keysleft, TRUE);
+    so = _ypSet_new(type, keysleft, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(so)) return so;
 
     // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean.

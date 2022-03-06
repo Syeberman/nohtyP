@@ -15,7 +15,6 @@ skip_exception_messages = skip("TODO: Support exception instances (with messages
 skip_files = skip("TODO: Implement files in nohtyP")
 skip_filter = skip("TODO: Implement yp_filter")
 skip_floats = skip("TODO: Implement yp_float methods")
-skip_float_nan = skip("TODO: Support nan (float)")
 skip_func_ascii = skip("TODO: Implement ascii() in nohtyP?")
 skip_function_deepcopy = skip("TODO: Support yp_function.__deepcopy__")
 skip_hash = skip("TODO: Update to test yp_hash")  # TODO It's the tests that need updating

@@ -7,8 +7,9 @@ from yp_test import support
 from yp_test.test_grammar import (VALID_UNDERSCORE_LITERALS,
                                INVALID_UNDERSCORE_LITERALS)
 
-# Extra assurance that we're not accidentally testing Python's int
+# Extra assurance that we're not accidentally testing Python's int/etc
 def int(*args, **kwargs): raise NotImplementedError("convert script to yp_int here")
+def float(*args, **kwargs): raise NotImplementedError("convert script to yp_float here")
 
 L = [
         ('0', yp_int(0)),

@@ -374,7 +374,7 @@ class TestOptimizedCompares(yp_unittest.TestCase):
         check_against_PyObject_RichCompareBool(self, yp_list(yp_float(x) for
                                                       x in yp_range(100)))
 
-    @yp_unittest.skip_float_nan
+    @yp_unittest.skip_floats
     def test_unsafe_tuple_compare(self):
         # This test was suggested by Tim Peters. It verifies that the tuple
         # comparison respects the current tuple compare semantics, which do not

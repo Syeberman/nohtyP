@@ -13,6 +13,10 @@ from yp_test.test_grammar import (VALID_UNDERSCORE_LITERALS,
                                INVALID_UNDERSCORE_LITERALS)
 from math import isinf, isnan, copysign, ldexp
 
+# TODO(skip_floats) Extra assurance that we're not accidentally testing Python's float/etc
+# def float(*args, **kwargs): raise NotImplementedError("convert script to yp_float here")
+# def int(*args, **kwargs): raise NotImplementedError("convert script to yp_int here")
+
 INF = float("inf")
 NAN = float("nan")
 
