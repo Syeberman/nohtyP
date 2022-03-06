@@ -2274,6 +2274,14 @@ class yp_frozenset(_ypSet):
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         # if len(self) < 1 and "yp_frozenset_empty" in globals():
         #    assert self is yp_frozenset_empty, "an empty frozenset should be yp_frozenset_empty"
+
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        if not self:
+            return yp_str("frozenset()")
+        return yp_str("frozenset({%s})" % ", ".join(repr(x) for x in self))
+    _yp_repr = _yp_str
+
 c_ypObject_p_value("yp_frozenset_empty")
 
 
@@ -2284,6 +2292,13 @@ class yp_set(_ypSet):
         if len(pyobj) > CTYPES_MAX_ARGCOUNT-1:
             return _yp_set(yp_iter._from_python(pyobj))
         return _yp_setN(*pyobj)
+
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        if not self:
+            return yp_str("set()")
+        return yp_str("{%s}" % ", ".join(repr(x) for x in self))
+    _yp_repr = _yp_str
 
 
 # Python dict objects need to be passed through this then sent to the "K" version of the function;
@@ -2389,12 +2404,6 @@ class _ypDict(ypObject):
             return _yp_dict(_yp_item_iter._from_python(pyobj))
         return _yp_dictK(*_yp_flatten_dict(pyobj))
 
-    @reprlib.recursive_repr("{...}")
-    def _yp_str(self):
-        # TODO When nohtyP supports str/repr, replace this faked-out version
-        return yp_str("{%s}" % ", ".join(f"{k!r}: {v!r}" for k, v in self))
-    _yp_repr = _yp_str
-
     def keys(self): return _keys_dictview(self)
 
     def values(self): return _values_dictview(self)
@@ -2425,6 +2434,11 @@ class yp_frozendict(_ypDict):
             return _yp_frozendict(_yp_item_iter._from_python(pyobj))
         return _yp_frozendictK(*_yp_flatten_dict(pyobj))
 
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        return yp_str("frozendict({%s})" % ", ".join(f"{k!r}: {v!r}" for k, v in self.items()))
+    _yp_repr = _yp_str
+
 
 @pytype(yp_t_dict, dict)
 class yp_dict(_ypDict):
@@ -2436,6 +2450,12 @@ class yp_dict(_ypDict):
         if len(pyobj) > (CTYPES_MAX_ARGCOUNT-1) // 2:
             return _yp_dict(_yp_item_iter._from_python(pyobj))
         return _yp_dictK(*_yp_flatten_dict(pyobj))
+
+    @reprlib.recursive_repr("{...}")
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        return yp_str("{%s}" % ", ".join(f"{k!r}: {v!r}" for k, v in self.items()))
+    _yp_repr = _yp_str
 
 
 @pytype(yp_t_range, range)
