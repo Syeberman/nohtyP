@@ -13752,6 +13752,7 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
     lo = ms.pending[0].base;
 
 succeed:
+    yp_ASSERT1(ms.exc == yp_None);
     result = yp_None;
     goto exit;
 
