@@ -5,6 +5,7 @@ IndentWidth: 4
 ContinuationIndentWidth: 8
 MaxEmptyLinesToKeep: 2
 SpacesBeforeTrailingComments: 2
+
 AlignAfterOpenBracket: DontAlign  # TODO reconsider
 AlignConsecutiveDeclarations: true
 AlignEscapedNewlinesLeft: true
@@ -15,6 +16,7 @@ BreakBeforeTernaryOperators: false
 BreakBeforeBraces: Linux
 CommentPragmas: '^lint '
 ---
+# TODO clang-format 15 supports `InsertBraces: true`!!
 # TODO clang-tidy YOUR_FILE.cpp -fix -checks="readability-braces-around-statements" -- COMPILE_OPTIONS
 # TODO clang-tidy has a -format-style=file option that automatically invokes clang-format too
 # TODO can move these files to a different directory and then read them in and supply their contents

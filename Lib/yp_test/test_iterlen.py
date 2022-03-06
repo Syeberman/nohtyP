@@ -43,7 +43,6 @@ enumerate(iter('abc')).
 
 from yp import *
 from yp_test import yp_unittest
-from yp_test import support
 from itertools import repeat
 from collections import deque
 from operator import length_hint as _length_hint
@@ -54,17 +53,17 @@ def length_hint(obj, default=0):
     return yp_int(_length_hint(obj, default))
 
 # Extra assurance that we're not accidentally testing Python's data types
-def iter( *args, **kwargs ): raise NotImplementedError( "convert script to yp_iter here" )
-def bytes( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytes here" )
-def bytearray( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bytearray here" )
-def str( *args, **kwargs ): raise NotImplementedError( "convert script to yp_str here" )
-def tuple( *args, **kwargs ): raise NotImplementedError( "convert script to yp_tuple here" )
-def list( *args, **kwargs ): raise NotImplementedError( "convert script to yp_list here" )
-def frozenset( *args, **kwargs ): raise NotImplementedError( "convert script to yp_frozenset here" )
-def set( *args, **kwargs ): raise NotImplementedError( "convert script to yp_set here" )
-def dict( *args, **kwargs ): raise NotImplementedError( "convert script to yp_dict here" )
-def range( *args, **kwargs ): raise NotImplementedError( "convert script to yp_range here" )
-def reversed( *args, **kwargs ): raise NotImplementedError( "convert script to yp_reversed here" )
+def iter(*args, **kwargs): raise NotImplementedError("convert script to yp_iter here")
+def bytes(*args, **kwargs): raise NotImplementedError("convert script to yp_bytes here")
+def bytearray(*args, **kwargs): raise NotImplementedError("convert script to yp_bytearray here")
+def str(*args, **kwargs): raise NotImplementedError("convert script to yp_str here")
+def tuple(*args, **kwargs): raise NotImplementedError("convert script to yp_tuple here")
+def list(*args, **kwargs): raise NotImplementedError("convert script to yp_list here")
+def frozenset(*args, **kwargs): raise NotImplementedError("convert script to yp_frozenset here")
+def set(*args, **kwargs): raise NotImplementedError("convert script to yp_set here")
+def dict(*args, **kwargs): raise NotImplementedError("convert script to yp_dict here")
+def range(*args, **kwargs): raise NotImplementedError("convert script to yp_range here")
+def reversed(*args, **kwargs): raise NotImplementedError("convert script to yp_reversed here")
 # TODO same for yp_min, yp_max, etc
 # TODO yp_iter(x) throws TypeError if x not a ypObject
 

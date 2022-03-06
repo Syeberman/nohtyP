@@ -1,14 +1,14 @@
 # Python test set -- built-in functions
 
 from yp import *
-import yp_test.support
 from yp_test import yp_unittest
 import sys
 import pickle
 import itertools
+from yp_test.support import ALWAYS_EQ
 
 # Extra assurance that we're not accidentally testing Python's range
-def range( *args, **kwargs ): raise NotImplementedError( "convert script to yp_range here" )
+def range(*args, **kwargs): raise NotImplementedError("convert script to yp_range here")
 
 # pure Python implementations (3 args only), for comparison
 def pyrange(start, stop, step):
@@ -52,7 +52,7 @@ class RangeTest(yp_unittest.TestCase):
                 self.fail('{}: unexpected excess element {} at '
                           'position {}'.format(test_id, x, i))
             else:
-                self.fail('{}: wrong element at position {};'
+                self.fail('{}: wrong element at position {}; '
                           'expected {}, got {}'.format(test_id, i, y, x))
 
     def test_range(self):
@@ -107,56 +107,73 @@ class RangeTest(yp_unittest.TestCase):
         self.assertRaises(SystemError, yp_range, 0, ypObject_LEN_MAX+1)
         self.assertRaises(SystemError, yp_range, 0, 1, yp_sys_minint)
 
+    def test_range_constructor_error_messages(self):
+        with self.assertRaisesRegex(
+                TypeError,
+                "range expected at least 1 argument, got 0"
+        ):
+            yp_range()
+
+        with self.assertRaisesRegex(
+                TypeError,
+                "range expected at most 3 arguments, got 6"
+        ):
+            yp_range(1, 2, 3, 4, 5, 6)
+
     @yp_unittest.skip_long_ints
     def test_large_operands(self):
         x = yp_range(10**20, 10**20+10, 3)
-        self.assertEqual(len(x), 4)
-        self.assertEqual(len(list(x)), 4)
+        self.assertEqual(yp_len(x), 4)
+        self.assertEqual(yp_len(yp_list(x)), 4)
 
         x = yp_range(10**20+10, 10**20, 3)
-        self.assertEqual(len(x), 0)
-        self.assertEqual(len(list(x)), 0)
+        self.assertEqual(yp_len(x), 0)
+        self.assertEqual(yp_len(yp_list(x)), 0)
+        self.assertFalse(x)
 
         x = yp_range(10**20, 10**20+10, -3)
-        self.assertEqual(len(x), 0)
-        self.assertEqual(len(list(x)), 0)
+        self.assertEqual(yp_len(x), 0)
+        self.assertEqual(yp_len(yp_list(x)), 0)
+        self.assertFalse(x)
 
         x = yp_range(10**20+10, 10**20, -3)
-        self.assertEqual(len(x), 4)
-        self.assertEqual(len(list(x)), 4)
+        self.assertEqual(yp_len(x), 4)
+        self.assertEqual(yp_len(yp_list(x)), 4)
+        self.assertTrue(x)
 
         # Now test yp_range() with longs
-        self.assertEqual(list(yp_range(-2**100)), [])
-        self.assertEqual(list(yp_range(0, -2**100)), [])
-        self.assertEqual(list(yp_range(0, 2**100, -1)), [])
-        self.assertEqual(list(yp_range(0, 2**100, -1)), [])
+        for x in [yp_range(-2**100),
+                  yp_range(0, -2**100),
+                  yp_range(0, 2**100, -1)]:
+            self.assertEqual(yp_list(x), yp_list())
+            self.assertFalse(x)
 
         a = int(10 * sys.maxsize)
         b = int(100 * sys.maxsize)
         c = int(50 * sys.maxsize)
 
-        self.assertEqual(list(yp_range(a, a+2)), [a, a+1])
-        self.assertEqual(list(yp_range(a+2, a, -1)), [a+2, a+1])
-        self.assertEqual(list(yp_range(a+4, a, -2)), [a+4, a+2])
+        self.assertEqual(yp_list(yp_range(a, a+2)), [a, a+1])
+        self.assertEqual(yp_list(yp_range(a+2, a, -1)), [a+2, a+1])
+        self.assertEqual(yp_list(yp_range(a+4, a, -2)), [a+4, a+2])
 
-        seq = list(yp_range(a, b, c))
+        seq = yp_list(yp_range(a, b, c))
         self.assertIn(a, seq)
         self.assertNotIn(b, seq)
-        self.assertEqual(len(seq), 2)
+        self.assertEqual(yp_len(seq), 2)
         self.assertEqual(seq[0], a)
         self.assertEqual(seq[-1], a+c)
 
-        seq = list(yp_range(b, a, -c))
+        seq = yp_list(yp_range(b, a, -c))
         self.assertIn(b, seq)
         self.assertNotIn(a, seq)
-        self.assertEqual(len(seq), 2)
+        self.assertEqual(yp_len(seq), 2)
         self.assertEqual(seq[0], b)
         self.assertEqual(seq[-1], b-c)
 
-        seq = list(yp_range(-a, -b, -c))
+        seq = yp_list(yp_range(-a, -b, -c))
         self.assertIn(-a, seq)
         self.assertNotIn(-b, seq)
-        self.assertEqual(len(seq), 2)
+        self.assertEqual(yp_len(seq), 2)
         self.assertEqual(seq[0], -a)
         self.assertEqual(seq[-1], -a-c)
 
@@ -166,18 +183,20 @@ class RangeTest(yp_unittest.TestCase):
         # len() is expected to fail due to limitations of the __len__ protocol
         def _range_len(x):
             try:
-                length = len(x)
+                length = yp_len(x)
             except OverflowError:
                 step = x[1] - x[0]
                 length = 1 + ((x[-1] - x[0]) // step)
             return length
+
         a = -sys.maxsize
         b = sys.maxsize
         expected_len = b - a
         x = yp_range(a, b)
         self.assertIn(a, x)
         self.assertNotIn(b, x)
-        self.assertRaises(OverflowError, len, x)
+        self.assertRaises(OverflowError, yp_len, x)
+        self.assertTrue(x)
         self.assertEqual(_range_len(x), expected_len)
         self.assertEqual(x[0], a)
         idx = sys.maxsize+1
@@ -194,7 +213,8 @@ class RangeTest(yp_unittest.TestCase):
         x = yp_range(a, b)
         self.assertIn(a, x)
         self.assertNotIn(b, x)
-        self.assertRaises(OverflowError, len, x)
+        self.assertRaises(OverflowError, yp_len, x)
+        self.assertTrue(x)
         self.assertEqual(_range_len(x), expected_len)
         self.assertEqual(x[0], a)
         idx = sys.maxsize+1
@@ -212,7 +232,8 @@ class RangeTest(yp_unittest.TestCase):
         x = yp_range(a, b, c)
         self.assertIn(a, x)
         self.assertNotIn(b, x)
-        self.assertRaises(OverflowError, len, x)
+        self.assertRaises(OverflowError, yp_len, x)
+        self.assertTrue(x)
         self.assertEqual(_range_len(x), expected_len)
         self.assertEqual(x[0], a)
         idx = sys.maxsize+1
@@ -230,7 +251,8 @@ class RangeTest(yp_unittest.TestCase):
         x = yp_range(a, b, c)
         self.assertIn(a, x)
         self.assertNotIn(b, x)
-        self.assertRaises(OverflowError, len, x)
+        self.assertRaises(OverflowError, yp_len, x)
+        self.assertTrue(x)
         self.assertEqual(_range_len(x), expected_len)
         self.assertEqual(x[0], a)
         idx = sys.maxsize+1
@@ -308,11 +330,7 @@ class RangeTest(yp_unittest.TestCase):
 
     @yp_unittest.skip_user_defined_types
     def test_index_always_equal(self):
-        class AlwaysEqual(object):
-            def __eq__(self, other):
-                return True
-        always_equal = AlwaysEqual()
-        self.assertEqual(yp_range(10).index(always_equal), 0)
+        self.assertEqual(yp_range(10).index(ALWAYS_EQ), 0)
 
     @yp_unittest.skip_user_defined_types
     def test_user_index_method(self):
@@ -325,8 +343,8 @@ class RangeTest(yp_unittest.TestCase):
                 self.n = int(n)
             def __index__(self):
                 return self.n
-        self.assertEqual(list(yp_range(I(bignum), I(bignum + 1))), [bignum])
-        self.assertEqual(list(yp_range(I(smallnum), I(smallnum + 1))), [smallnum])
+        self.assertEqual(yp_list(yp_range(I(bignum), I(bignum + 1))), [bignum])
+        self.assertEqual(yp_list(yp_range(I(smallnum), I(smallnum + 1))), [smallnum])
 
         # User-defined class with a failing __index__ method
         class IX:
@@ -356,28 +374,23 @@ class RangeTest(yp_unittest.TestCase):
         self.assertEqual(yp_range(3).count(1), 1)
         self.assertEqual(yp_range(3).count(2), 1)
         self.assertEqual(yp_range(3).count(3), 0)
-        # Not applicable to nohtyP
-        #self.assertIs(type(yp_range(3).count(-1)), int)
-        #self.assertIs(type(yp_range(3).count(1)), int)
+        self.assertIs(type(yp_range(3).count(-1)), yp_int)
+        self.assertIs(type(yp_range(3).count(1)), yp_int)
 
     @yp_unittest.skip_long_ints
     def test_count_long_ints(self):
         self.assertEqual(yp_range(10**20).count(1), 1)
         self.assertEqual(yp_range(10**20).count(10**20), 0)
-        self.assertEqual(yp_range(3).index(1), 1) # ? Why is this here...
+        # self.assertEqual(yp_range(3).index(1), 1) # ? Why is this here...
         self.assertEqual(yp_range(1, 2**100, 2).count(2**87), 0)
         self.assertEqual(yp_range(1, 2**100, 2).count(2**87+1), 1)
 
     @yp_unittest.skip_user_defined_types
     def test_count_always_equal(self):
-        class AlwaysEqual(object):
-            def __eq__(self, other):
-                return True
-        always_equal = AlwaysEqual()
-        self.assertEqual(yp_range(10).count(always_equal), 10)
+        self.assertEqual(yp_range(10).count(ALWAYS_EQ), 10)
 
         # ? Why is this here...
-        self.assertEqual(len(yp_range(sys.maxsize, sys.maxsize+10)), 10)
+        # self.assertEqual(yp_len(yp_range(sys.maxsize, sys.maxsize+10)), 10)
 
     def test_repr(self):
         self.assertEqual(yp_repr(yp_range(1)), 'range(0, 1)')
@@ -394,57 +407,81 @@ class RangeTest(yp_unittest.TestCase):
             for t in testcases:
                 with self.subTest(proto=proto, test=t):
                     r = yp_range(*t)
-                    self.assertEqual(list(pickle.loads(pickle.dumps(r, proto))),
-                                     list(r))
+                    self.assertEqual(yp_list(pickle.loads(pickle.dumps(r, proto))),
+                                     yp_list(r))
 
     @yp_unittest.skip_pickling
     def test_iterator_pickling(self):
-        testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1),
-                     (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
-        for proto in yp_range(pickle.HIGHEST_PROTOCOL + 1):
+        testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1), (13, 21, 3),
+                     (-2, 2, 2)]
+        for M in 2**31, 2**63:
+            testcases += [
+                (M-3, M-1), (4*M, 4*M+2),
+                (M-2, M-1, 2), (-M+1, -M, -2),
+                (1, 2, M-1), (-1, -2, -M),
+                (1, M-1, M-1), (-1, -M, -M),
+            ]
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             for t in testcases:
-                it = itorg = iter(yp_range(*t))
-                data = list(yp_range(*t))
+                with self.subTest(proto=proto, t=t):
+                    it = itorg = yp_iter(yp_range(*t))
+                    data = yp_list(yp_range(*t))
 
-                d = pickle.dumps(it)
-                it = pickle.loads(d)
-                self.assertEqual(type(itorg), type(it))
-                self.assertEqual(list(it), data)
+                    d = pickle.dumps(it, proto)
+                    it = pickle.loads(d)
+                    self.assertEqual(yp_type(itorg), yp_type(it))
+                    self.assertEqual(yp_list(it), data)
 
+                    it = pickle.loads(d)
+                    try:
+                        next(it)
+                    except StopIteration:
+                        continue
+                    d = pickle.dumps(it, proto)
+                    it = pickle.loads(d)
+                    self.assertEqual(yp_list(it), data[1:])
+
+    @yp_unittest.skip_pickling
+    def test_iterator_pickling_overflowing_index(self):
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            with self.subTest(proto=proto):
+                it = yp_iter(yp_range(2**32 + 2))
+                _, _, idx = it.__reduce__()
+                self.assertEqual(idx, 0)
+                it.__setstate__(2**32 + 1)  # undocumented way to set r->index
+                _, _, idx = it.__reduce__()
+                self.assertEqual(idx, 2**32 + 1)
+                d = pickle.dumps(it, proto)
                 it = pickle.loads(d)
-                try:
-                    next(it)
-                except StopIteration:
-                    continue
-                d = pickle.dumps(it)
-                it = pickle.loads(d)
-                self.assertEqual(list(it), data[1:])
+                self.assertEqual(next(it), 2**32 + 1)
 
     @yp_unittest.skip_pickling
     def test_exhausted_iterator_pickling(self):
-        r = yp_range(2**65, 2**65+2)
-        i = yp_iter(r)
-        while True:
-            r = next(i)
-            if r == 2**65+1:
-                break
-        d = pickle.dumps(i)
-        i2 = pickle.loads(d)
-        self.assertEqual(yp_list(i), [])
-        self.assertEqual(yp_list(i2), [])
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            r = yp_range(2**65, 2**65+2)
+            i = yp_iter(r)
+            while True:
+                r = next(i)
+                if r == 2**65+1:
+                    break
+            d = pickle.dumps(i, proto)
+            i2 = pickle.loads(d)
+            self.assertEqual(yp_list(i), [])
+            self.assertEqual(yp_list(i2), [])
 
     @yp_unittest.skip_pickling
     def test_large_exhausted_iterator_pickling(self):
-        r = yp_range(20)
-        i = yp_iter(r)
-        while True:
-            r = next(i)
-            if r == 19:
-                break
-        d = pickle.dumps(i)
-        i2 = pickle.loads(d)
-        self.assertEqual(yp_list(i), [])
-        self.assertEqual(yp_list(i2), [])
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            r = yp_range(20)
+            i = yp_iter(r)
+            while True:
+                r = next(i)
+                if r == 19:
+                    break
+            d = pickle.dumps(i, proto)
+            i2 = pickle.loads(d)
+            self.assertEqual(yp_list(i), [])
+            self.assertEqual(yp_list(i2), [])
 
     def test_odd_bug(self):
         # This used to raise a "SystemError: NULL result without error"
@@ -464,10 +501,8 @@ class RangeTest(yp_unittest.TestCase):
         self.assertIn(1+0j, yp_range(3))
 
     @yp_unittest.skip_user_defined_types
-    def test_types_user_types(self):
-        class C1:
-            def __eq__(self, other): return True
-        self.assertIn(C1(), yp_range(3))
+    def test_types_user_defined_types(self):
+        self.assertIn(ALWAYS_EQ, yp_range(3))
 
         # Objects are never coerced into other types for comparison.
         class C2:
@@ -482,7 +517,7 @@ class RangeTest(yp_unittest.TestCase):
         class C3(int):
             def __eq__(self, other): return True
         self.assertIn(C3(11), yp_range(10))
-        self.assertIn(C3(11), list(yp_range(10)))
+        self.assertIn(C3(11), yp_list(yp_range(10)))
 
     def test_strided_limits(self):
         r = yp_range(0, 101, 2)
@@ -514,7 +549,6 @@ class RangeTest(yp_unittest.TestCase):
         self.assertNotIn(-1, r)
         self.assertNotIn(1, r)
 
-    @yp_test.support.requires_resource('cpu')
     def test_range_iterators(self):
         # exercise 'fast' iterators, that use a rangeiterobject internally.
         # see issue 7298
@@ -529,7 +563,7 @@ class RangeTest(yp_unittest.TestCase):
 
         for start, end, step in test_ranges:
             if step == yp_sys_minint or \
-                    pyrange_calc_len(start, end, step) > ypObject_LEN_MAX:
+                    pyrange_calc_len(start, end, step) > ypObject_LEN_MAX._asint():
                 self.assertRaises((SystemError, OverflowError), yp_range, start, end, step)
                 continue
             try: iter1 = yp_range(start, end, step)
@@ -543,6 +577,14 @@ class RangeTest(yp_unittest.TestCase):
             iter2 = pyrange_reversed(start, end, step)
             test_id = "reversed(range({}, {}, {}))".format(start, end, step)
             self.assert_iterators_equal(iter1, iter2, test_id, limit=100)
+
+    def test_range_iterators_invocation(self):
+        # verify range iterators instances cannot be created by
+        # calling their type
+        rangeiter_type = type(yp_iter(yp_range(0)))
+        self.assertRaises(TypeError, rangeiter_type, 1, 3, 1)
+        long_rangeiter_type = type(yp_iter(yp_range(1 << 30))) # TODO(skip_long_ints)
+        self.assertRaises(TypeError, long_rangeiter_type, 1, 3, 1)
 
     def test_slice(self):
         def check(start, stop, step=None):
@@ -686,11 +728,17 @@ class RangeTest(yp_unittest.TestCase):
         self.assert_attrs(yp_range(0, 10, 3), 0, 10, 3)
         self.assert_attrs(yp_range(10, 0, -1), 10, 0, -1)
         self.assert_attrs(yp_range(10, 0, -3), 10, 0, -3)
+        self.assert_attrs(yp_range(True), 0, 1, 1)
+        self.assert_attrs(yp_range(False, True), 0, 1, 1)
+        self.assert_attrs(yp_range(False, True, True), 0, 1, 1)
 
     def assert_attrs(self, rangeobj, start, stop, step):
         self.assertEqual(rangeobj.start, start)
         self.assertEqual(rangeobj.stop, stop)
         self.assertEqual(rangeobj.step, step)
+        self.assertIs(type(rangeobj.start), int)
+        self.assertIs(type(rangeobj.stop), int)
+        self.assertIs(type(rangeobj.step), int)
 
         with self.assertRaises(AttributeError):
             rangeobj.start = 0
@@ -706,8 +754,5 @@ class RangeTest(yp_unittest.TestCase):
         with self.assertRaises(AttributeError):
             del rangeobj.step
 
-def test_main():
-    yp_test.support.run_unittest(RangeTest)
-
 if __name__ == "__main__":
-    test_main()
+    yp_unittest.main()

@@ -16,17 +16,8 @@ import array
 # Extra assurance that we're not accidentally testing Python's int or float...unless we mean to
 _int = int
 _float = float
-def int( *args, **kwargs ): raise NotImplementedError( "convert script to yp_int here" )
-def float( *args, **kwargs ): raise NotImplementedError( "convert script to yp_float here" )
-
-# Used for lazy formatting of failure messages
-class Frm(object):
-    def __init__(self, format, *args):
-        self.format = format
-        self.args = args
-
-    def __str__(self):
-        return self.format % self.args
+def int(*args, **kwargs): raise NotImplementedError("convert script to yp_int here")
+def float(*args, **kwargs): raise NotImplementedError("convert script to yp_float here")
 
 # SHIFT should match the value in longintrepr.h for best testing.
 SHIFT = sys.int_info.bits_per_digit
@@ -34,17 +25,18 @@ BASE = 2 ** SHIFT
 MASK = BASE - 1
 KARATSUBA_CUTOFF = 70   # from longobject.c
 
-MAXBITS = yp_sys_maxint._asint().bit_length()
 # Max number of base BASE digits to use in test cases.  Doubling
 # this will more than double the runtime.
-MAXDIGITS = MAXBITS // sys.int_info.bits_per_digit
+# TODO(skip_long_ints)
+MAXDIGITS = 2
 
 # build some special values
+# TODO(skip_long_ints)
 special = [yp_int(0), yp_int(1), yp_int(2), yp_int(BASE), yp_int(BASE >> 1),
         yp_int(0x5555555555555555), yp_int(0x2aaaaaaaaaaaaaaa)]
 #  some solid strings of one bits
 p2 = yp_int(4)  # 0 and 1 already added
-for i in range(2*SHIFT):
+for i in yp_range(2*SHIFT):
     special.append(yp_int(p2 - 1))
     p2 = p2 << 1
 del p2
@@ -169,59 +161,64 @@ class LongTest(yp_unittest.TestCase):
 
     def getran2(ndigits):
         answer = 0
-        for i in range(ndigits):
+        for i in yp_range(ndigits):
             answer = (answer << SHIFT) | random.randint(0, MASK)
         if random.random() < 0.5:
             answer = -answer
         return answer
 
     def check_division(self, x, y):
-        x = yp_int(x)
-        y = yp_int(y)
+        # TODO(skip_long_int) Skip numbers too large for nohtyP
+        try: x = yp_int(x)
+        except OverflowError: return
+        try: y = yp_int(y)
+        except OverflowError: return
         eq = self.assertEqual
-        q, r = divmod(x, y)
-        q2, r2 = x//y, x%y
-        try:
-            pab, pba = x*y, y*x
-            eq(pab, pba, Frm("multiplication does not commute for %r and %r", x, y))
-        except OverflowError: pass # ignore overflows here
-        eq(q, q2, Frm("divmod returns different quotient than / for %r and %r", x, y))
-        eq(r, r2, Frm("divmod returns different mod than %% for %r and %r", x, y))
-        eq(x, q*y + r, Frm("x != q*y + r after divmod on x=%r, y=%r", x, y))
-        if y > 0:
-            self.assertTrue(0 <= r < y, Frm("bad mod from divmod on %r and %r", x, y))
-        else:
-            self.assertTrue(y < r <= 0, Frm("bad mod from divmod on %r and %r", x, y))
+        with self.subTest(x=x, y=y):
+            q, r = divmod(x, y)
+            q2, r2 = x//y, x%y
+            try:
+                pab, pba = x*y, y*x
+                eq(pab, pba, "multiplication does not commute")
+            except OverflowError: pass # TODO(skip_long_int) Skip numbers too large for nohtyP
+            eq(q, q2, "divmod returns different quotient than /")
+            eq(r, r2, "divmod returns different mod than %")
+            eq(x, q*y + r, "x != q*y + r after divmod")
+            if y > 0:
+                self.assertTrue(0 <= r < y, "bad mod from divmod")
+            else:
+                self.assertTrue(y < r <= 0, "bad mod from divmod")
 
     def test_division(self):
-        #digits = list(range(1, MAXDIGITS+1)) + list(range(KARATSUBA_CUTOFF,
-        #                                              KARATSUBA_CUTOFF + 14))
-        #digits.append(KARATSUBA_CUTOFF * 3)
-        digits = list(range(1, MAXDIGITS+1))
+        digits = list(range(1, MAXDIGITS+1)) + list(range(KARATSUBA_CUTOFF,
+                                                      KARATSUBA_CUTOFF + 14))
+        digits.append(KARATSUBA_CUTOFF * 3)
         for lenx in digits:
-            x = self.getran(lenx)
+            # TODO(skip_long_int) Skip numbers too large for nohtyP
+            try: x = self.getran(lenx)
+            except OverflowError: continue
             for leny in digits:
-                y = self.getran(leny) or 1
+                try: y = self.getran(leny) or 1
+                except OverflowError: continue
                 self.check_division(x, y)
 
         # specific numbers chosen to exercise corner cases of the
         # current long division implementation
 
         # 30-bit cases involving a quotient digit estimate of BASE+1
-        # XXX Too large for nohtyP
-        #self.check_division(1231948412290879395966702881,
-        #                    1147341367131428698)
-        #self.check_division(815427756481275430342312021515587883,
-        #               707270836069027745)
-        #self.check_division(627976073697012820849443363563599041,
-        #               643588798496057020)
-        #self.check_division(1115141373653752303710932756325578065,
-        #               1038556335171453937726882627)
+        self.check_division(1231948412290879395966702881,
+                            1147341367131428698)
+        self.check_division(815427756481275430342312021515587883,
+                       707270836069027745)
+        self.check_division(627976073697012820849443363563599041,
+                       643588798496057020)
+        self.check_division(1115141373653752303710932756325578065,
+                       1038556335171453937726882627)
         # 30-bit cases that require the post-subtraction correction step
-        #self.check_division(922498905405436751940989320930368494,
-        #               949985870686786135626943396)
-        #self.check_division(768235853328091167204009652174031844,
-        #               1091555541180371554426545266)
+        self.check_division(922498905405436751940989320930368494,
+                       949985870686786135626943396)
+        self.check_division(768235853328091167204009652174031844,
+                       1091555541180371554426545266)
 
         # 15-bit cases involving a quotient digit estimate of BASE+1
         self.check_division(20172188947443, 615611397)
@@ -235,7 +232,7 @@ class LongTest(yp_unittest.TestCase):
 
 
     def test_karatsuba(self):
-        digits = list(range(1, 5)) + list(range(KARATSUBA_CUTOFF,
+        digits = list(yp_range(1, 5)) + list(yp_range(KARATSUBA_CUTOFF,
                                                 KARATSUBA_CUTOFF + 10))
         digits.extend([KARATSUBA_CUTOFF * 10, KARATSUBA_CUTOFF * 100])
 
@@ -244,98 +241,88 @@ class LongTest(yp_unittest.TestCase):
         # Test products of long strings of 1 bits -- (2**x-1)*(2**y-1) ==
         # 2**(x+y) - 2**x - 2**y + 1, so the proper result is easy to check.
         for abits in bits:
+            # TODO(skip_long_int) Skip numbers too large for nohtyP
             try: a = yp_int((1 << abits) - 1)
             except OverflowError: continue
             for bbits in bits:
                 if bbits < abits:
                     continue
-                try: b = yp_int((1 << bbits) - 1)
-                except OverflowError: continue
-                try: x = a * b
-                except OverflowError: continue
-                y = ((1 << (abits + bbits)) -
-                     (1 << abits) -
-                     (1 << bbits) +
-                     1)
-                self.assertEqual(x, y,
-                    Frm("bad result for a*b: a=%r, b=%r, x=%r, y=%r", a, b, x, y))
+                with self.subTest(abits=abits, bbits=bbits):
+                    try: b = (1 << bbits) - 1
+                    except OverflowError: continue
+                    try: x = a * b
+                    except OverflowError: continue
+                    y = ((1 << (abits + bbits)) -
+                         (1 << abits) -
+                         (1 << bbits) +
+                         1)
+                    self.assertEqual(x, y)
 
     def check_bitop_identities_1(self, x):
         x = yp_int(x)
         eq = self.assertEqual
-        eq(x & 0, 0, Frm("x & 0 != 0 for x=%r", x))
-        eq(x | 0, x, Frm("x | 0 != x for x=%r", x))
-        eq(x ^ 0, x, Frm("x ^ 0 != x for x=%r", x))
-        eq(x & -1, x, Frm("x & -1 != x for x=%r", x))
-        eq(x | -1, -1, Frm("x | -1 != -1 for x=%r", x))
-        eq(x ^ -1, ~x, Frm("x ^ -1 != ~x for x=%r", x))
-        eq(x, ~~x, Frm("x != ~~x for x=%r", x))
-        eq(x & x, x, Frm("x & x != x for x=%r", x))
-        eq(x | x, x, Frm("x | x != x for x=%r", x))
-        eq(x ^ x, 0, Frm("x ^ x != 0 for x=%r", x))
-        eq(x & ~x, 0, Frm("x & ~x != 0 for x=%r", x))
-        eq(x | ~x, -1, Frm("x | ~x != -1 for x=%r", x))
-        eq(x ^ ~x, -1, Frm("x ^ ~x != -1 for x=%r", x))
-        eq(-x, 1 + ~x, Frm("not -x == 1 + ~x for x=%r", x))
-        eq(-x, ~(x-1), Frm("not -x == ~(x-1) forx =%r", x))
+        with self.subTest(x=x):
+            eq(x & 0, 0)
+            eq(x | 0, x)
+            eq(x ^ 0, x)
+            eq(x & -1, x)
+            eq(x | -1, -1)
+            eq(x ^ -1, ~x)
+            eq(x, ~~x)
+            eq(x & x, x)
+            eq(x | x, x)
+            eq(x ^ x, 0)
+            eq(x & ~x, 0)
+            eq(x | ~x, -1)
+            eq(x ^ ~x, -1)
+            eq(-x, 1 + ~x)
+            eq(-x, ~(x-1))
 
     def check_bitop_identities_1_cpu(self, x):
         x = yp_int(x)
         eq = self.assertEqual
-        for n in range(2*SHIFT):
-            n = yp_int(n)
-            # Skip shifts too large for nohtyP
+        for n in yp_range(2*SHIFT):
+            # TODO(skip_long_ints) Skip shifts too large for nohtyP
             try: x << n
             except OverflowError: continue
-
             p2 = yp_int(2 ** n)
-            eq(x << n >> n, x,
-                Frm("x << n >> n != x for x=%r, n=%r", (x, n)))
-            eq(x // p2, x >> n,
-                Frm("x // p2 != x >> n for x=%r n=%r p2=%r", (x, n, p2)))
-            eq(x * p2, x << n,
-                Frm("x * p2 != x << n for x=%r n=%r p2=%r", (x, n, p2)))
-            eq(x & -p2, x >> n << n,
-                Frm("not x & -p2 == x >> n << n for x=%r n=%r p2=%r", (x, n, p2)))
-            eq(x & -p2, x & ~(p2 - 1),
-                Frm("not x & -p2 == x & ~(p2 - 1) for x=%r n=%r p2=%r", (x, n, p2)))
+            with self.subTest(x=x, n=n, p2=p2):
+                eq(x << n >> n, x)
+                eq(x // p2, x >> n)
+                eq(x * p2, x << n)
+                eq(x & -p2, x >> n << n)
+                eq(x & -p2, x & ~(p2 - 1))
 
     def check_bitop_identities_2(self, x, y):
         x = yp_int(x)
         y = yp_int(y)
         eq = self.assertEqual
-        eq(x & y, y & x, Frm("x & y != y & x for x=%r, y=%r", (x, y)))
-        eq(x | y, y | x, Frm("x | y != y | x for x=%r, y=%r", (x, y)))
-        eq(x ^ y, y ^ x, Frm("x ^ y != y ^ x for x=%r, y=%r", (x, y)))
-        eq(x ^ y ^ x, y, Frm("x ^ y ^ x != y for x=%r, y=%r", (x, y)))
-        eq(x & y, ~(~x | ~y), Frm("x & y != ~(~x | ~y) for x=%r, y=%r", (x, y)))
-        eq(x | y, ~(~x & ~y), Frm("x | y != ~(~x & ~y) for x=%r, y=%r", (x, y)))
-        eq(x ^ y, (x | y) & ~(x & y),
-             Frm("x ^ y != (x | y) & ~(x & y) for x=%r, y=%r", (x, y)))
-        eq(x ^ y, (x & ~y) | (~x & y),
-             Frm("x ^ y == (x & ~y) | (~x & y) for x=%r, y=%r", (x, y)))
-        eq(x ^ y, (x | y) & (~x | ~y),
-             Frm("x ^ y == (x | y) & (~x | ~y) for x=%r, y=%r", (x, y)))
+        with self.subTest(x=x, y=y):
+            eq(x & y, y & x)
+            eq(x | y, y | x)
+            eq(x ^ y, y ^ x)
+            eq(x ^ y ^ x, y)
+            eq(x & y, ~(~x | ~y))
+            eq(x | y, ~(~x & ~y))
+            eq(x ^ y, (x | y) & ~(x & y))
+            eq(x ^ y, (x & ~y) | (~x & y))
+            eq(x ^ y, (x | y) & (~x | ~y))
 
     def check_bitop_identities_3(self, x, y, z):
         x = yp_int(x)
         y = yp_int(y)
         z = yp_int(z)
         eq = self.assertEqual
-        eq((x & y) & z, x & (y & z),
-             Frm("(x & y) & z != x & (y & z) for x=%r, y=%r, z=%r", (x, y, z)))
-        eq((x | y) | z, x | (y | z),
-             Frm("(x | y) | z != x | (y | z) for x=%r, y=%r, z=%r", (x, y, z)))
-        eq((x ^ y) ^ z, x ^ (y ^ z),
-             Frm("(x ^ y) ^ z != x ^ (y ^ z) for x=%r, y=%r, z=%r", (x, y, z)))
-        eq(x & (y | z), (x & y) | (x & z),
-             Frm("x & (y | z) != (x & y) | (x & z) for x=%r, y=%r, z=%r", (x, y, z)))
-        eq(x | (y & z), (x | y) & (x | z),
-             Frm("x | (y & z) != (x | y) & (x | z) for x=%r, y=%r, z=%r", (x, y, z)))
+        with self.subTest(x=x, y=y, z=z):
+            eq((x & y) & z, x & (y & z))
+            eq((x | y) | z, x | (y | z))
+            eq((x ^ y) ^ z, x ^ (y ^ z))
+            eq(x & (y | z), (x & y) | (x & z))
+            eq(x | (y & z), (x | y) & (x | z))
 
     def test_bitop_identities(self):
         self.check_bitop_identities_1(random.choice(special))
-        digits = range(1, MAXDIGITS+1)
+        digits = yp_range(1, MAXDIGITS+1)
         lenx = random.choice(digits)
         x = self.getran(lenx)
         self.check_bitop_identities_1(x)
@@ -349,7 +336,7 @@ class LongTest(yp_unittest.TestCase):
         for x in special:
             self.check_bitop_identities_1(x)
             self.check_bitop_identities_1_cpu(x)
-        digits = range(1, MAXDIGITS+1)
+        digits = yp_range(1, MAXDIGITS+1)
         for lenx in digits:
             x = self.getran(lenx)
             self.check_bitop_identities_1(x)
@@ -376,18 +363,18 @@ class LongTest(yp_unittest.TestCase):
     def check_format_1(self, x):
         for base, mapper in (2, bin), (8, oct), (10, str), (10, repr), (16, hex):
             got = mapper(x)
-            expected = self.slow_format(x, base)
-            msg = Frm("%s returned %r but expected %r for %r",
-                mapper.__name__, got, expected, x)
-            self.assertEqual(got, expected, msg)
-            self.assertEqual(yp_int(got, 0), x, Frm('int("%s", 0) != %r', got, x))
+            with self.subTest(x=x, mapper=mapper.__name__):
+                expected = self.slow_format(x, base)
+                self.assertEqual(got, expected)
+            with self.subTest(got=got):
+                self.assertEqual(yp_int(got, 0), x)
 
     @yp_unittest.skip_str_repr
     def test_format(self):
         for x in special:
             self.check_format_1(x)
-        for i in range(10):
-            for lenx in range(1, MAXDIGITS+1):
+        for i in yp_range(10):
+            for lenx in yp_range(1, MAXDIGITS+1):
                 x = self.getran(lenx)
                 self.check_format_1(x)
 
@@ -397,6 +384,7 @@ class LongTest(yp_unittest.TestCase):
                 ('1' + '0'*5, 10**5),
                 ('1' + '0'*18, 10**18),
                 ('0' + '0'*100, 0),
+                # TODO(skip_long_int)
                 #('1' + '0'*20, 10**20),
                 #('1' + '0'*100, 10**100)
         ]
@@ -444,12 +432,18 @@ class LongTest(yp_unittest.TestCase):
                           2**100, -2**100,
                           ]
         for base in invalid_bases:
+            # TODO(skip_long_int) Skip numbers too large for nohtyP
             try: self.assertRaises(ValueError, yp_int, '42', base)
             except OverflowError: pass
+
+        # Invalid unicode string
+        # See bpo-34087
+        self.assertRaises(ValueError, yp_int, '\u3053\u3093\u306b\u3061\u306f')
 
 
     @yp_unittest.skip_not_applicable
     def test_conversion(self):
+
         class JustLong:
             # test that __long__ no longer used in 3.x
             def __long__(self):
@@ -501,13 +495,13 @@ class LongTest(yp_unittest.TestCase):
 
         # test round-half-even
         for x, y in [(1, 0), (2, 2), (3, 4), (4, 4), (5, 4), (6, 6), (7, 8)]:
-            for p in range(15):
+            for p in yp_range(15):
                 self.assertEqual(yp_int(yp_float(2**p*(2**53+x))), 2**p*(2**53+y))
 
         for x, y in [(0, 0), (1, 0), (2, 0), (3, 4), (4, 4), (5, 4), (6, 8),
                      (7, 8), (8, 8), (9, 8), (10, 8), (11, 12), (12, 12),
                      (13, 12), (14, 16), (15, 16)]:
-            for p in range(15):
+            for p in yp_range(15):
                 self.assertEqual(yp_int(yp_float(2**p*(2**54+x))), 2**p*(2**54+y))
 
         # behaviour near extremes of floating-point range
@@ -527,7 +521,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertRaises(OverflowError, yp_float, 2*top_power)
         self.assertRaises(OverflowError, yp_float, top_power*top_power)
 
-        for p in range(100):
+        for p in yp_range(100):
             x = 2**p * (2**53 + 1) + 1
             y = 2**p * (2**53 + 2)
             self.assertEqual(yp_int(yp_float(x)), y)
@@ -545,8 +539,8 @@ class LongTest(yp_unittest.TestCase):
             2*top_power-1, 2*top_power, top_power*top_power,
         ]
         test_values.extend(exact_values)
-        for p in range(-4, 8):
-            for x in range(-128, 128):
+        for p in yp_range(-4, 8):
+            for x in yp_range(-128, 128):
                 test_values.append(2**(p+53) + x)
         for value in test_values:
             self.check_float_conversion(value)
@@ -588,7 +582,7 @@ class LongTest(yp_unittest.TestCase):
     def test_logs(self):
         LOG10E = math.log10(math.e)
 
-        for exp in list(range(10)) + [100, 1000, 10000]:
+        for exp in list(yp_range(10)) + [100, 1000, 10000]:
             value = 10 ** exp
             log10 = math.log10(value)
             self.assertAlmostEqual(log10, exp)
@@ -660,8 +654,6 @@ class LongTest(yp_unittest.TestCase):
                 return (x > y) - (x < y)
             def __eq__(self, other):
                 return self._cmp__(other) == 0
-            def __ne__(self, other):
-                return self._cmp__(other) != 0
             def __ge__(self, other):
                 return self._cmp__(other) >= 0
             def __gt__(self, other):
@@ -680,7 +672,7 @@ class LongTest(yp_unittest.TestCase):
         cases.extend([0, 1, 2, sys.maxsize, yp_float(sys.maxsize)])
         # 1 << 20000 should exceed all double formats.  int(1e200) is to
         # check that we get equality with 1e200 above.
-        # nohtyP doesn't support numbers this large
+        # TODO(skip_long_int) Skip numbers too large for nohtyP
         #t = yp_int(1e200)
         #cases.extend([0, 1, 2, 1 << 20000, t-1, t, t+1])
         #cases.extend([-x for x in cases])
@@ -688,6 +680,7 @@ class LongTest(yp_unittest.TestCase):
         cases.extend([0, 1, 2])
         cases.extend([  -1,-2])
         for x in cases:
+            # TODO(skip_long_int) Skip numbers too large for nohtyP
             try: Rx = Rat(x)
             except OverflowError: continue
             for y in cases:
@@ -695,20 +688,23 @@ class LongTest(yp_unittest.TestCase):
                 except OverflowError: continue
                 try: Rcmp = (Rx > Ry) - (Rx < Ry)
                 except OverflowError: continue
-                try: xycmp = (x > y) - (x < y)
-                except OverflowError: continue
-                eq(Rcmp, xycmp, Frm("%r %r %d %d", x, y, Rcmp, xycmp))
-                eq(x == y, Rcmp == 0, Frm("%r == %r %d", x, y, Rcmp))
-                eq(x != y, Rcmp != 0, Frm("%r != %r %d", x, y, Rcmp))
-                eq(x < y, Rcmp < 0, Frm("%r < %r %d", x, y, Rcmp))
-                eq(x <= y, Rcmp <= 0, Frm("%r <= %r %d", x, y, Rcmp))
-                eq(x > y, Rcmp > 0, Frm("%r > %r %d", x, y, Rcmp))
-                eq(x >= y, Rcmp >= 0, Frm("%r >= %r %d", x, y, Rcmp))
+                with self.subTest(x=x, y=y, Rcmp=Rcmp):
+                    try: xycmp = (x > y) - (x < y)
+                    except OverflowError: continue
+                    eq(Rcmp, xycmp)
+                    eq(x == y, Rcmp == 0)
+                    eq(x != y, Rcmp != 0)
+                    eq(x < y, Rcmp < 0)
+                    eq(x <= y, Rcmp <= 0)
+                    eq(x > y, Rcmp > 0)
+                    eq(x >= y, Rcmp >= 0)
 
     @yp_unittest.skip_str_repr
     def test__format__(self):
         self.assertEqual(format(123456789, 'd'), '123456789')
         self.assertEqual(format(123456789, 'd'), '123456789')
+        self.assertEqual(format(123456789, ','), '123,456,789')
+        self.assertEqual(format(123456789, '_'), '123_456_789')
 
         # sign and aligning are interdependent
         self.assertEqual(format(1, "-"), '1')
@@ -737,8 +733,25 @@ class LongTest(yp_unittest.TestCase):
         self.assertEqual(format(yp_int('be', 16), "X"), "BE")
         self.assertEqual(format(-yp_int('be', 16), "x"), "-be")
         self.assertEqual(format(-yp_int('be', 16), "X"), "-BE")
+        self.assertRaises(ValueError, format, 1234567890, ',x')
+        self.assertEqual(format(1234567890, '_x'), '4996_02d2')
+        self.assertEqual(format(1234567890, '_X'), '4996_02D2')
 
         # octal
+        self.assertEqual(format(3, "o"), "3")
+        self.assertEqual(format(-3, "o"), "-3")
+        self.assertEqual(format(1234, "o"), "2322")
+        self.assertEqual(format(-1234, "o"), "-2322")
+        self.assertEqual(format(1234, "-o"), "2322")
+        self.assertEqual(format(-1234, "-o"), "-2322")
+        self.assertEqual(format(1234, " o"), " 2322")
+        self.assertEqual(format(-1234, " o"), "-2322")
+        self.assertEqual(format(1234, "+o"), "+2322")
+        self.assertEqual(format(-1234, "+o"), "-2322")
+        self.assertRaises(ValueError, format, 1234567890, ',o')
+        self.assertEqual(format(1234567890, '_o'), '111_4540_1322')
+
+        # binary
         self.assertEqual(format(3, "b"), "11")
         self.assertEqual(format(-3, "b"), "-11")
         self.assertEqual(format(1234, "b"), "10011010010")
@@ -749,15 +762,27 @@ class LongTest(yp_unittest.TestCase):
         self.assertEqual(format(-1234, " b"), "-10011010010")
         self.assertEqual(format(1234, "+b"), "+10011010010")
         self.assertEqual(format(-1234, "+b"), "-10011010010")
+        self.assertRaises(ValueError, format, 1234567890, ',b')
+        self.assertEqual(format(12345, '_b'), '11_0000_0011_1001')
 
         # make sure these are errors
         self.assertRaises(ValueError, format, 3, "1.3")  # precision disallowed
+        self.assertRaises(ValueError, format, 3, "_c")   # underscore,
+        self.assertRaises(ValueError, format, 3, ",c")   # comma, and
         self.assertRaises(ValueError, format, 3, "+c")   # sign not allowed
                                                          # with 'c'
 
+        self.assertRaisesRegex(ValueError, 'Cannot specify both', format, 3, '_,')
+        self.assertRaisesRegex(ValueError, 'Cannot specify both', format, 3, ',_')
+        self.assertRaisesRegex(ValueError, 'Cannot specify both', format, 3, '_,d')
+        self.assertRaisesRegex(ValueError, 'Cannot specify both', format, 3, ',_d')
+
+        self.assertRaisesRegex(ValueError, "Cannot specify ',' with 's'", format, 3, ',s')
+        self.assertRaisesRegex(ValueError, "Cannot specify '_' with 's'", format, 3, '_s')
+
         # ensure that only int and float type specifiers work
-        for format_spec in ([chr(x) for x in range(ord('a'), ord('z')+1)] +
-                            [chr(x) for x in range(ord('A'), ord('Z')+1)]):
+        for format_spec in ([chr(x) for x in yp_range(ord('a'), ord('z')+1)] +
+                            [chr(x) for x in yp_range(ord('A'), ord('Z')+1)]):
             if not format_spec in 'bcdoxXeEfFgGn%':
                 self.assertRaises(ValueError, format, 0, format_spec)
                 self.assertRaises(ValueError, format, 1, format_spec)
@@ -778,9 +803,23 @@ class LongTest(yp_unittest.TestCase):
         self.assertRaises(OverflowError, yp_int, yp_float('-inf'))
         self.assertRaises(ValueError, yp_int, yp_float('nan'))
 
+    def test_mod_division(self):
+        with self.assertRaises(ZeroDivisionError):
+            _ = yp_int(1) % 0
+
+        self.assertEqual(yp_int(13) % 10, 3)
+        self.assertEqual(yp_int(-13) % 10, 7)
+        self.assertEqual(yp_int(13) % -10, -7)
+        self.assertEqual(yp_int(-13) % -10, -3)
+
+        self.assertEqual(yp_int(12) % 4, 0)
+        self.assertEqual(yp_int(-12) % 4, 0)
+        self.assertEqual(yp_int(12) % -4, 0)
+        self.assertEqual(yp_int(-12) % -4, 0)
+
     @yp_unittest.skip_long_ints
     def test_true_division(self):
-        huge = 1 << 40000
+        huge = yp_int(1) << 40000
         mhuge = -huge
         self.assertEqual(huge / huge, 1.0)
         self.assertEqual(mhuge / mhuge, 1.0)
@@ -812,6 +851,25 @@ class LongTest(yp_unittest.TestCase):
 
         for zero in ["huge / 0", "mhuge / 0"]:
             self.assertRaises(ZeroDivisionError, eval, zero, namespace)
+
+    def test_floordiv(self):
+        with self.assertRaises(ZeroDivisionError):
+            _ = yp_int(1) // yp_int(0)
+
+        self.assertEqual(yp_int(2) // yp_int(3), 0)
+        self.assertEqual(yp_int(2) // yp_int(-3), -1)
+        self.assertEqual(yp_int(-2) // yp_int(3), -1)
+        self.assertEqual(yp_int(-2) // yp_int(-3), 0)
+
+        self.assertEqual(yp_int(-11) // yp_int(-3), 3)
+        self.assertEqual(yp_int(-11) // yp_int(3), -4)
+        self.assertEqual(yp_int(11) // yp_int(-3), -4)
+        self.assertEqual(yp_int(11) // yp_int(3), 3)
+
+        self.assertEqual(yp_int(-12) // yp_int(-3), 4)
+        self.assertEqual(yp_int(-12) // yp_int(3), -4)
+        self.assertEqual(yp_int(12) // yp_int(-3), -4)
+        self.assertEqual(yp_int(12) // yp_int(3), 4)
 
     def check_truediv(self, a, b, skip_small=True):
         """Verify that the result of a/b is correctly rounded, by
@@ -868,19 +926,19 @@ class LongTest(yp_unittest.TestCase):
         bases = (0, DBL_MANT_DIG, DBL_MIN_EXP,
                  DBL_MAX_EXP, DBL_MIN_EXP - DBL_MANT_DIG)
         for base in bases:
-            for exp in range(base - 15, base + 15):
+            for exp in yp_range(base - 15, base + 15):
                 self.check_truediv(75312*2**max(exp, 0), 69187*2**max(-exp, 0))
                 self.check_truediv(69187*2**max(exp, 0), 75312*2**max(-exp, 0))
 
         # overflow corner case
         for m in [1, 2, 7, 17, 12345, 7**100,
                   -1, -2, -5, -23, -67891, -41**50]:
-            for n in range(-10, 10):
+            for n in yp_range(-10, 10):
                 self.check_truediv(m*DBL_MIN_OVERFLOW + n, m)
                 self.check_truediv(m*DBL_MIN_OVERFLOW + n, -m)
 
         # check detection of inexactness in shifting stage
-        for n in range(250):
+        for n in yp_range(250):
             # (2**DBL_MANT_DIG+1)/(2**DBL_MANT_DIG) lies halfway
             # between two representable floats, and would usually be
             # rounded down under round-half-to-even.  The tiniest of
@@ -898,18 +956,18 @@ class LongTest(yp_unittest.TestCase):
         # a particularly bad case for the old algorithm:  gives an
         # error of close to 3.5 ulps.
         self.check_truediv(295147931372582273023, 295147932265116303360)
-        for i in range(1000):
+        for i in yp_range(1000):
             self.check_truediv(10**(i+1), 10**i)
             self.check_truediv(10**i, 10**(i+1))
 
         # test round-half-to-even behaviour, normal result
         for m in [1, 2, 4, 7, 8, 16, 17, 32, 12345, 7**100,
                   -1, -2, -5, -23, -67891, -41**50]:
-            for n in range(-10, 10):
+            for n in yp_range(-10, 10):
                 self.check_truediv(2**DBL_MANT_DIG*m + n, m)
 
         # test round-half-to-even, subnormal result
-        for n in range(-20, 20):
+        for n in yp_range(-20, 20):
             self.check_truediv(n, 2**1076)
 
         # largeish random divisions: a/b where |a| <= |b| <=
@@ -917,7 +975,7 @@ class LongTest(yp_unittest.TestCase):
         # always be bounded by 2**-54 with equality possible only
         # if the least significant bit of q=ans*2**53 is zero.
         for M in [10**10, 10**100, 10**1000]:
-            for i in range(1000):
+            for i in yp_range(1000):
                 a = random.randrange(1, M)
                 b = random.randrange(a, 2*a+1)
                 self.check_truediv(a, b)
@@ -926,7 +984,7 @@ class LongTest(yp_unittest.TestCase):
                 self.check_truediv(-a, -b)
 
         # and some (genuinely) random tests
-        for _ in range(10000):
+        for _ in yp_range(10000):
             a_bits = random.randrange(1000)
             b_bits = random.randrange(1, 1000)
             x = random.randrange(2**a_bits)
@@ -935,6 +993,63 @@ class LongTest(yp_unittest.TestCase):
             self.check_truediv(x, -y)
             self.check_truediv(-x, y)
             self.check_truediv(-x, -y)
+
+    def test_negative_shift_count(self):
+        with self.assertRaises(ValueError):
+            yp_int(42) << -3
+        with self.assertRaises(ValueError):
+            yp_int(42) << -(1 << 63) # TODO(skip_long_ints)
+        with self.assertRaises(ValueError):
+            yp_int(42) >> -3
+        with self.assertRaises(ValueError):
+            yp_int(42) >> -(1 << 63) # TODO(skip_long_ints)
+
+    def test_lshift_of_zero(self):
+        self.assertEqual(yp_int(0) << 0, 0)
+        self.assertEqual(yp_int(0) << 10, 0)
+        with self.assertRaises(ValueError):
+            yp_int(0) << -1
+
+    @yp_unittest.skip_long_ints
+    def test_lshift_of_zero_long_int(self):
+        self.assertEqual(yp_int(0) << (yp_int(1) << 1000), 0)
+        with self.assertRaises(ValueError):
+            yp_int(0) << -(yp_int(1) << 1000)
+
+    @support.cpython_only
+    def test_huge_lshift_of_zero(self):
+        # Shouldn't try to allocate memory for a huge shift. See issue #27870.
+        # Other implementations may have a different boundary for overflow,
+        # or not raise at all.
+        self.assertEqual(yp_int(0) << sys.maxsize, 0)
+        # TODO(skip_long_ints)
+        # self.assertEqual(yp_int(0) << (sys.maxsize + 1), 0)
+
+    @support.cpython_only
+    @support.bigmemtest(sys.maxsize + 1000, memuse=2/15 * 2, dry_run=False)
+    def test_huge_lshift(self, size):
+        self.assertEqual(yp_int(1) << (sys.maxsize + 1000), 1 << 1000 << sys.maxsize)
+
+    @yp_unittest.skip_long_ints
+    def test_huge_rshift(self):
+        self.assertEqual(yp_int(42) >> (1 << 1000), 0)
+        self.assertEqual(yp_int(-42) >> (1 << 1000), -1)
+
+    @support.cpython_only
+    @support.bigmemtest(sys.maxsize + 500, memuse=2/15, dry_run=False)
+    def test_huge_rshift_of_huge(self, size):
+        huge = yp_int((1 << 500) + 11) << sys.maxsize
+        self.assertEqual(huge >> (sys.maxsize + 1), (1 << 499) + 5)
+        self.assertEqual(huge >> (sys.maxsize + 1000), 0)
+
+    @yp_unittest.skip_long_ints
+    @support.cpython_only
+    def test_small_ints_in_huge_calculation(self):
+        a = yp_int(2 ** 100)
+        b = -a + 1
+        c = a + 1
+        self.assertIs(a + b, 1)
+        self.assertIs(c - a, 1)
 
     def test_small_ints(self):
         for i in yp_range(-5, 257):
@@ -950,6 +1065,7 @@ class LongTest(yp_unittest.TestCase):
             self.assertIs(i, yp_int(str(i)))
             self.assertIs(i, i<<2>>2, str(i))
         # corner cases
+        # TODO(skip_long_int)
         i = yp_int(1 << 30)
         self.assertIs(i - i, yp_int(0))
         self.assertIs(0 * i, yp_int(0))
@@ -982,7 +1098,7 @@ class LongTest(yp_unittest.TestCase):
         self.assertEqual(yp_int(2).bit_length(), 2)
         self.assertEqual(yp_int(-2).bit_length(), 2)
         for i in [2, 3, 15, 16, 17, 31, 32, 33, 63, 64, 234]:
-            # Skip numbers too large for nohtyP
+            # TODO(skip_long_int) Skip numbers too large for nohtyP
             try: a = yp_int(2**i)
             except OverflowError: continue
             self.assertEqual((a-1).bit_length(), i)
@@ -992,12 +1108,17 @@ class LongTest(yp_unittest.TestCase):
             self.assertEqual((a+1).bit_length(), i+1)
             self.assertEqual((-a-1).bit_length(), i+1)
 
-    def test_bit_length(self):
-        self.check_bit_length(random.sample(range(-130000, 130000),500))
+    @yp_unittest.skip_int_bit_count
+    def test_bit_count(self):
+        for a in yp_range(-1000, 1000):
+            self.assertEqual(a.bit_count(), bin(a).count("1"))
 
-    @support.requires_resource('cpu')
-    def test_bit_length_cpu(self):
-        self.check_bit_length(range(-65000, 65000))
+        for exp in [10, 17, 63, 64, 65, 1009, 70234, 1234567]:
+            a = yp_int(2**exp)
+            self.assertEqual(a.bit_count(), 1)
+            self.assertEqual((a - 1).bit_count(), exp)
+            self.assertEqual((a ^ 63).bit_count(), 7)
+            self.assertEqual(((a - 1) ^ 510).bit_count(), exp - 8)
 
     @yp_unittest.skip_floats
     def test_round(self):
@@ -1006,7 +1127,7 @@ class LongTest(yp_unittest.TestCase):
         test_dict = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0,
                      6:10, 7:10, 8:10, 9:10, 10:10, 11:10, 12:10, 13:10, 14:10,
                      15:20, 16:20, 17:20, 18:20, 19:20}
-        for offset in range(-520, 520, 20):
+        for offset in yp_range(-520, 520, 20):
             for k, v in test_dict.items():
                 got = round(k+offset, -1)
                 expected = v+offset
@@ -1046,15 +1167,15 @@ class LongTest(yp_unittest.TestCase):
         self.assertEqual(round(31415926535, -999), 0)
 
         # should get correct results even for huge inputs
-        for k in range(10, 100):
+        for k in yp_range(10, 100):
             got = round(10**k + 324678, -3)
             expect = 10**k + 325000
             self.assertEqual(got, expect)
             self.assertIs(type(got), yp_int)
 
         # nonnegative second argument: round(x, n) should just return x
-        for n in range(5):
-            for i in range(100):
+        for n in yp_range(5):
+            for i in yp_range(100):
                 x = random.randrange(-10000, 10000)
                 got = round(x, n)
                 self.assertEqual(got, x)
@@ -1063,14 +1184,14 @@ class LongTest(yp_unittest.TestCase):
             self.assertEqual(round(8979323, huge_n), 8979323)
 
         # omitted second argument
-        for i in range(100):
+        for i in yp_range(100):
             x = random.randrange(-10000, 10000)
             got = round(x)
             self.assertEqual(got, x)
             self.assertIs(type(got), yp_int)
 
         # bad second argument
-        bad_exponents = ('brian', 2.0, 0j, None)
+        bad_exponents = ('brian', 2.0, 0j)
         for e in bad_exponents:
             self.assertRaises(TypeError, round, 3, e)
 
@@ -1308,6 +1429,23 @@ class LongTest(yp_unittest.TestCase):
         self.assertRaises(TypeError, myint.from_bytes, 0, 'big')
         self.assertRaises(TypeError, yp_int.from_bytes, 0, 'big', True)
 
+        class myint2(yp_int):
+            def __new__(cls, value):
+                return yp_int.__new__(cls, value + 1)
+
+        i = myint2.from_bytes(b'\x01', 'big')
+        self.assertIs(type(i), myint2)
+        self.assertEqual(i, 2)
+
+        class myint3(yp_int):
+            def __init__(self, value):
+                self.foo = 'bar'
+
+        i = myint3.from_bytes(b'\x01', 'big')
+        self.assertIs(type(i), myint3)
+        self.assertEqual(i, 1)
+        self.assertEqual(getattr(i, 'foo', 'none'), 'bar')
+
     def test_access_to_nonexistent_digit_0(self):
         # http://bugs.python.org/issue14630: A bug in _PyLong_Copy meant that
         # ob_digit[0] was being incorrectly accessed for instances of a
@@ -1318,7 +1456,7 @@ class LongTest(yp_unittest.TestCase):
                 self.foo = 'foo'
                 return self
 
-        integers = [Integer(0) for i in range(1000)]
+        integers = [Integer(0) for i in yp_range(1000)]
         for n in map(yp_int, integers):
             self.assertEqual(n, 0)
 
@@ -1327,12 +1465,22 @@ class LongTest(yp_unittest.TestCase):
         # Issue #21422: ensure that bool << int and bool >> int return int
         for value in (True, False):
             for shift in (0, 2):
-                self.assertEqual(type(value << shift), int)
-                self.assertEqual(type(value >> shift), int)
+                self.assertEqual(type(value << shift), yp_int)
+                self.assertEqual(type(value >> shift), yp_int)
 
+    @yp_unittest.skip_num_integer_ratio
+    def test_as_integer_ratio(self):
+        # TODO(skip_user_defined_types)
+        # class myint(yp_int):
+        #     pass
+        # tests = [10, 0, -10, 1, sys.maxsize + 1, True, False, myint(42)]
+        tests = [10, 0, -10, 1, sys.maxsize + 1, True, False]
+        for value in tests:
+            numerator, denominator = value.as_integer_ratio()
+            self.assertEqual((numerator, denominator), (yp_int(value), 1))
+            self.assertEqual(type(numerator), yp_int)
+            self.assertEqual(type(denominator), yp_int)
 
-def test_main():
-    support.run_unittest(LongTest)
 
 if __name__ == "__main__":
-    test_main()
+    yp_unittest.main()

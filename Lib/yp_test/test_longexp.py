@@ -1,6 +1,4 @@
-from yp import *
 from yp_test import yp_unittest
-from yp_test import support
 
 @yp_unittest.skip_not_applicable
 class LongExpText(yp_unittest.TestCase):
@@ -9,8 +7,5 @@ class LongExpText(yp_unittest.TestCase):
         l = eval("[" + "2," * REPS + "]")
         self.assertEqual(len(l), REPS)
 
-def test_main():
-    support.run_unittest(LongExpText)
-
-if __name__=="__main__":
-    test_main()
+if __name__ == "__main__":
+    yp_unittest.main()

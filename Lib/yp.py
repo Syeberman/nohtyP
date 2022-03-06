@@ -450,6 +450,7 @@ yp_func(c_ypObject_p, "yp_dictK", (c_multiK_ypObject_p, ))
 
 # ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...);
 # ypObject *yp_frozendict_fromkeysNV(ypObject *value, int n, va_list args);
+yp_func(c_ypObject_p, "yp_frozendict_fromkeysN", ((c_ypObject_p, "value"), c_multiN_ypObject_p))
 # ypObject *yp_dict_fromkeysN(ypObject *value, int n, ...);
 # ypObject *yp_dict_fromkeysNV(ypObject *value, int n, va_list args);
 yp_func(c_ypObject_p, "yp_dict_fromkeysN", ((c_ypObject_p, "value"), c_multiN_ypObject_p))
@@ -461,12 +462,6 @@ yp_func(c_ypObject_p, "yp_dict", ((c_ypObject_p, "x"), ))
 
 # ypObject *yp_functionC(yp_function_decl_t *declaration);
 yp_func(c_ypObject_p, "yp_functionC", ((POINTER(c_yp_function_decl_t), "declaration"), ))
-
-# ypObject *yp_function_withstateCN(yp_function_decl_t *declaration, int n, ...);
-# ypObject *yp_function_withstateCNV(yp_function_decl_t *declaration, int n, va_list args);
-
-# ypObject *yp_function_withstatestructCN(yp_function_decl_t *declaration, void *state, yp_ssize_t size, int n, ...);
-# ypObject *yp_function_withstatestructCNV(yp_function_decl_t *declaration, void *state, yp_ssize_t size, int n, va_list args);
 
 # XXX The file type will be added in a future version
 
@@ -1771,6 +1766,12 @@ class yp_bool(ypObject):
 
     def __invert__(self): return ~self._as_int()
 
+    @property
+    def real(self): return self._as_int()
+
+    @property
+    def imag(self): return yp_i_zero
+
     @staticmethod
     def _boolean(left, op, right):
         result = yp_bool._arithmetic(left, op, right)
@@ -1854,6 +1855,9 @@ class yp_int(ypObject):
     def _yp_repr(self): return yp_str(repr(self._asint()))
 
     def bit_length(self): return yp_int(_yp_int_bit_lengthC(self, yp_None))
+
+    # TODO Implement yp_index
+    def __index__(self): return self._asint()
 c_ypObject_p_value("yp_sys_maxint")
 c_ypObject_p_value("yp_sys_minint")
 c_ypObject_p_value("yp_i_neg_one")
@@ -1927,6 +1931,20 @@ class _ypBytes(ypObject):
             raise TypeError
         return _yp_repeatC(self, factor)
 
+    # TODO When nohtyP has hex/fromhex, use it instead of this faked-out version
+
+    @classmethod
+    def fromhex(cls, s):
+        if isinstance(s, yp_str):
+            s = str(s)
+        return cls(bytes.fromhex(s))
+
+    def hex(self, sep=_yp_arg_missing, bytes_per_sep=1, /):
+        # Python's default value for sep is NULL, i.e. the null pointer, which is not friendly
+        if sep is _yp_arg_missing:
+            return yp_str(self._asbytes().hex())
+        else:
+            return yp_str(self._asbytes().hex(sep, bytes_per_sep))
 
 @pytype(yp_t_bytes, bytes)
 class yp_bytes(_ypBytes):
@@ -2256,6 +2274,14 @@ class yp_frozenset(_ypSet):
         # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
         # if len(self) < 1 and "yp_frozenset_empty" in globals():
         #    assert self is yp_frozenset_empty, "an empty frozenset should be yp_frozenset_empty"
+
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        if not self:
+            return yp_str("frozenset()")
+        return yp_str("frozenset({%s})" % ", ".join(repr(x) for x in self))
+    _yp_repr = _yp_str
+
 c_ypObject_p_value("yp_frozenset_empty")
 
 
@@ -2266,6 +2292,13 @@ class yp_set(_ypSet):
         if len(pyobj) > CTYPES_MAX_ARGCOUNT-1:
             return _yp_set(yp_iter._from_python(pyobj))
         return _yp_setN(*pyobj)
+
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        if not self:
+            return yp_str("set()")
+        return yp_str("{%s}" % ", ".join(repr(x) for x in self))
+    _yp_repr = _yp_str
 
 
 # Python dict objects need to be passed through this then sent to the "K" version of the function;
@@ -2371,15 +2404,6 @@ class _ypDict(ypObject):
             return _yp_dict(_yp_item_iter._from_python(pyobj))
         return _yp_dictK(*_yp_flatten_dict(pyobj))
 
-    @reprlib.recursive_repr("{...}")
-    def _yp_str(self):
-        # TODO When nohtyP supports str/repr, replace this faked-out version
-        return yp_str("{%s}" % ", ".join(f"{k!r}: {v!r}" for k, v in self))
-    _yp_repr = _yp_str
-
-    @classmethod
-    def fromkeys(cls, seq, value=None): return _yp_dict_fromkeysN(value, *seq)
-
     def keys(self): return _keys_dictview(self)
 
     def values(self): return _values_dictview(self)
@@ -2402,19 +2426,36 @@ class _ypDict(ypObject):
 @pytype(yp_t_frozendict, ())
 class yp_frozendict(_ypDict):
     @classmethod
+    def fromkeys(cls, seq, value=None): return _yp_frozendict_fromkeysN(value, *seq)
+
+    @classmethod
     def _from_python(cls, pyobj):
         if len(pyobj) > (CTYPES_MAX_ARGCOUNT-1) // 2:
             return _yp_frozendict(_yp_item_iter._from_python(pyobj))
         return _yp_frozendictK(*_yp_flatten_dict(pyobj))
 
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        return yp_str("frozendict({%s})" % ", ".join(f"{k!r}: {v!r}" for k, v in self.items()))
+    _yp_repr = _yp_str
+
 
 @pytype(yp_t_dict, dict)
 class yp_dict(_ypDict):
+    @classmethod
+    def fromkeys(cls, seq, value=None): return _yp_dict_fromkeysN(value, *seq)
+
     @classmethod
     def _from_python(cls, pyobj):
         if len(pyobj) > (CTYPES_MAX_ARGCOUNT-1) // 2:
             return _yp_dict(_yp_item_iter._from_python(pyobj))
         return _yp_dictK(*_yp_flatten_dict(pyobj))
+
+    @reprlib.recursive_repr("{...}")
+    def _yp_str(self):
+        # TODO When nohtyP supports str/repr, replace this faked-out version
+        return yp_str("{%s}" % ", ".join(f"{k!r}: {v!r}" for k, v in self.items()))
+    _yp_repr = _yp_str
 
 
 @pytype(yp_t_range, range)
@@ -2455,10 +2496,9 @@ class yp_function(ypObject):
     @staticmethod
     def _pyfunction_wrapper(pyfunction, yp_self, n, argarray):
         try:
-            args = _yp_transmute_and_cache(argarray[0], steal=False)
-            kwargs = _yp_transmute_and_cache(argarray[1], steal=False)
+            transmuted = tuple(_yp_transmute_and_cache(argarray[i], steal=False) for i in range(n))
             try:
-                py_result = pyfunction(*args, **kwargs)
+                py_result = pyfunction(*transmuted)
             except BaseException as e: # exceptions from the function get passed to nohtyP
                 return _yp_incref(_pyExc2yp[type(e)])
             return _yp_incref(ypObject._from_python(py_result))
@@ -2466,15 +2506,24 @@ class yp_function(ypObject):
             traceback.print_exc()
             return _yp_incref(_pyExc2yp.get(type(e), _yp_BaseException))
 
-    _parameters_decl = (c_yp_parameter_decl_t * 2)((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
-
     @classmethod
-    def _from_python(cls, pyobj):
-        ypcode = c_yp_function_code_t(functools.partial(cls._pyfunction_wrapper, pyobj))
-        declaration = c_yp_function_decl_t(ypcode, 0, len(cls._parameters_decl), cls._parameters_decl)
+    # TODO Get fancy: read the signature from pyobj and create the param decl from that?
+    def with_parameters(cls, pyfunction, parameters):
+        """Creates a yp_function object where the parameters are parsed by nohtyP. pyfunction will
+        be called with *argarray.
+        """
+        ypcode = c_yp_function_code_t(functools.partial(cls._pyfunction_wrapper, pyfunction))
+        declaration = c_yp_function_decl_t(ypcode, 0, len(parameters), (c_yp_parameter_decl_t * len(parameters))(*parameters))
         self = _yp_functionC(declaration)
         _yp_reverse_refs[self.value].append(ypcode)
         return self
+
+    @classmethod
+    def _from_python(cls, pyobj):
+        return cls.with_parameters(
+            lambda args, kwargs: pyobj(*args, **kwargs),
+            ((yp_s_star_args, ), (yp_s_star_star_kwargs, ))
+        )
 
 c_ypObject_p_value("yp_func_chr")
 c_ypObject_p_value("yp_func_hash")

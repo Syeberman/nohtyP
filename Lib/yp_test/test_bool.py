@@ -2,45 +2,36 @@
 
 from yp import *
 from yp_test import yp_unittest
-from yp_test import support
+from yp_test.support import os_helper
 
 import os
 
 # Extra assurance that we're not accidentally testing Python's bool; unfortunately we can't
 # redefine True/False because they are keywords
-def bool( *args, **kwargs ): raise NotImplementedError( "convert script to yp_bool here" )
+def bool(*args, **kwargs): raise NotImplementedError("convert script to yp_bool here")
 
 class BoolTest(yp_unittest.TestCase):
 
     @yp_unittest.skip_not_applicable
     def test_subclass(self):
         try:
-            class C(bool):
+            class C(yp_bool):
                 pass
         except TypeError:
             pass
         else:
             self.fail("bool should not be subclassable")
 
-        self.assertRaises(TypeError, int.__new__, bool, 0)
-
-    def test_print(self):
-        try:
-            fo = open(support.TESTFN, "w")
-            print(yp_False, yp_True, file=fo)
-            fo.close()
-            fo = open(support.TESTFN, "r")
-            with self.nohtyPCheck(False):
-                self.assertEqual(fo.read(), 'False True\n')
-        finally:
-            fo.close()
-            os.remove(support.TESTFN)
+        self.assertRaises(TypeError, int.__new__, yp_bool, 0)
 
     def test_repr(self):
         self.assertEqual(yp_repr(yp_False), 'False')
         self.assertEqual(yp_repr(yp_True), 'True')
-        self.assertEqual(eval(repr(yp_False)), yp_False)
-        self.assertEqual(eval(repr(yp_True)), yp_True)
+
+    @yp_unittest.skip_not_applicable
+    def test_repr_eval(self):
+        self.assertIs(eval(yp_repr(yp_False)), yp_False)
+        self.assertIs(eval(yp_repr(yp_True)), yp_True)
 
     def test_str(self):
         self.assertEqual(yp_str(yp_False), 'False')
@@ -102,6 +93,13 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIsNot(yp_True/1, yp_True)
         self.assertEqual(yp_False/1, 0)
         self.assertIsNot(yp_False/1, yp_False)
+
+        self.assertEqual(yp_True%1, 0)
+        self.assertIsNot(yp_True%1, yp_False)
+        self.assertEqual(yp_True%2, 1)
+        self.assertIsNot(yp_True%2, yp_True)
+        self.assertEqual(yp_False%1, 0)
+        self.assertIsNot(yp_False%1, yp_False)
 
         for b in yp_False, yp_True:
             for i in 0, 1, 2:
@@ -177,6 +175,10 @@ class BoolTest(yp_unittest.TestCase):
         self.assertIs(yp_bool(yp_str("hello")), yp_True)
         self.assertIs(yp_bool(yp_str("")), yp_False)
         self.assertIs(yp_bool(), yp_False)
+
+    def test_keyword_args(self):
+        with self.assertRaisesRegex(TypeError, 'keyword argument'):
+            yp_bool(x=10)
 
     @yp_unittest.skip_str_printf
     def test_format(self):
@@ -255,12 +257,11 @@ class BoolTest(yp_unittest.TestCase):
     @yp_unittest.skip_files
     def test_fileclosed(self):
         try:
-            f = open(support.TESTFN, "w")
-            self.assertIs(f.closed, yp_False)
-            f.close()
+            with open(os_helper.TESTFN, "w", encoding="utf-8") as f:
+                self.assertIs(f.closed, yp_False)
             self.assertIs(f.closed, yp_True)
         finally:
-            os.remove(support.TESTFN)
+            os.remove(os_helper.TESTFN)
 
     def test_types(self):
         # types are always true.
@@ -294,10 +295,9 @@ class BoolTest(yp_unittest.TestCase):
     @yp_unittest.skip_pickling
     def test_pickle(self):
         import pickle
-        self.assertIs(pickle.loads(pickle.dumps(yp_True)), yp_True)
-        self.assertIs(pickle.loads(pickle.dumps(yp_False)), yp_False)
-        self.assertIs(pickle.loads(pickle.dumps(yp_True, yp_True)), yp_True)
-        self.assertIs(pickle.loads(pickle.dumps(yp_False, yp_True)), yp_False)
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            self.assertIs(pickle.loads(pickle.dumps(yp_True, proto)), yp_True)
+            self.assertIs(pickle.loads(pickle.dumps(yp_False, proto)), yp_False)
 
     @yp_unittest.skip_pickling
     def test_picklevalues(self):
@@ -342,6 +342,11 @@ class BoolTest(yp_unittest.TestCase):
                 return -1
         self.assertRaises(ValueError, yp_bool, Eggs())
 
+    @yp_unittest.skip_int_to_bytes
+    def test_from_bytes(self):
+        self.assertIs(yp_bool.from_bytes(b'\x00'*8, 'big'), yp_False)
+        self.assertIs(yp_bool.from_bytes(b'abcd', 'little'), yp_True)
+
     @yp_unittest.skip_not_applicable
     def test_sane_len(self):
         # this test just tests our assumptions about __len__
@@ -358,19 +363,44 @@ class BoolTest(yp_unittest.TestCase):
                 except (Exception) as e_len:
                     self.assertEqual(str(e_bool), str(e_len))
 
-    @yp_unittest.skip_num_attributes
+    def test_blocked(self):
+        class A:
+            __bool__ = None
+        self.assertRaises(TypeError, yp_bool, A())
+
+        class B:
+            def __len__(self):
+                return 10
+            __bool__ = None
+        self.assertRaises(TypeError, yp_bool, B())
+
     def test_real_and_imag(self):
         self.assertEqual(yp_True.real, 1)
         self.assertEqual(yp_True.imag, 0)
-        self.assertIs(type(yp_True.real), int)
-        self.assertIs(type(yp_True.imag), int)
+        self.assertIs(type(yp_True.real), yp_int)
+        self.assertIs(type(yp_True.imag), yp_int)
         self.assertEqual(yp_False.real, 0)
         self.assertEqual(yp_False.imag, 0)
-        self.assertIs(type(yp_False.real), int)
-        self.assertIs(type(yp_False.imag), int)
+        self.assertIs(type(yp_False.real), yp_int)
+        self.assertIs(type(yp_False.imag), yp_int)
 
-def test_main():
-    support.run_unittest(BoolTest)
+    @yp_unittest.skip_not_applicable
+    def test_bool_called_at_least_once(self):
+        class X:
+            def __init__(self):
+                self.count = 0
+            def __bool__(self):
+                self.count += 1
+                return yp_True
+
+        def f(x):
+            if x or yp_True:
+                pass
+
+        x = X()
+        f(x)
+        self.assertGreaterEqual(x.count, 1)
+
 
 if __name__ == "__main__":
-    test_main()
+    yp_unittest.main()

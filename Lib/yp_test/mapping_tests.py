@@ -2,6 +2,7 @@
 from yp import *
 from yp_test import yp_unittest
 import collections
+import sys
 
 # nohtyP: Calls to dict are OK here: it's for comparing yp_dict with dict
 
@@ -67,7 +68,7 @@ class BasicTestMappingProtocol(yp_unittest.TestCase):
         self.assertEqual(d, d)
         self.assertNotEqual(p, d)
         self.assertNotEqual(d, p)
-        #__non__zero__
+        #bool
         if p: self.fail("Empty mapping must compare to False")
         if not d: self.fail("Full mapping must compare to True")
         # keys(), items(), iterkeys() ...
@@ -456,7 +457,7 @@ class TestMappingProtocol(BasicTestMappingProtocol):
         class Exc(Exception): pass
 
         class baddict1(self.type2test):
-            def __init__(self):
+            def __init__(self, *args, **kwargs):
                 raise Exc()
 
         self.assertRaises(Exc, baddict1.fromkeys, [1])
@@ -604,12 +605,14 @@ class TestHashMappingProtocol(TestMappingProtocol):
         d = self._empty_mapping()
         d[1] = 1
         try:
+            count = 0
             for i in d:
                 d[i+1] = 1
+                if count >= 1:
+                    self.fail("changing dict size during iteration doesn't raise Error")
+                count += 1
         except RuntimeError:
             pass
-        else:
-            self.fail("changing dict size during iteration doesn't raise Error")
 
     @yp_unittest.skip_str_repr
     def test_repr(self):
@@ -629,6 +632,14 @@ class TestHashMappingProtocol(TestMappingProtocol):
 
         d = self._full_mapping({1: BadRepr()})
         self.assertRaises(Exc, repr, d)
+
+    def test_repr_deep(self):
+        d = self._empty_mapping()
+        for i in range(sys.getrecursionlimit() + 100):
+            d0 = d
+            d = self._empty_mapping()
+            d[1] = d0
+        self.assertRaises(RecursionError, repr, d)
 
     def test_eq(self):
         self.assertEqual(self._empty_mapping(), self._empty_mapping())
