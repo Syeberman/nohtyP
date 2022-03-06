@@ -1448,14 +1448,18 @@ ypAPI ypObject *const yp_i_two;
  * Freezing, "Unfreezing", and Invalidating
  */
 
-// All objects support a one-way freeze method that makes them immutable, an unfrozen_copy method
+// TODO Reconsider how types that are strictly mutable or strictly immutable are handled.
+// TODO Reconsider how to document when objects are reused vs copied, and thus threadsafety.
+// TODO Reconsider if and how to document lazy shallow copies.
+
+// Most objects support a one-way freeze method that makes them immutable, an unfrozen_copy method
 // that returns a mutable copy, and a one-way invalidate method that renders the object useless;
 // there are also deep variants to these methods. Supplying an invalidated object to a function
 // raises yp_InvalidatedError. Invalidating an object stored in a container may cause some
 // operations on that container to raise yp_InvalidatedError. Freezing and invalidating are two
 // examples of object transmutation, where the type of the object is converted to a different type.
-// Unlike Python, most objects are copied in memory, even immutables, as copying is one strategy to
-// maintain threadsafety.
+// Unlike Python, most objects are deep copied in memory, even immutables, as deep copying is one
+// strategy to maintain threadsafety.
 
 // Transmutes *x to its associated immutable type.  If *x is already immutable this is a no-op.
 ypAPI void yp_freeze(ypObject **x);
@@ -1468,14 +1472,21 @@ ypAPI void yp_deepfreeze(ypObject **x);
 ypAPI ypObject *yp_unfrozen_copy(ypObject *x);
 
 // Creates a mutable copy of x and, recursively, all contained objects, returning a new reference.
+// If a copied object has no associated mutable type, or is referenced in a context that requires an
+// immutable type (e.g., a dict key), an immutable copy is made instead.
+//
+// While the deepcopy methods generally make one copy of each object, there are scenarios where
+// yp_unfrozen_deepcopy must make two copies. For example, if an object is used as both a key and a
+// value in a dict, and that object has an associated mutable type, then an immutable copy will be
+// made for the key and a mutable copy will be made for the value.
 ypAPI ypObject *yp_unfrozen_deepcopy(ypObject *x);
 
-// Returns a new reference to an immutable shallow copy of x.  If x has no associated immutable
-// type a new, invalidated object is returned.
+// Returns a new reference to an immutable shallow copy of x. If x has no associated immutable type
+// a mutable copy is returned.
 ypAPI ypObject *yp_frozen_copy(ypObject *x);
 
 // Creates an immutable copy of x and, recursively, all contained objects, returning a new
-// reference.
+// reference. If a copied object has no associated immutable type, a mutable copy is made instead.
 ypAPI ypObject *yp_frozen_deepcopy(ypObject *x);
 
 // Returns a new reference to an exact, shallow copy of x.
@@ -1503,7 +1514,7 @@ ypAPI void yp_deepinvalidate(ypObject **x);
 // returned; if it is invalidated, yp_t_invalidated is returned.
 ypAPI ypObject *yp_type(ypObject *object);
 
-// The immortal type objects.  Calling a type object (i.e. with yp_callN) typically constructs an
+// The immortal type objects.  Calling a type object (e.g., with yp_callN) typically constructs an
 // object of that type.
 ypAPI ypObject *const yp_t_invalidated;
 ypAPI ypObject *const yp_t_exception;
@@ -1560,11 +1571,11 @@ typedef struct _yp_state_decl_t {
     // for details).
     yp_ssize_t offsets_len;
 
-    // An array of offsets of the objects in state (i.e. the ypObject * members). Identifying these
+    // An array of offsets of the objects in state (i.e., the ypObject * members). Identifying these
     // offsets allows nohtyP to manage reference counts for these objects. Leave empty and set
     // offsets_len to 0 if state does not contain any objects.
     //
-    // If state is an array of objects (i.e. ypObject *state[]), leave offsets empty and set
+    // If state is an array of objects (i.e., ypObject *state[]), leave offsets empty and set
     // offsets_len to -1: the offsets will be calculated based on the size of the array. If state is
     // a struct that _includes_ arrays of objects, but also contains other data, you must instead
     // list the offsets for each element of each array.
@@ -2053,7 +2064,7 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts abuse ob_alloclen to hold a search finger for popitem
-// XXX The dealloc list (i.e. yp_decref) abuses ob_hash to point to the next object to dealloc
+// XXX The dealloc list (i.e., yp_decref) abuses ob_hash to point to the next object to dealloc
 typedef yp_int32_t _yp_ob_len_t;
 struct _ypObject {
     yp_uint16_t  ob_type;        // type code
