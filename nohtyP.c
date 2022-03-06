@@ -17920,6 +17920,8 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
     return _function_traverse_params(f, visitor, memo);
 }
 
+static ypObject *function_frozen_copy(ypObject *f) { return yp_incref(f); }
+
 static ypObject *function_currenthash(
         ypObject *f, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
@@ -17977,8 +17979,8 @@ static ypTypeObject ypFunction_Type = {
 
         // Freezing, copying, and invalidating
         MethodError_objproc,       // tp_freeze
-        MethodError_objproc,       // tp_unfrozen_copy
-        MethodError_objproc,       // tp_frozen_copy
+        function_frozen_copy,      // tp_unfrozen_copy
+        function_frozen_copy,      // tp_frozen_copy
         MethodError_traversefunc,  // tp_unfrozen_deepcopy
         MethodError_traversefunc,  // tp_frozen_deepcopy
         MethodError_objproc,       // tp_invalidate
