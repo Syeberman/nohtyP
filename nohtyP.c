@@ -3178,6 +3178,11 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
     ypObject *result;
 
     // Avoid recursion: we only have to visit each object once
+    // TODO An easier way to accomplish the same is to inspect ypObject_IS_MUTABLE, since we freeze
+    // before going deep.
+    // TODO ...and then switch to recursion depth check. In fact, reconsider anywhere we take a
+    // "weak reference" to an object as a means of preventing recursion. (And, also, if we do
+    // this we need a keepalive like deepcopy does.)
     id = yp_intC((yp_ssize_t)x);
     yp_pushuniqueE(memo, id, &exc);
     yp_decref(id);
@@ -3319,11 +3324,7 @@ ypObject *yp_unfrozen_deepcopy(ypObject *x)
     return _yp_deepcopy(x, _yp_unfrozen_deepcopy_visitor);
 }
 
-ypObject *yp_frozen_copy(ypObject *x)
-{
-    if (!ypObject_IS_MUTABLE(x)) return yp_incref(x);
-    return ypObject_TYPE(x)->tp_frozen_copy(x);
-}
+ypObject *yp_frozen_copy(ypObject *x) { return ypObject_TYPE(x)->tp_frozen_copy(x); }
 
 // Use this as the visitor for "frozen" deep copies (i.e. yp_frozen_deepcopy).
 static ypObject *_yp_frozen_deepcopy_visitor(ypObject *x, void *memo)
@@ -4489,8 +4490,12 @@ static ypObject *int_dealloc(ypObject *i, void *memo)
 
 static ypObject *int_unfrozen_copy(ypObject *i) { return yp_intstoreC(ypInt_VALUE(i)); }
 
-// FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
-static ypObject *int_frozen_copy(ypObject *i) { return yp_intC(ypInt_VALUE(i)); }
+static ypObject *int_frozen_copy(ypObject *i)
+{
+    // A shallow copy of an int to an int doesn't require an actual copy
+    if (ypObject_TYPE_CODE(i) == ypInt_CODE) return yp_incref(i);
+    return yp_intC(ypInt_VALUE(i));
+}
 
 // Check for the ypInt_IS_PREALLOC optimization before calling.
 static ypObject *_ypInt_deepcopy(int type, ypObject *i, void *copy_memo)
@@ -5643,7 +5648,12 @@ static ypObject *float_dealloc(ypObject *f, void *memo)
 
 static ypObject *float_unfrozen_copy(ypObject *f) { return yp_floatstoreCF(ypFloat_VALUE(f)); }
 
-static ypObject *float_frozen_copy(ypObject *f) { return yp_floatCF(ypFloat_VALUE(f)); }
+static ypObject *float_frozen_copy(ypObject *f)
+{
+    // A shallow copy of a float to a float doesn't require an actual copy
+    if (ypObject_TYPE_CODE(f) == ypFloat_CODE) return yp_incref(f);
+    return yp_floatCF(ypFloat_VALUE(f));
+}
 
 static ypObject *_ypFloat_deepcopy(int type, ypObject *f, void *copy_memo)
 {
