@@ -12920,7 +12920,7 @@ merge_getmem(MergeState *ms, yp_ssize_t need)
     // FIXME We can use nohtyP's custom realloc code here
     merge_freemem(ms);
     if ((size_t)need > yp_SSIZE_T_MAX / sizeof(ypObject*) / multiplier) {
-        ms->exc = yp_MemoryError;
+        ms->exc = yp_MemorySizeOverflowError;
         return -1;
     }
     ms->a.keys = (ypObject**)yp_malloc(&actual, multiplier * need * sizeof(ypObject *));
