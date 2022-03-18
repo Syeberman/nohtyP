@@ -2094,13 +2094,10 @@ struct _ypIntObject {
     // So, this may not be a great way to reduce the size of these simpler types.
     yp_int_t value;
 };
-struct _ypBytesObject {
+// bytes and str all share the same underlying structure, because they share some of the same
+// "StringLib" code
+struct _ypStringLibObject {
     _ypObject_HEAD;
-    _yp_INLINE_DATA(yp_uint8_t);
-};
-struct _ypStrObject {
-    _ypObject_HEAD;
-    ypObject *utf_8;
     _yp_INLINE_DATA(yp_uint8_t);
 };
 
@@ -2136,17 +2133,15 @@ struct _ypStrObject {
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_BYTES(qual, name, value)                                              \
     static const char            _##name##_data[] = value;                                 \
-    static struct _ypBytesObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
+    static struct _ypStringLibObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
             _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};  \
     qual ypObject *const         name = (ypObject *)&_##name##_struct /* force semi-colon */
-// TODO If we populate name->utf_8 on immortals, we are leaking memory. Either don't, or
-// pre-allocate an immortal bytes that we populate later? Or drop the name->utf_8 idea.
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                                               \
     static const char          _##name##_data[] = value;                                          \
-    static struct _ypStrObject _##name##_struct = {                                               \
+    static struct _ypStringLibObject _##name##_struct = {                                               \
             _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_LATIN_1, (void *)_##name##_data, \
                     sizeof(_##name##_data) - 1),                                                  \
-            NULL};                                                                                \
+    };                                                                                            \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
