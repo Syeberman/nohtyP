@@ -2131,14 +2131,14 @@ struct _ypStringLibObject {
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID), (value)}; \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
-#define _yp_IMMORTAL_BYTES(qual, name, value)                                              \
-    static const char            _##name##_data[] = value;                                 \
+#define _yp_IMMORTAL_BYTES(qual, name, value)                                                  \
+    static const char                _##name##_data[] = value;                                 \
     static struct _ypStringLibObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
-            _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};  \
-    qual ypObject *const         name = (ypObject *)&_##name##_struct /* force semi-colon */
+            _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};      \
+    qual ypObject *const             name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                                               \
-    static const char          _##name##_data[] = value;                                          \
-    static struct _ypStringLibObject _##name##_struct = {                                               \
+    static const char                _##name##_data[] = value;                                    \
+    static struct _ypStringLibObject _##name##_struct = {                                         \
             _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_LATIN_1, (void *)_##name##_data, \
                     sizeof(_##name##_data) - 1),                                                  \
     };                                                                                            \
