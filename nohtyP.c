@@ -6885,6 +6885,53 @@ static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
     return newS;
 }
 
+// Helper function for bytes_find and str_find. The string to find (x_data and x_len) must have
+// already been coerced into the same encoding as s. If x_data is NULL, it's treated as if the
+// string is not in s (_ypStr_coerce_encoding returns NULL if it can't coerce).
+// FIXME Replace with the faster find implementation from Python.
+static ypObject *ypStringLib_find(ypObject *s, void *x_data, yp_ssize_t x_len, yp_ssize_t start,
+        yp_ssize_t stop, findfunc_direction direction, yp_ssize_t *i)
+{
+    int         sizeshift = ypStringLib_ENC(s)->sizeshift;
+    yp_uint8_t *s_data = ypStringLib_DATA(s);
+    ypObject   *result;
+    yp_ssize_t  step = 1;  // may change to -1
+    yp_ssize_t  s_rlen;    // remaining length
+    yp_uint8_t *s_rdata;   // remaining data
+
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
+    // https://bugs.python.org/issue24243.
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &s_rlen);
+    if (yp_isexceptionC(result)) return result;
+
+    // Treat NULL as "not in string". Why do this check here instead of in the caller? Because this
+    // way we can check the slice arguments with ypSlice_AdjustIndicesC in a common location.
+    if (x_data == NULL) {
+        *i = -1;
+        return yp_None;
+    }
+
+    if (direction == yp_FIND_FORWARD) {
+        s_rdata = s_data + (start << sizeshift);
+        // step is already 1
+    } else {
+        s_rdata = s_data + ((stop - x_len) << sizeshift);
+        step = -1;
+    }
+
+    while (s_rlen >= x_len) {
+        if (memcmp(s_rdata, x_data, x_len << sizeshift) == 0) {
+            *i = (s_rdata - s_data) >> sizeshift;
+            return yp_None;
+        }
+        s_rdata += (step << sizeshift);
+        s_rlen--;
+    }
+    *i = -1;
+    return yp_None;
+}
+
 static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
 {
     yp_ssize_t           s_len = ypStringLib_LEN(s);
@@ -8770,7 +8817,6 @@ static ypObject *bytes_frozen_deepcopy(ypObject *b, visitfunc copy_visitor, void
 
 static ypObject *bytes_bool(ypObject *b) { return ypBool_FROM_C(ypBytes_LEN(b)); }
 
-// FIXME Replace with the faster find implementation from Python.
 static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *i)
 {
@@ -8778,36 +8824,11 @@ static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize
     yp_ssize_t  x_len;
     yp_uint8_t  storage;
     ypObject   *result;
-    yp_ssize_t  step = 1;  // may change to -1
-    yp_ssize_t  b_rlen;    // remaining length
-    yp_uint8_t *b_rdata;   // remaining data
 
     result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
     if (yp_isexceptionC(result)) return result;
 
-    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
-    // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
-    // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &b_rlen);
-    if (yp_isexceptionC(result)) return result;
-    if (direction == yp_FIND_FORWARD) {
-        b_rdata = ypBytes_DATA(b) + start;
-        // step is already 1
-    } else {
-        b_rdata = ypBytes_DATA(b) + stop - x_len;
-        step = -1;
-    }
-
-    while (b_rlen >= x_len) {
-        if (memcmp(b_rdata, x_data, x_len) == 0) {
-            *i = b_rdata - ypBytes_DATA(b);
-            return yp_None;
-        }
-        b_rdata += step;
-        b_rlen--;
-    }
-    *i = -1;
-    return yp_None;
+    return ypStringLib_find(b, x_data, x_len, start, stop, direction, i);
 }
 
 // Called when concatenating with an empty object: can simply make a copy (ensuring proper type)
@@ -9130,7 +9151,7 @@ static ypObject *_bytes_tailmatch(
     yp_ssize_t cmp_start;
     int        memcmp_result;
 
-    if (ypObject_TYPE_PAIR_CODE(x) != ypBytes_CODE) return yp_TypeError;
+    if (ypObject_TYPE_PAIR_CODE(x) != ypBytes_CODE) return_yp_BAD_TYPE(x);
 
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
     // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
@@ -9724,42 +9745,46 @@ yp_STATIC_ASSERT(yp_offsetof(ypStringLibObject, ob_inline_data) % 4 == 0, aligno
         ypStringLib_ASSERT_INVARIANTS(s);                                                      \
     } while (0)
 
-// As yp_index_asuint32C, but raises yp_ValueError when out of range.
-static yp_uint32_t _ypStr_asuint32C(ypObject *x, ypObject **exc)
+// If x is not a str/chrarray, returns yp_TypeError. If x is already in the requested encoding, sets
+// *x_data to x's data. If x cannot be converted, sets *x_data to NULL. Otherwise, sets *x_data to a
+// new buffer containing the converted data. If this function succeeds, you will need to call
+// _ypStr_coerce_encoding_free to clean up the data. *x_data may or may not be null terminated.
+static ypObject *_ypStr_coerce_encoding(int enc_code, ypObject *x, void **x_data)
 {
-    ypObject   *subexc = yp_None;
-    yp_int_t    asint;
-    yp_uint32_t retval;
+    int        dest_sizeshift = ypStringLib_encs[enc_code].sizeshift;
+    int        src_sizeshift;
+    yp_ssize_t alloclen;
 
-    asint = yp_index_asintC(x, &subexc);
-    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(0, exc, subexc);
-    retval = (yp_uint32_t)(asint & 0xFFFFFFFFu);
-    if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_ValueError);
-    return retval;
+    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
+    src_sizeshift = ypStringLib_ENC(x)->sizeshift;
+
+    // Ideal path: no allocations required.
+    if (dest_sizeshift == src_sizeshift) {
+        *x_data = ypStr_DATA(x);
+        return yp_None;
+    }
+
+    // Being unable to convert is not always an error: in find, it means the string is not present.
+    if (dest_sizeshift < src_sizeshift) {
+        *x_data = NULL;
+        return yp_None;
+    }
+
+    // Otherwise, we need to allocate a new buffer to hold this data.
+    *x_data = yp_malloc(&alloclen, (ypStr_LEN(x) + 1) << dest_sizeshift);
+    if (*x_data == NULL) return yp_MemoryError;
+    ypStringLib_elemcopy(dest_sizeshift, *x_data, 0, src_sizeshift, ypStr_DATA(x), 0, ypStr_LEN(x));
+    return yp_None;
 }
 
-// If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
-// x is a fellow str, set *x_data and *x_len.  Otherwise, returns an exception.
-static ypObject *_ypStr_coerce_intorstr(
-        ypObject *x, void **x_data, yp_ssize_t *x_len, yp_uint32_t *storage)
+// Cleans up after _ypStr_coerce_encoding. Safe to call for x_data=NULL.
+static void _ypStr_coerce_encoding_free(ypObject *x, void *x_data)
 {
-    ypObject *exc = yp_None;
-    int       x_pair = ypObject_TYPE_PAIR_CODE(x);
-
-    if (x_pair == ypBool_CODE || x_pair == ypInt_CODE) {
-        *storage = _ypStr_asuint32C(x, &exc);
-        if (yp_isexceptionC(exc)) return exc;
-        *x_data = storage;
-        *x_len = 1;
-        return yp_None;
-    } else if (x_pair == ypStr_CODE) {
-        *x_data = ypStr_DATA(x);
-        *x_len = ypStr_LEN(x);
-        return yp_None;
-    } else {
-        return_yp_BAD_TYPE(x);
+    if (x_data != ypStr_DATA(x) && x_data != NULL) {
+        yp_free(x_data);
     }
 }
+
 
 static ypObject *str_unfrozen_copy(ypObject *s)
 {
@@ -9837,13 +9862,18 @@ static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
     return yp_chrC(ypStringLib_ENC(s)->getindexX(ypStr_DATA(s), i));
 }
 
-static ypObject *str_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
+static ypObject *str_find(ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *i)
 {
-    // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
-    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings.  See
-    // https://bugs.python.org/issue24243.
-    return yp_NotImplementedError;
+    void     *x_data;
+    ypObject *result;
+
+    result = _ypStr_coerce_encoding(ypStringLib_ENC_CODE(s), x, &x_data);
+    if (yp_isexceptionC(result)) return result;
+
+    result = ypStringLib_find(s, x_data, ypStr_LEN(x), start, stop, direction, i);
+    _ypStr_coerce_encoding_free(x, x_data);
+    return result;
 }
 
 static ypObject *str_count(
@@ -9853,6 +9883,16 @@ static ypObject *str_count(
     // Python behaves peculiarly when stop<start in certain edge cases involving empty strings.  See
     // https://bugs.python.org/issue24243.
     return yp_NotImplementedError;
+}
+
+static ypObject *str_contains(ypObject *s, ypObject *x)
+{
+    ypObject  *result;
+    yp_ssize_t i = -1;
+
+    result = str_find(s, x, 0, yp_SLICE_USELEN, yp_FIND_FORWARD, &i);
+    if (yp_isexceptionC(result)) return result;
+    return ypBool_FROM_C(i >= 0);
 }
 
 static ypObject *str_len(ypObject *s, yp_ssize_t *len)
@@ -9889,7 +9929,7 @@ static ypObject *_str_tailmatch(
     ypObject  *result;
     yp_ssize_t cmp_start;
 
-    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_TypeError;
+    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
 
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
     // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
@@ -10211,7 +10251,7 @@ static ypTypeObject ypStr_Type = {
         TypeError_objobjproc,       // tp_send
 
         // Container operations
-        MethodError_objobjproc,     // tp_contains
+        str_contains,               // tp_contains
         str_len,                    // tp_len
         MethodError_objobjproc,     // tp_push
         MethodError_objproc,        // tp_clear
@@ -10240,7 +10280,7 @@ static ypSequenceMethods ypChrArray_as_sequence = {
         ypStringLib_repeat,           // tp_repeat
         str_getindex,                 // tp_getindex
         MethodError_objsliceproc,     // tp_getslice
-        MethodError_findfunc,         // tp_find
+        str_find,                     // tp_find
         MethodError_countfunc,        // tp_count
         MethodError_objssizeobjproc,  // tp_setindex
         MethodError_objsliceobjproc,  // tp_setslice
@@ -10300,7 +10340,7 @@ static ypTypeObject ypChrArray_Type = {
         TypeError_objobjproc,       // tp_send
 
         // Container operations
-        MethodError_objobjproc,     // tp_contains
+        str_contains,               // tp_contains
         str_len,                    // tp_len
         MethodError_objobjproc,     // tp_push
         ypStringLib_clear,          // tp_clear
@@ -18134,6 +18174,7 @@ ypObject *yp_next2(ypObject **iterator, ypObject *defval)
 ypObject *yp_throw(ypObject **iterator, ypObject *exc)
 {
     if (!yp_isexceptionC(exc)) {
+        // FIXME Use yp_BAD_TYPE?
         yp_INPLACE_ERR(iterator, yp_TypeError);
         return yp_TypeError;
     }
