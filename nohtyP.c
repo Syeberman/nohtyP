@@ -6726,7 +6726,7 @@ static ypObject *_ypStringLib_new(
     yp_ASSERT(requiredLen >= 0, "requiredLen cannot be negative");
     yp_ASSERT(requiredLen <= ypStringLib_LEN_MAX, "requiredLen cannot be >max");
     if (alloclen_fixed && !ypObject_TYPE_CODE_IS_MUTABLE(type)) {
-        yp_ASSERT(requiredLen > 0, "missed a yp_bytes_empty/yp_str_empty optimization");
+        yp_ASSERT(requiredLen > 0, "missed an empty_immutable optimization");
         newS = ypMem_MALLOC_CONTAINER_INLINE4(
                 ypStringLibObject, type, requiredLen + 1, ypStringLib_ALLOCLEN_MAX, elemsize);
     } else {
@@ -6762,7 +6762,7 @@ static ypObject *_ypStr_new_ucs_4(int type, yp_ssize_t requiredLen, int alloclen
 // (indicating the object will never grow), the data is placed inline with one allocation.
 // XXX Check for the possibility of a lazy shallow copy before calling this function
 // XXX Check for the empty_immutable case first
-static ypObject *ypStringLib_copy(int type, ypObject *s, int alloclen_fixed)
+static ypObject *ypStringLib_new_copy(int type, ypObject *s, int alloclen_fixed)
 {
     ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
     ypObject            *copy;
@@ -6777,6 +6777,20 @@ static ypObject *ypStringLib_copy(int type, ypObject *s, int alloclen_fixed)
     ypStringLib_SET_LEN(copy, ypStringLib_LEN(s));
     ypStringLib_ASSERT_INVARIANTS(copy);
     return copy;
+}
+
+// Returns a shallow copy of s of the given type. Optimizes for the lazy shallow copy and
+// empty_immutable cases.
+static ypObject *ypStringLib_copy(int type, ypObject *s)
+{
+    yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) == ypObject_TYPE_PAIR_CODE(s),
+            "incorrect type for copy");
+
+    if (!ypObject_TYPE_CODE_IS_MUTABLE(type)) {
+        if (ypStringLib_LEN(s) < 1) return ypStringLib_ENC(s)->empty_immutable;
+        if (!ypObject_IS_MUTABLE(s)) return yp_incref(s);
+    }
+    return ypStringLib_new_copy(type, s, /*alloclen_fixed=*/TRUE);
 }
 
 // Called on push/append, extend, irepeat, and similar functions to increase the alloclen and/or
@@ -6901,6 +6915,7 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
 
 
 // There are some efficiencies we can exploit if iterable/x is a fellow string object
+// TODO Is this really a scenario for which we should be optimizing? Why would someone ''.join('')?
 static ypObject *_ypStringLib_join_from_string(ypObject *s, ypObject *x)
 {
     yp_ssize_t           s_len = ypStringLib_LEN(s);
@@ -6924,10 +6939,7 @@ static ypObject *_ypStringLib_join_from_string(ypObject *s, ypObject *x)
         if (!ypObject_IS_MUTABLE(s)) return ypStringLib_ENC(s)->empty_immutable;
         return ypStringLib_ENC(s)->empty_mutable();
     } else if (s_len < 1 || x_len == 1) {
-        // Remember we need to return an object of the same type as s.  If s and x are both
-        // immutable then we can rely on a shallow copy.
-        if (!ypObject_IS_MUTABLE(s) && !ypObject_IS_MUTABLE(x)) return yp_incref(x);
-        return ypStringLib_copy(ypObject_TYPE_CODE(s), x, /*alloclen_fixed=*/TRUE);
+        return ypStringLib_copy(ypObject_TYPE_CODE(s), x);
     }
 
     // Calculate how long the result is going to be and which encoding we'll use
@@ -7038,10 +7050,7 @@ static ypObject *ypStringLib_join(
     } else if (seq_len == 1) {
         x = seq->getindexX(state, 0);  // borrowed
         if (ypObject_TYPE_PAIR_CODE(x) != s_pair) return_yp_BAD_TYPE(x);
-        // Remember we need to return an object of the same type as s.  If s and x are both
-        // immutable then we can rely on a lazy shallow copy.
-        if (!ypObject_IS_MUTABLE(s) && !ypObject_IS_MUTABLE(x)) return yp_incref(x);
-        return ypStringLib_copy(ypObject_TYPE_CODE(s), x, /*alloclen_fixed=*/TRUE);
+        return ypStringLib_copy(ypObject_TYPE_CODE(s), x);
     }
 
     // Calculate how long the result is going to be, which encoding we'll use, and ensure seq
@@ -8731,21 +8740,15 @@ static ypObject *_ypBytes_setslice_from_bytes(
 
 static ypObject *bytes_unfrozen_copy(ypObject *b)
 {
-    return ypStringLib_copy(ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE);
+    return ypStringLib_new_copy(ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE);
 }
 
-static ypObject *bytes_frozen_copy(ypObject *b)
-{
-    if (ypBytes_LEN(b) < 1) return yp_bytes_empty;
-    // A shallow copy of a bytes to a bytes doesn't require an actual copy
-    if (ypObject_TYPE_CODE(b) == ypBytes_CODE) return yp_incref(b);
-    return ypStringLib_copy(ypBytes_CODE, b, /*alloclen_fixed=*/TRUE);
-}
+static ypObject *bytes_frozen_copy(ypObject *b) { return ypStringLib_copy(ypBytes_CODE, b); }
 
 // XXX Check for the yp_bytes_empty case first
 static ypObject *_ypBytes_deepcopy(int type, ypObject *b, void *copy_memo)
 {
-    ypObject *b_copy = ypStringLib_copy(type, b, /*alloclen_fixed=*/TRUE);
+    ypObject *b_copy = ypStringLib_new_copy(type, b, /*alloclen_fixed=*/TRUE);
     ypObject *result = _yp_deepcopy_memo_setitem(copy_memo, b, b_copy);
     if (yp_isexceptionC(result)) {
         yp_decref(b_copy);
@@ -9209,8 +9212,7 @@ static ypObject *bytes_replace(ypObject *b, ypObject *oldsub, ypObject *newsub, 
     if (ypObject_TYPE_PAIR_CODE(oldsub) != ypBytes_CODE) return_yp_BAD_TYPE(oldsub);
     if (ypObject_TYPE_PAIR_CODE(newsub) != ypBytes_CODE) return_yp_BAD_TYPE(newsub);
     if ((ypBytes_LEN(oldsub) < 1 && ypBytes_LEN(newsub) < 1) || count == 0) {
-        if (ypObject_TYPE_CODE(b) == ypBytes_CODE) return yp_incref(b);
-        return ypStringLib_copy(ypByteArray_CODE, b, /*alloclen_fixed=*/FALSE);
+        return ypStringLib_copy(ypObject_TYPE_CODE(b), b);
     }
     return yp_NotImplementedError;
 }
@@ -9637,12 +9639,7 @@ static ypObject *_ypBytes(int type, ypObject *source)
     int       source_pair = ypObject_TYPE_PAIR_CODE(source);
 
     if (source_pair == ypBytes_CODE) {
-        // TODO Like other types, move these optimizations up the call stack?
-        if (type == ypBytes_CODE) {
-            if (ypBytes_LEN(source) < 1) return yp_bytes_empty;
-            if (ypObject_TYPE_CODE(source) == ypBytes_CODE) return yp_incref(source);
-        }
-        return ypStringLib_copy(type, source, /*alloclen_fixed=*/TRUE);
+        return ypStringLib_copy(type, source);
     } else if (source_pair == ypInt_CODE) {
         yp_ssize_t len = yp_index_asssizeC(source, &exc);
         if (yp_isexceptionC(exc)) return exc;
@@ -9766,21 +9763,15 @@ static ypObject *_ypStr_coerce_intorstr(
 
 static ypObject *str_unfrozen_copy(ypObject *s)
 {
-    return ypStringLib_copy(ypChrArray_CODE, s, TRUE);
+    return ypStringLib_new_copy(ypChrArray_CODE, s, TRUE);
 }
 
-static ypObject *str_frozen_copy(ypObject *s)
-{
-    if (ypStr_LEN(s) < 1) return yp_str_empty;
-    // A shallow copy of a str to a str doesn't require an actual copy
-    if (ypObject_TYPE_CODE(s) == ypStr_CODE) return yp_incref(s);
-    return ypStringLib_copy(ypStr_CODE, s, TRUE);
-}
+static ypObject *str_frozen_copy(ypObject *s) { return ypStringLib_copy(ypStr_CODE, s); }
 
 // XXX Check for the yp_str_empty case first
 static ypObject *_ypStr_deepcopy(int type, ypObject *s, void *copy_memo)
 {
-    ypObject *s_copy = ypStringLib_copy(type, s, /*alloclen_fixed=*/TRUE);
+    ypObject *s_copy = ypStringLib_new_copy(type, s, /*alloclen_fixed=*/TRUE);
     ypObject *result = _yp_deepcopy_memo_setitem(copy_memo, s, s_copy);
     if (yp_isexceptionC(result)) {
         yp_decref(s_copy);
@@ -10447,12 +10438,7 @@ ypObject *yp_decode(ypObject *b)
 static ypObject *_ypStr(int type, ypObject *object)
 {
     if (ypObject_TYPE_PAIR_CODE(object) == ypStr_CODE) {
-        // TODO Like other types, move these optimizations up the call stack?
-        if (type == ypStr_CODE) {
-            if (ypStr_LEN(object) < 1) return yp_str_empty;
-            if (ypObject_TYPE_CODE(object) == ypStr_CODE) return yp_incref(object);
-        }
-        return ypStringLib_copy(type, object, /*alloclen_fixed=*/TRUE);
+        return ypStringLib_copy(type, object);
     }
 
     return yp_NotImplementedError;
