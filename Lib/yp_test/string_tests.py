@@ -172,7 +172,6 @@ class BaseTest:
                     self.assertEqual(rem, 0, '%s != 0 for %s' % (rem, i))
                     self.assertEqual(r1, r2, '%s != %s for %s' % (r1, r2, i))
 
-    @yp_unittest.skip_str_find
     def test_find(self):
         self.checkequal(0, 'abcdefghiabc', 'find', 'abc')
         self.checkequal(9, 'abcdefghiabc', 'find', 'abc', 1)
@@ -180,7 +179,8 @@ class BaseTest:
 
         self.checkequal(0, 'abc', 'find', '', 0)
         self.checkequal(3, 'abc', 'find', '', 3)
-        self.checkequal(-1, 'abc', 'find', '', 4)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(3, 'abc', 'find', '', 4)
 
         # to check the ability to pass None as defaults
         self.checkequal( 2, 'rrarrrrrrrrra', 'find', 'a')
@@ -197,8 +197,9 @@ class BaseTest:
             self.checkraises(TypeError, 'hello', 'find', 42)
 
         self.checkequal(0, '', 'find', '')
-        self.checkequal(-1, '', 'find', '', 1, 1)
-        self.checkequal(-1, '', 'find', '', sys.maxsize, 0)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(0, '', 'find', '', 1, 1)
+        self.checkequal(0, '', 'find', '', sys.maxsize, 0)
 
         self.checkequal(-1, '', 'find', 'xx')
         self.checkequal(-1, '', 'find', 'xx', 1, 1)
@@ -209,7 +210,6 @@ class BaseTest:
         #self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
 
     @support.requires_resource('cpu')
-    @yp_unittest.skip_str_find
     def test_find_combinations(self):
         # For a variety of combinations,
         #    verify that str.find() matches __contains__
@@ -235,7 +235,6 @@ class BaseTest:
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
-    @yp_unittest.skip_str_find
     def test_rfind(self):
         self.checkequal(9,  'abcdefghiabc', 'rfind', 'abc')
         self.checkequal(12, 'abcdefghiabc', 'rfind', '')
@@ -244,7 +243,8 @@ class BaseTest:
 
         self.checkequal(3, 'abc', 'rfind', '', 0)
         self.checkequal(3, 'abc', 'rfind', '', 3)
-        self.checkequal(-1, 'abc', 'rfind', '', 4)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(3, 'abc', 'rfind', '', 4)
 
         # to check the ability to pass None as defaults
         self.checkequal(12, 'rrarrrrrrrrra', 'rfind', 'a')
@@ -261,7 +261,6 @@ class BaseTest:
             self.checkraises(TypeError, 'hello', 'rfind', 42)
 
     @support.requires_resource('cpu')
-    @yp_unittest.skip_str_find
     def test_rfind_combinations(self):
         # For a variety of combinations,
         #    verify that str.rfind() matches __contains__
@@ -287,7 +286,6 @@ class BaseTest:
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
-    @yp_unittest.skip_str_find
     def test_rfind_issues(self):
         # issue 7458
         # TODO(skip_long_ints)
@@ -296,7 +294,6 @@ class BaseTest:
         # issue #15534
         self.checkequal(0, '<......\u043c...', "rfind", "<")
 
-    @yp_unittest.skip_str_find
     def test_index(self):
         self.checkequal(0, 'abcdefghiabc', 'index', '')
         self.checkequal(3, 'abcdefghiabc', 'index', 'def')
@@ -322,7 +319,6 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'index', 42)
 
-    @yp_unittest.skip_str_find
     def test_rindex(self):
         self.checkequal(12, 'abcdefghiabc', 'rindex', '')
         self.checkequal(3,  'abcdefghiabc', 'rindex', 'def')
@@ -349,7 +345,6 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'rindex', 42)
 
-    @yp_unittest.skip_str_find
     def test_find_periodic_pattern(self):
         """Cover the special path for periodic patterns."""
         def reference_find(p, s):
@@ -370,7 +365,6 @@ class BaseTest:
                 self.checkequal(reference_find(p, text),
                                 text, 'find', p)
 
-    @yp_unittest.skip_str_find
     def test_find_shift_table_overflow(self):
         """When the table of 8-bit shifts overflows."""
         N = 2**8 + 100
@@ -1238,7 +1232,6 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, yp_str('hello'), 'endswith', (42,))
 
-    @yp_unittest.skip_str_find
     def test___contains__(self):
         self.checkequal(True, '', '__contains__', '')
         self.checkequal(True, 'abc', '__contains__', '')
@@ -1471,7 +1464,6 @@ class MixinStrUnicodeUserStringTest:
         self.checkraises(ValueError, S, 'rpartition', '')
         self.checkraises(TypeError, S, 'rpartition', None)
 
-    @yp_unittest.skip_str_find
     def test_none_arguments(self):
         # issue 11828
         s = yp_str('hello')
@@ -1495,6 +1487,9 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(2, s, 'rindex', 'l', None, -2)
         self.checkequal(0, s, 'rindex', 'h', None, None)
 
+    @yp_unittest.skip_str_count
+    def test_none_arguments_count(self):
+        s = yp_str('hello')
         self.checkequal(2, s, 'count', 'l', None)
         self.checkequal(1, s, 'count', 'l', -2, None)
         self.checkequal(1, s, 'count', 'l', None, -2)
@@ -1513,7 +1508,6 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(True, s, 'startswith', 'h', None, -2)
         self.checkequal(False, s, 'startswith', 'x', None, None)
 
-    @yp_unittest.skip_str_find
     def test_find_etc_raise_correct_error_messages(self):
         # issue 11828
         s = 'hello'

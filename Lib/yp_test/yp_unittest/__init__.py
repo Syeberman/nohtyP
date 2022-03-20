@@ -40,7 +40,6 @@ skip_str_big_chars = skip("TODO: Improve support for chars >latin-1")
 skip_str_case = skip("TODO: Implement yp_str.lower/swapcase/islower/etc")
 skip_str_codecs = skip("TODO: Support additional str codecs in nohtyP")  # TODO Fake it first.
 skip_str_count = skip("TODO: Implement yp_str.count")
-skip_str_find = skip("TODO: Implement yp_str.find/index/etc")
 skip_str_format = skip("TODO: Implement yp_str.format")
 skip_str_printf = skip("printf-style string formatting not supported in nohtyP")  # Unneeded?
 skip_str_replace = skip("TODO: Implement yp_str.replace/translate/etc")
