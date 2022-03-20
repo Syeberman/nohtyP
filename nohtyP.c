@@ -6406,11 +6406,6 @@ typedef struct {
     ypObject *(*empty_mutable)(void);     // Returns a new, empty mutable version of this type
     ypStringLib_getindexXfunc getindexX;  // Gets the ordinal at src[src_i]
     ypStringLib_setindexXfunc setindexX;  // Sets dest[dest_i] to value
-
-    // FIXME With utf_8 removed from string objects, can use common new/copy/grow between str/bytes.
-
-    // Clears s, possibly freeing some memory.
-    ypObject *(*clear)(ypObject *s);
 } ypStringLib_encinfo;
 static ypStringLib_encinfo ypStringLib_encs[4];
 
@@ -6826,6 +6821,19 @@ static ypObject *_ypStringLib_grow_onextend(
     return yp_None;
 }
 
+static ypObject *ypStringLib_clear(ypObject *s)
+{
+    yp_ASSERT(ypObject_IS_MUTABLE(s), "clear called on immutable object");
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR(s, ypStringLibObject, ypStringLib_ALLOCLEN_MAX);
+    yp_ASSERT(ypStringLib_DATA(s) == ypStringLib_INLINE_DATA(s),
+            "ypStringLib_clear didn't allocate inline!");
+    yp_ASSERT(ypStringLib_ALLOCLEN(s) >= 1, "bytes/str inlinelen must be at least 1");
+    ypStringLib_ENC(s)->setindexX(ypStringLib_DATA(s), 0, 0);
+    ypStringLib_SET_LEN(s, 0);
+    ypStringLib_ASSERT_INVARIANTS(s);
+    return yp_None;
+}
+
 
 // Common string methods
 
@@ -6873,7 +6881,7 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
 
     yp_ASSERT(ypObject_IS_MUTABLE(s), "irepeat called on immutable object");
     if (s_len < 1 || factor == 1) return yp_None;  // no-op
-    if (factor < 1) return s_enc->clear(s);
+    if (factor < 1) return ypStringLib_clear(s);
 
     if (factor > ypStringLib_LEN_MAX / s_len) return yp_MemorySizeOverflowError;
     newLen = s_len * factor;
@@ -8576,6 +8584,11 @@ static ypObject *_ypBytes_extend_from_bytes(ypObject *b, ypObject *x)
 // Extends b with the items yielded from x; never writes the null-terminator, and only updates
 // length once the iterator is exhausted
 // XXX Do "b[len(b)]=0" when this returns (even on error)
+// XXX In Python, if there's an error in the bytearray.extend iterator, the bytearray is unchanged,
+// even if valid values were yielded before the error. But Python is inconsistent: list.extend,
+// set.update, and dict.update all contain the values yielded from before the error. And
+// bytearray.extend achieves this by allocating a temporary bytearray behind the scenes, which is an
+// extra allocation we'd like to avoid. So we are intentially different than Python here.
 static ypObject *_ypBytes_extend_from_iter(ypObject *b, ypObject **mi, yp_uint64_t *mi_state)
 {
     ypObject  *exc = yp_None;
@@ -9008,21 +9021,6 @@ static ypObject *bytes_len(ypObject *b, yp_ssize_t *len)
 static ypObject *bytearray_push(ypObject *b, ypObject *x)
 {
     return bytearray_insert(b, yp_SLICE_USELEN, x);
-}
-
-static ypObject *bytearray_clear(ypObject *b)
-{
-    // FIXME ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR would be better, if we asserted that
-    // inlinelen for bytes was >= 1
-    void *oldptr =
-            ypMem_REALLOC_CONTAINER_VARIABLE(b, ypBytesObject, 0 + 1, 0, ypBytes_ALLOCLEN_MAX);
-    // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
-    if (oldptr != NULL) ypMem_REALLOC_CONTAINER_FREE_OLDPTR(b, ypBytesObject, oldptr);
-    yp_ASSERT(ypBytes_DATA(b) == ypBytes_INLINE_DATA(b), "bytearray_clear didn't allocate inline!");
-    ypBytes_DATA(b)[0] = '\0';
-    ypBytes_SET_LEN(b, 0);
-    ypBytes_ASSERT_INVARIANTS(b);
-    return yp_None;
 }
 
 static ypObject *bytearray_pop(ypObject *b)
@@ -9521,7 +9519,7 @@ static ypTypeObject ypByteArray_Type = {
         bytes_contains,             // tp_contains
         bytes_len,                  // tp_len
         bytearray_push,             // tp_push
-        bytearray_clear,            // tp_clear
+        ypStringLib_clear,          // tp_clear
         bytearray_pop,              // tp_pop
         bytearray_remove,           // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
@@ -10117,8 +10115,6 @@ static ypObject *str_currenthash(
     return yp_None;
 }
 
-#define chrarray_clear NULL
-
 static ypObject *str_dealloc(ypObject *s, void *memo)
 {
     ypMem_FREE_CONTAINER(s, ypStrObject);
@@ -10322,7 +10318,7 @@ static ypTypeObject ypChrArray_Type = {
         MethodError_objobjproc,     // tp_contains
         str_len,                    // tp_len
         MethodError_objobjproc,     // tp_push
-        MethodError_objproc,        // tp_clear
+        ypStringLib_clear,          // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
@@ -10535,8 +10531,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 yp_CONST_REF(yp_bytes_empty),  // empty_immutable
                 yp_bytearray0,                 // empty_mutable
                 ypStringLib_getindexX_1byte,   // getindexX
-                ypStringLib_setindexX_1byte,   // setindexX
-                bytearray_clear                // clear
+                ypStringLib_setindexX_1byte    // setindexX
         },
         {
                 // ypStringLib_ENC_LATIN_1
@@ -10548,8 +10543,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 yp_CONST_REF(yp_str_empty),   // empty_immutable
                 yp_chrarray0,                 // empty_mutable
                 ypStringLib_getindexX_1byte,  // getindexX
-                ypStringLib_setindexX_1byte,  // setindexX
-                chrarray_clear,               // clear
+                ypStringLib_setindexX_1byte   // setindexX
         },
         {
                 // ypStringLib_ENC_UCS_2
@@ -10561,8 +10555,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 yp_CONST_REF(yp_str_empty),    // empty_immutable
                 yp_chrarray0,                  // empty_mutable
                 ypStringLib_getindexX_2bytes,  // getindexX
-                ypStringLib_setindexX_2bytes,  // setindexX
-                chrarray_clear,                // clear
+                ypStringLib_setindexX_2bytes   // setindexX
         },
         {
                 // ypStringLib_ENC_UCS_4
@@ -10574,8 +10567,7 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 yp_CONST_REF(yp_str_empty),    // empty_immutable
                 yp_chrarray0,                  // empty_mutable
                 ypStringLib_getindexX_4bytes,  // getindexX
-                ypStringLib_setindexX_4bytes,  // setindexX
-                chrarray_clear,                // clear
+                ypStringLib_setindexX_4bytes   // setindexX
         }};
 
 // Assume these are most-likely to be run against str/chrarrays, so put that check first
@@ -11809,7 +11801,9 @@ static ypObject *list_clear(ypObject *sq)
 {
     // XXX yp_decref _could_ run code that requires us to be in a good state, so pop items from the
     // end one-at-a-time
-    // FIXME If yp_decref **adds** to this list, we'll never stop looping
+    // FIXME If yp_decref **adds** to this list, we'll never stop looping. We could use the detach
+    // methods...but if the data is inline then a small buffer is allocated, which isn't great for
+    // a clear method.
     while (ypTuple_LEN(sq) > 0) {
         ypTuple_SET_LEN(sq, ypTuple_LEN(sq) - 1);
         yp_decref(ypTuple_ARRAY(sq)[ypTuple_LEN(sq)]);
@@ -15827,7 +15821,6 @@ static ypObject *dict_clear(ypObject *mp)
     ypObject **oldvalues = ypDict_VALUES(mp);
     yp_ssize_t valuesleft = ypDict_LEN(mp);
     yp_ssize_t i;
-    void      *oldptr;
 
     if (ypDict_LEN(mp) < 1) return yp_None;
 
@@ -15850,13 +15843,9 @@ static ypObject *dict_clear(ypObject *mp)
     }
 
     // Free memory
-    // TODO ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR would be better, if we could trust that
-    // inlinelen for dicts was >=ypSet_ALLOCLEN_MIN
     // FIXME What if yp_decref modifies mp?
     yp_decref(ypDict_KEYSET(mp));
-    oldptr = ypMem_REALLOC_CONTAINER_VARIABLE(mp, ypDictObject, alloclen, 0, ypDict_ALLOCLEN_MAX);
-    // XXX if the realloc fails, we are still pointing at valid, if over-sized, memory
-    if (oldptr != NULL) ypMem_REALLOC_CONTAINER_FREE_OLDPTR(mp, ypDictObject, oldptr);
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR(mp, ypDictObject, ypDict_ALLOCLEN_MAX);
     yp_ASSERT(ypDict_VALUES(mp) == ypDict_INLINE_DATA(mp), "dict_clear didn't allocate inline!");
     yp_ASSERT(ypObject_ALLOCLEN(mp) >= ypSet_ALLOCLEN_MIN,
             "dict inlinelen must be at least ypSet_ALLOCLEN_MIN");
