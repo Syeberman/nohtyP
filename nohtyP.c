@@ -8836,8 +8836,6 @@ static ypObject *bytes_concat(ypObject *b, ypObject *x)
     return newB;
 }
 
-#define bytes_repeat ypStringLib_repeat
-
 // TODO Do we want a special-case for yp_intC that goes direct to the prealloc array?
 static ypObject *bytes_getindex(ypObject *b, yp_ssize_t i, ypObject *defval)
 {
@@ -8942,8 +8940,6 @@ static ypObject *bytearray_delslice(ypObject *b, yp_ssize_t start, yp_ssize_t st
 }
 
 #define bytearray_extend _ypBytes_extend
-
-#define bytearray_irepeat ypStringLib_irepeat
 
 static ypObject *bytearray_insert(ypObject *b, yp_ssize_t i, ypObject *x)
 {
@@ -9364,7 +9360,7 @@ yp_IMMORTAL_FUNCTION_static(
 
 static ypSequenceMethods ypBytes_as_sequence = {
         bytes_concat,                 // tp_concat
-        bytes_repeat,                 // tp_repeat
+        ypStringLib_repeat,           // tp_repeat
         bytes_getindex,               // tp_getindex
         bytes_getslice,               // tp_getslice
         bytes_find,                   // tp_find
@@ -9453,7 +9449,7 @@ static ypTypeObject ypBytes_Type = {
 
 static ypSequenceMethods ypByteArray_as_sequence = {
         bytes_concat,              // tp_concat
-        bytes_repeat,              // tp_repeat
+        ypStringLib_repeat,        // tp_repeat
         bytes_getindex,            // tp_getindex
         bytes_getslice,            // tp_getslice
         bytes_find,                // tp_find
@@ -9464,7 +9460,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
         bytearray_delslice,        // tp_delslice
         bytearray_push,            // tp_append
         bytearray_extend,          // tp_extend
-        bytearray_irepeat,         // tp_irepeat
+        ypStringLib_irepeat,       // tp_irepeat
         bytearray_insert,          // tp_insert
         bytearray_popindex,        // tp_popindex
         bytearray_reverse,         // tp_reverse
@@ -9841,8 +9837,6 @@ static ypObject *str_concat(ypObject *s, ypObject *x)
     return newS;
 }
 
-#define str_repeat ypStringLib_repeat
-
 static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
 {
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
@@ -10163,7 +10157,7 @@ yp_IMMORTAL_FUNCTION_static(chrarray_func_new, chrarray_func_new_code, _ypStr_FU
 
 static ypSequenceMethods ypStr_as_sequence = {
         str_concat,                   // tp_concat
-        str_repeat,                   // tp_repeat
+        ypStringLib_repeat,           // tp_repeat
         str_getindex,                 // tp_getindex
         MethodError_objsliceproc,     // tp_getslice
         str_find,                     // tp_find
@@ -10252,7 +10246,7 @@ static ypTypeObject ypStr_Type = {
 
 static ypSequenceMethods ypChrArray_as_sequence = {
         str_concat,                   // tp_concat
-        MethodError_objssizeproc,     // tp_repeat
+        ypStringLib_repeat,           // tp_repeat
         str_getindex,                 // tp_getindex
         MethodError_objsliceproc,     // tp_getslice
         MethodError_findfunc,         // tp_find
@@ -10263,7 +10257,7 @@ static ypSequenceMethods ypChrArray_as_sequence = {
         MethodError_objsliceproc,     // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        ypStringLib_irepeat,          // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
