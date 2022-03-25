@@ -8590,8 +8590,9 @@ static yp_uint8_t _ypBytes_asuint8C(ypObject *x, ypObject **exc)
     return retval;
 }
 
-// If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1.  If
-// x is a fellow bytes, set *x_data and *x_len.  Otherwise, returns an exception.
+// If x is a bool/int in range(256), store value in storage and set *x_data=storage, *x_len=1. If x
+// is a fellow bytes, set *x_data and *x_len. Otherwise, returns an exception. *x_data may or may
+// not be null terminated.
 static ypObject *_ypBytes_coerce_intorbytes(
         ypObject *x, yp_uint8_t **x_data, yp_ssize_t *x_len, yp_uint8_t *storage)
 {
@@ -9745,11 +9746,13 @@ yp_STATIC_ASSERT(yp_offsetof(ypStringLibObject, ob_inline_data) % 4 == 0, aligno
         ypStringLib_ASSERT_INVARIANTS(s);                                                      \
     } while (0)
 
-// If x is not a str/chrarray, returns yp_TypeError. If x is already in the requested encoding, sets
-// *x_data to x's data. If x cannot be converted, sets *x_data to NULL. Otherwise, sets *x_data to a
-// new buffer containing the converted data. If this function succeeds, you will need to call
-// _ypStr_coerce_encoding_free to clean up the data. *x_data may or may not be null terminated.
-static ypObject *_ypStr_coerce_encoding(int enc_code, ypObject *x, void **x_data)
+// If x is a str/chrarray that can be encoded as per enc_code, sets *x_data and *x_len to that
+// encoded string; this may be x's own data buffer, or a newly-allocated buffer. If x is a
+// str/chrarray that cannot be encoded as per enc_code, sets *x_data=NULL and *x_len=0; depending on
+// context, this is not necessarily an error (i.e. yp_contains would return false in this case).
+// Otherwise, returns an exception. *x_data may or may not be null terminated. If this function
+// succeeds, you will need to call _ypStr_coerce_encoding_free to deallocate appropriately.
+static ypObject *_ypStr_coerce_encoding(ypObject *x, int enc_code, void **x_data, yp_ssize_t *x_len)
 {
     int        dest_sizeshift = ypStringLib_encs[enc_code].sizeshift;
     int        src_sizeshift;
@@ -9761,19 +9764,23 @@ static ypObject *_ypStr_coerce_encoding(int enc_code, ypObject *x, void **x_data
     // Ideal path: no allocations required.
     if (dest_sizeshift == src_sizeshift) {
         *x_data = ypStr_DATA(x);
+        *x_len = ypStr_LEN(x);
         return yp_None;
     }
 
     // Being unable to convert is not always an error: in find, it means the string is not present.
     if (dest_sizeshift < src_sizeshift) {
         *x_data = NULL;
+        *x_len = 0;
         return yp_None;
     }
 
-    // Otherwise, we need to allocate a new buffer to hold this data.
-    *x_data = yp_malloc(&alloclen, (ypStr_LEN(x) + 1) << dest_sizeshift);
+    // Otherwise, we need to allocate a new buffer to hold this data. Don't bother writing the null
+    // terminator.
+    *x_data = yp_malloc(&alloclen, ypStr_LEN(x) << dest_sizeshift);
     if (*x_data == NULL) return yp_MemoryError;
     ypStringLib_elemcopy(dest_sizeshift, *x_data, 0, src_sizeshift, ypStr_DATA(x), 0, ypStr_LEN(x));
+    *x_len = ypStr_LEN(x);
     return yp_None;
 }
 
@@ -9866,12 +9873,13 @@ static ypObject *str_find(ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t
         findfunc_direction direction, yp_ssize_t *i)
 {
     void     *x_data;
+    yp_ssize_t x_len;
     ypObject *result;
 
-    result = _ypStr_coerce_encoding(ypStringLib_ENC_CODE(s), x, &x_data);
+    result = _ypStr_coerce_encoding(x, ypStringLib_ENC_CODE(s), &x_data, &x_len);
     if (yp_isexceptionC(result)) return result;
 
-    result = ypStringLib_find(s, x_data, ypStr_LEN(x), start, stop, direction, i);
+    result = ypStringLib_find(s, x_data, x_len, start, stop, direction, i);
     _ypStr_coerce_encoding_free(x, x_data);
     return result;
 }
