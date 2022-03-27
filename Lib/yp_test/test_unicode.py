@@ -2758,6 +2758,18 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertEqual(proc.rc, 10, proc)
 
 
+class UnicodeChrarrayTest(string_tests.CommonTest,
+        string_tests.MixinStrUnicodeUserStringTest,
+        string_tests.MixinStrUnicodeTest,
+        yp_unittest.TestCase):
+
+    type2test = yp_chrarray
+
+    @yp_unittest.skip("chrarray doesn't support yp_hash")
+    def test_hash(self):
+        pass
+
+
 class CAPITest(yp_unittest.TestCase):
 
     # Test PyUnicode_FromFormat()
