@@ -1101,20 +1101,20 @@ ypObject *const yp_i_two = ypInt_PREALLOC_REF(2);
 
 // Macros on ob_type_flags for string objects (bytes and str), used to index into
 // ypStringLib_encs.
-#define ypStringLib_ENC_BYTES _ypStringLib_ENC_BYTES
-#define ypStringLib_ENC_LATIN_1 _ypStringLib_ENC_LATIN_1
-#define ypStringLib_ENC_UCS_2 _ypStringLib_ENC_UCS_2
-#define ypStringLib_ENC_UCS_4 _ypStringLib_ENC_UCS_4
+#define ypStringLib_ENC_CODE_BYTES _ypStringLib_ENC_CODE_BYTES
+#define ypStringLib_ENC_CODE_LATIN_1 _ypStringLib_ENC_CODE_LATIN_1
+#define ypStringLib_ENC_CODE_UCS_2 _ypStringLib_ENC_CODE_UCS_2
+#define ypStringLib_ENC_CODE_UCS_4 _ypStringLib_ENC_CODE_UCS_4
 
 
 // Empty bytes can be represented by this, immortal object
-static ypStringLibObject _yp_bytes_empty_struct = {{ypBytes_CODE, 0, ypStringLib_ENC_BYTES,
+static ypStringLibObject _yp_bytes_empty_struct = {{ypBytes_CODE, 0, ypStringLib_ENC_CODE_BYTES,
         ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, ""}};
 ypObject *const          yp_bytes_empty = yp_CONST_REF(yp_bytes_empty);
 
 
 // Empty strs can be represented by this, immortal object
-static ypStringLibObject _yp_str_empty_struct = {{ypStr_CODE, 0, ypStringLib_ENC_LATIN_1,
+static ypStringLibObject _yp_str_empty_struct = {{ypStr_CODE, 0, ypStringLib_ENC_CODE_LATIN_1,
         ypObject_REFCNT_IMMORTAL, 0, ypObject_LEN_INVALID, ypObject_HASH_INVALID, ""}};
 ypObject *const          yp_str_empty = yp_CONST_REF(yp_str_empty);
 
@@ -6149,10 +6149,11 @@ static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp
 // Using the given _adjusted_ values, in-place converts the given start/stop/step values to the
 // inverse slice, where *step=-(*step).  slicelength must be >0 (slicelength==0 is a no-op).
 // XXX Adapted from Python's list_ass_subscript
-static void _ypSlice_InvertIndicesC(
+static void ypSlice_InvertIndicesC(
         yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step, yp_ssize_t slicelength)
 {
     yp_ASSERT(slicelength > 0, "slicelen must be >0");
+
     if (*step < 0) {
         // This comes direct from list_ass_subscript
         *stop = *start + 1;
@@ -6195,7 +6196,7 @@ static void _ypSlice_delslice_memmove(void *array, yp_ssize_t length, yp_ssize_t
 {
     yp_uint8_t *bytes = array;
 
-    if (step < 0) _ypSlice_InvertIndicesC(&start, &stop, &step, slicelength);
+    if (step < 0) ypSlice_InvertIndicesC(&start, &stop, &step, slicelength);
 
     if (step == 1) {
         // One contiguous section
@@ -6372,9 +6373,8 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
         yp_ASSERT(ypStringLib_ALLOCLEN(s) < 0 /*immortals have an invalid alloclen*/ ||          \
                           ypStringLib_LEN(s) <= ypStringLib_ALLOCLEN(s) - 1 /*null terminator*/, \
                 "bytes/str len (plus null terminator) larger than alloclen");                    \
-        yp_ASSERT(ypStringLib_ENC_CODE(s) == ypStringLib_ENC_BYTES ||                            \
-                          ypStringLib_checkenc(ypStringLib_ENC_CODE(s), ypStringLib_DATA(s),     \
-                                  ypStringLib_LEN(s)) == ypStringLib_ENC_CODE(s),                \
+        yp_ASSERT(ypStringLib_checkenc(ypStringLib_ENC(s), ypStringLib_DATA(s), 0,               \
+                          ypStringLib_LEN(s), 1, ypStringLib_LEN(s)) == ypStringLib_ENC(s),      \
                 "str not stored in smallest representation");                                    \
         yp_ASSERT(ypStringLib_ENC(s)->getindexX(ypStringLib_DATA(s), ypStringLib_LEN(s)) == 0,   \
                 "bytes/str not internally null-terminated");                                     \
@@ -6390,24 +6390,27 @@ typedef yp_uint32_t (*ypStringLib_getindexXfunc)(const void *src, yp_ssize_t src
 typedef void (*ypStringLib_setindexXfunc)(void *dest, yp_ssize_t dest_i, yp_uint32_t value);
 
 // XXX In general for this table, make sure you do not use type codes with the wrong
-// ypStringLib_ENC_* value.  ypStringLib_ENC_BYTES should only be used for bytes, and vice-versa.
-// TODO Some of these point to generic functions that handle multiple encodings...at that point
-// they might as well be statically-linked.  Alternatively, those generic functions could be
-// specialized.  Review these functions and find the right balance between the two schemes.
+// ypStringLib_ENC_* value.  ypStringLib_ENC_CODE_BYTES should only be used for bytes, and
+// vice-versa.
+// FIXME Which of these do we still need?
 typedef struct {
-    int         sizeshift;      // len<<sizeshift gives the size in bytes
-    yp_ssize_t  elemsize;       // The size (in bytes) of one character
-    yp_uint32_t max_char;       // Largest character value that encoding can store
-                                //  (may be larger than ypStringLib_MAX_UNICODE)
-    int       code;             // The ypStringLib_ENC_* value of the encoding
-    ypObject *name;             // Immortal str of the encoding name (ie yp_s_latin_1)
-    ypObject *empty_immutable;  // The immortal, empty immutable for this type
-    // FIXME Do we need empty_mutable?
+    int         code;                     // The ypStringLib_ENC_CODE_* value of the encoding
+    int         sizeshift;                // len<<sizeshift gives the size in bytes
+    yp_ssize_t  elemsize;                 // The size (in bytes) of one character
+    yp_uint32_t max_char;                 // Largest character value that encoding can store
+                                          //  (may be larger than ypStringLib_MAX_UNICODE)
+    ypObject *name;                       // Immortal str of the encoding name (ie yp_s_latin_1)
+    ypObject *empty_immutable;            // The immortal, empty immutable for this type
     ypObject *(*empty_mutable)(void);     // Returns a new, empty mutable version of this type
     ypStringLib_getindexXfunc getindexX;  // Gets the ordinal at src[src_i]
     ypStringLib_setindexXfunc setindexX;  // Sets dest[dest_i] to value
 } ypStringLib_encinfo;
-static ypStringLib_encinfo ypStringLib_encs[4];
+static ypStringLib_encinfo  ypStringLib_encs[4];
+static ypStringLib_encinfo *ypStringLib_enc_bytes = &(ypStringLib_encs[ypStringLib_ENC_CODE_BYTES]);
+static ypStringLib_encinfo *ypStringLib_enc_latin_1 =
+        &(ypStringLib_encs[ypStringLib_ENC_CODE_LATIN_1]);
+static ypStringLib_encinfo *ypStringLib_enc_ucs_2 = &(ypStringLib_encs[ypStringLib_ENC_CODE_UCS_2]);
+static ypStringLib_encinfo *ypStringLib_enc_ucs_4 = &(ypStringLib_encs[ypStringLib_ENC_CODE_UCS_4]);
 
 
 // Getters, setters, and copiers for our three internal encodings
@@ -6589,18 +6592,17 @@ static void ypStringLib_elemcopy(int dest_sizeshift, void *dest, yp_ssize_t dest
 yp_STATIC_ASSERT(((_yp_uint_t)ypStringLib_TYPE_CHECKENC_1FROM2_MASK) ==
                          ypStringLib_TYPE_CHECKENC_1FROM2_MASK,
         checkenc_1from2_mask_matches_type);
-// Returns the ypStringLib_ENC_* that _should_ be used for the given UCS-2-encoded string
 // XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
-static int ypStringLib_checkenc_ucs_2(const void *data, yp_ssize_t len)
+static ypStringLib_encinfo *ypStringLib_checkenc_contiguous_ucs_2(const void *data, yp_ssize_t len)
 {
     const _yp_uint_t  mask = ypStringLib_TYPE_CHECKENC_1FROM2_MASK;
     const yp_uint8_t *p = data;
     const yp_uint8_t *end = p + (len * 2);
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof(_yp_uint_t));
     yp_ASSERT((*(yp_uint8_t *)&mask) == 0,
-            "ypStringLib_checkenc_ucs_2 doesn't support big-endian yet");
+            "ypStringLib_checkenc_contiguous_ucs_2 doesn't support big-endian yet");
     yp_ASSERT(yp_IS_ALIGNED(data, 2), "unexpected alignment for ucs-2 data");
-    yp_ASSERT(len >= 0, "negative length");
+    yp_ASSERT1(len > 0);
 
     // If we don't contain an aligned _yp_uint_t, jump to the end
     if (aligned_end - p < yp_sizeof(_yp_uint_t)) goto final_loop;
@@ -6609,14 +6611,14 @@ static int ypStringLib_checkenc_ucs_2(const void *data, yp_ssize_t len)
     while (!yp_IS_ALIGNED(p, yp_sizeof(_yp_uint_t))) {
         yp_uint16_t value = *((yp_uint16_t *)p);
         // TODO This won't work on big-endian: will need a mask (for uint) and smallmask (uint16)
-        if (value & mask) return ypStringLib_ENC_UCS_2;
+        if (value & mask) return ypStringLib_enc_ucs_2;
         p += 2;
     }
 
     // Now read as many aligned ints as we can
     while (p < aligned_end) {
         _yp_uint_t value = *((_yp_uint_t *)p);
-        if (value & mask) return ypStringLib_ENC_UCS_2;
+        if (value & mask) return ypStringLib_enc_ucs_2;
         p += yp_sizeof(_yp_uint_t);
     }
 
@@ -6624,10 +6626,10 @@ static int ypStringLib_checkenc_ucs_2(const void *data, yp_ssize_t len)
 final_loop:
     while (p < end) {
         yp_uint16_t value = *((yp_uint16_t *)p);
-        if (value & mask) return ypStringLib_ENC_UCS_2;
+        if (value & mask) return ypStringLib_enc_ucs_2;
         p += 2;
     }
-    return ypStringLib_ENC_LATIN_1;
+    return ypStringLib_enc_latin_1;
 }
 
 #define ypStringLib_TYPE_CHECKENC_1FROM4_MASK 0xFFFFFF00FFFFFF00ULL
@@ -6640,13 +6642,13 @@ yp_STATIC_ASSERT(((_yp_uint_t)ypStringLib_TYPE_CHECKENC_2FROM4_MASK) ==
         checkenc_2from4_mask_matches_type);
 // Returns true if the UCS-4 string can be encoded in the encoding matching mask.  *p will point
 // to the location that failed the check, or to *end on success.
-// XXX On first look, this shares a lot of code with ypStringLib_checkenc_ucs_2. However, the two
-// "unaligned elements" loops are different (16- vs 32-bit reads).
+// XXX On first look, this shares a lot of code with ypStringLib_checkenc_contiguous_ucs_2. However,
+// the two "unaligned elements" loops are different (16- vs 32-bit reads).
 static int _ypStringLib_checkenc_ucs_4(_yp_uint_t mask, const yp_uint8_t **p, const yp_uint8_t *end)
 {
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof(_yp_uint_t));
     yp_ASSERT((*(yp_uint8_t *)&mask) == 0,
-            "ypStringLib_checkenc_ucs_4 doesn't support big-endian yet");
+            "ypStringLib_checkenc_contiguous_ucs_4 doesn't support big-endian yet");
 
     // If we don't contain an aligned _yp_uint_t, jump to the end
     if (aligned_end - *p < yp_sizeof(_yp_uint_t)) goto final_loop;
@@ -6677,34 +6679,90 @@ final_loop:
 }
 // Returns the ypStringLib_ENC_* that _should_ be used for the given UCS-4-encoded string
 // XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
-static int ypStringLib_checkenc_ucs_4(const void *data, yp_ssize_t len)
+static ypStringLib_encinfo *ypStringLib_checkenc_contiguous_ucs_4(const void *data, yp_ssize_t len)
 {
     const yp_uint8_t *p = data;
     const yp_uint8_t *end = p + (len * 4);
     yp_ASSERT(yp_IS_ALIGNED(data, 4), "unexpected alignment for ucs-4 data");
-    yp_ASSERT(len >= 0, "negative length");
+    yp_ASSERT1(len > 0);
 
     // If the 1FROM4 mask fails in the middle of the string, we can resume from that point
     // because we know 2FROM4 will match the first half anyway.
     if (_ypStringLib_checkenc_ucs_4(ypStringLib_TYPE_CHECKENC_1FROM4_MASK, &p, end)) {
-        return ypStringLib_ENC_LATIN_1;
+        return ypStringLib_enc_latin_1;
     }
     if (_ypStringLib_checkenc_ucs_4(ypStringLib_TYPE_CHECKENC_2FROM4_MASK, &p, end)) {
-        return ypStringLib_ENC_UCS_2;
+        return ypStringLib_enc_ucs_2;
     }
-    return ypStringLib_ENC_UCS_4;
+    return ypStringLib_enc_ucs_4;
 }
 
-static int ypStringLib_checkenc(int enc, const void *data, yp_ssize_t len)
+// FIXME Is "sliced" a good antonym for "contiguous"?
+static ypStringLib_encinfo *ypStringLib_checkenc_sliced_ucs_2(
+        const yp_uint16_t *data, yp_ssize_t start, yp_ssize_t step, yp_ssize_t slicelength)
 {
-    yp_ASSERT(len >= 0, "negative length");
-    if (enc == ypStringLib_ENC_LATIN_1) {
-        return ypStringLib_ENC_LATIN_1;
-    } else if (enc == ypStringLib_ENC_UCS_2) {
-        return ypStringLib_checkenc_ucs_2(data, len);
+    yp_ssize_t i;
+    yp_ASSERT(yp_IS_ALIGNED(data, 2), "unexpected alignment for ucs-2 data");
+    yp_ASSERT1(slicelength > 0);
+    yp_ASSERT1(step > 0);
+    for (i = 0; i < slicelength; i++) {
+        if (data[ypSlice_INDEX(start, step, i)] > 0xFFu) return ypStringLib_enc_ucs_2;
+    }
+    return ypStringLib_enc_latin_1;
+}
+
+static ypStringLib_encinfo *ypStringLib_checkenc_sliced_ucs_4(
+        const yp_uint32_t *data, yp_ssize_t start, yp_ssize_t step, yp_ssize_t slicelength)
+{
+    yp_ssize_t i;
+    yp_ASSERT(yp_IS_ALIGNED(data, 4), "unexpected alignment for ucs-4 data");
+    yp_ASSERT1(slicelength > 0);
+    yp_ASSERT1(step > 0);
+
+    // If the latin-1 check fails in the middle of the string, we can resume from that point
+    // because we know the ucs-2 check will match the first half anyway.
+    for (i = 0; i < slicelength; i++) {
+        if (data[ypSlice_INDEX(start, step, i)] > 0xFFu) goto check_for_ucs_2;
+    }
+    return ypStringLib_enc_latin_1;
+
+check_for_ucs_2:
+    for (/*i already set*/; i < slicelength; i++) {
+        if (data[ypSlice_INDEX(start, step, i)] > 0xFFFFu) return ypStringLib_enc_ucs_4;
+    }
+    return ypStringLib_enc_ucs_2;
+}
+
+// Returns the minimal encoding required for the given slice of string's data. start, stop, step,
+// and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC,
+static ypStringLib_encinfo *ypStringLib_checkenc(ypStringLib_encinfo *enc, const void *data,
+        yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength)
+{
+    if (enc->elemsize == 1) {
+        yp_ASSERT(enc == ypStringLib_enc_bytes || enc == ypStringLib_enc_latin_1);
+        return enc;  // can't shrink any smaller than one byte
+    } else if (slicelength < 1) {
+        // FIXME Require callers to handle this case before calling? Maybe?
+        yp_ASSERT(enc == ypStringLib_enc_ucs_2 || enc == ypStringLib_enc_ucs_4);
+        return ypStringLib_enc_latin_1;
+    }
+
+    if (step < 0) ypSlice_InvertIndicesC(&start, &stop, &step, slicelength);
+
+    if (step == 1) {
+        if (enc == ypStringLib_enc_ucs_2) {
+            return ypStringLib_checkenc_contiguous_ucs_2((yp_uint16_t *)data + start, stop - start);
+        } else {
+            yp_ASSERT(enc == ypStringLib_enc_ucs_4);
+            return ypStringLib_checkenc_contiguous_ucs_4((yp_uint32_t *)data + start, stop - start);
+        }
     } else {
-        yp_ASSERT(enc == ypStringLib_ENC_UCS_4);
-        return ypStringLib_checkenc_ucs_4(data, len);
+        if (enc == ypStringLib_enc_ucs_2) {
+            return ypStringLib_checkenc_sliced_ucs_2(data, start, step, slicelength);
+        } else {
+            yp_ASSERT(enc == ypStringLib_enc_ucs_4);
+            return ypStringLib_checkenc_sliced_ucs_4(data, start, step, slicelength);
+        }
     }
 }
 
@@ -6716,46 +6774,46 @@ static int ypStringLib_checkenc(int enc, const void *data, yp_ssize_t len)
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypStringLib_new(
-        int type, yp_ssize_t requiredLen, int alloclen_fixed, int enc_code)
+        int type, yp_ssize_t requiredLen, int alloclen_fixed, ypStringLib_encinfo *enc)
 {
-    yp_ssize_t elemsize = ypStringLib_encs[enc_code].elemsize;
-    ypObject  *newS;
-    yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) ==
-                      ypObject_TYPE_PAIR_CODE(ypStringLib_encs[enc_code].empty_immutable),
+    ypObject *newS;
+    yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) == ypObject_TYPE_PAIR_CODE(enc->empty_immutable),
             "incorrect type for encoding");
     yp_ASSERT(requiredLen >= 0, "requiredLen cannot be negative");
     yp_ASSERT(requiredLen <= ypStringLib_LEN_MAX, "requiredLen cannot be >max");
     if (alloclen_fixed && !ypObject_TYPE_CODE_IS_MUTABLE(type)) {
         yp_ASSERT(requiredLen > 0, "missed an empty_immutable optimization");
         newS = ypMem_MALLOC_CONTAINER_INLINE4(
-                ypStringLibObject, type, requiredLen + 1, ypStringLib_ALLOCLEN_MAX, elemsize);
+                ypStringLibObject, type, requiredLen + 1, ypStringLib_ALLOCLEN_MAX, enc->elemsize);
     } else {
-        newS = ypMem_MALLOC_CONTAINER_VARIABLE5(
-                ypStringLibObject, type, requiredLen + 1, 0, ypStringLib_ALLOCLEN_MAX, elemsize);
+        newS = ypMem_MALLOC_CONTAINER_VARIABLE5(ypStringLibObject, type, requiredLen + 1, 0,
+                ypStringLib_ALLOCLEN_MAX, enc->elemsize);
     }
-    ypStringLib_ENC_CODE(newS) = enc_code;
+    ypStringLib_ENC_CODE(newS) = enc->code;
     return newS;
 }
 
 static ypObject *_ypBytes_new(int type, yp_ssize_t requiredLen, int alloclen_fixed)
 {
-    return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_ENC_BYTES);
+    return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_enc_bytes);
 }
-static ypObject *_ypStr_new(int type, yp_ssize_t requiredLen, int alloclen_fixed, int enc_code)
+static ypObject *_ypStr_new(
+        int type, yp_ssize_t requiredLen, int alloclen_fixed, ypStringLib_encinfo *enc)
 {
-    return _ypStringLib_new(type, requiredLen, alloclen_fixed, enc_code);
+    yp_ASSERT1(ypObject_TYPE_CODE_AS_FROZEN(type) == ypStr_CODE);
+    return _ypStringLib_new(type, requiredLen, alloclen_fixed, enc);
 }
 static ypObject *_ypStr_new_latin_1(int type, yp_ssize_t requiredLen, int alloclen_fixed)
 {
-    return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_ENC_LATIN_1);
+    return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_enc_latin_1);
 }
 static ypObject *_ypStr_new_ucs_2(int type, yp_ssize_t requiredLen, int alloclen_fixed)
 {
-    return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_ENC_UCS_2);
+    return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_enc_ucs_2);
 }
 static ypObject *_ypStr_new_ucs_4(int type, yp_ssize_t requiredLen, int alloclen_fixed)
 {
-    return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_ENC_UCS_4);
+    return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_enc_ucs_4);
 }
 
 // Returns a new copy of s of the given type.  If type is immutable and alloclen_fixed is true
@@ -6764,17 +6822,17 @@ static ypObject *_ypStr_new_ucs_4(int type, yp_ssize_t requiredLen, int alloclen
 // XXX Check for the empty_immutable case first
 static ypObject *ypStringLib_new_copy(int type, ypObject *s, int alloclen_fixed)
 {
+    yp_ssize_t           s_len = ypStringLib_LEN(s);
     ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
     ypObject            *copy;
 
     yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) == ypObject_TYPE_PAIR_CODE(s),
             "incorrect type for copy");
 
-    copy = _ypStringLib_new(type, ypStringLib_LEN(s), alloclen_fixed, ypStringLib_ENC_CODE(s));
+    copy = _ypStringLib_new(type, s_len, alloclen_fixed, s_enc);
     if (yp_isexceptionC(copy)) return copy;
-    memcpy(ypStringLib_DATA(copy), ypStringLib_DATA(s),
-            (ypStringLib_LEN(s) + 1) << s_enc->sizeshift);
-    ypStringLib_SET_LEN(copy, ypStringLib_LEN(s));
+    memcpy(ypStringLib_DATA(copy), ypStringLib_DATA(s), (s_len + 1) << s_enc->sizeshift);
+    ypStringLib_SET_LEN(copy, s_len);
     ypStringLib_ASSERT_INVARIANTS(copy);
     return copy;
 }
@@ -6797,19 +6855,18 @@ static ypObject *ypStringLib_copy(int type, ypObject *s)
 // elemsize of s to fit requiredLen (plus null terminator). Does not update ypStringLib_LEN and
 // does not null-terminate. enc_code must be the same or larger as currently.
 static ypObject *_ypStringLib_grow_onextend(
-        ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra, int newEnc_code)
+        ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra, ypStringLib_encinfo *newEnc)
 {
     ypStringLib_encinfo *oldEnc = ypStringLib_ENC(s);
-    ypStringLib_encinfo *newEnc = &(ypStringLib_encs[newEnc_code]);
     void                *oldptr;
 
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypObject_TYPE_PAIR_CODE(newEnc->empty_immutable),
             "incorrect type for encoding");
     yp_ASSERT(requiredLen >= ypStringLib_LEN(s), "requiredLen cannot be <len(s)");
-    yp_ASSERT(requiredLen > ypStringLib_ALLOCLEN(s) - 1 || newEnc->code > oldEnc->code,
+    yp_ASSERT(requiredLen > ypStringLib_ALLOCLEN(s) - 1 || newEnc->elemsize > oldEnc->elemsize,
             "_ypStringLib_grow_onextend called unnecessarily");
     yp_ASSERT(requiredLen <= ypStringLib_LEN_MAX, "requiredLen cannot be >max");
-    yp_ASSERT(newEnc->code >= oldEnc->code, "can't 'grow' to a smaller encoding");
+    yp_ASSERT(newEnc->elemsize >= oldEnc->elemsize, "can't 'grow' to a smaller encoding");
 
     // TODO If we're doing a strict upconvert, it may not be necessary to realloc
 
@@ -6873,7 +6930,7 @@ static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
 
     if (factor > ypStringLib_LEN_MAX / s_len) return yp_MemorySizeOverflowError;
     newLen = s_len * factor;
-    newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newLen, /*alloclen_fixed=*/TRUE, s_enc->code);
+    newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newLen, /*alloclen_fixed=*/TRUE, s_enc);
     if (yp_isexceptionC(newS)) return newS;
 
     memcpy(ypStringLib_DATA(newS), ypStringLib_DATA(s), s_len << s_enc->sizeshift);
@@ -6948,7 +7005,7 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
     newLen = s_len * factor;
     if (ypStringLib_ALLOCLEN(s) - 1 < newLen) {
         // TODO Over-allocate?
-        ypObject *result = _ypStringLib_grow_onextend(s, newLen, 0, s_enc->code);
+        ypObject *result = _ypStringLib_grow_onextend(s, newLen, 0, s_enc);
         if (yp_isexceptionC(result)) return result;
     }
 
@@ -6966,6 +7023,7 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
 static ypObject *_ypStringLib_join_from_string(ypObject *s, ypObject *x)
 {
     yp_ssize_t           s_len = ypStringLib_LEN(s);
+    ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
     void                *x_data = ypStringLib_DATA(x);
     yp_ssize_t           x_len = ypStringLib_LEN(x);
     ypStringLib_encinfo *x_enc = ypStringLib_ENC(x);
@@ -6983,8 +7041,8 @@ static ypObject *_ypStringLib_join_from_string(ypObject *s, ypObject *x)
 
     // The 0- and 1-seq cases are pretty simple: just return an empty or a copy, respectively
     if (x_len < 1) {
-        if (!ypObject_IS_MUTABLE(s)) return ypStringLib_ENC(s)->empty_immutable;
-        return ypStringLib_ENC(s)->empty_mutable();
+        if (!ypObject_IS_MUTABLE(s)) return s_enc->empty_immutable;
+        return s_enc->empty_mutable();
     } else if (s_len < 1 || x_len == 1) {
         return ypStringLib_copy(ypObject_TYPE_CODE(s), x);
     }
@@ -6999,13 +7057,13 @@ static ypObject *_ypStringLib_join_from_string(ypObject *s, ypObject *x)
     // Now we can create the result object...
     result_enc = &(ypStringLib_encs[result_enc_code]);
     result = _ypStringLib_new(
-            ypObject_TYPE_CODE(s), result_len, /*alloclen_fixed=*/TRUE, result_enc->code);
+            ypObject_TYPE_CODE(s), result_len, /*alloclen_fixed=*/TRUE, result_enc);
     if (yp_isexceptionC(result)) return result;
 
     // ...and populate it, remembering to null-terminate and update the length
     result_data = ypStringLib_DATA(result);
-    ypStringLib_elemcopy(result_enc->sizeshift, result_data, 1, ypStringLib_ENC(s)->sizeshift,
-            ypStringLib_DATA(s), 0, s_len);
+    ypStringLib_elemcopy(
+            result_enc->sizeshift, result_data, 1, s_enc->sizeshift, ypStringLib_DATA(s), 0, s_len);
     _ypSequence_repeat_memcpy(result_data, x_len - 1, (s_len + 1) << result_enc->sizeshift);
     for (i = 0; i < x_len; i++) {
         result_enc->setindexX(result_data, i * (s_len + 1), x_enc->getindexX(x_data, i));
@@ -7024,7 +7082,6 @@ static void _ypStringLib_join_elemcopy(
         ypObject *result, ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state)
 {
     ypStringLib_encinfo *result_enc = ypStringLib_ENC(result);
-    int                  result_sizeshift = result_enc->sizeshift;
     void                *result_data = ypStringLib_DATA(result);
     yp_ssize_t           result_len = 0;
     yp_ssize_t           s_len = ypStringLib_LEN(s);
@@ -7037,7 +7094,7 @@ static void _ypStringLib_join_elemcopy(
             if (x == NULL) break;
             yp_ASSERT(ypStringLib_TYPE_CHECK(x), "ypStringLib_join didn't perform type checking");
             ypStringLib_ASSERT_INVARIANTS(x);
-            ypStringLib_elemcopy(result_sizeshift, result_data, result_len,
+            ypStringLib_elemcopy(result_enc->sizeshift, result_data, result_len,
                     ypStringLib_ENC(x)->sizeshift, ypStringLib_DATA(x), 0, ypStringLib_LEN(x));
             result_len += ypStringLib_LEN(x);
         }
@@ -7051,13 +7108,13 @@ static void _ypStringLib_join_elemcopy(
         yp_ASSERT(x != NULL, "_ypStringLib_join_elemcopy passed an empty seq");
         for (i = 1; /*stop at NULL*/; i++) {
             yp_ASSERT(ypStringLib_TYPE_CHECK(x), "ypStringLib_join didn't perform type checking");
-            ypStringLib_elemcopy(result_sizeshift, result_data, result_len,
+            ypStringLib_elemcopy(result_enc->sizeshift, result_data, result_len,
                     ypStringLib_ENC(x)->sizeshift, ypStringLib_DATA(x), 0, ypStringLib_LEN(x));
             result_len += ypStringLib_LEN(x);
             x = seq->getindexX(state, i);  // borrowed
             if (x == NULL) break;
             ypStringLib_elemcopy(
-                    result_sizeshift, result_data, result_len, s_sizeshift, s_data, 0, s_len);
+                    result_enc->sizeshift, result_data, result_len, s_sizeshift, s_data, 0, s_len);
             result_len += s_len;
         }
     }
@@ -7128,7 +7185,7 @@ static ypObject *ypStringLib_join(
     // Now we can create the result object and populate it
     result_enc = &(ypStringLib_encs[result_enc_code]);
     result = _ypStringLib_new(
-            ypObject_TYPE_CODE(s), result_len, /*alloclen_fixed=*/TRUE, result_enc->code);
+            ypObject_TYPE_CODE(s), result_len, /*alloclen_fixed=*/TRUE, result_enc);
     if (yp_isexceptionC(result)) return result;
     _ypStringLib_join_elemcopy(result, s, seq, state);
     yp_ASSERT(ypStringLib_LEN(result) == result_len,
@@ -7214,7 +7271,7 @@ static ypObject *ypStringLib_encode_concat_replacement(
     }
     newAlloclen = newLen + future_growth;
     if (ypStringLib_ALLOCLEN(encoded) < newAlloclen) {
-        result = _ypStringLib_grow_onextend(encoded, newAlloclen, 0, ypStringLib_ENC_BYTES);
+        result = _ypStringLib_grow_onextend(encoded, newAlloclen, 0, ypStringLib_enc_bytes);
         if (yp_isexceptionC(result)) return result;
     }
 
@@ -7274,9 +7331,11 @@ static ypObject *ypStringLib_decode_call_errorhandler(yp_codecs_error_handler_fu
 static ypObject *ypStringLib_decode_concat_replacement(
         ypObject *decoded, ypObject *replacement, yp_ssize_t future_growth)
 {
-    yp_ssize_t newLen;
-    yp_ssize_t newAlloclen;
-    ypObject  *result;
+    ypStringLib_encinfo *decoded_enc = ypStringLib_ENC(decoded);
+    ypStringLib_encinfo *replacement_enc = ypStringLib_ENC(replacement);
+    yp_ssize_t           newLen;
+    yp_ssize_t           newAlloclen;
+    ypObject            *result;
 
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(replacement) == ypStr_CODE, "replacement must be a string");
     yp_ASSERT(future_growth >= 0, "future_growth can't be negative");
@@ -7290,15 +7349,15 @@ static ypObject *ypStringLib_decode_concat_replacement(
     }
     newAlloclen = newLen + future_growth;
     if (ypStringLib_ALLOCLEN(decoded) < newAlloclen ||
-            ypStringLib_ENC(decoded) < ypStringLib_ENC(replacement)) {
-        result = _ypStringLib_grow_onextend(
-                decoded, newAlloclen, 0, ypStringLib_ENC_CODE(replacement));
+            decoded_enc->elemsize < replacement_enc->elemsize) {
+        result = _ypStringLib_grow_onextend(decoded, newAlloclen, 0, replacement_enc);
         if (yp_isexceptionC(result)) return result;
+        decoded_enc = replacement_enc;
     }
 
-    ypStringLib_elemcopy(ypStringLib_ENC(decoded)->sizeshift, ypStringLib_DATA(decoded),
-            ypStringLib_LEN(decoded), ypStringLib_ENC(replacement)->sizeshift,
-            ypStringLib_DATA(replacement), 0, ypStringLib_LEN(replacement));
+    ypStringLib_elemcopy(decoded_enc->sizeshift, ypStringLib_DATA(decoded),
+            ypStringLib_LEN(decoded), replacement_enc->sizeshift, ypStringLib_DATA(replacement), 0,
+            ypStringLib_LEN(replacement));
     ypStringLib_SET_LEN(decoded, newLen);
     return yp_None;
 }
@@ -7579,19 +7638,19 @@ Return:
 static ypObject *_ypStringLib_decode_utf_8_grow_encoding(
         ypObject *dest, yp_uint32_t ch, yp_ssize_t requiredLen)
 {
-    int       newEnc;
-    ypObject *result;
+    ypStringLib_encinfo *newEnc;
+    ypObject            *result;
     yp_ASSERT(ch > 0xFFu, "only call when _ypStringLib_decode_utf_8_inner_loop can't fit the "
                           "decoded character");
     yp_ASSERT(requiredLen - ypStringLib_LEN(dest) > 0, "not enough room given to write ch");
 
-    newEnc = ch > 0xFFFFu ? ypStringLib_ENC_UCS_4 : ypStringLib_ENC_UCS_2;
-    yp_ASSERT(newEnc > ypStringLib_ENC_CODE(dest),
+    newEnc = ch > 0xFFFFu ? ypStringLib_enc_ucs_4 : ypStringLib_enc_ucs_2;
+    yp_ASSERT(newEnc->elemsize > ypStringLib_ENC(dest)->elemsize,
             "function called without actually needing to grow the encoding");
     result = _ypStringLib_grow_onextend(dest, requiredLen, 0, newEnc);
     if (yp_isexceptionC(result)) return result;
 
-    ypStringLib_encs[newEnc].setindexX(ypStringLib_DATA(dest), ypStringLib_LEN(dest), ch);
+    newEnc->setindexX(ypStringLib_DATA(dest), ypStringLib_LEN(dest), ch);
     ypStringLib_SET_LEN(dest, ypStringLib_LEN(dest) + 1);
     return yp_None;
 }
@@ -7785,7 +7844,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     ((yp_uint16_t *)dest_data)[dest_len] = ch;
     dest_len += 1;
     ypStringLib_SET_LEN(dest, dest_len);
-    ypStringLib_ENC_CODE(dest) = ypStringLib_ENC_UCS_2;
+    ypStringLib_ENC_CODE(dest) = ypStringLib_ENC_CODE_UCS_2;
     ypStringLib_SET_ALLOCLEN(dest, ypStringLib_ALLOCLEN(dest) / 2);
 
     // We are at least ucs-2: see if we are actually ucs-4.  Recall that source was modified above.
@@ -7843,8 +7902,7 @@ static ypObject *_ypStringLib_decode_utf_8(
         // XXX Can't overflow because we've checked len<=MAX, and len is worst-case num of chars
         dest_requiredLen = ypStringLib_LEN(dest) /*ch isn't a char*/ + (end - source);
         if (dest_requiredLen > ypStringLib_ALLOCLEN(dest) - 1) {
-            result = _ypStringLib_grow_onextend(
-                    dest, dest_requiredLen, 0, ypStringLib_ENC_CODE(dest));
+            result = _ypStringLib_grow_onextend(dest, dest_requiredLen, 0, ypStringLib_ENC(dest));
             if (yp_isexceptionC(result)) {
                 yp_decref(dest);
                 return result;
@@ -7915,7 +7973,7 @@ static ypObject *_ypStringLib_encode_utf_8_from_latin_1(int type, ypObject *sour
     yp_uint8_t       *d;  // moving dest_data pointer
 
     ypStringLib_ASSERT_INVARIANTS(source);
-    yp_ASSERT(ypStringLib_ENC_CODE(source) == ypStringLib_ENC_LATIN_1,
+    yp_ASSERT(ypStringLib_ENC_CODE(source) == ypStringLib_ENC_CODE_LATIN_1,
             "_ypStringLib_encode_utf_8_from_latin_1 called on wrong str encoding");
     yp_ASSERT(source_len > 0,
             "empty-string case should be handled before _ypStringLib_encode_utf_8_from_latin_1");
@@ -7999,8 +8057,8 @@ static ypObject *_ypStringLib_encode_utf_8(int type, ypObject *source, ypObject 
 {
     yp_ssize_t const               source_len = ypStringLib_LEN(source);
     void *const                    source_data = ypStringLib_DATA(source);
-    int                            source_enc = ypStringLib_ENC_CODE(source);
-    ypStringLib_getindexXfunc      getindexX = ypStringLib_ENC(source)->getindexX;
+    ypStringLib_encinfo           *source_enc = ypStringLib_ENC(source);
+    ypStringLib_getindexXfunc      getindexX = source_enc->getindexX;
     yp_ssize_t                     maxCharSize;
     yp_ssize_t                     i;  // index into source_data
     ypObject                      *dest;
@@ -8011,11 +8069,11 @@ static ypObject *_ypStringLib_encode_utf_8(int type, ypObject *source, ypObject 
     ypObject                      *result;
 
     ypStringLib_ASSERT_INVARIANTS(source);
-    yp_ASSERT(source_enc != ypStringLib_ENC_LATIN_1,
+    yp_ASSERT(source_enc != ypStringLib_enc_latin_1,
             "use _ypStringLib_encode_utf_8_from_latin_1 for latin-1 strings");
     yp_ASSERT(
             source_len > 0, "empty-string case should be handled before _ypStringLib_encode_utf_8");
-    maxCharSize = source_enc == ypStringLib_ENC_UCS_2 ? 3 : 4;
+    maxCharSize = source_enc == ypStringLib_enc_ucs_2 ? 3 : 4;
 
     if (source_len > ypStringLib_LEN_MAX / maxCharSize) return yp_MemorySizeOverflowError;
     dest = _ypBytes_new(type, source_len * maxCharSize, /*alloclen_fixed=*/FALSE);  // new ref
@@ -8100,7 +8158,7 @@ static ypObject *ypStringLib_encode_utf_8(int type, ypObject *source, ypObject *
         return yp_bytearray0();
     }
 
-    if (ypStringLib_ENC_CODE(source) == ypStringLib_ENC_LATIN_1) {
+    if (ypStringLib_ENC_CODE(source) == ypStringLib_ENC_CODE_LATIN_1) {
         return _ypStringLib_encode_utf_8_from_latin_1(type, source);
     } else {
         return _ypStringLib_encode_utf_8(type, source, errors);
@@ -8159,7 +8217,7 @@ static ypObject *_yp_codecs_normalize_encoding_name(ypObject *encoding)
     yp_uint8_t *norm_data;
 
     // Only latin-1 names are accepted
-    if (ypStringLib_ENC_CODE(encoding) != ypStringLib_ENC_LATIN_1) return yp_ValueError;
+    if (ypStringLib_ENC_CODE(encoding) != ypStringLib_ENC_CODE_LATIN_1) return yp_ValueError;
 
     // encoding may already be normalized, in which case: do nothing
     data = ypStringLib_DATA(encoding);
@@ -8543,11 +8601,12 @@ yp_STATIC_ASSERT(yp_offsetof(ypBytesObject, ob_inline_data) % yp_MAX_ALIGNMENT =
 #define ypBytes_ALLOCLEN_MAX ypStringLib_ALLOCLEN_MAX
 #define ypBytes_LEN_MAX ypStringLib_LEN_MAX
 
-#define ypBytes_ASSERT_INVARIANTS(b)                                                             \
-    do {                                                                                         \
-        yp_ASSERT(ypObject_TYPE_PAIR_CODE(b) == ypBytes_CODE, "bad type for bytes");             \
-        yp_ASSERT(ypStringLib_ENC_CODE(b) == ypStringLib_ENC_BYTES, "bad StrLib_ENC for bytes"); \
-        ypStringLib_ASSERT_INVARIANTS(b);                                                        \
+#define ypBytes_ASSERT_INVARIANTS(b)                                                 \
+    do {                                                                             \
+        yp_ASSERT(ypObject_TYPE_PAIR_CODE(b) == ypBytes_CODE, "bad type for bytes"); \
+        yp_ASSERT(ypStringLib_ENC_CODE(b) == ypStringLib_ENC_CODE_BYTES,             \
+                "bad StrLib_ENC for bytes");                                         \
+        ypStringLib_ASSERT_INVARIANTS(b);                                            \
     } while (0)
 
 // Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or
@@ -8628,7 +8687,7 @@ static ypObject *_ypBytes_extend_from_bytes(ypObject *b, ypObject *x)
     newLen = ypBytes_LEN(b) + ypBytes_LEN(x);
     if (ypBytes_ALLOCLEN(b) - 1 < newLen) {
         // TODO Over-allocate
-        ypObject *result = _ypStringLib_grow_onextend(b, newLen, 0, ypStringLib_ENC_BYTES);
+        ypObject *result = _ypStringLib_grow_onextend(b, newLen, 0, ypStringLib_enc_bytes);
         if (yp_isexceptionC(result)) return result;
     }
     memcpy(ypBytes_DATA(b) + ypBytes_LEN(b), ypBytes_DATA(x), ypBytes_LEN(x));
@@ -9739,11 +9798,12 @@ yp_STATIC_ASSERT(yp_offsetof(ypStringLibObject, ob_inline_data) % 4 == 0, aligno
 #define ypStr_ALLOCLEN_MAX ypStringLib_ALLOCLEN_MAX
 #define ypStr_LEN_MAX ypStringLib_LEN_MAX
 
-#define ypStr_ASSERT_INVARIANTS(s)                                                             \
-    do {                                                                                       \
-        yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypStr_CODE, "bad type for str");               \
-        yp_ASSERT(ypStringLib_ENC_CODE(s) != ypStringLib_ENC_BYTES, "bad StrLib_ENC for str"); \
-        ypStringLib_ASSERT_INVARIANTS(s);                                                      \
+#define ypStr_ASSERT_INVARIANTS(s)                                                                \
+    do {                                                                                          \
+        yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypStr_CODE, "bad type for str");                  \
+        yp_ASSERT(                                                                                \
+                ypStringLib_ENC_CODE(s) != ypStringLib_ENC_CODE_BYTES, "bad StrLib_ENC for str"); \
+        ypStringLib_ASSERT_INVARIANTS(s);                                                         \
     } while (0)
 
 // If x is a str/chrarray that can be encoded as per enc_code, sets *x_data and *x_len to that
@@ -9752,9 +9812,10 @@ yp_STATIC_ASSERT(yp_offsetof(ypStringLibObject, ob_inline_data) % 4 == 0, aligno
 // context, this is not necessarily an error (i.e. yp_contains would return false in this case).
 // Otherwise, returns an exception. *x_data may or may not be null terminated. If this function
 // succeeds, you will need to call _ypStr_coerce_encoding_free to deallocate appropriately.
-static ypObject *_ypStr_coerce_encoding(ypObject *x, int enc_code, void **x_data, yp_ssize_t *x_len)
+static ypObject *_ypStr_coerce_encoding(
+        ypObject *x, ypStringLib_encinfo *enc, void **x_data, yp_ssize_t *x_len)
 {
-    int        dest_sizeshift = ypStringLib_encs[enc_code].sizeshift;
+    int        dest_sizeshift = enc->sizeshift;
     int        src_sizeshift;
     yp_ssize_t alloclen;
 
@@ -9833,10 +9894,10 @@ static ypObject *_str_concat_copy(int type, ypObject *s)
 }
 static ypObject *str_concat(ypObject *s, ypObject *x)
 {
-    yp_ssize_t           newLen;
-    int                  newEnc_code;
+    yp_ssize_t           newS_len;
+    int                  newS_enc_code;
+    ypStringLib_encinfo *newS_enc;
     ypObject            *newS;
-    ypStringLib_encinfo *newEnc;
 
     // Check the type, and optimize the case where s or x are empty
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
@@ -9844,18 +9905,18 @@ static ypObject *str_concat(ypObject *s, ypObject *x)
     if (ypStr_LEN(s) < 1) return _str_concat_copy(ypObject_TYPE_CODE(s), x);
 
     if (ypStr_LEN(s) > ypStr_LEN_MAX - ypStr_LEN(x)) return yp_MemorySizeOverflowError;
-    newLen = ypStr_LEN(s) + ypStr_LEN(x);
-    newEnc_code = MAX(ypStringLib_ENC_CODE(s), ypStringLib_ENC_CODE(x));
-    newS = _ypStr_new(ypObject_TYPE_CODE(s), newLen, /*alloclen_fixed=*/TRUE, newEnc_code);
+    newS_len = ypStr_LEN(s) + ypStr_LEN(x);
+    newS_enc_code = MAX(ypStringLib_ENC_CODE(s), ypStringLib_ENC_CODE(x));
+    newS_enc = &(ypStringLib_encs[newS_enc_code]);
+    newS = _ypStr_new(ypObject_TYPE_CODE(s), newS_len, /*alloclen_fixed=*/TRUE, newS_enc);
     if (yp_isexceptionC(newS)) return newS;
-    newEnc = &(ypStringLib_encs[newEnc_code]);
 
-    ypStringLib_elemcopy(newEnc->sizeshift, ypStr_DATA(newS), 0, ypStringLib_ENC(s)->sizeshift,
+    ypStringLib_elemcopy(newS_enc->sizeshift, ypStr_DATA(newS), 0, ypStringLib_ENC(s)->sizeshift,
             ypStr_DATA(s), 0, ypStr_LEN(s));
-    ypStringLib_elemcopy(newEnc->sizeshift, ypStr_DATA(newS), ypStr_LEN(s),
+    ypStringLib_elemcopy(newS_enc->sizeshift, ypStr_DATA(newS), ypStr_LEN(s),
             ypStringLib_ENC(x)->sizeshift, ypStr_DATA(x), 0,
             ypStr_LEN(x) + 1);  // incl null
-    ypStr_SET_LEN(newS, newLen);
+    ypStr_SET_LEN(newS, newS_len);
     ypStr_ASSERT_INVARIANTS(newS);
     return newS;
 }
@@ -9872,11 +9933,11 @@ static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
 static ypObject *str_find(ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
         findfunc_direction direction, yp_ssize_t *i)
 {
-    void     *x_data;
+    void      *x_data;
     yp_ssize_t x_len;
-    ypObject *result;
+    ypObject  *result;
 
-    result = _ypStr_coerce_encoding(x, ypStringLib_ENC_CODE(s), &x_data, &x_len);
+    result = _ypStr_coerce_encoding(x, ypStringLib_ENC(s), &x_data, &x_len);
     if (yp_isexceptionC(result)) return result;
 
     result = ypStringLib_find(s, x_data, x_len, start, stop, direction, i);
@@ -10078,8 +10139,8 @@ static ypObject *str_lt(ypObject *s, ypObject *x)
     if (s == x) return yp_False;
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_ComparisonNotImplemented;
     // TODO relative comps for ucs-2 and -4
-    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
-    if (ypStringLib_ENC_CODE(x) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(x) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) < 0);
 }
 static ypObject *str_le(ypObject *s, ypObject *x)
@@ -10087,8 +10148,8 @@ static ypObject *str_le(ypObject *s, ypObject *x)
     if (s == x) return yp_True;
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_ComparisonNotImplemented;
     // TODO relative comps for ucs-2 and -4
-    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
-    if (ypStringLib_ENC_CODE(x) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(x) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) <= 0);
 }
 static ypObject *str_ge(ypObject *s, ypObject *x)
@@ -10096,8 +10157,8 @@ static ypObject *str_ge(ypObject *s, ypObject *x)
     if (s == x) return yp_True;
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_ComparisonNotImplemented;
     // TODO relative comps for ucs-2 and -4
-    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
-    if (ypStringLib_ENC_CODE(x) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(x) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) >= 0);
 }
 static ypObject *str_gt(ypObject *s, ypObject *x)
@@ -10105,8 +10166,8 @@ static ypObject *str_gt(ypObject *s, ypObject *x)
     if (s == x) return yp_False;
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return yp_ComparisonNotImplemented;
     // TODO relative comps for ucs-2 and -4
-    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
-    if (ypStringLib_ENC_CODE(x) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(x) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) > 0);
 }
 
@@ -10140,7 +10201,7 @@ static ypObject *str_ne(ypObject *s, ypObject *x)
 static ypObject *str_currenthash(
         ypObject *s, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
+    if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
     *hash = yp_HashBytes(ypStr_DATA(s), ypStr_LEN(s) << ypStringLib_ENC(s)->sizeshift);
 
     // Since we never contain mutable objects, we can cache our hash
@@ -10381,7 +10442,7 @@ static ypObject *_yp_asencodedCX(
     *encoded = ypStr_DATA(s);
     if (size == NULL) {
         // TODO Support UCS-2 and -4 here
-        if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_LATIN_1) return yp_NotImplementedError;
+        if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
         if ((yp_ssize_t)strlen(*encoded) != ypStr_LEN(s)) return yp_TypeError;
     } else {
         *size = ypStr_LEN(s) << ypStringLib_ENC(s)->sizeshift;
@@ -10511,26 +10572,24 @@ ypObject *yp_chrarray0(void)
 // TODO Statically-allocate the first 256 characters for ypStr_CODE only?
 static ypObject *_yp_chrC(int type, yp_int_t i)
 {
-    int                  newEnc_code;
+    ypStringLib_encinfo *newS_enc;
     ypObject            *newS;
-    ypStringLib_encinfo *newEnc;
 
     if (i < 0 || i > ypStringLib_MAX_UNICODE) return yp_ValueError;
 
     // clang-format off
-    newEnc_code = i > 0xFFFFu ? ypStringLib_ENC_UCS_4 :
-                  i > 0xFFu   ? ypStringLib_ENC_UCS_2 :
-                  ypStringLib_ENC_LATIN_1;
+    newS_enc = i > 0xFFFFu ? ypStringLib_enc_ucs_4 :
+               i > 0xFFu   ? ypStringLib_enc_ucs_2 :
+               ypStringLib_enc_latin_1;
     // clang-format on
 
-    newS = _ypStr_new(type, 1, /*alloclen_fixed=*/TRUE, newEnc_code);
+    newS = _ypStr_new(type, 1, /*alloclen_fixed=*/TRUE, newS_enc);
     if (yp_isexceptionC(newS)) return newS;
     yp_ASSERT(ypStr_DATA(newS) == ypStr_INLINE_DATA(newS), "yp_chrC didn't allocate inline!");
 
     // Recall we've already checked that i isn't outside of a 32-bit range (MAX_UNICODE)
-    newEnc = &(ypStringLib_encs[newEnc_code]);
-    newEnc->setindexX(ypStr_DATA(newS), 0, (yp_uint32_t)i);
-    newEnc->setindexX(ypStr_DATA(newS), 1, 0);
+    newS_enc->setindexX(ypStr_DATA(newS), 0, (yp_uint32_t)i);
+    newS_enc->setindexX(ypStr_DATA(newS), 1, 0);
     ypStr_SET_LEN(newS, 1);
     ypStr_ASSERT_INVARIANTS(newS);
     return newS;
@@ -10550,11 +10609,10 @@ ypObject *yp_chrC(yp_int_t i) { return _yp_chrC(ypStr_CODE, i); }
 
 static ypStringLib_encinfo ypStringLib_encs[4] = {
         {
-                // ypStringLib_ENC_BYTES
+                ypStringLib_ENC_CODE_BYTES,    // code
                 0,                             // sizeshift
                 1,                             // elemsize
                 0xFFu,                         // max_char
-                ypStringLib_ENC_BYTES,         // code
                 NULL,                          // name
                 yp_CONST_REF(yp_bytes_empty),  // empty_immutable
                 yp_bytearray0,                 // empty_mutable
@@ -10562,23 +10620,21 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 ypStringLib_setindexX_1byte    // setindexX
         },
         {
-                // ypStringLib_ENC_LATIN_1
-                0,                            // sizeshift
-                1,                            // elemsize
-                0xFFu,                        // max_char
-                ypStringLib_ENC_LATIN_1,      // code
-                yp_CONST_REF(yp_s_latin_1),   // name
-                yp_CONST_REF(yp_str_empty),   // empty_immutable
-                yp_chrarray0,                 // empty_mutable
-                ypStringLib_getindexX_1byte,  // getindexX
-                ypStringLib_setindexX_1byte   // setindexX
+                ypStringLib_ENC_CODE_LATIN_1,  // code
+                0,                             // sizeshift
+                1,                             // elemsize
+                0xFFu,                         // max_char
+                yp_CONST_REF(yp_s_latin_1),    // name
+                yp_CONST_REF(yp_str_empty),    // empty_immutable
+                yp_chrarray0,                  // empty_mutable
+                ypStringLib_getindexX_1byte,   // getindexX
+                ypStringLib_setindexX_1byte    // setindexX
         },
         {
-                // ypStringLib_ENC_UCS_2
+                ypStringLib_ENC_CODE_UCS_2,    // code
                 1,                             // sizeshift
                 2,                             // elemsize
                 0xFFFFu,                       // max_char
-                ypStringLib_ENC_UCS_2,         // code
                 yp_CONST_REF(yp_s_ucs_2),      // name
                 yp_CONST_REF(yp_str_empty),    // empty_immutable
                 yp_chrarray0,                  // empty_mutable
@@ -10586,11 +10642,10 @@ static ypStringLib_encinfo ypStringLib_encs[4] = {
                 ypStringLib_setindexX_2bytes   // setindexX
         },
         {
-                // ypStringLib_ENC_UCS_4
+                ypStringLib_ENC_CODE_UCS_4,    // code
                 2,                             // sizeshift
                 4,                             // elemsize
                 0xFFFFFFFFu,                   // max_char
-                ypStringLib_ENC_UCS_4,         // code
                 yp_CONST_REF(yp_s_ucs_4),      // name
                 yp_CONST_REF(yp_str_empty),    // empty_immutable
                 yp_chrarray0,                  // empty_mutable
@@ -11481,7 +11536,7 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
     result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &sq_rlen);
     if (yp_isexceptionC(result)) return result;
     if (direction == yp_FIND_REVERSE) {
-        _ypSlice_InvertIndicesC(&start, &stop, &step, sq_rlen);
+        ypSlice_InvertIndicesC(&start, &stop, &step, sq_rlen);
     }
 
     for (i = start; sq_rlen > 0; i += step, sq_rlen--) {
@@ -13391,7 +13446,7 @@ unsafe_latin_compare(ypObject *v, ypObject *w, MergeState *ms)
     yp_ASSERT1(ypObject_TYPE_CODE(v) == ypStr_CODE);
     yp_ASSERT1(ypObject_TYPE_CODE(w) == ypStr_CODE);
     yp_ASSERT1(ypStringLib_ENC_CODE(v) == ypStringLib_ENC_CODE(w));
-    yp_ASSERT1(ypStringLib_ENC_CODE(v) == ypStringLib_ENC_LATIN_1);
+    yp_ASSERT1(ypStringLib_ENC_CODE(v) == ypStringLib_ENC_CODE_LATIN_1);
 
     len = MIN(ypStringLib_LEN(v), ypStringLib_LEN(w));
     res = memcmp(ypStringLib_DATA(v), ypStringLib_DATA(w), len);
@@ -13620,7 +13675,7 @@ list_sort(ypObject *self, ypObject *keyfunc, ypObject *_reverse)
             if (keys_are_all_same_type) {
                 if (key_type == ypStr_CODE &&
                         strings_are_latin &&
-                        ypStringLib_ENC_CODE(key) != ypStringLib_ENC_LATIN_1) {
+                        ypStringLib_ENC_CODE(key) != ypStringLib_ENC_CODE_LATIN_1) {
 
                     strings_are_latin = 0;
                 }

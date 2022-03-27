@@ -2110,10 +2110,10 @@ struct _ypStringLibObject {
 // Set ob_len or ob_alloclen to this value to signal an invalid length
 #define _ypObject_LEN_INVALID ((yp_ssize_t)-1)
 // Macros on ob_type_flags for string objects (bytes and str)
-#define _ypStringLib_ENC_BYTES (0u)
-#define _ypStringLib_ENC_LATIN_1 (1u)
-#define _ypStringLib_ENC_UCS_2 (2u)
-#define _ypStringLib_ENC_UCS_4 (3u)
+#define _ypStringLib_ENC_CODE_BYTES (0u)
+#define _ypStringLib_ENC_CODE_LATIN_1 (1u)
+#define _ypStringLib_ENC_CODE_UCS_2 (2u)
+#define _ypStringLib_ENC_CODE_UCS_4 (3u)
 
 // These type codes must match those in nohtyP.c
 #define _ypInt_CODE (10u)
@@ -2134,14 +2134,14 @@ struct _ypStringLibObject {
 #define _yp_IMMORTAL_BYTES(qual, name, value)                                                  \
     static const char                _##name##_data[] = value;                                 \
     static struct _ypStringLibObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
-            _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};      \
+            _ypStringLib_ENC_CODE_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)}; \
     qual ypObject *const             name = (ypObject *)&_##name##_struct /* force semi-colon */
-#define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                                               \
-    static const char                _##name##_data[] = value;                                    \
-    static struct _ypStringLibObject _##name##_struct = {                                         \
-            _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_LATIN_1, (void *)_##name##_data, \
-                    sizeof(_##name##_data) - 1),                                                  \
-    };                                                                                            \
+#define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                            \
+    static const char                _##name##_data[] = value;                 \
+    static struct _ypStringLibObject _##name##_struct = {                      \
+            _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_CODE_LATIN_1, \
+                    (void *)_##name##_data, sizeof(_##name##_data) - 1),       \
+    };                                                                         \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
