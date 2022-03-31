@@ -1249,7 +1249,6 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal('c', 'abc', '__getitem__', -1)
         self.checkequal('a', 'abc', '__getitem__', 0)
 
-    @yp_unittest.skip_str_slice
     def test_subscript_slice(self):
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 3))
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 1000))
@@ -1259,7 +1258,6 @@ class MixinStrUnicodeUserStringTest:
     def test_subscript_str(self):
         self.checkraises(TypeError, 'abc', '__getitem__', 'def')
 
-    @yp_unittest.skip_str_slice
     def test_slice(self):
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 1000))
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 3))
@@ -1273,7 +1271,6 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'abc', '__getitem__', 'def')
 
-    @yp_unittest.skip_str_slice
     def test_extended_getslice(self):
         # Test extended slicing by comparing with list slicing.
         s = string.ascii_letters + string.digits

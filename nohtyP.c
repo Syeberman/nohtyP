@@ -6346,14 +6346,14 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
 #define ypStringLib_INLINE_DATA(s) (((ypStringLibObject *)s)->ob_inline_data)
 
 // The maximum possible alloclen and length of any string object.  While Latin-1 could technically
-// allow four times as much data as UCS-4, for simplicity we use one maximum length for all
+// allow four times as much data as ucs-4, for simplicity we use one maximum length for all
 // encodings.  (Consider that an element in the largest Latin-1 chrarray could be replaced with a
-// UCS-4 character, thus quadrupling its size.)
+// ucs-4 character, thus quadrupling its size.)
 // XXX On the flip side, this means it's possible to create a string that, when encoded, cannot
 // fit in a bytes object, as it'll be larger than LEN_MAX.
 #define ypStringLib_ALLOCLEN_MAX                                                                \
     ((yp_ssize_t)MIN3(yp_SSIZE_T_MAX - yp_sizeof(ypStringLibObject),                            \
-            (yp_SSIZE_T_MAX - yp_sizeof(ypStringLibObject)) / 4 /* /4 for elemsize of UCS-4 */, \
+            (yp_SSIZE_T_MAX - yp_sizeof(ypStringLibObject)) / 4 /* /4 for elemsize of ucs-4 */, \
             ypObject_LEN_MAX))
 #define ypStringLib_LEN_MAX (ypStringLib_ALLOCLEN_MAX - 1 /* for null terminator */)
 
@@ -6405,6 +6405,7 @@ typedef struct {
     ypStringLib_getindexXfunc getindexX;  // Gets the ordinal at src[src_i]
     ypStringLib_setindexXfunc setindexX;  // Sets dest[dest_i] to value
 } ypStringLib_encinfo;
+// FIXME add const here?
 static ypStringLib_encinfo  ypStringLib_encs[4];
 static ypStringLib_encinfo *ypStringLib_enc_bytes = &(ypStringLib_encs[ypStringLib_ENC_CODE_BYTES]);
 static ypStringLib_encinfo *ypStringLib_enc_latin_1 =
@@ -6451,156 +6452,173 @@ static void ypStringLib_setindexX_4bytes(void *dest, yp_ssize_t dest_i, yp_uint3
     ((yp_uint32_t *)dest)[dest_i] = value;
 }
 
-// A version of ypStringLib_upconvert that copies from UCS-2 to UCS-4
+// Because we are converting to a larger encoding, copying in reverse avoids having to copy to a
+// temporary buffer.
 // TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_upconvert_4from2(void *_data, yp_ssize_t len)
-{
-    // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint32_t       *dest = ((yp_uint32_t *)_data) + len - 1;
-    const yp_uint16_t *src = ((yp_uint16_t *)_data) + len - 1;
-    for (/*len already set*/; len > 0; len--) {
-        *dest = *src;
-        dest--;
-        src--;
+#define _ypStringLib_INPLACE_UPCONVERT_FUNCTION(name, dest_type, src_type) \
+    static void name(void *_data, yp_ssize_t len)                          \
+    {                                                                      \
+        dest_type      *dest = ((dest_type *)_data) + len - 1;             \
+        const src_type *src = ((src_type *)_data) + len - 1;               \
+        for (/*len already set*/; len > 0; len--) {                        \
+            *dest = *src;                                                  \
+            dest--;                                                        \
+            src--;                                                         \
+        }                                                                  \
     }
-}
-
-// A version of ypStringLib_upconvert that copies from Latin-1 to UCS-4
-// TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_upconvert_4from1(void *_data, yp_ssize_t len)
-{
-    // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint32_t      *dest = ((yp_uint32_t *)_data) + len - 1;
-    const yp_uint8_t *src = ((yp_uint8_t *)_data) + len - 1;
-    for (/*len already set*/; len > 0; len--) {
-        *dest = *src;
-        dest--;
-        src--;
-    }
-}
-
-// A version of ypStringLib_upconvert that copies from Latin-1 to UCS-2
-// TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_upconvert_2from1(void *_data, yp_ssize_t len)
-{
-    // By copying in reverse, we avoid having to copy to a temporary buffer
-    yp_uint16_t      *dest = ((yp_uint16_t *)_data) + len - 1;
-    const yp_uint8_t *src = ((yp_uint8_t *)_data) + len - 1;
-    for (/*len already set*/; len > 0; len--) {
-        *dest = *src;
-        dest--;
-        src--;
-    }
-}
+_ypStringLib_INPLACE_UPCONVERT_FUNCTION(_ypStringLib_inplace_4from2, yp_uint32_t, yp_uint16_t);
+_ypStringLib_INPLACE_UPCONVERT_FUNCTION(_ypStringLib_inplace_4from1, yp_uint32_t, yp_uint8_t);
+_ypStringLib_INPLACE_UPCONVERT_FUNCTION(_ypStringLib_inplace_2from1, yp_uint16_t, yp_uint8_t);
 
 // Converts the len characters at data to a larger encoding
 // XXX There must be enough room in data to fit the larger characters
 // XXX new_sizeshift must be larger than old_sizeshift
-static void ypStringLib_upconvert(int new_sizeshift, int old_sizeshift, void *data, yp_ssize_t len)
+static void ypStringLib_inplace_upconvert(
+        int new_sizeshift, int old_sizeshift, void *data, yp_ssize_t len)
 {
     yp_ASSERT(new_sizeshift > old_sizeshift, "can only upconvert to a larger encoding, of course");
-    if (new_sizeshift == 2) {  // UCS-4
+
+    if (new_sizeshift == 2) {  // ucs-4
         if (old_sizeshift == 1) {
-            ypStringLib_upconvert_4from2(data, len);
+            _ypStringLib_inplace_4from2(data, len);
         } else {
             yp_ASSERT(old_sizeshift == 0, "unexpected old_sizeshift");
-            ypStringLib_upconvert_4from1(data, len);
+            _ypStringLib_inplace_4from1(data, len);
         }
-    } else {  // UCS-2
+    } else {  // ucs-2
         // If dest was sizeshift 0, then src would be too, and we'd have hit the memcpy case
         yp_ASSERT(new_sizeshift == 1, "unexpected new_sizeshift");
         yp_ASSERT(old_sizeshift == 0, "unexpected old_sizeshift");
-        ypStringLib_upconvert_2from1(data, len);
+        _ypStringLib_inplace_2from1(data, len);
     }
 }
 
-// A version of ypStringLib_elemcopy that copies from UCS-2 to UCS-4
 // TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_elemcopy_4from2(
-        void *_dest, yp_ssize_t dest_i, const void *_src, yp_ssize_t src_i, yp_ssize_t len)
-{
-    yp_uint32_t       *dest = ((yp_uint32_t *)_dest) + dest_i;
-    const yp_uint16_t *src = ((yp_uint16_t *)_src) + src_i;
-    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
-    for (/*len already set*/; len > 0; len--) {
-        *dest = *src;
-        dest++;
-        src++;
+#define _ypStringLib_ELEMCOPY_UPCONVERT_FUNCTION(name, dest_type, src_type)                     \
+    static void name(dest_type *dest, yp_ssize_t dest_i, const src_type *src, yp_ssize_t src_i, \
+            yp_ssize_t len)                                                                     \
+    {                                                                                           \
+        dest += dest_i;                                                                         \
+        src += src_i;                                                                           \
+        for (/*len already set*/; len > 0; len--) {                                             \
+            *dest = *src;                                                                       \
+            dest++;                                                                             \
+            src++;                                                                              \
+        }                                                                                       \
     }
-}
-
-// A version of ypStringLib_elemcopy that copies from Latin-1 to UCS-4
-// TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_elemcopy_4from1(
-        void *_dest, yp_ssize_t dest_i, const void *_src, yp_ssize_t src_i, yp_ssize_t len)
-{
-    yp_uint32_t      *dest = ((yp_uint32_t *)_dest) + dest_i;
-    const yp_uint8_t *src = ((yp_uint8_t *)_src) + src_i;
-    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
-    for (/*len already set*/; len > 0; len--) {
-        *dest = *src;
-        dest++;
-        src++;
-    }
-}
-
-// A version of ypStringLib_elemcopy that copies from Latin-1 to UCS-2
-// TODO Write multiple elements at once and, if possible, read in multiples too
-static void ypStringLib_elemcopy_2from1(
-        void *_dest, yp_ssize_t dest_i, const void *_src, yp_ssize_t src_i, yp_ssize_t len)
-{
-    yp_uint16_t      *dest = ((yp_uint16_t *)_dest) + dest_i;
-    const yp_uint8_t *src = ((yp_uint8_t *)_src) + src_i;
-    yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
-    for (/*len already set*/; len > 0; len--) {
-        *dest = *src;
-        dest++;
-        src++;
-    }
-}
+_ypStringLib_ELEMCOPY_UPCONVERT_FUNCTION(_ypStringLib_elemcopy_4from2, yp_uint32_t, yp_uint16_t);
+_ypStringLib_ELEMCOPY_UPCONVERT_FUNCTION(_ypStringLib_elemcopy_4from1, yp_uint32_t, yp_uint8_t);
+_ypStringLib_ELEMCOPY_UPCONVERT_FUNCTION(_ypStringLib_elemcopy_2from1, yp_uint16_t, yp_uint8_t);
 
 // Copies len elements from src starting at src_i, and places them at dest starting at dest_i.
-// dest_sizeshift must be >=src_sizeshift.
+// To be used in contexts where dest may have a larger encoding than src (i.e. where
+// dest_sizeshift>=src_sizeshift).
+// XXX Not applicable in contexts where dest may be a smaller encoding. See
+// ypStringLib_elemcopy_maybedownconvert for that.
 // XXX dest and src cannot overlap.
-static void ypStringLib_elemcopy(int dest_sizeshift, void *dest, yp_ssize_t dest_i,
+static void ypStringLib_elemcopy_maybeupconvert(int dest_sizeshift, void *dest, yp_ssize_t dest_i,
         int src_sizeshift, const void *src, yp_ssize_t src_i, yp_ssize_t len)
 {
     yp_ASSERT(dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding");
     yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
+    yp_ASSERT((dest + len) <= src || (src + len) <= dest, "buffers cannot overlap");
+
     if (dest_sizeshift == src_sizeshift) {
         // Huzzah!  We get to use the nice-and-quick memcpy
         memcpy(((yp_uint8_t *)dest) + (dest_i << dest_sizeshift),
                 ((const yp_uint8_t *)src) + (src_i << dest_sizeshift), len << dest_sizeshift);
-    } else if (dest_sizeshift == 2) {  // UCS-4
+    } else if (dest_sizeshift == 2) {  // ucs-4
         // If src was also sizeshift 2, then we'd have hit the memcpy case
         if (src_sizeshift == 1) {
-            ypStringLib_elemcopy_4from2(dest, dest_i, src, src_i, len);
+            _ypStringLib_elemcopy_4from2(dest, dest_i, src, src_i, len);
         } else {
             yp_ASSERT(src_sizeshift == 0, "unexpected src_sizeshift");
-            ypStringLib_elemcopy_4from1(dest, dest_i, src, src_i, len);
+            _ypStringLib_elemcopy_4from1(dest, dest_i, src, src_i, len);
         }
-    } else {  // UCS-2
+    } else {  // ucs-2
         // If dest was sizeshift 0, then src would be too, and we'd have hit the memcpy case
         yp_ASSERT(dest_sizeshift == 1, "unexpected dest_sizeshift");
         yp_ASSERT(src_sizeshift == 0, "unexpected src_sizeshift");
-        ypStringLib_elemcopy_2from1(dest, dest_i, src, src_i, len);
+        _ypStringLib_elemcopy_2from1(dest, dest_i, src, src_i, len);
     }
 }
 
+// TODO Write multiple elements at once and, if possible, read in multiples too
+#define _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(name, dest_type, src_type)                   \
+    static void name(dest_type *dest, yp_ssize_t dest_i, const src_type *src, yp_ssize_t src_i, \
+            yp_ssize_t src_step, yp_ssize_t slicelen)                                           \
+    {                                                                                           \
+        dest += dest_i;                                                                         \
+        src += src_i;                                                                           \
+        for (/*slicelen already set*/; slicelen > 0; slicelen--) {                              \
+            *dest = *src;                                                                       \
+            dest++;                                                                             \
+            src += src_step;                                                                    \
+        }                                                                                       \
+    }
+_ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_1from1, yp_uint8_t, yp_uint8_t);
+_ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_1from2, yp_uint8_t, yp_uint16_t);
+_ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_1from4, yp_uint8_t, yp_uint32_t);
+_ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_2from2, yp_uint16_t, yp_uint16_t);
+_ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_2from4, yp_uint16_t, yp_uint32_t);
+_ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_4from4, yp_uint32_t, yp_uint32_t);
+
+// Copies slicelen elements from src starting at src_i, and places them at dest starting at dest_i.
+// To be used in contexts where dest may have a smaller encoding than src (i.e. where
+// dest_sizeshift<=src_sizeshift). As getslice is one such context, the src_step parameter allows
+// copying non-contiguous, and reversed, characters from src. src_i, src_step, and slicelength must
+// be the _adjusted_ values from ypSlice_AdjustIndicesC.
+// XXX Not applicable in contexts where dest may be a larger encoding. See
+// ypStringLib_elemcopy_maybeupconvert for that.
+// XXX dest and src cannot overlap.
+static void ypStringLib_elemcopy_maybedownconvert(int dest_sizeshift, void *dest, yp_ssize_t dest_i,
+        int src_sizeshift, const void *src, yp_ssize_t src_i, yp_ssize_t src_step,
+        yp_ssize_t slicelen)
+{
+    yp_ASSERT(dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding");
+    yp_ASSERT(dest_i >= 0 && src_i >= 0 && slicelen >= 0, "indices/lengths must be >=0");
+    // Checking for overlap is slightly trickier here, let's skip for now.
+
+    if (dest_sizeshift == src_sizeshift && src_step == 1) {
+        // Huzzah!  We get to use the nice-and-quick memcpy
+        memcpy(((yp_uint8_t *)dest) + (dest_i << dest_sizeshift),
+                ((const yp_uint8_t *)src) + (src_i << dest_sizeshift), slicelen << dest_sizeshift);
+    } else if (dest_sizeshift == 0) {  // latin-1
+        if (src_sizeshift == 0) {
+            _ypStringLib_elemcopy_1from1(dest, dest_i, src, src_i, src_step, slicelen);
+        } else if (src_sizeshift == 1) {
+            _ypStringLib_elemcopy_1from2(dest, dest_i, src, src_i, src_step, slicelen);
+        } else {
+            yp_ASSERT(src_sizeshift == 2, "unexpected src_sizeshift");
+            _ypStringLib_elemcopy_1from4(dest, dest_i, src, src_i, src_step, slicelen);
+        }
+    } else if (dest_sizeshift == 1) {  // ucs-2
+        if (src_sizeshift == 1) {
+            _ypStringLib_elemcopy_2from2(dest, dest_i, src, src_i, src_step, slicelen);
+        } else {
+            yp_ASSERT(src_sizeshift == 2, "unexpected src_sizeshift");
+            _ypStringLib_elemcopy_2from4(dest, dest_i, src, src_i, src_step, slicelen);
+        }
+    } else {
+        yp_ASSERT(dest_sizeshift == 2, "unexpected dest_sizeshift");
+        yp_ASSERT(src_sizeshift == 2, "unexpected src_sizeshift");
+        _ypStringLib_elemcopy_4from4(dest, dest_i, src, src_i, src_step, slicelen);
+    }
+}
 
 #define ypStringLib_TYPE_CHECKENC_1FROM2_MASK 0xFF00FF00FF00FF00ULL
 yp_STATIC_ASSERT(((_yp_uint_t)ypStringLib_TYPE_CHECKENC_1FROM2_MASK) ==
                          ypStringLib_TYPE_CHECKENC_1FROM2_MASK,
         checkenc_1from2_mask_matches_type);
 // XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
-static ypStringLib_encinfo *ypStringLib_checkenc_contiguous_ucs_2(const void *data, yp_ssize_t len)
+static ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_2(const void *data, yp_ssize_t len)
 {
     const _yp_uint_t  mask = ypStringLib_TYPE_CHECKENC_1FROM2_MASK;
     const yp_uint8_t *p = data;
     const yp_uint8_t *end = p + (len * 2);
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof(_yp_uint_t));
     yp_ASSERT((*(yp_uint8_t *)&mask) == 0,
-            "ypStringLib_checkenc_contiguous_ucs_2 doesn't support big-endian yet");
+            "_ypStringLib_checkenc_contiguous_ucs_2 doesn't support big-endian yet");
     yp_ASSERT(yp_IS_ALIGNED(data, 2), "unexpected alignment for ucs-2 data");
     yp_ASSERT1(len > 0);
 
@@ -6640,15 +6658,15 @@ yp_STATIC_ASSERT(((_yp_uint_t)ypStringLib_TYPE_CHECKENC_1FROM4_MASK) ==
 yp_STATIC_ASSERT(((_yp_uint_t)ypStringLib_TYPE_CHECKENC_2FROM4_MASK) ==
                          ypStringLib_TYPE_CHECKENC_2FROM4_MASK,
         checkenc_2from4_mask_matches_type);
-// Returns true if the UCS-4 string can be encoded in the encoding matching mask.  *p will point
+// Returns true if the ucs-4 string can be encoded in the encoding matching mask.  *p will point
 // to the location that failed the check, or to *end on success.
-// XXX On first look, this shares a lot of code with ypStringLib_checkenc_contiguous_ucs_2. However,
-// the two "unaligned elements" loops are different (16- vs 32-bit reads).
+// XXX On first look, this shares a lot of code with _ypStringLib_checkenc_contiguous_ucs_2.
+// However, the two "unaligned elements" loops are different (16- vs 32-bit reads).
 static int _ypStringLib_checkenc_ucs_4(_yp_uint_t mask, const yp_uint8_t **p, const yp_uint8_t *end)
 {
     const yp_uint8_t *aligned_end = yp_ALIGN_DOWN(end, yp_sizeof(_yp_uint_t));
     yp_ASSERT((*(yp_uint8_t *)&mask) == 0,
-            "ypStringLib_checkenc_contiguous_ucs_4 doesn't support big-endian yet");
+            "_ypStringLib_checkenc_contiguous_ucs_4 doesn't support big-endian yet");
 
     // If we don't contain an aligned _yp_uint_t, jump to the end
     if (aligned_end - *p < yp_sizeof(_yp_uint_t)) goto final_loop;
@@ -6677,9 +6695,10 @@ final_loop:
     }
     return TRUE;
 }
-// Returns the ypStringLib_ENC_* that _should_ be used for the given UCS-4-encoded string
+
+// Returns the ypStringLib_ENC_* that _should_ be used for the given ucs-4-encoded string
 // XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
-static ypStringLib_encinfo *ypStringLib_checkenc_contiguous_ucs_4(const void *data, yp_ssize_t len)
+static ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_4(const void *data, yp_ssize_t len)
 {
     const yp_uint8_t *p = data;
     const yp_uint8_t *end = p + (len * 4);
@@ -6697,27 +6716,26 @@ static ypStringLib_encinfo *ypStringLib_checkenc_contiguous_ucs_4(const void *da
     return ypStringLib_enc_ucs_4;
 }
 
-// FIXME Is "sliced" a good antonym for "contiguous"?
-static ypStringLib_encinfo *ypStringLib_checkenc_sliced_ucs_2(
+static ypStringLib_encinfo *_ypStringLib_checkenc_noncontiguous_ucs_2(
         const yp_uint16_t *data, yp_ssize_t start, yp_ssize_t step, yp_ssize_t slicelength)
 {
     yp_ssize_t i;
     yp_ASSERT(yp_IS_ALIGNED(data, 2), "unexpected alignment for ucs-2 data");
-    yp_ASSERT1(slicelength > 0);
-    yp_ASSERT1(step > 0);
+    yp_ASSERT(slicelength > 0, "missed an 'empty slice' optimization");
+    yp_ASSERT(step > 1, "unexpected step");
     for (i = 0; i < slicelength; i++) {
         if (data[ypSlice_INDEX(start, step, i)] > 0xFFu) return ypStringLib_enc_ucs_2;
     }
     return ypStringLib_enc_latin_1;
 }
 
-static ypStringLib_encinfo *ypStringLib_checkenc_sliced_ucs_4(
+static ypStringLib_encinfo *_ypStringLib_checkenc_noncontiguous_ucs_4(
         const yp_uint32_t *data, yp_ssize_t start, yp_ssize_t step, yp_ssize_t slicelength)
 {
     yp_ssize_t i;
     yp_ASSERT(yp_IS_ALIGNED(data, 4), "unexpected alignment for ucs-4 data");
-    yp_ASSERT1(slicelength > 0);
-    yp_ASSERT1(step > 0);
+    yp_ASSERT(slicelength > 0, "missed an 'empty slice' optimization");
+    yp_ASSERT(step > 1, "unexpected step");
 
     // If the latin-1 check fails in the middle of the string, we can resume from that point
     // because we know the ucs-2 check will match the first half anyway.
@@ -6734,7 +6752,7 @@ check_for_ucs_2:
 }
 
 // Returns the minimal encoding required for the given slice of string's data. start, stop, step,
-// and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC,
+// and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC.
 static ypStringLib_encinfo *ypStringLib_checkenc(ypStringLib_encinfo *enc, const void *data,
         yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength)
 {
@@ -6751,17 +6769,19 @@ static ypStringLib_encinfo *ypStringLib_checkenc(ypStringLib_encinfo *enc, const
 
     if (step == 1) {
         if (enc == ypStringLib_enc_ucs_2) {
-            return ypStringLib_checkenc_contiguous_ucs_2((yp_uint16_t *)data + start, stop - start);
+            return _ypStringLib_checkenc_contiguous_ucs_2(
+                    (yp_uint16_t *)data + start, stop - start);
         } else {
             yp_ASSERT(enc == ypStringLib_enc_ucs_4);
-            return ypStringLib_checkenc_contiguous_ucs_4((yp_uint32_t *)data + start, stop - start);
+            return _ypStringLib_checkenc_contiguous_ucs_4(
+                    (yp_uint32_t *)data + start, stop - start);
         }
     } else {
         if (enc == ypStringLib_enc_ucs_2) {
-            return ypStringLib_checkenc_sliced_ucs_2(data, start, step, slicelength);
+            return _ypStringLib_checkenc_noncontiguous_ucs_2(data, start, step, slicelength);
         } else {
             yp_ASSERT(enc == ypStringLib_enc_ucs_4);
-            return ypStringLib_checkenc_sliced_ucs_4(data, start, step, slicelength);
+            return _ypStringLib_checkenc_noncontiguous_ucs_4(data, start, step, slicelength);
         }
     }
 }
@@ -6880,12 +6900,12 @@ static ypObject *_ypStringLib_grow_onextend(
     // and/or may need to be copied over from oldptr
     if (ypStringLib_DATA(s) == oldptr) {
         if (oldEnc != newEnc) {
-            ypStringLib_upconvert(
+            ypStringLib_inplace_upconvert(
                     newEnc->sizeshift, oldEnc->sizeshift, ypStringLib_DATA(s), ypStringLib_LEN(s));
         }
     } else {
-        ypStringLib_elemcopy(newEnc->sizeshift, ypStringLib_DATA(s), 0, oldEnc->sizeshift, oldptr,
-                0, ypStringLib_LEN(s));
+        ypStringLib_elemcopy_maybeupconvert(newEnc->sizeshift, ypStringLib_DATA(s), 0,
+                oldEnc->sizeshift, oldptr, 0, ypStringLib_LEN(s));
         ypMem_REALLOC_CONTAINER_FREE_OLDPTR(s, ypStringLibObject, oldptr);
     }
     ypStringLib_ENC_CODE(s) = newEnc->code;
@@ -6938,6 +6958,36 @@ static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
     s_enc->setindexX(ypStringLib_DATA(newS), newLen, 0);
     ypStringLib_SET_LEN(newS, newLen);
 
+    ypStringLib_ASSERT_INVARIANTS(newS);
+    return newS;
+}
+
+static ypObject *ypStringLib_getslice(
+        ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step)
+{
+    ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    ypObject            *result;
+    ypStringLib_encinfo *newS_enc;
+    yp_ssize_t           newLen;
+    ypObject            *newS;
+
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &newLen);
+    if (yp_isexceptionC(result)) return result;
+
+    if (newLen < 1) {
+        if (!ypObject_IS_MUTABLE(s)) return s_enc->empty_immutable;
+        return s_enc->empty_mutable();
+    }
+
+    newS_enc = ypStringLib_checkenc(s_enc, ypStringLib_DATA(s), start, stop, step, newLen);
+
+    newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newLen, /*alloclen_fixed=*/TRUE, newS_enc);
+    if (yp_isexceptionC(newS)) return newS;
+
+    ypStringLib_elemcopy_maybedownconvert(newS_enc->sizeshift, ypStringLib_DATA(newS), 0,
+            s_enc->sizeshift, ypStringLib_DATA(s), start, step, newLen);
+    newS_enc->setindexX(ypStringLib_DATA(newS), newLen, '\0');
+    ypStringLib_SET_LEN(newS, newLen);
     ypStringLib_ASSERT_INVARIANTS(newS);
     return newS;
 }
@@ -7062,7 +7112,7 @@ static ypObject *_ypStringLib_join_from_string(ypObject *s, ypObject *x)
 
     // ...and populate it, remembering to null-terminate and update the length
     result_data = ypStringLib_DATA(result);
-    ypStringLib_elemcopy(
+    ypStringLib_elemcopy_maybeupconvert(
             result_enc->sizeshift, result_data, 1, s_enc->sizeshift, ypStringLib_DATA(s), 0, s_len);
     _ypSequence_repeat_memcpy(result_data, x_len - 1, (s_len + 1) << result_enc->sizeshift);
     for (i = 0; i < x_len; i++) {
@@ -7094,7 +7144,7 @@ static void _ypStringLib_join_elemcopy(
             if (x == NULL) break;
             yp_ASSERT(ypStringLib_TYPE_CHECK(x), "ypStringLib_join didn't perform type checking");
             ypStringLib_ASSERT_INVARIANTS(x);
-            ypStringLib_elemcopy(result_enc->sizeshift, result_data, result_len,
+            ypStringLib_elemcopy_maybeupconvert(result_enc->sizeshift, result_data, result_len,
                     ypStringLib_ENC(x)->sizeshift, ypStringLib_DATA(x), 0, ypStringLib_LEN(x));
             result_len += ypStringLib_LEN(x);
         }
@@ -7108,12 +7158,12 @@ static void _ypStringLib_join_elemcopy(
         yp_ASSERT(x != NULL, "_ypStringLib_join_elemcopy passed an empty seq");
         for (i = 1; /*stop at NULL*/; i++) {
             yp_ASSERT(ypStringLib_TYPE_CHECK(x), "ypStringLib_join didn't perform type checking");
-            ypStringLib_elemcopy(result_enc->sizeshift, result_data, result_len,
+            ypStringLib_elemcopy_maybeupconvert(result_enc->sizeshift, result_data, result_len,
                     ypStringLib_ENC(x)->sizeshift, ypStringLib_DATA(x), 0, ypStringLib_LEN(x));
             result_len += ypStringLib_LEN(x);
             x = seq->getindexX(state, i);  // borrowed
             if (x == NULL) break;
-            ypStringLib_elemcopy(
+            ypStringLib_elemcopy_maybeupconvert(
                     result_enc->sizeshift, result_data, result_len, s_sizeshift, s_data, 0, s_len);
             result_len += s_len;
         }
@@ -7355,7 +7405,7 @@ static ypObject *ypStringLib_decode_concat_replacement(
         decoded_enc = replacement_enc;
     }
 
-    ypStringLib_elemcopy(decoded_enc->sizeshift, ypStringLib_DATA(decoded),
+    ypStringLib_elemcopy_maybeupconvert(decoded_enc->sizeshift, ypStringLib_DATA(decoded),
             ypStringLib_LEN(decoded), replacement_enc->sizeshift, ypStringLib_DATA(replacement), 0,
             ypStringLib_LEN(replacement));
     ypStringLib_SET_LEN(decoded, newLen);
@@ -7449,7 +7499,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inner_loop(
             yp_ssize_t ascii_len = ypStringLib_count_ascii_bytes(s, end);
             yp_ASSERT1(ascii_len > 0);
             yp_ASSERT1(ypStringLib_ALLOCLEN(dest) - 1 - dest_len >= ascii_len);
-            ypStringLib_elemcopy(
+            ypStringLib_elemcopy_maybeupconvert(
                     dest_sizeshift, dest_data, dest_len, 0 /*(ascii sizeshift)*/, s, 0, ascii_len);
             s += ascii_len;
             dest_len += ascii_len;
@@ -7840,7 +7890,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
 
     // Convert to ucs-2, and don't forget to write ch!
     dest_data = ypStringLib_DATA(dest);
-    ypStringLib_upconvert_2from1(dest_data, dest_len);
+    _ypStringLib_inplace_2from1(dest_data, dest_len);
     ((yp_uint16_t *)dest_data)[dest_len] = ch;
     dest_len += 1;
     ypStringLib_SET_LEN(dest, dest_len);
@@ -7922,13 +7972,13 @@ outer_loop:
 // Decodes the len bytes of utf-8 at source according to errors, and returns a new string of the
 // given type.  If source is NULL it is considered as having all null bytes; len cannot be
 // negative or greater than ypStringLib_LEN_MAX.
-// XXX Allocation-wise, the worst-case through the code would be a completely UCS-4 string, as we'd
+// XXX Allocation-wise, the worst-case through the code would be a completely ucs-4 string, as we'd
 // allocate len characters (len*4 bytes) for the decoding, but would only decode len/4 characters
-// TODO This is TERRIBLE, because if a string has more than a couple UCS-4 characters, it's
-// probably *mostly* UCS-4 characters.  Is there a quick way to scan the _entire_ string?  Or can
+// TODO This is TERRIBLE, because if a string has more than a couple ucs-4 characters, it's
+// probably *mostly* ucs-4 characters.  Is there a quick way to scan the _entire_ string?  Or can
 // we just trim the excess once we reach the end?
 // XXX Runtime-wise, the worst-case would probably be a string that starts completely Latin-1 (each
-// character is a call to enc->setindexX), followed by a UCS-2 then a UCS-4 character (each
+// character is a call to enc->setindexX), followed by a ucs-2 then a ucs-4 character (each
 // triggering an upconvert of previously-decoded characters)
 // TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
 // decoding errors
@@ -8957,36 +9007,6 @@ static ypObject *bytearray_delindex(ypObject *b, yp_ssize_t i)
     return yp_None;
 }
 
-static ypObject *bytes_getslice(ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step)
-{
-    ypObject  *result;
-    yp_ssize_t newLen;
-    ypObject  *newB;
-
-    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &newLen);
-    if (yp_isexceptionC(result)) return result;
-
-    if (newLen < 1) {
-        if (ypObject_TYPE_CODE(b) == ypBytes_CODE) return yp_bytes_empty;
-        return yp_bytearray0();
-    }
-    newB = _ypBytes_new(ypObject_TYPE_CODE(b), newLen, /*alloclen_fixed=*/TRUE);
-    if (yp_isexceptionC(newB)) return newB;
-
-    if (step == 1) {
-        memcpy(ypBytes_DATA(newB), ypBytes_DATA(b) + start, newLen);
-    } else {
-        yp_ssize_t i;
-        for (i = 0; i < newLen; i++) {
-            ypBytes_DATA(newB)[i] = ypBytes_DATA(b)[ypSlice_INDEX(start, step, i)];
-        }
-    }
-    ypBytes_DATA(newB)[newLen] = '\0';
-    ypBytes_SET_LEN(newB, newLen);
-    ypBytes_ASSERT_INVARIANTS(newB);
-    return newB;
-}
-
 static ypObject *bytearray_setslice(
         ypObject *b, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x)
 {
@@ -9445,7 +9465,7 @@ static ypSequenceMethods ypBytes_as_sequence = {
         bytes_concat,                 // tp_concat
         ypStringLib_repeat,           // tp_repeat
         bytes_getindex,               // tp_getindex
-        bytes_getslice,               // tp_getslice
+        ypStringLib_getslice,         // tp_getslice
         bytes_find,                   // tp_find
         bytes_count,                  // tp_count
         MethodError_objssizeobjproc,  // tp_setindex
@@ -9534,7 +9554,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
         bytes_concat,              // tp_concat
         ypStringLib_repeat,        // tp_repeat
         bytes_getindex,            // tp_getindex
-        bytes_getslice,            // tp_getslice
+        ypStringLib_getslice,      // tp_getslice
         bytes_find,                // tp_find
         bytes_count,               // tp_count
         bytearray_setindex,        // tp_setindex
@@ -9784,7 +9804,7 @@ ypObject *yp_bytearray0(void)
 
 typedef ypStringLibObject ypStrObject;
 
-// XXX str will only ever store Latin-1, UCS-2, or UCS-4 data, so only needs 4-byte alignment
+// XXX str will only ever store Latin-1, ucs-2, or ucs-4 data, so only needs 4-byte alignment
 yp_STATIC_ASSERT(yp_offsetof(ypStringLibObject, ob_inline_data) % 4 == 0, alignof_str_inline_data);
 
 // TODO pre-allocate static chrs in, say, range(255), or whatever seems appropriate
@@ -9840,7 +9860,8 @@ static ypObject *_ypStr_coerce_encoding(
     // terminator.
     *x_data = yp_malloc(&alloclen, ypStr_LEN(x) << dest_sizeshift);
     if (*x_data == NULL) return yp_MemoryError;
-    ypStringLib_elemcopy(dest_sizeshift, *x_data, 0, src_sizeshift, ypStr_DATA(x), 0, ypStr_LEN(x));
+    ypStringLib_elemcopy_maybeupconvert(
+            dest_sizeshift, *x_data, 0, src_sizeshift, ypStr_DATA(x), 0, ypStr_LEN(x));
     *x_len = ypStr_LEN(x);
     return yp_None;
 }
@@ -9911,9 +9932,9 @@ static ypObject *str_concat(ypObject *s, ypObject *x)
     newS = _ypStr_new(ypObject_TYPE_CODE(s), newS_len, /*alloclen_fixed=*/TRUE, newS_enc);
     if (yp_isexceptionC(newS)) return newS;
 
-    ypStringLib_elemcopy(newS_enc->sizeshift, ypStr_DATA(newS), 0, ypStringLib_ENC(s)->sizeshift,
-            ypStr_DATA(s), 0, ypStr_LEN(s));
-    ypStringLib_elemcopy(newS_enc->sizeshift, ypStr_DATA(newS), ypStr_LEN(s),
+    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStr_DATA(newS), 0,
+            ypStringLib_ENC(s)->sizeshift, ypStr_DATA(s), 0, ypStr_LEN(s));
+    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStr_DATA(newS), ypStr_LEN(s),
             ypStringLib_ENC(x)->sizeshift, ypStr_DATA(x), 0,
             ypStr_LEN(x) + 1);  // incl null
     ypStr_SET_LEN(newS, newS_len);
@@ -10259,7 +10280,7 @@ static ypSequenceMethods ypStr_as_sequence = {
         str_concat,                   // tp_concat
         ypStringLib_repeat,           // tp_repeat
         str_getindex,                 // tp_getindex
-        MethodError_objsliceproc,     // tp_getslice
+        ypStringLib_getslice,         // tp_getslice
         str_find,                     // tp_find
         str_count,                    // tp_count
         MethodError_objssizeobjproc,  // tp_setindex
@@ -10348,9 +10369,9 @@ static ypSequenceMethods ypChrArray_as_sequence = {
         str_concat,                   // tp_concat
         ypStringLib_repeat,           // tp_repeat
         str_getindex,                 // tp_getindex
-        MethodError_objsliceproc,     // tp_getslice
+        ypStringLib_getslice,         // tp_getslice
         str_find,                     // tp_find
-        MethodError_countfunc,        // tp_count
+        str_count,                    // tp_count
         MethodError_objssizeobjproc,  // tp_setindex
         MethodError_objsliceobjproc,  // tp_setslice
         MethodError_objssizeproc,     // tp_delindex
@@ -10441,7 +10462,7 @@ static ypObject *_yp_asencodedCX(
     ypStr_ASSERT_INVARIANTS(s);
     *encoded = ypStr_DATA(s);
     if (size == NULL) {
-        // TODO Support UCS-2 and -4 here
+        // TODO Support ucs-2 and -4 here
         if (ypStringLib_ENC_CODE(s) != ypStringLib_ENC_CODE_LATIN_1) return yp_NotImplementedError;
         if ((yp_ssize_t)strlen(*encoded) != ypStr_LEN(s)) return yp_TypeError;
     } else {
@@ -10569,7 +10590,7 @@ ypObject *yp_chrarray0(void)
     return newS;
 }
 
-// TODO Statically-allocate the first 256 characters for ypStr_CODE only?
+// FIXME Like ints, the latin-1 chars are singletons in Python. Do the same.
 static ypObject *_yp_chrC(int type, yp_int_t i)
 {
     ypStringLib_encinfo *newS_enc;

@@ -44,7 +44,6 @@ skip_str_format = skip("TODO: Implement yp_str.format")
 skip_str_printf = skip("printf-style string formatting not supported in nohtyP")  # Unneeded?
 skip_str_replace = skip("TODO: Implement yp_str.replace/translate/etc")
 skip_str_repr = skip("TODO: Implement yp_str/yp_repr")
-skip_str_slice = skip("TODO: Support slices in yp_str")
 skip_str_space = skip("TODO: Implement yp_str.expandtabs/strip/ljust/isspace/etc")
 skip_str_split = skip("TODO: Implement yp_str.split/splitlines/partition/etc")
 skip_str_unicode_db = skip("TODO: Implement yp_str.isalpha/isdigit/etc")
