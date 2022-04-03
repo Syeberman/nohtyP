@@ -6532,7 +6532,7 @@ static void ypStringLib_inplace_upconvert(
         dest_type      *dest = ((dest_type *)_data);                                    \
         const src_type *src = ((src_type *)_data);                                      \
         for (/*len already set*/; len > 0; len--) {                                     \
-            *dest = *src;                                                               \
+            *dest = (dest_type)*src;                                                    \
             yp_ASSERT(*dest == *src, "ypStringLib_inplace_downconvert truncated data"); \
             dest++;                                                                     \
             src++;                                                                      \
@@ -6595,7 +6595,6 @@ static void ypStringLib_elemcopy_maybeupconvert(int dest_sizeshift, void *dest, 
 {
     yp_ASSERT(dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding");
     yp_ASSERT(dest_i >= 0 && src_i >= 0 && len >= 0, "indices/lengths must be >=0");
-    yp_ASSERT((dest + len) <= src || (src + len) <= dest, "buffers cannot overlap");
 
     if (dest_sizeshift == src_sizeshift) {
         // Huzzah!  We get to use the nice-and-quick memcpy
@@ -6624,7 +6623,8 @@ static void ypStringLib_elemcopy_maybeupconvert(int dest_sizeshift, void *dest, 
         dest += dest_i;                                                                         \
         src += src_i;                                                                           \
         for (/*slicelen already set*/; slicelen > 0; slicelen--) {                              \
-            *dest = *src;                                                                       \
+            *dest = (dest_type)*src;                                                            \
+            yp_ASSERT(*dest == *src, "ypStringLib_elemcopy_maybedownconvert truncated data");   \
             dest++;                                                                             \
             src += src_step;                                                                    \
         }                                                                                       \
@@ -6650,7 +6650,6 @@ static void ypStringLib_elemcopy_maybedownconvert(int dest_sizeshift, void *dest
 {
     yp_ASSERT(dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding");
     yp_ASSERT(dest_i >= 0 && src_i >= 0 && slicelen >= 0, "indices/lengths must be >=0");
-    // Checking for overlap is slightly trickier here, let's skip for now.
 
     if (dest_sizeshift == src_sizeshift && src_step == 1) {
         // Huzzah!  We get to use the nice-and-quick memcpy
