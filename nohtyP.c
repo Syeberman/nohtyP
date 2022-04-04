@@ -795,11 +795,11 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 #if defined(_MSC_VER)
 #define yp_IS_NAN _isnan
 #define yp_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
-#define yp_IS_FINITE(X) _finite(X)
+#define yp_IS_FINITE _finite
 #elif defined(GCC_VER)
 #define yp_IS_NAN isnan
-#define yp_IS_INFINITY(X) (!finite(X) && !isnan(X))
-#define yp_IS_FINITE(X) finite(X)
+#define yp_IS_INFINITY isinf
+#define yp_IS_FINITE isfinite
 #else
 #error Need to port Py_IS_NAN et al to nohtyP for this platform
 #endif
@@ -863,7 +863,7 @@ static yp_hash_t yp_HashDouble(double v)
         m *= 268435456.0;  // 2**28
         e -= 28;
         y = (yp_uhash_t)m;  // pull out integer part
-        m -= y;
+        m -= (double)y;
         x += y;
         if (x >= _ypHASH_MODULUS) {
             x -= _ypHASH_MODULUS;
@@ -10083,7 +10083,8 @@ static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i)
         // XXX This could end up keeping 3x as much memory as needed (ucs-4 to latin-1). In general
         // we only reallocate when necessary (i.e. when growing) or easy (i.e. when clearing). But
         // perhaps we should establish a threshold here (and other str places) where if there's too
-        // much wasted space we free some memory. (set/dict kinda does the same.)
+        // much wasted space we free some memory. (set/dict kinda does the same, but maybe for
+        // different reasons.)
         ypStringLib_inplace_downconvert(
                 newEnc->sizeshift, ypStringLib_ENC(s)->sizeshift, ypStr_DATA(s), ypStr_LEN(s));
     }
