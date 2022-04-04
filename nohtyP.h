@@ -2065,16 +2065,17 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts abuse ob_alloclen to hold a search finger for popitem
 // XXX The dealloc list (i.e., yp_decref) abuses ob_hash to point to the next object to dealloc
-typedef yp_int32_t _yp_ob_len_t;
+typedef yp_uint16_t _yp_ob_type_t;
+typedef yp_int32_t  _yp_ob_len_t;
 struct _ypObject {
-    yp_uint16_t  ob_type;        // type code
-    yp_uint8_t   ob_flags;       // type-independent flags
-    yp_uint8_t   ob_type_flags;  // type-specific flags
-    yp_uint32_t  ob_refcnt;      // reference count
-    _yp_ob_len_t ob_len;         // length of object
-    _yp_ob_len_t ob_alloclen;    // allocated length
-    yp_hash_t    ob_hash;        // cached hash for immutables
-    void        *ob_data;        // pointer to object data
+    _yp_ob_type_t ob_type;        // type code
+    yp_uint8_t    ob_flags;       // type-independent flags
+    yp_uint8_t    ob_type_flags;  // type-specific flags
+    yp_uint32_t   ob_refcnt;      // reference count
+    _yp_ob_len_t  ob_len;         // length of object
+    _yp_ob_len_t  ob_alloclen;    // allocated length
+    yp_hash_t     ob_hash;        // cached hash for immutables
+    void         *ob_data;        // pointer to object data
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
 

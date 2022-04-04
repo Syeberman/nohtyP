@@ -173,6 +173,7 @@ def ApplyGCCOptions(env, version):
         "-Werror",
         "-Wall",
         "-Wsign-compare",
+        "-Wconversion",
         "-Wundef",
         "-Wstrict-prototypes",
         "-Wmissing-prototypes",
