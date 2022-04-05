@@ -795,11 +795,11 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 #if defined(_MSC_VER)
 #define yp_IS_NAN _isnan
 #define yp_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
-#define yp_IS_FINITE _finite
+#define yp_IS_FINITE(X) _finite(X)
 #elif defined(GCC_VER)
 #define yp_IS_NAN isnan
-#define yp_IS_INFINITY isinf
-#define yp_IS_FINITE isfinite
+#define yp_IS_INFINITY(X) (!finite(X) && !isnan(X))
+#define yp_IS_FINITE(X) finite(X)
 #else
 #error Need to port Py_IS_NAN et al to nohtyP for this platform
 #endif
@@ -4800,7 +4800,7 @@ static yp_int_t _yp_mulL_posints(yp_int_t x, yp_int_t y)
      * We still need to check for overflow in this addition, then we can return the result.
      */
     const yp_int_t num_bits_halved = yp_sizeof(yp_int_t) / 2 * 8;
-    const yp_int_t bit_mask_halved = (1ull << num_bits_halved) - 1ull;
+    const yp_int_t bit_mask_halved = (yp_int_t)((1ull << num_bits_halved) - 1ull);
     yp_int_t       result_hi, result_lo;
 
     // Split x and y into high and low halves

@@ -181,14 +181,16 @@ def ApplyGCCOptions(env, version):
         "-Wold-style-declaration",
         "-Wold-style-definition",
         "-Wmissing-parameter-type",
-        # Before 4.8, -Wshadow warned if a declaration shadowed a function (index, div)
+        # Before 4.8, shadow warned if a declaration shadowed a function (index, div)
         "-Wshadow" if version >= 4.8 else "",
         # Disable some warnings
-        # TODO maybe-uninitialized would be good during analyze
         "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
         "-Wno-unused-variable",  # TODO Mark TypeError_MappingMethods/etc as unused (portably)?
         "-Wno-pointer-sign",
         "-Wno-unknown-pragmas",
+        # Before 9.0, float-conversion warned about passing a double to finite/isnan
+        "" if version >= 9.0 else "-Wno-float-conversion",
+        # TODO maybe-uninitialized would be good during analyze
         "-Wno-maybe-uninitialized" if version >= 4.8 else "-Wno-uninitialized",
         # For shared libraries, only expose functions explicitly marked ypAPI
         "-fvisibility=hidden" if version >= 4.0 else "",
