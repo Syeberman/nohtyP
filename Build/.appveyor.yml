@@ -6,31 +6,93 @@ branches:
 
 skip_branch_with_pr: true
 
+cache: Build/site_toolsconfig.py
+
+deploy: off
+
 image:
   - Visual Studio 2019
   - Ubuntu2004
-  - Visual Studio 2017
-  - Ubuntu1604
-  - Visual Studio 2015
+  # - Visual Studio 2017
+  # - Ubuntu1604
+  # - Visual Studio 2015
 
-cache: Build/site_toolsconfig.py
+platform:
+  - x64
+  - x86
+
+configuration:
+  - Debug
+  - Build
+
+# Ideally, each compiler is listed once, against the most-recent image that includes it.
+for:
+  - matrix:
+      only:
+        - image: Visual Studio 2019
+    environment:
+      matrix:
+        # TODO: Support Visual Studio 2019
+        # - YP_COMPILER_OS: msvs_160_win32
+        - YP_COMPILER_OS: gcc_9_win32
+        - YP_COMPILER_OS: gcc_8_win32
+  - matrix:
+      only:
+        - image: Ubuntu2004
+    environment:
+      matrix:
+        - YP_COMPILER_OS: gcc_9_posix
+        - YP_COMPILER_OS: gcc_8_posix
+        - YP_COMPILER_OS: gcc_7_posix
+
+for:
+  - matrix:
+      only:
+        - platform: x64
+    environment:
+      YP_ARCH: amd64
+  - matrix:
+      only:
+        - platform: x86
+    environment:
+      YP_ARCH: x86
+
+for:
+  - matrix:
+      only:
+        - configuration: Debug
+    environment:
+      YP_CONFIGURATION: debug
+  - matrix:
+      only:
+        - configuration: Build
+    environment:
+      YP_CONFIGURATION: release
 
 build_script:
   - pwsh: >-
       if ($isWindows) {$env:Path = "C:/Python38-x64;" + $env:Path}
+
       if ($isLinux) {. $HOME/venv3.8/bin/activate.ps1}
-      Build/make all
+
+      Build/make "$($env:YP_COMPILER_OS)_$($env:YP_ARCH)_$($env:YP_CONFIGURATION)"
+
       if (! $?) {throw "build failed"}
 
 test_script:
   - pwsh: >-
       if ($isWindows) {$env:Path = "C:/Python38-x64;" + $env:Path}
-      if ($isLinux) {. $HOME/venv3.8/bin/activate.ps1}
-      Build/make testall
-      if (! $?) {
-        7z a yp_test.log.zip Build/*/*/yp_test.log
-        appveyor PushArtifact yp_test.log.zip
-        throw "build failed"
-      }
 
-deploy: off
+      if ($isLinux) {. $HOME/venv3.8/bin/activate.ps1}
+
+      Build/make "test$($env:YP_COMPILER_OS)_$($env:YP_ARCH)_$($env:YP_CONFIGURATION)"
+
+      if (! $?) {
+
+        7z a yp_test.log.zip Build/*/*/yp_test.log
+
+        appveyor PushArtifact yp_test.log.zip
+
+        throw "build failed"
+
+      }
