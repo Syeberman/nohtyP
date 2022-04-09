@@ -27,23 +27,32 @@ configuration:
 
 # Ideally, each compiler is listed once, against the most-recent image that includes it.
 for:
+  # TODO: Support Visual Studio 2019: YP_COMPILER_OS: msvs_160_win32
   - matrix:
       only:
         - image: Visual Studio 2019
     environment:
-      matrix:
-        # TODO: Support Visual Studio 2019
-        # - YP_COMPILER_OS: msvs_160_win32
-        - YP_COMPILER_OS: gcc_9_win32
-        - YP_COMPILER_OS: gcc_8_win32
+      YP_COMPILER_OS: gcc_9_win32
+  - matrix:
+      only:
+        - image: Visual Studio 2019
+    environment:
+      YP_COMPILER_OS: gcc_8_win32
   - matrix:
       only:
         - image: Ubuntu2004
     environment:
-      matrix:
-        - YP_COMPILER_OS: gcc_9_posix
-        - YP_COMPILER_OS: gcc_8_posix
-        - YP_COMPILER_OS: gcc_7_posix
+      YP_COMPILER_OS: gcc_9_posix
+  - matrix:
+      only:
+        - image: Ubuntu2004
+    environment:
+      YP_COMPILER_OS: gcc_8_posix
+  - matrix:
+      only:
+        - image: Ubuntu2004
+    environment:
+      YP_COMPILER_OS: gcc_7_posix
 
 install:
   # Write out a Build/.appveyor.ps1 file containing common configurations.
@@ -51,6 +60,7 @@ install:
       echo @'
       if ($isWindows) { $env:Path = "C:/Python38-x64;$($env:Path)" }
       if ($isLinux) { . $HOME/venv3.8/bin/activate.ps1 }
+      if (! $env:YP_COMPILER_OS) { throw "YP_COMPILER_OS not set" }
       switch ($env:PLATFORM) {
         "x64" { $env:YP_ARCH = "amd64" }
         "x86" { $env:YP_ARCH = "x86" }
@@ -62,7 +72,6 @@ install:
         default { throw "unknown configuration $($env:CONFIGURATION)" }
       }
       $env:YP_BUILD_TARGET = "$($env:YP_COMPILER_OS)_$($env:YP_ARCH)_$($env:YP_CONFIGURATION)"
-      echo "Target $($env:YP_BUILD_TARGET)"
       '@ > Build/.appveyor.ps1
 
 build_script:

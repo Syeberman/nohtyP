@@ -188,7 +188,7 @@ for compiler_name in compiler_names:
         AliasIfNotEmpty("testall", testTargets)
         AliasIfNotEmpty("analyzeall", analyzeTargets)
         heirarchy = (compiler_name, targ_os, targ_arch, configuration)
-        for heirarchyDepth in range(1, len(heirarchy)):
+        for heirarchyDepth in range(1, len(heirarchy)+1):
             heirarchyName = "_".join(heirarchy[:heirarchyDepth])
             AliasIfNotEmpty(heirarchyName, buildTargets)
             AliasIfNotEmpty("test" + heirarchyName, testTargets)
