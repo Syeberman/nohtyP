@@ -27,6 +27,14 @@ configuration:
   - Debug
   - Build
 
+matrix:
+  exclude:
+    # TODO Are there any 32-bit compilers on the Ubuntu images?
+    - image: Ubuntu2004
+      platform: x86
+    - image: Ubuntu1604
+      platform: x86
+
 # Ideally, each compiler is listed once, against the most-recent image that includes it.
 for:
   - matrix:
