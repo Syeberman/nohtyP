@@ -68,14 +68,15 @@ for:
       only:
         - image: Ubuntu1604
     environment:
-      YP_COMPILER_OSES: gcc_6_posix gcc_5_posix
+      # TODO Figure out why gcc_6_posix isn't available
+      YP_COMPILER_OSES: gcc_5_posix
   - matrix:
       only:
         - image: Visual Studio 2015
     environment:
       YP_COMPILER_OSES: gcc_6_win32 gcc_5_win32 msvs_120_win32 msvs_110_win32 msvs_100_win32 msvs_90_win32
-      # TODO Figure out why gcc_5_win32_amd64 isn't available (both here and VS 2015 image)
-      YP_SKIP_TARGETS: gcc_5_win32_amd64
+      # TODO Figure out why gcc_5_win32_amd64 isn't available
+      YP_SKIP_TARGETS: gcc_5_win32_amd64 msvs_100_win32_amd64 msvs_90_win32_amd64
 
 install:
   # Write out a Build/.appveyor.ps1 file containing common configurations.
