@@ -45,54 +45,40 @@ for:
         - YP_COMPILER_OS: gcc_8_posix
         - YP_COMPILER_OS: gcc_7_posix
 
-for:
-  - matrix:
-      only:
-        - platform: x64
-    environment:
-      YP_ARCH: amd64
-  - matrix:
-      only:
-        - platform: x86
-    environment:
-      YP_ARCH: x86
-
-for:
-  - matrix:
-      only:
-        - configuration: Debug
-    environment:
-      YP_CONFIGURATION: debug
-  - matrix:
-      only:
-        - configuration: Build
-    environment:
-      YP_CONFIGURATION: release
+install:
+  # Write out a Build/.appveyor.ps1 file containing common configurations.
+  - pwsh: |
+      echo @'
+      if ($isWindows) { $env:Path = "C:/Python38-x64;$($env:Path)" }
+      if ($isLinux) { . $HOME/venv3.8/bin/activate.ps1 }
+      switch ($env:PLATFORM) {
+        "x64" { $env:YP_ARCH = "amd64" }
+        "x86" { $env:YP_ARCH = "x86" }
+        default { throw "unknown platform $($env:PLATFORM)" }
+      }
+      switch ($env:CONFIGURATION) {
+        "Debug" { $env:YP_CONFIGURATION = "debug" }
+        "Build" { $env:YP_CONFIGURATION = "release" }
+        default { throw "unknown configuration $($env:CONFIGURATION)" }
+      }
+      $env:YP_BUILD_TARGET = "$($env:YP_COMPILER_OS)_$($env:YP_ARCH)_$($env:YP_CONFIGURATION)"
+      echo "Target $($env:YP_BUILD_TARGET)"
+      '@ > Build/.appveyor.ps1
 
 build_script:
-  - pwsh: >-
-      if ($isWindows) {$env:Path = "C:/Python38-x64;" + $env:Path}
-
-      if ($isLinux) {. $HOME/venv3.8/bin/activate.ps1}
-
-      Build/make "$($env:YP_COMPILER_OS)_$($env:YP_ARCH)_$($env:YP_CONFIGURATION)"
-
-      if (! $?) {throw "build failed"}
+  - pwsh: |
+      . Build/.appveyor.ps1
+      echo "Building $($env:YP_BUILD_TARGET)"
+      Build/make $env:YP_BUILD_TARGET
+      if (! $?) { throw "build failed" }
 
 test_script:
-  - pwsh: >-
-      if ($isWindows) {$env:Path = "C:/Python38-x64;" + $env:Path}
-
-      if ($isLinux) {. $HOME/venv3.8/bin/activate.ps1}
-
-      Build/make "test$($env:YP_COMPILER_OS)_$($env:YP_ARCH)_$($env:YP_CONFIGURATION)"
-
+  - pwsh: |
+      . Build/.appveyor.ps1
+      echo "Testing $($env:YP_BUILD_TARGET)"
+      Build/make "test$($env:YP_BUILD_TARGET)"
       if (! $?) {
-
         7z a yp_test.log.zip Build/*/*/yp_test.log
-
         appveyor PushArtifact yp_test.log.zip
-
         throw "build failed"
-
       }
