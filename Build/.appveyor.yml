@@ -1,0 +1,129 @@
+version: 0.5.{build}
+
+branches:
+  only:
+    - main
+
+skip_branch_with_pr: true
+
+cache: Build/site_toolsconfig.py
+
+deploy: off
+
+image:
+  # TODO Support Visual Studio 2022 (msvs_170_win32)
+  # - Visual Studio 2022
+  - Visual Studio 2019
+  - Ubuntu2004
+  - Visual Studio 2017
+  - Ubuntu1604
+  - Visual Studio 2015
+
+platform:
+  - x64
+  - x86
+
+configuration:
+  - Debug
+  - Build
+
+matrix:
+  exclude:
+    # TODO Are there any 32-bit compilers on the Ubuntu images?
+    - image: Ubuntu2004
+      platform: x86
+    - image: Ubuntu1604
+      platform: x86
+
+# Ideally, each compiler is listed once, against the most-recent image that includes it.
+for:
+  - matrix:
+      only:
+        - image: Visual Studio 2022
+    # TODO The docs say gcc_5_win32 is available, but it's not...
+    environment:
+       YP_COMPILER_OSES:
+  - matrix:
+      only:
+        - image: Visual Studio 2019
+    environment:
+      # TODO Support Visual Studio 2019 (msvs_160_win32)
+      YP_COMPILER_OSES: gcc_9_win32 gcc_8_win32
+      # TODO Figure out why gcc_9_win32_amd64 isn't available
+      YP_SKIP_TARGETS: gcc_9_win32_amd64
+  - matrix:
+      only:
+        - image: Ubuntu2004
+    environment:
+      YP_COMPILER_OSES: gcc_9_posix gcc_8_posix gcc_7_posix
+  - matrix:
+      only:
+        - image: Visual Studio 2017
+    environment:
+      # TODO Support Visual Studio 2017 (msvs_150_win32)
+      YP_COMPILER_OSES: gcc_7_win32 msvs_140_win32
+      # TODO Figure out why gcc_7_win32_x86 isn't available
+      YP_SKIP_TARGETS: gcc_7_win32_x86
+  - matrix:
+      only:
+        - image: Ubuntu1604
+    environment:
+      # TODO Figure out why gcc_6_posix isn't available
+      YP_COMPILER_OSES: gcc_5_posix
+  - matrix:
+      only:
+        - image: Visual Studio 2015
+    environment:
+      YP_COMPILER_OSES: gcc_6_win32 gcc_5_win32 msvs_120_win32 msvs_110_win32 msvs_100_win32 msvs_90_win32
+      # TODO Figure out why gcc_5_win32_amd64 isn't available
+      YP_SKIP_TARGETS: gcc_5_win32_amd64 msvs_100_win32_amd64 msvs_90_win32_amd64
+
+install:
+  # Write out a Build/.appveyor.ps1 file containing common configurations.
+  - pwsh: |
+      echo @'
+      $YP_ACTION = $args[0] # either "" (for build) or "test"
+      if (! $env:YP_COMPILER_OSES) { throw "YP_COMPILER_OSES not set" }
+      $YP_COMPILER_OSES = -split $env:YP_COMPILER_OSES
+      $YP_SKIP_TARGETS = -split $env:YP_SKIP_TARGETS
+      switch ($env:PLATFORM) {
+        "x64" { $YP_ARCH = "amd64" }
+        "x86" { $YP_ARCH = "x86" }
+        default { throw "unknown platform $($env:PLATFORM)" }
+      }
+      switch ($env:CONFIGURATION) {
+        "Debug" { $YP_CONFIGURATION = "debug" }
+        "Build" { $YP_CONFIGURATION = "release" }
+        default { throw "unknown configuration $($env:CONFIGURATION)" }
+      }
+
+      if ($isWindows) { $env:Path = "C:/Python38-x64;$($env:Path)" }
+      if ($isLinux) { . $HOME/venv3.8/bin/activate.ps1 }
+
+      foreach ($YP_COMPILER_OS in $YP_COMPILER_OSES) {
+        $YP_TARGET = "$($YP_COMPILER_OS)_$($YP_ARCH)_$($YP_CONFIGURATION)"
+        if ("$($YP_COMPILER_OS)_$($YP_ARCH)" -in $YP_SKIP_TARGETS) {
+          echo "Skipping due to YP_SKIP_TARGETS: $($YP_TARGET)"
+          continue
+        }
+        echo "Target: $($YP_TARGET)"
+        Build/make "$($YP_ACTION)$($YP_TARGET)"
+        if (! $?) { throw "Build/make returned an error" }
+      }
+      '@ > Build/.appveyor.ps1
+
+build_script:
+  - pwsh: |
+      try { Build/.appveyor.ps1 }
+      catch {
+        throw "build failed"
+      }
+
+test_script:
+  - pwsh: |
+      try { Build/.appveyor.ps1 test }
+      catch {
+        7z a yp_test.log.zip Build/*/*/yp_test.log
+        appveyor PushArtifact yp_test.log.zip
+        throw "tests failed"
+      }
