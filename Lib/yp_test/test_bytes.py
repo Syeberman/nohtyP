@@ -1662,7 +1662,8 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         a = yp_bytearray(b'')
         self.assertRaises(ValueError, a.extend, [0, 1, 2, 256])
         self.assertRaises(ValueError, a.extend, [0, 1, 2, -1])
-        self.assertEqual(yp_len(a), 0)
+        # Unlike Python, nohtyP does not undo the items added before the iterator failed.
+        self.assertEqual(yp_len(a), 6)
         a = yp_bytearray(b'')
         a.extend([Indexable(ord('a'))])
         self.assertEqual(a, b'a')
