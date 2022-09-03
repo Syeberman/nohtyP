@@ -1193,9 +1193,9 @@ ypObject *const      yp_tuple_empty = yp_CONST_REF(yp_tuple_empty);
 // Empty frozensets can be represented by this, immortal object
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject    _yp_frozenset_empty_struct = {
-        {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
-                ypObject_HASH_INVALID, _yp_frozenset_empty_data},
-        0};
+           {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
+                   ypObject_HASH_INVALID, _yp_frozenset_empty_data},
+           0};
 ypObject *const yp_frozenset_empty = yp_CONST_REF(yp_frozenset_empty);
 
 
@@ -3163,10 +3163,10 @@ static ypObject *_yp_freeze(ypObject *x)
     yp_ASSERT(newType != NULL, "all types should have an immutable counterpart");
 
     // Freeze the object, possibly reduce memory usage, etc
-    // FIXME Support unfreezable objects (like function). Let tp_freeze set the type code as
-    // appropriate, then inspect it after to see if it worked. (Or return yp_NotImplemented.)
-    // Perhaps return an exception if the top-level freeze doesn't freeze, but in the case of
-    // deep freeze allow deeper objects to silently fail to freeze.
+    // FIXME Support unfreezable objects. Let tp_freeze set the type code as appropriate, then
+    // inspect it after to see if it worked. (Or return yp_NotImplemented.) Perhaps return an
+    // exception if the top-level freeze doesn't freeze, but in the case of deep freeze allow deeper
+    // objects to silently fail to freeze.
     exc = newType->tp_freeze(x);
     if (yp_isexceptionC(exc)) return exc;
     ypObject_SET_TYPE_CODE(x, newCode);
@@ -6438,7 +6438,6 @@ typedef void (*ypStringLib_setindexXfunc)(void *dest, yp_ssize_t dest_i, yp_uint
 // ypStringLib_ENC_* value.  ypStringLib_ENC_CODE_BYTES should only be used for bytes, and
 // vice-versa.
 // XXX max_char may be larger than ypStringLib_MAX_UNICODE
-// FIXME Which of these do we still need?
 typedef struct {
     yp_uint8_t                code;       // The ypStringLib_ENC_CODE_* value of the encoding
     yp_uint8_t                sizeshift;  // len<<sizeshift gives the size in bytes
@@ -6447,14 +6446,16 @@ typedef struct {
     ypObject                 *name;       // Immortal str of the encoding name (ie yp_s_latin_1)
     ypStringLib_getindexXfunc getindexX;  // Gets the ordinal at src[src_i]
     ypStringLib_setindexXfunc setindexX;  // Sets dest[dest_i] to value
-} ypStringLib_encinfo;
-// FIXME add const here?
-static ypStringLib_encinfo  ypStringLib_encs[4];
-static ypStringLib_encinfo *ypStringLib_enc_bytes = &(ypStringLib_encs[ypStringLib_ENC_CODE_BYTES]);
-static ypStringLib_encinfo *ypStringLib_enc_latin_1 =
+} const ypStringLib_encinfo;
+static const ypStringLib_encinfo        ypStringLib_encs[4];
+static const ypStringLib_encinfo *const ypStringLib_enc_bytes =
+        &(ypStringLib_encs[ypStringLib_ENC_CODE_BYTES]);
+static const ypStringLib_encinfo *const ypStringLib_enc_latin_1 =
         &(ypStringLib_encs[ypStringLib_ENC_CODE_LATIN_1]);
-static ypStringLib_encinfo *ypStringLib_enc_ucs_2 = &(ypStringLib_encs[ypStringLib_ENC_CODE_UCS_2]);
-static ypStringLib_encinfo *ypStringLib_enc_ucs_4 = &(ypStringLib_encs[ypStringLib_ENC_CODE_UCS_4]);
+static const ypStringLib_encinfo *const ypStringLib_enc_ucs_2 =
+        &(ypStringLib_encs[ypStringLib_ENC_CODE_UCS_2]);
+static const ypStringLib_encinfo *const ypStringLib_enc_ucs_4 =
+        &(ypStringLib_encs[ypStringLib_ENC_CODE_UCS_4]);
 
 
 // Getters, setters, and copiers for our three internal encodings
@@ -6695,7 +6696,8 @@ yp_STATIC_ASSERT(((_yp_uint_t)ypStringLib_TYPE_CHECKENC_1FROM2_MASK) ==
                          ypStringLib_TYPE_CHECKENC_1FROM2_MASK,
         checkenc_1from2_mask_matches_type);
 // XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
-static ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_2(const void *data, yp_ssize_t len)
+static const ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_2(
+        const void *data, yp_ssize_t len)
 {
     const _yp_uint_t  mask = ypStringLib_TYPE_CHECKENC_1FROM2_MASK;
     const yp_uint8_t *p = data;
@@ -6782,7 +6784,8 @@ final_loop:
 
 // Returns the ypStringLib_ENC_* that _should_ be used for the given ucs-4-encoded string
 // XXX Adapted from Python's ascii_decode and STRINGLIB(find_max_char)
-static ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_4(const void *data, yp_ssize_t len)
+static const ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_4(
+        const void *data, yp_ssize_t len)
 {
     const yp_uint8_t *p = data;
     const yp_uint8_t *end = p + (len * 4);
@@ -6800,7 +6803,7 @@ static ypStringLib_encinfo *_ypStringLib_checkenc_contiguous_ucs_4(const void *d
     return ypStringLib_enc_ucs_4;
 }
 
-static ypStringLib_encinfo *_ypStringLib_checkenc_noncontiguous_ucs_2(
+static const ypStringLib_encinfo *_ypStringLib_checkenc_noncontiguous_ucs_2(
         const yp_uint16_t *data, yp_ssize_t start, yp_ssize_t step, yp_ssize_t slicelength)
 {
     yp_ssize_t i;
@@ -6813,7 +6816,7 @@ static ypStringLib_encinfo *_ypStringLib_checkenc_noncontiguous_ucs_2(
     return ypStringLib_enc_latin_1;
 }
 
-static ypStringLib_encinfo *_ypStringLib_checkenc_noncontiguous_ucs_4(
+static const ypStringLib_encinfo *_ypStringLib_checkenc_noncontiguous_ucs_4(
         const yp_uint32_t *data, yp_ssize_t start, yp_ssize_t step, yp_ssize_t slicelength)
 {
     yp_ssize_t i;
@@ -6837,11 +6840,11 @@ check_for_ucs_2:
 
 // Returns the minimal encoding required for the given slice of s's data. start, stop, step, and
 // slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC.
-static ypStringLib_encinfo *ypStringLib_checkenc_slice(
+static const ypStringLib_encinfo *ypStringLib_checkenc_slice(
         ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength)
 {
-    ypStringLib_encinfo *enc = ypStringLib_ENC(s);
-    const void          *data = ypStringLib_DATA(s);
+    const ypStringLib_encinfo *enc = ypStringLib_ENC(s);
+    const void                *data = ypStringLib_DATA(s);
 
     // FIXME here and elsewhere, assert ypSlice_AdjustIndicesC has been called?
 
@@ -6875,7 +6878,7 @@ static ypStringLib_encinfo *ypStringLib_checkenc_slice(
 }
 
 // Returns the minimal encoding required for s's data.
-static ypStringLib_encinfo *ypStringLib_checkenc(ypObject *s)
+static const ypStringLib_encinfo *ypStringLib_checkenc(ypObject *s)
 {
     return ypStringLib_checkenc_slice(s, 0, ypStringLib_LEN(s), 1, ypStringLib_LEN(s));
 }
@@ -6899,16 +6902,18 @@ static yp_uint8_t _ypBytes_asuint8C(ypObject *x, ypObject **exc)
 // for bytes, str for str, etc), returns yp_TypeError. If the value of x is out of range for the
 // target string, returns yp_ValueError. On error, *x_asitem and *x_enc are undefined.
 typedef ypObject *(*ypStringLib_asitemCfunc)(
-        ypObject *x, yp_uint32_t *x_asitem, ypStringLib_encinfo **x_enc);
+        ypObject *x, yp_uint32_t *x_asitem, const ypStringLib_encinfo **x_enc);
 
-static ypObject *_ypBytes_asitemC(ypObject *x, yp_uint32_t *x_asitem, ypStringLib_encinfo **x_enc)
+static ypObject *_ypBytes_asitemC(
+        ypObject *x, yp_uint32_t *x_asitem, const ypStringLib_encinfo **x_enc)
 {
     ypObject *exc = yp_None;
     *x_enc = ypStringLib_enc_bytes;
     *x_asitem = _ypBytes_asuint8C(x, &exc);
     return exc;
 }
-static ypObject *_ypStr_asitemC(ypObject *x, yp_uint32_t *x_asitem, ypStringLib_encinfo **x_enc)
+static ypObject *_ypStr_asitemC(
+        ypObject *x, yp_uint32_t *x_asitem, const ypStringLib_encinfo **x_enc)
 {
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) {
         return_yp_BAD_TYPE(x);
@@ -6934,7 +6939,7 @@ static ypObject *_ypStr_asitemC(ypObject *x, yp_uint32_t *x_asitem, ypStringLib_
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Over-allocate to avoid future resizings
 static ypObject *_ypStringLib_new(
-        int type, yp_ssize_t requiredLen, int alloclen_fixed, ypStringLib_encinfo *enc)
+        int type, yp_ssize_t requiredLen, int alloclen_fixed, const ypStringLib_encinfo *enc)
 {
     ypObject *newS;
     yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) == ypStringLib_PAIR_CODE_FROM_ENC(enc),
@@ -6958,7 +6963,7 @@ static ypObject *_ypBytes_new(int type, yp_ssize_t requiredLen, int alloclen_fix
     return _ypStringLib_new(type, requiredLen, alloclen_fixed, ypStringLib_enc_bytes);
 }
 static ypObject *_ypStr_new(
-        int type, yp_ssize_t requiredLen, int alloclen_fixed, ypStringLib_encinfo *enc)
+        int type, yp_ssize_t requiredLen, int alloclen_fixed, const ypStringLib_encinfo *enc)
 {
     yp_ASSERT1(ypObject_TYPE_CODE_AS_FROZEN(type) == ypStr_CODE);
     return _ypStringLib_new(type, requiredLen, alloclen_fixed, enc);
@@ -6996,9 +7001,9 @@ static ypObject *ypStringLib_new_empty(int type)
 // XXX Check for the empty immutable case first
 static ypObject *ypStringLib_new_copy(int type, ypObject *s, int alloclen_fixed)
 {
-    yp_ssize_t           s_len = ypStringLib_LEN(s);
-    ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
-    ypObject            *copy;
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    ypObject                  *copy;
 
     yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) == ypObject_TYPE_PAIR_CODE(s),
             "incorrect type for copy");
@@ -7028,10 +7033,10 @@ static ypObject *ypStringLib_copy(int type, ypObject *s)
 // elemsize of s to fit requiredLen (plus null terminator). Does not update ypStringLib_LEN and
 // does not null-terminate. enc_code must be the same or larger as currently.
 static ypObject *_ypStringLib_grow_onextend(
-        ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra, ypStringLib_encinfo *newEnc)
+        ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra, const ypStringLib_encinfo *newEnc)
 {
-    ypStringLib_encinfo *oldEnc = ypStringLib_ENC(s);
-    void                *oldptr;
+    const ypStringLib_encinfo *oldEnc = ypStringLib_ENC(s);
+    void                      *oldptr;
 
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypStringLib_PAIR_CODE_FROM_ENC(newEnc),
             "incorrect type for encoding");
@@ -7067,10 +7072,10 @@ static ypObject *_ypStringLib_grow_onextend(
 
 // Appends x to s, updating the length. Never writes the null-terminator.
 static ypObject *ypStringLib_push(
-        ypObject *s, yp_uint32_t x, ypStringLib_encinfo *x_enc, yp_ssize_t extra)
+        ypObject *s, yp_uint32_t x, const ypStringLib_encinfo *x_enc, yp_ssize_t extra)
 {
-    yp_ssize_t           newLen;
-    ypStringLib_encinfo *newEnc;
+    yp_ssize_t                 newLen;
+    const ypStringLib_encinfo *newEnc;
 
     if (ypStringLib_LEN(s) > ypStringLib_LEN_MAX - 1) return yp_MemorySizeOverflowError;
     newLen = ypStringLib_LEN(s) + 1;
@@ -7097,11 +7102,11 @@ static ypObject *ypStringLib_push(
 // extra allocation we'd like to avoid. So we are intentially different than Python here.
 static ypObject *_ypStringLib_extend_fromiter(ypObject *s, ypObject **mi, yp_uint64_t *mi_state)
 {
-    ypObject               *x;
-    ypStringLib_asitemCfunc asitem = ypStringLib_ASITEM_FUNC(s);
-    ypObject               *result = yp_None;
-    yp_uint32_t             x_asitem;
-    ypStringLib_encinfo    *x_enc;
+    ypObject                  *x;
+    ypStringLib_asitemCfunc    asitem = ypStringLib_ASITEM_FUNC(s);
+    ypObject                  *result = yp_None;
+    yp_uint32_t                x_asitem;
+    const ypStringLib_encinfo *x_enc;
     yp_ssize_t length_hint = yp_miniiter_length_hintC(*mi, mi_state, &result);  // zero on error
 
     while (1) {
@@ -7146,10 +7151,10 @@ static ypObject *ypStringLib_extend_fromiterable(ypObject *s, ypObject *iterable
 // TODO over-allocate as appropriate
 static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
 {
-    yp_ssize_t           x_len = ypStringLib_LEN(x);
-    ypStringLib_encinfo *x_enc = ypStringLib_ENC(x);
-    yp_ssize_t           newLen;
-    ypStringLib_encinfo *newEnc;
+    yp_ssize_t                 x_len = ypStringLib_LEN(x);
+    const ypStringLib_encinfo *x_enc = ypStringLib_ENC(x);
+    yp_ssize_t                 newLen;
+    const ypStringLib_encinfo *newEnc;
 
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypObject_TYPE_PAIR_CODE(x),
             "missed a yp_TypeError check");
@@ -7195,10 +7200,10 @@ static ypObject *ypStringLib_clear(ypObject *s)
 
 static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
 {
-    yp_ssize_t           s_len = ypStringLib_LEN(s);
-    ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
-    yp_ssize_t           newLen;
-    ypObject            *newS;
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    yp_ssize_t                 newLen;
+    ypObject                  *newS;
 
     ypStringLib_ASSERT_INVARIANTS(s);
 
@@ -7222,11 +7227,11 @@ static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
 static ypObject *ypStringLib_getslice(
         ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step)
 {
-    ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
-    ypObject            *result;
-    ypStringLib_encinfo *newS_enc;
-    yp_ssize_t           newLen;
-    ypObject            *newS;
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    ypObject                  *result;
+    const ypStringLib_encinfo *newS_enc;
+    yp_ssize_t                 newLen;
+    ypObject                  *newS;
 
     result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &newLen);
     if (yp_isexceptionC(result)) return result;
@@ -7294,9 +7299,9 @@ static ypObject *ypStringLib_find(ypObject *s, void *x_data, yp_ssize_t x_len, y
 
 static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
 {
-    yp_ssize_t           s_len = ypStringLib_LEN(s);
-    ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
-    yp_ssize_t           newLen;
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    yp_ssize_t                 newLen;
 
     ypStringLib_ASSERT_INVARIANTS(s);
 
@@ -7325,17 +7330,17 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
 // TODO Is this really a scenario for which we should be optimizing? Why would someone ''.join('')?
 static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
 {
-    yp_ssize_t           s_len = ypStringLib_LEN(s);
-    ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
-    void                *x_data = ypStringLib_DATA(x);
-    yp_ssize_t           x_len = ypStringLib_LEN(x);
-    ypStringLib_encinfo *x_enc = ypStringLib_ENC(x);
-    yp_ssize_t           i;
-    void                *result_data;
-    yp_ssize_t           result_len;
-    int                  result_enc_code;
-    ypStringLib_encinfo *result_enc;
-    ypObject            *result;
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    void                      *x_data = ypStringLib_DATA(x);
+    yp_ssize_t                 x_len = ypStringLib_LEN(x);
+    const ypStringLib_encinfo *x_enc = ypStringLib_ENC(x);
+    yp_ssize_t                 i;
+    void                      *result_data;
+    yp_ssize_t                 result_len;
+    int                        result_enc_code;
+    const ypStringLib_encinfo *result_enc;
+    ypObject                  *result;
 
     ypStringLib_ASSERT_INVARIANTS(s);
     ypStringLib_ASSERT_INVARIANTS(x);
@@ -7379,11 +7384,11 @@ static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
 static void _ypStringLib_join_elemcopy(
         ypObject *result, ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state)
 {
-    ypStringLib_encinfo *result_enc = ypStringLib_ENC(result);
-    void                *result_data = ypStringLib_DATA(result);
-    yp_ssize_t           result_len = 0;
-    yp_ssize_t           s_len = ypStringLib_LEN(s);
-    yp_ssize_t           i;
+    const ypStringLib_encinfo *result_enc = ypStringLib_ENC(result);
+    void                      *result_data = ypStringLib_DATA(result);
+    yp_ssize_t                 result_len = 0;
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    yp_ssize_t                 i;
 
     if (s_len < 1) {
         // The separator is empty, so we just concatenate seq's elements
@@ -7431,15 +7436,15 @@ static void _ypStringLib_join_elemcopy(
 static ypObject *ypStringLib_join(
         ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state)
 {
-    ypObject            *exc = yp_None;
-    unsigned             s_pair = ypObject_TYPE_PAIR_CODE(s);
-    yp_ssize_t           seq_len;
-    yp_ssize_t           i;
-    ypObject            *x;
-    yp_ssize_t           result_len;
-    int                  result_enc_code;
-    ypStringLib_encinfo *result_enc;
-    ypObject            *result;
+    ypObject                  *exc = yp_None;
+    unsigned                   s_pair = ypObject_TYPE_PAIR_CODE(s);
+    yp_ssize_t                 seq_len;
+    yp_ssize_t                 i;
+    ypObject                  *x;
+    yp_ssize_t                 result_len;
+    int                        result_enc_code;
+    const ypStringLib_encinfo *result_enc;
+    ypObject                  *result;
 
     ypStringLib_ASSERT_INVARIANTS(s);
 
@@ -7626,11 +7631,11 @@ static ypObject *ypStringLib_decode_call_errorhandler(yp_codecs_error_handler_fu
 static ypObject *ypStringLib_decode_extend_replacement(
         ypObject *decoded, ypObject *replacement, yp_ssize_t future_growth)
 {
-    ypStringLib_encinfo *decoded_enc = ypStringLib_ENC(decoded);
-    ypStringLib_encinfo *replacement_enc = ypStringLib_ENC(replacement);
-    yp_ssize_t           newLen;
-    yp_ssize_t           newAlloclen;
-    ypObject            *result;
+    const ypStringLib_encinfo *decoded_enc = ypStringLib_ENC(decoded);
+    const ypStringLib_encinfo *replacement_enc = ypStringLib_ENC(replacement);
+    yp_ssize_t                 newLen;
+    yp_ssize_t                 newAlloclen;
+    ypObject                  *result;
 
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(decoded) == ypStr_CODE, "decoded must be a string");
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(replacement) == ypStr_CODE, "replacement must be a string");
@@ -7935,8 +7940,8 @@ Return:
 static ypObject *_ypStringLib_decode_utf_8_grow_encoding(
         ypObject *dest, yp_uint32_t ch, yp_ssize_t requiredLen)
 {
-    ypStringLib_encinfo *newEnc;
-    ypObject            *result;
+    const ypStringLib_encinfo *newEnc;
+    ypObject                  *result;
     yp_ASSERT(ch > 0xFFu, "only call when _ypStringLib_decode_utf_8_inner_loop can't fit the "
                           "decoded character");
     yp_ASSERT(requiredLen - ypStringLib_LEN(dest) > 0, "not enough room given to write ch");
@@ -8354,7 +8359,7 @@ static ypObject *_ypStringLib_encode_utf_8(int type, ypObject *source, ypObject 
 {
     yp_ssize_t const               source_len = ypStringLib_LEN(source);
     void *const                    source_data = ypStringLib_DATA(source);
-    ypStringLib_encinfo           *source_enc = ypStringLib_ENC(source);
+    const ypStringLib_encinfo     *source_enc = ypStringLib_ENC(source);
     ypStringLib_getindexXfunc      getindexX = source_enc->getindexX;
     yp_ssize_t                     maxCharSize;
     yp_ssize_t                     i;  // index into source_data
@@ -10003,7 +10008,7 @@ yp_STATIC_ASSERT(yp_offsetof(ypStringLibObject, ob_inline_data) % 4 == 0, aligno
 // Otherwise, returns an exception. *x_data may or may not be null terminated. If this function
 // succeeds, you will need to call _ypStr_coerce_encoding_free to deallocate appropriately.
 static ypObject *_ypStr_coerce_encoding(
-        ypObject *x, ypStringLib_encinfo *enc, void **x_data, yp_ssize_t *x_len)
+        ypObject *x, const ypStringLib_encinfo *enc, void **x_data, yp_ssize_t *x_len)
 {
     int        dest_sizeshift = enc->sizeshift;
     int        src_sizeshift;
@@ -10079,10 +10084,10 @@ static ypObject *str_bool(ypObject *s) { return ypBool_FROM_C(ypStr_LEN(s)); }
 
 static ypObject *str_concat(ypObject *s, ypObject *x)
 {
-    yp_ssize_t           newS_len;
-    int                  newS_enc_code;
-    ypStringLib_encinfo *newS_enc;
-    ypObject            *newS;
+    yp_ssize_t                 newS_len;
+    int                        newS_enc_code;
+    const ypStringLib_encinfo *newS_enc;
+    ypObject                  *newS;
 
     // Check the type, and optimize the case where s or x are empty
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
@@ -10132,7 +10137,7 @@ static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
 
 static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i)
 {
-    ypStringLib_encinfo *newEnc;
+    const ypStringLib_encinfo *newEnc;
 
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
         return yp_IndexError;
@@ -10197,9 +10202,9 @@ static ypObject *chrarray_delslice(ypObject *s, yp_ssize_t start, yp_ssize_t sto
 
 static ypObject *chrarray_push(ypObject *s, ypObject *x)
 {
-    ypObject            *result;
-    yp_uint32_t          x_asitem;
-    ypStringLib_encinfo *x_enc;
+    ypObject                  *result;
+    yp_uint32_t                x_asitem;
+    const ypStringLib_encinfo *x_enc;
 
     result = _ypStr_asitemC(x, &x_asitem, &x_enc);
     if (yp_isexceptionC(result)) return result;
@@ -10874,8 +10879,8 @@ ypObject *yp_chrarray0(void)
 // FIXME Like ints, the latin-1 chars are singletons in Python. Do the same.
 static ypObject *_yp_chrC(int type, yp_int_t i)
 {
-    ypStringLib_encinfo *newS_enc;
-    ypObject            *newS;
+    const ypStringLib_encinfo *newS_enc;
+    ypObject                  *newS;
 
     if (i < 0 || i > ypStringLib_MAX_UNICODE) return yp_ValueError;
 
@@ -10909,7 +10914,7 @@ ypObject *yp_chrC(yp_int_t i) { return _yp_chrC(ypStr_CODE, i); }
 // XXX Since it's not likely that anything other than str and bytes will need to implement these
 // methods, they are left out of the type's method table.  This may change in the future.
 
-static ypStringLib_encinfo ypStringLib_encs[4] = {
+static const ypStringLib_encinfo ypStringLib_encs[4] = {
         // Indices are encoding codes; elements are constants and methods to work with encoding.
         {
                 ypStringLib_ENC_CODE_BYTES,   // code
