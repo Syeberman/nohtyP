@@ -6112,6 +6112,26 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
     return TRUE;
 }
 
+// Asserts that the given indices have been adjusted by ypSlice_AdjustIndicesC. Used by internal
+// methods that require adjusted indices. If stop is unknown use yp_SLICE_DEFAULT.
+// XXX As we do not have access to the original length, we can't assert that start<=len, etc.
+#define ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength)                         \
+    do {                                                                                        \
+        yp_ASSERT((step) != 0 && (step) >= -yp_SSIZE_T_MAX, "invalid step %" PRIssize, (step)); \
+        yp_ASSERT((slicelength) >= 0, "invalid slicelength %" PRIssize, (slicelength));         \
+        yp_ASSERT((start) >= ((step) < 0 ? -1 : 0), "invalid start %" PRIssize, (start));       \
+        if ((stop) != yp_SLICE_DEFAULT) {                                                       \
+            yp_ssize_t expected_slicelength =                                                   \
+                    ((stop) - (start) + ((step) < 0 ? 1 : -1)) / (step) + 1;                    \
+            if (expected_slicelength < 0) expected_slicelength = 0;                             \
+            yp_ASSERT((stop) >= ((step) < 0 ? -1 : 0), "invalid stop %" PRIssize, (stop));      \
+            yp_ASSERT((slicelength) == expected_slicelength,                                    \
+                    "invalid slicelength %" PRIssize " (%" PRIssize ":%" PRIssize ":%" PRIssize \
+                    ")",                                                                        \
+                    (slicelength), (start), (stop), (step));                                    \
+        }                                                                                       \
+    } while (0)
+
 // Using the given length, in-place converts the given start/stop/step values to valid indices, and
 // also calculates the length of the slice.  Returns yp_ValueError if *step is zero, else yp_None;
 // there are no out-of-bounds errors with slices.
@@ -6168,7 +6188,8 @@ static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp
 static void ypSlice_InvertIndicesC(
         yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step, yp_ssize_t slicelength)
 {
-    yp_ASSERT(slicelength > 0, "slicelen must be >0");
+    yp_ASSERT(slicelength > 0, "slicelength must be >0");
+    ypSlice_ASSERT_ADJUSTED_INDICES(*start, *stop, *step, slicelength);
 
     if (*step < 0) {
         // This comes direct from list_ass_subscript
@@ -6211,6 +6232,8 @@ static void _ypSlice_delslice_memmove(void *array, yp_ssize_t length, yp_ssize_t
         yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength)
 {
     yp_uint8_t *bytes = array;
+
+    ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength);
 
     if (step < 0) ypSlice_InvertIndicesC(&start, &stop, &step, slicelength);
 
@@ -6632,11 +6655,11 @@ static void ypStringLib_elemcopy_maybeupconvert(int dest_sizeshift, void *dest, 
 // TODO Write multiple elements at once and, if possible, read in multiples too
 #define _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(name, dest_type, src_type)                   \
     static void name(dest_type *dest, yp_ssize_t dest_i, const src_type *src, yp_ssize_t src_i, \
-            yp_ssize_t src_step, yp_ssize_t slicelen)                                           \
+            yp_ssize_t src_step, yp_ssize_t slicelength)                                        \
     {                                                                                           \
         dest += dest_i;                                                                         \
         src += src_i;                                                                           \
-        for (/*slicelen already set*/; slicelen > 0; slicelen--) {                              \
+        for (/*slicelength already set*/; slicelength > 0; slicelength--) {                     \
             *dest = (dest_type)*src;                                                            \
             yp_ASSERT(*dest == *src, "ypStringLib_elemcopy_maybedownconvert truncated data");   \
             dest++;                                                                             \
@@ -6650,8 +6673,8 @@ _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_2from2, yp_uint
 _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_2from4, yp_uint16_t, yp_uint32_t);
 _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_4from4, yp_uint32_t, yp_uint32_t);
 
-// Copies slicelen elements from src starting at src_i, and places them at dest starting at dest_i.
-// To be used in contexts where dest may have a smaller encoding than src (i.e. where
+// Copies slicelength elements from src starting at src_i, and places them at dest starting at
+// dest_i. To be used in contexts where dest may have a smaller encoding than src (i.e. where
 // dest_sizeshift<=src_sizeshift). As getslice is one such context, the src_step parameter allows
 // copying non-contiguous, and reversed, characters from src. src_i, src_step, and slicelength must
 // be the _adjusted_ values from ypSlice_AdjustIndicesC.
@@ -6660,34 +6683,35 @@ _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_4from4, yp_uint
 // XXX dest and src cannot overlap.
 static void ypStringLib_elemcopy_maybedownconvert(int dest_sizeshift, void *dest, yp_ssize_t dest_i,
         int src_sizeshift, const void *src, yp_ssize_t src_i, yp_ssize_t src_step,
-        yp_ssize_t slicelen)
+        yp_ssize_t slicelength)
 {
     yp_ASSERT(dest_sizeshift >= src_sizeshift, "can't elemcopy to smaller encoding");
-    yp_ASSERT(dest_i >= 0 && src_i >= 0 && slicelen >= 0, "indices/lengths must be >=0");
+    yp_ASSERT(dest_i >= 0 && src_i >= 0 && slicelength >= 0, "indices/lengths must be >=0");
+    ypSlice_ASSERT_ADJUSTED_INDICES(src_i, (yp_ssize_t)yp_SLICE_DEFAULT, src_step, slicelength);
 
     if (dest_sizeshift == src_sizeshift && src_step == 1) {
         // Huzzah!  We get to use the nice-and-quick memcpy
-        ypStringLib_MEMCPY(dest_sizeshift, dest, dest_i, src, src_i, slicelen);
+        ypStringLib_MEMCPY(dest_sizeshift, dest, dest_i, src, src_i, slicelength);
     } else if (dest_sizeshift == 0) {  // latin-1
         if (src_sizeshift == 0) {
-            _ypStringLib_elemcopy_1from1(dest, dest_i, src, src_i, src_step, slicelen);
+            _ypStringLib_elemcopy_1from1(dest, dest_i, src, src_i, src_step, slicelength);
         } else if (src_sizeshift == 1) {
-            _ypStringLib_elemcopy_1from2(dest, dest_i, src, src_i, src_step, slicelen);
+            _ypStringLib_elemcopy_1from2(dest, dest_i, src, src_i, src_step, slicelength);
         } else {
             yp_ASSERT(src_sizeshift == 2, "unexpected src_sizeshift");
-            _ypStringLib_elemcopy_1from4(dest, dest_i, src, src_i, src_step, slicelen);
+            _ypStringLib_elemcopy_1from4(dest, dest_i, src, src_i, src_step, slicelength);
         }
     } else if (dest_sizeshift == 1) {  // ucs-2
         if (src_sizeshift == 1) {
-            _ypStringLib_elemcopy_2from2(dest, dest_i, src, src_i, src_step, slicelen);
+            _ypStringLib_elemcopy_2from2(dest, dest_i, src, src_i, src_step, slicelength);
         } else {
             yp_ASSERT(src_sizeshift == 2, "unexpected src_sizeshift");
-            _ypStringLib_elemcopy_2from4(dest, dest_i, src, src_i, src_step, slicelen);
+            _ypStringLib_elemcopy_2from4(dest, dest_i, src, src_i, src_step, slicelength);
         }
     } else {
         yp_ASSERT(dest_sizeshift == 2, "unexpected dest_sizeshift");
         yp_ASSERT(src_sizeshift == 2, "unexpected src_sizeshift");
-        _ypStringLib_elemcopy_4from4(dest, dest_i, src, src_i, src_step, slicelen);
+        _ypStringLib_elemcopy_4from4(dest, dest_i, src, src_i, src_step, slicelength);
     }
 }
 
@@ -6846,7 +6870,7 @@ static const ypStringLib_encinfo *ypStringLib_checkenc_slice(
     const ypStringLib_encinfo *enc = ypStringLib_ENC(s);
     const void                *data = ypStringLib_DATA(s);
 
-    // FIXME here and elsewhere, assert ypSlice_AdjustIndicesC has been called?
+    ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength);
 
     if (enc->elemsize == 1) {
         yp_ASSERT(enc == ypStringLib_enc_bytes || enc == ypStringLib_enc_latin_1);
