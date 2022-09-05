@@ -6185,11 +6185,12 @@ static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp
 // Using the given _adjusted_ values, in-place converts the given start/stop/step values to the
 // inverse slice, where *step=-(*step).  slicelength must be >0 (slicelength==0 is a no-op).
 // XXX Adapted from Python's list_ass_subscript
+// XXX Check for the empty slice case first
 static void ypSlice_InvertIndicesC(
         yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step, yp_ssize_t slicelength)
 {
-    yp_ASSERT(slicelength > 0, "slicelength must be >0");
     ypSlice_ASSERT_ADJUSTED_INDICES(*start, *stop, *step, slicelength);
+    yp_ASSERT(slicelength > 0, "missed an 'empty slice' optimization");
 
     if (*step < 0) {
         // This comes direct from list_ass_subscript
@@ -6224,16 +6225,17 @@ static void _ypSequence_repeat_memcpy(void *_data, yp_ssize_t factor, yp_ssize_t
             n_size * (factor - copied));  // no-op if factor==copied
 }
 
-// Used to remove elements from an array containing length elements, each of elemsize bytes.
-// start, stop, step, and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC,
-// and slicelength must be >0 (slicelength==0 is a no-op).  Any references in the removed elements
-// must have already been discarded.
+// Used to remove elements from an array containing length elements, each of elemsize bytes. start,
+// stop, step, and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC.  Any
+// references in the removed elements must have already been discarded.
+// XXX Check for the empty slice case first
 static void _ypSlice_delslice_memmove(void *array, yp_ssize_t length, yp_ssize_t elemsize,
         yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength)
 {
     yp_uint8_t *bytes = array;
 
     ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength);
+    yp_ASSERT(slicelength > 0, "missed an 'empty slice' optimization");
 
     if (step < 0) ypSlice_InvertIndicesC(&start, &stop, &step, slicelength);
 
@@ -6469,7 +6471,7 @@ typedef struct {
     ypObject                 *name;       // Immortal str of the encoding name (ie yp_s_latin_1)
     ypStringLib_getindexXfunc getindexX;  // Gets the ordinal at src[src_i]
     ypStringLib_setindexXfunc setindexX;  // Sets dest[dest_i] to value
-} const ypStringLib_encinfo;
+} ypStringLib_encinfo;
 static const ypStringLib_encinfo        ypStringLib_encs[4];
 static const ypStringLib_encinfo *const ypStringLib_enc_bytes =
         &(ypStringLib_encs[ypStringLib_ENC_CODE_BYTES]);
@@ -6677,7 +6679,7 @@ _ypStringLib_ELEMCOPY_DOWNCONVERT_FUNCTION(_ypStringLib_elemcopy_4from4, yp_uint
 // dest_i. To be used in contexts where dest may have a smaller encoding than src (i.e. where
 // dest_sizeshift<=src_sizeshift). As getslice is one such context, the src_step parameter allows
 // copying non-contiguous, and reversed, characters from src. src_i, src_step, and slicelength must
-// be the _adjusted_ values from ypSlice_AdjustIndicesC.
+// be the _adjusted_ values from ypSlice_AdjustIndicesC. Never writes the null-terminator.
 // XXX Not applicable in contexts where dest may be a larger encoding. See
 // ypStringLib_elemcopy_maybeupconvert for that.
 // XXX dest and src cannot overlap.
@@ -6871,17 +6873,13 @@ static const ypStringLib_encinfo *ypStringLib_checkenc_slice(
     const void                *data = ypStringLib_DATA(s);
 
     ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength);
+    yp_ASSERT(slicelength > 0, "missed an 'empty slice' optimization");
 
     if (enc->elemsize == 1) {
         yp_ASSERT(enc == ypStringLib_enc_bytes || enc == ypStringLib_enc_latin_1);
         return enc;  // can't shrink any smaller than one byte
-    } else if (slicelength < 1) {
-        // FIXME Require callers to handle this case before calling? Maybe?
-        yp_ASSERT(enc == ypStringLib_enc_ucs_2 || enc == ypStringLib_enc_ucs_4);
-        return ypStringLib_enc_latin_1;
     }
 
-    // FIXME Since we have slicelength, do we need stop in ypStringLib_checkenc?
     if (step < 0) ypSlice_InvertIndicesC(&start, &stop, &step, slicelength);
 
     if (step == 1) {
@@ -6904,20 +6902,20 @@ static const ypStringLib_encinfo *ypStringLib_checkenc_slice(
 // Returns the minimal encoding required for s's data.
 static const ypStringLib_encinfo *ypStringLib_checkenc(ypObject *s)
 {
+    if (ypStringLib_LEN(s) < 1) {
+        return ypStringLib_ENC_CODE(s) == ypStringLib_ENC_CODE_BYTES ? ypStringLib_enc_bytes :
+                                                                       ypStringLib_enc_latin_1;
+    }
     return ypStringLib_checkenc_slice(s, 0, ypStringLib_LEN(s), 1, ypStringLib_LEN(s));
 }
 
 // As yp_index_asuint8C, but raises yp_ValueError (not yp_OverflowError) when out of range.
 static yp_uint8_t _ypBytes_asuint8C(ypObject *x, ypObject **exc)
 {
-    ypObject  *subexc = yp_None;
-    yp_uint8_t retval;
-
-    retval = yp_index_asuint8C(x, &subexc);
-    if (yp_isexceptionC(subexc)) {
-        if (subexc == yp_OverflowError) subexc = yp_ValueError;
-        return_yp_CEXC_ERR(retval, exc, subexc);
-    }
+    // Recall that when yp_index_asintC raises an exception, it returns zero.
+    yp_int_t   asint = yp_index_asintC(x, exc);
+    yp_uint8_t retval = (yp_uint8_t)(asint & 0xFFu);
+    if ((yp_int_t)retval != asint) return_yp_CEXC_ERR(retval, exc, yp_ValueError);
     return retval;
 }
 
@@ -7351,7 +7349,7 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
 
 
 // There are some efficiencies we can exploit if iterable/x is a fellow string object
-// TODO Is this really a scenario for which we should be optimizing? Why would someone ''.join('')?
+// TODO Is this really a scenario for which we should be optimizing? How typical is ''.join('')?
 static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
 {
     yp_ssize_t                 s_len = ypStringLib_LEN(s);
