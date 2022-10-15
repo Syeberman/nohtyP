@@ -11,12 +11,14 @@ cache: Build/site_toolsconfig.py
 deploy: off
 
 image:
+  - macOS-Monterey
   # TODO Support Visual Studio 2022 (msvs_170_win32)
   # - Visual Studio 2022
   - Visual Studio 2019
   - Ubuntu2004
   - Visual Studio 2017
-  - Ubuntu1604
+  # TODO https://help.appveyor.com/discussions/problems/33426
+  # - Ubuntu1604
   - Visual Studio 2015
 
 platform:
@@ -29,6 +31,9 @@ configuration:
 
 matrix:
   exclude:
+    # TODO Are there any 32-bit compilers on the macOS images?
+    - image: macOS-Monterey
+      platform: x86
     # TODO Are there any 32-bit compilers on the Ubuntu images?
     - image: Ubuntu2004
       platform: x86
@@ -37,6 +42,11 @@ matrix:
 
 # Ideally, each compiler is listed once, against the most-recent image that includes it.
 for:
+  - matrix:
+      only:
+        - image: macOS-Monterey
+    environment:
+       YP_COMPILER_OSES: gcc_8_darwin gcc_7_darwin gcc_6_darwin
   - matrix:
       only:
         - image: Visual Studio 2022
@@ -116,6 +126,7 @@ build_script:
   - pwsh: |
       try { Build/.appveyor.ps1 }
       catch {
+        Write-Error $PSItem
         throw "build failed"
       }
 
@@ -125,5 +136,6 @@ test_script:
       catch {
         7z a yp_test.log.zip Build/*/*/yp_test.log
         appveyor PushArtifact yp_test.log.zip
+        Write-Error $PSItem
         throw "tests failed"
       }
