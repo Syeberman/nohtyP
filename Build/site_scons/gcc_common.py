@@ -259,7 +259,7 @@ def ApplyGCCOptions(env, version):
         # Static libgcc (arithmetic, mostly)
         "-static-libgcc",
         # Create a mapfile (.map)
-        "-Wl,-Map,${TARGET.base}.map",
+        "-Wl,-map,${TARGET.base}.map" if _platform_name == "darwin" else "-Wl,-Map,${TARGET.base}.map",
         # TODO Version stamp?
     )
     if env["TARGET_ARCH"] == "x86":
