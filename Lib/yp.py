@@ -19,7 +19,15 @@ import pickle
 import reprlib
 import traceback
 
-ypdll = CDLL(os.getenv("NOHTYP_LIBRARY"))
+
+def _load_dynamic_library():
+    path = os.getenv("NOHTYP_LIBRARY")
+    if not path:
+        raise ValueError("set NOHTYP_LIBRARY to the path of the nohtyP dynamic library")
+    return CDLL(path)
+
+ypdll = _load_dynamic_library()
+
 
 # From the ctypes documentation...
 c_IN = 1
