@@ -37,6 +37,7 @@ def _version_detector(python):
 python_finder = ToolFinder(
     win_dirs=('Python*', ),
     posix_dirs=(),  # rely on the environment's path for now
+    darwin_dirs=(),  # rely on the environment's path for now
     exe_globs=("python*.*", "python?*", "python"),  # prefer specificity
     version_detector=_version_detector
 )

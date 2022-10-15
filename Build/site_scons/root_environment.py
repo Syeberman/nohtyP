@@ -39,6 +39,7 @@ RootEnv.Replace(CPPFLAGS=[], PPCCCOMSTR="", SHCCCOMSTR="", SHLINKCOMSTR="",
                 LIBPATH=[], PCH="",
                 WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="",
                 RPATH=[],
+                _FRAMEWORKPATH="",
                 )
 
 # Put .sconsign.dblite (et al) in Build rather than the top nohtyP directory

@@ -32,10 +32,8 @@ def nohtyP_SharedLibrary(env):
 
 
 def nohtyP_yp_test(env, sharedLib):
-    sharedLibDir = Flatten(sharedLib)[0].get_dir()
     env.PrependENVPath("PYTHONPATH", "#/Lib")
-    env.PrependENVPath("PATH", sharedLibDir)  # Windows
-    env.PrependENVPath("LD_LIBRARY_PATH", sharedLibDir)  # Linux
+    env["ENV"]["NOHTYP_LIBRARY"] = Flatten(sharedLib)[0]
     scripts = ("#/Lib/yp.py", Glob("#/Lib/yp_test/*.py"), Glob("#/Lib/yp_test/*.txt"))
     testLog = env.Command(
         "$VTOP/yp_test.log", (sharedLib, scripts), "$PYTHON -m yp_test -v > $TARGET"
@@ -75,7 +73,7 @@ compiler_names = (
     "msvs_158", "gcc_10", "gcc_9", "gcc_8", "gcc_7", "msvs_140", "gcc_6", "gcc_5", "msvs_120",
     "gcc_49", "gcc_48", "msvs_110", "gcc_47", "gcc_46", "msvs_100", "msvs_90"
 )
-oses = ("win32", "posix")
+oses = ("win32", "posix", "darwin")
 archs = ("amd64", "x86")
 # TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
 # lint against the compiler's headers
