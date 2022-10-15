@@ -14,16 +14,12 @@ import collections
 import sys
 import weakref
 import operator
+import os
 import pickle
 import reprlib
 import traceback
 
-try:
-    # Ideally this would work everywhere
-    ypdll = CDLL("nohtyP", winmode=0)
-except OSError:
-    # Perhaps we're on Linux?
-    ypdll = CDLL("libnohtyP.so")
+ypdll = CDLL(os.getenv("NOHTYP_LIBRARY"))
 
 # From the ctypes documentation...
 c_IN = 1
