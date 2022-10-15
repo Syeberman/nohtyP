@@ -101,6 +101,6 @@ proprietary projects.
 All trademarks referenced herein are property of their respective holders.
 
 
-[AppVeyor badge]: https://ci.appveyor.com/api/projects/status/8t43r157h40vmfu6/branch/master?svg=true
-[AppVeyor log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/master
+[AppVeyor badge]: https://ci.appveyor.com/api/projects/status/8t43r157h40vmfu6/branch/main?svg=true
+[AppVeyor log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/main
 [AppVeyor]: http://ci.appveyor.com
