@@ -75,7 +75,7 @@ compiler_names = (
     "msvs_158", "gcc_10", "gcc_9", "gcc_8", "gcc_7", "msvs_140", "gcc_6", "gcc_5", "msvs_120",
     "gcc_49", "gcc_48", "msvs_110", "gcc_47", "gcc_46", "msvs_100", "msvs_90"
 )
-oses = ("win32", "posix")
+oses = ("win32", "posix", "darwin")
 archs = ("amd64", "x86")
 # TODO An "analyze" configuration to use the compiler's static analysis, "lint" to explicitly use
 # lint against the compiler's headers
