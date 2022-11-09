@@ -17,8 +17,7 @@ image:
   - Visual Studio 2019
   - Ubuntu2004
   - Visual Studio 2017
-  # TODO https://help.appveyor.com/discussions/problems/33426
-  # - Ubuntu1604
+  - Ubuntu1604
   - Visual Studio 2015
 
 platform:
@@ -87,6 +86,10 @@ for:
       YP_COMPILER_OSES: gcc_6_win32 gcc_5_win32 msvs_120_win32 msvs_110_win32 msvs_100_win32 msvs_90_win32
       # TODO Figure out why gcc_5_win32_amd64 isn't available
       YP_SKIP_TARGETS: gcc_5_win32_amd64 msvs_100_win32_amd64 msvs_90_win32_amd64
+
+init:
+  # Use this to refresh the cache; see https://www.appveyor.com/docs/build-cache.
+  # - pwsh: $env:APPVEYOR_CACHE_SKIP_RESTORE = "true"
 
 install:
   # Write out a Build/.appveyor.ps1 file containing common configurations.
