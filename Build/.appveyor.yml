@@ -87,6 +87,10 @@ for:
       # TODO Figure out why gcc_5_win32_amd64 isn't available
       YP_SKIP_TARGETS: gcc_5_win32_amd64 msvs_100_win32_amd64 msvs_90_win32_amd64
 
+init:
+  # Use this to refresh the cache; see https://www.appveyor.com/docs/build-cache.
+  # - pwsh: $env:APPVEYOR_CACHE_SKIP_RESTORE = "true"
+
 install:
   # Write out a Build/.appveyor.ps1 file containing common configurations.
   - pwsh: |
