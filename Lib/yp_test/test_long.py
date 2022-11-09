@@ -241,17 +241,18 @@ class LongTest(yp_unittest.TestCase):
         # Test products of long strings of 1 bits -- (2**x-1)*(2**y-1) ==
         # 2**(x+y) - 2**x - 2**y + 1, so the proper result is easy to check.
         for abits in bits:
-            # TODO(skip_long_int) Skip numbers too large for nohtyP
+            # TODO(skip_long_int) Skip numbers too large for nohtyP. Note Python raises ValueError if
+            # sys.set_int_max_str_digits is exceeded creating the OverflowError message.
             try: a = yp_int((1 << abits) - 1)
-            except OverflowError: continue
+            except (OverflowError, ValueError): continue
             for bbits in bits:
                 if bbits < abits:
                     continue
                 with self.subTest(abits=abits, bbits=bbits):
                     try: b = (1 << bbits) - 1
-                    except OverflowError: continue
+                    except (OverflowError, ValueError): continue
                     try: x = a * b
-                    except OverflowError: continue
+                    except (OverflowError, ValueError): continue
                     y = ((1 << (abits + bbits)) -
                          (1 << abits) -
                          (1 << bbits) +
