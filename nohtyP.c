@@ -1875,7 +1875,6 @@ static void *_ypMem_realloc_container_variable_new(ypObject *ob, yp_ssize_t requ
     void      *newptr;
     void      *oldptr;
     yp_ssize_t size;
-    yp_ssize_t extra_size;
     yp_ssize_t alloclen;
     void      *inlineptr = ((yp_uint8_t *)ob) + offsetof_inline;
     yp_ssize_t inlinelen = _ypMem_inlinelen_container_variable(offsetof_inline, elemsize);
@@ -9685,7 +9684,6 @@ static ypObject *bytearray_insert(ypObject *b, yp_ssize_t i, ypObject *x)
 {
     ypObject  *exc = yp_None;
     yp_uint8_t x_asbyte;
-    ypObject  *result;
 
     // Recall that insert behaves like b[i:i]=[x], so we don't validate the index.
     x_asbyte = _ypBytes_asuint8C(x, &exc);
@@ -10600,8 +10598,6 @@ static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
 
 static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i)
 {
-    const ypStringLib_encinfo *newEnc;
-
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
         return yp_IndexError;
     }
