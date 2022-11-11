@@ -146,6 +146,10 @@
 #endif
 #endif
 
+#define yp_ASSERT_ENABLED (yp_DEBUG_LEVEL >= 1)
+#define yp_INFO_ENABLED (yp_DEBUG_LEVEL >= 10)
+#define yp_DEBUG_ENABLED (yp_DEBUG_LEVEL >= 20)
+
 // From http://stackoverflow.com/questions/5641427
 #define _yp_S(x) #x
 #define _yp_S_(x) _yp_S(x)
@@ -165,7 +169,7 @@
     _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL(" #fmt ", " #__VA_ARGS__ ");", fmt, __VA_ARGS__)
 #define yp_FATAL1(msg) _yp_FATAL("nohtyP.c", _yp_S__LINE__, "yp_FATAL1(" #msg ");", msg)
 
-#if yp_DEBUG_LEVEL >= 1
+#if yp_ASSERT_ENABLED
 // TODO Get really, super-duper fancy and print an actual full stack trace.
 #define _yp_ASSERT(expr, s_file, s_line, line_of_code, ...)                \
     do {                                                                   \
@@ -191,7 +195,7 @@ static void yp_breakonerr(ypObject *err) {
 #define yp_breakonerr(err)
 #endif
 
-#if yp_DEBUG_LEVEL >= 10
+#if yp_INFO_ENABLED
 #define yp_INFO0(fmt)              \
     do {                           \
         (void)fflush(NULL);        \
@@ -209,7 +213,7 @@ static void yp_breakonerr(ypObject *err) {
 #define yp_INFO(fmt, ...)
 #endif
 
-#if yp_DEBUG_LEVEL >= 20
+#if yp_DEBUG_ENABLED
 #define yp_DEBUG0 yp_INFO0
 #define yp_DEBUG yp_INFO
 #else
@@ -6188,6 +6192,7 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 // Asserts that the given indices have been adjusted by ypSlice_AdjustIndicesC. Used by internal
 // methods that require adjusted indices. If stop is unknown use yp_SLICE_DEFAULT.
 // XXX As we do not have access to the original length, we can't assert that start<=len, etc.
+#if yp_ASSERT_ENABLED
 #define ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength)                         \
     do {                                                                                        \
         yp_ASSERT((step) != 0 && (step) >= -yp_SSIZE_T_MAX, "invalid step %" PRIssize, (step)); \
@@ -6207,6 +6212,9 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
                     (slicelength), (start), (stop), (step));                                    \
         }                                                                                       \
     } while (0)
+#else
+#define ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength)
+#endif
 
 // Using the given length, in-place converts the given start/stop/step values to valid indices, and
 // also calculates the length of the slice.  Returns yp_ValueError if *step is zero, else yp_None;
@@ -7468,21 +7476,16 @@ static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
     return newS;
 }
 
-static ypObject *_ypStringLib_getslice_total(ypObject *s, yp_ssize_t step)
+static ypObject *_ypStringLib_getslice_total_reversed(ypObject *s)
 {
-    int                        s_type = ypObject_TYPE_CODE(s);
     yp_ssize_t                 s_len = ypStringLib_LEN(s);
     const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
     ypObject                  *newS;
     yp_ssize_t                 i;
 
-    yp_ASSERT(step == 1 || step == -1, "unexpected step %d for a total slice", step);
+    yp_ASSERT(s_len > 0, "missed an 'empty slice' case");
 
-    if (step == 1) return ypStringLib_copy(s_type, s);
-
-    if (s_len < 1) return ypStringLib_new_empty(s_type);
-
-    newS = _ypStringLib_new(s_type, s_len, /*alloclen_fixed=*/TRUE, s_enc);
+    newS = _ypStringLib_new(ypObject_TYPE_CODE(s), s_len, /*alloclen_fixed=*/TRUE, s_enc);
     if (yp_isexceptionC(newS)) return newS;
 
     for (i = 0; i < s_len; i++) {
@@ -7510,7 +7513,11 @@ static ypObject *ypStringLib_getslice(
     if (yp_isexceptionC(result)) return result;
 
     if (newLen < 1) return ypStringLib_new_empty(ypObject_TYPE_CODE(s));
-    if (newLen >= ypStringLib_LEN(s)) return _ypStringLib_getslice_total(s, step);
+    if (newLen >= ypStringLib_LEN(s)) {
+        if (step == 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), s);
+        yp_ASSERT(step == -1, "unexpected step %" PRIssize " for a total slice", step);
+        return _ypStringLib_getslice_total_reversed(s);
+    }
 
     newS_enc = ypStringLib_checkenc_getslice(s, start, stop, step, newLen);
     newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newLen, /*alloclen_fixed=*/TRUE, newS_enc);
@@ -7559,7 +7566,7 @@ static ypObject *_ypStringLib_setslice_total(ypObject *s, yp_ssize_t step, void 
 {
     void *oldptr;
 
-    yp_ASSERT(step == 1 || step == -1, "unexpected step %d for a total slice", step);
+    yp_ASSERT(step == 1 || step == -1, "unexpected step %" PRIssize " for a total slice", step);
     yp_ASSERT(step == 1 || ypStringLib_LEN(s) == x_len,
             "missed an 'extended slices can't grow' check");
 
@@ -7603,7 +7610,7 @@ static ypObject *_ypStringLib_setslice_regular(ypObject *s, yp_ssize_t start, yp
     yp_ssize_t newLen;
     void      *oldptr;
 
-    ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, 1, slicelength);
+    ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, (yp_ssize_t)1, slicelength);
     yp_ASSERT(slicelength < ypStringLib_LEN(s), "missed a 'total slice' optimization");
 
     // Ensure there's enough space allocated
