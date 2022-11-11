@@ -6191,9 +6191,12 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
         yp_ASSERT((slicelength) >= 0, "invalid slicelength %" PRIssize, (slicelength));         \
         yp_ASSERT((start) >= ((step) < 0 ? -1 : 0), "invalid start %" PRIssize, (start));       \
         if ((stop) != yp_SLICE_DEFAULT) {                                                       \
-            yp_ssize_t expected_slicelength =                                                   \
-                    ((stop) - (start) + ((step) < 0 ? 1 : -1)) / (step) + 1;                    \
-            if (expected_slicelength < 0) expected_slicelength = 0;                             \
+            yp_ssize_t expected_slicelength;                                                    \
+            if (step < 0) {                                                                     \
+                expected_slicelength = (stop >= start) ? 0 : (stop - start + 1) / (step) + 1;   \
+            } else {                                                                            \
+                expected_slicelength = (start >= stop) ? 0 : (stop - start - 1) / (step) + 1;   \
+            }                                                                                   \
             yp_ASSERT((stop) >= ((step) < 0 ? -1 : 0), "invalid stop %" PRIssize, (stop));      \
             yp_ASSERT((slicelength) == expected_slicelength,                                    \
                     "invalid slicelength %" PRIssize " (%" PRIssize ":%" PRIssize ":%" PRIssize \
@@ -6282,6 +6285,7 @@ static void ypSlice_InvertIndicesC(
 // factor*n_size objects, the bytes to repeat must be in the first n_size bytes of data, and the
 // rest of data must not contain any references (they will be overwritten).  Cannot fail.
 // XXX Handle the "empty" case (factor<1 or n_size<1) before calling this function
+// TODO Change n_size to sizeshift, similar to the string library?
 static void _ypSequence_repeat_memcpy(void *_data, yp_ssize_t factor, yp_ssize_t n_size)
 {
     yp_uint8_t *data = (yp_uint8_t *)_data;
@@ -7386,7 +7390,6 @@ static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
 
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypObject_TYPE_PAIR_CODE(x),
             "missed a yp_TypeError check");
-    yp_ASSERT(s != x, "FIXME handle this case (ypStringLib_extend_fromstring)!");
 
     if (ypStringLib_LEN(s) > ypStringLib_LEN_MAX - ypStringLib_LEN(x)) {
         return yp_MemorySizeOverflowError;
@@ -7403,8 +7406,15 @@ static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
         if (yp_isexceptionC(result)) return result;
     }
 
-    ypStringLib_elemcopy_maybeupconvert(newEnc->sizeshift, ypStringLib_DATA(s), ypStringLib_LEN(s),
-            x_enc->sizeshift, ypStringLib_DATA(x), 0, ypStringLib_LEN(x));
+    if (s == x) {
+        // ypStringLib_elemcopy_maybeupconvert asserts when src and dest are the same object.
+        yp_uint8_t *data = ypStringLib_DATA(s);
+        yp_ssize_t  lenBytes = ypStringLib_LEN(s) << newEnc->sizeshift;
+        yp_memcpy(data + lenBytes, data, lenBytes);
+    } else {
+        ypStringLib_elemcopy_maybeupconvert(newEnc->sizeshift, ypStringLib_DATA(s),
+                ypStringLib_LEN(s), x_enc->sizeshift, ypStringLib_DATA(x), 0, ypStringLib_LEN(x));
+    }
     newEnc->setindexX(ypStringLib_DATA(s), newLen, 0);
 
     ypStringLib_SET_LEN(s, newLen);
@@ -7455,6 +7465,35 @@ static ypObject *ypStringLib_repeat(ypObject *s, yp_ssize_t factor)
     return newS;
 }
 
+static ypObject *_ypStringLib_getslice_total(ypObject *s, yp_ssize_t step)
+{
+    int                        s_type = ypObject_TYPE_CODE(s);
+    yp_ssize_t                 s_len = ypStringLib_LEN(s);
+    const ypStringLib_encinfo *s_enc = ypStringLib_ENC(s);
+    ypObject                  *newS;
+    yp_ssize_t                 i;
+
+    yp_ASSERT(step == 1 || step == -1, "unexpected step %d for a total slice", step);
+
+    if (step == 1) return ypStringLib_copy(s_type, s);
+
+    if (s_len < 1) return ypStringLib_new_empty(s_type);
+
+    newS = _ypStringLib_new(s_type, s_len, /*alloclen_fixed=*/TRUE, s_enc);
+    if (yp_isexceptionC(newS)) return newS;
+
+    for (i = 0; i < s_len; i++) {
+        yp_uint32_t s_char = s_enc->getindexX(ypStringLib_DATA(s), i);
+        s_enc->setindexX(ypStringLib_DATA(newS), s_len - 1 - i, s_char);
+    }
+    s_enc->setindexX(ypStringLib_DATA(newS), s_len, '\0');
+
+    ypStringLib_ENC_CODE(newS) = s_enc->code;
+    ypStringLib_SET_LEN(newS, s_len);
+    ypStringLib_ASSERT_INVARIANTS(newS);
+    return newS;
+}
+
 static ypObject *ypStringLib_getslice(
         ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step)
 {
@@ -7468,6 +7507,7 @@ static ypObject *ypStringLib_getslice(
     if (yp_isexceptionC(result)) return result;
 
     if (newLen < 1) return ypStringLib_new_empty(ypObject_TYPE_CODE(s));
+    if (newLen >= ypStringLib_LEN(s)) return _ypStringLib_getslice_total(s, step);
 
     newS_enc = ypStringLib_checkenc_getslice(s, start, stop, step, newLen);
     newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newLen, /*alloclen_fixed=*/TRUE, newS_enc);
@@ -7545,7 +7585,7 @@ static ypObject *_ypStringLib_setslice_total(ypObject *s, yp_ssize_t step, void 
     ypStringLib_ENC_CODE(s) = x_enc->code;
     ypStringLib_SET_LEN(s, x_len);
     ypStringLib_ASSERT_INVARIANTS(s);
-    return s;
+    return yp_None;
 }
 
 // Called for a regular setslice (step==1).
@@ -7574,7 +7614,9 @@ static ypObject *_ypStringLib_setslice_regular(ypObject *s, yp_ssize_t start, yp
         if (oldptr == NULL) return yp_MemoryError;
 
         if (ypStringLib_DATA(s) == oldptr) {
-            ypStringLib_ELEMMOVE(s, stop + growBy, stop);  // memmove: data overlaps
+            if (growBy != 0) {
+                ypStringLib_ELEMMOVE(s, stop + growBy, stop);  // memmove: data overlaps
+            }
         } else {
             // The data doesn't overlap, so use memcpy
             ypStringLib_MEMCPY(newEnc->sizeshift, ypStringLib_DATA(s), 0, oldptr, 0, start);
@@ -12028,13 +12070,16 @@ static void _ypTuple_setslice_elemmove(
 // Called on a setslice of step 1 and positive growBy, or an insert.  Similar to
 // _ypTuple_setslice_elemmove, except sq will grow if it doesn't have enough space allocated.  On
 // error, sq is not modified.
+// XXX start and stop must be adjusted values.
 static ypObject *_ypTuple_setslice_grow(
         ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t growBy, yp_ssize_t extra)
 {
     yp_ssize_t newLen;
     ypObject **oldptr;
     yp_ssize_t i;
+
     yp_ASSERT(growBy >= 1, "growBy cannot be less than 1");
+    yp_ASSERT(start >= 0 && stop >= 0, "start and stop must be adjusted values");
 
     // XXX We have to be careful that we do not discard items or otherwise modify sq until failure
     // becomes impossible
@@ -12415,8 +12460,14 @@ static ypObject *list_insert(ypObject *sq, yp_ssize_t i, ypObject *x)
 {
     ypObject *result;
 
-    // Recall that insert behaves like sq[i:i]=[x], so we don't validate the index.
+    // Check for exceptions, then adjust the index (noting it should behave like sq[i:i]=[x])
     if (yp_isexceptionC(x)) return x;
+    if (i < 0) {
+        i += ypTuple_LEN(sq);
+        if (i < 0) i = 0;
+    } else if (i > ypTuple_LEN(sq)) {
+        i = ypTuple_LEN(sq);
+    }
 
     // Make room at i and add x
     // TODO over-allocate
