@@ -12,7 +12,7 @@ rsorted = functools.partial(sorted, reverse=True)
 _platform_name = SCons.Platform.Platform().name
 if _platform_name in ("win32", "cygwin"):
 
-    def _get_dirs(win_dirs):
+    def _get_dirs(os_dirs):
         # Use an OrderedDict to ensure uniqueness (values are ignored)
         dir_paths = OrderedDict()
         drives = OrderedDict.fromkeys((Path('C:\\'), Path(Path.cwd().anchor)))  # FIXME cwd?
@@ -38,15 +38,15 @@ if _platform_name in ("win32", "cygwin"):
                 except FileNotFoundError:
                     continue
                 # Directory patterns are in order, allowing tools to configure.
-                for dir_glob in win_dirs:
+                for dir_glob in os_dirs:
                     # Matching directories are sorted in reverse, so that if the path happens to
                     # contain version information, later versions are (roughly) yielded first.
-                    for win_path in rsorted(prog_files_path.glob(dir_glob)):
-                        dir_paths[win_path] = None
+                    for os_path in rsorted(prog_files_path.glob(dir_glob)):
+                        dir_paths[os_path] = None
 
         return dir_paths.keys()
 
-    def _iter_paths(win_dirs, posix_dirs, exe_globs):
+    def _iter_paths(win_dirs, posix_dirs, darwin_dirs, exe_globs):
         path_exts = [
             ext for ext in os.environ.get('PATHEXT', '.COM;.EXE;.BAT;.CMD').lower().split(';')
             if ext.startswith(".")
@@ -64,7 +64,7 @@ if _platform_name in ("win32", "cygwin"):
 
 else:
 
-    def _get_dirs(posix_dirs):
+    def _get_dirs(os_dirs):
         # Use an OrderedDict to ensure uniqueness (values are ignored)
         dir_paths = OrderedDict()
 
@@ -79,17 +79,18 @@ else:
             dir_paths[environ_path] = None
 
         # Directory patterns are in order, allowing tools to configure.
-        for dir_glob in posix_dirs:
+        for dir_glob in os_dirs:
             # Matching directories are sorted in reverse, so that if the path happens to contain
             # version information, later versions are (roughly) yielded first.
-            for posix_path in rsorted(Path("/").glob(dir_glob)):
-                dir_paths[posix_path] = None
+            for os_path in rsorted(Path("/").glob(dir_glob)):
+                dir_paths[os_path] = None
 
         return dir_paths.keys()
 
-    def _iter_paths(win_dirs, posix_dirs, exe_globs):
+    def _iter_paths(win_dirs, posix_dirs, darwin_dirs, exe_globs):
         # Paths are searched in order, respecting the user's priorities.
-        for dir_path in _get_dirs(posix_dirs):
+        os_dirs = darwin_dirs if _platform_name == "darwin" else posix_dirs
+        for dir_path in _get_dirs(os_dirs):
             # Executable patterns are in order, allowing tools to configure.
             for exe_glob in exe_globs:
                 # Matching executables are sorted in reverse, so that if the path happens to contain
@@ -100,11 +101,11 @@ else:
 
 # TODO This, or something like it, should be in SCons
 class ToolFinder:
-    def __init__(self, win_dirs, posix_dirs, exe_globs, version_detector):
+    def __init__(self, win_dirs, posix_dirs, darwin_dirs, exe_globs, version_detector):
         """ToolFinder looks for tools by executable name and tests them for version information.
         It first searches for executables matching exe_globs in PATH, then in the paths identified
-        by win_dirs or posix_dirs.  The order of globs is respected: each exe_glob is tested in
-        a single path before moving to the next path.
+        by win_dirs, posix_dirs, or darwin_dirs.  The order of globs is respected: each exe_glob
+        is tested in a single path before moving to the next path.
 
         win_dirs
             List of Windows path globs to search for executables.  Each glob is prepended with
@@ -113,6 +114,9 @@ class ToolFinder:
         posix_dirs
             List of Unix/Linux/BSD path globs to search for executables.  Each glob should be an
             absolute path starting with '/'.
+        darwin_dirs
+            List of MacOS path globs to search for executables.  Each glob should be an absolute
+            path starting with '/'.
         exe_globs
             List of filename globs for the executables that will be tested with version_detector.
             On Windows each of the PATHEXT extensions is appended (so do not include .exe, etc).
@@ -123,6 +127,7 @@ class ToolFinder:
         """
         self.win_dirs = win_dirs
         self.posix_dirs = posix_dirs
+        self.darwin_dirs = darwin_dirs
         self.exe_globs = exe_globs
         self.version_detector = version_detector
         self._path2version = None
@@ -130,7 +135,7 @@ class ToolFinder:
     def _ensure_path2version(self):
         if self._path2version is None:
             self._path2version = OrderedDict.fromkeys(
-                _iter_paths(self.win_dirs, self.posix_dirs, self.exe_globs), None
+                _iter_paths(self.win_dirs, self.posix_dirs, self.darwin_dirs, self.exe_globs), None
             )
 
     def __iter__(self):

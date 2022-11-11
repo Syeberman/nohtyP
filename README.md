@@ -17,8 +17,8 @@ CI is run against both Linux and Windows with the generous support of
 Build Instructions
 ------------------
 
-In the simplest case, just add nohtyP.c and nohtyP.h to your C project, and
-call yp_initialize on start-up.  nohtyP also builds as a shared library.
+In the simplest case, just add `nohtyP.c` and `nohtyP.h` to your C project, and
+call `yp_initialize` on start-up.  nohtyP also builds as a shared library.
 
 The Build directory contains an optional SCons makefile that supports various
 compilers and targets.  To build a shared library for your platform, run the
@@ -27,14 +27,14 @@ following from the top-level directory:
     Build/make
 
 This will build both a debug and a release version for your native OS and
-architecture, and will copy the binaries to Build/native. For more information,
-run the above command with the -h option.
+architecture, and will copy the binaries to `Build/native`. For more information,
+run the above command with the `-h` option.
 
 
 Documentation
 -------------
 
-nohtyP.h contains complete, albeit brief, documentation on all functions; its
+`nohtyP.h` contains complete, albeit brief, documentation on all functions; its
 brevity is best-suited for those already familiar with Python.  More detailed
 information can be found in Python's own documentation:
 
@@ -44,8 +44,8 @@ information can be found in Python's own documentation:
 Testing
 -------
 
-To test nohtyP, first build a shared library, and ensure it is listed on your
-PATH. Then, from the Lib directory, run:
+To test nohtyP, change to the `Lib` directory, set `NOHTYP_LIBRARY` to the
+path to the shared library (i.e. `../Build/native/libnohtyP.so`), then run:
 
     python -m yp_test
 
@@ -60,8 +60,8 @@ output from the following command:
     python -m yp_test -v test_whatever
 
 This runs the test in verbose mode.  You can also obtain this output using the
-"test" target to Build/make, which creates two yp_test.log files under
-Build/native and Build/native/debug.
+`test` target in `Build/make`, which creates a `yp_test.log` file in the same
+directory as the shared library.
 
 
 Issue Tracker and Mailing List
@@ -101,6 +101,6 @@ proprietary projects.
 All trademarks referenced herein are property of their respective holders.
 
 
-[AppVeyor badge]: https://ci.appveyor.com/api/projects/status/8t43r157h40vmfu6/branch/master?svg=true
-[AppVeyor log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/master
+[AppVeyor badge]: https://ci.appveyor.com/api/projects/status/8t43r157h40vmfu6/branch/main?svg=true
+[AppVeyor log]: https://ci.appveyor.com/project/Syeberman/nohtyp/branch/main
 [AppVeyor]: http://ci.appveyor.com

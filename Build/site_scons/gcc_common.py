@@ -44,7 +44,7 @@ def _version_detector(gcc):
     if _test_gcc_temp_dir is None:
         _test_gcc_temp_dir = tempfile.mkdtemp(prefix="nohtyP-gcc-")
         with open(os.path.join(_test_gcc_temp_dir, "test.c"), "w") as outfile:
-            outfile.write("void main(){}\n")
+            outfile.write("int main(){}\n")
 
     # Test to see if gcc supports the target
     supportedArchs = []
@@ -65,8 +65,8 @@ def _version_detector(gcc):
     return version, tuple(supportedArchs)
 
 
-# Try some known, and unknown-but-logical, default locations for mingw
 gcc_finder = ToolFinder(
+    # Try some known, and unknown-but-logical, default locations for mingw
     # MinGW-w64 (http://sourceforge.net/projects/mingw-w64/)
     #   C:\Program Files\mingw-w64\x86_64-4.8.4-posix-seh-rt_v3-rev0\mingw64
     # Official MinGW (http://www.mingw.org/)
@@ -84,6 +84,7 @@ gcc_finder = ToolFinder(
         'win-builds*\\*\\bin',
     ),
     posix_dirs=(),  # rely on the environment's path for now
+    darwin_dirs=(),  # rely on the environment's path for now
     exe_globs=("gcc-*.*", "gcc-*", "gcc"),  # prefer specificity
     version_detector=_version_detector
 )
@@ -137,7 +138,7 @@ def _updateCcEmitters(env):
 def _linkEmitter(target, source, env):
     t_base, t_ext = os.path.splitext(target[0].path)
     # TODO Remove these asserts once we've gotten this right
-    assert t_ext in (".dll", ".exe", ".so", ".", ""), target[0].path
+    assert t_ext in (".dll", ".dylib", ".exe", ".so", ".", ""), target[0].path
     for ext in (".map", ):
         env.Clean(target[0], t_base + ext)
     return target, source
@@ -261,7 +262,7 @@ def ApplyGCCOptions(env, version):
         # Static libgcc (arithmetic, mostly)
         "-static-libgcc",
         # Create a mapfile (.map)
-        "-Wl,-Map,${TARGET.base}.map",
+        "-Wl,-map,${TARGET.base}.map" if _platform_name == "darwin" else "-Wl,-Map,${TARGET.base}.map",
         # TODO Version stamp?
     )
     if env["TARGET_ARCH"] == "x86":

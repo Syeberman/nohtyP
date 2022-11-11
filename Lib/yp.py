@@ -14,16 +14,20 @@ import collections
 import sys
 import weakref
 import operator
+import os
 import pickle
 import reprlib
 import traceback
 
-try:
-    # Ideally this would work everywhere
-    ypdll = CDLL("nohtyP", winmode=0)
-except OSError:
-    # Perhaps we're on Linux?
-    ypdll = CDLL("libnohtyP.so")
+
+def _load_dynamic_library():
+    path = os.getenv("NOHTYP_LIBRARY")
+    if not path:
+        raise ValueError("set NOHTYP_LIBRARY to the path of the nohtyP dynamic library")
+    return CDLL(path)
+
+ypdll = _load_dynamic_library()
+
 
 # From the ctypes documentation...
 c_IN = 1

@@ -115,6 +115,9 @@
 #endif
 #if defined(yp_ARCH_32_BIT)
 #define PRIssize "d"
+#elif defined(__APPLE__)
+// The MacOS X 12.3 SDK defines ssize_t as long (see __darwin_ssize_t in the _types.h files).
+#define PRIssize "ld"
 #else
 #define PRIssize PRIint
 #endif
