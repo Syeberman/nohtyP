@@ -186,7 +186,6 @@ def ApplyGCCOptions(env, version):
         "-Wshadow" if version >= 4.8 else "",
         # Disable some warnings
         "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
-        "-Wno-unused-variable",  # TODO Mark TypeError_MappingMethods/etc as unused (portably)?
         "-Wno-pointer-sign",
         "-Wno-unknown-pragmas",
         # Before 9.0, float-conversion warned about passing a double to finite/isnan

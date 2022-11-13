@@ -2062,6 +2062,13 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
  * Internals  XXX Do not use directly!
  */
 
+// _yp_UNUSED suppresses compiler warnings about unused variables or structure fields.
+#if defined(__GNUC__)  // GCC
+#define _yp_UNUSED __attribute__((unused))
+#else
+#define _yp_UNUSED
+#endif
+
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts abuse ob_alloclen to hold a search finger for popitem
 // XXX The dealloc list (i.e., yp_decref) abuses ob_hash to point to the next object to dealloc
@@ -2143,7 +2150,7 @@ struct _ypStringLibObject {
             _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_CODE_LATIN_1, \
                     (void *)_##name##_data, sizeof(_##name##_data) - 1),       \
     };                                                                         \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
 // TODO Instead of _yp_NOQUAL, should we force extern? We really don't want yp_IMMORTAL_* placed

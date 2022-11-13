@@ -122,6 +122,9 @@
 #define PRIssize PRIint
 #endif
 
+// Internal define from nohtyP.h
+#define yp_UNUSED _yp_UNUSED
+
 
 /*************************************************************************************************
  * Debug control
@@ -583,10 +586,10 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
     static ypObject *name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
     static ypObject *name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; } \
     \
-    static ypNumberMethods name ## _NumberMethods[1] = { { \
+    static ypNumberMethods yp_UNUSED name ## _NumberMethods[1] = { { \
         *name ## _objproc \
     } }; \
-    static ypSequenceMethods name ## _SequenceMethods[1] = { { \
+    static ypSequenceMethods yp_UNUSED name ## _SequenceMethods[1] = { { \
         *name ## _objobjproc, \
         *name ## _objssizeproc, \
         *name ## _objssizeobjproc, \
@@ -605,7 +608,7 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
         *name ## _objproc, \
         *name ## _objobjobjproc \
     } }; \
-    static ypSetMethods name ## _SetMethods[1] = { { \
+    static ypSetMethods yp_UNUSED name ## _SetMethods[1] = { { \
         *name ## _objobjproc, \
         *name ## _objobjproc, \
         *name ## _objobjproc, \
@@ -618,7 +621,7 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
         *name ## _objobjproc, \
         *name ## _objobjproc \
     } }; \
-    static ypMappingMethods name ## _MappingMethods[1] = { { \
+    static ypMappingMethods yp_UNUSED name ## _MappingMethods[1] = { { \
         *name ## _miniiterfunc, \
         *name ## _objproc, \
         *name ## _miniiterfunc, \
@@ -630,7 +633,7 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
         *name ## _miniiterfunc, \
         *name ## _objproc \
     } }; \
-    static ypCallableMethods name ## _CallableMethods[1] = { { \
+    static ypCallableMethods yp_UNUSED name ## _CallableMethods[1] = { { \
         FALSE, \
         *name ## _objpobjpobjproc \
     } };
@@ -1224,7 +1227,7 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 #define _yp_IMMORTAL_FUNCTION_OBJECT(qual, name, code, parameters_len, parameters)                \
     static struct _ypFunctionObject _##name##_struct = {                                          \
             _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters, parameters_len), code, NULL}; \
-    qual ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
+    qual ypObject *const yp_UNUSED name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
     static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
     _yp_IMMORTAL_FUNCTION_OBJECT(                                                \
@@ -2119,7 +2122,7 @@ void yp_decref(ypObject *x)
     int deallocate = _ypObject_decref(x, NULL);
     if (deallocate) {
         ypObject_dealloclist dealloclist = ypObject_DEALLOCLIST_INIT();
-        ypObject            *result = _ypObject_dealloc(x, &dealloclist);
+        ypObject *yp_UNUSED  result = _ypObject_dealloc(x, &dealloclist);
         yp_ASSERT(!yp_isexceptionC(result), "tp_dealloc returned exception %p", result);
     }
 }
@@ -7397,10 +7400,10 @@ static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypObject_TYPE_PAIR_CODE(x),
             "missed a yp_TypeError check");
 
-    if (ypStringLib_LEN(s) > ypStringLib_LEN_MAX - ypStringLib_LEN(x)) {
+    if (ypStringLib_LEN(s) > ypStringLib_LEN_MAX - x_len) {
         return yp_MemorySizeOverflowError;
     }
-    newLen = ypStringLib_LEN(s) + ypStringLib_LEN(x);
+    newLen = ypStringLib_LEN(s) + x_len;
 
     newEnc = ypStringLib_ENC(s);
     if (newEnc->sizeshift < x_enc->sizeshift) newEnc = x_enc;
@@ -7419,7 +7422,7 @@ static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
         yp_memcpy(data + lenBytes, data, lenBytes);
     } else {
         ypStringLib_elemcopy_maybeupconvert(newEnc->sizeshift, ypStringLib_DATA(s),
-                ypStringLib_LEN(s), x_enc->sizeshift, ypStringLib_DATA(x), 0, ypStringLib_LEN(x));
+                ypStringLib_LEN(s), x_enc->sizeshift, ypStringLib_DATA(x), 0, x_len);
     }
     newEnc->setindexX(ypStringLib_DATA(s), newLen, 0);
 
@@ -7793,7 +7796,6 @@ static ypObject *_ypStringLib_delslice(
         ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength)
 {
     const ypStringLib_encinfo *oldEnc = ypStringLib_ENC(s);
-    ypObject                  *result;
     const ypStringLib_encinfo *newEnc;
 
     ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength);
@@ -7820,7 +7822,6 @@ static ypObject *_ypStringLib_delslice(
         ypStringLib_inplace_downconvert(newEnc->sizeshift, ypStringLib_ENC(s)->sizeshift,
                 ypStringLib_DATA(s), ypStringLib_LEN(s));
     }
-
 
     ypStringLib_ENC_CODE(s) = newEnc->code;
     ypStringLib_SET_LEN(s, ypStringLib_LEN(s) - slicelength);
@@ -8093,7 +8094,6 @@ static ypObject *ypStringLib_encode_call_errorhandler(yp_codecs_error_handler_fu
         const char *reason, ypObject *encoding, ypObject *source, yp_ssize_t errStart,
         yp_ssize_t errEnd, yp_ssize_t *newPos)
 {
-    ypObject                        *exc = yp_None;
     yp_codecs_error_handler_params_t params = {yp_sizeof(yp_codecs_error_handler_params_t)};
     ypObject                        *replacement;
     yp_ssize_t                       source_len = ypStringLib_LEN(source);
@@ -8180,7 +8180,6 @@ static ypObject *ypStringLib_decode_call_errorhandler(yp_codecs_error_handler_fu
         const char *reason, ypObject *encoding, const yp_uint8_t *source, yp_ssize_t source_len,
         yp_ssize_t errStart, yp_ssize_t errEnd, yp_ssize_t *newPos)
 {
-    ypObject                        *exc = yp_None;
     yp_codecs_error_handler_params_t params = {yp_sizeof(yp_codecs_error_handler_params_t)};
     ypObject                        *replacement;
 
@@ -11995,7 +11994,6 @@ static ypObject *_ypTuple_extend_fromminiiter(
 static ypObject *_ypTuple_extend_fromiterable(
         ypObject *sq, yp_ssize_t length_hint, ypObject *iterable)
 {
-    ypObject   *exc = yp_None;
     ypObject   *result;
     yp_uint64_t mi_state;
     ypObject   *mi;
