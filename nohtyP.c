@@ -68,6 +68,11 @@
 // `x.clear()` or `del x[:]` or even `del x[-1]`, if the result is empty should we free the buffer,
 // or keep it in case the object grows again? No clear answer, but we should be consistent.)
 
+// TODO Review the work of the Faster CPython project:
+//      https://github.com/faster-cpython/ideas/issues/72
+//      https://github.com/python/cpython/issues/84297
+//      https://github.com/faster-cpython/ideas
+
 #include "nohtyP.h"
 #include <float.h>
 #include <math.h>
