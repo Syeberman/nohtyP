@@ -1868,7 +1868,6 @@ static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required
 // larger than alloclen_max. Does not update ob_len.
 //
 // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
-// FIXME use with set_resize/etc
 static void *_ypMem_realloc_container_variable_new(ypObject *ob, yp_ssize_t required,
         yp_ssize_t extra, yp_ssize_t alloclen_max, yp_ssize_t offsetof_inline, yp_ssize_t elemsize)
 {
@@ -3239,7 +3238,7 @@ static ypObject *_yp_freeze(ypObject *x)
     yp_ASSERT(newType != NULL, "all types should have an immutable counterpart");
 
     // Freeze the object, possibly reduce memory usage, etc
-    // FIXME Support unfreezable objects. Let tp_freeze set the type code as appropriate, then
+    // TODO Support unfreezable objects. Let tp_freeze set the type code as appropriate, then
     // inspect it after to see if it worked. (Or return yp_NotImplemented.) Perhaps return an
     // exception if the top-level freeze doesn't freeze, but in the case of deep freeze allow deeper
     // objects to silently fail to freeze.
@@ -7149,7 +7148,7 @@ static ypObject *_ypStr_asitemC(
 // XXX Remember to add the null terminator
 // XXX Check for the empty immutable, negative len, and >max len cases first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
-// TODO Over-allocate to avoid future resizings
+// TODO Overallocate to avoid future resizings
 static ypObject *_ypStringLib_new(
         int type, yp_ssize_t requiredLen, int alloclen_fixed, const ypStringLib_encinfo *enc)
 {
@@ -7248,7 +7247,6 @@ static ypObject *ypStringLib_copy(int type, ypObject *s)
 // error). Does not update enc or len and does not null-terminate. Remember to free oldptr with
 // ypMem_REALLOC_CONTAINER_FREE_OLDPTR after copying the data over.
 // TODO Is the word "maybe" correct here? If we are always updaing alloclen, isn't that a realloc?
-// TODO Are there other places we can use this function?
 static ypObject *_ypStringLib_maybe_realloc(
         ypObject *s, yp_ssize_t requiredLen, yp_ssize_t extra, const ypStringLib_encinfo *newEnc)
 {
@@ -7281,7 +7279,6 @@ static ypObject *_ypStringLib_grow_onextend(
     const ypStringLib_encinfo *oldEnc = ypStringLib_ENC(s);
     void                      *oldptr;
 
-    // FIXME Are these conditions still correct/necessary?
     yp_ASSERT(requiredLen >= ypStringLib_LEN(s), "requiredLen cannot be <len(s)");
     yp_ASSERT(requiredLen > ypStringLib_ALLOCLEN(s) - 1 || newEnc->elemsize > oldEnc->elemsize,
             "_ypStringLib_grow_onextend called unnecessarily");
@@ -7308,7 +7305,6 @@ static ypObject *_ypStringLib_grow_onextend(
 }
 
 // Appends x to s, updating the length. Never writes the null-terminator.
-// FIXME Call ypStringLib_extend_fromstring instead and remove this.
 static ypObject *ypStringLib_push(
         ypObject *s, yp_uint32_t x, const ypStringLib_encinfo *x_enc, yp_ssize_t extra)
 {
@@ -7323,7 +7319,7 @@ static ypObject *ypStringLib_push(
 
     if (ypStringLib_ALLOCLEN(s) - 1 < newLen || ypStringLib_ENC(s) != newEnc) {
         // Recall _ypStringLib_grow_onextend adjusts alloclen and enc.
-        // TODO Over-allocate?
+        // TODO Overallocate?
         ypObject *result = _ypStringLib_grow_onextend(s, newLen, extra, newEnc);
         if (yp_isexceptionC(result)) return result;
     }
@@ -7411,7 +7407,7 @@ static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
 
     if (ypStringLib_ALLOCLEN(s) - 1 < newLen || ypStringLib_ENC(s) != newEnc) {
         // Recall _ypStringLib_grow_onextend adjusts alloclen and enc.
-        // TODO Over-allocate?
+        // TODO Overallocate?
         ypObject *result = _ypStringLib_grow_onextend(s, newLen, 0, newEnc);
         if (yp_isexceptionC(result)) return result;
     }
@@ -7438,7 +7434,8 @@ static ypObject *ypStringLib_clear(ypObject *s)
                                                 ypStringLib_enc_bytes :
                                                 ypStringLib_enc_latin_1;
     yp_ASSERT(ypObject_IS_MUTABLE(s), "clear called on immutable object");
-    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR(s, ypStringLibObject, ypStringLib_ALLOCLEN_MAX);
+    ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR3(
+            s, ypStringLibObject, ypStringLib_ALLOCLEN_MAX, newEnc->elemsize);
     yp_ASSERT(ypStringLib_DATA(s) == ypStringLib_INLINE_DATA(s),
             "ypStringLib_clear didn't allocate inline!");
     yp_ASSERT(ypStringLib_ALLOCLEN(s) >= 1, "bytes/str inlinelen must be at least 1");
@@ -7716,7 +7713,6 @@ static ypObject *_ypStringLib_setslice_extended(ypObject *s, yp_ssize_t start, y
     if (oldEnc->elemsize > newEnc->elemsize) {
         yp_ssize_t newAlloclen = ypStringLib_ALLOCLEN(s) << (oldEnc->sizeshift - newEnc->sizeshift);
         ypStringLib_SET_ALLOCLEN(s, newAlloclen);
-        // FIXME Look for other missed alloclen places
         ypStringLib_inplace_downconvert(
                 newEnc->sizeshift, oldEnc->sizeshift, ypStringLib_DATA(s), ypStringLib_LEN(s));
     }
@@ -7762,29 +7758,47 @@ static ypObject *ypStringLib_setslice_fromstring7(ypObject *s, yp_ssize_t start,
     }
 }
 
+// s and x can be the same object (a copy is made internally).
 static ypObject *ypStringLib_setslice_fromstring(
         ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, ypObject *x)
 {
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypObject_TYPE_PAIR_CODE(x),
             "missed a yp_TypeError check");
 
+    if (s == x) {
+        // If x is the same object as s, we need a copy of the data.
+        yp_ssize_t                 x_len = ypStringLib_LEN(x);
+        const ypStringLib_encinfo *x_enc = ypStringLib_ENC(x);
+        yp_ssize_t                 x_lenBytes = x_len << x_enc->sizeshift;
+        yp_ssize_t                 size;  // ignored
+        ypObject                  *result;
+
+        void *x_copy = yp_malloc(&size, x_lenBytes);
+        if (x_copy == NULL) return yp_MemoryError;
+        yp_memcpy(x_copy, ypStringLib_DATA(x), x_lenBytes);
+
+        result = ypStringLib_setslice_fromstring7(s, start, stop, step, x_copy, x_len, x_enc);
+
+        yp_decref(x_copy);
+        return result;
+    }
+
     return ypStringLib_setslice_fromstring7(
             s, start, stop, step, ypStringLib_DATA(x), ypStringLib_LEN(x), ypStringLib_ENC(x));
 }
 
-static ypObject *ypStringLib_delslice(
-        ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step)
+// A version of ypStringLib_delslice that takes adjusted slices.
+// XXX Handle the "empty slice" and "total slice" cases first.
+static ypObject *_ypStringLib_delslice(
+        ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step, yp_ssize_t slicelength)
 {
     const ypStringLib_encinfo *oldEnc = ypStringLib_ENC(s);
     ypObject                  *result;
-    yp_ssize_t                 slicelength;
     const ypStringLib_encinfo *newEnc;
 
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
-    if (yp_isexceptionC(result)) return result;
-    if (slicelength < 1) return yp_None;  // no-op
-    // FIXME Ensure the "clear" (i.e. `del b[:]`) case is handled the same everywhere.
-    if (slicelength >= ypStringLib_LEN(s)) return ypStringLib_clear(s);
+    ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, step, slicelength);
+    yp_ASSERT(slicelength > 0, "missed an 'empty slice' optimization");
+    yp_ASSERT(slicelength < ypStringLib_LEN(s), "missed a 'total slice' optimization");
 
     // Add one to the length to include the hidden null-terminator
     _ypSlice_delslice_memmove(ypStringLib_DATA(s), ypStringLib_LEN(s) + 1, oldEnc->elemsize, start,
@@ -7794,6 +7808,7 @@ static ypObject *ypStringLib_delslice(
     // again in ypStringLib_inplace_downconvert. A possible optimization could be a version of
     // ypStringLib_inplace_downconvert that works like _ypSlice_delslice_memmove.
     newEnc = ypStringLib_checkenc(s);
+    yp_ASSERT(oldEnc->elemsize >= newEnc->elemsize, "unexpected result from ypStringLib_checkenc");
     if (oldEnc != newEnc) {
         // XXX This could end up keeping 3x as much memory as needed (ucs-4 to latin-1). In general
         // we only reallocate when necessary (i.e. when growing) or easy (i.e. when clearing). But
@@ -7813,10 +7828,24 @@ static ypObject *ypStringLib_delslice(
     return yp_None;
 }
 
+static ypObject *ypStringLib_delslice(
+        ypObject *s, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t step)
+{
+    ypObject  *result;
+    yp_ssize_t slicelength;
+
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
+    if (yp_isexceptionC(result)) return result;
+    if (slicelength < 1) return yp_None;  // no-op
+    if (slicelength >= ypStringLib_LEN(s)) return ypStringLib_clear(s);
+
+    return _ypStringLib_delslice(s, start, stop, step, slicelength);
+}
+
 // Helper function for bytes_find and str_find. The string to find (x_data and x_len) must have
 // already been coerced into the same encoding as s. If x_data is NULL, it's treated as if the
 // string is not in s (_ypStr_coerce_encoding returns NULL if it can't coerce).
-// FIXME Replace with the faster find implementation from Python.
+// TODO Replace with the faster find implementation from Python.
 static ypObject *ypStringLib_find(ypObject *s, void *x_data, yp_ssize_t x_len, yp_ssize_t start,
         yp_ssize_t stop, findfunc_direction direction, yp_ssize_t *i)
 {
@@ -7873,7 +7902,7 @@ static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
     if (factor > ypStringLib_LEN_MAX / s_len) return yp_MemorySizeOverflowError;
     newLen = s_len * factor;
     if (ypStringLib_ALLOCLEN(s) - 1 < newLen) {
-        // TODO Over-allocate?
+        // TODO Overallocate?
         ypObject *result = _ypStringLib_grow_onextend(s, newLen, 0, s_enc);
         if (yp_isexceptionC(result)) return result;
     }
@@ -9645,15 +9674,7 @@ static ypObject *bytearray_setslice(
 {
     int x_pair = ypObject_TYPE_PAIR_CODE(x);
 
-    if (b == x) {
-        // If x is the same object as b, we need a copy of the data.
-        ypObject *result;
-        ypObject *x_copy = ypStringLib_copy(ypBytes_CODE, x);
-        if (yp_isexceptionC(x_copy)) return x_copy;
-        result = ypStringLib_setslice_fromstring(b, start, stop, step, x_copy);
-        yp_decref(x_copy);
-        return result;
-    } else if (x_pair == ypBytes_CODE) {
+    if (x_pair == ypBytes_CODE) {
         return ypStringLib_setslice_fromstring(b, start, stop, step, x);
     } else if (x_pair == ypInt_CODE || x_pair == ypStr_CODE) {
         return yp_TypeError;
@@ -9741,7 +9762,6 @@ static ypObject *bytes_len(ypObject *b, yp_ssize_t *len)
     return yp_None;
 }
 
-// FIXME Instead of piggy-backing on insert, implement directly (makes some checks unnecessary)
 static ypObject *bytearray_push(ypObject *b, ypObject *x)
 {
     return bytearray_insert(b, yp_SLICE_USELEN, x);
@@ -10583,9 +10603,12 @@ static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
 
 static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
 {
-    // FIXME Use _ypStr_asitemC here and elsewhere?
-    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
-    if (ypStr_LEN(x) != 1) return yp_ValueError;
+    ypObject                  *result;
+    yp_uint32_t                x_asitem;
+    const ypStringLib_encinfo *x_enc;
+
+    result = _ypStr_asitemC(x, &x_asitem, &x_enc);
+    if (yp_isexceptionC(result)) return result;
 
     if (!ypSequence_AdjustIndexC(ypStr_LEN(s), &i)) {
         return yp_IndexError;
@@ -10593,7 +10616,8 @@ static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
 
     // It's possible we will need to either upconvert or downconvert s in order to replace s[i]
     // with x. The logic to do this is already implemented in ypStringLib_setslice_fromstring.
-    return ypStringLib_setslice_fromstring(s, i, i + 1, 1, x);
+    // TODO Do we want a setslice that asserts the slice arguments are already adjusted?
+    return ypStringLib_setslice_fromstring7(s, i, i + 1, 1, &x_asitem, 1, x_enc);
 }
 
 static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i)
@@ -10603,10 +10627,8 @@ static ypObject *chrarray_delindex(ypObject *s, yp_ssize_t i)
     }
 
     // It's possible we will need to downconvert s in order to delete s[i]. The logic to do this is
-    // already implemented in ypStringLib_delslice.
-    // TODO A version of ypStringLib_delslice (maybe _ypStringLib_delslice?) that takes adjusted
-    // indicies.
-    return ypStringLib_delslice(s, i, i + 1, 1);
+    // already implemented in _ypStringLib_delslice.
+    return _ypStringLib_delslice(s, i, i + 1, 1, 1);
 }
 
 static ypObject *_ypStr_fromiterable(int type, ypObject *iterable);
@@ -10615,23 +10637,12 @@ static ypObject *chrarray_setslice(
 {
     int x_pair = ypObject_TYPE_PAIR_CODE(x);
 
-    if (s == x) {
-        // If x is the same object as s, we need a copy of the data.
-        ypObject *result;
-        ypObject *x_copy = ypStringLib_copy(ypStr_CODE, x);
-        if (yp_isexceptionC(x_copy)) return x_copy;
-        result = ypStringLib_setslice_fromstring(s, start, stop, step, x_copy);
-        yp_decref(x_copy);
-        return result;
-    } else if (x_pair == ypStr_CODE) {
+    if (x_pair == ypStr_CODE) {
         return ypStringLib_setslice_fromstring(s, start, stop, step, x);
     } else if (x_pair == ypBytes_CODE) {
         return yp_TypeError;
     } else {
         ypObject *result;
-        // FIXME Things get tricky here. bytearray_setslice allows setting from any iterable. The
-        // iterable must return ints, i.e. the individual elements. But normal ypStr doesn't work
-        // that way, instead returning tp_str.
         ypObject *x_asstr = _ypStr_fromiterable(ypStr_CODE, x);
         if (yp_isexceptionC(x_asstr)) return x_asstr;
         result = ypStringLib_setslice_fromstring(s, start, stop, step, x_asstr);
@@ -10649,7 +10660,7 @@ static ypObject *chrarray_push(ypObject *s, ypObject *x)
     result = _ypStr_asitemC(x, &x_asitem, &x_enc);
     if (yp_isexceptionC(result)) return result;
 
-    // TODO over-allocate
+    // TODO Overallocate
     result = ypStringLib_push(s, x_asitem, x_enc, 0);
     ypStringLib_ENC(s)->setindexX(ypStringLib_DATA(s), ypStringLib_LEN(s), 0);
 
@@ -10672,14 +10683,17 @@ static ypObject *chrarray_extend(ypObject *s, ypObject *iterable)
 
 static ypObject *chrarray_insert(ypObject *s, yp_ssize_t i, ypObject *x)
 {
+    ypObject                  *result;
+    yp_uint32_t                x_asitem;
+    const ypStringLib_encinfo *x_enc;
+
     // Recall that insert behaves like s[i:i]=[x], so we don't validate the index.
-    // FIXME Use _ypStr_asitemC here and elsewhere?
-    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
-    if (ypStr_LEN(x) != 1) return yp_ValueError;
+    result = _ypStr_asitemC(x, &x_asitem, &x_enc);
+    if (yp_isexceptionC(result)) return result;
 
     // It's possible we will need to either upconvert or downconvert s in order to insert x. The
     // logic to do this is already implemented in ypStringLib_setslice_fromstring.
-    return ypStringLib_setslice_fromstring(s, i, i, 1, x);
+    return ypStringLib_setslice_fromstring7(s, i, i, 1, &x_asitem, 1, x_enc);
 }
 
 static ypObject *str_find(ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t stop,
@@ -11297,10 +11311,43 @@ ypObject *yp_decode(ypObject *b)
             yp_s_strict);
 }
 
-// FIXME Not a typical constructor! Only for setslice and the like.
+// XXX strs are not typically created from iterables. Whereas bytes() works like tuple() in taking
+// an iterable of elements, str() does not work that way (passing an iterable to str() returns the
+// string representation of the iterable). This is used in the few contexts where we want a str
+// constructor that works like tuple() (chrarray_setslice, in particular).
 static ypObject *_ypStr_fromiterable(int type, ypObject *iterable)
 {
-    return yp_NotImplementedError;  // FIXME Implement
+    ypObject  *exc = yp_None;
+    yp_ssize_t length_hint;
+    ypObject  *newS;
+    ypObject  *result;
+
+    yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypStr_CODE, "call ypStringLib_copy instead");
+    yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypBytes_CODE, "raise yp_TypeError earlier");
+
+    length_hint = yp_lenC(iterable, &exc);
+    if (yp_isexceptionC(exc)) {
+        // Ignore errors determining length_hint: it just means we can't pre-allocate
+        length_hint = yp_length_hintC(iterable, &exc);
+        if (length_hint > ypStr_LEN_MAX) length_hint = ypStr_LEN_MAX;
+    } else if (length_hint < 1) {
+        // yp_lenC reports an empty iterable, so we can shortcut ypStringLib_extend_fromiterable
+        if (type == ypStr_CODE) return yp_str_empty;
+        return yp_chrarray0();
+    } else if (length_hint > ypStr_LEN_MAX) {
+        // yp_lenC reports that we don't have room to add their elements
+        return yp_MemorySizeOverflowError;
+    }
+
+    newS = _ypStr_new_latin_1(type, length_hint, /*alloclen_fixed=*/FALSE);
+    if (yp_isexceptionC(newS)) return newS;
+    result = ypStringLib_extend_fromiterable(newS, iterable);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newS);
+        return result;
+    }
+    ypStr_ASSERT_INVARIANTS(newS);
+    return newS;
 }
 
 static ypObject *_ypStr(int type, ypObject *object)
@@ -11328,7 +11375,7 @@ ypObject *yp_chrarray0(void)
     return newS;
 }
 
-// FIXME Like ints, the latin-1 chars are singletons in Python. Do the same.
+// TODO Like ints, the latin-1 chars are singletons in Python. Do the same.
 static ypObject *_yp_chrC(int type, yp_int_t i)
 {
     const ypStringLib_encinfo *newS_enc;
@@ -11638,7 +11685,7 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
 // with one allocation.
 // XXX Check for the yp_tuple_empty and ypTuple_ALLOCLEN_MAX cases first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
-// TODO Over-allocate to avoid future resizings
+// TODO Overallocate to avoid future resizings
 static ypObject *_ypTuple_new(int type, yp_ssize_t alloclen, int alloclen_fixed)
 {
     ypTuple_ASSERT_ALLOCLEN(alloclen);
@@ -12135,7 +12182,7 @@ static ypObject *_ypTuple_setslice_fromtuple(
         // Note that -len(sq)<=growBy<=len(x), so the growBy calculation can't overflow
         yp_ssize_t growBy = ypTuple_LEN(x) - slicelength;  // negative means list shrinking
         if (growBy > 0) {
-            // TODO Over-allocate?
+            // TODO Overallocate?
             result = _ypTuple_setslice_grow(sq, start, stop, growBy, 0);
             if (yp_isexceptionC(result)) return result;
         } else {
@@ -12192,7 +12239,7 @@ static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
 
     newSq = _ypTuple_new(sq_type, ypTuple_LEN(sq) + length_hint, /*alloclen_fixed=*/FALSE);
     if (yp_isexceptionC(newSq)) return newSq;
-    result = _ypTuple_extend_fromtuple(newSq, sq);  // FIXME We don't need extend's alloclen check
+    result = _ypTuple_extend_fromtuple(newSq, sq);  // TODO We don't need extend's alloclen check
     if (!yp_isexceptionC(result)) {
         result = _ypTuple_extend_fromiterable(newSq, length_hint, iterable);
     }
@@ -12476,7 +12523,7 @@ static ypObject *list_insert(ypObject *sq, yp_ssize_t i, ypObject *x)
     }
 
     // Make room at i and add x
-    // TODO over-allocate
+    // TODO Overallocate
     result = _ypTuple_setslice_grow(sq, i, i, 1, 0);
     if (yp_isexceptionC(result)) return result;
     ypTuple_ARRAY(sq)[i] = yp_incref(x);
@@ -12636,7 +12683,7 @@ static ypObject *tuple_len(ypObject *sq, yp_ssize_t *len)
 
 static ypObject *list_push(ypObject *sq, ypObject *x)
 {
-    // TODO over-allocate via growhint
+    // TODO Overallocate via growhint
     return _ypTuple_push(sq, x, 0);
 }
 
@@ -12644,7 +12691,7 @@ static ypObject *list_clear(ypObject *sq)
 {
     // XXX yp_decref _could_ run code that requires us to be in a good state, so pop items from the
     // end one-at-a-time
-    // FIXME If yp_decref **adds** to this list, we'll never stop looping. We could use the detach
+    // TODO If yp_decref **adds** to this list, we'll never stop looping. We could use the detach
     // methods...but if the data is inline then a small buffer is allocated, which isn't great for
     // a clear method.
     while (ypTuple_LEN(sq) > 0) {
@@ -14683,7 +14730,7 @@ static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
 // Returns a new, empty set or frozenset object to hold minused entries
 // XXX Check for the yp_frozenset_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
-// TODO Over-allocate to avoid future resizings
+// TODO Overallocate to avoid future resizings
 static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
 {
     ypObject  *so;
@@ -15682,7 +15729,7 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 static ypObject *set_pushunique(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
-    // TODO Over-allocate
+    // TODO Overallocate
     ypObject *result = _ypSet_push(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;  // TODO: As usual, what if this is yp_KeyError?
     return result == yp_True ? yp_None : yp_KeyError;
@@ -15691,7 +15738,7 @@ static ypObject *set_pushunique(ypObject *so, ypObject *x)
 static ypObject *set_push(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
-    // TODO Over-allocate
+    // TODO Overallocate
     ypObject *result = _ypSet_push(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;
     return yp_None;
@@ -16163,7 +16210,7 @@ yp_STATIC_ASSERT(
 // Returns a new, empty dict or frozendict object to hold minused entries
 // XXX Check for the "yp_frozendict_empty" case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
-// TODO Over-allocate to avoid future resizings
+// TODO Overallocate to avoid future resizings
 static ypObject *_ypDict_new(int type, yp_ssize_t minused, int alloclen_fixed)
 {
     ypObject  *keyset;
@@ -16715,7 +16762,7 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
 static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
-    // TODO Over-allocate
+    // TODO Overallocate
     ypObject *result = _ypDict_push(mp, key, value, 1, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;
     return yp_None;
@@ -16794,7 +16841,7 @@ static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
             ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
         } else {
             yp_ssize_t spaceleft = _ypSet_space_remaining(keyset);
-            // TODO Over-allocate
+            // TODO Overallocate
             result = _ypDict_push_newkey(mp, &key_loc, key, hash, defval, &spaceleft, 0);
             // value_loc is no longer valid
             if (yp_isexceptionC(result)) return result;
@@ -18980,9 +19027,10 @@ ypObject *yp_next2(ypObject **iterator, ypObject *defval)
 ypObject *yp_throw(ypObject **iterator, ypObject *exc)
 {
     if (!yp_isexceptionC(exc)) {
-        // FIXME Use yp_BAD_TYPE?
-        yp_INPLACE_ERR(iterator, yp_TypeError);
-        return yp_TypeError;
+        // typeExc may be yp_InvalidatedError or yp_TypeError.
+        ypObject *typeExc = yp_BAD_TYPE(exc);
+        yp_INPLACE_ERR(iterator, typeExc);
+        return typeExc;
     }
     return _yp_send(iterator, exc);
 }
