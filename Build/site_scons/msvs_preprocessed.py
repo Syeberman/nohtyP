@@ -36,7 +36,7 @@ def msvc_pp_output_flag(target, source, env, for_signature):
     Returns the correct /Fi flag for batching.
 
     If batching is disabled or there's only one source file, then we
-    return an /Fi string that specifies the target explicitly.  Otherwise,
+    return an /Fi string that specifies the target explicitly. Otherwise,
     we return an /Fi string that just specifies the first target's
     directory (where the Visual C/C++ compiler will put the .i files).
     """
@@ -53,7 +53,7 @@ def msvc_pp_output_flag(target, source, env, for_signature):
         return '/Fi$TARGET'
     else:
         # The Visual C/C++ compiler requires a \ at the end of the /Fi
-        # option to indicate an output directory.  We use os.sep here so
+        # option to indicate an output directory. We use os.sep here so
         # that the test(s) for this can be run on non-Windows systems
         # without having a hard-coded backslash mess up command-line
         # argument parsing.

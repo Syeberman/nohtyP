@@ -9,7 +9,7 @@ import SCons.Tool.MSCommon.vs
 import SCons.Warnings
 import msvs_preprocessed
 
-# Disables "MSVC_USE_SCRIPT set to False" warnings.  Unfortunately, also disables "No version of
+# Disables "MSVC_USE_SCRIPT set to False" warnings. Unfortunately, also disables "No version of
 # Visual Studio compiler found" et al, but these are actually errors and they're trapped
 # separately.
 SCons.Warnings.suppressWarningClass(SCons.Warnings.VisualCMissingWarning)
@@ -76,7 +76,7 @@ def _updateLinkEmitters(env, version):
 
 # TODO Any new options in VS 14.0 (aka 2015) that we can take advantage of?
 def ApplyMSVSOptions(env, version):
-    """Updates env with MSVS-specific compiler options for nohtyP.  version is numeric (ie 12.0).
+    """Updates env with MSVS-specific compiler options for nohtyP. version is numeric (ie 12.0).
     """
     def addCcFlags(*args):
         env.AppendUnique(CCFLAGS=list(args))

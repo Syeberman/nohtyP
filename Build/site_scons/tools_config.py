@@ -1,4 +1,4 @@
-"""Site-specific tool configuration.  For some tools, this caches the results of lengthy
+"""Site-specific tool configuration. For some tools, this caches the results of lengthy
 auto-detection; for other tools that don't have version-dependent auto-detect, this allows the
 user to tell us where they put the other versions.
 """
@@ -17,7 +17,7 @@ class ToolsConfig:
 
     def _readOrCreate(self):
         """Called on initialization to either read in the current configuration or create a new,
-        empty configuration file.  Returns a dictionary of global variables from that file.
+        empty configuration file. Returns a dictionary of global variables from that file.
         """
         globalDict = {}
         try:
@@ -29,7 +29,7 @@ class ToolsConfig:
                 outfile.write(
                     "# Holds site-specific configuration options for the compilers and other tools.\n")
                 outfile.write(
-                    "# Edit as appropriate.  Missing entries added automatically.  Rebuilt if deleted.\n")
+                    "# Edit as appropriate. Missing entries added automatically. Rebuilt if deleted.\n")
                 outfile.write("# None disables autodetection of that tool.\n\n")
         else:
             with infile:
@@ -60,7 +60,7 @@ class ToolsConfig:
         return self._config.get(key, default)
 
     def update(self, other):
-        """Updates our configurations with data from the other dictionary.  This also writes the
+        """Updates our configurations with data from the other dictionary. This also writes the
         updated configuration to disk (appending to the file).
         """
         towrite = self._formatConfiguration(other)

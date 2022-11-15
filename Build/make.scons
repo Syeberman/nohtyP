@@ -43,8 +43,8 @@ def nohtyP_yp_test(env, sharedLib):
 
 
 def nohtyP_checkapi(env):
-    # nohtyP.h contains very few PP conditionals, so not much needs to be set up.  Preprocessed
-    # only recognizes .c (etc) files so we make a copy with that extension.  Use dummy versions
+    # nohtyP.h contains very few PP conditionals, so not much needs to be set up. Preprocessed
+    # only recognizes .c (etc) files so we make a copy with that extension. Use dummy versions
     # of standard headers that work well with pycparser.
     env.PrependUnique(CPPPATH=["#", "#/Include/fake_libc_include"], PDB="", LIBS="")
     headerDotC = env.Command(
@@ -147,7 +147,7 @@ for compiler_name in compiler_names:
 
         if targ_os == native_os and targ_arch in native_archs:
             # We can only run yp_test on native OS and architectures, and only if a version
-            # of Python exists that can run against the target architecture.  Include sharedLib
+            # of Python exists that can run against the target architecture. Include sharedLib
             # in testTargets so that "test:release" will pull them into the native directory.
             try:
                 testTargets.extend((
@@ -159,7 +159,7 @@ for compiler_name in compiler_names:
                 traceback.print_exc(file=SconscriptLog)
 
             # Pick one variant from each configuration that matches the host system, and copy it
-            # to the Build/native directory for easy access.  nativeTargetsToCreate tracks which
+            # to the Build/native directory for easy access. nativeTargetsToCreate tracks which
             # configurations we have yet to pick.
             if configuration in nativeTargetsToCreate:
                 nativeTargetsToCreate.remove(configuration)
