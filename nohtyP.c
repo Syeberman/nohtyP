@@ -697,6 +697,7 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 
 // Functions that modify their inputs take a "ypObject **x".
 // Use this as "yp_INPLACE_ERR(x, yp_ValueError);" to discard x and set it to an exception
+// TODO What if *ob is already an exception? Or an invalidated?
 #define yp_INPLACE_ERR(ob, _err)        \
     do {                                \
         ypObject *_yp_ERR_err = (_err); \
@@ -3612,6 +3613,8 @@ extern ypObject *const yp_ComparisonNotImplemented;
         if (result != yp_ComparisonNotImplemented) return result;                     \
         return (defval);                                                              \
     }
+// Recall that tp_lt/etc for exceptions and invalidateds will return the correct exception, so
+// yp_TypeError is correct to use here (rather than yp_BAD_TYPE).
 _ypBool_PUBLIC_CMP_FUNCTION(lt, gt, yp_TypeError);
 _ypBool_PUBLIC_CMP_FUNCTION(le, ge, yp_TypeError);
 _ypBool_PUBLIC_CMP_FUNCTION(eq, eq, ypBool_FROM_C(x == y));
@@ -11430,6 +11433,7 @@ static ypObject *_ypStr_fromiterable(int type, ypObject *iterable)
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypStr_CODE, "call ypStringLib_copy instead");
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypBytes_CODE, "raise yp_TypeError earlier");
 
+    // TODO Here and everywhere, rethink this bit of code: how much do we trust yp_lenC?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint: it just means we can't pre-allocate
@@ -16413,7 +16417,7 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // Always allocate a separate buffer. Remember that mp->ob_alloclen has been repurposed to hold
-    // a search finger, so reset it after ypMem_REALLOC.
+    // a search finger.
     newkeyset = _ypSet_new(ypFrozenSet_CODE, minused, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newkeyset)) return newkeyset;
     newalloclen = ypSet_ALLOCLEN(newkeyset);
@@ -16425,7 +16429,6 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
         return yp_MemoryError;
     }
     yp_memset(ypDict_VALUES(mp), 0, newalloclen * yp_sizeof(ypObject *));
-    ypDict_SET_POPITEM_FINGER(mp, 0);
 
     // Move the keys and values from the old tables.
     oldkeys = ypSet_TABLE(ypDict_KEYSET(mp));
@@ -16819,7 +16822,7 @@ static ypObject *dict_clear(ypObject *mp)
         yp_decref(oldvalues[i]);
     }
 
-    // Free memory
+    // Free memory. Remember that mp->ob_alloclen has been repurposed to hold a search finger.
     // FIXME What if yp_decref modifies mp?
     yp_decref(ypDict_KEYSET(mp));
     ypMem_REALLOC_CONTAINER_VARIABLE_CLEAR(mp, ypDictObject, ypDict_ALLOCLEN_MAX);
