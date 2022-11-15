@@ -81,7 +81,7 @@ def ApplyMSVSOptions(env, version):
     def addCcFlags(*args):
         env.AppendUnique(CCFLAGS=list(args))
 
-    # TODO /analyze? (enable /Wall, disable /WX, supress individual warnings)
+    # TODO /analyze? (enable /Wall, disable /WX, suppress individual warnings)
     addCcFlags(
         # Warning level 3, warnings-as-errors
         "/W3",

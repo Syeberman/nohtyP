@@ -195,15 +195,15 @@ class UnicodeTest(string_tests.CommonTest,
     def test_count(self):
         string_tests.CommonTest.test_count(self)
         # check mixed argument types
-        self.checkequalnofix(3,  'aaa', 'count', 'a')
-        self.checkequalnofix(0,  'aaa', 'count', 'b')
-        self.checkequalnofix(3, 'aaa', 'count',  'a')
-        self.checkequalnofix(0, 'aaa', 'count',  'b')
-        self.checkequalnofix(0, 'aaa', 'count',  'b')
-        self.checkequalnofix(1, 'aaa', 'count',  'a', -1)
-        self.checkequalnofix(3, 'aaa', 'count',  'a', -10)
-        self.checkequalnofix(2, 'aaa', 'count',  'a', 0, -1)
-        self.checkequalnofix(0, 'aaa', 'count',  'a', 0, -10)
+        self.checkequalnofix(yp_int(3),  yp_str('aaa'), 'count', 'a')
+        self.checkequalnofix(yp_int(0),  yp_str('aaa'), 'count', 'b')
+        self.checkequalnofix(yp_int(3), yp_str('aaa'), 'count',  'a')
+        self.checkequalnofix(yp_int(0), yp_str('aaa'), 'count',  'b')
+        self.checkequalnofix(yp_int(0), yp_str('aaa'), 'count',  'b')
+        self.checkequalnofix(yp_int(1), yp_str('aaa'), 'count',  'a', -1)
+        self.checkequalnofix(yp_int(3), yp_str('aaa'), 'count',  'a', -10)
+        self.checkequalnofix(yp_int(2), yp_str('aaa'), 'count',  'a', 0, -1)
+        self.checkequalnofix(yp_int(0), yp_str('aaa'), 'count',  'a', 0, -10)
         # test mixed kinds
         self.checkequal(10, '\u0102' + 'a' * 10, 'count', 'a')
         self.checkequal(10, '\U00100304' + 'a' * 10, 'count', 'a')
@@ -218,7 +218,6 @@ class UnicodeTest(string_tests.CommonTest,
         self.checkequal(0, 'a' * 10, 'count', 'a\U00100304')
         self.checkequal(0, '\u0102' * 10, 'count', '\u0102\U00100304')
 
-    @yp_unittest.skip_str_find
     def test_find(self):
         string_tests.CommonTest.test_find(self)
         # test implementation details of the memchr fast path
@@ -230,12 +229,12 @@ class UnicodeTest(string_tests.CommonTest,
         self.checkequal(-1, 'a' * 100 + '\U00100304', 'find', '\U00100204')
         self.checkequal(-1, 'a' * 100 + '\U00100304', 'find', '\U00102004')
         # check mixed argument types
-        self.checkequalnofix(0,  'abcdefghiabc', 'find', 'abc')
-        self.checkequalnofix(9,  'abcdefghiabc', 'find', 'abc', 1)
-        self.checkequalnofix(-1, 'abcdefghiabc', 'find', 'def', 4)
+        self.checkequalnofix(yp_int(0),  yp_str('abcdefghiabc'), 'find', 'abc')
+        self.checkequalnofix(yp_int(9),  yp_str('abcdefghiabc'), 'find', 'abc', 1)
+        self.checkequalnofix(yp_int(-1), yp_str('abcdefghiabc'), 'find', 'def', 4)
 
-        self.assertRaises(TypeError, 'hello'.find)
-        self.assertRaises(TypeError, 'hello'.find, 42)
+        self.assertRaises(TypeError, yp_str('hello').find)
+        self.assertRaises(TypeError, yp_str('hello').find, 42)
         # test mixed kinds
         self.checkequal(100, '\u0102' * 100 + 'a', 'find', 'a')
         self.checkequal(100, '\U00100304' * 100 + 'a', 'find', 'a')
@@ -250,7 +249,6 @@ class UnicodeTest(string_tests.CommonTest,
         self.checkequal(-1, 'a' * 100, 'find', 'a\U00100304')
         self.checkequal(-1, '\u0102' * 100, 'find', '\u0102\U00100304')
 
-    @yp_unittest.skip_str_find
     def test_rfind(self):
         string_tests.CommonTest.test_rfind(self)
         # test implementation details of the memrchr fast path
@@ -262,9 +260,9 @@ class UnicodeTest(string_tests.CommonTest,
         self.checkequal(-1, '\U00100304' + 'a' * 100, 'rfind', '\U00100204')
         self.checkequal(-1, '\U00100304' + 'a' * 100, 'rfind', '\U00102004')
         # check mixed argument types
-        self.checkequalnofix(9,   'abcdefghiabc', 'rfind', 'abc')
-        self.checkequalnofix(12,  'abcdefghiabc', 'rfind', '')
-        self.checkequalnofix(12, 'abcdefghiabc', 'rfind',  '')
+        self.checkequalnofix(yp_int(9),   yp_str('abcdefghiabc'), 'rfind', 'abc')
+        self.checkequalnofix(yp_int(12),  yp_str('abcdefghiabc'), 'rfind', '')
+        self.checkequalnofix(yp_int(12), yp_str('abcdefghiabc'), 'rfind',  '')
         # test mixed kinds
         self.checkequal(0, 'a' + '\u0102' * 100, 'rfind', 'a')
         self.checkequal(0, 'a' + '\U00100304' * 100, 'rfind', 'a')
@@ -279,57 +277,55 @@ class UnicodeTest(string_tests.CommonTest,
         self.checkequal(-1, 'a' * 100, 'rfind', '\U00100304a')
         self.checkequal(-1, '\u0102' * 100, 'rfind', '\U00100304\u0102')
 
-    @yp_unittest.skip_str_find
     def test_index(self):
         string_tests.CommonTest.test_index(self)
-        self.checkequalnofix(0, 'abcdefghiabc', 'index',  '')
-        self.checkequalnofix(3, 'abcdefghiabc', 'index',  'def')
-        self.checkequalnofix(0, 'abcdefghiabc', 'index',  'abc')
-        self.checkequalnofix(9, 'abcdefghiabc', 'index',  'abc', 1)
-        self.assertRaises(ValueError, 'abcdefghiabc'.index, 'hib')
-        self.assertRaises(ValueError, 'abcdefghiab'.index,  'abc', 1)
-        self.assertRaises(ValueError, 'abcdefghi'.index,  'ghi', 8)
-        self.assertRaises(ValueError, 'abcdefghi'.index,  'ghi', -1)
+        self.checkequalnofix(yp_int(0), yp_str('abcdefghiabc'), 'index',  '')
+        self.checkequalnofix(yp_int(3), yp_str('abcdefghiabc'), 'index',  'def')
+        self.checkequalnofix(yp_int(0), yp_str('abcdefghiabc'), 'index',  'abc')
+        self.checkequalnofix(yp_int(9), yp_str('abcdefghiabc'), 'index',  'abc', 1)
+        self.assertRaises(ValueError, yp_str('abcdefghiabc').index, 'hib')
+        self.assertRaises(ValueError, yp_str('abcdefghiab').index,  'abc', 1)
+        self.assertRaises(ValueError, yp_str('abcdefghi').index,  'ghi', 8)
+        self.assertRaises(ValueError, yp_str('abcdefghi').index,  'ghi', -1)
         # test mixed kinds
         self.checkequal(100, '\u0102' * 100 + 'a', 'index', 'a')
         self.checkequal(100, '\U00100304' * 100 + 'a', 'index', 'a')
         self.checkequal(100, '\U00100304' * 100 + '\u0102', 'index', '\u0102')
-        self.assertRaises(ValueError, ('a' * 100).index, '\u0102')
-        self.assertRaises(ValueError, ('a' * 100).index, '\U00100304')
-        self.assertRaises(ValueError, ('\u0102' * 100).index, '\U00100304')
+        self.assertRaises(ValueError, yp_str('a' * 100).index, '\u0102')
+        self.assertRaises(ValueError, yp_str('a' * 100).index, '\U00100304')
+        self.assertRaises(ValueError, yp_str('\u0102' * 100).index, '\U00100304')
         self.checkequal(100, '\u0102' * 100 + 'a_', 'index', 'a_')
         self.checkequal(100, '\U00100304' * 100 + 'a_', 'index', 'a_')
         self.checkequal(100, '\U00100304' * 100 + '\u0102_', 'index', '\u0102_')
-        self.assertRaises(ValueError, ('a' * 100).index, 'a\u0102')
-        self.assertRaises(ValueError, ('a' * 100).index, 'a\U00100304')
-        self.assertRaises(ValueError, ('\u0102' * 100).index, '\u0102\U00100304')
+        self.assertRaises(ValueError, yp_str('a' * 100).index, 'a\u0102')
+        self.assertRaises(ValueError, yp_str('a' * 100).index, 'a\U00100304')
+        self.assertRaises(ValueError, yp_str('\u0102' * 100).index, '\u0102\U00100304')
 
-    @yp_unittest.skip_str_find
     def test_rindex(self):
         string_tests.CommonTest.test_rindex(self)
-        self.checkequalnofix(12, 'abcdefghiabc', 'rindex',  '')
-        self.checkequalnofix(3,  'abcdefghiabc', 'rindex',  'def')
-        self.checkequalnofix(9,  'abcdefghiabc', 'rindex',  'abc')
-        self.checkequalnofix(0,  'abcdefghiabc', 'rindex',  'abc', 0, -1)
+        self.checkequalnofix(yp_int(12), yp_str('abcdefghiabc'), 'rindex',  '')
+        self.checkequalnofix(yp_int(3),  yp_str('abcdefghiabc'), 'rindex',  'def')
+        self.checkequalnofix(yp_int(9),  yp_str('abcdefghiabc'), 'rindex',  'abc')
+        self.checkequalnofix(yp_int(0),  yp_str('abcdefghiabc'), 'rindex',  'abc', 0, -1)
 
-        self.assertRaises(ValueError, 'abcdefghiabc'.rindex,  'hib')
-        self.assertRaises(ValueError, 'defghiabc'.rindex,  'def', 1)
-        self.assertRaises(ValueError, 'defghiabc'.rindex,  'abc', 0, -1)
-        self.assertRaises(ValueError, 'abcdefghi'.rindex,  'ghi', 0, 8)
-        self.assertRaises(ValueError, 'abcdefghi'.rindex,  'ghi', 0, -1)
+        self.assertRaises(ValueError, yp_str('abcdefghiabc').rindex,  'hib')
+        self.assertRaises(ValueError, yp_str('defghiabc').rindex,  'def', 1)
+        self.assertRaises(ValueError, yp_str('defghiabc').rindex,  'abc', 0, -1)
+        self.assertRaises(ValueError, yp_str('abcdefghi').rindex,  'ghi', 0, 8)
+        self.assertRaises(ValueError, yp_str('abcdefghi').rindex,  'ghi', 0, -1)
         # test mixed kinds
         self.checkequal(0, 'a' + '\u0102' * 100, 'rindex', 'a')
         self.checkequal(0, 'a' + '\U00100304' * 100, 'rindex', 'a')
         self.checkequal(0, '\u0102' + '\U00100304' * 100, 'rindex', '\u0102')
-        self.assertRaises(ValueError, ('a' * 100).rindex, '\u0102')
-        self.assertRaises(ValueError, ('a' * 100).rindex, '\U00100304')
-        self.assertRaises(ValueError, ('\u0102' * 100).rindex, '\U00100304')
+        self.assertRaises(ValueError, yp_str('a' * 100).rindex, '\u0102')
+        self.assertRaises(ValueError, yp_str('a' * 100).rindex, '\U00100304')
+        self.assertRaises(ValueError, yp_str('\u0102' * 100).rindex, '\U00100304')
         self.checkequal(0, '_a' + '\u0102' * 100, 'rindex', '_a')
         self.checkequal(0, '_a' + '\U00100304' * 100, 'rindex', '_a')
         self.checkequal(0, '_\u0102' + '\U00100304' * 100, 'rindex', '_\u0102')
-        self.assertRaises(ValueError, ('a' * 100).rindex, '\u0102a')
-        self.assertRaises(ValueError, ('a' * 100).rindex, '\U00100304a')
-        self.assertRaises(ValueError, ('\u0102' * 100).rindex, '\U00100304\u0102')
+        self.assertRaises(ValueError, yp_str('a' * 100).rindex, '\u0102a')
+        self.assertRaises(ValueError, yp_str('a' * 100).rindex, '\U00100304a')
+        self.assertRaises(ValueError, yp_str('\u0102' * 100).rindex, '\U00100304\u0102')
 
     @yp_unittest.skip_str_replace
     def test_maketrans_translate(self):
@@ -626,7 +622,7 @@ class UnicodeTest(string_tests.CommonTest,
     @yp_unittest.skip_str_case
     def test_islower(self):
         super().test_islower()
-        self.checkequalnofix(False, '\u1FFc', 'islower')
+        self.checkequalnofix(yp_False, '\u1FFc', 'islower')
         self.assertFalse('\u2167'.islower())
         self.assertTrue('\u2177'.islower())
         # non-BMP, uppercase
@@ -643,7 +639,7 @@ class UnicodeTest(string_tests.CommonTest,
     def test_isupper(self):
         super().test_isupper()
         if not sys.platform.startswith('java'):
-            self.checkequalnofix(False, '\u1FFc', 'isupper')
+            self.checkequalnofix(yp_False, '\u1FFc', 'isupper')
         self.assertTrue('\u2167'.isupper())
         self.assertFalse('\u2177'.isupper())
         # non-BMP, uppercase
@@ -659,8 +655,8 @@ class UnicodeTest(string_tests.CommonTest,
     @yp_unittest.skip_str_case
     def test_istitle(self):
         super().test_istitle()
-        self.checkequalnofix(True, '\u1FFc', 'istitle')
-        self.checkequalnofix(True, 'Greek \u1FFcitlecases ...', 'istitle')
+        self.checkequalnofix(yp_True, '\u1FFc', 'istitle')
+        self.checkequalnofix(yp_True, 'Greek \u1FFcitlecases ...', 'istitle')
 
         # non-BMP, uppercase + lowercase
         self.assertTrue('\U00010401\U00010429'.istitle())
@@ -672,9 +668,9 @@ class UnicodeTest(string_tests.CommonTest,
     @yp_unittest.skip_str_space
     def test_isspace(self):
         super().test_isspace()
-        self.checkequalnofix(True, '\u2000', 'isspace')
-        self.checkequalnofix(True, '\u200a', 'isspace')
-        self.checkequalnofix(False, '\u2014', 'isspace')
+        self.checkequalnofix(yp_True, '\u2000', 'isspace')
+        self.checkequalnofix(yp_True, '\u200a', 'isspace')
+        self.checkequalnofix(yp_False, '\u2014', 'isspace')
         # There are no non-BMP whitespace chars as of Unicode 12.
         for ch in ['\U00010401', '\U00010427', '\U00010429', '\U0001044E',
                    '\U0001F40D', '\U0001F46F']:
@@ -700,7 +696,7 @@ class UnicodeTest(string_tests.CommonTest,
     @yp_unittest.skip_str_unicode_db
     def test_isalpha(self):
         super().test_isalpha()
-        self.checkequalnofix(True, '\u1FFc', 'isalpha')
+        self.checkequalnofix(yp_True, '\u1FFc', 'isalpha')
         # non-BMP, cased
         self.assertTrue('\U00010401'.isalpha())
         self.assertTrue('\U00010427'.isalpha())
@@ -718,14 +714,14 @@ class UnicodeTest(string_tests.CommonTest,
 
     @yp_unittest.skip_str_unicode_db
     def test_isdecimal(self):
-        self.checkequalnofix(False, '', 'isdecimal')
-        self.checkequalnofix(False, 'a', 'isdecimal')
-        self.checkequalnofix(True, '0', 'isdecimal')
-        self.checkequalnofix(False, '\u2460', 'isdecimal') # CIRCLED DIGIT ONE
-        self.checkequalnofix(False, '\xbc', 'isdecimal') # VULGAR FRACTION ONE QUARTER
-        self.checkequalnofix(True, '\u0660', 'isdecimal') # ARABIC-INDIC DIGIT ZERO
-        self.checkequalnofix(True, '0123456789', 'isdecimal')
-        self.checkequalnofix(False, '0123456789a', 'isdecimal')
+        self.checkequalnofix(yp_False, '', 'isdecimal')
+        self.checkequalnofix(yp_False, 'a', 'isdecimal')
+        self.checkequalnofix(yp_True, '0', 'isdecimal')
+        self.checkequalnofix(yp_False, '\u2460', 'isdecimal') # CIRCLED DIGIT ONE
+        self.checkequalnofix(yp_False, '\xbc', 'isdecimal') # VULGAR FRACTION ONE QUARTER
+        self.checkequalnofix(yp_True, '\u0660', 'isdecimal') # ARABIC-INDIC DIGIT ZERO
+        self.checkequalnofix(yp_True, '0123456789', 'isdecimal')
+        self.checkequalnofix(yp_False, '0123456789a', 'isdecimal')
 
         self.checkraises(TypeError, 'abc', 'isdecimal', 42)
 
@@ -738,9 +734,9 @@ class UnicodeTest(string_tests.CommonTest,
     @yp_unittest.skip_str_unicode_db
     def test_isdigit(self):
         super().test_isdigit()
-        self.checkequalnofix(True, '\u2460', 'isdigit')
-        self.checkequalnofix(False, '\xbc', 'isdigit')
-        self.checkequalnofix(True, '\u0660', 'isdigit')
+        self.checkequalnofix(yp_True, '\u2460', 'isdigit')
+        self.checkequalnofix(yp_False, '\xbc', 'isdigit')
+        self.checkequalnofix(yp_True, '\u0660', 'isdigit')
 
         for ch in ['\U00010401', '\U00010427', '\U00010429', '\U0001044E',
                    '\U0001F40D', '\U0001F46F', '\U00011065']:
@@ -750,14 +746,14 @@ class UnicodeTest(string_tests.CommonTest,
 
     @yp_unittest.skip_str_unicode_db
     def test_isnumeric(self):
-        self.checkequalnofix(False, '', 'isnumeric')
-        self.checkequalnofix(False, 'a', 'isnumeric')
-        self.checkequalnofix(True, '0', 'isnumeric')
-        self.checkequalnofix(True, '\u2460', 'isnumeric')
-        self.checkequalnofix(True, '\xbc', 'isnumeric')
-        self.checkequalnofix(True, '\u0660', 'isnumeric')
-        self.checkequalnofix(True, '0123456789', 'isnumeric')
-        self.checkequalnofix(False, '0123456789a', 'isnumeric')
+        self.checkequalnofix(yp_False, '', 'isnumeric')
+        self.checkequalnofix(yp_False, 'a', 'isnumeric')
+        self.checkequalnofix(yp_True, '0', 'isnumeric')
+        self.checkequalnofix(yp_True, '\u2460', 'isnumeric')
+        self.checkequalnofix(yp_True, '\xbc', 'isnumeric')
+        self.checkequalnofix(yp_True, '\u0660', 'isnumeric')
+        self.checkequalnofix(yp_True, '0123456789', 'isnumeric')
+        self.checkequalnofix(yp_False, '0123456789a', 'isnumeric')
 
         self.assertRaises(TypeError, "abc".isnumeric, 42)
 
@@ -827,7 +823,7 @@ class UnicodeTest(string_tests.CommonTest,
         for meth_name in ('islower', 'isupper', 'istitle'):
             meth = getattr(yp_str, meth_name)
             for s in (yp_str('\uD800'), yp_str('\uDFFF'), yp_str('\uD800\uD800'), yp_str('\uDFFF\uDFFF')):
-                self.assertFalse(meth(s), '%a.%s() is False' % (s, meth_name))
+                self.assertFalse(meth(s), '%a.%s() is yp_False' % (s, meth_name))
 
         for meth_name in ('isalpha', 'isalnum', 'isdigit', 'isspace',
                           'isdecimal', 'isnumeric',
@@ -836,7 +832,7 @@ class UnicodeTest(string_tests.CommonTest,
             for s in (yp_str('\uD800'), yp_str('\uDFFF'), yp_str('\uD800\uD800'), yp_str('\uDFFF\uDFFF'),
                       yp_str('a\uD800b\uDFFF'), yp_str('a\uDFFFb\uD800'),
                       yp_str('a\uD800b\uDFFFa'), yp_str('a\uDFFFb\uD800a')):
-                self.assertFalse(meth(s), '%a.%s() is False' % (s, meth_name))
+                self.assertFalse(meth(s), '%a.%s() is yp_False' % (s, meth_name))
 
 
     @yp_unittest.skip_str_case
@@ -978,7 +974,6 @@ class UnicodeTest(string_tests.CommonTest,
         finally:
             del s
 
-    @yp_unittest.skip_str_find
     def test_contains(self):
         # Testing Unicode contains method
         self.assertIn(yp_str('a'), yp_str('abdb'))
@@ -2763,6 +2758,18 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertEqual(proc.rc, 10, proc)
 
 
+class UnicodeChrarrayTest(string_tests.CommonTest,
+        string_tests.MixinStrUnicodeUserStringTest,
+        string_tests.MixinStrUnicodeTest,
+        yp_unittest.TestCase):
+
+    type2test = yp_chrarray
+
+    @yp_unittest.skip("chrarray doesn't support yp_hash")
+    def test_hash(self):
+        pass
+
+
 class CAPITest(yp_unittest.TestCase):
 
     # Test PyUnicode_FromFormat()
@@ -3079,15 +3086,15 @@ class CAPITest(yp_unittest.TestCase):
         for s in ['abc', '\xa1\xa2', '\u4f60\u597d', 'a\U0001f600',
                   'a\ud800b\udfffc', '\ud834\udd1e']:
             l = len(s)
-            self.assertEqual(unicode_asucs4(s, l, True), s+'\0')
-            self.assertEqual(unicode_asucs4(s, l, False), s+'\uffff')
-            self.assertEqual(unicode_asucs4(s, l+1, True), s+'\0\uffff')
-            self.assertEqual(unicode_asucs4(s, l+1, False), s+'\0\uffff')
-            self.assertRaises(SystemError, unicode_asucs4, s, l-1, True)
-            self.assertRaises(SystemError, unicode_asucs4, s, l-2, False)
+            self.assertEqual(unicode_asucs4(s, l, yp_True), s+'\0')
+            self.assertEqual(unicode_asucs4(s, l, yp_False), s+'\uffff')
+            self.assertEqual(unicode_asucs4(s, l+1, yp_True), s+'\0\uffff')
+            self.assertEqual(unicode_asucs4(s, l+1, yp_False), s+'\0\uffff')
+            self.assertRaises(SystemError, unicode_asucs4, s, l-1, yp_True)
+            self.assertRaises(SystemError, unicode_asucs4, s, l-2, yp_False)
             s = '\0'.join([s, s])
-            self.assertEqual(unicode_asucs4(s, len(s), True), s+'\0')
-            self.assertEqual(unicode_asucs4(s, len(s), False), s+'\uffff')
+            self.assertEqual(unicode_asucs4(s, len(s), yp_True), s+'\0')
+            self.assertEqual(unicode_asucs4(s, len(s), yp_False), s+'\uffff')
 
     # Test PyUnicode_AsUTF8()
     @support.cpython_only
@@ -3282,13 +3289,13 @@ class StringModuleTest(yp_unittest.TestCase):
             items[1] = list(items[1])
             return items
         self.assertEqual(split("obj"), ["obj", []])
-        self.assertEqual(split("obj.arg"), ["obj", [(True, 'arg')]])
-        self.assertEqual(split("obj[key]"), ["obj", [(False, 'key')]])
+        self.assertEqual(split("obj.arg"), ["obj", [(yp_True, 'arg')]])
+        self.assertEqual(split("obj[key]"), ["obj", [(yp_False, 'key')]])
         self.assertEqual(split("obj.arg[key1][key2]"), [
             "obj",
-            [(True, 'arg'),
-             (False, 'key1'),
-             (False, 'key2'),
+            [(yp_True, 'arg'),
+             (yp_False, 'key1'),
+             (yp_False, 'key2'),
             ]])
         self.assertRaises(TypeError, _string.formatter_field_name_split, 1)
 

@@ -103,6 +103,7 @@ class BaseTest:
         args = self.fixtype(args)
         getattr(obj, methodname)(*args)
 
+    @yp_unittest.skip_str_count
     def test_count(self):
         self.checkequal(3, 'aaa', 'count', 'a')
         self.checkequal(0, 'aaa', 'count', 'b')
@@ -172,7 +173,6 @@ class BaseTest:
                     self.assertEqual(rem, 0, '%s != 0 for %s' % (rem, i))
                     self.assertEqual(r1, r2, '%s != %s for %s' % (r1, r2, i))
 
-    @yp_unittest.skip_str_find
     def test_find(self):
         self.checkequal(0, 'abcdefghiabc', 'find', 'abc')
         self.checkequal(9, 'abcdefghiabc', 'find', 'abc', 1)
@@ -180,7 +180,8 @@ class BaseTest:
 
         self.checkequal(0, 'abc', 'find', '', 0)
         self.checkequal(3, 'abc', 'find', '', 3)
-        self.checkequal(-1, 'abc', 'find', '', 4)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(3, 'abc', 'find', '', 4)
 
         # to check the ability to pass None as defaults
         self.checkequal( 2, 'rrarrrrrrrrra', 'find', 'a')
@@ -197,8 +198,9 @@ class BaseTest:
             self.checkraises(TypeError, 'hello', 'find', 42)
 
         self.checkequal(0, '', 'find', '')
-        self.checkequal(-1, '', 'find', '', 1, 1)
-        self.checkequal(-1, '', 'find', '', sys.maxsize, 0)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(0, '', 'find', '', 1, 1)
+        self.checkequal(0, '', 'find', '', sys.maxsize, 0)
 
         self.checkequal(-1, '', 'find', 'xx')
         self.checkequal(-1, '', 'find', 'xx', 1, 1)
@@ -209,7 +211,6 @@ class BaseTest:
         #self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
 
     @support.requires_resource('cpu')
-    @yp_unittest.skip_str_find
     def test_find_combinations(self):
         # For a variety of combinations,
         #    verify that str.find() matches __contains__
@@ -235,7 +236,6 @@ class BaseTest:
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
-    @yp_unittest.skip_str_find
     def test_rfind(self):
         self.checkequal(9,  'abcdefghiabc', 'rfind', 'abc')
         self.checkequal(12, 'abcdefghiabc', 'rfind', '')
@@ -244,7 +244,8 @@ class BaseTest:
 
         self.checkequal(3, 'abc', 'rfind', '', 0)
         self.checkequal(3, 'abc', 'rfind', '', 3)
-        self.checkequal(-1, 'abc', 'rfind', '', 4)
+        # XXX nohtyP _always_ treats start as in slice: https://bugs.python.org/issue24243
+        self.checkequal(3, 'abc', 'rfind', '', 4)
 
         # to check the ability to pass None as defaults
         self.checkequal(12, 'rrarrrrrrrrra', 'rfind', 'a')
@@ -261,7 +262,6 @@ class BaseTest:
             self.checkraises(TypeError, 'hello', 'rfind', 42)
 
     @support.requires_resource('cpu')
-    @yp_unittest.skip_str_find
     def test_rfind_combinations(self):
         # For a variety of combinations,
         #    verify that str.rfind() matches __contains__
@@ -287,7 +287,6 @@ class BaseTest:
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
-    @yp_unittest.skip_str_find
     def test_rfind_issues(self):
         # issue 7458
         # TODO(skip_long_ints)
@@ -296,7 +295,6 @@ class BaseTest:
         # issue #15534
         self.checkequal(0, '<......\u043c...', "rfind", "<")
 
-    @yp_unittest.skip_str_find
     def test_index(self):
         self.checkequal(0, 'abcdefghiabc', 'index', '')
         self.checkequal(3, 'abcdefghiabc', 'index', 'def')
@@ -322,7 +320,6 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'index', 42)
 
-    @yp_unittest.skip_str_find
     def test_rindex(self):
         self.checkequal(12, 'abcdefghiabc', 'rindex', '')
         self.checkequal(3,  'abcdefghiabc', 'rindex', 'def')
@@ -349,7 +346,6 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'rindex', 42)
 
-    @yp_unittest.skip_str_find
     def test_find_periodic_pattern(self):
         """Cover the special path for periodic patterns."""
         def reference_find(p, s):
@@ -370,7 +366,6 @@ class BaseTest:
                 self.checkequal(reference_find(p, text),
                                 text, 'find', p)
 
-    @yp_unittest.skip_str_find
     def test_find_shift_table_overflow(self):
         """When the table of 8-bit shifts overflows."""
         N = 2**8 + 100
@@ -1156,34 +1151,34 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(True, '', 'startswith', '', 1, 0)
 
         # test negative indices
-        self.checkequal(True, yp_str('hello'), 'startswith', 'he', 0, -1)
-        self.checkequal(True, yp_str('hello'), 'startswith', 'he', -53, -1)
-        self.checkequal(False, yp_str('hello'), 'startswith', 'hello', 0, -1)
-        self.checkequal(False, yp_str('hello'), 'startswith', 'hello world', -1, -10)
-        self.checkequal(False, yp_str('hello'), 'startswith', 'ello', -5)
-        self.checkequal(True, yp_str('hello'), 'startswith', 'ello', -4)
-        self.checkequal(False, yp_str('hello'), 'startswith', 'o', -2)
-        self.checkequal(True, yp_str('hello'), 'startswith', 'o', -1)
-        self.checkequal(True, yp_str('hello'), 'startswith', '', -3, -3)
-        self.checkequal(False, yp_str('hello'), 'startswith', 'lo', -9)
+        self.checkequal(True, 'hello', 'startswith', 'he', 0, -1)
+        self.checkequal(True, 'hello', 'startswith', 'he', -53, -1)
+        self.checkequal(False, 'hello', 'startswith', 'hello', 0, -1)
+        self.checkequal(False, 'hello', 'startswith', 'hello world', -1, -10)
+        self.checkequal(False, 'hello', 'startswith', 'ello', -5)
+        self.checkequal(True, 'hello', 'startswith', 'ello', -4)
+        self.checkequal(False, 'hello', 'startswith', 'o', -2)
+        self.checkequal(True, 'hello', 'startswith', 'o', -1)
+        self.checkequal(True, 'hello', 'startswith', '', -3, -3)
+        self.checkequal(False, 'hello', 'startswith', 'lo', -9)
 
-        self.checkraises(TypeError, yp_str('hello'), 'startswith')
-        self.checkraises(TypeError, yp_str('hello'), 'startswith', 42)
+        self.checkraises(TypeError, 'hello', 'startswith')
+        self.checkraises(TypeError, 'hello', 'startswith', 42)
 
         # test tuple arguments
-        self.checkequal(True, yp_str('hello'), 'startswith', ('he', 'ha'))
-        self.checkequal(False, yp_str('hello'), 'startswith', ('lo', 'llo'))
-        self.checkequal(True, yp_str('hello'), 'startswith', ('hellox', 'hello'))
-        self.checkequal(False, yp_str('hello'), 'startswith', ())
-        self.checkequal(True, yp_str('helloworld'), 'startswith', ('hellowo',
+        self.checkequal(True, 'hello', 'startswith', ('he', 'ha'))
+        self.checkequal(False, 'hello', 'startswith', ('lo', 'llo'))
+        self.checkequal(True, 'hello', 'startswith', ('hellox', 'hello'))
+        self.checkequal(False, 'hello', 'startswith', ())
+        self.checkequal(True, 'helloworld', 'startswith', ('hellowo',
                                                            'rld', 'lowo'), 3)
-        self.checkequal(False, yp_str('helloworld'), 'startswith', ('hellowo', 'ello',
+        self.checkequal(False, 'helloworld', 'startswith', ('hellowo', 'ello',
                                                             'rld'), 3)
-        self.checkequal(True, yp_str('hello'), 'startswith', ('lo', 'he'), 0, -1)
-        self.checkequal(False, yp_str('hello'), 'startswith', ('he', 'hel'), 0, 1)
-        self.checkequal(True, yp_str('hello'), 'startswith', ('he', 'hel'), 0, 2)
+        self.checkequal(True, 'hello', 'startswith', ('lo', 'he'), 0, -1)
+        self.checkequal(False, 'hello', 'startswith', ('he', 'hel'), 0, 1)
+        self.checkequal(True, 'hello', 'startswith', ('he', 'hel'), 0, 2)
 
-        self.checkraises(TypeError, yp_str('hello'), 'startswith', (42,))
+        self.checkraises(TypeError, 'hello', 'startswith', (42,))
 
     def test_endswith(self):
         self.checkequal(True, 'hello', 'endswith', 'lo')
@@ -1206,39 +1201,38 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(True, '', 'endswith', '', 1, 0)
 
         # test negative indices
-        self.checkequal(True, yp_str('hello'), 'endswith', 'lo', -2)
-        self.checkequal(False, yp_str('hello'), 'endswith', 'he', -2)
-        self.checkequal(True, yp_str('hello'), 'endswith', '', -3, -3)
-        self.checkequal(False, yp_str('hello'), 'endswith', 'hello world', -10, -2)
-        self.checkequal(False, yp_str('helloworld'), 'endswith', 'worl', -6)
-        self.checkequal(True, yp_str('helloworld'), 'endswith', 'worl', -5, -1)
-        self.checkequal(True, yp_str('helloworld'), 'endswith', 'worl', -5, 9)
-        self.checkequal(True, yp_str('helloworld'), 'endswith', 'world', -7, 12)
-        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', -99, -3)
-        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', -8, -3)
-        self.checkequal(True, yp_str('helloworld'), 'endswith', 'lowo', -7, -3)
-        self.checkequal(False, yp_str('helloworld'), 'endswith', 'lowo', 3, -4)
-        self.checkequal(False, yp_str('helloworld'), 'endswith', 'lowo', -8, -2)
+        self.checkequal(True, 'hello', 'endswith', 'lo', -2)
+        self.checkequal(False, 'hello', 'endswith', 'he', -2)
+        self.checkequal(True, 'hello', 'endswith', '', -3, -3)
+        self.checkequal(False, 'hello', 'endswith', 'hello world', -10, -2)
+        self.checkequal(False, 'helloworld', 'endswith', 'worl', -6)
+        self.checkequal(True, 'helloworld', 'endswith', 'worl', -5, -1)
+        self.checkequal(True, 'helloworld', 'endswith', 'worl', -5, 9)
+        self.checkequal(True, 'helloworld', 'endswith', 'world', -7, 12)
+        self.checkequal(True, 'helloworld', 'endswith', 'lowo', -99, -3)
+        self.checkequal(True, 'helloworld', 'endswith', 'lowo', -8, -3)
+        self.checkequal(True, 'helloworld', 'endswith', 'lowo', -7, -3)
+        self.checkequal(False, 'helloworld', 'endswith', 'lowo', 3, -4)
+        self.checkequal(False, 'helloworld', 'endswith', 'lowo', -8, -2)
 
-        self.checkraises(TypeError, yp_str('hello'), 'endswith')
-        self.checkraises(TypeError, yp_str('hello'), 'endswith', 42)
+        self.checkraises(TypeError, 'hello', 'endswith')
+        self.checkraises(TypeError, 'hello', 'endswith', 42)
 
         # test tuple arguments
-        self.checkequal(False, yp_str('hello'), 'endswith', ('he', 'ha'))
-        self.checkequal(True, yp_str('hello'), 'endswith', ('lo', 'llo'))
-        self.checkequal(True, yp_str('hello'), 'endswith', ('hellox', 'hello'))
-        self.checkequal(False, yp_str('hello'), 'endswith', ())
-        self.checkequal(True, yp_str('helloworld'), 'endswith', ('hellowo',
+        self.checkequal(False, 'hello', 'endswith', ('he', 'ha'))
+        self.checkequal(True, 'hello', 'endswith', ('lo', 'llo'))
+        self.checkequal(True, 'hello', 'endswith', ('hellox', 'hello'))
+        self.checkequal(False, 'hello', 'endswith', ())
+        self.checkequal(True, 'helloworld', 'endswith', ('hellowo',
                                                            'rld', 'lowo'), 3)
-        self.checkequal(False, yp_str('helloworld'), 'endswith', ('hellowo', 'ello',
+        self.checkequal(False, 'helloworld', 'endswith', ('hellowo', 'ello',
                                                             'rld'), 3, -1)
-        self.checkequal(True, yp_str('hello'), 'endswith', ('hell', 'ell'), 0, -1)
-        self.checkequal(False, yp_str('hello'), 'endswith', ('he', 'hel'), 0, 1)
-        self.checkequal(True, yp_str('hello'), 'endswith', ('he', 'hell'), 0, 4)
+        self.checkequal(True, 'hello', 'endswith', ('hell', 'ell'), 0, -1)
+        self.checkequal(False, 'hello', 'endswith', ('he', 'hel'), 0, 1)
+        self.checkequal(True, 'hello', 'endswith', ('he', 'hell'), 0, 4)
 
-        self.checkraises(TypeError, yp_str('hello'), 'endswith', (42,))
+        self.checkraises(TypeError, 'hello', 'endswith', (42,))
 
-    @yp_unittest.skip_str_find
     def test___contains__(self):
         self.checkequal(True, '', '__contains__', '')
         self.checkequal(True, 'abc', '__contains__', '')
@@ -1255,7 +1249,6 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal('c', 'abc', '__getitem__', -1)
         self.checkequal('a', 'abc', '__getitem__', 0)
 
-    @yp_unittest.skip_str_slice
     def test_subscript_slice(self):
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 3))
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 1000))
@@ -1265,7 +1258,6 @@ class MixinStrUnicodeUserStringTest:
     def test_subscript_str(self):
         self.checkraises(TypeError, 'abc', '__getitem__', 'def')
 
-    @yp_unittest.skip_str_slice
     def test_slice(self):
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 1000))
         self.checkequal('abc', 'abc', '__getitem__', slice(0, 3))
@@ -1279,7 +1271,6 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, 'abc', '__getitem__', 'def')
 
-    @yp_unittest.skip_str_slice
     def test_extended_getslice(self):
         # Test extended slicing by comparing with list slicing.
         s = string.ascii_letters + string.digits
@@ -1293,12 +1284,12 @@ class MixinStrUnicodeUserStringTest:
                                     slice(start, stop, step))
 
     def test_mul(self):
-        self.checkequal(yp_str(''), yp_str('abc'), '__mul__', -1)
-        self.checkequal(yp_str(''), yp_str('abc'), '__mul__', 0)
-        self.checkequal(yp_str('abc'), yp_str('abc'), '__mul__', 1)
-        self.checkequal(yp_str('abcabcabc'), yp_str('abc'), '__mul__', 3)
-        self.checkraises(TypeError, yp_str('abc'), '__mul__')
-        self.checkraises(TypeError, yp_str('abc'), '__mul__', yp_str(''))
+        self.checkequal('', 'abc', '__mul__', -1)
+        self.checkequal('', 'abc', '__mul__', 0)
+        self.checkequal('abc', 'abc', '__mul__', 1)
+        self.checkequal('abcabcabc', 'abc', '__mul__', 3)
+        self.checkraises(TypeError, 'abc', '__mul__')
+        self.checkraises(TypeError, 'abc', '__mul__', '')
         # XXX: on a 64-bit system, this doesn't raise an overflow error,
         # but either raises a MemoryError, or succeeds (if you have 54TiB)
         #self.checkraises(OverflowError, 10000*'abc', '__mul__', 2000000000)
@@ -1341,6 +1332,7 @@ class MixinStrUnicodeUserStringTest:
         else:
             self.fail('exception not raised')
 
+    @yp_unittest.skip_str_format
     def test_formatting(self):
         self.checkequal('+hello+', '+%s+', '__mod__', 'hello')
         self.checkequal('+10+', '+%d+', '__mod__', 10)
@@ -1471,10 +1463,9 @@ class MixinStrUnicodeUserStringTest:
         self.checkraises(ValueError, S, 'rpartition', '')
         self.checkraises(TypeError, S, 'rpartition', None)
 
-    @yp_unittest.skip_str_find
     def test_none_arguments(self):
         # issue 11828
-        s = yp_str('hello')
+        s = 'hello'
         self.checkequal(2, s, 'find', 'l', None)
         self.checkequal(3, s, 'find', 'l', -2, None)
         self.checkequal(2, s, 'find', 'l', None, -2)
@@ -1495,6 +1486,9 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(2, s, 'rindex', 'l', None, -2)
         self.checkequal(0, s, 'rindex', 'h', None, None)
 
+    @yp_unittest.skip_str_count
+    def test_none_arguments_count(self):
+        s = 'hello'
         self.checkequal(2, s, 'count', 'l', None)
         self.checkequal(1, s, 'count', 'l', -2, None)
         self.checkequal(1, s, 'count', 'l', None, -2)
@@ -1502,7 +1496,7 @@ class MixinStrUnicodeUserStringTest:
 
     def test_none_arguments_startswith_endswith(self):
         # issue 11828
-        s = yp_str('hello')
+        s = 'hello'
         self.checkequal(True, s, 'endswith', 'o', None)
         self.checkequal(True, s, 'endswith', 'lo', -2, None)
         self.checkequal(True, s, 'endswith', 'l', None, -2)
@@ -1513,7 +1507,6 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(True, s, 'startswith', 'h', None, -2)
         self.checkequal(False, s, 'startswith', 'x', None, None)
 
-    @yp_unittest.skip_str_find
     def test_find_etc_raise_correct_error_messages(self):
         # issue 11828
         s = 'hello'

@@ -2062,19 +2062,27 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
  * Internals  XXX Do not use directly!
  */
 
+// _yp_UNUSED suppresses compiler warnings about unused variables or structure fields.
+#if defined(__GNUC__)  // GCC
+#define _yp_UNUSED __attribute__((unused))
+#else
+#define _yp_UNUSED
+#endif
+
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts abuse ob_alloclen to hold a search finger for popitem
 // XXX The dealloc list (i.e., yp_decref) abuses ob_hash to point to the next object to dealloc
-typedef yp_int32_t _yp_ob_len_t;
+typedef yp_uint16_t _yp_ob_type_t;
+typedef yp_int32_t  _yp_ob_len_t;
 struct _ypObject {
-    yp_uint16_t  ob_type;        // type code
-    yp_uint8_t   ob_flags;       // type-independent flags
-    yp_uint8_t   ob_type_flags;  // type-specific flags
-    yp_uint32_t  ob_refcnt;      // reference count
-    _yp_ob_len_t ob_len;         // length of object
-    _yp_ob_len_t ob_alloclen;    // allocated length
-    yp_hash_t    ob_hash;        // cached hash for immutables
-    void        *ob_data;        // pointer to object data
+    _yp_ob_type_t ob_type;        // type code
+    yp_uint8_t    ob_flags;       // type-independent flags
+    yp_uint8_t    ob_type_flags;  // type-specific flags
+    yp_uint32_t   ob_refcnt;      // reference count
+    _yp_ob_len_t  ob_len;         // length of object
+    _yp_ob_len_t  ob_alloclen;    // allocated length
+    yp_hash_t     ob_hash;        // cached hash for immutables
+    void         *ob_data;        // pointer to object data
     // Note that we are 8-byte aligned here on both 32- and 64-bit systems
 };
 
@@ -2094,13 +2102,10 @@ struct _ypIntObject {
     // So, this may not be a great way to reduce the size of these simpler types.
     yp_int_t value;
 };
-struct _ypBytesObject {
+// bytes and str all share the same underlying structure, because they share some of the same
+// "StringLib" code
+struct _ypStringLibObject {
     _ypObject_HEAD;
-    _yp_INLINE_DATA(yp_uint8_t);
-};
-struct _ypStrObject {
-    _ypObject_HEAD;
-    ypObject *utf_8;
     _yp_INLINE_DATA(yp_uint8_t);
 };
 
@@ -2113,10 +2118,10 @@ struct _ypStrObject {
 // Set ob_len or ob_alloclen to this value to signal an invalid length
 #define _ypObject_LEN_INVALID ((yp_ssize_t)-1)
 // Macros on ob_type_flags for string objects (bytes and str)
-#define _ypStringLib_ENC_BYTES (0u)
-#define _ypStringLib_ENC_LATIN_1 (1u)
-#define _ypStringLib_ENC_UCS_2 (2u)
-#define _ypStringLib_ENC_UCS_4 (3u)
+#define _ypStringLib_ENC_CODE_BYTES (0u)
+#define _ypStringLib_ENC_CODE_LATIN_1 (1u)
+#define _ypStringLib_ENC_CODE_UCS_2 (2u)
+#define _ypStringLib_ENC_CODE_UCS_4 (3u)
 
 // These type codes must match those in nohtyP.c
 #define _ypInt_CODE (10u)
@@ -2134,20 +2139,18 @@ struct _ypStrObject {
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID), (value)}; \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
-#define _yp_IMMORTAL_BYTES(qual, name, value)                                              \
-    static const char            _##name##_data[] = value;                                 \
-    static struct _ypBytesObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
-            _ypStringLib_ENC_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)};  \
-    qual ypObject *const         name = (ypObject *)&_##name##_struct /* force semi-colon */
-// TODO If we populate name->utf_8 on immortals, we are leaking memory. Either don't, or
-// pre-allocate an immortal bytes that we populate later? Or drop the name->utf_8 idea.
-#define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                                               \
-    static const char          _##name##_data[] = value;                                          \
-    static struct _ypStrObject _##name##_struct = {                                               \
-            _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_LATIN_1, (void *)_##name##_data, \
-                    sizeof(_##name##_data) - 1),                                                  \
-            NULL};                                                                                \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+#define _yp_IMMORTAL_BYTES(qual, name, value)                                                  \
+    static const char                _##name##_data[] = value;                                 \
+    static struct _ypStringLibObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
+            _ypStringLib_ENC_CODE_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)}; \
+    qual ypObject *const             name = (ypObject *)&_##name##_struct /* force semi-colon */
+#define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                            \
+    static const char                _##name##_data[] = value;                 \
+    static struct _ypStringLibObject _##name##_struct = {                      \
+            _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_CODE_LATIN_1, \
+                    (void *)_##name##_data, sizeof(_##name##_data) - 1),       \
+    };                                                                         \
+    qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
 // TODO Instead of _yp_NOQUAL, should we force extern? We really don't want yp_IMMORTAL_* placed

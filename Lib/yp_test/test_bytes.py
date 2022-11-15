@@ -974,7 +974,6 @@ class BaseBytesTest:
         self.assertRaises(ValueError, self.type2test.maketrans, b'abc', b'xyzq')
         self.assertRaises(TypeError, self.type2test.maketrans, 'abc', 'def')
 
-    @yp_unittest.skip_str_find
     def test_none_arguments(self):
         # issue 11828
         b = self.type2test(b'hello')
@@ -1034,7 +1033,6 @@ class BaseBytesTest:
             self.assertRaises(ValueError, method, 256)
             self.assertRaises(ValueError, method, 9999)
 
-    @yp_unittest.skip_str_find
     def test_find_etc_raise_correct_error_messages(self):
         # issue 11828
         b = self.type2test(b'hello')
@@ -1664,7 +1662,8 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         a = yp_bytearray(b'')
         self.assertRaises(ValueError, a.extend, [0, 1, 2, 256])
         self.assertRaises(ValueError, a.extend, [0, 1, 2, -1])
-        self.assertEqual(yp_len(a), 0)
+        # Unlike Python, nohtyP does not undo the items added before the iterator failed.
+        self.assertEqual(yp_len(a), 6)
         a = yp_bytearray(b'')
         a.extend([Indexable(ord('a'))])
         self.assertEqual(a, b'a')

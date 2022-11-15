@@ -179,6 +179,16 @@ class TestCopy(yp_unittest.TestCase):
         self.assertEqual(y, x)
         self.assertIsNot(y, x)
 
+    def test_copy_chrarray(self):
+        x = yp_chrarray('abc')
+        y = copy.copy(x)
+        self.assertEqual(y, x)
+        self.assertIsNot(y, x)
+        x = yp_chrarray()
+        y = copy.copy(x)
+        self.assertEqual(y, x)
+        self.assertIsNot(y, x)
+
     @yp_unittest.skip_user_defined_types
     def test_copy_inst_vanilla(self):
         class C:

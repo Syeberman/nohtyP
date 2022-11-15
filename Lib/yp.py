@@ -2008,8 +2008,34 @@ class yp_bytearray(_ypBytes):
 
 # TODO When nohtyP has types that have string representations, update this
 # TODO Just generally move more of this logic into nohtyP, when available
+class _ypStr(ypObject):
+    def _asstr(self): return self.encode()._asbytes().decode()
+
+    # nohtyP currently doesn't overload yp_add et al, but Python expects this
+    def __add__(self, other): return _yp_concat(self, other)
+
+    def __mul__(self, factor):
+        if isinstance(factor, float):
+            raise TypeError
+        return _yp_repeatC(self, factor)
+
+    __rmul__ = __mul__
+
+    # TODO Use nohtyP's versions when supported, not these faked-out versions
+    def replace(self, old, new, count=-1):
+        if isinstance(old, _ypStr):
+            old = old._asstr()
+        if isinstance(new, _ypStr):
+            new = new._asstr()
+        return yp_type(self)(self._asstr().replace(old, new, count))
+
+    def split(self, sep=None, maxsplit=-1):
+        if isinstance(sep, _ypStr):
+            sep = sep._asstr()
+        return yp_list(self._asstr().split(sep, maxsplit))
+
 @pytype(yp_t_str, str)
-class yp_str(ypObject):
+class yp_str(_ypStr):
     def __new__(cls, *args, **kwargs):
         if yp_str._new_bypass_call_stars(*args, **kwargs):
             return args[0]._yp_str()
@@ -2027,61 +2053,25 @@ class yp_str(ypObject):
         encoded = pyobj.encode("utf-8", "surrogatepass")
         return _yp_str_frombytesC4(encoded, len(encoded), yp_s_utf_8, yp_s_surrogatepass)
 
-    def _get_encoded_size_encoding(self):
-        encoded = c_char_pp(c_char_p())
-        size = c_yp_ssize_t_p(c_yp_ssize_t(0))
-        encoding = c_ypObject_pp(yp_None)
-        # errcheck disabled for _yp_asencodedCX, so do it here
-        _yp_asencodedCX(self, encoded, size, encoding)._yp_errcheck()
-        # _yp_asencodedCX should return one of yp_s_latin_1, yp_s_ucs_2, or yp_s_ucs_4
-        enc_type, enc_elemsize = _yp_str_enc2type[encoding[0].value]
-        return cast(encoded.contents, enc_type), size[0]//enc_elemsize, encoding[0]
-
-    def _yp_errcheck(self):
-        super()._yp_errcheck()
-        encoded, size, encoding = self._get_encoded_size_encoding()
-        if encoding is yp_s_ucs_2:
-            pass  # TODO ensure string contains at least one >0xFF character
-        elif encoding is yp_s_ucs_4:
-            pass  # TODO ensure string contains at least one >0xFFFF character
-        assert encoded[size] == 0, "missing null terminator"
-        # TODO ...unless it's built with an empty tuple; is it worth replacing with empty?
-        # if size < 1 and "yp_str_empty" in globals():
-        #    assert self is yp_str_empty, "an empty str should be yp_str_empty"
-
     # Just as yp_bool.__bool__ must return a bool, so too must this return a str
-    def __str__(self): return self.encode()._asbytes().decode()
+    def __str__(self): return self._asstr()
 
     def _yp_str(self): return self
+
     # TODO When nohtyP supports repr, replace this faked-out version
+    def _yp_repr(self): return yp_str._from_python(repr(self._asstr()))
 
-    def _yp_repr(self): return yp_str(repr(str(self)))
+@pytype(yp_t_chrarray, ())
+class yp_chrarray(_ypStr):
+    @classmethod
+    def _from_python(cls, pyobj):
+        encoded = pyobj.encode("utf-8", "surrogatepass")
+        return _yp_chrarray_frombytesC4(encoded, len(encoded), yp_s_utf_8, yp_s_surrogatepass)
 
-    # nohtyP currently doesn't overload yp_add et al, but Python expects this
-    def __add__(self, other): return _yp_concat(self, other)
+    def _yp_str(self): return yp_str._from_python(self._asstr())
 
-    def __mul__(self, factor):
-        if isinstance(factor, float):
-            raise TypeError
-        return _yp_repeatC(self, factor)
-
-    def __rmul__(self, factor):
-        if isinstance(factor, float):
-            raise TypeError
-        return _yp_repeatC(self, factor)
-
-    # TODO Use nohtyP's versions when supported, not these faked-out versions
-    def replace(self, old, new, count=-1):
-        if isinstance(old, yp_str):
-            old = str(old)
-        if isinstance(new, yp_str):
-            new = str(new)
-        return yp_str(str(self).replace(old, new, count))
-
-    def split(self, sep=None, maxsplit=-1):
-        if isinstance(sep, yp_str):
-            sep = str(sep)
-        return yp_list(str(self).split(sep, maxsplit))
+    # TODO When nohtyP supports repr, replace this faked-out version
+    def _yp_repr(self): return yp_str._from_python("chrarray(%r)" % self._asstr())
 
 c_ypObject_p_value("yp_s_ascii")
 c_ypObject_p_value("yp_s_latin_1")
@@ -2097,10 +2087,6 @@ c_ypObject_p_value("yp_s_surrogateescape")
 c_ypObject_p_value("yp_s_surrogatepass")
 c_ypObject_p_value("yp_s_star_args")
 c_ypObject_p_value("yp_s_star_star_kwargs")
-_yp_str_enc2type = {
-    yp_s_latin_1.value: (POINTER(c_uint8),  1),
-    yp_s_ucs_2.value:   (POINTER(c_uint16), 2),
-    yp_s_ucs_4.value:   (POINTER(c_uint32), 4)}
 c_ypObject_p_value("yp_str_empty")
 yp_s_None = _yp_str_frombytesC2(b"None", 4)
 yp_s_True = _yp_str_frombytesC2(b"True", 4)
