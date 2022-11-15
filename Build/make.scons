@@ -62,7 +62,7 @@ def nohtyP_checkapi(env):
 
 
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
-# "native" (ie the default target)
+# "build" (ie the default target)
 # TODO If none of these compilers can be found, default to an "any" compiler (but still version the
 # output directory)
 # TODO Would love to make this more dynamic, finding any known compiler, and then trimming.
@@ -148,7 +148,7 @@ for compiler_name in compiler_names:
         if targ_os == native_os and targ_arch in native_archs:
             # We can only run yp_test on native OS and architectures, and only if a version
             # of Python exists that can run against the target architecture.  Include sharedLib
-            # in testTargets so that "testrelease" will pull them into the native directory.
+            # in testTargets so that "test:release" will pull them into the native directory.
             try:
                 testTargets.extend((
                     nohtyP_yp_test(variantEnv.Clone(tools=[
@@ -172,29 +172,37 @@ for compiler_name in compiler_names:
                 analyzeTargets.append(variantEnv.Install(native_dest, analyzeTargets))
 
                 # Most developers only want to build or test with one variant on their host system.
-                # These aliases make this easy.
+                # These aliases make this easy. A full alias looks like `test:release`. The action
+                # (`test`) defaults to `build`. The configuration (`release`) defaults to both
+                # `release` and `debug`.
                 AliasIfNotEmpty(configuration, buildTargets)
-                AliasIfNotEmpty("test" + configuration, testTargets)
-                AliasIfNotEmpty("analyze" + configuration, analyzeTargets)
-                AliasIfNotEmpty("native", buildTargets)
+                AliasIfNotEmpty("build:" + configuration, buildTargets)
+                AliasIfNotEmpty("test:" + configuration, testTargets)
+                AliasIfNotEmpty("analyze:" + configuration, analyzeTargets)
+                AliasIfNotEmpty("build", buildTargets)
                 AliasIfNotEmpty("test", testTargets)
                 AliasIfNotEmpty("analyze", analyzeTargets)
 
-        # These aliases exist for developers that are looking to test their changes across
-        # multiple, or specific, compilers.
+        # These aliases exist for developers that are looking to test their changes across multiple,
+        # or specific, compilers. A full alias looks like `test:gcc_9:win32:x86:release`. The action
+        # (`test`) defaults to `build`. The configuration (`release`) defaults to both `release` and
+        # `debug`. arch (`x86`) and OS (`win32`) default to all available values for each. `all` can
+        # be used in place of `compiler:os:arch:configuration` for all available values for each.
         AliasIfNotEmpty("all", buildTargets)
-        AliasIfNotEmpty("testall", testTargets)
-        AliasIfNotEmpty("analyzeall", analyzeTargets)
+        AliasIfNotEmpty("build:all", buildTargets)
+        AliasIfNotEmpty("test:all", testTargets)
+        AliasIfNotEmpty("analyze:all", analyzeTargets)
         heirarchy = (compiler_name, targ_os, targ_arch, configuration)
         for heirarchyDepth in range(1, len(heirarchy)+1):
-            heirarchyName = "_".join(heirarchy[:heirarchyDepth])
+            heirarchyName = ":".join(heirarchy[:heirarchyDepth])
             AliasIfNotEmpty(heirarchyName, buildTargets)
-            AliasIfNotEmpty("test" + heirarchyName, testTargets)
-            AliasIfNotEmpty("analyze" + heirarchyName, analyzeTargets)
+            AliasIfNotEmpty("build:" + heirarchyName, buildTargets)
+            AliasIfNotEmpty("test:" + heirarchyName, testTargets)
+            AliasIfNotEmpty("analyze:" + heirarchyName, analyzeTargets)
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to
 # build just the native debug and release targets
 if GetOption("clean"):
     Default("#Build")
 else:
-    Default("native")
+    Default("build")
