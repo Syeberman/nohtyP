@@ -114,16 +114,19 @@ install:
       if ($isWindows) { $env:Path = "C:/Python38-x64;$($env:Path)" }
       if ($isLinux) { . $HOME/venv3.8/bin/activate.ps1 }
 
+      $YP_TARGETS = @()
       foreach ($YP_COMPILER_OS in $YP_COMPILER_OSES) {
-        $YP_TARGET = "$($YP_COMPILER_OS):$($YP_ARCH):$($YP_CONFIGURATION)"
+        $YP_TARGET = "$($YP_ACTION):$($YP_COMPILER_OS):$($YP_ARCH):$($YP_CONFIGURATION)"
         if ("$($YP_COMPILER_OS):$($YP_ARCH)" -in $YP_SKIP_TARGETS) {
           echo "Skipping due to YP_SKIP_TARGETS: $($YP_TARGET)"
           continue
         }
-        echo "Target: $($YP_TARGET)"
-        Build/make "$($YP_ACTION):$($YP_TARGET)"
-        if (! $?) { throw "Build/make returned an error" }
+        $YP_TARGETS += "$($YP_TARGET)"
       }
+
+      echo "Targets: $($YP_TARGETS)"
+      Build/make $($YP_TARGETS)
+      if (! $?) { throw "Build/make returned an error" }
       '@ > Build/.appveyor.ps1
 
 build_script:
