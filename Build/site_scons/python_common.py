@@ -80,7 +80,7 @@ def DefinePythonToolFunctions(hexversions, tool_name):
         raise ImportError("this tool module cannot be run as a script")
 
     # FIXME If the right Python cannot be found, then each time we clone an environment we take a
-    # long time iterating in _find.  This takes a long time despite the caching in ToolFinder.
+    # long time iterating in _find. This takes a long time despite the caching in ToolFinder.
     # Figure out why and optimize.
     def generate(env):
         if env["TARGET_OS"] != env["HOST_OS"]:

@@ -39,7 +39,7 @@ _test_pclint_cache = {}
 
 
 def _test_pclint(pclint):
-    """Tests if the given pclint exists, and return its version if so, or None if not.  Caches
+    """Tests if the given pclint exists, and return its version if so, or None if not. Caches
     results for speed."""
     # See if we've tested this executable before
     try:
@@ -64,7 +64,7 @@ def _test_pclint(pclint):
 
 
 def _find(env):
-    """Find a PC-Lint executable returning the path or None.  Picks the executable with the
+    """Find a PC-Lint executable returning the path or None. Picks the executable with the
     largest version number."""
     pclintDirs = list(os.environ.get("PATH", "").split(os.pathsep))
     pclintDirs.extend(_pclint_paths_found)

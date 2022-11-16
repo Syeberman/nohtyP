@@ -104,25 +104,25 @@ class ToolFinder:
     def __init__(self, win_dirs, posix_dirs, darwin_dirs, exe_globs, version_detector):
         """ToolFinder looks for tools by executable name and tests them for version information.
         It first searches for executables matching exe_globs in PATH, then in the paths identified
-        by win_dirs, posix_dirs, or darwin_dirs.  The order of globs is respected: each exe_glob
+        by win_dirs, posix_dirs, or darwin_dirs. The order of globs is respected: each exe_glob
         is tested in a single path before moving to the next path.
 
         win_dirs
-            List of Windows path globs to search for executables.  Each glob is prepended with
+            List of Windows path globs to search for executables. Each glob is prepended with
             'C:\Program Files', 'C:\Program Files (x86)', 'C:\', and similar for detected fixed
             drives.
         posix_dirs
-            List of Unix/Linux/BSD path globs to search for executables.  Each glob should be an
+            List of Unix/Linux/BSD path globs to search for executables. Each glob should be an
             absolute path starting with '/'.
         darwin_dirs
-            List of MacOS path globs to search for executables.  Each glob should be an absolute
+            List of MacOS path globs to search for executables. Each glob should be an absolute
             path starting with '/'.
         exe_globs
             List of filename globs for the executables that will be tested with version_detector.
             On Windows each of the PATHEXT extensions is appended (so do not include .exe, etc).
         version_detector
             A function that takes an absolute Path to an executable and returns the version of
-            the tool as an arbitrary object.  The results of this function are cached and returned
+            the tool as an arbitrary object. The results of this function are cached and returned
             by __iter__ and the like.
         """
         self.win_dirs = win_dirs

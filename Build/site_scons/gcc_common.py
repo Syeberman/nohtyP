@@ -157,7 +157,7 @@ def _updateLinkEmitters(env, version):
 
 
 def ApplyGCCOptions(env, version):
-    """Updates env with GCC-specific compiler options for nohtyP.  version is numeric (ie 4.8).
+    """Updates env with GCC-specific compiler options for nohtyP. version is numeric (ie 4.8).
     """
     try:
         archOpts = _arch2opts[env["TARGET_ARCH"]]
