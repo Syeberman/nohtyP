@@ -244,7 +244,8 @@ ypAPI ypObject *yp_rangeC(yp_int_t stop);
 // Returns a new reference to a bytes/bytearray, copying the first len bytes from source. If
 // source is NULL it is considered as having all null bytes; if len is negative source is
 // considered null terminated (and, therefore, will not contain the null byte).
-//  Ex: pre-allocate a bytearray of length 50: yp_bytearrayC(NULL, 50)
+//
+// Ex: pre-allocate a bytearray of length 50: yp_bytearrayC(NULL, 50)
 ypAPI ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
 ypAPI ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len);
 
@@ -254,9 +255,11 @@ ypAPI ypObject *yp_bytes3(ypObject *source, ypObject *encoding, ypObject *errors
 ypAPI ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *errors);
 
 // Returns a new reference to a bytes/bytearray object, depending on the type of source:
-//  - integer: the array will have that size and be initialized with null bytes
-//  - iterable: it must be an iterable of integers in range(256) used to initialize the array (this
-//  includes bytes and bytearray objects)
+//
+// - integer: the array will have that size and be initialized with null bytes
+// - iterable: it must be an iterable of integers in range(256) used to initialize the array (this
+//   includes bytes and bytearray objects)
+//
 // Raises yp_TypeError if source is a str/chrarray; instead, use yp_bytes3/yp_bytearray3.
 ypAPI ypObject *yp_bytes(ypObject *source);
 ypAPI ypObject *yp_bytearray(ypObject *source);
@@ -264,10 +267,11 @@ ypAPI ypObject *yp_bytearray(ypObject *source);
 // Returns a new reference to an empty bytearray. (An empty bytes is exported as yp_bytes_empty.)
 ypAPI ypObject *yp_bytearray0(void);
 
-// Returns a new reference to a str/chrarray decoded from the given bytes. source and len are as
-// in yp_bytesC. The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
+// Returns a new reference to a str/chrarray decoded from the given bytes. source and len are as in
+// yp_bytesC. The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
 // ascii-encoded source), while for errors it is yp_s_strict. Equivalent to:
-//  yp_str3(yp_bytesC(source, len), encoding, errors)
+//
+//      yp_str3(yp_bytesC(source, len), encoding, errors)
 ypAPI ypObject *yp_str_frombytesC4(
         const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray_frombytesC4(
@@ -306,8 +310,10 @@ ypAPI ypObject *yp_listNV(int n, va_list args);
 // Returns a new reference to a tuple/list made from factor shallow-copies of yp_tupleN(n, ...)
 // concatenated; the length will be factor*n. Equivalent to "factor * (obj0, obj1, ...)" in
 // Python.
-//  Ex: pre-allocate a list of length 99: yp_list_repeatCN(99, 1, yp_None)
-//  Ex: an 8-tuple containing alternating bools: yp_tuple_repeatCN(4, 2, yp_False, yp_True)
+//
+// Ex: pre-allocate a list of length 99: yp_list_repeatCN(99, 1, yp_None)
+//
+// Ex: an 8-tuple containing alternating bools: yp_tuple_repeatCN(4, 2, yp_False, yp_True)
 ypAPI ypObject *yp_tuple_repeatCN(yp_ssize_t factor, int n, ...);
 ypAPI ypObject *yp_tuple_repeatCNV(yp_ssize_t factor, int n, va_list args);
 ypAPI ypObject *yp_list_repeatCN(yp_ssize_t factor, int n, ...);
@@ -340,7 +346,8 @@ ypAPI ypObject *yp_set(ypObject *iterable);
 // Returns a new reference to a frozendict/dict containing the given n key/value pairs (for a total
 // of 2*n objects); the length will be n, unless there are duplicate keys, in which case the last
 // value will be retained.
-//  Ex: yp_dictK(3, key0, value0, key1, value1, key2, value2)
+//
+// Ex: yp_dictK(3, key0, value0, key1, value1, key2, value2)
 ypAPI ypObject *yp_frozendictK(int n, ...);
 ypAPI ypObject *yp_frozendictKV(int n, va_list args);
 ypAPI ypObject *yp_dictK(int n, ...);
@@ -349,7 +356,8 @@ ypAPI ypObject *yp_dictKV(int n, va_list args);
 // Returns a new reference to a frozendict/dict containing the given n keys all set to value; the
 // length will be n, unless there are duplicate keys. The Python-equivalent default of value is
 // yp_None. Note that, unlike Python, value is the _first_ argument.
-//  Ex: pre-allocate a dict with 3 keys: yp_dict_fromkeysN(yp_None, 3, key0, key1, key2)
+//
+// Ex: pre-allocate a dict with 3 keys: yp_dict_fromkeysN(yp_None, 3, key0, key1, key2)
 ypAPI ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...);
 ypAPI ypObject *yp_frozendict_fromkeysNV(ypObject *value, int n, va_list args);
 ypAPI ypObject *yp_dict_fromkeysN(ypObject *value, int n, ...);
@@ -622,7 +630,7 @@ ypAPI ypObject *yp_getindexC(ypObject *sequence, yp_ssize_t i);
 // "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.
 ypAPI ypObject *yp_getsliceC4(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k);
 
-// Equivalent to yp_getindexC(sequence, yp_asssizeC(key, &exc)).
+// Equivalent to yp_getindexC(sequence, yp_asssizeC(key, exc)).
 ypAPI ypObject *yp_getitem(ypObject *sequence, ypObject *key);
 
 // Returns the lowest index in sequence where x is found, such that x is contained in the slice
@@ -675,7 +683,8 @@ ypAPI void yp_delindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc);
 // Removes the elements of the slice from sequence, from i to j with step k. The Python-
 // equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1. On error,
 // *exc is set to an exception.
-ypAPI void yp_delsliceC4(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject **exc);
+ypAPI void yp_delsliceC4(
+        ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject **exc);
 
 // Equivalent to yp_delindexC(sequence, yp_asssizeC(key, exc), exc).
 ypAPI void yp_delitem(ypObject *sequence, ypObject *key, ypObject **exc);
@@ -725,25 +734,29 @@ ypAPI void yp_sort(ypObject *sequence, ypObject **exc);
 
 // When given to a slice-like start/stop C argument, signals that the default "end" value be
 // substituted for the argument. Which end depends on the sign of step:
-//  - positive step: 0 substituted for start, len(s) substituted for stop
-//  - negative step: len(s)-1 substituted for start, -1 substituted for stop
+//
+// - positive step: 0 substituted for start, len(s) substituted for stop
+// - negative step: len(s)-1 substituted for start, -1 substituted for stop
+//
 //  Ex: The nohtyP equivalent of "[::a]" is "yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, a"
 #define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
 
 // When given to a slice-like start/stop C argument, signals that len(s) should be substituted for
 // the argument. In other words, it signals that the slice should start/stop at the end of the
 // sequence.
+//
 //  Ex: The nohtyP equivalent of "[:]" is "0, yp_SLICE_USELEN, 1"
 #define yp_SLICE_USELEN yp_SSIZE_T_MAX
 
 // When an index in a slice is outside of range(-len(s),len(s)), it gets clamped to the bounds of
 // the sequence. Specifically:
-//  - if i>=len(s) and k>0, or i<-len(s) and k<0, the slice is empty, regardless of j
-//  - if i>=len(s) and k<0, the (reversed) slice starts with the last element
-//  - if i<-len(s) and k>0, the slice starts with the first element
-//  - if j>=len(s) and k<0, or j<-len(s) and k>0, the slice is empty, regardless of i
-//  - if j>=len(s) and k>0, the slice ends after the last element
-//  - if j<-len(s) and k<0, the (reversed) slice ends after the first element
+//
+// - if i>=len(s) and k>0, or i<-len(s) and k<0, the slice is empty, regardless of j
+// - if i>=len(s) and k<0, the (reversed) slice starts with the last element
+// - if i<-len(s) and k>0, the slice starts with the first element
+// - if j>=len(s) and k<0, or j<-len(s) and k>0, the slice is empty, regardless of i
+// - if j>=len(s) and k>0, the slice ends after the last element
+// - if j<-len(s) and k<0, the (reversed) slice ends after the first element
 
 // Immortal empty tuple and range objects.
 ypAPI ypObject *const yp_tuple_empty;
@@ -1091,18 +1104,21 @@ ypAPI void yp_rpartition(
 // is -1, there is no limit on the number of splits made. If sep is yp_None this behaves as
 // yp_split, otherwise consecutive delimiters are not grouped together and are deemed to delimit
 // empty strings.
-//  Ex: yp_split2("1,,2", ",") returns ["1", "", "2"]
+//
+// Ex: yp_split2("1,,2", ",") returns ["1", "", "2"]
 ypAPI ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 ypAPI ypObject *yp_split2(ypObject *s, ypObject *sep);
 
 // Similar to yp_splitC3, except a different splitting algorithm is used. Runs of consecutive
 // whitespace are regarded as a single separator and the result will contain no empty strings at
 // the start or end if the string has leading or trailing whitespace.
-//  Ex: yp_split(" 1  2   3  ") returns ["1", "2", "3"]
+//
+// Ex: yp_split(" 1  2   3  ") returns ["1", "2", "3"]
 ypAPI ypObject *yp_split(ypObject *s);
 
 // Similar to yp_splitC3, except only performs the rightmost splits up to maxsplit.
-//  Ex: yp_rsplitC3("  1  2   3  ", yp_None, 1) returns ["  1  2", "3"]
+//
+// Ex: yp_rsplitC3("  1  2   3  ", yp_None, 1) returns ["  1  2", "3"]
 ypAPI ypObject *yp_rsplitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 
 // Returns a new reference to a list of lines in the string, breaking at line boundaries. Python's
@@ -1260,15 +1276,16 @@ ypAPI ypObject *const yp_func_sorted;
 
 // The numeric types include ints and floats (and their mutable counterparts, of course).
 
-// Each of these methods return new reference(s) to the result of the given numeric operation;
-// for example, yp_add returns the result of adding x and y together. If the given operands do not
+// Each of these methods return new reference(s) to the result of the given numeric operation; for
+// example, yp_add returns the result of adding x and y together. If the given operands do not
 // support the operation, yp_TypeError is returned. Additional notes:
-//  - yp_divmod returns two objects via *div and *mod; on error, they are both set to an exception
-//  - If z is yp_None, yp_pow3 returns x to the power y, otherwise x to the power y modulo z
-//  - To avoid confusion with the logical operators of the same name, yp_amp implements bitwise
-//  and, while yp_bar implements bitwise or
-//  - Bitwise operations (lshift/rshift/amp/xor/bar/invert) are only applicable to integers
-//  - Unlike Python, non-numeric types do not (currently) overload these operators
+//
+// - yp_divmod returns two objects via *div and *mod; on error, they are both set to an exception
+// - If z is yp_None, yp_pow3 returns x to the power y, otherwise x to the power y modulo z
+// - To avoid confusion with the logical operators of the same name, yp_amp implements bitwise and,
+//   while yp_bar implements bitwise or
+// - Bitwise operations (lshift/rshift/amp/xor/bar/invert) are only applicable to integers
+// - Unlike Python, non-numeric types do not (currently) overload these operators
 ypAPI ypObject *yp_add(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_sub(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_mul(ypObject *x, ypObject *y);
@@ -1345,10 +1362,11 @@ ypAPI void yp_ipowCF(ypObject **x, yp_float_t y);
 
 // Library routines for nohtyP integer operations on C types. Returns zero and sets *exc on error.
 // Additional notes:
-//  - yp_truedivL returns a floating-point number
-//  - If z is 0, yp_powL3 returns x to the power y, otherwise x to the power y modulo z
-//  - If y is negative, yp_powL and yp_powL3 raise yp_ValueError, as the result should be a
-//  floating-point number; use yp_powLF for negative exponents instead
+//
+// - yp_truedivL returns a floating-point number
+// - If z is 0, yp_powL3 returns x to the power y, otherwise x to the power y modulo z
+// - If y is negative, yp_powL and yp_powL3 raise yp_ValueError, as the result should be a
+//   floating-point number; use yp_powLF for negative exponents instead
 ypAPI yp_int_t   yp_addL(yp_int_t x, yp_int_t y, ypObject **exc);
 ypAPI yp_int_t   yp_subL(yp_int_t x, yp_int_t y, ypObject **exc);
 ypAPI yp_int_t   yp_mulL(yp_int_t x, yp_int_t y, ypObject **exc);
@@ -1583,6 +1601,7 @@ typedef struct _yp_state_decl_t {
 // if you need to store an iterator in a list, stick with yp_iter.
 //
 // The restrictions on how mini iterators are used means you'll typically write the following:
+//
 //      yp_uint64_t mi_state;
 //      ypObject *mi = yp_miniiter(list, &mi_state);
 //      while(1) {
@@ -1647,15 +1666,14 @@ ypAPI void yp_miniiter_items_next(
 // with ascii) is assumed, while if errors is missing yp_s_strict is assumed. yp_*_containsC
 // returns false and sets *exc on exception.
 
-// Operations on containers that map objects to integers
+// Operations on containers that map objects to integers.
 ypAPI int      yp_o2i_containsC(ypObject *container, yp_int_t x, ypObject **exc);
 ypAPI void     yp_o2i_pushC(ypObject *container, yp_int_t x, ypObject **exc);
 ypAPI yp_int_t yp_o2i_popC(ypObject *container, ypObject **exc);
 ypAPI yp_int_t yp_o2i_getitemC(ypObject *container, ypObject *key, ypObject **exc);
 ypAPI void     yp_o2i_setitemC(ypObject *container, ypObject *key, yp_int_t x, ypObject **exc);
 
-// Operations on containers that map objects to strs
-// yp_o2s_getitemCX is documented below, as it must be used carefully.
+// Operations on containers that map objects to strs. yp_o2s_getitemCX is documented below.
 ypAPI void yp_o2s_setitemC4(
         ypObject **container, ypObject *key, const yp_uint8_t *x, yp_ssize_t x_len);
 
@@ -1664,26 +1682,28 @@ ypAPI void yp_o2s_setitemC4(
 ypAPI ypObject *yp_i2o_getitemC(ypObject *container, yp_int_t key);
 ypAPI void      yp_i2o_setitemC(ypObject *container, yp_int_t key, ypObject *x, ypObject **exc);
 
-// Operations on containers that map integers to integers
+// Operations on containers that map integers to integers.
 ypAPI yp_int_t yp_i2i_getitemC(ypObject *container, yp_int_t key, ypObject **exc);
 ypAPI void     yp_i2i_setitemC(ypObject *container, yp_int_t key, yp_int_t x, ypObject **exc);
 
-// Operations on containers that map integers to strs
-// yp_i2s_getitemCX is documented below, as it must be used carefully.
+// Operations on containers that map integers to strs. yp_i2s_getitemCX is documented below.
 ypAPI void yp_i2s_setitemC4(
         ypObject **container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len);
 
 // Operations on containers that map strs to objects. Note that if the value of the str is
 // known at compile-time, as in:
+//
 //      value = yp_s2o_getitemC3(o, "mykey", -1);
+//
 // it is more efficient to use yp_IMMORTAL_STR_LATIN_1 (also compatible with ascii), as in:
+//
 //      yp_IMMORTAL_STR_LATIN_1(s_mykey, "mykey");
 //      value = yp_getitem(o, s_mykey);
 ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len);
 ypAPI void      yp_s2o_setitemC4(
              ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject *x);
 
-// Operations on containers that map strs to integers
+// Operations on containers that map strs to integers.
 ypAPI yp_int_t yp_s2i_getitemC3(
         ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject **exc);
 ypAPI void yp_s2i_setitemC4(
@@ -1696,12 +1716,14 @@ ypAPI void yp_s2i_setitemC4(
 
 // Defines an immortal int object at compile-time, which can be accessed by the variable name,
 // which is of type "ypObject * const". value is a (constant) yp_int_t. To be used as:
+//
 //      yp_IMMORTAL_INT(name, value);
 
 // Defines an immortal bytes object at compile-time, which can be accessed by the variable name,
 // which is of type "ypObject * const". value is a C string literal that can contain null bytes.
 // The length is calculated while compiling; the hash will be calculated the first time it is
 // accessed. To be used as:
+//
 //      yp_IMMORTAL_BYTES(name, value);
 
 // Defines an immortal str constant at compile-time, which can be accessed by the variable name,
@@ -1709,6 +1731,7 @@ ypAPI void yp_s2i_setitemC4(
 // contain null characters. The length is calculated while compiling; the hash will be calculated
 // the first time it is accessed. Note that this also accepts an ascii-encoded C string literal,
 // as ascii is a subset of latin-1.
+//
 //      yp_IMMORTAL_STR_LATIN_1(name, value);
 
 // The default immortal "constructor" macros declare variables as "ypObject * const". This means
@@ -1716,6 +1739,7 @@ ypAPI void yp_s2i_setitemC4(
 // use these macros in a function, as the variable will be "deallocated" when the function returns,
 // and immortals should never be deallocated. The following macros work as above, except the
 // variables are declared as "static ypObject * const".
+//
 //      yp_IMMORTAL_INT_static(name, value);
 //      yp_IMMORTAL_BYTES_static(name, value);
 //      yp_IMMORTAL_STR_LATIN_1_static(name, value);
@@ -1824,14 +1848,16 @@ typedef struct _yp_initialize_parameters_t {
 
     // Resizes the given buffer in-place if possible, otherwise allocates a new buffer. There are
     // three possible scenarios:
-    //  - On error, returns NULL, p is not freed, and *actual is undefined
-    //  - On successful in-place resize, returns p, and *actual is the amount of memory now
-    //  allocated by p
-    //  - Otherwise, returns a pointer to the new buffer, p is not freed, and *actual is the amount
-    //  of memory allocated to the new buffer; nohtyP will then copy the data and call yp_free(p)
-    // The resized/new buffer will be at least size bytes; extra is a hint as to how much the
-    // buffer should be over-allocated, which may be ignored. This must succeed when size==0 or
-    // extra==0; the behaviour is undefined when size<0 or extra<0.
+    //
+    // - On error, returns NULL, p is not freed, and *actual is undefined
+    // - On successful in-place resize, returns p, and *actual is the amount of memory now allocated
+    //   by p
+    // - Otherwise, returns a pointer to the new buffer, p is not freed, and *actual is the amount
+    //   of memory allocated to the new buffer; nohtyP will then copy the data and call yp_free(p)
+    //
+    // The resized/new buffer will be at least size bytes; extra is a hint as to how much the buffer
+    // should be over-allocated, which may be ignored. This must succeed when size==0 or extra==0;
+    // the behaviour is undefined when size<0 or extra<0.
     // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
     // XXX It's recommended that negative sizes abort in debug builds to catch overflow errors.
     void *(*yp_malloc_resize)(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
@@ -1915,10 +1941,12 @@ ypAPI ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_
 ypAPI ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args);
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
-//  yp_asencodedCX(yp_getitem(container, key), encoded, size, encoding)
-// For all other types, this raises yp_TypeError, and sets the outputs accordingly. *encoded
-// will point into internal object memory which MUST NOT be modified; furthermore, the str
-// itself must neither be modified nor removed from the container while using the array.
+//
+//      yp_asencodedCX(yp_getitem(container, key), encoded, size, encoding)
+//
+// For all other types, this raises yp_TypeError, and sets the outputs accordingly. *encoded will
+// point into internal object memory which MUST NOT be modified; furthermore, the str itself must
+// neither be modified nor removed from the container while using the array.
 ypAPI ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t **encoded,
         yp_ssize_t *size, ypObject **encoding);
 
@@ -1939,6 +1967,7 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 #ifdef yp_FUTURE
 // yp_IF: A series of macros to emulate an if/elif/else with exception handling. To be used
 // strictly as follows (including braces):
+//
 //      yp_IF(condition1) {
 //          // branch1
 //      } yp_ELIF(condition2) {   // optional; multiple yp_ELIFs allowed
@@ -1948,6 +1977,7 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 //      } yp_ELSE_EXCEPT_AS(e) {  // optional; can also use yp_ELSE_EXCEPT
 //          // exception-branch
 //      } yp_ENDIF
+//
 // C's return statement works as you'd expect. yp_ELSE_EXCEPT_AS defines the exception target
 // variable.
 //
@@ -1957,12 +1987,14 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 // exceptions in the chosen branch do not trigger the exception-branch. If a condition creates a
 // new reference that must be discarded, use yp_IFd and/or yp_ELIFd ("d" stands for "discard" or
 // "decref"):
+//
 //      yp_IFd(yp_getitem(a, key))
 #endif
 
 #ifdef yp_FUTURE
-// yp_WHILE: A series of macros to emulate a while/else with exception handling. To be used
-// strictly as follows (including braces):
+// yp_WHILE: A series of macros to emulate a while/else with exception handling. To be used strictly
+// as follows (including braces):
+//
 //      yp_WHILE(condition) {
 //          // suite
 //      } yp_WHILE_ELSE {         // optional
@@ -1970,23 +2002,27 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 //      } yp_WHILE_EXCEPT_AS(e) { // optional; can also use yp_WHILE_EXCEPT
 //          // exception-suite
 //      } yp_ENDWHILE
+//
 // C's break, continue, and return statements work as you'd expect. yp_WHILE_EXCEPT_AS defines the
 // exception target variable.
 //
 // As in Python, the condition is evaluated multiple times until:
-//  - it evaluates to false, in which case the else-suite is executed
-//  - a break statement, in which case neither the else- nor exception-suites are executed
-//  - an exception occurs in condition, in which case the exception target (which is only available
-//  inside exception-suite) is set to the exception and the exception-suite is executed
-// Unlike Python, exceptions in the suites do not trigger the exception-suite. If condition
-// creates a new reference that must be discarded, use yp_WHILEd ("d" stands for "discard" or
-// "decref"):
+//
+// - it evaluates to false, in which case the else-suite is executed
+// - a break statement, in which case neither the else- nor exception-suites are executed
+// - an exception occurs in condition, in which case the exception target (which is only available
+//   inside exception-suite) is set to the exception and the exception-suite is executed
+//
+// Unlike Python, exceptions in the suites do not trigger the exception-suite. If condition creates
+// a new reference that must be discarded, use yp_WHILEd ("d" stands for "discard" or "decref"):
+//
 //      yp_WHILEd(yp_getindexC(a, -1))
 #endif
 
 #ifdef yp_FUTURE
-// yp_FOR: A series of macros to emulate a for/else with exception handling. To be used strictly
-// as follows (including braces):
+// yp_FOR: A series of macros to emulate a for/else with exception handling. To be used strictly as
+// follows (including braces):
+//
 //      ypObject *x = yp_NameError; // initialize to any new or immortal reference
 //      yp_FOR(x, expression) {
 //          // suite
@@ -1995,49 +2031,61 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 //      } yp_FOR_EXCEPT_AS(e) {     // optional; can also use yp_FOR_EXCEPT
 //          // exception-suite
 //      } yp_ENDFOR
+//
 // C's break and continue statements work as you'd expect; however, use yp_FOR_return instead of
 // return to avoid leaking a reference. yp_FOR_EXCEPT_AS defines the exception target variable.
 //
 // As in Python, the expression is evaluated once to create an iterator, then the suite is executed
-// once for each successfully-yielded value, which is assigned to the target variable. This
-// occurs until:
-//  - the iterator raises yp_StopIteration, in which case else-suite is executed (but *not* the
-//  exception-suite)
-//  - a break statement, in which case neither the else- nor exception-suites are executed
-//  - an exception occurs in expression or the iterator, in which case the exception target (which
-//  is only available inside exception-suite) is set to the exception and the exception-suite is
-//  executed
-// Unlike Python, there can only be one target (no automatic tuple unpacking), and exceptions in
-// the suites do not trigger the exception-suite. If expression creates a new reference that must
-// be discarded, use yp_FORd ("d" stands for "discard" or "decref"):
+// once for each successfully-yielded value, which is assigned to the target variable. This occurs
+// until:
+//
+// - the iterator raises yp_StopIteration (FIXME generator exit? others?), in which case else-suite
+//   is executed (but *not* the exception-suite)
+// - a break statement, in which case neither the else- nor exception-suites are executed
+// - an exception occurs in expression or the iterator, in which case the exception target (which is
+//   only available inside exception-suite) is set to the exception and the exception-suite is
+//   executed
+//
+// Unlike Python, there can only be one target (no automatic tuple unpacking), and exceptions in the
+// suites do not trigger the exception-suite. If expression creates a new reference that must be
+// discarded, use yp_FORd ("d" stands for "discard" or "decref"):
+//
 //      yp_FORd(x, yp_tupleN(3, a, b, c))
 //
 // Before a new reference is assigned to the target variable, the previous reference in the target
 // is automatically discarded. As such:
-//  - if the iterator yields no values, the target's value does not change
-//  - when the loop completes, the target will retain a reference to the last successfully-yielded
-//  value; this includes the else- and exception-suites
-//  - the target *must* have a value before the loop; initializing to yp_NameError mimics Python's
-//  behaviour when the iterator yields no values
-//  - if you assign a new value to the target, remember to discard the previous reference yourself;
-//  also, this new value will be discarded on subsequently-yielded values
-//  - if you want to retain a reference to a yielded value before moving to the next one, create
-//  a new reference (via yp_incref, perhaps)
+//
+// - if the iterator yields no values, the target's value does not change
+// - when the loop completes, the target will retain a reference to the last successfully-yielded
+//   value; this includes the else- and exception-suites
+// - the target *must* have a value before the loop; initializing to yp_NameError mimics Python's
+//   behaviour when the iterator yields no values
+// - if you assign a new value to the target, remember to discard the previous reference yourself;
+//   also, this new value will be discarded on subsequently-yielded values
+// - if you want to retain a reference to a yielded value before moving to the next one, create a
+//   new reference (via yp_incref, perhaps)
 #endif
 
 #ifdef yp_FUTURE
 // yp: A set of macros to make nohtyP function calls look more like Python operators and method
 // calls. Best explained with examples:
-//  a.append(b)           --> yp(a,append, b)               --> yp_append(a, b)
-//  a + b                 --> yp(a, add, b)                 --> yp_add(a, b)
+//
+//      a.append(b) --> yp(a,append, b) --> yp_append(a, b)
+//      a + b       --> yp(a, add, b)   --> yp_add(a, b)
+//
 // For methods that take no arguments, use yp1 (the '1' counts the object a, but not the method):
-//  a.isspace()           --> yp1(a,isspace)                --> yp_isspace(a)
+//
+//      a.isspace() --> yp1(a,isspace) --> yp_isspace(a)
+//
 // If variadic macros are supported by your compiler, yp can take multiple arguments:
-//  a.setdefault(b, c)    --> yp(&a,setdefault, b, c)       --> yp_setdefault(&a, b, c)
-//  a.startswith(b, 2, 7) --> yp(a,startswith4, b, 2, 7)    --> yp_startswith4(a, b, 2, 7)
+//
+//      a.setdefault(b, c)    --> yp(a,setdefault, b, c)     --> yp_setdefault(a, b, c)
+//      a.startswith(b, 2, 7) --> yp(a,startswith4, b, 2, 7) --> yp_startswith4(a, b, 2, 7)
+//
 // If variadic macros are not supported, use yp3, yp4, etc (and define yp_NO_VARIADIC_MACROS):
-//  a.setdefault(b, c)    --> yp3(&a,setdefault, b, c)      --> yp_setdefault(&a, b, c)
-//  a.startswith(b, 2, 7) --> yp4(a,startswith4, b, 2, 7)   --> yp_startswith4(a, b, 2, 7)
+//
+//      a.setdefault(b, c)    --> yp3(a,setdefault, b, c)     --> yp_setdefault(a, b, c)
+//      a.startswith(b, 2, 7) --> yp4(a,startswith4, b, 2, 7) --> yp_startswith4(a, b, 2, 7)
 #endif
 
 
@@ -2079,9 +2127,11 @@ struct _ypIntObject {
     _ypObject_HEAD;
     // TODO If sizeof(yp_int_t)==sizeof(yp_hash_t), we _could_ use ob_hash instead of value,
     // except:
-    //  - ob_hash is currently only supposed to be for immutable values
-    //  - Value -1 gets mapped to hash -2, which if cached would *change the value* of "-1"
-    //  - We could _not_ make this optimization for floats...
+    //
+    // - ob_hash is currently only supposed to be for immutable values
+    // - Value -1 gets mapped to hash -2, which if cached would *change the value* of "-1"
+    // - We could _not_ make this optimization for floats...
+    //
     // So, this may not be a great way to reduce the size of these simpler types.
     yp_int_t value;
 };
