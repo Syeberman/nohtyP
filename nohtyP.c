@@ -16,9 +16,9 @@
 
 // TODO Audit the use of leading underscore and ensure consistency
 
-// TODO A flag on (immutable) objects to verify the stored hash.  Flag is set when internal
+// TODO A flag on (immutable) objects to verify the stored hash. Flag is set when internal
 // pointers are returned (think yp_asencodedCX), then verified/cleared when yp_hash/currenthash is
-// called again.  Provides a safeguard against this internal data being modified.
+// called again. Provides a safeguard against this internal data being modified.
 
 // TODO what do we gain by caching the hash?  We already jump through hoops to use the hash
 // stored in the hash table where possible.
@@ -37,7 +37,7 @@
 // TODO Use NotImplemented, instead of NotImplementedError, as per Python.
 
 // TODO Look for all the places yp_decref, yp_eq, and others might execute arbitrary code that
-// might modify the object being iterated over.  OR  Add some sort of universal flag to objects to
+// might modify the object being iterated over. OR  Add some sort of universal flag to objects to
 // prevent modifications.
 
 // TODO Look for places we use a borrowed reference from an object and then call arbitrary code:
@@ -362,7 +362,7 @@ typedef enum { yp_FIND_FORWARD, yp_FIND_REVERSE } findfunc_direction;
 typedef ypObject *(*findfunc)(
         ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, findfunc_direction, yp_ssize_t *);
 
-// Suite of number methods.  A placeholder for now, as the current implementation doesn't allow
+// Suite of number methods. A placeholder for now, as the current implementation doesn't allow
 // overriding yp_add et al (TODO).
 typedef struct {
     objproc _placeholder;
@@ -646,7 +646,7 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
 
 DEFINE_GENERIC_METHODS(MethodError, yp_MethodError);  // for methods the type doesn't support
 // TODO A yp_ImmutableTypeError, subexception of yp_TypeError, for methods that are supported only
-// by the mutable version.  Then, add a debug yp_initialize assert to ensure all type tables uses
+// by the mutable version. Then, add a debug yp_initialize assert to ensure all type tables uses
 // this appropriately.
 DEFINE_GENERIC_METHODS(TypeError, yp_TypeError);
 DEFINE_GENERIC_METHODS(InvalidatedError, yp_InvalidatedError);  // for Invalidated objects
@@ -749,10 +749,10 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 #define yp_offsetof(structType, member) ((yp_ssize_t)offsetof(structType, member))
 #define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
 
-// Length of an array.  Only call for arrays of fixed size that haven't been coerced to pointers.
+// Length of an array. Only call for arrays of fixed size that haven't been coerced to pointers.
 #define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof(x[0]))
 
-// Length of an array in a structure.  Only call for arrays of fixed size.
+// Length of an array in a structure. Only call for arrays of fixed size.
 #define yp_lengthof_array_member(structType, member) yp_lengthof_array(((structType *)0)->member)
 
 // Versions of memcmp/etc that don't warn about yp_ssize_t mismatches.
@@ -762,7 +762,7 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 #define yp_memset(x, c, l) (memset((x), (c), (size_t)(l)))
 
 // XXX Adapted from _Py_SIZE_ROUND_DOWN et al
-// Below "a" is a power of 2.  Round down size "n" to be a multiple of "a".
+// Below "a" is a power of 2. Round down size "n" to be a multiple of "a".
 #define yp_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a)-1))
 // Round up size "n" to be a multiple of "a".
 #define yp_SIZE_ROUND_UP(n, a) (((size_t)(n) + (size_t)((a)-1)) & ~(size_t)((a)-1))
@@ -824,7 +824,7 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 // XXX Adapted from Python's _PyHASH_MULTIPLIER
 #define _ypHASH_MULTIPLIER 1000003  // 0xf4243
 
-// Parameters used for the numeric hash implementation.  Numeric hashes are based on reduction
+// Parameters used for the numeric hash implementation. Numeric hashes are based on reduction
 // modulo the prime 2**_PyHASH_BITS - 1.
 // XXX Adapted from Python's pyport.h
 #if defined(yp_ARCH_32_BIT)
@@ -1506,7 +1506,7 @@ const yp_uint8_t _yp_ctype_toupper[256] = {
 //  - malloc/realloc may allocate more memory than requested, memory that _could_ be used if we
 //  only knew how much there was
 // yp_malloc, yp_malloc_resize, and yp_free are the top level functions of nohtyP's memory
-// allocation scheme, designed to overcome these inefficiencies.  There are several implementations
+// allocation scheme, designed to overcome these inefficiencies. There are several implementations
 // of these APIs depending on the target platform; you can also provide your own versions via
 // yp_initialize.
 
@@ -1633,7 +1633,7 @@ yp_STATIC_ASSERT(yp_sizeof(_ypMem_starting_refcnt) == yp_sizeof_member(ypObject,
         sizeof_starting_refcnt);
 
 // When calculating the number of required bytes, there is protection at higher levels to ensure
-// the multiplication never overflows.  However, when calculating extra (or required+extra) bytes,
+// the multiplication never overflows. However, when calculating extra (or required+extra) bytes,
 // if the multiplication overflows we clamp to yp_SSIZE_T_MAX.
 static yp_ssize_t _ypMem_calc_extra_size(yp_ssize_t alloclen, yp_ssize_t elemsize)
 {
@@ -1662,9 +1662,9 @@ static ypObject *_ypMem_malloc_fixed(int type, yp_ssize_t sizeof_obStruct)
 #define ypMem_MALLOC_FIXED(obStruct, type) _ypMem_malloc_fixed((type), yp_sizeof(obStruct))
 
 // Returns a malloc'd buffer for a container object holding alloclen elements in-line, or exception
-// on failure.  The container can neither grow nor shrink after allocation.  ob_inline_data in
-// obStruct is used to determine the element size and ob_data; ob_len is set to zero.  alloclen
-// must not be negative and offsetof_inline+(alloclen*elemsize) must not overflow.  ob_alloclen may
+// on failure. The container can neither grow nor shrink after allocation. ob_inline_data in
+// obStruct is used to determine the element size and ob_data; ob_len is set to zero. alloclen
+// must not be negative and offsetof_inline+(alloclen*elemsize) must not overflow. ob_alloclen may
 // be larger than requested, but will never be larger than alloclen_max.
 static ypObject *_ypMem_malloc_container_inline(int type, yp_ssize_t alloclen,
         yp_ssize_t alloclen_max, yp_ssize_t offsetof_inline, yp_ssize_t elemsize)
@@ -1715,9 +1715,9 @@ static ypObject *_ypMem_malloc_container_inline(int type, yp_ssize_t alloclen,
 static yp_ssize_t _ypMem_ideal_size = _ypMem_ideal_size_DEFAULT;
 
 // Returns a malloc'd buffer for a container that may grow or shrink in the future, or exception on
-// failure.  A fixed amount of memory is allocated in-line, as per _ypMem_ideal_size.  If this fits
+// failure. A fixed amount of memory is allocated in-line, as per _ypMem_ideal_size. If this fits
 // required elements, it is used, otherwise a separate buffer of required+extra elements is
-// allocated.  required and extra must not be negative and required*elemsize must not overflow.
+// allocated. required and extra must not be negative and required*elemsize must not overflow.
 // ob_alloclen may be larger than requested, but will never be larger than alloclen_max.
 static yp_ssize_t _ypMem_inlinelen_container_variable(
         yp_ssize_t offsetof_inline, yp_ssize_t elemsize);
@@ -1787,7 +1787,7 @@ static yp_ssize_t _ypMem_inlinelen_container_variable(
             (ob), obStruct, yp_sizeof_member(obStruct, ob_inline_data[0]))
 
 // Resizes ob_data, the variable-portion of ob, and returns the previous value of ob_data
-// ("oldptr").  There are three possible scenarios:
+// ("oldptr"). There are three possible scenarios:
 //  - On error, returns NULL, and ob is not modified
 //  - If ob_data can be resized in-place, updates ob_alloclen and returns ob_data; in this case, no
 //  memcpy is necessary, as the buffer has not moved
@@ -1795,10 +1795,10 @@ static yp_ssize_t _ypMem_inlinelen_container_variable(
 //  will need to copy the data from oldptr, then free it with:
 //      ypMem_REALLOC_CONTAINER_FREE_OLDPTR(ob, obStruct, oldptr)
 // Required is the minimum ob_alloclen required; if required can fit inline, the inline buffer is
-// used.  extra is a hint as to how much the buffer should be over-allocated, which may be ignored.
+// used. extra is a hint as to how much the buffer should be over-allocated, which may be ignored.
 // This function will always resize the data, so first check to see if a resize is necessary.
-// required and extra must not be negative and required*elemsize must not overflow.  ob_alloclen
-// may be larger than requested, but will never be larger than alloclen_max.  Does not update
+// required and extra must not be negative and required*elemsize must not overflow. ob_alloclen
+// may be larger than requested, but will never be larger than alloclen_max. Does not update
 // ob_len.
 // XXX Unlike realloc, this *never* copies to the new buffer and *never* frees the old buffer.
 static void *_ypMem_realloc_container_variable(ypObject *ob, yp_ssize_t required, yp_ssize_t extra,
@@ -1941,8 +1941,8 @@ static void _ypMem_realloc_container_free_oldptr(
 #define ypMem_REALLOC_CONTAINER_FREE_OLDPTR(ob, obStruct, oldptr) \
     _ypMem_realloc_container_free_oldptr((ob), oldptr, yp_offsetof(obStruct, ob_inline_data))
 
-// Resets ob_data to the inline buffer and frees the separate buffer (if there is one).  Any
-// contained objects must have already been discarded; no memory is copied.  Always succeeds.
+// Resets ob_data to the inline buffer and frees the separate buffer (if there is one). Any
+// contained objects must have already been discarded; no memory is copied. Always succeeds.
 // TODO Is it actually a good idea to free the buffer on clear? If the object grows again, we will
 // need a new buffer, and isn't it a fair assumption that a reused object will be about the same
 // size every time? We should have consistency and guidance in the documentation.
@@ -2012,7 +2012,7 @@ void yp_increfN(int n, ...)
 }
 
 // FIXME This ypObject_dealloclist support should be available externally as part of nohtyP.h,
-// so that custom objects can also delay deallocation until the end of their methods.  Will need to
+// so that custom objects can also delay deallocation until the end of their methods. Will need to
 // think hard about the names these should be given, and which parts of the API should be opaque.
 typedef struct {
     ypObject *head;
@@ -2029,7 +2029,7 @@ static void _ypObject_dealloclist_push(ypObject_dealloclist *list, ypObject *x)
     yp_ASSERT1(list != NULL);
     yp_ASSERT1(ypObject_REFCNT(x) == 1);
 
-    // We abuse ob_hash to form a linked list of objects to deallocate.  This is safe since we
+    // We abuse ob_hash to form a linked list of objects to deallocate. This is safe since we
     // alone hold the last remaining reference, and as such no other code should access this field.
     ypObject_CACHED_HASH(x) = (yp_hash_t)NULL;
     if (list->head == NULL) {
@@ -2054,7 +2054,7 @@ static ypObject *_ypObject_dealloclist_pop(ypObject_dealloclist *list)
         return NULL;
     }
 
-    // We abuse ob_hash to form a linked list of objects to deallocate.  Because deallocating x
+    // We abuse ob_hash to form a linked list of objects to deallocate. Because deallocating x
     // will run arbitrary code that may depend on ob_hash, we invalidate ob_hash before returning.
     if (x == list->tail) {
         list->head = NULL;
@@ -2115,12 +2115,12 @@ static void yp_decref_fromdealloc(ypObject *x, void *memo)
     }
 }
 
-// TODO A version of decref that returns exceptions.  Objects that could fail deallocation need to
+// TODO A version of decref that returns exceptions. Objects that could fail deallocation need to
 // ensure they are in a consistent state when returning...perhaps the deallocation can be attempted
 // again and it will skip over the part that failed?  Still need yp_decref to squelch errors, but
 // an ASSERT on error is not enough: in testing, an exception would have to be raised in a debug
-// build for anybody to notice.  Instead, certain types (i.e. file) would need to require that
-// the exception-returning version is used.  If tp_dealloc took a ypObject**exc that yp_decref set
+// build for anybody to notice. Instead, certain types (i.e. file) would need to require that
+// the exception-returning version is used. If tp_dealloc took a ypObject**exc that yp_decref set
 // to NULL but yp_decrefE didn't, then file could ASSERT on the NULL and the user would know to use
 // the exception-returning version.
 void yp_decref(ypObject *x)
@@ -2154,8 +2154,8 @@ void yp_decrefN(int n, ...)
 // consolidate or simplify some code by using this API
 
 // This API exists to reduce duplication of code where variants of a method accept va_lists of
-// ypObject*s, or a general-purpose iterable.  This code intends to be a light-weight abstraction
-// over all of these, but particularly efficient for va_lists.  In particular, it doesn't require
+// ypObject*s, or a general-purpose iterable. This code intends to be a light-weight abstraction
+// over all of these, but particularly efficient for va_lists. In particular, it doesn't require
 // a temporary tuple to be allocated.
 //
 // Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
@@ -2196,15 +2196,15 @@ typedef struct {
     // empty tuple if the iterator is exhausted. Exhausts the iterator, even on error.
     ypObject *(*remaining_as_tuple)(ypQuickIter_state *state);
 
-    // Returns the number of items left to be yielded.  Sets *isexact to true if this is an exact
-    // value, or false if this is an estimate.  On error, sets *exc, returns zero, and *isexact is
+    // Returns the number of items left to be yielded. Sets *isexact to true if this is an exact
+    // value, or false if this is an estimate. On error, sets *exc, returns zero, and *isexact is
     // undefined.
     // TODO Do like Python, and instead of *isexact accept a default hint that is returned?
     // There's also the idea of a ypObject_MIN_LENHINT...
     // FIXME Instead, return an error, take a pointer to the hint.
     yp_ssize_t (*length_hint)(ypQuickIter_state *state, int *isexact, ypObject **exc);
 
-    // Closes the ypQuickIter.  Any further operations on state will be undefined.
+    // Closes the ypQuickIter. Any further operations on state will be undefined.
     // TODO If any of these close methods raise errors, we'll need to return them
     void (*close)(ypQuickIter_state *state);
 } ypQuickIter_methods;
@@ -2249,8 +2249,8 @@ static const ypQuickIter_methods ypQuickIter_var_methods = {
         ypQuickIter_var_close                // close
 };
 
-// Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
-// ypQuickIter_var_methods as the method table.  The QuickIter is only valid so long as args is.
+// Initializes state with the given va_list containing n ypObject*s. Always succeeds. Use
+// ypQuickIter_var_methods as the method table. The QuickIter is only valid so long as args is.
 static void ypQuickIter_new_fromvar(ypQuickIter_state *state, int n, va_list args)
 {
     yp_ASSERT1(n >= 0);
@@ -2306,7 +2306,7 @@ static const ypQuickIter_methods ypQuickIter_array_methods = {
         ypQuickIter_array_close                // close
 };
 
-// Initializes state with the given array containing n ypObject*s. Always succeeds.  Use
+// Initializes state with the given array containing n ypObject*s. Always succeeds. Use
 // ypQuickIter_array_methods as the method table. The QuickIter is only valid so long as array is.
 static void ypQuickIter_new_fromarray(
         ypQuickIter_state *state, yp_ssize_t n, ypObject *const *array)
@@ -2382,8 +2382,8 @@ static const ypQuickIter_methods ypQuickIter_mi_methods = {
 
 
 // Initializes state to iterate over the given iterable, sets *methods to the proper method
-// table to use, and returns yp_None.  On error, returns an exception, and *methods and state are
-// undefined.  iterable is borrowed by state and must not be freed until methods->close is called.
+// table to use, and returns yp_None. On error, returns an exception, and *methods and state are
+// undefined. iterable is borrowed by state and must not be freed until methods->close is called.
 static ypObject *ypQuickIter_new_fromiterable(
         const ypQuickIter_methods **methods, ypQuickIter_state *state, ypObject *iterable)
 {
@@ -2417,14 +2417,14 @@ static ypObject *ypQuickIter_new_fromiterable(
 #pragma region ypQuickSeq
 
 // This API exists to reduce duplication of code where variants of a method accept va_lists of
-// ypObject*s, or a general-purpose sequence.  This code intends to be a light-weight abstraction
-// over all of these, but particularly efficient for va_lists accessed by increasing index.  That
+// ypObject*s, or a general-purpose sequence. This code intends to be a light-weight abstraction
+// over all of these, but particularly efficient for va_lists accessed by increasing index. That
 // last point is important: using a lower index than previously may incur a performance hit, as
 // the va_list will need to be va_end'ed, then va_copy'ed from the original, to get back to
-// index 0.  If you need random access to the va_list, consider first converting to a tuple.
+// index 0. If you need random access to the va_list, consider first converting to a tuple.
 //
 // Additionally, this API can be used in places where an iterable would normally be converted into
-// a tuple.  Similar to va_lists, set and dict can "index" their elements in increasing order, but
+// a tuple. Similar to va_lists, set and dict can "index" their elements in increasing order, but
 // will incur a performance hit if acccessed out-of-order.
 //
 // Be very careful how you use this API, as only the bare-minimum safety checks are implemented.
@@ -2450,16 +2450,16 @@ typedef union {
 // The various ypQuickSeq_new_* calls either correspond with, or return a pointer to, one of
 // these method tables, which is used to manipulate the associated ypQuickSeq_state.
 typedef struct {
-    // Returns a *borrowed* reference to the object at index i, or an exception.  If the index is
-    // out-of-range, returns NULL; negative indices are not allowed.  The borrowed reference
+    // Returns a *borrowed* reference to the object at index i, or an exception. If the index is
+    // out-of-range, returns NULL; negative indices are not allowed. The borrowed reference
     // becomes invalid when a new value is retrieved or close is called.
     ypObject *(*getindexX)(ypQuickSeq_state *state, yp_ssize_t i);
     // Similar to getindexX, but returns a new reference (that will remain valid until decref'ed).
     ypObject *(*getindex)(ypQuickSeq_state *state, yp_ssize_t i);
-    // Returns the total number of elements in the ypQuickSeq.  On error, sets *exc and returns
+    // Returns the total number of elements in the ypQuickSeq. On error, sets *exc and returns
     // zero.
     yp_ssize_t (*len)(ypQuickSeq_state *state, ypObject **exc);
-    // Closes the ypQuickSeq.  Any further operations on state will be undefined.
+    // Closes the ypQuickSeq. Any further operations on state will be undefined.
     // TODO If any of these close methods raise errors, we'll need to return them
     void (*close)(ypQuickSeq_state *state);
 } ypQuickSeq_methods;
@@ -2470,7 +2470,7 @@ static ypObject *ypQuickSeq_var_getindexX(ypQuickSeq_state *state, yp_ssize_t i)
     yp_ASSERT(i >= 0, "negative indices not allowed in ypQuickSeq");
     if (i >= state->var.len) return NULL;
 
-    // To go backwards, we have to restart state->var.args.  Note that if state->var.len is zero,
+    // To go backwards, we have to restart state->var.args. Note that if state->var.len is zero,
     // then we've already returned NULL before reaching this code.
     if (i < state->var.i) {
         va_end(state->var.args);
@@ -2510,8 +2510,8 @@ static const ypQuickSeq_methods ypQuickSeq_var_methods = {
         ypQuickSeq_var_close       // close
 };
 
-// Initializes state with the given va_list containing n ypObject*s.  Always succeeds.  Use
-// ypQuickSeq_var_methods as the method table.  The QuickSeq is only valid so long as args is.
+// Initializes state with the given va_list containing n ypObject*s. Always succeeds. Use
+// ypQuickSeq_var_methods as the method table. The QuickSeq is only valid so long as args is.
 static void ypQuickSeq_new_fromvar(ypQuickSeq_state *state, int n, va_list args)
 {
     state->var.len = MAX(n, 0);
@@ -2569,7 +2569,7 @@ static const ypQuickSeq_methods ypQuickSeq_seq_methods = {
 
 
 // Returns true if sequence is a supported built-in sequence object, in which case *methods and
-// state are initialized.  Cannot fail, but if sequence is not supported this returns false.
+// state are initialized. Cannot fail, but if sequence is not supported this returns false.
 // XXX The "built-in" distinction is important because we know that getindex will behave sanely
 static int ypQuickSeq_new_fromsequence_builtins(
         const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence)
@@ -2584,7 +2584,7 @@ static int ypQuickSeq_new_fromsequence_builtins(
 }
 
 // Initializes state with the given sequence, sets *methods to the proper method table to use, and
-// returns yp_None.  On error, returns an exception, and *methods and state are undefined.
+// returns yp_None. On error, returns an exception, and *methods and state are undefined.
 // sequence is borrowed by state and must not be freed until methods->close is called.
 static ypObject *ypQuickSeq_new_fromsequence(
         const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *sequence)
@@ -2611,7 +2611,7 @@ static ypObject *ypQuickSeq_new_fromsequence(
 
 
 // Returns true if iterable is a supported built-in iterable object, in which case *methods and
-// state are initialized.  Cannot fail, but if iterable is not supported this returns false.
+// state are initialized. Cannot fail, but if iterable is not supported this returns false.
 // XXX The "built-in" distinction is important because we know that getindex will behave sanely
 static int ypQuickSeq_new_fromiterable_builtins(
         const ypQuickSeq_methods **methods, ypQuickSeq_state *state, ypObject *iterable)
@@ -2656,7 +2656,7 @@ static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc v
     }
 }
 
-// objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state.  On error,
+// objlocs: bit n is 1 if (n*yp_sizeof(ypObject *)) is the offset of an object in state. On error,
 // *size and *objlocs are undefined.
 static ypObject *_ypState_fromdecl(
         yp_ssize_t *size, yp_uint32_t *objlocs, yp_state_decl_t *state_decl)
@@ -2682,7 +2682,7 @@ static ypObject *_ypState_fromdecl(
     }
     if (state_decl->offsets_len < 0) return yp_ValueError;
 
-    // Determine the location of the objects.  There are a few errors the user could make:
+    // Determine the location of the objects. There are a few errors the user could make:
     //  - an offset for a ypObject* that is at least partially outside of state
     //  - an unaligned ypObject*, which isn't currently allowed and should never happen
     //  - a larger offset than we can represent with objlocs: a current limitation of nohtyP
@@ -2787,8 +2787,8 @@ static ypObject *iter_close(ypObject *i)
     ypIter_LENHINT(i) = 0;
     ypIter_FUNC(i) = _iter_closed_generator;
 
-    // Handle the returned value from the generator.  yp_StopIteration and yp_GeneratorExit are not
-    // errors.  Any other exception or yielded value _is_ an error, as per Python.
+    // Handle the returned value from the generator. yp_StopIteration and yp_GeneratorExit are not
+    // errors. Any other exception or yielded value _is_ an error, as per Python.
     if (yp_isexceptionCN(result, 2, yp_StopIteration, yp_GeneratorExit)) return yp_None;
     if (yp_isexceptionC(result)) return result;
     yp_decref(result);  // discard unexpectedly-yielded value
@@ -2821,7 +2821,7 @@ static ypObject *iter_send(ypObject *i, ypObject *value)
     ypObject *result = _iter_send(i, value);
 
     // As per Python, when a generator raises an exception, it can't continue to yield values, so
-    // close it.  If iter_close fails just ignore it: result is already set to an exception.
+    // close it. If iter_close fails just ignore it: result is already set to an exception.
     // TODO Don't hide errors from iter_close; instead, use Python's "while handling this
     // exception, another occurred" style of reporting
     if (yp_isexceptionC(result)) {
@@ -2836,7 +2836,7 @@ static ypObject *iter_send(ypObject *i, ypObject *value)
 static ypObject *iter_dealloc(ypObject *i, void *memo)
 {
     // FIXME Is there something better we can do to handle errors than just ignore them?
-    // TODO iter_close calls yp_decref.  Can we get it to call yp_decref_fromdealloc instead?
+    // TODO iter_close calls yp_decref. Can we get it to call yp_decref_fromdealloc instead?
     (void)iter_close(i);  // ignore errors; discards all references
     ypMem_FREE_CONTAINER(i, ypIterObject);
     return yp_None;
@@ -2974,7 +2974,7 @@ void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
     ypObject  **dest;
 
     // Set the given n arguments to the values yielded from iterable; if an exception occurs, we
-    // will need to restart and discard these values.  Remember that if yp_miniiter fails,
+    // will need to restart and discard these values. Remember that if yp_miniiter fails,
     // yp_miniiter_next will return the same exception.
     // TODO Hmmm; let's say iterable was yp_StopIteration for some reason: this code would actually
     // succeed when n=0 even though it should probably fail...we should check the yp_miniiter
@@ -3440,8 +3440,8 @@ static ypObject *_yp_sametype_deepcopy_visitor(ypObject *x, void *memo)
 
 ypObject *yp_deepcopy(ypObject *x) { return _yp_deepcopy(x, _yp_sametype_deepcopy_visitor); }
 
-// TODO CONTAINER_INLINE objects won't release any of their memory on invalidation.  This is a
-// tradeoff in the interests of reducing individual allocations.  Perhaps there should be a limit
+// TODO CONTAINER_INLINE objects won't release any of their memory on invalidation. This is a
+// tradeoff in the interests of reducing individual allocations. Perhaps there should be a limit
 // on how large to make CONTAINER_INLINE objects, or perhaps we should try to shrink the
 // invalidated object in-place (if supported by the heap).
 // TODO Should attempting to invalidate an immortal be an error?
@@ -3465,16 +3465,16 @@ void yp_deepinvalidate(ypObject **x)
  *************************************************************************************************/
 #pragma region comparison
 
-// Returns 1 if the object is yp_True, else 0.  b must be a bool or an exception.
+// Returns 1 if the object is yp_True, else 0. b must be a bool or an exception.
 #define ypBool_IS_TRUE_C(b) ((b) == yp_True)
 
-// Returns 1 if the object is yp_False, else 0.  b must be a bool or an exception.
+// Returns 1 if the object is yp_False, else 0. b must be a bool or an exception.
 #define ypBool_IS_FALSE_C(b) ((b) == yp_False)
 
 // Returns yp_True if cond is true (non-zero), else yp_False.
 #define ypBool_FROM_C(cond) ((cond) ? yp_True : yp_False)
 
-// yp_not as a macro.  b must be a bool or an exception.
+// yp_not as a macro. b must be a bool or an exception.
 // XXX b should be a variable, _not_ an expression, as it's evaluated up to three times
 // clang-format off
 #define ypBool_NOT(b) ( (b) == yp_True ? yp_False : \
@@ -3807,7 +3807,7 @@ static ypTypeObject ypInvalidated_Type = {
 #pragma region exception
 
 // TODO A nohtyP.h macro to get exception info as a string, include file/line info of the place
-// the macro is checked.  Something to make reporting exceptions easier for the user of nohtyP.
+// the macro is checked. Something to make reporting exceptions easier for the user of nohtyP.
 
 #define _ypException_NAME(e) (((ypExceptionObject *)e)->name)
 #define _ypException_SUPER(e) (((ypExceptionObject *)e)->super)
@@ -4860,9 +4860,9 @@ static yp_int_t _yp_mulL_minint(yp_int_t y, ypObject **exc)
     return_yp_CEXC_ERR(0, exc, yp_OverflowError);
 }
 
-// Special case of yp_mulL where both x and y are positive, or zero.  Returns yp_INT_T_MIN if
+// Special case of yp_mulL where both x and y are positive, or zero. Returns yp_INT_T_MIN if
 // x*y overflows to _exactly_ that value; it will be up to the caller to determine if this is
-// a valid result.  All other overflows will return a negative number strictly larger than
+// a valid result. All other overflows will return a negative number strictly larger than
 // yp_INT_T_MIN.
 // TODO It would be easier just to check "x > max/y"...how does the performance compare, though?
 static yp_int_t _yp_mulL_posints(yp_int_t x, yp_int_t y)
@@ -4924,7 +4924,7 @@ static yp_int_t _yp_mulL_posints(yp_int_t x, yp_int_t y)
     return yp_UINT_MATH(result_hi, +, result_lo);
 }
 
-// Python 2.7's int_mul uses the phrase "close enough", which scares me.  I prefer the method
+// Python 2.7's int_mul uses the phrase "close enough", which scares me. I prefer the method
 // described at http://www.fefe.de/intof.html, although it requires abs(x) and abs(y), meaning
 // we need to handle yp_INT_T_MIN specially because we can't negate it.
 yp_int_t yp_mulL(yp_int_t x, yp_int_t y, ypObject **exc)
@@ -5001,13 +5001,13 @@ void yp_divmodL(yp_int_t x, yp_int_t y, yp_int_t *_div, yp_int_t *_mod, ypObject
      * for an example of overflow, take x = LONG_MIN, y = 5 or x =
      * LONG_MAX, y = -5.)  However, x - xdivy*y is always
      * representable as a long, since it lies strictly between
-     * -abs(y) and abs(y).  We add casts to avoid intermediate
+     * -abs(y) and abs(y). We add casts to avoid intermediate
      * overflow.
      */
     xmody = yp_UINT_MATH(x, -, yp_UINT_MATH(xdivy, *, y));
     /* If the signs of x and y differ, and the remainder is non-0,
      * C89 doesn't define whether xdivy is now the floor or the
-     * ceiling of the infinitely precise quotient.  We want the floor,
+     * ceiling of the infinitely precise quotient. We want the floor,
      * and we have it iff the remainder's sign matches y's.
      */
     if (xmody && ((y ^ xmody) < 0)) {  // i.e. and signs differ
@@ -5053,7 +5053,7 @@ yp_int_t yp_powL3(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc)
              * The (unsigned long) cast below ensures that the multiplication
              * is interpreted as an unsigned operation rather than a signed one
              * (C99 6.3.1.8p1), thus avoiding the perils of undefined behaviour
-             * from signed arithmetic overflow (C99 6.5p5).  See issue #12973.
+             * from signed arithmetic overflow (C99 6.5p5). See issue #12973.
              */
             result = yp_UINT_MATH(result, *, temp);
             if (temp == 0) break;  // Avoid result / 0
@@ -5629,8 +5629,8 @@ static yp_int_t yp_index_asintC(ypObject *x, ypObject **exc)
     return_yp_CEXC_BAD_TYPE(0, exc, x);
 }
 
-// Defines the conversion functions.  Overflow checking is done by first truncating the value then
-// seeing if it equals the stored value.  Note that when yp_asintC raises an exception, it returns
+// Defines the conversion functions. Overflow checking is done by first truncating the value then
+// seeing if it equals the stored value. Note that when yp_asintC raises an exception, it returns
 // zero, which can be represented in every integer type, so we won't override any yp_TypeError
 // errors.
 // TODO review http://blog.reverberate.org/2012/12/testing-for-integer-overflow-in-c-and-c.html
@@ -5694,7 +5694,7 @@ static yp_hash_t yp_index_ashashC(ypObject *x, ypObject **exc) { return yp_index
 
 // TODO Make this a public API?
 // Similar to yp_int and yp_asintC, but raises yp_ArithmeticError rather than truncating a float
-// toward zero.  An important property is that yp_int_exact(x) will equal x.
+// toward zero. An important property is that yp_int_exact(x) will equal x.
 // XXX Inspired by Python's Decimal.to_integral_exact; yp_ArithmeticError may be replaced with a
 // more-specific sub-exception in the future
 // FIXME Decimal.to_integral_exact doesn't raise an error: it rounds! Python is tricky as to where
@@ -6148,12 +6148,12 @@ yp_int_t yp_asintLF(yp_float_t x, ypObject **exc)
     yp_float_t wholepart;  // integral portion of x, rounded toward 0
 
     (void)modf(x, &wholepart);
-    /* Try to get out cheap if this fits in a Python int.  The attempt
+    /* Try to get out cheap if this fits in a Python int. The attempt
      * to cast to long must be protected, as C doesn't define what
-     * happens if the double is too big to fit in a long.  Some rare
+     * happens if the double is too big to fit in a long. Some rare
      * systems raise an exception then (RISCOS was mentioned as one,
      * and someone using a non-default option on Sun also bumped into
-     * that).  Note that checking for >= and <= LONG_{MIN,MAX} would
+     * that). Note that checking for >= and <= LONG_{MIN,MAX} would
      * still be vulnerable:  if a long has more bits of precision than
      * a double, casting MIN/MAX to double may yield an approximation,
      * and if that's rounded up, then, e.g., wholepart=LONG_MAX+1 would
@@ -6189,7 +6189,7 @@ static yp_int_t yp_asint_exactLF(yp_float_t x, ypObject **exc)
  *************************************************************************************************/
 #pragma region sequence
 
-// Using the given length, adjusts negative indices to positive.  Returns false if the adjusted
+// Using the given length, adjusts negative indices to positive. Returns false if the adjusted
 // index is out-of-bounds, else true.
 static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 {
@@ -6226,7 +6226,7 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 #endif
 
 // Using the given length, in-place converts the given start/stop/step values to valid indices, and
-// also calculates the length of the slice.  Returns yp_ValueError if *step is zero, else yp_None;
+// also calculates the length of the slice. Returns yp_ValueError if *step is zero, else yp_None;
 // there are no out-of-bounds errors with slices.
 // XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
 // yp_SLICE_USELEN is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
@@ -6276,7 +6276,7 @@ static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp
 }
 
 // Using the given _adjusted_ values, in-place converts the given start/stop/step values to the
-// inverse slice, where *step=-(*step).  slicelength must be >0 (slicelength==0 is a no-op).
+// inverse slice, where *step=-(*step). slicelength must be >0 (slicelength==0 is a no-op).
 // XXX Adapted from Python's list_ass_subscript
 // XXX Check for the empty slice case first
 static void ypSlice_InvertIndicesC(
@@ -6297,13 +6297,13 @@ static void ypSlice_InvertIndicesC(
     *step = -(*step);
 }
 
-// Returns the index of the i'th item in the slice with the given adjusted start/step values.  i
+// Returns the index of the i'th item in the slice with the given adjusted start/step values. i
 // must be in range(slicelength).
 #define ypSlice_INDEX(start, step, i) ((start) + (i) * (step))
 
-// Used by tp_repeat et al to perform the necessary memcpy's.  data must be allocated to hold
+// Used by tp_repeat et al to perform the necessary memcpy's. data must be allocated to hold
 // factor*n_size objects, the bytes to repeat must be in the first n_size bytes of data, and the
-// rest of data must not contain any references (they will be overwritten).  Cannot fail.
+// rest of data must not contain any references (they will be overwritten). Cannot fail.
 // XXX Handle the "empty" case (factor<1 or n_size<1) before calling this function
 static void _ypSequence_repeat_memcpy(void *_data, yp_ssize_t factor, yp_ssize_t n_size)
 {
@@ -6319,7 +6319,7 @@ static void _ypSequence_repeat_memcpy(void *_data, yp_ssize_t factor, yp_ssize_t
 }
 
 // Used to remove elements from an array containing length elements, each of elemsize bytes. start,
-// stop, step, and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC.  Any
+// stop, step, and slicelength must be the _adjusted_ values from ypSlice_AdjustIndicesC. Any
 // references in the removed elements must have already been discarded.
 // XXX Check for the empty slice and total slice cases first
 static void _ypSlice_delslice_memmove(void *array, yp_ssize_t length, yp_ssize_t elemsize,
@@ -6397,10 +6397,10 @@ static ypObject *_ypSequence_delitem(ypObject *x, ypObject *key)
 typedef struct _yp_codecs_error_handler_params_t {
     yp_ssize_t sizeof_struct;  // Set to yp_sizeof(yp_codecs_error_handler_params_t) on allocation
 
-    // Details of the error.  All references, va_lists, and pointers are borrowed and should not be
+    // Details of the error. All references, va_lists, and pointers are borrowed and should not be
     // replaced.
     // TODO Python's error handlers are flexible enough to take any exception object containing
-    // any data.  Make sure this, while optimized for Unicode, can do the same.
+    // any data. Make sure this, while optimized for Unicode, can do the same.
     ypObject *exc;       // yp_UnicodeEncodeError, *DecodeError, or *TranslateError
     ypObject *encoding;  // The unaliased name of the encoding that raised the error
     struct {             // A to-be-formatted string+args describing the specific codec error
@@ -6424,7 +6424,7 @@ typedef struct _yp_codecs_error_handler_params_t {
     yp_ssize_t end;    // The index after the last invalid data in source
 } yp_codecs_error_handler_params_t;
 
-// Error handler.  Either raise params->exc, or a different error, via *replacement.  Otherwise,
+// Error handler. Either raise params->exc, or a different error, via *replacement. Otherwise,
 // set *replacement to the object that replaces the bad data, and *new_position to the index at
 // which to restart encoding/decoding.
 // XXX It's possible for *new_position to be less than or even greater than params->end on output
@@ -6434,8 +6434,8 @@ typedef void (*yp_codecs_error_handler_func_t)(
 
 // Registers the alias as an alternate name for the encoding and returns the immortal yp_None. Both
 // alias and encoding are normalized before being registered (lowercased, ' ' and '_' converted to
-// '-').  Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there is no
-// other protection against using encoding names as aliases.  Returns an exception on error.
+// '-'). Attempting to register "utf-8" as an alias will raise yp_ValueError; however, there is no
+// other protection against using encoding names as aliases. Returns an exception on error.
 static ypObject *yp_codecs_register_alias(ypObject *alias, ypObject *encoding);
 
 // Returns a new reference to the normalized, unaliased encoding name.
@@ -6443,15 +6443,15 @@ static ypObject *yp_codecs_register_alias(ypObject *alias, ypObject *encoding);
 // we want to be before releasing this API
 static ypObject *yp_codecs_lookup_alias(ypObject *alias);
 
-// Registers error_handler under the given name, and returns the immortal yp_None.  This handler
+// Registers error_handler under the given name, and returns the immortal yp_None. This handler
 // will be called on codec errors when name is specified as the errors parameter (see yp_encode3
-// for an example).  Returns an exception on error.
+// for an example). Returns an exception on error.
 // TODO Make error_handler a function object.
 static ypObject *yp_codecs_register_error(
         ypObject *name, yp_codecs_error_handler_func_t error_handler);
 
-// Returns the error_handler associated with the given name.  Raises yp_LookupError if the handler
-// cannot be found.  Sets *exc and returns the built-in "strict" handler on error (which may not
+// Returns the error_handler associated with the given name. Raises yp_LookupError if the handler
+// cannot be found. Sets *exc and returns the built-in "strict" handler on error (which may not
 // be the _registered_ "strict" handler.)
 // TODO We protect "utf-8" from being aliased; should we protect "strict"/etc?
 static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, ypObject **exc);
@@ -6481,9 +6481,9 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
 #define ypStringLib_SET_ALLOCLEN ypObject_SET_ALLOCLEN
 #define ypStringLib_INLINE_DATA(s) (((ypStringLibObject *)s)->ob_inline_data)
 
-// The maximum possible alloclen and length of any string object.  While Latin-1 could technically
+// The maximum possible alloclen and length of any string object. While Latin-1 could technically
 // allow four times as much data as ucs-4, for simplicity we use one maximum length for all
-// encodings.  (Consider that an element in the largest Latin-1 chrarray could be replaced with a
+// encodings. (Consider that an element in the largest Latin-1 chrarray could be replaced with a
 // ucs-4 character, thus quadrupling its size.)
 // XXX On the flip side, this means it's possible to create a string that, when encoded, cannot
 // fit in a bytes object, as it'll be larger than LEN_MAX.
@@ -6550,17 +6550,17 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
                 (ypStringLib_LEN(s) - (src) + 1) << ypStringLib_ENC(s)->sizeshift);                \
     } while (0)
 
-// Gets the ordinal at src[src_i].  src_i must be in range(len): no bounds checking is performed.
+// Gets the ordinal at src[src_i]. src_i must be in range(len): no bounds checking is performed.
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
 typedef yp_uint32_t (*ypStringLib_getindexXfunc)(const void *src, yp_ssize_t src_i);
 
-// Sets dest[dest_i] to value.  dest_i must be in range(alloclen): no bounds checking is performed.
+// Sets dest[dest_i] to value. dest_i must be in range(alloclen): no bounds checking is performed.
 // XXX dest's encoding must be able to store value
 // TODO Is there a declaration we could give this (or the definitions) to make them faster?
 typedef void (*ypStringLib_setindexXfunc)(void *dest, yp_ssize_t dest_i, yp_uint32_t value);
 
 // XXX In general for this table, make sure you do not use type codes with the wrong
-// ypStringLib_ENC_* value.  ypStringLib_ENC_CODE_BYTES should only be used for bytes, and
+// ypStringLib_ENC_* value. ypStringLib_ENC_CODE_BYTES should only be used for bytes, and
 // vice-versa.
 // XXX max_char may be larger than ypStringLib_MAX_UNICODE
 typedef struct {
@@ -6881,7 +6881,7 @@ yp_STATIC_ASSERT(((_yp_uint_t)ypStringLib_TYPE_CHECKENC_1FROM4_MASK) ==
 yp_STATIC_ASSERT(((_yp_uint_t)ypStringLib_TYPE_CHECKENC_2FROM4_MASK) ==
                          ypStringLib_TYPE_CHECKENC_2FROM4_MASK,
         checkenc_2from4_mask_matches_type);
-// Returns true if the ucs-4 string can be encoded in the encoding matching mask.  *p will point
+// Returns true if the ucs-4 string can be encoded in the encoding matching mask. *p will point
 // to the location that failed the check, or to *end on success.
 // XXX On first look, this shares a lot of code with _ypStringLib_checkenc_contiguous_ucs_2.
 // However, the two "unaligned elements" loops are different (16- vs 32-bit reads).
@@ -7154,7 +7154,7 @@ static ypObject *_ypStr_asitemC(
 
 // Return a new bytes/bytearray/str/chrarray object that can fit the given requiredLen plus the null
 // terminator. If type is immutable and alloclen_fixed is true (indicating the object will never
-// grow), the data is placed inline with one allocation.  enc_code must agree with type.
+// grow), the data is placed inline with one allocation. enc_code must agree with type.
 // XXX Remember to add the null terminator
 // XXX Check for the empty immutable, negative len, and >max len cases first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
@@ -7216,7 +7216,7 @@ static ypObject *ypStringLib_new_empty(int type)
     }
 }
 
-// Returns a new copy of s of the given type.  If type is immutable and alloclen_fixed is true
+// Returns a new copy of s of the given type. If type is immutable and alloclen_fixed is true
 // (indicating the object will never grow), the data is placed inline with one allocation.
 // XXX Check for the possibility of a lazy shallow copy before calling this function
 // XXX Check for the empty immutable case first
@@ -7273,7 +7273,7 @@ static ypObject *_ypStringLib_maybe_realloc(
         ypStringLib_SET_ALLOCLEN(s, haveBytes >> newEnc->sizeshift);
         return ypStringLib_DATA(s);
     } else {
-        // ypMem_REALLOC sets alloclen, but does not require it to be correct on input.  If it did,
+        // ypMem_REALLOC sets alloclen, but does not require it to be correct on input. If it did,
         // we'd need to adjust it to the new encoding first.
         return ypMem_REALLOC_CONTAINER_VARIABLE5(s, ypStringLibObject, requiredLen + 1, extra,
                 ypStringLib_ALLOCLEN_MAX, newEnc->elemsize);
@@ -7877,7 +7877,7 @@ static ypObject *ypStringLib_find(ypObject *s, void *x_data, yp_ssize_t x_len, y
     yp_uint8_t *s_rdata;   // remaining data
 
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
-    // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
     result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &s_rlen);
     if (yp_isexceptionC(result)) return result;
@@ -7989,7 +7989,7 @@ static ypObject *_ypStringLib_join_fromstring(ypObject *s, ypObject *x)
 }
 
 // Performs the necessary elemcopy's on behalf of ypStringLib_join, null-terminates, and updates
-// result's length.  Assumes adequate space has already been allocated, and that type checking on
+// result's length. Assumes adequate space has already been allocated, and that type checking on
 // seq's elements has already been performed.
 static void _ypStringLib_join_elemcopy(
         ypObject *result, ypObject *s, const ypQuickSeq_methods *seq, ypQuickSeq_state *state)
@@ -8106,7 +8106,7 @@ static ypObject *ypStringLib_join(
 
 // Calls the error handler with appropriate arguments, sets *newPos to the (adjusted) index at
 // which encoding should continue, and returns the replacement that should be concatenated onto the
-// encoded bytes (using ypStringLib_encode_extend_replacement, perhaps).  Returns exception on
+// encoded bytes (using ypStringLib_encode_extend_replacement, perhaps). Returns exception on
 // error (*newPos will be undefined).
 // XXX Adapted from Python's unicode_encode_call_errorhandler
 static ypObject *ypStringLib_encode_call_errorhandler(yp_codecs_error_handler_func_t errorHandler,
@@ -8151,8 +8151,8 @@ static ypObject *ypStringLib_encode_call_errorhandler(yp_codecs_error_handler_fu
 }
 
 // future_growth is an upper-bound estimate of the number of additional bytes, not including
-// the replacement text, that are expected to be added to encoded.  After appending, encoded will
-// have at least future_growth space available.  Does not null-terminate encoded.
+// the replacement text, that are expected to be added to encoded. After appending, encoded will
+// have at least future_growth space available. Does not null-terminate encoded.
 // TODO Rewrite to use ypStringLib_extend_fromstring? (Although, what about future_growth?)
 static ypObject *ypStringLib_encode_extend_replacement(
         ypObject *encoded, ypObject *replacement, yp_ssize_t future_growth)
@@ -8192,7 +8192,7 @@ static ypObject *ypStringLib_encode_extend_replacement(
 
 // Calls the error handler with appropriate arguments, sets *newPos to the (adjusted) index at
 // which decoding should continue, and returns the replacement that should be concatenated onto the
-// decoded string (using ypStringLib_decode_extend_replacement, perhaps).  Returns exception on
+// decoded string (using ypStringLib_decode_extend_replacement, perhaps). Returns exception on
 // error (*newPos will be undefined).
 // XXX Adapted from Python's unicode_decode_call_errorhandler_writer
 static ypObject *ypStringLib_decode_call_errorhandler(yp_codecs_error_handler_func_t errorHandler,
@@ -8234,8 +8234,8 @@ static ypObject *ypStringLib_decode_call_errorhandler(yp_codecs_error_handler_fu
 }
 
 // future_growth is an upper-bound estimate of the number of additional characters, not including
-// the replacement text, that are expected to be added to decoded.  After appending, decoded will
-// have at least future_growth space available.  Does not null-terminate decoded.
+// the replacement text, that are expected to be added to decoded. After appending, decoded will
+// have at least future_growth space available. Does not null-terminate decoded.
 // TODO Rewrite to use ypStringLib_extend_fromstring? (Although, what about future_growth?)
 static ypObject *ypStringLib_decode_extend_replacement(
         ypObject *decoded, ypObject *replacement, yp_ssize_t future_growth)
@@ -8276,7 +8276,7 @@ static ypObject *ypStringLib_decode_extend_replacement(
 
 // UTF-8 encoding and decoding functions
 
-// Returns the number of consecutive ascii bytes starting at start.  Valid for ascii, latin-1, and
+// Returns the number of consecutive ascii bytes starting at start. Valid for ascii, latin-1, and
 // utf-8 encodings.
 // XXX Adapted from Python's ascii_decode
 #define ypStringLib_ASCII_CHAR_MASK 0x8080808080808080ULL
@@ -8290,14 +8290,14 @@ static yp_ssize_t ypStringLib_count_ascii_bytes(const yp_uint8_t *start, const y
     // If we don't contain an aligned _yp_uint_t, jump to the end
     if (aligned_end - start < yp_sizeof(_yp_uint_t)) goto final_loop;
 
-    // Read the first few bytes until we're aligned.  We can return early because we're reading
+    // Read the first few bytes until we're aligned. We can return early because we're reading
     // byte-by-byte.
     while (!yp_IS_ALIGNED(p, yp_sizeof(_yp_uint_t))) {
         if (((yp_uint8_t)*p) & 0x80) return p - start;
         ++p;
     }
 
-    // Now read as many aligned ints as we can.  Remember that even though the CHAR_MASK test may
+    // Now read as many aligned ints as we can. Remember that even though the CHAR_MASK test may
     // fail, there may still be a few ascii bytes, so we still need to jump to the end.
     while (p < aligned_end) {
         _yp_uint_t value = *((_yp_uint_t *)p);
@@ -8318,7 +8318,7 @@ final_loop:
 #define ypStringLib_UTF_8_IS_CONTINUATION(ch) ((ch) >= 0x80 && (ch) < 0xC0)
 
 // _ypStringLib_decode_utf_8_inner_loop either returns one of these values, or the out-of-range
-// character (>0xFF) that was decoded (but not written to dest).  The "invalid continuation" values
+// character (>0xFF) that was decoded (but not written to dest). The "invalid continuation" values
 // (1, 2, and 3) are chosen so that the value gives the number of bytes that must be skipped.
 // clang-format off
 #define ypStringLib_UTF_8_DATA_END          (0u)    // aka success
@@ -8329,9 +8329,9 @@ final_loop:
 #define ypStringLib_UTF_8_INVALID_END       (5u)    // *unexpected* end of data
 // clang-format on
 
-// Appends the decoded bytes to dest, updating its length.  If a decoding error occurs, *source
+// Appends the decoded bytes to dest, updating its length. If a decoding error occurs, *source
 // will point to the start of the invalid sequence of bytes, and one of the above error codes will
-// be returned.  If a character is decoded that is too large to fit in dest's encoding, *source
+// be returned. If a character is decoded that is too large to fit in dest's encoding, *source
 // will point to the end of the (valid) sequence of bytes, the character will be returned, and
 // it will be up to the caller to reallocate dest *and* append the character.
 // XXX Don't forget to append the valid-but-too-large character to dest!
@@ -8543,7 +8543,7 @@ Return:
 }
 
 // Called when _ypStringLib_decode_utf_8_inner_loop can't fit the decoded character ch in the
-// current encoding.  This will up-convert dest to an encoding that can fit ch, then append ch.
+// current encoding. This will up-convert dest to an encoding that can fit ch, then append ch.
 // dest will have space for requiredLen characters plus the null terminator (make sure this
 // includes room for ch).
 // TODO Rewrite to call ypStringLib_push?
@@ -8580,7 +8580,7 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop(ypObject *dest, const yp_u
         yp_uint32_t ch = _ypStringLib_decode_utf_8_inner_loop(dest, &source, end);
 
         if (ch == ypStringLib_UTF_8_DATA_END) {
-            // That's it, everything's decoded.  Null-terminate the object and return.
+            // That's it, everything's decoded. Null-terminate the object and return.
             yp_ASSERT(source == end,
                     "_ypStringLib_decode_utf_8_inner_loop didn't end at the end...?");
             // TODO See how much wasted space is left here and if we should release some back to
@@ -8650,7 +8650,7 @@ static ypObject *_ypStringLib_decode_utf_8_outer_loop(ypObject *dest, const yp_u
 }
 
 
-// Called on a null source.  Returns a (null-terminated) string of null characters of the given
+// Called on a null source. Returns a (null-terminated) string of null characters of the given
 // length.
 static ypObject *_ypStringLib_decode_utf_8_onnull(int type, yp_ssize_t len)
 {
@@ -8662,7 +8662,7 @@ static ypObject *_ypStringLib_decode_utf_8_onnull(int type, yp_ssize_t len)
     return newS;
 }
 
-// Called when source starts with at least one ascii character.  Returns the decoded string object.
+// Called when source starts with at least one ascii character. Returns the decoded string object.
 static ypObject *_yp_chrC(int type, yp_int_t i);
 static ypObject *_ypStringLib_decode_utf_8_ascii_start(
         int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors)
@@ -8713,12 +8713,12 @@ static ypObject *_ypStringLib_decode_utf_8_ascii_start(
     return dest;
 }
 
-// Should only be called from  _ypStringLib_decode_utf_8.  Using only the inline buffer of dest,
-// decode the first "few" characters in *source.  As in _ypStringLib_decode_utf_8_inner_loop,
+// Should only be called from  _ypStringLib_decode_utf_8. Using only the inline buffer of dest,
+// decode the first "few" characters in *source. As in _ypStringLib_decode_utf_8_inner_loop,
 // returns either an error code, or the character that could not be written to dest's inline
 // buffer; the latter thus indicates what encoding to start with when allocating the separate
-// buffer.  *source will point to either the error location, or the byte after the returned
-// character; dest may be re-encoded in-place.  On input, dest must be empty and latin-1, and
+// buffer. *source will point to either the error location, or the byte after the returned
+// character; dest may be re-encoded in-place. On input, dest must be empty and latin-1, and
 // *source must be larger than dest's inline buffer (otherwise there's no point in the precheck).
 static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
         ypObject *dest, const yp_uint8_t **source)
@@ -8728,8 +8728,8 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     // strings "usually" entirely latin-1, or ucs-2, or ucs-4?  Isn't it enough just to check the
     // first, I dunno, 16 characters?  Doing this won't save on allocations, but it *will* save
     // on the memcpy required to move to a separate buffer.
-    // ...But wait, consider an HTML page.  It's going to start with a bunch of ASCII, then
-    // anything ucs-2 or ucs-4 will be in the middle.  What use cases am I optimizing for:
+    // ...But wait, consider an HTML page. It's going to start with a bunch of ASCII, then
+    // anything ucs-2 or ucs-4 will be in the middle. What use cases am I optimizing for:
     // converting a whole document, or small strings one-at-a-time?
     const yp_uint8_t *fake_end = (*source) + dest_maxinline;
     yp_uint32_t       ch;
@@ -8745,7 +8745,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     }
 
     // To do anything useful, we need room to upconvert, write ch, then write at least one more
-    // character.  If we can't, we bail.
+    // character. If we can't, we bail.
     dest_maxinline = (ypStringLib_ALLOCLEN(dest) / 2) - 1;
     dest_len = ypStringLib_LEN(dest);
     // -1 for ch, then -1 to make sure we can detect at least one more character
@@ -8762,12 +8762,12 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
     ypStringLib_ENC_CODE(dest) = ypStringLib_ENC_CODE_UCS_2;
     ypStringLib_SET_ALLOCLEN(dest, ypStringLib_ALLOCLEN(dest) / 2);
 
-    // We are at least ucs-2: see if we are actually ucs-4.  Recall that source was modified above.
+    // We are at least ucs-2: see if we are actually ucs-4. Recall that source was modified above.
     fake_end = (*source) + (dest_maxinline - dest_len);
     return _ypStringLib_decode_utf_8_inner_loop(dest, source, fake_end);
 }
 
-// Called by ypStringLib_decode_frombytesC_utf_8 in the general case.  Returns the decoded string
+// Called by ypStringLib_decode_frombytesC_utf_8 in the general case. Returns the decoded string
 // object.
 static ypObject *_ypStringLib_decode_utf_8(
         int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors)
@@ -8809,11 +8809,11 @@ static ypObject *_ypStringLib_decode_utf_8(
 
     } else {
         // We've reached the end of what we can decode into the inline buffer, or there was a
-        // decoding error.  Either way, resize and move on to outer_loop.
+        // decoding error. Either way, resize and move on to outer_loop.
         // XXX That's actually a lie: we've reached fake_end, but it's possible we haven't decoded
-        // as many characters as we estimated and there's still room in the inline buffer.  We
+        // as many characters as we estimated and there's still room in the inline buffer. We
         // _could_ keep adjusting fake_end until there's no more room, but I don't think this is
-        // advantageous.  Don't the first few characters usually determine the encoding?
+        // advantageous. Don't the first few characters usually determine the encoding?
         // XXX Can't overflow because we've checked len<=MAX, and len is worst-case num of chars
         dest_requiredLen = ypStringLib_LEN(dest) /*ch isn't a char*/ + (end - source);
         if (dest_requiredLen > ypStringLib_ALLOCLEN(dest) - 1) {
@@ -8836,12 +8836,12 @@ outer_loop:
 }
 
 // Decodes the len bytes of utf-8 at source according to errors, and returns a new string of the
-// given type.  If source is NULL it is considered as having all null bytes; len cannot be
+// given type. If source is NULL it is considered as having all null bytes; len cannot be
 // negative or greater than ypStringLib_LEN_MAX.
 // XXX Allocation-wise, the worst-case through the code would be a completely ucs-4 string, as we'd
 // allocate len characters (len*4 bytes) for the decoding, but would only decode len/4 characters
 // TODO This is TERRIBLE, because if a string has more than a couple ucs-4 characters, it's
-// probably *mostly* ucs-4 characters.  Is there a quick way to scan the _entire_ string?  Or can
+// probably *mostly* ucs-4 characters. Is there a quick way to scan the _entire_ string?  Or can
 // we just trim the excess once we reach the end?
 // XXX Runtime-wise, the worst-case would probably be a string that starts completely Latin-1 (each
 // character is a call to enc->setindexX), followed by a ucs-2 then a ucs-4 character (each
@@ -9029,7 +9029,7 @@ static ypObject *_ypStringLib_encode_utf_8(int type, ypObject *source, ypObject 
             }
 
             // We can now update our expectation of how many more bytes will be added: it's the
-            // number of characters left to encode (remembering i was modified above).  Remember
+            // number of characters left to encode (remembering i was modified above). Remember
             // ypStringLib_encode_extend_replacement needs dest's len set appropriately.
             ypStringLib_SET_LEN(dest, d - dest_data);
             result = ypStringLib_encode_extend_replacement(
@@ -9105,12 +9105,12 @@ static ypStringLib_getindexXfunc _yp_codecs_strenc2getindexX(ypObject *encoding)
     return NULL;
 }
 
-// Set containing the standard encodings like yp_s_utf_8.  Instead of a series of yp_eq calls,
+// Set containing the standard encodings like yp_s_utf_8. Instead of a series of yp_eq calls,
 // yp_set_getintern is used to return one of these objects, which is then compared by identity
-// (i.e. ptr value).  Initialized in _yp_codecs_initialize.
+// (i.e. ptr value). Initialized in _yp_codecs_initialize.
 static ypObject *_yp_codecs_standard = NULL;
 
-// Dict mapping normalized aliases to "official" names.  Initialized in _yp_codecs_initialize.
+// Dict mapping normalized aliases to "official" names. Initialized in _yp_codecs_initialize.
 // TODO Can we statically-allocate this dict?  Perhaps the standard aliases can fit in the
 // inline array, and if it grows past that then we allocate on the heap.
 static ypObject *_yp_codecs_alias2encoding = NULL;
@@ -9221,7 +9221,7 @@ static ypObject *yp_codecs_lookup_alias(ypObject *alias)
 // (this way, utf-8 can return a bytearray as required by yp_bytearray3)
 
 
-// Dict mapping error handler names to their functions.  Initialized in _yp_codecs_initialize.
+// Dict mapping error handler names to their functions. Initialized in _yp_codecs_initialize.
 // TODO Can we statically-allocate this dict?  Perhaps the standard error handlers can fit in the
 // inline array, and if it grows past that then we allocate on the heap.
 static ypObject *_yp_codecs_errors2handler = NULL;
@@ -9362,7 +9362,7 @@ static ypObject *_yp_codecs_surrogatepass_errors_onencode(
         yp_ssize_t badEnd;      // index of end of surrogates to replace from source
         yp_ssize_t badLen = 0;  // number of surrogate characters to replace
 
-        // Count the number of consecutive surrogates.  Stop at the first non-surrogate, or at the
+        // Count the number of consecutive surrogates. Stop at the first non-surrogate, or at the
         // end of the buffer.
         for (i = params->start; i < params->source.data.len; i++) {
             yp_int_t ch = getindexX(params->source.data.ptr, i);
@@ -9418,8 +9418,8 @@ static ypObject *_yp_codecs_surrogatepass_errors_ondecode(
         yp_ssize_t badEnd;      // index of end of surrogates to replace from source
         yp_ssize_t repLen = 0;  // number of surrogate characters (once decoded) to replace
 
-        // Count the number of consecutive surrogates.  Stop at the first non-surrogate, or at the
-        // end of the buffer.  All surrogates are 3 bytes long.
+        // Count the number of consecutive surrogates. Stop at the first non-surrogate, or at the
+        // end of the buffer. All surrogates are 3 bytes long.
         for (i = params->start; params->source.data.len - i >= 3; i += 3) {
             if (!_yp_codecs_UTF8_SURROGATE_PRECHECK(source_data + i)) break;
             ch = _yp_codecs_UTF8_SURROGATE_DECODE(source_data + i);
@@ -9526,13 +9526,13 @@ yp_STATIC_ASSERT(yp_offsetof(ypBytesObject, ob_inline_data) % yp_MAX_ALIGNMENT =
     } while (0)
 
 // Moves the bytes from [src:] to the index dest; this can be used when deleting bytes, or
-// inserting bytes (the new space is uninitialized).  Assumes enough space is allocated for the
-// move.  Recall that memmove handles overlap.  Also adjusts null terminator.
+// inserting bytes (the new space is uninitialized). Assumes enough space is allocated for the
+// move. Recall that memmove handles overlap. Also adjusts null terminator.
 #define ypBytes_ELEMMOVE(b, dest, src) \
     yp_memmove(ypBytes_DATA(b) + (dest), ypBytes_DATA(b) + (src), ypBytes_LEN(b) - (src) + 1);
 
 // When byte arrays are accepted from C, a negative len indicates that strlen(source) should be
-// used as the length.  This function updates *len accordingly.  Returns false if the final value
+// used as the length. This function updates *len accordingly. Returns false if the final value
 // of *len would be larger than ypBytes_LEN_MAX, in which case *len is undefined and
 // yp_MemorySizeOverflowError should probably be returned.
 static int ypBytes_adjust_lenC(const yp_uint8_t *source, yp_ssize_t *len)
@@ -9850,7 +9850,7 @@ static ypObject *bytes_count(
     if (yp_isexceptionC(result)) return result;
 
     // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
-    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings.  See
+    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
     result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &b_rlen);
     if (yp_isexceptionC(result)) return result;
@@ -9909,7 +9909,7 @@ static ypObject *_bytes_tailmatch(
     if (ypObject_TYPE_PAIR_CODE(x) != ypBytes_CODE) return_yp_BAD_TYPE(x);
 
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
-    // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
     result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &end, &step, &slice_len);
     if (yp_isexceptionC(result)) return result;
@@ -10060,7 +10060,7 @@ static ypObject *bytes_gt(ypObject *b, ypObject *x)
     return ypBool_FROM_C(_ypBytes_relative_cmp(b, x) > 0);
 }
 
-// Returns true (1) if the two bytes/bytearrays are equal.  Size is a quick way to check equality.
+// Returns true (1) if the two bytes/bytearrays are equal. Size is a quick way to check equality.
 // TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
 static int _ypBytes_are_equal(ypObject *b, ypObject *x)
 {
@@ -10824,7 +10824,7 @@ static ypObject *str_count(
         ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *n)
 {
     // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
-    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings.  See
+    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
     return yp_NotImplementedError;
 }
@@ -10876,7 +10876,7 @@ static ypObject *_str_tailmatch(
     if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
 
     // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
-    // Python behaves peculiarly when end<start in certain edge cases involving empty strings.  See
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
     result = ypSlice_AdjustIndicesC(ypStr_LEN(s), &start, &end, &step, &slice_len);
     if (yp_isexceptionC(result)) return result;
@@ -11046,7 +11046,7 @@ static ypObject *str_gt(ypObject *s, ypObject *x)
     return ypBool_FROM_C(_ypStr_relative_cmp(s, x) > 0);
 }
 
-// Returns true (1) if the two str/chrarrays are equal.  Size is a quick way to check equality.
+// Returns true (1) if the two str/chrarrays are equal. Size is a quick way to check equality.
 // TODO Would the pre-computed hash be a quick check for inequality before the memcmp?
 static int _ypStr_are_equal(ypObject *s, ypObject *x)
 {
@@ -11520,7 +11520,7 @@ ypObject *yp_chrC(yp_int_t i) { return _yp_chrC(ypStr_CODE, i); }
 #pragma region string_methods
 
 // XXX Since it's not likely that anything other than str and bytes will need to implement these
-// methods, they are left out of the type's method table.  This may change in the future.
+// methods, they are left out of the type's method table. This may change in the future.
 // TODO Since "this may change in the future", perhaps we should raise yp_MethodError instead.
 
 static const ypStringLib_encinfo ypStringLib_encs[4] = {
@@ -11778,8 +11778,8 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
 #define ypTuple_LEN_MAX ypTuple_ALLOCLEN_MAX
 
 // Moves the elements from [src:] to the index dest; this can be used when deleting items (they
-// must be discarded first), or inserting (the new space is uninitialized).  Assumes enough space
-// is allocated for the move.  Recall that memmove handles overlap.
+// must be discarded first), or inserting (the new space is uninitialized). Assumes enough space
+// is allocated for the move. Recall that memmove handles overlap.
 #define ypTuple_ELEMMOVE(sq, dest, src)                               \
     yp_memmove(ypTuple_ARRAY(sq) + (dest), ypTuple_ARRAY(sq) + (src), \
             (ypTuple_LEN(sq) - (src)) * yp_sizeof(ypObject *));
@@ -11790,7 +11790,7 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
         yp_ASSERT(alloclen <= ypTuple_ALLOCLEN_MAX, "alloclen cannot be >max"); \
     } while (0)
 
-// Return a new tuple/list object with the given alloclen.  If type is immutable and
+// Return a new tuple/list object with the given alloclen. If type is immutable and
 // alloclen_fixed is true (indicating the object will never grow), the data is placed inline
 // with one allocation.
 // XXX Check for the yp_tuple_empty and ypTuple_ALLOCLEN_MAX cases first
@@ -11838,9 +11838,9 @@ static ypObject *_ypTuple_new_detached_array(yp_ssize_t alloclen, ypTuple_detach
 }
 
 // Clears sq, placing the array of objects and other metadata in detached so that the array can be
-// reattached with _ypTuple_attach_array.  This is used by sort and other methods that may execute
+// reattached with _ypTuple_attach_array. This is used by sort and other methods that may execute
 // arbitrary code (i.e. yp_lt) while modifying the list, to prevent that arbitrary code from also
-// modifying the list.  Returns an exception on error, in which case sq is not modified and detached
+// modifying the list. Returns an exception on error, in which case sq is not modified and detached
 // is invalid.
 // XXX Handle the "empty list" case before calling this function.
 // TODO Would a flag on the object to prevent mutations work better? We need it for iterating...
@@ -11885,7 +11885,7 @@ static void _ypTuple_free_detached(ypTuple_detached *detached)
 
 // Reverses the effect of _ypTuple_detach_array, reattaching the array to sq and freeing detached.
 // If it is detected that sq was modified since being detached, sq will be cleared before
-// re-attachment, and yp_ValueError will be raised.  (If clearing sq fails, which is very unlikely,
+// re-attachment, and yp_ValueError will be raised. (If clearing sq fails, which is very unlikely,
 // the contents of sq is undefined and a different exception may be raised.) Also works to attach
 // arrays created by _ypTuple_new_detached_array.
 // XXX sq must have been created with ypMem_MALLOC_CONTAINER_VARIABLE (alloclen_fixed=FALSE);
@@ -12015,15 +12015,15 @@ static ypObject *_ypTuple_deepcopy(int type, ypObject *x, visitfunc copy_visitor
     return sq;
 }
 
-// Used by tp_repeat et al to perform the necessary memcpy's.  sq's array must be allocated
+// Used by tp_repeat et al to perform the necessary memcpy's. sq's array must be allocated
 // to hold factor*n objects, the objects to repeat must be in the first n elements of the array,
-// and the rest of the array must not contain any references (they will be overwritten).  Further,
-// factor and n must both be greater than zero.  Cannot fail.
+// and the rest of the array must not contain any references (they will be overwritten). Further,
+// factor and n must both be greater than zero. Cannot fail.
 // XXX Handle the "empty" case (factor<1 or n<1) before calling this function
 #define _ypTuple_repeat_memcpy(sq, factor, n) \
     _ypSequence_repeat_memcpy(ypTuple_ARRAY(sq), (factor), (n)*yp_sizeof(ypObject *))
 
-// Called on push/append, extend, or irepeat to increase the allocated size of the tuple.  Does not
+// Called on push/append, extend, or irepeat to increase the allocated size of the tuple. Does not
 // update ypTuple_LEN.
 // XXX Check for the "same size" case first
 static ypObject *_ypTuple_extend_grow(ypObject *sq, yp_ssize_t required, yp_ssize_t extra)
@@ -12215,8 +12215,8 @@ static ypObject *_ypTuple_concat_fromtuple(ypObject *sq, ypObject *x)
 }
 
 // Called by setslice to discard the items at sq[start:stop] and shift the items at sq[stop:] to
-// start at sq[stop+growBy]; the pointers at sq[start:stop+growBy] will be uninitialized.  sq must
-// have enough space allocated for the move. Updates ypTuple_LEN.  Cannot fail.
+// start at sq[stop+growBy]; the pointers at sq[start:stop+growBy] will be uninitialized. sq must
+// have enough space allocated for the move. Updates ypTuple_LEN. Cannot fail.
 static void _ypTuple_setslice_elemmove(
         ypObject *sq, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t growBy)
 {
@@ -12229,8 +12229,8 @@ static void _ypTuple_setslice_elemmove(
     ypTuple_SET_LEN(sq, ypTuple_LEN(sq) + growBy);
 }
 
-// Called on a setslice of step 1 and positive growBy, or an insert.  Similar to
-// _ypTuple_setslice_elemmove, except sq will grow if it doesn't have enough space allocated.  On
+// Called on a setslice of step 1 and positive growBy, or an insert. Similar to
+// _ypTuple_setslice_elemmove, except sq will grow if it doesn't have enough space allocated. On
 // error, sq is not modified.
 // XXX start and stop must be adjusted values.
 static ypObject *_ypTuple_setslice_grow(
@@ -12616,7 +12616,7 @@ static ypObject *list_irepeat(ypObject *sq, yp_ssize_t factor)
     return yp_None;
 }
 
-// TODO Python's ins1 does an item-by-item copy rather than a memmove.  Contribute an optimization
+// TODO Python's ins1 does an item-by-item copy rather than a memmove. Contribute an optimization
 // back to Python.
 static ypObject *list_insert(ypObject *sq, yp_ssize_t i, ypObject *x)
 {
@@ -12675,7 +12675,7 @@ static ypObject *tuple_frozen_deepcopy(ypObject *sq, visitfunc copy_visitor, voi
 static ypObject *tuple_bool(ypObject *sq) { return ypBool_FROM_C(ypTuple_LEN(sq)); }
 
 // Sets *i to the index in sq and x of the first differing element, or -1 if the elements are equal
-// up to the length of the shortest object.  Returns exception on error.
+// up to the length of the shortest object. Returns exception on error.
 static ypObject *_ypTuple_cmp_first_difference(ypObject *sq, ypObject *x, yp_ssize_t *i)
 {
     yp_ssize_t min_len;
@@ -12711,7 +12711,7 @@ _ypTuple_RELATIVE_CMP_FUNCTION(le, <=);
 _ypTuple_RELATIVE_CMP_FUNCTION(ge, >=);
 _ypTuple_RELATIVE_CMP_FUNCTION(gt, >);
 
-// Returns yp_True if the two tuples/lists are equal.  Size is a quick way to check equality.
+// Returns yp_True if the two tuples/lists are equal. Size is a quick way to check equality.
 // TODO comparison functions can recurse, just like currenthash...fix!
 static ypObject *tuple_eq(ypObject *sq, ypObject *x)
 {
@@ -12722,7 +12722,7 @@ static ypObject *tuple_eq(ypObject *sq, ypObject *x)
     if (ypObject_TYPE_PAIR_CODE(x) != ypTuple_CODE) return yp_ComparisonNotImplemented;
     if (sq_len != ypTuple_LEN(x)) return yp_False;
 
-    // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
+    // We need to inspect all our items for equality, which could be time-intensive. It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when sq!=x.
     if (ypObject_CACHED_HASH(sq) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
@@ -12730,8 +12730,8 @@ static ypObject *tuple_eq(ypObject *sq, ypObject *x)
         return yp_False;
     }
     // TODO What if we haven't cached this hash yet, but we could?  Calculating the hash now could
-    // speed up future comparisons against these objects.  But!  What if we're a tuple of mutable
-    // objects...we will then attempt to calculate the hash on every comparison, only to fail.  If
+    // speed up future comparisons against these objects. But!  What if we're a tuple of mutable
+    // objects...we will then attempt to calculate the hash on every comparison, only to fail. If
     // we had a flag to differentiate "tuple of mutables" with "not yet computed"...crap, that
     // still wouldn't quite work, because what if we freeze those mutables?
 
@@ -13107,7 +13107,7 @@ static yp_ssize_t ypQuickIter_tuple_length_hint(
 
 static void ypQuickIter_tuple_close(ypQuickIter_state *state)
 {
-    // No-op.  We don't yp_decref because it's a borrowed reference.
+    // No-op. We don't yp_decref because it's a borrowed reference.
 }
 
 static const ypQuickIter_methods ypQuickIter_tuple_methods = {
@@ -13118,8 +13118,8 @@ static const ypQuickIter_methods ypQuickIter_tuple_methods = {
         ypQuickIter_tuple_close                // close
 };
 
-// Initializes state with the given tuple.  Always succeeds.  Use ypQuickIter_tuple_methods as the
-// method table.  tuple is borrowed by state and most not be freed until methods->close is called.
+// Initializes state with the given tuple. Always succeeds. Use ypQuickIter_tuple_methods as the
+// method table. tuple is borrowed by state and most not be freed until methods->close is called.
 static void ypQuickIter_new_fromtuple(ypQuickIter_state *state, ypObject *tuple)
 {
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(tuple) == ypTuple_CODE, "tuple must be a tuple/list");
@@ -13150,7 +13150,7 @@ static yp_ssize_t ypQuickSeq_tuple_len(ypQuickSeq_state *state, ypObject **exc)
 
 static void ypQuickSeq_tuple_close(ypQuickSeq_state *state)
 {
-    // No-op.  We don't yp_decref because it's a borrowed reference.
+    // No-op. We don't yp_decref because it's a borrowed reference.
 }
 
 static const ypQuickSeq_methods ypQuickSeq_tuple_methods = {
@@ -13160,8 +13160,8 @@ static const ypQuickSeq_methods ypQuickSeq_tuple_methods = {
         ypQuickSeq_tuple_close       // close
 };
 
-// Initializes state with the given tuple.  Always succeeds.  Use ypQuickSeq_tuple_methods as the
-// method table.  tuple is borrowed by state and must not be freed until methods->close is called.
+// Initializes state with the given tuple. Always succeeds. Use ypQuickSeq_tuple_methods as the
+// method table. tuple is borrowed by state and must not be freed until methods->close is called.
 static void ypQuickSeq_new_fromtuple(ypQuickSeq_state *state, ypObject *tuple)
 {
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(tuple) == ypTuple_CODE, "tuple must be a tuple/list");
@@ -14796,7 +14796,7 @@ yp_STATIC_ASSERT(ypSet_RESIZE_AT_NMR <= yp_SSIZE_T_MAX / ypSet_ALLOCLEN_MAX,
         ypSet_space_remaining_cant_overflow);
 static yp_ssize_t _ypSet_space_remaining(ypObject *so)
 {
-    /* If fill >= 2/3 size, adjust size.  Normally, this doubles or
+    /* If fill >= 2/3 size, adjust size. Normally, this doubles or
      * quaduples the size, but it's also possible for the dict to shrink
      * (if ma_fill is much larger than se_used, meaning a lot of dict
      * keys have been deleted).
@@ -14865,7 +14865,7 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
 
 // XXX Check for the "lazy shallow copy" and "yp_frozenset_empty" cases first
 // TODO It's tempting to look into memcpy to copy the tables, although that would mean the copy
-// would be just as dirty as the original.  But if the original isn't "too dirty"...
+// would be just as dirty as the original. But if the original isn't "too dirty"...
 static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep);
 static ypObject *_ypSet_copy(int type, ypObject *x, int alloclen_fixed)
 {
@@ -14927,8 +14927,8 @@ static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, 
     return so;
 }
 
-// Resizes the set to the smallest size that will hold minused values.  If you want to reduce the
-// need for future resizes, call with a larger minused.  Returns yp_None, or an exception on error.
+// Resizes the set to the smallest size that will hold minused values. If you want to reduce the
+// need for future resizes, call with a larger minused. Returns yp_None, or an exception on error.
 // TODO Do we want to split minused into required and extra, like in other areas?
 yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof(ypSet_KeyEntry),
         ypSet_resize_cant_overflow);
@@ -15032,7 +15032,7 @@ success:
     return yp_None;
 }
 
-// Steals key and adds it to the hash table at the given location.  loc must not currently be in
+// Steals key and adds it to the hash table at the given location. loc must not currently be in
 // use! Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict in dictobject.c
 static void _ypSet_movekey(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash)
@@ -15045,9 +15045,9 @@ static void _ypSet_movekey(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_
     ypSet_SET_LEN(so, ypSet_LEN(so) + 1);
 }
 
-// Steals key and adds it to the *clean* hash table.  Only use if the key is known to be absent
+// Steals key and adds it to the *clean* hash table. Only use if the key is known to be absent
 // from the table, and the table contains no deleted entries; this is usually known when
-// cleaning/resizing/copying a table.  Sets *loc to the location at which the key was inserted.
+// cleaning/resizing/copying a table. Sets *loc to the location at which the key was inserted.
 // Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
 static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep)
@@ -15082,8 +15082,8 @@ static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
     return oldkey;
 }
 
-// Adds the key to the hash table.  *spaceleft should be initialized from  _ypSet_space_remaining;
-// this function then decrements it with each key added, and resets it on every resize.  growhint
+// Adds the key to the hash table. *spaceleft should be initialized from  _ypSet_space_remaining;
+// this function then decrements it with each key added, and resets it on every resize. growhint
 // is the number of additional items, not including key, that are expected to be added to the set.
 // Returns yp_True if so was modified, yp_False if it wasn't due to the key already being in the
 // set, or an exception on error.
@@ -15113,7 +15113,7 @@ static ypObject *_ypSet_push(
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
-    // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.  If adding growhint
+    // fast _ypSet_movekey_clean. Give mutable objects a bit of room to grow. If adding growhint
     // overflows ypSet_LEN_MAX (or yp_SSIZE_T_MAX), clamp to ypSet_LEN_MAX.
     if (growhint < 0) growhint = 0;
     if (ypSet_LEN(so) > ypSet_LEN_MAX - 1) return yp_MemorySizeOverflowError;
@@ -15127,7 +15127,7 @@ static ypObject *_ypSet_push(
     return yp_True;
 }
 
-// Removes the key from the hash table.  The set is not resized.  Returns the reference to the
+// Removes the key from the hash table. The set is not resized. Returns the reference to the
 // removed key if so was modified, ypSet_dummy if it wasn't due to the key not being in the
 // set, or an exception on error.
 static ypObject *_ypSet_pop(ypObject *so, ypObject *key)
@@ -15235,7 +15235,7 @@ static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject **mi, yp_uint64_t
     return yp_None;
 }
 
-// Adds the keys yielded from iterable to the set.  If the set has enough space to hold all the
+// Adds the keys yielded from iterable to the set. If the set has enough space to hold all the
 // keys, the set is not resized (important, as yp_setN et al pre-allocate the necessary space).
 // Requires that iterable's items are immutable; unavoidable as they are to be added to the set.
 // XXX Check for the so==iterable case _before_ calling this function
@@ -15270,7 +15270,7 @@ static ypObject *_ypSet_intersection_update_fromset(ypObject *so, ypObject *othe
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
     yp_ASSERT1(so != other);
 
-    // Since we're only removing keys from so, it won't be resized, so we can loop over it.  We
+    // Since we're only removing keys from so, it won't be resized, so we can loop over it. We
     // break once so is empty because we aren't expecting any errors from _ypSet_lookkey.
     for (i = 0; keysleft > 0; i++) {
         if (ypSet_LEN(so) < 1) break;
@@ -15299,12 +15299,12 @@ static ypObject *_ypSet_intersection_update_fromiter(
 
     // TODO can we do this without creating a copy or, alternatively, would it be better to
     // implement this as ypSet_intersection?
-    // Unfortunately, we need to create a short-lived copy of so.  It's either that, or convert
+    // Unfortunately, we need to create a short-lived copy of so. It's either that, or convert
     // mi to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
     so_toremove = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(so_toremove)) return so_toremove;
 
-    // Remove items from so_toremove that are yielded by mi.  so_toremove is then a set
+    // Remove items from so_toremove that are yielded by mi. so_toremove is then a set
     // containing the keys to remove from so.
     result = _ypSet_difference_update_fromiter(so_toremove, mi, mi_state);
     if (!yp_isexceptionC(result)) {
@@ -15665,7 +15665,7 @@ static ypObject *frozenset_eq(ypObject *so, ypObject *x)
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenSet_CODE) return yp_ComparisonNotImplemented;
     if (ypSet_LEN(so) != ypSet_LEN(x)) return yp_False;
 
-    // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
+    // We need to inspect all our items for equality, which could be time-intensive. It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when so!=x.
     if (ypObject_CACHED_HASH(so) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
@@ -15760,10 +15760,10 @@ static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
     }
 }
 
-// XXX We redirect the new-object set methods to the in-place versions.  Among other things, this
+// XXX We redirect the new-object set methods to the in-place versions. Among other things, this
 // helps to avoid duplicating code.
 // TODO ...except we are creating objects that we destroy then create new ones, which can probably
-// be optimized in certain cases, so rethink these four methods.  At the very least, can we avoid
+// be optimized in certain cases, so rethink these four methods. At the very least, can we avoid
 // the yp_freeze?
 static ypObject *frozenset_union(ypObject *so, int n, va_list args)
 {
@@ -16282,8 +16282,8 @@ ypObject *yp_set(ypObject *iterable)
 // original source for documentation on this implementation
 
 // XXX keyset requires care!  It is potentially shared among multiple dicts, so we cannot remove
-// keys or resize it.  It identifies itself as a frozendict, yet we add keys to it, so it is not
-// truly immutable.  As such, it cannot be exposed outside of the set/dict implementations.  On the
+// keys or resize it. It identifies itself as a frozendict, yet we add keys to it, so it is not
+// truly immutable. As such, it cannot be exposed outside of the set/dict implementations. On the
 // plus side, we can allocate it's data inline (via alloclen_fixed).
 
 // ypDictObject and ypDict_LEN are defined above, for use by the set code
@@ -16452,12 +16452,12 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
 }
 
 // Adds a new key with the given hash at the given key_loc, which may require a resize, and sets
-// value appropriately.  *key_loc must point to a currently-unused location in the hash table; it
-// will be updated if a resize occurs.  Otherwise behaves as _ypDict_push.
+// value appropriately. *key_loc must point to a currently-unused location in the hash table; it
+// will be updated if a resize occurs. Otherwise behaves as _ypDict_push.
 // XXX Adapted from PyDict_SetItem
 // TODO The decision to resize currently depends only on _ypSet_space_remaining, but what if the
 // shared keyset contains 5x the keys that we actually use?  That's a large waste in the value
-// table.  Really, we should have a _ypDict_space_remaining.
+// table. Really, we should have a _ypDict_space_remaining.
 static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypObject *key,
         yp_hash_t hash, ypObject *value, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
@@ -16477,7 +16477,7 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
-    // fast _ypSet_movekey_clean.  Give mutable objects a bit of room to grow.  If adding growhint
+    // fast _ypSet_movekey_clean. Give mutable objects a bit of room to grow. If adding growhint
     // overflows ypSet_LEN_MAX (or yp_SSIZE_T_MAX), clamp to ypSet_LEN_MAX.
     if (growhint < 0) growhint = 0;
     if (ypDict_LEN(mp) > ypSet_LEN_MAX - 1) return yp_MemorySizeOverflowError;
@@ -16494,10 +16494,10 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     return yp_True;
 }
 
-// Adds the key/value to the dict.  If override is false, returns yp_False and does not modify the
-// dict if there is an existing value.  *spaceleft should be initialized from
+// Adds the key/value to the dict. If override is false, returns yp_False and does not modify the
+// dict if there is an existing value. *spaceleft should be initialized from
 // _ypSet_space_remaining; this function then decrements it with each key added, and resets it on
-// every resize.  Returns yp_True if mp was modified, yp_False if it wasn't due to existing values
+// every resize. Returns yp_True if mp was modified, yp_False if it wasn't due to existing values
 // being preserved (ie override is false), or an exception on error.
 // XXX Adapted from PyDict_SetItem
 static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int override,
@@ -16537,8 +16537,8 @@ static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int 
     return _ypDict_push_newkey(mp, &key_loc, key, hash, value, spaceleft, growhint);
 }
 
-// Removes the value from the dict; the key stays in the keyset, but that's of no concern.  The
-// dict is not resized.  Returns the reference to the removed value if mp was modified, ypSet_dummy
+// Removes the value from the dict; the key stays in the keyset, but that's of no concern. The
+// dict is not resized. Returns the reference to the removed value if mp was modified, ypSet_dummy
 // if it wasn't due to the value not being set, or an exception on error.
 static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
 {
@@ -16570,8 +16570,8 @@ static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
     return oldvalue;  // new ref
 }
 
-// Item iterators yield iterators that yield exactly 2 values: key first, then value.  This
-// returns new references to that pair in *key and *value.  Both are set to an exception on error;
+// Item iterators yield iterators that yield exactly 2 values: key first, then value. This
+// returns new references to that pair in *key and *value. Both are set to an exception on error;
 // in particular, yp_ValueError is returned if exactly 2 values are not returned.
 // XXX Yes, the yielded value can be any iterable, even a set or dict (good luck guessing which
 // will be the key, and which the value)
@@ -16637,7 +16637,7 @@ static ypObject *_ypDict_update_fromiter(ypObject *mp, ypObject **itemiter)
     return yp_None;
 }
 
-// Adds the key/value pairs yielded from either yp_iter_items or yp_iter to the dict.  If the dict
+// Adds the key/value pairs yielded from either yp_iter_items or yp_iter to the dict. If the dict
 // has enough space to hold all the items, the dict is not resized (important, as yp_dictK et al
 // pre-allocate the necessary space).
 // XXX Check for the "fellow frozendict" case before calling this function.
@@ -16731,7 +16731,7 @@ static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE) return yp_ComparisonNotImplemented;
     if (ypDict_LEN(mp) != ypDict_LEN(x)) return yp_False;
 
-    // We need to inspect all our items for equality, which could be time-intensive.  It's fairly
+    // We need to inspect all our items for equality, which could be time-intensive. It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when mp!=x.
     if (ypObject_CACHED_HASH(mp) != ypObject_HASH_INVALID &&
             ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID &&
@@ -16767,7 +16767,7 @@ static ypObject *frozendict_ne(ypObject *mp, ypObject *x)
 }
 
 // TODO frozendict_currenthash, when implemented, will need to consider the currenthashes of its
-// values as well as its keys.  Just as a tuple with mutable items can't be hashed, hashing a
+// values as well as its keys. Just as a tuple with mutable items can't be hashed, hashing a
 // frozendict with mutable values will be an error.
 //  What about this for the hash?  hash(frozenset(x.items()))  (performance?)
 // Rejected ideas:
@@ -17744,7 +17744,7 @@ static ypObject *range_ne(ypObject *r, ypObject *x)
     return ypBool_NOT(result);
 }
 
-/* Hash function for range objects.  Rough C equivalent of
+/* Hash function for range objects. Rough C equivalent of
    if not len(r):
        return hash((len(r), 0, 1))
    if len(r) == 1:
@@ -19671,7 +19671,7 @@ ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t 
     int       container_pair = ypObject_TYPE_PAIR_CODE(container);
 
     // XXX The pointer returned via *encoded is only valid so long as the str/chrarray object
-    // remains allocated and isn't modified.  As such, limit this function to those containers that
+    // remains allocated and isn't modified. As such, limit this function to those containers that
     // we *know* will keep the object allocated (so long as _they_ aren't modified, of course).
     if (container_pair != ypTuple_CODE && container_pair != ypFrozenDict_CODE) {
         return_yp_BAD_TYPE(container);
@@ -19907,7 +19907,7 @@ static ypTypeObject *ypTypeTable[255] = {
 };
 // clang-format on
 
-// TODO Reconsider the behaviour of exceptions.  Python returns `type`.  If we ever want to support
+// TODO Reconsider the behaviour of exceptions. Python returns `type`. If we ever want to support
 // creating instances of exceptions, we should do the same.
 ypObject *yp_type(ypObject *object) { return (ypObject *)ypObject_TYPE(object); }
 
@@ -19976,7 +19976,7 @@ static const yp_initialize_parameters_t _default_initialize = {
     )
 // clang-format on
 
-// Called *exactly* *once* by yp_initialize to set up memory management.  Further, setting
+// Called *exactly* *once* by yp_initialize to set up memory management. Further, setting
 // yp_malloc here helps ensure that yp_initialize is called before anything else in the library
 // (because otherwise all mallocs result in yp_MemoryError).
 static void _ypMem_initialize(const yp_initialize_parameters_t *args)
@@ -19993,20 +19993,20 @@ static void _ypMem_initialize(const yp_initialize_parameters_t *args)
     }
 
     // TODO Config param idea: "minimum" or "average" or "usual" or "preferred" allocation
-    // size...something that indicates that malloc handles these sizes particularly well.  The
-    // number should be small, like 64 bytes or something.  This number can be used to decide how
-    // much data to put in-line.  The call to malloc would use exactly this size when creating an
-    // object, and at least this size when allocating extra data.  This makes all objects the same
-    // size, which will help malloc avoid fragmentation.  It also recognizes the fact that each
+    // size...something that indicates that malloc handles these sizes particularly well. The
+    // number should be small, like 64 bytes or something. This number can be used to decide how
+    // much data to put in-line. The call to malloc would use exactly this size when creating an
+    // object, and at least this size when allocating extra data. This makes all objects the same
+    // size, which will help malloc avoid fragmentation. It also recognizes the fact that each
     // malloc has a certain overhead in memory, so might as well allocate a certain amount to
-    // compensate.  When invalidating an object, the extra data is freed, but the invalidated
+    // compensate. When invalidating an object, the extra data is freed, but the invalidated
     // object that remains would sit in memory with this size until fully freed, so the extra data
-    // is wasted until then, which is why the value should be small.  (Actually, not all objects
+    // is wasted until then, which is why the value should be small. (Actually, not all objects
     // will be this size, as int/float, when they become small objects, will only allocate a
     // fraction of this.)
 }
 
-// Called *exactly* *once* by yp_initialize to set up the codecs module.  Errors are largely
+// Called *exactly* *once* by yp_initialize to set up the codecs module. Errors are largely
 // ignored: calling code will fail gracefully later on.
 // TODO Instead, fail with an ASSERT on any exceptions
 static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
