@@ -5,20 +5,10 @@
  *      License: http://docs.python.org/3/license.html
  */
 
-// TODO This discard-on-error ypObject** idea is weird, and it can be easily misused if you are
-// modifying a borrowed reference (i.e you get a ypObject* parameter and use it directly). But it
-// may still be useful while building a new object. Should we call this our "builder pattern"
-// (postfix B)? Or, we could mimic __iadd__/etc and make it the "in-place" pattern (postfix I). In
-// either case, we'd drop the E and make &exc the default.
-
 // TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
 // yp_sys_minint, or yp_sys_maxsize
 
 // TODO Audit the use of leading underscore and ensure consistency
-
-// TODO A flag on (immutable) objects to verify the stored hash. Flag is set when internal
-// pointers are returned (think yp_asencodedCX), then verified/cleared when yp_hash/currenthash is
-// called again. Provides a safeguard against this internal data being modified.
 
 // TODO what do we gain by caching the hash?  We already jump through hoops to use the hash
 // stored in the hash table where possible.
@@ -46,7 +36,7 @@
 // TODO Big, big difference in DLL sizes: 187 KB for MSVS 9.0 64-bit release to 1.6 MB for GCC 8
 // 64-bit release. What's using up so much space? Why are GCC release builds larger than debug?
 // Because we allow yp_malloc to be customized, can we lazy-load the malloc library? Are there other
-// libraries we can trim off.
+// libraries we can trim off?
 
 // TODO Invalidation is the only way immutable objects can be mutated. (Is "the only way" true?)
 // However, that breaks various optimizations, like holding a pointer to a tuple's array and looping
@@ -5024,10 +5014,10 @@ error:
     *_mod = 0;
 }
 
-yp_int_t yp_powL(yp_int_t x, yp_int_t y, ypObject **exc) { return yp_powL3(x, y, 0, exc); }
+yp_int_t yp_powL(yp_int_t x, yp_int_t y, ypObject **exc) { return yp_powL4(x, y, 0, exc); }
 
 // XXX Adapted from Python 2.7's int_pow
-yp_int_t yp_powL3(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc)
+yp_int_t yp_powL4(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc)
 {
     yp_int_t result, temp, prev;
     if (y < 0) {
@@ -19090,8 +19080,6 @@ ypObject *yp_bool(ypObject *x) { _yp_REDIRECT_BOOL1(x, tp_bool, (x)); }
 
 ypObject *yp_iter(ypObject *x) { _yp_REDIRECT1(x, tp_iter, (x)); }
 
-// FIXME Now that iterators are considered "immutable", don't discard it on _next/etc. i.e.
-// turn ypObject **iterator into just ypObject *iterator.
 static ypObject *_yp_send(ypObject **iterator, ypObject *value)
 {
     ypTypeObject *type = ypObject_TYPE(*iterator);
@@ -19143,6 +19131,8 @@ ypObject *yp_throw(ypObject **iterator, ypObject *exc)
     return _yp_send(iterator, exc);
 }
 
+ypObject *yp_close(ypObject *x) { _yp_REDIRECT1(x, tp_close, (x)); }
+
 ypObject *yp_reversed(ypObject *x) { _yp_REDIRECT1(x, tp_iter_reversed, (x)); }
 
 ypObject *yp_contains(ypObject *container, ypObject *x)
@@ -19189,7 +19179,7 @@ ypObject *yp_getsliceC4(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize
     _yp_REDIRECT2(sequence, tp_as_sequence, tp_getslice, (sequence, i, j, k));
 }
 
-yp_ssize_t yp_findC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
+yp_ssize_t yp_findC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
 {
     yp_ssize_t index;
     ypObject  *result = ypObject_TYPE(sequence)->tp_as_sequence->tp_find(
@@ -19201,13 +19191,13 @@ yp_ssize_t yp_findC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j
 
 yp_ssize_t yp_findC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_findC4(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_findC5(sequence, x, 0, yp_SLICE_USELEN, exc);
 }
 
-yp_ssize_t yp_indexC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
+yp_ssize_t yp_indexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
 {
     ypObject  *subexc = yp_None;
-    yp_ssize_t result = yp_findC4(sequence, x, i, j, &subexc);
+    yp_ssize_t result = yp_findC5(sequence, x, i, j, &subexc);
     if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(-1, exc, subexc);
     if (result == -1) return_yp_CEXC_ERR(-1, exc, yp_ValueError);
     return result;
@@ -19215,10 +19205,10 @@ yp_ssize_t yp_indexC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_indexC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_indexC4(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_indexC5(sequence, x, 0, yp_SLICE_USELEN, exc);
 }
 
-yp_ssize_t yp_rfindC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
+yp_ssize_t yp_rfindC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
 {
     yp_ssize_t index;
     ypObject  *result = ypObject_TYPE(sequence)->tp_as_sequence->tp_find(
@@ -19230,13 +19220,13 @@ yp_ssize_t yp_rfindC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_rfindC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_rfindC4(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_rfindC5(sequence, x, 0, yp_SLICE_USELEN, exc);
 }
 
-yp_ssize_t yp_rindexC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
+yp_ssize_t yp_rindexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
 {
     ypObject  *subexc = yp_None;
-    yp_ssize_t result = yp_rfindC4(sequence, x, i, j, &subexc);
+    yp_ssize_t result = yp_rfindC5(sequence, x, i, j, &subexc);
     if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(-1, exc, subexc);
     if (result == -1) return_yp_CEXC_ERR(-1, exc, yp_ValueError);
     return result;
@@ -19244,10 +19234,10 @@ yp_ssize_t yp_rindexC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t
 
 yp_ssize_t yp_rindexC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_rindexC4(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_rindexC5(sequence, x, 0, yp_SLICE_USELEN, exc);
 }
 
-yp_ssize_t yp_countC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
+yp_ssize_t yp_countC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
 {
     yp_ssize_t count;
     ypObject *result = ypObject_TYPE(sequence)->tp_as_sequence->tp_count(sequence, x, i, j, &count);
@@ -19258,7 +19248,7 @@ yp_ssize_t yp_countC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_countC4(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_countC5(sequence, x, 0, yp_SLICE_USELEN, exc);
 }
 
 void yp_setindexC(ypObject **sequence, yp_ssize_t i, ypObject *x)
@@ -19266,7 +19256,7 @@ void yp_setindexC(ypObject **sequence, yp_ssize_t i, ypObject *x)
     _yp_INPLACE2(sequence, tp_as_sequence, tp_setindex, (*sequence, i, x));
 }
 
-void yp_setsliceC5(ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x)
+void yp_setsliceC6(ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x)
 {
     _yp_INPLACE2(sequence, tp_as_sequence, tp_setslice, (*sequence, i, j, k, x));
 }
@@ -19276,7 +19266,7 @@ void yp_delindexC(ypObject **sequence, yp_ssize_t i)
     _yp_INPLACE2(sequence, tp_as_sequence, tp_delindex, (*sequence, i));
 }
 
-void yp_delsliceC4(ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k)
+void yp_delsliceC5(ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k)
 {
     _yp_INPLACE2(sequence, tp_as_sequence, tp_delslice, (*sequence, i, j, k));
 }
@@ -19316,7 +19306,7 @@ void yp_reverse(ypObject **sequence)
     _yp_INPLACE2(sequence, tp_as_sequence, tp_reverse, (*sequence));
 }
 
-void yp_sort3(ypObject **sequence, ypObject *key, ypObject *reverse)
+void yp_sort4(ypObject **sequence, ypObject *key, ypObject *reverse)
 {
     _yp_INPLACE2(sequence, tp_as_sequence, tp_sort, (*sequence, key, reverse));
 }
@@ -19752,7 +19742,7 @@ void yp_s2o_setitemC4(
     yp_decref(key);
 }
 
-yp_int_t yp_s2i_getitemC3(
+yp_int_t yp_s2i_getitemC4(
         ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, ypObject **exc)
 {
     ypObject *key = yp_str_frombytesC2(keyC, key_lenC);

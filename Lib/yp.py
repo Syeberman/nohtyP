@@ -963,7 +963,7 @@ yp_func(c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ))
 # void yp_ifloordiv(ypObject **x, ypObject *y);
 # void yp_imod(ypObject **x, ypObject *y);
 # void yp_ipow(ypObject **x, ypObject *y);
-# void yp_ipow3(ypObject **x, ypObject *y, ypObject *z);
+# void yp_ipow4(ypObject **x, ypObject *y, ypObject *z);
 # void yp_ilshift(ypObject **x, ypObject *y);
 # void yp_irshift(ypObject **x, ypObject *y);
 # void yp_iamp(ypObject **x, ypObject *y);
@@ -981,7 +981,7 @@ yp_func(c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ))
 # void yp_ifloordivC(ypObject **x, yp_int_t y);
 # void yp_imodC(ypObject **x, yp_int_t y);
 # void yp_ipowC(ypObject **x, yp_int_t y);
-# void yp_ipowC3(ypObject **x, yp_int_t y, yp_int_t z);
+# void yp_ipowC4(ypObject **x, yp_int_t y, yp_int_t z);
 # void yp_ilshiftC(ypObject **x, yp_int_t y);
 # void yp_irshiftC(ypObject **x, yp_int_t y);
 # void yp_iampC(ypObject **x, yp_int_t y);
@@ -1009,7 +1009,7 @@ yp_func(c_ypObject_p, "yp_invert", ((c_ypObject_p, "x"), ))
 # yp_int_t yp_modL(yp_int_t x, yp_int_t y, ypObject **exc);
 # void yp_divmodL(yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc);
 # yp_int_t yp_powL(yp_int_t x, yp_int_t y, ypObject **exc);
-# yp_int_t yp_powL3(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc);
+# yp_int_t yp_powL4(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc);
 # yp_int_t yp_lshiftL(yp_int_t x, yp_int_t y, ypObject **exc);
 # yp_int_t yp_rshiftL(yp_int_t x, yp_int_t y, ypObject **exc);
 # yp_int_t yp_ampL(yp_int_t x, yp_int_t y, ypObject **exc);

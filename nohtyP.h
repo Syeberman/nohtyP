@@ -108,8 +108,8 @@ typedef struct _yp_state_decl_t            yp_state_decl_t;
  */
 
 // Must be called once before any other function; subsequent calls are a no-op. If a fatal error
-// occurs abort() is called. args can be NULL to accept all defaults; further documentation
-// on these parameters can be found below.
+// occurs abort() is called. args can be NULL to accept all defaults; further documentation on these
+// parameters can be found below.
 ypAPI void yp_initialize(const yp_initialize_parameters_t *args);
 
 
@@ -135,8 +135,8 @@ ypAPI ypObject *yp_incref(ypObject *x);
 ypAPI void yp_increfN(int n, ...);
 ypAPI void yp_increfNV(int n, va_list args);
 
-// Decrements the reference count of x, deallocating it if the count reaches zero. Always
-// succeeds; if x is immortal this is a no-op.
+// Decrements the reference count of x, deallocating it if the count reaches zero. Always succeeds;
+// if x is immortal this is a no-op.
 ypAPI void yp_decref(ypObject *x);
 
 // A convenience function to decrement the references of n objects.
@@ -194,16 +194,16 @@ typedef yp_float64_t yp_float_t;
  */
 
 // Unlike Python, most nohtyP types have both mutable and immutable versions. An "intstore" is a
-// mutable int (it "stores" an int); similar for floatstore. The mutable str is called a
-// "chrarray", while a "frozendict" is an immutable dict.
+// mutable int (it "stores" an int); similar for floatstore. The mutable str is called a "chrarray",
+// while a "frozendict" is an immutable dict.
 
 // Returns a new reference to an int/intstore with the given value.
 ypAPI ypObject *yp_intC(yp_int_t value);
 ypAPI ypObject *yp_intstoreC(yp_int_t value);
 
 // Returns a new reference to an int/intstore with the given str, chrarray, bytes, or bytearray
-// object interpreted as an integer literal in radix base. The Python-equivalent default for base
-// is 10; a base of 0 means to interpret exactly as a Python code literal.
+// object interpreted as an integer literal in radix base. The Python-equivalent default for base is
+// 10; a base of 0 means to interpret exactly as a Python code literal.
 ypAPI ypObject *yp_int_baseC(ypObject *x, yp_int_t base);
 ypAPI ypObject *yp_intstore_baseC(ypObject *x, yp_int_t base);
 
@@ -219,8 +219,8 @@ ypAPI ypObject *yp_floatstoreCF(yp_float_t value);
 
 // Returns a new reference to a float/floatstore. If x is a number, it is converted to a float.
 // Otherwise, x must be a str, chrarray, bytes, or bytearray object, which will be interpreted as a
-// Python floating-point literal. In either case, if the resulting value is outside the range of
-// a float then yp_OverflowError is returned.
+// Python floating-point literal. In either case, if the resulting value is outside the range of a
+// float then yp_OverflowError is returned.
 ypAPI ypObject *yp_float(ypObject *x);
 ypAPI ypObject *yp_floatstore(ypObject *x);
 
@@ -237,13 +237,15 @@ ypAPI ypObject *yp_iter2(ypObject *callable, ypObject *sentinel);
 // documentation for yp_generator_decl_t for more details.
 ypAPI ypObject *yp_generatorC(yp_generator_decl_t *declaration);
 
-// Returns a new reference to a range object. yp_rangeC is equivalent to yp_rangeC3(0, stop, 1).
+// Returns a new reference to a range object.
 ypAPI ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step);
+
+// Equivalent to yp_rangeC3(0, stop, 1).
 ypAPI ypObject *yp_rangeC(yp_int_t stop);
 
-// Returns a new reference to a bytes/bytearray, copying the first len bytes from source. If
-// source is NULL it is considered as having all null bytes; if len is negative source is
-// considered null terminated (and, therefore, will not contain the null byte).
+// Returns a new reference to a bytes/bytearray, copying the first len bytes from source. If source
+// is NULL it is considered as having all null bytes; if len is negative source is considered null
+// terminated (and, therefore, will not contain the null byte).
 //
 // Ex: pre-allocate a bytearray of length 50: yp_bytearrayC(NULL, 50)
 ypAPI ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
@@ -288,8 +290,8 @@ ypAPI ypObject *yp_chrarray_frombytesC2(const yp_uint8_t *source, yp_ssize_t len
 ypAPI ypObject *yp_str3(ypObject *source, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray3(ypObject *source, ypObject *encoding, ypObject *errors);
 
-// Returns a new reference to the "informal" or nicely-printable string representation of object,
-// as a str/chrarray. As in Python, passing a bytes object to this constructor returns the string
+// Returns a new reference to the "informal" or nicely-printable string representation of object, as
+// a str/chrarray. As in Python, passing a bytes object to this constructor returns the string
 // representation ("b'Zoot!'"); to decode the bytes, use yp_str3.
 ypAPI ypObject *yp_str(ypObject *object);
 ypAPI ypObject *yp_chrarray(ypObject *object);
@@ -308,8 +310,7 @@ ypAPI ypObject *yp_listN(int n, ...);
 ypAPI ypObject *yp_listNV(int n, va_list args);
 
 // Returns a new reference to a tuple/list made from factor shallow-copies of yp_tupleN(n, ...)
-// concatenated; the length will be factor*n. Equivalent to "factor * (obj0, obj1, ...)" in
-// Python.
+// concatenated; the length will be factor*n. Equivalent to "factor * (obj0, obj1, ...)" in Python.
 //
 // Ex: pre-allocate a list of length 99: yp_list_repeatCN(99, 1, yp_None)
 //
@@ -433,8 +434,8 @@ ypAPI ypObject *yp_andNV(int n, va_list args);
 ypAPI ypObject *yp_allN(int n, ...);
 ypAPI ypObject *yp_allNV(int n, va_list args);
 
-// Returns the immortal yp_True if all elements of iterable are true or the iterable is empty.
-// Stops iterating at the first false element.
+// Returns the immortal yp_True if all elements of iterable are true or the iterable is empty. Stops
+// iterating at the first false element.
 ypAPI ypObject *yp_all(ypObject *iterable);
 
 // Implements the "less than" (x<y), "less than or equal" (x<=y), "equal" (x==y), "not equal"
@@ -454,13 +455,13 @@ ypAPI ypObject *yp_gt(ypObject *x, ypObject *y);
  * Generic Object Operations
  */
 
-// Returns the hash value of x; x must be immutable and must not contain mutable objects. Returns
-// -1 and sets *exc on error.
+// Returns the hash value of x; x must be immutable and must not contain mutable objects. Returns -1
+// and sets *exc on error.
 ypAPI yp_hash_t yp_hashC(ypObject *x, ypObject **exc);
 
 // Returns the _current_ hash value of x; this value may change between calls. Returns -1 and sets
-// *exc on error. This is able to calculate the hash value of mutable objects and objects
-// containing mutable objects that would otherwise fail with yp_hashC.
+// *exc on error. This is able to calculate the hash value of mutable objects and objects containing
+// mutable objects that would otherwise fail with yp_hashC.
 ypAPI yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 
 
@@ -491,18 +492,17 @@ ypAPI ypObject *yp_next2(ypObject *iterator, ypObject *defval);
 // yp_StopIteration is raised.
 ypAPI ypObject *yp_throw(ypObject *iterator, ypObject *exception);
 
-// Returns a hint as to how many items are left to be yielded. The accuracy of this hint depends
-// on the underlying type: most containers know their lengths exactly, but some generators may not.
-// A hint of zero could mean that the iterator is exhausted, that the length is unknown, or that
-// the iterator will yield infinite values. Returns zero and sets *exc on error.
+// Returns a hint as to how many items are left to be yielded. The accuracy of this hint depends on
+// the underlying type: most containers know their lengths exactly, but some generators may not. A
+// hint of zero could mean that the iterator is exhausted, that the length is unknown, or that the
+// iterator will yield infinite values. Returns zero and sets *exc on error.
 ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
 
-// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit). If yp_StopIteration or
-// yp_GeneratorExit is returned by yp_throw, ??FIXME??; on any other error, an exception is
-// returned. The behaviour of this method for other types, in particular files, is documented
-// elsewhere.
-// FIXME what if yp_throw doesn't return an exception?
-ypAPI ypObject *yp_close(ypObject *iterator);
+// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit). yp_throw is expected to
+// return either yp_StopIteration or yp_GeneratorExit: these are not treated as errors. If yp_throw
+// yields a value, it is discarded and yp_RuntimeError is raised. Sets *exc on error. The behaviour
+// of this method for other types, in particular files, is documented elsewhere.
+ypAPI void yp_close(ypObject *iterator, ypObject **exc);
 
 // Sets the given n ypObject**s to new references for the values yielded from iterable. Iterable
 // must yield exactly n objects, or else a yp_ValueError is raised. Sets all n ypObject**s to the
@@ -519,7 +519,7 @@ ypAPI ypObject *yp_filterfalse(ypObject *function, ypObject *iterable);
 
 // Returns a new reference to the largest/smallest of the given n objects. key is a one-argument
 // function used to extract a comparison key from each element in iterable; to compare the elements
-// directly, use yp_None.
+// directly, use yp_None. Note that key is before n as you cannot have arguments after ellipsis.
 ypAPI ypObject *yp_max_keyN(ypObject *key, int n, ...);
 ypAPI ypObject *yp_max_keyNV(ypObject *key, int n, va_list args);
 ypAPI ypObject *yp_min_keyN(ypObject *key, int n, ...);
@@ -587,12 +587,11 @@ ypAPI ypObject *yp_not_in(ypObject *x, ypObject *container);
 // Returns the length of container. Returns zero and sets *exc on error.
 ypAPI yp_ssize_t yp_lenC(ypObject *container, ypObject **exc);
 
-// Adds an item to container. On error, *exc is set to an exception. The relation between yp_push
-// and yp_pop depends on the type: x may be the first or last item popped, or items may be popped in
-// arbitrary order.
+// Adds an item to container. Sets *exc on error. The relation between yp_push and yp_pop depends on
+// the type: x may be the first or last item popped, or items may be popped in arbitrary order.
 ypAPI void yp_push(ypObject *container, ypObject *x, ypObject **exc);
 
-// Removes all items from container. On error, *exc is set to an exception.
+// Removes all items from container. Sets *exc on error.
 ypAPI void yp_clear(ypObject *container, ypObject **exc);
 
 // Removes an item from container and returns a new reference to the item. Not supported on dicts;
@@ -604,15 +603,15 @@ ypAPI ypObject *yp_pop(ypObject *container);
  * Sequence Operations
  */
 
-// These methods are supported by bytes, str, and tuple (and their mutable counterparts, of
-// course). Most methods are also supported by range; notable exceptions are yp_concat and
-// yp_repeatC. They are _not_ supported by frozenset and frozendict because those types do not
-// store their elements in any particular order.
+// These methods are supported by bytes, str, and tuple (and their mutable counterparts, of course).
+// Most methods are also supported by range; notable exceptions are yp_concat and yp_repeatC. They
+// are _not_ supported by frozenset and frozendict because those types do not store their elements
+// in any particular order.
 
 // Sequences are indexed origin zero. Negative indices are relative to the end of the sequence: in
 // effect, when i is negative it is substituted with len(s)+i, and len(s)+j for negative j. The
-// slice of s from i to j with step k is the sequence of items with indices i, i+k, i+2*k, i+3*k
-// and so on, stopping when j is reached (but never including j); k cannot be zero. A single index
+// slice of s from i to j with step k is the sequence of items with indices i, i+k, i+2*k, i+3*k and
+// so on, stopping when j is reached (but never including j); k cannot be zero. A single index
 // outside of range(-len(s),len(s)) raises a yp_IndexError, but in a slice such an index gets
 // clamped to the bounds of the sequence. See yp_SLICE_DEFAULT and yp_SLICE_USELEN below for more
 // information.
@@ -637,71 +636,70 @@ ypAPI ypObject *yp_getitem(ypObject *sequence, ypObject *key);
 // sequence[i:j], or -1 if x is not found. Returns -1 and sets *exc on error; *exc is _not_ set if x
 // is not found. Types such as tuples inspect only one item at a time, while types such as strs look
 // for a particular sub-sequence of items.
-ypAPI yp_ssize_t yp_findC4(
+ypAPI yp_ssize_t yp_findC5(
         ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc);
 
-// Equivalent to yp_findC4(sequence, x, 0, yp_SLICE_USELEN, exc).
+// Equivalent to yp_findC5(sequence, x, 0, yp_SLICE_USELEN, exc).
 ypAPI yp_ssize_t yp_findC(ypObject *sequence, ypObject *x, ypObject **exc);
 
-// Similar to yp_findC4 and yp_findC, except sets *exc to yp_ValueError if x is not found.
-ypAPI yp_ssize_t yp_indexC4(
+// Similar to yp_findC5 and yp_findC, except raises yp_ValueError if x is not found.
+ypAPI yp_ssize_t yp_indexC5(
         ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc);
 ypAPI yp_ssize_t yp_indexC(ypObject *sequence, ypObject *x, ypObject **exc);
 
-// Similar to yp_findC4, yp_indexC4, etc, except returns the _highest_ index (it starts
-// searching "from the right" or "in reverse".)
-ypAPI yp_ssize_t yp_rfindC4(
+// Similar to yp_findC5, yp_indexC5, etc, except returns the _highest_ index (it starts searching
+// "from the right" or "in reverse".)
+ypAPI yp_ssize_t yp_rfindC5(
         ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc);
 ypAPI yp_ssize_t yp_rfindC(ypObject *sequence, ypObject *x, ypObject **exc);
-ypAPI yp_ssize_t yp_rindexC4(
+ypAPI yp_ssize_t yp_rindexC5(
         ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc);
 ypAPI yp_ssize_t yp_rindexC(ypObject *sequence, ypObject *x, ypObject **exc);
 
-// Returns the total number of non-overlapping occurrences of x in sequence[i:j]. Returns 0 and
-// sets *exc on error. Types such as tuples inspect only one item at a time, while types such as
-// strs look for a particular sub-sequence of items.
-ypAPI yp_ssize_t yp_countC4(
+// Returns the total number of non-overlapping occurrences of x in sequence[i:j]. Returns 0 and sets
+// *exc on error. Types such as tuples inspect only one item at a time, while types such as strs
+// look for a particular sub-sequence of items.
+ypAPI yp_ssize_t yp_countC5(
         ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc);
 
-// Equivalent to yp_countC4(sequence, x, 0, yp_SLICE_USELEN, exc).
+// Equivalent to yp_countC5(sequence, x, 0, yp_SLICE_USELEN, exc).
 ypAPI yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc);
 
-// Sets the i-th item of sequence to x. On error, *exc is set to an exception.
+// Sets the i-th item of sequence to x. Sets *exc on error.
 ypAPI void yp_setindexC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc);
 
 // Sets the slice of sequence, from i to j with step k, to x. The Python-equivalent "defaults" for i
-// and j are yp_SLICE_DEFAULT, while for k it is 1. On error, *exc is set to an exception.
-ypAPI void yp_setsliceC5(
+// and j are yp_SLICE_DEFAULT, while for k it is 1. Sets *exc on error.
+ypAPI void yp_setsliceC6(
         ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x, ypObject **exc);
 
 // Equivalent to yp_setindexC(sequence, yp_asssizeC(key, exc), x, exc).
 ypAPI void yp_setitem(ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc);
 
-// Removes the i-th item from sequence. On error, *exc is set to an exception.
+// Removes the i-th item from sequence. Sets *exc on error.
 ypAPI void yp_delindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc);
 
-// Removes the elements of the slice from sequence, from i to j with step k. The Python-
-// equivalent "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1. On error,
-// *exc is set to an exception.
-ypAPI void yp_delsliceC4(
+// Removes the elements of the slice from sequence, from i to j with step k. The Python- equivalent
+// "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1. Sets *exc on error.
+ypAPI void yp_delsliceC5(
         ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject **exc);
 
 // Equivalent to yp_delindexC(sequence, yp_asssizeC(key, exc), exc).
 ypAPI void yp_delitem(ypObject *sequence, ypObject *key, ypObject **exc);
 
-// Appends x to the end of sequence. On error, *exc is set to an exception.
+// Appends x to the end of sequence. Sets *exc on error.
 ypAPI void yp_append(ypObject *sequence, ypObject *x, ypObject **exc);
 ypAPI void yp_push(ypObject *sequence, ypObject *x, ypObject **exc);
 
-// Appends the contents of t to the end of sequence. On error, *exc is set to an exception.
+// Appends the contents of t to the end of sequence. Sets *exc on error.
 ypAPI void yp_extend(ypObject *sequence, ypObject *t, ypObject **exc);
 
 // Appends the contents of sequence to itself factor-1 times; if factor is zero sequence is cleared.
-// Equivalent to seq*=factor for lists in Python. On error, *exc is set to an exception.
+// Equivalent to seq*=factor for lists in Python. Sets *exc on error.
 ypAPI void yp_irepeatC(ypObject *sequence, yp_ssize_t factor, ypObject **exc);
 
-// Inserts x into sequence at the index given by i; existing elements are shifted to make room.
-// On error, *exc is set to an exception.
+// Inserts x into sequence at the index given by i; existing elements are shifted to make room. Sets
+// *exc on error.
 ypAPI void yp_insertC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc);
 
 // Removes the i-th item from sequence and returns it. The Python-equivalent "default" for i is -1.
@@ -712,24 +710,22 @@ ypAPI ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i);
 ypAPI ypObject *yp_pop(ypObject *sequence);
 
 // Removes the first item from sequence that equals x. Raises yp_ValueError if x is not contained in
-// sequence. On error, *exc is set to an exception.
+// sequence. Sets *exc on error.
 ypAPI void yp_remove(ypObject *sequence, ypObject *x, ypObject **exc);
 
 // Removes the first item from sequence that equals x. Does _not_ raise an exception if x is not
-// contained in sequence. On error, *exc is set to an exception.
+// contained in sequence. Sets *exc on error.
 ypAPI void yp_discard(ypObject *sequence, ypObject *x, ypObject **exc);
 
-// Reverses the items of sequence in-place. On error, *exc is set to an exception.
+// Reverses the items of sequence in-place. Sets *exc on error.
 ypAPI void yp_reverse(ypObject *sequence, ypObject **exc);
 
 // Sorts the items of sequence in-place. key is a one-argument function used to extract a comparison
 // key from each element in iterable; to compare the elements directly, use yp_None. If reverse is
-// true, the list elements are sorted as if each comparison were reversed. On error, *exc is set to
-// an exception.
-// FIXME sort4?!?!
-ypAPI void yp_sort3(ypObject *sequence, ypObject *key, ypObject *reverse, ypObject **exc);
+// true, the list elements are sorted as if each comparison were reversed. Sets *exc on error.
+ypAPI void yp_sort4(ypObject *sequence, ypObject *key, ypObject *reverse, ypObject **exc);
 
-// Equivalent to yp_sort3(sequence, yp_None, yp_False, exc).
+// Equivalent to yp_sort4(sequence, yp_None, yp_False, exc).
 ypAPI void yp_sort(ypObject *sequence, ypObject **exc);
 
 // When given to a slice-like start/stop C argument, signals that the default "end" value be
@@ -803,43 +799,48 @@ ypAPI ypObject *yp_differenceNV(ypObject *set, int n, va_list args);
 // either set or x but not both.
 ypAPI ypObject *yp_symmetric_difference(ypObject *set, ypObject *x);
 
-// Add the elements from the n objects to set. On error, *exc is set to an exception.
-// FIXME exc after varargs?!?!?
-ypAPI void yp_updateN(ypObject *set, int n, ...);
-ypAPI void yp_updateNV(ypObject *set, int n, va_list args);
+// Add the elements from the n objects to set. Sets *exc on error. Note that exc is before n as you
+// cannot have arguments after ellipsis.
+ypAPI void yp_updateN(ypObject *set, ypObject **exc, int n, ...);
+ypAPI void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
 
-// Removes elements from set that are not contained in all n objects. On error, *exc is set to an
-// exception.
-// FIXME exc after varargs?!?!?
-ypAPI void yp_intersection_updateN(ypObject *set, int n, ...);
-ypAPI void yp_intersection_updateNV(ypObject *set, int n, va_list args);
+// Equivalent to yp_updateN(set, exc, 1, x).
+ypAPI void yp_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes elements from set that are contained in any of the n objects. On error, *exc is set to an
-// exception.
-// FIXME exc after varargs?!?!?
-ypAPI void yp_difference_updateN(ypObject *set, int n, ...);
-ypAPI void yp_difference_updateNV(ypObject *set, int n, va_list args);
+// Removes elements from set that are not contained in all n objects. Sets *exc on error. Note that
+// exc is before n as you cannot have arguments after ellipsis.
+ypAPI void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...);
+ypAPI void yp_intersection_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
+
+// Equivalent to yp_intersection_updateN(set, exc, 1, x).
+ypAPI void yp_intersection_update(ypObject *set, ypObject *x, ypObject **exc);
+
+// Removes elements from set that are contained in any of the n objects. Sets *exc on error. Note
+// that exc is before n as you cannot have arguments after ellipsis.
+ypAPI void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...);
+ypAPI void yp_difference_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
+
+// Equivalent to yp_difference_updateN(set, exc, 1, x).
+ypAPI void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes elements from set that are contained in x, and adds elements from x not contained in set.
-// On error, *exc is set to an exception.
+// Sets *exc on error.
 ypAPI void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Adds element x to set. On error, *exc is set to an exception. While Python calls this method add,
-// yp_add is already used for "a+b", so these two equivalent aliases are provided instead.
+// Adds element x to set. Sets *exc on error. While Python calls this method add, yp_add is already
+// used for "a+b", so these two equivalent aliases are provided instead.
 ypAPI void yp_push(ypObject *set, ypObject *x, ypObject **exc);
 ypAPI void yp_set_add(ypObject *set, ypObject *x, ypObject **exc);
 
 // If x is already contained in set, raises yp_KeyError; otherwise, adds x to set. Sets *exc on
 // error.
-// FIXME Ensure consistency everywhere on the language I use for "*exc on error".
 ypAPI void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes element x from set. Raises yp_KeyError if x is not contained in set. On error, *exc is
-// set to an exception.
+// Removes element x from set. Raises yp_KeyError if x is not contained in set. Sets *exc on error.
 ypAPI void yp_remove(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes element x from set. Does _not_ raise an exception if x is not contained in set. On
-// error, *exc is set to an exception.
+// Removes element x from set. Does _not_ raise an exception if x is not contained in set. Sets *exc
+// on error.
 ypAPI void yp_discard(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes an arbitrary item from set and returns a new reference to it. You cannot use the order of
@@ -854,11 +855,11 @@ ypAPI ypObject *const yp_frozenset_empty;
  * Mapping Operations
  */
 
-// frozendicts and dicts are both mapping objects. Note that yp_contains, yp_in, yp_not_in,
-// and yp_iter operate solely on a mapping's keys.
+// frozendicts and dicts are both mapping objects. Note that yp_contains, yp_in, yp_not_in, and
+// yp_iter operate solely on a mapping's keys.
 
-// Returns a new reference to the value of mapping with the given key. Returns yp_KeyError if key
-// is not in the map.
+// Returns a new reference to the value of mapping with the given key. Returns yp_KeyError if key is
+// not in the map.
 ypAPI ypObject *yp_getitem(ypObject *mapping, ypObject *key);
 
 // Similar to yp_getitem, but returns a new reference to defval if key is not in the map. defval
@@ -874,12 +875,11 @@ ypAPI ypObject *yp_iter_keys(ypObject *mapping);
 // Returns a new reference to an iterator that yields mapping's values.
 ypAPI ypObject *yp_iter_values(ypObject *mapping);
 
-// Adds or replaces the value of mapping with the given key, setting it to x. On error, *exc is set
-// to an exception.
+// Adds or replaces the value of mapping with the given key, setting it to x. Sets *exc on error.
 ypAPI void yp_setitem(ypObject *mapping, ypObject *key, ypObject *x, ypObject **exc);
 
-// Removes the item with the given key from mapping. Raises yp_KeyError if key is not in mapping. On
-// error, *exc is set to an exception.
+// Removes the item with the given key from mapping. Raises yp_KeyError if key is not in mapping.
+// Sets *exc on error.
 ypAPI void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc);
 
 // If key is in mapping, remove it and return a new reference to its value, else return a new
@@ -902,17 +902,18 @@ ypAPI void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value);
 ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval);
 
 // Add the given n key/value pairs (for a total of 2*n objects) to mapping, overwriting existing
-// keys. If a given key is seen more than once, the last value is retained. On error, *exc is set to
-// an exception.
-// FIXME exc and vararg
-ypAPI void yp_updateK(ypObject *mapping, int n, ...);
-ypAPI void yp_updateKV(ypObject *mapping, int n, va_list args);
+// keys. If a given key is seen more than once, the last value is retained. Sets *exc on error. Note
+// that exc is before n as you cannot have arguments after ellipsis.
+ypAPI void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...);
+ypAPI void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args);
 
-// Add the elements from the n objects to mapping. Each object is handled as per yp_dict. On error,
-// *exc is set to an exception.
-// FIXME exc and vararg
-ypAPI void yp_updateN(ypObject *mapping, int n, ...);
-ypAPI void yp_updateNV(ypObject *mapping, int n, va_list args);
+// Add the elements from the n objects to mapping. Each object is handled as per yp_dict. Sets *exc
+// on error. Note that exc is before n as you cannot have arguments after ellipsis.
+ypAPI void yp_updateN(ypObject *mapping, ypObject **exc, int n, ...);
+ypAPI void yp_updateNV(ypObject *mapping, ypObject **exc, int n, va_list args);
+
+// Equivalent to yp_updateN(mapping, exc, 1, x).
+ypAPI void yp_update(ypObject *mapping, ypObject *x, ypObject **exc);
 
 // Immortal empty frozendict object.
 ypAPI ypObject *const yp_frozendict_empty;
@@ -923,16 +924,16 @@ ypAPI ypObject *const yp_frozendict_empty;
  */
 
 // These methods are supported by bytes and str (and their mutable counterparts, of course).
-// Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return ints
-// for these types, and will only accept ints for yp_setindexC. The individual elements of strs and
-// chrarrays are single-character strs. Using bytes/bytearray arguments on a str/chrarray method,
-// or str/chrarray arguments on a bytes/bytearray method, raises yp_TypeError (unless otherwise
+// Individual elements of bytes and bytearrays are ints, so yp_getindexC will always return ints for
+// these types, and will only accept ints for yp_setindexC. The individual elements of strs and
+// chrarrays are single-character strs. Using bytes/bytearray arguments on a str/chrarray method, or
+// str/chrarray arguments on a bytes/bytearray method, raises yp_TypeError (unless otherwise
 // documented).
 
-// Slicing an object always returns an object of the same type, so yp_getsliceC4 on a bytearray
-// will return a bytearray, while a slice of a str is another str, and so forth.
+// Slicing an object always returns an object of the same type, so yp_getsliceC4 on a bytearray will
+// return a bytearray, while a slice of a str is another str, and so forth.
 
-// Unlike Python, the arguments start/end (yp_startswithC4 et al) and i/j (yp_findC4 et al) are
+// Unlike Python, the arguments start/end (yp_startswithC4 et al) and i/j (yp_findC5 et al) are
 // always treated as in slice notation. Python behaves peculiarly when end<start in certain edge
 // cases involving empty strings (compare "foo"[5:0].startswith("") to "foo".startswith("", 5, 0)).
 
@@ -965,9 +966,9 @@ ypAPI ypObject *const yp_s_surrogatepass;      // "surrogatepass"
 ypAPI ypObject *yp_isalnum(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are alphabetic and there is at least one
-// character, otherwise yp_False. Alphabetic characters are those characters defined in the
-// Unicode character database as "Letter". Note that this is different from the "Alphabetic"
-// property defined in the Unicode Standard.
+// character, otherwise yp_False. Alphabetic characters are those characters defined in the Unicode
+// character database as "Letter". Note that this is different from the "Alphabetic" property
+// defined in the Unicode Standard.
 ypAPI ypObject *yp_isalpha(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are decimal characters and there is at least
@@ -983,36 +984,36 @@ ypAPI ypObject *yp_isdigit(ypObject *s);
 // definition, otherwise yp_False.
 ypAPI ypObject *yp_isidentifier(ypObject *s);
 
-// Returns the immortal yp_True if all cased characters in s are lowercase and there is at least
-// one cased character, otherwise yp_False. Cased characters are those with a general category
-// property of "Lu", "Ll", or "Lt".
+// Returns the immortal yp_True if all cased characters in s are lowercase and there is at least one
+// cased character, otherwise yp_False. Cased characters are those with a general category property
+// of "Lu", "Ll", or "Lt".
 ypAPI ypObject *yp_islower(ypObject *s);
 
-// Returns the immortal yp_True if all characters in s are numeric characters and there is at
-// least one character, otherwise yp_False. Numeric characters are those that have the Unicode
-// numeric value property.
+// Returns the immortal yp_True if all characters in s are numeric characters and there is at least
+// one character, otherwise yp_False. Numeric characters are those that have the Unicode numeric
+// value property.
 ypAPI ypObject *yp_isnumeric(ypObject *s);
 
 // Returns the immortal yp_True if all characters in s are printable or s is empty, otherwise
-// yp_False. Nonprintable characters are those characters defined in the Unicode character
-// database as "Other" or "Separator", excepting space (0x20) which is considered printable.
+// yp_False. Nonprintable characters are those characters defined in the Unicode character database
+// as "Other" or "Separator", excepting space (0x20) which is considered printable.
 ypAPI ypObject *yp_isprintable(ypObject *s);
 
 // Returns the immortal yp_True if there are only whitespace characters in s and there is at least
 // one character, otherwise yp_False. Whitespace characters are those characters defined in the
-// Unicode character database as "Other" or "Separator" and those with bidirectional property
-// being one of "WS", "B", or "S".
+// Unicode character database as "Other" or "Separator" and those with bidirectional property being
+// one of "WS", "B", or "S".
 ypAPI ypObject *yp_isspace(ypObject *s);
 
-// Returns the immortal yp_True if all cased characters in s are uppercase and there is at least
-// one cased character, otherwise yp_False. Cased characters are those with a general category
-// property of "Lu", "Ll", or "Lt".
+// Returns the immortal yp_True if all cased characters in s are uppercase and there is at least one
+// cased character, otherwise yp_False. Cased characters are those with a general category property
+// of "Lu", "Ll", or "Lt".
 ypAPI ypObject *yp_isupper(ypObject *s);
 
 // Returns the immortal yp_True if s[start:end] starts with the specified prefix, otherwise
-// yp_False. prefix can also be a tuple of prefix strings for which to look. If a prefix string
-// is empty, returns yp_True. yp_startswith considers the entire string (as if start is 0 and end
-// is yp_SLICE_USELEN).
+// yp_False. prefix can also be a tuple of prefix strings for which to look. If a prefix string is
+// empty, returns yp_True. yp_startswith considers the entire string (as if start is 0 and end is
+// yp_SLICE_USELEN).
 ypAPI ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
 ypAPI ypObject *yp_startswith(ypObject *s, ypObject *prefix);
 
@@ -1032,8 +1033,8 @@ ypAPI ypObject *yp_upper(ypObject *s);
 // casefolding algorithm is described in section 3.13 of the Unicode Standard.
 ypAPI ypObject *yp_casefold(ypObject *s);
 
-// Returns a new reference to a copy of s with uppercase characters converted to lowercase and
-// vice versa.
+// Returns a new reference to a copy of s with uppercase characters converted to lowercase and vice
+// versa.
 ypAPI ypObject *yp_swapcase(ypObject *s);
 
 // Returns a new reference to a copy of s with its first character capitalized and the rest
@@ -1079,8 +1080,8 @@ ypAPI ypObject *yp_rstrip(ypObject *s);
 ypAPI ypObject *yp_strip2(ypObject *s, ypObject *chars);
 ypAPI ypObject *yp_strip(ypObject *s);
 
-// Returns a new reference to the concatenation of the strings in iterable, using s as the
-// separator between elements. Raises yp_TypeError if there are any non-string values.
+// Returns a new reference to the concatenation of the strings in iterable, using s as the separator
+// between elements. Raises yp_TypeError if there are any non-string values.
 ypAPI ypObject *yp_join(ypObject *s, ypObject *iterable);
 
 // Equivalent to yp_join(s, yp_tupleN(n, ...)).
@@ -1089,29 +1090,29 @@ ypAPI ypObject *yp_joinNV(ypObject *s, int n, va_list args);
 
 // Splits s at the first occurrence of sep and returns new references to 3 objects: *part0 is the
 // part before the separator, *part1 the separator itself, and *part2 the part after. If the
-// separator is not found, *part0 is a copy of s, and *part1 and *part2 are empty strings. Sets
-// all 3 ypObject**s to the same exception on error.
+// separator is not found, *part0 is a copy of s, and *part1 and *part2 are empty strings. Sets all
+// 3 ypObject**s to the same exception on error.
 ypAPI void yp_partition(
         ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2);
 
-// Similar to yp_partition, except s is split at the last occurrence of sep, and if the separator
-// is not found then *part0 and *part1 are empty strings, and *part2 is a copy of s.
+// Similar to yp_partition, except s is split at the last occurrence of sep, and if the separator is
+// not found then *part0 and *part1 are empty strings, and *part2 is a copy of s.
 ypAPI void yp_rpartition(
         ypObject *s, ypObject *sep, ypObject **part0, ypObject **part1, ypObject **part2);
 
-// Returns a new reference to a list of words in the string, using sep as the delimiter string.
-// For yp_splitC3, only performs the leftmost splits up to maxsplit; for yp_split2, or if maxsplit
-// is -1, there is no limit on the number of splits made. If sep is yp_None this behaves as
-// yp_split, otherwise consecutive delimiters are not grouped together and are deemed to delimit
-// empty strings.
+// Returns a new reference to a list of words in the string, using sep as the delimiter string. For
+// yp_splitC3, only performs the leftmost splits up to maxsplit; for yp_split2, or if maxsplit is
+// -1, there is no limit on the number of splits made. If sep is yp_None this behaves as yp_split,
+// otherwise consecutive delimiters are not grouped together and are deemed to delimit empty
+// strings.
 //
 // Ex: yp_split2("1,,2", ",") returns ["1", "", "2"]
 ypAPI ypObject *yp_splitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 ypAPI ypObject *yp_split2(ypObject *s, ypObject *sep);
 
 // Similar to yp_splitC3, except a different splitting algorithm is used. Runs of consecutive
-// whitespace are regarded as a single separator and the result will contain no empty strings at
-// the start or end if the string has leading or trailing whitespace.
+// whitespace are regarded as a single separator and the result will contain no empty strings at the
+// start or end if the string has leading or trailing whitespace.
 //
 // Ex: yp_split(" 1  2   3  ") returns ["1", "2", "3"]
 ypAPI ypObject *yp_split(ypObject *s);
@@ -1156,8 +1157,8 @@ ypAPI ypObject *yp_formatN(ypObject *s, int n, ...);
 ypAPI ypObject *yp_formatNV(ypObject *s, int n, va_list args);
 
 // Similar to yp_formatN, except each replacement field contains the name of one of the n key/value
-// pairs (for a total of 2*n objects). (Implementation note: this function is optimized for
-// in-order replacement field names.)
+// pairs (for a total of 2*n objects). (Implementation note: this function is optimized for in-order
+// replacement field names.)
 ypAPI ypObject *yp_formatK(ypObject *s, int n, ...);
 ypAPI ypObject *yp_formatKV(ypObject *s, int n, va_list args);
 
@@ -1247,8 +1248,8 @@ typedef struct _yp_function_decl_t {
     // Array of parameters. Errors in this array generally raise yp_ParameterSyntaxError.
     yp_parameter_decl_t *parameters;
 
-    // Additional data that will be made available to code via yp_function_stateCX. Can be NULL.
-    // See yp_state_decl_t for more details.
+    // Additional data that will be made available to code via yp_function_stateCX. Can be NULL. See
+    // yp_state_decl_t for more details.
     void *state;
 
     // Describes the layout of state. If NULL, no state is copied into the object.
@@ -1305,67 +1306,56 @@ ypAPI ypObject *yp_xor(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_bar(ypObject *x, ypObject *y);
 ypAPI ypObject *yp_invert(ypObject *x);
 
-// In-place versions of the above; if the object *x can be modified to hold the result, it is,
-// otherwise *x is discarded and replaced with the result. If *x is immutable on input, an
-// immutable object is returned, otherwise a mutable object is returned. On error, *x is
-// discarded and set to an exception.
-// FIXME Rethink these inplace things. Why are we modifying mutables and replacing immutables?
-// Is it the Python library, or its syntax, that technically is implementing this?
-// FIXME Also stop discarding inputs...never steal an input!!
-ypAPI void yp_iadd(ypObject **x, ypObject *y);
-ypAPI void yp_isub(ypObject **x, ypObject *y);
-ypAPI void yp_imul(ypObject **x, ypObject *y);
-ypAPI void yp_itruediv(ypObject **x, ypObject *y);
-ypAPI void yp_ifloordiv(ypObject **x, ypObject *y);
-ypAPI void yp_imod(ypObject **x, ypObject *y);
-ypAPI void yp_ipow(ypObject **x, ypObject *y);
-ypAPI void yp_ipow3(ypObject **x, ypObject *y, ypObject *z);
-ypAPI void yp_ineg(ypObject **x);
-ypAPI void yp_ipos(ypObject **x);
-ypAPI void yp_iabs(ypObject **x);
-ypAPI void yp_ilshift(ypObject **x, ypObject *y);
-ypAPI void yp_irshift(ypObject **x, ypObject *y);
-ypAPI void yp_iamp(ypObject **x, ypObject *y);
-ypAPI void yp_ixor(ypObject **x, ypObject *y);
-ypAPI void yp_ibar(ypObject **x, ypObject *y);
-ypAPI void yp_iinvert(ypObject **x);
+// In-place versions of the above. Modifies x to hold the result. Sets *exc on error. Unlike Python,
+// x must be mutable (Python's __iadd__ et al return a new object if x is immutable).
+ypAPI void yp_iadd(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_isub(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_imul(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_itruediv(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_ifloordiv(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_imod(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_ipow(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_ipow4(ypObject *x, ypObject *y, ypObject *z, ypObject **exc);
+ypAPI void yp_ineg(ypObject *x, ypObject **exc);
+ypAPI void yp_ipos(ypObject *x, ypObject **exc);
+ypAPI void yp_iabs(ypObject *x, ypObject **exc);
+ypAPI void yp_ilshift(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_irshift(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_iamp(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_ixor(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_ibar(ypObject *x, ypObject *y, ypObject **exc);
+ypAPI void yp_iinvert(ypObject *x, ypObject **exc);
 
-// Versions of yp_iadd et al that accept a C integer as the second argument. Remember that *x may
-// be discarded and replaced with the result.
-// FIXME Rethink (see above).
-// FIXME Also stop discarding inputs...never steal an input!!
-ypAPI void yp_iaddC(ypObject **x, yp_int_t y);
-ypAPI void yp_isubC(ypObject **x, yp_int_t y);
-ypAPI void yp_imulC(ypObject **x, yp_int_t y);
-ypAPI void yp_itruedivC(ypObject **x, yp_int_t y);
-ypAPI void yp_ifloordivC(ypObject **x, yp_int_t y);
-ypAPI void yp_imodC(ypObject **x, yp_int_t y);
-ypAPI void yp_ipowC(ypObject **x, yp_int_t y);
-ypAPI void yp_ipowC3(ypObject **x, yp_int_t y, yp_int_t z);
-ypAPI void yp_ilshiftC(ypObject **x, yp_int_t y);
-ypAPI void yp_irshiftC(ypObject **x, yp_int_t y);
-ypAPI void yp_iampC(ypObject **x, yp_int_t y);
-ypAPI void yp_ixorC(ypObject **x, yp_int_t y);
-ypAPI void yp_ibarC(ypObject **x, yp_int_t y);
+// Versions of yp_iadd et al that accept a C integer as the second argument.
+ypAPI void yp_iaddC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_isubC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_imulC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_itruedivC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_ifloordivC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_imodC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_ipowC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_ipowC4(ypObject *x, yp_int_t y, yp_int_t z, ypObject **exc);
+ypAPI void yp_ilshiftC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_irshiftC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_iampC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_ixorC(ypObject *x, yp_int_t y, ypObject **exc);
+ypAPI void yp_ibarC(ypObject *x, yp_int_t y, ypObject **exc);
 
-// Versions of yp_iadd et al that accept a C floating-point as the second argument. Remember that
-// *x may be discarded and replaced with the result.
-// FIXME Rethink (see above).
-// FIXME Also stop discarding inputs...never steal an input!!
-ypAPI void yp_iaddCF(ypObject **x, yp_float_t y);
-ypAPI void yp_isubCF(ypObject **x, yp_float_t y);
-ypAPI void yp_imulCF(ypObject **x, yp_float_t y);
-ypAPI void yp_itruedivCF(ypObject **x, yp_float_t y);
-ypAPI void yp_ifloordivCF(ypObject **x, yp_float_t y);
-ypAPI void yp_imodCF(ypObject **x, yp_float_t y);
-ypAPI void yp_ipowCF(ypObject **x, yp_float_t y);
+// Versions of yp_iadd et al that accept a C floating-point as the second argument.
+ypAPI void yp_iaddCF(ypObject *x, yp_float_t y, ypObject **exc);
+ypAPI void yp_isubCF(ypObject *x, yp_float_t y, ypObject **exc);
+ypAPI void yp_imulCF(ypObject *x, yp_float_t y, ypObject **exc);
+ypAPI void yp_itruedivCF(ypObject *x, yp_float_t y, ypObject **exc);
+ypAPI void yp_ifloordivCF(ypObject *x, yp_float_t y, ypObject **exc);
+ypAPI void yp_imodCF(ypObject *x, yp_float_t y, ypObject **exc);
+ypAPI void yp_ipowCF(ypObject *x, yp_float_t y, ypObject **exc);
 
 // Library routines for nohtyP integer operations on C types. Returns zero and sets *exc on error.
 // Additional notes:
 //
 // - yp_truedivL returns a floating-point number
-// - If z is 0, yp_powL3 returns x to the power y, otherwise x to the power y modulo z
-// - If y is negative, yp_powL and yp_powL3 raise yp_ValueError, as the result should be a
+// - If z is 0, yp_powL4 returns x to the power y, otherwise x to the power y modulo z
+// - If y is negative, yp_powL and yp_powL4 raise yp_ValueError, as the result should be a
 //   floating-point number; use yp_powLF for negative exponents instead
 ypAPI yp_int_t   yp_addL(yp_int_t x, yp_int_t y, ypObject **exc);
 ypAPI yp_int_t   yp_subL(yp_int_t x, yp_int_t y, ypObject **exc);
@@ -1375,7 +1365,7 @@ ypAPI yp_int_t   yp_floordivL(yp_int_t x, yp_int_t y, ypObject **exc);
 ypAPI yp_int_t   yp_modL(yp_int_t x, yp_int_t y, ypObject **exc);
 ypAPI void       yp_divmodL(yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject **exc);
 ypAPI yp_int_t   yp_powL(yp_int_t x, yp_int_t y, ypObject **exc);
-ypAPI yp_int_t   yp_powL3(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc);
+ypAPI yp_int_t   yp_powL4(yp_int_t x, yp_int_t y, yp_int_t z, ypObject **exc);
 ypAPI yp_int_t   yp_negL(yp_int_t x, ypObject **exc);
 ypAPI yp_int_t   yp_posL(yp_int_t x, ypObject **exc);
 ypAPI yp_int_t   yp_absL(yp_int_t x, ypObject **exc);
@@ -1386,8 +1376,8 @@ ypAPI yp_int_t   yp_xorL(yp_int_t x, yp_int_t y, ypObject **exc);
 ypAPI yp_int_t   yp_barL(yp_int_t x, yp_int_t y, ypObject **exc);
 ypAPI yp_int_t   yp_invertL(yp_int_t x, ypObject **exc);
 
-// Library routines for nohtyP floating-point operations on C types. Returns zero and sets *exc
-// on error.
+// Library routines for nohtyP floating-point operations on C types. Returns zero and sets *exc on
+// error.
 ypAPI yp_float_t yp_addLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_subLF(yp_float_t x, yp_float_t y, ypObject **exc);
 ypAPI yp_float_t yp_mulLF(yp_float_t x, yp_float_t y, ypObject **exc);
@@ -1401,9 +1391,9 @@ ypAPI yp_float_t yp_negLF(yp_float_t x, ypObject **exc);
 ypAPI yp_float_t yp_posLF(yp_float_t x, ypObject **exc);
 ypAPI yp_float_t yp_absLF(yp_float_t x, ypObject **exc);
 
-// Conversion routines from C types or objects to C types. Returns a reasonable value and sets
-// *exc on error; "reasonable" usually means "truncated". Converting a float to an int truncates
-// toward zero but is not an error.
+// Conversion routines from C types or objects to C types. Returns a reasonable value and sets *exc
+// on error; "reasonable" usually means "truncated". Converting a float to an int truncates toward
+// zero but is not an error.
 ypAPI yp_int_t     yp_asintC(ypObject *x, ypObject **exc);
 ypAPI yp_int8_t    yp_asint8C(ypObject *x, ypObject **exc);
 ypAPI yp_uint8_t   yp_asuint8C(ypObject *x, ypObject **exc);
@@ -1463,11 +1453,11 @@ ypAPI ypObject *const yp_i_two;
 // Unlike Python, most objects are deep copied in memory, even immutables, as deep copying is one
 // strategy to maintain threadsafety.
 
-// Transmutes x to its associated immutable type. If x is already immutable this is a no-op. On
-// error, *exc is set to an exception.
+// Transmutes x to its associated immutable type. If x is already immutable this is a no-op. Sets
+// *exc on error.
 ypAPI void yp_freeze(ypObject *x, ypObject **exc);
 
-// Freezes x and, recursively, all contained objects. On error, *exc is set to an exception.
+// Freezes x and, recursively, all contained objects. Sets *exc on error.
 ypAPI void yp_deepfreeze(ypObject *x, ypObject **exc);
 
 // Returns a new reference to a mutable shallow copy of x. If x has no associated mutable type an
@@ -1500,12 +1490,12 @@ ypAPI ypObject *yp_deepcopy(ypObject *x);
 
 // Discards all contained objects in x, deallocates _some_ memory, and transmutes it to the
 // ypInvalidated type (rendering the object useless). If x is immortal or already invalidated this
-// is a no-op; immutable objects _can_ be invalidated. On error, *exc is set to an exception.
+// is a no-op; immutable objects _can_ be invalidated. Sets *exc on error.
 ypAPI void yp_invalidate(ypObject *x, ypObject **exc);
 
 // Invalidates x and, recursively, all contained objects. As nohtyP does not currently detect
 // reference cycles during garbage collection, this is an effective way to break cycles and free
-// memory. On error, *exc is set to an exception.
+// memory. Sets *exc on error.
 ypAPI void yp_deepinvalidate(ypObject *x, ypObject **exc);
 
 
@@ -1570,8 +1560,8 @@ typedef struct _yp_state_decl_t {
     // The total size of state, in bytes.
     yp_ssize_t size;
 
-    // The number of elements in the offsets array, or -1 to calculate the offsets (see offsets
-    // for details).
+    // The number of elements in the offsets array, or -1 to calculate the offsets (see offsets for
+    // details).
     yp_ssize_t offsets_len;
 
     // An array of offsets of the objects in state (i.e., the ypObject * members). Identifying these
@@ -1630,9 +1620,9 @@ ypAPI ypObject *yp_miniiter(ypObject *x, yp_uint64_t *state);
 // exhausted yp_StopIteration is raised.
 ypAPI ypObject *yp_miniiter_next(ypObject *mi, yp_uint64_t *state);
 
-// Returns a hint as to how many items are left to be yielded. See yp_length_hintC for
-// additional information. state must point to the same data returned by the previous yp_miniiter*
-// call. Returns zero and sets *exc on error.
+// Returns a hint as to how many items are left to be yielded. See yp_length_hintC for additional
+// information. state must point to the same data returned by the previous yp_miniiter* call.
+// Returns zero and sets *exc on error.
 ypAPI yp_ssize_t yp_miniiter_length_hintC(ypObject *mi, yp_uint64_t *state, ypObject **exc);
 
 // Mini iterator versions of yp_iter_keys and yp_iter_values. Otherwise behaves as yp_miniiter.
@@ -1662,9 +1652,9 @@ ypAPI void yp_miniiter_items_next(
 // when dealing with containers. Keep in mind, though, that many of these functions create
 // short-lived objects internally, so excessive use may impact execution time.
 
-// For functions that deal with strs, if encoding is missing yp_s_utf_8 (which is compatible
-// with ascii) is assumed, while if errors is missing yp_s_strict is assumed. yp_*_containsC
-// returns false and sets *exc on exception.
+// For functions that deal with strs, if encoding is missing yp_s_utf_8 (which is compatible with
+// ascii) is assumed, while if errors is missing yp_s_strict is assumed. yp_*_containsC returns
+// false and sets *exc on exception.
 
 // Operations on containers that map objects to integers.
 ypAPI int      yp_o2i_containsC(ypObject *container, yp_int_t x, ypObject **exc);
@@ -1677,8 +1667,8 @@ ypAPI void     yp_o2i_setitemC(ypObject *container, ypObject *key, yp_int_t x, y
 ypAPI void yp_o2s_setitemC4(
         ypObject **container, ypObject *key, const yp_uint8_t *x, yp_ssize_t x_len);
 
-// Operations on containers that map integers to objects. Note that if the container is known
-// at compile-time to be a sequence, then yp_getindexC et al are better choices.
+// Operations on containers that map integers to objects. Note that if the container is known at
+// compile-time to be a sequence, then yp_getindexC et al are better choices.
 ypAPI ypObject *yp_i2o_getitemC(ypObject *container, yp_int_t key);
 ypAPI void      yp_i2o_setitemC(ypObject *container, yp_int_t key, ypObject *x, ypObject **exc);
 
@@ -1690,8 +1680,8 @@ ypAPI void     yp_i2i_setitemC(ypObject *container, yp_int_t key, yp_int_t x, yp
 ypAPI void yp_i2s_setitemC4(
         ypObject **container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len);
 
-// Operations on containers that map strs to objects. Note that if the value of the str is
-// known at compile-time, as in:
+// Operations on containers that map strs to objects. Note that if the value of the str is known at
+// compile-time, as in:
 //
 //      value = yp_s2o_getitemC3(o, "mykey", -1);
 //
@@ -1704,7 +1694,7 @@ ypAPI void      yp_s2o_setitemC4(
              ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject *x);
 
 // Operations on containers that map strs to integers.
-ypAPI yp_int_t yp_s2i_getitemC3(
+ypAPI yp_int_t yp_s2i_getitemC4(
         ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject **exc);
 ypAPI void yp_s2i_setitemC4(
         ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len, yp_int_t x);
@@ -1714,31 +1704,31 @@ ypAPI void yp_s2i_setitemC4(
  * Immortal "Constructor" Macros
  */
 
-// Defines an immortal int object at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const". value is a (constant) yp_int_t. To be used as:
+// Defines an immortal int object at compile-time, which can be accessed by the variable name, which
+// is of type "ypObject * const". value is a (constant) yp_int_t. To be used as:
 //
 //      yp_IMMORTAL_INT(name, value);
 
 // Defines an immortal bytes object at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const". value is a C string literal that can contain null bytes.
-// The length is calculated while compiling; the hash will be calculated the first time it is
-// accessed. To be used as:
+// which is of type "ypObject * const". value is a C string literal that can contain null bytes. The
+// length is calculated while compiling; the hash will be calculated the first time it is accessed.
+// To be used as:
 //
 //      yp_IMMORTAL_BYTES(name, value);
 
 // Defines an immortal str constant at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const". value is a latin-1 encoded C string literal that can
-// contain null characters. The length is calculated while compiling; the hash will be calculated
-// the first time it is accessed. Note that this also accepts an ascii-encoded C string literal,
-// as ascii is a subset of latin-1.
+// which is of type "ypObject * const". value is a latin-1 encoded C string literal that can contain
+// null characters. The length is calculated while compiling; the hash will be calculated the first
+// time it is accessed. Note that this also accepts an ascii-encoded C string literal, as ascii is a
+// subset of latin-1.
 //
 //      yp_IMMORTAL_STR_LATIN_1(name, value);
 
 // The default immortal "constructor" macros declare variables as "ypObject * const". This means
-// immortals defined outside of a function will be extern. It also means you should *not*
-// use these macros in a function, as the variable will be "deallocated" when the function returns,
-// and immortals should never be deallocated. The following macros work as above, except the
-// variables are declared as "static ypObject * const".
+// immortals defined outside of a function will be extern. It also means you should *not* use these
+// macros in a function, as the variable will be "deallocated" when the function returns, and
+// immortals should never be deallocated. The following macros work as above, except the variables
+// are declared as "static ypObject * const".
 //
 //      yp_IMMORTAL_INT_static(name, value);
 //      yp_IMMORTAL_BYTES_static(name, value);
@@ -1886,8 +1876,8 @@ ypAPI void yp_mem_default_free(void *p);
  * Direct Object Memory Access
  */
 
-// XXX The "X" in these names is a reminder that the function is returning internal memory, and
-// as such should be used with caution.
+// XXX The "X" in these names is a reminder that the function is returning internal memory, and as
+// such should be used with caution.
 
 // Typically only called from within yp_generator_decl_t.func functions. Sets *state and *size to
 // the internal iterator state buffer and its size in bytes, and returns the immortal yp_None. The
@@ -1897,8 +1887,8 @@ ypAPI void yp_mem_default_free(void *p);
 // returns an exception on error.
 ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
 
-// Typically only called from within yp_function_decl_t.code functions. Sets *state and *size to
-// the internal function state buffer and its size in bytes, and returns the immortal yp_None. The
+// Typically only called from within yp_function_decl_t.code functions. Sets *state and *size to the
+// internal function state buffer and its size in bytes, and returns the immortal yp_None. The
 // structure and initial values of *state are determined when the function is created; the size
 // cannot change after creation, and any ypObject*s in *state should be considered *borrowed* (it is
 // safe to replace them with new or immortal references). Sets *state to NULL, *size to zero, and
@@ -1915,12 +1905,12 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t
 
 // str and chrarray internally store their Unicode characters in particular encodings, usually
 // depending on the contents of the string. This function sets *encoded to the beginning of that
-// data, *size to the number of bytes in encoded, and *encoding to the immortal str representing
-// the encoding used (yp_s_latin_1, perhaps). *encoded will point into internal object memory
-// which MUST NOT be modified; furthermore, the string itself must not be modified while using the
-// array. As a special case, if size is NULL, the string must not contain null characters and
-// *encoded will point to a null-terminated string. On error, sets *encoded to NULL, *size to
-// zero (if size is not NULL), *encoding to the exception, and returns the exception.
+// data, *size to the number of bytes in encoded, and *encoding to the immortal str representing the
+// encoding used (yp_s_latin_1, perhaps). *encoded will point into internal object memory which MUST
+// NOT be modified; furthermore, the string itself must not be modified while using the array. As a
+// special case, if size is NULL, the string must not contain null characters and *encoded will
+// point to a null-terminated string. On error, sets *encoded to NULL, *size to zero (if size is not
+// NULL), *encoding to the exception, and returns the exception.
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding);
 
@@ -1965,8 +1955,8 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
  */
 
 #ifdef yp_FUTURE
-// yp_IF: A series of macros to emulate an if/elif/else with exception handling. To be used
-// strictly as follows (including braces):
+// yp_IF: A series of macros to emulate an if/elif/else with exception handling. To be used strictly
+// as follows (including braces):
 //
 //      yp_IF(condition1) {
 //          // branch1
@@ -1984,8 +1974,8 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 // As in Python, a condition is only evaluated if previous conditions evaluated false and did not
 // raise an exception, the exception-branch is executed if any evaluated condition raises an
 // exception, and the exception target is only available inside exception-branch. Unlike Python,
-// exceptions in the chosen branch do not trigger the exception-branch. If a condition creates a
-// new reference that must be discarded, use yp_IFd and/or yp_ELIFd ("d" stands for "discard" or
+// exceptions in the chosen branch do not trigger the exception-branch. If a condition creates a new
+// reference that must be discarded, use yp_IFd and/or yp_ELIFd ("d" stands for "discard" or
 // "decref"):
 //
 //      yp_IFd(yp_getitem(a, key))
@@ -2039,8 +2029,8 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uin
 // once for each successfully-yielded value, which is assigned to the target variable. This occurs
 // until:
 //
-// - the iterator raises yp_StopIteration (FIXME generator exit? others?), in which case else-suite
-//   is executed (but *not* the exception-suite)
+// - the iterator raises yp_StopIteration, in which case else-suite is executed (but *not* the
+//   exception-suite)
 // - a break statement, in which case neither the else- nor exception-suites are executed
 // - an exception occurs in expression or the iterator, in which case the exception target (which is
 //   only available inside exception-suite) is set to the exception and the exception-suite is
@@ -2125,8 +2115,7 @@ struct _ypObject {
 // These structures are likely to change in future versions; they should only exist in-memory
 struct _ypIntObject {
     _ypObject_HEAD;
-    // TODO If sizeof(yp_int_t)==sizeof(yp_hash_t), we _could_ use ob_hash instead of value,
-    // except:
+    // TODO If sizeof(yp_int_t)==sizeof(yp_hash_t), we _could_ use ob_hash instead of value, except:
     //
     // - ob_hash is currently only supposed to be for immutable values
     // - Value -1 gets mapped to hash -2, which if cached would *change the value* of "-1"

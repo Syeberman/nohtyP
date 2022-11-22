@@ -920,7 +920,7 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_ipow( ref ypObject_p x, ypObject_p y );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_ipow3( ref ypObject_p x, ypObject_p y, ypObject_p z );
+        internal static extern void yp_ipow4( ref ypObject_p x, ypObject_p y, ypObject_p z );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_ineg( ref ypObject_p x );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
@@ -948,7 +948,7 @@ namespace nohtyP
         internal static extern void yp_ifloordivC( ypObject_p *x, yp_int_t y );
         internal static extern void yp_imodC( ypObject_p *x, yp_int_t y );
         internal static extern void yp_ipowC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_ipowC3( ypObject_p *x, yp_int_t y, yp_int_t z );
+        internal static extern void yp_ipowC4( ypObject_p *x, yp_int_t y, yp_int_t z );
         internal static extern void yp_ilshiftC( ypObject_p *x, yp_int_t y );
         internal static extern void yp_irshiftC( ypObject_p *x, yp_int_t y );
         internal static extern void yp_iampC( ypObject_p *x, yp_int_t y );
@@ -971,7 +971,7 @@ namespace nohtyP
         internal static extern yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject_p *exc );
         internal static extern void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject_p *exc );
         internal static extern yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_powL3( yp_int_t x, yp_int_t y, yp_int_t z, ypObject_p *exc );
+        internal static extern yp_int_t yp_powL4( yp_int_t x, yp_int_t y, yp_int_t z, ypObject_p *exc );
         internal static extern yp_int_t yp_negL( yp_int_t x, ypObject_p *exc );
         internal static extern yp_int_t yp_posL( yp_int_t x, ypObject_p *exc );
         internal static extern yp_int_t yp_absL( yp_int_t x, ypObject_p *exc );
