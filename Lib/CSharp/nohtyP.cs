@@ -740,7 +740,7 @@ namespace nohtyP
         internal static extern void yp_setindexC( ref ypObject_p sequence, yp_ssize_t i, ypObject_p x );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_setsliceC5( ref ypObject_p sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k,
+        internal static extern void yp_setsliceC6( ref ypObject_p sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k,
                 ypObject_p x );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
@@ -750,7 +750,7 @@ namespace nohtyP
         internal static extern void yp_delindexC( ref ypObject_p sequence, yp_ssize_t i );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_delsliceC4( ref ypObject_p sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+        internal static extern void yp_delsliceC5( ref ypObject_p sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_delitem( ref ypObject_p sequence, ypObject_p key );
@@ -780,7 +780,7 @@ namespace nohtyP
         internal static extern void yp_reverse( ref ypObject_p sequence );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_sort3( ref ypObject_p sequence, yp_sort_key_func_t key, ypObject_p reverse );
+        internal static extern void yp_sort4( ref ypObject_p sequence, yp_sort_key_func_t key, ypObject_p reverse );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_sort( ref ypObject_p sequence );
@@ -939,79 +939,6 @@ namespace nohtyP
         internal static extern void yp_ibar( ref ypObject_p x, ypObject_p y );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_iinvert( ref ypObject_p x );
-
-#if NOTDEFINED
-        internal static extern void yp_iaddC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_isubC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_imulC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_itruedivC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_ifloordivC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_imodC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_ipowC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_ipowC4( ypObject_p *x, yp_int_t y, yp_int_t z );
-        internal static extern void yp_ilshiftC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_irshiftC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_iampC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_ixorC( ypObject_p *x, yp_int_t y );
-        internal static extern void yp_ibarC( ypObject_p *x, yp_int_t y );
-
-        internal static extern void yp_iaddCF( ypObject_p *x, yp_float_t y );
-        internal static extern void yp_isubCF( ypObject_p *x, yp_float_t y );
-        internal static extern void yp_imulCF( ypObject_p *x, yp_float_t y );
-        internal static extern void yp_itruedivCF( ypObject_p *x, yp_float_t y );
-        internal static extern void yp_ifloordivCF( ypObject_p *x, yp_float_t y );
-        internal static extern void yp_imodCF( ypObject_p *x, yp_float_t y );
-        internal static extern void yp_ipowCF( ypObject_p *x, yp_float_t y );
-
-        internal static extern yp_int_t yp_addL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_subL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_mulL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_float_t yp_truedivL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_floordivL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_modL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern void yp_divmodL( yp_int_t x, yp_int_t y, yp_int_t *div, yp_int_t *mod, ypObject_p *exc );
-        internal static extern yp_int_t yp_powL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_powL4( yp_int_t x, yp_int_t y, yp_int_t z, ypObject_p *exc );
-        internal static extern yp_int_t yp_negL( yp_int_t x, ypObject_p *exc );
-        internal static extern yp_int_t yp_posL( yp_int_t x, ypObject_p *exc );
-        internal static extern yp_int_t yp_absL( yp_int_t x, ypObject_p *exc );
-        internal static extern yp_int_t yp_lshiftL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_rshiftL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_ampL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_xorL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_barL( yp_int_t x, yp_int_t y, ypObject_p *exc );
-        internal static extern yp_int_t yp_invertL( yp_int_t x, ypObject_p *exc );
-
-        internal static extern yp_float_t yp_addLF( yp_float_t x, yp_float_t y, ypObject_p *exc );
-        internal static extern yp_float_t yp_subLF( yp_float_t x, yp_float_t y, ypObject_p *exc );
-        internal static extern yp_float_t yp_mulLF( yp_float_t x, yp_float_t y, ypObject_p *exc );
-        internal static extern yp_float_t yp_truedivLF( yp_float_t x, yp_float_t y, ypObject_p *exc );
-        internal static extern yp_float_t yp_floordivLF( yp_float_t x, yp_float_t y, ypObject_p *exc );
-        internal static extern yp_float_t yp_modLF( yp_float_t x, yp_float_t y, ypObject_p *exc );
-        internal static extern void yp_divmodLF( yp_float_t x, yp_float_t y,
-                yp_float_t *div, yp_float_t *mod, ypObject_p *exc );
-        internal static extern yp_float_t yp_powLF( yp_float_t x, yp_float_t y, ypObject_p *exc );
-        internal static extern yp_float_t yp_negLF( yp_float_t x, ypObject_p *exc );
-        internal static extern yp_float_t yp_posLF( yp_float_t x, ypObject_p *exc );
-        internal static extern yp_float_t yp_absLF( yp_float_t x, ypObject_p *exc );
-
-        internal static extern yp_int_t yp_asintC( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_int8_t yp_asint8C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_uint8_t yp_asuint8C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_int16_t yp_asint16C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_uint16_t yp_asuint16C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_int32_t yp_asint32C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_uint32_t yp_asuint32C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_int64_t yp_asint64C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_uint64_t yp_asuint64C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_float_t yp_asfloatC( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_float32_t yp_asfloat32C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_float64_t yp_asfloat64C( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_ssize_t yp_asssizeC( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_hash_t yp_ashashC( ypObject_p x, ypObject_p *exc );
-        internal static extern yp_float_t yp_asfloatL( yp_int_t x, ypObject_p *exc );
-        internal static extern yp_int_t yp_asintLF( yp_float_t x, ypObject_p *exc );
-#endif
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_roundC( ypObject_p x, int ndigits );
