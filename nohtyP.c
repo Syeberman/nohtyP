@@ -677,8 +677,8 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 #define MIN4(a, b, c, d) MIN(MIN(a, b), MIN(c, d))
 
 
-// Functions that return nohtyP objects simply need to return the error object to "raise" it. Use
-// this as "return_yp_ERR(yp_ValueError);" to return the error properly.
+// Functions that return nohtyP objects return the error object to "raise" it. Use this as
+// "return_yp_ERR(yp_ValueError);" to return the error properly.
 #define return_yp_ERR(_err)             \
     do {                                \
         ypObject *_yp_ERR_err = (_err); \

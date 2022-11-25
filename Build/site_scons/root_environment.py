@@ -34,11 +34,12 @@ if vars_unknown:
 
 # Require that construction variable names exist at expansion, then add those allowed to be empty
 AllowSubstExceptions()
-RootEnv.Replace(CPPFLAGS=[], PPCCCOMSTR="", SHCCCOMSTR="", SHLINKCOMSTR="",
-                SHLIBVERSION="", SHLIBNOVERSIONSYMLINKS="",
+RootEnv.Replace(CPPFLAGS=[], PPCCCOMSTR="",
+                CCCOMSTR="", LINKCOMSTR="", LIBVERSION="", LIBNOVERSIONSYMLINKS="",
+                SHCCCOMSTR="", SHLINKCOMSTR="", SHLIBVERSION="", SHLIBNOVERSIONSYMLINKS="",
                 LIBPATH=[], PCH="",
                 WINDOWS_INSERT_DEF=0, WINDOWSDEFPREFIX="", WINDOWSDEFSUFFIX="",
-                RPATH=[],
+                RPATH=[], _RPATH=[], __RPATH=[],
                 _FRAMEWORKPATH="",
                 )
 

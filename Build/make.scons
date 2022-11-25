@@ -26,19 +26,54 @@ def nohtyP_SharedLibrary(env):
             "yp_DEBUG_LEVEL=%s" % ("10" if env["CONFIGURATION"] == "debug" else "0"),
         ],
         PDB="$VTOP/nohtyP.pdb",
-        LIBS="",
+        LIBS=[],
     )
     return (env.SharedLibrary("$VTOP/nohtyP", source="$VTOP/nohtyP.c"), )
+
+
+# Builds the munit_test suite against the shared library.
+def nohtyP_munit_test_Program_shared(env, sharedLib):
+    env.PrependUnique(
+        CPPPATH=[
+            "#",
+            "#/Lib",
+            "#/Tools/munit",
+        ],
+        CPPDEFINES=[
+            "yp_ENABLE_SHARED",
+        ],
+        PDB="$VTOP/munit_test.pdb",
+        LIBS=[
+            sharedLib
+        ],
+    )
+    source = [
+        # TODO Add ypExample.c to the munit tests.
+        env.Glob("$VTOP/Lib/munit_test/*.c"),
+        env.Glob("$VTOP/Lib/munit_test/*/*.c"),
+        # "$VTOP/Tools/munit/munit.c"
+    ]
+    return (env.Program("$VTOP/munit_test", source=source), )
 
 
 def nohtyP_yp_test(env, sharedLib):
     env.PrependENVPath("PYTHONPATH", "#/Lib")
     env["ENV"]["NOHTYP_LIBRARY"] = Flatten(sharedLib)[0]
-    scripts = ("#/Lib/yp.py", Glob("#/Lib/yp_test/*.py"), Glob("#/Lib/yp_test/*.txt"))
+    scripts = ("#/Lib/yp.py", env.Glob("#/Lib/yp_test/*.py"), env.Glob("#/Lib/yp_test/*.txt"))
     testLog = env.Command(
         "$VTOP/yp_test.log", (sharedLib, scripts), "$PYTHON -m yp_test -v > $TARGET"
     )
     Clean(sharedLib, testLog)
+    return testLog
+
+
+# Runs the munit_test suite.
+def nohtyP_munit_test(env, munit_test):
+    env["MUNIT_TEST"] = Flatten(munit_test)[0]
+    testLog = env.Command(
+        "$VTOP/munit_test.log", (munit_test), "$MUNIT_TEST > $TARGET"
+    )
+    Clean(munit_test, testLog)
     return testLog
 
 
@@ -53,7 +88,7 @@ def nohtyP_checkapi(env):
     preprocessed = env.Preprocessed("$VTOP/checkapi/nohtyP_h", source=headerDotC)
 
     # TODO Have checkapi write directly to the file
-    scripts = (Glob("#/Tools/checkapi/*.py"), )
+    scripts = (env.Glob("#/Tools/checkapi/*.py"), )
     checkapiLog = env.Command(
         "$VTOP/checkapi.log", (preprocessed, scripts),
         "$PYTHON Tools/checkapi/checkapi.py $SOURCE > $TARGET"
@@ -146,9 +181,17 @@ for compiler_name in compiler_names:
             traceback.print_exc(file=SconscriptLog)
 
         if targ_os == native_os and targ_arch in native_archs:
-            # We can only run yp_test on native OS and architectures, and only if a version
-            # of Python exists that can run against the target architecture. Include sharedLib
-            # in testTargets so that "test:release" will pull them into the native directory.
+            # We can only run munit_test on native OS and architectures.
+            testTargets.extend((
+                nohtyP_munit_test(
+                    variantEnv.Clone(),
+                    nohtyP_munit_test_Program_shared(compilerEnv.Clone(), sharedLib)
+                )
+            ))
+
+            # yp_test can only run if a version of Python exists that can run against the target
+            # architecture. Include sharedLib in testTargets so that "test:release" will pull them
+            # into the native directory.
             try:
                 testTargets.extend((
                     nohtyP_yp_test(variantEnv.Clone(tools=[
