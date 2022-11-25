@@ -390,8 +390,7 @@ yp_func(c_void, "yp_push", ((c_ypObject_p, "container"), (c_ypObject_p, "x"), c_
 yp_func(c_void, "yp_clear", ((c_ypObject_p, "container"), c_ypObject_pp_exc))
 
 # ypObject *yp_pop(ypObject *container);
-yp_func(c_ypObject_p, "yp_pop", ((c_ypObject_p, "container")))
-
+yp_func(c_ypObject_p, "yp_pop", ((c_ypObject_p, "container"), ))
 
 # ypObject *yp_concat(ypObject *sequence, ypObject *x);
 yp_func(c_ypObject_p, "yp_concat", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x")))
@@ -406,49 +405,49 @@ yp_func(c_ypObject_p, "yp_getindexC", ((c_ypObject_p, "sequence"), (c_yp_ssize_t
 yp_func(c_ypObject_p, "yp_getsliceC4", ((c_ypObject_p, "sequence"),
                                         (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k")))
 
-# yp_ssize_t yp_findC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+# yp_ssize_t yp_findC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc);
-yp_func(c_yp_ssize_t, "yp_findC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+yp_func(c_yp_ssize_t, "yp_findC5", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                     (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
 
 # yp_ssize_t yp_findC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_findC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                    c_ypObject_pp_exc))
 
-# yp_ssize_t yp_indexC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+# yp_ssize_t yp_indexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc);
-yp_func(c_yp_ssize_t, "yp_indexC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+yp_func(c_yp_ssize_t, "yp_indexC5", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                      (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
 # yp_ssize_t yp_indexC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_indexC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                     c_ypObject_pp_exc))
 
-# yp_ssize_t yp_rfindC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+# yp_ssize_t yp_rfindC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc);
-yp_func(c_yp_ssize_t, "yp_rfindC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+yp_func(c_yp_ssize_t, "yp_rfindC5", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                      (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
 # yp_ssize_t yp_rfindC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_rfindC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                     c_ypObject_pp_exc))
-# yp_ssize_t yp_rindexC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+# yp_ssize_t yp_rindexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #         ypObject **exc);
-yp_func(c_yp_ssize_t, "yp_rindexC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+yp_func(c_yp_ssize_t, "yp_rindexC5", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                       (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
 # yp_ssize_t yp_rindexC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_rindexC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                      c_ypObject_pp_exc))
 
-# yp_ssize_t yp_countC4(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
+# yp_ssize_t yp_countC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j,
 #        ypObject **exc);
-yp_func(c_yp_ssize_t, "yp_countC4", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
+yp_func(c_yp_ssize_t, "yp_countC5", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                      (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), c_ypObject_pp_exc))
 
 # yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc);
 yp_func(c_yp_ssize_t, "yp_countC", ((c_ypObject_p, "sequence"), (c_ypObject_p, "x"),
                                     c_ypObject_pp_exc))
 
-# void yp_setsliceC6(
-#         ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x, ypObject **exc);
+# void yp_setsliceC6(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x,
+#         ypObject **exc);
 yp_func(c_void, "yp_setsliceC6", ((c_ypObject_p, "sequence"),
                                   (c_yp_ssize_t, "i"), (c_yp_ssize_t, "j"), (c_yp_ssize_t, "k"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
 
@@ -527,7 +526,7 @@ yp_func(c_void, "yp_symmetric_difference_update", ((c_ypObject_p, "set"), (c_ypO
 yp_func(c_void, "yp_set_add", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
 
 # void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc);
-yp_func(c_void, "yp_pushuniqueE", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
+yp_func(c_void, "yp_pushunique", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
 
 # void yp_discard(ypObject *set, ypObject *x, ypObject **exc);
 yp_func(c_void, "yp_discard", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
@@ -970,9 +969,9 @@ class ypObject(c_ypObject_p):
         exc._yp_errcheck()
         return result
 
-    def push(self, x): _yp_push(self, x)
+    def push(self, x): _yp_push(self, x, yp_None)
 
-    def clear(self): _yp_clear(self)
+    def clear(self): _yp_clear(self, yp_None)
 
     def pop(self): return _yp_pop(self)
 
@@ -986,30 +985,30 @@ class ypObject(c_ypObject_p):
         return func4(self, x, i, j, *extra)
 
     def find(self, x, i=None, j=None):
-        return yp_int(self._sliceSearch(_yp_findC, _yp_findC4, x, i, j, yp_None))
+        return yp_int(self._sliceSearch(_yp_findC, _yp_findC5, x, i, j, yp_None))
 
     def index(self, x, i=None, j=None):
-        return yp_int(self._sliceSearch(_yp_indexC, _yp_indexC4, x, i, j, yp_None))
+        return yp_int(self._sliceSearch(_yp_indexC, _yp_indexC5, x, i, j, yp_None))
 
     def rfind(self, x, i=None, j=None):
-        return yp_int(self._sliceSearch(_yp_rfindC, _yp_rfindC4, x, i, j, yp_None))
+        return yp_int(self._sliceSearch(_yp_rfindC, _yp_rfindC5, x, i, j, yp_None))
 
     def rindex(self, x, i=None, j=None):
-        return yp_int(self._sliceSearch(_yp_rindexC, _yp_rindexC4, x, i, j, yp_None))
+        return yp_int(self._sliceSearch(_yp_rindexC, _yp_rindexC5, x, i, j, yp_None))
 
     def count(self, x, i=None, j=None):
-        return yp_int(self._sliceSearch(_yp_countC, _yp_countC4, x, i, j, yp_None))
+        return yp_int(self._sliceSearch(_yp_countC, _yp_countC5, x, i, j, yp_None))
 
-    def append(self, x): _yp_append(self, x)
+    def append(self, x): _yp_append(self, x, yp_None)
 
-    def extend(self, t): _yp_extend(self, _yp_iterable(t))
+    def extend(self, t): _yp_extend(self, _yp_iterable(t), yp_None)
 
-    def insert(self, i, x): _yp_insertC(self, i, x)
+    def insert(self, i, x): _yp_insertC(self, i, x, yp_None)
 
-    def reverse(self): _yp_reverse(self)
+    def reverse(self): _yp_reverse(self, yp_None)
 
     def sort(self, *, key=None, reverse=False):
-        _yp_sort3(self, key, reverse)
+        _yp_sort4(self, key, reverse, yp_None)
 
     def isdisjoint(self, other):
         return _yp_isdisjoint(self, _yp_iterable(other))
@@ -1033,20 +1032,20 @@ class ypObject(c_ypObject_p):
         return _yp_symmetric_difference(self, _yp_iterable(other))
 
     def update(self, *others):
-        _yp_updateN(self, *(_yp_iterable(x) for x in others))
+        _yp_updateN(self, yp_None, *(_yp_iterable(x) for x in others))
 
     def intersection_update(self, *others):
-        _yp_intersection_updateN(self, *(_yp_iterable(x) for x in others))
+        _yp_intersection_updateN(self, yp_None, *(_yp_iterable(x) for x in others))
 
     def difference_update(self, *others):
-        _yp_difference_updateN(self, *(_yp_iterable(x) for x in others))
+        _yp_difference_updateN(self, yp_None, *(_yp_iterable(x) for x in others))
 
     def symmetric_difference_update(self, other):
-        _yp_symmetric_difference_update(self, _yp_iterable(other))
+        _yp_symmetric_difference_update(self, _yp_iterable(other), yp_None)
 
-    def remove(self, elem): _yp_remove(self, elem)
+    def remove(self, elem): _yp_remove(self, elem, yp_None)
 
-    def discard(self, elem): _yp_discard(self, elem)
+    def discard(self, elem): _yp_discard(self, elem, yp_None)
 
     def _slice(self, func, key, *args):
         start, stop, step = key.start, key.stop, key.step
@@ -1066,15 +1065,15 @@ class ypObject(c_ypObject_p):
 
     def __setitem__(self, key, value):
         if isinstance(key, slice):
-            self._slice(_yp_setsliceC5, key, value)
+            self._slice(_yp_setsliceC6, key, value, yp_None)
         else:
-            _yp_setitem(self, key, value)
+            _yp_setitem(self, key, value, yp_None)
 
     def __delitem__(self, key):
         if isinstance(key, slice):
-            self._slice(_yp_delsliceC4, key)
+            self._slice(_yp_delsliceC5, key, yp_None)
         else:
-            _yp_delitem(self, key)
+            _yp_delitem(self, key, yp_None)
 
     def get(self, key, defval=None): return _yp_getdefault(self, key, defval)
 
@@ -1648,13 +1647,13 @@ class yp_bytearray(_ypBytes):
             return _yp_popindexC(self, i)
 
     def __iadd__(self, other):
-        _yp_extend(self, other)
+        _yp_extend(self, other, yp_None)
         return self
 
     def __imul__(self, factor):
         if isinstance(factor, float):
             raise TypeError
-        _yp_irepeatC(self, factor)
+        _yp_irepeatC(self, factor, None)
         return self
     # XXX nohtyP will return a chrarray if asked to decode a bytearray, but Python expects str
 
@@ -1823,13 +1822,13 @@ class yp_list(_ypTuple):
             return _yp_popindexC(self, i)
 
     def __iadd__(self, other):
-        _yp_extend(self, other)
+        _yp_extend(self, other, yp_None)
         return self
 
     def __imul__(self, factor):
         if isinstance(factor, float):
             raise TypeError
-        _yp_irepeatC(self, factor)
+        _yp_irepeatC(self, factor, yp_None)
         return self
 
 
@@ -1885,28 +1884,28 @@ class _ypSet(ypObject):
     def __ior__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        _yp_updateN(self, other)
+        _yp_updateN(self, yp_None, other)
         return self
 
     def __iand__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        _yp_intersection_updateN(self, other)
+        _yp_intersection_updateN(self, yp_None, other)
         return self
 
     def __isub__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        _yp_difference_updateN(self, other)
+        _yp_difference_updateN(self, yp_None, other)
         return self
 
     def __ixor__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        _yp_symmetric_difference_update(self, other)
+        _yp_symmetric_difference_update(self, other, yp_None)
         return self
 
-    def add(self, elem): _yp_set_add(self, elem)
+    def add(self, elem): _yp_set_add(self, elem, yp_None)
 
 
 @pytype(yp_t_frozenset, frozenset)
@@ -2068,7 +2067,7 @@ class _ypDict(ypObject):
         return (key_p[0], value_p[0])
 
     def update(self, object=yp_tuple_empty, /, **kwargs):
-        _yp_updateN(self, _yp_dict_iterable(object), kwargs)
+        _yp_updateN(self, yp_None, _yp_dict_iterable(object), kwargs)
 
 
 @pytype(yp_t_frozendict, ())

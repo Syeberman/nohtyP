@@ -706,31 +706,31 @@ namespace nohtyP
         internal static extern ypObject_p yp_getitem( ypObject_p sequence, ypObject_p key );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_ssize_t yp_findC4( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
+        internal static extern yp_ssize_t yp_findC5( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
                 ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern yp_ssize_t yp_findC( ypObject_p sequence, ypObject_p x, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_ssize_t yp_indexC4( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
+        internal static extern yp_ssize_t yp_indexC5( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
                 ref ypObject_p exc );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern yp_ssize_t yp_indexC( ypObject_p sequence, ypObject_p x, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_ssize_t yp_rfindC4( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
+        internal static extern yp_ssize_t yp_rfindC5( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
                 ref ypObject_p exc );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern yp_ssize_t yp_rfindC( ypObject_p sequence, ypObject_p x, ref ypObject_p exc );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_ssize_t yp_rindexC4( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
+        internal static extern yp_ssize_t yp_rindexC5( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
                 ref ypObject_p exc );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern yp_ssize_t yp_rindexC( ypObject_p sequence, ypObject_p x, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern yp_ssize_t yp_countC4( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
+        internal static extern yp_ssize_t yp_countC5( ypObject_p sequence, ypObject_p x, yp_ssize_t i, yp_ssize_t j,
                 ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
@@ -825,7 +825,7 @@ namespace nohtyP
         internal static extern void yp_set_add( ref ypObject_p set, ypObject_p x );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_pushuniqueE( ypObject_p set, ypObject_p x, ref ypObject_p exc );
+        internal static extern void yp_pushunique( ypObject_p set, ypObject_p x, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_getdefault( ypObject_p mapping, ypObject_p key, ypObject_p defval );
