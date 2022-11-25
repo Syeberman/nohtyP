@@ -41,6 +41,11 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
         ],
         CPPDEFINES=[
             "yp_ENABLE_SHARED",
+            # TODO munit assertion failures go to stderr, status updates to MUNIT_OUTPUT_FILE. We
+            # can configure status updates, but not failures. Contribute a patch to put everything
+            # to stdout. (Errors running the tests should still go to stderr.)
+            # FIXME Just write it to two separate files, since they don't play nice combined.
+            "MUNIT_OUTPUT_FILE=stderr"
         ],
         PDB="$VTOP/munit_test.pdb",
         LIBS=[
@@ -76,7 +81,8 @@ def nohtyP_yp_test(env, sharedLib):
 def nohtyP_munit_test(env, munit_test):
     env["MUNIT_TEST"] = Flatten(munit_test)[0]
     testLog = env.Command(
-        "$VTOP/munit_test.log", (munit_test), "$MUNIT_TEST > $TARGET"
+        # TODO See MUNIT_OUTPUT_FILE comment above.
+        "$VTOP/munit_test.log", (munit_test), "$MUNIT_TEST 2> $TARGET"
     )
     Clean(munit_test, testLog)
     return testLog
