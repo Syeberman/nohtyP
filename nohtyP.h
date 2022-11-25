@@ -1196,7 +1196,7 @@ typedef struct _yp_parameter_decl_t {
     // The name of the parameter as a str. name must be a valid Python identifier, or one of the
     // following special forms.
     //
-    // If name is /, the preceeding parameters are positional-only. / cannot be the first parameter.
+    // If name is /, the preceding parameters are positional-only. / cannot be the first parameter.
     // If / is in the middle, the corresponding argarray element will be NULL. If / is last, it is
     // not included in argarray, and n will be one less than the number of parameters. / cannot come
     // after *, *args, or **kwargs.
@@ -1595,7 +1595,7 @@ typedef struct _yp_state_decl_t {
 //      yp_uint64_t mi_state;
 //      ypObject *mi = yp_miniiter(list, &mi_state);
 //      while(1) {
-//          ypObject *item = yp_miniiter_next(&mi, &mi_state);
+//          ypObject *item = yp_miniiter_next(mi, &mi_state);
 //          if(yp_isexceptionC2(item, yp_StopIteration)) break;
 //          // ... operate on item ...
 //          yp_decref(item);

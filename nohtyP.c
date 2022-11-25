@@ -677,32 +677,17 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 #define MIN4(a, b, c, d) MIN(MIN(a, b), MIN(c, d))
 
 
-// Functions that return nohtyP objects simply need to return the error object to "raise" it
-// Use this as "return_yp_ERR(x, yp_ValueError);" to return the error properly
+// Functions that return nohtyP objects simply need to return the error object to "raise" it. Use
+// this as "return_yp_ERR(yp_ValueError);" to return the error properly.
 #define return_yp_ERR(_err)             \
     do {                                \
         ypObject *_yp_ERR_err = (_err); \
         return _yp_ERR_err;             \
     } while (0)
 
-// Functions that modify their inputs take a "ypObject **x".
-// Use this as "yp_INPLACE_ERR(x, yp_ValueError);" to discard x and set it to an exception
-// TODO What if *ob is already an exception? Or an invalidated?
-#define yp_INPLACE_ERR(ob, _err)        \
-    do {                                \
-        ypObject *_yp_ERR_err = (_err); \
-        yp_decref(*(ob));               \
-        *(ob) = (_yp_ERR_err);          \
-    } while (0)
-// Use this as "return_yp_INPLACE_ERR(x, yp_ValueError);" to return the error properly
-#define return_yp_INPLACE_ERR(ob, _err) \
-    do {                                \
-        yp_INPLACE_ERR((ob), (_err));   \
-        return;                         \
-    } while (0)
-
-// Functions that return C values take a "ypObject **exc" that are only modified on error and are
-// not discarded beforehand; they also need to return a valid C value
+// Functions that return C values take a "ypObject **exc" that is only modified on error and is not
+// discarded beforehand; such functions also need to return some C value on error (zero, typically).
+// Use this as "return_yp_CEXC_ERR(0, exc, yp_ValueError);" to return the error properly.
 #define return_yp_CEXC_ERR(retval, exc, _err) \
     do {                                      \
         ypObject *_yp_ERR_err = (_err);       \
@@ -710,9 +695,19 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
         return retval;                        \
     } while (0)
 
+// Functions without outputs take a "ypObject **exc" that is only modified on error and is not
+// discarded beforehand. Use this as "return_yp_EXC_ERR(exc, yp_ValueError);" to return the error
+// properly.
+#define return_yp_EXC_ERR(exc, _err)    \
+    do {                                \
+        ypObject *_yp_ERR_err = (_err); \
+        *(exc) = (_yp_ERR_err);         \
+        return;                         \
+    } while (0)
+
 // When an object encounters an unknown type, there are three possible cases:
 //  - it's an invalidated object, so return yp_InvalidatedError
-//  - it's an exception, so return it
+//  - it's an exception, so return that exception
 //  - it's some other type, so return yp_TypeError
 // TODO It'd be nice to remove a comparison from this, as a minor efficiency, but not sure how
 // TODO Ensure we are using yp_BAD_TYPE in place of yp_TypeError in all the right places
@@ -726,9 +721,9 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
         yp_TypeError)
 // clang-format on
 #define return_yp_BAD_TYPE(bad_ob) return_yp_ERR(yp_BAD_TYPE(bad_ob))
-#define return_yp_INPLACE_BAD_TYPE(ob, bad_ob) return_yp_INPLACE_ERR((ob), yp_BAD_TYPE(bad_ob))
 #define return_yp_CEXC_BAD_TYPE(retval, exc, bad_ob) \
     return_yp_CEXC_ERR((retval), (exc), yp_BAD_TYPE(bad_ob))
+#define return_yp_EXC_BAD_TYPE(exc, bad_ob) return_yp_EXC_ERR((exc), yp_BAD_TYPE(bad_ob))
 
 #define yp_IS_EXCEPTION_C(x) (ypObject_TYPE_PAIR_CODE(x) == ypException_CODE)
 int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
@@ -2339,7 +2334,7 @@ static ypObject *ypQuickIter_mi_nextX(ypQuickIter_state *state)
     return x;
 }
 
-static ypObject *yp_tuple_fromminiiter(ypObject **mi, yp_uint64_t *mi_state);
+static ypObject *yp_tuple_fromminiiter(ypObject *mi, yp_uint64_t *mi_state);
 static ypObject *ypQuickIter_mi_remaining_as_tuple(ypQuickIter_state *state)
 {
     return yp_tuple_fromminiiter(&(state->mi.iter), &(state->mi.state));  // new ref
@@ -3247,10 +3242,10 @@ static ypObject *_yp_freeze(ypObject *x)
     return exc;
 }
 
-void yp_freeze(ypObject **x)
+void yp_freeze(ypObject *x, ypObject **exc)
 {
-    ypObject *result = _yp_freeze(*x);
-    if (yp_isexceptionC(result)) return_yp_INPLACE_ERR(x, result);
+    ypObject *result = _yp_freeze(x);
+    if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
 }
 
 static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
@@ -3283,15 +3278,15 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
 
 // TODO All "deep" operations may try to operate on immortals...but shouldn't all immortals be
 // immutable already anyway?
-void yp_deepfreeze(ypObject **x)
+void yp_deepfreeze(ypObject *x, ypObject **exc)
 {
     ypObject *memo = yp_setN(0);
-    ypObject *result = _yp_deepfreeze(*x, memo);
+    ypObject *result = _yp_deepfreeze(x, memo);
     yp_decref(memo);
-    if (yp_isexceptionC(result)) return_yp_INPLACE_ERR(x, result);
+    if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
 }
 
-// Returns the existing deepcopied object made from x, or yp_KeyError if no such copy has been made
+// Returns the existing deep-copied object made from x, or yp_KeyError if no such copy has been made
 // yet.
 static ypObject *_yp_deepcopy_memo_getitem(void *_memo, ypObject *x)
 {
@@ -3309,12 +3304,11 @@ static ypObject *_yp_deepcopy_memo_getitem(void *_memo, ypObject *x)
     return result;
 }
 
-// Adds the new deepcopied object made from x to the memo.
+// Adds the new deep-copied object made from x to the memo.
 static ypObject *_yp_deepcopy_memo_setitem(void *_memo, ypObject *x, ypObject *x_copy)
 {
     yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;
-    ypObject           *keep_alive;
-    ypObject           *copies;
+    ypObject           *exc = yp_None;
     ypObject           *x_id;
 
     // We keep the objects in memo uninitialized until we need them.
@@ -3324,22 +3318,16 @@ static ypObject *_yp_deepcopy_memo_setitem(void *_memo, ypObject *x, ypObject *x
     }
 
     // Ensure x stays alive at least as long as we reference its ID.
-    // TODO I'm really disliking this discard-on-exception idea as the default.
-    keep_alive = yp_incref(memo->keep_alive);  // new ref
-    yp_append(&keep_alive, x);
-    if (yp_isexceptionC(keep_alive)) return keep_alive;
-    yp_decref(keep_alive);
+    yp_append(memo->keep_alive, x, &exc);
+    if (yp_isexceptionC(exc)) return exc;
 
     // TODO It'd be nice if we didn't have to create this temporary int...
     x_id = yp_intC((yp_ssize_t)x);  // new ref
     if (yp_isexceptionC(x_id)) return x_id;
 
-    // TODO I'm really disliking this discard-on-exception idea as the default.
-    copies = yp_incref(memo->copies);  // new ref
-    yp_setitem(&copies, x_id, x_copy);
+    yp_setitem(memo->copies, x_id, x_copy, exc);
     yp_decref(x_id);
-    if (yp_isexceptionC(copies)) return copies;
-    yp_decref(copies);
+    if (yp_isexceptionC(exc)) return exc;
     return yp_None;
 }
 
@@ -3435,16 +3423,16 @@ ypObject *yp_deepcopy(ypObject *x) { return _yp_deepcopy(x, _yp_sametype_deepcop
 // on how large to make CONTAINER_INLINE objects, or perhaps we should try to shrink the
 // invalidated object in-place (if supported by the heap).
 // TODO Should attempting to invalidate an immortal be an error?
-void yp_invalidate(ypObject **x)
+void yp_invalidate(ypObject *x, ypObject **exc)
 {
-    // TODO implement
+    return_yp_EXC_ERR(exc, yp_NotImplementedError);  // TODO implement
 }
 
 // TODO All "deep" operations may try to operate on immortals, which should not be invalidated.
 // Should this be an exception, or should these objects be silently skipped?
-void yp_deepinvalidate(ypObject **x)
+void yp_deepinvalidate(ypObject *x, ypObject **exc)
 {
-    // TODO implement
+    return_yp_EXC_ERR(exc, yp_NotImplementedError);  // TODO implement
 }
 
 #pragma endregion transmute
@@ -4388,17 +4376,17 @@ static ypTypeObject ypBool_Type = {
 // Signatures of some specialized arithmetic functions
 typedef yp_int_t (*arithLfunc)(yp_int_t, yp_int_t, ypObject **);
 typedef yp_float_t (*arithLFfunc)(yp_float_t, yp_float_t, ypObject **);
-typedef void (*iarithCfunc)(ypObject **, yp_int_t);
-typedef void (*iarithCFfunc)(ypObject **, yp_float_t);
+typedef void (*iarithCfunc)(ypObject *, yp_int_t, ypObject **);
+typedef void (*iarithCFfunc)(ypObject *, yp_float_t, ypObject **);
 typedef yp_int_t (*unaryLfunc)(yp_int_t, ypObject **);
 typedef yp_float_t (*unaryLFfunc)(yp_float_t, ypObject **);
 
 // Bitwise operations on floats aren't supported, so these functions simply raise yp_TypeError
-static void       yp_ilshiftCF(ypObject **x, yp_float_t y);
-static void       yp_irshiftCF(ypObject **x, yp_float_t y);
-static void       yp_iampCF(ypObject **x, yp_float_t y);
-static void       yp_ixorCF(ypObject **x, yp_float_t y);
-static void       yp_ibarCF(ypObject **x, yp_float_t y);
+static void       yp_ilshiftCF(ypObject *x, yp_float_t y, ypObject **exc);
+static void       yp_irshiftCF(ypObject *x, yp_float_t y, ypObject **exc);
+static void       yp_iampCF(ypObject *x, yp_float_t y, ypObject **exc);
+static void       yp_ixorCF(ypObject *x, yp_float_t y, ypObject **exc);
+static void       yp_ibarCF(ypObject *x, yp_float_t y, ypObject **exc);
 static yp_float_t yp_lshiftLF(yp_float_t x, yp_float_t y, ypObject **exc);
 static yp_float_t yp_rshiftLF(yp_float_t x, yp_float_t y, ypObject **exc);
 static yp_float_t yp_ampLF(yp_float_t x, yp_float_t y, ypObject **exc);
@@ -4599,7 +4587,6 @@ static ypObject *int_unfrozen_deepcopy(ypObject *i, visitfunc copy_visitor, void
     return _ypInt_deepcopy(ypIntStore_CODE, i, copy_memo);
 }
 
-// FIXME No need to call yp_intC if i is already an int...which we can ensure via type table
 static ypObject *int_frozen_deepcopy(ypObject *i, visitfunc copy_visitor, void *copy_memo)
 {
     // We don't need to memoize the preallocated integers.
@@ -4945,13 +4932,13 @@ yp_int_t yp_mulL(yp_int_t x, yp_int_t y, ypObject **exc)
 // XXX Operands are fist converted to float, then divided; result always a float
 yp_float_t yp_truedivL(yp_int_t x, yp_int_t y, ypObject **exc)
 {
-    ypObject  *subexc = yp_None;
+    ypObject  *subExc = yp_None;
     yp_float_t x_asfloat, y_asfloat;
 
-    x_asfloat = yp_asfloatL(x, &subexc);
-    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(0.0, exc, subexc);
-    y_asfloat = yp_asfloatL(y, &subexc);
-    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(0.0, exc, subexc);
+    x_asfloat = yp_asfloatL(x, &subExc);
+    if (yp_isexceptionC(subExc)) return_yp_CEXC_ERR(0.0, exc, subExc);
+    y_asfloat = yp_asfloatL(y, &subExc);
+    if (yp_isexceptionC(subExc)) return_yp_CEXC_ERR(0.0, exc, subExc);
     return yp_truedivLF(x_asfloat, y_asfloat, exc);
 }
 
@@ -5123,46 +5110,41 @@ yp_int_t yp_absL(yp_int_t x, ypObject **exc)
 yp_int_t yp_invertL(yp_int_t x, ypObject **exc) { return ~x; }
 
 // XXX Overloading of add/etc currently not supported
-static void iarithmeticC(ypObject **x, yp_int_t y, arithLfunc intop, iarithCFfunc floatop)
+static void iarithmeticC(
+        ypObject *x, yp_int_t y, ypObject **exc, arithLfunc intop, arithLFfunc floatop)
 {
-    int       x_pair = ypObject_TYPE_PAIR_CODE(*x);
-    ypObject *exc = yp_None;
+    int       x_type = ypObject_TYPE_CODE(x);
+    ypObject *subExc = yp_None;
 
-    if (x_pair == ypInt_CODE) {
-        yp_int_t result = intop(ypInt_VALUE(*x), y, &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        if (ypObject_IS_MUTABLE(x)) {
-            ypInt_VALUE(x) = result;
-        } else {
-            yp_decref(*x);
-            *x = yp_intC(result);
-        }
-        return;
+    if (x_type == ypIntStore_CODE) {
+        yp_int_t result = intop(ypInt_VALUE(x), y, &subExc);
+        if (yp_isexceptionC(subExc)) return_yp_EXC_ERR(exc, subExc);
+        ypInt_VALUE(x) = result;
 
-    } else if (x_pair == ypFloat_CODE) {
-        yp_float_t y_asfloat = yp_asfloatL(y, &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        floatop(x, y_asfloat);
-        return;
+    } else if (x_type == ypFloatStore_CODE) {
+        yp_float_t result = floatop(ypFloat_VALUE(x), y, &subExc);
+        if (yp_isexceptionC(subExc)) return_yp_EXC_ERR(exc, subExc);
+        ypFloat_VALUE(x) = result;
+
+    } else {
+        return_yp_EXC_BAD_TYPE(exc, x);
     }
-
-    return_yp_INPLACE_BAD_TYPE(x, *x);
 }
 
-static void iarithmetic(ypObject **x, ypObject *y, iarithCfunc intop, iarithCFfunc floatop)
+static void iarithmetic(
+        ypObject *x, ypObject *y, ypObject **exc, iarithCfunc intop, iarithCFfunc floatop)
 {
     int y_pair = ypObject_TYPE_PAIR_CODE(y);
 
     if (y_pair == ypInt_CODE) {
-        intop(x, ypInt_VALUE(y));
-        return;
+        intop(x, ypInt_VALUE(y), exc);
 
     } else if (y_pair == ypFloat_CODE) {
-        floatop(x, ypFloat_VALUE(y));
-        return;
-    }
+        floatop(x, ypFloat_VALUE(y), exc);
 
-    return_yp_INPLACE_BAD_TYPE(x, y);
+    } else {
+        return_yp_EXC_BAD_TYPE(exc, y);
+    }
 }
 
 static ypObject *arithmetic_intop(yp_int_t x, yp_int_t y, arithLfunc intop, int result_mutable)
@@ -5216,18 +5198,18 @@ static ypObject *arithmetic(ypObject *x, ypObject *y, arithLfunc intop, arithLFf
 }
 
 // Defined here are yp_iaddC (et al), yp_iadd (et al), and yp_add (et al)
-#define _ypInt_PUBLIC_ARITH_FUNCTION(name)                    \
-    void yp_i##name##C(ypObject **x, yp_int_t y)              \
-    {                                                         \
-        iarithmeticC(x, y, yp_##name##L, yp_i##name##CF);     \
-    }                                                         \
-    void yp_i##name(ypObject **x, ypObject *y)                \
-    {                                                         \
-        iarithmetic(x, y, yp_i##name##C, yp_i##name##CF);     \
-    }                                                         \
-    ypObject *yp_##name(ypObject *x, ypObject *y)             \
-    {                                                         \
-        return arithmetic(x, y, yp_##name##L, yp_##name##LF); \
+#define _ypInt_PUBLIC_ARITH_FUNCTION(name)                      \
+    void yp_i##name##C(ypObject *x, yp_int_t y, ypObject **exc) \
+    {                                                           \
+        iarithmeticC(x, y, exc, yp_##name##L, yp_i##name##CF);  \
+    }                                                           \
+    void yp_i##name(ypObject *x, ypObject *y, ypObject **exc)   \
+    {                                                           \
+        iarithmetic(x, y, exc, yp_i##name##C, yp_i##name##CF);  \
+    }                                                           \
+    ypObject *yp_##name(ypObject *x, ypObject *y)               \
+    {                                                           \
+        return arithmetic(x, y, yp_##name##L, yp_##name##LF);   \
     }
 _ypInt_PUBLIC_ARITH_FUNCTION(add);
 _ypInt_PUBLIC_ARITH_FUNCTION(sub);
@@ -5243,42 +5225,35 @@ _ypInt_PUBLIC_ARITH_FUNCTION(amp);
 _ypInt_PUBLIC_ARITH_FUNCTION(xor);
 _ypInt_PUBLIC_ARITH_FUNCTION(bar);
 
-void yp_itruedivC(ypObject **x, yp_int_t y)
+void yp_itruedivC(ypObject *x, yp_int_t y, ypObject **exc)
 {
-    int       x_pair = ypObject_TYPE_PAIR_CODE(*x);
-    ypObject *exc = yp_None;
+    int       x_type = ypObject_TYPE_CODE(x);
+    ypObject *subExc = yp_None;
 
-    if (x_pair == ypInt_CODE) {
-        yp_float_t result = yp_truedivL(ypInt_VALUE(*x), y, &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        yp_decref(*x);
-        *x = yp_floatCF(result);
-        return;
+    // True division is always a float, so being in-place means x cannot be an int.
+    if (x_type == ypFloatStore_CODE) {
+        yp_float_t y_asfloat = yp_asfloatL(y, &subExc);
+        if (yp_isexceptionC(subExc)) return_yp_EXC_ERR(exc, subExc);
+        yp_itruedivCF(x, y_asfloat, exc);
 
-    } else if (x_pair == ypFloat_CODE) {
-        yp_float_t y_asfloat = yp_asfloatL(y, &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        yp_itruedivCF(x, y_asfloat);
-        return;
+    } else {
+        return_yp_EXC_BAD_TYPE(exc, x);
     }
-
-    return_yp_INPLACE_BAD_TYPE(x, *x);
 }
 
-void yp_itruediv(ypObject **x, ypObject *y)
+void yp_itruediv(ypObject *x, ypObject *y, ypObject **exc)
 {
     int y_pair = ypObject_TYPE_PAIR_CODE(y);
 
     if (y_pair == ypInt_CODE) {
-        yp_itruedivC(x, ypInt_VALUE(y));
-        return;
+        yp_itruedivC(x, ypInt_VALUE(y), exc);
 
     } else if (y_pair == ypFloat_CODE) {
-        yp_itruedivCF(x, ypFloat_VALUE(y));
-        return;
-    }
+        yp_itruedivCF(x, ypFloat_VALUE(y), exc);
 
-    return_yp_INPLACE_BAD_TYPE(x, y);
+    } else {
+        return_yp_EXC_BAD_TYPE(exc, x);
+    }
 }
 
 ypObject *yp_truediv(ypObject *x, ypObject *y)
@@ -5393,37 +5368,23 @@ void yp_divmod(ypObject *x, ypObject *y, ypObject **div, ypObject **mod)
     }
 }
 
-static void iunaryoperation(ypObject **x, unaryLfunc intop, unaryLFfunc floatop)
+static void iunaryoperation(ypObject *x, ypObject **exc, unaryLfunc intop, unaryLFfunc floatop)
 {
-    int       x_pair = ypObject_TYPE_PAIR_CODE(*x);
-    ypObject *exc = yp_None;
+    int       x_type = ypObject_TYPE_CODE(x);
+    ypObject *subExc = yp_None;
 
-    if (x_pair == ypInt_CODE) {
-        yp_int_t result = intop(ypInt_VALUE(*x), &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        if (ypObject_IS_MUTABLE(*x)) {
-            ypInt_VALUE(*x) = result;
-        } else {
-            if (result == ypInt_VALUE(*x)) return;
-            yp_decref(*x);
-            *x = yp_intC(result);
-        }
-        return;
+    if (x_type == ypIntStore_CODE) {
+        yp_int_t result = intop(ypInt_VALUE(x), &subExc);
+        if (yp_isexceptionC(subExc)) return_yp_EXC_ERR(exc, subExc);
+        ypInt_VALUE(x) = result;
 
-    } else if (x_pair == ypFloat_CODE) {
-        yp_float_t result = floatop(ypFloat_VALUE(*x), &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        if (ypObject_IS_MUTABLE(*x)) {
-            ypFloat_VALUE(*x) = result;
-        } else {
-            if (result == ypFloat_VALUE(*x)) return;
-            yp_decref(*x);
-            *x = yp_floatCF(result);
-        }
-        return;
+    } else if (x_type == ypFloatStore_CODE) {
+        yp_float_t result = floatop(ypFloat_VALUE(x), &subExc);
+        if (yp_isexceptionC(subExc)) return_yp_EXC_ERR(exc, subExc);
+        ypFloat_VALUE(x) = result;
 
     } else {
-        return_yp_INPLACE_BAD_TYPE(x, *x);
+        return_yp_EXC_BAD_TYPE(exc, x);
     }
 }
 
@@ -5458,8 +5419,11 @@ static ypObject *unaryoperation(ypObject *x, unaryLfunc intop, unaryLFfunc float
 }
 
 // Defined here are yp_ineg (et al), and yp_neg (et al)
-#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                                                  \
-    void      yp_i##name(ypObject **x) { iunaryoperation(x, yp_##name##L, yp_##name##LF); } \
+#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                    \
+    void yp_i##name(ypObject *x, ypObject **exc)              \
+    {                                                         \
+        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF); \
+    }                                                         \
     ypObject *yp_##name(ypObject *x) { return unaryoperation(x, yp_##name##L, yp_##name##LF); }
 _ypInt_PUBLIC_UNARY_FUNCTION(neg);
 _ypInt_PUBLIC_UNARY_FUNCTION(pos);
@@ -6017,39 +5981,29 @@ yp_float_t yp_absLF(yp_float_t x, ypObject **exc)
     return x;
 }
 
-static void iarithmeticCF(ypObject **x, yp_float_t y, arithLFfunc floatop)
+static void iarithmeticCF(ypObject *x, yp_float_t y, ypObject **exc, arithLFfunc floatop)
 {
-    int        x_pair = ypObject_TYPE_PAIR_CODE(*x);
-    ypObject  *exc = yp_None;
+    int        x_type = ypObject_TYPE_CODE(x);
+    ypObject  *subExc = yp_None;
     yp_float_t result;
 
-    if (x_pair == ypFloat_CODE) {
-        result = floatop(ypFloat_VALUE(*x), y, &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        if (ypObject_IS_MUTABLE(x)) {
-            ypFloat_VALUE(x) = result;
-        } else {
-            yp_decref(*x);
-            *x = yp_floatCF(result);
-        }
-        return;
+    // Arithmetic with floats is always a float. We are in-place, so x cannot be an int.
+    if (x_type == ypFloatStore_CODE) {
+        result = floatop(ypFloat_VALUE(x), y, &subExc);
+        if (yp_isexceptionC(subExc)) return_yp_EXC_ERR(exc, subExc);
+        ypFloat_VALUE(x) = result;
 
-    } else if (x_pair == ypInt_CODE) {
-        yp_float_t x_asfloat = yp_asfloatC(*x, &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        result = floatop(x_asfloat, y, &exc);
-        if (yp_isexceptionC(exc)) return_yp_INPLACE_ERR(x, exc);
-        yp_decref(*x);
-        *x = yp_floatCF(result);
-        return;
+    } else {
+        return_yp_EXC_BAD_TYPE(exc, x);
     }
-
-    return_yp_INPLACE_BAD_TYPE(x, *x);
 }
 
 // Defined here are yp_iaddCF (et al)
-#define _ypFloat_PUBLIC_ARITH_FUNCTION(name) \
-    void yp_i##name##CF(ypObject **x, yp_float_t y) { iarithmeticCF(x, y, yp_##name##LF); }
+#define _ypFloat_PUBLIC_ARITH_FUNCTION(name)                       \
+    void yp_i##name##CF(ypObject *x, yp_float_t y, ypObject **exc) \
+    {                                                              \
+        iarithmeticCF(x, y, exc, yp_##name##LF);                   \
+    }
 _ypFloat_PUBLIC_ARITH_FUNCTION(add);
 _ypFloat_PUBLIC_ARITH_FUNCTION(sub);
 _ypFloat_PUBLIC_ARITH_FUNCTION(mul);
@@ -6059,11 +6013,26 @@ _ypFloat_PUBLIC_ARITH_FUNCTION(mod);
 _ypFloat_PUBLIC_ARITH_FUNCTION(pow);
 
 // Binary operations are not applicable on floats
-static void yp_ilshiftCF(ypObject **x, yp_float_t y) { return_yp_INPLACE_ERR(x, yp_TypeError); }
-static void yp_irshiftCF(ypObject **x, yp_float_t y) { return_yp_INPLACE_ERR(x, yp_TypeError); }
-static void yp_iampCF(ypObject **x, yp_float_t y) { return_yp_INPLACE_ERR(x, yp_TypeError); }
-static void yp_ixorCF(ypObject **x, yp_float_t y) { return_yp_INPLACE_ERR(x, yp_TypeError); }
-static void yp_ibarCF(ypObject **x, yp_float_t y) { return_yp_INPLACE_ERR(x, yp_TypeError); }
+static void yp_ilshiftCF(ypObject *x, yp_float_t y, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_TypeError);
+}
+static void yp_irshiftCF(ypObject *x, yp_float_t y, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_TypeError);
+}
+static void yp_iampCF(ypObject *x, yp_float_t y, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_TypeError);
+}
+static void yp_ixorCF(ypObject *x, yp_float_t y, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_TypeError);
+}
+static void yp_ibarCF(ypObject *x, yp_float_t y, ypObject **exc)
+{
+    return_yp_EXC_ERR(exc, yp_TypeError);
+}
 static yp_float_t yp_lshiftLF(yp_float_t x, yp_float_t y, ypObject **exc)
 {
     return_yp_CEXC_ERR(0.0, exc, yp_TypeError);
@@ -12072,7 +12041,7 @@ static ypObject *_ypTuple_extend_fromtuple(ypObject *sq, ypObject *x)
 }
 
 static ypObject *_ypTuple_extend_fromminiiter(
-        ypObject *sq, yp_ssize_t length_hint, ypObject **mi, yp_uint64_t *mi_state)
+        ypObject *sq, yp_ssize_t length_hint, ypObject *mi, yp_uint64_t *mi_state)
 {
     ypObject *x;
     ypObject *result;
@@ -12111,7 +12080,7 @@ static ypObject *_ypTuple_extend_fromiterable(
 
 // Check for the ypTuple_ALLOCLEN_MAX case first
 static ypObject *_ypTuple_new_fromminiiter(
-        int type, yp_ssize_t length_hint, ypObject **mi, yp_uint64_t *mi_state)
+        int type, yp_ssize_t length_hint, ypObject *mi, yp_uint64_t *mi_state)
 {
     ypObject *newSq;
     ypObject *result;
@@ -13235,10 +13204,10 @@ static ypObject *yp_tuple_fromarray(yp_ssize_t n, ypObject *const *array)
 
 // Used by QuickIter to convert iterators into a tuple (i.e. for *args).
 // TODO Again, we could make this public, but I'd rather not.
-static ypObject *yp_tuple_fromminiiter(ypObject **mi, yp_uint64_t *mi_state)
+static ypObject *yp_tuple_fromminiiter(ypObject *mi, yp_uint64_t *mi_state)
 {
     ypObject  *exc = yp_None;
-    yp_ssize_t length_hint = yp_miniiter_length_hintC(*mi, mi_state, &exc);  // zero on error
+    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &exc);  // zero on error
     return _ypTuple_new_fromminiiter(ypTuple_CODE, length_hint, mi, mi_state);
 }
 
@@ -15757,6 +15726,7 @@ static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
 // the yp_freeze?
 static ypObject *frozenset_union(ypObject *so, int n, va_list args)
 {
+    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
@@ -15769,12 +15739,18 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
         yp_decref(newSo);
         return result;
     }
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(&newSo);
+
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
     return newSo;
 }
 
 static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
 {
+    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
@@ -15787,12 +15763,18 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
         yp_decref(newSo);
         return result;
     }
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(&newSo);
+
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
     return newSo;
 }
 
 static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
 {
+    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
@@ -15805,12 +15787,18 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
         yp_decref(newSo);
         return result;
     }
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(&newSo);
+
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
     return newSo;
 }
 
 static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 {
+    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
@@ -15821,7 +15809,12 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
         yp_decref(newSo);
         return result;
     }
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(&newSo);
+
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
     return newSo;
 }
 
@@ -16139,12 +16132,12 @@ static ypTypeObject ypSet_Type = {
 
 // Public functions
 
-void yp_set_add(ypObject **set, ypObject *x)
+void yp_set_add(ypObject *set, ypObject *x, ypObject **exc)
 {
     ypObject *result;
-    if (ypObject_TYPE_CODE(*set) != ypSet_CODE) return_yp_INPLACE_BAD_TYPE(set, *set);
-    result = set_push(*set, x);
-    if (yp_isexceptionC(result)) return_yp_INPLACE_ERR(set, result);
+    if (ypObject_TYPE_CODE(set) != ypSet_CODE) return_yp_EXC_BAD_TYPE(exc, set);
+    result = set_push(set, x);
+    if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
 }
 
 // TODO Calling it yp_set_* implies it only works for sets, so do we need a yp_frozenset_*?  If we
@@ -16565,7 +16558,7 @@ static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
 // in particular, yp_ValueError is returned if exactly 2 values are not returned.
 // XXX Yes, the yielded value can be any iterable, even a set or dict (good luck guessing which
 // will be the key, and which the value)
-static void _ypDict_iter_items_next(ypObject **itemiter, ypObject **key, ypObject **value)
+static void _ypDict_iter_items_next(ypObject *itemiter, ypObject **key, ypObject **value)
 {
     ypObject *keyvaliter = yp_next(itemiter);  // new ref
     if (yp_isexceptionC(keyvaliter)) {         // including yp_StopIteration
@@ -19044,94 +19037,46 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
         return;                                                 \
     } while (0)
 
-#define _yp_INPLACE1(pOb, tp_meth, args)                                 \
-    do {                                                                 \
-        ypTypeObject *type = ypObject_TYPE(*pOb);                        \
-        ypObject *result = type->tp_meth args;                           \
-        if (yp_isexceptionC(result)) return_yp_INPLACE_ERR(pOb, result); \
-        return;                                                          \
-    } while (0)
-
-#define _yp_INPLACE2(pOb, tp_suite, suite_meth, args)                    \
-    do {                                                                 \
-        ypTypeObject *type = ypObject_TYPE(*pOb);                        \
-        ypObject *result = type->tp_suite->suite_meth args;              \
-        if (yp_isexceptionC(result)) return_yp_INPLACE_ERR(pOb, result); \
-        return;                                                          \
-    } while (0)
-
-#define _yp_INPLACE_RETURN1(pOb, tp_meth, args)                   \
-    do {                                                          \
-        ypTypeObject *type = ypObject_TYPE(*pOb);                 \
-        ypObject *result = type->tp_meth args;                    \
-        if (yp_isexceptionC(result)) yp_INPLACE_ERR(pOb, result); \
-        return result;                                            \
-    } while (0)
-
-#define _yp_INPLACE_RETURN2(pOb, tp_suite, suite_meth, args)      \
-    do {                                                          \
-        ypTypeObject *type = ypObject_TYPE(*pOb);                 \
-        ypObject *result = type->tp_suite->suite_meth args;       \
-        if (yp_isexceptionC(result)) yp_INPLACE_ERR(pOb, result); \
-        return result;                                            \
-    } while (0)
-
 ypObject *yp_bool(ypObject *x) { _yp_REDIRECT_BOOL1(x, tp_bool, (x)); }
 
 ypObject *yp_iter(ypObject *x) { _yp_REDIRECT1(x, tp_iter, (x)); }
 
-static ypObject *_yp_send(ypObject **iterator, ypObject *value)
+static ypObject *_yp_send(ypObject *iterator, ypObject *value)
 {
-    ypTypeObject *type = ypObject_TYPE(*iterator);
-    ypObject     *result = type->tp_send(*iterator, value);
-    if (yp_isexceptionC(result)) {
-        // tp_send closes *iterator; it's up to us to not treat yp_StopIteration as a typical error
-        if (!yp_isexceptionC2(result, yp_StopIteration)) {
-            yp_INPLACE_ERR(iterator, result);
-        }
-    }
+    ypTypeObject *type = ypObject_TYPE(iterator);
+    ypObject     *result = type->tp_send(iterator, value);
     return result;
 }
 
-ypObject *yp_send(ypObject **iterator, ypObject *value)
+ypObject *yp_send(ypObject *iterator, ypObject *value)
 {
     if (yp_isexceptionC(value)) {
-        yp_INPLACE_ERR(iterator, value);
         return value;
     }
     return _yp_send(iterator, value);
 }
 
-ypObject *yp_next(ypObject **iterator) { return _yp_send(iterator, yp_None); }
+ypObject *yp_next(ypObject *iterator) { return _yp_send(iterator, yp_None); }
 
-ypObject *yp_next2(ypObject **iterator, ypObject *defval)
+ypObject *yp_next2(ypObject *iterator, ypObject *defval)
 {
-    ypTypeObject *type = ypObject_TYPE(*iterator);
-    ypObject     *result = type->tp_send(*iterator, yp_None);
-    // tp_send closes *iterator; it's up to us to not treat yp_StopIteration as a typical error
+    ypObject *result = _yp_send(iterator, yp_None);
     if (yp_isexceptionC2(result, yp_StopIteration)) {
         result = yp_incref(defval);
-    }
-    if (yp_isexceptionC(result)) {
-        if (!yp_isexceptionC2(result, yp_StopIteration)) {
-            yp_INPLACE_ERR(iterator, result);
-        }
     }
     return result;
 }
 
-ypObject *yp_throw(ypObject **iterator, ypObject *exc)
+ypObject *yp_throw(ypObject *iterator, ypObject *exc)
 {
     if (!yp_isexceptionC(exc)) {
         // typeExc may be yp_InvalidatedError or yp_TypeError.
-        ypObject *typeExc = yp_BAD_TYPE(exc);
-        yp_INPLACE_ERR(iterator, typeExc);
-        return typeExc;
+        return_yp_BAD_TYPE(exc);
     }
     return _yp_send(iterator, exc);
 }
 
-ypObject *yp_close(ypObject *x) { _yp_REDIRECT1(x, tp_close, (x)); }
+void yp_close(ypObject *x, ypObject **exc) { _yp_REDIRECT_EXC1(x, tp_close, (x), exc); }
 
 ypObject *yp_reversed(ypObject *x) { _yp_REDIRECT1(x, tp_iter_reversed, (x)); }
 
@@ -19150,14 +19095,17 @@ ypObject *yp_not_in(ypObject *x, ypObject *container)
     return ypBool_NOT(result);
 }
 
-void yp_push(ypObject **container, ypObject *x)
+void yp_push(ypObject *container, ypObject *x, ypObject **exc)
 {
-    _yp_INPLACE1(container, tp_push, (*container, x));
+    _yp_REDIRECT_EXC1(container, tp_push, (container, x), exc);
 }
 
-void yp_clear(ypObject **container) { _yp_INPLACE1(container, tp_clear, (*container)); }
+void yp_clear(ypObject *container, ypObject **exc)
+{
+    _yp_REDIRECT_EXC1(container, tp_clear, (container), exc);
+}
 
-ypObject *yp_pop(ypObject **container) { _yp_INPLACE_RETURN1(container, tp_pop, (*container)); }
+ypObject *yp_pop(ypObject *container) { _yp_REDIRECT1(container, tp_pop, (container)); }
 
 ypObject *yp_concat(ypObject *sequence, ypObject *x)
 {
@@ -19196,9 +19144,9 @@ yp_ssize_t yp_findC(ypObject *sequence, ypObject *x, ypObject **exc)
 
 yp_ssize_t yp_indexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
 {
-    ypObject  *subexc = yp_None;
-    yp_ssize_t result = yp_findC5(sequence, x, i, j, &subexc);
-    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(-1, exc, subexc);
+    ypObject  *subExc = yp_None;
+    yp_ssize_t result = yp_findC5(sequence, x, i, j, &subExc);
+    if (yp_isexceptionC(subExc)) return_yp_CEXC_ERR(-1, exc, subExc);
     if (result == -1) return_yp_CEXC_ERR(-1, exc, yp_ValueError);
     return result;
 }
@@ -19225,9 +19173,9 @@ yp_ssize_t yp_rfindC(ypObject *sequence, ypObject *x, ypObject **exc)
 
 yp_ssize_t yp_rindexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
 {
-    ypObject  *subexc = yp_None;
-    yp_ssize_t result = yp_rfindC5(sequence, x, i, j, &subexc);
-    if (yp_isexceptionC(subexc)) return_yp_CEXC_ERR(-1, exc, subexc);
+    ypObject  *subExc = yp_None;
+    yp_ssize_t result = yp_rfindC5(sequence, x, i, j, &subExc);
+    if (yp_isexceptionC(subExc)) return_yp_CEXC_ERR(-1, exc, subExc);
     if (result == -1) return_yp_CEXC_ERR(-1, exc, yp_ValueError);
     return result;
 }
@@ -19251,69 +19199,70 @@ yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc)
     return yp_countC5(sequence, x, 0, yp_SLICE_USELEN, exc);
 }
 
-void yp_setindexC(ypObject **sequence, yp_ssize_t i, ypObject *x)
+void yp_setindexC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_setindex, (*sequence, i, x));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_setindex, (sequence, i, x), exc);
 }
 
-void yp_setsliceC6(ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x)
+void yp_setsliceC6(
+        ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_setslice, (*sequence, i, j, k, x));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_setslice, (sequence, i, j, k, x), exc);
 }
 
-void yp_delindexC(ypObject **sequence, yp_ssize_t i)
+void yp_delindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_delindex, (*sequence, i));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_delindex, (sequence, i), exc);
 }
 
-void yp_delsliceC5(ypObject **sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k)
+void yp_delsliceC5(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_delslice, (*sequence, i, j, k));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_delslice, (sequence, i, j, k), exc);
 }
 
-void yp_append(ypObject **sequence, ypObject *x)
+void yp_append(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_append, (*sequence, x));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_append, (sequence, x), exc);
 }
 
-void yp_extend(ypObject **sequence, ypObject *x)
+void yp_extend(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_extend, (*sequence, x));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_extend, (sequence, x), exc);
 }
 
-void yp_irepeatC(ypObject **sequence, yp_ssize_t factor)
+void yp_irepeatC(ypObject *sequence, yp_ssize_t factor, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_irepeat, (*sequence, factor));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_irepeat, (sequence, factor), exc);
 }
 
-void yp_insertC(ypObject **sequence, yp_ssize_t i, ypObject *x)
+void yp_insertC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_insert, (*sequence, i, x));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_insert, (sequence, i, x), exc);
 }
 
-ypObject *yp_popindexC(ypObject **sequence, yp_ssize_t i)
+ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i)
 {
-    _yp_INPLACE_RETURN2(sequence, tp_as_sequence, tp_popindex, (*sequence, i));
+    _yp_REDIRECT2(sequence, tp_as_sequence, tp_popindex, (sequence, i));
 }
 
-void yp_remove(ypObject **sequence, ypObject *x)
+void yp_remove(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    _yp_INPLACE1(sequence, tp_remove, (*sequence, x, NULL));
+    _yp_REDIRECT_EXC1(sequence, tp_remove, (sequence, x, NULL), exc);
 }
 
-void yp_reverse(ypObject **sequence)
+void yp_reverse(ypObject *sequence, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_reverse, (*sequence));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_reverse, (sequence), exc);
 }
 
-void yp_sort4(ypObject **sequence, ypObject *key, ypObject *reverse)
+void yp_sort4(ypObject *sequence, ypObject *key, ypObject *reverse, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_sort, (*sequence, key, reverse));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_sort, (sequence, key, reverse), exc);
 }
 
-void yp_sort(ypObject **sequence)
+void yp_sort(ypObject *sequence, ypObject **exc)
 {
-    _yp_INPLACE2(sequence, tp_as_sequence, tp_sort, (*sequence, yp_None, yp_False));
+    _yp_REDIRECT_EXC2(sequence, tp_as_sequence, tp_sort, (sequence, yp_None, yp_False), exc);
 }
 
 ypObject *yp_isdisjoint(ypObject *set, ypObject *x)
@@ -19363,63 +19312,61 @@ ypObject *yp_symmetric_difference(ypObject *set, ypObject *x)
     _yp_REDIRECT2(set, tp_as_set, tp_symmetric_difference, (set, x));
 }
 
-void yp_updateN(ypObject **set, int n, ...)
+void yp_updateN(ypObject *set, ypObject **exc, int n, ...)
 {
-    return_yp_V_FUNC_void(yp_updateNV, (set, n, args), n);
+    return_yp_V_FUNC_void(yp_updateNV, (set, exc, n, args), n);
 }
-void yp_updateNV(ypObject **set, int n, va_list args)
+void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
 {
-    _yp_INPLACE1(set, tp_update, (*set, n, args));
-}
-
-void yp_intersection_updateN(ypObject **set, int n, ...)
-{
-    return_yp_V_FUNC_void(yp_intersection_updateNV, (set, n, args), n);
-}
-void yp_intersection_updateNV(ypObject **set, int n, va_list args)
-{
-    _yp_INPLACE2(set, tp_as_set, tp_intersection_update, (*set, n, args));
+    _yp_REDIRECT_EXC1(set, tp_update, (set, n, args), exc);
 }
 
-void yp_difference_updateN(ypObject **set, int n, ...)
+void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...)
 {
-    return_yp_V_FUNC_void(yp_difference_updateNV, (set, n, args), n);
+    return_yp_V_FUNC_void(yp_intersection_updateNV, (set, exc, n, args), n);
 }
-void yp_difference_updateNV(ypObject **set, int n, va_list args)
+void yp_intersection_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
 {
-    _yp_INPLACE2(set, tp_as_set, tp_difference_update, (*set, n, args));
-}
-
-void yp_symmetric_difference_update(ypObject **set, ypObject *x)
-{
-    _yp_INPLACE2(set, tp_as_set, tp_symmetric_difference_update, (*set, x));
+    _yp_REDIRECT_EXC2(set, tp_as_set, tp_intersection_update, (set, n, args), exc);
 }
 
-void yp_pushuniqueE(ypObject *set, ypObject *x, ypObject **exc)
+void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...)
+{
+    return_yp_V_FUNC_void(yp_difference_updateNV, (set, exc, n, args), n);
+}
+void yp_difference_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
+{
+    _yp_REDIRECT_EXC2(set, tp_as_set, tp_difference_update, (set, n, args), exc);
+}
+
+void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc)
+{
+    _yp_REDIRECT_EXC2(set, tp_as_set, tp_symmetric_difference_update, (set, x), exc);
+}
+
+void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc)
 {
     _yp_REDIRECT_EXC2(set, tp_as_set, tp_pushunique, (set, x), exc);
 }
 
-void yp_discard(ypObject **set, ypObject *x) { _yp_INPLACE1(set, tp_remove, (*set, x, yp_None)); }
+void yp_discard(ypObject *set, ypObject *x, ypObject **exc)
+{
+    _yp_REDIRECT_EXC1(set, tp_remove, (set, x, yp_None), exc);
+}
 
 ypObject *yp_getitem(ypObject *mapping, ypObject *key)
 {
     _yp_REDIRECT1(mapping, tp_getdefault, (mapping, key, NULL));
 }
 
-void yp_setitem(ypObject **mapping, ypObject *key, ypObject *x)
-{
-    _yp_INPLACE1(mapping, tp_setitem, (*mapping, key, x));
-}
-
-void yp_setitemE(ypObject *mapping, ypObject *key, ypObject *x, ypObject **exc)
+void yp_setitem(ypObject *mapping, ypObject *key, ypObject *x, ypObject **exc)
 {
     _yp_REDIRECT_EXC1(mapping, tp_setitem, (mapping, key, x), exc);
 }
 
-void yp_delitem(ypObject **mapping, ypObject *key)
+void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc)
 {
-    _yp_INPLACE1(mapping, tp_delitem, (*mapping, key));
+    _yp_REDIRECT_EXC1(mapping, tp_delitem, (mapping, key), exc);
 }
 
 ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *defval)
@@ -19437,36 +19384,34 @@ ypObject *yp_iter_keys(ypObject *mapping)
     _yp_REDIRECT2(mapping, tp_as_mapping, tp_iter_keys, (mapping));
 }
 
-ypObject *yp_popvalue3(ypObject **mapping, ypObject *key, ypObject *defval)
+ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *defval)
 {
-    _yp_INPLACE_RETURN2(mapping, tp_as_mapping, tp_popvalue, (*mapping, key, defval));
+    _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, defval));
 }
 
-void yp_popitem(ypObject **mapping, ypObject **key, ypObject **value)
+void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value)
 {
-    ypTypeObject *type = ypObject_TYPE(*mapping);
-    ypObject     *result = type->tp_as_mapping->tp_popitem(*mapping, key, value);
+    ypTypeObject *type = ypObject_TYPE(mapping);
+    ypObject     *result = type->tp_as_mapping->tp_popitem(mapping, key, value);
     if (yp_isexceptionC(result)) {
         *key = *value = result;
-        yp_INPLACE_ERR(mapping, result);
     }
 }
 
-ypObject *yp_setdefault(ypObject **mapping, ypObject *key, ypObject *defval)
+ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval)
 {
-    ypTypeObject *type = ypObject_TYPE(*mapping);
-    ypObject     *result = type->tp_as_mapping->tp_setdefault(*mapping, key, defval);
-    if (yp_isexceptionC(result)) yp_INPLACE_ERR(mapping, result);
+    ypTypeObject *type = ypObject_TYPE(mapping);
+    ypObject     *result = type->tp_as_mapping->tp_setdefault(mapping, key, defval);
     return result;
 }
 
-void yp_updateK(ypObject **mapping, int n, ...)
+void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...)
 {
-    return_yp_K_FUNC_void(yp_updateKV, (mapping, n, args), n);
+    return_yp_K_FUNC_void(yp_updateKV, (mapping, exc, n, args), n);
 }
-void yp_updateKV(ypObject **mapping, int n, va_list args)
+void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args)
 {
-    _yp_INPLACE2(mapping, tp_as_mapping, tp_updateK, (*mapping, n, args));
+    _yp_REDIRECT_EXC2(mapping, tp_as_mapping, tp_updateK, (mapping, n, args), exc);
 }
 
 int yp_iscallableC(ypObject *x) { return ypObject_TYPE(x)->tp_as_callable->tp_iscallable; }
@@ -19579,18 +19524,10 @@ ypObject *yp_miniiter(ypObject *x, yp_uint64_t *state)
     _yp_REDIRECT1(x, tp_miniiter, (x, state));
 }
 
-// FIXME Now that iterators are considered "immutable", don't discard on _next/etc? i.e. turn
-// ypObject **mi into just ypObject *mi.
-ypObject *yp_miniiter_next(ypObject **mi, yp_uint64_t *state)
+ypObject *yp_miniiter_next(ypObject *mi, yp_uint64_t *state)
 {
-    ypTypeObject *type = ypObject_TYPE(*mi);
-    ypObject     *result = type->tp_miniiter_next(*mi, state);
-    if (yp_isexceptionC(result)) {
-        // tp_miniiter_next closes; it's up to us to not treat yp_StopIteration as an "error"
-        if (!yp_isexceptionC2(result, yp_StopIteration)) {
-            yp_INPLACE_ERR(mi, result);
-        }
-    }
+    ypTypeObject *type = ypObject_TYPE(mi);
+    ypObject     *result = type->tp_miniiter_next(mi, state);
     return result;
 }
 
@@ -19623,14 +19560,14 @@ int yp_o2i_containsC(ypObject *container, yp_int_t xC, ypObject **exc)
     return result == yp_True;  // returns false on yp_False or exception
 }
 
-void yp_o2i_pushC(ypObject **container, yp_int_t xC)
+void yp_o2i_pushC(ypObject *container, yp_int_t xC, ypObject **exc)
 {
     ypObject *x = yp_intC(xC);
-    yp_push(container, x);
+    yp_push(container, x, exc);
     yp_decref(x);
 }
 
-yp_int_t yp_o2i_popC(ypObject **container, ypObject **exc)
+yp_int_t yp_o2i_popC(ypObject *container, ypObject **exc)
 {
     ypObject *x = yp_pop(container);
     yp_int_t  xC = yp_index_asintC(x, exc);
@@ -19646,10 +19583,10 @@ yp_int_t yp_o2i_getitemC(ypObject *container, ypObject *key, ypObject **exc)
     return xC;
 }
 
-void yp_o2i_setitemC(ypObject **container, ypObject *key, yp_int_t xC)
+void yp_o2i_setitemC(ypObject *container, ypObject *key, yp_int_t xC, ypObject **exc)
 {
     ypObject *x = yp_intC(xC);
-    yp_setitem(container, key, x);
+    yp_setitem(container, key, x, exc);
     yp_decref(x);
 }
 
@@ -19673,10 +19610,11 @@ ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t 
     return result;
 }
 
-void yp_o2s_setitemC4(ypObject **container, ypObject *key, const yp_uint8_t *xC, yp_ssize_t x_lenC)
+void yp_o2s_setitemC5(
+        ypObject *container, ypObject *key, const yp_uint8_t *xC, yp_ssize_t x_lenC, ypObject **exc)
 {
     ypObject *x = yp_str_frombytesC2(xC, x_lenC);
-    yp_setitem(container, key, x);
+    yp_setitem(container, key, x, exc);
     yp_decref(x);
 }
 
@@ -19688,10 +19626,10 @@ ypObject *yp_i2o_getitemC(ypObject *container, yp_int_t keyC)
     return x;
 }
 
-void yp_i2o_setitemC(ypObject **container, yp_int_t keyC, ypObject *x)
+void yp_i2o_setitemC(ypObject *container, yp_int_t keyC, ypObject *x, ypObject **exc)
 {
     ypObject *key = yp_intC(keyC);
-    yp_setitem(container, key, x);
+    yp_setitem(container, key, x, exc);
     yp_decref(key);
 }
 
@@ -19703,10 +19641,10 @@ yp_int_t yp_i2i_getitemC(ypObject *container, yp_int_t keyC, ypObject **exc)
     return x;
 }
 
-void yp_i2i_setitemC(ypObject **container, yp_int_t keyC, yp_int_t xC)
+void yp_i2i_setitemC(ypObject *container, yp_int_t keyC, yp_int_t xC, ypObject **exc)
 {
     ypObject *key = yp_intC(keyC);
-    yp_o2i_setitemC(container, key, xC);
+    yp_o2i_setitemC(container, key, xC, exc);
     yp_decref(key);
 }
 
@@ -19719,10 +19657,11 @@ ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t keyC, const yp_uint8_t 
     return result;
 }
 
-void yp_i2s_setitemC4(ypObject **container, yp_int_t keyC, const yp_uint8_t *xC, yp_ssize_t x_lenC)
+void yp_i2s_setitemC5(
+        ypObject *container, yp_int_t keyC, const yp_uint8_t *xC, yp_ssize_t x_lenC, ypObject **exc)
 {
     ypObject *key = yp_intC(keyC);
-    yp_o2s_setitemC4(container, key, xC, x_lenC);
+    yp_o2s_setitemC5(container, key, xC, x_lenC, exc);
     yp_decref(key);
 }
 
@@ -19734,11 +19673,11 @@ ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *keyC, yp_ssize
     return x;
 }
 
-void yp_s2o_setitemC4(
-        ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, ypObject *x)
+void yp_s2o_setitemC5(ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
+        ypObject *x, ypObject **exc)
 {
     ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
-    yp_setitem(container, key, x);
+    yp_setitem(container, key, x, exc);
     yp_decref(key);
 }
 
@@ -19751,11 +19690,11 @@ yp_int_t yp_s2i_getitemC4(
     return x;
 }
 
-void yp_s2i_setitemC4(
-        ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, yp_int_t xC)
+void yp_s2i_setitemC5(ypObject **container, const yp_uint8_t *keyC, yp_ssize_t key_lenC,
+        yp_int_t xC, ypObject **exc)
 {
     ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
-    yp_o2i_setitemC(container, key, xC);
+    yp_o2i_setitemC(container, key, xC, exc);
     yp_decref(key);
 }
 
@@ -19998,9 +19937,10 @@ static void _ypMem_initialize(const yp_initialize_parameters_t *args)
 
 // Called *exactly* *once* by yp_initialize to set up the codecs module. Errors are largely
 // ignored: calling code will fail gracefully later on.
-// TODO Instead, fail with an ASSERT on any exceptions
 static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
 {
+    ypObject *exc = yp_None;
+
     // The set of standard encodings
     // TODO This would be easier to maintain with a "yp_N" macro to count args
     // clang-format off
@@ -20017,10 +19957,11 @@ static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a length_hint
     // (yp_dict_fromlength_hint?)
     _yp_codecs_alias2encoding = yp_dictK(0);
-#define yp_codecs_init_ADD_ALIAS(alias, name)                       \
-    do {                                                            \
-        yp_IMMORTAL_STR_LATIN_1(_alias_obj, alias);                 \
-        yp_setitem(&_yp_codecs_alias2encoding, _alias_obj, (name)); \
+#define yp_codecs_init_ADD_ALIAS(alias, name)                            \
+    do {                                                                 \
+        yp_IMMORTAL_STR_LATIN_1(_alias_obj, alias);                      \
+        yp_setitem(_yp_codecs_alias2encoding, _alias_obj, (name), &exc); \
+        yp_ASSERT1(!yp_isexceptionC(exc));                               \
     } while (0)
     // clang-format off
     yp_codecs_init_ADD_ALIAS("646",            yp_s_ascii);
@@ -20050,8 +19991,11 @@ static void _yp_codecs_initialize(const yp_initialize_parameters_t *args)
     // TODO Whether statically- or dynamically-allocated, this dict creation needs a length_hint
     // (yp_dict_fromlength_hint?)
     _yp_codecs_errors2handler = yp_dictK(0);
-#define yp_codecs_init_ADD_ERROR(name, func) \
-    yp_o2i_setitemC(&_yp_codecs_errors2handler, (name), (yp_ssize_t)(func))
+#define yp_codecs_init_ADD_ERROR(name, func)                                          \
+    do {                                                                              \
+        yp_o2i_setitemC(&_yp_codecs_errors2handler, (name), (yp_ssize_t)(func), exc); \
+        yp_ASSERT1(!yp_isexceptionC(exc));                                            \
+    } while (0)
     // clang-format off
     yp_codecs_init_ADD_ERROR(yp_s_strict,            yp_codecs_strict_errors);
     yp_codecs_init_ADD_ERROR(yp_s_replace,           yp_codecs_replace_errors);
