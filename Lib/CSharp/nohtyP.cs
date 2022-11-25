@@ -750,7 +750,8 @@ namespace nohtyP
         internal static extern void yp_delindexC( ref ypObject_p sequence, yp_ssize_t i );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_delsliceC5( ref ypObject_p sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k );
+        internal static extern void yp_delsliceC5( ref ypObject_p sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k,
+                ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_delitem( ref ypObject_p sequence, ypObject_p key );
@@ -780,7 +781,8 @@ namespace nohtyP
         internal static extern void yp_reverse( ref ypObject_p sequence );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_sort4( ref ypObject_p sequence, yp_sort_key_func_t key, ypObject_p reverse );
+        internal static extern void yp_sort4( ref ypObject_p sequence, yp_sort_key_func_t key, ypObject_p reverse,
+                ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_sort( ref ypObject_p sequence );
@@ -920,7 +922,8 @@ namespace nohtyP
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_ipow( ref ypObject_p x, ypObject_p y );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_ipow4( ref ypObject_p x, ypObject_p y, ypObject_p z );
+        internal static extern void yp_ipow4( ref ypObject_p x, ypObject_p y, ypObject_p z,
+                ref ypObject_p exc );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_ineg( ref ypObject_p x );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
