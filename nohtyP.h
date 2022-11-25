@@ -1664,8 +1664,8 @@ ypAPI yp_int_t yp_o2i_getitemC(ypObject *container, ypObject *key, ypObject **ex
 ypAPI void     yp_o2i_setitemC(ypObject *container, ypObject *key, yp_int_t x, ypObject **exc);
 
 // Operations on containers that map objects to strs. yp_o2s_getitemCX is documented below.
-ypAPI void yp_o2s_setitemC4(
-        ypObject **container, ypObject *key, const yp_uint8_t *x, yp_ssize_t x_len);
+ypAPI void yp_o2s_setitemC5(
+        ypObject *container, ypObject *key, const yp_uint8_t *x, yp_ssize_t x_len, ypObject **exc);
 
 // Operations on containers that map integers to objects. Note that if the container is known at
 // compile-time to be a sequence, then yp_getindexC et al are better choices.
@@ -1677,8 +1677,8 @@ ypAPI yp_int_t yp_i2i_getitemC(ypObject *container, yp_int_t key, ypObject **exc
 ypAPI void     yp_i2i_setitemC(ypObject *container, yp_int_t key, yp_int_t x, ypObject **exc);
 
 // Operations on containers that map integers to strs. yp_i2s_getitemCX is documented below.
-ypAPI void yp_i2s_setitemC4(
-        ypObject **container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len);
+ypAPI void yp_i2s_setitemC5(
+        ypObject *container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len, ypObject **exc);
 
 // Operations on containers that map strs to objects. Note that if the value of the str is known at
 // compile-time, as in:
@@ -1690,14 +1690,14 @@ ypAPI void yp_i2s_setitemC4(
 //      yp_IMMORTAL_STR_LATIN_1(s_mykey, "mykey");
 //      value = yp_getitem(o, s_mykey);
 ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len);
-ypAPI void      yp_s2o_setitemC4(
-             ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject *x);
+ypAPI void      yp_s2o_setitemC5(ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len,
+             ypObject *x, ypObject **exc);
 
 // Operations on containers that map strs to integers.
 ypAPI yp_int_t yp_s2i_getitemC4(
         ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject **exc);
-ypAPI void yp_s2i_setitemC4(
-        ypObject **container, const yp_uint8_t *key, yp_ssize_t key_len, yp_int_t x);
+ypAPI void yp_s2i_setitemC5(
+        ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len, yp_int_t x, ypObject **exc);
 
 
 /*
