@@ -46,12 +46,17 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
         LIBS=[
             sharedLib
         ],
+        CCFLAGS=[
+            # munit.c has a bunch of these warnings
+            # TODO Contribute a fix back to munit?
+            "-Wno-sign-conversion"
+        ]
     )
     source = [
         # TODO Add ypExample.c to the munit tests.
         env.Glob("$VTOP/Lib/munit_test/*.c"),
         env.Glob("$VTOP/Lib/munit_test/*/*.c"),
-        # "$VTOP/Tools/munit/munit.c"
+        "$VTOP/Tools/munit/munit.c"
     ]
     return (env.Program("$VTOP/munit_test", source=source), )
 
