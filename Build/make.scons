@@ -25,9 +25,9 @@ def nohtyP_SharedLibrary(env):
             "yp_BUILD_CORE",
             "yp_DEBUG_LEVEL=%s" % ("10" if env["CONFIGURATION"] == "debug" else "0"),
         ],
-        PDB="$VTOP/nohtyP.pdb",
         LIBS=[],
     )
+    env.Replace(PDB="$VTOP/nohtyP.pdb")
     return (env.SharedLibrary("$VTOP/nohtyP", source="$VTOP/nohtyP.c"), )
 
 
@@ -47,8 +47,10 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
             # FIXME Just write it to two separate files, since they don't play nice combined.
             "MUNIT_OUTPUT_FILE=stderr"
         ],
-        PDB="$VTOP/munit_test.pdb",
         LIBS=[sharedLib],
+    )
+    env.Replace(
+        PDB="$VTOP/munit_test.pdb", CCCOMSTR="Compiling $TARGET", LINKCOMSTR="Linking $TARGET"
     )
     source = [
         # TODO Add ypExample.c to the munit tests.
