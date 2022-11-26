@@ -24,7 +24,7 @@ The Build directory contains an optional SCons makefile that supports various
 compilers and targets.  To build a shared library for your platform, run the
 following from the top-level directory:
 
-    Build/make
+    ./Build/make
 
 This will build both a debug and a release version for your native OS and
 architecture, and will copy the binaries to `Build/native`. For more information,
@@ -60,7 +60,7 @@ output from the following command:
     python -m yp_test -v test_whatever
 
 This runs the test in verbose mode.  You can also obtain this output using the
-`test` target in `Build/make`, which creates a `yp_test.log` file in the same
+`test` target in `./Build/make`, which creates a `yp_test.log` file in the same
 directory as the shared library.
 
 
