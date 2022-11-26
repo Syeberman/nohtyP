@@ -12,6 +12,7 @@ extern "C" {
 
 
 typedef struct _fixture_t {
+    void *_dummy; // FIXME "C requires that a struct or union has at least one member"
 } fixture_t;
 
 
