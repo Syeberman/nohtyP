@@ -25,9 +25,12 @@
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #pragma GCC diagnostic ignored "-Wshadow"
 
-// GCC on certain versions of MacOS hit a strange bug. We don't need AuthSession.h, so disable.
+// GCC on certain versions of MacOS hit a strange bug. We don't need security, so disable.
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=93082
-#define __AuthSession__
+// #define _SECURITY_H_
+#define __LAUNCHSERVICES__
+#define __OSSERVICES__
+#define __SHAREDFILELIST__
 
 /*** Configuration ***/
 
