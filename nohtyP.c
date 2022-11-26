@@ -3873,11 +3873,11 @@ static ypTypeObject ypException_Type = {
 // The immortal exception objects; this should match Python's hierarchy:
 //  http://docs.python.org/3/library/exceptions.html
 
-#define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                                     \
-    yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                            \
-    static ypExceptionObject _##name##_struct = {                                           \
-            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, NULL, 0), yp_CONST_REF(name##_name), \
-            (superptr)};                                                                    \
+#define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                             \
+    yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                    \
+    static ypExceptionObject _##name##_struct = {                                   \
+            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, NULL, ypObject_LEN_INVALID), \
+            yp_CONST_REF(name##_name), (superptr)};                                 \
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_EXCEPTION(name, super) \
     _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, yp_CONST_REF(super))
