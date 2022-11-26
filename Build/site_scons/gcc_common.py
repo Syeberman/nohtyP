@@ -260,7 +260,7 @@ def ApplyGCCOptions(env, version):
         "-Wall",
         # Building a shared library with GCC on Windows requires the GCC shared libraries, which are
         # not available by default. So link these libraries statically.
-        "-static" if _platform_name == "win32" else "",
+        "-static" if env["TARGET_OS"] == "win32" else "",
         # Create a mapfile (.map)
         "-Wl,-map,${TARGET.base}.map"
         if _platform_name == "darwin" else "-Wl,-Map,${TARGET.base}.map",

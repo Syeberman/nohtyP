@@ -47,7 +47,11 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
             # FIXME Just write it to two separate files, since they don't play nice combined.
             "MUNIT_OUTPUT_FILE=stderr"
         ],
-        LIBS=[sharedLib],
+        LIBS=[
+            sharedLib,
+            # Fixes `libnohtyP.so: undefined reference to `pow'` on Ubuntu 20.04.
+            "m" if env["TARGET_OS"] == "posix" else "",
+        ],
     )
     env.Replace(
         PDB="$VTOP/munit_test.pdb", CCCOMSTR="Compiling $TARGET", LINKCOMSTR="Linking $TARGET"
