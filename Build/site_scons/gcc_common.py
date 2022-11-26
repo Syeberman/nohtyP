@@ -192,8 +192,6 @@ def ApplyGCCOptions(env, version):
         "" if version >= 9.0 else "-Wno-float-conversion",
         # TODO maybe-uninitialized would be good during analyze
         "-Wno-maybe-uninitialized" if version >= 4.8 else "-Wno-uninitialized",
-        # munit.c has a bunch of these warnings TODO Contribute a fix back to munit?
-        "-Wno-sign-conversion",
         # For shared libraries, only expose functions explicitly marked ypAPI
         "-fvisibility=hidden" if version >= 4.0 else "",
         # Debugging information

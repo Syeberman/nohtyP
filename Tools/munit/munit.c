@@ -21,6 +21,10 @@
  * SOFTWARE.
  */
 
+// TODO munit trips over the following gcc errors. Contribute the fixes back to munit?
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wshadow"
+
 /*** Configuration ***/
 
 /* This is just where the output from the test goes.  It's really just
