@@ -48,14 +48,7 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
             "MUNIT_OUTPUT_FILE=stderr"
         ],
         PDB="$VTOP/munit_test.pdb",
-        LIBS=[
-            sharedLib
-        ],
-        CCFLAGS=[
-            # munit.c has a bunch of these warnings
-            # TODO Contribute a fix back to munit?
-            "-Wno-sign-conversion"
-        ]
+        LIBS=[sharedLib],
     )
     source = [
         # TODO Add ypExample.c to the munit tests.
@@ -82,7 +75,9 @@ def nohtyP_munit_test(env, munit_test):
     env["MUNIT_TEST"] = Flatten(munit_test)[0]
     testLog = env.Command(
         # TODO See MUNIT_OUTPUT_FILE comment above.
-        "$VTOP/munit_test.log", (munit_test), "$MUNIT_TEST 2> $TARGET"
+        "$VTOP/munit_test.log",
+        (munit_test),
+        "$MUNIT_TEST 2> $TARGET"
     )
     Clean(munit_test, testLog)
     return testLog
@@ -247,7 +242,7 @@ for compiler_name in compiler_names:
         AliasIfNotEmpty("test:all", testTargets)
         AliasIfNotEmpty("analyze:all", analyzeTargets)
         heirarchy = (compiler_name, targ_os, targ_arch, configuration)
-        for heirarchyDepth in range(1, len(heirarchy)+1):
+        for heirarchyDepth in range(1, len(heirarchy) + 1):
             heirarchyName = ":".join(heirarchy[:heirarchyDepth])
             AliasIfNotEmpty(heirarchyName, buildTargets)
             AliasIfNotEmpty("build:" + heirarchyName, buildTargets)
