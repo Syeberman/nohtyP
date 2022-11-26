@@ -3,12 +3,12 @@
 
 
 // FIXME fixture? data? user_data?
-static MunitResult test_concat(const MunitParameter params[], void *fixture)
+static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture)
 {
     ypObject *result;
 
     result = yp_concat(yp_tuple_empty, yp_tuple_empty);
-    assert_int(yp_lenC(result, NULL), ==, 0);
+    assert_len(result, 0);
 
     return MUNIT_OK;
 }
