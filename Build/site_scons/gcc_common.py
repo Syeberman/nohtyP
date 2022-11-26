@@ -258,8 +258,9 @@ def ApplyGCCOptions(env, version):
         # Warnings-as-errors, all (avoidable) warnings
         "-Werror",
         "-Wall",
-        # Static libgcc (arithmetic, mostly)
-        "-static-libgcc",
+        # Building a shared library with GCC on Windows requires the GCC shared libraries, which are
+        # not available by default. So link these libraries statically.
+        "-static" if _platform_name == "win32" else "",
         # Create a mapfile (.map)
         "-Wl,-map,${TARGET.base}.map"
         if _platform_name == "darwin" else "-Wl,-Map,${TARGET.base}.map",
