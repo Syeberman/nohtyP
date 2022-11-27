@@ -12,6 +12,17 @@ if not os.path.exists("nohtyP.c"):
 RootEnv.Replace(NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0)
 
 
+# TODO Can these be moved into root_environment.py?
+def get_implib(env, target):
+    return env.FindIxes(target, 'LIBPREFIX', 'LIBSUFFIX')
+
+def get_dll(env, target):
+    return env.FindIxes(target, 'SHLIBPREFIX', 'SHLIBSUFFIX')
+
+def get_prog(env, target):
+    return env.FindIxes(target, "PROGPREFIX", "PROGSUFFIX")
+
+
 # Adds nohtyP.dll/libnotyP.so/etc as a target in env
 # TODO Combine nohtyP.c and nohtyP.cs into a single DLL
 #   https://blogs.msdn.microsoft.com/junfeng/2005/05/19/how-do-i-mix-c-and-c-code-in-a-single-assembly/
@@ -28,7 +39,7 @@ def nohtyP_SharedLibrary(env):
         LIBS=[],
     )
     env.Replace(PDB="$VTOP/nohtyP.pdb")
-    return (env.SharedLibrary("$VTOP/nohtyP", source="$VTOP/nohtyP.c"), )
+    return env.SharedLibrary("$VTOP/nohtyP", source="$VTOP/nohtyP.c")
 
 
 # Builds the munit_test suite against the shared library.
@@ -48,7 +59,7 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
             "MUNIT_OUTPUT_FILE=stderr"
         ],
         LIBS=[
-            sharedLib,
+            get_implib(env, sharedLib),
             # Fixes `libnohtyP.so: undefined reference to `pow'` on Ubuntu 20.04.
             "m" if env["TARGET_OS"] == "posix" else "",
         ],
@@ -62,12 +73,12 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
         env.Glob("$VTOP/Lib/munit_test/*/*.c"),
         "$VTOP/Tools/munit/munit.c"
     ]
-    return (env.Program("$VTOP/munit_test", source=source), )
+    return env.Program("$VTOP/munit_test", source=source)
 
 
 def nohtyP_yp_test(env, sharedLib):
     env.PrependENVPath("PYTHONPATH", "#/Lib")
-    env["ENV"]["NOHTYP_LIBRARY"] = Flatten(sharedLib)[0]
+    env["ENV"]["NOHTYP_LIBRARY"] = get_dll(env, sharedLib)
     scripts = ("#/Lib/yp.py", env.Glob("#/Lib/yp_test/*.py"), env.Glob("#/Lib/yp_test/*.txt"))
     testLog = env.Command(
         "$VTOP/yp_test.log", (sharedLib, scripts), "$PYTHON -m yp_test -v > $TARGET"
@@ -78,7 +89,7 @@ def nohtyP_yp_test(env, sharedLib):
 
 # Runs the munit_test suite.
 def nohtyP_munit_test(env, munit_test):
-    env["MUNIT_TEST"] = Flatten(munit_test)[0]
+    env["MUNIT_TEST"] = get_prog(env, munit_test)
     testLog = env.Command(
         # TODO See MUNIT_OUTPUT_FILE comment above.
         "$VTOP/munit_test.log",
