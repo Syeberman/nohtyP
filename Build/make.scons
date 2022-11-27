@@ -13,11 +13,12 @@ RootEnv.Replace(NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0)
 
 
 # TODO Can these be moved into root_environment.py?
-def get_implib(env, target):
-    return env.FindIxes(target, 'LIBPREFIX', 'LIBSUFFIX')
-
 def get_dll(env, target):
     return env.FindIxes(target, 'SHLIBPREFIX', 'SHLIBSUFFIX')
+
+def get_implib(env, target):
+    # MacOS uses the dll (.dylib) as the import library.
+    return env.FindIxes(target, 'LIBPREFIX', 'LIBSUFFIX') or get_dll(env, target)
 
 def get_prog(env, target):
     return env.FindIxes(target, "PROGPREFIX", "PROGSUFFIX")
