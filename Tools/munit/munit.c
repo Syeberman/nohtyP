@@ -22,15 +22,18 @@
  */
 
 // TODO munit trips over the following gcc errors. Contribute the fixes back to munit?
+#if defined(__GNUC__)  // GCC
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #pragma GCC diagnostic ignored "-Wshadow"
+#endif
 
 // GCC on certain versions of MacOS hit a strange bug. We don't need security, so disable.
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=93082
-// #define _SECURITY_H_
+#if defined(__APPLE__)
 #define __LAUNCHSERVICES__
 #define __OSSERVICES__
 #define __SHAREDFILELIST__
+#endif
 
 /*** Configuration ***/
 
