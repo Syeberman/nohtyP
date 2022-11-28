@@ -60,16 +60,31 @@ extern "C" {
 #endif
 
 
+#define STRINGIFY1(a) #a
+#define STRINGIFY2(a, b) #a, #b
+#define STRINGIFY3(a, b, c) #a, #b, #c
+#define STRINGIFY4(a, b, c, d) #a, #b, #c, #d
+#define STRINGIFY5(a, b, c, d, e) #a, #b, #c, #d, #e
+#define STRINGIFY6(a, b, c, d, e, f) #a, #b, #c, #d, #e, #f
+#define STRINGIFY7(a, b, c, d, e, f, g) #a, #b, #c, #d, #e, #f, #g
+#define STRINGIFY8(a, b, c, d, e, f, g, h) #a, #b, #c, #d, #e, #f, #g, #h
+#define STRINGIFY9(a, b, c, d, e, f, g, h, i) #a, #b, #c, #d, #e, #f, #g, #h, #i
+#define STRINGIFY10(a, b, c, d, e, f, g, h, i, j) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j
+#define STRINGIFY11(a, b, c, d, e, f, g, h, i, j, k) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k
+#define STRINGIFY12(a, b, c, d, e, f, g, h, i, j, k, l) \
+#a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l
+
+
 // FIXME A suite of tests to ensure these assertions are working. They can be
 // MUNIT_TEST_OPTION_TODO, which will fail if they pass.
 
 #define assert_ssize(a, op, b) assert_type(yp_ssize_t, PRIssize, a, op, b)
 
 // FIXME A better error message to list the exception name.
-#define _assert_not_exception(obj, obj_str, ...)                                          \
+#define _assert_not_exception(obj, obj_fmt, ...)                                          \
     do {                                                                                  \
         if (yp_isexceptionC(obj)) {                                                       \
-            munit_errorf("assertion failed: !yp_isexceptionC(" obj_str ")", __VA_ARGS__); \
+            munit_errorf("assertion failed: !yp_isexceptionC(" obj_fmt ")", __VA_ARGS__); \
         }                                                                                 \
     } while (0)
 
@@ -82,22 +97,22 @@ extern "C" {
 // Called when the test should fail because an exception was returned. Fails with either "assertion
 // failed: yp_isexceptionC" (ex yp_eq returns an exception) or "returned non-exception on error" (ex
 // yp_eq returns something other than yp_True, yp_False, or an exception).
-#define _ypmt_error_exception(exc, non_exc_str, obj_str, ...) \
+#define _ypmt_error_exception(exc, non_exc_fmt, obj_fmt, ...) \
     do {                                                      \
-        _assert_not_exception(exc, obj_str, __VA_ARGS__);     \
-        munit_errorf(non_exc_str ": " obj_str, __VA_ARGS__);  \
+        _assert_not_exception(exc, obj_fmt, __VA_ARGS__);     \
+        munit_errorf(non_exc_fmt ": " obj_fmt, __VA_ARGS__);  \
     } while (0)
 
-#define _assert_not_raises_exc(statement, statement_str, ...)                              \
+#define _assert_not_raises_exc(statement, statement_fmt, ...)                              \
     do {                                                                                   \
         ypObject *exc = NULL;                                                              \
         statement;                                                                         \
         if (exc != NULL) {                                                                 \
             if (yp_isexceptionC(exc)) {                                                    \
-                munit_errorf("assertion failed: " statement_str "; !yp_isexceptionC(exc)", \
+                munit_errorf("assertion failed: " statement_fmt "; !yp_isexceptionC(exc)", \
                         __VA_ARGS__);                                                      \
             }                                                                              \
-            munit_errorf("exc set to a non-exception: " statement_str, __VA_ARGS__);       \
+            munit_errorf("exc set to a non-exception: " statement_fmt, __VA_ARGS__);       \
         }                                                                                  \
     } while (0)
 
@@ -108,17 +123,18 @@ extern "C" {
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
 #define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
 
-#define _assert_obj(a, op, b, a_str, b_str, ...)                                                   \
+// TODO Print the values of a and b (needs yp_str)
+#define _assert_obj(a, op, b, a_fmt, b_fmt, ...)                                                   \
     do {                                                                                           \
         ypObject *_ypmt_OBJ_result = yp_##op(a, b);                                                \
         if (_ypmt_OBJ_result == yp_True) {                                                         \
             /* pass */                                                                             \
         } else if (_ypmt_OBJ_result == yp_False) {                                                 \
             munit_errorf(                                                                          \
-                    "assertion failed: yp_" #op "(" a_str ", " b_str ") == yp_True", __VA_ARGS__); \
+                    "assertion failed: yp_" #op "(" a_fmt ", " b_fmt ") == yp_True", __VA_ARGS__); \
         } else {                                                                                   \
             _ypmt_error_exception(_ypmt_OBJ_result, "expected yp_True, yp_False, or an exception", \
-                    "yp_" #op "(" a_str ", " b_str ")", __VA_ARGS__);                              \
+                    "yp_" #op "(" a_fmt ", " b_fmt ")", __VA_ARGS__);                              \
         }                                                                                          \
     } while (0)
 
@@ -129,13 +145,13 @@ extern "C" {
         _assert_obj(_ypmt_OBJ_a, op, _ypmt_OBJ_b, "%s", "%s", #a, #b); \
     } while (0)
 
-#define _assert_len(obj, expected, obj_str, expected_str, ...)                           \
+#define _assert_len(obj, expected, obj_fmt, expected_fmt, ...)                           \
     do {                                                                                 \
         yp_ssize_t _ypmt_LEN_actual;                                                     \
         _assert_not_raises_exc(_ypmt_LEN_actual = yp_lenC(obj, &exc),                    \
-                "yp_lenC(" obj_str ", &exc) == " expected_str, __VA_ARGS__);             \
+                "yp_lenC(" obj_fmt ", &exc) == " expected_fmt, __VA_ARGS__);             \
         if (_ypmt_LEN_actual != expected) {                                              \
-            munit_errorf("assertion failed: yp_lenC(" obj_str ", &exc) == " expected_str \
+            munit_errorf("assertion failed: yp_lenC(" obj_fmt ", &exc) == " expected_fmt \
                          " (%" PRIssize " == %" PRIssize ")",                            \
                     __VA_ARGS__, _ypmt_LEN_actual, expected);                            \
         }                                                                                \
@@ -149,23 +165,23 @@ extern "C" {
     } while (0)
 
 // Asserts that obj is a sequence containing exactly the given n items in that order. Validates
-// yp_lenC and yp_getindexC.
-// FIXME Nicely print item that failed (needs yp_str)
-// FIXME How does this cleanup for the teardown method if it fails?
-// FIXME Do better than <expected>
-#define assert_sequence(obj, n, ...)                                                           \
-    do {                                                                                       \
-        ypObject  *_ypmt_SEQ_obj = (obj);                                                      \
-        yp_ssize_t _ypmt_SEQ_n = (n);                                                          \
-        ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                                          \
-        yp_ssize_t _ypmt_SEQ_i;                                                                \
-        _assert_len(_ypmt_SEQ_obj, _ypmt_SEQ_n, "%s", "%s", #obj, #n);                         \
-        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < _ypmt_SEQ_n; _ypmt_SEQ_i++) {                      \
-            ypObject *_ypmt_SEQ_actual = yp_getindexC(_ypmt_SEQ_obj, _ypmt_SEQ_i);             \
-            _assert_obj(_ypmt_SEQ_actual, eq, _ypmt_SEQ_items[_ypmt_SEQ_i],                    \
-                    "yp_getindexC(%s, %" PRIssize ")", "%s", #obj, _ypmt_SEQ_i, "<expected>"); \
-            yp_decref(_ypmt_SEQ_actual);                                                       \
-        }                                                                                      \
+// yp_lenC and yp_getindexC. n must be an integer literal.
+// XXX This is unable to cleanup _ypmt_SEQ_actual on error, as tear_down is not called on assertion
+// failures. As such, test failures may leak some memory.
+#define assert_sequence(obj, n, ...)                                               \
+    do {                                                                           \
+        ypObject  *_ypmt_SEQ_obj = (obj);                                          \
+        ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                              \
+        char      *_ypmt_SEQ_item_strs[] = {STRINGIFY##n(__VA_ARGS__)};            \
+        yp_ssize_t _ypmt_SEQ_i;                                                    \
+        _assert_len(_ypmt_SEQ_obj, n, "%s", #n, #obj);                             \
+        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < n; _ypmt_SEQ_i++) {                    \
+            ypObject *_ypmt_SEQ_actual = yp_getindexC(_ypmt_SEQ_obj, _ypmt_SEQ_i); \
+            _assert_obj(_ypmt_SEQ_actual, eq, _ypmt_SEQ_items[_ypmt_SEQ_i],        \
+                    "yp_getindexC(%s, %" PRIssize ")", "%s", #obj, _ypmt_SEQ_i,    \
+                    _ypmt_SEQ_item_strs[_ypmt_SEQ_i]);                             \
+            yp_decref(_ypmt_SEQ_actual);                                           \
+        }                                                                          \
     } while (0)
 
 
