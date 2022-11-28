@@ -23,6 +23,8 @@ int main(int argc, char **argv)
         yp_initialize(&args);
     }
 
+    unittest_initialize();
+
     {
         void *user_data = NULL;
         return munit_suite_main(&munit_test_suite, user_data, argc, argv);

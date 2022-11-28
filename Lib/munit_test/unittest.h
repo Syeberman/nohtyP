@@ -10,12 +10,6 @@ extern "C" {
 #define MUNIT_ENABLE_ASSERT_ALIASES
 #include "munit.h"
 
-
-typedef struct _fixture_t {
-    void *_dummy;  // FIXME "C requires that a struct or union has at least one member"
-} fixture_t;
-
-
 #define SUITE_OF_TESTS(name)                             \
     {                                                    \
         "/" #name,                      /* prefix */     \
@@ -156,7 +150,6 @@ typedef struct _fixture_t {
 
 // Asserts that obj is a sequence containing exactly the given n items in that order. Validates
 // yp_lenC and yp_getindexC.
-// FIXME And yp_getitemC? And others?
 // FIXME Nicely print item that failed (needs yp_str)
 // FIXME How does this cleanup for the teardown method if it fails?
 // FIXME Do better than <expected>
@@ -174,6 +167,68 @@ typedef struct _fixture_t {
             yp_decref(_ypmt_SEQ_actual);                                                       \
         }                                                                                      \
     } while (0)
+
+
+typedef ypObject *(*objvoidfunc)(void);
+typedef ypObject *(*objvarargfunc)(int, ...);
+typedef void (*voidobjpobjpfunc)(ypObject **, ypObject **);
+
+
+// Any methods or arguments here that don't apply to a given type will fail the test.
+typedef struct _fixture_type_t {
+    char     *name;  // The name of the type (i.e. int, bytearray, dict)
+    ypObject *type;  // The type object (i.e. yp_t_float, yp_t_list)
+
+    objvarargfunc newN;  // Creates an object to hold the given values (i.e. yp_tupleN, yp_int where
+                         // n<2, yp_dict_fromkeysN where value=yp_None).
+    objvarargfunc newK;  // Creates an object to hold the given key/values (i.e. yp_dictK).
+    objvoidfunc   rand_falsy;   // Creates a random object of this type that evaluates to yp_False.
+    objvoidfunc   rand_truthy;  // Creates a random object of this type that evaluates to yp_True.
+
+    objvoidfunc      rand_value;      // Creates a random value that can be used with newN.
+    voidobjpobjpfunc rand_key_value;  // Creates a random key and value that can be used with newK;
+
+    // Flags to describe the properties of the type.
+    int is_mutable;
+    int is_numeric;
+    int is_iterable;
+    int is_collection;  // FIXME nohtyP.h calls this "container", but Python abc is collection
+    int is_sequence;
+    int is_string;
+    int is_set;
+    int is_mapping;
+    int is_callable;
+    // FIXME Is there a better word? The Python docs just say "Ranges implement all of the common
+    // sequence operations except concatenation and repetition".
+    // FIXME "is_insertion_ordered" is nice because when dict/set are made ordered, this applies.
+    int is_insertion_ordered;  // i.e. range doesn't support concat, repeat, newN, etc
+} fixture_type_t;
+
+extern fixture_type_t fixture_type_int;
+extern fixture_type_t fixture_type_intstore;
+extern fixture_type_t fixture_type_float;
+extern fixture_type_t fixture_type_floatstore;
+extern fixture_type_t fixture_type_iter;
+extern fixture_type_t fixture_type_range;
+extern fixture_type_t fixture_type_bytes;
+extern fixture_type_t fixture_type_bytearray;
+extern fixture_type_t fixture_type_str;
+extern fixture_type_t fixture_type_chrarray;
+extern fixture_type_t fixture_type_tuple;
+extern fixture_type_t fixture_type_list;
+extern fixture_type_t fixture_type_frozenset;
+extern fixture_type_t fixture_type_set;
+extern fixture_type_t fixture_type_frozendict;
+extern fixture_type_t fixture_type_dict;
+// FIXME type itself, exceptions, others?
+
+typedef struct _fixture_t {
+    fixture_type_t *type;  // The primary type under test.
+} fixture_t;
+
+
+extern void unittest_initialize(void);
+
 
 #ifdef __cplusplus
 }

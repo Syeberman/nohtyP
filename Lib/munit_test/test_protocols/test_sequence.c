@@ -2,7 +2,6 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME fixture? data? user_data?
 static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture)
 {
     ypObject *result;
