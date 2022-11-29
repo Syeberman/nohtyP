@@ -21,6 +21,78 @@ static void voidobjpobjpfunc_error(ypObject **key, ypObject **value)
 }
 
 
+fixture_type_t fixture_type_type = {
+        "type",  // name
+        NULL,    // type (initialized at runtime)
+
+        objvarargfunc_error,  // newN
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_falsy
+        objvoidfunc_error,    // rand_truthy
+
+        objvoidfunc_error,       // rand_value
+        voidobjpobjpfunc_error,  // rand_key_value
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        FALSE,  // is_iterable
+        FALSE,  // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_set
+        FALSE,  // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_insertion_ordered
+};
+
+fixture_type_t fixture_type_NoneType = {
+        "NoneType",  // name
+        NULL,        // type (initialized at runtime)
+
+        objvarargfunc_error,  // newN
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_falsy
+        objvoidfunc_error,    // rand_truthy
+
+        objvoidfunc_error,       // rand_value
+        voidobjpobjpfunc_error,  // rand_key_value
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        FALSE,  // is_iterable
+        FALSE,  // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_set
+        FALSE,  // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_insertion_ordered
+};
+
+fixture_type_t fixture_type_bool = {
+        "bool",  // name
+        NULL,    // type (initialized at runtime)
+
+        objvarargfunc_error,  // newN
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_falsy
+        objvoidfunc_error,    // rand_truthy
+
+        objvoidfunc_error,       // rand_value
+        voidobjpobjpfunc_error,  // rand_key_value
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        FALSE,  // is_iterable
+        FALSE,  // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_set
+        FALSE,  // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_insertion_ordered
+};
+
 fixture_type_t fixture_type_int = {
         "int",  // name
         NULL,   // type (initialized at runtime)
@@ -405,9 +477,77 @@ fixture_type_t fixture_type_dict = {
         FALSE,  // is_insertion_ordered
 };
 
+fixture_type_t fixture_type_function = {
+        "function",  // name
+        NULL,        // type (initialized at runtime)
+
+        objvarargfunc_error,  // newN
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_falsy
+        objvoidfunc_error,    // rand_truthy
+
+        objvoidfunc_error,       // rand_value
+        voidobjpobjpfunc_error,  // rand_key_value
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        FALSE,  // is_iterable
+        FALSE,  // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_set
+        FALSE,  // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_insertion_ordered
+};
+
+fixture_type_t *fixture_types_all[] = {&fixture_type_type, &fixture_type_NoneType,
+        &fixture_type_bool, &fixture_type_int, &fixture_type_intstore, &fixture_type_float,
+        &fixture_type_floatstore, &fixture_type_iter, &fixture_type_range, &fixture_type_bytes,
+        &fixture_type_bytearray, &fixture_type_str, &fixture_type_chrarray, &fixture_type_tuple,
+        &fixture_type_list, &fixture_type_frozenset, &fixture_type_set, &fixture_type_frozendict,
+        &fixture_type_dict, &fixture_type_function, NULL};
+// These are subsets of fixture_types_all, so will at most hold that many elements.
+fixture_type_t *fixture_types_numeric[yp_lengthof_array(fixture_types_all)];
+fixture_type_t *fixture_types_iterable[yp_lengthof_array(fixture_types_all)];
+fixture_type_t *fixture_types_collection[yp_lengthof_array(fixture_types_all)];
+fixture_type_t *fixture_types_sequence[yp_lengthof_array(fixture_types_all)];
+fixture_type_t *fixture_types_string[yp_lengthof_array(fixture_types_all)];
+fixture_type_t *fixture_types_set[yp_lengthof_array(fixture_types_all)];
+fixture_type_t *fixture_types_mapping[yp_lengthof_array(fixture_types_all)];
+
+// Once again, subsets of fixture_types_all.
+char *param_type_all[yp_lengthof_array(fixture_types_all)];
+char *param_type_numeric[yp_lengthof_array(fixture_types_all)];
+char *param_type_iterable[yp_lengthof_array(fixture_types_all)];
+char *param_type_collection[yp_lengthof_array(fixture_types_all)];
+char *param_type_sequence[yp_lengthof_array(fixture_types_all)];
+char *param_type_string[yp_lengthof_array(fixture_types_all)];
+char *param_type_set[yp_lengthof_array(fixture_types_all)];
+char *param_type_mapping[yp_lengthof_array(fixture_types_all)];
+
+// The given arrays must be no smaller than fixture_types_all.
+static void fill_type_arrays(fixture_type_t **fixture_array, char **param_array, yp_ssize_t offset)
+{
+    fixture_type_t **types;
+    for (types = fixture_types_all; *types != NULL; types++) {
+        if (*((int *)(((yp_uint8_t *)*types) + offset))) {
+            *fixture_array = *types;
+            fixture_array++;
+            *param_array = (*types)->name;
+            param_array++;
+        }
+    }
+    *fixture_array = NULL;
+    *param_array = NULL;
+}
+
 static void initialize_fixture_types(void)
 {
     // These need to be initialized at runtime because they may be imported from a DLL.
+    fixture_type_type.type = yp_t_type;
+    fixture_type_NoneType.type = yp_t_NoneType;
+    fixture_type_bool.type = yp_t_bool;
     fixture_type_int.type = yp_t_int;
     fixture_type_intstore.type = yp_t_intstore;
     fixture_type_float.type = yp_t_float;
@@ -424,6 +564,29 @@ static void initialize_fixture_types(void)
     fixture_type_set.type = yp_t_set;
     fixture_type_frozendict.type = yp_t_frozendict;
     fixture_type_dict.type = yp_t_dict;
+    fixture_type_function.type = yp_t_function;
+
+    {
+        fixture_type_t **types;
+        char           **param_array = param_type_all;
+        for (types = fixture_types_all; *types != NULL; types++) {
+            *param_array = (*types)->name;
+            param_array++;
+        }
+        *param_array = NULL;
+    }
+
+#define FILL_TYPE_ARRAYS(protocol)                                    \
+    fill_type_arrays(fixture_types_##protocol, param_type_##protocol, \
+            yp_offsetof(fixture_type_t, is_##protocol));
+    FILL_TYPE_ARRAYS(numeric);
+    FILL_TYPE_ARRAYS(iterable);
+    FILL_TYPE_ARRAYS(collection);
+    FILL_TYPE_ARRAYS(sequence);
+    FILL_TYPE_ARRAYS(string);
+    FILL_TYPE_ARRAYS(set);
+    FILL_TYPE_ARRAYS(mapping);
+#undef FILL_TYPE_ARRAYS
 }
 
 extern void unittest_initialize(void) { initialize_fixture_types(); }

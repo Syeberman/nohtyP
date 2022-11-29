@@ -2,9 +2,7 @@
 #include "munit_test/unittest.h"
 #include <stdlib.h>
 
-extern MunitSuite test_protocols_suites[];
-
-static MunitSuite munit_test_suites[] = {SUITE_OF_SUITES(test_protocols), {NULL}};
+extern MunitSuite munit_test_suites[];
 
 // TODO Write a pycparser script that ensures all test functions lead back to here. Also to ensure
 // the suite names match the directory/file names.

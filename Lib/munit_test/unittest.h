@@ -10,23 +10,7 @@ extern "C" {
 #define MUNIT_ENABLE_ASSERT_ALIASES
 #include "munit.h"
 
-#define SUITE_OF_TESTS(name)                             \
-    {                                                    \
-        "/" #name,                      /* prefix */     \
-                name##_tests,           /* tests */      \
-                NULL,                   /* suites */     \
-                1,                      /* iterations */ \
-                MUNIT_SUITE_OPTION_NONE /* options */    \
-    }
-
-#define SUITE_OF_SUITES(name)                            \
-    {                                                    \
-        "/" #name,                      /* prefix */     \
-                NULL,                   /* tests */      \
-                name##_suites,          /* suites */     \
-                1,                      /* iterations */ \
-                MUNIT_SUITE_OPTION_NONE /* options */    \
-    }
+#include <stddef.h>
 
 
 #ifndef TRUE
@@ -59,7 +43,7 @@ extern "C" {
 #define PRIssize PRIint
 #endif
 
-
+// clang-format off
 #define STRINGIFY1(a) #a
 #define STRINGIFY2(a, b) #a, #b
 #define STRINGIFY3(a, b, c) #a, #b, #c
@@ -71,8 +55,52 @@ extern "C" {
 #define STRINGIFY9(a, b, c, d, e, f, g, h, i) #a, #b, #c, #d, #e, #f, #g, #h, #i
 #define STRINGIFY10(a, b, c, d, e, f, g, h, i, j) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j
 #define STRINGIFY11(a, b, c, d, e, f, g, h, i, j, k) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k
-#define STRINGIFY12(a, b, c, d, e, f, g, h, i, j, k, l) \
-#a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l
+#define STRINGIFY12(a, b, c, d, e, f, g, h, i, j, k, l) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l
+#define STRINGIFY13(a, b, c, d, e, f, g, h, i, j, k, l, m) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m
+#define STRINGIFY14(a, b, c, d, e, f, g, h, i, j, k, l, m, n) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n
+#define STRINGIFY15(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o
+#define STRINGIFY16(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p
+#define STRINGIFY17(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q
+#define STRINGIFY18(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r
+#define STRINGIFY19(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s
+#define STRINGIFY20(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t
+#define STRINGIFY21(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u
+#define STRINGIFY22(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v
+#define STRINGIFY23(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w
+#define STRINGIFY24(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x
+#define STRINGIFY25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y
+#define STRINGIFY26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z
+// clang-format on
+
+// sizeof and offsetof as yp_ssize_t, and sizeof a structure member
+#define yp_sizeof(x) ((yp_ssize_t)sizeof(x))
+#define yp_offsetof(structType, member) ((yp_ssize_t)offsetof(structType, member))
+#define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
+
+// Length of an array. Only call for arrays of fixed size that haven't been coerced to pointers.
+#define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof(x[0]))
+
+// Length of an array in a structure. Only call for arrays of fixed size.
+#define yp_lengthof_array_member(structType, member) yp_lengthof_array(((structType *)0)->member)
+
+
+#define SUITE_OF_TESTS(name)                             \
+    {                                                    \
+        "/" #name,                      /* prefix */     \
+                name##_tests,           /* tests */      \
+                NULL,                   /* suites */     \
+                1,                      /* iterations */ \
+                MUNIT_SUITE_OPTION_NONE /* options */    \
+    }
+
+#define SUITE_OF_SUITES(name)                            \
+    {                                                    \
+        "/" #name,                      /* prefix */     \
+                NULL,                   /* tests */      \
+                name##_suites,          /* suites */     \
+                1,                      /* iterations */ \
+                MUNIT_SUITE_OPTION_NONE /* options */    \
+    }
 
 
 // FIXME A suite of tests to ensure these assertions are working. They can be
@@ -123,6 +151,15 @@ extern "C" {
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
 #define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
 
+// A different take on munit_assert_ptr that gives greater control over the format string.
+#define _assert_ptr(a, op, b, a_fmt, b_fmt, ...)                                           \
+    do {                                                                                   \
+        if (!(a op b)) {                                                                   \
+            munit_errorf("assertion failed: " a_fmt " " #op " " b_fmt " (%p " #op " %p) ", \
+                    __VA_ARGS__, a, b);                                                    \
+        }                                                                                  \
+    } while (0)
+
 // TODO Print the values of a and b (needs yp_str)
 #define _assert_obj(a, op, b, a_fmt, b_fmt, ...)                                                   \
     do {                                                                                           \
@@ -133,7 +170,7 @@ extern "C" {
             munit_errorf(                                                                          \
                     "assertion failed: yp_" #op "(" a_fmt ", " b_fmt ") == yp_True", __VA_ARGS__); \
         } else {                                                                                   \
-            _ypmt_error_exception(_ypmt_OBJ_result, "expected yp_True, yp_False, or an exception", \
+            _ypmt_error_exception(_ypmt_OBJ_result, "expected a bool or an exception",             \
                     "yp_" #op "(" a_fmt ", " b_fmt ")", __VA_ARGS__);                              \
         }                                                                                          \
     } while (0)
@@ -164,8 +201,10 @@ extern "C" {
         _assert_len(_ypmt_LEN_obj, _ypmt_LEN_expected, "%s", "%s", #obj, #expected); \
     } while (0)
 
-// Asserts that obj is a sequence containing exactly the given n items in that order. Validates
-// yp_lenC and yp_getindexC. n must be an integer literal.
+// Asserts that obj is a sequence containing exactly the given n items in that order. Items are
+// compared by nohtyP equality (i.e. yp_eq). Validates yp_lenC and yp_getindexC. n must be an
+// integer literal.
+//
 // XXX This is unable to cleanup _ypmt_SEQ_actual on error, as tear_down is not called on assertion
 // failures. As such, test failures may leak some memory.
 #define assert_sequence(obj, n, ...)                                               \
@@ -184,6 +223,20 @@ extern "C" {
         }                                                                          \
     } while (0)
 
+// Asserts that the first n pointer items in array are exactly the given n items in that order.
+// Items are compared by C equality (i.e. ==). n must be an integer literal.
+#define assert_ptr_array(array, n, ...)                                                      \
+    do {                                                                                     \
+        void     **_ypmt_PTR_ARR_array = (void **)(array);                                   \
+        void     *_ypmt_PTR_ARR_items[] = {__VA_ARGS__};                                    \
+        char      *_ypmt_PTR_ARR_item_strs[] = {STRINGIFY##n(__VA_ARGS__)};                  \
+        yp_ssize_t _ypmt_PTR_ARR_i;                                                          \
+        for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < n; _ypmt_PTR_ARR_i++) {                  \
+            _assert_ptr(_ypmt_PTR_ARR_array[_ypmt_PTR_ARR_i], ==,                            \
+                    _ypmt_PTR_ARR_items[_ypmt_PTR_ARR_i], "%s[%" PRIssize "]", "%s", #array, \
+                    _ypmt_PTR_ARR_i, _ypmt_PTR_ARR_item_strs[_ypmt_PTR_ARR_i]);              \
+        }                                                                                    \
+    } while (0)
 
 typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objvarargfunc)(int, ...);
@@ -220,6 +273,9 @@ typedef struct _fixture_type_t {
     int is_insertion_ordered;  // i.e. range doesn't support concat, repeat, newN, etc
 } fixture_type_t;
 
+extern fixture_type_t fixture_type_type;
+extern fixture_type_t fixture_type_NoneType;
+extern fixture_type_t fixture_type_bool;
 extern fixture_type_t fixture_type_int;
 extern fixture_type_t fixture_type_intstore;
 extern fixture_type_t fixture_type_float;
@@ -236,11 +292,30 @@ extern fixture_type_t fixture_type_frozenset;
 extern fixture_type_t fixture_type_set;
 extern fixture_type_t fixture_type_frozendict;
 extern fixture_type_t fixture_type_dict;
-// FIXME type itself, exceptions, others?
+extern fixture_type_t fixture_type_function;
 
 typedef struct _fixture_t {
     fixture_type_t *type;  // The primary type under test.
 } fixture_t;
+
+extern fixture_type_t *fixture_types_all[];  // "All", except invalidated and exception.
+extern fixture_type_t *fixture_types_numeric[];
+extern fixture_type_t *fixture_types_iterable[];
+extern fixture_type_t *fixture_types_collection[];
+extern fixture_type_t *fixture_types_sequence[];
+extern fixture_type_t *fixture_types_string[];
+extern fixture_type_t *fixture_types_set[];
+extern fixture_type_t *fixture_types_mapping[];
+
+// Arrays of MunitParameterEnum values for "type" and similar parameters (i.e. the names of types).
+extern char *param_type_all[];
+extern char *param_type_numeric[];
+extern char *param_type_iterable[];
+extern char *param_type_collection[];
+extern char *param_type_sequence[];
+extern char *param_type_string[];
+extern char *param_type_set[];
+extern char *param_type_mapping[];
 
 
 extern void unittest_initialize(void);
