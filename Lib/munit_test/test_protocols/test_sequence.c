@@ -4,20 +4,19 @@
 
 static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture)
 {
-    ypObject *result;
+    fixture_type_t *type = fixture->type;
 
-    result = yp_concat(yp_tuple_empty, yp_tuple_empty);
-    assert_len(result, 0);
+    {
+        ypObject *obj = type->rand_falsy();
+        ypObject *result = yp_concat(obj, obj);
+        assert_len(result, 0);
+        yp_decrefN(2, obj, result);
+    }
 
     return MUNIT_OK;
 }
 
-MunitTest test_sequence_tests[] = {{
-                                           "/test_concat",              // name
-                                           (MunitTestFunc)test_concat,  // test
-                                           (MunitTestSetup)NULL,        // setup
-                                           (MunitTestTearDown)NULL,     // tear_down
-                                           MUNIT_TEST_OPTION_NONE,      // options
-                                           NULL                         // parameters
-                                   },
-        {NULL}};
+static MunitParameterEnum test_sequence_params[] = {
+        {param_key_type, param_values_types_sequence}, {NULL}};
+
+MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params), {NULL}};

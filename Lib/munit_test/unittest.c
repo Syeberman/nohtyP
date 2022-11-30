@@ -41,7 +41,7 @@ fixture_type_t fixture_type_type = {
         FALSE,  // is_string
         FALSE,  // is_set
         FALSE,  // is_mapping
-        FALSE,  // is_callable
+        TRUE,   // is_callable
         FALSE,  // is_insertion_ordered
 };
 
@@ -267,7 +267,7 @@ fixture_type_t fixture_type_bytearray = {
 
         objvarargfunc_error,  // newN
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_falsy
+        yp_bytearray0,        // rand_falsy
         objvoidfunc_error,    // rand_truthy
 
         objvoidfunc_error,       // rand_value
@@ -315,7 +315,7 @@ fixture_type_t fixture_type_chrarray = {
 
         objvarargfunc_error,  // newN
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_falsy
+        yp_chrarray0,         // rand_falsy
         objvoidfunc_error,    // rand_truthy
 
         objvoidfunc_error,       // rand_value
@@ -497,7 +497,7 @@ fixture_type_t fixture_type_function = {
         FALSE,  // is_string
         FALSE,  // is_set
         FALSE,  // is_mapping
-        FALSE,  // is_callable
+        TRUE,   // is_callable
         FALSE,  // is_insertion_ordered
 };
 
@@ -517,14 +517,14 @@ fixture_type_t *fixture_types_set[yp_lengthof_array(fixture_types_all)];
 fixture_type_t *fixture_types_mapping[yp_lengthof_array(fixture_types_all)];
 
 // Once again, subsets of fixture_types_all.
-char *param_type_all[yp_lengthof_array(fixture_types_all)];
-char *param_type_numeric[yp_lengthof_array(fixture_types_all)];
-char *param_type_iterable[yp_lengthof_array(fixture_types_all)];
-char *param_type_collection[yp_lengthof_array(fixture_types_all)];
-char *param_type_sequence[yp_lengthof_array(fixture_types_all)];
-char *param_type_string[yp_lengthof_array(fixture_types_all)];
-char *param_type_set[yp_lengthof_array(fixture_types_all)];
-char *param_type_mapping[yp_lengthof_array(fixture_types_all)];
+char *param_values_types_all[yp_lengthof_array(fixture_types_all)];
+char *param_values_types_numeric[yp_lengthof_array(fixture_types_all)];
+char *param_values_types_iterable[yp_lengthof_array(fixture_types_all)];
+char *param_values_types_collection[yp_lengthof_array(fixture_types_all)];
+char *param_values_types_sequence[yp_lengthof_array(fixture_types_all)];
+char *param_values_types_string[yp_lengthof_array(fixture_types_all)];
+char *param_values_types_set[yp_lengthof_array(fixture_types_all)];
+char *param_values_types_mapping[yp_lengthof_array(fixture_types_all)];
 
 // The given arrays must be no smaller than fixture_types_all.
 static void fill_type_arrays(fixture_type_t **fixture_array, char **param_array, yp_ssize_t offset)
@@ -568,7 +568,7 @@ static void initialize_fixture_types(void)
 
     {
         fixture_type_t **types;
-        char           **param_array = param_type_all;
+        char           **param_array = param_values_types_all;
         for (types = fixture_types_all; *types != NULL; types++) {
             *param_array = (*types)->name;
             param_array++;
@@ -576,8 +576,8 @@ static void initialize_fixture_types(void)
         *param_array = NULL;
     }
 
-#define FILL_TYPE_ARRAYS(protocol)                                    \
-    fill_type_arrays(fixture_types_##protocol, param_type_##protocol, \
+#define FILL_TYPE_ARRAYS(protocol)                                            \
+    fill_type_arrays(fixture_types_##protocol, param_values_types_##protocol, \
             yp_offsetof(fixture_type_t, is_##protocol));
     FILL_TYPE_ARRAYS(numeric);
     FILL_TYPE_ARRAYS(iterable);
@@ -588,5 +588,33 @@ static void initialize_fixture_types(void)
     FILL_TYPE_ARRAYS(mapping);
 #undef FILL_TYPE_ARRAYS
 }
+
+char param_key_type[] = "type";
+
+static fixture_type_t *fixture_get_type(const MunitParameter params[])
+{
+    fixture_type_t **type;
+    const char      *type_name = munit_parameters_get(params, param_key_type);
+    if (type_name == NULL) return NULL;
+
+    for (type = fixture_types_all; *type != NULL; type++) {
+        if (strcmp((*type)->name, type_name) == 0) return *type;
+    }
+
+    munit_errorf("fixture_get_type: unknown type %s", type_name);
+    return NULL;
+}
+
+extern fixture_t *fixture_setup(const MunitParameter params[], void *user_data)
+{
+    fixture_t *fixture = munit_new(fixture_t);
+
+    fixture->type = fixture_get_type(params);
+
+    return fixture;
+}
+
+extern void fixture_tear_down(fixture_t *fixture) { free(fixture); }
+
 
 extern void unittest_initialize(void) { initialize_fixture_types(); }

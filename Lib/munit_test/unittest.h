@@ -84,10 +84,21 @@ extern "C" {
 #define yp_lengthof_array_member(structType, member) yp_lengthof_array(((structType *)0)->member)
 
 
+// parameters can be NULL.
+#define TEST(name, parameters)                                         \
+    {                                                                  \
+        "/" #name,                                    /* name */       \
+                (MunitTestFunc)(name),                /* test */       \
+                (MunitTestSetup)fixture_setup,        /* setup */      \
+                (MunitTestTearDown)fixture_tear_down, /* tear_down */  \
+                MUNIT_TEST_OPTION_NONE,               /* options */    \
+                parameters                            /* parameters */ \
+    }
+
 #define SUITE_OF_TESTS(name)                             \
     {                                                    \
         "/" #name,                      /* prefix */     \
-                name##_tests,           /* tests */      \
+                (name##_tests),         /* tests */      \
                 NULL,                   /* suites */     \
                 1,                      /* iterations */ \
                 MUNIT_SUITE_OPTION_NONE /* options */    \
@@ -97,7 +108,7 @@ extern "C" {
     {                                                    \
         "/" #name,                      /* prefix */     \
                 NULL,                   /* tests */      \
-                name##_suites,          /* suites */     \
+                (name##_suites),        /* suites */     \
                 1,                      /* iterations */ \
                 MUNIT_SUITE_OPTION_NONE /* options */    \
     }
@@ -228,7 +239,7 @@ extern "C" {
 #define assert_ptr_array(array, n, ...)                                                      \
     do {                                                                                     \
         void     **_ypmt_PTR_ARR_array = (void **)(array);                                   \
-        void     *_ypmt_PTR_ARR_items[] = {__VA_ARGS__};                                    \
+        void      *_ypmt_PTR_ARR_items[] = {__VA_ARGS__};                                    \
         char      *_ypmt_PTR_ARR_item_strs[] = {STRINGIFY##n(__VA_ARGS__)};                  \
         yp_ssize_t _ypmt_PTR_ARR_i;                                                          \
         for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < n; _ypmt_PTR_ARR_i++) {                  \
@@ -308,14 +319,21 @@ extern fixture_type_t *fixture_types_set[];
 extern fixture_type_t *fixture_types_mapping[];
 
 // Arrays of MunitParameterEnum values for "type" and similar parameters (i.e. the names of types).
-extern char *param_type_all[];
-extern char *param_type_numeric[];
-extern char *param_type_iterable[];
-extern char *param_type_collection[];
-extern char *param_type_sequence[];
-extern char *param_type_string[];
-extern char *param_type_set[];
-extern char *param_type_mapping[];
+extern char *param_values_types_all[];
+extern char *param_values_types_numeric[];
+extern char *param_values_types_iterable[];
+extern char *param_values_types_collection[];
+extern char *param_values_types_sequence[];
+extern char *param_values_types_string[];
+extern char *param_values_types_set[];
+extern char *param_values_types_mapping[];
+
+
+extern char param_key_type[];
+
+
+extern fixture_t *fixture_setup(const MunitParameter params[], void *user_data);
+extern void       fixture_tear_down(fixture_t *fixture);
 
 
 extern void unittest_initialize(void);

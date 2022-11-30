@@ -42,10 +42,10 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
     return MUNIT_OK;
 }
 
-// Ensure the various param_type_* arrays were initialzed properly.
+// Ensure the various param_values_types_* arrays were initialzed properly.
 static MunitResult test_param_type(const MunitParameter params[], fixture_t *fixture)
 {
-    assert_ptr_array(param_type_all, 21, fixture_type_type.name, fixture_type_NoneType.name,
+    assert_ptr_array(param_values_types_all, 21, fixture_type_type.name, fixture_type_NoneType.name,
             fixture_type_bool.name, fixture_type_int.name, fixture_type_intstore.name,
             fixture_type_float.name, fixture_type_floatstore.name, fixture_type_iter.name,
             fixture_type_range.name, fixture_type_bytes.name, fixture_type_bytearray.name,
@@ -53,49 +53,37 @@ static MunitResult test_param_type(const MunitParameter params[], fixture_t *fix
             fixture_type_list.name, fixture_type_frozenset.name, fixture_type_set.name,
             fixture_type_frozendict.name, fixture_type_dict.name, fixture_type_function.name, NULL);
 
-    assert_ptr_array(param_type_numeric, 5, fixture_type_int.name, fixture_type_intstore.name,
-            fixture_type_float.name, fixture_type_floatstore.name, NULL);
+    assert_ptr_array(param_values_types_numeric, 5, fixture_type_int.name,
+            fixture_type_intstore.name, fixture_type_float.name, fixture_type_floatstore.name,
+            NULL);
 
-    assert_ptr_array(param_type_iterable, 13, fixture_type_iter.name, fixture_type_range.name,
+    assert_ptr_array(param_values_types_iterable, 13, fixture_type_iter.name,
+            fixture_type_range.name, fixture_type_bytes.name, fixture_type_bytearray.name,
+            fixture_type_str.name, fixture_type_chrarray.name, fixture_type_tuple.name,
+            fixture_type_list.name, fixture_type_frozenset.name, fixture_type_set.name,
+            fixture_type_frozendict.name, fixture_type_dict.name, NULL);
+
+    assert_ptr_array(param_values_types_collection, 12, fixture_type_range.name,
             fixture_type_bytes.name, fixture_type_bytearray.name, fixture_type_str.name,
             fixture_type_chrarray.name, fixture_type_tuple.name, fixture_type_list.name,
             fixture_type_frozenset.name, fixture_type_set.name, fixture_type_frozendict.name,
             fixture_type_dict.name, NULL);
 
-    assert_ptr_array(param_type_collection, 12, fixture_type_range.name, fixture_type_bytes.name,
-            fixture_type_bytearray.name, fixture_type_str.name, fixture_type_chrarray.name,
-            fixture_type_tuple.name, fixture_type_list.name, fixture_type_frozenset.name,
-            fixture_type_set.name, fixture_type_frozendict.name, fixture_type_dict.name, NULL);
+    assert_ptr_array(param_values_types_sequence, 8, fixture_type_range.name,
+            fixture_type_bytes.name, fixture_type_bytearray.name, fixture_type_str.name,
+            fixture_type_chrarray.name, fixture_type_tuple.name, fixture_type_list.name, NULL);
 
-    assert_ptr_array(param_type_sequence, 8, fixture_type_range.name, fixture_type_bytes.name,
-            fixture_type_bytearray.name, fixture_type_str.name, fixture_type_chrarray.name,
-            fixture_type_tuple.name, fixture_type_list.name, NULL);
-
-    assert_ptr_array(param_type_string, 5, fixture_type_bytes.name, fixture_type_bytearray.name,
-            fixture_type_str.name, fixture_type_chrarray.name, NULL);
-
-    assert_ptr_array(param_type_set, 3, fixture_type_frozenset.name, fixture_type_set.name, NULL);
+    assert_ptr_array(param_values_types_string, 5, fixture_type_bytes.name,
+            fixture_type_bytearray.name, fixture_type_str.name, fixture_type_chrarray.name, NULL);
 
     assert_ptr_array(
-            param_type_mapping, 3, fixture_type_frozendict.name, fixture_type_dict.name, NULL);
+            param_values_types_set, 3, fixture_type_frozenset.name, fixture_type_set.name, NULL);
+
+    assert_ptr_array(param_values_types_mapping, 3, fixture_type_frozendict.name,
+            fixture_type_dict.name, NULL);
 
     return MUNIT_OK;
 }
 
-MunitTest test_unittest_tests[] = {{
-                                           "/test_fixture_types",              // name
-                                           (MunitTestFunc)test_fixture_types,  // test
-                                           (MunitTestSetup)NULL,               // setup
-                                           (MunitTestTearDown)NULL,            // tear_down
-                                           MUNIT_TEST_OPTION_NONE,             // options
-                                           NULL                                // parameters
-                                   },
-        {
-                "/test_param_type",              // name
-                (MunitTestFunc)test_param_type,  // test
-                (MunitTestSetup)NULL,            // setup
-                (MunitTestTearDown)NULL,         // tear_down
-                MUNIT_TEST_OPTION_NONE,          // options
-                NULL                             // parameters
-        },
-        {NULL}};
+MunitTest test_unittest_tests[] = {
+        TEST(test_fixture_types, NULL), TEST(test_param_type, NULL), {NULL}};
