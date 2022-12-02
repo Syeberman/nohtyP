@@ -171,19 +171,36 @@ extern "C" {
         }                                                                                  \
     } while (0)
 
+// value is the expected value, either yp_True or yp_False; not_value is the negation of value.
+#define _assert_bool(obj, value, not_value, obj_fmt, ...)                                        \
+    do {                                                                                         \
+        if (obj == value) {                                                                      \
+            /* pass */                                                                           \
+        } else if (obj == not_value) {                                                           \
+            munit_errorf("assertion failed: " obj_fmt " == " #value, __VA_ARGS__);               \
+        } else {                                                                                 \
+            _ypmt_error_exception(obj, "expected a bool or an exception", obj_fmt, __VA_ARGS__); \
+        }                                                                                        \
+    } while (0)
+
+#define assert_falsy(obj)                                                         \
+    do {                                                                          \
+        ypObject *_ypmt_FALSY_result = yp_bool(obj);                              \
+        _assert_bool(_ypmt_FALSY_result, yp_False, yp_True, "yp_bool(%s)", #obj); \
+    } while (0)
+
+#define assert_truthy(obj)                                                         \
+    do {                                                                           \
+        ypObject *_ypmt_TRUTHY_result = yp_bool(obj);                              \
+        _assert_bool(_ypmt_TRUTHY_result, yp_True, yp_False, "yp_bool(%s)", #obj); \
+    } while (0)
+
 // TODO Print the values of a and b (needs yp_str)
-#define _assert_obj(a, op, b, a_fmt, b_fmt, ...)                                                   \
-    do {                                                                                           \
-        ypObject *_ypmt_OBJ_result = yp_##op(a, b);                                                \
-        if (_ypmt_OBJ_result == yp_True) {                                                         \
-            /* pass */                                                                             \
-        } else if (_ypmt_OBJ_result == yp_False) {                                                 \
-            munit_errorf(                                                                          \
-                    "assertion failed: yp_" #op "(" a_fmt ", " b_fmt ") == yp_True", __VA_ARGS__); \
-        } else {                                                                                   \
-            _ypmt_error_exception(_ypmt_OBJ_result, "expected a bool or an exception",             \
-                    "yp_" #op "(" a_fmt ", " b_fmt ")", __VA_ARGS__);                              \
-        }                                                                                          \
+#define _assert_obj(a, op, b, a_fmt, b_fmt, ...)                                              \
+    do {                                                                                      \
+        ypObject *_ypmt_OBJ_result = yp_##op(a, b);                                           \
+        _assert_bool(_ypmt_OBJ_result, yp_True, yp_False, "yp_" #op "(" a_fmt ", " b_fmt ")", \
+                __VA_ARGS__);                                                                 \
     } while (0)
 
 #define assert_obj(a, op, b)                                           \
@@ -191,6 +208,17 @@ extern "C" {
         ypObject *_ypmt_OBJ_a = (a);                                   \
         ypObject *_ypmt_OBJ_b = (b);                                   \
         _assert_obj(_ypmt_OBJ_a, op, _ypmt_OBJ_b, "%s", "%s", #a, #b); \
+    } while (0)
+
+// yp_type(obj) == expected
+#define assert_type_is(obj, expected)                                                        \
+    do {                                                                                     \
+        ypObject *_ypmt_TYPE_obj = (obj);                                                    \
+        ypObject *_ypmt_TYPE_expected = (expected);                                          \
+        ypObject *_ypmt_TYPE_type_obj = yp_type(_ypmt_TYPE_obj);                             \
+        _assert_not_exception(_ypmt_TYPE_type_obj, "yp_type(%s)", #obj);                     \
+        _assert_ptr(_ypmt_TYPE_type_obj, ==, _ypmt_TYPE_expected, "yp_type(%s)", "%s", #obj, \
+                #expected);                                                                  \
     } while (0)
 
 #define _assert_len(obj, expected, obj_fmt, expected_fmt, ...)                           \
@@ -255,9 +283,11 @@ typedef void (*voidobjpobjpfunc)(ypObject **, ypObject **);
 
 
 // Any methods or arguments here that don't apply to a given type will fail the test.
+typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
-    char     *name;  // The name of the type (i.e. int, bytearray, dict)
-    ypObject *type;  // The type object (i.e. yp_t_float, yp_t_list)
+    char           *name;  // The name of the type (i.e. int, bytearray, dict).
+    ypObject       *type;  // The type object (i.e. yp_t_float, yp_t_list).
+    fixture_type_t *pair;  // The other type in this object pair, or points back to this type.
 
     objvarargfunc newN;  // Creates an object to hold the given values (i.e. yp_tupleN, yp_int where
                          // n<2, yp_dict_fromkeysN where value=yp_None).
@@ -265,8 +295,10 @@ typedef struct _fixture_type_t {
     objvoidfunc   rand_falsy;   // Creates a random object of this type that evaluates to yp_False.
     objvoidfunc   rand_truthy;  // Creates a random object of this type that evaluates to yp_True.
 
-    objvoidfunc      rand_value;      // Creates a random value that can be used with newN.
-    voidobjpobjpfunc rand_key_value;  // Creates a random key and value that can be used with newK;
+    // FIXME getitem doesn't apply to set, so how to describe? And dict.in refers to keys!
+    objvoidfunc      rand_item;       // Creates a random value as would be returned by yp_getitem.
+    voidobjpobjpfunc rand_key_value;  // Creates a random key/value pair as would be yielded by
+                                      // yp_iter_items.
 
     // Flags to describe the properties of the type.
     int is_mutable;
@@ -309,7 +341,12 @@ typedef struct _fixture_t {
     fixture_type_t *type;  // The primary type under test.
 } fixture_t;
 
-extern fixture_type_t *fixture_types_all[];  // "All", except invalidated and exception.
+// The number of elements in fixture_types_all (ignoring the null terminator).
+#define FIXTURE_TYPES_ALL_LEN 20
+
+// "All", except invalidated and exception.
+extern fixture_type_t *fixture_types_all[FIXTURE_TYPES_ALL_LEN + 1];
+
 extern fixture_type_t *fixture_types_numeric[];
 extern fixture_type_t *fixture_types_iterable[];
 extern fixture_type_t *fixture_types_collection[];

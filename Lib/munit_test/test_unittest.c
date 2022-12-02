@@ -85,5 +85,35 @@ static MunitResult test_param_type(const MunitParameter params[], fixture_t *fix
     return MUNIT_OK;
 }
 
-MunitTest test_unittest_tests[] = {
-        TEST(test_fixture_types, NULL), TEST(test_param_type, NULL), {NULL}};
+// Ensure rand_falsy and rand_truthy return falsy and truthy values.
+// TODO Run a few iterations of this?
+static MunitResult test_rand_falsy_truthy(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    // Some types don't have falsy values.
+    if (type != &fixture_type_type && type != &fixture_type_iter &&
+            type != &fixture_type_function) {
+        ypObject *falsy = type->rand_falsy();
+        assert_falsy(falsy);
+        assert_type_is(falsy, type->type);
+        yp_decref(falsy);
+    }
+
+    // Some types don't have truthy values.
+    if (type != &fixture_type_NoneType) {
+        ypObject *truthy = type->rand_truthy();
+        assert_truthy(truthy);
+        assert_type_is(truthy, type->type);
+        yp_decref(truthy);
+    }
+
+    return MUNIT_OK;
+}
+
+
+static MunitParameterEnum test_types_all_params[] = {
+        {param_key_type, param_values_types_all}, {NULL}};
+
+MunitTest test_unittest_tests[] = {TEST(test_fixture_types, NULL), TEST(test_param_type, NULL),
+        TEST(test_rand_falsy_truthy, test_types_all_params), {NULL}};
