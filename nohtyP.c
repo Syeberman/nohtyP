@@ -2753,10 +2753,20 @@ static ypObject *iter_traverse(ypObject *i, visitfunc visitor, void *memo)
     return _ypState_traverse(ypIter_STATE(i), ypIter_OBJLOCS(i), visitor, memo);
 }
 
+static ypObject *iter_bool(ypObject *i) { return yp_True; }
+
 // Decrements the reference count of the visited object
 static ypObject *_iter_closing_visitor(ypObject *x, void *memo)
 {
     yp_decref(x);
+    return yp_None;
+}
+
+static ypObject *iter_currenthash(
+        ypObject *i, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+{
+    // Since iters are compared by identity, we can cache our hash
+    *hash = ypObject_CACHED_HASH(i) = yp_HashPointer(i);
     return yp_None;
 }
 
@@ -2864,7 +2874,7 @@ static ypTypeObject ypIter_Type = {
         MethodError_objproc,       // tp_invalidate
 
         // Boolean operations and comparisons
-        MethodError_objproc,         // tp_bool
+        iter_bool,                   // tp_bool
         NotImplemented_comparefunc,  // tp_lt
         NotImplemented_comparefunc,  // tp_le
         NotImplemented_comparefunc,  // tp_eq
@@ -2873,8 +2883,8 @@ static ypTypeObject ypIter_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
-        iter_close,            // tp_close
+        iter_currenthash,  // tp_currenthash
+        iter_close,        // tp_close
 
         // Number operations
         MethodError_NumberMethods,  // tp_as_number
@@ -3873,6 +3883,7 @@ static ypTypeObject ypException_Type = {
 // The immortal exception objects; this should match Python's hierarchy:
 //  http://docs.python.org/3/library/exceptions.html
 
+// FIXME These exception names (the strings) all start with yp_.
 #define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                             \
     yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                    \
     static ypExceptionObject _##name##_struct = {                                   \
@@ -4030,6 +4041,14 @@ static ypObject *type_frozen_deepcopy(ypObject *t, visitfunc copy_visitor, void 
 
 static ypObject *type_bool(ypObject *t) { return yp_True; }
 
+static ypObject *type_currenthash(
+        ypObject *t, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+{
+    // Since types are compared by identity, we can cache our hash
+    *hash = ypObject_CACHED_HASH(t) = yp_HashPointer(t);
+    return yp_None;
+}
+
 static ypObject *type_call(ypObject *t, ypObject **function, ypObject **self)
 {
     *function = yp_incref(((ypTypeObject *)t)->tp_func_new);
@@ -4082,8 +4101,8 @@ static ypTypeObject ypType_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
-        MethodError_objproc,   // tp_close
+        type_currenthash,     // tp_currenthash
+        MethodError_objproc,  // tp_close
 
         // Number operations
         MethodError_NumberMethods,  // tp_as_number
@@ -16760,6 +16779,11 @@ static ypObject *frozendict_ne(ypObject *mp, ypObject *x)
 // Rejected ideas:
 //  This wouldn't work as item order is arbitrary: hash(tuple(x.items()))
 //  Calling sorted in the above would require ordering of the keys, which may not be true
+static ypObject *frozendict_currenthash(
+        ypObject *b, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+{
+    return yp_NotImplementedError;
+}
 
 static ypObject *frozendict_contains(ypObject *mp, ypObject *key)
 {
@@ -17191,8 +17215,8 @@ static ypTypeObject ypFrozenDict_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
-        MethodError_objproc,   // tp_close
+        frozendict_currenthash,  // tp_currenthash
+        MethodError_objproc,     // tp_close
 
         // Number operations
         MethodError_NumberMethods,  // tp_as_number
@@ -17273,8 +17297,8 @@ static ypTypeObject ypDict_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
-        MethodError_objproc,   // tp_close
+        frozendict_currenthash,  // tp_currenthash
+        MethodError_objproc,     // tp_close
 
         // Number operations
         MethodError_NumberMethods,  // tp_as_number
@@ -18820,10 +18844,13 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
 
 static ypObject *function_frozen_copy(ypObject *f) { return yp_incref(f); }
 
+static ypObject *function_bool(ypObject *f) { return yp_True; }
+
 static ypObject *function_currenthash(
         ypObject *f, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    *hash = yp_HashPointer(f);  // functions are compared based on identity
+    // Since types are compared by identity, we can cache our hash.
+    *hash = ypObject_CACHED_HASH(f) = yp_HashPointer(f);
     return yp_None;
 }
 
@@ -18884,7 +18911,7 @@ static ypTypeObject ypFunction_Type = {
         MethodError_objproc,       // tp_invalidate
 
         // Boolean operations and comparisons
-        MethodError_objproc,         // tp_bool
+        function_bool,               // tp_bool
         NotImplemented_comparefunc,  // tp_lt
         NotImplemented_comparefunc,  // tp_le
         NotImplemented_comparefunc,  // tp_eq
