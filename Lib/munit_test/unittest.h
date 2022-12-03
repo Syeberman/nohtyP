@@ -168,6 +168,15 @@ extern "C" {
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
 #define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
 
+#define assert_isexception2(obj, expected)                                               \
+    do {                                                                                 \
+        ypObject *_ypmt_ISEXC_obj = (obj);                                               \
+        ypObject *_ypmt_ISEXC_expected = (expected);                                     \
+        if (!yp_isexceptionC2(_ypmt_ISEXC_obj, _ypmt_ISEXC_expected)) {                  \
+            munit_errorf("assertion failed: yp_isexceptionC2(%s, %s)", #obj, #expected); \
+        }                                                                                \
+    } while (0)
+
 // A different take on munit_assert_ptr that gives greater control over the format string.
 #define _assert_ptr(a, op, b, a_fmt, b_fmt, ...)                                           \
     do {                                                                                   \
@@ -209,6 +218,7 @@ extern "C" {
                 __VA_ARGS__);                                                                 \
     } while (0)
 
+// op can be: lt, le, eq, ne, ge, gt.
 #define assert_obj(a, op, b)                                           \
     do {                                                               \
         ypObject *_ypmt_OBJ_a = (a);                                   \
