@@ -43,6 +43,12 @@ extern "C" {
 #define PRIssize PRIint
 #endif
 
+#if defined(GCC_VER) && GCC_VER >= 40600
+#define STATIC_ASSERT(cond, tag) _Static_assert(cond, #tag)
+#else
+#define STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
+#endif
+
 // clang-format off
 #define STRINGIFY1(a) #a
 #define STRINGIFY2(a, b) #a, #b
@@ -117,7 +123,7 @@ extern "C" {
 // FIXME A suite of tests to ensure these assertions are working. They can be
 // MUNIT_TEST_OPTION_TODO, which will fail if they pass.
 
-#define assert_ssize(a, op, b) assert_type(yp_ssize_t, PRIssize, a, op, b)
+#define assert_ssize(a, op, b) munit_assert_type(yp_ssize_t, PRIssize, a, op, b)
 
 // FIXME A better error message to list the exception name.
 #define _assert_not_exception(obj, obj_fmt, ...)                                          \
@@ -277,10 +283,12 @@ extern "C" {
         }                                                                                    \
     } while (0)
 
+
 typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef void (*voidobjpobjpfunc)(ypObject **, ypObject **);
-
+typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
+typedef ypObject *(*rand_obj_supplier_t)(rand_obj_supplier_memo_t *);
 
 // Any methods or arguments here that don't apply to a given type will fail the test.
 typedef struct _fixture_type_t fixture_type_t;
@@ -289,11 +297,10 @@ typedef struct _fixture_type_t {
     ypObject       *type;  // The type object (i.e. yp_t_float, yp_t_list).
     fixture_type_t *pair;  // The other type in this object pair, or points back to this type.
 
+    rand_obj_supplier_t new_rand;  // Creates a random object, with visitor supplying sub-objects.
     objvarargfunc newN;  // Creates an object to hold the given values (i.e. yp_tupleN, yp_int where
                          // n<2, yp_dict_fromkeysN where value=yp_None).
     objvarargfunc newK;  // Creates an object to hold the given key/values (i.e. yp_dictK).
-    objvoidfunc   rand_falsy;   // Creates a random object of this type that evaluates to yp_False.
-    objvoidfunc   rand_truthy;  // Creates a random object of this type that evaluates to yp_True.
 
     // FIXME getitem doesn't apply to set, so how to describe? And dict.in refers to keys!
     objvoidfunc      rand_item;       // Creates a random value as would be returned by yp_getitem.
@@ -345,8 +352,9 @@ typedef struct _fixture_t {
 #define FIXTURE_TYPES_ALL_LEN 20
 
 // "All", except invalidated and exception.
-extern fixture_type_t *fixture_types_all[FIXTURE_TYPES_ALL_LEN + 1];
+extern fixture_type_t *fixture_types_all[];
 
+extern fixture_type_t *fixture_types_immutable[];
 extern fixture_type_t *fixture_types_numeric[];
 extern fixture_type_t *fixture_types_iterable[];
 extern fixture_type_t *fixture_types_collection[];
@@ -367,6 +375,19 @@ extern char *param_values_types_mapping[];
 
 
 extern char param_key_type[];
+
+
+// Returns a random object of any type.
+extern ypObject *rand_obj_any(void);
+
+// Returns a random hashable object of any type.
+extern ypObject *rand_obj_any_hashable(void);
+
+// Returns a random object of the given type.
+extern ypObject *rand_obj(fixture_type_t *type);
+
+// Returns a random hashable object of the given type. type must be immutable.
+extern ypObject *rand_obj_hashable(fixture_type_t *type);
 
 
 extern fixture_t *fixture_setup(const MunitParameter params[], void *user_data);

@@ -7,7 +7,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     fixture_type_t *type = fixture->type;
 
     {
-        ypObject *obj = type->rand_falsy();
+        ypObject *obj = rand_obj(type);
         ypObject *result = yp_concat(obj, obj);
         assert_len(result, 0);
         yp_decrefN(2, obj, result);
