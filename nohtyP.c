@@ -317,6 +317,7 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 #define ypObject_SET_ALLOCLEN(ob, len) (((ypObject *)(ob))->ob_alloclen = (_yp_ob_len_t)(len))
 
 // Hashes can be cached in the object for easy retrieval
+// TODO Python is unsure if this is beneficial: https://bugs.python.org/issue9685
 #define ypObject_CACHED_HASH(ob) (((ypObject *)(ob))->ob_hash)  // HASH_INVALID if invalid
 
 // Declares the ob_inline_data array for container object structures
@@ -915,6 +916,84 @@ static yp_hash_t yp_HashBytes(yp_uint8_t *p, yp_ssize_t len)
         x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
     }
     return (yp_hash_t)x;
+}
+
+/* Hash for tuples. This is a slightly simplified version of the xxHash
+   non-cryptographic hash:
+   - we do not use any parallellism, there is only 1 accumulator.
+   - we drop the final mixing since this is just a permutation of the
+     output space: it does not help against collisions.
+   - at the end, we mangle the length with a single constant.
+   For the xxHash specification, see
+   https://github.com/Cyan4973/xxHash/blob/master/doc/xxhash_spec.md
+
+   Below are the official constants from the xxHash specification. Optimizing
+   compilers should emit a single "rotate" instruction for the
+   _PyHASH_XXROTATE() expansion. If that doesn't happen for some important
+   platform, the macro could be changed to expand to a platform-specific rotate
+   spelling instead.
+*/
+// XXX Adapted from Python's tuplehash
+#ifdef yp_ARCH_64_BIT
+#define _ypHASH_XXPRIME_1 ((yp_uhash_t)11400714785074694791ULL)
+#define _ypHASH_XXPRIME_2 ((yp_uhash_t)14029467366897019727ULL)
+#define _ypHASH_XXPRIME_5 ((yp_uhash_t)2870177450012600261ULL)
+#define _ypHASH_XXROTATE(x) ((x << 31) | (x >> 33)) /* Rotate left 31 bits */
+#else
+#define _ypHASH_XXPRIME_1 ((yp_uhash_t)2654435761UL)
+#define _ypHASH_XXPRIME_2 ((yp_uhash_t)2246822519UL)
+#define _ypHASH_XXPRIME_5 ((yp_uhash_t)374761393UL)
+#define _ypHASH_XXROTATE(x) ((x << 13) | (x >> 19)) /* Rotate left 13 bits */
+#endif
+
+typedef struct _yp_HashSequence_state_t {
+    size_t len;
+    yp_uhash_t acc;
+} yp_HashSequence_state_t;
+
+// XXX Adapted from Python's tuplehash
+static void yp_HashSequence_init(yp_HashSequence_state_t *state, yp_ssize_t len)
+{
+    yp_ASSERT1(len >= 0);
+    state->len = (size_t)len;
+    state->acc = _ypHASH_XXPRIME_5;
+}
+
+static void yp_HashSequence_next(yp_HashSequence_state_t *state, yp_hash_t lane)
+{
+    yp_ASSERT1(lane != ypObject_HASH_INVALID);
+    state->acc += ((yp_uhash_t)lane) * _ypHASH_XXPRIME_2;
+    state->acc = _ypHASH_XXROTATE(state->acc);
+    state->acc *= _ypHASH_XXPRIME_1;
+}
+
+static yp_hash_t yp_HashSequence_fini(yp_HashSequence_state_t *state)
+{
+    /* Add input length, mangled to keep the historical value of hash(()). */
+    state->acc += state->len ^ (_ypHASH_XXPRIME_5 ^ 3527539UL);
+
+    if (state->acc == (yp_uhash_t)ypObject_HASH_INVALID) {
+        return 1546275796;
+    } else {
+        return (yp_hash_t)state->acc;
+    }
+}
+
+// Given a list of hashes from the items of this sequence, computes the hash of this sequence.
+// Useful for when the size of the sequence is known at compile time (i.e. calculating the hash of
+// a key/value pair, or a range).
+static yp_hash_t yp_HashSequenceN(int n, ...)
+{
+    yp_HashSequence_state_t state;
+    va_list                 args;
+
+    yp_HashSequence_init(&state, n);
+    va_start(args, n);
+    for (/*n already set*/; n > 0; n--) {
+        yp_HashSequence_next(&state, va_arg(args, yp_hash_t));
+    }
+    va_end(args);
+    return yp_HashSequence_fini(&state);
 }
 
 
@@ -12733,26 +12812,19 @@ static ypObject *tuple_ne(ypObject *sq, ypObject *x)
 static ypObject *tuple_currenthash(
         ypObject *sq, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    ypObject  *result;
-    yp_uhash_t x;
-    yp_hash_t  y;
-    yp_ssize_t len = ypTuple_LEN(sq);
-    ypObject **p;
-    yp_uhash_t mult = _ypHASH_MULTIPLIER;
-    x = 0x345678;
-    p = ypTuple_ARRAY(sq);
-    while (--len >= 0) {
-        result = hash_visitor(*p++, hash_memo, &y);
+    yp_HashSequence_state_t state;
+    yp_ssize_t              i;
+
+    yp_HashSequence_init(&state, ypTuple_LEN(sq));
+    for (i = 0; i < ypTuple_LEN(sq); i++) {
+        // TODO What if the hash visitor changes sq?
+        yp_hash_t lane;
+        ypObject *result = hash_visitor(ypTuple_ARRAY(sq)[i], hash_memo, &lane);
         if (yp_isexceptionC(result)) return result;
-        x = (x ^ (yp_uhash_t)y) * mult;
-        // the cast might truncate len; that doesn't change hash stability
-        mult += (yp_uhash_t)(82520L + len + len);
+        yp_HashSequence_next(&state, lane);
     }
-    x += 97531L;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
-    }
-    *hash = (yp_hash_t)x;
+    *hash = yp_HashSequence_fini(&state);
+
     return yp_None;
 }
 
@@ -17768,25 +17840,10 @@ static ypObject *range_ne(ypObject *r, ypObject *x)
 static ypObject *range_currenthash(
         ypObject *r, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    yp_uhash_t x = 0x345678;
-    yp_uhash_t mult = _ypHASH_MULTIPLIER;
-
     ypRange_ASSERT_NORMALIZED(r);
 
-    x = (x ^ (yp_uhash_t)yp_HashInt(ypRange_LEN(r))) * mult;
-    mult += (yp_hash_t)(82520L + 2 + 2);
-
-    x = (x ^ (yp_uhash_t)yp_HashInt(ypRange_START(r))) * mult;
-    mult += (yp_hash_t)(82520L + 1 + 1);
-
-    x = (x ^ (yp_uhash_t)yp_HashInt(ypRange_STEP(r))) * mult;
-    // Unnecessary: mult += (yp_hash_t)(82520L + 0 + 0);
-
-    x += 97531L;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
-    }
-    *hash = (yp_hash_t)x;
+    *hash = yp_HashSequenceN(3, yp_HashInt(ypRange_LEN(r)), yp_HashInt(ypRange_START(r)),
+            yp_HashInt(ypRange_STEP(r)));
 
     // Since we never contain mutable objects, we can cache our hash
     ypObject_CACHED_HASH(yp_None) = *hash;
