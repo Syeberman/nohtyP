@@ -317,7 +317,6 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 #define ypObject_SET_ALLOCLEN(ob, len) (((ypObject *)(ob))->ob_alloclen = (_yp_ob_len_t)(len))
 
 // Hashes can be cached in the object for easy retrieval
-// TODO Python is unsure if this is beneficial: https://bugs.python.org/issue9685
 #define ypObject_CACHED_HASH(ob) (((ypObject *)(ob))->ob_hash)  // HASH_INVALID if invalid
 
 // Declares the ob_inline_data array for container object structures
@@ -808,19 +807,20 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 
 // Prime multiplier used in string and various other hashes
 // XXX Adapted from Python's _PyHASH_MULTIPLIER
-#define _ypHASH_MULTIPLIER 1000003  // 0xf4243
+#define _ypHASH_MULTIPLIER 1000003UL /* 0xf4243 */
 
-// Parameters used for the numeric hash implementation. Numeric hashes are based on reduction
-// modulo the prime 2**_PyHASH_BITS - 1.
+/* Parameters used for the numeric hash implementation.  See notes for
+   _Py_HashDouble in Python/pyhash.c.  Numeric hashes are based on
+   reduction modulo the prime 2**_PyHASH_BITS - 1. */
 // XXX Adapted from Python's pyport.h
-#if defined(yp_ARCH_32_BIT)
-#define _ypHASH_BITS 31
-#else
+#if defined(yp_ARCH_64_BIT)
 #define _ypHASH_BITS 61
+#else
+#define _ypHASH_BITS 31
 #endif
 #define _ypHASH_MODULUS (((size_t)1 << _ypHASH_BITS) - 1)
 #define _ypHASH_INF 314159
-#define _ypHASH_NAN 0
+#define _ypHASH_IMAG _ypHASH_MULTIPLIER
 
 // Return the hash of the given int; always succeeds
 static yp_hash_t yp_HashInt(yp_int_t v)
@@ -832,9 +832,11 @@ static yp_hash_t yp_HashInt(yp_int_t v)
     return hash;
 }
 
-// Return the hash of the given double; always succeeds
-// XXX Adapted from Python's _Py_HashDouble
-static yp_hash_t yp_HashDouble(double v)
+// Return the hash of the given double; always succeeds. inst is the object containing this value
+// (recall that NaN is compared by identity).
+// XXX Adapted from Python's _Py_HashDouble in pyhash.c.
+static yp_hash_t yp_HashPointer(void *p);
+static yp_hash_t yp_HashDouble(ypObject *inst, double v)
 {
     int        e;
     yp_uhash_t sign;
@@ -845,7 +847,7 @@ static yp_hash_t yp_HashDouble(double v)
         if (yp_IS_INFINITY(v)) {
             return v > 0 ? _ypHASH_INF : -_ypHASH_INF;
         } else {
-            return _ypHASH_NAN;
+            return yp_HashPointer(inst);
         }
     }
 
@@ -862,29 +864,25 @@ static yp_hash_t yp_HashDouble(double v)
     x = 0;
     while (m) {
         x = ((x << 28) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - 28);
-        m *= 268435456.0;  // 2**28
+        m *= 268435456.0; /* 2**28 */
         e -= 28;
-        y = (yp_uhash_t)m;  // pull out integer part
+        y = (yp_uhash_t)m; /* pull out integer part */
         m -= (double)y;
         x += y;
-        if (x >= _ypHASH_MODULUS) {
-            x -= _ypHASH_MODULUS;
-        }
+        if (x >= _ypHASH_MODULUS) x -= _ypHASH_MODULUS;
     }
 
-    // adjust for the exponent;  first reduce it modulo _ypHASH_BITS
+    /* adjust for the exponent;  first reduce it modulo _ypHASH_BITS */
     e = e >= 0 ? e % _ypHASH_BITS : _ypHASH_BITS - 1 - ((-1 - e) % _ypHASH_BITS);
     x = ((x << e) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - e);
 
     x = x * sign;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
-    }
+    if (x == (yp_uhash_t)ypObject_HASH_INVALID) x -= 1;
     return (yp_hash_t)x;
 }
 
 // Return the hash of the given pointer; always succeeds
-// XXX Adapted from Python's _Py_HashPointer
+// XXX Adapted from Python's _Py_HashPointer in pyhash.c.
 static yp_hash_t yp_HashPointer(void *p)
 {
     yp_hash_t x;
@@ -898,7 +896,8 @@ static yp_hash_t yp_HashPointer(void *p)
 }
 
 // Return the hash of the given number of bytes; always succeeds
-// XXX Adapted from Python's _Py_HashBytes
+// XXX Adapted from Python's _Py_HashBytes in pyhash.c.
+// TODO Python now uses pysiphash for security.
 static yp_hash_t yp_HashBytes(yp_uint8_t *p, yp_ssize_t len)
 {
     yp_uhash_t x;
@@ -947,7 +946,7 @@ static yp_hash_t yp_HashBytes(yp_uint8_t *p, yp_ssize_t len)
 #endif
 
 typedef struct _yp_HashSequence_state_t {
-    size_t len;
+    size_t     len;
     yp_uhash_t acc;
 } yp_HashSequence_state_t;
 
@@ -961,39 +960,127 @@ static void yp_HashSequence_init(yp_HashSequence_state_t *state, yp_ssize_t len)
 
 static void yp_HashSequence_next(yp_HashSequence_state_t *state, yp_hash_t lane)
 {
+    yp_uhash_t acc = state->acc;
+
     yp_ASSERT1(lane != ypObject_HASH_INVALID);
-    state->acc += ((yp_uhash_t)lane) * _ypHASH_XXPRIME_2;
-    state->acc = _ypHASH_XXROTATE(state->acc);
-    state->acc *= _ypHASH_XXPRIME_1;
+    acc += ((yp_uhash_t)lane) * _ypHASH_XXPRIME_2;
+    acc = _ypHASH_XXROTATE(acc);
+    acc *= _ypHASH_XXPRIME_1;
+
+    state->acc = acc;
 }
 
 static yp_hash_t yp_HashSequence_fini(yp_HashSequence_state_t *state)
 {
-    /* Add input length, mangled to keep the historical value of hash(()). */
-    state->acc += state->len ^ (_ypHASH_XXPRIME_5 ^ 3527539UL);
+    yp_uhash_t acc = state->acc;
 
-    if (state->acc == (yp_uhash_t)ypObject_HASH_INVALID) {
+    /* Add input length, mangled to keep the historical value of hash(()). */
+    acc += state->len ^ (_ypHASH_XXPRIME_5 ^ 3527539UL);
+
+    if (acc == (yp_uhash_t)ypObject_HASH_INVALID) {
         return 1546275796;
     } else {
-        return (yp_hash_t)state->acc;
+        return (yp_hash_t)acc;
     }
 }
 
-// Given a list of hashes from the items of this sequence, computes the hash of this sequence.
-// Useful for when the size of the sequence is known at compile time (i.e. calculating the hash of
-// a key/value pair, or a range).
-static yp_hash_t yp_HashSequenceN(int n, ...)
-{
-    yp_HashSequence_state_t state;
-    va_list                 args;
+typedef struct {
+    yp_hash_t se_hash;
+    ypObject *se_key;
+} ypSet_KeyEntry;
 
-    yp_HashSequence_init(&state, n);
-    va_start(args, n);
-    for (/*n already set*/; n > 0; n--) {
-        yp_HashSequence_next(&state, va_arg(args, yp_hash_t));
+typedef struct _yp_HashSet_state_t {
+    yp_ssize_t len;
+    yp_uhash_t hash;
+} yp_HashSet_state_t;
+
+/* Work to increase the bit dispersion for closely spaced hash values.
+   This is important because some use cases have many combinations of a
+   small number of elements with nearby hashes so that many distinct
+   combinations collapse to only a handful of distinct hash values. */
+
+// XXX Adapted from Python's frozenset_hash
+static yp_uhash_t _yp_HashSet_shuffle_bits(yp_uhash_t h)
+{
+    return ((h ^ 89869747UL) ^ (h << 16)) * 3644798167UL;
+}
+
+/* Most of the constants in this hash algorithm are randomly chosen
+   large primes with "interesting bit patterns" and that passed tests
+   for good collision statistics on a variety of problematic datasets
+   including powersets and graph structures (such as David Eppstein's
+   graph recipes in Lib/test/test_set.py) */
+
+static void yp_HashSet_init(yp_HashSet_state_t *state, yp_ssize_t len)
+{
+    yp_ASSERT1(len >= 0);
+    state->len = len;
+    state->hash = 0;
+}
+
+#if 0  // FIXME
+static void yp_HashSet_next(yp_HashSet_state_t *state, yp_hash_t lane)
+{
+    /* Xor-in shuffled bits from every entry's hash field because xor is
+       commutative and a frozenset hash should be independent of order. */
+
+    yp_ASSERT1(lane != ypObject_HASH_INVALID);
+    state->hash ^= _yp_HashSet_shuffle_bits((yp_uhash_t)lane);
+}
+#endif
+
+// Combines yp_HashSet_init and yp_HashSet_next into a form optimized for a ypSet_KeyEntry table.
+static void yp_HashSet_next_table(
+        yp_HashSet_state_t *state, ypSet_KeyEntry *table, yp_ssize_t mask, yp_ssize_t fill)
+{
+    yp_uhash_t      hash = state->hash;
+    ypSet_KeyEntry *entry;
+
+    yp_ASSERT1(mask >= 0 && fill >= 0 && state->len >= 0);
+    yp_ASSERT1(mask + 1 >= fill && fill >= state->len);
+
+    /* Xor-in shuffled bits from every entry's hash field because xor is
+       commutative and a frozenset hash should be independent of order.
+
+       For speed, include null entries and dummy entries and then
+       subtract out their effect afterwards so that the final hash
+       depends only on active entries.  This allows the code to be
+       vectorized by the compiler and it saves the unpredictable
+       branches that would arise when trying to exclude null and dummy
+       entries on every iteration. */
+
+    for (entry = table; entry <= &table[mask]; entry++) {
+        hash ^= _yp_HashSet_shuffle_bits((yp_uhash_t)entry->se_hash);
     }
-    va_end(args);
-    return yp_HashSequence_fini(&state);
+
+    /* Remove the effect of an odd number of NULL entries */
+    if ((mask + 1 - fill) & 1) hash ^= _yp_HashSet_shuffle_bits(0);
+
+    /* Remove the effect of an odd number of dummy entries */
+    if ((fill - state->len) & 1) {
+        hash ^= _yp_HashSet_shuffle_bits((yp_uhash_t)ypObject_HASH_INVALID);
+    }
+
+    state->hash = hash;
+}
+
+static yp_hash_t yp_HashSet_fini(yp_HashSet_state_t *state)
+{
+    yp_uhash_t hash = state->hash;
+
+    /* Factor in the number of active entries */
+    hash ^= ((yp_uhash_t)state->len + 1) * 1927868237UL;
+
+    /* Disperse patterns arising in nested frozensets */
+    hash ^= (hash >> 11) ^ (hash >> 25);
+    hash = hash * 69069U + 907133923UL;
+
+    /* -1 is reserved as an error code */
+    if (hash == (yp_uhash_t)ypObject_HASH_INVALID) {
+        return 590923713;
+    } else {
+        return (yp_hash_t)hash;
+    }
 }
 
 
@@ -1098,10 +1185,7 @@ typedef struct {
 } ypTupleObject;
 
 
-typedef struct {
-    yp_hash_t se_hash;
-    ypObject *se_key;
-} ypSet_KeyEntry;
+// ypSet_KeyEntry defined above.
 typedef struct {
     ypObject_HEAD;
     yp_ssize_t fill;  // # Active + # Dummy
@@ -5858,7 +5942,7 @@ static ypObject *float_currenthash(
         ypObject *f, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
     // This must remain consistent with the other numeric types
-    *hash = yp_HashDouble(ypFloat_VALUE(f));
+    *hash = yp_HashDouble(f, ypFloat_VALUE(f));
 
     // Since we never contain mutable objects, we can cache our hash
     if (!ypObject_IS_MUTABLE(f)) ypObject_CACHED_HASH(f) = *hash;
@@ -15132,6 +15216,7 @@ static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
     ypObject *oldkey = loc->se_key;
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
     loc->se_key = ypSet_dummy;
+    loc->se_hash = ypObject_HASH_INVALID;
     ypSet_SET_LEN(so, ypSet_LEN(so) - 1);
     return oldkey;
 }
@@ -15543,33 +15628,16 @@ static ypObject *frozenset_bool(ypObject *so) { return ypBool_FROM_C(ypSet_LEN(s
 
 // XXX Adapted from Python's frozenset_hash
 static ypObject *frozenset_currenthash(
-        ypObject *so, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *_hash)
+        ypObject *so, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    ypSet_KeyEntry *keys = ypSet_TABLE(so);
-    yp_ssize_t      keysleft = ypSet_LEN(so);
-    yp_ssize_t      i;
-    yp_uhash_t      h, hash = 1927868237U;
+    yp_HashSet_state_t state;
 
-    hash *= (yp_uhash_t)ypSet_LEN(so) + 1;
-    for (i = 0; keysleft > 0; i++) {
-        if (!ypSet_ENTRY_USED(&keys[i])) continue;
-        keysleft -= 1;
-        /* Work to increase the bit dispersion for closely spaced hash
-           values.  The is important because some use cases have many
-           combinations of a small number of elements with nearby
-           hashes so that many distinct combinations collapse to only
-           a handful of distinct hash values. */
-        h = (yp_uhash_t)keys[i].se_hash;
-        hash ^= (h ^ (h << 16) ^ 89869747U) * 3644798167U;
-    }
-    hash = hash * 69069U + 907133923U;
-    if (hash == (yp_uhash_t)ypObject_HASH_INVALID) {
-        hash = 590923713U;
-    }
-    *_hash = (yp_hash_t)hash;
+    yp_HashSet_init(&state, ypSet_LEN(so));
+    yp_HashSet_next_table(&state, ypSet_TABLE(so), ypSet_MASK(so), ypSet_FILL(so));
+    *hash = yp_HashSet_fini(&state);
 
     // Since we never contain mutable objects, we can cache our hash
-    if (!ypObject_IS_MUTABLE(so)) ypObject_CACHED_HASH(so) = *_hash;
+    if (!ypObject_IS_MUTABLE(so)) ypObject_CACHED_HASH(so) = *hash;
     return yp_None;
 }
 
@@ -17840,13 +17908,16 @@ static ypObject *range_ne(ypObject *r, ypObject *x)
 static ypObject *range_currenthash(
         ypObject *r, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
+    yp_HashSequence_state_t state;
     ypRange_ASSERT_NORMALIZED(r);
 
-    *hash = yp_HashSequenceN(3, yp_HashInt(ypRange_LEN(r)), yp_HashInt(ypRange_START(r)),
-            yp_HashInt(ypRange_STEP(r)));
-
+    yp_HashSequence_init(&state, 3);
+    yp_HashSequence_next(&state, yp_HashInt(ypRange_LEN(r)));
+    yp_HashSequence_next(&state, yp_HashInt(ypRange_START(r)));
+    yp_HashSequence_next(&state, yp_HashInt(ypRange_STEP(r)));
     // Since we never contain mutable objects, we can cache our hash
-    ypObject_CACHED_HASH(yp_None) = *hash;
+    *hash = ypObject_CACHED_HASH(yp_None) = yp_HashSequence_fini(&state);
+
     return yp_None;
 }
 

@@ -124,6 +124,7 @@ extern "C" {
 // MUNIT_TEST_OPTION_TODO, which will fail if they pass.
 
 #define assert_ssize(a, op, b) munit_assert_type(yp_ssize_t, PRIssize, a, op, b)
+#define assert_hashC(a, b) munit_assert_type(yp_hash_t, PRIssize, a, ==, b)
 
 // FIXME A better error message to list the exception name.
 #define _assert_not_exception(obj, obj_fmt, ...)                                          \
@@ -218,7 +219,8 @@ extern "C" {
                 __VA_ARGS__);                                                                 \
     } while (0)
 
-// op can be: lt, le, eq, ne, ge, gt.
+// op can be: lt, le, eq, ne, ge, gt, contains, in, not_in, isdisjoint, issubset, issuperset,
+// startswith, endswith.
 #define assert_obj(a, op, b)                                           \
     do {                                                               \
         ypObject *_ypmt_OBJ_a = (a);                                   \
