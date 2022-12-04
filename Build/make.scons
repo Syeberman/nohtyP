@@ -57,7 +57,9 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
             # can configure status updates, but not failures. Contribute a patch to put everything
             # to stdout. (Errors running the tests should still go to stderr.)
             # FIXME Just write it to two separate files, since they don't play nice combined.
-            "MUNIT_OUTPUT_FILE=stderr"
+            "MUNIT_OUTPUT_FILE=stderr",
+            "MUNIT_TEST_NAME_LEN=58",
+            "MUNIT_DISABLE_TIMING",
         ],
         LIBS=[
             get_implib(env, sharedLib),

@@ -1018,7 +1018,6 @@ static void yp_HashSet_init(yp_HashSet_state_t *state, yp_ssize_t len)
     state->hash = 0;
 }
 
-#if 0  // FIXME
 static void yp_HashSet_next(yp_HashSet_state_t *state, yp_hash_t lane)
 {
     /* Xor-in shuffled bits from every entry's hash field because xor is
@@ -1027,7 +1026,6 @@ static void yp_HashSet_next(yp_HashSet_state_t *state, yp_hash_t lane)
     yp_ASSERT1(lane != ypObject_HASH_INVALID);
     state->hash ^= _yp_HashSet_shuffle_bits((yp_uhash_t)lane);
 }
-#endif
 
 // Combines yp_HashSet_init and yp_HashSet_next into a form optimized for a ypSet_KeyEntry table.
 static void yp_HashSet_next_table(
@@ -4452,8 +4450,9 @@ _ypBool_RELATIVE_CMP_FUNCTION(gt, >);
 static ypObject *bool_currenthash(
         ypObject *b, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    // This must remain consistent with the other numeric types
-    *hash = (yp_hash_t)_ypBool_VALUE(b);  // either 0 or 1
+    // This must remain consistent with the other numeric types. Since we never contain mutable
+    // objects, we can cache our hash.
+    *hash = ypObject_CACHED_HASH(b) = yp_HashInt(_ypBool_VALUE(b));  // either 0 or 1
     return yp_None;
 }
 
@@ -16753,6 +16752,7 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
         valuesleft -= 1;
 
         // TODO _ypDict_push will call yp_hashC again, even though we already know the hash
+        // TODO yp_hashC may mutate mp, invalidating valuesleft!
         result = _ypDict_push(
                 mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, 1, &spaceleft, valuesleft);
         if (yp_isexceptionC(result)) return result;
@@ -16825,6 +16825,7 @@ static ypObject *frozendict_traverse(ypObject *mp, visitfunc visitor, void *memo
     result = visitor(ypDict_KEYSET(mp), memo);
     if (yp_isexceptionC(result)) return result;
 
+    // TODO visitor may mutate mp, invalidating valuesleft!
     for (i = 0; valuesleft > 0; i++) {
         value = ypDict_VALUES(mp)[i];
         if (value == NULL) continue;
@@ -16885,6 +16886,7 @@ static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
         return yp_False;
     }
 
+    // TODO yp_eq may mutate mp, invalidating valuesleft!
     valuesleft = ypDict_LEN(mp);
     for (mp_i = 0; valuesleft > 0; mp_i++) {
         mp_value = ypDict_VALUES(mp)[mp_i];
@@ -16912,17 +16914,50 @@ static ypObject *frozendict_ne(ypObject *mp, ypObject *x)
     return ypBool_NOT(result);
 }
 
-// TODO frozendict_currenthash, when implemented, will need to consider the currenthashes of its
-// values as well as its keys. Just as a tuple with mutable items can't be hashed, hashing a
-// frozendict with mutable values will be an error.
-//  What about this for the hash?  hash(frozenset(x.items()))  (performance?)
-// Rejected ideas:
-//  This wouldn't work as item order is arbitrary: hash(tuple(x.items()))
-//  Calling sorted in the above would require ordering of the keys, which may not be true
-static ypObject *frozendict_currenthash(
-        ypObject *b, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+// Essentially: hash((key, value))
+static yp_hash_t _ypDict_currenthash_item(yp_hash_t key_hash, yp_hash_t value_hash)
 {
-    return yp_NotImplementedError;
+    yp_HashSequence_state_t state;
+    yp_HashSequence_init(&state, 2);
+    yp_HashSequence_next(&state, key_hash);
+    yp_HashSequence_next(&state, value_hash);
+    return yp_HashSequence_fini(&state);
+}
+
+// Essentially: hash(frozenset(x.items()))
+static ypObject *frozendict_currenthash(
+        ypObject *mp, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+{
+    yp_HashSet_state_t state;
+    yp_ssize_t         valuesleft;
+    yp_ssize_t         mp_i;
+    ypObject          *mp_value;
+    ypSet_KeyEntry    *mp_key_loc;
+    yp_hash_t          mp_value_hash;
+    yp_hash_t          mp_item_hash;
+    ypObject          *result;
+
+    yp_HashSet_init(&state, ypDict_LEN(mp));
+
+    // TODO hash_visitor may mutate mp, invalidating valuesleft!
+    valuesleft = ypDict_LEN(mp);
+    for (mp_i = 0; valuesleft > 0; mp_i++) {
+        mp_value = ypDict_VALUES(mp)[mp_i];
+        if (mp_value == NULL) continue;
+        valuesleft -= 1;
+        mp_key_loc = ypSet_TABLE(ypDict_KEYSET(mp)) + mp_i;
+
+        // We have the hash of the key at mp_key_loc->se_hash, but not the hash of the value.
+        result = hash_visitor(mp_value, hash_memo, &mp_value_hash);
+        if (yp_isexceptionC(result)) return result;
+
+        mp_item_hash = _ypDict_currenthash_item(mp_key_loc->se_hash, mp_value_hash);
+        yp_HashSet_next(&state, mp_item_hash);
+    }
+
+    *hash = yp_HashSet_fini(&state);
+
+    return yp_None;
 }
 
 static ypObject *frozendict_contains(ypObject *mp, ypObject *key)
@@ -16966,7 +17001,7 @@ static ypObject *dict_clear(ypObject *mp)
             alloclen == ypSet_ALLOCLEN_MIN, "expect alloclen of ypSet_ALLOCLEN_MIN for new keyset");
 
     // Discard the old values
-    // FIXME What if yp_decref modifies mp?
+    // TODO yp_decref may mutate mp, invalidating valuesleft!
     for (i = 0; valuesleft > 0; i++) {
         if (oldvalues[i] == NULL) continue;
         valuesleft -= 1;
