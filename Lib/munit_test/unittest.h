@@ -299,7 +299,7 @@ extern "C" {
 typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
-typedef ypObject *(*rand_obj_supplier_t)(rand_obj_supplier_memo_t *);
+typedef ypObject *(*rand_obj_supplier_t)(const rand_obj_supplier_memo_t *);
 
 // Any methods or arguments here that don't apply to a given type will fail the test.
 typedef struct _fixture_type_t fixture_type_t;

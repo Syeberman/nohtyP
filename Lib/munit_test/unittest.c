@@ -75,12 +75,12 @@ typedef struct _rand_obj_supplier_memo_t {
 static ypObject *rand_obj_terminal(void)
 {
     // FIXME Initialize this using a property of the type, perhaps?
-    static fixture_type_t          *terminal_types[] = {&fixture_type_type, &fixture_type_NoneType,
-                     &fixture_type_bool, &fixture_type_int, &fixture_type_intstore, &fixture_type_float,
-                     &fixture_type_floatstore, &fixture_type_range, &fixture_type_bytes,
-                     &fixture_type_bytearray, &fixture_type_str, &fixture_type_chrarray,
-                     &fixture_type_function};
-    static rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
+    static fixture_type_t *terminal_types[] = {&fixture_type_type, &fixture_type_NoneType,
+            &fixture_type_bool, &fixture_type_int, &fixture_type_intstore, &fixture_type_float,
+            &fixture_type_floatstore, &fixture_type_range, &fixture_type_bytes,
+            &fixture_type_bytearray, &fixture_type_str, &fixture_type_chrarray,
+            &fixture_type_function};
+    static const rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
 
     fixture_type_t *type = rand_choice_array(terminal_types);
     return type->_new_rand(&terminal_memo);
@@ -90,10 +90,10 @@ static ypObject *rand_obj_terminal(void)
 static ypObject *rand_obj_terminal_hashable(void)
 {
     // FIXME Initialize this using a property of the type, perhaps?
-    static fixture_type_t          *terminal_types[] = {&fixture_type_type, &fixture_type_NoneType,
-                     &fixture_type_bool, &fixture_type_int, &fixture_type_float, &fixture_type_range,
-                     &fixture_type_bytes, &fixture_type_str, &fixture_type_function};
-    static rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
+    static fixture_type_t *terminal_types[] = {&fixture_type_type, &fixture_type_NoneType,
+            &fixture_type_bool, &fixture_type_int, &fixture_type_float, &fixture_type_range,
+            &fixture_type_bytes, &fixture_type_str, &fixture_type_function};
+    static const rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
 
     fixture_type_t *type = rand_choice_array(terminal_types);
     return type->_new_rand(&terminal_memo);
@@ -101,7 +101,7 @@ static ypObject *rand_obj_terminal_hashable(void)
 
 // "Any" may be limited by memo (i.e. we might only return "terminal" types).
 static yp_ssize_t fixture_types_immutable_len;
-static ypObject  *rand_obj_any_hashable1(rand_obj_supplier_memo_t *memo)
+static ypObject  *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 {
     assert_ssize(memo->depth, >, 0);
     if (memo->depth < 2) {
@@ -114,7 +114,7 @@ static ypObject  *rand_obj_any_hashable1(rand_obj_supplier_memo_t *memo)
 }
 
 // "Any" may be limited by memo (i.e. we might only return hashable types).
-static ypObject *rand_obj_any1(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_any1(const rand_obj_supplier_memo_t *memo)
 {
     assert_ssize(memo->depth, >, 0);
     if (memo->only_hashable) {
@@ -128,7 +128,7 @@ static ypObject *rand_obj_any1(rand_obj_supplier_memo_t *memo)
 }
 
 // Returns a 2-tuple of a hashable key and any value. Recall that "any" may be limited by memo.
-static ypObject *rand_obj_any_keyvalue1(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_any_keyvalue1(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *key = rand_obj_any_hashable1(memo);
     ypObject *value = rand_obj_any1(memo);
@@ -168,9 +168,9 @@ ypObject *rand_obj_any(void)
 
 
 typedef struct _rand_obj_iter_state {
-    yp_ssize_t          n;
-    rand_obj_supplier_t supplier;
-    void               *supplier_memo;
+    yp_ssize_t               n;
+    rand_obj_supplier_t      supplier;
+    rand_obj_supplier_memo_t supplier_memo;
 } rand_obj_iter_state;
 
 static yp_state_decl_t rand_obj_iter_state_decl = {yp_sizeof(rand_obj_iter_state)};
@@ -185,12 +185,13 @@ static ypObject *rand_obj_iter_func(ypObject *g, ypObject *value)
 
     if (state->n < 1) return yp_StopIteration;
     state->n--;
-    return state->supplier(state->supplier_memo);
+    return state->supplier(&state->supplier_memo);
 }
 
-static ypObject *rand_obj_iter3(yp_ssize_t n, rand_obj_supplier_t supplier, void *supplier_memo)
+static ypObject *rand_obj_iter3(
+        yp_ssize_t n, rand_obj_supplier_t supplier, const rand_obj_supplier_memo_t *supplier_memo)
 {
-    rand_obj_iter_state state = {n, supplier, supplier_memo};
+    rand_obj_iter_state state = {n, supplier, *supplier_memo};
     yp_generator_decl_t decl = {rand_obj_iter_func, n, &state, &rand_obj_iter_state_decl};
     ypObject           *result = yp_generatorC(&decl);
     assert_not_exception(result);
@@ -199,7 +200,7 @@ static ypObject *rand_obj_iter3(yp_ssize_t n, rand_obj_supplier_t supplier, void
 
 
 // Returns a random type object, except invalidated and exception objects.
-static ypObject *rand_obj_type(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_type(const rand_obj_supplier_memo_t *memo)
 {
     return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->type;
 }
@@ -231,7 +232,7 @@ fixture_type_t fixture_type_type = {
 };
 
 // There is only one NoneType object: yp_None.
-static ypObject *rand_obj_NoneType(rand_obj_supplier_memo_t *memo) { return yp_None; }
+static ypObject *rand_obj_NoneType(const rand_obj_supplier_memo_t *memo) { return yp_None; }
 
 fixture_type_t fixture_type_NoneType = {
         "NoneType",              // name
@@ -259,7 +260,7 @@ fixture_type_t fixture_type_NoneType = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_bool(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_bool(const rand_obj_supplier_memo_t *memo)
 {
     if (munit_rand_int_range(0, 1)) {
         return yp_True;
@@ -294,7 +295,7 @@ fixture_type_t fixture_type_bool = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_int(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_int(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = yp_intC(rand_intC());
     assert_not_exception(result);
@@ -327,7 +328,7 @@ fixture_type_t fixture_type_int = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_intstore(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_intstore(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = yp_intstoreC(rand_intC());
     assert_not_exception(result);
@@ -360,7 +361,7 @@ fixture_type_t fixture_type_intstore = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_float(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_float(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = yp_floatCF(rand_floatCF());
     assert_not_exception(result);
@@ -393,7 +394,7 @@ fixture_type_t fixture_type_float = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_floatstore(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_floatstore(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = yp_floatstoreCF(rand_floatCF());
     assert_not_exception(result);
@@ -426,7 +427,7 @@ fixture_type_t fixture_type_floatstore = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_iter(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_iter(const rand_obj_supplier_memo_t *memo)
 {
     yp_ssize_t n = munit_rand_int_range(0, 16);
     return rand_obj_iter3(n, rand_obj_any1, memo);
@@ -461,7 +462,7 @@ fixture_type_t fixture_type_iter = {
 };
 
 // TODO Ranges that cover more values, not just 32-bit-ish.
-static ypObject *rand_obj_range(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_range(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_range_empty;
@@ -504,7 +505,7 @@ fixture_type_t fixture_type_range = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_bytes(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_bytes(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_bytes_empty;
@@ -547,7 +548,7 @@ fixture_type_t fixture_type_bytes = {
         TRUE,   // is_insertion_ordered
 };
 
-static ypObject *rand_obj_bytearray(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_bytearray(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_bytearray0();
@@ -591,7 +592,7 @@ fixture_type_t fixture_type_bytearray = {
 };
 
 // TODO Return larger characters than just ascii.
-static ypObject *rand_obj_str(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_str(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_str_empty;
@@ -636,7 +637,7 @@ fixture_type_t fixture_type_str = {
 };
 
 // TODO Return larger characters than just ascii.
-static ypObject *rand_obj_chrarray(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_chrarray(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_chrarray0();
@@ -680,7 +681,7 @@ fixture_type_t fixture_type_chrarray = {
         TRUE,   // is_insertion_ordered
 };
 
-static ypObject *rand_obj_tuple(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_tuple(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_tuple_empty;
@@ -720,7 +721,7 @@ fixture_type_t fixture_type_tuple = {
         TRUE,   // is_insertion_ordered
 };
 
-static ypObject *rand_obj_list(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_list(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_listN(0);
@@ -760,7 +761,7 @@ fixture_type_t fixture_type_list = {
         TRUE,   // is_insertion_ordered
 };
 
-static ypObject *rand_obj_frozenset(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_frozenset(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_frozenset_empty;
@@ -801,7 +802,7 @@ fixture_type_t fixture_type_frozenset = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_set(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_set(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_setN(0);
@@ -842,7 +843,7 @@ fixture_type_t fixture_type_set = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_frozendict(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_frozendict(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_frozendict_empty;
@@ -883,7 +884,7 @@ fixture_type_t fixture_type_frozendict = {
         FALSE,  // is_insertion_ordered
 };
 
-static ypObject *rand_obj_dict(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_dict(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_dictK(0);
@@ -929,7 +930,7 @@ static ypObject *rand_obj_function_code(ypObject *f, yp_ssize_t n, ypObject *con
     return rand_obj_any();
 }
 
-static ypObject *rand_obj_function(rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_function(const rand_obj_supplier_memo_t *memo)
 {
     yp_parameter_decl_t parameter_decl[] = {{yp_s_star_args}, {yp_s_star_star_kwargs}};
     yp_function_decl_t  decl = {
