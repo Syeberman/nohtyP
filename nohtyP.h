@@ -504,6 +504,8 @@ ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
 // of this method for other types, in particular files, is documented elsewhere.
 ypAPI void yp_close(ypObject *iterator, ypObject **exc);
 
+// FIXME Most functions below deal with *iterables*.
+
 // Sets the given n ypObject**s to new references for the values yielded from iterable. Iterable
 // must yield exactly n objects, or else a yp_ValueError is raised. Sets all n ypObject**s to the
 // same exception on error.
@@ -576,6 +578,9 @@ typedef struct _yp_generator_decl_t {
 
 // These methods are supported by range, bytes, str, tuple, frozenset, and frozendict (and their
 // mutable counterparts, of course).
+
+// FIXME No: mapping types don't support push/pop.
+// FIXME Contains is supported by iterators!
 
 // Returns the immortal yp_True if an item of container is equal to x, else yp_False.
 ypAPI ypObject *yp_contains(ypObject *container, ypObject *x);

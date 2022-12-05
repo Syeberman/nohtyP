@@ -298,7 +298,6 @@ extern "C" {
 
 typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objvarargfunc)(int, ...);
-typedef void (*voidobjpobjpfunc)(ypObject **, ypObject **);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
 typedef ypObject *(*rand_obj_supplier_t)(rand_obj_supplier_memo_t *);
 
@@ -309,15 +308,18 @@ typedef struct _fixture_type_t {
     ypObject       *type;  // The type object (i.e. yp_t_float, yp_t_list).
     fixture_type_t *pair;  // The other type in this object pair, or points back to this type.
 
-    rand_obj_supplier_t new_rand;  // Creates a random object, with visitor supplying sub-objects.
-    objvarargfunc newN;  // Creates an object to hold the given values (i.e. yp_tupleN, yp_int where
-                         // n<2, yp_dict_fromkeysN where value=yp_None).
-    objvarargfunc newK;  // Creates an object to hold the given key/values (i.e. yp_dictK).
+    rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
 
-    // FIXME getitem doesn't apply to set, so how to describe? And dict.in refers to keys!
-    objvoidfunc      rand_item;       // Creates a random value as would be returned by yp_getitem.
-    voidobjpobjpfunc rand_key_value;  // Creates a random key/value pair as would be yielded by
-                                      // yp_iter_items.
+    // Functions for non-mapping, non-range iterables, where rand_item returns an object accepted
+    // by newN, yielded by the associated iterator, and returned by yp_getitem (if supported).
+    objvarargfunc newN;       // Creates a iterable for the given items (i.e. yp_tupleN).
+    objvoidfunc   rand_item;  // Creates a random object to store in the iterable.
+
+    // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
+    // yp_getitem returns values.
+    objvarargfunc newK;        // Creates an object to hold the given key/values (i.e. yp_dictK).
+    objvoidfunc   rand_key;    // Creates a random key to store in the mapping.
+    objvoidfunc   rand_value;  // Creates a random value to store in the mapping.
 
     // Flags to describe the properties of the type.
     int is_mutable;
@@ -332,6 +334,8 @@ typedef struct _fixture_type_t {
     // FIXME Is there a better word? The Python docs just say "Ranges implement all of the common
     // sequence operations except concatenation and repetition".
     // FIXME "is_insertion_ordered" is nice because when dict/set are made ordered, this applies.
+    // FIXME Maybe this is simply "has_rand_item", as in it can store any number of values that
+    // returns.
     int is_insertion_ordered;  // i.e. range doesn't support concat, repeat, newN, etc
 } fixture_type_t;
 

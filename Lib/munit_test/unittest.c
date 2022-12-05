@@ -20,12 +20,6 @@ static ypObject *objvarargfunc_error(int n, ...)
     return NULL;
 }
 
-static void voidobjpobjpfunc_error(ypObject **key, ypObject **value)
-{
-    munit_error("unsupported operation");
-    *key = *value = NULL;
-}
-
 
 // Returns a random yp_int_t value. Prioritizes zero and small numbers.
 static yp_int_t rand_intC(void)
@@ -89,7 +83,7 @@ static ypObject *rand_obj_terminal(void)
     static rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
 
     fixture_type_t *type = rand_choice_array(terminal_types);
-    return type->new_rand(&terminal_memo);
+    return type->_new_rand(&terminal_memo);
 }
 
 // Returns a random object for a hashable type that does not itself require a supplier.
@@ -102,7 +96,7 @@ static ypObject *rand_obj_terminal_hashable(void)
     static rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
 
     fixture_type_t *type = rand_choice_array(terminal_types);
-    return type->new_rand(&terminal_memo);
+    return type->_new_rand(&terminal_memo);
 }
 
 // "Any" may be limited by memo (i.e. we might only return "terminal" types).
@@ -115,7 +109,7 @@ static ypObject  *rand_obj_any_hashable1(rand_obj_supplier_memo_t *memo)
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/TRUE};
         return rand_choice(fixture_types_immutable_len, fixture_types_immutable)
-                ->new_rand(&sub_memo);
+                ->_new_rand(&sub_memo);
     }
 }
 
@@ -129,7 +123,7 @@ static ypObject *rand_obj_any1(rand_obj_supplier_memo_t *memo)
         return rand_obj_terminal();
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/FALSE};
-        return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->new_rand(&sub_memo);
+        return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->_new_rand(&sub_memo);
     }
 }
 
@@ -146,18 +140,18 @@ static ypObject *rand_obj_any_keyvalue1(rand_obj_supplier_memo_t *memo)
 
 ypObject *rand_obj_hashable(fixture_type_t *type)
 {
-    // Start with depth-1 as we are calling new_rand ourselves.
+    // Start with depth-1 as we are calling _new_rand ourselves.
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH - 1, /*only_hashable=*/TRUE};
-    ypObject                *result = type->new_rand(&memo);
+    ypObject                *result = type->_new_rand(&memo);
     assert_false(type->is_mutable);
     return result;
 }
 
 ypObject *rand_obj(fixture_type_t *type)
 {
-    // Start with depth-1 as we are calling new_rand ourselves.
+    // Start with depth-1 as we are calling _new_rand ourselves.
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH - 1, /*only_hashable=*/FALSE};
-    return type->new_rand(&memo);
+    return type->_new_rand(&memo);
 }
 
 ypObject *rand_obj_any_hashable(void)
@@ -215,12 +209,14 @@ fixture_type_t fixture_type_type = {
         NULL,                // type (initialized at runtime)
         &fixture_type_type,  // pair
 
-        rand_obj_type,        // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_type,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -242,12 +238,14 @@ fixture_type_t fixture_type_NoneType = {
         NULL,                    // type (initialized at runtime)
         &fixture_type_NoneType,  // pair
 
-        rand_obj_NoneType,    // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_NoneType,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -275,12 +273,14 @@ fixture_type_t fixture_type_bool = {
         NULL,                // type (initialized at runtime)
         &fixture_type_bool,  // pair
 
-        rand_obj_bool,        // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_bool,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -306,12 +306,14 @@ fixture_type_t fixture_type_int = {
         NULL,                    // type (initialized at runtime)
         &fixture_type_intstore,  // pair
 
-        rand_obj_int,         // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_int,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -337,12 +339,14 @@ fixture_type_t fixture_type_intstore = {
         NULL,               // type (initialized at runtime)
         &fixture_type_int,  // pair
 
-        rand_obj_intstore,    // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_intstore,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -368,12 +372,14 @@ fixture_type_t fixture_type_float = {
         NULL,                      // type (initialized at runtime)
         &fixture_type_floatstore,  // pair
 
-        rand_obj_float,       // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_float,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -399,12 +405,14 @@ fixture_type_t fixture_type_floatstore = {
         NULL,                 // type (initialized at runtime)
         &fixture_type_float,  // pair
 
-        rand_obj_floatstore,  // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_floatstore,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -424,17 +432,21 @@ static ypObject *rand_obj_iter(rand_obj_supplier_memo_t *memo)
     return rand_obj_iter3(n, rand_obj_any1, memo);
 }
 
+static ypObject *newN_iter(int n, ...) { munit_error("FIXME Implement"); }
+
 fixture_type_t fixture_type_iter = {
         "iter",              // name
         NULL,                // type (initialized at runtime)
         &fixture_type_iter,  // pair
 
-        rand_obj_iter,        // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_iter,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        newN_iter,     // newN
+        rand_obj_any,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -471,12 +483,14 @@ fixture_type_t fixture_type_range = {
         NULL,                 // type (initialized at runtime)
         &fixture_type_range,  // pair
 
-        rand_obj_range,       // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_range,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -505,17 +519,21 @@ static ypObject *rand_obj_bytes(rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *newN_bytes(int n, ...) { munit_error("FIXME Implement"); }
+
 fixture_type_t fixture_type_bytes = {
         "bytes",                  // name
         NULL,                     // type (initialized at runtime)
         &fixture_type_bytearray,  // pair
 
-        rand_obj_bytes,       // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_bytes,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        newN_bytes,         // newN
+        objvoidfunc_error,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -544,17 +562,21 @@ static ypObject *rand_obj_bytearray(rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *newN_bytearray(int n, ...) { munit_error("FIXME Implement"); }
+
 fixture_type_t fixture_type_bytearray = {
         "bytearray",          // name
         NULL,                 // type (initialized at runtime)
         &fixture_type_bytes,  // pair
 
-        rand_obj_bytearray,   // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_bytearray,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        newN_bytearray,     // newN
+        objvoidfunc_error,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -585,17 +607,21 @@ static ypObject *rand_obj_str(rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *newN_str(int n, ...) { munit_error("FIXME Implement"); }
+
 fixture_type_t fixture_type_str = {
         "str",                   // name
         NULL,                    // type (initialized at runtime)
         &fixture_type_chrarray,  // pair
 
-        rand_obj_str,         // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_str,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        newN_str,           // newN
+        objvoidfunc_error,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -626,17 +652,21 @@ static ypObject *rand_obj_chrarray(rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *newN_chrarray(int n, ...) { munit_error("FIXME Implement"); }
+
 fixture_type_t fixture_type_chrarray = {
         "chrarray",         // name
         NULL,               // type (initialized at runtime)
         &fixture_type_str,  // pair
 
-        rand_obj_chrarray,    // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_chrarray,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        newN_chrarray,      // newN
+        objvoidfunc_error,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -669,12 +699,14 @@ fixture_type_t fixture_type_tuple = {
         NULL,                // type (initialized at runtime)
         &fixture_type_list,  // pair
 
-        rand_obj_tuple,       // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_tuple,  // _new_rand
 
-        rand_obj_any,            // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        yp_tupleN,     // newN
+        rand_obj_any,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -707,12 +739,14 @@ fixture_type_t fixture_type_list = {
         NULL,                 // type (initialized at runtime)
         &fixture_type_tuple,  // pair
 
-        rand_obj_list,        // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_list,  // _new_rand
 
-        rand_obj_any,            // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        yp_listN,      // newN
+        rand_obj_any,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -746,12 +780,14 @@ fixture_type_t fixture_type_frozenset = {
         NULL,               // type (initialized at runtime)
         &fixture_type_set,  // pair
 
-        rand_obj_frozenset,   // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_frozenset,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        yp_frozensetN,          // newN
+        rand_obj_any_hashable,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -785,12 +821,14 @@ fixture_type_t fixture_type_set = {
         NULL,                     // type (initialized at runtime)
         &fixture_type_frozenset,  // pair
 
-        rand_obj_set,         // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_set,  // _new_rand
 
-        rand_obj_any_hashable,   // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        yp_setN,                // newN
+        rand_obj_any_hashable,  // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -824,12 +862,14 @@ fixture_type_t fixture_type_frozendict = {
         NULL,                // type (initialized at runtime)
         &fixture_type_dict,  // pair
 
-        rand_obj_frozendict,  // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_frozendict,  // _new_rand
 
-        rand_obj_any,            // rand_item  // FIXME maybe this one returns 2-tuples?
-        voidobjpobjpfunc_error,  // rand_key_value  // FIXME ...and this one...remove?
+        objvarargfunc_error,  // newN
+        rand_obj_any,         // rand_item
+
+        yp_frozendictK,         // newK
+        rand_obj_any_hashable,  // rand_key
+        rand_obj_any,           // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -863,12 +903,14 @@ fixture_type_t fixture_type_dict = {
         NULL,                      // type (initialized at runtime)
         &fixture_type_frozendict,  // pair
 
-        rand_obj_dict,        // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_dict,  // _new_rand
 
-        rand_obj_any,            // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        rand_obj_any,         // rand_item
+
+        yp_dictK,               // newK
+        rand_obj_any_hashable,  // rand_key
+        rand_obj_any,           // rand_value
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -902,12 +944,14 @@ fixture_type_t fixture_type_function = {
         NULL,                    // type (initialized at runtime)
         &fixture_type_function,  // pair
 
-        rand_obj_function,    // new_rand
-        objvarargfunc_error,  // newN
-        objvarargfunc_error,  // newK
+        rand_obj_function,  // _new_rand
 
-        objvoidfunc_error,       // rand_item
-        voidobjpobjpfunc_error,  // rand_key_value
+        objvarargfunc_error,  // newN
+        objvoidfunc_error,    // rand_item
+
+        objvarargfunc_error,  // newK
+        objvoidfunc_error,    // rand_key
+        objvoidfunc_error,    // rand_value
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
