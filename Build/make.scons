@@ -16,9 +16,11 @@ RootEnv.Replace(NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0)
 def get_dll(env, target):
     return env.FindIxes(target, 'SHLIBPREFIX', 'SHLIBSUFFIX')
 
+
 def get_implib(env, target):
     # MacOS uses the dll (.dylib) as the import library.
     return env.FindIxes(target, 'LIBPREFIX', 'LIBSUFFIX') or get_dll(env, target)
+
 
 def get_prog(env, target):
     return env.FindIxes(target, "PROGPREFIX", "PROGSUFFIX")
@@ -131,8 +133,8 @@ def nohtyP_checkapi(env):
 # TODO Clang/LLVM support
 # TODO GCC 6 can't be found on AppVeyor's Ubuntu1604
 compiler_names = (
-    "msvs_158", "gcc_10", "gcc_9", "gcc_8", "gcc_7", "msvs_140", "gcc_6", "gcc_5", "msvs_120",
-    "gcc_49", "gcc_48", "msvs_110", "gcc_47", "gcc_46", "msvs_100", "msvs_90"
+    "gcc_12", "gcc_11", "msvs_158", "gcc_10", "gcc_9", "gcc_8", "gcc_7", "msvs_140", "gcc_6",
+    "gcc_5", "msvs_120", "gcc_49", "gcc_48", "msvs_110", "gcc_47", "gcc_46", "msvs_100", "msvs_90"
 )
 oses = ("win32", "posix", "darwin")
 archs = ("amd64", "x86")

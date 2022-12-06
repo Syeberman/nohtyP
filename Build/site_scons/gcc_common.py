@@ -67,6 +67,8 @@ def _version_detector(gcc):
 
 gcc_finder = ToolFinder(
     # Try some known, and unknown-but-logical, default locations for mingw
+    # WinLibs https://winlibs.com/
+    #   C:\MinGW\winlibs-x86_64-posix-seh-gcc-12.2.0-llvm-14.0.6-mingw-w64ucrt-10.0.0-r2\mingw64
     # MinGW-w64 (http://sourceforge.net/projects/mingw-w64/)
     #   C:\Program Files\mingw-w64\x86_64-4.8.4-posix-seh-rt_v3-rev0\mingw64
     # Official MinGW (http://www.mingw.org/)
@@ -187,8 +189,8 @@ def ApplyGCCOptions(env, version):
         "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
         "-Wno-pointer-sign",
         "-Wno-unknown-pragmas",
-        # Before 9.0, float-conversion warned about passing a double to finite/isnan
-        "" if version >= 9.0 else "-Wno-float-conversion",
+        # float-conversion warns about passing a double to finite/isnan, unfortunately
+        "-Wno-float-conversion",
         # TODO maybe-uninitialized would be good during analyze
         "-Wno-maybe-uninitialized" if version >= 4.8 else "-Wno-uninitialized",
         # For shared libraries, only expose functions explicitly marked ypAPI
@@ -206,10 +208,13 @@ def ApplyGCCOptions(env, version):
         addCcFlags(
             # Disable (non-debuggable) optimizations
             "-Og" if version >= 4.8 else "-O0",
-            # Runtime checks: int overflow, stack overflow
-            # TODO Stack overflow detection should possibly always be enabled.
+            # Runtime check: int overflow
             "-ftrapv",
-            "-fstack-clash-protection" if version >= 8 else "-fstack-check",
+            # Runtime check: stack overflow
+            # XXX Not supported on Windows: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90458#c4
+            # TODO Stack overflow detection should possibly always be enabled.
+            "-fstack-clash-protection"
+            if version >= 8 and _platform_name != "win32" else "-fstack-check",
             # Runtime check: buffer overflow (needs -fmudflap to linker)
             # TODO Not supported on MinGW/Windows, apparently
             #"-fmudflapth",
