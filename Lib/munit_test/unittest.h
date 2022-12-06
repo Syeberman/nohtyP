@@ -50,32 +50,59 @@ extern "C" {
 #endif
 
 // clang-format off
-#define STRINGIFY1(a) #a
-#define STRINGIFY2(a, b) #a, #b
-#define STRINGIFY3(a, b, c) #a, #b, #c
-#define STRINGIFY4(a, b, c, d) #a, #b, #c, #d
-#define STRINGIFY5(a, b, c, d, e) #a, #b, #c, #d, #e
-#define STRINGIFY6(a, b, c, d, e, f) #a, #b, #c, #d, #e, #f
-#define STRINGIFY7(a, b, c, d, e, f, g) #a, #b, #c, #d, #e, #f, #g
-#define STRINGIFY8(a, b, c, d, e, f, g, h) #a, #b, #c, #d, #e, #f, #g, #h
-#define STRINGIFY9(a, b, c, d, e, f, g, h, i) #a, #b, #c, #d, #e, #f, #g, #h, #i
-#define STRINGIFY10(a, b, c, d, e, f, g, h, i, j) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j
-#define STRINGIFY11(a, b, c, d, e, f, g, h, i, j, k) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k
-#define STRINGIFY12(a, b, c, d, e, f, g, h, i, j, k, l) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l
-#define STRINGIFY13(a, b, c, d, e, f, g, h, i, j, k, l, m) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m
-#define STRINGIFY14(a, b, c, d, e, f, g, h, i, j, k, l, m, n) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n
-#define STRINGIFY15(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o
-#define STRINGIFY16(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p
-#define STRINGIFY17(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q
-#define STRINGIFY18(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r
-#define STRINGIFY19(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s
-#define STRINGIFY20(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t
-#define STRINGIFY21(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u
-#define STRINGIFY22(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v
-#define STRINGIFY23(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w
-#define STRINGIFY24(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x
-#define STRINGIFY25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y
-#define STRINGIFY26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z
+#define _STRINGIFY1(a) #a
+#define _STRINGIFY2(a, b) #a, #b
+#define _STRINGIFY3(a, b, c) #a, #b, #c
+#define _STRINGIFY4(a, b, c, d) #a, #b, #c, #d
+#define _STRINGIFY5(a, b, c, d, e) #a, #b, #c, #d, #e
+#define _STRINGIFY6(a, b, c, d, e, f) #a, #b, #c, #d, #e, #f
+#define _STRINGIFY7(a, b, c, d, e, f, g) #a, #b, #c, #d, #e, #f, #g
+#define _STRINGIFY8(a, b, c, d, e, f, g, h) #a, #b, #c, #d, #e, #f, #g, #h
+#define _STRINGIFY9(a, b, c, d, e, f, g, h, i) #a, #b, #c, #d, #e, #f, #g, #h, #i
+#define _STRINGIFY10(a, b, c, d, e, f, g, h, i, j) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j
+#define _STRINGIFY11(a, b, c, d, e, f, g, h, i, j, k) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k
+#define _STRINGIFY12(a, b, c, d, e, f, g, h, i, j, k, l) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l
+#define _STRINGIFY13(a, b, c, d, e, f, g, h, i, j, k, l, m) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m
+#define _STRINGIFY14(a, b, c, d, e, f, g, h, i, j, k, l, m, n) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n
+#define _STRINGIFY15(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o
+#define _STRINGIFY16(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p
+#define _STRINGIFY17(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q
+#define _STRINGIFY18(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r
+#define _STRINGIFY19(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s
+#define _STRINGIFY20(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t
+#define _STRINGIFY21(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u
+#define _STRINGIFY22(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v
+#define _STRINGIFY23(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w
+#define _STRINGIFY24(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x
+#define _STRINGIFY25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y
+#define _STRINGIFY26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z
+
+#define _COMMAS1(x) x
+#define _COMMAS2(x) x, x
+#define _COMMAS3(x) x, x, x
+#define _COMMAS4(x) x, x, x, x
+#define _COMMAS5(x) x, x, x, x, x
+#define _COMMAS6(x) x, x, x, x, x, x
+#define _COMMAS7(x) x, x, x, x, x, x, x
+#define _COMMAS8(x) x, x, x, x, x, x, x, x
+#define _COMMAS9(x) x, x, x, x, x, x, x, x, x
+#define _COMMAS10(x) x, x, x, x, x, x, x, x, x, x
+#define _COMMAS11(x) x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS12(x) x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS13(x) x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS14(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS15(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS16(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS17(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS18(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS19(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS20(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS21(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS22(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS23(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS24(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS25(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMAS26(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 // clang-format on
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
@@ -268,7 +295,7 @@ extern "C" {
     do {                                                                           \
         ypObject  *_ypmt_SEQ_obj = (obj);                                          \
         ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                              \
-        char      *_ypmt_SEQ_item_strs[] = {STRINGIFY##n(__VA_ARGS__)};            \
+        char      *_ypmt_SEQ_item_strs[] = {_STRINGIFY##n(__VA_ARGS__)};           \
         yp_ssize_t _ypmt_SEQ_i;                                                    \
         _assert_len(_ypmt_SEQ_obj, n, "%s", #n, #obj);                             \
         for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < n; _ypmt_SEQ_i++) {                    \
@@ -286,7 +313,7 @@ extern "C" {
     do {                                                                                     \
         void     **_ypmt_PTR_ARR_array = (void **)(array);                                   \
         void      *_ypmt_PTR_ARR_items[] = {__VA_ARGS__};                                    \
-        char      *_ypmt_PTR_ARR_item_strs[] = {STRINGIFY##n(__VA_ARGS__)};                  \
+        char      *_ypmt_PTR_ARR_item_strs[] = {_STRINGIFY##n(__VA_ARGS__)};                 \
         yp_ssize_t _ypmt_PTR_ARR_i;                                                          \
         for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < n; _ypmt_PTR_ARR_i++) {                  \
             _assert_ptr(_ypmt_PTR_ARR_array[_ypmt_PTR_ARR_i], ==,                            \
@@ -404,6 +431,39 @@ extern ypObject *rand_obj(fixture_type_t *type);
 
 // Returns a random hashable object of the given type. type must be immutable.
 extern ypObject *rand_obj_hashable(fixture_type_t *type);
+
+
+// Declares a ypObject * array of length n and populates it by executing expression n times. name
+// must be a valid variable name. n must be an integer literal.
+// Example:
+//
+//      obj_array_init(items, 5, type->rand_item());  // Declares ypObject *items[5];
+#define obj_array_init(name, n, expression) ypObject *name[] = {_COMMAS##n((expression))}
+
+#define _obj_array_fini(array, n)                                                  \
+    do {                                                                           \
+        yp_ssize_t _ypmt_OBJ_ARR_i;                                                \
+        for (_ypmt_OBJ_ARR_i = 0; _ypmt_OBJ_ARR_i < n; _ypmt_OBJ_ARR_i++) {        \
+            if (array[_ypmt_OBJ_ARR_i] != NULL) yp_decref(array[_ypmt_OBJ_ARR_i]); \
+        }                                                                          \
+        memset(array, 0, n * sizeof(ypObject *)); /* FIXME necessary? */           \
+    } while (0)
+
+// Discards all references in the ypObject * array. Only call for arrays of fixed size (uses
+// yp_lengthof_array).
+#define obj_array_fini(name)                                           \
+    do {                                                               \
+        ypObject **_ypmt_OBJ_ARR_array = (name);                       \
+        _obj_array_fini(_ypmt_OBJ_ARR_array, yp_lengthof_array(name)); \
+    } while (0)
+
+// Discards all references in the ypObject * array of length n. Prefer obj_array_fini when possible.
+#define obj_array_fini2(name, n)                                                           \
+    do {                                                                                   \
+        ypObject **_ypmt_OBJ_ARR_array = (name); /* FIXME does this hide bounds checks? */ \
+        ypObject **_ypmt_OBJ_ARR_n = (n);                                                  \
+        _obj_array_fini(_ypmt_OBJ_ARR_array, _ypmt_OBJ_ARR_n);                             \
+    } while (0)
 
 
 extern fixture_t *fixture_setup(const MunitParameter params[], void *user_data);
