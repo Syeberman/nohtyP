@@ -59,7 +59,7 @@ static void rand_ascii(yp_ssize_t len, yp_uint8_t *source)
 }
 
 // Chooses a random element from the array with the given length
-#define rand_choice(len, array) ((array)[munit_rand_int_range(0, (len)-1)])
+#define rand_choice(len, array) ((array)[munit_rand_int_range(0, ((int)(len)) - 1)])
 
 // Chooses a random element from the array. Only call for arrays of fixed size that haven't been
 // coerced to pointers.
@@ -137,8 +137,6 @@ static ypObject *rand_obj_any_keyvalue1(const rand_obj_supplier_memo_t *memo)
     assert_not_exception(result);
     return result;
 }
-
-static ypObject *rand_obj_int(void) { return rand_obj(&fixture_type_int); }
 
 // TODO Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
 static ypObject *rand_obj_byte(void) { return yp_intC(munit_rand_int_range(0, 255)); }
@@ -236,7 +234,7 @@ fixture_type_t fixture_type_type = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         TRUE,   // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 // There is only one NoneType object: yp_None.
@@ -265,7 +263,7 @@ fixture_type_t fixture_type_NoneType = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_bool(const rand_obj_supplier_memo_t *memo)
@@ -300,7 +298,7 @@ fixture_type_t fixture_type_bool = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_int(const rand_obj_supplier_memo_t *memo)
@@ -333,7 +331,7 @@ fixture_type_t fixture_type_int = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_intstore(const rand_obj_supplier_memo_t *memo)
@@ -366,7 +364,7 @@ fixture_type_t fixture_type_intstore = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_float(const rand_obj_supplier_memo_t *memo)
@@ -399,7 +397,7 @@ fixture_type_t fixture_type_float = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_floatstore(const rand_obj_supplier_memo_t *memo)
@@ -432,7 +430,7 @@ fixture_type_t fixture_type_floatstore = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
@@ -480,7 +478,7 @@ fixture_type_t fixture_type_iter = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 // TODO Ranges that cover more values, not just 32-bit-ish.
@@ -501,6 +499,52 @@ static ypObject *new_rand_range(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+// Because range's items must follow a pattern, there's a limit to the objects we can create with
+// newN. We can construct a range between any two integers from rand_item_range, so start there.
+// This allows newN to work with "any" items, so long as there are two or less. Also remember that
+// if both values are equal, range only stores one of them.
+// FIXME Am I stretching too far trying to get range working with the sequence tests?
+static ypObject *newN_range(int n, ...)
+{
+    va_list   args;
+    yp_int_t  first;
+    yp_int_t  second;
+    ypObject *result;
+
+    va_start(args, n);
+    if (n > 0) assert_not_raises_exc(first = yp_asintC(va_arg(args, ypObject *), &exc));
+    if (n > 1) assert_not_raises_exc(second = yp_asintC(va_arg(args, ypObject *), &exc));
+    va_end(args);
+
+    if (n < 1) {
+        result = yp_range_empty;
+    } else if (n == 1) {
+        result = yp_rangeC3(first, first + 1, 1);
+    } else if (n == 2) {
+        if (first < second) {
+            result = yp_rangeC3(first, second + 1, second);
+        } else if (first == second) {
+            result = yp_rangeC3(first, first + 1, 1);
+        } else {
+            result = yp_rangeC3(first, second - 1, -second);
+        }
+    } else {
+        munit_errorf("newN_range unable to create range containing %d items", n);
+    }
+
+    assert_not_exception(result);
+    return result;
+}
+
+static ypObject *rand_item_range(void)
+{
+    // Our current implementation has some limitations. step can't be yp_INT_T_MIN, and the length
+    // can't be >ypObject_LEN_MAX (31 bits). So just play within a narrower area.
+    ypObject *result = yp_intC(munit_rand_int_range(-0x3FFFFFFF, 0x3FFFFFFF));
+    assert_not_exception(result);
+    return result;
+}
+
 fixture_type_t fixture_type_range = {
         "range",              // name
         NULL,                 // type (initialized at runtime)
@@ -508,8 +552,8 @@ fixture_type_t fixture_type_range = {
 
         new_rand_range,  // _new_rand
 
-        objvarargfunc_error,  // newN
-        rand_obj_int,         // rand_item
+        newN_range,       // newN
+        rand_item_range,  // rand_item
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -524,7 +568,7 @@ fixture_type_t fixture_type_range = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        TRUE,   // is_patterned
 };
 
 static ypObject *new_rand_bytes(const rand_obj_supplier_memo_t *memo)
@@ -582,7 +626,7 @@ fixture_type_t fixture_type_bytes = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_bytearray(const rand_obj_supplier_memo_t *memo)
@@ -640,7 +684,7 @@ fixture_type_t fixture_type_bytearray = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 // TODO Return larger characters than just ascii.
@@ -702,7 +746,7 @@ fixture_type_t fixture_type_str = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 // TODO Return larger characters than just ascii.
@@ -764,7 +808,7 @@ fixture_type_t fixture_type_chrarray = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
@@ -804,7 +848,7 @@ fixture_type_t fixture_type_tuple = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
@@ -844,7 +888,7 @@ fixture_type_t fixture_type_list = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
@@ -885,7 +929,7 @@ fixture_type_t fixture_type_frozenset = {
         TRUE,   // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
@@ -926,7 +970,7 @@ fixture_type_t fixture_type_set = {
         TRUE,   // is_set
         FALSE,  // is_mapping
         FALSE,  // is_callable
-        TRUE,   // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
@@ -967,7 +1011,7 @@ fixture_type_t fixture_type_frozendict = {
         FALSE,  // is_set
         TRUE,   // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
@@ -1008,7 +1052,7 @@ fixture_type_t fixture_type_dict = {
         FALSE,  // is_set
         TRUE,   // is_mapping
         FALSE,  // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 static ypObject *new_rand_function_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
@@ -1049,7 +1093,7 @@ fixture_type_t fixture_type_function = {
         FALSE,  // is_set
         FALSE,  // is_mapping
         TRUE,   // is_callable
-        FALSE,  // has_newN
+        FALSE,  // is_patterned
 };
 
 fixture_type_t *fixture_types_all[] = {&fixture_type_type, &fixture_type_NoneType,

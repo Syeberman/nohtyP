@@ -359,7 +359,7 @@ typedef struct _fixture_type_t {
     int is_set;
     int is_mapping;
     int is_callable;
-    int has_newN;  // i.e. range is an iterable that doesn't support newN
+    int is_patterned;  // i.e. range doesn't store values, it stores a pattern
 } fixture_type_t;
 
 extern fixture_type_t fixture_type_type;

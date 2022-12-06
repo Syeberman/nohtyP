@@ -7,9 +7,8 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     fixture_type_t *type = fixture->type;
     obj_array_init(items, 4, type->rand_item());
 
-    // Not all sequences support concatenation. For example, range only stores integers following a
-    // given pattern: this is also why newN isn't supported.
-    if (!type->has_newN) {
+    // range stores integers following a pattern, so doesn't support concat.
+    if (type->is_patterned) {
         ypObject *obj = rand_obj(type);
         ypObject *result = yp_concat(obj, obj);
         assert_isexception2(result, yp_MethodError);
@@ -29,6 +28,7 @@ tear_down:
     obj_array_fini(items);
     return MUNIT_OK;
 }
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
