@@ -8,6 +8,28 @@
 #define RAND_OBJ_DEFAULT_DEPTH (3)
 
 
+static fixture_type_t fixture_type_type_struct;
+static fixture_type_t fixture_type_NoneType_struct;
+static fixture_type_t fixture_type_bool_struct;
+static fixture_type_t fixture_type_int_struct;
+static fixture_type_t fixture_type_intstore_struct;
+static fixture_type_t fixture_type_float_struct;
+static fixture_type_t fixture_type_floatstore_struct;
+static fixture_type_t fixture_type_iter_struct;
+static fixture_type_t fixture_type_range_struct;
+static fixture_type_t fixture_type_bytes_struct;
+static fixture_type_t fixture_type_bytearray_struct;
+static fixture_type_t fixture_type_str_struct;
+static fixture_type_t fixture_type_chrarray_struct;
+static fixture_type_t fixture_type_tuple_struct;
+static fixture_type_t fixture_type_list_struct;
+static fixture_type_t fixture_type_frozenset_struct;
+static fixture_type_t fixture_type_set_struct;
+static fixture_type_t fixture_type_frozendict_struct;
+static fixture_type_t fixture_type_dict_struct;
+static fixture_type_t fixture_type_function_struct;
+
+
 static ypObject *objvoidfunc_error(void)
 {
     munit_error("unsupported operation");
@@ -75,11 +97,13 @@ typedef struct _rand_obj_supplier_memo_t {
 static ypObject *rand_obj_terminal(void)
 {
     // FIXME Initialize this using a property of the type, perhaps?
-    static fixture_type_t *terminal_types[] = {&fixture_type_type, &fixture_type_NoneType,
-            &fixture_type_bool, &fixture_type_int, &fixture_type_intstore, &fixture_type_float,
-            &fixture_type_floatstore, &fixture_type_range, &fixture_type_bytes,
-            &fixture_type_bytearray, &fixture_type_str, &fixture_type_chrarray,
-            &fixture_type_function};
+    static fixture_type_t *terminal_types[] = {&fixture_type_type_struct,
+            &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
+            &fixture_type_intstore_struct, &fixture_type_float_struct,
+            &fixture_type_floatstore_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
+            &fixture_type_bytearray_struct, &fixture_type_str_struct, &fixture_type_chrarray_struct,
+            &fixture_type_function_struct};
+
     static const rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
 
     fixture_type_t *type = rand_choice_array(terminal_types);
@@ -90,9 +114,11 @@ static ypObject *rand_obj_terminal(void)
 static ypObject *rand_obj_terminal_hashable(void)
 {
     // FIXME Initialize this using a property of the type, perhaps?
-    static fixture_type_t *terminal_types[] = {&fixture_type_type, &fixture_type_NoneType,
-            &fixture_type_bool, &fixture_type_int, &fixture_type_float, &fixture_type_range,
-            &fixture_type_bytes, &fixture_type_str, &fixture_type_function};
+    static fixture_type_t *terminal_types[] = {&fixture_type_type_struct,
+            &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
+            &fixture_type_float_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
+            &fixture_type_str_struct, &fixture_type_function_struct};
+
     static const rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
 
     fixture_type_t *type = rand_choice_array(terminal_types);
@@ -211,10 +237,10 @@ static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
     return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->type;
 }
 
-fixture_type_t fixture_type_type = {
-        "type",              // name
-        NULL,                // type (initialized at runtime)
-        &fixture_type_type,  // pair
+static fixture_type_t fixture_type_type_struct = {
+        "type",                     // name
+        NULL,                       // type (initialized at runtime)
+        &fixture_type_type_struct,  // pair
 
         new_rand_type,  // _new_rand
 
@@ -240,10 +266,10 @@ fixture_type_t fixture_type_type = {
 // There is only one NoneType object: yp_None.
 static ypObject *new_rand_NoneType(const rand_obj_supplier_memo_t *memo) { return yp_None; }
 
-fixture_type_t fixture_type_NoneType = {
-        "NoneType",              // name
-        NULL,                    // type (initialized at runtime)
-        &fixture_type_NoneType,  // pair
+static fixture_type_t fixture_type_NoneType_struct = {
+        "NoneType",                     // name
+        NULL,                           // type (initialized at runtime)
+        &fixture_type_NoneType_struct,  // pair
 
         new_rand_NoneType,  // _new_rand
 
@@ -275,10 +301,10 @@ static ypObject *new_rand_bool(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-fixture_type_t fixture_type_bool = {
-        "bool",              // name
-        NULL,                // type (initialized at runtime)
-        &fixture_type_bool,  // pair
+static fixture_type_t fixture_type_bool_struct = {
+        "bool",                     // name
+        NULL,                       // type (initialized at runtime)
+        &fixture_type_bool_struct,  // pair
 
         new_rand_bool,  // _new_rand
 
@@ -308,10 +334,10 @@ static ypObject *new_rand_int(const rand_obj_supplier_memo_t *memo)
     return result;
 }
 
-fixture_type_t fixture_type_int = {
-        "int",                   // name
-        NULL,                    // type (initialized at runtime)
-        &fixture_type_intstore,  // pair
+static fixture_type_t fixture_type_int_struct = {
+        "int",                          // name
+        NULL,                           // type (initialized at runtime)
+        &fixture_type_intstore_struct,  // pair
 
         new_rand_int,  // _new_rand
 
@@ -341,10 +367,10 @@ static ypObject *new_rand_intstore(const rand_obj_supplier_memo_t *memo)
     return result;
 }
 
-fixture_type_t fixture_type_intstore = {
-        "intstore",         // name
-        NULL,               // type (initialized at runtime)
-        &fixture_type_int,  // pair
+static fixture_type_t fixture_type_intstore_struct = {
+        "intstore",                // name
+        NULL,                      // type (initialized at runtime)
+        &fixture_type_int_struct,  // pair
 
         new_rand_intstore,  // _new_rand
 
@@ -374,10 +400,10 @@ static ypObject *new_rand_float(const rand_obj_supplier_memo_t *memo)
     return result;
 }
 
-fixture_type_t fixture_type_float = {
-        "float",                   // name
-        NULL,                      // type (initialized at runtime)
-        &fixture_type_floatstore,  // pair
+static fixture_type_t fixture_type_float_struct = {
+        "float",                          // name
+        NULL,                             // type (initialized at runtime)
+        &fixture_type_floatstore_struct,  // pair
 
         new_rand_float,  // _new_rand
 
@@ -407,10 +433,10 @@ static ypObject *new_rand_floatstore(const rand_obj_supplier_memo_t *memo)
     return result;
 }
 
-fixture_type_t fixture_type_floatstore = {
-        "floatstore",         // name
-        NULL,                 // type (initialized at runtime)
-        &fixture_type_float,  // pair
+static fixture_type_t fixture_type_floatstore_struct = {
+        "floatstore",                // name
+        NULL,                        // type (initialized at runtime)
+        &fixture_type_float_struct,  // pair
 
         new_rand_floatstore,  // _new_rand
 
@@ -455,10 +481,10 @@ static ypObject *newN_iter(int n, ...)
     return result;
 }
 
-fixture_type_t fixture_type_iter = {
-        "iter",              // name
-        NULL,                // type (initialized at runtime)
-        &fixture_type_iter,  // pair
+static fixture_type_t fixture_type_iter_struct = {
+        "iter",                     // name
+        NULL,                       // type (initialized at runtime)
+        &fixture_type_iter_struct,  // pair
 
         new_rand_iter,  // _new_rand
 
@@ -545,10 +571,10 @@ static ypObject *rand_item_range(void)
     return result;
 }
 
-fixture_type_t fixture_type_range = {
-        "range",              // name
-        NULL,                 // type (initialized at runtime)
-        &fixture_type_range,  // pair
+static fixture_type_t fixture_type_range_struct = {
+        "range",                     // name
+        NULL,                        // type (initialized at runtime)
+        &fixture_type_range_struct,  // pair
 
         new_rand_range,  // _new_rand
 
@@ -603,10 +629,10 @@ static ypObject *newN_bytes(int n, ...)
     return result;
 }
 
-fixture_type_t fixture_type_bytes = {
-        "bytes",                  // name
-        NULL,                     // type (initialized at runtime)
-        &fixture_type_bytearray,  // pair
+static fixture_type_t fixture_type_bytes_struct = {
+        "bytes",                         // name
+        NULL,                            // type (initialized at runtime)
+        &fixture_type_bytearray_struct,  // pair
 
         new_rand_bytes,  // _new_rand
 
@@ -661,10 +687,10 @@ static ypObject *newN_bytearray(int n, ...)
     return result;
 }
 
-fixture_type_t fixture_type_bytearray = {
-        "bytearray",          // name
-        NULL,                 // type (initialized at runtime)
-        &fixture_type_bytes,  // pair
+static fixture_type_t fixture_type_bytearray_struct = {
+        "bytearray",                 // name
+        NULL,                        // type (initialized at runtime)
+        &fixture_type_bytes_struct,  // pair
 
         new_rand_bytearray,  // _new_rand
 
@@ -723,10 +749,10 @@ static ypObject *newN_str(int n, ...)
     return result;
 }
 
-fixture_type_t fixture_type_str = {
-        "str",                   // name
-        NULL,                    // type (initialized at runtime)
-        &fixture_type_chrarray,  // pair
+static fixture_type_t fixture_type_str_struct = {
+        "str",                          // name
+        NULL,                           // type (initialized at runtime)
+        &fixture_type_chrarray_struct,  // pair
 
         new_rand_str,  // _new_rand
 
@@ -785,10 +811,10 @@ static ypObject *newN_chrarray(int n, ...)
     return result;
 }
 
-fixture_type_t fixture_type_chrarray = {
-        "chrarray",         // name
-        NULL,               // type (initialized at runtime)
-        &fixture_type_str,  // pair
+static fixture_type_t fixture_type_chrarray_struct = {
+        "chrarray",                // name
+        NULL,                      // type (initialized at runtime)
+        &fixture_type_str_struct,  // pair
 
         new_rand_chrarray,  // _new_rand
 
@@ -825,10 +851,10 @@ static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-fixture_type_t fixture_type_tuple = {
-        "tuple",             // name
-        NULL,                // type (initialized at runtime)
-        &fixture_type_list,  // pair
+static fixture_type_t fixture_type_tuple_struct = {
+        "tuple",                    // name
+        NULL,                       // type (initialized at runtime)
+        &fixture_type_list_struct,  // pair
 
         new_rand_tuple,  // _new_rand
 
@@ -865,10 +891,10 @@ static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-fixture_type_t fixture_type_list = {
-        "list",               // name
-        NULL,                 // type (initialized at runtime)
-        &fixture_type_tuple,  // pair
+static fixture_type_t fixture_type_list_struct = {
+        "list",                      // name
+        NULL,                        // type (initialized at runtime)
+        &fixture_type_tuple_struct,  // pair
 
         new_rand_list,  // _new_rand
 
@@ -906,10 +932,10 @@ static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-fixture_type_t fixture_type_frozenset = {
-        "frozenset",        // name
-        NULL,               // type (initialized at runtime)
-        &fixture_type_set,  // pair
+static fixture_type_t fixture_type_frozenset_struct = {
+        "frozenset",               // name
+        NULL,                      // type (initialized at runtime)
+        &fixture_type_set_struct,  // pair
 
         new_rand_frozenset,  // _new_rand
 
@@ -947,10 +973,10 @@ static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-fixture_type_t fixture_type_set = {
-        "set",                    // name
-        NULL,                     // type (initialized at runtime)
-        &fixture_type_frozenset,  // pair
+static fixture_type_t fixture_type_set_struct = {
+        "set",                           // name
+        NULL,                            // type (initialized at runtime)
+        &fixture_type_frozenset_struct,  // pair
 
         new_rand_set,  // _new_rand
 
@@ -988,10 +1014,10 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-fixture_type_t fixture_type_frozendict = {
-        "frozendict",        // name
-        NULL,                // type (initialized at runtime)
-        &fixture_type_dict,  // pair
+static fixture_type_t fixture_type_frozendict_struct = {
+        "frozendict",               // name
+        NULL,                       // type (initialized at runtime)
+        &fixture_type_dict_struct,  // pair
 
         new_rand_frozendict,  // _new_rand
 
@@ -1029,10 +1055,10 @@ static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
     }
 }
 
-fixture_type_t fixture_type_dict = {
-        "dict",                    // name
-        NULL,                      // type (initialized at runtime)
-        &fixture_type_frozendict,  // pair
+static fixture_type_t fixture_type_dict_struct = {
+        "dict",                           // name
+        NULL,                             // type (initialized at runtime)
+        &fixture_type_frozendict_struct,  // pair
 
         new_rand_dict,  // _new_rand
 
@@ -1070,10 +1096,10 @@ static ypObject *new_rand_function(const rand_obj_supplier_memo_t *memo)
     return result;
 }
 
-fixture_type_t fixture_type_function = {
-        "function",              // name
-        NULL,                    // type (initialized at runtime)
-        &fixture_type_function,  // pair
+static fixture_type_t fixture_type_function_struct = {
+        "function",                     // name
+        NULL,                           // type (initialized at runtime)
+        &fixture_type_function_struct,  // pair
 
         new_rand_function,  // _new_rand
 
@@ -1096,12 +1122,35 @@ fixture_type_t fixture_type_function = {
         FALSE,  // is_patterned
 };
 
-fixture_type_t *fixture_types_all[] = {&fixture_type_type, &fixture_type_NoneType,
-        &fixture_type_bool, &fixture_type_int, &fixture_type_intstore, &fixture_type_float,
-        &fixture_type_floatstore, &fixture_type_iter, &fixture_type_range, &fixture_type_bytes,
-        &fixture_type_bytearray, &fixture_type_str, &fixture_type_chrarray, &fixture_type_tuple,
-        &fixture_type_list, &fixture_type_frozenset, &fixture_type_set, &fixture_type_frozendict,
-        &fixture_type_dict, &fixture_type_function, NULL};
+fixture_type_t *fixture_type_type = &fixture_type_type_struct;
+fixture_type_t *fixture_type_NoneType = &fixture_type_NoneType_struct;
+fixture_type_t *fixture_type_bool = &fixture_type_bool_struct;
+fixture_type_t *fixture_type_int = &fixture_type_int_struct;
+fixture_type_t *fixture_type_intstore = &fixture_type_intstore_struct;
+fixture_type_t *fixture_type_float = &fixture_type_float_struct;
+fixture_type_t *fixture_type_floatstore = &fixture_type_floatstore_struct;
+fixture_type_t *fixture_type_iter = &fixture_type_iter_struct;
+fixture_type_t *fixture_type_range = &fixture_type_range_struct;
+fixture_type_t *fixture_type_bytes = &fixture_type_bytes_struct;
+fixture_type_t *fixture_type_bytearray = &fixture_type_bytearray_struct;
+fixture_type_t *fixture_type_str = &fixture_type_str_struct;
+fixture_type_t *fixture_type_chrarray = &fixture_type_chrarray_struct;
+fixture_type_t *fixture_type_tuple = &fixture_type_tuple_struct;
+fixture_type_t *fixture_type_list = &fixture_type_list_struct;
+fixture_type_t *fixture_type_frozenset = &fixture_type_frozenset_struct;
+fixture_type_t *fixture_type_set = &fixture_type_set_struct;
+fixture_type_t *fixture_type_frozendict = &fixture_type_frozendict_struct;
+fixture_type_t *fixture_type_dict = &fixture_type_dict_struct;
+fixture_type_t *fixture_type_function = &fixture_type_function_struct;
+
+fixture_type_t *fixture_types_all[] = {&fixture_type_type_struct, &fixture_type_NoneType_struct,
+        &fixture_type_bool_struct, &fixture_type_int_struct, &fixture_type_intstore_struct,
+        &fixture_type_float_struct, &fixture_type_floatstore_struct, &fixture_type_iter_struct,
+        &fixture_type_range_struct, &fixture_type_bytes_struct, &fixture_type_bytearray_struct,
+        &fixture_type_str_struct, &fixture_type_chrarray_struct, &fixture_type_tuple_struct,
+        &fixture_type_list_struct, &fixture_type_frozenset_struct, &fixture_type_set_struct,
+        &fixture_type_frozendict_struct, &fixture_type_dict_struct, &fixture_type_function_struct,
+        NULL};
 
 STATIC_ASSERT(yp_lengthof_array(fixture_types_all) == FIXTURE_TYPES_ALL_LEN + 1,
         lengthof_fixture_types_all);
@@ -1147,26 +1196,26 @@ static void fill_type_arrays(fixture_type_t **fixture_array, char **param_array,
 static void initialize_fixture_types(void)
 {
     // These need to be initialized at runtime because they may be imported from a DLL.
-    fixture_type_type.type = yp_t_type;
-    fixture_type_NoneType.type = yp_t_NoneType;
-    fixture_type_bool.type = yp_t_bool;
-    fixture_type_int.type = yp_t_int;
-    fixture_type_intstore.type = yp_t_intstore;
-    fixture_type_float.type = yp_t_float;
-    fixture_type_floatstore.type = yp_t_floatstore;
-    fixture_type_iter.type = yp_t_iter;
-    fixture_type_range.type = yp_t_range;
-    fixture_type_bytes.type = yp_t_bytes;
-    fixture_type_bytearray.type = yp_t_bytearray;
-    fixture_type_str.type = yp_t_str;
-    fixture_type_chrarray.type = yp_t_chrarray;
-    fixture_type_tuple.type = yp_t_tuple;
-    fixture_type_list.type = yp_t_list;
-    fixture_type_frozenset.type = yp_t_frozenset;
-    fixture_type_set.type = yp_t_set;
-    fixture_type_frozendict.type = yp_t_frozendict;
-    fixture_type_dict.type = yp_t_dict;
-    fixture_type_function.type = yp_t_function;
+    fixture_type_type->type = yp_t_type;
+    fixture_type_NoneType->type = yp_t_NoneType;
+    fixture_type_bool->type = yp_t_bool;
+    fixture_type_int->type = yp_t_int;
+    fixture_type_intstore->type = yp_t_intstore;
+    fixture_type_float->type = yp_t_float;
+    fixture_type_floatstore->type = yp_t_floatstore;
+    fixture_type_iter->type = yp_t_iter;
+    fixture_type_range->type = yp_t_range;
+    fixture_type_bytes->type = yp_t_bytes;
+    fixture_type_bytearray->type = yp_t_bytearray;
+    fixture_type_str->type = yp_t_str;
+    fixture_type_chrarray->type = yp_t_chrarray;
+    fixture_type_tuple->type = yp_t_tuple;
+    fixture_type_list->type = yp_t_list;
+    fixture_type_frozenset->type = yp_t_frozenset;
+    fixture_type_set->type = yp_t_set;
+    fixture_type_frozendict->type = yp_t_frozendict;
+    fixture_type_dict->type = yp_t_dict;
+    fixture_type_function->type = yp_t_function;
 
     {
         fixture_type_t **types;

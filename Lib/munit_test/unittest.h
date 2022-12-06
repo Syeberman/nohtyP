@@ -362,26 +362,26 @@ typedef struct _fixture_type_t {
     int is_patterned;  // i.e. range doesn't store values, it stores a pattern
 } fixture_type_t;
 
-extern fixture_type_t fixture_type_type;
-extern fixture_type_t fixture_type_NoneType;
-extern fixture_type_t fixture_type_bool;
-extern fixture_type_t fixture_type_int;
-extern fixture_type_t fixture_type_intstore;
-extern fixture_type_t fixture_type_float;
-extern fixture_type_t fixture_type_floatstore;
-extern fixture_type_t fixture_type_iter;
-extern fixture_type_t fixture_type_range;
-extern fixture_type_t fixture_type_bytes;
-extern fixture_type_t fixture_type_bytearray;
-extern fixture_type_t fixture_type_str;
-extern fixture_type_t fixture_type_chrarray;
-extern fixture_type_t fixture_type_tuple;
-extern fixture_type_t fixture_type_list;
-extern fixture_type_t fixture_type_frozenset;
-extern fixture_type_t fixture_type_set;
-extern fixture_type_t fixture_type_frozendict;
-extern fixture_type_t fixture_type_dict;
-extern fixture_type_t fixture_type_function;
+extern fixture_type_t *fixture_type_type;
+extern fixture_type_t *fixture_type_NoneType;
+extern fixture_type_t *fixture_type_bool;
+extern fixture_type_t *fixture_type_int;
+extern fixture_type_t *fixture_type_intstore;
+extern fixture_type_t *fixture_type_float;
+extern fixture_type_t *fixture_type_floatstore;
+extern fixture_type_t *fixture_type_iter;
+extern fixture_type_t *fixture_type_range;
+extern fixture_type_t *fixture_type_bytes;
+extern fixture_type_t *fixture_type_bytearray;
+extern fixture_type_t *fixture_type_str;
+extern fixture_type_t *fixture_type_chrarray;
+extern fixture_type_t *fixture_type_tuple;
+extern fixture_type_t *fixture_type_list;
+extern fixture_type_t *fixture_type_frozenset;
+extern fixture_type_t *fixture_type_set;
+extern fixture_type_t *fixture_type_frozendict;
+extern fixture_type_t *fixture_type_dict;
+extern fixture_type_t *fixture_type_function;
 
 typedef struct _fixture_t {
     fixture_type_t *type;  // The primary type under test.
