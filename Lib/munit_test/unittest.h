@@ -337,8 +337,9 @@ typedef struct _fixture_type_t {
 
     rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
 
-    // Functions for non-mapping, non-range iterables, where rand_item returns an object accepted
-    // by newN, yielded by the associated iterator, and returned by yp_getitem (if supported).
+    // Functions for non-mapping iterables, where rand_item returns an object that can be yielded by
+    // the associated iterator, accepted by newN (if supported), and returned by yp_getitem (if
+    // supported).
     objvarargfunc newN;       // Creates a iterable for the given items (i.e. yp_tupleN).
     objvoidfunc   rand_item;  // Creates a random object to store in the iterable.
 
@@ -358,12 +359,7 @@ typedef struct _fixture_type_t {
     int is_set;
     int is_mapping;
     int is_callable;
-    // FIXME Is there a better word? The Python docs just say "Ranges implement all of the common
-    // sequence operations except concatenation and repetition".
-    // FIXME "is_insertion_ordered" is nice because when dict/set are made ordered, this applies.
-    // FIXME Maybe this is simply "has_rand_item", as in it can store any number of values that
-    // returns.
-    int is_insertion_ordered;  // i.e. range doesn't support concat, repeat, newN, etc
+    int has_newN;  // i.e. range is an iterable that doesn't support newN
 } fixture_type_t;
 
 extern fixture_type_t fixture_type_type;

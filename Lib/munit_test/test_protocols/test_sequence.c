@@ -8,8 +8,8 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     obj_array_init(items, 4, type->rand_item());
 
     // Not all sequences support concatenation. For example, range only stores integers following a
-    // given pattern. "Insertion ordered" is the closest I've come to describing the difference.
-    if (!type->is_insertion_ordered) {
+    // given pattern: this is also why newN isn't supported.
+    if (!type->has_newN) {
         ypObject *obj = rand_obj(type);
         ypObject *result = yp_concat(obj, obj);
         assert_isexception2(result, yp_MethodError);
