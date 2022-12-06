@@ -7582,6 +7582,63 @@ static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
     return yp_None;
 }
 
+// Concatenates s with the items yielded from iterable, returning the new string.
+static ypObject *ypStringLib_concat_fromiterable(ypObject *s, ypObject *iterable)
+{
+    ypObject *newS;
+    ypObject *result;
+
+    yp_ASSERT(!ypStringLib_TYPE_CHECK(iterable),
+            "fellow string passed to ypStringLib_concat_fromiterable");
+
+    // TODO Allocate newS a little larger to consider lengthhint?
+    newS = ypStringLib_new_copy(ypObject_TYPE_CODE(s), s, /*alloclen_fixed=*/FALSE);  // new ref
+    if (yp_isexceptionC(newS)) return newS;
+
+    result = ypStringLib_extend_fromiterable(newS, iterable);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newS);
+        return result;
+    }
+    return newS;
+}
+
+// Concatenates s and x, a fellow string object, retuning the new string. s and x can be the same
+// object.
+static ypObject *ypStringLib_concat_fromstring(ypObject *s, ypObject *x)
+{
+    yp_ssize_t                 newS_len;
+    int                        newS_enc_code;
+    const ypStringLib_encinfo *newS_enc;
+    ypObject                  *newS;
+
+    yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypObject_TYPE_PAIR_CODE(x),
+            "missed a yp_TypeError check");
+
+    // Optimize the case where s or x are empty
+    if (ypStringLib_LEN(x) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), s);
+    if (ypStringLib_LEN(s) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), x);
+
+    if (ypStringLib_LEN(s) > ypStringLib_LEN_MAX - ypStringLib_LEN(x)) {
+        return yp_MemorySizeOverflowError;
+    }
+    newS_len = ypStringLib_LEN(s) + ypStringLib_LEN(x);
+    // TODO Some places take the max code, some places look explicitly at elemsize. Be consistent!
+    newS_enc_code = MAX(ypStringLib_ENC_CODE(s), ypStringLib_ENC_CODE(x));
+    newS_enc = &(ypStringLib_encs[newS_enc_code]);
+    newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newS_len, /*alloclen_fixed=*/TRUE, newS_enc);
+    if (yp_isexceptionC(newS)) return newS;
+
+    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStringLib_DATA(newS), 0,
+            ypStringLib_ENC(s)->sizeshift, ypStringLib_DATA(s), 0, ypStringLib_LEN(s));
+    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStringLib_DATA(newS),
+            ypStringLib_LEN(s), ypStringLib_ENC(x)->sizeshift, ypStringLib_DATA(x), 0,
+            ypStringLib_LEN(x) + 1);  // incl null
+    ypStringLib_SET_LEN(newS, newS_len);
+    ypStringLib_ASSERT_INVARIANTS(newS);
+    return newS;
+}
+
 static ypObject *ypStringLib_clear(ypObject *s)
 {
     const ypStringLib_encinfo *newEnc = ypObject_TYPE_PAIR_CODE(s) == ypBytes_CODE ?
@@ -9770,27 +9827,17 @@ static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize
     return ypStringLib_find(b, x_data, x_len, start, stop, direction, i);
 }
 
-static ypObject *bytes_concat(ypObject *b, ypObject *x)
+static ypObject *bytes_concat(ypObject *b, ypObject *iterable)
 {
-    yp_ssize_t newLen;
-    ypObject  *newB;
+    int iterable_pair = ypObject_TYPE_PAIR_CODE(iterable);
 
-    // Check the type, and optimize the case where b or x are empty
-    if (ypObject_TYPE_PAIR_CODE(x) != ypBytes_CODE) return_yp_BAD_TYPE(x);
-    if (ypBytes_LEN(x) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(b), b);
-    if (ypBytes_LEN(b) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(b), x);
-
-    if (ypBytes_LEN(b) > ypBytes_LEN_MAX - ypBytes_LEN(x)) return yp_MemorySizeOverflowError;
-    newLen = ypBytes_LEN(b) + ypBytes_LEN(x);
-    newB = _ypBytes_new(ypObject_TYPE_CODE(b), newLen, /*alloclen_fixed=*/TRUE);
-    if (yp_isexceptionC(newB)) return newB;
-
-    yp_memcpy(ypBytes_DATA(newB), ypBytes_DATA(b), ypBytes_LEN(b));
-    yp_memcpy(ypBytes_DATA(newB) + ypBytes_LEN(b), ypBytes_DATA(x), ypBytes_LEN(x));
-    ypBytes_DATA(newB)[newLen] = '\0';
-    ypBytes_SET_LEN(newB, newLen);
-    ypBytes_ASSERT_INVARIANTS(newB);
-    return newB;
+    if (iterable_pair == ypBytes_CODE) {
+        return ypStringLib_concat_fromstring(b, iterable);
+    } else if (iterable_pair == ypStr_CODE) {
+        return yp_TypeError;
+    } else {
+        return ypStringLib_concat_fromiterable(b, iterable);
+    }
 }
 
 // TODO Do we want a special-case for yp_intC that goes direct to the prealloc array?
@@ -10739,33 +10786,17 @@ static ypObject *str_frozen_deepcopy(ypObject *s, visitfunc copy_visitor, void *
 
 static ypObject *str_bool(ypObject *s) { return ypBool_FROM_C(ypStr_LEN(s)); }
 
-static ypObject *str_concat(ypObject *s, ypObject *x)
+static ypObject *str_concat(ypObject *s, ypObject *iterable)
 {
-    yp_ssize_t                 newS_len;
-    int                        newS_enc_code;
-    const ypStringLib_encinfo *newS_enc;
-    ypObject                  *newS;
+    int iterable_pair = ypObject_TYPE_PAIR_CODE(iterable);
 
-    // Check the type, and optimize the case where s or x are empty
-    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
-    if (ypStr_LEN(x) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), s);
-    if (ypStr_LEN(s) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), x);
-
-    if (ypStr_LEN(s) > ypStr_LEN_MAX - ypStr_LEN(x)) return yp_MemorySizeOverflowError;
-    newS_len = ypStr_LEN(s) + ypStr_LEN(x);
-    newS_enc_code = MAX(ypStr_ENC_CODE(s), ypStr_ENC_CODE(x));
-    newS_enc = &(ypStringLib_encs[newS_enc_code]);
-    newS = _ypStr_new(ypObject_TYPE_CODE(s), newS_len, /*alloclen_fixed=*/TRUE, newS_enc);
-    if (yp_isexceptionC(newS)) return newS;
-
-    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStr_DATA(newS), 0,
-            ypStr_ENC(s)->sizeshift, ypStr_DATA(s), 0, ypStr_LEN(s));
-    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStr_DATA(newS), ypStr_LEN(s),
-            ypStr_ENC(x)->sizeshift, ypStr_DATA(x), 0,
-            ypStr_LEN(x) + 1);  // incl null
-    ypStr_SET_LEN(newS, newS_len);
-    ypStr_ASSERT_INVARIANTS(newS);
-    return newS;
+    if (iterable_pair == ypStr_CODE) {
+        return ypStringLib_concat_fromstring(s, iterable);
+    } else if (iterable_pair == ypBytes_CODE) {
+        return yp_TypeError;
+    } else {
+        return ypStringLib_concat_fromiterable(s, iterable);
+    }
 }
 
 static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
