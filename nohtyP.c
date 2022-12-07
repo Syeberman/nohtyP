@@ -3514,7 +3514,8 @@ static ypObject *_yp_deepcopy_visitor(ypObject *x, visitfunc visitor, void *_mem
     yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;
     ypObject           *result;
 
-    yp_DEBUG("deepcopy: %p type %d depth %" PRIssize, x, ypObject_TYPE_CODE(x), memo->recursion_depth);
+    yp_DEBUG("deepcopy: %p type %d depth %" PRIssize, x, ypObject_TYPE_CODE(x),
+            memo->recursion_depth);
 
     // Be efficient: reuse existing copies of objects. Also helps avoid recursion!
     result = _yp_deepcopy_memo_getitem(memo, x);
@@ -17877,6 +17878,8 @@ static ypObject *range_getslice(ypObject *r, yp_ssize_t start, yp_ssize_t stop, 
     if (yp_isexceptionC(result)) return result;
 
     if (newR_len < 1) return yp_range_empty;
+    if (newR_len >= ypRange_LEN(r) && step == 1) return yp_incref(r);
+
     newR = ypMem_MALLOC_FIXED(ypRangeObject, ypRange_CODE);
     if (yp_isexceptionC(newR)) return newR;
     ypRange_START(newR) = ypRange_GET_INDEX(r, start);
@@ -17998,7 +18001,6 @@ static ypObject *range_dealloc(ypObject *r, void *memo)
 
 static ypObject *range_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    // FIXME Bust this out to a `yp_range`, `yp_range3` that takes objects directly?
     ypObject *exc = yp_None;
     yp_int_t  start;
     yp_int_t  stop;
@@ -18152,6 +18154,7 @@ ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step)
     // TODO We could store len in our own _yp_uint_t field, to allow for larger ranges, but a lot
     // of other code would also have to change
     if (ulen > ((_yp_uint_t)ypObject_LEN_MAX)) return yp_SystemLimitationError;
+    if (ulen < 1) return yp_range_empty;
     if (ulen < 2) step = 1;  // makes comparisons easier
 
     newR = ypMem_MALLOC_FIXED(ypRangeObject, ypRange_CODE);
