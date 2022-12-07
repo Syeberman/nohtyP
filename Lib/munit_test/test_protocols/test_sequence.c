@@ -13,10 +13,10 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
 
     // range stores integers following a pattern, so doesn't support concat.
     if (type->is_patterned) {
-        ypObject *obj = rand_obj(type);
-        ypObject *result = yp_concat(obj, obj);
+        ypObject *self = rand_obj(type);
+        ypObject *result = yp_concat(self, self);
         assert_isexception2(result, yp_MethodError);
-        yp_decrefN(2, obj, result);
+        yp_decrefN(2, self, result);
         goto tear_down;  // Skip the remaining tests.
     }
 
@@ -92,8 +92,84 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_repeat(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    obj_array_init(items, 2, type->rand_item());
+
+    // range stores integers following a pattern, so doesn't support repeat.
+    if (type->is_patterned) {
+        ypObject *self = rand_obj(type);
+        ypObject *result = yp_repeatC(self, 2);
+        assert_isexception2(result, yp_MethodError);
+        yp_decrefN(2, self, result);
+        goto tear_down;  // Skip the remaining tests.
+    }
+
+    // Basic repeat.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *result = yp_repeatC(self, 2);
+        assert_type_is(result, type->type);
+        assert_sequence(result, 4, items[0], items[1], items[0], items[1]);
+        yp_decrefN(2, self, result);
+    }
+
+    // Factor of one.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *result = yp_repeatC(self, 1);
+        assert_type_is(result, type->type);
+        assert_sequence(result, 2, items[0], items[1]);
+        yp_decrefN(2, self, result);
+    }
+
+    // Factor of zero.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *result = yp_repeatC(self, 0);
+        assert_type_is(result, type->type);
+        assert_len(result, 0);
+        yp_decrefN(2, self, result);
+    }
+
+    // Empty self.
+    {
+        ypObject *self = type->newN(0);
+        ypObject *result = yp_repeatC(self, 2);
+        assert_type_is(result, type->type);
+        assert_len(result, 0);
+        yp_decrefN(2, self, result);
+    }
+
+    // Optimization: lazy shallow copy of an immutable self when factor is one.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *result = yp_repeatC(self, 1);
+        if (type->is_mutable) {
+            assert_obj(self, is_not, result);
+        } else {
+            assert_obj(self, is, result);
+        }
+        yp_decrefN(2, self, result);
+    }
+
+    // Optimization: empty immortal when immutable self is empty.
+    if (type->falsy != NULL) {
+        ypObject *self = type->newN(0);
+        ypObject *result = yp_repeatC(self, 2);
+        assert_obj(result, is, type->falsy);
+        yp_decrefN(2, self, result);
+    }
+
+tear_down:
+    obj_array_fini(items);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
 
-MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params), {NULL}};
+MunitTest test_sequence_tests[] = {
+        TEST(test_concat, test_sequence_params), TEST(test_repeat, test_sequence_params), {NULL}};
