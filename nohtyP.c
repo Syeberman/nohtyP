@@ -6376,7 +6376,7 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 // also calculates the length of the slice. Returns yp_ValueError if *step is zero, else yp_None;
 // there are no out-of-bounds errors with slices.
 // XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
-// yp_SLICE_USELEN is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
+// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
 // as any value that's greater than length.
 // XXX Adapted from PySlice_GetIndicesEx
 static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
@@ -9963,7 +9963,7 @@ static ypObject *bytes_contains(ypObject *b, ypObject *x)
     ypObject  *result;
     yp_ssize_t i = -1;
 
-    result = bytes_find(b, x, 0, yp_SLICE_USELEN, yp_FIND_FORWARD, &i);
+    result = bytes_find(b, x, 0, yp_SLICE_LAST, yp_FIND_FORWARD, &i);
     if (yp_isexceptionC(result)) return result;
     return ypBool_FROM_C(i >= 0);
 }
@@ -11012,7 +11012,7 @@ static ypObject *str_contains(ypObject *s, ypObject *x)
     ypObject  *result;
     yp_ssize_t i = -1;
 
-    result = str_find(s, x, 0, yp_SLICE_USELEN, yp_FIND_FORWARD, &i);
+    result = str_find(s, x, 0, yp_SLICE_LAST, yp_FIND_FORWARD, &i);
     if (yp_isexceptionC(result)) return result;
     return ypBool_FROM_C(i >= 0);
 }
@@ -11783,7 +11783,7 @@ ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ss
 
 ypObject *yp_startswith(ypObject *s, ypObject *prefix)
 {
-    return yp_startswithC4(s, prefix, 0, yp_SLICE_USELEN);
+    return yp_startswithC4(s, prefix, 0, yp_SLICE_LAST);
 }
 
 ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end)
@@ -11793,7 +11793,7 @@ ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssiz
 
 ypObject *yp_endswith(ypObject *s, ypObject *suffix)
 {
-    return yp_endswithC4(s, suffix, 0, yp_SLICE_USELEN);
+    return yp_endswithC4(s, suffix, 0, yp_SLICE_LAST);
 }
 
 ypObject *yp_lower(ypObject *s) { _ypStringLib_REDIRECT1(s, lower, (s)); }
@@ -18361,7 +18361,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             must_have_default = FALSE;
             if (param_kind == yp_s_star_args) {
                 has_var_positional = TRUE;
-                // param_name = string_getslice(param.name, 1, yp_SLICE_USELEN, 1);
+                // param_name = string_getslice(param.name, 1, yp_SLICE_LAST, 1);
             }
         } else if (param_kind == yp_s_star_star_kwargs) {
             if (i != params_len - 1) {
@@ -18372,7 +18372,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
                 return yp_ParameterSyntaxError;
             }
             has_var_keyword = TRUE;
-            // param_name = string_getslice(param.name, 2, yp_SLICE_USELEN, 1);
+            // param_name = string_getslice(param.name, 2, yp_SLICE_LAST, 1);
         } else if (param_kind == yp_None) {
             if (must_have_default) {
                 if (param.default_ == NULL) {
@@ -19370,7 +19370,7 @@ yp_ssize_t yp_findC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j
 
 yp_ssize_t yp_findC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_findC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_findC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 yp_ssize_t yp_indexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
@@ -19384,7 +19384,7 @@ yp_ssize_t yp_indexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_indexC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_indexC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_indexC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 yp_ssize_t yp_rfindC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
@@ -19399,7 +19399,7 @@ yp_ssize_t yp_rfindC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_rfindC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_rfindC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_rfindC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 yp_ssize_t yp_rindexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
@@ -19413,7 +19413,7 @@ yp_ssize_t yp_rindexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t
 
 yp_ssize_t yp_rindexC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_rindexC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_rindexC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 yp_ssize_t yp_countC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
@@ -19427,7 +19427,7 @@ yp_ssize_t yp_countC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_countC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_countC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 void yp_setindexC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc)

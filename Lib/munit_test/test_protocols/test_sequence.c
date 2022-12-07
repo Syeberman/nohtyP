@@ -303,18 +303,26 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(5, self, i_pos_step, j_pos_step, i_neg_step, j_neg_step);
     }
 
-    // yp_SLICE_USELEN.
+    // yp_SLICE_LAST.
     {
         ypObject *self = type->newN(2, items[0], items[1]);
-        ypObject *i_pos_step = yp_getsliceC4(self, yp_SLICE_USELEN, 2, 1);
-        ypObject *j_pos_step = yp_getsliceC4(self, 0, yp_SLICE_USELEN, 1);
-        ypObject *i_neg_step = yp_getsliceC4(self, yp_SLICE_USELEN, -3, -1);
-        ypObject *j_neg_step = yp_getsliceC4(self, 1, yp_SLICE_USELEN, -1);
+        ypObject *i_pos_step = yp_getsliceC4(self, yp_SLICE_LAST, 2, 1);
+        ypObject *j_pos_step = yp_getsliceC4(self, 0, yp_SLICE_LAST, 1);
+        ypObject *i_neg_step = yp_getsliceC4(self, yp_SLICE_LAST, -3, -1);
+        ypObject *j_neg_step = yp_getsliceC4(self, 1, yp_SLICE_LAST, -1);
         assert_len(i_pos_step, 0);
         assert_sequence(j_pos_step, 2, items[0], items[1]);
         assert_sequence(i_neg_step, 2, items[1], items[0]);
         assert_len(j_neg_step, 0);
         yp_decrefN(5, self, i_pos_step, j_pos_step, i_neg_step, j_neg_step);
+    }
+
+    // FIXME Bug reproduction.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *slice = yp_getsliceC4(self, yp_SLICE_LAST, -1, -1);
+        assert_sequence(slice, 2, items[1], items[0]);
+        yp_decrefN(5, self, slice);
     }
 
     // TODO Larger sequence, larger slice

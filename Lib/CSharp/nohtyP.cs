@@ -788,7 +788,7 @@ namespace nohtyP
         internal static extern void yp_sort( ref ypObject_p sequence );
 
         //internal static const yp_ssize_t yp_SLICE_DEFAULT = yp_ssize_t.MinValue;
-        //internal static const yp_ssize_t yp_SLICE_USELEN = yp_ssize_t.MaxValue;
+        //internal static const yp_ssize_t yp_SLICE_LAST = yp_ssize_t.MaxValue;
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_isdisjoint( ypObject_p set, ypObject_p x );

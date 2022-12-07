@@ -618,7 +618,7 @@ ypAPI ypObject *yp_pop(ypObject *container);
 // slice of s from i to j with step k is the sequence of items with indices i, i+k, i+2*k, i+3*k and
 // so on, stopping when j is reached (but never including j); k cannot be zero. A single index
 // outside of range(-len(s),len(s)) raises a yp_IndexError, but in a slice such an index gets
-// clamped to the bounds of the sequence. See yp_SLICE_DEFAULT and yp_SLICE_USELEN below for more
+// clamped to the bounds of the sequence. See yp_SLICE_DEFAULT and yp_SLICE_LAST below for more
 // information.
 
 // Returns a new reference to the concatenation of sequence and x.
@@ -644,7 +644,7 @@ ypAPI ypObject *yp_getitem(ypObject *sequence, ypObject *key);
 ypAPI yp_ssize_t yp_findC5(
         ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc);
 
-// Equivalent to yp_findC5(sequence, x, 0, yp_SLICE_USELEN, exc).
+// Equivalent to yp_findC5(sequence, x, 0, yp_SLICE_LAST, exc).
 ypAPI yp_ssize_t yp_findC(ypObject *sequence, ypObject *x, ypObject **exc);
 
 // Similar to yp_findC5 and yp_findC, except raises yp_ValueError if x is not found.
@@ -667,7 +667,7 @@ ypAPI yp_ssize_t yp_rindexC(ypObject *sequence, ypObject *x, ypObject **exc);
 ypAPI yp_ssize_t yp_countC5(
         ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc);
 
-// Equivalent to yp_countC5(sequence, x, 0, yp_SLICE_USELEN, exc).
+// Equivalent to yp_countC5(sequence, x, 0, yp_SLICE_LAST, exc).
 ypAPI yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc);
 
 // Sets the i-th item of sequence to x. Sets *exc on error.
@@ -742,12 +742,14 @@ ypAPI void yp_sort(ypObject *sequence, ypObject **exc);
 //  Ex: The nohtyP equivalent of "[::a]" is "yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, a"
 #define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
 
-// When given to a slice-like start/stop C argument, signals that len(s) should be substituted for
-// the argument. In other words, it signals that the slice should start/stop at the end of the
-// sequence.
+// When given to a slice-like start/stop C argument, signals that the slice should start/stop with
+// the last item of the sequence. Specifically:
 //
-//  Ex: The nohtyP equivalent of "[:]" is "0, yp_SLICE_USELEN, 1"
-#define yp_SLICE_USELEN yp_SSIZE_T_MAX
+// - positive step: len(s) substituted for start/stop
+// - negative step: len(s)-1 substituted for start/stop
+//
+//  Ex: The nohtyP equivalent of "[:]" is "0, yp_SLICE_LAST, 1"
+#define yp_SLICE_LAST yp_SSIZE_T_MAX
 
 // When an index in a slice is outside of range(-len(s),len(s)), it gets clamped to the bounds of
 // the sequence. Specifically, for the slice [i:j:k]:
@@ -1018,7 +1020,7 @@ ypAPI ypObject *yp_isupper(ypObject *s);
 // Returns the immortal yp_True if s[start:end] starts with the specified prefix, otherwise
 // yp_False. prefix can also be a tuple of prefix strings for which to look. If a prefix string is
 // empty, returns yp_True. yp_startswith considers the entire string (as if start is 0 and end is
-// yp_SLICE_USELEN).
+// yp_SLICE_LAST).
 ypAPI ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ssize_t end);
 ypAPI ypObject *yp_startswith(ypObject *s, ypObject *prefix);
 

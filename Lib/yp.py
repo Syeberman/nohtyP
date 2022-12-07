@@ -486,8 +486,8 @@ yp_func(
 
 # define yp_SLICE_DEFAULT yp_SSIZE_T_MIN
 _yp_SLICE_DEFAULT = _yp_SSIZE_T_MIN
-# define yp_SLICE_USELEN  yp_SSIZE_T_MAX
-_yp_SLICE_USELEN = _yp_SSIZE_T_MAX
+# define yp_SLICE_LAST  yp_SSIZE_T_MAX
+_yp_SLICE_LAST = _yp_SSIZE_T_MAX
 
 # ypObject *yp_isdisjoint(ypObject *set, ypObject *x);
 yp_func(c_ypObject_p, "yp_isdisjoint", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
@@ -981,7 +981,7 @@ class ypObject(c_ypObject_p):
         if i is None:
             i = 0
         if j is None:
-            j = _yp_SLICE_USELEN
+            j = _yp_SLICE_LAST
         return func4(self, x, i, j, *extra)
 
     def find(self, x, i=None, j=None):
