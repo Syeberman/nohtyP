@@ -2,6 +2,13 @@
 #include "munit_test/unittest.h"
 
 
+typedef struct _slice_args_t {
+    yp_ssize_t i;
+    yp_ssize_t j;
+    yp_ssize_t k;
+} slice_args_t;
+
+
 static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -92,7 +99,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-static MunitResult test_repeat(const MunitParameter params[], fixture_t *fixture)
+static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
     obj_array_init(items, 2, type->rand_item());
@@ -167,9 +174,135 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    obj_array_init(items, 2, type->rand_item());
+
+    // Basic index.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *zero = yp_getindexC(self, 0);
+        ypObject *one = yp_getindexC(self, 1);
+        assert_obj(zero, eq, items[0]);
+        assert_obj(one, eq, items[1]);
+        yp_decrefN(3, self, zero, one);
+    }
+
+    // Negative index.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *neg_one = yp_getindexC(self, -1);
+        ypObject *neg_two = yp_getindexC(self, -2);
+        assert_obj(neg_one, eq, items[1]);
+        assert_obj(neg_two, eq, items[0]);
+        yp_decrefN(3, self, neg_one, neg_two);
+    }
+
+    // Out of bounds.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *two = yp_getindexC(self, 2);
+        ypObject *neg_three = yp_getindexC(self, -3);
+        assert_isexception2(two, yp_IndexError);
+        assert_isexception2(neg_three, yp_IndexError);
+        yp_decrefN(3, self, two, neg_three);
+    }
+
+    // Empty self.
+    {
+        ypObject *self = type->newN(0);
+        ypObject *zero = yp_getindexC(self, 0);
+        ypObject *neg_one = yp_getindexC(self, -1);
+        assert_isexception2(zero, yp_IndexError);
+        assert_isexception2(neg_one, yp_IndexError);
+        yp_decrefN(3, self, zero, neg_one);
+    }
+
+    obj_array_fini(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    obj_array_init(items, 5, type->rand_item());
+
+    // Basic slice.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *zero_one = yp_getsliceC4(self, 0, 1, 1);
+        ypObject *one_two = yp_getsliceC4(self, 1, 2, 1);
+        assert_type_is(zero_one, type->type);
+        assert_sequence(zero_one, 1, items[0]);
+        assert_type_is(one_two, type->type);
+        assert_sequence(one_two, 1, items[1]);
+        yp_decrefN(3, self, zero_one, one_two);
+    }
+
+    // Complete slice.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *forward = yp_getsliceC4(self, 0, 2, 1);
+        ypObject *reverse = yp_getsliceC4(self, 1, -3, -1);
+        assert_type_is(forward, type->type);
+        assert_sequence(forward, 2, items[0], items[1]);
+        // Optimization: lazy shallow copy of an immutable self for complete forward slice.
+        if (!type->is_mutable) assert_obj(forward, is, self);
+        assert_type_is(reverse, type->type);
+        assert_sequence(reverse, 2, items[1], items[0]);
+        yp_decrefN(3, self, forward, reverse);
+    }
+
+    // Step of 2, -2.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *forward = yp_getsliceC4(self, 0, 2, 2);
+        ypObject *reverse = yp_getsliceC4(self, 2, 0, -2);
+        assert_type_is(forward, type->type);
+        assert_sequence(forward, 1, items[0]);
+        assert_type_is(reverse, type->type);
+        assert_sequence(reverse, 1, items[1]);
+        yp_decrefN(3, self, forward, reverse);
+    }
+
+    // Empty slices.
+    {
+        ypObject    *self = type->newN(2, items[0], items[1]);
+        slice_args_t slices[] = {
+                {0, 0, 1},    // typical empty slice
+                {2, 3, 1},    // if i>=len(s) and k>0, the slice is empty, regardless of j
+                {-3, 2, -1},  // if i<-len(s) and k<0, the slice is empty, regardless of j
+                {3, 2, -1},   // if j>=len(s) and k<0, the slice is empty, regardless of i
+                {2, -3, 1},   // if j<-len(s) and k>0, the slice is empty, regardless of i
+        };
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(slices); i++) {
+            slice_args_t args = slices[i];
+            ypObject    *empty = yp_getsliceC4(self, args.i, args.j, args.k);
+            assert_type_is(empty, type->type);
+            assert_len(empty, 0);
+            // Optimization: empty immortal when slice is empty.
+            if (type->falsy != NULL) assert_obj(empty, is, type->falsy);
+            yp_decref(empty);
+        }
+        yp_decref(self);
+    }
+
+    // TODO Test yp_SLICE_DEFAULT
+
+    // TODO Test yp_SLICE_USELEN
+
+    // TODO Larger sequence, larger slice
+
+    obj_array_fini(items);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
 
-MunitTest test_sequence_tests[] = {
-        TEST(test_concat, test_sequence_params), TEST(test_repeat, test_sequence_params), {NULL}};
+MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
+        TEST(test_repeatC, test_sequence_params), TEST(test_getindexC, test_sequence_params),
+        TEST(test_getsliceC, test_sequence_params), {NULL}};

@@ -535,9 +535,8 @@ static ypObject *new_rand_range(const rand_obj_supplier_memo_t *memo)
 
 // Because range's items must follow a pattern, there's a limit to the objects we can create with
 // newN. We can construct a range between any two integers from rand_item_range, so start there.
-// This allows newN to work with "any" items, so long as there are two or less. Also remember that
-// if both values are equal, range only stores one of them.
-// FIXME Am I stretching too far trying to get range working with the sequence tests?
+// This allows newN to work with "any" items, so long as there are two or less.
+// XXX Will fail the test if the two numbers are equal, as range only contains unique values.
 static ypObject *newN_range(int n, ...)
 {
     va_list   args;
@@ -556,11 +555,11 @@ static ypObject *newN_range(int n, ...)
         result = yp_rangeC3(first, first + 1, 1);
     } else if (n == 2) {
         if (first < second) {
-            result = yp_rangeC3(first, second + 1, second);
+            result = yp_rangeC3(first, second + 1, second - first);
         } else if (first == second) {
-            result = yp_rangeC3(first, first + 1, 1);
+            munit_errorf("newN_range called with same number twice (%d)", first);
         } else {
-            result = yp_rangeC3(first, second - 1, -second);
+            result = yp_rangeC3(first, second - 1, second - first);
         }
     } else {
         munit_errorf("newN_range unable to create range containing %d items", n);
@@ -574,7 +573,13 @@ static ypObject *rand_item_range(void)
 {
     // Our current implementation has some limitations. step can't be yp_INT_T_MIN, and the length
     // can't be >ypObject_LEN_MAX (31 bits). So just play within a narrower area.
-    ypObject *result = yp_intC(munit_rand_int_range(-0x3FFFFFFF, 0x3FFFFFFF));
+    //
+    // There's also a limitation where we want newN_range to act like a sequence, but range does not
+    // store duplicates. So keep the lowest byte incrementing to decrease the chance of a collision.
+    static yp_int_t low_byte = 0;
+    yp_int_t value = (munit_rand_int_range(-0x3FFFFF, 0x3FFFFF) << 8) | low_byte;
+    ypObject *result = yp_intC(value);
+    low_byte = (low_byte + 1) & 0xFF;
     assert_not_exception(result);
     return result;
 }
