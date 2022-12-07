@@ -1028,6 +1028,8 @@ static void yp_HashSet_next(yp_HashSet_state_t *state, yp_hash_t lane)
 }
 
 // Combines yp_HashSet_init and yp_HashSet_next into a form optimized for a ypSet_KeyEntry table.
+// FIXME If we want to call this multiple times, then `used` should be a parameter (the len from
+// init is the total length, but this table may have a different `used` parameter).
 static void yp_HashSet_next_table(
         yp_HashSet_state_t *state, ypSet_KeyEntry *table, yp_ssize_t mask, yp_ssize_t fill)
 {
@@ -3512,7 +3514,7 @@ static ypObject *_yp_deepcopy_visitor(ypObject *x, visitfunc visitor, void *_mem
     yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;
     ypObject           *result;
 
-    yp_DEBUG("deepcopy: %p type %d depth %d", x, ypObject_TYPE_CODE(x), memo->recursion_depth);
+    yp_DEBUG("deepcopy: %p type %d depth %" PRIssize, x, ypObject_TYPE_CODE(x), memo->recursion_depth);
 
     // Be efficient: reuse existing copies of objects. Also helps avoid recursion!
     result = _yp_deepcopy_memo_getitem(memo, x);
@@ -16759,6 +16761,7 @@ static void _ypDict_iter_items_next(ypObject *itemiter, ypObject **key, ypObject
         return;
     }
     yp_unpackN(keyvaliter, 2, key, value);
+    yp_decref(keyvaliter);
 }
 
 // XXX Check for the mp==other case _before_ calling this function

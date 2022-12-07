@@ -858,8 +858,8 @@ static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
         yp_ssize_t len = munit_rand_int_range(1, 16);
         ypObject  *iter = new_rand_iter3(len, rand_obj_any1, memo);
         ypObject  *result = yp_tuple(iter);
-        assert_not_exception(result);
         yp_decref(iter);
+        assert_not_exception(result);
         return result;
     }
 }
@@ -899,8 +899,8 @@ static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
         yp_ssize_t len = munit_rand_int_range(1, 16);
         ypObject  *iter = new_rand_iter3(len, rand_obj_any1, memo);
         ypObject  *result = yp_list(iter);
-        assert_not_exception(result);
         yp_decref(iter);
+        assert_not_exception(result);
         return result;
     }
 }
@@ -941,8 +941,8 @@ static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
         yp_ssize_t n = munit_rand_int_range(1, 16);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable1, memo);
         ypObject  *result = yp_frozenset(iter);
-        assert_not_exception(result);
         yp_decref(iter);
+        assert_not_exception(result);
         return result;
     }
 }
@@ -983,8 +983,8 @@ static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
         yp_ssize_t n = munit_rand_int_range(1, 16);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_hashable1, memo);
         ypObject  *result = yp_set(iter);
-        assert_not_exception(result);
         yp_decref(iter);
+        assert_not_exception(result);
         return result;
     }
 }
@@ -1025,8 +1025,8 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
         yp_ssize_t n = munit_rand_int_range(1, 16);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue1, memo);
         ypObject  *result = yp_frozendict(iter);
-        assert_not_exception(result);
         yp_decref(iter);
+        assert_not_exception(result);
         return result;
     }
 }
@@ -1067,8 +1067,8 @@ static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
         yp_ssize_t n = munit_rand_int_range(1, 16);
         ypObject  *iter = new_rand_iter3(n, rand_obj_any_keyvalue1, memo);
         ypObject  *result = yp_dict(iter);
-        assert_not_exception(result);
         yp_decref(iter);
+        assert_not_exception(result);
         return result;
     }
 }
