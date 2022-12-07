@@ -87,6 +87,37 @@ static MunitResult test_param_type(const MunitParameter params[], fixture_t *fix
     return MUNIT_OK;
 }
 
+// Tests the properties of each fixture type.
+static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+
+    assert_not_null(type->name);
+    assert_type_is(type->type, yp_t_type);
+    if (type->is_mutable) {
+        assert_null(type->falsy);
+    } else if (type->falsy != NULL) {
+        assert_type_is(type->falsy, type->type);
+    }
+    assert_not_null(type->pair);
+    assert_not_null(type->_new_rand);
+    if (type->newN == NULL) {
+        assert_null(type->rand_item);
+    } else {
+        assert_not_null(type->rand_item);
+    }
+    if (type->newK == NULL) {
+        assert_null(type->rand_key);
+        assert_null(type->rand_value);
+    } else {
+        assert_not_null(type->rand_key);
+        assert_not_null(type->rand_value);
+    }
+    // Property flags are tested implicitly by test_fixture_types.
+
+    return MUNIT_OK;
+}
+
 // TODO Run a few iterations of this?
 static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixture)
 {
@@ -128,4 +159,5 @@ static MunitParameterEnum test_types_all_params[] = {
         {param_key_type, param_values_types_all}, {NULL}};
 
 MunitTest test_unittest_tests[] = {TEST(test_fixture_types, NULL), TEST(test_param_type, NULL),
-        TEST(test_rand_obj, test_types_all_params), {NULL}};
+        TEST(test_fixture_type, test_types_all_params), TEST(test_rand_obj, test_types_all_params),
+        {NULL}};

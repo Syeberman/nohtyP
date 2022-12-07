@@ -238,6 +238,10 @@ extern "C" {
         _assert_bool(_ypmt_TRUTHY_result, yp_True, yp_False, "yp_bool(%s)", #obj); \
     } while (0)
 
+// Cheeky little hack to make assert_obj(a, is, b) and assert_obj(a, is_not, b) work.
+#define yp_is(a, b) ((a) == (b) ? yp_True : yp_False)
+#define yp_is_not(a, b) ((a) != (b) ? yp_True : yp_False)
+
 // TODO Print the values of a and b (needs yp_str)
 #define _assert_obj(a, op, b, a_fmt, b_fmt, ...)                                              \
     do {                                                                                      \
@@ -246,8 +250,8 @@ extern "C" {
                 __VA_ARGS__);                                                                 \
     } while (0)
 
-// op can be: lt, le, eq, ne, ge, gt, contains, in, not_in, isdisjoint, issubset, issuperset,
-// startswith, endswith.
+// op can be: is, is_not, lt, le, eq, ne, ge, gt, contains, in, not_in, isdisjoint, issubset,
+// issuperset, startswith, endswith.
 #define assert_obj(a, op, b)                                           \
     do {                                                               \
         ypObject *_ypmt_OBJ_a = (a);                                   \
@@ -331,8 +335,9 @@ typedef ypObject *(*rand_obj_supplier_t)(const rand_obj_supplier_memo_t *);
 // Any methods or arguments here that don't apply to a given type will fail the test.
 typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
-    char           *name;  // The name of the type (i.e. int, bytearray, dict).
-    ypObject       *type;  // The type object (i.e. yp_t_float, yp_t_list).
+    char     *name;        // The name of the type (i.e. int, bytearray, dict).
+    ypObject *type;        // The type object (i.e. yp_t_float, yp_t_list).
+    ypObject *falsy;       // The falsy/empty immortal for this type, or NULL. (Only immutables.)
     fixture_type_t *pair;  // The other type in this object pair, or points back to this type.
 
     rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
