@@ -467,6 +467,11 @@ extern ypObject *rand_obj_hashable(fixture_type_t *type);
     } while (0)
 
 
+extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size);
+extern void *malloc_tracker_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+extern void malloc_tracker_free(void *p);
+
+
 extern fixture_t *fixture_setup(const MunitParameter params[], void *user_data);
 extern void       fixture_tear_down(fixture_t *fixture);
 

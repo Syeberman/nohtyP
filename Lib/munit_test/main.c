@@ -17,7 +17,8 @@ static MunitSuite munit_test_suite = {
 int main(int argc, char **argv)
 {
     {
-        yp_initialize_parameters_t args = {sizeof(yp_initialize_parameters_t)};
+        yp_initialize_parameters_t args = {sizeof(yp_initialize_parameters_t),
+                malloc_tracker_malloc, malloc_tracker_malloc_resize, malloc_tracker_free};
         yp_initialize(&args);
     }
 

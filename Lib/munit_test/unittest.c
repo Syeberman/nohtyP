@@ -1277,6 +1277,81 @@ static void initialize_fixture_types(void)
 #undef FILL_TYPE_ARRAYS
 }
 
+
+#define MALLOC_TRACKER_MAX_LEN 1000
+
+// TODO Not currently threadsafe
+struct _malloc_tracker_t {
+    yp_ssize_t len;
+    void      *mallocs[MALLOC_TRACKER_MAX_LEN];
+} malloc_tracker = {0};
+
+static void malloc_tracker_fixture_setup(void)
+{
+    // We only track allocations made during the test, to verify they have been freed by the end.
+    malloc_tracker.len = 0;
+}
+
+static void malloc_tracker_push(void *p)
+{
+    assert_not_null(p);  // NULL should be handled before push is called.
+
+    // Increase the size of the mallocs array as necessary.
+    assert_ssize(malloc_tracker.len, <, MALLOC_TRACKER_MAX_LEN);
+
+    // Don't bother deduplicating; that should never happen!
+    malloc_tracker.mallocs[malloc_tracker.len] = p;
+    malloc_tracker.len++;
+}
+
+static void malloc_tracker_pop(void *p)
+{
+    yp_ssize_t i;
+    assert_not_null(p);  // NULL should be handled before pop is called.
+
+    // Find the pointer and set it to NULL. Ignore unknown pointers: we are only concerned with
+    // allocations during the test.
+    for (i = malloc_tracker.len - 1; i >= 0; i--) {
+        if (malloc_tracker.mallocs[i] == p) {
+            malloc_tracker.mallocs[i] = NULL;
+            break;
+        }
+    }
+
+    // Trim trailing NULL entries from the list.
+    while (malloc_tracker.len > 0 && malloc_tracker.mallocs[malloc_tracker.len - 1] == NULL) {
+        malloc_tracker.len--;
+    }
+}
+
+void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size)
+{
+    void *p = yp_mem_default_malloc(actual, size);
+    if (p != NULL) malloc_tracker_push(p);
+    return p;
+}
+
+void *malloc_tracker_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra)
+{
+    void *newP = yp_mem_default_malloc_resize(actual, p, size, extra);
+    if (newP != NULL && newP != p) malloc_tracker_push(newP);
+    return newP;
+}
+
+void malloc_tracker_free(void *p)
+{
+    yp_mem_default_free(p);
+    if (p != NULL) malloc_tracker_pop(p);
+}
+
+static void malloc_tracker_fixture_tear_down(void)
+{
+    if (malloc_tracker.len > 0) {
+        munit_errorf("memory leak: %p", malloc_tracker.mallocs[malloc_tracker.len - 1]);
+    }
+}
+
+
 char param_key_type[] = "type";
 
 static fixture_type_t *fixture_get_type(const MunitParameter params[])
@@ -1299,10 +1374,17 @@ extern fixture_t *fixture_setup(const MunitParameter params[], void *user_data)
 
     fixture->type = fixture_get_type(params);
 
+    malloc_tracker_fixture_setup();
+
     return fixture;
 }
 
-extern void fixture_tear_down(fixture_t *fixture) { free(fixture); }
+extern void fixture_tear_down(fixture_t *fixture)
+{
+    malloc_tracker_fixture_tear_down();
+
+    free(fixture);
+}
 
 
 extern void unittest_initialize(void) { initialize_fixture_types(); }
