@@ -750,7 +750,7 @@ ypAPI void yp_sort(ypObject *sequence, ypObject **exc);
 #define yp_SLICE_USELEN yp_SSIZE_T_MAX
 
 // When an index in a slice is outside of range(-len(s),len(s)), it gets clamped to the bounds of
-// the sequence. Specifically:
+// the sequence. Specifically, for the slice [i:j:k]:
 //
 // - if i>=len(s) and k>0, or i<-len(s) and k<0, the slice is empty, regardless of j
 // - if i>=len(s) and k<0, the (reversed) slice starts with the last element

@@ -3,9 +3,9 @@
 
 
 typedef struct _slice_args_t {
-    yp_ssize_t i;
-    yp_ssize_t j;
-    yp_ssize_t k;
+    yp_ssize_t start;
+    yp_ssize_t stop;
+    yp_ssize_t step;
 } slice_args_t;
 
 
@@ -279,7 +279,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
-            ypObject    *empty = yp_getsliceC4(self, args.i, args.j, args.k);
+            ypObject    *empty = yp_getsliceC4(self, args.start, args.stop, args.step);
             assert_type_is(empty, type->type);
             assert_len(empty, 0);
             // Optimization: empty immortal when slice is empty.
@@ -289,9 +289,33 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decref(self);
     }
 
-    // TODO Test yp_SLICE_DEFAULT
+    // yp_SLICE_DEFAULT.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *i_pos_step = yp_getsliceC4(self, yp_SLICE_DEFAULT, 2, 1);
+        ypObject *j_pos_step = yp_getsliceC4(self, 0, yp_SLICE_DEFAULT, 1);
+        ypObject *i_neg_step = yp_getsliceC4(self, yp_SLICE_DEFAULT, -3, -1);
+        ypObject *j_neg_step = yp_getsliceC4(self, 1, yp_SLICE_DEFAULT, -1);
+        assert_sequence(i_pos_step, 2, items[0], items[1]);
+        assert_sequence(j_pos_step, 2, items[0], items[1]);
+        assert_sequence(i_neg_step, 2, items[1], items[0]);
+        assert_sequence(j_neg_step, 2, items[1], items[0]);
+        yp_decrefN(5, self, i_pos_step, j_pos_step, i_neg_step, j_neg_step);
+    }
 
-    // TODO Test yp_SLICE_USELEN
+    // yp_SLICE_USELEN.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *i_pos_step = yp_getsliceC4(self, yp_SLICE_USELEN, 2, 1);
+        ypObject *j_pos_step = yp_getsliceC4(self, 0, yp_SLICE_USELEN, 1);
+        ypObject *i_neg_step = yp_getsliceC4(self, yp_SLICE_USELEN, -3, -1);
+        ypObject *j_neg_step = yp_getsliceC4(self, 1, yp_SLICE_USELEN, -1);
+        assert_len(i_pos_step, 0);
+        assert_sequence(j_pos_step, 2, items[0], items[1]);
+        assert_sequence(i_neg_step, 2, items[1], items[0]);
+        assert_len(j_neg_step, 0);
+        yp_decrefN(5, self, i_pos_step, j_pos_step, i_neg_step, j_neg_step);
+    }
 
     // TODO Larger sequence, larger slice
 
