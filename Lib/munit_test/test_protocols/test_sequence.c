@@ -244,11 +244,9 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     {
         ypObject *self = type->newN(2, items[0], items[1]);
         ypObject *forward = yp_getsliceC4(self, 0, 2, 1);
-        ypObject *reverse = yp_getsliceC4(self, 1, -3, -1);
+        ypObject *reverse = yp_getsliceC4(self, -1, -3, -1);
         assert_type_is(forward, type->type);
         assert_sequence(forward, 2, items[0], items[1]);
-        // Optimization: lazy shallow copy of an immutable self for complete forward slice.
-        if (!type->is_mutable) assert_obj(forward, is, self);
         assert_type_is(reverse, type->type);
         assert_sequence(reverse, 2, items[1], items[0]);
         yp_decrefN(3, self, forward, reverse);
@@ -258,7 +256,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     {
         ypObject *self = type->newN(2, items[0], items[1]);
         ypObject *forward = yp_getsliceC4(self, 0, 2, 2);
-        ypObject *reverse = yp_getsliceC4(self, 2, 0, -2);
+        ypObject *reverse = yp_getsliceC4(self, -1, -3, -2);
         assert_type_is(forward, type->type);
         assert_sequence(forward, 1, items[0]);
         assert_type_is(reverse, type->type);
@@ -270,11 +268,11 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     {
         ypObject    *self = type->newN(2, items[0], items[1]);
         slice_args_t slices[] = {
-                {0, 0, 1},    // typical empty slice
-                {2, 3, 1},    // if i>=len(s) and k>0, the slice is empty, regardless of j
-                {-3, 2, -1},  // if i<-len(s) and k<0, the slice is empty, regardless of j
-                {3, 2, -1},   // if j>=len(s) and k<0, the slice is empty, regardless of i
-                {2, -3, 1},   // if j<-len(s) and k>0, the slice is empty, regardless of i
+                {0, 0, 1},      // typical empty slice
+                {2, 99, 1},     // if i>=len(s) and k>0, the slice is empty, regardless of j
+                {-3, -99, -1},  // if i<-len(s) and k<0, the slice is empty, regardless of j
+                {99, 2, -1},    // if j>=len(s) and k<0, the slice is empty, regardless of i
+                {-99, -3, 1},   // if j<-len(s) and k>0, the slice is empty, regardless of i
         };
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
@@ -282,8 +280,6 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
             ypObject    *empty = yp_getsliceC4(self, args.start, args.stop, args.step);
             assert_type_is(empty, type->type);
             assert_len(empty, 0);
-            // Optimization: empty immortal when slice is empty.
-            if (type->falsy != NULL) assert_obj(empty, is, type->falsy);
             yp_decref(empty);
         }
         yp_decref(self);
@@ -295,7 +291,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         ypObject *i_pos_step = yp_getsliceC4(self, yp_SLICE_DEFAULT, 2, 1);
         ypObject *j_pos_step = yp_getsliceC4(self, 0, yp_SLICE_DEFAULT, 1);
         ypObject *i_neg_step = yp_getsliceC4(self, yp_SLICE_DEFAULT, -3, -1);
-        ypObject *j_neg_step = yp_getsliceC4(self, 1, yp_SLICE_DEFAULT, -1);
+        ypObject *j_neg_step = yp_getsliceC4(self, -1, yp_SLICE_DEFAULT, -1);
         assert_sequence(i_pos_step, 2, items[0], items[1]);
         assert_sequence(j_pos_step, 2, items[0], items[1]);
         assert_sequence(i_neg_step, 2, items[1], items[0]);
@@ -309,7 +305,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         ypObject *i_pos_step = yp_getsliceC4(self, yp_SLICE_LAST, 2, 1);
         ypObject *j_pos_step = yp_getsliceC4(self, 0, yp_SLICE_LAST, 1);
         ypObject *i_neg_step = yp_getsliceC4(self, yp_SLICE_LAST, -3, -1);
-        ypObject *j_neg_step = yp_getsliceC4(self, 1, yp_SLICE_LAST, -1);
+        ypObject *j_neg_step = yp_getsliceC4(self, -1, yp_SLICE_LAST, -1);
         assert_len(i_pos_step, 0);
         assert_sequence(j_pos_step, 2, items[0], items[1]);
         assert_sequence(i_neg_step, 2, items[1], items[0]);
@@ -317,12 +313,28 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(5, self, i_pos_step, j_pos_step, i_neg_step, j_neg_step);
     }
 
-    // FIXME Bug reproduction.
+    // FIXME Bug reproduction: assertion failed: yp_lenC(slice, &exc) == 2 (0 == 140728898420738)
     {
         ypObject *self = type->newN(2, items[0], items[1]);
         ypObject *slice = yp_getsliceC4(self, yp_SLICE_LAST, -1, -1);
         assert_sequence(slice, 2, items[1], items[0]);
-        yp_decrefN(5, self, slice);
+        yp_decrefN(2, self, slice);
+    }
+
+    // Optimization: lazy shallow copy of an immutable self for complete forward slice.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *forward = yp_getsliceC4(self, 0, 2, 1);
+        assert_obj(forward, is, self);
+        yp_decrefN(2, self, forward);
+    }
+
+    // Optimization: empty immortal when slice is empty.
+    if (type->falsy != NULL) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *empty = yp_getsliceC4(self, 0, 0, 1);
+        assert_obj(empty, is, type->falsy);
+        yp_decrefN(2, self, empty);
     }
 
     // TODO Larger sequence, larger slice
