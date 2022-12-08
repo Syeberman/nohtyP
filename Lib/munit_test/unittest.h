@@ -77,33 +77,66 @@ extern "C" {
 #define _STRINGIFY25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y
 #define _STRINGIFY26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z
 
-#define _COMMAS1(x) x
-#define _COMMAS2(x) x, x
-#define _COMMAS3(x) x, x, x
-#define _COMMAS4(x) x, x, x, x
-#define _COMMAS5(x) x, x, x, x, x
-#define _COMMAS6(x) x, x, x, x, x, x
-#define _COMMAS7(x) x, x, x, x, x, x, x
-#define _COMMAS8(x) x, x, x, x, x, x, x, x
-#define _COMMAS9(x) x, x, x, x, x, x, x, x, x
-#define _COMMAS10(x) x, x, x, x, x, x, x, x, x, x
-#define _COMMAS11(x) x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS12(x) x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS13(x) x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS14(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS15(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS16(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS17(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS18(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS19(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS20(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS21(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS22(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS23(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS24(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS25(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
-#define _COMMAS26(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA1(a) a
+#define _COMMA2(a, b) a, b
+#define _COMMA3(a, b, c) a, b, c
+#define _COMMA4(a, b, c, d) a, b, c, d
+#define _COMMA5(a, b, c, d, e) a, b, c, d, e
+#define _COMMA6(a, b, c, d, e, f) a, b, c, d, e, f
+#define _COMMA7(a, b, c, d, e, f, g) a, b, c, d, e, f, g
+#define _COMMA8(a, b, c, d, e, f, g, h) a, b, c, d, e, f, g, h
+#define _COMMA9(a, b, c, d, e, f, g, h, i) a, b, c, d, e, f, g, h, i
+#define _COMMA10(a, b, c, d, e, f, g, h, i, j) a, b, c, d, e, f, g, h, i, j
+#define _COMMA11(a, b, c, d, e, f, g, h, i, j, k) a, b, c, d, e, f, g, h, i, j, k
+#define _COMMA12(a, b, c, d, e, f, g, h, i, j, k, l) a, b, c, d, e, f, g, h, i, j, k, l
+#define _COMMA13(a, b, c, d, e, f, g, h, i, j, k, l, m) a, b, c, d, e, f, g, h, i, j, k, l, m
+#define _COMMA14(a, b, c, d, e, f, g, h, i, j, k, l, m, n) a, b, c, d, e, f, g, h, i, j, k, l, m, n
+#define _COMMA15(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o
+#define _COMMA16(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p
+#define _COMMA17(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q
+#define _COMMA18(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r
+#define _COMMA19(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s
+#define _COMMA20(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t
+#define _COMMA21(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u
+#define _COMMA22(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v
+#define _COMMA23(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w
+#define _COMMA24(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x
+#define _COMMA25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y
+#define _COMMA26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
+
+#define _COMMA_REPEAT1(x) x
+#define _COMMA_REPEAT2(x) x, x
+#define _COMMA_REPEAT3(x) x, x, x
+#define _COMMA_REPEAT4(x) x, x, x, x
+#define _COMMA_REPEAT5(x) x, x, x, x, x
+#define _COMMA_REPEAT6(x) x, x, x, x, x, x
+#define _COMMA_REPEAT7(x) x, x, x, x, x, x, x
+#define _COMMA_REPEAT8(x) x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT9(x) x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT10(x) x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT11(x) x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT12(x) x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT13(x) x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT14(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT15(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT16(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT17(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT18(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT19(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT20(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT21(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT22(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT23(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT24(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT25(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT26(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 // clang-format on
+
+// Macro redefinitions to ensure the number of arguments equals n. n must be an integer literal.
+// Doesn't work for yp_tupleN/etc as those occasionally have zero arguments.
+#define yp_increfN(n, ...) (yp_increfN((n), _COMMA##n(__VA_ARGS__)))
+#define yp_decrefN(n, ...) (yp_decrefN((n), _COMMA##n(__VA_ARGS__)))
+#define yp_unpackN(n, iterable, ...) (yp_unpackN((n), (iterable), _COMMA##n(__VA_ARGS__)))
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
 #define yp_sizeof(x) ((yp_ssize_t)sizeof(x))
@@ -111,7 +144,7 @@ extern "C" {
 #define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
 
 // Length of an array. Only call for arrays of fixed size that haven't been coerced to pointers.
-#define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof(x[0]))
+#define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof((x)[0]))
 
 // Length of an array in a structure. Only call for arrays of fixed size.
 #define yp_lengthof_array_member(structType, member) yp_lengthof_array(((structType *)0)->member)
@@ -270,6 +303,7 @@ extern "C" {
                 #expected);                                                                  \
     } while (0)
 
+// XXX expected must be a yp_ssize_t!
 #define _assert_len(obj, expected, obj_fmt, expected_fmt, ...)                           \
     do {                                                                                 \
         yp_ssize_t _ypmt_LEN_actual;                                                     \
@@ -301,8 +335,8 @@ extern "C" {
         ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                              \
         char      *_ypmt_SEQ_item_strs[] = {_STRINGIFY##n(__VA_ARGS__)};           \
         yp_ssize_t _ypmt_SEQ_i;                                                    \
-        _assert_len(_ypmt_SEQ_obj, n, "%s", #n, #obj);                             \
-        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < n; _ypmt_SEQ_i++) {                    \
+        _assert_len(_ypmt_SEQ_obj, ((yp_ssize_t)(n)), "%s", #n, #obj);             \
+        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < (n); _ypmt_SEQ_i++) {                  \
             ypObject *_ypmt_SEQ_actual = yp_getindexC(_ypmt_SEQ_obj, _ypmt_SEQ_i); \
             _assert_obj(_ypmt_SEQ_actual, eq, _ypmt_SEQ_items[_ypmt_SEQ_i],        \
                     "yp_getindexC(%s, %" PRIssize ")", "%s", #obj, _ypmt_SEQ_i,    \
@@ -319,7 +353,7 @@ extern "C" {
         void      *_ypmt_PTR_ARR_items[] = {__VA_ARGS__};                                    \
         char      *_ypmt_PTR_ARR_item_strs[] = {_STRINGIFY##n(__VA_ARGS__)};                 \
         yp_ssize_t _ypmt_PTR_ARR_i;                                                          \
-        for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < n; _ypmt_PTR_ARR_i++) {                  \
+        for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < (n); _ypmt_PTR_ARR_i++) {                \
             _assert_ptr(_ypmt_PTR_ARR_array[_ypmt_PTR_ARR_i], ==,                            \
                     _ypmt_PTR_ARR_items[_ypmt_PTR_ARR_i], "%s[%" PRIssize "]", "%s", #array, \
                     _ypmt_PTR_ARR_i, _ypmt_PTR_ARR_item_strs[_ypmt_PTR_ARR_i]);              \
@@ -335,10 +369,10 @@ typedef ypObject *(*rand_obj_supplier_t)(const rand_obj_supplier_memo_t *);
 // Any methods or arguments here that don't apply to a given type will fail the test.
 typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
-    char     *name;        // The name of the type (i.e. int, bytearray, dict).
-    ypObject *type;        // The type object (i.e. yp_t_float, yp_t_list).
-    ypObject *falsy;       // The falsy/empty immortal for this type, or NULL. (Only immutables.)
-    fixture_type_t *pair;  // The other type in this object pair, or points back to this type.
+    char           *name;   // The name of the type (i.e. int, bytearray, dict).
+    ypObject       *type;   // The type object (i.e. yp_t_float, yp_t_list).
+    ypObject       *falsy;  // The falsy/empty immortal for this type, or NULL. (Only immutables.)
+    fixture_type_t *pair;   // The other type in this object pair, or points back to this type.
 
     rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
 
@@ -439,7 +473,7 @@ extern ypObject *rand_obj_hashable(fixture_type_t *type);
 // Example:
 //
 //      obj_array_init(items, 5, type->rand_item());  // Declares ypObject *items[5];
-#define obj_array_init(name, n, expression) ypObject *name[] = {_COMMAS##n((expression))}
+#define obj_array_init(name, n, expression) ypObject *name[] = {_COMMA_REPEAT##n((expression))}
 
 #define _obj_array_fini(array, n)                                                  \
     do {                                                                           \
@@ -468,7 +502,8 @@ extern ypObject *rand_obj_hashable(fixture_type_t *type);
 
 
 extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size);
-extern void *malloc_tracker_malloc_resize(yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
+extern void *malloc_tracker_malloc_resize(
+        yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);
 extern void malloc_tracker_free(void *p);
 
 
