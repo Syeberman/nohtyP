@@ -6373,8 +6373,8 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 #endif
 
 // Using the given length, in-place converts the given start/stop/step values to valid indices, and
-// also calculates the length of the slice. Returns yp_ValueError if *step is zero, else yp_None;
-// there are no out-of-bounds errors with slices.
+// also calculates the length of the slice. Returns yp_ValueError if *step is zero. Recall there are
+// no out-of-bounds errors with slices.
 // XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
 // yp_SLICE_LAST is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
 // as any value that's greater than length.
@@ -6382,9 +6382,13 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
         yp_ssize_t *step, yp_ssize_t *slicelength)
 {
-    // Adjust step
     if (*step == 0) return yp_ValueError;
-    if (*step < -yp_SSIZE_T_MAX) *step = -yp_SSIZE_T_MAX;  // ensure *step can be negated
+    if (*step < -yp_SSIZE_T_MAX) return yp_SystemLimitationError;  // Ensure *step can be negated.
+
+    if (length < 1) {
+        *start = *stop = *slicelength = 0;
+        return yp_None;
+    }
 
     // Adjust start
     if (*start == yp_SLICE_DEFAULT) {
