@@ -240,7 +240,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(3, self, zero_one, one_two);
     }
 
-    // Complete slice.
+    // Total slice, forward and backward.
     {
         ypObject *self = type->newN(2, items[0], items[1]);
         ypObject *forward = yp_getsliceC4(self, 0, 2, 1);
@@ -290,13 +290,18 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         ypObject *self = type->newN(2, items[0], items[1]);
         ypObject *i_pos_step = yp_getsliceC4(self, yp_SLICE_DEFAULT, 2, 1);
         ypObject *j_pos_step = yp_getsliceC4(self, 0, yp_SLICE_DEFAULT, 1);
+        ypObject *both_pos_step = yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1);
         ypObject *i_neg_step = yp_getsliceC4(self, yp_SLICE_DEFAULT, -3, -1);
         ypObject *j_neg_step = yp_getsliceC4(self, -1, yp_SLICE_DEFAULT, -1);
+        ypObject *both_neg_step = yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1);
         assert_sequence(i_pos_step, 2, items[0], items[1]);
         assert_sequence(j_pos_step, 2, items[0], items[1]);
+        assert_sequence(both_pos_step, 2, items[0], items[1]);
         assert_sequence(i_neg_step, 2, items[1], items[0]);
         assert_sequence(j_neg_step, 2, items[1], items[0]);
-        yp_decrefN(5, self, i_pos_step, j_pos_step, i_neg_step, j_neg_step);
+        assert_sequence(both_neg_step, 2, items[1], items[0]);
+        yp_decrefN(7, self, i_pos_step, j_pos_step, both_pos_step, i_neg_step, j_neg_step,
+                both_neg_step);
     }
 
     // yp_SLICE_LAST.
@@ -304,24 +309,21 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         ypObject *self = type->newN(2, items[0], items[1]);
         ypObject *i_pos_step = yp_getsliceC4(self, yp_SLICE_LAST, 2, 1);
         ypObject *j_pos_step = yp_getsliceC4(self, 0, yp_SLICE_LAST, 1);
+        ypObject *both_pos_step = yp_getsliceC4(self, yp_SLICE_LAST, yp_SLICE_LAST, 1);
         ypObject *i_neg_step = yp_getsliceC4(self, yp_SLICE_LAST, -3, -1);
         ypObject *j_neg_step = yp_getsliceC4(self, -1, yp_SLICE_LAST, -1);
+        ypObject *both_neg_step = yp_getsliceC4(self, yp_SLICE_LAST, yp_SLICE_LAST, -1);
         assert_len(i_pos_step, 0);
         assert_sequence(j_pos_step, 2, items[0], items[1]);
+        assert_len(both_pos_step, 0);
         assert_sequence(i_neg_step, 2, items[1], items[0]);
         assert_len(j_neg_step, 0);
-        yp_decrefN(5, self, i_pos_step, j_pos_step, i_neg_step, j_neg_step);
+        assert_len(both_neg_step, 0);
+        yp_decrefN(7, self, i_pos_step, j_pos_step, both_pos_step, i_neg_step, j_neg_step,
+                both_neg_step);
     }
 
-    // FIXME Bug reproduction: assertion failed: yp_lenC(slice, &exc) == 2 (0 == 140728898420738)
-    {
-        ypObject *self = type->newN(2, items[0], items[1]);
-        ypObject *slice = yp_getsliceC4(self, yp_SLICE_LAST, -1, -1);
-        assert_sequence(slice, 2, items[1], items[0]);
-        yp_decrefN(2, self, slice);
-    }
-
-    // Optimization: lazy shallow copy of an immutable self for complete forward slice.
+    // Optimization: lazy shallow copy of an immutable self for total forward slice.
     if (!type->is_mutable) {
         ypObject *self = type->newN(2, items[0], items[1]);
         ypObject *forward = yp_getsliceC4(self, 0, 2, 1);
@@ -337,7 +339,50 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(2, self, empty);
     }
 
-    // TODO Larger sequence, larger slice
+// Python's test_getslice. Patterned sequences like range only support newN(2, ...).
+// FIXME Add a similar test for test_range.c!
+#define try_slice(args, assertion)            \
+    do {                                      \
+        ypObject *slice = yp_getsliceC4 args; \
+        assertion;                            \
+        yp_decref(slice);                     \
+    } while (0)
+    if (!type->is_patterned) {
+        ypObject *self = type->newN(5, items[0], items[1], items[2], items[3], items[4]);
+        try_slice((self, 0, 0, 1), assert_len(slice, 0));
+        try_slice((self, 1, 2, 1), assert_sequence(slice, 1, items[1]));
+        try_slice((self, -2, -1, 1), assert_sequence(slice, 1, items[3]));
+        try_slice((self, -1000, 1000, 1), assert_obj(slice, eq, self));
+        try_slice((self, 1000, -1000, 1), assert_len(slice, 0));
+        try_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1), assert_obj(slice, eq, self));
+        try_slice((self, 1, yp_SLICE_DEFAULT, 1),
+                assert_sequence(slice, 4, items[1], items[2], items[3], items[4]));
+        try_slice((self, yp_SLICE_DEFAULT, 3, 1),
+                assert_sequence(slice, 3, items[0], items[1], items[2]));
+
+        try_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 2),
+                assert_sequence(slice, 3, items[0], items[2], items[4]));
+        try_slice((self, 1, yp_SLICE_DEFAULT, 2), assert_sequence(slice, 2, items[1], items[3]));
+        try_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1),
+                assert_sequence(slice, 5, items[4], items[3], items[2], items[1], items[0]));
+        try_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -2),
+                assert_sequence(slice, 3, items[4], items[2], items[0]));
+        try_slice((self, 3, yp_SLICE_DEFAULT, -2), assert_sequence(slice, 2, items[3], items[1]));
+        try_slice((self, 3, 3, -2), assert_len(slice, 0));
+        try_slice((self, 3, 2, -2), assert_sequence(slice, 1, items[3]));
+        try_slice((self, 3, 1, -2), assert_sequence(slice, 1, items[3]));
+        try_slice((self, 3, 0, -2), assert_sequence(slice, 2, items[3], items[1]));
+        try_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -100),
+                assert_sequence(slice, 1, items[4]));
+        try_slice((self, 100, -100, 1), assert_len(slice, 0));
+        try_slice((self, -100, 100, 1), assert_obj(slice, eq, self));
+        try_slice((self, 100, -100, -1),
+                assert_sequence(slice, 5, items[4], items[3], items[2], items[1], items[0]));
+        try_slice((self, -100, 100, -1), assert_len(slice, 0));
+        try_slice((self, -100, 100, 2), assert_sequence(slice, 3, items[0], items[2], items[4]));
+        yp_decref(self);
+    }
+#undef try_slice
 
     obj_array_fini(items);
     return MUNIT_OK;
