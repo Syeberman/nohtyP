@@ -223,9 +223,12 @@ static ypObject *new_rand_iter_func(ypObject *g, ypObject *value)
 static ypObject *new_rand_iter3(
         yp_ssize_t n, rand_obj_supplier_t supplier, const rand_obj_supplier_memo_t *supplier_memo)
 {
-    new_rand_iter_state state = {n, supplier, *supplier_memo};
+    ypObject           *result;
+    new_rand_iter_state state = {n, supplier};
     yp_generator_decl_t decl = {new_rand_iter_func, n, &state, &new_rand_iter_state_decl};
-    ypObject           *result = yp_generatorC(&decl);
+    state.supplier_memo = *supplier_memo;
+
+    result = yp_generatorC(&decl);
     assert_not_exception(result);
     return result;
 }
