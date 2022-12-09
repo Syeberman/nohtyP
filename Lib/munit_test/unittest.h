@@ -360,6 +360,18 @@ extern "C" {
         }                                                                                    \
     } while (0)
 
+// Execute, assert, decref: ead. For those very small one-liner tests. Executes the statement, sets
+// name to the result, executes the assertion, then discards the result. To be used like:
+//
+//      ead(result, yp_tupleN(0), assert_len(result, 0));
+// FIXME Is this a good idea? Is this the best way to do it?
+#define ead(name, statement, assertion) \
+    do {                                \
+        ypObject *(name) = (statement); \
+        assertion;                    \
+        yp_decref(name);                \
+    } while (0)
+
 
 typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objvarargfunc)(int, ...);
