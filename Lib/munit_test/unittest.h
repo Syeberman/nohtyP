@@ -49,6 +49,9 @@ extern "C" {
 #define STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
 #endif
 
+// Work around a preprocessing bug in msvs_120 and earlier: https://stackoverflow.com/a/3985071/770500
+#define _ESC(...) __VA_ARGS__
+
 // clang-format off
 #define _STRINGIFY1(a) #a
 #define _STRINGIFY2(a, b) #a, #b
@@ -134,9 +137,9 @@ extern "C" {
 
 // Macro redefinitions to ensure the number of arguments equals n. n must be an integer literal.
 // Doesn't work for yp_tupleN/etc as those occasionally have zero arguments.
-#define yp_increfN(n, ...) (yp_increfN((n), _COMMA##n(__VA_ARGS__)))
-#define yp_decrefN(n, ...) (yp_decrefN((n), _COMMA##n(__VA_ARGS__)))
-#define yp_unpackN(n, iterable, ...) (yp_unpackN((n), (iterable), _COMMA##n(__VA_ARGS__)))
+#define yp_increfN(n, ...) (yp_increfN((n), _ESC(_COMMA##n(__VA_ARGS__))))
+#define yp_decrefN(n, ...) (yp_decrefN((n), _ESC(_COMMA##n(__VA_ARGS__))))
+#define yp_unpackN(n, iterable, ...) (yp_unpackN((n), (iterable), _ESC(_COMMA##n(__VA_ARGS__))))
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
 #define yp_sizeof(x) ((yp_ssize_t)sizeof(x))
@@ -333,7 +336,7 @@ extern "C" {
     do {                                                                           \
         ypObject  *_ypmt_SEQ_obj = (obj);                                          \
         ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                              \
-        char      *_ypmt_SEQ_item_strs[] = {_STRINGIFY##n(__VA_ARGS__)};           \
+        char      *_ypmt_SEQ_item_strs[] = {_ESC(_STRINGIFY##n(__VA_ARGS__))};     \
         yp_ssize_t _ypmt_SEQ_i;                                                    \
         _assert_len(_ypmt_SEQ_obj, ((yp_ssize_t)(n)), "%s", #n, #obj);             \
         for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < (n); _ypmt_SEQ_i++) {                  \
@@ -351,7 +354,7 @@ extern "C" {
     do {                                                                                     \
         void     **_ypmt_PTR_ARR_array = (void **)(array);                                   \
         void      *_ypmt_PTR_ARR_items[] = {__VA_ARGS__};                                    \
-        char      *_ypmt_PTR_ARR_item_strs[] = {_STRINGIFY##n(__VA_ARGS__)};                 \
+        char      *_ypmt_PTR_ARR_item_strs[] = {_ESC(_STRINGIFY##n(__VA_ARGS__))};           \
         yp_ssize_t _ypmt_PTR_ARR_i;                                                          \
         for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < (n); _ypmt_PTR_ARR_i++) {                \
             _assert_ptr(_ypmt_PTR_ARR_array[_ypmt_PTR_ARR_i], ==,                            \
@@ -368,7 +371,7 @@ extern "C" {
 #define ead(name, statement, assertion) \
     do {                                \
         ypObject *(name) = (statement); \
-        assertion;                    \
+        assertion;                      \
         yp_decref(name);                \
     } while (0)
 
