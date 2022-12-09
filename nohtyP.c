@@ -735,7 +735,7 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 #define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
 
 // Length of an array. Only call for arrays of fixed size that haven't been coerced to pointers.
-#define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof(x[0]))
+#define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof((x)[0]))
 
 // Length of an array in a structure. Only call for arrays of fixed size.
 #define yp_lengthof_array_member(structType, member) yp_lengthof_array(((structType *)0)->member)

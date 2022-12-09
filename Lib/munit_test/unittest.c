@@ -560,7 +560,7 @@ static ypObject *newN_range(int n, ...)
         if (first < second) {
             result = yp_rangeC3(first, second + 1, second - first);
         } else if (first == second) {
-            munit_errorf("newN_range called with same number twice (%d)", first);
+            munit_errorf("newN_range called with same number twice (%" PRIint ")", first);
         } else {
             result = yp_rangeC3(first, second - 1, second - first);
         }

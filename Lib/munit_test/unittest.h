@@ -1,4 +1,3 @@
-
 #ifndef yp_MUNIT_TEST_UNITTEST_H
 #define yp_MUNIT_TEST_UNITTEST_H
 #ifdef __cplusplus
@@ -49,8 +48,7 @@ extern "C" {
 #define STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
 #endif
 
-// Work around a preprocessing bug in msvs_120 and earlier:
-// https://stackoverflow.com/a/3985071/770500
+// Work around preprocessing bug in msvs_120 and earlier: https://stackoverflow.com/a/3985071/770500
 #define _ESC(...) __VA_ARGS__
 
 // clang-format off
