@@ -339,45 +339,96 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(2, self, empty);
     }
 
-// Python's test_getslice. Patterned sequences like range only support newN(2, ...).
-// FIXME Add a similar test for test_range.c!
-// FIXME Is this ead_slice a good idea? Is this the best way to do it? Playing with macros is
-// playing with fire.
-#define ead_slice(args, assertion) ead(slice, yp_getsliceC4 args, assert_##assertion)
+    // Python's test_getslice. Patterned sequences like range only support newN(2, ...).
+    // FIXME Add a similar test for test_range.c!
     if (!type->is_patterned) {
         ypObject *self = type->newN(5, items[0], items[1], items[2], items[3], items[4]);
-        ead_slice((self, 0, 0, 1), len(slice, 0));
-        ead_slice((self, 1, 2, 1), sequence(slice, 1, items[1]));
-        ead_slice((self, -2, -1, 1), sequence(slice, 1, items[3]));
-        ead_slice((self, -1000, 1000, 1), obj(slice, eq, self));
-        ead_slice((self, 1000, -1000, 1), len(slice, 0));
-        ead_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1), obj(slice, eq, self));
-        ead_slice((self, 1, yp_SLICE_DEFAULT, 1),
-                sequence(slice, 4, items[1], items[2], items[3], items[4]));
-        ead_slice((self, yp_SLICE_DEFAULT, 3, 1), sequence(slice, 3, items[0], items[1], items[2]));
+        ead(slice, yp_getsliceC4(self, 0, 0, 1), assert_len(slice, 0));
+        ead(slice, yp_getsliceC4(self, 1, 2, 1), assert_sequence(slice, 1, items[1]));
+        ead(slice, yp_getsliceC4(self, -2, -1, 1), assert_sequence(slice, 1, items[3]));
+        ead(slice, yp_getsliceC4(self, -1000, 1000, 1), assert_obj(slice, eq, self));
+        ead(slice, yp_getsliceC4(self, 1000, -1000, 1), assert_len(slice, 0));
+        ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1),
+                assert_obj(slice, eq, self));
+        ead(slice, yp_getsliceC4(self, 1, yp_SLICE_DEFAULT, 1),
+                assert_sequence(slice, 4, items[1], items[2], items[3], items[4]));
+        ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, 3, 1),
+                assert_sequence(slice, 3, items[0], items[1], items[2]));
 
-        ead_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 2),
-                sequence(slice, 3, items[0], items[2], items[4]));
-        ead_slice((self, 1, yp_SLICE_DEFAULT, 2), sequence(slice, 2, items[1], items[3]));
-        ead_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1),
-                sequence(slice, 5, items[4], items[3], items[2], items[1], items[0]));
-        ead_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -2),
-                sequence(slice, 3, items[4], items[2], items[0]));
-        ead_slice((self, 3, yp_SLICE_DEFAULT, -2), sequence(slice, 2, items[3], items[1]));
-        ead_slice((self, 3, 3, -2), len(slice, 0));
-        ead_slice((self, 3, 2, -2), sequence(slice, 1, items[3]));
-        ead_slice((self, 3, 1, -2), sequence(slice, 1, items[3]));
-        ead_slice((self, 3, 0, -2), sequence(slice, 2, items[3], items[1]));
-        ead_slice((self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -100), sequence(slice, 1, items[4]));
-        ead_slice((self, 100, -100, 1), len(slice, 0));
-        ead_slice((self, -100, 100, 1), obj(slice, eq, self));
-        ead_slice((self, 100, -100, -1),
-                sequence(slice, 5, items[4], items[3], items[2], items[1], items[0]));
-        ead_slice((self, -100, 100, -1), len(slice, 0));
-        ead_slice((self, -100, 100, 2), sequence(slice, 3, items[0], items[2], items[4]));
+        ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 2),
+                assert_sequence(slice, 3, items[0], items[2], items[4]));
+        ead(slice, yp_getsliceC4(self, 1, yp_SLICE_DEFAULT, 2),
+                assert_sequence(slice, 2, items[1], items[3]));
+        ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1),
+                assert_sequence(slice, 5, items[4], items[3], items[2], items[1], items[0]));
+        ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -2),
+                assert_sequence(slice, 3, items[4], items[2], items[0]));
+        ead(slice, yp_getsliceC4(self, 3, yp_SLICE_DEFAULT, -2),
+                assert_sequence(slice, 2, items[3], items[1]));
+        ead(slice, yp_getsliceC4(self, 3, 3, -2), assert_len(slice, 0));
+        ead(slice, yp_getsliceC4(self, 3, 2, -2), assert_sequence(slice, 1, items[3]));
+        ead(slice, yp_getsliceC4(self, 3, 1, -2), assert_sequence(slice, 1, items[3]));
+        ead(slice, yp_getsliceC4(self, 3, 0, -2), assert_sequence(slice, 2, items[3], items[1]));
+        ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -100),
+                assert_sequence(slice, 1, items[4]));
+        ead(slice, yp_getsliceC4(self, 100, -100, 1), assert_len(slice, 0));
+        ead(slice, yp_getsliceC4(self, -100, 100, 1), assert_obj(slice, eq, self));
+        ead(slice, yp_getsliceC4(self, 100, -100, -1),
+                assert_sequence(slice, 5, items[4], items[3], items[2], items[1], items[0]));
+        ead(slice, yp_getsliceC4(self, -100, 100, -1), assert_len(slice, 0));
+        ead(slice, yp_getsliceC4(self, -100, 100, 2),
+                assert_sequence(slice, 3, items[0], items[2], items[4]));
         yp_decref(self);
     }
-#undef ead_slice
+
+    obj_array_fini(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    obj_array_init(items, 2, type->rand_item());
+
+    // Basic index.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *zero = yp_getitem(self, int_0);
+        ypObject *one = yp_getitem(self, int_1);
+        assert_obj(zero, eq, items[0]);
+        assert_obj(one, eq, items[1]);
+        yp_decrefN(3, self, zero, one);
+    }
+
+    // Negative index.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *neg_one = yp_getitem(self, int_neg_1);
+        ypObject *neg_two = yp_getitem(self, int_neg_2);
+        assert_obj(neg_one, eq, items[1]);
+        assert_obj(neg_two, eq, items[0]);
+        yp_decrefN(3, self, neg_one, neg_two);
+    }
+
+    // Out of bounds.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *two = yp_getitem(self, int_2);
+        ypObject *neg_three = yp_getitem(self, int_neg_3);
+        assert_isexception2(two, yp_IndexError);
+        assert_isexception2(neg_three, yp_IndexError);
+        yp_decrefN(3, self, two, neg_three);
+    }
+
+    // Empty self.
+    {
+        ypObject *self = type->newN(0);
+        ypObject *zero = yp_getitem(self, int_0);
+        ypObject *neg_one = yp_getitem(self, int_neg_1);
+        assert_isexception2(zero, yp_IndexError);
+        assert_isexception2(neg_one, yp_IndexError);
+        yp_decrefN(3, self, zero, neg_one);
+    }
 
     obj_array_fini(items);
     return MUNIT_OK;

@@ -518,6 +518,20 @@ extern ypObject *rand_obj_hashable(fixture_type_t *type);
     } while (0)
 
 
+// Handy pre-made objects.
+extern ypObject * const int_neg_5;
+extern ypObject * const int_neg_4;
+extern ypObject * const int_neg_3;
+extern ypObject * const int_neg_2;
+extern ypObject * const int_neg_1;
+extern ypObject * const int_0;
+extern ypObject * const int_1;
+extern ypObject * const int_2;
+extern ypObject * const int_3;
+extern ypObject * const int_4;
+extern ypObject * const int_5;
+
+
 extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size);
 extern void *malloc_tracker_malloc_resize(
         yp_ssize_t *actual, void *p, yp_ssize_t size, yp_ssize_t extra);

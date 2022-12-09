@@ -1286,6 +1286,19 @@ static void initialize_fixture_types(void)
 }
 
 
+yp_IMMORTAL_INT(int_neg_5, -5);
+yp_IMMORTAL_INT(int_neg_4, -4);
+yp_IMMORTAL_INT(int_neg_3, -3);
+yp_IMMORTAL_INT(int_neg_2, -2);
+yp_IMMORTAL_INT(int_neg_1, -1);
+yp_IMMORTAL_INT(int_0, 0);
+yp_IMMORTAL_INT(int_1, 1);
+yp_IMMORTAL_INT(int_2, 2);
+yp_IMMORTAL_INT(int_3, 3);
+yp_IMMORTAL_INT(int_4, 4);
+yp_IMMORTAL_INT(int_5, 5);
+
+
 #define MALLOC_TRACKER_MAX_LEN 1000
 
 // TODO Not currently threadsafe
