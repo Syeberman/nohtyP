@@ -100,7 +100,7 @@ def ApplyMSVSOptions(env, version):
     if env["CONFIGURATION"] == "debug":
         addCcFlags(
             # Runtime checks, disable optimizations
-            "/RTCcsu",
+            "/RTCsu",
             "/Od",
             # Debug multithread and DLL MSVCRT
             "/MDd",
