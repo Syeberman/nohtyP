@@ -580,8 +580,8 @@ static ypObject *rand_item_range(void)
     // There's also a limitation where we want newN_range to act like a sequence, but range does not
     // store duplicates. So keep the lowest byte incrementing to decrease the chance of a collision.
     static yp_int_t low_byte = 0;
-    yp_int_t value = (munit_rand_int_range(-0x3FFFFF, 0x3FFFFF) << 8) | low_byte;
-    ypObject *result = yp_intC(value);
+    yp_int_t        value = (munit_rand_int_range(-0x3FFFFF, 0x3FFFFF) << 8) | low_byte;
+    ypObject       *result = yp_intC(value);
     low_byte = (low_byte + 1) & 0xFF;
     assert_not_exception(result);
     return result;
@@ -1117,7 +1117,7 @@ static ypObject *new_rand_function(const rand_obj_supplier_memo_t *memo)
 {
     yp_parameter_decl_t parameter_decl[] = {{yp_s_star_args}, {yp_s_star_star_kwargs}};
     yp_function_decl_t  decl = {
-             new_rand_function_code, 0, yp_lengthof_array(parameter_decl), parameter_decl};
+            new_rand_function_code, 0, yp_lengthof_array(parameter_decl), parameter_decl};
     ypObject *result = yp_functionC(&decl);
     assert_not_exception(result);
     return result;
@@ -1393,6 +1393,22 @@ extern void fixture_tear_down(fixture_t *fixture)
 
     free(fixture);
 }
+
+
+#if defined(_MSC_VER) && defined(_DEBUG)
+#include <crtdbg.h>
+static int crt_report_hook(int reportType, char *message, int *returnValue)
+{
+    munit_error(message);
+    return TRUE;  // Unreachable.
+}
+
+// Disable the debugger pop-up on Windows, preferring instead to fail the test.
+extern void disable_debugger_popups(void) { _CrtSetReportHook(crt_report_hook); }
+
+#else
+extern void disable_debugger_popups(void) {}
+#endif
 
 
 extern void unittest_initialize(void) { initialize_fixture_types(); }

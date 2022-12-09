@@ -49,7 +49,8 @@ extern "C" {
 #define STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
 #endif
 
-// Work around a preprocessing bug in msvs_120 and earlier: https://stackoverflow.com/a/3985071/770500
+// Work around a preprocessing bug in msvs_120 and earlier:
+// https://stackoverflow.com/a/3985071/770500
 #define _ESC(...) __VA_ARGS__
 
 // clang-format off
@@ -524,6 +525,10 @@ extern void malloc_tracker_free(void *p);
 
 extern fixture_t *fixture_setup(const MunitParameter params[], void *user_data);
 extern void       fixture_tear_down(fixture_t *fixture);
+
+
+// Disables debugger pop-ups, which can freeze CI builds.
+extern void disable_debugger_popups(void);
 
 
 extern void unittest_initialize(void);
