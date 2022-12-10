@@ -393,3 +393,6 @@ static MunitParameterEnum test_sequence_params[] = {
 MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_repeatC, test_sequence_params), TEST(test_getindexC, test_sequence_params),
         TEST(test_getsliceC, test_sequence_params), {NULL}};
+
+
+extern void test_sequence_initialize(void) {}

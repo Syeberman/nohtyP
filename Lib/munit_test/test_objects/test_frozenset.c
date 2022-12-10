@@ -33,3 +33,6 @@ static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture
 //         {param_key_type, param_values_test_objects_set}, {NULL}};
 
 MunitTest test_frozenset_tests[] = {TEST(test_remove, NULL), {NULL}};
+
+
+extern void test_frozenset_initialize(void) {}

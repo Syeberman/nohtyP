@@ -544,7 +544,18 @@ extern void       fixture_tear_down(fixture_t *fixture);
 extern void disable_debugger_popups(void);
 
 
+extern void munit_test_initialize(void);
+
 extern void unittest_initialize(void);
+
+extern void test_unittest_initialize(void);
+
+extern void test_objects_initialize(void);
+extern void test_protocols_initialize(void);
+
+extern void test_frozenset_initialize(void);
+
+extern void test_sequence_initialize(void);
 
 
 #ifdef __cplusplus

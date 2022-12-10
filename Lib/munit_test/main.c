@@ -24,7 +24,7 @@ int main(int argc, char **argv)
         yp_initialize(&args);
     }
 
-    unittest_initialize();
+    munit_test_initialize();
 
     {
         void *user_data = NULL;

@@ -99,7 +99,8 @@
 #define yp_ARCH_32_BIT 1
 #endif
 
-// Similar to PRId64 defined in inttypes.h, this chooses the appropriate format string depending on the compiler.
+// Similar to PRId64 defined in inttypes.h, this chooses the appropriate format string depending on
+// the compiler.
 //
 // - PRIint: for use with yp_int_t
 // - PRIssize: for use with yp_ssize_t
@@ -1362,9 +1363,9 @@ ypObject *const      yp_tuple_empty = yp_CONST_REF(yp_tuple_empty);
 // Empty frozensets can be represented by this, immortal object
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject    _yp_frozenset_empty_struct = {
-           {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
+        {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
                    ypObject_HASH_INVALID, _yp_frozenset_empty_data},
-           0};
+        0};
 ypObject *const yp_frozenset_empty = yp_CONST_REF(yp_frozenset_empty);
 
 
@@ -5612,12 +5613,15 @@ static ypObject *unaryoperation(ypObject *x, unaryLfunc intop, unaryLFfunc float
 }
 
 // Defined here are yp_ineg (et al), and yp_neg (et al)
-#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                    \
-    void yp_i##name(ypObject *x, ypObject **exc)              \
-    {                                                         \
-        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF); \
-    }                                                         \
-    ypObject *yp_##name(ypObject *x) { return unaryoperation(x, yp_##name##L, yp_##name##LF); }
+#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                     \
+    void yp_i##name(ypObject *x, ypObject **exc)               \
+    {                                                          \
+        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF);  \
+    }                                                          \
+    ypObject *yp_##name(ypObject *x)                           \
+    {                                                          \
+        return unaryoperation(x, yp_##name##L, yp_##name##LF); \
+    }
 _ypInt_PUBLIC_UNARY_FUNCTION(neg);
 _ypInt_PUBLIC_UNARY_FUNCTION(pos);
 _ypInt_PUBLIC_UNARY_FUNCTION(abs);
@@ -19371,7 +19375,7 @@ yp_ssize_t yp_findC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j
 {
     yp_ssize_t index;
     ypObject  *result = ypObject_TYPE(sequence)->tp_as_sequence->tp_find(
-             sequence, x, i, j, yp_FIND_FORWARD, &index);
+            sequence, x, i, j, yp_FIND_FORWARD, &index);
     if (yp_isexceptionC(result)) return_yp_CEXC_ERR(-1, exc, result);
     yp_ASSERT(index >= -1, "tp_find cannot return <-1");
     return index;
@@ -19400,7 +19404,7 @@ yp_ssize_t yp_rfindC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 {
     yp_ssize_t index;
     ypObject  *result = ypObject_TYPE(sequence)->tp_as_sequence->tp_find(
-             sequence, x, i, j, yp_FIND_REVERSE, &index);
+            sequence, x, i, j, yp_FIND_REVERSE, &index);
     if (yp_isexceptionC(result)) return_yp_CEXC_ERR(-1, exc, result);
     yp_ASSERT(index >= -1, "tp_find cannot return <-1");
     return index;

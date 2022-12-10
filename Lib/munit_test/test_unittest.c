@@ -161,3 +161,6 @@ static MunitParameterEnum test_types_all_params[] = {
 MunitTest test_unittest_tests[] = {TEST(test_fixture_types, NULL), TEST(test_param_type, NULL),
         TEST(test_fixture_type, test_types_all_params), TEST(test_rand_obj, test_types_all_params),
         {NULL}};
+
+
+extern void test_unittest_initialize(void) {}
