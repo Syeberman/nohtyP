@@ -113,6 +113,9 @@
 #define PRIssize "d"
 #elif defined(_MSC_VER)
 #define PRIssize "I64d"
+#elif defined(__APPLE__)
+// The MacOS X 12.3 SDK defines ssize_t as long (see __darwin_ssize_t in the _types.h files).
+#define PRIssize "ld"
 #elif defined(PRId64)
 #define PRIssize PRId64
 #else
