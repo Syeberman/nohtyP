@@ -16,19 +16,22 @@ RootEnv.Replace(NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0)
 def get_dll(env, target):
     return env.FindIxes(target, 'SHLIBPREFIX', 'SHLIBSUFFIX')
 
-
 def get_implib(env, target):
     # MacOS uses the dll (.dylib) as the import library.
     return env.FindIxes(target, 'LIBPREFIX', 'LIBSUFFIX') or get_dll(env, target)
 
 def get_prog(env, target):
+    target = Flatten(target)
+
     find_ixes = env.FindIxes(target, "PROGPREFIX", "PROGSUFFIX")
     if find_ixes: return find_ixes
 
     # Only Windows uses a suffix. Everything else we have to search.
-    for t in Flatten(target):
+    for t in target:
         if t.exists() and os.access(t.get_abspath(), os.X_OK): return t
-    return None
+
+    # Hopefully it's the first one.
+    return target[0]
 
 
 # Adds nohtyP.dll/libnotyP.so/etc as a target in env
