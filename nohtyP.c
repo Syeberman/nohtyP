@@ -103,7 +103,7 @@
 //
 // - PRIint: for use with yp_int_t
 // - PRIssize: for use with yp_ssize_t
-#if defined(_MSC_VER)  // MSVC
+#if defined(_MSC_VER)
 #define PRIint "I64d"
 #else
 #define PRIint "lld"
@@ -111,11 +111,10 @@
 
 #if defined(yp_ARCH_32_BIT)
 #define PRIssize "d"
-#elif defined(_MSC_VER)  // MSVC
-#define PRIint "I64d"
-#elif defined(SSIZE_MAX)
-// Platforms with ssize_t tend to define it as long it. (See __darwin_ssize_t in _types.h in MacOS X 12.3 SDK.)
-#define PRIssize "ld"
+#elif defined(_MSC_VER)
+#define PRIssize "I64d"
+#elif defined(PRId64)
+#define PRIssize PRId64
 #else
 #define PRIssize "lld"
 #endif
