@@ -129,7 +129,7 @@ static ypObject *rand_obj_terminal_hashable(void)
 static yp_ssize_t fixture_types_immutable_len;
 static ypObject  *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 {
-    assert_ssize(memo->depth, >, 0);
+    assert_ssizeC(memo->depth, >, 0);
     if (memo->depth < 2) {
         return rand_obj_terminal_hashable();
     } else {
@@ -142,7 +142,7 @@ static ypObject  *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 // "Any" may be limited by memo (i.e. we might only return hashable types).
 static ypObject *rand_obj_any1(const rand_obj_supplier_memo_t *memo)
 {
-    assert_ssize(memo->depth, >, 0);
+    assert_ssizeC(memo->depth, >, 0);
     if (memo->only_hashable) {
         return rand_obj_any_hashable1(memo);
     } else if (memo->depth < 2) {
@@ -213,7 +213,7 @@ static ypObject *new_rand_iter_func(ypObject *g, ypObject *value)
     yp_ssize_t           size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, (void **)&state, &size));
-    assert_ssize(size, ==, yp_sizeof(*state));
+    assert_ssizeC(size, ==, yp_sizeof(*state));
 
     if (state->n < 1) return yp_StopIteration;
     state->n--;
@@ -1318,7 +1318,7 @@ static void malloc_tracker_push(void *p)
     assert_not_null(p);  // NULL should be handled before push is called.
 
     // Increase the size of the mallocs array as necessary.
-    assert_ssize(malloc_tracker.len, <, MALLOC_TRACKER_MAX_LEN);
+    assert_ssizeC(malloc_tracker.len, <, MALLOC_TRACKER_MAX_LEN);
 
     // Don't bother deduplicating; that should never happen!
     malloc_tracker.mallocs[malloc_tracker.len] = p;

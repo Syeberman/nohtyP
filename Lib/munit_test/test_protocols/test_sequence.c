@@ -386,13 +386,29 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     return MUNIT_OK;
 }
 
+static MunitResult test_findC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    // FIXME Two _distinct_ items!
+    obj_array_init(items, 2, type->rand_item());
+    ypObject *self = type->newN(2, items[0], items[1]);
+    ypObject *empty = type->newN(0);
+
+    // FIXME Write some tests
+    assert_ssizeC_exc(yp_findC(self, items[0], &exc), ==, 0);
+
+    obj_array_fini(items);
+    yp_decrefN(2, self, empty);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
 
 MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_repeatC, test_sequence_params), TEST(test_getindexC, test_sequence_params),
-        TEST(test_getsliceC, test_sequence_params), {NULL}};
+        TEST(test_getsliceC, test_sequence_params), TEST(test_findC, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}

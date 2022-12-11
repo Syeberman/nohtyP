@@ -6,7 +6,6 @@ extern "C" {
 
 #include "nohtyP.h"
 
-#define MUNIT_ENABLE_ASSERT_ALIASES
 #include "munit.h"
 
 #include <stddef.h>
@@ -186,8 +185,29 @@ extern "C" {
 // FIXME A suite of tests to ensure these assertions are working. They can be
 // MUNIT_TEST_OPTION_TODO, which will fail if they pass.
 
-#define assert_ssize(a, op, b) munit_assert_type(yp_ssize_t, PRIssize, a, op, b)
-#define assert_hashC(a, b) munit_assert_type(yp_hash_t, PRIssize, a, ==, b)
+// A different take on munit_assert_type_full that allows for formatting in the strings for a and b.
+// a and b may be evaluated multiple times (assign to a variable first).
+#define _assert_typeC(a, op, b, val_pri, a_fmt, b_fmt, ...)                                 \
+    do {                                                                                    \
+        if (!(a op b)) {                                                                    \
+            munit_errorf("assertion failed: " a_fmt " " #op " " b_fmt " (%" val_pri " " #op \
+                         " %" val_pri ") ",                                                 \
+                    __VA_ARGS__, a, b);                                                     \
+        }                                                                                   \
+    } while (0)
+
+// a and b may be evaluated multiple times (assign to a variable first).
+#define _assert_ptr(a, op, b, a_fmt, b_fmt, ...) \
+    _assert_typeC(a, op, b, "p", a_fmt, b_fmt, __VA_ARGS__)
+
+// The munit assertions are sufficient: we do not need control over the formatting of a and b.
+#define assert_true(expr) munit_assert_true(expr)
+#define assert_false(expr) munit_assert_false(expr)
+#define assert_ptr(a, op, b) munit_assert_ptr(a, op, b)
+#define assert_null(ptr) munit_assert_null(ptr)
+#define assert_not_null(ptr) munit_assert_not_null(ptr)
+#define assert_ssizeC(a, op, b) munit_assert_type(yp_ssize_t, PRIssize, a, op, b)
+#define assert_hashC(a, op, b) munit_assert_type(yp_hash_t, PRIssize, a, op, b)
 
 // FIXME A better error message to list the exception name.
 #define _assert_not_exception(obj, obj_fmt, ...)                                          \
@@ -212,6 +232,16 @@ extern "C" {
         munit_errorf(non_exc_fmt ": " obj_fmt, __VA_ARGS__);  \
     } while (0)
 
+// statement is only evaluated once.
+#define _assert_not_raises(statement, statement_fmt, ...)                        \
+    do {                                                                         \
+        ypObject *_ypmt_NOT_RAISES_obj = statement;                              \
+        _assert_not_exception(_ypmt_NOT_RAISES_obj, statement_fmt, __VA_ARGS__); \
+    } while (0)
+
+#define assert_not_raises(statement) _assert_not_raises(statement, "%s", #statement)
+
+// statement is only evaluated once.
 #define _assert_not_raises_exc(statement, statement_fmt, ...)                              \
     do {                                                                                   \
         ypObject *exc = NULL;                                                              \
@@ -225,9 +255,9 @@ extern "C" {
         }                                                                                  \
     } while (0)
 
-// For a function that takes `ypObject **exc`, asserts that it does not raise an exception.
-// Statement must include `&exc` for the exception argument, and can include a variable assignment.
-// Example:
+// For a function that takes a `ypObject **exc` argument, asserts that it does not raise an
+// exception. Statement must include `&exc` for the exception argument, and can include a variable
+// assignment. Example:
 //
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
 #define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
@@ -241,14 +271,26 @@ extern "C" {
         }                                                                                \
     } while (0)
 
-// A different take on munit_assert_ptr that gives greater control over the format string.
-#define _assert_ptr(a, op, b, a_fmt, b_fmt, ...)                                           \
-    do {                                                                                   \
-        if (!(a op b)) {                                                                   \
-            munit_errorf("assertion failed: " a_fmt " " #op " " b_fmt " (%p " #op " %p) ", \
-                    __VA_ARGS__, a, b);                                                    \
-        }                                                                                  \
+// A version of _assert_typeC that ensures a_statement and b_statement do not throw an exception via
+// a `ypObject **exc` argument. a_statement and b_statement are only evaluated once.
+#define _assert_typeC_exc(T, a_statement, op, b_statement, val_pri, a_fmt, b_fmt, ...)       \
+    do {                                                                                     \
+        T _ypmt_TYPEC_a;                                                                     \
+        T _ypmt_TYPEC_b;                                                                     \
+        _assert_not_raises_exc(_ypmt_TYPEC_a = (a_statement); _ypmt_TYPEC_b = (b_statement), \
+                               a_fmt " " #op " " b_fmt, __VA_ARGS__);                        \
+        _assert_typeC(_ypmt_TYPEC_a, op, _ypmt_TYPEC_b, val_pri, a_fmt, b_fmt, __VA_ARGS__); \
     } while (0)
+
+// Asserts that neither a nor b raise an exception via a `ypObject **exc` argument. a and b must
+// evaluate to the appropriate type, and at least one of them must be a function call using `&exc`
+// for the exception argument. Example:
+//
+//      assert_ssizeC_exc(yp_findC(obj, item, &exc), ==, 3);
+#define assert_ssizeC_exc(a, op, b) \
+    _assert_typeC_exc(yp_ssize_t, a, op, b, PRIssize, "%s", "%s", #a, #b)
+#define assert_hashC_exc(a, op, b) \
+    _assert_typeC_exc(yp_hash_t, a, op, b, PRIssize, "%s", "%s", #a, #b)
 
 // value is the expected value, either yp_True or yp_False; not_value is the negation of value.
 #define _assert_bool(obj, value, not_value, obj_fmt, ...)                                        \
@@ -306,7 +348,7 @@ extern "C" {
                 #expected);                                                                  \
     } while (0)
 
-// XXX expected must be a yp_ssize_t!
+// XXX expected must be a yp_ssize_t.
 #define _assert_len(obj, expected, obj_fmt, expected_fmt, ...)                           \
     do {                                                                                 \
         yp_ssize_t _ypmt_LEN_actual;                                                     \
