@@ -247,10 +247,13 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     {
         slice_args_t slices[] = {
                 {0, 0, 1},      // typical empty slice
-                {5, 99, 1},     // if i>=len(s) and k>0, the slice is empty, regardless of j
-                {-6, -99, -1},  // if i<-len(s) and k<0, the slice is empty, regardless of j
-                {99, 5, -1},    // if j>=len(s) and k<0, the slice is empty, regardless of i
-                {-99, -6, 1},   // if j<-len(s) and k>0, the slice is empty, regardless of i
+                {5, 99, 1},     // i>=len(s) and k>0 (regardless of j)
+                {-6, -99, -1},  // i<-len(s) and k<0 (regardless of j)
+                {99, 5, -1},    // j>=len(s) and k<0 (regardless of i)
+                {-99, -6, 1},   // j<-len(s) and k>0 (regardless of i)
+                {4, 4, 1},      // i=j (regardless of k)
+                {1, 0, 1},      // i>j and k>0
+                {0, 1, -1},     // i<j and k<0
         };
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
@@ -371,13 +374,133 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 static MunitResult test_findC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    // FIXME Two _distinct_ items!
-    ypObject *items[] = obj_array_init(2, type->rand_item());
-    ypObject *self = type->newN(2, items[0], items[1]);
-    ypObject *empty = type->newN(0);
+    ypObject       *items[3];
+    ypObject       *self;
+    ypObject       *empty = type->newN(0);
+    obj_array_fill(items, type->rand_items);
+    self = type->newN(2, items[0], items[1]);
 
-    // FIXME Write some tests
+    // Basic find.
     assert_ssizeC_exc(yp_findC(self, items[0], &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC(self, items[1], &exc), ==, 1);
+
+    // Not in sequence.
+    assert_ssizeC_exc(yp_findC(self, items[2], &exc), ==, -1);
+
+    // Empty self.
+    assert_ssizeC_exc(yp_findC(empty, items[0], &exc), ==, -1);
+
+    // Basic slice.
+    assert_ssizeC_exc(yp_findC5(self, items[0], 0, 1, &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC5(self, items[0], 1, 2, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], 0, 1, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], 1, 2, &exc), ==, 1);
+
+    // Negative indicies.
+    assert_ssizeC_exc(yp_findC5(self, items[0], -2, -1, &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC5(self, items[0], -1, 2, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], -2, -1, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], -1, 2, &exc), ==, 1);
+
+    // Total slice.
+    assert_ssizeC_exc(yp_findC5(self, items[0], 0, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC5(self, items[1], 0, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_findC5(self, items[2], 0, 2, &exc), ==, -1);
+
+    // Total slice, negative indicies.
+    assert_ssizeC_exc(yp_findC5(self, items[0], -2, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC5(self, items[1], -2, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_findC5(self, items[2], -2, 2, &exc), ==, -1);
+
+    // Empty slices.
+    {
+        slice_args_t slices[] = {
+                // recall step is always 1 for find
+                {0, 0, 1},     // typical empty slice
+                {2, 99, 1},    // i>=len(s) and k>0 (regardless of j)
+                {-99, -3, 1},  // j<-len(s) and k>0 (regardless of i)
+                {2, 2, 1},     // i=j (regardless of k)
+                {1, 0, 1},     // i>j and k>0
+                {-1, -3, 1},   // reverse total slice...but k is always 1
+        };
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(slices); i++) {
+            slice_args_t args = slices[i];
+            assert_ssizeC_exc(yp_findC5(self, items[0], args.start, args.stop, &exc), ==, -1);
+            assert_ssizeC_exc(yp_findC5(self, items[1], args.start, args.stop, &exc), ==, -1);
+            assert_ssizeC_exc(yp_findC5(self, items[2], args.start, args.stop, &exc), ==, -1);
+        }
+    }
+
+    // yp_SLICE_DEFAULT.
+    assert_ssizeC_exc(yp_findC5(self, items[0], yp_SLICE_DEFAULT, 1, &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC5(self, items[0], 0, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC5(self, items[0], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC5(self, items[1], yp_SLICE_DEFAULT, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], 1, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(yp_findC5(self, items[2], yp_SLICE_DEFAULT, 2, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[2], 0, yp_SLICE_DEFAULT, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[2], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, -1);
+
+    // yp_SLICE_LAST.
+    assert_ssizeC_exc(yp_findC5(self, items[0], yp_SLICE_LAST, 2, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[0], 0, yp_SLICE_LAST, &exc), ==, 0);
+    assert_ssizeC_exc(yp_findC5(self, items[0], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], yp_SLICE_LAST, 2, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], 1, yp_SLICE_LAST, &exc), ==, 1);
+    assert_ssizeC_exc(yp_findC5(self, items[1], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[2], yp_SLICE_LAST, 2, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[2], 0, yp_SLICE_LAST, &exc), ==, -1);
+    assert_ssizeC_exc(yp_findC5(self, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, -1);
+
+    // If multiples, find the first. Recall patterned sequences like range don't store duplicates.
+    if (!type->is_patterned) {
+        ypObject *multi = type->newN(3, items[2], items[2], items[2]);
+        assert_ssizeC_exc(yp_findC(multi, items[2], &exc), ==, 0);
+        assert_ssizeC_exc(yp_findC5(multi, items[2], 0, 2, &exc), ==, 0);    // Basic slice.
+        assert_ssizeC_exc(yp_findC5(multi, items[2], 1, 3, &exc), ==, 1);    // Basic slice.
+        assert_ssizeC_exc(yp_findC5(multi, items[2], -3, -1, &exc), ==, 0);  // Neg indicies.
+        assert_ssizeC_exc(yp_findC5(multi, items[2], -2, 3, &exc), ==, 1);   // Neg indicies.
+        assert_ssizeC_exc(yp_findC5(multi, items[2], 0, 3, &exc), ==, 0);    // Total slice.
+        assert_ssizeC_exc(yp_findC5(multi, items[2], -3, 3, &exc), ==, 0);   // Total neg ind.
+        yp_decref(multi);
+    }
+
+    if (type->is_string) {
+        // For strings, find looks for sub-sequences of items.
+        ypObject *string = type->newN(3, items[0], items[1], items[2]);
+        ypObject *other_0_1 = type->newN(2, items[0], items[1]);
+        ypObject *other_1_2 = type->newN(2, items[1], items[2]);
+        ypObject *other_0_2 = type->newN(2, items[0], items[2]);
+        ypObject *other_1_0 = type->newN(2, items[1], items[0]);
+
+        assert_ssizeC_exc(yp_findC(string, other_0_1, &exc), ==, 0);   // Sub-string.
+        assert_ssizeC_exc(yp_findC(string, other_1_2, &exc), ==, 1);   // Sub-string.
+        assert_ssizeC_exc(yp_findC(string, other_0_2, &exc), ==, -1);  // Out-of-order.
+        assert_ssizeC_exc(yp_findC(string, other_1_0, &exc), ==, -1);  // Out-of-order.
+        assert_ssizeC_exc(yp_findC(string, string, &exc), ==, 0);      // Self.
+
+        assert_ssizeC_exc(yp_findC5(string, other_0_1, 0, 3, &exc), ==, 0);   // Total slice.
+        assert_ssizeC_exc(yp_findC5(string, other_0_1, 0, 2, &exc), ==, 0);   // Exact slice.
+        assert_ssizeC_exc(yp_findC5(string, other_0_1, 0, 1, &exc), ==, -1);  // Too-small slice.
+        assert_ssizeC_exc(yp_findC5(string, other_0_1, 0, 0, &exc), ==, -1);  // Empty slice.
+
+        assert_ssizeC_exc(yp_findC5(string, other_1_2, 1, 3, &exc), ==, 1);   // Exact slice.
+        assert_ssizeC_exc(yp_findC5(string, other_1_2, 1, 2, &exc), ==, -1);  // Too-small slice.
+        assert_ssizeC_exc(yp_findC5(string, other_1_2, 1, 1, &exc), ==, -1);  // Empty slice.
+
+        // FIXME That empty slice bug thing. Anything else to add here?
+        // FIXME empty (from above)
+
+        yp_decrefN(5, string, other_0_1, other_1_2, other_0_2, other_1_0);
+
+    } else {
+        // All other sequences inspect only one item at a time.
+        ypObject *seq = type->newN(3, items[0], items[1], items[2]);
+        assert_ssizeC_exc(yp_findC(seq, seq, &exc), ==, -1);
+        yp_decref(seq);
+    }
 
     obj_array_decref(items);
     yp_decrefN(2, self, empty);

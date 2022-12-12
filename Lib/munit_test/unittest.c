@@ -650,11 +650,10 @@ static ypObject *rand_item_range(void)
 static void rand_items_range(yp_ssize_t n, ypObject **array)
 {
     yp_ssize_t i;
-    yp_int_t   item = range_rand_start();
+    yp_int_t   start = range_rand_start();
     yp_int_t   step = range_rand_step();
     for (i = 0; i < n; i++) {
-        assert_not_raises(array[i] = yp_intC(item));
-        item += step;
+        assert_not_raises(array[i] = yp_intC(start + (i * step)));
     }
 }
 
