@@ -42,6 +42,11 @@ static ypObject *objvarargfunc_error(int n, ...)
     return NULL;
 }
 
+static void voidarrayfunc_error(yp_ssize_t n, ypObject **array)
+{
+    munit_error("unsupported operation");
+}
+
 
 // Returns a random yp_int_t value. Prioritizes zero and small numbers.
 static yp_int_t rand_intC(void)
@@ -198,6 +203,45 @@ ypObject *rand_obj_any(void)
     return rand_obj_any1(&memo);
 }
 
+static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
+{
+    yp_ssize_t i;
+    ypObject  *result;
+    for (i = 0; i < n; i++) {
+        assert_not_raises(result = yp_eq(array[i], x));
+        if (result == yp_True) return TRUE;
+    }
+    return FALSE;
+}
+
+// Fills array with n unique objects as returned by supplier.
+static void rand_objs3(yp_ssize_t n, ypObject **array, objvoidfunc supplier)
+{
+    yp_ssize_t max_dups = n + 10;  // Ensure we don't loop indefinitely with a bad supplier.
+    yp_ssize_t fill = 0;
+    while (fill < n) {
+        array[fill] = supplier();  // new ref
+        if (array_contains(fill, array, array[fill])) {
+            max_dups--;
+            if (max_dups < 1) munit_error("too many duplicate objects returned");
+            yp_decref(array[fill]);  // Not unique, so discard it.
+        } else {
+            fill++;  // Unique, so keep it.
+        }
+    }
+}
+
+static void rand_objs_byte(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_byte); }
+
+static void rand_objs_chr(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_chr); }
+
+static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
+{
+    rand_objs3(n, array, rand_obj_any_hashable);
+}
+
+static void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
+
 
 typedef struct _new_rand_iter_state {
     yp_ssize_t               n;
@@ -250,6 +294,7 @@ static fixture_type_t fixture_type_type_struct = {
 
         objvarargfunc_error,  // newN
         objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -280,6 +325,7 @@ static fixture_type_t fixture_type_NoneType_struct = {
 
         objvarargfunc_error,  // newN
         objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -316,6 +362,7 @@ static fixture_type_t fixture_type_bool_struct = {
 
         objvarargfunc_error,  // newN
         objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -350,6 +397,7 @@ static fixture_type_t fixture_type_int_struct = {
 
         objvarargfunc_error,  // newN
         objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -384,6 +432,7 @@ static fixture_type_t fixture_type_intstore_struct = {
 
         objvarargfunc_error,  // newN
         objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -418,6 +467,7 @@ static fixture_type_t fixture_type_float_struct = {
 
         objvarargfunc_error,  // newN
         objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -452,6 +502,7 @@ static fixture_type_t fixture_type_floatstore_struct = {
 
         objvarargfunc_error,  // newN
         objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -499,8 +550,9 @@ static fixture_type_t fixture_type_iter_struct = {
 
         new_rand_iter,  // _new_rand
 
-        newN_iter,     // newN
-        rand_obj_any,  // rand_item
+        newN_iter,      // newN
+        rand_obj_any,   // rand_item
+        rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -519,55 +571,61 @@ static fixture_type_t fixture_type_iter_struct = {
 };
 
 // TODO Ranges that cover more values, not just 32-bit-ish.
+static yp_int_t range_rand_start(void) { return (yp_int_t)((yp_int32_t)munit_rand_uint32()); }
+static yp_int_t range_rand_step(void)
+{
+    yp_int_t step = (yp_int_t)munit_rand_int_range(-128, 128);
+    if (step == 0) step = 129;
+    return step;
+}
+
 static ypObject *new_rand_range(const rand_obj_supplier_memo_t *memo)
 {
     if (RAND_OBJ_RETURN_FALSY()) {
         return yp_range_empty;
     } else {
-        ypObject *result;
-        yp_int_t  start = (yp_int_t)((yp_int32_t)munit_rand_uint32());
+        yp_int_t  start = range_rand_start();
         yp_int_t  len = (yp_int_t)munit_rand_int_range(1, 256);
-        yp_int_t  step = (yp_int_t)munit_rand_int_range(-128, 128);
-        if (step == 0) step = 1;  // This makes step=1 more likely.
-
-        result = yp_rangeC3(start, start + (step * len), step);
+        yp_int_t  step = range_rand_step();
+        ypObject *result = yp_rangeC3(start, start + (step * len), step);
         assert_not_exception(result);
         return result;
     }
 }
 
-// Because range's items must follow a pattern, there's a limit to the objects we can create with
-// newN. We can construct a range between any two integers from rand_item_range, so start there.
-// This allows newN to work with "any" items, so long as there are two or less.
-// XXX Will fail the test if the two numbers are equal, as range only contains unique values.
+// XXX The arguments must follow a valid range pattern, in order. Note that rand_items_range creates
+// objects that follow this pattern.
 static ypObject *newN_range(int n, ...)
 {
     va_list   args;
-    yp_int_t  first;
-    yp_int_t  second;
+    yp_int_t  start;
+    yp_int_t  stop;
+    yp_int_t  step;
+    int       i;
     ypObject *result;
 
-    va_start(args, n);
-    if (n > 0) assert_not_raises_exc(first = yp_asintC(va_arg(args, ypObject *), &exc));
-    if (n > 1) assert_not_raises_exc(second = yp_asintC(va_arg(args, ypObject *), &exc));
-    va_end(args);
+    if (n < 1) return yp_range_empty;
 
-    if (n < 1) {
-        result = yp_range_empty;
-    } else if (n == 1) {
-        result = yp_rangeC3(first, first + 1, 1);
-    } else if (n == 2) {
-        if (first < second) {
-            result = yp_rangeC3(first, second + 1, second - first);
-        } else if (first == second) {
-            munit_errorf("newN_range called with same number twice (%" PRIint ")", first);
-        } else {
-            result = yp_rangeC3(first, second - 1, second - first);
-        }
-    } else {
-        munit_errorf("newN_range unable to create range containing %d items", n);
+    va_start(args, n);
+    assert_not_raises_exc(start = yp_asintC(va_arg(args, ypObject *), &exc));
+    if (n < 2) {
+        stop = start + 1;
+        step = 1;
+        goto args_end;
     }
 
+    assert_not_raises_exc(step = yp_asintC(va_arg(args, ypObject *), &exc) - start);
+    assert_intC(step, !=, 0);
+    stop = start + (n * step);
+
+    // Ensure the remaining items match the pattern.
+    for (i = 2; i < n; i++) {
+        assert_intC_exc(yp_asintC(va_arg(args, ypObject *), &exc), ==, start + (i * step));
+    }
+args_end:
+    va_end(args);
+
+    result = yp_rangeC3(start, stop, step);
     assert_not_exception(result);
     return result;
 }
@@ -587,6 +645,19 @@ static ypObject *rand_item_range(void)
     return result;
 }
 
+// Fills array with n integers that cover a range with a random start and step. Any slice of these
+// integers is suitable to pass to newN_range to construct a new range.
+static void rand_items_range(yp_ssize_t n, ypObject **array)
+{
+    yp_ssize_t i;
+    yp_int_t   item = range_rand_start();
+    yp_int_t   step = range_rand_step();
+    for (i = 0; i < n; i++) {
+        assert_not_raises(array[i] = yp_intC(item));
+        item += step;
+    }
+}
+
 static fixture_type_t fixture_type_range_struct = {
         "range",                     // name
         NULL,                        // type (initialized at runtime)
@@ -595,8 +666,9 @@ static fixture_type_t fixture_type_range_struct = {
 
         new_rand_range,  // _new_rand
 
-        newN_range,       // newN
-        rand_item_range,  // rand_item
+        newN_range,        // newN
+        rand_item_range,   // rand_item
+        rand_items_range,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -654,8 +726,9 @@ static fixture_type_t fixture_type_bytes_struct = {
 
         new_rand_bytes,  // _new_rand
 
-        newN_bytes,     // newN
-        rand_obj_byte,  // rand_item
+        newN_bytes,      // newN
+        rand_obj_byte,   // rand_item
+        rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -715,6 +788,7 @@ static fixture_type_t fixture_type_bytearray_struct = {
 
         newN_bytearray,  // newN
         rand_obj_byte,   // rand_item
+        rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -776,8 +850,9 @@ static fixture_type_t fixture_type_str_struct = {
 
         new_rand_str,  // _new_rand
 
-        newN_str,      // newN
-        rand_obj_chr,  // rand_item
+        newN_str,       // newN
+        rand_obj_chr,   // rand_item
+        rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -841,6 +916,7 @@ static fixture_type_t fixture_type_chrarray_struct = {
 
         newN_chrarray,  // newN
         rand_obj_chr,   // rand_item
+        rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -880,8 +956,9 @@ static fixture_type_t fixture_type_tuple_struct = {
 
         new_rand_tuple,  // _new_rand
 
-        yp_tupleN,     // newN
-        rand_obj_any,  // rand_item
+        yp_tupleN,      // newN
+        rand_obj_any,   // rand_item
+        rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -921,8 +998,9 @@ static fixture_type_t fixture_type_list_struct = {
 
         new_rand_list,  // _new_rand
 
-        yp_listN,      // newN
-        rand_obj_any,  // rand_item
+        yp_listN,       // newN
+        rand_obj_any,   // rand_item
+        rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -963,8 +1041,9 @@ static fixture_type_t fixture_type_frozenset_struct = {
 
         new_rand_frozenset,  // _new_rand
 
-        yp_frozensetN,          // newN
-        rand_obj_any_hashable,  // rand_item
+        yp_frozensetN,           // newN
+        rand_obj_any_hashable,   // rand_item
+        rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -1005,8 +1084,9 @@ static fixture_type_t fixture_type_set_struct = {
 
         new_rand_set,  // _new_rand
 
-        yp_setN,                // newN
-        rand_obj_any_hashable,  // rand_item
+        yp_setN,                 // newN
+        rand_obj_any_hashable,   // rand_item
+        rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -1048,7 +1128,8 @@ static fixture_type_t fixture_type_frozendict_struct = {
         new_rand_frozendict,  // _new_rand
 
         objvarargfunc_error,  // newN
-        rand_obj_any,         // rand_item
+        objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         yp_frozendictK,         // newK
         rand_obj_any_hashable,  // rand_key
@@ -1090,7 +1171,8 @@ static fixture_type_t fixture_type_dict_struct = {
         new_rand_dict,  // _new_rand
 
         objvarargfunc_error,  // newN
-        rand_obj_any,         // rand_item
+        objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         yp_dictK,               // newK
         rand_obj_any_hashable,  // rand_key
@@ -1133,6 +1215,7 @@ static fixture_type_t fixture_type_function_struct = {
 
         objvarargfunc_error,  // newN
         objvoidfunc_error,    // rand_item
+        voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
         objvoidfunc_error,    // rand_key
@@ -1283,6 +1366,17 @@ static void initialize_fixture_types(void)
     FILL_TYPE_ARRAYS(set);
     FILL_TYPE_ARRAYS(mapping);
 #undef FILL_TYPE_ARRAYS
+}
+
+
+extern void obj_array_decref2(yp_ssize_t n, ypObject **array)
+{
+    yp_ssize_t i;
+    if (n < 1) return;
+    for (i = 0; i < n; i++) {
+        if (array[i] != NULL) yp_decref(array[i]);
+    }
+    memset(array, 0, ((size_t)n) * sizeof(ypObject *));  // FIXME necessary?
 }
 
 

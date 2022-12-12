@@ -100,19 +100,7 @@ static MunitResult test_fixture_type(const MunitParameter params[], fixture_t *f
         assert_type_is(type->falsy, type->type);
     }
     assert_not_null(type->pair);
-    assert_not_null(type->_new_rand);
-    if (type->newN == NULL) {
-        assert_null(type->rand_item);
-    } else {
-        assert_not_null(type->rand_item);
-    }
-    if (type->newK == NULL) {
-        assert_null(type->rand_key);
-        assert_null(type->rand_value);
-    } else {
-        assert_not_null(type->rand_key);
-        assert_not_null(type->rand_value);
-    }
+    // TODO Test the suppliers more than just "not NULL"?
     // Property flags are tested implicitly by test_fixture_types.
 
     return MUNIT_OK;

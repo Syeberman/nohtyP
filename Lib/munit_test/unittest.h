@@ -206,6 +206,7 @@ extern "C" {
 #define assert_ptr(a, op, b) munit_assert_ptr(a, op, b)
 #define assert_null(ptr) munit_assert_null(ptr)
 #define assert_not_null(ptr) munit_assert_not_null(ptr)
+#define assert_intC(a, op, b) munit_assert_type(yp_int_t, PRIint, a, op, b)
 #define assert_ssizeC(a, op, b) munit_assert_type(yp_ssize_t, PRIssize, a, op, b)
 #define assert_hashC(a, op, b) munit_assert_type(yp_hash_t, PRIssize, a, op, b)
 
@@ -287,6 +288,7 @@ extern "C" {
 // for the exception argument. Example:
 //
 //      assert_ssizeC_exc(yp_findC(obj, item, &exc), ==, 3);
+#define assert_intC_exc(a, op, b) _assert_typeC_exc(yp_int_t, a, op, b, PRIint, "%s", "%s", #a, #b)
 #define assert_ssizeC_exc(a, op, b) \
     _assert_typeC_exc(yp_ssize_t, a, op, b, PRIssize, "%s", "%s", #a, #b)
 #define assert_hashC_exc(a, op, b) \
@@ -420,10 +422,12 @@ extern "C" {
 
 typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objvarargfunc)(int, ...);
+typedef void (*voidarrayfunc)(yp_ssize_t, ypObject **);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
 typedef ypObject *(*rand_obj_supplier_t)(const rand_obj_supplier_memo_t *);
 
 // Any methods or arguments here that don't apply to a given type will fail the test.
+// FIXME Review all these at the end to see what is actually needed.
 typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
     char           *name;   // The name of the type (i.e. int, bytearray, dict).
@@ -436,8 +440,9 @@ typedef struct _fixture_type_t {
     // Functions for non-mapping iterables, where rand_item returns an object that can be yielded by
     // the associated iterator, accepted by newN (if supported), and returned by yp_getitem (if
     // supported).
-    objvarargfunc newN;       // Creates a iterable for the given items (i.e. yp_tupleN).
-    objvoidfunc   rand_item;  // Creates a random object to store in the iterable.
+    objvarargfunc newN;        // Creates a iterable for the given items (i.e. yp_tupleN).
+    objvoidfunc   rand_item;   // Creates a random object to store in the iterable.
+    voidarrayfunc rand_items;  // Fills an array with n random, unique objects.
 
     // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
     // yp_getitem returns values.
@@ -525,37 +530,28 @@ extern ypObject *rand_obj(fixture_type_t *type);
 extern ypObject *rand_obj_hashable(fixture_type_t *type);
 
 
-// Declares a ypObject * array of length n and populates it by executing expression n times. name
-// must be a valid variable name. n must be an integer literal.
-// Example:
+// Initializes a ypObject * array of length n with values from expression. Expression is evaluated n
+// times. n must be an integer literal. Example:
 //
-//      obj_array_init(items, 5, type->rand_item());  // Declares ypObject *items[5];
-#define obj_array_init(name, n, expression) ypObject *name[] = {_COMMA_REPEAT##n((expression))}
+//      ypObject *items[] = obj_array_init(5, type->rand_item());
+#define obj_array_init(n, expression)  \
+    {                                  \
+        _COMMA_REPEAT##n((expression)) \
+    }
 
-#define _obj_array_fini(array, n)                                                  \
-    do {                                                                           \
-        yp_ssize_t _ypmt_OBJ_ARR_i;                                                \
-        for (_ypmt_OBJ_ARR_i = 0; _ypmt_OBJ_ARR_i < n; _ypmt_OBJ_ARR_i++) {        \
-            if (array[_ypmt_OBJ_ARR_i] != NULL) yp_decref(array[_ypmt_OBJ_ARR_i]); \
-        }                                                                          \
-        memset(array, 0, n * sizeof(ypObject *)); /* FIXME necessary? */           \
-    } while (0)
+// Fills the ypObject * array using the given filler. Only call for arrays of fixed size (uses
+// yp_lengthof_array). Example:
+//
+//      ypObject *items[5];
+//      obj_array_fill(items, type->rand_items);
+#define obj_array_fill(array, filler) (filler)(yp_lengthof_array(array), (array))
+
+// Discards all references in the ypObject * array of length n.
+extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 
 // Discards all references in the ypObject * array. Only call for arrays of fixed size (uses
 // yp_lengthof_array).
-#define obj_array_fini(name)                                           \
-    do {                                                               \
-        ypObject **_ypmt_OBJ_ARR_array = (name);                       \
-        _obj_array_fini(_ypmt_OBJ_ARR_array, yp_lengthof_array(name)); \
-    } while (0)
-
-// Discards all references in the ypObject * array of length n. Prefer obj_array_fini when possible.
-#define obj_array_fini2(name, n)                                                           \
-    do {                                                                                   \
-        ypObject **_ypmt_OBJ_ARR_array = (name); /* FIXME does this hide bounds checks? */ \
-        ypObject **_ypmt_OBJ_ARR_n = (n);                                                  \
-        _obj_array_fini(_ypmt_OBJ_ARR_array, _ypmt_OBJ_ARR_n);                             \
-    } while (0)
+#define obj_array_decref(array) obj_array_decref2(yp_lengthof_array(array), (array))
 
 
 // Handy pre-made objects.
