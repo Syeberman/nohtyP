@@ -383,37 +383,44 @@ static MunitResult _test_findC(fixture_type_t *type,
     obj_array_fill(items, type->rand_items);
     self = type->newN(2, items[0], items[1]);
 
+#define assert_not_found_exc(expression)                     \
+    do {                                                     \
+        ypObject *exc = yp_None;                             \
+        assert_ssizeC(expression, ==, -1);                   \
+        if (raises) assert_isexception2(exc, yp_ValueError); \
+    } while (0)
+
     // Basic find.
     assert_ssizeC_exc(any_findC(self, items[0], &exc), ==, 0);
     assert_ssizeC_exc(any_findC(self, items[1], &exc), ==, 1);
 
     // Not in sequence.
-    assert_ssizeC_exc(any_findC(self, items[2], &exc), ==, -1);
+    assert_not_found_exc(any_findC(self, items[2], &exc));
 
     // Empty self.
-    assert_ssizeC_exc(any_findC(empty, items[0], &exc), ==, -1);
+    assert_not_found_exc(any_findC(empty, items[0], &exc));
 
     // Basic slice.
     assert_ssizeC_exc(any_findC5(self, items[0], 0, 1, &exc), ==, 0);
-    assert_ssizeC_exc(any_findC5(self, items[0], 1, 2, &exc), ==, -1);
-    assert_ssizeC_exc(any_findC5(self, items[1], 0, 1, &exc), ==, -1);
+    assert_not_found_exc(any_findC5(self, items[0], 1, 2, &exc));
+    assert_not_found_exc(any_findC5(self, items[1], 0, 1, &exc));
     assert_ssizeC_exc(any_findC5(self, items[1], 1, 2, &exc), ==, 1);
 
     // Negative indicies.
     assert_ssizeC_exc(any_findC5(self, items[0], -2, -1, &exc), ==, 0);
-    assert_ssizeC_exc(any_findC5(self, items[0], -1, 2, &exc), ==, -1);
-    assert_ssizeC_exc(any_findC5(self, items[1], -2, -1, &exc), ==, -1);
+    assert_not_found_exc(any_findC5(self, items[0], -1, 2, &exc));
+    assert_not_found_exc(any_findC5(self, items[1], -2, -1, &exc));
     assert_ssizeC_exc(any_findC5(self, items[1], -1, 2, &exc), ==, 1);
 
     // Total slice.
     assert_ssizeC_exc(any_findC5(self, items[0], 0, 2, &exc), ==, 0);
     assert_ssizeC_exc(any_findC5(self, items[1], 0, 2, &exc), ==, 1);
-    assert_ssizeC_exc(any_findC5(self, items[2], 0, 2, &exc), ==, -1);
+    assert_not_found_exc(any_findC5(self, items[2], 0, 2, &exc));
 
     // Total slice, negative indicies.
     assert_ssizeC_exc(any_findC5(self, items[0], -2, 2, &exc), ==, 0);
     assert_ssizeC_exc(any_findC5(self, items[1], -2, 2, &exc), ==, 1);
-    assert_ssizeC_exc(any_findC5(self, items[2], -2, 2, &exc), ==, -1);
+    assert_not_found_exc(any_findC5(self, items[2], -2, 2, &exc));
 
     // Empty slices.
     {
@@ -429,9 +436,9 @@ static MunitResult _test_findC(fixture_type_t *type,
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
-            assert_ssizeC_exc(any_findC5(self, items[0], args.start, args.stop, &exc), ==, -1);
-            assert_ssizeC_exc(any_findC5(self, items[1], args.start, args.stop, &exc), ==, -1);
-            assert_ssizeC_exc(any_findC5(self, items[2], args.start, args.stop, &exc), ==, -1);
+            assert_not_found_exc(any_findC5(self, items[0], args.start, args.stop, &exc));
+            assert_not_found_exc(any_findC5(self, items[1], args.start, args.stop, &exc));
+            assert_not_found_exc(any_findC5(self, items[2], args.start, args.stop, &exc));
         }
     }
 
@@ -442,20 +449,20 @@ static MunitResult _test_findC(fixture_type_t *type,
     assert_ssizeC_exc(any_findC5(self, items[1], yp_SLICE_DEFAULT, 2, &exc), ==, 1);
     assert_ssizeC_exc(any_findC5(self, items[1], 1, yp_SLICE_DEFAULT, &exc), ==, 1);
     assert_ssizeC_exc(any_findC5(self, items[1], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
-    assert_ssizeC_exc(any_findC5(self, items[2], yp_SLICE_DEFAULT, 2, &exc), ==, -1);
-    assert_ssizeC_exc(any_findC5(self, items[2], 0, yp_SLICE_DEFAULT, &exc), ==, -1);
-    assert_ssizeC_exc(any_findC5(self, items[2], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, -1);
+    assert_not_found_exc(any_findC5(self, items[2], yp_SLICE_DEFAULT, 2, &exc));
+    assert_not_found_exc(any_findC5(self, items[2], 0, yp_SLICE_DEFAULT, &exc));
+    assert_not_found_exc(any_findC5(self, items[2], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc));
 
     // yp_SLICE_LAST.
-    assert_ssizeC_exc(any_findC5(self, items[0], yp_SLICE_LAST, 2, &exc), ==, -1);
+    assert_not_found_exc(any_findC5(self, items[0], yp_SLICE_LAST, 2, &exc));
     assert_ssizeC_exc(any_findC5(self, items[0], 0, yp_SLICE_LAST, &exc), ==, 0);
-    assert_ssizeC_exc(any_findC5(self, items[0], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, -1);
-    assert_ssizeC_exc(any_findC5(self, items[1], yp_SLICE_LAST, 2, &exc), ==, -1);
+    assert_not_found_exc(any_findC5(self, items[0], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
+    assert_not_found_exc(any_findC5(self, items[1], yp_SLICE_LAST, 2, &exc));
     assert_ssizeC_exc(any_findC5(self, items[1], 1, yp_SLICE_LAST, &exc), ==, 1);
-    assert_ssizeC_exc(any_findC5(self, items[1], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, -1);
-    assert_ssizeC_exc(any_findC5(self, items[2], yp_SLICE_LAST, 2, &exc), ==, -1);
-    assert_ssizeC_exc(any_findC5(self, items[2], 0, yp_SLICE_LAST, &exc), ==, -1);
-    assert_ssizeC_exc(any_findC5(self, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, -1);
+    assert_not_found_exc(any_findC5(self, items[1], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
+    assert_not_found_exc(any_findC5(self, items[2], yp_SLICE_LAST, 2, &exc));
+    assert_not_found_exc(any_findC5(self, items[2], 0, yp_SLICE_LAST, &exc));
+    assert_not_found_exc(any_findC5(self, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
 
     // If multiples, which one is found depends on the direction. Recall patterned sequences like
     // range don't store duplicates.
@@ -479,20 +486,20 @@ static MunitResult _test_findC(fixture_type_t *type,
         ypObject *other_0_2 = type->newN(2, items[0], items[2]);
         ypObject *other_1_0 = type->newN(2, items[1], items[0]);
 
-        assert_ssizeC_exc(any_findC(string, other_0_1, &exc), ==, 0);   // Sub-string.
-        assert_ssizeC_exc(any_findC(string, other_1_2, &exc), ==, 1);   // Sub-string.
-        assert_ssizeC_exc(any_findC(string, other_0_2, &exc), ==, -1);  // Out-of-order.
-        assert_ssizeC_exc(any_findC(string, other_1_0, &exc), ==, -1);  // Out-of-order.
-        assert_ssizeC_exc(any_findC(string, string, &exc), ==, 0);      // Self.
+        assert_ssizeC_exc(any_findC(string, other_0_1, &exc), ==, 0);  // Sub-string.
+        assert_ssizeC_exc(any_findC(string, other_1_2, &exc), ==, 1);  // Sub-string.
+        assert_not_found_exc(any_findC(string, other_0_2, &exc));      // Out-of-order.
+        assert_not_found_exc(any_findC(string, other_1_0, &exc));      // Out-of-order.
+        assert_ssizeC_exc(any_findC(string, string, &exc), ==, 0);     // Self.
 
-        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 3, &exc), ==, 0);   // Total slice.
-        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 2, &exc), ==, 0);   // Exact slice.
-        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 1, &exc), ==, -1);  // Too-small slice.
-        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 0, &exc), ==, -1);  // Empty slice.
+        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 3, &exc), ==, 0);  // Total slice.
+        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 2, &exc), ==, 0);  // Exact slice.
+        assert_not_found_exc(any_findC5(string, other_0_1, 0, 1, &exc));      // Too-small slice.
+        assert_not_found_exc(any_findC5(string, other_0_1, 0, 0, &exc));      // Empty slice.
 
-        assert_ssizeC_exc(any_findC5(string, other_1_2, 1, 3, &exc), ==, 1);   // Exact slice.
-        assert_ssizeC_exc(any_findC5(string, other_1_2, 1, 2, &exc), ==, -1);  // Too-small slice.
-        assert_ssizeC_exc(any_findC5(string, other_1_2, 1, 1, &exc), ==, -1);  // Empty slice.
+        assert_ssizeC_exc(any_findC5(string, other_1_2, 1, 3, &exc), ==, 1);  // Exact slice.
+        assert_not_found_exc(any_findC5(string, other_1_2, 1, 2, &exc));      // Too-small slice.
+        assert_not_found_exc(any_findC5(string, other_1_2, 1, 1, &exc));      // Empty slice.
 
         // FIXME That empty slice bug thing. Anything else to add here?
         // FIXME empty (from above)
@@ -503,10 +510,12 @@ static MunitResult _test_findC(fixture_type_t *type,
     } else {
         // All other sequences inspect only one item at a time.
         ypObject *seq = type->newN(3, items[0], items[1], items[2]);
-        assert_ssizeC_exc(any_findC(seq, seq, &exc), ==, -1);
-        assert_ssizeC_exc(any_findC5(seq, seq, 0, 3, &exc), ==, -1);
+        assert_not_found_exc(any_findC(seq, seq, &exc));
+        assert_not_found_exc(any_findC5(seq, seq, 0, 3, &exc));
         yp_decref(seq);
     }
+
+#undef assert_not_found_exc
 
     obj_array_decref(items);
     yp_decrefN(2, self, empty);
@@ -518,12 +527,21 @@ static MunitResult test_findC(const MunitParameter params[], fixture_t *fixture)
     return _test_findC(fixture->type, yp_findC, yp_findC5, /*forward=*/TRUE, /*raises=*/FALSE);
 }
 
-// FIXME yp_index here
+static MunitResult test_indexC(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_findC(fixture->type, yp_indexC, yp_indexC5, /*forward=*/TRUE, /*raises=*/TRUE);
+}
 
 static MunitResult test_rfindC(const MunitParameter params[], fixture_t *fixture)
 {
     return _test_findC(fixture->type, yp_rfindC, yp_rfindC5, /*forward=*/FALSE, /*raises=*/FALSE);
 }
+
+static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_findC(fixture->type, yp_rindexC, yp_rindexC5, /*forward=*/FALSE, /*raises=*/TRUE);
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
@@ -531,7 +549,8 @@ static MunitParameterEnum test_sequence_params[] = {
 MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_repeatC, test_sequence_params), TEST(test_getindexC, test_sequence_params),
         TEST(test_getsliceC, test_sequence_params), TEST(test_findC, test_sequence_params),
-        TEST(test_rfindC, test_sequence_params), {NULL}};
+        TEST(test_indexC, test_sequence_params), TEST(test_rfindC, test_sequence_params),
+        TEST(test_rindexC, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}
