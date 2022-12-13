@@ -6365,12 +6365,14 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
         yp_ASSERT((start) >= ((step) < 0 ? -1 : 0), "invalid start %" PRIssize, (start));       \
         if ((stop) != yp_SLICE_DEFAULT) {                                                       \
             yp_ssize_t expected_slicelength;                                                    \
-            if (step < 0) {                                                                     \
-                expected_slicelength = (stop >= start) ? 0 : (stop - start + 1) / (step) + 1;   \
-            } else {                                                                            \
-                expected_slicelength = (start >= stop) ? 0 : (stop - start - 1) / (step) + 1;   \
-            }                                                                                   \
             yp_ASSERT((stop) >= ((step) < 0 ? -1 : 0), "invalid stop %" PRIssize, (stop));      \
+            if ((step) < 0) {                                                                   \
+                expected_slicelength =                                                          \
+                        ((stop) >= (start)) ? 0 : ((stop) - (start) + 1) / (step) + 1;          \
+            } else {                                                                            \
+                expected_slicelength =                                                          \
+                        ((start) >= (stop)) ? 0 : ((stop) - (start)-1) / (step) + 1;            \
+            }                                                                                   \
             yp_ASSERT((slicelength) == expected_slicelength,                                    \
                     "invalid slicelength %" PRIssize " (%" PRIssize ":%" PRIssize ":%" PRIssize \
                     ")",                                                                        \
@@ -6442,8 +6444,8 @@ static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp
 static void ypSlice_InvertIndicesC(
         yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step, yp_ssize_t slicelength)
 {
-    ypSlice_ASSERT_ADJUSTED_INDICES(*start, *stop, *step, slicelength);
     yp_ASSERT(slicelength > 0, "missed an 'empty slice' optimization");
+    ypSlice_ASSERT_ADJUSTED_INDICES(*start, *stop, *step, slicelength);
 
     if (*step < 0) {
         // This comes direct from list_ass_subscript
@@ -12641,6 +12643,8 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
 
     result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &sq_rlen);
     if (yp_isexceptionC(result)) return result;
+    if (sq_rlen < 1) goto not_found;
+
     if (direction == yp_FIND_REVERSE) {
         ypSlice_InvertIndicesC(&start, &stop, &step, sq_rlen);
     }
@@ -12653,6 +12657,7 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
             return yp_None;
         }
     }
+not_found:
     *index = -1;
     return yp_None;
 }
