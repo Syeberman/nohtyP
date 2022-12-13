@@ -479,33 +479,18 @@ static MunitResult _test_findC(fixture_type_t *type,
     }
 
     if (type->is_string) {
-        // For strings, find looks for sub-sequences of items.
+        // For strings, find looks for sub-sequences of items. This behaviour is tested more
+        // thoroughly in test_string.
         ypObject *string = type->newN(3, items[0], items[1], items[2]);
         ypObject *other_0_1 = type->newN(2, items[0], items[1]);
-        ypObject *other_1_2 = type->newN(2, items[1], items[2]);
-        ypObject *other_0_2 = type->newN(2, items[0], items[2]);
-        ypObject *other_1_0 = type->newN(2, items[1], items[0]);
 
-        assert_ssizeC_exc(any_findC(string, other_0_1, &exc), ==, 0);  // Sub-string.
-        assert_ssizeC_exc(any_findC(string, other_1_2, &exc), ==, 1);  // Sub-string.
-        assert_not_found_exc(any_findC(string, other_0_2, &exc));      // Out-of-order.
-        assert_not_found_exc(any_findC(string, other_1_0, &exc));      // Out-of-order.
-        assert_ssizeC_exc(any_findC(string, string, &exc), ==, 0);     // Self.
+        assert_ssizeC_exc(any_findC(string, other_0_1, &exc), ==, 0);
+        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 3, &exc), ==, 0);
 
-        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 3, &exc), ==, 0);  // Total slice.
-        assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 2, &exc), ==, 0);  // Exact slice.
-        assert_not_found_exc(any_findC5(string, other_0_1, 0, 1, &exc));      // Too-small slice.
-        assert_not_found_exc(any_findC5(string, other_0_1, 0, 0, &exc));      // Empty slice.
+        assert_ssizeC_exc(any_findC(string, string, &exc), ==, 0);
+        assert_ssizeC_exc(any_findC5(string, string, 0, 3, &exc), ==, 0);
 
-        assert_ssizeC_exc(any_findC5(string, other_1_2, 1, 3, &exc), ==, 1);  // Exact slice.
-        assert_not_found_exc(any_findC5(string, other_1_2, 1, 2, &exc));      // Too-small slice.
-        assert_not_found_exc(any_findC5(string, other_1_2, 1, 1, &exc));      // Empty slice.
-
-        // FIXME That empty slice bug thing. Anything else to add here?
-        // FIXME empty (from above)
-        // FIXME !forward substrings?
-
-        yp_decrefN(5, string, other_0_1, other_1_2, other_0_2, other_1_0);
+        yp_decrefN(2, string, other_0_1);
 
     } else {
         // All other sequences inspect only one item at a time.

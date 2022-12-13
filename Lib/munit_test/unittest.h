@@ -591,9 +591,12 @@ extern void test_unittest_initialize(void);
 extern void test_objects_initialize(void);
 extern void test_protocols_initialize(void);
 
+// test_objects
 extern void test_frozenset_initialize(void);
 
+// test_protocols
 extern void test_sequence_initialize(void);
+extern void test_string_initialize(void);
 
 
 #ifdef __cplusplus
