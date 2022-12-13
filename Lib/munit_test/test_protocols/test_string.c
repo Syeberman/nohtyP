@@ -79,6 +79,7 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
     return _test_findC(fixture->type, yp_rindexC, yp_rindexC5, /*forward=*/FALSE, /*raises=*/TRUE);
 }
 
+// FIXME test_countC, for non-overlapping substrings.
 
 static MunitParameterEnum test_string_params[] = {
         {param_key_type, param_values_types_string}, {NULL}};

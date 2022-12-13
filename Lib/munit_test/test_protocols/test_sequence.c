@@ -527,6 +527,131 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
     return _test_findC(fixture->type, yp_rindexC, yp_rindexC5, /*forward=*/FALSE, /*raises=*/TRUE);
 }
 
+static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[3];
+    ypObject       *self;
+    ypObject       *empty = type->newN(0);
+    obj_array_fill(items, type->rand_items);
+    self = type->newN(2, items[0], items[1]);
+
+    // Basic count.
+    assert_ssizeC_exc(yp_countC(self, items[0], &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC(self, items[1], &exc), ==, 1);
+
+    // Not in sequence.
+    assert_ssizeC_exc(yp_countC(self, items[2], &exc), ==, 0);
+
+    // Empty self.
+    assert_ssizeC_exc(yp_countC(empty, items[0], &exc), ==, 0);
+
+    // Basic slice.
+    assert_ssizeC_exc(yp_countC5(self, items[0], 0, 1, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[0], 1, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[1], 0, 1, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[1], 1, 2, &exc), ==, 1);
+
+    // Negative indicies.
+    assert_ssizeC_exc(yp_countC5(self, items[0], -2, -1, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[0], -1, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[1], -2, -1, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[1], -1, 2, &exc), ==, 1);
+
+    // Total slice.
+    assert_ssizeC_exc(yp_countC5(self, items[0], 0, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[1], 0, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[2], 0, 2, &exc), ==, 0);
+
+    // Total slice, negative indicies.
+    assert_ssizeC_exc(yp_countC5(self, items[0], -2, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[1], -2, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[2], -2, 2, &exc), ==, 0);
+
+    // Empty slices.
+    {
+        slice_args_t slices[] = {
+                // recall step is always 1 for count
+                {0, 0, 1},     // typical empty slice
+                {2, 99, 1},    // i>=len(s) and k>0 (regardless of j)
+                {-99, -3, 1},  // j<-len(s) and k>0 (regardless of i)
+                {2, 2, 1},     // i=j (regardless of k)
+                {1, 0, 1},     // i>j and k>0
+                {-1, -3, 1},   // reverse total slice...but k is always 1
+        };
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(slices); i++) {
+            slice_args_t args = slices[i];
+            assert_ssizeC_exc(yp_countC5(self, items[0], args.start, args.stop, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(self, items[1], args.start, args.stop, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(self, items[2], args.start, args.stop, &exc), ==, 0);
+        }
+    }
+
+    // yp_SLICE_DEFAULT.
+    assert_ssizeC_exc(yp_countC5(self, items[0], yp_SLICE_DEFAULT, 1, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[0], 1, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[0], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[1], yp_SLICE_DEFAULT, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[1], 1, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[1], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[2], yp_SLICE_DEFAULT, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[2], 0, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[2], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 0);
+
+    // yp_SLICE_LAST.
+    assert_ssizeC_exc(yp_countC5(self, items[0], yp_SLICE_LAST, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[0], 0, yp_SLICE_LAST, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[0], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[1], yp_SLICE_LAST, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[1], 1, yp_SLICE_LAST, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(self, items[1], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[2], yp_SLICE_LAST, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[2], 0, yp_SLICE_LAST, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(self, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
+
+    // Recall patterned sequences like range don't store duplicates.
+    if (!type->is_patterned) {
+        ypObject *multi = type->newN(3, items[2], items[2], items[2]);
+        assert_ssizeC_exc(yp_countC(multi, items[2], &exc), ==, 3);
+        assert_ssizeC_exc(yp_countC5(multi, items[2], 0, 1, &exc), ==, 1);    // Basic.
+        assert_ssizeC_exc(yp_countC5(multi, items[2], 0, 2, &exc), ==, 2);    // Basic.
+        assert_ssizeC_exc(yp_countC5(multi, items[2], 1, 3, &exc), ==, 2);    // Basic.
+        assert_ssizeC_exc(yp_countC5(multi, items[2], -3, -2, &exc), ==, 1);  // Neg.
+        assert_ssizeC_exc(yp_countC5(multi, items[2], -3, -1, &exc), ==, 2);  // Neg.
+        assert_ssizeC_exc(yp_countC5(multi, items[2], -2, 3, &exc), ==, 2);   // Neg.
+        assert_ssizeC_exc(yp_countC5(multi, items[2], 0, 3, &exc), ==, 3);    // Total.
+        assert_ssizeC_exc(yp_countC5(multi, items[2], -3, 3, &exc), ==, 3);   // Total.
+        yp_decref(multi);
+    }
+
+    if (type->is_string) {
+        // For strings, count looks for non-overlapping sub-sequences of items. This behaviour is
+        // tested more thoroughly in test_string.
+        ypObject *string = type->newN(3, items[0], items[1], items[2]);
+        ypObject *other_0_1 = type->newN(2, items[0], items[1]);
+
+        assert_ssizeC_exc(yp_countC(string, other_0_1, &exc), ==, 1);
+        assert_ssizeC_exc(yp_countC5(string, other_0_1, 0, 3, &exc), ==, 1);
+
+        assert_ssizeC_exc(yp_countC(string, string, &exc), ==, 1);
+        assert_ssizeC_exc(yp_countC5(string, string, 0, 3, &exc), ==, 1);
+
+        yp_decrefN(2, string, other_0_1);
+
+    } else {
+        // All other sequences count only one item at a time.
+        ypObject *seq = type->newN(3, items[0], items[1], items[2]);
+        assert_ssizeC_exc(yp_countC(seq, seq, &exc), ==, 0);
+        assert_ssizeC_exc(yp_countC5(seq, seq, 0, 3, &exc), ==, 0);
+        yp_decref(seq);
+    }
+
+    obj_array_decref(items);
+    yp_decrefN(2, self, empty);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
@@ -535,7 +660,7 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_repeatC, test_sequence_params), TEST(test_getindexC, test_sequence_params),
         TEST(test_getsliceC, test_sequence_params), TEST(test_findC, test_sequence_params),
         TEST(test_indexC, test_sequence_params), TEST(test_rfindC, test_sequence_params),
-        TEST(test_rindexC, test_sequence_params), {NULL}};
+        TEST(test_rindexC, test_sequence_params), TEST(test_countC, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}
