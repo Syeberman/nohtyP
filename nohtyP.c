@@ -8082,50 +8082,68 @@ static ypObject *ypStringLib_delslice(
 }
 
 // Helper function for bytes_find and str_find. The string to find (x_data and x_len) must have
-// already been coerced into the same encoding as s. If x_data is NULL, it's treated as if the
-// string is not in s (_ypStr_coerce_encoding returns NULL if it can't coerce).
+// already been coerced into the same encoding as s.
 // TODO Replace with the faster find implementation from Python.
-static ypObject *ypStringLib_find(ypObject *s, void *x_data, yp_ssize_t x_len, yp_ssize_t start,
-        yp_ssize_t stop, findfunc_direction direction, yp_ssize_t *i)
+static yp_ssize_t _ypStringLib_find(ypObject *s, void *x_data, yp_ssize_t x_len, yp_ssize_t start,
+        yp_ssize_t slicelength, findfunc_direction direction)
 {
     int         sizeshift = ypStringLib_ENC(s)->sizeshift;
     yp_uint8_t *s_data = ypStringLib_DATA(s);
-    ypObject   *result;
-    yp_ssize_t  step = 1;  // may change to -1
-    yp_ssize_t  s_rlen;    // remaining length
-    yp_uint8_t *s_rdata;   // remaining data
+    yp_ssize_t  stop = start + slicelength;
+    yp_ssize_t  step;
+    yp_ssize_t  s_rlen;   // Remaining length.
+    yp_uint8_t *s_rdata;  // Remaining data.
 
-    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
-    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
-    // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &s_rlen);
-    if (yp_isexceptionC(result)) return result;
-
-    // Treat NULL as "not in string". Why do this check here instead of in the caller? Because this
-    // way we can check the slice arguments with ypSlice_AdjustIndicesC in a common location.
-    if (x_data == NULL) {
-        *i = -1;
-        return yp_None;
-    }
+    ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, (yp_ssize_t)1, slicelength);
 
     if (direction == yp_FIND_FORWARD) {
         s_rdata = s_data + (start << sizeshift);
-        // step is already 1
+        step = 1;
     } else {
         s_rdata = s_data + ((stop - x_len) << sizeshift);
         step = -1;
     }
 
+    s_rlen = stop - start;
     while (s_rlen >= x_len) {
         if (yp_memcmp(s_rdata, x_data, x_len << sizeshift) == 0) {
-            *i = (s_rdata - s_data) >> sizeshift;
-            return yp_None;
+            return (s_rdata - s_data) >> sizeshift;
         }
         s_rdata += (step << sizeshift);
         s_rlen--;
     }
-    *i = -1;
-    return yp_None;
+    return -1;
+}
+
+// Helper function for bytes_count and str_count. The string to find (x_data and x_len) must have
+// already been coerced into the same encoding as s.
+static yp_ssize_t _ypStringLib_count(
+        ypObject *s, void *x_data, yp_ssize_t x_len, yp_ssize_t start, yp_ssize_t slicelength)
+{
+    yp_ssize_t s_rstart;  // Start of remaining slice.
+    yp_ssize_t s_rlen;    // Remaining length.
+    yp_ssize_t n;
+
+    ypSlice_ASSERT_ADJUSTED_INDICES(start, start + slicelength, (yp_ssize_t)1, slicelength);
+
+    // The empty string "matches" every position, including the end of the slice.
+    if (x_len < 1) {
+        return slicelength + 1;
+    }
+
+    // Do the counting.
+    s_rstart = start;
+    s_rlen = slicelength;
+    n = 0;
+    while (s_rlen >= x_len) {
+        yp_ssize_t i = _ypStringLib_find(s, x_data, x_len, s_rstart, s_rlen, yp_FIND_FORWARD);
+        if (i < 0) break;  // x does not exist in the remainder of s.
+
+        n += 1;
+        s_rstart = i + x_len;  // We count non-overlapping substrings.
+        s_rlen = slicelength - (s_rstart - start);
+    }
+    return n;
 }
 
 static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
@@ -9779,6 +9797,7 @@ static ypObject *_ypBytes_coerce_intorbytes(
     ypObject *exc = yp_None;
     int       x_pair = ypObject_TYPE_PAIR_CODE(x);
 
+    // FIXME We should make bools non-numeric, I think, which means removing from here.
     if (x_pair == ypBool_CODE || x_pair == ypInt_CODE) {
         *storage = _ypBytes_asuint8C(x, &exc);
         if (yp_isexceptionC(exc)) return exc;
@@ -9837,12 +9856,22 @@ static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize
     yp_uint8_t *x_data;
     yp_ssize_t  x_len;
     yp_uint8_t  storage;
+    yp_ssize_t  step = 1;
+    yp_ssize_t  slicelength;
     ypObject   *result;
 
     result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
     if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(x_data != NULL, "_ypBytes_coerce_intorbytes unexpectedly returned NULL");
 
-    return ypStringLib_find(b, x_data, x_len, start, stop, direction, i);
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
+    // https://bugs.python.org/issue24243.
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(b), &start, &stop, &step, &slicelength);
+    if (yp_isexceptionC(result)) return result;
+
+    *i = _ypStringLib_find(b, x_data, x_len, start, slicelength, direction);
+    return yp_None;
 }
 
 static ypObject *bytes_concat(ypObject *b, ypObject *iterable)
@@ -10052,37 +10081,19 @@ static ypObject *bytes_count(
     yp_uint8_t  storage;
     ypObject   *result;
     yp_ssize_t  step = 1;
-    yp_ssize_t  b_rlen;   // remaining length
-    yp_uint8_t *b_rdata;  // remaining data
+    yp_ssize_t  slicelength;
 
     result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
     if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(x_data != NULL, "_ypBytes_coerce_intorbytes unexpectedly returned NULL");
 
     // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
     // Python behaves peculiarly when stop<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &b_rlen);
+    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &slicelength);
     if (yp_isexceptionC(result)) return result;
 
-    // The empty string "matches" every byte position, including the end of the slice
-    if (x_len < 1) {
-        *n = b_rlen + 1;
-        return yp_None;
-    }
-
-    // Do the counting
-    b_rdata = ypBytes_DATA(b) + start;
-    *n = 0;
-    while (b_rlen >= x_len) {
-        if (yp_memcmp(b_rdata, x_data, x_len) == 0) {
-            *n += 1;
-            b_rdata += x_len;
-            b_rlen -= x_len;
-        } else {
-            b_rdata += 1;
-            b_rlen -= 1;
-        }
-    }
+    *n = _ypStringLib_count(b, x_data, x_len, start, slicelength);
     return yp_None;
 }
 
@@ -11003,23 +11014,53 @@ static ypObject *str_find(ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t
 {
     void      *x_data;
     yp_ssize_t x_len;
+    yp_ssize_t step = 1;
+    yp_ssize_t slicelength;
     ypObject  *result;
 
     result = _ypStr_coerce_encoding(x, ypStr_ENC(s), &x_data, &x_len);
     if (yp_isexceptionC(result)) return result;
 
-    result = ypStringLib_find(s, x_data, x_len, start, stop, direction, i);
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
+    // https://bugs.python.org/issue24243.
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
+    if (yp_isexceptionC(result)) return result;
+
+    if (x_data == NULL) {
+        *i = -1;  // We could not coerce to the target encoding, so it must not be in s.
+    } else {
+        *i = _ypStringLib_find(s, x_data, x_len, start, slicelength, direction);
+    }
     _ypStr_coerce_encoding_free(x, x_data);
-    return result;
+    return yp_None;
 }
 
 static ypObject *str_count(
         ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *n)
 {
-    // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
-    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings. See
+    void      *x_data;
+    yp_ssize_t x_len;
+    yp_ssize_t step = 1;
+    yp_ssize_t slicelength;
+    ypObject  *result;
+
+    result = _ypStr_coerce_encoding(x, ypStr_ENC(s), &x_data, &x_len);
+    if (yp_isexceptionC(result)) return result;
+
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    return yp_NotImplementedError;
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
+    if (yp_isexceptionC(result)) return result;
+
+    if (x_data == NULL) {
+        *n = 0;  // We could not coerce to the target encoding, so it must not be in s.
+    } else {
+        *n = _ypStringLib_count(s, x_data, x_len, start, slicelength);
+    }
+    _ypStr_coerce_encoding_free(x, x_data);
+    return result;
 }
 
 static ypObject *str_contains(ypObject *s, ypObject *x)

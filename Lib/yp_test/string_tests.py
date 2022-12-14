@@ -103,7 +103,6 @@ class BaseTest:
         args = self.fixtype(args)
         getattr(obj, methodname)(*args)
 
-    @yp_unittest.skip_str_count
     def test_count(self):
         self.checkequal(3, 'aaa', 'count', 'a')
         self.checkequal(0, 'aaa', 'count', 'b')
@@ -144,33 +143,33 @@ class BaseTest:
         else:
             self.checkraises(TypeError, 'hello', 'count', 42)
 
-    @yp_unittest.skip_str_count
+    @yp_unittest.skip_str_replace
     def test_count_combinations(self):
         # For a variety of combinations,
         #    verify that str.count() matches an equivalent function
         #    replacing all occurrences and then differencing the string lengths
-        charset = ['', 'a', 'b']
-        digits = 7
-        base = len(charset)
-        teststrings = set()
-        for i in range(base ** digits):
+        charset = yp_list(['', 'a', 'b'])
+        digits = yp_int(7)
+        base = yp_len(charset)
+        teststrings = yp_set()
+        for i in yp_range(base ** digits):
             entry = []
-            for j in range(digits):
+            for j in yp_range(digits):
                 i, m = divmod(i, base)
                 entry.append(charset[m])
-            teststrings.add(''.join(entry))
+            teststrings.add(yp_str('').join(entry))
         teststrings = [self.fixtype(ts) for ts in teststrings]
         for i in teststrings:
-            n = len(i)
+            n = yp_len(i)
             for j in teststrings:
                 r1 = i.count(j)
                 if j:
-                    r2, rem = divmod(n - len(i.replace(j, self.fixtype(''))),
-                                     len(j))
+                    r2, rem = divmod(n - yp_len(i.replace(j, self.fixtype(''))),
+                                     yp_len(j))
                 else:
-                    r2, rem = len(i)+1, 0
+                    r2, rem = yp_len(i)+1, yp_int(0)
                 if rem or r1 != r2:
-                    self.assertEqual(rem, 0, '%s != 0 for %s' % (rem, i))
+                    self.assertEqual(rem, yp_int(0), '%s != 0 for %s' % (rem, i))
                     self.assertEqual(r1, r2, '%s != %s for %s' % (r1, r2, i))
 
     def test_find(self):
@@ -1486,7 +1485,6 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(2, s, 'rindex', 'l', None, -2)
         self.checkequal(0, s, 'rindex', 'h', None, None)
 
-    @yp_unittest.skip_str_count
     def test_none_arguments_count(self):
         s = 'hello'
         self.checkequal(2, s, 'count', 'l', None)

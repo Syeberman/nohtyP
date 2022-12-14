@@ -191,7 +191,6 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertEqual(next(it), "\u3333")
         self.assertRaises(StopIteration, next, it)
 
-    @yp_unittest.skip_str_count
     def test_count(self):
         string_tests.CommonTest.test_count(self)
         # check mixed argument types

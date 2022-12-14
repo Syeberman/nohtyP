@@ -20,6 +20,7 @@ static MunitResult _test_findC(fixture_type_t *type,
 
     obj_array_fill(items, type->rand_items);
     self = type->newN(3, items[0], items[1], items[2]);
+    // FIXME Test against different "other" types (the other pair, really)
     other_0_1 = type->newN(2, items[0], items[1]);
     other_1_2 = type->newN(2, items[1], items[2]);
     other_0_2 = type->newN(2, items[0], items[2]);
