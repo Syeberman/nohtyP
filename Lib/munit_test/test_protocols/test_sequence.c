@@ -21,9 +21,8 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     // range stores integers following a pattern, so doesn't support concat.
     if (type->is_patterned) {
         ypObject *self = rand_obj(type);
-        ypObject *result = yp_concat(self, self);
-        assert_isexception2(result, yp_MethodError);
-        yp_decrefN(2, self, result);
+        assert_raises(yp_concat(self, self), yp_MethodError);
+        yp_decref(self);
         goto tear_down;  // Skip the remaining tests.
     }
 
@@ -107,9 +106,8 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     // range stores integers following a pattern, so doesn't support repeat.
     if (type->is_patterned) {
         ypObject *self = rand_obj(type);
-        ypObject *result = yp_repeatC(self, 2);
-        assert_isexception2(result, yp_MethodError);
-        yp_decrefN(2, self, result);
+        assert_raises(yp_repeatC(self, 2), yp_MethodError);
+        yp_decref(self);
         goto tear_down;  // Skip the remaining tests.
     }
 
@@ -190,12 +188,12 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
     ead(neg_two, yp_getindexC(self, -2), assert_obj(neg_two, eq, items[0]));
 
     // Out of bounds.
-    ead(two, yp_getindexC(self, 2), assert_isexception2(two, yp_IndexError));
-    ead(neg_three, yp_getindexC(self, -3), assert_isexception2(neg_three, yp_IndexError));
+    assert_raises(yp_getindexC(self, 2), yp_IndexError);
+    assert_raises(yp_getindexC(self, -3), yp_IndexError);
 
     // Empty self.
-    ead(zero, yp_getindexC(empty, 0), assert_isexception2(zero, yp_IndexError));
-    ead(neg_one, yp_getindexC(empty, -1), assert_isexception2(neg_one, yp_IndexError));
+    assert_raises(yp_getindexC(empty, 0), yp_IndexError);
+    assert_raises(yp_getindexC(empty, -1), yp_IndexError);
 
     obj_array_decref(items);
     yp_decrefN(2, self, empty);
@@ -359,12 +357,12 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     ead(neg_two, yp_getitem(self, int_neg_2), assert_obj(neg_two, eq, items[0]));
 
     // Out of bounds.
-    ead(two, yp_getitem(self, int_2), assert_isexception2(two, yp_IndexError));
-    ead(neg_three, yp_getitem(self, int_neg_3), assert_isexception2(neg_three, yp_IndexError));
+    assert_raises(yp_getitem(self, int_2), yp_IndexError);
+    assert_raises(yp_getitem(self, int_neg_3), yp_IndexError);
 
     // Empty self.
-    ead(zero, yp_getitem(empty, int_0), assert_isexception2(zero, yp_IndexError));
-    ead(neg_one, yp_getitem(empty, int_neg_1), assert_isexception2(neg_one, yp_IndexError));
+    assert_raises(yp_getitem(empty, int_0), yp_IndexError);
+    assert_raises(yp_getitem(empty, int_neg_1), yp_IndexError);
 
     obj_array_decref(items);
     yp_decrefN(2, self, empty);
@@ -383,11 +381,11 @@ static MunitResult _test_findC(fixture_type_t *type,
     obj_array_fill(items, type->rand_items);
     self = type->newN(2, items[0], items[1]);
 
-#define assert_not_found_exc(expression)                     \
-    do {                                                     \
-        ypObject *exc = yp_None;                             \
-        assert_ssizeC(expression, ==, -1);                   \
-        if (raises) assert_isexception2(exc, yp_ValueError); \
+#define assert_not_found_exc(expression)                    \
+    do {                                                    \
+        ypObject *exc = yp_None;                            \
+        assert_ssizeC(expression, ==, -1);                  \
+        if (raises) assert_isexception(exc, yp_ValueError); \
     } while (0)
 
     // Basic find.

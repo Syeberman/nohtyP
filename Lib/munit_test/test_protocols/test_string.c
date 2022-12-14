@@ -30,7 +30,7 @@ static MunitResult _test_findC(fixture_type_t *type,
     do {                                                     \
         ypObject *exc = yp_None;                             \
         assert_ssizeC(expression, ==, -1);                   \
-        if (raises) assert_isexception2(exc, yp_ValueError); \
+        if (raises) assert_isexception(exc, yp_ValueError); \
     } while (0)
 
     assert_ssizeC_exc(any_findC(self, other_0_1, &exc), ==, 0);  // Sub-string.

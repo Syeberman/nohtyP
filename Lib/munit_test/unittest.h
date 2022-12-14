@@ -263,13 +263,43 @@ extern "C" {
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
 #define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
 
-#define assert_isexception2(obj, expected)                                               \
-    do {                                                                                 \
-        ypObject *_ypmt_ISEXC_obj = (obj);                                               \
-        ypObject *_ypmt_ISEXC_expected = (expected);                                     \
-        if (!yp_isexceptionC2(_ypmt_ISEXC_obj, _ypmt_ISEXC_expected)) {                  \
-            munit_errorf("assertion failed: yp_isexceptionC2(%s, %s)", #obj, #expected); \
-        }                                                                                \
+#define _assert_isexception(obj, expected, obj_fmt, expected_fmt, ...)                        \
+    do {                                                                                      \
+        if (!yp_isexceptionC2(obj, expected)) {                                               \
+            munit_errorf("assertion failed: yp_isexceptionC2(" obj_fmt ", " expected_fmt ")", \
+                    __VA_ARGS__);                                                             \
+        }                                                                                     \
+    } while (0)
+
+#define assert_isexception(obj, expected)                                                        \
+    do {                                                                                         \
+        ypObject *_ypmt_ISEXC_obj = (obj);                                                       \
+        ypObject *_ypmt_ISEXC_expected = (expected);                                             \
+        _assert_isexception(_ypmt_ISEXC_obj, _ypmt_ISEXC_expected, "%s", "%s", #obj, #expected); \
+    } while (0)
+
+#define assert_raises(statement, expected) assert_isexception(statement, expected)
+
+// statement is only evaluated once.
+#define _assert_raises_exc(statement, expected, statement_fmt, expected_fmt, ...) \
+    do {                                                                          \
+        ypObject *exc = yp_None;                                                  \
+        statement;                                                                \
+        if (!yp_isexceptionC2(exc, expected)) {                                   \
+            munit_errorf("assertion failed: " statement_fmt                       \
+                         "; yp_isexceptionC2(exc, " expected_fmt ")",             \
+                    __VA_ARGS__);                                                 \
+        }                                                                         \
+    } while (0)
+
+// For a function that takes a `ypObject **exc` argument, asserts that it raises the given
+// exception. Statement must include `&exc` for the exception argument. Example:
+//
+//      assert_raises_exc(yp_lenC(obj, &exc), yp_MethodError);
+#define assert_raises_exc(statement, expected)                                                   \
+    do {                                                                                         \
+        ypObject *_ypmt_RAISES_expected = (expected);                                            \
+        _assert_raises_exc(statement, _ypmt_RAISES_expected, "%s", "%s", #statement, #expected); \
     } while (0)
 
 // A version of _assert_typeC that ensures a_statement and b_statement do not throw an exception via
