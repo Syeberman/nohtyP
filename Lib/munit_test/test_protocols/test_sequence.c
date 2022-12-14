@@ -219,6 +219,17 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(2, zero_one, one_two);
     }
 
+    // Negative step.
+    {
+        ypObject *neg_one_neg_two = yp_getsliceC4(self, -1, -2, -1);
+        ypObject *neg_two_neg_three = yp_getsliceC4(self, -2, -3, -1);
+        assert_type_is(neg_one_neg_two, type->type);
+        assert_sequence(neg_one_neg_two, 1, items[4]);
+        assert_type_is(neg_two_neg_three, type->type);
+        assert_sequence(neg_two_neg_three, 1, items[3]);
+        yp_decrefN(2, neg_one_neg_two, neg_two_neg_three);
+    }
+
     // Total slice, forward and backward.
     {
         ypObject *forward = yp_getsliceC4(self, 0, 5, 1);
@@ -709,7 +720,211 @@ tear_down:
     return MUNIT_OK;
 }
 
-// FIXME yp_setsliceC6
+static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    // Sequences should setslice from themselves, their pairs, and iterators.
+    fixture_type_t  *x_types[] = {type, type->pair, fixture_type_iter, NULL};
+    fixture_type_t **x_type;
+    ypObject        *items[] = obj_array_init(11, type->rand_item());
+
+    // Immutables don't support setslice.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *two = type->newN(1, items[2]);
+        assert_raises_exc(yp_setsliceC6(self, 0, 1, 1, two, &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decrefN(2, self, two);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic slice.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *two = (*x_type)->newN(1, items[2]);
+        ypObject *three = (*x_type)->newN(1, items[3]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 1, 1, two, &exc));
+        assert_sequence(self, 2, items[2], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 1, 2, 1, three, &exc));
+        assert_sequence(self, 2, items[2], items[3]);
+        yp_decrefN(3, self, two, three);
+    }
+
+    // Negative step.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *two = (*x_type)->newN(1, items[2]);
+        ypObject *three = (*x_type)->newN(1, items[3]);
+        assert_not_raises_exc(yp_setsliceC6(self, -1, -2, -1, two, &exc));
+        assert_sequence(self, 2, items[0], items[2]);
+        assert_not_raises_exc(yp_setsliceC6(self, -2, -3, -1, three, &exc));
+        assert_sequence(self, 2, items[3], items[2]);
+        yp_decrefN(3, self, two, three);
+    }
+
+    // Total slice, forward and backward.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *four_five = (*x_type)->newN(2, items[4], items[5]);
+        ypObject *six_seven = (*x_type)->newN(2, items[6], items[7]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 2, 1, four_five, &exc));
+        assert_sequence(self, 2, items[4], items[5]);
+        assert_not_raises_exc(yp_setsliceC6(self, -1, -3, -1, six_seven, &exc));
+        assert_sequence(self, 2, items[7], items[6]);
+        yp_decrefN(3, self, four_five, six_seven);
+    }
+
+    // Step of 2, -2.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(5, items[0], items[1], items[2], items[3], items[4]);
+        ypObject *five_six_seven = (*x_type)->newN(3, items[5], items[6], items[7]);
+        ypObject *eight_nine_ten = (*x_type)->newN(3, items[8], items[9], items[10]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 5, 2, five_six_seven, &exc));
+        assert_sequence(self, 5, items[5], items[1], items[6], items[3], items[7]);
+        assert_not_raises_exc(yp_setsliceC6(self, -1, -6, -2, eight_nine_ten, &exc));
+        assert_sequence(self, 5, items[10], items[1], items[9], items[3], items[8]);
+        yp_decrefN(3, self, five_six_seven, eight_nine_ten);
+    }
+
+    // Empty slices.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject    *self = type->newN(2, items[0], items[1]);
+        ypObject    *empty = (*x_type)->newN(0);
+        slice_args_t slices[] = {
+                {0, 0, 1},      // typical empty slice
+                {5, 99, 1},     // i>=len(s) and k>0 (regardless of j)
+                {-6, -99, -1},  // i<-len(s) and k<0 (regardless of j)
+                {99, 5, -1},    // j>=len(s) and k<0 (regardless of i)
+                {-99, -6, 1},   // j<-len(s) and k>0 (regardless of i)
+                {4, 4, 1},      // i=j (regardless of k)
+                {1, 0, 1},      // i>j and k>0
+                {0, 1, -1},     // i<j and k<0
+        };
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(slices); i++) {
+            slice_args_t args = slices[i];
+            assert_not_raises_exc(
+                    yp_setsliceC6(self, args.start, args.stop, args.step, empty, &exc));
+            assert_sequence(self, 2, items[0], items[1]);
+        }
+        yp_decrefN(2, self, empty);
+    }
+
+    // yp_SLICE_DEFAULT.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *two = (*x_type)->newN(1, items[2]);
+        ypObject *three = (*x_type)->newN(1, items[3]);
+        ypObject *four_five = (*x_type)->newN(2, items[4], items[5]);
+        ypObject *six = (*x_type)->newN(1, items[6]);
+        ypObject *seven = (*x_type)->newN(1, items[7]);
+        ypObject *eight_nine = (*x_type)->newN(2, items[8], items[9]);
+        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_DEFAULT, 1, 1, two, &exc));
+        assert_sequence(self, 2, items[2], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 1, yp_SLICE_DEFAULT, 1, three, &exc));
+        assert_sequence(self, 2, items[2], items[3]);
+        assert_not_raises_exc(
+                yp_setsliceC6(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1, four_five, &exc));
+        assert_sequence(self, 2, items[4], items[5]);
+        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_DEFAULT, -2, -1, six, &exc));
+        assert_sequence(self, 2, items[4], items[6]);
+        assert_not_raises_exc(yp_setsliceC6(self, -2, yp_SLICE_DEFAULT, -1, seven, &exc));
+        assert_sequence(self, 2, items[7], items[6]);
+        assert_not_raises_exc(
+                yp_setsliceC6(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1, eight_nine, &exc));
+        assert_sequence(self, 2, items[9], items[8]);
+        yp_decrefN(7, self, two, three, four_five, six, seven, eight_nine);
+    }
+
+    // yp_SLICE_LAST.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *empty = (*x_type)->newN(0);
+        ypObject *two = (*x_type)->newN(1, items[2]);
+        ypObject *three_four = (*x_type)->newN(2, items[3], items[4]);
+        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_LAST, 2, 1, empty, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 1, yp_SLICE_LAST, 1, two, &exc));
+        assert_sequence(self, 2, items[0], items[2]);
+        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_LAST, yp_SLICE_LAST, 1, empty, &exc));
+        assert_sequence(self, 2, items[0], items[2]);
+        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_LAST, -3, -1, three_four, &exc));
+        assert_sequence(self, 2, items[4], items[3]);
+        assert_not_raises_exc(yp_setsliceC6(self, -1, yp_SLICE_LAST, -1, empty, &exc));
+        assert_sequence(self, 2, items[4], items[3]);
+        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_LAST, yp_SLICE_LAST, -1, empty, &exc));
+        assert_sequence(self, 2, items[4], items[3]);
+        yp_decrefN(4, self, empty, two, three_four);
+    }
+
+    // Regular slices (step==1) can grow and shrink the sequence.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(0);
+        ypObject *empty = (*x_type)->newN(0);
+        ypObject *zero_one = (*x_type)->newN(2, items[0], items[1]);
+        ypObject *two = (*x_type)->newN(1, items[2]);
+        ypObject *three = (*x_type)->newN(1, items[3]);
+        ypObject *four_five = (*x_type)->newN(2, items[4], items[5]);
+        ypObject *six_seven_eight = (*x_type)->newN(3, items[6], items[7], items[8]);
+        ypObject *nine = (*x_type)->newN(1, items[9]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 0, 1, zero_one, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 0, 1, empty, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 0, 1, two, &exc));
+        assert_sequence(self, 3, items[2], items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 1, 2, 1, empty, &exc));
+        assert_sequence(self, 2, items[2], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 1, 2, 1, three, &exc));
+        assert_sequence(self, 2, items[2], items[3]);
+        assert_not_raises_exc(yp_setsliceC6(self, 1, 2, 1, four_five, &exc));
+        assert_sequence(self, 3, items[2], items[4], items[5]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 3, 1, six_seven_eight, &exc));
+        assert_sequence(self, 3, items[6], items[7], items[8]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 3, 1, nine, &exc));
+        assert_sequence(self, 1, items[9]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 1, 1, empty, &exc));
+        assert_len(self, 0);
+        yp_decrefN(8, self, empty, zero_one, two, three, four_five, six_seven_eight, nine);
+    }
+
+    // Extended slices (step!=1) can neither grow nor shrink the sequence.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *empty = (*x_type)->newN(0);
+        ypObject *two = (*x_type)->newN(1, items[2]);
+        ypObject *three_four = (*x_type)->newN(2, items[3], items[4]);
+        assert_raises_exc(yp_setsliceC6(self, 0, 0, 2, two, &exc), yp_ValueError);
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(self, -1, -2, -1, empty, &exc), yp_ValueError);
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(self, -1, -2, -1, three_four, &exc), yp_ValueError);
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(self, -1, -3, -1, empty, &exc), yp_ValueError);
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(self, -1, -3, -1, two, &exc), yp_ValueError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decrefN(4, self, empty, two, three_four);
+    }
+
+    // x can be self.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 0, 1, self, &exc));
+        assert_sequence(self, 4, items[0], items[1], items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 1, 4, 1, self, &exc));
+        assert_sequence(self, 5, items[0], items[0], items[1], items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 5, 1, self, &exc));
+        assert_sequence(self, 5, items[0], items[0], items[1], items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(self, -1, -6, -1, self, &exc));
+        assert_sequence(self, 5, items[1], items[0], items[1], items[0], items[0]);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
 
 static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixture)
 {
@@ -779,8 +994,8 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_getsliceC, test_sequence_params), TEST(test_findC, test_sequence_params),
         TEST(test_indexC, test_sequence_params), TEST(test_rfindC, test_sequence_params),
         TEST(test_rindexC, test_sequence_params), TEST(test_countC, test_sequence_params),
-        TEST(test_setindexC, test_sequence_params), TEST(test_setitem, test_sequence_params),
-        {NULL}};
+        TEST(test_setindexC, test_sequence_params), TEST(test_setsliceC, test_sequence_params),
+        TEST(test_setitem, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}
