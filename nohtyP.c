@@ -9402,9 +9402,6 @@ convert:
     return norm;
 }
 
-// TODO Move these to nohtyP.h...eventually
-ypAPI void yp_setitemE(ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc);
-
 static ypObject *yp_set_getintern(ypObject *set, ypObject *x);
 
 static ypObject *_yp_codecs_register_alias_norm(ypObject *alias_norm, ypObject *encoding_norm)
@@ -9417,7 +9414,7 @@ static ypObject *_yp_codecs_register_alias_norm(ypObject *alias_norm, ypObject *
         if (yp_isexceptionC(result)) return result;
         return yp_ValueError;
     }
-    yp_setitemE(_yp_codecs_alias2encoding, alias_norm, encoding_norm, &exc);
+    yp_setitem(_yp_codecs_alias2encoding, alias_norm, encoding_norm, &exc);
     return exc;
 }
 
@@ -9468,7 +9465,7 @@ static ypObject *yp_codecs_register_error(
 {
     ypObject *exc = yp_None;
     ypObject *result = yp_intC((yp_ssize_t)error_handler);
-    yp_setitemE(_yp_codecs_errors2handler, name, result, &exc);
+    yp_setitem(_yp_codecs_errors2handler, name, result, &exc);
     yp_decref(result);
     return exc;  // on success or exception
 }

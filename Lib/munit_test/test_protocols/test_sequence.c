@@ -2,6 +2,10 @@
 #include "munit_test/unittest.h"
 
 
+// TODO x_types are type, pair, and iter, but should we also include tuple/list? Is it required that
+// every sequence be compatible with tuple/list as an iterable?
+
+
 typedef struct _slice_args_t {
     yp_ssize_t start;
     yp_ssize_t stop;
@@ -53,6 +57,16 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         ypObject *result = yp_concat(self, x);
         assert_type_is(result, type->type);
         assert_sequence(result, 2, items[0], items[1]);
+        yp_decrefN(3, self, x, result);
+    }
+
+    // Both are empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_concat(self, x);
+        assert_type_is(result, type->type);
+        assert_len(result, 0);
         yp_decrefN(3, self, x, result);
     }
 
@@ -135,6 +149,17 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
         ypObject *result = yp_repeatC(self, 0);
         assert_type_is(result, type->type);
         assert_len(result, 0);
+        yp_decrefN(2, self, result);
+    }
+
+    // Large factor. (Exercises _ypSequence_repeat_memcpy optimization.)
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *result = yp_repeatC(self, 8);
+        assert_type_is(result, type->type);
+        assert_sequence(result, 16, items[0], items[1], items[0], items[1], items[0], items[1],
+                items[0], items[1], items[0], items[1], items[0], items[1], items[0], items[1],
+                items[0], items[1]);
         yp_decrefN(2, self, result);
     }
 
@@ -374,6 +399,37 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     // Empty self.
     assert_raises(yp_getitem(empty, int_0), yp_IndexError);
     assert_raises(yp_getitem(empty, int_neg_1), yp_IndexError);
+
+    // FIXME non-integer indicies.
+
+    obj_array_decref(items);
+    yp_decrefN(2, self, empty);
+    return MUNIT_OK;
+}
+
+// FIXME yp_getdefault isn't listed as part of the sequence protocol in nohtyP.h, but it is.
+static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(3, type->rand_item());
+    ypObject       *self = type->newN(2, items[0], items[1]);
+    ypObject       *empty = type->newN(0);
+
+    // Basic index.
+    ead(zero, yp_getdefault(self, int_0, items[2]), assert_obj(zero, eq, items[0]));
+    ead(one, yp_getdefault(self, int_1, items[2]), assert_obj(one, eq, items[1]));
+
+    // Negative index.
+    ead(neg_one, yp_getdefault(self, int_neg_1, items[2]), assert_obj(neg_one, eq, items[1]));
+    ead(neg_two, yp_getdefault(self, int_neg_2, items[2]), assert_obj(neg_two, eq, items[0]));
+
+    // Out of bounds.
+    ead(two, yp_getdefault(self, int_2, items[2]), assert_obj(two, eq, items[2]));
+    ead(neg_three, yp_getdefault(self, int_neg_3, items[2]), assert_obj(neg_three, eq, items[2]));
+
+    // Empty self.
+    ead(zero, yp_getdefault(empty, int_0, items[2]), assert_obj(zero, eq, items[2]));
+    ead(neg_one, yp_getdefault(empty, int_neg_1, items[2]), assert_obj(neg_one, eq, items[2]));
 
     // FIXME non-integer indicies.
 
@@ -991,7 +1047,8 @@ static MunitParameterEnum test_sequence_params[] = {
 
 MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_repeatC, test_sequence_params), TEST(test_getindexC, test_sequence_params),
-        TEST(test_getsliceC, test_sequence_params), TEST(test_findC, test_sequence_params),
+        TEST(test_getsliceC, test_sequence_params), TEST(test_getitem, test_sequence_params),
+        TEST(test_getdefault, test_sequence_params), TEST(test_findC, test_sequence_params),
         TEST(test_indexC, test_sequence_params), TEST(test_rfindC, test_sequence_params),
         TEST(test_rindexC, test_sequence_params), TEST(test_countC, test_sequence_params),
         TEST(test_setindexC, test_sequence_params), TEST(test_setsliceC, test_sequence_params),

@@ -26,18 +26,19 @@ static MunitResult _test_findC(fixture_type_t *type,
     other_0_2 = type->newN(2, items[0], items[2]);
     other_1_0 = type->newN(2, items[1], items[0]);
 
-#define assert_not_found_exc(expression)                     \
-    do {                                                     \
-        ypObject *exc = yp_None;                             \
-        assert_ssizeC(expression, ==, -1);                   \
+#define assert_not_found_exc(expression)                    \
+    do {                                                    \
+        ypObject *exc = yp_None;                            \
+        assert_ssizeC(expression, ==, -1);                  \
         if (raises) assert_isexception(exc, yp_ValueError); \
     } while (0)
 
-    assert_ssizeC_exc(any_findC(self, other_0_1, &exc), ==, 0);  // Sub-string.
-    assert_ssizeC_exc(any_findC(self, other_1_2, &exc), ==, 1);  // Sub-string.
-    assert_not_found_exc(any_findC(self, other_0_2, &exc));      // Out-of-order.
-    assert_not_found_exc(any_findC(self, other_1_0, &exc));      // Out-of-order.
-    assert_ssizeC_exc(any_findC(self, self, &exc), ==, 0);       // Self.
+    assert_ssizeC_exc(any_findC(self, other_0_1, &exc), ==, 0);            // Sub-string.
+    assert_ssizeC_exc(any_findC(self, other_1_2, &exc), ==, 1);            // Sub-string.
+    assert_not_found_exc(any_findC(self, other_0_2, &exc));                // Out-of-order.
+    assert_not_found_exc(any_findC(self, other_1_0, &exc));                // Out-of-order.
+    assert_ssizeC_exc(any_findC(self, empty, &exc), ==, forward ? 0 : 3);  // Empty.
+    assert_ssizeC_exc(any_findC(self, self, &exc), ==, 0);                 // Self.
 
     assert_ssizeC_exc(any_findC5(self, other_0_1, 0, 3, &exc), ==, 0);  // Total slice.
     assert_ssizeC_exc(any_findC5(self, other_0_1, 0, 2, &exc), ==, 0);  // Exact slice.
@@ -48,8 +49,11 @@ static MunitResult _test_findC(fixture_type_t *type,
     assert_not_found_exc(any_findC5(self, other_1_2, 1, 2, &exc));      // Too-small slice.
     assert_not_found_exc(any_findC5(self, other_1_2, 1, 1, &exc));      // Empty slice.
 
+    assert_ssizeC_exc(any_findC5(self, empty, 0, 3, &exc), ==, forward ? 0 : 3);  // Empty, total.
+    assert_ssizeC_exc(any_findC5(self, empty, 1, 2, &exc), ==, forward ? 1 : 2);  // Empty, partial.
+    assert_ssizeC_exc(any_findC5(self, empty, 2, 2, &exc), ==, 2);                // Empty, empty.
+
     // FIXME That empty slice bug thing.
-    // FIXME empty (from above)
     // FIXME !forward substrings?
     // FIXME Anything else to add here?
 
