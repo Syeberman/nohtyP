@@ -41,7 +41,7 @@ def generate_PreprocessedBuilder(env):
 
     add_common_ppcc_variables(env)
 
-    # CCPP is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
+    # PPCC is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
     env['PPCC'] = '$CC'
     env['PPCFLAGS'] = SCons.Util.CLVar('$CFLAGS')
