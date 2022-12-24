@@ -61,7 +61,8 @@ def CoverageAction(target, source, env):
     env.Execute(quietDelete(CoverageDataFiles(env)))
 
     # Run the tests. This creates new data files. This is an input to the builder.
-    env.Execute("$COVTESTACTION", "$COVTESTACTIONSTR")
+    if env.Execute("$COVTESTACTION", "$COVTESTACTIONSTR"):
+        env.Exit(1)
 
     # Process the data files into the output format. Note that CoverageDataFiles may return a
     # different list than before.
@@ -70,17 +71,19 @@ def CoverageAction(target, source, env):
         outFile = env.ReplaceIxes(
             dataFile, "COVDATAPREFIX", "COVDATASUFFIX", "COVOUTPREFIX", "COVOUTSUFFIX"
         )
-        env.Execute(*env.subst(["$COVCOM", "$COVCOMSTR"], target=outFile, source=dataFile))
+        if env.Execute(*env.subst(["$COVCOM", "$COVCOMSTR"], target=outFile, source=dataFile)):
+            env.Exit(1)
         outFiles.append(outFile)
 
     # Combine the output files into an archive for later processing.
-    env.Execute(
+    if env.Execute(
         *env.subst(
             ["$TAR -zc -f $TARGET $SOURCES", "Archiving coverage results to $TARGET"],
             target=archive,
             source=outFiles,
         )
-    )
+    ):
+        env.Exit(1)
 
 
 def CoverageEmitter(target, source, env):
