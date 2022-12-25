@@ -325,6 +325,11 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     ead(both_neg_step, yp_getsliceC4(self, yp_SLICE_LAST, yp_SLICE_LAST, -1),
             assert_len(both_neg_step, 0));
 
+    // Invalid slices.
+    assert_raises(yp_getsliceC4(self, 0, 1, 0), yp_ValueError);  // step==0
+    assert_raises(yp_getsliceC4(self, 0, 1, -yp_SSIZE_T_MAX - 1),
+            yp_SystemLimitationError);  // too-small step
+
     // Optimization: lazy shallow copy of an immutable self for total forward slice.
     if (!type->is_mutable) {
         ead(forward, yp_getsliceC4(self, 0, 5, 1), assert_obj(forward, is, self));
@@ -913,6 +918,18 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(4, self, empty, two, three_four);
     }
 
+    // Invalid slices.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *empty = (*x_type)->newN(0);
+        assert_raises_exc(yp_setsliceC6(self, 0, 1, 0, empty, &exc), yp_ValueError);  // step==0
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(self, 0, 1, -yp_SSIZE_T_MAX - 1, empty, &exc),
+                yp_SystemLimitationError);  // too-small step
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decrefN(2, self, empty);
+    }
+
     // Regular slices (step==1) can grow and shrink the sequence.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *self = type->newN(0);
@@ -1098,7 +1115,137 @@ tear_down:
     return MUNIT_OK;
 }
 
-// FIXME yp_delsliceC5
+static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(9, type->rand_item());
+
+    // Immutables don't support delslice.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_delsliceC5(self, 0, 1, 1, &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic slice.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_delsliceC5(self, 0, 1, 1, &exc));
+        assert_sequence(self, 2, items[1], items[2]);
+        assert_not_raises_exc(yp_delsliceC5(self, 1, 2, 1, &exc));
+        assert_sequence(self, 1, items[1]);
+        yp_decref(self);
+    }
+
+    // Negative step.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_delsliceC5(self, -1, -2, -1, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_not_raises_exc(yp_delsliceC5(self, -2, -3, -1, &exc));
+        assert_sequence(self, 1, items[1]);
+        yp_decref(self);
+    }
+
+    // Total slice, forward and backward.
+    {
+        ypObject *self1 = type->newN(2, items[0], items[1]);
+        ypObject *self2 = type->newN(2, items[2], items[3]);
+        assert_not_raises_exc(yp_delsliceC5(self1, 0, 2, 1, &exc));
+        assert_len(self1, 0);
+        assert_not_raises_exc(yp_delsliceC5(self2, -1, -3, -1, &exc));
+        assert_len(self2, 0);
+        yp_decrefN(2, self1, self2);
+    }
+
+    // Step of 2, -2.
+    {
+        ypObject *self = type->newN(9, items[0], items[1], items[2], items[3], items[4], items[5],
+                items[6], items[7], items[8]);
+        assert_not_raises_exc(yp_delsliceC5(self, 0, 9, 2, &exc));
+        assert_sequence(self, 4, items[1], items[3], items[5], items[7]);
+        assert_not_raises_exc(yp_delsliceC5(self, -1, -5, -2, &exc));
+        assert_sequence(self, 2, items[1], items[5]);
+        yp_decref(self);
+    }
+
+    // Empty slices.
+    {
+        ypObject    *self = type->newN(2, items[0], items[1]);
+        slice_args_t slices[] = {
+                {0, 0, 1},      // typical empty slice
+                {5, 99, 1},     // i>=len(s) and k>0 (regardless of j)
+                {-6, -99, -1},  // i<-len(s) and k<0 (regardless of j)
+                {99, 5, -1},    // j>=len(s) and k<0 (regardless of i)
+                {-99, -6, 1},   // j<-len(s) and k>0 (regardless of i)
+                {4, 4, 1},      // i=j (regardless of k)
+                {1, 0, 1},      // i>j and k>0
+                {0, 1, -1},     // i<j and k<0
+        };
+        yp_ssize_t i;
+        for (i = 0; i < yp_lengthof_array(slices); i++) {
+            slice_args_t args = slices[i];
+            assert_not_raises_exc(yp_delsliceC5(self, args.start, args.stop, args.step, &exc));
+            assert_sequence(self, 2, items[0], items[1]);
+        }
+        yp_decref(self);
+    }
+
+    // yp_SLICE_DEFAULT.
+    {
+        ypObject *self1 = type->newN(4, items[0], items[1], items[2], items[3]);
+        ypObject *self2 = type->newN(4, items[4], items[5], items[6], items[7]);
+        assert_not_raises_exc(yp_delsliceC5(self1, yp_SLICE_DEFAULT, 1, 1, &exc));
+        assert_sequence(self1, 3, items[1], items[2], items[3]);
+        assert_not_raises_exc(yp_delsliceC5(self1, 2, yp_SLICE_DEFAULT, 1, &exc));
+        assert_sequence(self1, 2, items[1], items[2]);
+        assert_not_raises_exc(yp_delsliceC5(self1, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1, &exc));
+        assert_len(self1, 0);
+        assert_not_raises_exc(yp_delsliceC5(self2, yp_SLICE_DEFAULT, -2, -1, &exc));
+        assert_sequence(self2, 3, items[4], items[5], items[6]);
+        assert_not_raises_exc(yp_delsliceC5(self2, -3, yp_SLICE_DEFAULT, -1, &exc));
+        assert_sequence(self2, 2, items[5], items[6]);
+        assert_not_raises_exc(yp_delsliceC5(self2, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1, &exc));
+        assert_len(self2, 0);
+        yp_decrefN(2, self1, self2);
+    }
+
+    // yp_SLICE_LAST.
+    {
+        ypObject *self1 = type->newN(4, items[0], items[1], items[2], items[3]);
+        ypObject *self2 = type->newN(4, items[4], items[5], items[6], items[7]);
+        assert_not_raises_exc(yp_delsliceC5(self1, yp_SLICE_LAST, 4, 1, &exc));
+        assert_sequence(self1, 4, items[0], items[1], items[2], items[3]);
+        assert_not_raises_exc(yp_delsliceC5(self1, 3, yp_SLICE_LAST, 1, &exc));
+        assert_sequence(self1, 3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_delsliceC5(self1, yp_SLICE_LAST, yp_SLICE_LAST, 1, &exc));
+        assert_sequence(self1, 3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_delsliceC5(self2, yp_SLICE_LAST, -2, -1, &exc));
+        assert_sequence(self2, 3, items[4], items[5], items[6]);
+        assert_not_raises_exc(yp_delsliceC5(self2, -1, yp_SLICE_LAST, -1, &exc));
+        assert_sequence(self2, 3, items[4], items[5], items[6]);
+        assert_not_raises_exc(yp_delsliceC5(self2, yp_SLICE_LAST, yp_SLICE_LAST, -1, &exc));
+        assert_sequence(self2, 3, items[4], items[5], items[6]);
+        yp_decrefN(2, self1, self2);
+    }
+
+    // Invalid slices.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_delsliceC5(self, 0, 1, 0, &exc), yp_ValueError);  // step==0
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_raises_exc(yp_delsliceC5(self, 0, 1, -yp_SSIZE_T_MAX - 1, &exc),
+                yp_SystemLimitationError);  // too-small step
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
 
 static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixture)
 {
@@ -1169,7 +1316,8 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_rindexC, test_sequence_params), TEST(test_countC, test_sequence_params),
         TEST(test_setindexC, test_sequence_params), TEST(test_setsliceC, test_sequence_params),
         TEST(test_setitem, test_sequence_params), TEST(test_delindexC, test_sequence_params),
-        TEST(test_delitemC, test_sequence_params), {NULL}};
+        TEST(test_delsliceC, test_sequence_params), TEST(test_delitemC, test_sequence_params),
+        {NULL}};
 
 
 extern void test_sequence_initialize(void) {}
