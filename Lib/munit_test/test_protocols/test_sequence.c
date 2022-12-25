@@ -1041,6 +1041,122 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(4, type->rand_item());
+
+    // Immutables don't support delindex.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_delindexC(self, 0, &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic index.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_delindexC(self, 0, &exc));
+        assert_sequence(self, 2, items[1], items[2]);
+        assert_not_raises_exc(yp_delindexC(self, 1, &exc));
+        assert_sequence(self, 1, items[1]);
+        yp_decref(self);
+    }
+
+    // Negative index.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_delindexC(self, -1, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_not_raises_exc(yp_delindexC(self, -2, &exc));
+        assert_sequence(self, 1, items[1]);
+        yp_decref(self);
+    }
+
+    // Out of bounds.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_delindexC(self, 2, &exc), yp_IndexError);
+        assert_raises_exc(yp_delindexC(self, -3, &exc), yp_IndexError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Empty self.
+    {
+        ypObject *empty = type->newN(0);
+        assert_raises_exc(yp_delindexC(empty, 0, &exc), yp_IndexError);
+        assert_raises_exc(yp_delindexC(empty, -1, &exc), yp_IndexError);
+        assert_len(empty, 0);
+        yp_decref(empty);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+// FIXME yp_delsliceC5
+
+static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(4, type->rand_item());
+
+    // Immutables don't support delitem.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_delitem(self, int_0, &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic index.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_delitem(self, int_0, &exc));
+        assert_sequence(self, 2, items[1], items[2]);
+        assert_not_raises_exc(yp_delitem(self, int_1, &exc));
+        assert_sequence(self, 1, items[1]);
+        yp_decref(self);
+    }
+
+    // Negative index.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_delitem(self, int_neg_1, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        assert_not_raises_exc(yp_delitem(self, int_neg_2, &exc));
+        assert_sequence(self, 1, items[1]);
+        yp_decref(self);
+    }
+
+    // Out of bounds.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_delitem(self, int_2, &exc), yp_IndexError);
+        assert_raises_exc(yp_delitem(self, int_neg_3, &exc), yp_IndexError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Empty self.
+    {
+        ypObject *empty = type->newN(0);
+        assert_raises_exc(yp_delitem(empty, int_0, &exc), yp_IndexError);
+        assert_raises_exc(yp_delitem(empty, int_neg_1, &exc), yp_IndexError);
+        assert_len(empty, 0);
+        yp_decref(empty);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
@@ -1052,7 +1168,8 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_indexC, test_sequence_params), TEST(test_rfindC, test_sequence_params),
         TEST(test_rindexC, test_sequence_params), TEST(test_countC, test_sequence_params),
         TEST(test_setindexC, test_sequence_params), TEST(test_setsliceC, test_sequence_params),
-        TEST(test_setitem, test_sequence_params), {NULL}};
+        TEST(test_setitem, test_sequence_params), TEST(test_delindexC, test_sequence_params),
+        TEST(test_delitemC, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}
