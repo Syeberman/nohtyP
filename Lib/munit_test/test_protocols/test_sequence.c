@@ -2,8 +2,14 @@
 #include "munit_test/unittest.h"
 
 
-// TODO x_types are type, pair, and iter, but should we also include tuple/list? Is it required that
-// every sequence be compatible with tuple/list as an iterable?
+// Sequences should accept themselves, their pairs, and iterators as valid types for the "x" (i.e.
+// "other iterable") argument.
+// TODO Should x_types also include tuple/list? Is it required that every sequence be compatible
+// with tuple/list as an iterable?
+#define x_types_init(type)                            \
+    {                                                 \
+        (type), (type)->pair, fixture_type_iter, NULL \
+    }
 
 
 typedef struct _slice_args_t {
@@ -15,9 +21,8 @@ typedef struct _slice_args_t {
 
 static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t *type = fixture->type;
-    // Sequences should concatenate with themselves, their pairs, and iterators.
-    fixture_type_t  *x_types[] = {type, type->pair, fixture_type_iter, NULL};
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t  *friend_types[] = {type, type->pair, NULL};
     fixture_type_t **x_type;
     ypObject        *items[] = obj_array_init(4, type->rand_item());
@@ -106,6 +111,9 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
             yp_decrefN(3, self, x, result);
         }
     }
+
+    // FIXME Test x being an iterator that fails at start, mid-way.
+    // FIXME Test x being an iterator that lies about lenhint.
 
 tear_down:
     obj_array_decref(items);
@@ -783,9 +791,8 @@ tear_down:
 
 static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t *type = fixture->type;
-    // Sequences should setslice from themselves, their pairs, and iterators.
-    fixture_type_t  *x_types[] = {type, type->pair, fixture_type_iter, NULL};
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *items[] = obj_array_init(11, type->rand_item());
 
@@ -993,6 +1000,9 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         assert_sequence(self, 5, items[1], items[0], items[1], items[0], items[0]);
         yp_decref(self);
     }
+
+    // FIXME Test x being an iterator that fails at start, mid-way.
+    // FIXME Test x being an iterator that lies about lenhint.
 
 tear_down:
     obj_array_decref(items);
@@ -1304,6 +1314,121 @@ tear_down:
     return MUNIT_OK;
 }
 
+// Shared tests for yp_append, yp_push. (These are the same operation on sequences.)
+static MunitResult _test_appendC(
+        fixture_type_t *type, void (*any_append)(ypObject *, ypObject *, ypObject **))
+{
+    ypObject *items[] = obj_array_init(3, type->rand_item());
+
+    // Immutables don't support append.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(any_append(self, items[2], &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic append.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(any_append(self, items[2], &exc));
+        assert_sequence(self, 3, items[0], items[1], items[2]);
+        yp_decref(self);
+    }
+
+    // Self is empty.
+    {
+        ypObject *self = type->newN(0);
+        assert_not_raises_exc(any_append(self, items[2], &exc));
+        assert_sequence(self, 1, items[2]);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_append(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_appendC(fixture->type, yp_append);
+}
+
+static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_appendC(fixture->type, yp_push);
+}
+
+static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    ypObject        *items[] = obj_array_init(4, type->rand_item());
+
+    // Immutables don't support extend.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *two = type->newN(1, items[2]);
+        assert_raises_exc(yp_extend(self, two, &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decrefN(2, self, two);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic extend.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *x = (*x_type)->newN(2, items[2], items[3]);
+        assert_not_raises_exc(yp_extend(self, x, &exc));
+        assert_sequence(self, 4, items[0], items[1], items[2], items[3]);
+        yp_decrefN(2, self, x);
+    }
+
+    // self is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(0);
+        ypObject *x = (*x_type)->newN(2, items[2], items[3]);
+        assert_not_raises_exc(yp_extend(self, x, &exc));
+        assert_sequence(self, 2, items[2], items[3]);
+        yp_decrefN(2, self, x);
+    }
+
+    // x is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_extend(self, x, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decrefN(2, self, x);
+    }
+
+    // Both are empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_extend(self, x, &exc));
+        assert_len(self, 0);
+        yp_decrefN(2, self, x);
+    }
+
+    // x can be self.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_extend(self, self, &exc));
+        assert_sequence(self, 4, items[0], items[1], items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // FIXME Test x being an iterator that fails at start, mid-way.
+    // FIXME Test x being an iterator that lies about lenhint.
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
@@ -1317,7 +1442,8 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_setindexC, test_sequence_params), TEST(test_setsliceC, test_sequence_params),
         TEST(test_setitem, test_sequence_params), TEST(test_delindexC, test_sequence_params),
         TEST(test_delsliceC, test_sequence_params), TEST(test_delitemC, test_sequence_params),
-        {NULL}};
+        TEST(test_append, test_sequence_params), TEST(test_push, test_sequence_params),
+        TEST(test_extend, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}

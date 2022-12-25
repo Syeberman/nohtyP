@@ -576,11 +576,11 @@ extern ypObject *rand_obj_hashable(fixture_type_t *type);
 //      obj_array_fill(items, type->rand_items);
 #define obj_array_fill(array, filler) (filler)(yp_lengthof_array(array), (array))
 
-// Discards all references in the ypObject * array of length n.
+// Discards all references in the ypObject * array of length n. Skips NULL elements.
 extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 
-// Discards all references in the ypObject * array. Only call for arrays of fixed size (uses
-// yp_lengthof_array).
+// Discards all references in the ypObject * array. Skips NULL elements. Only call for arrays of
+// fixed size (uses yp_lengthof_array).
 #define obj_array_decref(array) obj_array_decref2(yp_lengthof_array(array), (array))
 
 
