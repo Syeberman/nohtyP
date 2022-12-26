@@ -1689,8 +1689,8 @@ class ByteArrayTest(BaseBytesTest, yp_unittest.TestCase):
         b.remove(ord('o'))
         b.remove(ord('h'))
         self.assertEqual(b, b'e')
-        self.assertRaises(TypeError, lambda: b.remove(b'e'))
-        b.remove(Indexable(ord('e')))
+        # XXX Unlike Python, nohtyP's remove behaves like find: it looks for substrings.
+        b.remove(b'e')
         self.assertEqual(b, b'')
 
         # test values outside of the ascii range: (0, 127)

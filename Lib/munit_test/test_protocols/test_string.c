@@ -86,6 +86,8 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
 
 // FIXME test_countC, for non-overlapping substrings.
 
+// FIXME test_remove and test_discard, for substrings.
+
 static MunitParameterEnum test_string_params[] = {
         {param_key_type, param_values_types_string}, {NULL}};
 

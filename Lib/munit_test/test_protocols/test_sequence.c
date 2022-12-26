@@ -486,11 +486,15 @@ static MunitResult _test_findC(fixture_type_t *type,
     obj_array_fill(items, type->rand_items);
     self = type->newN(2, items[0], items[1]);
 
-#define assert_not_found_exc(expression)                    \
-    do {                                                    \
-        ypObject *exc = yp_None;                            \
-        assert_ssizeC(expression, ==, -1);                  \
-        if (raises) assert_isexception(exc, yp_ValueError); \
+#define assert_not_found_exc(expression)            \
+    do {                                            \
+        ypObject *exc = yp_None;                    \
+        assert_ssizeC(expression, ==, -1);          \
+        if (raises) {                               \
+            assert_isexception(exc, yp_ValueError); \
+        } else {                                    \
+            assert_obj(exc, is, yp_None);           \
+        }                                           \
     } while (0)
 
     // Basic find.
@@ -1737,6 +1741,161 @@ tear_down:
     return MUNIT_OK;
 }
 
+// Shared tests for yp_remove, yp_discard.
+static MunitResult _test_remove(
+        fixture_type_t *type, void (*any_remove)(ypObject *, ypObject *, ypObject **), int raises)
+{
+    ypObject *items[3];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support remove.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(any_remove(self, items[0], &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+#define assert_not_found_exc(expression)            \
+    do {                                            \
+        ypObject *exc = yp_None;                    \
+        (expression);                               \
+        if (raises) {                               \
+            assert_isexception(exc, yp_ValueError); \
+        } else {                                    \
+            assert_obj(exc, is, yp_None);           \
+        }                                           \
+    } while (0)
+
+    // Basic remove.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(any_remove(self, items[0], &exc));
+        assert_sequence(self, 1, items[1]);
+        assert_not_raises_exc(any_remove(self, items[1], &exc));
+        assert_len(self, 0);
+        yp_decref(self);
+    }
+
+    // Not in sequence.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_found_exc(any_remove(self, items[2], &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Empty self.
+    {
+        ypObject *self = type->newN(0);
+        assert_not_found_exc(any_remove(self, items[2], &exc));
+        assert_len(self, 0);
+        yp_decref(self);
+    }
+
+    // If multiples, the first one is the one that's removed. (There is no yp_rremove, yet.)
+    if (!type->is_patterned) {
+        ypObject *multi = type->newN(4, items[0], items[2], items[1], items[2]);
+        assert_not_raises_exc(any_remove(multi, items[2], &exc));
+        assert_sequence(multi, 3, items[0], items[1], items[2]);
+        yp_decref(multi);
+    }
+
+    if (type->is_string) {
+        // For strings, remove looks for sub-sequences of items. This behaviour is tested more
+        // thoroughly in test_string.
+        ypObject *string = type->newN(3, items[0], items[1], items[2]);
+        ypObject *other_0_1 = type->newN(2, items[0], items[1]);
+
+        assert_not_raises_exc(any_remove(string, other_0_1, &exc));
+        assert_sequence(string, 1, items[2]);
+
+        assert_not_raises_exc(any_remove(string, string, &exc));
+        assert_len(string, 0);
+
+        yp_decrefN(2, string, other_0_1);
+
+    } else {
+        // All other sequences inspect only one item at a time.
+        ypObject *seq = type->newN(3, items[0], items[1], items[2]);
+        assert_not_found_exc(any_remove(seq, seq, &exc));
+        assert_sequence(seq, 3, items[0], items[1], items[2]);
+        yp_decref(seq);
+    }
+
+#undef assert_not_found_exc
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_remove(fixture->type, yp_remove, /*raises=*/TRUE);
+}
+
+static MunitResult test_discard(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_remove(fixture->type, yp_discard, /*raises=*/FALSE);
+}
+
+static MunitResult test_reverse(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(3, type->rand_item());
+
+    // Immutables don't support reverse.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_reverse(self, &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic reverse.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_reverse(self, &exc));
+        assert_sequence(self, 3, items[2], items[1], items[0]);
+        assert_not_raises_exc(yp_reverse(self, &exc));
+        assert_sequence(self, 3, items[0], items[1], items[2]);
+        yp_decref(self);
+    }
+
+    // Reverse sequence of length 2.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_reverse(self, &exc));
+        assert_sequence(self, 2, items[1], items[0]);
+        assert_not_raises_exc(yp_reverse(self, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Reverse sequence of length 1.
+    {
+        ypObject *self = type->newN(1, items[0]);
+        assert_not_raises_exc(yp_reverse(self, &exc));
+        assert_sequence(self, 1, items[0]);
+        yp_decref(self);
+    }
+
+    // Self is empty.
+    {
+        ypObject *self = type->newN(0);
+        assert_not_raises_exc(yp_reverse(self, &exc));
+        assert_len(self, 0);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
@@ -1753,7 +1912,8 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_append, test_sequence_params), TEST(test_push, test_sequence_params),
         TEST(test_extend, test_sequence_params), TEST(test_irepeatC, test_sequence_params),
         TEST(test_insertC, test_sequence_params), TEST(test_popindexC, test_sequence_params),
-        TEST(test_pop, test_sequence_params), {NULL}};
+        TEST(test_pop, test_sequence_params), TEST(test_remove, test_sequence_params),
+        TEST(test_discard, test_sequence_params), TEST(test_reverse, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}

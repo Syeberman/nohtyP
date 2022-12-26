@@ -406,20 +406,22 @@ extern "C" {
 //
 // XXX This is unable to cleanup _ypmt_SEQ_actual on error, as tear_down is not called on assertion
 // failures. As such, test failures may leak some memory.
-#define assert_sequence(obj, n, ...)                                               \
-    do {                                                                           \
-        ypObject  *_ypmt_SEQ_obj = (obj);                                          \
-        ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                              \
-        char      *_ypmt_SEQ_item_strs[] = {_ESC(_STRINGIFY##n(__VA_ARGS__))};     \
-        yp_ssize_t _ypmt_SEQ_i;                                                    \
-        _assert_len(_ypmt_SEQ_obj, ((yp_ssize_t)(n)), "%s", #n, #obj);             \
-        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < (n); _ypmt_SEQ_i++) {                  \
-            ypObject *_ypmt_SEQ_actual = yp_getindexC(_ypmt_SEQ_obj, _ypmt_SEQ_i); \
-            _assert_obj(_ypmt_SEQ_actual, eq, _ypmt_SEQ_items[_ypmt_SEQ_i],        \
-                    "yp_getindexC(%s, %" PRIssize ")", "%s", #obj, _ypmt_SEQ_i,    \
-                    _ypmt_SEQ_item_strs[_ypmt_SEQ_i]);                             \
-            yp_decref(_ypmt_SEQ_actual);                                           \
-        }                                                                          \
+#define assert_sequence(obj, n, ...)                                                         \
+    do {                                                                                     \
+        ypObject  *_ypmt_SEQ_obj = (obj);                                                    \
+        ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                                        \
+        char      *_ypmt_SEQ_item_strs[] = {_ESC(_STRINGIFY##n(__VA_ARGS__))};               \
+        yp_ssize_t _ypmt_SEQ_i;                                                              \
+        _assert_len(_ypmt_SEQ_obj, ((yp_ssize_t)(n)), "%s", #n, #obj);                       \
+        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < (n); _ypmt_SEQ_i++) {                            \
+            ypObject *_ypmt_SEQ_actual = yp_getindexC(_ypmt_SEQ_obj, _ypmt_SEQ_i);           \
+            _assert_not_exception(                                                           \
+                    _ypmt_SEQ_actual, "yp_getindexC(%s, %" PRIssize ")", #obj, _ypmt_SEQ_i); \
+            _assert_obj(_ypmt_SEQ_actual, eq, _ypmt_SEQ_items[_ypmt_SEQ_i],                  \
+                    "yp_getindexC(%s, %" PRIssize ")", "%s", #obj, _ypmt_SEQ_i,              \
+                    _ypmt_SEQ_item_strs[_ypmt_SEQ_i]);                                       \
+            yp_decref(_ypmt_SEQ_actual);                                                     \
+        }                                                                                    \
     } while (0)
 
 // Asserts that the first n pointer items in array are exactly the given n items in that order.
@@ -615,21 +617,26 @@ extern void       fixture_tear_down(fixture_t *fixture);
 extern void disable_debugger_popups(void);
 
 
-extern void munit_test_initialize(void);
-
 extern void unittest_initialize(void);
 
-extern void test_unittest_initialize(void);
+#define SUITE_OF_TESTS_DECLS(name)   \
+    extern MunitTest name##_tests[]; \
+    extern void      name##_initialize(void)
 
-extern void test_objects_initialize(void);
-extern void test_protocols_initialize(void);
+#define SUITE_OF_SUITES_DECLS(name)    \
+    extern MunitSuite name##_suites[]; \
+    extern void       name##_initialize(void)
 
-// test_objects
-extern void test_frozenset_initialize(void);
 
-// test_protocols
-extern void test_sequence_initialize(void);
-extern void test_string_initialize(void);
+SUITE_OF_SUITES_DECLS(munit_test);
+SUITE_OF_TESTS_DECLS(test_unittest);
+
+SUITE_OF_SUITES_DECLS(test_objects);
+SUITE_OF_TESTS_DECLS(test_frozenset);
+
+SUITE_OF_SUITES_DECLS(test_protocols);
+SUITE_OF_TESTS_DECLS(test_sequence);
+SUITE_OF_TESTS_DECLS(test_string);
 
 
 #ifdef __cplusplus

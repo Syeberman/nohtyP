@@ -2,7 +2,6 @@
 #include "munit_test/unittest.h"
 #include <stdlib.h>
 
-extern MunitSuite munit_test_suites[];
 
 // TODO Write a pycparser script that ensures all test functions lead back to here. Also to ensure
 // the suite names match the directory/file names.
@@ -23,6 +22,8 @@ int main(int argc, char **argv)
                 malloc_tracker_malloc, malloc_tracker_malloc_resize, malloc_tracker_free};
         yp_initialize(&args);
     }
+
+    unittest_initialize();
 
     munit_test_initialize();
 
