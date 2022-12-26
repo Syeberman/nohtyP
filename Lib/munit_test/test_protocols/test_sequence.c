@@ -160,6 +160,15 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
         yp_decrefN(2, self, result);
     }
 
+    // Negative factor.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ypObject *result = yp_repeatC(self, -1);
+        assert_type_is(result, type->type);
+        assert_len(result, 0);
+        yp_decrefN(2, self, result);
+    }
+
     // Large factor. (Exercises _ypSequence_repeat_memcpy optimization.)
     {
         ypObject *self = type->newN(2, items[0], items[1]);
@@ -227,6 +236,10 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
     // Empty self.
     assert_raises(yp_getindexC(empty, 0), yp_IndexError);
     assert_raises(yp_getindexC(empty, -1), yp_IndexError);
+
+    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
+    assert_raises(yp_getindexC(self, yp_SLICE_DEFAULT), yp_IndexError);
+    assert_raises(yp_getindexC(self, yp_SLICE_LAST), yp_IndexError);
 
     obj_array_decref(items);
     yp_decrefN(2, self, empty);
@@ -413,7 +426,11 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_raises(yp_getitem(empty, int_0), yp_IndexError);
     assert_raises(yp_getitem(empty, int_neg_1), yp_IndexError);
 
-    // FIXME non-integer indicies.
+    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
+    assert_raises(yp_getitem(self, int_SLICE_DEFAULT), yp_IndexError);
+    assert_raises(yp_getitem(self, int_SLICE_LAST), yp_IndexError);
+
+    // FIXME non-integer indicies?
 
     obj_array_decref(items);
     yp_decrefN(2, self, empty);
@@ -444,7 +461,13 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     ead(zero, yp_getdefault(empty, int_0, items[2]), assert_obj(zero, eq, items[2]));
     ead(neg_one, yp_getdefault(empty, int_neg_1, items[2]), assert_obj(neg_one, eq, items[2]));
 
-    // FIXME non-integer indicies.
+    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
+    ead(slice_default, yp_getdefault(self, int_SLICE_DEFAULT, items[2]),
+            assert_obj(slice_default, eq, items[2]));
+    ead(slice_last, yp_getdefault(self, int_SLICE_LAST, items[2]),
+            assert_obj(slice_last, eq, items[2]));
+
+    // FIXME non-integer indicies?
 
     obj_array_decref(items);
     yp_decrefN(2, self, empty);
@@ -784,6 +807,15 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(empty);
     }
 
+    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_setindexC(self, yp_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
+        assert_raises_exc(yp_setindexC(self, yp_SLICE_LAST, items[3], &exc), yp_IndexError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -1061,7 +1093,16 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(empty);
     }
 
-    // FIXME non-integer indicies.
+    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_setitem(self, int_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
+        assert_raises_exc(yp_setitem(self, int_SLICE_LAST, items[3], &exc), yp_IndexError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // FIXME non-integer indicies?
 
 tear_down:
     obj_array_decref(items);
@@ -1118,6 +1159,15 @@ static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixt
         assert_raises_exc(yp_delindexC(empty, -1, &exc), yp_IndexError);
         assert_len(empty, 0);
         yp_decref(empty);
+    }
+
+    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_delindexC(self, yp_SLICE_DEFAULT, &exc), yp_IndexError);
+        assert_raises_exc(yp_delindexC(self, yp_SLICE_LAST, &exc), yp_IndexError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
     }
 
 tear_down:
@@ -1309,6 +1359,15 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
         yp_decref(empty);
     }
 
+    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_delitem(self, int_SLICE_DEFAULT, &exc), yp_IndexError);
+        assert_raises_exc(yp_delitem(self, int_SLICE_LAST, &exc), yp_IndexError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -1429,6 +1488,152 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(2, type->rand_item());
+
+    // Immutables don't support irepeat.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_irepeatC(self, 2, &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic irepeat.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_irepeatC(self, 2, &exc));
+        assert_sequence(self, 4, items[0], items[1], items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Factor of one.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_irepeatC(self, 1, &exc));
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Factor of zero.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_irepeatC(self, 0, &exc));
+        assert_len(self, 0);
+        yp_decref(self);
+    }
+
+    // Negative factor.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_irepeatC(self, -1, &exc));
+        assert_len(self, 0);
+        yp_decref(self);
+    }
+
+    // Large factor. (Exercises _ypSequence_repeat_memcpy optimization.).
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_irepeatC(self, 8, &exc));
+        assert_sequence(self, 16, items[0], items[1], items[0], items[1], items[0], items[1],
+                items[0], items[1], items[0], items[1], items[0], items[1], items[0], items[1],
+                items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Empty self.
+    {
+        ypObject *self = type->newN(0);
+        assert_not_raises_exc(yp_irepeatC(self, 2, &exc));
+        assert_len(self, 0);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(4, type->rand_item());
+
+    // Immutables don't support insert.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_insertC(self, 0, items[2], &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic insert.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_insertC(self, 0, items[2], &exc));
+        assert_sequence(self, 3, items[2], items[0], items[1]);
+        assert_not_raises_exc(yp_insertC(self, 1, items[3], &exc));
+        assert_sequence(self, 4, items[2], items[3], items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Negative index.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_insertC(self, -1, items[2], &exc));
+        assert_sequence(self, 3, items[0], items[2], items[1]);
+        assert_not_raises_exc(yp_insertC(self, -2, items[3], &exc));
+        assert_sequence(self, 4, items[0], items[3], items[2], items[1]);
+        yp_decref(self);
+    }
+
+    // "Out of bounds": recall s.insert(i, x) is the same as s[i:i] = [x].
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_insertC(self, 2, items[2], &exc));
+        assert_sequence(self, 3, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_insertC(self, -4, items[3], &exc));
+        assert_sequence(self, 4, items[3], items[0], items[1], items[2]);
+        yp_decref(self);
+    }
+
+    // Empty self.
+    {
+        ypObject *self1 = type->newN(0);
+        ypObject *self2 = type->newN(0);
+        assert_not_raises_exc(yp_insertC(self1, 0, items[2], &exc));
+        assert_sequence(self1, 1, items[2]);
+        assert_not_raises_exc(yp_insertC(self2, -1, items[3], &exc));
+        assert_sequence(self2, 1, items[3]);
+        yp_decrefN(2, self1, self2);
+    }
+
+    // yp_SLICE_DEFAULT. Recall in slices that yp_SLICE_DEFAULT is equivalent to None (or omitting)
+    // in Python. Since s.insert(None, '') raises TypeError, that seems correct here too.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_insertC(self, yp_SLICE_DEFAULT, items[2], &exc), yp_TypeError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // yp_SLICE_LAST.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_not_raises_exc(yp_insertC(self, yp_SLICE_LAST, items[2], &exc));
+        assert_sequence(self, 3, items[0], items[1], items[2]);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
@@ -1443,7 +1648,8 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_setitem, test_sequence_params), TEST(test_delindexC, test_sequence_params),
         TEST(test_delsliceC, test_sequence_params), TEST(test_delitemC, test_sequence_params),
         TEST(test_append, test_sequence_params), TEST(test_push, test_sequence_params),
-        TEST(test_extend, test_sequence_params), {NULL}};
+        TEST(test_extend, test_sequence_params), TEST(test_irepeatC, test_sequence_params),
+        TEST(test_insertC, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}

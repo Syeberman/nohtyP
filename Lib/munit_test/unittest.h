@@ -597,6 +597,9 @@ extern ypObject *const int_3;
 extern ypObject *const int_4;
 extern ypObject *const int_5;
 
+extern ypObject *const int_SLICE_DEFAULT;
+extern ypObject *const int_SLICE_LAST;
+
 
 extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size);
 extern void *malloc_tracker_malloc_resize(
