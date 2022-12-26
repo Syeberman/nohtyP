@@ -1896,6 +1896,36 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(2, type->rand_item());
+
+    // Sort is currently only implemented for list.
+    // FIXME Should this even be a part of the sequence protocol?
+    if (type->type != yp_t_list) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises_exc(yp_sort(self, &exc), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic sort. This is more thoroughly tested in test_tuple.
+    {
+        ypObject *self = type->newN(3, int_2, int_0, int_1);
+        assert_not_raises_exc(yp_sort(self, &exc));
+        assert_sequence(self, 3, int_0, int_1, int_2);
+        assert_not_raises_exc(yp_sort4(self, yp_None, yp_True, &exc));
+        assert_sequence(self, 3, int_2, int_1, int_0);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
@@ -1913,7 +1943,8 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_extend, test_sequence_params), TEST(test_irepeatC, test_sequence_params),
         TEST(test_insertC, test_sequence_params), TEST(test_popindexC, test_sequence_params),
         TEST(test_pop, test_sequence_params), TEST(test_remove, test_sequence_params),
-        TEST(test_discard, test_sequence_params), TEST(test_reverse, test_sequence_params), {NULL}};
+        TEST(test_discard, test_sequence_params), TEST(test_reverse, test_sequence_params),
+        TEST(test_sort, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}
