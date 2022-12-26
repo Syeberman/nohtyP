@@ -1634,6 +1634,109 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(4, type->rand_item());
+
+    // Immutables don't support popindex.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises(yp_popindexC(self, 0), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic popindex.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        ead(popped, yp_popindexC(self, 0), assert_obj(popped, eq, items[0]));
+        assert_sequence(self, 2, items[1], items[2]);
+        ead(popped, yp_popindexC(self, 1), assert_obj(popped, eq, items[2]));
+        assert_sequence(self, 1, items[1]);
+        yp_decref(self);
+    }
+
+    // Negative index.
+    {
+        ypObject *self = type->newN(3, items[0], items[1], items[2]);
+        ead(popped, yp_popindexC(self, -1), assert_obj(popped, eq, items[2]));
+        assert_sequence(self, 2, items[0], items[1]);
+        ead(popped, yp_popindexC(self, -2), assert_obj(popped, eq, items[0]));
+        assert_sequence(self, 1, items[1]);
+        yp_decref(self);
+    }
+
+    // Out of bounds.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises(yp_popindexC(self, 2), yp_IndexError);
+        assert_raises(yp_popindexC(self, -3), yp_IndexError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+    // Empty self.
+    {
+        ypObject *empty = type->newN(0);
+        assert_raises(yp_popindexC(empty, 0), yp_IndexError);
+        assert_raises(yp_popindexC(empty, -1), yp_IndexError);
+        assert_len(empty, 0);
+        yp_decref(empty);
+    }
+
+    // yp_SLICE_DEFAULT, yp_SLICE_LAST.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises(yp_popindexC(self, yp_SLICE_DEFAULT), yp_IndexError);
+        assert_raises(yp_popindexC(self, yp_SLICE_LAST), yp_IndexError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(2, type->rand_item());
+
+    // Immutables don't support pop.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        assert_raises(yp_pop(self), yp_MethodError);
+        assert_sequence(self, 2, items[0], items[1]);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic pop.
+    {
+        ypObject *self = type->newN(2, items[0], items[1]);
+        ead(popped, yp_pop(self), assert_obj(popped, eq, items[1]));
+        assert_sequence(self, 1, items[0]);
+        ead(popped, yp_pop(self), assert_obj(popped, eq, items[0]));
+        assert_len(self, 0);
+        yp_decref(self);
+    }
+
+    // Self is empty.
+    {
+        ypObject *self = type->newN(0);
+        assert_raises(yp_pop(self), yp_IndexError);
+        assert_len(self, 0);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_sequence_params[] = {
         {param_key_type, param_values_types_sequence}, {NULL}};
@@ -1649,7 +1752,8 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_delsliceC, test_sequence_params), TEST(test_delitemC, test_sequence_params),
         TEST(test_append, test_sequence_params), TEST(test_push, test_sequence_params),
         TEST(test_extend, test_sequence_params), TEST(test_irepeatC, test_sequence_params),
-        TEST(test_insertC, test_sequence_params), {NULL}};
+        TEST(test_insertC, test_sequence_params), TEST(test_popindexC, test_sequence_params),
+        TEST(test_pop, test_sequence_params), {NULL}};
 
 
 extern void test_sequence_initialize(void) {}
