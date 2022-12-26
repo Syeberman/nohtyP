@@ -731,6 +731,9 @@ ypAPI void yp_discard(ypObject *sequence, ypObject *x, ypObject **exc);
 // Reverses the items of sequence in-place. Sets *exc on error.
 ypAPI void yp_reverse(ypObject *sequence, ypObject **exc);
 
+// FIXME Sort is currently only implemented for list...and that's likely where it should stay? If
+// so, how to document in this header this fact?
+
 // Sorts the items of sequence in-place. key is a one-argument function used to extract a comparison
 // key from each element in iterable; to compare the elements directly, use yp_None. If reverse is
 // true, the list elements are sorted as if each comparison were reversed. Sets *exc on error.

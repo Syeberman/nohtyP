@@ -10995,14 +10995,15 @@ static ypObject *chrarray_popindex(ypObject *s, yp_ssize_t i)
 // XXX Adapted from Python's reverse_slice.
 static ypObject *chrarray_reverse(ypObject *s)
 {
+    void                     *s_data = ypStr_DATA(s);
     ypStringLib_getindexXfunc getindexX = ypStr_ENC(s)->getindexX;
     ypStringLib_setindexXfunc setindexX = ypStr_ENC(s)->setindexX;
     yp_ssize_t                lo = 0;
     yp_ssize_t                hi = ypStr_LEN(s) - 1;
     while (lo < hi) {
-        yp_uint32_t t = getindexX(s, lo);
-        setindexX(s, lo, getindexX(s, hi));
-        setindexX(s, hi, t);
+        yp_uint32_t t = getindexX(s_data, lo);
+        setindexX(s_data, lo, getindexX(s_data, hi));
+        setindexX(s_data, hi, t);
         lo += 1;
         hi -= 1;
     }
