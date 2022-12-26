@@ -9959,7 +9959,8 @@ static ypObject *bytearray_insert(ypObject *b, yp_ssize_t i, ypObject *x)
     ypObject  *exc = yp_None;
     yp_uint8_t x_asbyte;
 
-    // Recall that insert behaves like b[i:i]=[x], so we don't validate the index.
+    // Recall that insert behaves like b[i:i]=[x], but i can't be yp_SLICE_DEFAULT.
+    if (i == yp_SLICE_DEFAULT) return yp_TypeError;
     x_asbyte = _ypBytes_asuint8C(x, &exc);
     if (yp_isexceptionC(exc)) return exc;
 
@@ -10963,7 +10964,8 @@ static ypObject *chrarray_insert(ypObject *s, yp_ssize_t i, ypObject *x)
     yp_uint32_t                x_asitem;
     const ypStringLib_encinfo *x_enc;
 
-    // Recall that insert behaves like s[i:i]=[x], so we don't validate the index.
+    // Recall that insert behaves like s[i:i]=[x], but i can't be yp_SLICE_DEFAULT.
+    if (i == yp_SLICE_DEFAULT) return yp_TypeError;
     result = _ypStr_asitemC(x, &x_asitem, &x_enc);
     if (yp_isexceptionC(result)) return result;
 
@@ -12856,7 +12858,9 @@ static ypObject *list_insert(ypObject *sq, yp_ssize_t i, ypObject *x)
 {
     ypObject *result;
 
-    // Check for exceptions, then adjust the index (noting it should behave like sq[i:i]=[x])
+    // Check for exceptions, then adjust the index. Recall that insert behaves like sq[i:i]=[x], but
+    // i can't be yp_SLICE_DEFAULT.
+    if (i == yp_SLICE_DEFAULT) return yp_TypeError;
     if (yp_isexceptionC(x)) return x;
     if (i < 0) {
         i += ypTuple_LEN(sq);
