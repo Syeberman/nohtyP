@@ -10048,23 +10048,26 @@ static ypObject *bytearray_pop(ypObject *b)
 // onmissing must be an immortal, or NULL.
 static ypObject *bytearray_remove(ypObject *b, ypObject *x, ypObject *onmissing)
 {
-    ypObject  *exc = yp_None;
-    yp_uint8_t x_asbyte;
-    yp_ssize_t i;
+    yp_uint8_t *x_data;
+    yp_ssize_t  x_len;
+    yp_uint8_t  storage;
+    ypObject   *result;
+    yp_ssize_t  i;
 
-    x_asbyte = _ypBytes_asuint8C(x, &exc);
-    if (yp_isexceptionC(exc)) return exc;
+    result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
+    if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(x_data != NULL, "_ypBytes_coerce_intorbytes unexpectedly returned NULL");
 
-    for (i = 0; i < ypBytes_LEN(b); i++) {
-        if (x_asbyte != ypBytes_DATA(b)[i]) continue;
+    i = _ypStringLib_find(b, x_data, x_len, 0, ypBytes_LEN(b), yp_FIND_FORWARD);
+    if (i < 0) goto missing;
 
-        // We found a match to remove
-        ypBytes_ELEMMOVE(b, i, i + 1);
-        ypBytes_SET_LEN(b, ypBytes_LEN(b) - 1);
-        ypBytes_ASSERT_INVARIANTS(b);
-        return yp_None;
-    }
+    // We found a match to remove
+    ypBytes_ELEMMOVE(b, i, i + x_len);
+    ypBytes_SET_LEN(b, ypBytes_LEN(b) - x_len);
     ypBytes_ASSERT_INVARIANTS(b);
+    return yp_None;
+
+missing:
     if (onmissing == NULL) return yp_ValueError;
     return onmissing;
 }
@@ -10918,27 +10921,26 @@ static ypObject *chrarray_pop(ypObject *s)
 // onmissing must be an immortal, or NULL.
 static ypObject *chrarray_remove(ypObject *s, ypObject *x, ypObject *onmissing)
 {
-    const ypStringLib_encinfo *s_enc = ypStr_ENC(s);
-    ypObject                  *result;
-    yp_uint32_t                x_asitem;
-    const ypStringLib_encinfo *x_enc;
-    yp_ssize_t                 i;
+    void      *x_data;
+    yp_ssize_t x_len;
+    ypObject  *result;
+    yp_ssize_t i;
 
-    result = _ypStr_asitemC(x, &x_asitem, &x_enc);
+    result = _ypStr_coerce_encoding(x, ypStr_ENC(s), &x_data, &x_len);
     if (yp_isexceptionC(result)) return result;
 
-    // Early exit: if x is too large to fit in s, then we know it's not in s.
-    if (s_enc->elemsize < x_enc->elemsize) goto missing;
+    // If we could not coerce to the target encoding, then it must not be in s.
+    if (x_data == NULL) goto missing;
 
-    for (i = 0; i < ypStr_LEN(s); i++) {
-        if (x_asitem != s_enc->getindexX(s, i)) continue;
+    i = _ypStringLib_find(s, x_data, x_len, 0, ypStr_LEN(s), yp_FIND_FORWARD);
+    _ypStr_coerce_encoding_free(x, x_data);
+    if (i < 0) goto missing;
 
-        // We found a match to remove.
-        ypStr_ELEMMOVE(s, i, i + 1);
-        ypStr_SET_LEN(s, ypStr_LEN(s) - 1);
-        ypStr_ASSERT_INVARIANTS(s);
-        return yp_None;
-    }
+    // We found a match to remove.
+    ypStr_ELEMMOVE(s, i, i + x_len);
+    ypStr_SET_LEN(s, ypStr_LEN(s) - x_len);
+    ypStr_ASSERT_INVARIANTS(s);
+    return yp_None;
 
 missing:
     if (onmissing == NULL) return yp_ValueError;

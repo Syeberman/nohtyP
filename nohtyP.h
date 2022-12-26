@@ -714,8 +714,14 @@ ypAPI ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i);
 // together implement a stack (last in, first out).
 ypAPI ypObject *yp_pop(ypObject *sequence);
 
+// FIXME In Python, remove modifies, but removeprefix/etc returns a new string (like strip/etc).
+// Should this be called iremove? Or what if we went the sort/sorted (reverse/reversed, ...) route
+// and used remove/removed (strip/stripped, removeprefix/withoutprefix)? Also if remove means raise,
+// then removeprefix should be discardprefix.
+
 // Removes the first item from sequence that equals x. Raises yp_ValueError if x is not contained in
-// sequence. Sets *exc on error.
+// sequence. Sets *exc on error. Types such as tuples inspect only one item at a time, while types
+// such as strs look for a particular sub-sequence of items.
 ypAPI void yp_remove(ypObject *sequence, ypObject *x, ypObject **exc);
 
 // Removes the first item from sequence that equals x. Does _not_ raise an exception if x is not
