@@ -224,15 +224,6 @@ ypAPI ypObject *yp_floatstoreCF(yp_float_t value);
 ypAPI ypObject *yp_float(ypObject *x);
 ypAPI ypObject *yp_floatstore(ypObject *x);
 
-// Returns a new reference to an iterator for object x. It is usually unwise to modify an object
-// being iterated over.
-ypAPI ypObject *yp_iter(ypObject *x);
-
-// Returns a new reference to an iterator that yields the values returned from repeatedly calling
-// callable, stopping when callable returns a value equal to sentinel. callable is called with no
-// arguments; the sentinel value is never yielded.
-ypAPI ypObject *yp_iter2(ypObject *callable, ypObject *sentinel);
-
 // Returns a new reference to a generator iterator object as described by declaration. See the
 // documentation for yp_generator_decl_t for more details.
 ypAPI ypObject *yp_generatorC(yp_generator_decl_t *declaration);
@@ -323,15 +314,6 @@ ypAPI ypObject *yp_list_repeatCNV(yp_ssize_t factor, int n, va_list args);
 // Returns a new reference to a tuple/list whose elements come from iterable.
 ypAPI ypObject *yp_tuple(ypObject *iterable);
 ypAPI ypObject *yp_list(ypObject *iterable);
-
-// Returns a new reference to a sorted list from the items in iterable. key is a one-argument
-// function used to extract a comparison key from each element in iterable; to compare the elements
-// directly, use yp_None. If reverse is true, the list elements are sorted as if each comparison
-// were reversed.
-ypAPI ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse);
-
-// Equivalent to yp_sorted3(iterable, yp_None, yp_False).
-ypAPI ypObject *yp_sorted(ypObject *iterable);
 
 // Returns a new reference to a frozenset/set containing the given n objects; the length will be n,
 // unless there are duplicate objects.
@@ -466,45 +448,21 @@ ypAPI yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc);
 
 
 /*
- * Iterator Operations
+ * Iterable Operations
  */
 
-// An "iterator" is an object that implements yp_next, while an "iterable" is an object that
-// implements yp_iter. Examples of iterables include range, bytes, str, tuple, set, and dict;
-// examples of iterators include files and generators. It is usually unwise to modify an object
-// being iterated over.
+// An "iterable" is an object that implements yp_iter, returning an "iterator" that yields values
+// from yp_next. Examples of iterables include range, bytes, str, tuple, set, and dict; examples of
+// iterators include files and generators. It is usually unwise to modify an object being iterated
+// over.
 
-// "Sends" a value into iterator and returns a new reference to the next yielded value, or an
-// exception. The iterator may ignore the value. value cannot be an exception. When the iterator is
-// exhausted yp_StopIteration is raised.
-ypAPI ypObject *yp_send(ypObject *iterator, ypObject *value);
+// Returns a new reference to an iterator for object x.
+ypAPI ypObject *yp_iter(ypObject *x);
 
-// Equivalent to yp_send(iterator, yp_None). Typically used on iterators that ignore the value.
-ypAPI ypObject *yp_next(ypObject *iterator);
-
-// Similar to yp_next, but when the iterator is exhausted a new reference to defval is returned.
-// defval _can_ be an exception: if it is, then exhaustion is treated as an error.
-ypAPI ypObject *yp_next2(ypObject *iterator, ypObject *defval);
-
-// "Sends" an exception into iterator and returns a new reference to the next yielded value, or an
-// exception. The iterator may ignore the exception, or it may return it or any other exception. If
-// exception is not an exception, yp_TypeError is raised. When the iterator is exhausted
-// yp_StopIteration is raised.
-ypAPI ypObject *yp_throw(ypObject *iterator, ypObject *exception);
-
-// Returns a hint as to how many items are left to be yielded. The accuracy of this hint depends on
-// the underlying type: most containers know their lengths exactly, but some generators may not. A
-// hint of zero could mean that the iterator is exhausted, that the length is unknown, or that the
-// iterator will yield infinite values. Returns zero and sets *exc on error.
-ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
-
-// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit). yp_throw is expected to
-// return either yp_StopIteration or yp_GeneratorExit: these are not treated as errors. If yp_throw
-// yields a value, it is discarded and yp_RuntimeError is raised. Sets *exc on error. The behaviour
-// of this method for other types, in particular files, is documented elsewhere.
-ypAPI void yp_close(ypObject *iterator, ypObject **exc);
-
-// FIXME Most functions below deal with *iterables*.
+// Returns a new reference to an iterator that yields the values returned from repeatedly calling
+// callable, stopping when callable returns a value equal to sentinel. callable is called with no
+// arguments; the sentinel value is never yielded.
+ypAPI ypObject *yp_iter2(ypObject *callable, ypObject *sentinel);
 
 // Sets the given n ypObject**s to new references for the values yielded from iterable. Iterable
 // must yield exactly n objects, or else a yp_ValueError is raised. Sets all n ypObject**s to the
@@ -541,8 +499,18 @@ ypAPI ypObject *yp_min_key(ypObject *iterable, ypObject *key);
 ypAPI ypObject *yp_max(ypObject *iterable);
 ypAPI ypObject *yp_min(ypObject *iterable);
 
-// Returns a new reference to an iterator that yields the elements of sequence in reverse order.
-ypAPI ypObject *yp_reversed(ypObject *sequence);
+// Returns a new reference to an iterator that yields the elements of iterable in reverse order.
+// Raises yp_TypeError if iterable is not reversible (i.e., iterators, sets).
+ypAPI ypObject *yp_reversed(ypObject *iterable);
+
+// Returns a new reference to a sorted list from the items in iterable. key is a one-argument
+// function used to extract a comparison key from each element in iterable; to compare the elements
+// directly, use yp_None. If reverse is true, the list elements are sorted as if each comparison
+// were reversed.
+ypAPI ypObject *yp_sorted3(ypObject *iterable, ypObject *key, ypObject *reverse);
+
+// Equivalent to yp_sorted3(iterable, yp_None, yp_False).
+ypAPI ypObject *yp_sorted(ypObject *iterable);
 
 // Returns a new reference to an iterator that aggregates elements from each of the n iterables.
 ypAPI ypObject *yp_zipN(int n, ...);
@@ -573,6 +541,46 @@ typedef struct _yp_generator_decl_t {
 
 
 /*
+ * Iterator Operations
+ */
+
+// An "iterator" is an object that yields values from yp_next. Iterators may become "exhausted" when
+// they have yielded all their values. Iterators are themselves iterable: calling yp_iter on an
+// iterator usually returns the iterator unchanged. Most iterators cannot be "restarted", and will
+// remain in a partially- or fully-exhausted state after use.
+
+// "Sends" a value into iterator and returns a new reference to the next yielded value, or an
+// exception. The iterator may ignore the value. value cannot be an exception. When the iterator is
+// exhausted yp_StopIteration is raised.
+ypAPI ypObject *yp_send(ypObject *iterator, ypObject *value);
+
+// Equivalent to yp_send(iterator, yp_None). Typically used on iterators that ignore the value.
+ypAPI ypObject *yp_next(ypObject *iterator);
+
+// Similar to yp_next, but when the iterator is exhausted a new reference to defval is returned.
+// defval _can_ be an exception: if it is, then exhaustion is treated as an error.
+ypAPI ypObject *yp_next2(ypObject *iterator, ypObject *defval);
+
+// "Sends" an exception into iterator and returns a new reference to the next yielded value, or an
+// exception. The iterator may ignore the exception, or it may return it or any other exception. If
+// exception is not an exception, yp_TypeError is raised. When the iterator is exhausted
+// yp_StopIteration is raised.
+ypAPI ypObject *yp_throw(ypObject *iterator, ypObject *exception);
+
+// Returns a hint as to how many items are left to be yielded. The accuracy of this hint depends on
+// the underlying type: most containers know their lengths exactly, but some generators may not. A
+// hint of zero could mean that the iterator is exhausted, that the length is unknown, or that the
+// iterator will yield infinite values. Returns zero and sets *exc on error.
+ypAPI yp_ssize_t yp_length_hintC(ypObject *iterator, ypObject **exc);
+
+// "Closes" the iterator by calling yp_throw(iterator, yp_GeneratorExit). yp_throw is expected to
+// return either yp_StopIteration or yp_GeneratorExit: these are not treated as errors. If yp_throw
+// yields a value, it is discarded and yp_RuntimeError is raised. Sets *exc on error. The behaviour
+// of this method for other types, in particular files, is documented elsewhere.
+ypAPI void yp_close(ypObject *iterator, ypObject **exc);
+
+
+/*
  * Container Operations
  */
 
@@ -580,13 +588,13 @@ typedef struct _yp_generator_decl_t {
 // mutable counterparts, of course).
 
 // FIXME No: mapping types don't support push/pop.
-// FIXME Contains is supported by iterators!
 
-// Returns the immortal yp_True if an item of container is equal to x, else yp_False.
+// Returns the immortal yp_True if an item of container is equal to x, else yp_False. Unlike Python,
+// this is not supported on iterators.
 ypAPI ypObject *yp_contains(ypObject *container, ypObject *x);
 ypAPI ypObject *yp_in(ypObject *x, ypObject *container);
 
-// Returns the immortal yp_False if an item of container is equal to x, else yp_True.
+// Equivalent to yp_not(yp_in(x, container)).
 ypAPI ypObject *yp_not_in(ypObject *x, ypObject *container);
 
 // Returns the length of container. Returns zero and sets *exc on error.
@@ -602,6 +610,8 @@ ypAPI void yp_clear(ypObject *container, ypObject **exc);
 // Removes an item from container and returns a new reference to the item. Not supported on dicts;
 // use yp_popvalue3 or yp_popitem instead.
 ypAPI ypObject *yp_pop(ypObject *container);
+
+// FIXME remove, others
 
 
 /*
