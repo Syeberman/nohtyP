@@ -53,7 +53,7 @@ extern "C" {
 
 // clang-format off
 // From https://stackoverflow.com/a/2308651/770500
-#define _PP_NARG(prefix, ...) _PP_ARG_N(prefix, __VA_ARGS__)
+#define _PP_NARG(prefix, ...) _ESC(_PP_ARG_N(prefix, __VA_ARGS__))
 #define _PP_ARG_N(prefix, \
      _1, _2, _3, _4, _5, _6, _7, _8, _9,_10, \
     _11,_12,_13,_14,_15,_16,_17,_18,_19,_20, \
@@ -128,7 +128,7 @@ extern "C" {
 
 // Variadic macro tricks.
 #define N(...) _PP_NARG(, __VA_ARGS__, _PP_RSEQ_N()), __VA_ARGS__
-#define STRINGIFY(...) _PP_NARG(_STRINGIFY, __VA_ARGS__, _PP_RSEQ_N())(__VA_ARGS__)
+#define STRINGIFY(...) _ESC(_PP_NARG(_STRINGIFY, __VA_ARGS__, _PP_RSEQ_N())(__VA_ARGS__))
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
 #define yp_sizeof(x) ((yp_ssize_t)sizeof(x))
