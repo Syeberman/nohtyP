@@ -587,8 +587,6 @@ ypAPI void yp_close(ypObject *iterator, ypObject **exc);
 // These methods are supported by range, bytes, str, tuple, frozenset, and frozendict (and their
 // mutable counterparts, of course).
 
-// FIXME No: mapping types don't support push/pop.
-
 // Returns the immortal yp_True if an item of container is equal to x, else yp_False. Unlike Python,
 // this is not supported on iterators.
 ypAPI ypObject *yp_contains(ypObject *container, ypObject *x);
@@ -600,18 +598,8 @@ ypAPI ypObject *yp_not_in(ypObject *x, ypObject *container);
 // Returns the length of container. Returns zero and sets *exc on error.
 ypAPI yp_ssize_t yp_lenC(ypObject *container, ypObject **exc);
 
-// Adds an item to container. Sets *exc on error. The relation between yp_push and yp_pop depends on
-// the type: x may be the first or last item popped, or items may be popped in arbitrary order.
-ypAPI void yp_push(ypObject *container, ypObject *x, ypObject **exc);
-
 // Removes all items from container. Sets *exc on error.
 ypAPI void yp_clear(ypObject *container, ypObject **exc);
-
-// Removes an item from container and returns a new reference to the item. Not supported on dicts;
-// use yp_popvalue3 or yp_popitem instead.
-ypAPI ypObject *yp_pop(ypObject *container);
-
-// FIXME remove, others
 
 
 /*
@@ -626,10 +614,9 @@ ypAPI ypObject *yp_pop(ypObject *container);
 // Sequences are indexed origin zero. Negative indices are relative to the end of the sequence: in
 // effect, when i is negative it is substituted with len(s)+i, and len(s)+j for negative j. The
 // slice of s from i to j with step k is the sequence of items with indices i, i+k, i+2*k, i+3*k and
-// so on, stopping when j is reached (but never including j); k cannot be zero. A single index
-// outside of range(-len(s),len(s)) raises a yp_IndexError, but in a slice such an index gets
-// clamped to the bounds of the sequence. See yp_SLICE_DEFAULT and yp_SLICE_LAST below for more
-// information.
+// so on, stopping when j is reached (but never including j); k cannot be zero. An index outside of
+// range(-len(s),len(s)) typically raises yp_IndexError, but in a slice such an index gets clamped
+// to the bounds of the sequence. See yp_SLICE_DEFAULT and yp_SLICE_LAST below for more information.
 
 // Returns a new reference to the concatenation of sequence and x.
 ypAPI ypObject *yp_concat(ypObject *sequence, ypObject *x);
@@ -644,8 +631,12 @@ ypAPI ypObject *yp_getindexC(ypObject *sequence, yp_ssize_t i);
 // "defaults" for i and j are yp_SLICE_DEFAULT, while for k it is 1.
 ypAPI ypObject *yp_getsliceC4(ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k);
 
-// Equivalent to yp_getindexC(sequence, yp_asssizeC(key, exc)).
-ypAPI ypObject *yp_getitem(ypObject *sequence, ypObject *key);
+// Equivalent to yp_getindexC(sequence, yp_asssizeC(i, exc)).
+ypAPI ypObject *yp_getitem(ypObject *sequence, ypObject *i);
+
+// Similar to yp_getitem, but returns a new reference to defval if i is out of bounds. defval _can_
+// be an exception: if it is, then that exception is raised on out of bounds.
+ypAPI ypObject *yp_getdefault(ypObject *sequence, ypObject *i, ypObject *defval);
 
 // Returns the lowest index in sequence where x is found, such that x is contained in the slice
 // sequence[i:j], or -1 if x is not found. Returns -1 and sets *exc on error; *exc is _not_ set if x
@@ -688,8 +679,8 @@ ypAPI void yp_setindexC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject 
 ypAPI void yp_setsliceC6(
         ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *x, ypObject **exc);
 
-// Equivalent to yp_setindexC(sequence, yp_asssizeC(key, exc), x, exc).
-ypAPI void yp_setitem(ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc);
+// Equivalent to yp_setindexC(sequence, yp_asssizeC(i, exc), x, exc).
+ypAPI void yp_setitem(ypObject *sequence, ypObject *i, ypObject *x, ypObject **exc);
 
 // Removes the i-th item from sequence. Sets *exc on error.
 ypAPI void yp_delindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc);
@@ -699,8 +690,8 @@ ypAPI void yp_delindexC(ypObject *sequence, yp_ssize_t i, ypObject **exc);
 ypAPI void yp_delsliceC5(
         ypObject *sequence, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject **exc);
 
-// Equivalent to yp_delindexC(sequence, yp_asssizeC(key, exc), exc).
-ypAPI void yp_delitem(ypObject *sequence, ypObject *key, ypObject **exc);
+// Equivalent to yp_delindexC(sequence, yp_asssizeC(i, exc), exc).
+ypAPI void yp_delitem(ypObject *sequence, ypObject *i, ypObject **exc);
 
 // Appends x to the end of sequence. Sets *exc on error.
 ypAPI void yp_append(ypObject *sequence, ypObject *x, ypObject **exc);
@@ -720,8 +711,8 @@ ypAPI void yp_insertC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **
 // Removes the i-th item from sequence and returns it. The Python-equivalent "default" for i is -1.
 ypAPI ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i);
 
-// Equivalent to yp_popindexC(sequence, -1, exc). Note that for sequences, yp_push and yp_pop
-// together implement a stack (last in, first out).
+// Equivalent to yp_popindexC(sequence, -1). Note that for sequences, yp_push and yp_pop together
+// implement a stack (last in, first out).
 ypAPI ypObject *yp_pop(ypObject *sequence);
 
 // FIXME In Python, remove modifies, but removeprefix/etc returns a new string (like strip/etc).
@@ -788,6 +779,9 @@ ypAPI ypObject *const yp_range_empty;
 /*
  * Set Operations
  */
+
+// frozensets and sets are both "set" objects.
+// FIXME Describe set (no duplicates).
 
 // Returns the immortal yp_True if set has no elements in common with x, else yp_False.
 ypAPI ypObject *yp_isdisjoint(ypObject *set, ypObject *x);
@@ -883,13 +877,15 @@ ypAPI ypObject *const yp_frozenset_empty;
 
 // frozendicts and dicts are both mapping objects. Note that yp_contains, yp_in, yp_not_in, and
 // yp_iter operate solely on a mapping's keys.
+// FIXME describe a little more?
 
 // Returns a new reference to the value of mapping with the given key. Returns yp_KeyError if key is
 // not in the map.
 ypAPI ypObject *yp_getitem(ypObject *mapping, ypObject *key);
 
 // Similar to yp_getitem, but returns a new reference to defval if key is not in the map. defval
-// _can_ be an exception; the Python-equivalent "default" for defval is yp_None.
+// _can_ be an exception: if it is, then that exception is raised on a missing key. The
+// Python-equivalent "default" for defval is yp_None.
 ypAPI ypObject *yp_getdefault(ypObject *mapping, ypObject *key, ypObject *defval);
 
 // Returns a new reference to an iterator that yields mapping's (key, value) pairs as 2-tuples.
