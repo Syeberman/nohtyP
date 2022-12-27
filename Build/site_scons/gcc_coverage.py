@@ -4,7 +4,7 @@
 import SCons.Action
 import SCons.Builder
 import SCons.Defaults
-from site_init import RGlob
+from pathlib import Path
 
 
 # TODO SCons should have an easier way to disable output for a Delete.
@@ -27,30 +27,17 @@ quietDelete = SCons.Action.ActionFactory(SCons.Defaults.Delete.actfunc, lambda x
 # COVCOM - command line used to generate analyzed coverage files
 
 
-def _CoverageFiles(env, prefix_var, suffix_var):
-    prefix = env.subst("$" + prefix_var)
-    suffix = env.subst("$" + suffix_var)
-    dataDir = env.subst("$COVDATADIR")
+def CoverageDataFiles(env):
+    """Finds coverage data files that currently exist on disk."""
+    prefix = env.subst("$COVDATAPREFIX")
+    suffix = env.subst("$COVDATASUFFIX")
+    dataDir = Path(env.subst("$COVDATADIR"))
 
     # Protect against deleting all files in a directory.
     if not prefix and not suffix:
-        raise ValueError(f"Missing {prefix_var}/{suffix_var}")
+        raise ValueError(f"Missing COVDATAPREFIX/COVDATASUFFIX")
 
-    # FIXME Why is RGlob returning duplicates?
-    return sorted(set(str(x) for x in RGlob(env, dataDir, f"{prefix}*{suffix}")))
-
-
-def CoverageNoteFiles(env):
-    return _CoverageFiles(env, "COVNOTEPREFIX", "COVNOTESUFFIX")
-
-
-def CoverageDataFiles(env):
-    return _CoverageFiles(env, "COVDATAPREFIX", "COVDATASUFFIX")
-
-
-# FIXME Rename "out file" to something else?
-def CoverageOutFiles(env):
-    return _CoverageFiles(env, "COVOUTPREFIX", "COVOUTSUFFIX")
+    return sorted(str(x) for x in dataDir.rglob(f"{prefix}*{suffix}"))
 
 
 # FIXME Perhaps investigate AddPreAction/AddPostAction.
