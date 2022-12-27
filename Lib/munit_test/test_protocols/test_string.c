@@ -19,12 +19,12 @@ static MunitResult _test_findC(fixture_type_t *type,
     ypObject *empty = type->newN(0);
 
     obj_array_fill(items, type->rand_items);
-    self = type->newN(3, items[0], items[1], items[2]);
+    self = type->newN(N(items[0], items[1], items[2]));
     // FIXME Test against different "other" types (the other pair, really)
-    other_0_1 = type->newN(2, items[0], items[1]);
-    other_1_2 = type->newN(2, items[1], items[2]);
-    other_0_2 = type->newN(2, items[0], items[2]);
-    other_1_0 = type->newN(2, items[1], items[0]);
+    other_0_1 = type->newN(N(items[0], items[1]));
+    other_1_2 = type->newN(N(items[1], items[2]));
+    other_0_2 = type->newN(N(items[0], items[2]));
+    other_1_0 = type->newN(N(items[1], items[0]));
 
 #define assert_not_found_exc(expression)                    \
     do {                                                    \
@@ -60,7 +60,7 @@ static MunitResult _test_findC(fixture_type_t *type,
 #undef assert_not_found_exc
 
     obj_array_decref(items);
-    yp_decrefN(6, self, empty, other_0_1, other_1_2, other_0_2, other_1_0);
+    yp_decrefN(N(self, empty, other_0_1, other_1_2, other_0_2, other_1_0));
     return MUNIT_OK;
 }
 

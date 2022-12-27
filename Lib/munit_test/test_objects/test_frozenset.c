@@ -8,9 +8,9 @@ static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture
     // Remove an item from a set. The hash should equal a "clean" set. This was a bug from the
     // implementation of the yp_HashSet functions.
     {
-        ypObject *expected = yp_frozensetN(1, int_0);
+        ypObject *expected = yp_frozensetN(N(int_0));
         yp_hash_t expected_hash;
-        ypObject *set = yp_setN(2, int_0, int_1);
+        ypObject *set = yp_setN(N(int_0, int_1));
         yp_hash_t set_hash;
 
         assert_not_raises_exc(yp_remove(set, int_1, &exc));
@@ -20,7 +20,7 @@ static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture
         assert_not_raises_exc(set_hash = yp_currenthashC(set, &exc));
         assert_hashC(expected_hash, ==, set_hash);
 
-        yp_decrefN(2, expected, set);
+        yp_decrefN(N(expected, set));
     }
 
     return MUNIT_OK;

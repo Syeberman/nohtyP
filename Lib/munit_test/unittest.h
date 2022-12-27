@@ -52,6 +52,25 @@ extern "C" {
 #define _ESC(...) __VA_ARGS__
 
 // clang-format off
+// From https://stackoverflow.com/a/2308651/770500
+#define _PP_NARG(prefix, ...) _PP_ARG_N(prefix, __VA_ARGS__)
+#define _PP_ARG_N(prefix, \
+     _1, _2, _3, _4, _5, _6, _7, _8, _9,_10, \
+    _11,_12,_13,_14,_15,_16,_17,_18,_19,_20, \
+    _21,_22,_23,_24,_25,_26,_27,_28,_29,_30, \
+    _31,_32,_33,_34,_35,_36,_37,_38,_39,_40, \
+    _41,_42,_43,_44,_45,_46,_47,_48,_49,_50, \
+    _51,_52,_53,_54,_55,_56,_57,_58,_59,_60, \
+    _61,_62,_63,  n, ...) prefix##n
+#define _PP_RSEQ_N() \
+                      63,62,61,60, \
+    59,58,57,56,55,54,53,52,51,50, \
+    49,48,47,46,45,44,43,42,41,40, \
+    39,38,37,36,35,34,33,32,31,30, \
+    29,28,27,26,25,24,23,22,21,20, \
+    19,18,17,16,15,14,13,12,11,10, \
+     9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+
 #define _STRINGIFY1(a) #a
 #define _STRINGIFY2(a, b) #a, #b
 #define _STRINGIFY3(a, b, c) #a, #b, #c
@@ -78,33 +97,6 @@ extern "C" {
 #define _STRINGIFY24(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x
 #define _STRINGIFY25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y
 #define _STRINGIFY26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z
-
-#define _COMMA1(a) a
-#define _COMMA2(a, b) a, b
-#define _COMMA3(a, b, c) a, b, c
-#define _COMMA4(a, b, c, d) a, b, c, d
-#define _COMMA5(a, b, c, d, e) a, b, c, d, e
-#define _COMMA6(a, b, c, d, e, f) a, b, c, d, e, f
-#define _COMMA7(a, b, c, d, e, f, g) a, b, c, d, e, f, g
-#define _COMMA8(a, b, c, d, e, f, g, h) a, b, c, d, e, f, g, h
-#define _COMMA9(a, b, c, d, e, f, g, h, i) a, b, c, d, e, f, g, h, i
-#define _COMMA10(a, b, c, d, e, f, g, h, i, j) a, b, c, d, e, f, g, h, i, j
-#define _COMMA11(a, b, c, d, e, f, g, h, i, j, k) a, b, c, d, e, f, g, h, i, j, k
-#define _COMMA12(a, b, c, d, e, f, g, h, i, j, k, l) a, b, c, d, e, f, g, h, i, j, k, l
-#define _COMMA13(a, b, c, d, e, f, g, h, i, j, k, l, m) a, b, c, d, e, f, g, h, i, j, k, l, m
-#define _COMMA14(a, b, c, d, e, f, g, h, i, j, k, l, m, n) a, b, c, d, e, f, g, h, i, j, k, l, m, n
-#define _COMMA15(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o
-#define _COMMA16(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p
-#define _COMMA17(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q
-#define _COMMA18(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r
-#define _COMMA19(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s
-#define _COMMA20(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t
-#define _COMMA21(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u
-#define _COMMA22(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v
-#define _COMMA23(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w
-#define _COMMA24(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x
-#define _COMMA25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y
-#define _COMMA26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
 
 #define _COMMA_REPEAT1(x) x
 #define _COMMA_REPEAT2(x) x, x
@@ -134,11 +126,9 @@ extern "C" {
 #define _COMMA_REPEAT26(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 // clang-format on
 
-// Macro redefinitions to ensure the number of arguments equals n. n must be an integer literal.
-// Doesn't work for yp_tupleN/etc as those occasionally have zero arguments.
-#define yp_increfN(n, ...) (yp_increfN((n), _ESC(_COMMA##n(__VA_ARGS__))))
-#define yp_decrefN(n, ...) (yp_decrefN((n), _ESC(_COMMA##n(__VA_ARGS__))))
-#define yp_unpackN(n, iterable, ...) (yp_unpackN((n), (iterable), _ESC(_COMMA##n(__VA_ARGS__))))
+// Variadic macro tricks.
+#define N(...) _PP_NARG(, __VA_ARGS__, _PP_RSEQ_N()), __VA_ARGS__
+#define STRINGIFY(...) _PP_NARG(_STRINGIFY, __VA_ARGS__, _PP_RSEQ_N())(__VA_ARGS__)
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
 #define yp_sizeof(x) ((yp_ssize_t)sizeof(x))
@@ -401,19 +391,16 @@ extern "C" {
     } while (0)
 
 // Asserts that obj is a sequence containing exactly the given n items in that order. Items are
-// compared by nohtyP equality (i.e. yp_eq). Validates yp_lenC and yp_getindexC. n must be an
-// integer literal.
-//
-// XXX This is unable to cleanup _ypmt_SEQ_actual on error, as tear_down is not called on assertion
-// failures. As such, test failures may leak some memory.
-#define assert_sequence(obj, n, ...)                                                         \
+// compared by nohtyP equality (i.e. yp_eq). Validates yp_lenC and yp_getindexC.
+#define assert_sequence(obj, ...)                                                            \
     do {                                                                                     \
         ypObject  *_ypmt_SEQ_obj = (obj);                                                    \
         ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                                        \
-        char      *_ypmt_SEQ_item_strs[] = {_ESC(_STRINGIFY##n(__VA_ARGS__))};               \
+        char      *_ypmt_SEQ_item_strs[] = {STRINGIFY(__VA_ARGS__)};                         \
+        yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(_ypmt_SEQ_items);                         \
         yp_ssize_t _ypmt_SEQ_i;                                                              \
-        _assert_len(_ypmt_SEQ_obj, ((yp_ssize_t)(n)), "%s", #n, #obj);                       \
-        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < (n); _ypmt_SEQ_i++) {                            \
+        _assert_len(_ypmt_SEQ_obj, _ypmt_SEQ_n, "%s", "%" PRIssize, #obj, _ypmt_SEQ_n);      \
+        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < _ypmt_SEQ_n; _ypmt_SEQ_i++) {                    \
             ypObject *_ypmt_SEQ_actual = yp_getindexC(_ypmt_SEQ_obj, _ypmt_SEQ_i);           \
             _assert_not_exception(                                                           \
                     _ypmt_SEQ_actual, "yp_getindexC(%s, %" PRIssize ")", #obj, _ypmt_SEQ_i); \
@@ -425,14 +412,15 @@ extern "C" {
     } while (0)
 
 // Asserts that the first n pointer items in array are exactly the given n items in that order.
-// Items are compared by C equality (i.e. ==). n must be an integer literal.
-#define assert_ptr_array(array, n, ...)                                                      \
+// Items are compared by C equality (i.e. ==).
+#define assert_ptr_array(array, ...)                                                         \
     do {                                                                                     \
         void     **_ypmt_PTR_ARR_array = (void **)(array);                                   \
         void      *_ypmt_PTR_ARR_items[] = {__VA_ARGS__};                                    \
-        char      *_ypmt_PTR_ARR_item_strs[] = {_ESC(_STRINGIFY##n(__VA_ARGS__))};           \
+        char      *_ypmt_PTR_ARR_item_strs[] = {STRINGIFY(__VA_ARGS__)};                     \
+        yp_ssize_t _ypmt_PTR_ARR_n = yp_lengthof_array(_ypmt_PTR_ARR_items);                 \
         yp_ssize_t _ypmt_PTR_ARR_i;                                                          \
-        for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < (n); _ypmt_PTR_ARR_i++) {                \
+        for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < _ypmt_PTR_ARR_n; _ypmt_PTR_ARR_i++) {    \
             _assert_ptr(_ypmt_PTR_ARR_array[_ypmt_PTR_ARR_i], ==,                            \
                     _ypmt_PTR_ARR_items[_ypmt_PTR_ARR_i], "%s[%" PRIssize "]", "%s", #array, \
                     _ypmt_PTR_ARR_i, _ypmt_PTR_ARR_item_strs[_ypmt_PTR_ARR_i]);              \

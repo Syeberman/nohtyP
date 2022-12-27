@@ -164,7 +164,7 @@ static ypObject *rand_obj_any_keyvalue1(const rand_obj_supplier_memo_t *memo)
     ypObject *key = rand_obj_any_hashable1(memo);
     ypObject *value = rand_obj_any1(memo);
     ypObject *result = yp_tupleN(2, key, value);
-    yp_decrefN(2, key, value);
+    yp_decrefN(N(key, value));
     assert_not_exception(result);
     return result;
 }
