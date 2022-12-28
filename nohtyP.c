@@ -63,6 +63,20 @@
 //      https://github.com/python/cpython/issues/84297
 //      https://github.com/faster-cpython/ideas
 
+// TODO Python is not consistent in their naming of mutating vs returning functions. Compare
+// bytearray.remove, which modifies, with bytearray.removeprefix, which returns a new string. (It's
+// also not consistent because remove raises an error if it can't be found but removeprefix
+// doesn't.) There's the "i" prefix, as in yp_add vs yp_iadd, but this is limited to the numeric
+// methods and yp_irepeat (which is so-named as it's __imul__ in Python, so it's kinda also
+// numeric). Plus, the "i" prefix is for a+=b, i.e. the magic syntax Python has to say "either
+// modify this in place, or set it to the new value, but either works". (But I also don't like the
+// "either works" part really, as it can lead to confusion.) There's also list.sort vs sorted (and
+// list.reverse/reversed), which I like more but then would it be chrarray.strip vs
+// chrarray.stripped? ESL programmers may have trouble here, and we'd have to break from Python's
+// str.strip/etc. Really the bulk of the issues are in the str/bytes methods, as those tried hard to
+// be non-mutating.
+
+
 #include "nohtyP.h"
 #include <float.h>
 #include <math.h>
@@ -381,7 +395,7 @@ typedef struct {
     objssizeobjproc tp_insert;
     objssizeproc    tp_popindex;
     objproc         tp_reverse;
-    objobjobjproc   tp_sort;
+    objobjobjproc   tp_sort;  // FIXME only implemented for list...remove?
 } ypSequenceMethods;
 
 typedef struct {

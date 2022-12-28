@@ -715,11 +715,6 @@ ypAPI ypObject *yp_popindexC(ypObject *sequence, yp_ssize_t i);
 // implement a stack (last in, first out).
 ypAPI ypObject *yp_pop(ypObject *sequence);
 
-// FIXME In Python, remove modifies, but removeprefix/etc returns a new string (like strip/etc).
-// Should this be called iremove? Or what if we went the sort/sorted (reverse/reversed, ...) route
-// and used remove/removed (strip/stripped, removeprefix/withoutprefix)? Also if remove means raise,
-// then removeprefix should be discardprefix.
-
 // Removes the first item from sequence that equals x. Raises yp_ValueError if x is not contained in
 // sequence. Sets *exc on error. Types such as tuples inspect only one item at a time, while types
 // such as strs look for a particular sub-sequence of items.
@@ -731,17 +726,6 @@ ypAPI void yp_discard(ypObject *sequence, ypObject *x, ypObject **exc);
 
 // Reverses the items of sequence in-place. Sets *exc on error.
 ypAPI void yp_reverse(ypObject *sequence, ypObject **exc);
-
-// FIXME Sort is currently only implemented for list...and that's likely where it should stay? If
-// so, how to document in this header this fact?
-
-// Sorts the items of sequence in-place. key is a one-argument function used to extract a comparison
-// key from each element in iterable; to compare the elements directly, use yp_None. If reverse is
-// true, the list elements are sorted as if each comparison were reversed. Sets *exc on error.
-ypAPI void yp_sort4(ypObject *sequence, ypObject *key, ypObject *reverse, ypObject **exc);
-
-// Equivalent to yp_sort4(sequence, yp_None, yp_False, exc).
-ypAPI void yp_sort(ypObject *sequence, ypObject **exc);
 
 // When given to a slice-like start/stop C argument, signals that the default "end" value be
 // substituted for the argument. Which end depends on the sign of step:
@@ -777,11 +761,25 @@ ypAPI ypObject *const yp_range_empty;
 
 
 /*
+ * list Operations
+ */
+
+// Sorts the items of the list sq in-place. key is a one-argument function used to extract a
+// comparison key from each element in sq; to compare the elements directly, use yp_None. If reverse
+// is true, the elements are sorted as if each comparison were reversed. Sets *exc on error.
+ypAPI void yp_sort4(ypObject *sq, ypObject *key, ypObject *reverse, ypObject **exc);
+
+// Equivalent to yp_sort4(sq, yp_None, yp_False, exc).
+ypAPI void yp_sort(ypObject *sq, ypObject **exc);
+
+
+/*
  * Set Operations
  */
 
-// frozensets and sets are both "set" objects.
-// FIXME Describe set (no duplicates).
+// frozensets and sets are both "set" objects. A set object is an unordered collection of distinct
+// hashable objects. Attempting to add an object that already exists in the set does not modify the
+// set, and typically does not raise an error.
 
 // Returns the immortal yp_True if set has no elements in common with x, else yp_False.
 ypAPI ypObject *yp_isdisjoint(ypObject *set, ypObject *x);
@@ -875,9 +873,10 @@ ypAPI ypObject *const yp_frozenset_empty;
  * Mapping Operations
  */
 
-// frozendicts and dicts are both mapping objects. Note that yp_contains, yp_in, yp_not_in, and
-// yp_iter operate solely on a mapping's keys.
-// FIXME describe a little more?
+// frozendicts and dicts are both "mapping" objects. A mapping object maps distinct hashable "keys"
+// to arbitrary "values". Attempting to add a key that already exists in the mapping replaces the
+// existing value for that key. Note that yp_contains, yp_in, yp_not_in, and yp_iter operate solely
+// on a mapping's keys.
 
 // Returns a new reference to the value of mapping with the given key. Returns yp_KeyError if key is
 // not in the map.
