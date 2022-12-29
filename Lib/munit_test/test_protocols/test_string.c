@@ -20,7 +20,7 @@ static MunitResult _test_findC(fixture_type_t *type,
 
     obj_array_fill(items, type->rand_items);
     self = type->newN(N(items[0], items[1], items[2]));
-    // FIXME Test against different "other" types (the other pair, really)
+    // TODO Test against different "other" types (the other pair, really)
     other_0_1 = type->newN(N(items[0], items[1]));
     other_1_2 = type->newN(N(items[1], items[2]));
     other_0_2 = type->newN(N(items[0], items[2]));
@@ -53,9 +53,9 @@ static MunitResult _test_findC(fixture_type_t *type,
     assert_ssizeC_exc(any_findC5(self, empty, 1, 2, &exc), ==, forward ? 1 : 2);  // Empty, partial.
     assert_ssizeC_exc(any_findC5(self, empty, 2, 2, &exc), ==, 2);                // Empty, empty.
 
-    // FIXME That empty slice bug thing.
-    // FIXME !forward substrings?
-    // FIXME Anything else to add here?
+    // TODO That empty slice bug thing.
+    // TODO !forward substrings?
+    // TODO Anything else to add here?
 
 #undef assert_not_found_exc
 
@@ -84,9 +84,9 @@ static MunitResult test_rindexC(const MunitParameter params[], fixture_t *fixtur
     return _test_findC(fixture->type, yp_rindexC, yp_rindexC5, /*forward=*/FALSE, /*raises=*/TRUE);
 }
 
-// FIXME test_countC, for non-overlapping substrings.
+// TODO test_countC, for non-overlapping substrings.
 
-// FIXME test_remove and test_discard, for substrings.
+// TODO test_remove and test_discard, for substrings.
 
 static MunitParameterEnum test_string_params[] = {
         {param_key_type, param_values_types_string}, {NULL}};

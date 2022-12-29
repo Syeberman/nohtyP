@@ -431,7 +431,6 @@ extern "C" {
 // name to the result, executes the assertion, then discards the result. To be used like:
 //
 //      ead(result, yp_tupleN(0), assert_len(result, 0));
-// FIXME Is this a good idea? Is this the best way to do it?
 #define ead(name, expression, assertion) \
     do {                                 \
         ypObject *(name) = (expression); \
@@ -447,7 +446,6 @@ typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
 typedef ypObject *(*rand_obj_supplier_t)(const rand_obj_supplier_memo_t *);
 
 // Any methods or arguments here that don't apply to a given type will fail the test.
-// FIXME Review all these at the end to see what is actually needed.
 typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
     char           *name;   // The name of the type (i.e. int, bytearray, dict).

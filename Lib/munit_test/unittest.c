@@ -2,8 +2,13 @@
 #include "munit_test/unittest.h"
 
 
-// 1 in 100 are falsy FIXME make this a macro (5 in 100, etc)
-#define RAND_OBJ_RETURN_FALSY() (munit_rand_int_range(0, 100 - 1) == 0)
+// If something should happen 2 in 23 times: RAND_BOOL_FRACTION(2, 23)
+// TODO Better name? Better argument names?
+#define RAND_BOOL_FRACTION(numerator, denominator) \
+    (munit_rand_int_range(0, denominator - 1) < numerator)
+
+// 1 in 50 objects created are falsy.
+#define RAND_OBJ_RETURN_FALSY() (RAND_BOOL_FRACTION(1, 50))
 
 #define RAND_OBJ_DEFAULT_DEPTH (3)
 
@@ -54,14 +59,13 @@ static yp_int_t rand_intC(void)
     if (RAND_OBJ_RETURN_FALSY()) {
         return 0;
 
-    } else if (munit_rand_int_range(0, 10 - 1) == 0) {
+    } else if (RAND_BOOL_FRACTION(1, 10)) {
         // 1 in 10 will be large. munit doesn't supply a munit_rand_uint64, so make our own.
-        // FIXME Make a macro for "x in y" ratio
         return (yp_int_t)((((yp_uint64_t)munit_rand_uint32()) << 32u) | munit_rand_uint32());
 
     } else {
         // munit doesn't supply a munit_rand_int32 (signed), so make our own.
-        // FIXME make this smaller?
+        // TODO Make these small values even smaller?
         return (yp_int_t)((yp_int32_t)munit_rand_uint32());
     }
 }
@@ -101,7 +105,7 @@ typedef struct _rand_obj_supplier_memo_t {
 // Returns a random object for a type that does not itself require a supplier.
 static ypObject *rand_obj_terminal(void)
 {
-    // FIXME Initialize this using a property of the type, perhaps?
+    // TODO Initialize this using a property of the type, perhaps?
     static fixture_type_t *terminal_types[] = {&fixture_type_type_struct,
             &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
             &fixture_type_intstore_struct, &fixture_type_float_struct,
@@ -118,7 +122,7 @@ static ypObject *rand_obj_terminal(void)
 // Returns a random object for a hashable type that does not itself require a supplier.
 static ypObject *rand_obj_terminal_hashable(void)
 {
-    // FIXME Initialize this using a property of the type, perhaps?
+    // TODO Initialize this using a property of the type, perhaps?
     static fixture_type_t *terminal_types[] = {&fixture_type_type_struct,
             &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
             &fixture_type_float_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
@@ -873,7 +877,6 @@ static ypObject *newN_str(int n, ...)
     va_end(args);
 
     // Recall that yp_str isn't a typical container constructor, so we use yp_concat.
-    // FIXME Support any iterable with str_concat.
     result = yp_concat(yp_str_empty, tuple);
     yp_decref(tuple);
     assert_not_exception(result);
@@ -1414,7 +1417,7 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array)
     for (i = 0; i < n; i++) {
         if (array[i] != NULL) yp_decref(array[i]);
     }
-    memset(array, 0, ((size_t)n) * sizeof(ypObject *));  // FIXME necessary?
+    memset(array, 0, ((size_t)n) * sizeof(ypObject *));
 }
 
 
@@ -1434,7 +1437,8 @@ yp_IMMORTAL_INT(int_SLICE_DEFAULT, yp_SLICE_DEFAULT);
 yp_IMMORTAL_INT(int_SLICE_LAST, yp_SLICE_LAST);
 
 
-yp_ssize_t yp_lenC_not_raises(ypObject *container) {
+yp_ssize_t yp_lenC_not_raises(ypObject *container)
+{
     yp_ssize_t result;
     assert_not_raises_exc(result = yp_lenC(container, &exc));
     return result;
