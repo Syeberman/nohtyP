@@ -2829,7 +2829,7 @@ static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc v
 static ypObject *_ypState_fromdecl(
         yp_ssize_t *size, yp_uint32_t *objlocs, yp_state_decl_t *state_decl)
 {
-    yp_ssize_t n;
+    yp_ssize_t i;
     yp_ssize_t objoffset;
     yp_ssize_t objloc_index;
 
@@ -2855,8 +2855,8 @@ static ypObject *_ypState_fromdecl(
     //  - an unaligned ypObject*, which isn't currently allowed and should never happen
     //  - a larger offset than we can represent with objlocs: a current limitation of nohtyP
     *objlocs = 0x0u;
-    for (n = state_decl->offsets_len; n > 0; n--) {
-        objoffset = state_decl->offsets[n];
+    for (i = 0; i < state_decl->offsets_len; i++) {
+        objoffset = state_decl->offsets[i];
         if (objoffset < 0) return yp_ValueError;
         if (objoffset > state_decl->size - yp_sizeof(ypObject *)) return yp_ValueError;
         if (objoffset % yp_sizeof(ypObject *) != 0) return yp_SystemLimitationError;
