@@ -2,11 +2,10 @@
 """
 
 import SCons.Util
-from site_scons.root_environment import RootEnv
 
 
 # This ensures that targets like "test" will fail if Python 3 isn't available
-def AliasIfNotEmpty(alias, targets=(), action=()):
+def AliasIfNotEmpty(env, alias, targets=(), action=()):
     """Creates or updates the alias iff targets or action is not empty. Empty aliases are normally
     successful no-ops when specified as build targets on the command line: this ensures that aliases
     that don't actually do anything will cause build failures.
@@ -15,7 +14,7 @@ def AliasIfNotEmpty(alias, targets=(), action=()):
     action = SCons.Util.flatten(action)
     if not targets and not action:
         return alias
-    return RootEnv.Alias(alias, targets, action)
+    return env.Alias(alias, targets, action)
 
 
 # https://stackoverflow.com/a/73436348

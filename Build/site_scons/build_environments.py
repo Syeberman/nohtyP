@@ -2,10 +2,12 @@
 """
 
 import itertools
-import SCons.Tool
-from site_scons.root_environment import SconscriptLog, RootEnv
-from site_scons.utilities import AliasIfNotEmpty
 import traceback
+
+import SCons.Tool
+from site_scons.root_environment import SconscriptLog
+from site_scons.utilities import AliasIfNotEmpty
+
 
 # List these in order of decreasing "preference"; the first variant that matches will be chosen as
 # "build" (ie the default target)
@@ -41,24 +43,24 @@ archs = ("amd64", "x86")
 # lint against the compiler's headers
 configurations = ("debug", "release", "coverage")
 
-native_os = RootEnv["HOST_OS"]
-if RootEnv["HOST_ARCH"] == "x86_64":
-    native_archs = ("amd64", "x86")
-else:
-    native_archs = (RootEnv["HOST_ARCH"],)
-
 # The native targets ("debug", "release", etc) should each copy files from a single variant
 nativeTargetsToCreate = set(("debug", "release", "coverage"))
 
-SconscriptLog.write(
-    f"""
+
+def MakeCompilerEnvs(rootEnv):
+    native_os = rootEnv["HOST_OS"]
+    if rootEnv["HOST_ARCH"] == "x86_64":
+        native_archs = ("amd64", "x86")
+    else:
+        native_archs = (rootEnv["HOST_ARCH"],)
+
+    SconscriptLog.write(
+        f"""
 Native OS: {native_os}
 Native Arches: {native_archs}
 """
-)
+    )
 
-
-def MakeCompilerEnvs():
     for compiler_name in compiler_names:
         compiler = SCons.Tool.Tool(compiler_name)
 
@@ -71,7 +73,7 @@ def MakeCompilerEnvs():
 
             # Skip compilers that can't be found.
             try:
-                compilerEnv = RootEnv.Clone(
+                compilerEnv = rootEnv.Clone(
                     COMPILER=compiler,
                     TARGET_OS=targ_os,
                     TARGET_ARCH=targ_arch,
@@ -100,11 +102,11 @@ def MakeCompilerEnvs():
 
 
 def AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets):
-    compiler_name : str= compilerEnv["COMPILER"].name
-    targ_os : str= compilerEnv["TARGET_OS"]
-    targ_arch: str= compilerEnv["TARGET_ARCH"]
-    configuration: str= compilerEnv["CONFIGURATION"]
-    is_native : str= compilerEnv["IS_NATIVE"]
+    compiler_name: str = compilerEnv["COMPILER"].name
+    targ_os: str = compilerEnv["TARGET_OS"]
+    targ_arch: str = compilerEnv["TARGET_ARCH"]
+    configuration: str = compilerEnv["CONFIGURATION"]
+    is_native: str = compilerEnv["IS_NATIVE"]
 
     # FIXME Handle this differently?
     if configuration == "coverage":
@@ -128,14 +130,14 @@ def AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets
             # These aliases make this easy. A full alias looks like `test:release`. The action
             # (`test`) defaults to `build`. The configuration (`release`) defaults to both
             # `release` and `debug`.
-            AliasIfNotEmpty(configuration, buildTargets)
+            AliasIfNotEmpty(compilerEnv, configuration, buildTargets)
             if configuration != "coverage":
-                AliasIfNotEmpty("build:" + configuration, buildTargets)
-                AliasIfNotEmpty("test:" + configuration, testTargets)
-                AliasIfNotEmpty("analyze:" + configuration, analyzeTargets)
-                AliasIfNotEmpty("build", buildTargets)
-                AliasIfNotEmpty("test", testTargets)
-                AliasIfNotEmpty("analyze", analyzeTargets)
+                AliasIfNotEmpty(compilerEnv, "build:" + configuration, buildTargets)
+                AliasIfNotEmpty(compilerEnv, "test:" + configuration, testTargets)
+                AliasIfNotEmpty(compilerEnv, "analyze:" + configuration, analyzeTargets)
+                AliasIfNotEmpty(compilerEnv, "build", buildTargets)
+                AliasIfNotEmpty(compilerEnv, "test", testTargets)
+                AliasIfNotEmpty(compilerEnv, "analyze", analyzeTargets)
 
     # These aliases exist for developers that are looking to test their changes across multiple,
     # or specific, compilers. A full alias looks like `test:gcc_9:win32:x86:release`. The action
@@ -145,16 +147,15 @@ def AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets
     hierarchy = (compiler_name, targ_os, targ_arch, configuration)
     if configuration == "coverage":
         hierarchyName = ":".join(hierarchy)
-        AliasIfNotEmpty(hierarchyName, buildTargets)
+        AliasIfNotEmpty(compilerEnv, hierarchyName, buildTargets)
     else:
-        AliasIfNotEmpty("all", buildTargets)
-        AliasIfNotEmpty("build:all", buildTargets)
-        AliasIfNotEmpty("test:all", testTargets)
-        AliasIfNotEmpty("analyze:all", analyzeTargets)
+        AliasIfNotEmpty(compilerEnv, "all", buildTargets)
+        AliasIfNotEmpty(compilerEnv, "build:all", buildTargets)
+        AliasIfNotEmpty(compilerEnv, "test:all", testTargets)
+        AliasIfNotEmpty(compilerEnv, "analyze:all", analyzeTargets)
         for hierarchyDepth in range(1, len(hierarchy) + 1):
             hierarchyName = ":".join(hierarchy[:hierarchyDepth])
-            AliasIfNotEmpty(hierarchyName, buildTargets)
-            AliasIfNotEmpty("build:" + hierarchyName, buildTargets)
-            AliasIfNotEmpty("test:" + hierarchyName, testTargets)
-            AliasIfNotEmpty("analyze:" + hierarchyName, analyzeTargets)
-
+            AliasIfNotEmpty(compilerEnv, hierarchyName, buildTargets)
+            AliasIfNotEmpty(compilerEnv, "build:" + hierarchyName, buildTargets)
+            AliasIfNotEmpty(compilerEnv, "test:" + hierarchyName, testTargets)
+            AliasIfNotEmpty(compilerEnv, "analyze:" + hierarchyName, analyzeTargets)

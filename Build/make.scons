@@ -7,12 +7,20 @@ import SCons.Errors
 import SCons.Tool
 import SCons.Util
 from site_scons.build_environments import MakeCompilerEnvs, AddCompilerEnvAliases
-from site_scons.root_environment import RootEnv, SconscriptLog
+from site_scons.root_environment import MakeRootEnv, SconscriptLog
 from site_scons.utilities import RGlob
+
+
+# TODO support scons -h for build options
+
+
+RootEnv = MakeRootEnv()
+
 
 # Confirm that SCons' top-level directory, the current directory, _is_ the project top
 if not os.path.exists("nohtyP.c"):
     RootEnv.Exit("Run SCons from top project dir (or use Build/make, or scons -C)")
+
 
 # TODO Scripts to update version numbers in source, build scripts, etc
 RootEnv.Replace(NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0)
@@ -140,9 +148,7 @@ python_min_38 = SCons.Tool.Tool("python_min_38")  # yp_test requires at least Py
 pclint = SCons.Tool.Tool("pclint")
 
 
-# TODO support scons -h for build options
-
-for compilerEnv in MakeCompilerEnvs():
+for compilerEnv in MakeCompilerEnvs(RootEnv):
     sharedLib = nohtyP_SharedLibrary(compilerEnv.Clone())
 
     # checkapi requires Python 3, but so do our build scripts, so this should not raise errors.
