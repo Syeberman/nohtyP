@@ -6,10 +6,9 @@ import SCons.Defaults
 import SCons.Errors
 import SCons.Tool
 import SCons.Util
-from site_scons.build_environments import MakeCompilerEnvs, AddCompilerEnvAliases
+from site_scons.build_environments import AddBuildTargets
 from site_scons.root_environment import MakeRootEnv, SconscriptLog
 from site_scons.utilities import RGlob
-
 
 # TODO support scons -h for build options
 
@@ -148,7 +147,7 @@ python_min_38 = SCons.Tool.Tool("python_min_38")  # yp_test requires at least Py
 pclint = SCons.Tool.Tool("pclint")
 
 
-for compilerEnv in MakeCompilerEnvs(RootEnv):
+def MakeCompilerTargets(compilerEnv):
     sharedLib = nohtyP_SharedLibrary(compilerEnv.Clone())
 
     # checkapi requires Python 3, but so do our build scripts, so this should not raise errors.
@@ -163,7 +162,7 @@ for compilerEnv in MakeCompilerEnvs(RootEnv):
     testTargets = [sharedLib]
     analyzeTargets = [sharedLib, checkapi]
 
-    if compilerEnv["IS_NATIVE"]:
+    if compilerEnv["IS_NATIVE_TARGET"]:
         # We can only run munit_test on native OS and architectures.
         testTargets.append(
             nohtyP_munit_test(
@@ -187,7 +186,10 @@ for compilerEnv in MakeCompilerEnvs(RootEnv):
         except (SCons.Errors.UserError, SCons.Errors.StopError):
             traceback.print_exc(file=SconscriptLog)
 
-    AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets)
+    return buildTargets, testTargets, analyzeTargets
+
+
+AddBuildTargets(RootEnv, MakeCompilerTargets)
 
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to

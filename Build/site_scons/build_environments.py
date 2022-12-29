@@ -43,11 +43,8 @@ archs = ("amd64", "x86")
 # lint against the compiler's headers
 configurations = ("debug", "release", "coverage")
 
-# The native targets ("debug", "release", etc) should each copy files from a single variant
-nativeTargetsToCreate = set(("debug", "release", "coverage"))
 
-
-def MakeCompilerEnvs(rootEnv):
+def _MakeCompilerEnvs(rootEnv):
     native_os = rootEnv["HOST_OS"]
     if rootEnv["HOST_ARCH"] == "x86_64":
         native_archs = ("amd64", "x86")
@@ -61,6 +58,9 @@ Native Arches: {native_archs}
 """
     )
 
+    # The native targets ("debug", "release", etc) should each copy files from a single variant.
+    install_targets_to_create = set(("debug", "release", "coverage"))
+
     for compiler_name in compiler_names:
         compiler = SCons.Tool.Tool(compiler_name)
 
@@ -69,21 +69,30 @@ Native Arches: {native_archs}
             if targ_os != native_os:
                 continue
 
+            is_native_target = (targ_os == native_os and targ_arch in native_archs)
+
             SconscriptLog.write(f"\n{compiler_name} {targ_os} {targ_arch} {configuration}\n")
 
-            # Skip compilers that can't be found.
             try:
                 compilerEnv = rootEnv.Clone(
                     COMPILER=compiler,
                     TARGET_OS=targ_os,
                     TARGET_ARCH=targ_arch,
                     CONFIGURATION=configuration,
-                    IS_NATIVE=(targ_os == native_os and targ_arch in native_archs),
+                    IS_NATIVE_TARGET=is_native_target,
+                    IS_INSTALL_TARGET= False, # possibly set to True below
                     tools=[compiler, "tar"],
                 )
             except (SCons.Errors.UserError, SCons.Errors.StopError):
+                # Skip compilers that can't be found.
                 traceback.print_exc(file=SconscriptLog)
                 continue
+
+            # Pick one variant from each configuration that matches the host system, and copy it to
+            # the Build/native directory for easy access.
+            if is_native_target and configuration in install_targets_to_create:
+                install_targets_to_create.remove(configuration)
+                compilerEnv["IS_INSTALL_TARGET"] = True
 
             # Maintain a separate directory for intermediate and target files, but don't copy
             # source.
@@ -101,43 +110,38 @@ Native Arches: {native_archs}
             yield compilerEnv
 
 
-def AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets):
+def _AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets):
     compiler_name: str = compilerEnv["COMPILER"].name
     targ_os: str = compilerEnv["TARGET_OS"]
     targ_arch: str = compilerEnv["TARGET_ARCH"]
     configuration: str = compilerEnv["CONFIGURATION"]
-    is_native: str = compilerEnv["IS_NATIVE"]
+    is_install_target: str = compilerEnv["IS_INSTALL_TARGET"]
 
     # FIXME Handle this differently?
     if configuration == "coverage":
         buildTargets += testTargets
 
-    if is_native:
-        # Pick one variant from each configuration that matches the host system, and copy it
-        # to the Build/native directory for easy access. nativeTargetsToCreate tracks which
-        # configurations we have yet to pick.
-        if configuration in nativeTargetsToCreate:
-            nativeTargetsToCreate.remove(configuration)
-            if configuration == "release":
-                native_dest = "#Build/native"
-            else:
-                native_dest = "#Build/native/" + configuration
-            buildTargets.append(compilerEnv.Install(native_dest, buildTargets))
-            testTargets.append(compilerEnv.Install(native_dest, testTargets))
-            analyzeTargets.append(compilerEnv.Install(native_dest, analyzeTargets))
+    if is_install_target:
+        if configuration == "release":
+            native_dest = "#Build/native"
+        else:
+            native_dest = "#Build/native/" + configuration
+        buildTargets.append(compilerEnv.Install(native_dest, buildTargets))
+        testTargets.append(compilerEnv.Install(native_dest, testTargets))
+        analyzeTargets.append(compilerEnv.Install(native_dest, analyzeTargets))
 
-            # Most developers only want to build or test with one variant on their host system.
-            # These aliases make this easy. A full alias looks like `test:release`. The action
-            # (`test`) defaults to `build`. The configuration (`release`) defaults to both
-            # `release` and `debug`.
-            AliasIfNotEmpty(compilerEnv, configuration, buildTargets)
-            if configuration != "coverage":
-                AliasIfNotEmpty(compilerEnv, "build:" + configuration, buildTargets)
-                AliasIfNotEmpty(compilerEnv, "test:" + configuration, testTargets)
-                AliasIfNotEmpty(compilerEnv, "analyze:" + configuration, analyzeTargets)
-                AliasIfNotEmpty(compilerEnv, "build", buildTargets)
-                AliasIfNotEmpty(compilerEnv, "test", testTargets)
-                AliasIfNotEmpty(compilerEnv, "analyze", analyzeTargets)
+        # Most developers only want to build or test with one variant on their host system.
+        # These aliases make this easy. A full alias looks like `test:release`. The action
+        # (`test`) defaults to `build`. The configuration (`release`) defaults to both
+        # `release` and `debug`.
+        AliasIfNotEmpty(compilerEnv, configuration, buildTargets)
+        if configuration != "coverage":
+            AliasIfNotEmpty(compilerEnv, "build:" + configuration, buildTargets)
+            AliasIfNotEmpty(compilerEnv, "test:" + configuration, testTargets)
+            AliasIfNotEmpty(compilerEnv, "analyze:" + configuration, analyzeTargets)
+            AliasIfNotEmpty(compilerEnv, "build", buildTargets)
+            AliasIfNotEmpty(compilerEnv, "test", testTargets)
+            AliasIfNotEmpty(compilerEnv, "analyze", analyzeTargets)
 
     # These aliases exist for developers that are looking to test their changes across multiple,
     # or specific, compilers. A full alias looks like `test:gcc_9:win32:x86:release`. The action
@@ -159,3 +163,9 @@ def AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets
             AliasIfNotEmpty(compilerEnv, "build:" + hierarchyName, buildTargets)
             AliasIfNotEmpty(compilerEnv, "test:" + hierarchyName, testTargets)
             AliasIfNotEmpty(compilerEnv, "analyze:" + hierarchyName, analyzeTargets)
+
+
+def AddBuildTargets(rootEnv, makeTargets):
+    for compilerEnv in _MakeCompilerEnvs(rootEnv):
+        buildTargets, testTargets, analyzeTargets = makeTargets(compilerEnv)
+        _AddCompilerEnvAliases(compilerEnv, buildTargets, testTargets, analyzeTargets)
