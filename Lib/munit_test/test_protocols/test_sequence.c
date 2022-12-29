@@ -73,6 +73,15 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(self, x, result));
     }
 
+    // x can be self.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_concat(self, self);
+        assert_type_is(result, type->type);
+        assert_sequence(result, items[0], items[1], items[0], items[1]);
+        yp_decrefN(N(self, result));
+    }
+
     // Optimization: lazy shallow copy of an immutable self when friendly x is empty.
     for (x_type = friend_types; (*x_type) != NULL; x_type++) {
         ypObject *self = type->newN(N(items[0], items[1]));
@@ -110,8 +119,50 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         }
     }
 
-    // FIXME Test x being an iterator that fails at start, mid-way.
-    // FIXME Test x being an iterator that lies about lenhint.
+    // x is an iterator that fails at the start.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises(yp_concat(self, x), yp_SyntaxError);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises(yp_concat(self, x), yp_SyntaxError);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        ypObject *result = yp_concat(self, x);
+        assert_sequence(result, items[0], items[1], items[2], items[3]);
+        yp_decrefN(N(self, x_supplier, x, result));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        ypObject *result = yp_concat(self, x);
+        assert_sequence(result, items[0], items[1], items[2], items[3]);
+        yp_decrefN(N(self, x_supplier, x, result));
+    }
+
+    // x is not an iterable.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        assert_raises(yp_concat(self, int_1), yp_TypeError);
+        yp_decrefN(N(self));
+    }
 
 tear_down:
     obj_array_decref(items);
@@ -428,14 +479,11 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_raises(yp_getitem(self, int_SLICE_DEFAULT), yp_IndexError);
     assert_raises(yp_getitem(self, int_SLICE_LAST), yp_IndexError);
 
-    // FIXME non-integer indicies?
-
     obj_array_decref(items);
     yp_decrefN(N(self, empty));
     return MUNIT_OK;
 }
 
-// FIXME yp_getdefault isn't listed as part of the sequence protocol in nohtyP.h, but it is.
 static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -464,8 +512,6 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
             assert_obj(slice_default, eq, items[2]));
     ead(slice_last, yp_getdefault(self, int_SLICE_LAST, items[2]),
             assert_obj(slice_last, eq, items[2]));
-
-    // FIXME non-integer indicies?
 
     obj_array_decref(items);
     yp_decrefN(N(self, empty));
@@ -1035,8 +1081,55 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decref(self);
     }
 
-    // FIXME Test x being an iterator that fails at start, mid-way.
-    // FIXME Test x being an iterator that lies about lenhint.
+    // x is an iterator that fails at the start.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises_exc(yp_setsliceC6(self, 0, 2, 1, x, &exc), yp_SyntaxError);
+        // In setslice, iterators must be converted to sequences _first_, to validate slicelength.
+        assert_sequence(self, items[0], items[1]);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises_exc(yp_setsliceC6(self, 0, 2, 1, x, &exc), yp_SyntaxError);
+        // In setslice, iterators must be converted to sequences _first_, to validate slicelength.
+        assert_sequence(self, items[0], items[1]);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 2, 1, x, &exc));
+        assert_sequence(self, items[2], items[3]);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        assert_not_raises_exc(yp_setsliceC6(self, 0, 2, 1, x, &exc));
+        assert_sequence(self, items[2], items[3]);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is not an iterable.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setsliceC6(self, 0, 2, 1, int_1, &exc), yp_TypeError);
+        assert_sequence(self, items[0], items[1]);
+        yp_decrefN(N(self));
+    }
 
 tear_down:
     obj_array_decref(items);
@@ -1103,8 +1196,6 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         assert_sequence(self, items[0], items[1]);
         yp_decref(self);
     }
-
-    // FIXME non-integer indicies?
 
 tear_down:
     obj_array_decref(items);
@@ -1482,8 +1573,54 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
         yp_decref(self);
     }
 
-    // FIXME Test x being an iterator that fails at start, mid-way.
-    // FIXME Test x being an iterator that lies about lenhint.
+    // x is an iterator that fails at the start.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises_exc(yp_extend(self, x, &exc), yp_SyntaxError);
+        assert_sequence(self, items[0], items[1]);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises_exc(yp_extend(self, x, &exc), yp_SyntaxError);
+        // In extend, we avoid converting iterator to a sequence by appending directly to self.
+        assert_sequence(self, items[0], items[1], items[2]);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        assert_not_raises_exc(yp_extend(self, x, &exc));
+        assert_sequence(self, items[0], items[1], items[2], items[3]);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        assert_not_raises_exc(yp_extend(self, x, &exc));
+        assert_sequence(self, items[0], items[1], items[2], items[3]);
+        yp_decrefN(N(self, x_supplier, x));
+    }
+
+    // x is not an iterable.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_extend(self, int_1, &exc), yp_TypeError);
+        assert_sequence(self, items[0], items[1]);
+        yp_decrefN(N(self));
+    }
 
 tear_down:
     obj_array_decref(items);
@@ -1899,8 +2036,7 @@ static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t *type = fixture->type;
     ypObject       *items[] = obj_array_init(2, type->rand_item());
 
-    // Sort is currently only implemented for list.
-    // FIXME Should this even be a part of the sequence protocol?
+    // Sort is only implemented for list; it's not currently part of the sequence protocol.
     if (type->type != yp_t_list) {
         ypObject *self = type->newN(N(items[0], items[1]));
         assert_raises_exc(yp_sort(self, &exc), yp_MethodError);

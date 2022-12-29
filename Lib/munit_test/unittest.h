@@ -549,6 +549,11 @@ extern ypObject *rand_obj(fixture_type_t *type);
 // Returns a random hashable object of the given type. type must be immutable.
 extern ypObject *rand_obj_hashable(fixture_type_t *type);
 
+// Returns an iterator that yields values from supplier (an iterable) until n values have been
+// yielded, after which the given exception is raised. The iterator is initialized with the given
+// length_hint, which may be different than the number of values actually yielded.
+extern ypObject *new_faulty_iter(
+        ypObject *supplier, yp_ssize_t n, ypObject *exception, yp_ssize_t length_hint);
 
 // Initializes a ypObject * array of length n with values from expression. Expression is evaluated n
 // times. n must be an integer literal. Example:
@@ -589,6 +594,10 @@ extern ypObject *const int_5;
 
 extern ypObject *const int_SLICE_DEFAULT;
 extern ypObject *const int_SLICE_LAST;
+
+
+// yp_lenC, asserting an exception is not raised.
+yp_ssize_t yp_lenC_not_raises(ypObject *container);
 
 
 extern void *malloc_tracker_malloc(yp_ssize_t *actual, yp_ssize_t size);

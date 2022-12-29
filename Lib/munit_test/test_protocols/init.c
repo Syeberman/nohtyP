@@ -1,4 +1,8 @@
 
+// XXX The protocol tests may check for particular behaviours that are not, strictly speaking, part
+// of their protocols, but that are instead common among all types that currently implement those
+// protocols. There is room to adjust these tests as new types are created.
+
 #include "munit_test/unittest.h"
 
 

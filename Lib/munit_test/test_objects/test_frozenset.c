@@ -15,7 +15,7 @@ static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture
 
         assert_not_raises_exc(yp_remove(set, int_1, &exc));
 
-        // FIXME Make an assert_hashes_equal?
+        // TODO Make an assert_hashes_equal?
         assert_not_raises_exc(expected_hash = yp_currenthashC(expected, &exc));
         assert_not_raises_exc(set_hash = yp_currenthashC(set, &exc));
         assert_hashC(expected_hash, ==, set_hash);

@@ -54,10 +54,7 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
         ],
         CPPDEFINES=[
             "yp_ENABLE_SHARED",
-            # TODO munit assertion failures go to stderr, status updates to MUNIT_OUTPUT_FILE. We
-            # can configure status updates, but not failures. Contribute a patch to put everything
-            # to stdout. (Errors running the tests should still go to stderr.)
-            # FIXME Just write it to two separate files, since they don't play nice combined.
+            # Assertion failures go to stderr, status updates to MUNIT_OUTPUT_FILE.
             "MUNIT_OUTPUT_FILE=stderr",
             "MUNIT_TEST_NAME_LEN=58",
             "MUNIT_DISABLE_TIMING",
@@ -95,7 +92,7 @@ def nohtyP_munit_test(env, munit_test):
     munit_target = "$VTOP/munit_test.log"
     env.Replace(MUNIT_TEST=GetProgram(env, munit_test), MUNIT_TARGET=munit_target)
 
-    # TODO See MUNIT_OUTPUT_FILE comment above.
+    # Assertion failures and status updates go to stderr (see MUNIT_OUTPUT_FILE above).
     munit_action = "$MUNIT_TEST 2> $MUNIT_TARGET"
     if env.subst("$CONFIGURATION") == "coverage":
         env.Replace(COVDATADIR="$VTOP", COVTESTACTION=munit_action, COVCOMSTR="Analyzing $SOURCE")

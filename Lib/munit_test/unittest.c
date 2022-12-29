@@ -277,6 +277,45 @@ static ypObject *new_rand_iter3(
     return result;
 }
 
+typedef struct _new_faulty_iter_state {
+    ypObject  *supplier;   // Sub-iterator supplying values to yield until n reaches zero.
+    yp_ssize_t n;          // Raise exception when this reaches zero.
+    ypObject  *exception;  // Exception to raise.
+} new_faulty_iter_state;
+
+static yp_state_decl_t new_faulty_iter_state_decl = {yp_sizeof(new_faulty_iter_state), 2,
+        {yp_offsetof(new_faulty_iter_state, supplier),
+                yp_offsetof(new_faulty_iter_state, exception)}};
+
+static ypObject *new_faulty_iter_func(ypObject *g, ypObject *value)
+{
+    new_faulty_iter_state *state;
+    yp_ssize_t             size;
+    if (yp_isexceptionC(value)) return value;
+    assert_not_exception(yp_iter_stateCX(g, (void **)&state, &size));
+    assert_ssizeC(size, ==, yp_sizeof(*state));
+
+    if (state->n < 1) return state->exception;
+    state->n--;
+    return yp_next(state->supplier);
+}
+
+extern ypObject *new_faulty_iter(
+        ypObject *supplier, yp_ssize_t n, ypObject *exception, yp_ssize_t length_hint)
+{
+    ypObject             *result;
+    new_faulty_iter_state state = {yp_iter(supplier) /*new ref*/, n, exception};
+    yp_generator_decl_t   decl = {
+            new_faulty_iter_func, length_hint, &state, &new_faulty_iter_state_decl};
+    assert_not_exception(state.supplier);
+    assert_isexception(exception, yp_BaseException);
+
+    result = yp_generatorC(&decl);
+    yp_decref(state.supplier);  // Recall yp_generatorC makes its own references.
+    assert_not_exception(result);
+    return result;
+}
+
 
 // Returns a random type object, except invalidated and exception objects.
 static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
@@ -1393,6 +1432,13 @@ yp_IMMORTAL_INT(int_5, 5);
 
 yp_IMMORTAL_INT(int_SLICE_DEFAULT, yp_SLICE_DEFAULT);
 yp_IMMORTAL_INT(int_SLICE_LAST, yp_SLICE_LAST);
+
+
+yp_ssize_t yp_lenC_not_raises(ypObject *container) {
+    yp_ssize_t result;
+    assert_not_raises_exc(result = yp_lenC(container, &exc));
+    return result;
+}
 
 
 #define MALLOC_TRACKER_MAX_LEN 1000
