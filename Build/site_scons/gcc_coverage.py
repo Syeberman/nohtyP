@@ -4,6 +4,7 @@
 import SCons.Action
 import SCons.Builder
 import SCons.Defaults
+import SCons.Util
 from pathlib import Path
 
 
@@ -74,7 +75,7 @@ def CoverageAction(target, source, env):
 
 
 def CoverageEmitter(target, source, env):
-    archive, *others = env.Flatten(target)
+    archive, *others = SCons.Util.flatten(target)
     archive = SCons.Util.adjustixes(str(archive), env.subst("$COVPREFIX"), env.subst("$COVSUFFIX"))
     return [archive, *others], source
 
