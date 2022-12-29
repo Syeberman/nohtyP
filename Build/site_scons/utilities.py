@@ -4,6 +4,20 @@
 import SCons.Util
 
 
+def GetSharedLibrary(env, target):
+    return env.FindIxes(target, "SHLIBPREFIX", "SHLIBSUFFIX")
+
+
+def GetImportLibrary(env, target):
+    # MacOS uses the dll (.dylib) as the import library.
+    return env.FindIxes(target, "LIBPREFIX", "LIBSUFFIX") or GetSharedLibrary(env, target)
+
+
+def GetProgram(env, target):
+    # Only Windows uses a suffix. Everything else we hope it's the first target
+    return env.FindIxes(target, "PROGPREFIX", "PROGSUFFIX") or SCons.Util.flatten(target)[0]
+
+
 # This ensures that targets like "test" will fail if Python 3 isn't available
 def AliasIfNotEmpty(env, alias, targets=(), action=()):
     """Creates or updates the alias iff targets or action is not empty. Empty aliases are normally

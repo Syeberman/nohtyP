@@ -8,7 +8,7 @@ import SCons.Tool
 import SCons.Util
 from site_scons.build_environments import AddBuildTargets
 from site_scons.root_environment import MakeRootEnv, SconscriptLog
-from site_scons.utilities import RGlob
+from site_scons.utilities import GetImportLibrary, GetProgram, GetSharedLibrary, RGlob
 
 # TODO support scons -h for build options
 
@@ -23,21 +23,6 @@ if not os.path.exists("nohtyP.c"):
 
 # TODO Scripts to update version numbers in source, build scripts, etc
 RootEnv.Replace(NOHTYP_MAJOR=0, NOHTYP_MINOR=5, NOHTYP_PATCH=0)
-
-
-# TODO Can these be moved into root_environment.py?
-def get_dll(env, target):
-    return env.FindIxes(target, "SHLIBPREFIX", "SHLIBSUFFIX")
-
-
-def get_implib(env, target):
-    # MacOS uses the dll (.dylib) as the import library.
-    return env.FindIxes(target, "LIBPREFIX", "LIBSUFFIX") or get_dll(env, target)
-
-
-def get_prog(env, target):
-    # Only Windows uses a suffix. Everything else we hope it's the first target
-    return env.FindIxes(target, "PROGPREFIX", "PROGSUFFIX") or SCons.Util.flatten(target)[0]
 
 
 # Adds nohtyP.dll/libnotyP.so/etc as a target in env
@@ -78,7 +63,7 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
             "MUNIT_DISABLE_TIMING",
         ],
         LIBS=[
-            get_implib(env, sharedLib),
+            GetImportLibrary(env, sharedLib),
             # Fixes `libnohtyP.so: undefined reference to `pow'` on Ubuntu 20.04.
             "m" if env["TARGET_OS"] == "posix" else "",
         ],
@@ -96,7 +81,7 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
 
 def nohtyP_yp_test(env, sharedLib):
     env.PrependENVPath("PYTHONPATH", "#/Lib")
-    env["ENV"]["NOHTYP_LIBRARY"] = get_dll(env, sharedLib)
+    env["ENV"]["NOHTYP_LIBRARY"] = GetSharedLibrary(env, sharedLib)
     scripts = ("#/Lib/yp.py", env.Glob("#/Lib/yp_test/*.py"), env.Glob("#/Lib/yp_test/*.txt"))
     testLog = env.Command(
         "$VTOP/yp_test.log", (sharedLib, scripts), "$PYTHON -m yp_test -v > $TARGET"
@@ -108,7 +93,7 @@ def nohtyP_yp_test(env, sharedLib):
 # Runs the munit_test suite.
 def nohtyP_munit_test(env, munit_test):
     munit_target = "$VTOP/munit_test.log"
-    env.Replace(MUNIT_TEST=get_prog(env, munit_test), MUNIT_TARGET=munit_target)
+    env.Replace(MUNIT_TEST=GetProgram(env, munit_test), MUNIT_TARGET=munit_target)
 
     # TODO See MUNIT_OUTPUT_FILE comment above.
     munit_action = "$MUNIT_TEST 2> $MUNIT_TARGET"
