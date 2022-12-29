@@ -2,13 +2,11 @@
 #include "munit_test/unittest.h"
 
 
-// Sequences should accept themselves, their pairs, and iterators as valid types for the "x" (i.e.
-// "other iterable") argument.
-// TODO Should x_types also include tuple/list? Is it required that every sequence be compatible
-// with tuple/list as an iterable?
-#define x_types_init(type)                            \
-    {                                                 \
-        (type), (type)->pair, fixture_type_iter, NULL \
+// Sequences should accept themselves, their pairs, iterators, and tuple/list as valid types for the
+// "x" (i.e. "other iterable") argument.
+#define x_types_init(type)                                                                   \
+    {                                                                                        \
+        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, NULL \
     }
 
 
