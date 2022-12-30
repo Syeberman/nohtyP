@@ -5,7 +5,7 @@
  *      License: http://docs.python.org/3/license.html
  */
 
-// TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
+// TODO In python_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
 // yp_sys_minint, or yp_sys_maxsize
 
 // TODO Audit the use of leading underscore and ensure consistency

@@ -76,12 +76,12 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
     return env.Program("$VTOP/munit_test", source=source)
 
 
-def nohtyP_yp_test(env, sharedLib):
+def nohtyP_python_test(env, sharedLib):
     env.PrependENVPath("PYTHONPATH", "#/Lib")
     env["ENV"]["NOHTYP_LIBRARY"] = GetSharedLibrary(env, sharedLib)
-    scripts = ("#/Lib/yp.py", env.Glob("#/Lib/yp_test/*.py"), env.Glob("#/Lib/yp_test/*.txt"))
+    scripts = ("#/Lib/yp.py", env.Glob("#/Lib/python_test/*.py"), env.Glob("#/Lib/python_test/*.txt"))
     testLog = env.Command(
-        "$VTOP/yp_test.log", (sharedLib, scripts), "$PYTHON -m yp_test -v > $TARGET"
+        "$VTOP/python_test.log", (sharedLib, scripts), "$PYTHON -m python_test -v > $TARGET"
     )
     env.Clean(sharedLib, testLog)
     return testLog
@@ -125,7 +125,7 @@ def nohtyP_checkapi(env):
 
 
 python_3 = SCons.Tool.Tool("python_3")
-python_min_38 = SCons.Tool.Tool("python_min_38")  # yp_test requires at least Python 3.8
+python_min_38 = SCons.Tool.Tool("python_min_38")  # python_test requires at least Python 3.8
 pclint = SCons.Tool.Tool("pclint")
 
 
@@ -137,7 +137,7 @@ def MakeCompilerTargets(compilerEnv):
 
     # These collect all the build, test, and analysis targets, including:
     #   - the C and C# builds of the nohtyP shared library
-    #   - yp_test and ypExamples results
+    #   - python_test and ypExamples results
     #   - checkapi.py, PC-lint, expanded compiler warnings
     #   - targets that copy the above to Build/native (why sharedLib is in every one)
     buildTargets = [sharedLib]
@@ -153,10 +153,10 @@ def MakeCompilerTargets(compilerEnv):
             )
         )
 
-        # yp_test requires a minimum version of Python.
+        # python_test requires a minimum version of Python.
         try:
             testTargets.append(
-                nohtyP_yp_test(
+                nohtyP_python_test(
                     compilerEnv.Clone(
                         tools=[
                             python_min_38,
