@@ -11,12 +11,13 @@ import SCons.Platform
 import SCons.Tool
 import SCons.Warnings
 import cc_preprocessed
+import gcc_coverage
 from root_environment import SconscriptLog
 from tool_finder import ToolFinder
 
 _arch2opts = {
-    "x86": ("-m32", ),
-    "amd64": ("-m64", ),
+    "x86": ("-m32",),
+    "amd64": ("-m64",),
 }
 _test_gcc_temp_dir = None
 
@@ -34,8 +35,13 @@ def _version_detector(gcc):
     # Determine if the version's right, returning if it isn't
     try:
         # They changed -dumpverion: https://stackoverflow.com/a/47410010
-        version = subprocess.check_output([str(gcc), "-dumpfullversion", "-dumpversion"],
-                                          stderr=subprocess.PIPE).decode().strip()
+        version = (
+            subprocess.check_output(
+                [str(gcc), "-dumpfullversion", "-dumpversion"], stderr=subprocess.PIPE
+            )
+            .decode()
+            .strip()
+        )
     except subprocess.CalledProcessError:
         return "", ()
 
@@ -52,7 +58,7 @@ def _version_detector(gcc):
     env["PATH"] = str(gcc.parent) + os.pathsep + env.get("PATH", "")
     for arch, archOpts in _arch2opts.items():
         gcc_args = [str(gcc), "test.c"] + list(archOpts)
-        SconscriptLog.write("Testing for architecture support: %r\n" % (gcc_args, ))
+        SconscriptLog.write("Testing for architecture support: %r\n" % (gcc_args,))
         SconscriptLog.flush()
         gcc_result = subprocess.call(
             gcc_args, cwd=_test_gcc_temp_dir, stdout=SconscriptLog, stderr=SconscriptLog, env=env
@@ -67,6 +73,8 @@ def _version_detector(gcc):
 
 gcc_finder = ToolFinder(
     # Try some known, and unknown-but-logical, default locations for mingw
+    # WinLibs https://winlibs.com/
+    #   C:\MinGW\winlibs-x86_64-posix-seh-gcc-12.2.0-llvm-14.0.6-mingw-w64ucrt-10.0.0-r2\mingw64
     # MinGW-w64 (http://sourceforge.net/projects/mingw-w64/)
     #   C:\Program Files\mingw-w64\x86_64-4.8.4-posix-seh-rt_v3-rev0\mingw64
     # Official MinGW (http://www.mingw.org/)
@@ -77,16 +85,16 @@ gcc_finder = ToolFinder(
     # Win-builds (http://win-builds.org/)
     #   C:\win-builds-32, C:\win-builds-64, C:\win-builds-64-1.3, C:\win-builds-64\1.3
     win_dirs=(
-        'mingw*\\bin',
-        'mingw*\\*\\bin',
-        'mingw*\\*\\*\\bin',
-        'win-builds*\\bin',
-        'win-builds*\\*\\bin',
+        "mingw*\\bin",
+        "mingw*\\*\\bin",
+        "mingw*\\*\\*\\bin",
+        "win-builds*\\bin",
+        "win-builds*\\*\\bin",
     ),
     posix_dirs=(),  # rely on the environment's path for now
     darwin_dirs=(),  # rely on the environment's path for now
     exe_globs=("gcc-*.*", "gcc-*", "gcc"),  # prefer specificity
-    version_detector=_version_detector
+    version_detector=_version_detector,
 )
 
 # Without a toolpath argument these will find SCons' tool modules
@@ -116,17 +124,14 @@ def _find(env, re_version):
 def _ccEmitter(target, source, env, parent_emitter):
     # Emitters appear to be inconsistent in whether they modify target/source, or return new objs
     target, source = parent_emitter(target, source, env)
-    # TODO Remove these asserts once we've gotten this right
-    assert len(source) == 1, source
-    assert os.path.splitext(target[0].path)[1] in (".o", ".os"), target[0].path
     s_base = os.path.splitext(source[0].path)[0]
-    for ext in (".i", ".s"):
+    for ext in (".i", ".s", ".gcno", ".gcda", ".gcov"):
         env.Clean(target[0], s_base + ext)
     return target, source
 
 
 def _updateCcEmitters(env):
-    builders = (env['BUILDERS']['StaticObject'], env['BUILDERS']['SharedObject'])
+    builders = (env["BUILDERS"]["StaticObject"], env["BUILDERS"]["SharedObject"])
     # TODO Instead, translate the emitter into a ListEmitter
     for builder in builders:
         for source_suffix, parent_emitter in builder.emitter.items():
@@ -137,9 +142,8 @@ def _updateCcEmitters(env):
 
 def _linkEmitter(target, source, env):
     t_base, t_ext = os.path.splitext(target[0].path)
-    # TODO Remove these asserts once we've gotten this right
     assert t_ext in (".dll", ".dylib", ".exe", ".so", ".", ""), target[0].path
-    for ext in (".map", ):
+    for ext in (".map",):
         env.Clean(target[0], t_base + ext)
     return target, source
 
@@ -148,17 +152,18 @@ def _updateLinkEmitters(env, version):
     env.Append(
         PROGEMITTER=[
             _linkEmitter,
-        ], SHLIBEMITTER=[
+        ],
+        SHLIBEMITTER=[
             _linkEmitter,
-        ], LDMODULEEMITTER=[
+        ],
+        LDMODULEEMITTER=[
             _linkEmitter,
-        ]
+        ],
     )
 
 
 def ApplyGCCOptions(env, version):
-    """Updates env with GCC-specific compiler options for nohtyP. version is numeric (ie 4.8).
-    """
+    """Updates env with GCC-specific compiler options for nohtyP. version is numeric (ie 4.8)."""
     try:
         archOpts = _arch2opts[env["TARGET_ARCH"]]
     except KeyError:
@@ -188,8 +193,8 @@ def ApplyGCCOptions(env, version):
         "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
         "-Wno-pointer-sign",
         "-Wno-unknown-pragmas",
-        # Before 9.0, float-conversion warned about passing a double to finite/isnan
-        "" if version >= 9.0 else "-Wno-float-conversion",
+        # float-conversion warns about passing a double to finite/isnan, unfortunately
+        "-Wno-float-conversion",
         # TODO maybe-uninitialized would be good during analyze
         "-Wno-maybe-uninitialized" if version >= 4.8 else "-Wno-uninitialized",
         # For shared libraries, only expose functions explicitly marked ypAPI
@@ -201,19 +206,23 @@ def ApplyGCCOptions(env, version):
         "-save-temps=obj",
         "-fverbose-asm",
         # Source/assembly listing (.s) TODO preprocessed?
-        #"-Wa,-alns=${TARGET.base}.s",
+        # "-Wa,-alns=${TARGET.base}.s",
     )
-    if env["CONFIGURATION"] == "debug":
+    if env["CONFIGURATION"] in ("debug", "coverage"):
         addCcFlags(
             # Disable (non-debuggable) optimizations
             "-Og" if version >= 4.8 else "-O0",
-            # Runtime checks: int overflow, stack overflow
-            # TODO Stack overflow detection should possibly always be enabled.
+            # Runtime check: int overflow
             "-ftrapv",
-            "-fstack-clash-protection" if version >= 8 else "-fstack-check",
+            # Runtime check: stack overflow
+            # XXX Not supported on Windows: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90458#c4
+            # TODO Stack overflow detection should possibly always be enabled.
+            "-fstack-clash-protection"
+            if version >= 8 and _platform_name != "win32"
+            else "-fstack-check",
             # Runtime check: buffer overflow (needs -fmudflap to linker)
             # TODO Not supported on MinGW/Windows, apparently
-            #"-fmudflapth",
+            # "-fmudflapth",
         )
     else:
         addCcFlags(
@@ -221,8 +230,14 @@ def ApplyGCCOptions(env, version):
             "-O3",
             # Optimize whole program (needs -flto to linker): conflicts with -g
             # https://gcc.gnu.org/onlinedocs/gcc-4.9.0/gcc/Optimize-Options.html
-            #"-flto",
+            # "-flto",
         )
+    if env["CONFIGURATION"] == "coverage":
+        addCcFlags(
+            "--coverage",
+            "-fprofile-abs-path",
+        )
+
     # Disable frame-pointer omission (ie frame pointers will be available on all builds)
     # XXX Must come after any other optimization compiler options
     if _platform_name == "win32" and version == 8 and env["TARGET_ARCH"] == "amd64":
@@ -239,16 +254,16 @@ def ApplyGCCOptions(env, version):
     def addCppDefines(*args):
         env.AppendUnique(CPPDEFINES=list(args))
 
-    if env["CONFIGURATION"] == "debug":
+    if env["CONFIGURATION"] in ("debug", "coverage"):
         addCppDefines("_DEBUG")
     else:
         addCppDefines("NDEBUG")
 
-    # CCPP is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
+    # PPCC is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
     # TODO -save-temps above also writes the .i file
     # TODO Create PPCC, PPCFLAGS, PPCCFLAGS just like SHCC/etc, and contribute back to SCons?
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
-    env['PPCCCOM'] = '$CC -E -o $TARGET -c $CFLAGS $CCFLAGS $_CCCOMCOM $SOURCES'
+    env["PPCCCOM"] = "$CC -E -o $TARGET -c $CFLAGS $CCFLAGS $_CCCOMCOM $SOURCES"
 
     def addLinkFlags(*args):
         env.AppendUnique(LINKFLAGS=list(args))
@@ -258,29 +273,33 @@ def ApplyGCCOptions(env, version):
         # Warnings-as-errors, all (avoidable) warnings
         "-Werror",
         "-Wall",
-        # Static libgcc (arithmetic, mostly)
-        "-static-libgcc",
+        # Building a shared library with GCC on Windows requires the GCC shared libraries, which are
+        # not available by default. So link these libraries statically.
+        "-static" if env["TARGET_OS"] == "win32" else "",
         # Create a mapfile (.map)
-        "-Wl,-map,${TARGET.base}.map" if _platform_name == "darwin" else "-Wl,-Map,${TARGET.base}.map",
+        "-Wl,-map,${TARGET.base}.map"
+        if _platform_name == "darwin"
+        else "-Wl,-Map,${TARGET.base}.map",
         # TODO Version stamp?
     )
     if env["TARGET_ARCH"] == "x86":
         # Large address aware (>2GB)
         addLinkFlags("-Wl,--large-address-aware")
-    if env["CONFIGURATION"] == "debug":
+    if env["CONFIGURATION"] in ("debug", "coverage"):
         addLinkFlags(
             # Disable (non-debuggable) optimizations
             "-Og" if version >= 4.8 else "-O0",
             # Runtime check: buffer overflow (needs -fmudflap* to compiler)
             # TODO Not supported on MinGW/Windows, apparently
-            #"-fmudflap",
+            # "-fmudflap",
+            "--coverage" if env["CONFIGURATION"] == "coverage" else "",
         )
     else:
         addLinkFlags(
             # Optimize for speed
             "-O3",
             # Optimize whole program (needs -flto to compiler): see above
-            #"-flto",
+            # "-flto",
         )
     # Ensure SCons knows to clean .map, etc
     _updateLinkEmitters(env, version)
@@ -304,7 +323,7 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         re_version = re.compile(rf"{major}\.{minor}(\.\d+)*")
 
     def generate(env):
-        if env["CONFIGURATION"] not in ("release", "debug"):
+        if env["CONFIGURATION"] not in ("release", "debug", "coverage"):
             raise SCons.Errors.StopError(
                 "GCC doesn't support the %r configuration (yet)" % env["CONFIGURATION"]
             )
@@ -329,6 +348,7 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         for tool in _tools:
             tool.generate(env)
         cc_preprocessed.generate_PreprocessedBuilder(env)
+        gcc_coverage.generate_CoverageBuilder(env)
 
         # The tool (ie mingw) may helpfully prepend to path and other variables...so make sure we
         # prepend *our* path after the tool does its thing

@@ -14,13 +14,10 @@ for suffix in CPreprocessedSuffix:
 
 
 def createPreprocessedBuilder(env):
-    """This is a utility function that creates the Preprocessed
-    Builders in an Environment if they are not there already.
+    """This is a utility function that creates the Preprocessed Builders in an Environment if they
+    are not there already.
 
     If they are there already, we return the existing one.
-
-    This is a separate function because soooo many Tools
-    use this functionality.
 
     Returns the Preprocessed builder.
     """
@@ -35,7 +32,7 @@ def createPreprocessedBuilder(env):
                                              #suffix = '$CPREPROCESSEDSUFFIX',
                                              src_builder=['CFile', 'CXXFile'],
                                              source_scanner=SCons.Tool.SourceFileScanner,
-                                             single_source=1)
+                                             single_source=True)
         env['BUILDERS']['Preprocessed'] = preprocessed
 
         # TODO msvc preprocesses both C and C++ files with a .i extension; gcc keeps them separate

@@ -141,8 +141,8 @@ test_script:
   - pwsh: |
       try { Build/.appveyor.ps1 test }
       catch {
-        7z a yp_test.log.zip Build/*/*/yp_test.log
-        appveyor PushArtifact yp_test.log.zip
+        7z a tests.log.zip Build/*/*/python_test.log Build/*/*/munit_test.log
+        appveyor PushArtifact tests.log.zip
         Write-Error $PSItem
         throw "tests failed"
       }

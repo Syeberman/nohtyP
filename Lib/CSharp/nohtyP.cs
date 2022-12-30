@@ -91,10 +91,10 @@ namespace nohtyP
         }
 
         public static @object bytes( long source ) {
-            return new @object( _dll.yp_bytesC( null, (yp_ssize_t) source ) );
+            return new @object( _dll.yp_bytesC( (yp_ssize_t) source, null ) );
         }
         public static @object bytes( byte[] source ) {
-            return new @object( _dll.yp_bytesC( source, (yp_ssize_t) source.Length ) );
+            return new @object( _dll.yp_bytesC( (yp_ssize_t) source.Length, source ) );
         }
         public static @object bytes( @object source, @object encoding, @object errors ) {
             return new @object( _dll.yp_bytes3( source.self, encoding.self, errors.self ) );
@@ -106,14 +106,14 @@ namespace nohtyP
             return new @object( _dll.yp_bytes( source.self ) );
         }
         public static @object bytes() {
-            return new @object( _dll.yp_bytesC( null, (yp_ssize_t) 0 ) ); // TODO yp_bytes0
+            return new @object( _dll.yp_bytesC( (yp_ssize_t) 0, null ) ); // TODO yp_bytes0
         }
 
         public static @object bytearray( long source ) {
-            return new @object( _dll.yp_bytearrayC( null, (yp_ssize_t) source ) );
+            return new @object( _dll.yp_bytearrayC( (yp_ssize_t) source, null ) );
         }
         public static @object bytearray( byte[] source ) {
-            return new @object( _dll.yp_bytearrayC( source, (yp_ssize_t) source.Length ) );
+            return new @object( _dll.yp_bytearrayC( (yp_ssize_t) source.Length, source ) );
         }
         public static @object bytearray( @object source, @object encoding, @object errors ) {
             return new @object( _dll.yp_bytearray3( source.self, encoding.self, errors.self ) );
@@ -125,19 +125,19 @@ namespace nohtyP
             return new @object( _dll.yp_bytearray( source.self ) );
         }
         public static @object bytearray() {
-            return new @object( _dll.yp_bytearrayC( null, (yp_ssize_t) 0 ) ); // TODO yp_bytearray0
+            return new @object( _dll.yp_bytearrayC( (yp_ssize_t) 0, null ) ); // TODO yp_bytearray0
         }
 
         private static ypObject_p _str( string source ) {
             var encoded = Encoding.UTF8.GetBytes( source );
-            return _dll.yp_str_frombytesC2( encoded, (yp_ssize_t) encoded.Length );
+            return _dll.yp_str_frombytesC2( (yp_ssize_t) encoded.Length, encoded );
         }
         public static @object str( string source ) {
             return new @object( _str( source ) );
         }
         // TODO default values? Perhaps just for errors
         public static @object str( byte[] source, @object encoding, @object errors ) {
-            return new @object( _dll.yp_str_frombytesC4( source, (yp_ssize_t) source.Length,
+            return new @object( _dll.yp_str_frombytesC4( (yp_ssize_t) source.Length, source,
                 encoding.self, errors.self ) );
         }
         public static @object str( @object @object, @object encoding, @object errors ) {
@@ -159,14 +159,14 @@ namespace nohtyP
 
         private static ypObject_p _chrarray( string source ) {
             var encoded = Encoding.UTF8.GetBytes( source );
-            return _dll.yp_str_frombytesC2( encoded, (yp_ssize_t) encoded.Length );
+            return _dll.yp_str_frombytesC2( (yp_ssize_t) encoded.Length, encoded );
         }
         public static @object chrarray( string source ) {
             return new @object( _chrarray( source ) );
         }
         // TODO default values? Perhaps just for errors
         public static @object chrarray( byte[] source, @object encoding, @object errors ) {
-            return new @object( _dll.yp_chrarray_frombytesC4( source, (yp_ssize_t) source.Length,
+            return new @object( _dll.yp_chrarray_frombytesC4( (yp_ssize_t) source.Length, source,
                 encoding.self, errors.self ) );
         }
         public static @object chrarray( @object @object, @object encoding, @object errors ) {
@@ -462,9 +462,9 @@ namespace nohtyP
         internal static extern ypObject_p yp_rangeC( yp_int_t stop );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_bytesC( yp_uint8_t[] source, yp_ssize_t len );
+        internal static extern ypObject_p yp_bytesC( yp_ssize_t len, yp_uint8_t[] source );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_bytearrayC( yp_uint8_t[] source, yp_ssize_t len );
+        internal static extern ypObject_p yp_bytearrayC( yp_ssize_t len, yp_uint8_t[] source );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_bytes3( ypObject_p source, ypObject_p encoding, ypObject_p errors );
@@ -482,16 +482,16 @@ namespace nohtyP
         internal static extern ypObject_p yp_bytearray0();
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_str_frombytesC4( yp_uint8_t[] source, yp_ssize_t len,
+        internal static extern ypObject_p yp_str_frombytesC4( yp_ssize_t len, yp_uint8_t[] source,
                 ypObject_p encoding, ypObject_p errors );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_chrarray_frombytesC4( yp_uint8_t[] source, yp_ssize_t len,
+        internal static extern ypObject_p yp_chrarray_frombytesC4( yp_ssize_t len, yp_uint8_t[] source,
                 ypObject_p encoding, ypObject_p errors );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_str_frombytesC2( yp_uint8_t[] source, yp_ssize_t len );
+        internal static extern ypObject_p yp_str_frombytesC2( yp_ssize_t len, yp_uint8_t[] source );
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_chrarray_frombytesC2( yp_uint8_t[] source, yp_ssize_t len );
+        internal static extern ypObject_p yp_chrarray_frombytesC2( yp_ssize_t len, yp_uint8_t[] source );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_str3( ypObject_p @object, ypObject_p encoding, ypObject_p errors );
@@ -630,7 +630,7 @@ namespace nohtyP
         internal static extern yp_ssize_t yp_length_hintC( ypObject_p iterator, ref ypObject_p exc );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_iter_stateCX( ypObject_p iterator, out UIntPtr state, out yp_ssize_t size );
+        internal static extern ypObject_p yp_iter_stateCX( ypObject_p iterator, out yp_ssize_t size, out UIntPtr state );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_close( ref ypObject_p iterator );
@@ -788,7 +788,7 @@ namespace nohtyP
         internal static extern void yp_sort( ref ypObject_p sequence );
 
         //internal static const yp_ssize_t yp_SLICE_DEFAULT = yp_ssize_t.MinValue;
-        //internal static const yp_ssize_t yp_SLICE_USELEN = yp_ssize_t.MaxValue;
+        //internal static const yp_ssize_t yp_SLICE_LAST = yp_ssize_t.MaxValue;
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern ypObject_p yp_isdisjoint( ypObject_p set, ypObject_p x );
@@ -1063,14 +1063,14 @@ namespace nohtyP
         internal static extern int yp_isexceptionCN( ypObject_p x, int n, params ypObject_p[] args );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_asbytesCX( ypObject_p seq, out yp_uint8_t[] bytes, out yp_ssize_t len );
+        internal static extern ypObject_p yp_asbytesCX( ypObject_p seq, out yp_ssize_t len, out yp_uint8_t[] bytes );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_asencodedCX( ypObject_p seq, out yp_uint8_t[] encoded, out yp_ssize_t size,
+        internal static extern ypObject_p yp_asencodedCX( ypObject_p seq, out yp_ssize_t size, out yp_uint8_t[] encoded,
                 out ypObject_p encoding );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern ypObject_p yp_itemarrayCX( ypObject_p seq, ref ypObject_p* array, yp_ssize_t* len );
+        internal static extern ypObject_p yp_itemarrayCX( ypObject_p seq, yp_ssize_t* len, ref ypObject_p* array );
 
         // FIXME Remove
         public static void Main()

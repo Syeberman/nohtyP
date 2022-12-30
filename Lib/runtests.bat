@@ -4,5 +4,5 @@ set PYTHONPATH=%~dp0
 set NOHTYP_LIBRARY=%~dp0\..\%1\nohtyP.dll
 shift
 cd %~dp0
-python -m yp_test %$
+python -m python_test %$
 endlocal

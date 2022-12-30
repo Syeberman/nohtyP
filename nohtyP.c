@@ -5,7 +5,7 @@
  *      License: http://docs.python.org/3/license.html
  */
 
-// TODO In yp_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
+// TODO In python_test, use of sys.maxsize needs to be replaced as appropriate with yp_sys_maxint,
 // yp_sys_minint, or yp_sys_maxsize
 
 // TODO Audit the use of leading underscore and ensure consistency
@@ -63,6 +63,20 @@
 //      https://github.com/python/cpython/issues/84297
 //      https://github.com/faster-cpython/ideas
 
+// TODO Python is not consistent in their naming of mutating vs returning functions. Compare
+// bytearray.remove, which modifies, with bytearray.removeprefix, which returns a new string. (It's
+// also not consistent because remove raises an error if it can't be found but removeprefix
+// doesn't.) There's the "i" prefix, as in yp_add vs yp_iadd, but this is limited to the numeric
+// methods and yp_irepeat (which is so-named as it's __imul__ in Python, so it's kinda also
+// numeric). Plus, the "i" prefix is for a+=b, i.e. the magic syntax Python has to say "either
+// modify this in place, or set it to the new value, but either works". (But I also don't like the
+// "either works" part really, as it can lead to confusion.) There's also list.sort vs sorted (and
+// list.reverse/reversed), which I like more but then would it be chrarray.strip vs
+// chrarray.stripped? ESL programmers may have trouble here, and we'd have to break from Python's
+// str.strip/etc. Really the bulk of the issues are in the str/bytes methods, as those tried hard to
+// be non-mutating.
+
+
 #include "nohtyP.h"
 #include <float.h>
 #include <math.h>
@@ -99,22 +113,28 @@
 #define yp_ARCH_32_BIT 1
 #endif
 
-// Similar to PRId64 defined in inttypes.h, this chooses the appropriate format string depending
-// on the compiler.
-//  PRIint: for use with yp_int_t
-//  PRIssize: for use with yp_ssize_t
-#if defined(PRId64)
-#define PRIint PRId64
-#else
+// Similar to PRId64 defined in inttypes.h, this chooses the appropriate format string depending on
+// the compiler.
+//
+// - PRIint: for use with yp_int_t
+// - PRIssize: for use with yp_ssize_t
+#if defined(_MSC_VER)
 #define PRIint "I64d"
+#else
+#define PRIint "lld"
 #endif
+
 #if defined(yp_ARCH_32_BIT)
 #define PRIssize "d"
+#elif defined(_MSC_VER)
+#define PRIssize "I64d"
 #elif defined(__APPLE__)
 // The MacOS X 12.3 SDK defines ssize_t as long (see __darwin_ssize_t in the _types.h files).
 #define PRIssize "ld"
+#elif defined(PRId64)
+#define PRIssize PRId64
 #else
-#define PRIssize PRIint
+#define PRIssize "lld"
 #endif
 
 // Internal define from nohtyP.h
@@ -326,7 +346,7 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
 // Base "constructor" for immortal type objects
-#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT(ypType_CODE, 0, NULL, ypObject_LEN_INVALID)
+#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT(ypType_CODE, 0, ypObject_LEN_INVALID, NULL)
 
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)(ypObject *);
@@ -375,7 +395,7 @@ typedef struct {
     objssizeobjproc tp_insert;
     objssizeproc    tp_popindex;
     objproc         tp_reverse;
-    objobjobjproc   tp_sort;
+    objobjobjproc   tp_sort;  // FIXME only implemented for list...remove?
 } ypSequenceMethods;
 
 typedef struct {
@@ -677,8 +697,8 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 #define MIN4(a, b, c, d) MIN(MIN(a, b), MIN(c, d))
 
 
-// Functions that return nohtyP objects simply need to return the error object to "raise" it. Use
-// this as "return_yp_ERR(yp_ValueError);" to return the error properly.
+// Functions that return nohtyP objects return the error object to "raise" it. Use this as
+// "return_yp_ERR(yp_ValueError);" to return the error properly.
 #define return_yp_ERR(_err)             \
     do {                                \
         ypObject *_yp_ERR_err = (_err); \
@@ -735,7 +755,7 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 #define yp_sizeof_member(structType, member) yp_sizeof(((structType *)0)->member)
 
 // Length of an array. Only call for arrays of fixed size that haven't been coerced to pointers.
-#define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof(x[0]))
+#define yp_lengthof_array(x) (yp_sizeof(x) / yp_sizeof((x)[0]))
 
 // Length of an array in a structure. Only call for arrays of fixed size.
 #define yp_lengthof_array_member(structType, member) yp_lengthof_array(((structType *)0)->member)
@@ -807,19 +827,20 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 
 // Prime multiplier used in string and various other hashes
 // XXX Adapted from Python's _PyHASH_MULTIPLIER
-#define _ypHASH_MULTIPLIER 1000003  // 0xf4243
+#define _ypHASH_MULTIPLIER 1000003UL /* 0xf4243 */
 
-// Parameters used for the numeric hash implementation. Numeric hashes are based on reduction
-// modulo the prime 2**_PyHASH_BITS - 1.
+/* Parameters used for the numeric hash implementation.  See notes for
+   _Py_HashDouble in Python/pyhash.c.  Numeric hashes are based on
+   reduction modulo the prime 2**_PyHASH_BITS - 1. */
 // XXX Adapted from Python's pyport.h
-#if defined(yp_ARCH_32_BIT)
-#define _ypHASH_BITS 31
-#else
+#if defined(yp_ARCH_64_BIT)
 #define _ypHASH_BITS 61
+#else
+#define _ypHASH_BITS 31
 #endif
 #define _ypHASH_MODULUS (((size_t)1 << _ypHASH_BITS) - 1)
 #define _ypHASH_INF 314159
-#define _ypHASH_NAN 0
+#define _ypHASH_IMAG _ypHASH_MULTIPLIER
 
 // Return the hash of the given int; always succeeds
 static yp_hash_t yp_HashInt(yp_int_t v)
@@ -831,9 +852,11 @@ static yp_hash_t yp_HashInt(yp_int_t v)
     return hash;
 }
 
-// Return the hash of the given double; always succeeds
-// XXX Adapted from Python's _Py_HashDouble
-static yp_hash_t yp_HashDouble(double v)
+// Return the hash of the given double; always succeeds. inst is the object containing this value
+// (recall that NaN is compared by identity).
+// XXX Adapted from Python's _Py_HashDouble in pyhash.c.
+static yp_hash_t yp_HashPointer(void *p);
+static yp_hash_t yp_HashDouble(ypObject *inst, double v)
 {
     int        e;
     yp_uhash_t sign;
@@ -844,7 +867,7 @@ static yp_hash_t yp_HashDouble(double v)
         if (yp_IS_INFINITY(v)) {
             return v > 0 ? _ypHASH_INF : -_ypHASH_INF;
         } else {
-            return _ypHASH_NAN;
+            return yp_HashPointer(inst);
         }
     }
 
@@ -861,29 +884,25 @@ static yp_hash_t yp_HashDouble(double v)
     x = 0;
     while (m) {
         x = ((x << 28) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - 28);
-        m *= 268435456.0;  // 2**28
+        m *= 268435456.0; /* 2**28 */
         e -= 28;
-        y = (yp_uhash_t)m;  // pull out integer part
+        y = (yp_uhash_t)m; /* pull out integer part */
         m -= (double)y;
         x += y;
-        if (x >= _ypHASH_MODULUS) {
-            x -= _ypHASH_MODULUS;
-        }
+        if (x >= _ypHASH_MODULUS) x -= _ypHASH_MODULUS;
     }
 
-    // adjust for the exponent;  first reduce it modulo _ypHASH_BITS
+    /* adjust for the exponent;  first reduce it modulo _ypHASH_BITS */
     e = e >= 0 ? e % _ypHASH_BITS : _ypHASH_BITS - 1 - ((-1 - e) % _ypHASH_BITS);
     x = ((x << e) & _ypHASH_MODULUS) | x >> (_ypHASH_BITS - e);
 
     x = x * sign;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
-    }
+    if (x == (yp_uhash_t)ypObject_HASH_INVALID) x -= 1;
     return (yp_hash_t)x;
 }
 
 // Return the hash of the given pointer; always succeeds
-// XXX Adapted from Python's _Py_HashPointer
+// XXX Adapted from Python's _Py_HashPointer in pyhash.c.
 static yp_hash_t yp_HashPointer(void *p)
 {
     yp_hash_t x;
@@ -897,7 +916,8 @@ static yp_hash_t yp_HashPointer(void *p)
 }
 
 // Return the hash of the given number of bytes; always succeeds
-// XXX Adapted from Python's _Py_HashBytes
+// XXX Adapted from Python's _Py_HashBytes in pyhash.c.
+// TODO Python now uses pysiphash for security.
 static yp_hash_t yp_HashBytes(yp_uint8_t *p, yp_ssize_t len)
 {
     yp_uhash_t x;
@@ -915,6 +935,172 @@ static yp_hash_t yp_HashBytes(yp_uint8_t *p, yp_ssize_t len)
         x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
     }
     return (yp_hash_t)x;
+}
+
+/* Hash for tuples. This is a slightly simplified version of the xxHash
+   non-cryptographic hash:
+   - we do not use any parallellism, there is only 1 accumulator.
+   - we drop the final mixing since this is just a permutation of the
+     output space: it does not help against collisions.
+   - at the end, we mangle the length with a single constant.
+   For the xxHash specification, see
+   https://github.com/Cyan4973/xxHash/blob/master/doc/xxhash_spec.md
+
+   Below are the official constants from the xxHash specification. Optimizing
+   compilers should emit a single "rotate" instruction for the
+   _PyHASH_XXROTATE() expansion. If that doesn't happen for some important
+   platform, the macro could be changed to expand to a platform-specific rotate
+   spelling instead.
+*/
+// XXX Adapted from Python's tuplehash
+#ifdef yp_ARCH_64_BIT
+#define _ypHASH_XXPRIME_1 ((yp_uhash_t)11400714785074694791ULL)
+#define _ypHASH_XXPRIME_2 ((yp_uhash_t)14029467366897019727ULL)
+#define _ypHASH_XXPRIME_5 ((yp_uhash_t)2870177450012600261ULL)
+#define _ypHASH_XXROTATE(x) ((x << 31) | (x >> 33)) /* Rotate left 31 bits */
+#else
+#define _ypHASH_XXPRIME_1 ((yp_uhash_t)2654435761UL)
+#define _ypHASH_XXPRIME_2 ((yp_uhash_t)2246822519UL)
+#define _ypHASH_XXPRIME_5 ((yp_uhash_t)374761393UL)
+#define _ypHASH_XXROTATE(x) ((x << 13) | (x >> 19)) /* Rotate left 13 bits */
+#endif
+
+typedef struct _yp_HashSequence_state_t {
+    size_t     len;
+    yp_uhash_t acc;
+} yp_HashSequence_state_t;
+
+// XXX Adapted from Python's tuplehash
+static void yp_HashSequence_init(yp_HashSequence_state_t *state, yp_ssize_t len)
+{
+    yp_ASSERT1(len >= 0);
+    state->len = (size_t)len;
+    state->acc = _ypHASH_XXPRIME_5;
+}
+
+static void yp_HashSequence_next(yp_HashSequence_state_t *state, yp_hash_t lane)
+{
+    yp_uhash_t acc = state->acc;
+
+    yp_ASSERT1(lane != ypObject_HASH_INVALID);
+    acc += ((yp_uhash_t)lane) * _ypHASH_XXPRIME_2;
+    acc = _ypHASH_XXROTATE(acc);
+    acc *= _ypHASH_XXPRIME_1;
+
+    state->acc = acc;
+}
+
+static yp_hash_t yp_HashSequence_fini(yp_HashSequence_state_t *state)
+{
+    yp_uhash_t acc = state->acc;
+
+    /* Add input length, mangled to keep the historical value of hash(()). */
+    acc += state->len ^ (_ypHASH_XXPRIME_5 ^ 3527539UL);
+
+    if (acc == (yp_uhash_t)ypObject_HASH_INVALID) {
+        return 1546275796;
+    } else {
+        return (yp_hash_t)acc;
+    }
+}
+
+typedef struct {
+    yp_hash_t se_hash;
+    ypObject *se_key;
+} ypSet_KeyEntry;
+
+typedef struct _yp_HashSet_state_t {
+    yp_ssize_t len;
+    yp_uhash_t hash;
+} yp_HashSet_state_t;
+
+/* Work to increase the bit dispersion for closely spaced hash values.
+   This is important because some use cases have many combinations of a
+   small number of elements with nearby hashes so that many distinct
+   combinations collapse to only a handful of distinct hash values. */
+
+// XXX Adapted from Python's frozenset_hash
+static yp_uhash_t _yp_HashSet_shuffle_bits(yp_uhash_t h)
+{
+    return ((h ^ 89869747UL) ^ (h << 16)) * 3644798167UL;
+}
+
+/* Most of the constants in this hash algorithm are randomly chosen
+   large primes with "interesting bit patterns" and that passed tests
+   for good collision statistics on a variety of problematic datasets
+   including powersets and graph structures (such as David Eppstein's
+   graph recipes in Lib/test/test_set.py) */
+
+static void yp_HashSet_init(yp_HashSet_state_t *state, yp_ssize_t len)
+{
+    yp_ASSERT1(len >= 0);
+    state->len = len;
+    state->hash = 0;
+}
+
+static void yp_HashSet_next(yp_HashSet_state_t *state, yp_hash_t lane)
+{
+    /* Xor-in shuffled bits from every entry's hash field because xor is
+       commutative and a frozenset hash should be independent of order. */
+
+    yp_ASSERT1(lane != ypObject_HASH_INVALID);
+    state->hash ^= _yp_HashSet_shuffle_bits((yp_uhash_t)lane);
+}
+
+// Combines yp_HashSet_init and yp_HashSet_next into a form optimized for a ypSet_KeyEntry table.
+// FIXME If we want to call this multiple times, then `used` should be a parameter (the len from
+// init is the total length, but this table may have a different `used` parameter).
+static void yp_HashSet_next_table(
+        yp_HashSet_state_t *state, ypSet_KeyEntry *table, yp_ssize_t mask, yp_ssize_t fill)
+{
+    yp_uhash_t      hash = state->hash;
+    ypSet_KeyEntry *entry;
+
+    yp_ASSERT1(mask >= 0 && fill >= 0 && state->len >= 0);
+    yp_ASSERT1(mask + 1 >= fill && fill >= state->len);
+
+    /* Xor-in shuffled bits from every entry's hash field because xor is
+       commutative and a frozenset hash should be independent of order.
+
+       For speed, include null entries and dummy entries and then
+       subtract out their effect afterwards so that the final hash
+       depends only on active entries.  This allows the code to be
+       vectorized by the compiler and it saves the unpredictable
+       branches that would arise when trying to exclude null and dummy
+       entries on every iteration. */
+
+    for (entry = table; entry <= &table[mask]; entry++) {
+        hash ^= _yp_HashSet_shuffle_bits((yp_uhash_t)entry->se_hash);
+    }
+
+    /* Remove the effect of an odd number of NULL entries */
+    if ((mask + 1 - fill) & 1) hash ^= _yp_HashSet_shuffle_bits(0);
+
+    /* Remove the effect of an odd number of dummy entries */
+    if ((fill - state->len) & 1) {
+        hash ^= _yp_HashSet_shuffle_bits((yp_uhash_t)ypObject_HASH_INVALID);
+    }
+
+    state->hash = hash;
+}
+
+static yp_hash_t yp_HashSet_fini(yp_HashSet_state_t *state)
+{
+    yp_uhash_t hash = state->hash;
+
+    /* Factor in the number of active entries */
+    hash ^= ((yp_uhash_t)state->len + 1) * 1927868237UL;
+
+    /* Disperse patterns arising in nested frozensets */
+    hash ^= (hash >> 11) ^ (hash >> 25);
+    hash = hash * 69069U + 907133923UL;
+
+    /* -1 is reserved as an error code */
+    if (hash == (yp_uhash_t)ypObject_HASH_INVALID) {
+        return 590923713;
+    } else {
+        return (yp_hash_t)hash;
+    }
 }
 
 
@@ -1019,10 +1205,7 @@ typedef struct {
 } ypTupleObject;
 
 
-typedef struct {
-    yp_hash_t se_hash;
-    ypObject *se_key;
-} ypSet_KeyEntry;
+// ypSet_KeyEntry defined above.
 typedef struct {
     ypObject_HEAD;
     yp_ssize_t fill;  // # Active + # Dummy
@@ -1070,7 +1253,7 @@ typedef struct _ypFunctionObject {
 
 #define yp_IMMORTAL_INVALIDATED(name)                                                   \
     static struct _ypObject _##name##_struct =                                          \
-            _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID); \
+            _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, _ypObject_LEN_INVALID, NULL); \
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 
 // For use internally as parameter defaults to detect when an argument was not supplied. yp_None
@@ -1084,15 +1267,15 @@ yp_IMMORTAL_INVALIDATED(yp_Arg_Missing);
 
 
 static ypObject _yp_None_struct =
-        yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, NULL, ypObject_LEN_INVALID);
+        yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, ypObject_LEN_INVALID, NULL);
 ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 
 // There are exactly two bool objects
 // TODO Could initialize ypObject_CACHED_HASH here...in fact our value could be in CACHED_HASH.
-static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 1};
+static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, 0, NULL), 1};
 ypObject *const     yp_True = yp_CONST_REF(yp_True);
-static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 0};
+static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, 0, NULL), 0};
 ypObject *const     yp_False = yp_CONST_REF(yp_False);
 
 
@@ -1194,9 +1377,9 @@ ypObject *const      yp_tuple_empty = yp_CONST_REF(yp_tuple_empty);
 // Empty frozensets can be represented by this, immortal object
 static ypSet_KeyEntry _yp_frozenset_empty_data[ypSet_ALLOCLEN_MIN] = {{0}};
 static ypSetObject    _yp_frozenset_empty_struct = {
-           {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
+        {ypFrozenSet_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, ypSet_ALLOCLEN_MIN,
                    ypObject_HASH_INVALID, _yp_frozenset_empty_data},
-           0};
+        0};
 ypObject *const yp_frozenset_empty = yp_CONST_REF(yp_frozenset_empty);
 
 
@@ -1217,7 +1400,7 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 
 #define _yp_IMMORTAL_FUNCTION_OBJECT(qual, name, code, parameters_len, parameters)                \
     static struct _ypFunctionObject _##name##_struct = {                                          \
-            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters, parameters_len), code, NULL}; \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters_len, parameters), code, NULL}; \
     qual ypObject *const yp_UNUSED name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
     static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
@@ -2646,7 +2829,7 @@ static ypObject *_ypState_traverse(void *state, yp_uint32_t objlocs, visitfunc v
 static ypObject *_ypState_fromdecl(
         yp_ssize_t *size, yp_uint32_t *objlocs, yp_state_decl_t *state_decl)
 {
-    yp_ssize_t n;
+    yp_ssize_t i;
     yp_ssize_t objoffset;
     yp_ssize_t objloc_index;
 
@@ -2672,8 +2855,8 @@ static ypObject *_ypState_fromdecl(
     //  - an unaligned ypObject*, which isn't currently allowed and should never happen
     //  - a larger offset than we can represent with objlocs: a current limitation of nohtyP
     *objlocs = 0x0u;
-    for (n = state_decl->offsets_len; n > 0; n--) {
-        objoffset = state_decl->offsets[n];
+    for (i = 0; i < state_decl->offsets_len; i++) {
+        objoffset = state_decl->offsets[i];
         if (objoffset < 0) return yp_ValueError;
         if (objoffset > state_decl->size - yp_sizeof(ypObject *)) return yp_ValueError;
         if (objoffset % yp_sizeof(ypObject *) != 0) return yp_SystemLimitationError;
@@ -2753,10 +2936,20 @@ static ypObject *iter_traverse(ypObject *i, visitfunc visitor, void *memo)
     return _ypState_traverse(ypIter_STATE(i), ypIter_OBJLOCS(i), visitor, memo);
 }
 
+static ypObject *iter_bool(ypObject *i) { return yp_True; }
+
 // Decrements the reference count of the visited object
 static ypObject *_iter_closing_visitor(ypObject *x, void *memo)
 {
     yp_decref(x);
+    return yp_None;
+}
+
+static ypObject *iter_currenthash(
+        ypObject *i, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+{
+    // Since iters are compared by identity, we can cache our hash
+    *hash = ypObject_CACHED_HASH(i) = yp_HashPointer(i);
     return yp_None;
 }
 
@@ -2864,7 +3057,7 @@ static ypTypeObject ypIter_Type = {
         MethodError_objproc,       // tp_invalidate
 
         // Boolean operations and comparisons
-        MethodError_objproc,         // tp_bool
+        iter_bool,                   // tp_bool
         NotImplemented_comparefunc,  // tp_lt
         NotImplemented_comparefunc,  // tp_le
         NotImplemented_comparefunc,  // tp_eq
@@ -2873,8 +3066,8 @@ static ypTypeObject ypIter_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
-        iter_close,            // tp_close
+        iter_currenthash,  // tp_currenthash
+        iter_close,        // tp_close
 
         // Number operations
         MethodError_NumberMethods,  // tp_as_number
@@ -2927,15 +3120,15 @@ yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
     return length_hint < 0 ? 0 : length_hint;
 }
 
-ypObject *yp_iter_stateCX(ypObject *i, void **state, yp_ssize_t *size)
+ypObject *yp_iter_stateCX(ypObject *i, yp_ssize_t *size, void **state)
 {
     if (ypObject_TYPE_PAIR_CODE(i) != ypIter_CODE) {
-        *state = NULL;
         *size = 0;
+        *state = NULL;
         return_yp_BAD_TYPE(i);
     }
-    *state = ypIter_STATE(i);
     *size = ypIter_STATE_SIZE(i);
+    *state = ypIter_STATE(i);
     return yp_None;
 }
 
@@ -3341,7 +3534,8 @@ static ypObject *_yp_deepcopy_visitor(ypObject *x, visitfunc visitor, void *_mem
     yp_deepcopy_memo_t *memo = (yp_deepcopy_memo_t *)_memo;
     ypObject           *result;
 
-    yp_DEBUG("deepcopy: %p type %d depth %d", x, ypObject_TYPE_CODE(x), memo->recursion_depth);
+    yp_DEBUG("deepcopy: %p type %d depth %" PRIssize, x, ypObject_TYPE_CODE(x),
+            memo->recursion_depth);
 
     // Be efficient: reuse existing copies of objects. Also helps avoid recursion!
     result = _yp_deepcopy_memo_getitem(memo, x);
@@ -3873,11 +4067,12 @@ static ypTypeObject ypException_Type = {
 // The immortal exception objects; this should match Python's hierarchy:
 //  http://docs.python.org/3/library/exceptions.html
 
-#define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                                     \
-    yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                            \
-    static ypExceptionObject _##name##_struct = {                                           \
-            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, NULL, 0), yp_CONST_REF(name##_name), \
-            (superptr)};                                                                    \
+// FIXME These exception names (the strings) all start with yp_.
+#define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                             \
+    yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                    \
+    static ypExceptionObject _##name##_struct = {                                   \
+            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, ypObject_LEN_INVALID, NULL), \
+            yp_CONST_REF(name##_name), (superptr)};                                 \
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_EXCEPTION(name, super) \
     _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, yp_CONST_REF(super))
@@ -4030,6 +4225,14 @@ static ypObject *type_frozen_deepcopy(ypObject *t, visitfunc copy_visitor, void 
 
 static ypObject *type_bool(ypObject *t) { return yp_True; }
 
+static ypObject *type_currenthash(
+        ypObject *t, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+{
+    // Since types are compared by identity, we can cache our hash
+    *hash = ypObject_CACHED_HASH(t) = yp_HashPointer(t);
+    return yp_None;
+}
+
 static ypObject *type_call(ypObject *t, ypObject **function, ypObject **self)
 {
     *function = yp_incref(((ypTypeObject *)t)->tp_func_new);
@@ -4082,8 +4285,8 @@ static ypTypeObject ypType_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
-        MethodError_objproc,   // tp_close
+        type_currenthash,     // tp_currenthash
+        MethodError_objproc,  // tp_close
 
         // Number operations
         MethodError_NumberMethods,  // tp_as_number
@@ -4270,8 +4473,9 @@ _ypBool_RELATIVE_CMP_FUNCTION(gt, >);
 static ypObject *bool_currenthash(
         ypObject *b, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    // This must remain consistent with the other numeric types
-    *hash = (yp_hash_t)_ypBool_VALUE(b);  // either 0 or 1
+    // This must remain consistent with the other numeric types. Since we never contain mutable
+    // objects, we can cache our hash.
+    *hash = ypObject_CACHED_HASH(b) = yp_HashInt(_ypBool_VALUE(b));  // either 0 or 1
     return yp_None;
 }
 
@@ -5423,12 +5627,15 @@ static ypObject *unaryoperation(ypObject *x, unaryLfunc intop, unaryLFfunc float
 }
 
 // Defined here are yp_ineg (et al), and yp_neg (et al)
-#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                    \
-    void yp_i##name(ypObject *x, ypObject **exc)              \
-    {                                                         \
-        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF); \
-    }                                                         \
-    ypObject *yp_##name(ypObject *x) { return unaryoperation(x, yp_##name##L, yp_##name##LF); }
+#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                     \
+    void yp_i##name(ypObject *x, ypObject **exc)               \
+    {                                                          \
+        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF);  \
+    }                                                          \
+    ypObject *yp_##name(ypObject *x)                           \
+    {                                                          \
+        return unaryoperation(x, yp_##name##L, yp_##name##LF); \
+    }
 _ypInt_PUBLIC_UNARY_FUNCTION(neg);
 _ypInt_PUBLIC_UNARY_FUNCTION(pos);
 _ypInt_PUBLIC_UNARY_FUNCTION(abs);
@@ -5471,7 +5678,7 @@ yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc)
 // clang-format off
 static ypIntObject _ypInt_pre_allocated[] = {
     #define _ypInt_PREALLOC(value) \
-        { yp_IMMORTAL_HEAD_INIT(ypInt_CODE, 0, NULL, ypObject_LEN_INVALID), (value) }
+        { yp_IMMORTAL_HEAD_INIT(ypInt_CODE, 0, ypObject_LEN_INVALID, NULL), (value) }
     _ypInt_PREALLOC(-5),
     _ypInt_PREALLOC(-4),
     _ypInt_PREALLOC(-3),
@@ -5521,14 +5728,14 @@ static ypObject *_ypInt(ypObject *(*allocator)(yp_int_t), ypObject *x, yp_int_t 
         return allocator(ypBool_IS_TRUE_C(x));
     } else if (x_pair == ypBytes_CODE) {
         const yp_uint8_t *bytes;
-        ypObject         *result = yp_asbytesCX(x, &bytes, NULL);
+        ypObject         *result = yp_asbytesCX(x, NULL, &bytes);
         if (yp_isexceptionC(result)) return yp_ValueError;  // contains null bytes
         return _ypInt_fromascii(allocator, bytes, base);
     } else if (x_pair == ypStr_CODE) {
         // TODO Implement decoding
         const yp_uint8_t *encoded;
         ypObject         *encoding;
-        ypObject         *result = yp_asencodedCX(x, &encoded, NULL, &encoding);
+        ypObject         *result = yp_asencodedCX(x, NULL, &encoded, &encoding);
         if (yp_isexceptionC(result)) return yp_ValueError;  // contains null bytes
         if (encoding != yp_s_latin_1) return yp_NotImplementedError;
         return _ypInt_fromascii(allocator, encoded, base);
@@ -5760,7 +5967,7 @@ static ypObject *float_currenthash(
         ypObject *f, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
     // This must remain consistent with the other numeric types
-    *hash = yp_HashDouble(ypFloat_VALUE(f));
+    *hash = yp_HashDouble(f, ypFloat_VALUE(f));
 
     // Since we never contain mutable objects, we can cache our hash
     if (!ypObject_IS_MUTABLE(f)) ypObject_CACHED_HASH(f) = *hash;
@@ -6172,12 +6379,14 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
         yp_ASSERT((start) >= ((step) < 0 ? -1 : 0), "invalid start %" PRIssize, (start));       \
         if ((stop) != yp_SLICE_DEFAULT) {                                                       \
             yp_ssize_t expected_slicelength;                                                    \
-            if (step < 0) {                                                                     \
-                expected_slicelength = (stop >= start) ? 0 : (stop - start + 1) / (step) + 1;   \
-            } else {                                                                            \
-                expected_slicelength = (start >= stop) ? 0 : (stop - start - 1) / (step) + 1;   \
-            }                                                                                   \
             yp_ASSERT((stop) >= ((step) < 0 ? -1 : 0), "invalid stop %" PRIssize, (stop));      \
+            if ((step) < 0) {                                                                   \
+                expected_slicelength =                                                          \
+                        ((stop) >= (start)) ? 0 : ((stop) - (start) + 1) / (step) + 1;          \
+            } else {                                                                            \
+                expected_slicelength =                                                          \
+                        ((start) >= (stop)) ? 0 : ((stop) - (start)-1) / (step) + 1;            \
+            }                                                                                   \
             yp_ASSERT((slicelength) == expected_slicelength,                                    \
                     "invalid slicelength %" PRIssize " (%" PRIssize ":%" PRIssize ":%" PRIssize \
                     ")",                                                                        \
@@ -6189,18 +6398,22 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 #endif
 
 // Using the given length, in-place converts the given start/stop/step values to valid indices, and
-// also calculates the length of the slice. Returns yp_ValueError if *step is zero, else yp_None;
-// there are no out-of-bounds errors with slices.
+// also calculates the length of the slice. Returns yp_ValueError if *step is zero. Recall there are
+// no out-of-bounds errors with slices.
 // XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
-// yp_SLICE_USELEN is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
+// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
 // as any value that's greater than length.
 // XXX Adapted from PySlice_GetIndicesEx
 static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
         yp_ssize_t *step, yp_ssize_t *slicelength)
 {
-    // Adjust step
     if (*step == 0) return yp_ValueError;
-    if (*step < -yp_SSIZE_T_MAX) *step = -yp_SSIZE_T_MAX;  // ensure *step can be negated
+    if (*step < -yp_SSIZE_T_MAX) return yp_SystemLimitationError;  // Ensure *step can be negated.
+
+    if (length < 1) {
+        *start = *stop = *slicelength = 0;
+        return yp_None;
+    }
 
     // Adjust start
     if (*start == yp_SLICE_DEFAULT) {
@@ -6245,8 +6458,8 @@ static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp
 static void ypSlice_InvertIndicesC(
         yp_ssize_t *start, yp_ssize_t *stop, yp_ssize_t *step, yp_ssize_t slicelength)
 {
-    ypSlice_ASSERT_ADJUSTED_INDICES(*start, *stop, *step, slicelength);
     yp_ASSERT(slicelength > 0, "missed an 'empty slice' optimization");
+    ypSlice_ASSERT_ADJUSTED_INDICES(*start, *stop, *step, slicelength);
 
     if (*step < 0) {
         // This comes direct from list_ass_subscript
@@ -7401,6 +7614,63 @@ static ypObject *ypStringLib_extend_fromstring(ypObject *s, ypObject *x)
     return yp_None;
 }
 
+// Concatenates s with the items yielded from iterable, returning the new string.
+static ypObject *ypStringLib_concat_fromiterable(ypObject *s, ypObject *iterable)
+{
+    ypObject *newS;
+    ypObject *result;
+
+    yp_ASSERT(!ypStringLib_TYPE_CHECK(iterable),
+            "fellow string passed to ypStringLib_concat_fromiterable");
+
+    // TODO Allocate newS a little larger to consider lengthhint?
+    newS = ypStringLib_new_copy(ypObject_TYPE_CODE(s), s, /*alloclen_fixed=*/FALSE);  // new ref
+    if (yp_isexceptionC(newS)) return newS;
+
+    result = ypStringLib_extend_fromiterable(newS, iterable);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newS);
+        return result;
+    }
+    return newS;
+}
+
+// Concatenates s and x, a fellow string object, retuning the new string. s and x can be the same
+// object.
+static ypObject *ypStringLib_concat_fromstring(ypObject *s, ypObject *x)
+{
+    yp_ssize_t                 newS_len;
+    int                        newS_enc_code;
+    const ypStringLib_encinfo *newS_enc;
+    ypObject                  *newS;
+
+    yp_ASSERT(ypObject_TYPE_PAIR_CODE(s) == ypObject_TYPE_PAIR_CODE(x),
+            "missed a yp_TypeError check");
+
+    // Optimize the case where s or x are empty
+    if (ypStringLib_LEN(x) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), s);
+    if (ypStringLib_LEN(s) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), x);
+
+    if (ypStringLib_LEN(s) > ypStringLib_LEN_MAX - ypStringLib_LEN(x)) {
+        return yp_MemorySizeOverflowError;
+    }
+    newS_len = ypStringLib_LEN(s) + ypStringLib_LEN(x);
+    // TODO Some places take the max code, some places look explicitly at elemsize. Be consistent!
+    newS_enc_code = MAX(ypStringLib_ENC_CODE(s), ypStringLib_ENC_CODE(x));
+    newS_enc = &(ypStringLib_encs[newS_enc_code]);
+    newS = _ypStringLib_new(ypObject_TYPE_CODE(s), newS_len, /*alloclen_fixed=*/TRUE, newS_enc);
+    if (yp_isexceptionC(newS)) return newS;
+
+    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStringLib_DATA(newS), 0,
+            ypStringLib_ENC(s)->sizeshift, ypStringLib_DATA(s), 0, ypStringLib_LEN(s));
+    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStringLib_DATA(newS),
+            ypStringLib_LEN(s), ypStringLib_ENC(x)->sizeshift, ypStringLib_DATA(x), 0,
+            ypStringLib_LEN(x) + 1);  // incl null
+    ypStringLib_SET_LEN(newS, newS_len);
+    ypStringLib_ASSERT_INVARIANTS(newS);
+    return newS;
+}
+
 static ypObject *ypStringLib_clear(ypObject *s)
 {
     const ypStringLib_encinfo *newEnc = ypObject_TYPE_PAIR_CODE(s) == ypBytes_CODE ?
@@ -7826,50 +8096,68 @@ static ypObject *ypStringLib_delslice(
 }
 
 // Helper function for bytes_find and str_find. The string to find (x_data and x_len) must have
-// already been coerced into the same encoding as s. If x_data is NULL, it's treated as if the
-// string is not in s (_ypStr_coerce_encoding returns NULL if it can't coerce).
+// already been coerced into the same encoding as s.
 // TODO Replace with the faster find implementation from Python.
-static ypObject *ypStringLib_find(ypObject *s, void *x_data, yp_ssize_t x_len, yp_ssize_t start,
-        yp_ssize_t stop, findfunc_direction direction, yp_ssize_t *i)
+static yp_ssize_t _ypStringLib_find(ypObject *s, void *x_data, yp_ssize_t x_len, yp_ssize_t start,
+        yp_ssize_t slicelength, findfunc_direction direction)
 {
     int         sizeshift = ypStringLib_ENC(s)->sizeshift;
     yp_uint8_t *s_data = ypStringLib_DATA(s);
-    ypObject   *result;
-    yp_ssize_t  step = 1;  // may change to -1
-    yp_ssize_t  s_rlen;    // remaining length
-    yp_uint8_t *s_rdata;   // remaining data
+    yp_ssize_t  stop = start + slicelength;
+    yp_ssize_t  step;
+    yp_ssize_t  s_rlen;   // Remaining length.
+    yp_uint8_t *s_rdata;  // Remaining data.
 
-    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
-    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
-    // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &s_rlen);
-    if (yp_isexceptionC(result)) return result;
-
-    // Treat NULL as "not in string". Why do this check here instead of in the caller? Because this
-    // way we can check the slice arguments with ypSlice_AdjustIndicesC in a common location.
-    if (x_data == NULL) {
-        *i = -1;
-        return yp_None;
-    }
+    ypSlice_ASSERT_ADJUSTED_INDICES(start, stop, (yp_ssize_t)1, slicelength);
 
     if (direction == yp_FIND_FORWARD) {
         s_rdata = s_data + (start << sizeshift);
-        // step is already 1
+        step = 1;
     } else {
         s_rdata = s_data + ((stop - x_len) << sizeshift);
         step = -1;
     }
 
+    s_rlen = stop - start;
     while (s_rlen >= x_len) {
         if (yp_memcmp(s_rdata, x_data, x_len << sizeshift) == 0) {
-            *i = (s_rdata - s_data) >> sizeshift;
-            return yp_None;
+            return (s_rdata - s_data) >> sizeshift;
         }
         s_rdata += (step << sizeshift);
         s_rlen--;
     }
-    *i = -1;
-    return yp_None;
+    return -1;
+}
+
+// Helper function for bytes_count and str_count. The string to find (x_data and x_len) must have
+// already been coerced into the same encoding as s.
+static yp_ssize_t _ypStringLib_count(
+        ypObject *s, void *x_data, yp_ssize_t x_len, yp_ssize_t start, yp_ssize_t slicelength)
+{
+    yp_ssize_t s_rstart;  // Start of remaining slice.
+    yp_ssize_t s_rlen;    // Remaining length.
+    yp_ssize_t n;
+
+    ypSlice_ASSERT_ADJUSTED_INDICES(start, start + slicelength, (yp_ssize_t)1, slicelength);
+
+    // The empty string "matches" every position, including the end of the slice.
+    if (x_len < 1) {
+        return slicelength + 1;
+    }
+
+    // Do the counting.
+    s_rstart = start;
+    s_rlen = slicelength;
+    n = 0;
+    while (s_rlen >= x_len) {
+        yp_ssize_t i = _ypStringLib_find(s, x_data, x_len, s_rstart, s_rlen, yp_FIND_FORWARD);
+        if (i < 0) break;  // x does not exist in the remainder of s.
+
+        n += 1;
+        s_rstart = i + x_len;  // We count non-overlapping substrings.
+        s_rlen = slicelength - (s_rstart - start);
+    }
+    return n;
 }
 
 static ypObject *ypStringLib_irepeat(ypObject *s, yp_ssize_t factor)
@@ -8628,7 +8916,7 @@ static ypObject *_ypStringLib_decode_utf_8_onnull(int type, yp_ssize_t len)
 // Called when source starts with at least one ascii character. Returns the decoded string object.
 static ypObject *_yp_chrC(int type, yp_int_t i);
 static ypObject *_ypStringLib_decode_utf_8_ascii_start(
-        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors)
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *errors)
 {
     const yp_uint8_t *starts = source;
     const yp_uint8_t *end = source + len;
@@ -8733,7 +9021,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
 // Called by ypStringLib_decode_frombytesC_utf_8 in the general case. Returns the decoded string
 // object.
 static ypObject *_ypStringLib_decode_utf_8(
-        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors)
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *errors)
 {
     const yp_uint8_t *starts = source;
     const yp_uint8_t *end = source + len;
@@ -8812,7 +9100,7 @@ outer_loop:
 // TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
 // decoding errors
 static ypObject *ypStringLib_decode_frombytesC_utf_8(
-        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors)
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *errors)
 {
     yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) == ypStr_CODE, "incorrect str type");
     yp_ASSERT(len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before "
@@ -8828,9 +9116,9 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8(
     } else if (source[0] < 0x80u) {
         // We optimize for UTF-8 data that is completely, or at least starts with, ASCII: since
         // ASCII is equivalent to the first 128 ordinals in Unicode, we can just memcpy
-        return _ypStringLib_decode_utf_8_ascii_start(type, source, len, errors);
+        return _ypStringLib_decode_utf_8_ascii_start(type, len, source, errors);
     } else {
-        return _ypStringLib_decode_utf_8(type, source, len, errors);
+        return _ypStringLib_decode_utf_8(type, len, source, errors);
     }
 }
 
@@ -8839,7 +9127,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8(
 // under half the buffer
 // XXX Runtime-wise, the worst-case is a string with completely latin-1 characters
 // XXX There's no possibility of an error handler being called, so we can use alloclen_fixed=TRUE
-static ypObject *_ypBytesC(int type, const yp_uint8_t *source, yp_ssize_t len);
+static ypObject *_ypBytesC(int type, yp_ssize_t len, const yp_uint8_t *source);
 static ypObject *_ypStringLib_encode_utf_8_fromlatin_1(int type, ypObject *source)
 {
     yp_ssize_t const  source_len = ypStringLib_LEN(source);
@@ -8867,7 +9155,7 @@ static ypObject *_ypStringLib_encode_utf_8_fromlatin_1(int type, ypObject *sourc
         yp_ASSERT1(leading_ascii <= source_len);
         if (leading_ascii == source_len) {
             // TODO When we have an associated UTF-8 bytes object, we can share the ASCII buffer
-            return _ypBytesC(type, source_data, source_len /*alloclen_fixed=TRUE*/);
+            return _ypBytesC(type, source_len, source_data /*alloclen_fixed=TRUE*/);
         }
 
         // Otherwise, it's not entirely ASCII, but we know it starts that way, so copy over the
@@ -9128,9 +9416,6 @@ convert:
     return norm;
 }
 
-// TODO Move these to nohtyP.h...eventually
-ypAPI void yp_setitemE(ypObject *sequence, ypObject *key, ypObject *x, ypObject **exc);
-
 static ypObject *yp_set_getintern(ypObject *set, ypObject *x);
 
 static ypObject *_yp_codecs_register_alias_norm(ypObject *alias_norm, ypObject *encoding_norm)
@@ -9143,7 +9428,7 @@ static ypObject *_yp_codecs_register_alias_norm(ypObject *alias_norm, ypObject *
         if (yp_isexceptionC(result)) return result;
         return yp_ValueError;
     }
-    yp_setitemE(_yp_codecs_alias2encoding, alias_norm, encoding_norm, &exc);
+    yp_setitem(_yp_codecs_alias2encoding, alias_norm, encoding_norm, &exc);
     return exc;
 }
 
@@ -9194,7 +9479,7 @@ static ypObject *yp_codecs_register_error(
 {
     ypObject *exc = yp_None;
     ypObject *result = yp_intC((yp_ssize_t)error_handler);
-    yp_setitemE(_yp_codecs_errors2handler, name, result, &exc);
+    yp_setitem(_yp_codecs_errors2handler, name, result, &exc);
     yp_decref(result);
     return exc;  // on success or exception
 }
@@ -9498,7 +9783,7 @@ yp_STATIC_ASSERT(yp_offsetof(ypBytesObject, ob_inline_data) % yp_MAX_ALIGNMENT =
 // used as the length. This function updates *len accordingly. Returns false if the final value
 // of *len would be larger than ypBytes_LEN_MAX, in which case *len is undefined and
 // yp_MemorySizeOverflowError should probably be returned.
-static int ypBytes_adjust_lenC(const yp_uint8_t *source, yp_ssize_t *len)
+static int ypBytes_adjust_lenC(yp_ssize_t *len, const yp_uint8_t *source)
 {
     if (*len < 0) {
         if (source == NULL) {
@@ -9523,6 +9808,7 @@ static ypObject *_ypBytes_coerce_intorbytes(
     ypObject *exc = yp_None;
     int       x_pair = ypObject_TYPE_PAIR_CODE(x);
 
+    // FIXME We should make bools non-numeric, I think, which means removing from here.
     if (x_pair == ypBool_CODE || x_pair == ypInt_CODE) {
         *storage = _ypBytes_asuint8C(x, &exc);
         if (yp_isexceptionC(exc)) return exc;
@@ -9581,35 +9867,35 @@ static ypObject *bytes_find(ypObject *b, ypObject *x, yp_ssize_t start, yp_ssize
     yp_uint8_t *x_data;
     yp_ssize_t  x_len;
     yp_uint8_t  storage;
+    yp_ssize_t  step = 1;
+    yp_ssize_t  slicelength;
     ypObject   *result;
 
     result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
     if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(x_data != NULL, "_ypBytes_coerce_intorbytes unexpectedly returned NULL");
 
-    return ypStringLib_find(b, x_data, x_len, start, stop, direction, i);
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
+    // https://bugs.python.org/issue24243.
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(b), &start, &stop, &step, &slicelength);
+    if (yp_isexceptionC(result)) return result;
+
+    *i = _ypStringLib_find(b, x_data, x_len, start, slicelength, direction);
+    return yp_None;
 }
 
-static ypObject *bytes_concat(ypObject *b, ypObject *x)
+static ypObject *bytes_concat(ypObject *b, ypObject *iterable)
 {
-    yp_ssize_t newLen;
-    ypObject  *newB;
+    int iterable_pair = ypObject_TYPE_PAIR_CODE(iterable);
 
-    // Check the type, and optimize the case where b or x are empty
-    if (ypObject_TYPE_PAIR_CODE(x) != ypBytes_CODE) return_yp_BAD_TYPE(x);
-    if (ypBytes_LEN(x) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(b), b);
-    if (ypBytes_LEN(b) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(b), x);
-
-    if (ypBytes_LEN(b) > ypBytes_LEN_MAX - ypBytes_LEN(x)) return yp_MemorySizeOverflowError;
-    newLen = ypBytes_LEN(b) + ypBytes_LEN(x);
-    newB = _ypBytes_new(ypObject_TYPE_CODE(b), newLen, /*alloclen_fixed=*/TRUE);
-    if (yp_isexceptionC(newB)) return newB;
-
-    yp_memcpy(ypBytes_DATA(newB), ypBytes_DATA(b), ypBytes_LEN(b));
-    yp_memcpy(ypBytes_DATA(newB) + ypBytes_LEN(b), ypBytes_DATA(x), ypBytes_LEN(x));
-    ypBytes_DATA(newB)[newLen] = '\0';
-    ypBytes_SET_LEN(newB, newLen);
-    ypBytes_ASSERT_INVARIANTS(newB);
-    return newB;
+    if (iterable_pair == ypBytes_CODE) {
+        return ypStringLib_concat_fromstring(b, iterable);
+    } else if (iterable_pair == ypStr_CODE) {
+        return yp_TypeError;
+    } else {
+        return ypStringLib_concat_fromiterable(b, iterable);
+    }
 }
 
 // TODO Do we want a special-case for yp_intC that goes direct to the prealloc array?
@@ -9687,7 +9973,8 @@ static ypObject *bytearray_insert(ypObject *b, yp_ssize_t i, ypObject *x)
     ypObject  *exc = yp_None;
     yp_uint8_t x_asbyte;
 
-    // Recall that insert behaves like b[i:i]=[x], so we don't validate the index.
+    // Recall that insert behaves like b[i:i]=[x], but i can't be yp_SLICE_DEFAULT.
+    if (i == yp_SLICE_DEFAULT) return yp_TypeError;
     x_asbyte = _ypBytes_asuint8C(x, &exc);
     if (yp_isexceptionC(exc)) return exc;
 
@@ -9732,7 +10019,7 @@ static ypObject *bytes_contains(ypObject *b, ypObject *x)
     ypObject  *result;
     yp_ssize_t i = -1;
 
-    result = bytes_find(b, x, 0, yp_SLICE_USELEN, yp_FIND_FORWARD, &i);
+    result = bytes_find(b, x, 0, yp_SLICE_LAST, yp_FIND_FORWARD, &i);
     if (yp_isexceptionC(result)) return result;
     return ypBool_FROM_C(i >= 0);
 }
@@ -9775,23 +10062,26 @@ static ypObject *bytearray_pop(ypObject *b)
 // onmissing must be an immortal, or NULL.
 static ypObject *bytearray_remove(ypObject *b, ypObject *x, ypObject *onmissing)
 {
-    ypObject  *exc = yp_None;
-    yp_uint8_t x_asbyte;
-    yp_ssize_t i;
+    yp_uint8_t *x_data;
+    yp_ssize_t  x_len;
+    yp_uint8_t  storage;
+    ypObject   *result;
+    yp_ssize_t  i;
 
-    x_asbyte = _ypBytes_asuint8C(x, &exc);
-    if (yp_isexceptionC(exc)) return exc;
+    result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
+    if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(x_data != NULL, "_ypBytes_coerce_intorbytes unexpectedly returned NULL");
 
-    for (i = 0; i < ypBytes_LEN(b); i++) {
-        if (x_asbyte != ypBytes_DATA(b)[i]) continue;
+    i = _ypStringLib_find(b, x_data, x_len, 0, ypBytes_LEN(b), yp_FIND_FORWARD);
+    if (i < 0) goto missing;
 
-        // We found a match to remove
-        ypBytes_ELEMMOVE(b, i, i + 1);
-        ypBytes_SET_LEN(b, ypBytes_LEN(b) - 1);
-        ypBytes_ASSERT_INVARIANTS(b);
-        return yp_None;
-    }
+    // We found a match to remove
+    ypBytes_ELEMMOVE(b, i, i + x_len);
+    ypBytes_SET_LEN(b, ypBytes_LEN(b) - x_len);
     ypBytes_ASSERT_INVARIANTS(b);
+    return yp_None;
+
+missing:
     if (onmissing == NULL) return yp_ValueError;
     return onmissing;
 }
@@ -9806,37 +10096,19 @@ static ypObject *bytes_count(
     yp_uint8_t  storage;
     ypObject   *result;
     yp_ssize_t  step = 1;
-    yp_ssize_t  b_rlen;   // remaining length
-    yp_uint8_t *b_rdata;  // remaining data
+    yp_ssize_t  slicelength;
 
     result = _ypBytes_coerce_intorbytes(x, &x_data, &x_len, &storage);
     if (yp_isexceptionC(result)) return result;
+    yp_ASSERT(x_data != NULL, "_ypBytes_coerce_intorbytes unexpectedly returned NULL");
 
     // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
     // Python behaves peculiarly when stop<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &b_rlen);
+    result = ypSlice_AdjustIndicesC(ypBytes_LEN(b), &start, &stop, &step, &slicelength);
     if (yp_isexceptionC(result)) return result;
 
-    // The empty string "matches" every byte position, including the end of the slice
-    if (x_len < 1) {
-        *n = b_rlen + 1;
-        return yp_None;
-    }
-
-    // Do the counting
-    b_rdata = ypBytes_DATA(b) + start;
-    *n = 0;
-    while (b_rlen >= x_len) {
-        if (yp_memcmp(b_rdata, x_data, x_len) == 0) {
-            *n += 1;
-            b_rdata += x_len;
-            b_rlen -= x_len;
-        } else {
-            b_rdata += 1;
-            b_rlen -= 1;
-        }
-    }
+    *n = _ypStringLib_count(b, x_data, x_len, start, slicelength);
     return yp_None;
 }
 
@@ -10277,7 +10549,7 @@ static ypTypeObject ypByteArray_Type = {
         TypeError_CallableMethods  // tp_as_callable
 };
 
-static ypObject *_yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len)
+static ypObject *_yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **bytes)
 {
     if (ypObject_TYPE_PAIR_CODE(seq) != ypBytes_CODE) return_yp_BAD_TYPE(seq);
 
@@ -10289,19 +10561,19 @@ static ypObject *_yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize
     }
     return yp_None;
 }
-ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len)
+ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **bytes)
 {
-    ypObject *result = _yp_asbytesCX(seq, bytes, len);
+    ypObject *result = _yp_asbytesCX(seq, len, bytes);
     if (yp_isexceptionC(result)) {
-        *bytes = NULL;
         if (len != NULL) *len = 0;
+        *bytes = NULL;
     }
     return result;
 }
 
 // Public constructors
 
-static ypObject *_ypBytesC(int type, const yp_uint8_t *source, yp_ssize_t len)
+static ypObject *_ypBytesC(int type, yp_ssize_t len, const yp_uint8_t *source)
 {
     ypObject *b;
     yp_ASSERT(len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before _ypBytesC*)");
@@ -10326,15 +10598,15 @@ static ypObject *_ypBytesC(int type, const yp_uint8_t *source, yp_ssize_t len)
 }
 // TODO Be consistent and always put "len" params before the thing they are sizing. This breaks with
 // Python but, conceptually at least, you need the length of something before you use it.
-ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len)
+ypObject *yp_bytesC(yp_ssize_t len, const yp_uint8_t *source)
 {
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    return _ypBytesC(ypBytes_CODE, source, len);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    return _ypBytesC(ypBytes_CODE, len, source);
 }
-ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len)
+ypObject *yp_bytearrayC(yp_ssize_t len, const yp_uint8_t *source)
 {
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    return _ypBytesC(ypByteArray_CODE, source, len);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    return _ypBytesC(ypByteArray_CODE, len, source);
 }
 
 static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
@@ -10417,7 +10689,7 @@ static ypObject *_ypBytes(int type, ypObject *source)
         yp_ssize_t len = yp_index_asssizeC(source, &exc);
         if (yp_isexceptionC(exc)) return exc;
         if (len < 0) return yp_ValueError;
-        return _ypBytesC(type, NULL, len);
+        return _ypBytesC(type, len, NULL);
     } else if (source_pair == ypStr_CODE) {
         return yp_TypeError;
     } else {
@@ -10558,33 +10830,17 @@ static ypObject *str_frozen_deepcopy(ypObject *s, visitfunc copy_visitor, void *
 
 static ypObject *str_bool(ypObject *s) { return ypBool_FROM_C(ypStr_LEN(s)); }
 
-static ypObject *str_concat(ypObject *s, ypObject *x)
+static ypObject *str_concat(ypObject *s, ypObject *iterable)
 {
-    yp_ssize_t                 newS_len;
-    int                        newS_enc_code;
-    const ypStringLib_encinfo *newS_enc;
-    ypObject                  *newS;
+    int iterable_pair = ypObject_TYPE_PAIR_CODE(iterable);
 
-    // Check the type, and optimize the case where s or x are empty
-    if (ypObject_TYPE_PAIR_CODE(x) != ypStr_CODE) return_yp_BAD_TYPE(x);
-    if (ypStr_LEN(x) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), s);
-    if (ypStr_LEN(s) < 1) return ypStringLib_copy(ypObject_TYPE_CODE(s), x);
-
-    if (ypStr_LEN(s) > ypStr_LEN_MAX - ypStr_LEN(x)) return yp_MemorySizeOverflowError;
-    newS_len = ypStr_LEN(s) + ypStr_LEN(x);
-    newS_enc_code = MAX(ypStr_ENC_CODE(s), ypStr_ENC_CODE(x));
-    newS_enc = &(ypStringLib_encs[newS_enc_code]);
-    newS = _ypStr_new(ypObject_TYPE_CODE(s), newS_len, /*alloclen_fixed=*/TRUE, newS_enc);
-    if (yp_isexceptionC(newS)) return newS;
-
-    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStr_DATA(newS), 0,
-            ypStr_ENC(s)->sizeshift, ypStr_DATA(s), 0, ypStr_LEN(s));
-    ypStringLib_elemcopy_maybeupconvert(newS_enc->sizeshift, ypStr_DATA(newS), ypStr_LEN(s),
-            ypStr_ENC(x)->sizeshift, ypStr_DATA(x), 0,
-            ypStr_LEN(x) + 1);  // incl null
-    ypStr_SET_LEN(newS, newS_len);
-    ypStr_ASSERT_INVARIANTS(newS);
-    return newS;
+    if (iterable_pair == ypStr_CODE) {
+        return ypStringLib_concat_fromstring(s, iterable);
+    } else if (iterable_pair == ypBytes_CODE) {
+        return yp_TypeError;
+    } else {
+        return ypStringLib_concat_fromiterable(s, iterable);
+    }
 }
 
 static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
@@ -10679,27 +10935,26 @@ static ypObject *chrarray_pop(ypObject *s)
 // onmissing must be an immortal, or NULL.
 static ypObject *chrarray_remove(ypObject *s, ypObject *x, ypObject *onmissing)
 {
-    const ypStringLib_encinfo *s_enc = ypStr_ENC(s);
-    ypObject                  *result;
-    yp_uint32_t                x_asitem;
-    const ypStringLib_encinfo *x_enc;
-    yp_ssize_t                 i;
+    void      *x_data;
+    yp_ssize_t x_len;
+    ypObject  *result;
+    yp_ssize_t i;
 
-    result = _ypStr_asitemC(x, &x_asitem, &x_enc);
+    result = _ypStr_coerce_encoding(x, ypStr_ENC(s), &x_data, &x_len);
     if (yp_isexceptionC(result)) return result;
 
-    // Early exit: if x is too large to fit in s, then we know it's not in s.
-    if (s_enc->elemsize < x_enc->elemsize) goto missing;
+    // If we could not coerce to the target encoding, then it must not be in s.
+    if (x_data == NULL) goto missing;
 
-    for (i = 0; i < ypStr_LEN(s); i++) {
-        if (x_asitem != s_enc->getindexX(s, i)) continue;
+    i = _ypStringLib_find(s, x_data, x_len, 0, ypStr_LEN(s), yp_FIND_FORWARD);
+    _ypStr_coerce_encoding_free(x, x_data);
+    if (i < 0) goto missing;
 
-        // We found a match to remove.
-        ypStr_ELEMMOVE(s, i, i + 1);
-        ypStr_SET_LEN(s, ypStr_LEN(s) - 1);
-        ypStr_ASSERT_INVARIANTS(s);
-        return yp_None;
-    }
+    // We found a match to remove.
+    ypStr_ELEMMOVE(s, i, i + x_len);
+    ypStr_SET_LEN(s, ypStr_LEN(s) - x_len);
+    ypStr_ASSERT_INVARIANTS(s);
+    return yp_None;
 
 missing:
     if (onmissing == NULL) return yp_ValueError;
@@ -10725,7 +10980,8 @@ static ypObject *chrarray_insert(ypObject *s, yp_ssize_t i, ypObject *x)
     yp_uint32_t                x_asitem;
     const ypStringLib_encinfo *x_enc;
 
-    // Recall that insert behaves like s[i:i]=[x], so we don't validate the index.
+    // Recall that insert behaves like s[i:i]=[x], but i can't be yp_SLICE_DEFAULT.
+    if (i == yp_SLICE_DEFAULT) return yp_TypeError;
     result = _ypStr_asitemC(x, &x_asitem, &x_enc);
     if (yp_isexceptionC(result)) return result;
 
@@ -10753,14 +11009,15 @@ static ypObject *chrarray_popindex(ypObject *s, yp_ssize_t i)
 // XXX Adapted from Python's reverse_slice.
 static ypObject *chrarray_reverse(ypObject *s)
 {
+    void                     *s_data = ypStr_DATA(s);
     ypStringLib_getindexXfunc getindexX = ypStr_ENC(s)->getindexX;
     ypStringLib_setindexXfunc setindexX = ypStr_ENC(s)->setindexX;
     yp_ssize_t                lo = 0;
     yp_ssize_t                hi = ypStr_LEN(s) - 1;
     while (lo < hi) {
-        yp_uint32_t t = getindexX(s, lo);
-        setindexX(s, lo, getindexX(s, hi));
-        setindexX(s, hi, t);
+        yp_uint32_t t = getindexX(s_data, lo);
+        setindexX(s_data, lo, getindexX(s_data, hi));
+        setindexX(s_data, hi, t);
         lo += 1;
         hi -= 1;
     }
@@ -10773,23 +11030,53 @@ static ypObject *str_find(ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t
 {
     void      *x_data;
     yp_ssize_t x_len;
+    yp_ssize_t step = 1;
+    yp_ssize_t slicelength;
     ypObject  *result;
 
     result = _ypStr_coerce_encoding(x, ypStr_ENC(s), &x_data, &x_len);
     if (yp_isexceptionC(result)) return result;
 
-    result = ypStringLib_find(s, x_data, x_len, start, stop, direction, i);
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
+    // https://bugs.python.org/issue24243.
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
+    if (yp_isexceptionC(result)) return result;
+
+    if (x_data == NULL) {
+        *i = -1;  // We could not coerce to the target encoding, so it must not be in s.
+    } else {
+        *i = _ypStringLib_find(s, x_data, x_len, start, slicelength, direction);
+    }
     _ypStr_coerce_encoding_free(x, x_data);
-    return result;
+    return yp_None;
 }
 
 static ypObject *str_count(
         ypObject *s, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *n)
 {
-    // XXX Unlike Python, the arguments start and stop are always treated as in slice notation.
-    // Python behaves peculiarly when stop<start in certain edge cases involving empty strings. See
+    void      *x_data;
+    yp_ssize_t x_len;
+    yp_ssize_t step = 1;
+    yp_ssize_t slicelength;
+    ypObject  *result;
+
+    result = _ypStr_coerce_encoding(x, ypStr_ENC(s), &x_data, &x_len);
+    if (yp_isexceptionC(result)) return result;
+
+    // XXX Unlike Python, the arguments start and end are always treated as in slice notation.
+    // Python behaves peculiarly when end<start in certain edge cases involving empty strings. See
     // https://bugs.python.org/issue24243.
-    return yp_NotImplementedError;
+    result = ypSlice_AdjustIndicesC(ypStringLib_LEN(s), &start, &stop, &step, &slicelength);
+    if (yp_isexceptionC(result)) return result;
+
+    if (x_data == NULL) {
+        *n = 0;  // We could not coerce to the target encoding, so it must not be in s.
+    } else {
+        *n = _ypStringLib_count(s, x_data, x_len, start, slicelength);
+    }
+    _ypStr_coerce_encoding_free(x, x_data);
+    return result;
 }
 
 static ypObject *str_contains(ypObject *s, ypObject *x)
@@ -10797,7 +11084,7 @@ static ypObject *str_contains(ypObject *s, ypObject *x)
     ypObject  *result;
     yp_ssize_t i = -1;
 
-    result = str_find(s, x, 0, yp_SLICE_USELEN, yp_FIND_FORWARD, &i);
+    result = str_find(s, x, 0, yp_SLICE_LAST, yp_FIND_FORWARD, &i);
     if (yp_isexceptionC(result)) return result;
     return ypBool_FROM_C(i >= 0);
 }
@@ -11272,7 +11559,7 @@ static ypTypeObject ypChrArray_Type = {
 };
 
 static ypObject *_yp_asencodedCX(
-        ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding)
+        ypObject *s, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding)
 {
     if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_BAD_TYPE(s);
 
@@ -11289,12 +11576,12 @@ static ypObject *_yp_asencodedCX(
     return yp_None;
 }
 ypObject *yp_asencodedCX(
-        ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding)
+        ypObject *s, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding)
 {
-    ypObject *result = _yp_asencodedCX(s, encoded, size, encoding);
+    ypObject *result = _yp_asencodedCX(s, size, encoded, encoding);
     if (yp_isexceptionC(result)) {
-        *encoded = NULL;
         if (size != NULL) *size = 0;
+        *encoded = NULL;
         *encoding = result;
     }
     return result;
@@ -11303,7 +11590,7 @@ ypObject *yp_asencodedCX(
 // Public constructors
 
 static ypObject *_ypStr_frombytes(
-        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors)
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors)
 {
     ypObject *result;
 
@@ -11311,8 +11598,8 @@ static ypObject *_ypStr_frombytes(
     if (yp_eq(encoding, yp_s_utf_8) != yp_True) return yp_NotImplementedError;
 
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    result = ypStringLib_decode_frombytesC_utf_8(type, source, len, errors);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    result = ypStringLib_decode_frombytesC_utf_8(type, len, source, errors);
     if (yp_isexceptionC(result)) return result;
     yp_ASSERT(ypObject_TYPE_CODE(result) == type, "text encoding didn't return correct type");
     ypStr_ASSERT_INVARIANTS(result);
@@ -11321,24 +11608,24 @@ static ypObject *_ypStr_frombytes(
 // TODO Be consistent and always put "len" params before the thing they are sizing. This breaks with
 // Python but, conceptually at least, you need the length of something before you use it.
 ypObject *yp_str_frombytesC4(
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors)
+        yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors)
 {
-    return _ypStr_frombytes(ypStr_CODE, source, len, encoding, errors);
+    return _ypStr_frombytes(ypStr_CODE, len, source, encoding, errors);
 }
 ypObject *yp_chrarray_frombytesC4(
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors)
+        yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors)
 {
-    return _ypStr_frombytes(ypChrArray_CODE, source, len, encoding, errors);
+    return _ypStr_frombytes(ypChrArray_CODE, len, source, encoding, errors);
 }
-ypObject *yp_str_frombytesC2(const yp_uint8_t *source, yp_ssize_t len)
+ypObject *yp_str_frombytesC2(yp_ssize_t len, const yp_uint8_t *source)
 {
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    return ypStringLib_decode_frombytesC_utf_8(ypStr_CODE, source, len, yp_s_strict);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    return ypStringLib_decode_frombytesC_utf_8(ypStr_CODE, len, source, yp_s_strict);
 }
-ypObject *yp_chrarray_frombytesC2(const yp_uint8_t *source, yp_ssize_t len)
+ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source)
 {
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    return ypStringLib_decode_frombytesC_utf_8(ypChrArray_CODE, source, len, yp_s_strict);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    return ypStringLib_decode_frombytesC_utf_8(ypChrArray_CODE, len, source, yp_s_strict);
 }
 
 static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
@@ -11355,7 +11642,7 @@ static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, y
 
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_decode_frombytesC_utf_8(
-            type, ypBytes_DATA(source), ypBytes_LEN(source), errors);
+            type, ypBytes_LEN(source), ypBytes_DATA(source), errors);
     if (yp_isexceptionC(result)) return result;
     yp_ASSERT(ypObject_TYPE_CODE(result) == type, "text encoding didn't return correct type");
     ypStr_ASSERT_INVARIANTS(result);
@@ -11378,7 +11665,7 @@ ypObject *yp_decode(ypObject *b)
 {
     if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_BAD_TYPE(b);
     return ypStringLib_decode_frombytesC_utf_8(
-            ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, ypBytes_DATA(b), ypBytes_LEN(b),
+            ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, ypBytes_LEN(b), ypBytes_DATA(b),
             yp_s_strict);
 }
 
@@ -11568,7 +11855,7 @@ ypObject *yp_startswithC4(ypObject *s, ypObject *prefix, yp_ssize_t start, yp_ss
 
 ypObject *yp_startswith(ypObject *s, ypObject *prefix)
 {
-    return yp_startswithC4(s, prefix, 0, yp_SLICE_USELEN);
+    return yp_startswithC4(s, prefix, 0, yp_SLICE_LAST);
 }
 
 ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssize_t end)
@@ -11578,7 +11865,7 @@ ypObject *yp_endswithC4(ypObject *s, ypObject *suffix, yp_ssize_t start, yp_ssiz
 
 ypObject *yp_endswith(ypObject *s, ypObject *suffix)
 {
-    return yp_endswithC4(s, suffix, 0, yp_SLICE_USELEN);
+    return yp_endswithC4(s, suffix, 0, yp_SLICE_LAST);
 }
 
 ypObject *yp_lower(ypObject *s) { _ypStringLib_REDIRECT1(s, lower, (s)); }
@@ -12413,6 +12700,8 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
 
     result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &sq_rlen);
     if (yp_isexceptionC(result)) return result;
+    if (sq_rlen < 1) goto not_found;
+
     if (direction == yp_FIND_REVERSE) {
         ypSlice_InvertIndicesC(&start, &stop, &step, sq_rlen);
     }
@@ -12425,6 +12714,7 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
             return yp_None;
         }
     }
+not_found:
     *index = -1;
     return yp_None;
 }
@@ -12585,7 +12875,9 @@ static ypObject *list_insert(ypObject *sq, yp_ssize_t i, ypObject *x)
 {
     ypObject *result;
 
-    // Check for exceptions, then adjust the index (noting it should behave like sq[i:i]=[x])
+    // Check for exceptions, then adjust the index. Recall that insert behaves like sq[i:i]=[x], but
+    // i can't be yp_SLICE_DEFAULT.
+    if (i == yp_SLICE_DEFAULT) return yp_TypeError;
     if (yp_isexceptionC(x)) return x;
     if (i < 0) {
         i += ypTuple_LEN(sq);
@@ -12714,26 +13006,19 @@ static ypObject *tuple_ne(ypObject *sq, ypObject *x)
 static ypObject *tuple_currenthash(
         ypObject *sq, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    ypObject  *result;
-    yp_uhash_t x;
-    yp_hash_t  y;
-    yp_ssize_t len = ypTuple_LEN(sq);
-    ypObject **p;
-    yp_uhash_t mult = _ypHASH_MULTIPLIER;
-    x = 0x345678;
-    p = ypTuple_ARRAY(sq);
-    while (--len >= 0) {
-        result = hash_visitor(*p++, hash_memo, &y);
+    yp_HashSequence_state_t state;
+    yp_ssize_t              i;
+
+    yp_HashSequence_init(&state, ypTuple_LEN(sq));
+    for (i = 0; i < ypTuple_LEN(sq); i++) {
+        // TODO What if the hash visitor changes sq?
+        yp_hash_t lane;
+        ypObject *result = hash_visitor(ypTuple_ARRAY(sq)[i], hash_memo, &lane);
         if (yp_isexceptionC(result)) return result;
-        x = (x ^ (yp_uhash_t)y) * mult;
-        // the cast might truncate len; that doesn't change hash stability
-        mult += (yp_uhash_t)(82520L + len + len);
+        yp_HashSequence_next(&state, lane);
     }
-    x += 97531L;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
-    }
-    *hash = (yp_hash_t)x;
+    *hash = yp_HashSequence_fini(&state);
+
     return yp_None;
 }
 
@@ -13012,15 +13297,15 @@ static ypTypeObject ypList_Type = {
         TypeError_CallableMethods  // tp_as_callable
 };
 
-ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_t *len)
+ypObject *yp_itemarrayCX(ypObject *seq, yp_ssize_t *len, ypObject *const **array)
 {
     if (ypObject_TYPE_PAIR_CODE(seq) != ypTuple_CODE) {
-        *array = NULL;
         *len = 0;
+        *array = NULL;
         return_yp_BAD_TYPE(seq);
     }
-    *array = ypTuple_ARRAY(seq);
     *len = ypTuple_LEN(seq);
+    *array = ypTuple_ARRAY(seq);
     return yp_None;
 }
 
@@ -15041,6 +15326,7 @@ static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
     ypObject *oldkey = loc->se_key;
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
     loc->se_key = ypSet_dummy;
+    loc->se_hash = ypObject_HASH_INVALID;
     ypSet_SET_LEN(so, ypSet_LEN(so) - 1);
     return oldkey;
 }
@@ -15452,33 +15738,16 @@ static ypObject *frozenset_bool(ypObject *so) { return ypBool_FROM_C(ypSet_LEN(s
 
 // XXX Adapted from Python's frozenset_hash
 static ypObject *frozenset_currenthash(
-        ypObject *so, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *_hash)
+        ypObject *so, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    ypSet_KeyEntry *keys = ypSet_TABLE(so);
-    yp_ssize_t      keysleft = ypSet_LEN(so);
-    yp_ssize_t      i;
-    yp_uhash_t      h, hash = 1927868237U;
+    yp_HashSet_state_t state;
 
-    hash *= (yp_uhash_t)ypSet_LEN(so) + 1;
-    for (i = 0; keysleft > 0; i++) {
-        if (!ypSet_ENTRY_USED(&keys[i])) continue;
-        keysleft -= 1;
-        /* Work to increase the bit dispersion for closely spaced hash
-           values.  The is important because some use cases have many
-           combinations of a small number of elements with nearby
-           hashes so that many distinct combinations collapse to only
-           a handful of distinct hash values. */
-        h = (yp_uhash_t)keys[i].se_hash;
-        hash ^= (h ^ (h << 16) ^ 89869747U) * 3644798167U;
-    }
-    hash = hash * 69069U + 907133923U;
-    if (hash == (yp_uhash_t)ypObject_HASH_INVALID) {
-        hash = 590923713U;
-    }
-    *_hash = (yp_hash_t)hash;
+    yp_HashSet_init(&state, ypSet_LEN(so));
+    yp_HashSet_next_table(&state, ypSet_TABLE(so), ypSet_MASK(so), ypSet_FILL(so));
+    *hash = yp_HashSet_fini(&state);
 
     // Since we never contain mutable objects, we can cache our hash
-    if (!ypObject_IS_MUTABLE(so)) ypObject_CACHED_HASH(so) = *_hash;
+    if (!ypObject_IS_MUTABLE(so)) ypObject_CACHED_HASH(so) = *hash;
     return yp_None;
 }
 
@@ -16570,6 +16839,7 @@ static void _ypDict_iter_items_next(ypObject *itemiter, ypObject **key, ypObject
         return;
     }
     yp_unpackN(keyvaliter, 2, key, value);
+    yp_decref(keyvaliter);
 }
 
 // XXX Check for the mp==other case _before_ calling this function
@@ -16594,6 +16864,7 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
         valuesleft -= 1;
 
         // TODO _ypDict_push will call yp_hashC again, even though we already know the hash
+        // TODO yp_hashC may mutate mp, invalidating valuesleft!
         result = _ypDict_push(
                 mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, 1, &spaceleft, valuesleft);
         if (yp_isexceptionC(result)) return result;
@@ -16666,6 +16937,7 @@ static ypObject *frozendict_traverse(ypObject *mp, visitfunc visitor, void *memo
     result = visitor(ypDict_KEYSET(mp), memo);
     if (yp_isexceptionC(result)) return result;
 
+    // TODO visitor may mutate mp, invalidating valuesleft!
     for (i = 0; valuesleft > 0; i++) {
         value = ypDict_VALUES(mp)[i];
         if (value == NULL) continue;
@@ -16726,6 +16998,7 @@ static ypObject *frozendict_eq(ypObject *mp, ypObject *x)
         return yp_False;
     }
 
+    // TODO yp_eq may mutate mp, invalidating valuesleft!
     valuesleft = ypDict_LEN(mp);
     for (mp_i = 0; valuesleft > 0; mp_i++) {
         mp_value = ypDict_VALUES(mp)[mp_i];
@@ -16753,13 +17026,51 @@ static ypObject *frozendict_ne(ypObject *mp, ypObject *x)
     return ypBool_NOT(result);
 }
 
-// TODO frozendict_currenthash, when implemented, will need to consider the currenthashes of its
-// values as well as its keys. Just as a tuple with mutable items can't be hashed, hashing a
-// frozendict with mutable values will be an error.
-//  What about this for the hash?  hash(frozenset(x.items()))  (performance?)
-// Rejected ideas:
-//  This wouldn't work as item order is arbitrary: hash(tuple(x.items()))
-//  Calling sorted in the above would require ordering of the keys, which may not be true
+// Essentially: hash((key, value))
+static yp_hash_t _ypDict_currenthash_item(yp_hash_t key_hash, yp_hash_t value_hash)
+{
+    yp_HashSequence_state_t state;
+    yp_HashSequence_init(&state, 2);
+    yp_HashSequence_next(&state, key_hash);
+    yp_HashSequence_next(&state, value_hash);
+    return yp_HashSequence_fini(&state);
+}
+
+// Essentially: hash(frozenset(x.items()))
+static ypObject *frozendict_currenthash(
+        ypObject *mp, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
+{
+    yp_HashSet_state_t state;
+    yp_ssize_t         valuesleft;
+    yp_ssize_t         mp_i;
+    ypObject          *mp_value;
+    ypSet_KeyEntry    *mp_key_loc;
+    yp_hash_t          mp_value_hash;
+    yp_hash_t          mp_item_hash;
+    ypObject          *result;
+
+    yp_HashSet_init(&state, ypDict_LEN(mp));
+
+    // TODO hash_visitor may mutate mp, invalidating valuesleft!
+    valuesleft = ypDict_LEN(mp);
+    for (mp_i = 0; valuesleft > 0; mp_i++) {
+        mp_value = ypDict_VALUES(mp)[mp_i];
+        if (mp_value == NULL) continue;
+        valuesleft -= 1;
+        mp_key_loc = ypSet_TABLE(ypDict_KEYSET(mp)) + mp_i;
+
+        // We have the hash of the key at mp_key_loc->se_hash, but not the hash of the value.
+        result = hash_visitor(mp_value, hash_memo, &mp_value_hash);
+        if (yp_isexceptionC(result)) return result;
+
+        mp_item_hash = _ypDict_currenthash_item(mp_key_loc->se_hash, mp_value_hash);
+        yp_HashSet_next(&state, mp_item_hash);
+    }
+
+    *hash = yp_HashSet_fini(&state);
+
+    return yp_None;
+}
 
 static ypObject *frozendict_contains(ypObject *mp, ypObject *key)
 {
@@ -16802,7 +17113,7 @@ static ypObject *dict_clear(ypObject *mp)
             alloclen == ypSet_ALLOCLEN_MIN, "expect alloclen of ypSet_ALLOCLEN_MIN for new keyset");
 
     // Discard the old values
-    // FIXME What if yp_decref modifies mp?
+    // TODO yp_decref may mutate mp, invalidating valuesleft!
     for (i = 0; valuesleft > 0; i++) {
         if (oldvalues[i] == NULL) continue;
         valuesleft -= 1;
@@ -17191,8 +17502,8 @@ static ypTypeObject ypFrozenDict_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
-        MethodError_objproc,   // tp_close
+        frozendict_currenthash,  // tp_currenthash
+        MethodError_objproc,     // tp_close
 
         // Number operations
         MethodError_NumberMethods,  // tp_as_number
@@ -17273,8 +17584,8 @@ static ypTypeObject ypDict_Type = {
         NotImplemented_comparefunc,  // tp_gt
 
         // Generic object operations
-        MethodError_hashfunc,  // tp_currenthash
-        MethodError_objproc,   // tp_close
+        frozendict_currenthash,  // tp_currenthash
+        MethodError_objproc,     // tp_close
 
         // Number operations
         MethodError_NumberMethods,  // tp_as_number
@@ -17644,6 +17955,8 @@ static ypObject *range_getslice(ypObject *r, yp_ssize_t start, yp_ssize_t stop, 
     if (yp_isexceptionC(result)) return result;
 
     if (newR_len < 1) return yp_range_empty;
+    if (newR_len >= ypRange_LEN(r) && step == 1) return yp_incref(r);
+
     newR = ypMem_MALLOC_FIXED(ypRangeObject, ypRange_CODE);
     if (yp_isexceptionC(newR)) return newR;
     ypRange_START(newR) = ypRange_GET_INDEX(r, start);
@@ -17744,28 +18057,16 @@ static ypObject *range_ne(ypObject *r, ypObject *x)
 static ypObject *range_currenthash(
         ypObject *r, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    yp_uhash_t x = 0x345678;
-    yp_uhash_t mult = _ypHASH_MULTIPLIER;
-
+    yp_HashSequence_state_t state;
     ypRange_ASSERT_NORMALIZED(r);
 
-    x = (x ^ (yp_uhash_t)yp_HashInt(ypRange_LEN(r))) * mult;
-    mult += (yp_hash_t)(82520L + 2 + 2);
-
-    x = (x ^ (yp_uhash_t)yp_HashInt(ypRange_START(r))) * mult;
-    mult += (yp_hash_t)(82520L + 1 + 1);
-
-    x = (x ^ (yp_uhash_t)yp_HashInt(ypRange_STEP(r))) * mult;
-    // Unnecessary: mult += (yp_hash_t)(82520L + 0 + 0);
-
-    x += 97531L;
-    if (x == (yp_uhash_t)ypObject_HASH_INVALID) {
-        x = (yp_uhash_t)(ypObject_HASH_INVALID - 1);
-    }
-    *hash = (yp_hash_t)x;
-
+    yp_HashSequence_init(&state, 3);
+    yp_HashSequence_next(&state, yp_HashInt(ypRange_LEN(r)));
+    yp_HashSequence_next(&state, yp_HashInt(ypRange_START(r)));
+    yp_HashSequence_next(&state, yp_HashInt(ypRange_STEP(r)));
     // Since we never contain mutable objects, we can cache our hash
-    ypObject_CACHED_HASH(yp_None) = *hash;
+    *hash = ypObject_CACHED_HASH(yp_None) = yp_HashSequence_fini(&state);
+
     return yp_None;
 }
 
@@ -17777,7 +18078,6 @@ static ypObject *range_dealloc(ypObject *r, void *memo)
 
 static ypObject *range_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
-    // FIXME Bust this out to a `yp_range`, `yp_range3` that takes objects directly?
     ypObject *exc = yp_None;
     yp_int_t  start;
     yp_int_t  stop;
@@ -17931,6 +18231,7 @@ ypObject *yp_rangeC3(yp_int_t start, yp_int_t stop, yp_int_t step)
     // TODO We could store len in our own _yp_uint_t field, to allow for larger ranges, but a lot
     // of other code would also have to change
     if (ulen > ((_yp_uint_t)ypObject_LEN_MAX)) return yp_SystemLimitationError;
+    if (ulen < 1) return yp_range_empty;
     if (ulen < 2) step = 1;  // makes comparisons easier
 
     newR = ypMem_MALLOC_FIXED(ypRangeObject, ypRange_CODE);
@@ -18137,7 +18438,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             must_have_default = FALSE;
             if (param_kind == yp_s_star_args) {
                 has_var_positional = TRUE;
-                // param_name = string_getslice(param.name, 1, yp_SLICE_USELEN, 1);
+                // param_name = string_getslice(param.name, 1, yp_SLICE_LAST, 1);
             }
         } else if (param_kind == yp_s_star_star_kwargs) {
             if (i != params_len - 1) {
@@ -18148,7 +18449,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
                 return yp_ParameterSyntaxError;
             }
             has_var_keyword = TRUE;
-            // param_name = string_getslice(param.name, 2, yp_SLICE_USELEN, 1);
+            // param_name = string_getslice(param.name, 2, yp_SLICE_LAST, 1);
         } else if (param_kind == yp_None) {
             if (must_have_default) {
                 if (param.default_ == NULL) {
@@ -18820,10 +19121,13 @@ static ypObject *function_traverse(ypObject *f, visitfunc visitor, void *memo)
 
 static ypObject *function_frozen_copy(ypObject *f) { return yp_incref(f); }
 
+static ypObject *function_bool(ypObject *f) { return yp_True; }
+
 static ypObject *function_currenthash(
         ypObject *f, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    *hash = yp_HashPointer(f);  // functions are compared based on identity
+    // Since types are compared by identity, we can cache our hash.
+    *hash = ypObject_CACHED_HASH(f) = yp_HashPointer(f);
     return yp_None;
 }
 
@@ -18884,7 +19188,7 @@ static ypTypeObject ypFunction_Type = {
         MethodError_objproc,       // tp_invalidate
 
         // Boolean operations and comparisons
-        MethodError_objproc,         // tp_bool
+        function_bool,               // tp_bool
         NotImplemented_comparefunc,  // tp_lt
         NotImplemented_comparefunc,  // tp_le
         NotImplemented_comparefunc,  // tp_eq
@@ -19135,7 +19439,7 @@ yp_ssize_t yp_findC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j
 {
     yp_ssize_t index;
     ypObject  *result = ypObject_TYPE(sequence)->tp_as_sequence->tp_find(
-             sequence, x, i, j, yp_FIND_FORWARD, &index);
+            sequence, x, i, j, yp_FIND_FORWARD, &index);
     if (yp_isexceptionC(result)) return_yp_CEXC_ERR(-1, exc, result);
     yp_ASSERT(index >= -1, "tp_find cannot return <-1");
     return index;
@@ -19143,7 +19447,7 @@ yp_ssize_t yp_findC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j
 
 yp_ssize_t yp_findC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_findC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_findC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 yp_ssize_t yp_indexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
@@ -19157,14 +19461,14 @@ yp_ssize_t yp_indexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_indexC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_indexC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_indexC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 yp_ssize_t yp_rfindC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
 {
     yp_ssize_t index;
     ypObject  *result = ypObject_TYPE(sequence)->tp_as_sequence->tp_find(
-             sequence, x, i, j, yp_FIND_REVERSE, &index);
+            sequence, x, i, j, yp_FIND_REVERSE, &index);
     if (yp_isexceptionC(result)) return_yp_CEXC_ERR(-1, exc, result);
     yp_ASSERT(index >= -1, "tp_find cannot return <-1");
     return index;
@@ -19172,7 +19476,7 @@ yp_ssize_t yp_rfindC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_rfindC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_rfindC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_rfindC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 yp_ssize_t yp_rindexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
@@ -19186,7 +19490,7 @@ yp_ssize_t yp_rindexC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t
 
 yp_ssize_t yp_rindexC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_rindexC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_rindexC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 yp_ssize_t yp_countC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t j, ypObject **exc)
@@ -19200,7 +19504,7 @@ yp_ssize_t yp_countC5(ypObject *sequence, ypObject *x, yp_ssize_t i, yp_ssize_t 
 
 yp_ssize_t yp_countC(ypObject *sequence, ypObject *x, ypObject **exc)
 {
-    return yp_countC5(sequence, x, 0, yp_SLICE_USELEN, exc);
+    return yp_countC5(sequence, x, 0, yp_SLICE_LAST, exc);
 }
 
 void yp_setindexC(ypObject *sequence, yp_ssize_t i, ypObject *x, ypObject **exc)
@@ -19594,8 +19898,8 @@ void yp_o2i_setitemC(ypObject *container, ypObject *key, yp_int_t xC, ypObject *
     yp_decref(x);
 }
 
-ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t **encoded,
-        yp_ssize_t *size, ypObject **encoding)
+ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, yp_ssize_t *size,
+        const yp_uint8_t **encoded, ypObject **encoding)
 {
     ypObject *x;
     ypObject *result;
@@ -19609,15 +19913,15 @@ ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t 
     }
 
     x = yp_getitem(container, key);
-    result = yp_asencodedCX(x, encoded, size, encoding);
+    result = yp_asencodedCX(x, size, encoded, encoding);
     yp_decref(x);
     return result;
 }
 
 void yp_o2s_setitemC5(
-        ypObject *container, ypObject *key, const yp_uint8_t *xC, yp_ssize_t x_lenC, ypObject **exc)
+        ypObject *container, ypObject *key, yp_ssize_t x_lenC, const yp_uint8_t *xC, ypObject **exc)
 {
-    ypObject *x = yp_str_frombytesC2(xC, x_lenC);
+    ypObject *x = yp_str_frombytesC2(x_lenC, xC);
     yp_setitem(container, key, x, exc);
     yp_decref(x);
 }
@@ -19652,52 +19956,52 @@ void yp_i2i_setitemC(ypObject *container, yp_int_t keyC, yp_int_t xC, ypObject *
     yp_decref(key);
 }
 
-ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t keyC, const yp_uint8_t **encoded,
-        yp_ssize_t *size, ypObject **encoding)
+ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t keyC, yp_ssize_t *size,
+        const yp_uint8_t **encoded, ypObject **encoding)
 {
     ypObject *key = yp_intC(keyC);
-    ypObject *result = yp_o2s_getitemCX(container, key, encoded, size, encoding);
+    ypObject *result = yp_o2s_getitemCX(container, key, size, encoded, encoding);
     yp_decref(key);
     return result;
 }
 
 void yp_i2s_setitemC5(
-        ypObject *container, yp_int_t keyC, const yp_uint8_t *xC, yp_ssize_t x_lenC, ypObject **exc)
+        ypObject *container, yp_int_t keyC, yp_ssize_t x_lenC, const yp_uint8_t *xC, ypObject **exc)
 {
     ypObject *key = yp_intC(keyC);
-    yp_o2s_setitemC5(container, key, xC, x_lenC, exc);
+    yp_o2s_setitemC5(container, key, x_lenC, xC, exc);
     yp_decref(key);
 }
 
-ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC)
+ypObject *yp_s2o_getitemC3(ypObject *container, yp_ssize_t key_lenC, const yp_uint8_t *keyC)
 {
-    ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
+    ypObject *key = yp_str_frombytesC2(key_lenC, keyC);
     ypObject *x = yp_getitem(container, key);
     yp_decref(key);
     return x;
 }
 
-void yp_s2o_setitemC5(ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, ypObject *x,
+void yp_s2o_setitemC5(ypObject *container, yp_ssize_t key_lenC, const yp_uint8_t *keyC, ypObject *x,
         ypObject **exc)
 {
-    ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
+    ypObject *key = yp_str_frombytesC2(key_lenC, keyC);
     yp_setitem(container, key, x, exc);
     yp_decref(key);
 }
 
 yp_int_t yp_s2i_getitemC4(
-        ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, ypObject **exc)
+        ypObject *container, yp_ssize_t key_lenC, const yp_uint8_t *keyC, ypObject **exc)
 {
-    ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
+    ypObject *key = yp_str_frombytesC2(key_lenC, keyC);
     yp_int_t  x = yp_o2i_getitemC(container, key, exc);
     yp_decref(key);
     return x;
 }
 
-void yp_s2i_setitemC5(ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, yp_int_t xC,
+void yp_s2i_setitemC5(ypObject *container, yp_ssize_t key_lenC, const yp_uint8_t *keyC, yp_int_t xC,
         ypObject **exc)
 {
-    ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
+    ypObject *key = yp_str_frombytesC2(key_lenC, keyC);
     yp_o2i_setitemC(container, key, xC, exc);
     yp_decref(key);
 }
