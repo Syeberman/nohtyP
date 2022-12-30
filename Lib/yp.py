@@ -310,18 +310,18 @@ yp_func(c_ypObject_p, "yp_generatorC", ((POINTER(c_yp_generator_decl_t), "declar
 yp_func(c_ypObject_p, "yp_rangeC3",
         ((c_yp_int_t, "start"), (c_yp_int_t, "stop"), (c_yp_int_t, "step")))
 
-# ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
-yp_func(c_ypObject_p, "yp_bytesC", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
-# ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len);
-yp_func(c_ypObject_p, "yp_bytearrayC", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
+# ypObject *yp_bytesC(yp_ssize_t len, const yp_uint8_t *source);
+yp_func(c_ypObject_p, "yp_bytesC", ((c_yp_ssize_t, "len"), (c_char_p, "source")))
+# ypObject *yp_bytearrayC(yp_ssize_t len, const yp_uint8_t *source);
+yp_func(c_ypObject_p, "yp_bytearrayC", ((c_yp_ssize_t, "len"), (c_char_p, "source")))
 
-# ypObject *yp_str_frombytesC4(const yp_uint8_t *source, yp_ssize_t len,
+# ypObject *yp_str_frombytesC4(yp_ssize_t len, const yp_uint8_t *source,
 #         ypObject *encoding, ypObject *errors);
-yp_func(c_ypObject_p, "yp_str_frombytesC4", ((c_char_p, "source"), (c_yp_ssize_t, "len"),
+yp_func(c_ypObject_p, "yp_str_frombytesC4", ((c_yp_ssize_t, "len"), (c_char_p, "source"),
                                              (c_ypObject_p, "encoding"), (c_ypObject_p, "errors")))
 
-# ypObject *yp_str_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
-yp_func(c_ypObject_p, "yp_str_frombytesC2", ((c_char_p, "source"), (c_yp_ssize_t, "len")))
+# ypObject *yp_str_frombytesC2(yp_ssize_t len, const yp_uint8_t *source);
+yp_func(c_ypObject_p, "yp_str_frombytesC2", ((c_yp_ssize_t, "len"), (c_char_p, "source")))
 
 # ypObject *yp_str3(ypObject *object, ypObject *encoding, ypObject *errors);
 yp_func(c_ypObject_p, "yp_str3", ((c_ypObject_p, "object"),
@@ -759,14 +759,14 @@ yp_func(c_yp_int_t, "yp_int_bit_lengthC", ((c_ypObject_p, "x"), c_ypObject_pp_ex
 # ypObject *yp_type(ypObject *object);
 yp_func(c_ypObject_p, "yp_type", ((c_ypObject_p, "object"), ))
 
-# ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t * *bytes, yp_ssize_t *len);
+# ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t * *bytes);
 yp_func(c_ypObject_p, "yp_asbytesCX", ((c_ypObject_p, "seq"),
-                                       (c_char_pp, "bytes"), (c_yp_ssize_t_p, "len")), errcheck=False)
+                                       (c_yp_ssize_t_p, "len"), (c_char_pp, "bytes")), errcheck=False)
 
-# ypObject *yp_asencodedCX(ypObject *seq, const yp_uint8_t * *encoded, yp_ssize_t *size,
+# ypObject *yp_asencodedCX(ypObject *seq, yp_ssize_t *size, const yp_uint8_t * *encoded,
 #        ypObject * *encoding);
 yp_func(c_ypObject_p, "yp_asencodedCX", ((c_ypObject_p, "seq"),
-                                         (c_char_pp, "encoded"), (c_yp_ssize_t_p, "size"), (c_ypObject_pp, "encoding")),
+                                         (c_yp_ssize_t_p, "size"), (c_char_pp, "encoded"), (c_ypObject_pp, "encoding")),
         errcheck=False)
 
 
@@ -1563,21 +1563,21 @@ class _ypBytes(ypObject):
         return _yp_call_stars(cls._yp_type, args, kwargs)
 
     def _get_data_size(self):
-        data = c_char_pp(c_char_p())
         size = c_yp_ssize_t_p(c_yp_ssize_t(0))
+        data = c_char_pp(c_char_p())
         # errcheck disabled for _yp_asbytesCX, so do it here
-        _yp_asbytesCX(self, data, size)._yp_errcheck()
-        return cast(data.contents, c_void_p), size[0]
+        _yp_asbytesCX(self, size, data)._yp_errcheck()
+        return size[0], cast(data.contents, c_void_p)
 
     def _asbytes(self):
-        data, size = self._get_data_size()
+        size, data = self._get_data_size()
         return string_at(data, size)
 
     def _yp_errcheck(self):
         super()._yp_errcheck()
-        data, size = self._get_data_size()
+        size, data = self._get_data_size()
         assert string_at(data.value+size, 1) == b"\x00", "missing null terminator"
-        return data, size
+        return size, data
 
     # nohtyP currently doesn't overload yp_add et al, but Python expects this
     def __add__(self, other): return _yp_concat(self, other)
@@ -1611,7 +1611,7 @@ class _ypBytes(ypObject):
 class yp_bytes(_ypBytes):
     @classmethod
     def _from_python(cls, pyobj):
-        return _yp_bytesC(pyobj, len(pyobj))
+        return _yp_bytesC(len(pyobj), pyobj)
 
     # TODO When nohtyP has str/repr, use it instead of this faked-out version
 
@@ -1635,7 +1635,7 @@ class yp_bytearray(_ypBytes):
 
     @classmethod
     def _from_python(cls, pyobj):
-        return _yp_bytearrayC(pyobj, len(pyobj))
+        return _yp_bytearrayC(len(pyobj), pyobj)
 
     def _yp_str(self): return yp_str("bytearray(%r)" % self._asbytes())
     _yp_repr = _yp_str
@@ -1708,7 +1708,7 @@ class yp_str(_ypStr):
     @classmethod
     def _from_python(cls, pyobj):
         encoded = pyobj.encode("utf-8", "surrogatepass")
-        return _yp_str_frombytesC4(encoded, len(encoded), yp_s_utf_8, yp_s_surrogatepass)
+        return _yp_str_frombytesC4(len(encoded), encoded, yp_s_utf_8, yp_s_surrogatepass)
 
     # Just as yp_bool.__bool__ must return a bool, so too must this return a str
     def __str__(self): return self._asstr()
@@ -1723,7 +1723,7 @@ class yp_chrarray(_ypStr):
     @classmethod
     def _from_python(cls, pyobj):
         encoded = pyobj.encode("utf-8", "surrogatepass")
-        return _yp_chrarray_frombytesC4(encoded, len(encoded), yp_s_utf_8, yp_s_surrogatepass)
+        return _yp_chrarray_frombytesC4(len(encoded), encoded, yp_s_utf_8, yp_s_surrogatepass)
 
     def _yp_str(self): return yp_str._from_python(self._asstr())
 
@@ -1745,9 +1745,9 @@ c_ypObject_p_value("yp_s_surrogatepass")
 c_ypObject_p_value("yp_s_star_args")
 c_ypObject_p_value("yp_s_star_star_kwargs")
 c_ypObject_p_value("yp_str_empty")
-yp_s_None = _yp_str_frombytesC2(b"None", 4)
-yp_s_True = _yp_str_frombytesC2(b"True", 4)
-yp_s_False = _yp_str_frombytesC2(b"False", 5)
+yp_s_None = _yp_str_frombytesC2(4, b"None")
+yp_s_True = _yp_str_frombytesC2(4, b"True")
+yp_s_False = _yp_str_frombytesC2(5, b"False")
 
 
 # FIXME Support repr, then make this a proper nohtyP function object.

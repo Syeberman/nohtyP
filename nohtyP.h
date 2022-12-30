@@ -238,9 +238,9 @@ ypAPI ypObject *yp_rangeC(yp_int_t stop);
 // is NULL it is considered as having all null bytes; if len is negative source is considered null
 // terminated (and, therefore, will not contain the null byte).
 //
-// Ex: pre-allocate a bytearray of length 50: yp_bytearrayC(NULL, 50)
-ypAPI ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len);
-ypAPI ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len);
+// Ex: pre-allocate a bytearray of length 50: yp_bytearrayC(50, NULL)
+ypAPI ypObject *yp_bytesC(yp_ssize_t len, const yp_uint8_t *source);
+ypAPI ypObject *yp_bytearrayC(yp_ssize_t len, const yp_uint8_t *source);
 
 // Returns a new reference to a bytes/bytearray encoded from the given str or chrarray object. The
 // Python-equivalent default for encoding is yp_s_utf_8, while for errors it is yp_s_strict.
@@ -260,21 +260,21 @@ ypAPI ypObject *yp_bytearray(ypObject *source);
 // Returns a new reference to an empty bytearray. (An empty bytes is exported as yp_bytes_empty.)
 ypAPI ypObject *yp_bytearray0(void);
 
-// Returns a new reference to a str/chrarray decoded from the given bytes. source and len are as in
+// Returns a new reference to a str/chrarray decoded from the given bytes. len and source are as in
 // yp_bytesC. The Python-equivalent default for encoding is yp_s_utf_8 (compatible with an
 // ascii-encoded source), while for errors it is yp_s_strict. Equivalent to:
 //
-//      yp_str3(yp_bytesC(source, len), encoding, errors)
+//      yp_str3(yp_bytesC(len, source), encoding, errors)
 ypAPI ypObject *yp_str_frombytesC4(
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors);
+        yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors);
 ypAPI ypObject *yp_chrarray_frombytesC4(
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors);
+        yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors);
 
-// Equivalent to yp_str3(yp_bytesC(source, len), yp_s_utf_8, yp_s_strict). Note that in Python,
+// Equivalent to yp_str3(yp_bytesC(len, source), yp_s_utf_8, yp_s_strict). Note that in Python,
 // omitting encoding and errors would normally return the string representation of the bytes object
 // ("b'Zoot!'"), however this constructor decodes it ("Zoot!").
-ypAPI ypObject *yp_str_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
-ypAPI ypObject *yp_chrarray_frombytesC2(const yp_uint8_t *source, yp_ssize_t len);
+ypAPI ypObject *yp_str_frombytesC2(yp_ssize_t len, const yp_uint8_t *source);
+ypAPI ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source);
 
 // Returns a new reference to a str/chrarray decoded from the given bytes or bytearray object. The
 // Python-equivalent default for encoding is yp_s_utf_8, while for errors it is yp_s_strict.
@@ -1686,7 +1686,7 @@ ypAPI void     yp_o2i_setitemC(ypObject *container, ypObject *key, yp_int_t x, y
 
 // Operations on containers that map objects to strs. yp_o2s_getitemCX is documented below.
 ypAPI void yp_o2s_setitemC5(
-        ypObject *container, ypObject *key, const yp_uint8_t *x, yp_ssize_t x_len, ypObject **exc);
+        ypObject *container, ypObject *key, yp_ssize_t x_len, const yp_uint8_t *x, ypObject **exc);
 
 // Operations on containers that map integers to objects. Note that if the container is known at
 // compile-time to be a sequence, then yp_getindexC et al are better choices.
@@ -1699,26 +1699,26 @@ ypAPI void     yp_i2i_setitemC(ypObject *container, yp_int_t key, yp_int_t x, yp
 
 // Operations on containers that map integers to strs. yp_i2s_getitemCX is documented below.
 ypAPI void yp_i2s_setitemC5(
-        ypObject *container, yp_int_t key, const yp_uint8_t *x, yp_ssize_t x_len, ypObject **exc);
+        ypObject *container, yp_int_t key, yp_ssize_t x_len, const yp_uint8_t *x, ypObject **exc);
 
 // Operations on containers that map strs to objects. Note that if the value of the str is known at
 // compile-time, as in:
 //
-//      value = yp_s2o_getitemC3(o, "mykey", -1);
+//      value = yp_s2o_getitemC3(o, -1, "mykey");
 //
 // it is more efficient to use yp_IMMORTAL_STR_LATIN_1 (also compatible with ascii), as in:
 //
 //      yp_IMMORTAL_STR_LATIN_1(s_mykey, "mykey");
 //      value = yp_getitem(o, s_mykey);
-ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len);
-ypAPI void      yp_s2o_setitemC5(ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len,
+ypAPI ypObject *yp_s2o_getitemC3(ypObject *container, yp_ssize_t key_len, const yp_uint8_t *key);
+ypAPI void      yp_s2o_setitemC5(ypObject *container, yp_ssize_t key_len, const yp_uint8_t *key,
              ypObject *x, ypObject **exc);
 
 // Operations on containers that map strs to integers.
 ypAPI yp_int_t yp_s2i_getitemC4(
-        ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len, ypObject **exc);
+        ypObject *container, yp_ssize_t key_len, const yp_uint8_t *key, ypObject **exc);
 ypAPI void yp_s2i_setitemC5(
-        ypObject *container, const yp_uint8_t *key, yp_ssize_t key_len, yp_int_t x, ypObject **exc);
+        ypObject *container, yp_ssize_t key_len, const yp_uint8_t *key, yp_int_t x, ypObject **exc);
 
 
 /*
@@ -1904,25 +1904,25 @@ ypAPI void yp_mem_default_free(void *p);
 // the internal iterator state buffer and its size in bytes, and returns the immortal yp_None. The
 // structure and initial values of *state are determined when the iterator is created; the size
 // cannot change after creation, and any ypObject*s in *state should be considered *borrowed* (it is
-// safe to replace them with new or immortal references). Sets *state to NULL, *size to zero, and
+// safe to replace them with new or immortal references). Sets *size to zero, *state to NULL, and
 // returns an exception on error.
-ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, void **state, yp_ssize_t *size);
+ypAPI ypObject *yp_iter_stateCX(ypObject *iterator, yp_ssize_t *size, void **state);
 
 // Typically only called from within yp_function_decl_t.code functions. Sets *state and *size to the
 // internal function state buffer and its size in bytes, and returns the immortal yp_None. The
 // structure and initial values of *state are determined when the function is created; the size
 // cannot change after creation, and any ypObject*s in *state should be considered *borrowed* (it is
-// safe to replace them with new or immortal references). Sets *state to NULL, *size to zero, and
+// safe to replace them with new or immortal references). Sets *size to zero, *state to NULL, and
 // returns an exception on error.
-ypAPI ypObject *yp_function_stateCX(ypObject *function, void **state, yp_ssize_t *size);
+ypAPI ypObject *yp_function_stateCX(ypObject *function, yp_ssize_t *size, void **state);
 
 // For sequences that store their elements as an array of bytes (bytes and bytearray), sets *bytes
 // to the beginning of that array, *len to the length of the sequence, and returns the immortal
 // yp_None. *bytes will point into internal object memory which MUST NOT be modified; furthermore,
 // the sequence itself must not be modified while using the array. As a special case, if len is
 // NULL, the sequence must not contain null bytes and *bytes will point to a null-terminated array.
-// Sets *bytes to NULL, *len to zero (if len is not NULL), and returns an exception on error.
-ypAPI ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len);
+// Sets *len to zero (if len is not NULL), *bytes to NULL, and returns an exception on error.
+ypAPI ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **bytes);
 
 // str and chrarray internally store their Unicode characters in particular encodings, usually
 // depending on the contents of the string. This function sets *encoded to the beginning of that
@@ -1930,17 +1930,17 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t
 // encoding used (yp_s_latin_1, perhaps). *encoded will point into internal object memory which MUST
 // NOT be modified; furthermore, the string itself must not be modified while using the array. As a
 // special case, if size is NULL, the string must not contain null characters and *encoded will
-// point to a null-terminated string. On error, sets *encoded to NULL, *size to zero (if size is not
-// NULL), *encoding to the exception, and returns the exception.
+// point to a null-terminated string. On error, sets *size to zero (if size is not NULL), *encoded
+// to NULL, *encoding to the exception, and returns the exception.
 ypAPI ypObject *yp_asencodedCX(
-        ypObject *seq, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding);
+        ypObject *seq, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding);
 
 // For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
 // sets *array to the beginning of that array, *len to the length of the sequence, and returns the
 // immortal yp_None. *array will point into internal object memory, so they are *borrowed*
 // references and MUST NOT be replaced; furthermore, the sequence itself must not be modified while
-// using the array. Sets *array to NULL, *len to zero, and returns an exception on error.
-ypAPI ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_t *len);
+// using the array. Sets *len to zero, *array to NULL, and returns an exception on error.
+ypAPI ypObject *yp_itemarrayCX(ypObject *seq, yp_ssize_t *len, ypObject *const **array);
 
 // Similar to yp_callN, except the callable is at args[0] and the arguments start at args[1]. n is
 // the total length of the array; yp_TypeError is raised if n is less than 1. The array itself is
@@ -1953,19 +1953,19 @@ ypAPI ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args);
 
 // For tuples, lists, dicts, and frozendicts, this is equivalent to:
 //
-//      yp_asencodedCX(yp_getitem(container, key), encoded, size, encoding)
+//      yp_asencodedCX(yp_getitem(container, key), size, encoded, encoding)
 //
 // For all other types, this raises yp_TypeError, and sets the outputs accordingly. *encoded will
 // point into internal object memory which MUST NOT be modified; furthermore, the str itself must
 // neither be modified nor removed from the container while using the array.
-ypAPI ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t **encoded,
-        yp_ssize_t *size, ypObject **encoding);
+ypAPI ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, yp_ssize_t *size,
+        const yp_uint8_t **encoded, ypObject **encoding);
 
 // Similar to yp_o2s_getitemCX, except key is a yp_int_t. *encoded will point into internal object
 // memory which MUST NOT be modified; furthermore, the str itself must neither be modified nor
 // removed from the container while using the array.
-ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, const yp_uint8_t **encoded,
-        yp_ssize_t *size, ypObject **encoding);
+ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, yp_ssize_t *size,
+        const yp_uint8_t **encoded, ypObject **encoding);
 
 
 /*
@@ -2173,25 +2173,25 @@ struct _ypStringLibObject {
 #define _ypFunction_CODE (28u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, data, len)                         \
+#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                         \
     {                                                                               \
         type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, len, _ypObject_LEN_INVALID, \
                 _ypObject_HASH_INVALID, data                                        \
     }
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
-            _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, NULL, _ypObject_LEN_INVALID), (value)}; \
+            _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, _ypObject_LEN_INVALID, NULL), (value)}; \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_BYTES(qual, name, value)                                                  \
     static const char                _##name##_data[] = value;                                 \
     static struct _ypStringLibObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
-            _ypStringLib_ENC_CODE_BYTES, (void *)_##name##_data, sizeof(_##name##_data) - 1)}; \
+            _ypStringLib_ENC_CODE_BYTES, sizeof(_##name##_data) - 1, (void *)_##name##_data)}; \
     qual ypObject *const             name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                            \
     static const char                _##name##_data[] = value;                 \
     static struct _ypStringLibObject _##name##_struct = {                      \
             _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_CODE_LATIN_1, \
-                    (void *)_##name##_data, sizeof(_##name##_data) - 1),       \
+                    sizeof(_##name##_data) - 1, (void *)_##name##_data),       \
     };                                                                         \
     qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE

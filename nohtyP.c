@@ -346,7 +346,7 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 #define yp_IMMORTAL_HEAD_INIT _yp_IMMORTAL_HEAD_INIT
 
 // Base "constructor" for immortal type objects
-#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT(ypType_CODE, 0, NULL, ypObject_LEN_INVALID)
+#define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT(ypType_CODE, 0, ypObject_LEN_INVALID, NULL)
 
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)(ypObject *);
@@ -1253,7 +1253,7 @@ typedef struct _ypFunctionObject {
 
 #define yp_IMMORTAL_INVALIDATED(name)                                                   \
     static struct _ypObject _##name##_struct =                                          \
-            _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, NULL, _ypObject_LEN_INVALID); \
+            _yp_IMMORTAL_HEAD_INIT(ypInvalidated_CODE, 0, _ypObject_LEN_INVALID, NULL); \
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 
 // For use internally as parameter defaults to detect when an argument was not supplied. yp_None
@@ -1267,15 +1267,15 @@ yp_IMMORTAL_INVALIDATED(yp_Arg_Missing);
 
 
 static ypObject _yp_None_struct =
-        yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, NULL, ypObject_LEN_INVALID);
+        yp_IMMORTAL_HEAD_INIT(ypNoneType_CODE, 0, ypObject_LEN_INVALID, NULL);
 ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 
 // There are exactly two bool objects
 // TODO Could initialize ypObject_CACHED_HASH here...in fact our value could be in CACHED_HASH.
-static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 1};
+static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, 0, NULL), 1};
 ypObject *const     yp_True = yp_CONST_REF(yp_True);
-static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, NULL, 0), 0};
+static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, 0, NULL), 0};
 ypObject *const     yp_False = yp_CONST_REF(yp_False);
 
 
@@ -1400,7 +1400,7 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 
 #define _yp_IMMORTAL_FUNCTION_OBJECT(qual, name, code, parameters_len, parameters)                \
     static struct _ypFunctionObject _##name##_struct = {                                          \
-            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters, parameters_len), code, NULL}; \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters_len, parameters), code, NULL}; \
     qual ypObject *const yp_UNUSED name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
     static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
@@ -3120,15 +3120,15 @@ yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
     return length_hint < 0 ? 0 : length_hint;
 }
 
-ypObject *yp_iter_stateCX(ypObject *i, void **state, yp_ssize_t *size)
+ypObject *yp_iter_stateCX(ypObject *i, yp_ssize_t *size, void **state)
 {
     if (ypObject_TYPE_PAIR_CODE(i) != ypIter_CODE) {
-        *state = NULL;
         *size = 0;
+        *state = NULL;
         return_yp_BAD_TYPE(i);
     }
-    *state = ypIter_STATE(i);
     *size = ypIter_STATE_SIZE(i);
+    *state = ypIter_STATE(i);
     return yp_None;
 }
 
@@ -4071,7 +4071,7 @@ static ypTypeObject ypException_Type = {
 #define _yp_IMMORTAL_EXCEPTION_SUPERPTR(name, superptr)                             \
     yp_IMMORTAL_STR_LATIN_1(name##_name, #name);                                    \
     static ypExceptionObject _##name##_struct = {                                   \
-            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, NULL, ypObject_LEN_INVALID), \
+            yp_IMMORTAL_HEAD_INIT(ypException_CODE, 0, ypObject_LEN_INVALID, NULL), \
             yp_CONST_REF(name##_name), (superptr)};                                 \
     ypObject *const name = yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_EXCEPTION(name, super) \
@@ -5678,7 +5678,7 @@ yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc)
 // clang-format off
 static ypIntObject _ypInt_pre_allocated[] = {
     #define _ypInt_PREALLOC(value) \
-        { yp_IMMORTAL_HEAD_INIT(ypInt_CODE, 0, NULL, ypObject_LEN_INVALID), (value) }
+        { yp_IMMORTAL_HEAD_INIT(ypInt_CODE, 0, ypObject_LEN_INVALID, NULL), (value) }
     _ypInt_PREALLOC(-5),
     _ypInt_PREALLOC(-4),
     _ypInt_PREALLOC(-3),
@@ -5728,14 +5728,14 @@ static ypObject *_ypInt(ypObject *(*allocator)(yp_int_t), ypObject *x, yp_int_t 
         return allocator(ypBool_IS_TRUE_C(x));
     } else if (x_pair == ypBytes_CODE) {
         const yp_uint8_t *bytes;
-        ypObject         *result = yp_asbytesCX(x, &bytes, NULL);
+        ypObject         *result = yp_asbytesCX(x, NULL, &bytes);
         if (yp_isexceptionC(result)) return yp_ValueError;  // contains null bytes
         return _ypInt_fromascii(allocator, bytes, base);
     } else if (x_pair == ypStr_CODE) {
         // TODO Implement decoding
         const yp_uint8_t *encoded;
         ypObject         *encoding;
-        ypObject         *result = yp_asencodedCX(x, &encoded, NULL, &encoding);
+        ypObject         *result = yp_asencodedCX(x, NULL, &encoded, &encoding);
         if (yp_isexceptionC(result)) return yp_ValueError;  // contains null bytes
         if (encoding != yp_s_latin_1) return yp_NotImplementedError;
         return _ypInt_fromascii(allocator, encoded, base);
@@ -8916,7 +8916,7 @@ static ypObject *_ypStringLib_decode_utf_8_onnull(int type, yp_ssize_t len)
 // Called when source starts with at least one ascii character. Returns the decoded string object.
 static ypObject *_yp_chrC(int type, yp_int_t i);
 static ypObject *_ypStringLib_decode_utf_8_ascii_start(
-        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors)
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *errors)
 {
     const yp_uint8_t *starts = source;
     const yp_uint8_t *end = source + len;
@@ -9021,7 +9021,7 @@ static yp_uint32_t _ypStringLib_decode_utf_8_inline_precheck(
 // Called by ypStringLib_decode_frombytesC_utf_8 in the general case. Returns the decoded string
 // object.
 static ypObject *_ypStringLib_decode_utf_8(
-        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors)
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *errors)
 {
     const yp_uint8_t *starts = source;
     const yp_uint8_t *end = source + len;
@@ -9100,7 +9100,7 @@ outer_loop:
 // TODO Keep the UTF-8 bytes object associated with the new string, but only if there were no
 // decoding errors
 static ypObject *ypStringLib_decode_frombytesC_utf_8(
-        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *errors)
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *errors)
 {
     yp_ASSERT(ypObject_TYPE_CODE_AS_FROZEN(type) == ypStr_CODE, "incorrect str type");
     yp_ASSERT(len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before "
@@ -9116,9 +9116,9 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8(
     } else if (source[0] < 0x80u) {
         // We optimize for UTF-8 data that is completely, or at least starts with, ASCII: since
         // ASCII is equivalent to the first 128 ordinals in Unicode, we can just memcpy
-        return _ypStringLib_decode_utf_8_ascii_start(type, source, len, errors);
+        return _ypStringLib_decode_utf_8_ascii_start(type, len, source, errors);
     } else {
-        return _ypStringLib_decode_utf_8(type, source, len, errors);
+        return _ypStringLib_decode_utf_8(type, len, source, errors);
     }
 }
 
@@ -9127,7 +9127,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8(
 // under half the buffer
 // XXX Runtime-wise, the worst-case is a string with completely latin-1 characters
 // XXX There's no possibility of an error handler being called, so we can use alloclen_fixed=TRUE
-static ypObject *_ypBytesC(int type, const yp_uint8_t *source, yp_ssize_t len);
+static ypObject *_ypBytesC(int type, yp_ssize_t len, const yp_uint8_t *source);
 static ypObject *_ypStringLib_encode_utf_8_fromlatin_1(int type, ypObject *source)
 {
     yp_ssize_t const  source_len = ypStringLib_LEN(source);
@@ -9155,7 +9155,7 @@ static ypObject *_ypStringLib_encode_utf_8_fromlatin_1(int type, ypObject *sourc
         yp_ASSERT1(leading_ascii <= source_len);
         if (leading_ascii == source_len) {
             // TODO When we have an associated UTF-8 bytes object, we can share the ASCII buffer
-            return _ypBytesC(type, source_data, source_len /*alloclen_fixed=TRUE*/);
+            return _ypBytesC(type, source_len, source_data /*alloclen_fixed=TRUE*/);
         }
 
         // Otherwise, it's not entirely ASCII, but we know it starts that way, so copy over the
@@ -9783,7 +9783,7 @@ yp_STATIC_ASSERT(yp_offsetof(ypBytesObject, ob_inline_data) % yp_MAX_ALIGNMENT =
 // used as the length. This function updates *len accordingly. Returns false if the final value
 // of *len would be larger than ypBytes_LEN_MAX, in which case *len is undefined and
 // yp_MemorySizeOverflowError should probably be returned.
-static int ypBytes_adjust_lenC(const yp_uint8_t *source, yp_ssize_t *len)
+static int ypBytes_adjust_lenC(yp_ssize_t *len, const yp_uint8_t *source)
 {
     if (*len < 0) {
         if (source == NULL) {
@@ -10549,7 +10549,7 @@ static ypTypeObject ypByteArray_Type = {
         TypeError_CallableMethods  // tp_as_callable
 };
 
-static ypObject *_yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len)
+static ypObject *_yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **bytes)
 {
     if (ypObject_TYPE_PAIR_CODE(seq) != ypBytes_CODE) return_yp_BAD_TYPE(seq);
 
@@ -10561,19 +10561,19 @@ static ypObject *_yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize
     }
     return yp_None;
 }
-ypObject *yp_asbytesCX(ypObject *seq, const yp_uint8_t **bytes, yp_ssize_t *len)
+ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **bytes)
 {
-    ypObject *result = _yp_asbytesCX(seq, bytes, len);
+    ypObject *result = _yp_asbytesCX(seq, len, bytes);
     if (yp_isexceptionC(result)) {
-        *bytes = NULL;
         if (len != NULL) *len = 0;
+        *bytes = NULL;
     }
     return result;
 }
 
 // Public constructors
 
-static ypObject *_ypBytesC(int type, const yp_uint8_t *source, yp_ssize_t len)
+static ypObject *_ypBytesC(int type, yp_ssize_t len, const yp_uint8_t *source)
 {
     ypObject *b;
     yp_ASSERT(len >= 0, "negative len not allowed (do ypBytes_adjust_lenC before _ypBytesC*)");
@@ -10598,15 +10598,15 @@ static ypObject *_ypBytesC(int type, const yp_uint8_t *source, yp_ssize_t len)
 }
 // TODO Be consistent and always put "len" params before the thing they are sizing. This breaks with
 // Python but, conceptually at least, you need the length of something before you use it.
-ypObject *yp_bytesC(const yp_uint8_t *source, yp_ssize_t len)
+ypObject *yp_bytesC(yp_ssize_t len, const yp_uint8_t *source)
 {
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    return _ypBytesC(ypBytes_CODE, source, len);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    return _ypBytesC(ypBytes_CODE, len, source);
 }
-ypObject *yp_bytearrayC(const yp_uint8_t *source, yp_ssize_t len)
+ypObject *yp_bytearrayC(yp_ssize_t len, const yp_uint8_t *source)
 {
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    return _ypBytesC(ypByteArray_CODE, source, len);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    return _ypBytesC(ypByteArray_CODE, len, source);
 }
 
 static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
@@ -10689,7 +10689,7 @@ static ypObject *_ypBytes(int type, ypObject *source)
         yp_ssize_t len = yp_index_asssizeC(source, &exc);
         if (yp_isexceptionC(exc)) return exc;
         if (len < 0) return yp_ValueError;
-        return _ypBytesC(type, NULL, len);
+        return _ypBytesC(type, len, NULL);
     } else if (source_pair == ypStr_CODE) {
         return yp_TypeError;
     } else {
@@ -11559,7 +11559,7 @@ static ypTypeObject ypChrArray_Type = {
 };
 
 static ypObject *_yp_asencodedCX(
-        ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding)
+        ypObject *s, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding)
 {
     if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_BAD_TYPE(s);
 
@@ -11576,12 +11576,12 @@ static ypObject *_yp_asencodedCX(
     return yp_None;
 }
 ypObject *yp_asencodedCX(
-        ypObject *s, const yp_uint8_t **encoded, yp_ssize_t *size, ypObject **encoding)
+        ypObject *s, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding)
 {
-    ypObject *result = _yp_asencodedCX(s, encoded, size, encoding);
+    ypObject *result = _yp_asencodedCX(s, size, encoded, encoding);
     if (yp_isexceptionC(result)) {
-        *encoded = NULL;
         if (size != NULL) *size = 0;
+        *encoded = NULL;
         *encoding = result;
     }
     return result;
@@ -11590,7 +11590,7 @@ ypObject *yp_asencodedCX(
 // Public constructors
 
 static ypObject *_ypStr_frombytes(
-        int type, const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors)
+        int type, yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors)
 {
     ypObject *result;
 
@@ -11598,8 +11598,8 @@ static ypObject *_ypStr_frombytes(
     if (yp_eq(encoding, yp_s_utf_8) != yp_True) return yp_NotImplementedError;
 
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    result = ypStringLib_decode_frombytesC_utf_8(type, source, len, errors);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    result = ypStringLib_decode_frombytesC_utf_8(type, len, source, errors);
     if (yp_isexceptionC(result)) return result;
     yp_ASSERT(ypObject_TYPE_CODE(result) == type, "text encoding didn't return correct type");
     ypStr_ASSERT_INVARIANTS(result);
@@ -11608,24 +11608,24 @@ static ypObject *_ypStr_frombytes(
 // TODO Be consistent and always put "len" params before the thing they are sizing. This breaks with
 // Python but, conceptually at least, you need the length of something before you use it.
 ypObject *yp_str_frombytesC4(
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors)
+        yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors)
 {
-    return _ypStr_frombytes(ypStr_CODE, source, len, encoding, errors);
+    return _ypStr_frombytes(ypStr_CODE, len, source, encoding, errors);
 }
 ypObject *yp_chrarray_frombytesC4(
-        const yp_uint8_t *source, yp_ssize_t len, ypObject *encoding, ypObject *errors)
+        yp_ssize_t len, const yp_uint8_t *source, ypObject *encoding, ypObject *errors)
 {
-    return _ypStr_frombytes(ypChrArray_CODE, source, len, encoding, errors);
+    return _ypStr_frombytes(ypChrArray_CODE, len, source, encoding, errors);
 }
-ypObject *yp_str_frombytesC2(const yp_uint8_t *source, yp_ssize_t len)
+ypObject *yp_str_frombytesC2(yp_ssize_t len, const yp_uint8_t *source)
 {
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    return ypStringLib_decode_frombytesC_utf_8(ypStr_CODE, source, len, yp_s_strict);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    return ypStringLib_decode_frombytesC_utf_8(ypStr_CODE, len, source, yp_s_strict);
 }
-ypObject *yp_chrarray_frombytesC2(const yp_uint8_t *source, yp_ssize_t len)
+ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source)
 {
-    if (!ypBytes_adjust_lenC(source, &len)) return yp_MemorySizeOverflowError;
-    return ypStringLib_decode_frombytesC_utf_8(ypChrArray_CODE, source, len, yp_s_strict);
+    if (!ypBytes_adjust_lenC(&len, source)) return yp_MemorySizeOverflowError;
+    return ypStringLib_decode_frombytesC_utf_8(ypChrArray_CODE, len, source, yp_s_strict);
 }
 
 static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
@@ -11642,7 +11642,7 @@ static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, y
 
     // TODO Python limits this to codecs that identify themselves as text encodings: do the same
     result = ypStringLib_decode_frombytesC_utf_8(
-            type, ypBytes_DATA(source), ypBytes_LEN(source), errors);
+            type, ypBytes_LEN(source), ypBytes_DATA(source), errors);
     if (yp_isexceptionC(result)) return result;
     yp_ASSERT(ypObject_TYPE_CODE(result) == type, "text encoding didn't return correct type");
     ypStr_ASSERT_INVARIANTS(result);
@@ -11665,7 +11665,7 @@ ypObject *yp_decode(ypObject *b)
 {
     if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_BAD_TYPE(b);
     return ypStringLib_decode_frombytesC_utf_8(
-            ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, ypBytes_DATA(b), ypBytes_LEN(b),
+            ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, ypBytes_LEN(b), ypBytes_DATA(b),
             yp_s_strict);
 }
 
@@ -13297,15 +13297,15 @@ static ypTypeObject ypList_Type = {
         TypeError_CallableMethods  // tp_as_callable
 };
 
-ypObject *yp_itemarrayCX(ypObject *seq, ypObject *const **array, yp_ssize_t *len)
+ypObject *yp_itemarrayCX(ypObject *seq, yp_ssize_t *len, ypObject *const **array)
 {
     if (ypObject_TYPE_PAIR_CODE(seq) != ypTuple_CODE) {
-        *array = NULL;
         *len = 0;
+        *array = NULL;
         return_yp_BAD_TYPE(seq);
     }
-    *array = ypTuple_ARRAY(seq);
     *len = ypTuple_LEN(seq);
+    *array = ypTuple_ARRAY(seq);
     return yp_None;
 }
 
@@ -19898,8 +19898,8 @@ void yp_o2i_setitemC(ypObject *container, ypObject *key, yp_int_t xC, ypObject *
     yp_decref(x);
 }
 
-ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t **encoded,
-        yp_ssize_t *size, ypObject **encoding)
+ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, yp_ssize_t *size,
+        const yp_uint8_t **encoded, ypObject **encoding)
 {
     ypObject *x;
     ypObject *result;
@@ -19913,15 +19913,15 @@ ypObject *yp_o2s_getitemCX(ypObject *container, ypObject *key, const yp_uint8_t 
     }
 
     x = yp_getitem(container, key);
-    result = yp_asencodedCX(x, encoded, size, encoding);
+    result = yp_asencodedCX(x, size, encoded, encoding);
     yp_decref(x);
     return result;
 }
 
 void yp_o2s_setitemC5(
-        ypObject *container, ypObject *key, const yp_uint8_t *xC, yp_ssize_t x_lenC, ypObject **exc)
+        ypObject *container, ypObject *key, yp_ssize_t x_lenC, const yp_uint8_t *xC, ypObject **exc)
 {
-    ypObject *x = yp_str_frombytesC2(xC, x_lenC);
+    ypObject *x = yp_str_frombytesC2(x_lenC, xC);
     yp_setitem(container, key, x, exc);
     yp_decref(x);
 }
@@ -19956,52 +19956,52 @@ void yp_i2i_setitemC(ypObject *container, yp_int_t keyC, yp_int_t xC, ypObject *
     yp_decref(key);
 }
 
-ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t keyC, const yp_uint8_t **encoded,
-        yp_ssize_t *size, ypObject **encoding)
+ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t keyC, yp_ssize_t *size,
+        const yp_uint8_t **encoded, ypObject **encoding)
 {
     ypObject *key = yp_intC(keyC);
-    ypObject *result = yp_o2s_getitemCX(container, key, encoded, size, encoding);
+    ypObject *result = yp_o2s_getitemCX(container, key, size, encoded, encoding);
     yp_decref(key);
     return result;
 }
 
 void yp_i2s_setitemC5(
-        ypObject *container, yp_int_t keyC, const yp_uint8_t *xC, yp_ssize_t x_lenC, ypObject **exc)
+        ypObject *container, yp_int_t keyC, yp_ssize_t x_lenC, const yp_uint8_t *xC, ypObject **exc)
 {
     ypObject *key = yp_intC(keyC);
-    yp_o2s_setitemC5(container, key, xC, x_lenC, exc);
+    yp_o2s_setitemC5(container, key, x_lenC, xC, exc);
     yp_decref(key);
 }
 
-ypObject *yp_s2o_getitemC3(ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC)
+ypObject *yp_s2o_getitemC3(ypObject *container, yp_ssize_t key_lenC, const yp_uint8_t *keyC)
 {
-    ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
+    ypObject *key = yp_str_frombytesC2(key_lenC, keyC);
     ypObject *x = yp_getitem(container, key);
     yp_decref(key);
     return x;
 }
 
-void yp_s2o_setitemC5(ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, ypObject *x,
+void yp_s2o_setitemC5(ypObject *container, yp_ssize_t key_lenC, const yp_uint8_t *keyC, ypObject *x,
         ypObject **exc)
 {
-    ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
+    ypObject *key = yp_str_frombytesC2(key_lenC, keyC);
     yp_setitem(container, key, x, exc);
     yp_decref(key);
 }
 
 yp_int_t yp_s2i_getitemC4(
-        ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, ypObject **exc)
+        ypObject *container, yp_ssize_t key_lenC, const yp_uint8_t *keyC, ypObject **exc)
 {
-    ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
+    ypObject *key = yp_str_frombytesC2(key_lenC, keyC);
     yp_int_t  x = yp_o2i_getitemC(container, key, exc);
     yp_decref(key);
     return x;
 }
 
-void yp_s2i_setitemC5(ypObject *container, const yp_uint8_t *keyC, yp_ssize_t key_lenC, yp_int_t xC,
+void yp_s2i_setitemC5(ypObject *container, yp_ssize_t key_lenC, const yp_uint8_t *keyC, yp_int_t xC,
         ypObject **exc)
 {
-    ypObject *key = yp_str_frombytesC2(keyC, key_lenC);
+    ypObject *key = yp_str_frombytesC2(key_lenC, keyC);
     yp_o2i_setitemC(container, key, xC, exc);
     yp_decref(key);
 }

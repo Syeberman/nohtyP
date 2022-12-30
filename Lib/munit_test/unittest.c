@@ -173,7 +173,7 @@ static ypObject *rand_obj_any_keyvalue1(const rand_obj_supplier_memo_t *memo)
     return result;
 }
 
-// TODO Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
+// XXX Interesting. 0 is a falsy byte, but '\x00' is not a falsy char.
 static ypObject *rand_obj_byte(void) { return yp_intC(munit_rand_int_range(0, 255)); }
 
 // TODO Return more than just latin-1 characters
@@ -260,7 +260,7 @@ static ypObject *new_rand_iter_func(ypObject *g, ypObject *value)
     new_rand_iter_state *state;
     yp_ssize_t           size;
     if (yp_isexceptionC(value)) return value;
-    assert_not_exception(yp_iter_stateCX(g, (void **)&state, &size));
+    assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
 
     if (state->n < 1) return yp_StopIteration;
@@ -296,7 +296,7 @@ static ypObject *new_faulty_iter_func(ypObject *g, ypObject *value)
     new_faulty_iter_state *state;
     yp_ssize_t             size;
     if (yp_isexceptionC(value)) return value;
-    assert_not_exception(yp_iter_stateCX(g, (void **)&state, &size));
+    assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
 
     if (state->n < 1) return state->exception;
@@ -737,7 +737,7 @@ static ypObject *new_rand_bytes(const rand_obj_supplier_memo_t *memo)
         yp_uint8_t source[16];
         yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
         munit_rand_memory((size_t)len, source);
-        result = yp_bytesC(source, len);  // FIXME I gotta flip these arguments around!
+        result = yp_bytesC(len, source);
         assert_not_exception(result);
         return result;
     }
@@ -797,7 +797,7 @@ static ypObject *new_rand_bytearray(const rand_obj_supplier_memo_t *memo)
         yp_uint8_t source[16];
         yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
         munit_rand_memory((size_t)len, source);
-        result = yp_bytearrayC(source, len);  // FIXME I gotta flip these arguments around!
+        result = yp_bytearrayC(len, source);
         assert_not_exception(result);
         return result;
     }
@@ -858,8 +858,7 @@ static ypObject *new_rand_str(const rand_obj_supplier_memo_t *memo)
         yp_uint8_t source[16];
         yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
         rand_ascii(len, source);
-        // FIXME I gotta flip these arguments around!
-        result = yp_str_frombytesC4(source, len, yp_s_utf_8, yp_s_strict);
+        result = yp_str_frombytesC4(len, source, yp_s_utf_8, yp_s_strict);
         assert_not_exception(result);
         return result;
     }
@@ -921,8 +920,7 @@ static ypObject *new_rand_chrarray(const rand_obj_supplier_memo_t *memo)
         yp_uint8_t source[16];
         yp_ssize_t len = munit_rand_int_range(1, yp_lengthof_array(source));
         rand_ascii(len, source);
-        // FIXME I gotta flip these arguments around!
-        result = yp_chrarray_frombytesC4(source, len, yp_s_utf_8, yp_s_strict);
+        result = yp_chrarray_frombytesC4(len, source, yp_s_utf_8, yp_s_strict);
         assert_not_exception(result);
         return result;
     }

@@ -295,12 +295,12 @@ EXAMPLE( Dictionaries, SmallExample )
  * work in quite the same way... */
 EXAMPLE( ConditionalStatements, ELIF )
 {
-    ypObject *cond1 = yp_bytesC( NULL, 0 );
+    ypObject *cond1 = yp_bytesC( 0, NULL );
     ypObject *cond2 = yp_intC( 5 );
     bool branch2_taken = false;
 
     yp_IF( cond1 ) {
-        ExpectUnreachable( );  // Will not be executed, yp_bytesC( NULL, 0 ) is false
+        ExpectUnreachable( );  // Will not be executed, yp_bytesC( 0, NULL) is false
     } yp_ELIF( cond2 ) {
         // Will be executed, yp_intC( 5 ) is true; yp_getindexC fails, but unlike Python this
         // doesn't trigger yp_ELSE_EXCEPT_AS
@@ -324,7 +324,7 @@ EXAMPLE( ConditionalStatements, ELIF )
  * discarded: yp_IFd handles this (the 'd' is for "discard"). */
 EXAMPLE( ConditionalStatements, IFd )
 {
-    ypObject *bytes = yp_bytesC( "ABCDE", -1 ); // -1 means "null-terminated"
+    ypObject *bytes = yp_bytesC( -1, "ABCDE" ); // -1 means "null-terminated"
     bool branch1_taken = false;
 
     // yp_getindexC returns a new reference that must be discarded, hence the use of yp_IFd
@@ -347,7 +347,7 @@ EXAMPLE( ConditionalStatements, IFd )
 /* Here's how you handle an exception occuring in one of your condition statements. */
 EXAMPLE( ConditionalStatements, EXCEPT_AS )
 {
-    ypObject *bytes = yp_bytesC( "ABCDE", -1 ); // -1 means "null-terminated"
+    ypObject *bytes = yp_bytesC( -1, "ABCDE" ); // -1 means "null-terminated"
     bool except_taken = false;
 
     // yp_getindexC will return yp_IndexError as 20 is not valid
@@ -372,7 +372,7 @@ EXAMPLE( ConditionalStatements, EXCEPT_AS )
 /* yp_FOR has an else clause, just like Python. */
 EXAMPLE( LoopStatements, FOR_ELSE )
 {
-    ypObject *bytes = yp_bytesC( "ABCDE", -1 ); // -1 means "null-terminated"
+    ypObject *bytes = yp_bytesC( -1, "ABCDE" ); // -1 means "null-terminated"
     ypObject *byte = yp_NameError;
     bool else_taken = false;
 
