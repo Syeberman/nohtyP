@@ -1219,7 +1219,7 @@ typedef struct _yp_parameter_decl_t {
     //
     // If name is /, the preceding parameters are positional-only. / cannot be the first parameter.
     // If / is in the middle, the corresponding argarray element will be NULL. If / is last, it is
-    // not included in argarray, and n will be one less than the number of parameters. / cannot come
+    // not included in argarray, and n will be one less than the number of parameters. / cannot be
     // after *, *args, or **kwargs.
     //
     // If name is *, the subsequent parameters are keyword-only. If * is first or in the middle, the

@@ -18356,7 +18356,7 @@ static ypObject *_ypFunction_parameter_kind(ypObject *name)
     ypStringLib_getindexXfunc getindexX;
 
     if (ypObject_TYPE_CODE(name) != ypStr_CODE) {
-        return_yp_BAD_TYPE(name);  // FIXME Should also be yp_ParameterSyntaxError
+        return_yp_BAD_TYPE(name);
     }
 
     len = ypStr_LEN(name);

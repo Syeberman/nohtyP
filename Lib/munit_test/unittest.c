@@ -1434,6 +1434,23 @@ yp_IMMORTAL_INT(int_5, 5);
 yp_IMMORTAL_INT(int_SLICE_DEFAULT, yp_SLICE_DEFAULT);
 yp_IMMORTAL_INT(int_SLICE_LAST, yp_SLICE_LAST);
 
+yp_IMMORTAL_BYTES(bytes_a, "a");
+yp_IMMORTAL_BYTES(bytes_b, "b");
+yp_IMMORTAL_BYTES(bytes_c, "c");
+yp_IMMORTAL_BYTES(bytes_d, "d");
+yp_IMMORTAL_BYTES(bytes_e, "e");
+
+yp_IMMORTAL_BYTES(bytes_slash, "/");
+yp_IMMORTAL_BYTES(bytes_star, "*");
+yp_IMMORTAL_BYTES(bytes_star_args, "*args");
+yp_IMMORTAL_BYTES(bytes_star_star_kwargs, "**kwargs");
+
+yp_IMMORTAL_STR_LATIN_1(str_a, "a");
+yp_IMMORTAL_STR_LATIN_1(str_b, "b");
+yp_IMMORTAL_STR_LATIN_1(str_c, "c");
+yp_IMMORTAL_STR_LATIN_1(str_d, "d");
+yp_IMMORTAL_STR_LATIN_1(str_e, "e");
+
 
 yp_ssize_t yp_lenC_not_raises(ypObject *container)
 {
