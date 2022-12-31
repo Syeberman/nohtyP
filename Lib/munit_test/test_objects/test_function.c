@@ -67,6 +67,74 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
         yp_decref(func);
     }
 
+    // flags must be zero.
+    {
+        yp_function_decl_t decl = {None_code, 0xFFFFFFFFu, 0, NULL, NULL, NULL};
+        assert_raises(yp_functionC(&decl), yp_ValueError);
+    }
+
+    // parameters_len cannot be negative.
+    {
+        yp_function_decl_t decl = {None_code, 0, -1, NULL, NULL, NULL};
+        assert_raises(yp_functionC(&decl), yp_ValueError);
+    }
+
+    // state_decl.size cannot be negative.
+    {
+        yp_state_decl_t state_decl = {-1};
+        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_ValueError);
+    }
+
+    // state_decl.offsets_len == -1 (array of objects) is not yet implemented.
+    {
+        yp_state_decl_t state_decl = {yp_sizeof(ypObject *), -1};
+        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_NotImplementedError);
+    }
+
+    // state_decl.offsets_len must be >= 0 or -1.
+    {
+        yp_state_decl_t state_decl = {yp_sizeof(ypObject *), -2};
+        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_ValueError);
+    }
+
+    // state_decl offsets cannot be negative.
+    {
+        static yp_state_decl_t state_decl = {yp_sizeof(ypObject *), 1, {-1}};
+        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_ValueError);
+    }
+
+    // state_decl objects must be fully contained in state.
+    {
+        static yp_state_decl_t state_decl = {yp_sizeof(ypObject *), 1, {1}};
+        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_ValueError);
+    }
+
+    // state_decl objects must be aligned.
+    {
+        static yp_state_decl_t state_decl = {1 + yp_sizeof(ypObject *), 1, {1}};
+        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_SystemLimitationError);
+    }
+
+    // There is a maximum to the state_decl object offsets.
+    {
+        static yp_state_decl_t state_decl = {33 * yp_sizeof(ypObject *), 1, {32 * yp_sizeof(ypObject *)}};
+        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_SystemLimitationError);
+    }
+
+    // state is not yet implemented.
+    {
+        yp_state_decl_t state_decl = {1};
+        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        assert_raises(yp_functionC(&decl), yp_NotImplementedError);
+    }
+
     // Invalid signatures.
     {
         yp_ssize_t  i;
@@ -127,8 +195,6 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
         yp_function_decl_t decl = {None_code, 0, signature.n, signature.params, NULL, NULL};
         assert_raises(yp_functionC(&decl), yp_OSError);
     }
-
-    // TODO flags not zero
 
     return MUNIT_OK;
 }
