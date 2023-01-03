@@ -10852,6 +10852,8 @@ static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
     return yp_chrC(ypStr_ENC(s)->getindexX(ypStr_DATA(s), i));
 }
 
+#define str_getslice ypStringLib_getslice
+
 static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
 {
     ypObject                  *result;
@@ -11384,7 +11386,7 @@ static ypSequenceMethods ypStr_as_sequence = {
         str_concat,                   // tp_concat
         ypStringLib_repeat,           // tp_repeat
         str_getindex,                 // tp_getindex
-        ypStringLib_getslice,         // tp_getslice
+        str_getslice,                 // tp_getslice
         str_find,                     // tp_find
         str_count,                    // tp_count
         MethodError_objssizeobjproc,  // tp_setindex
@@ -18402,7 +18404,8 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     int remaining_are_keyword_only = FALSE;  // all after * or *args are kw-only
     int must_have_default = FALSE;           // if a parameter has a default, all until * must also
 
-    // ypObject *param_names;  // a yp_set used to detect duplicate names
+    ypObject *param_names;       // a set used to detect duplicate names
+    ypObject *result = yp_None;  // set to exception on error
 
     yp_ASSERT1(!(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED));  // need only be called once
 
@@ -18412,19 +18415,21 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     }
 
     // FIXME We could give yp_set a hint as to how big this will be.
-    // param_names = yp_setN(0);
+    param_names = yp_setN(0);  // new ref
     for (i = 0; i < params_len; i++) {
         yp_parameter_decl_t param = ypFunction_PARAMS(f)[i];
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
-        // ypObject *              param_name = NULL;  // actual name, stripping leading * or **
+        ypObject           *param_name = NULL;  // actual name, stripping leading * or **
 
         if (param_kind == yp_s_slash) {
             if (n_positional_or_keyword < 1 || n_positional_only > 0 ||
                     remaining_are_keyword_only) {
                 // Invalid: (/), (a, /, /), (*, /), (a, *, /), (*, a, /), (*args, /)
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             } else if (param.default_ != NULL) {
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             }
             // The previous positional-or-keyword arguments were actually positional-only.
             n_positional_only = n_positional_or_keyword;
@@ -18432,26 +18437,30 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
         } else if (param_kind == yp_s_star || param_kind == yp_s_star_args) {
             if (remaining_are_keyword_only) {
                 // Invalid: (*, *, a), (*, *args), (*args, *, a), (*args, *args)
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             } else if (param.default_ != NULL) {
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             }
             remaining_are_keyword_only = TRUE;
             must_have_default = FALSE;
             if (param_kind == yp_s_star_args) {
                 has_var_positional = TRUE;
-                // param_name = string_getslice(param.name, 1, yp_SLICE_LAST, 1);
+                param_name = str_getslice(param.name, 1, yp_SLICE_LAST, 1);  // new ref
             }
         } else if (param_kind == yp_s_star_star_kwargs) {
             if (i != params_len - 1) {
                 // Invalid: (**kwargs, a), (**kwargs, /), (**kwargs, *, a), (**kwargs, *args),
                 // (**kwargs, **kwargs)
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             } else if (param.default_ != NULL) {
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             }
             has_var_keyword = TRUE;
-            // param_name = string_getslice(param.name, 2, yp_SLICE_LAST, 1);
+            param_name = str_getslice(param.name, 2, yp_SLICE_LAST, 1);  // new ref
         } else if (param_kind == yp_None) {
             if (remaining_are_keyword_only) {
                 has_keyword_only = TRUE;
@@ -18459,39 +18468,45 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
                 if (param.default_ != NULL) {
                     must_have_default = TRUE;
                 } else if (must_have_default) {
-                    return yp_ParameterSyntaxError;
+                    result = yp_ParameterSyntaxError;
+                    break;
                 }
                 n_positional_or_keyword += 1;
             }
-            // param_name = yp_incref(param.name);
+            param_name = yp_incref(param.name);  // new ref
         } else {
             yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
-            return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
+            result = yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
+            break;
         }
 
-        // FIXME: Implement str_isidentifier, string_getslice, then enable this.
-        // FIXME Place this code in a separate helper function.
-        // if (param_name != NULL) {
-        //     ypObject *result = str_isidentifier(param_name);
-        //     if (result != yp_True) {
-        //         // Invalid: (1), (*1), (**1)
-        //         yp_ASSERT(result == yp_False || yp_isexceptionC(result),
-        //                 "unexpected return from str_isidentifier");
-        //         yp_decref(param_name);
-        //         return yp_isexceptionC(result) ? result : yp_ParameterSyntaxError;
-        //     }
+        if (param_name != NULL) {
+            // FIXME: Implement str_isidentifier, then enable this.
+            // result = str_isidentifier(param_name);
+            // if (result != yp_True) {
+            //     // Invalid: (1), (*1), (**1)
+            //     if (result == yp_False) result = yp_ParameterSyntaxError;
+            //     yp_ASSERT(yp_isexceptionC(result), "unexpected return from str_isidentifier");
+            //     yp_decref(param_name);
+            //     break;
+            // }
 
-        //     result = set_pushunique(param_names, param_name);
-        //     if (result != yp_None) {
-        //         // Invalid: (a, a), (a, *a), (a, **a)
-        //         yp_ASSERT(yp_isexceptionC(result), "unexpected return from set_pushunique");
-        //         yp_decref(param_name);
-        //         return result == yp_KeyError ? yp_ParameterSyntaxError : result;
-        //     }
-        //     yp_decref(param_name);
-        // }
+            result = set_pushunique(param_names, param_name);
+            if (result != yp_None) {
+                // Invalid: (a, a), (a, *a), (a, **a), (*a, a), (*a, **a)
+                if (result == yp_KeyError) result = yp_ParameterSyntaxError;
+                yp_ASSERT(yp_isexceptionC(result), "unexpected return from set_pushunique");
+                yp_decref(param_name);
+                break;
+            }
+            yp_decref(param_name);
+        }
     }
-    // yp_decref(param_names);
+    yp_decref(param_names);
+    if (result != yp_None) {
+        yp_ASSERT(yp_isexceptionC(result), "result set to non-exception");
+        return yp_isexceptionC(result) ? result : yp_SystemError;
+    }
 
     if (remaining_are_keyword_only && !has_var_positional && !has_keyword_only) {
         // Invalid: (*), (*, **kwargs) (named arguments must follow bare *)

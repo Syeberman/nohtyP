@@ -164,10 +164,13 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     // Invalid signatures.
     {
         yp_ssize_t i;
+        yp_IMMORTAL_STR_LATIN_1_static(str_1, "1");
+        yp_IMMORTAL_STR_LATIN_1_static(str_star_a, "*a");
+        yp_IMMORTAL_STR_LATIN_1_static(str_star_1, "*1");
         yp_IMMORTAL_STR_LATIN_1_static(str_star_star, "**");
+        yp_IMMORTAL_STR_LATIN_1_static(str_star_star_a, "**a");
+        yp_IMMORTAL_STR_LATIN_1_static(str_star_star_1, "**1");
         signature_t signatures[] = {
-                {1, {{yp_str_empty}}},  // name must be an identifier
-                // FIXME name must be a valid Python identifier
                 {1, {{yp_s_slash}}},                            // / cannot be first
                 {2, {{yp_s_star}, {yp_s_slash}}},               // / cannot be after *
                 {3, {{str_a}, {yp_s_star}, {yp_s_slash}}},      // / cannot be after *
@@ -193,10 +196,20 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 {2, {{str_a, int_0}, {str_b}}},                // Defaults on remaining pos. args
                 {3, {{str_a, int_0}, {str_b}, {yp_s_slash}}},  // Defaults on remaining pos. args
                 {3, {{str_a, int_0}, {yp_s_slash}, {str_b}}},  // Defaults on remaining pos. args
-                // FIXME *name must be a valid Python identifier
-                {1, {{str_star_star}}},  // **name must be an identifier
-                                         // FIXME **name must be a valid Python identifier
-                // FIXME name must not be repeated (so test *args, *another above?)
+
+                // Non-identifiers
+                {1, {{yp_str_empty}}},
+                // FIXME Implement str_isidentifier: {1, {{str_1}}},
+                // FIXME Implement str_isidentifier: {1, {{str_star_1}}},
+                {1, {{str_star_star}}},
+                // FIXME Implement str_isidentifier: {1, {{str_star_star_1}}},
+
+                // Non-unique names
+                {2, {{str_a}, {str_a}}},
+                {2, {{str_a}, {str_star_a}}},
+                {2, {{str_a}, {str_star_star_a}}},
+                {2, {{str_star_a}, {str_a}}},
+                {2, {{str_star_a}, {str_star_star_a}}},
         };
         for (i = 0; i < yp_lengthof_array(signatures); i++) {
             signature_t        signature = signatures[i];
