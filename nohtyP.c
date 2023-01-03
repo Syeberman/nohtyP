@@ -18379,6 +18379,8 @@ static ypObject *_ypFunction_parameter_kind(ypObject *name)
             return yp_None;  // just a regular parameter
         } else if (getindexX(name_data, 1) != '*') {
             return yp_s_star_args;
+        } else if (name_len < 3) {
+            return yp_ParameterSyntaxError;
         } else {
             return yp_s_star_star_kwargs;
         }
@@ -18419,7 +18421,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
         if (param_kind == yp_s_slash) {
             if (n_positional_or_keyword < 1 || n_positional_only > 0 ||
                     remaining_are_keyword_only) {
-                // Invalid: (/), (a, /, /), (*, /), (*args, /)
+                // Invalid: (/), (a, /, /), (*, /), (a, *, /), (*, a, /), (*args, /)
                 return yp_ParameterSyntaxError;
             } else if (param.default_ != NULL) {
                 return yp_ParameterSyntaxError;

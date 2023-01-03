@@ -37,18 +37,43 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     {
         yp_ssize_t  i;
         signature_t signatures[] = {
-                {0, {}},                                     // def f()
-                {1, {{str_a}}},                              // def f(a)
-                {1, {{str_a, yp_None}}},                     // def f(a=None)
-                {1, {{str_a, yp_NameError}}},                // def f(a=<exception>)
-                {2, {{str_a}, {yp_s_slash}}},                // def f(a, /)
-                {2, {{str_a, yp_None}, {yp_s_slash}}},       // def f(a=None, /)
-                {2, {{str_a, yp_NameError}, {yp_s_slash}}},  // def f(a=<exception>, /)
-                {2, {{yp_s_star}, {str_a}}},                 // def f(*, a)
-                {2, {{yp_s_star}, {str_a, yp_None}}},        // def f(*, a=None)
-                {2, {{yp_s_star}, {str_a, yp_NameError}}},   // def f(*, a=<exception>)
-                {1, {{yp_s_star_args}}},                     // def f(*args)
-                {1, {{yp_s_star_star_kwargs}}},              // def f(**kwargs)
+                {0, {}},                                                  // def f()
+                {1, {{str_a}}},                                           // def f(a)
+                {2, {{str_a}, {str_b}}},                                  // def f(a, b)
+                {1, {{str_a, int_0}}},                                    // def f(a=0)
+                {1, {{str_a, yp_NameError}}},                             // def f(a=<exc>)
+                {2, {{str_a, int_0}, {str_b, int_0}}},                    // def f(a=0, b=0)
+                {2, {{str_a}, {yp_s_slash}}},                             // def f(a, /)
+                {3, {{str_a}, {yp_s_slash}, {str_b}}},                    // def f(a, /, b)
+                {3, {{str_a}, {str_b}, {yp_s_slash}}},                    // def f(a, b, /)
+                {2, {{str_a, int_0}, {yp_s_slash}}},                      // def f(a=0, /)
+                {2, {{str_a, yp_NameError}, {yp_s_slash}}},               // def f(a=<exc>, /)
+                {3, {{str_a, int_0}, {str_b, int_0}, {yp_s_slash}}},      // def f(a=0, b=0, /)
+                {3, {{str_a, int_0}, {yp_s_slash}, {str_b, int_0}}},      // def f(a=0, /, b=0)
+                {2, {{yp_s_star}, {str_a}}},                              // def f(*, a)
+                {3, {{yp_s_star}, {str_a}, {str_b}}},                     // def f(*, a, b)
+                {3, {{str_a}, {yp_s_star}, {str_b}}},                     // def f(a, *, b)
+                {2, {{yp_s_star}, {str_a, int_0}}},                       // def f(*, a=0)
+                {2, {{yp_s_star}, {str_a, yp_NameError}}},                // def f(*, a=<exc>)
+                {3, {{yp_s_star}, {str_a, int_0}, {str_b}}},              // def f(*, a=0, b)
+                {3, {{yp_s_star}, {str_a, int_0}, {str_b, int_0}}},       // def f(*, a=0, b=0)
+                {3, {{str_a, int_0}, {yp_s_star}, {str_b}}},              // def f(a=0, *, b)
+                {3, {{str_a, int_0}, {yp_s_star}, {str_b, int_0}}},       // def f(a=0, *, b=0)
+                {1, {{yp_s_star_args}}},                                  // def f(*args)
+                {2, {{yp_s_star_args}, {str_a}}},                         // def f(*args, a)
+                {3, {{yp_s_star_args}, {str_a}, {str_b}}},                // def f(*args, a, b)
+                {3, {{str_a}, {yp_s_star_args}, {str_b}}},                // def f(a, *args, b)
+                {2, {{yp_s_star_args}, {str_a, int_0}}},                  // def f(*args, a=0)
+                {2, {{yp_s_star_args}, {str_a, yp_NameError}}},           // def f(*args, a=<exc>)
+                {3, {{yp_s_star_args}, {str_a, int_0}, {str_b}}},         // def f(*args, a=0, b)
+                {3, {{yp_s_star_args}, {str_a, int_0}, {str_b, int_0}}},  // def f(*args, a=0, b=0)
+                {3, {{str_a, int_0}, {yp_s_star_args}, {str_b}}},         // def f(a=0, *args, b)
+                {3, {{str_a, int_0}, {yp_s_star_args}, {str_b, int_0}}},  // def f(a=0, *args, b=0)
+                {1, {{yp_s_star_star_kwargs}}},                           // def f(**kwargs)
+                {6, {{str_a}, {yp_s_slash}, {str_b}, {yp_s_star}, {str_c},
+                            {yp_s_star_star_kwargs}}},  // def f(a, /, b, *, c, **kwargs)
+                {6, {{str_a}, {yp_s_slash}, {str_b}, {yp_s_star_args}, {str_c},
+                            {yp_s_star_star_kwargs}}},  // def f(a, /, b, *args, c, **kwargs)
         };
         for (i = 0; i < yp_lengthof_array(signatures); i++) {
             signature_t        signature = signatures[i];
@@ -81,21 +106,21 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
     // state_decl.size cannot be negative.
     {
-        yp_state_decl_t state_decl = {-1};
+        yp_state_decl_t    state_decl = {-1};
         yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_ValueError);
     }
 
     // state_decl.offsets_len == -1 (array of objects) is not yet implemented.
     {
-        yp_state_decl_t state_decl = {yp_sizeof(ypObject *), -1};
+        yp_state_decl_t    state_decl = {yp_sizeof(ypObject *), -1};
         yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_NotImplementedError);
     }
 
     // state_decl.offsets_len must be >= 0 or -1.
     {
-        yp_state_decl_t state_decl = {yp_sizeof(ypObject *), -2};
+        yp_state_decl_t    state_decl = {yp_sizeof(ypObject *), -2};
         yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_ValueError);
     }
@@ -103,55 +128,75 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     // state_decl offsets cannot be negative.
     {
         static yp_state_decl_t state_decl = {yp_sizeof(ypObject *), 1, {-1}};
-        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        yp_function_decl_t     decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_ValueError);
     }
 
     // state_decl objects must be fully contained in state.
     {
         static yp_state_decl_t state_decl = {yp_sizeof(ypObject *), 1, {1}};
-        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        yp_function_decl_t     decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_ValueError);
     }
 
     // state_decl objects must be aligned.
     {
         static yp_state_decl_t state_decl = {1 + yp_sizeof(ypObject *), 1, {1}};
-        yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
+        yp_function_decl_t     decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_SystemLimitationError);
     }
 
     // There is a maximum to the state_decl object offsets.
     {
-        static yp_state_decl_t state_decl = {33 * yp_sizeof(ypObject *), 1, {32 * yp_sizeof(ypObject *)}};
+        static yp_state_decl_t state_decl = {
+                33 * yp_sizeof(ypObject *), 1, {32 * yp_sizeof(ypObject *)}};
         yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_SystemLimitationError);
     }
 
     // state is not yet implemented.
     {
-        yp_state_decl_t state_decl = {1};
+        yp_state_decl_t    state_decl = {1};
         yp_function_decl_t decl = {None_code, 0, 0, NULL, NULL, &state_decl};
         assert_raises(yp_functionC(&decl), yp_NotImplementedError);
     }
 
     // Invalid signatures.
     {
-        yp_ssize_t  i;
+        yp_ssize_t i;
+        yp_IMMORTAL_STR_LATIN_1_static(str_star_star, "**");
         signature_t signatures[] = {
                 {1, {{yp_str_empty}}},  // name must be an identifier
                 // FIXME name must be a valid Python identifier
-                {1, {{yp_s_slash}}},                            // / cannot be the first parameter
+                {1, {{yp_s_slash}}},                            // / cannot be first
                 {2, {{yp_s_star}, {yp_s_slash}}},               // / cannot be after *
+                {3, {{str_a}, {yp_s_star}, {yp_s_slash}}},      // / cannot be after *
+                {3, {{yp_s_star}, {str_a}, {yp_s_slash}}},      // / cannot be after *
                 {2, {{yp_s_star_args}, {yp_s_slash}}},          // / cannot be after *args
                 {2, {{yp_s_star_star_kwargs}, {yp_s_slash}}},   // / cannot be after **kwargs
+                {3, {{str_a}, {yp_s_slash}, {yp_s_slash}}},     // At most one /
+                {2, {{str_a}, {yp_s_slash, int_0}}},            // / cannot have default
                 {1, {{yp_s_star}}},                             // * cannot be last
                 {2, {{yp_s_star}, {yp_s_star_star_kwargs}}},    // * cannot be imm. before **kwargs
+                {3, {{yp_s_star}, {yp_s_star}, {str_a}}},       // At most one *
                 {2, {{yp_s_star}, {yp_s_star_args}}},           // * or *args, not both
                 {3, {{yp_s_star_args}, {yp_s_star}, {str_a}}},  // * or *args, not both
+                {2, {{yp_s_star, int_0}, {str_a}}},             // * cannot have default
+                {2, {{yp_s_star_args}, {yp_s_star_args}}},      // At most one *args
+                {1, {{yp_s_star_args, int_0}}},                 // *args cannot have default
+                {2, {{yp_s_star_star_kwargs}, {str_a}}},        // **kwargs must be last
+                {2, {{yp_s_star_star_kwargs}, {yp_s_slash}}},   // **kwargs must be last
+                {3, {{yp_s_star_star_kwargs}, {yp_s_star}, {str_a}}},     // **kwargs must be last
+                {2, {{yp_s_star_star_kwargs}, {yp_s_star_args}}},         // **kwargs must be last
+                {2, {{yp_s_star_star_kwargs}, {yp_s_star_star_kwargs}}},  // At most one **kwargs
+                {1, {{yp_s_star_star_kwargs, int_0}}},         // **kwargs cannot have default
+                {2, {{str_a, int_0}, {str_b}}},                // Defaults on remaining pos. args
+                {3, {{str_a, int_0}, {str_b}, {yp_s_slash}}},  // Defaults on remaining pos. args
+                {3, {{str_a, int_0}, {yp_s_slash}, {str_b}}},  // Defaults on remaining pos. args
                 // FIXME *name must be a valid Python identifier
-                // FIXME **name must be a valid Python identifier
-                // FIXME name must not be repeated
+                {1, {{str_star_star}}},  // **name must be an identifier
+                                         // FIXME **name must be a valid Python identifier
+                // FIXME name must not be repeated (so test *args, *another above?)
         };
         for (i = 0; i < yp_lengthof_array(signatures); i++) {
             signature_t        signature = signatures[i];

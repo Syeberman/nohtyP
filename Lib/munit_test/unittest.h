@@ -253,12 +253,17 @@ extern "C" {
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
 #define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
 
-#define _assert_isexception(obj, expected, obj_fmt, expected_fmt, ...)                        \
-    do {                                                                                      \
-        if (!yp_isexceptionC2(obj, expected)) {                                               \
-            munit_errorf("assertion failed: yp_isexceptionC2(" obj_fmt ", " expected_fmt ")", \
-                    __VA_ARGS__);                                                             \
-        }                                                                                     \
+#define _assert_isexception(obj, expected, obj_fmt, expected_fmt, ...)                            \
+    do {                                                                                          \
+        if (!yp_isexceptionC(obj)) {                                                              \
+            munit_errorf("assertion failed: yp_isexceptionC(" obj_fmt ") (expected " expected_fmt \
+                         ")",                                                                     \
+                    __VA_ARGS__);                                                                 \
+        }                                                                                         \
+        if (!yp_isexceptionC2(obj, expected)) {                                                   \
+            munit_errorf("assertion failed: yp_isexceptionC2(" obj_fmt ", " expected_fmt ")",     \
+                    __VA_ARGS__);                                                                 \
+        }                                                                                         \
     } while (0)
 
 #define assert_isexception(obj, expected)                                                        \
@@ -275,6 +280,11 @@ extern "C" {
     do {                                                                          \
         ypObject *exc = yp_None;                                                  \
         statement;                                                                \
+        if (!yp_isexceptionC(exc)) {                                              \
+            munit_errorf("assertion failed: " statement_fmt                       \
+                         "; yp_isexceptionC(exc) (expected " expected_fmt ")",    \
+                    __VA_ARGS__);                                                 \
+        }                                                                         \
         if (!yp_isexceptionC2(exc, expected)) {                                   \
             munit_errorf("assertion failed: " statement_fmt                       \
                          "; yp_isexceptionC2(exc, " expected_fmt ")",             \
