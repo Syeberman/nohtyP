@@ -1220,19 +1220,21 @@ typedef struct _yp_parameter_decl_t {
     // If name is /, the preceding parameters are positional-only. / cannot be the first parameter.
     // If / is in the middle, the corresponding argarray element will be NULL. If / is last, it is
     // not included in argarray, and n will be one less than the number of parameters. / cannot be
-    // after *, *args, or **kwargs.
+    // after *, *args, or **kwargs. At most one / may be present.
     //
     // If name is *, the subsequent parameters are keyword-only. If * is first or in the middle, the
     // corresponding argarray element will be NULL. * cannot be last, and cannot be immediately
-    // followed by **kwargs. At most one of * or *args may be present.
+    // before **kwargs. At most one * may be present; * and *args cannot both be present.
     //
     // If name starts with a single *, the corresponding argarray element will be a (possibly empty)
-    // tuple receiving any excess positional arguments. Any subsequent parameters are keyword-only.
-    // The string after * must be a valid Python identifier. Conventionally named *args.
+    // tuple receiving any excess positional arguments. Typically named *args. Any subsequent
+    // parameters are keyword-only. The string after * must be a valid Python identifier. At most
+    // one *args may be present.
     //
     // If name starts with **, the corresponding argarray element will be a (possibly empty)
-    // frozendict receiving any excess keyword arguments. If present, this parameter must be last.
-    // The string after ** must be a valid Python identifier. Conventionally named **kwargs.
+    // frozendict receiving any excess keyword arguments. Typically named **kwargs. If present, this
+    // parameter must be last. The string after ** must be a valid Python identifier. At most one
+    // **kwargs may be present.
     //
     // For convenience using these special forms, nohtyP exports the following immortal strs:
     // yp_s_slash, yp_s_star, yp_s_star_args, yp_s_star_star_kwargs.
