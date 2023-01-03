@@ -18351,7 +18351,7 @@ yp_IMMORTAL_INVALIDATED(ypFunction_key_missing);
 // parameter list.
 static ypObject *_ypFunction_parameter_kind(ypObject *name)
 {
-    yp_ssize_t                len;
+    yp_ssize_t                name_len;
     const void               *name_data;
     ypStringLib_getindexXfunc getindexX;
 
@@ -18359,12 +18359,12 @@ static ypObject *_ypFunction_parameter_kind(ypObject *name)
         return_yp_BAD_TYPE(name);
     }
 
-    len = ypStr_LEN(name);
+    name_len = ypStr_LEN(name);
     name_data = ypStr_DATA(name);
     getindexX = ypStr_ENC(name)->getindexX;
-    if (len < 1) {
+    if (name_len < 1) {
         return yp_ParameterSyntaxError;
-    } else if (len == 1) {
+    } else if (name_len == 1) {
         yp_uint32_t ch = getindexX(name_data, 0);
         if (ch == '/') {
             return yp_s_slash;
@@ -18429,7 +18429,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             n_positional_or_keyword = 0;
         } else if (param_kind == yp_s_star || param_kind == yp_s_star_args) {
             if (remaining_are_keyword_only) {
-                // Invalid: (*, *), (*args, *), (*, *args), (*args, *args)
+                // Invalid: (*, *, a), (*, *args), (*args, *, a), (*args, *args)
                 return yp_ParameterSyntaxError;
             } else if (param.default_ != NULL) {
                 return yp_ParameterSyntaxError;
@@ -18442,7 +18442,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             }
         } else if (param_kind == yp_s_star_star_kwargs) {
             if (i != params_len - 1) {
-                // Invalid: (**kwargs, a), (**kwargs, /), (**kwargs, *), (**kwargs, *args),
+                // Invalid: (**kwargs, a), (**kwargs, /), (**kwargs, *, a), (**kwargs, *args),
                 // (**kwargs, **kwargs)
                 return yp_ParameterSyntaxError;
             } else if (param.default_ != NULL) {
@@ -18451,16 +18451,14 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             has_var_keyword = TRUE;
             // param_name = string_getslice(param.name, 2, yp_SLICE_LAST, 1);
         } else if (param_kind == yp_None) {
-            if (must_have_default) {
-                if (param.default_ == NULL) {
-                    return yp_ParameterSyntaxError;
-                }
-            } else if (param.default_ != NULL) {
-                must_have_default = TRUE;
-            }
             if (remaining_are_keyword_only) {
                 has_keyword_only = TRUE;
             } else {
+                if (param.default_ != NULL) {
+                    must_have_default = TRUE;
+                } else if (must_have_default) {
+                    return yp_ParameterSyntaxError;
+                }
                 n_positional_or_keyword += 1;
             }
             // param_name = yp_incref(param.name);
