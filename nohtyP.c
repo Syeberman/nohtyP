@@ -1415,6 +1415,7 @@ ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
     _yp_IMMORTAL_FUNCTION_OBJECT(_yp_NOQUAL, name, code, 0, NULL)
 #define yp_IMMORTAL_FUNCTION2_static(name, code) \
     _yp_IMMORTAL_FUNCTION_OBJECT(static, name, code, 0, NULL)
+// FIXME an *args/**kwargs shortcut?
 
 #pragma endregion common_immortals
 

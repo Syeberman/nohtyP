@@ -21,19 +21,28 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
     return result;
 }
 
-#define assert_captured_f(capture, op, expected)                                                 \
-    do {                                                                                         \
-        ypObject *_ypmt_CAPT_f = yp_getindexC((capture), 0); /* new ref */                       \
-        ypObject *_ypmt_CAPT_expected = (expected);                                              \
-        _assert_not_exception(_ypmt_CAPT_f, "yp_getindexC(%s, 0)", #capture);                    \
-        _assert_obj(_ypmt_CAPT_f, op, _ypmt_CAPT_expected, "<%s f>", "%s", #capture, #expected); \
-        yp_decref(_ypmt_CAPT_f);                                                                 \
+#define assert_captured_f(captured, op, expected)                                                 \
+    do {                                                                                          \
+        ypObject *_ypmt_CAPT_f = yp_getindexC((captured), 0); /* new ref */                       \
+        ypObject *_ypmt_CAPT_expected = (expected);                                               \
+        _assert_not_exception(_ypmt_CAPT_f, "yp_getindexC(%s, 0)", #captured);                    \
+        _assert_obj(_ypmt_CAPT_f, op, _ypmt_CAPT_expected, "<%s f>", "%s", #captured, #expected); \
+        yp_decref(_ypmt_CAPT_f);                                                                  \
     } while (0)
+
+// Declares a variable name of type ypObject * and initializes it with a new reference to a function
+// object. The parameters argument must be surrounded by parentheses.
+#define define_function(name, code, parameters)                                                     \
+    yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                               \
+    yp_function_decl_t  _##name##_declaration = {                                                   \
+            (code), 0, yp_lengthof_array(_##name##_parameters), _##name##_parameters, NULL, NULL}; \
+    ypObject *name = yp_functionC(&_##name##_declaration)
 
 
 static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 {
     // Valid signatures.
+    // FIXME Use define_function somehow?
     {
         yp_ssize_t  i;
         signature_t signatures[] = {
@@ -162,6 +171,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Invalid signatures.
+    // FIXME Use define_function somehow?
     {
         yp_ssize_t i;
         yp_IMMORTAL_STR_LATIN_1_static(str_1, "1");
@@ -219,6 +229,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Parameter names must be strs.
+    // FIXME Use define_function somehow?
     {
         yp_ssize_t  i;
         ypObject   *chrarray_a = yp_chrarray(str_a);
@@ -249,16 +260,80 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
     // Keep the exception if name is an exception.
     {
-        signature_t        signature = {1, {{yp_OSError}}};
-        yp_function_decl_t decl = {None_code, 0, signature.n, signature.params, NULL, NULL};
-        assert_raises(yp_functionC(&decl), yp_OSError);
+        define_function(f, None_code, ({yp_OSError}));
+        assert_isexception(f, yp_OSError);
     }
 
     return MUNIT_OK;
 }
 
+// FIXME test_new_immortal: test the yp_IMMORTAL_FUNCTION/etc "constructors"
 
-MunitTest test_function_tests[] = {TEST(test_newC, NULL), {NULL}};
+static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
+{
+    {
+        define_function(f, capture_code, ());
+        ypObject *captured = any_callN(f, 0);
+        assert_captured_f(captured, is, f);
+        yp_decrefN(N(f, captured));
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_callN(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_callN(yp_callN);
+}
+
+// Accepts the yp_callN signature and instead calls yp_call_stars. For use in _test_callN. n must be
+// >= 0.
+static ypObject *callN_to_call_stars(ypObject *c, int n, ...)
+{
+    va_list   args;
+    ypObject *as_tuple;
+    ypObject *result;
+
+    va_start(args, n);
+    as_tuple = yp_tupleNV(n, args);  // new ref
+    va_end(args);
+
+    result = yp_call_stars(c, as_tuple, yp_frozendict_empty);
+    yp_decref(as_tuple);
+    return result;
+}
+
+static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_callN(callN_to_call_stars);
+}
+
+// Accepts the yp_callN signature and instead calls yp_call_arrayX. For use in _test_callN. n must
+// be >= 0.
+static ypObject *callN_to_call_arrayX(ypObject *c, int n, ...)
+{
+    va_list   args;
+    ypObject *as_array[n + 1];
+    int       i;
+
+    va_start(args, n);
+    as_array[0] = c;  // the callable is at args[0]
+    for (i = 0; i < n; i++) {
+        as_array[i + 1] = va_arg(args, ypObject *);  // arguments start at args[1]
+    }
+    va_end(args);
+
+    return yp_call_arrayX(n + 1, as_array);
+}
+
+static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_callN(callN_to_call_arrayX);
+}
+
+
+MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_callN, NULL),
+        TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL), {NULL}};
 
 
 extern void test_function_initialize(void) {}
