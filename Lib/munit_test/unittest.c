@@ -1419,39 +1419,6 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array)
 }
 
 
-yp_IMMORTAL_INT(int_neg_5, -5);
-yp_IMMORTAL_INT(int_neg_4, -4);
-yp_IMMORTAL_INT(int_neg_3, -3);
-yp_IMMORTAL_INT(int_neg_2, -2);
-yp_IMMORTAL_INT(int_neg_1, -1);
-yp_IMMORTAL_INT(int_0, 0);
-yp_IMMORTAL_INT(int_1, 1);
-yp_IMMORTAL_INT(int_2, 2);
-yp_IMMORTAL_INT(int_3, 3);
-yp_IMMORTAL_INT(int_4, 4);
-yp_IMMORTAL_INT(int_5, 5);
-
-yp_IMMORTAL_INT(int_SLICE_DEFAULT, yp_SLICE_DEFAULT);
-yp_IMMORTAL_INT(int_SLICE_LAST, yp_SLICE_LAST);
-
-yp_IMMORTAL_BYTES(bytes_a, "a");
-yp_IMMORTAL_BYTES(bytes_b, "b");
-yp_IMMORTAL_BYTES(bytes_c, "c");
-yp_IMMORTAL_BYTES(bytes_d, "d");
-yp_IMMORTAL_BYTES(bytes_e, "e");
-
-yp_IMMORTAL_BYTES(bytes_slash, "/");
-yp_IMMORTAL_BYTES(bytes_star, "*");
-yp_IMMORTAL_BYTES(bytes_star_args, "*args");
-yp_IMMORTAL_BYTES(bytes_star_star_kwargs, "**kwargs");
-
-yp_IMMORTAL_STR_LATIN_1(str_a, "a");
-yp_IMMORTAL_STR_LATIN_1(str_b, "b");
-yp_IMMORTAL_STR_LATIN_1(str_c, "c");
-yp_IMMORTAL_STR_LATIN_1(str_d, "d");
-yp_IMMORTAL_STR_LATIN_1(str_e, "e");
-
-
 yp_ssize_t yp_lenC_not_raises(ypObject *container)
 {
     yp_ssize_t result;

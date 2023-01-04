@@ -595,40 +595,6 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 #define obj_array_decref(array) obj_array_decref2(yp_lengthof_array(array), (array))
 
 
-// Handy pre-made objects.
-extern ypObject *const int_neg_5;
-extern ypObject *const int_neg_4;
-extern ypObject *const int_neg_3;
-extern ypObject *const int_neg_2;
-extern ypObject *const int_neg_1;
-extern ypObject *const int_0;
-extern ypObject *const int_1;
-extern ypObject *const int_2;
-extern ypObject *const int_3;
-extern ypObject *const int_4;
-extern ypObject *const int_5;
-
-extern ypObject *const int_SLICE_DEFAULT;
-extern ypObject *const int_SLICE_LAST;
-
-extern ypObject *const bytes_a;
-extern ypObject *const bytes_b;
-extern ypObject *const bytes_c;
-extern ypObject *const bytes_d;
-extern ypObject *const bytes_e;
-
-extern ypObject *const bytes_slash;
-extern ypObject *const bytes_star;
-extern ypObject *const bytes_star_args;
-extern ypObject *const bytes_star_star_kwargs;
-
-extern ypObject *const str_a;
-extern ypObject *const str_b;
-extern ypObject *const str_c;
-extern ypObject *const str_d;
-extern ypObject *const str_e;
-
-
 // yp_lenC, asserting an exception is not raised.
 yp_ssize_t yp_lenC_not_raises(ypObject *container);
 

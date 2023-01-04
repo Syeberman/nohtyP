@@ -87,48 +87,58 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
 
 static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 {
+    ypObject *int_0 = yp_intC(0);
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject *str_c = yp_str_frombytesC2(-1, "c");
+    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject *str_star = yp_str_frombytesC2(-1, "*");
+    ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    ypObject *str_empty = yp_str_frombytesC2(-1, "");
+
     // Valid signatures.
     // FIXME Use define_function somehow?
     {
         yp_ssize_t  i;
         signature_t signatures[] = {
-                {0},                                                      // def f()
-                {1, {{str_a}}},                                           // def f(a)
-                {2, {{str_a}, {str_b}}},                                  // def f(a, b)
-                {1, {{str_a, int_0}}},                                    // def f(a=0)
-                {1, {{str_a, yp_NameError}}},                             // def f(a=<exc>)
-                {2, {{str_a, int_0}, {str_b, int_0}}},                    // def f(a=0, b=0)
-                {2, {{str_a}, {yp_s_slash}}},                             // def f(a, /)
-                {3, {{str_a}, {yp_s_slash}, {str_b}}},                    // def f(a, /, b)
-                {3, {{str_a}, {str_b}, {yp_s_slash}}},                    // def f(a, b, /)
-                {2, {{str_a, int_0}, {yp_s_slash}}},                      // def f(a=0, /)
-                {2, {{str_a, yp_NameError}, {yp_s_slash}}},               // def f(a=<exc>, /)
-                {3, {{str_a, int_0}, {str_b, int_0}, {yp_s_slash}}},      // def f(a=0, b=0, /)
-                {3, {{str_a, int_0}, {yp_s_slash}, {str_b, int_0}}},      // def f(a=0, /, b=0)
-                {2, {{yp_s_star}, {str_a}}},                              // def f(*, a)
-                {3, {{yp_s_star}, {str_a}, {str_b}}},                     // def f(*, a, b)
-                {3, {{str_a}, {yp_s_star}, {str_b}}},                     // def f(a, *, b)
-                {2, {{yp_s_star}, {str_a, int_0}}},                       // def f(*, a=0)
-                {2, {{yp_s_star}, {str_a, yp_NameError}}},                // def f(*, a=<exc>)
-                {3, {{yp_s_star}, {str_a, int_0}, {str_b}}},              // def f(*, a=0, b)
-                {3, {{yp_s_star}, {str_a, int_0}, {str_b, int_0}}},       // def f(*, a=0, b=0)
-                {3, {{str_a, int_0}, {yp_s_star}, {str_b}}},              // def f(a=0, *, b)
-                {3, {{str_a, int_0}, {yp_s_star}, {str_b, int_0}}},       // def f(a=0, *, b=0)
-                {1, {{yp_s_star_args}}},                                  // def f(*args)
-                {2, {{yp_s_star_args}, {str_a}}},                         // def f(*args, a)
-                {3, {{yp_s_star_args}, {str_a}, {str_b}}},                // def f(*args, a, b)
-                {3, {{str_a}, {yp_s_star_args}, {str_b}}},                // def f(a, *args, b)
-                {2, {{yp_s_star_args}, {str_a, int_0}}},                  // def f(*args, a=0)
-                {2, {{yp_s_star_args}, {str_a, yp_NameError}}},           // def f(*args, a=<exc>)
-                {3, {{yp_s_star_args}, {str_a, int_0}, {str_b}}},         // def f(*args, a=0, b)
-                {3, {{yp_s_star_args}, {str_a, int_0}, {str_b, int_0}}},  // def f(*args, a=0, b=0)
-                {3, {{str_a, int_0}, {yp_s_star_args}, {str_b}}},         // def f(a=0, *args, b)
-                {3, {{str_a, int_0}, {yp_s_star_args}, {str_b, int_0}}},  // def f(a=0, *args, b=0)
-                {1, {{yp_s_star_star_kwargs}}},                           // def f(**kwargs)
-                {6, {{str_a}, {yp_s_slash}, {str_b}, {yp_s_star}, {str_c},
-                            {yp_s_star_star_kwargs}}},  // def f(a, /, b, *, c, **kwargs)
-                {6, {{str_a}, {yp_s_slash}, {str_b}, {yp_s_star_args}, {str_c},
-                            {yp_s_star_star_kwargs}}},  // def f(a, /, b, *args, c, **kwargs)
+                {0},                                                     // def f()
+                {1, {{str_a}}},                                          // def f(a)
+                {2, {{str_a}, {str_b}}},                                 // def f(a, b)
+                {1, {{str_a, int_0}}},                                   // def f(a=0)
+                {1, {{str_a, yp_NameError}}},                            // def f(a=<exc>)
+                {2, {{str_a, int_0}, {str_b, int_0}}},                   // def f(a=0, b=0)
+                {2, {{str_a}, {str_slash}}},                             // def f(a, /)
+                {3, {{str_a}, {str_slash}, {str_b}}},                    // def f(a, /, b)
+                {3, {{str_a}, {str_b}, {str_slash}}},                    // def f(a, b, /)
+                {2, {{str_a, int_0}, {str_slash}}},                      // def f(a=0, /)
+                {2, {{str_a, yp_NameError}, {str_slash}}},               // def f(a=<exc>, /)
+                {3, {{str_a, int_0}, {str_b, int_0}, {str_slash}}},      // def f(a=0, b=0, /)
+                {3, {{str_a, int_0}, {str_slash}, {str_b, int_0}}},      // def f(a=0, /, b=0)
+                {2, {{str_star}, {str_a}}},                              // def f(*, a)
+                {3, {{str_star}, {str_a}, {str_b}}},                     // def f(*, a, b)
+                {3, {{str_a}, {str_star}, {str_b}}},                     // def f(a, *, b)
+                {2, {{str_star}, {str_a, int_0}}},                       // def f(*, a=0)
+                {2, {{str_star}, {str_a, yp_NameError}}},                // def f(*, a=<exc>)
+                {3, {{str_star}, {str_a, int_0}, {str_b}}},              // def f(*, a=0, b)
+                {3, {{str_star}, {str_a, int_0}, {str_b, int_0}}},       // def f(*, a=0, b=0)
+                {3, {{str_a, int_0}, {str_star}, {str_b}}},              // def f(a=0, *, b)
+                {3, {{str_a, int_0}, {str_star}, {str_b, int_0}}},       // def f(a=0, *, b=0)
+                {1, {{str_star_args}}},                                  // def f(*args)
+                {2, {{str_star_args}, {str_a}}},                         // def f(*args, a)
+                {3, {{str_star_args}, {str_a}, {str_b}}},                // def f(*args, a, b)
+                {3, {{str_a}, {str_star_args}, {str_b}}},                // def f(a, *args, b)
+                {2, {{str_star_args}, {str_a, int_0}}},                  // def f(*args, a=0)
+                {2, {{str_star_args}, {str_a, yp_NameError}}},           // def f(*args, a=<exc>)
+                {3, {{str_star_args}, {str_a, int_0}, {str_b}}},         // def f(*args, a=0, b)
+                {3, {{str_star_args}, {str_a, int_0}, {str_b, int_0}}},  // def f(*args, a=0, b=0)
+                {3, {{str_a, int_0}, {str_star_args}, {str_b}}},         // def f(a=0, *args, b)
+                {3, {{str_a, int_0}, {str_star_args}, {str_b, int_0}}},  // def f(a=0, *args, b=0)
+                {1, {{str_star_star_kwargs}}},                           // def f(**kwargs)
+                {6, {{str_a}, {str_slash}, {str_b}, {str_star}, {str_c},
+                            {str_star_star_kwargs}}},  // def f(a, /, b, *, c, **kwargs)
+                {6, {{str_a}, {str_slash}, {str_b}, {str_star_args}, {str_c},
+                            {str_star_star_kwargs}}},  // def f(a, /, b, *args, c, **kwargs)
         };
         for (i = 0; i < yp_lengthof_array(signatures); i++) {
             signature_t        signature = signatures[i];
@@ -220,41 +230,41 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     // FIXME Use define_function somehow?
     {
         yp_ssize_t i;
-        yp_IMMORTAL_STR_LATIN_1_static(str_1, "1");
-        yp_IMMORTAL_STR_LATIN_1_static(str_star_a, "*a");
-        yp_IMMORTAL_STR_LATIN_1_static(str_star_1, "*1");
-        yp_IMMORTAL_STR_LATIN_1_static(str_star_star, "**");
-        yp_IMMORTAL_STR_LATIN_1_static(str_star_star_a, "**a");
-        yp_IMMORTAL_STR_LATIN_1_static(str_star_star_1, "**1");
+        // ypObject   *str_1 = yp_str_frombytesC2(-1, "1");
+        ypObject *str_star_a = yp_str_frombytesC2(-1, "*a");
+        // ypObject   *str_star_1 = yp_str_frombytesC2(-1, "*1");
+        ypObject *str_star_star = yp_str_frombytesC2(-1, "**");
+        ypObject *str_star_star_a = yp_str_frombytesC2(-1, "**a");
+        // ypObject   *str_star_star_1 = yp_str_frombytesC2(-1, "**1");
         signature_t signatures[] = {
-                {1, {{yp_s_slash}}},                            // / cannot be first
-                {2, {{yp_s_star}, {yp_s_slash}}},               // / cannot be after *
-                {3, {{str_a}, {yp_s_star}, {yp_s_slash}}},      // / cannot be after *
-                {3, {{yp_s_star}, {str_a}, {yp_s_slash}}},      // / cannot be after *
-                {2, {{yp_s_star_args}, {yp_s_slash}}},          // / cannot be after *args
-                {2, {{yp_s_star_star_kwargs}, {yp_s_slash}}},   // / cannot be after **kwargs
-                {3, {{str_a}, {yp_s_slash}, {yp_s_slash}}},     // At most one /
-                {2, {{str_a}, {yp_s_slash, int_0}}},            // / cannot have default
-                {1, {{yp_s_star}}},                             // * cannot be last
-                {2, {{yp_s_star}, {yp_s_star_star_kwargs}}},    // * cannot be imm. before **kwargs
-                {3, {{yp_s_star}, {yp_s_star}, {str_a}}},       // At most one *
-                {2, {{yp_s_star}, {yp_s_star_args}}},           // * or *args, not both
-                {3, {{yp_s_star_args}, {yp_s_star}, {str_a}}},  // * or *args, not both
-                {2, {{yp_s_star, int_0}, {str_a}}},             // * cannot have default
-                {2, {{yp_s_star_args}, {yp_s_star_args}}},      // At most one *args
-                {1, {{yp_s_star_args, int_0}}},                 // *args cannot have default
-                {2, {{yp_s_star_star_kwargs}, {str_a}}},        // **kwargs must be last
-                {2, {{yp_s_star_star_kwargs}, {yp_s_slash}}},   // **kwargs must be last
-                {3, {{yp_s_star_star_kwargs}, {yp_s_star}, {str_a}}},     // **kwargs must be last
-                {2, {{yp_s_star_star_kwargs}, {yp_s_star_args}}},         // **kwargs must be last
-                {2, {{yp_s_star_star_kwargs}, {yp_s_star_star_kwargs}}},  // At most one **kwargs
-                {1, {{yp_s_star_star_kwargs, int_0}}},         // **kwargs cannot have default
-                {2, {{str_a, int_0}, {str_b}}},                // Defaults on remaining pos. args
-                {3, {{str_a, int_0}, {str_b}, {yp_s_slash}}},  // Defaults on remaining pos. args
-                {3, {{str_a, int_0}, {yp_s_slash}, {str_b}}},  // Defaults on remaining pos. args
+                {1, {{str_slash}}},                           // / cannot be first
+                {2, {{str_star}, {str_slash}}},               // / cannot be after *
+                {3, {{str_a}, {str_star}, {str_slash}}},      // / cannot be after *
+                {3, {{str_star}, {str_a}, {str_slash}}},      // / cannot be after *
+                {2, {{str_star_args}, {str_slash}}},          // / cannot be after *args
+                {2, {{str_star_star_kwargs}, {str_slash}}},   // / cannot be after **kwargs
+                {3, {{str_a}, {str_slash}, {str_slash}}},     // At most one /
+                {2, {{str_a}, {str_slash, int_0}}},           // / cannot have default
+                {1, {{str_star}}},                            // * cannot be last
+                {2, {{str_star}, {str_star_star_kwargs}}},    // * cannot be imm. before **kwargs
+                {3, {{str_star}, {str_star}, {str_a}}},       // At most one *
+                {2, {{str_star}, {str_star_args}}},           // * or *args, not both
+                {3, {{str_star_args}, {str_star}, {str_a}}},  // * or *args, not both
+                {2, {{str_star, int_0}, {str_a}}},            // * cannot have default
+                {2, {{str_star_args}, {str_star_args}}},      // At most one *args
+                {1, {{str_star_args, int_0}}},                // *args cannot have default
+                {2, {{str_star_star_kwargs}, {str_a}}},       // **kwargs must be last
+                {2, {{str_star_star_kwargs}, {str_slash}}},   // **kwargs must be last
+                {3, {{str_star_star_kwargs}, {str_star}, {str_a}}},     // **kwargs must be last
+                {2, {{str_star_star_kwargs}, {str_star_args}}},         // **kwargs must be last
+                {2, {{str_star_star_kwargs}, {str_star_star_kwargs}}},  // At most one **kwargs
+                {1, {{str_star_star_kwargs, int_0}}},         // **kwargs cannot have default
+                {2, {{str_a, int_0}, {str_b}}},               // Defaults on remaining pos. args
+                {3, {{str_a, int_0}, {str_b}, {str_slash}}},  // Defaults on remaining pos. args
+                {3, {{str_a, int_0}, {str_slash}, {str_b}}},  // Defaults on remaining pos. args
 
                 // Non-identifiers
-                {1, {{yp_str_empty}}},
+                {1, {{str_empty}}},
                 // FIXME Implement str_isidentifier: {1, {{str_1}}},
                 // FIXME Implement str_isidentifier: {1, {{str_star_1}}},
                 {1, {{str_star_star}}},
@@ -272,17 +282,23 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
             yp_function_decl_t decl = {None_code, 0, signature.n, signature.params, NULL, NULL};
             assert_raises(yp_functionC(&decl), yp_ParameterSyntaxError);
         }
+        yp_decrefN(N(str_star_a, str_star_star, str_star_star_a));
     }
 
     // Parameter names must be strs.
     // FIXME Use define_function somehow?
     {
         yp_ssize_t  i;
+        ypObject   *bytes_a = yp_encode(str_a);
+        ypObject   *bytes_slash = yp_encode(str_slash);
+        ypObject   *bytes_star = yp_encode(str_star);
+        ypObject   *bytes_star_args = yp_encode(str_star_args);
+        ypObject   *bytes_star_star_kwargs = yp_encode(str_star_star_kwargs);
         ypObject   *chrarray_a = yp_chrarray(str_a);
-        ypObject   *chrarray_slash = yp_chrarray(yp_s_slash);
-        ypObject   *chrarray_star = yp_chrarray(yp_s_star);
-        ypObject   *chrarray_star_args = yp_chrarray(yp_s_star_args);
-        ypObject   *chrarray_star_star_kwargs = yp_chrarray(yp_s_star_star_kwargs);
+        ypObject   *chrarray_slash = yp_chrarray(str_slash);
+        ypObject   *chrarray_star = yp_chrarray(str_star);
+        ypObject   *chrarray_star_args = yp_chrarray(str_star_args);
+        ypObject   *chrarray_star_star_kwargs = yp_chrarray(str_star_star_kwargs);
         signature_t signatures[] = {
                 {1, {{bytes_a}}},                    // name must be a str
                 {1, {{chrarray_a}}},                 // name must be a str
@@ -300,7 +316,8 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
             yp_function_decl_t decl = {None_code, 0, signature.n, signature.params, NULL, NULL};
             assert_raises(yp_functionC(&decl), yp_TypeError);
         }
-        yp_decrefN(N(chrarray_a, chrarray_slash, chrarray_star, chrarray_star_args,
+        yp_decrefN(N(bytes_a, bytes_slash, bytes_star, bytes_star_args, bytes_star_star_kwargs,
+                chrarray_a, chrarray_slash, chrarray_star, chrarray_star_args,
                 chrarray_star_star_kwargs));
     }
 
@@ -310,6 +327,8 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
         assert_isexception(f, yp_OSError);
     }
 
+    yp_decrefN(N(
+            int_0, str_a, str_b, str_c, str_slash, str_star, str_star_args, str_star_star_kwargs));
     return MUNIT_OK;
 }
 
@@ -317,6 +336,8 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
 static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 {
+    ypObject *int_0 = yp_intC(0);
+
     {
         define_function(f, capture_code, ());
         ypObject *captured = any_callN(f, 0);
@@ -329,6 +350,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decrefN(N(f, captured));
     }
 
+    yp_decrefN(N(int_0));
     return MUNIT_OK;
 }
 

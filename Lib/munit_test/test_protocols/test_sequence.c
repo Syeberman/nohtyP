@@ -23,6 +23,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t  *friend_types[] = {type, type->pair, NULL};
     fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
     ypObject        *items[] = obj_array_init(4, type->rand_item());
 
     // range stores integers following a pattern, so doesn't support concat.
@@ -416,8 +417,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     ead(slice, yp_getsliceC4(sq, -2, -1, 1), assert_sequence(slice, items[3]));
     ead(slice, yp_getsliceC4(sq, -1000, 1000, 1), assert_obj(slice, eq, sq));
     ead(slice, yp_getsliceC4(sq, 1000, -1000, 1), assert_len(slice, 0));
-    ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1),
-            assert_obj(slice, eq, sq));
+    ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1), assert_obj(slice, eq, sq));
     ead(slice, yp_getsliceC4(sq, 1, yp_SLICE_DEFAULT, 1),
             assert_sequence(slice, items[1], items[2], items[3], items[4]));
     ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, 3, 1),
@@ -455,6 +455,15 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
 static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_neg_1 = yp_intC(-1);
+    ypObject       *int_neg_2 = yp_intC(-2);
+    ypObject       *int_neg_3 = yp_intC(-3);
+    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
+    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
+    ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[] = obj_array_init(2, type->rand_item());
     ypObject       *sq = type->newN(N(items[0], items[1]));
     ypObject       *empty = type->newN(0);
@@ -479,14 +488,27 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_raises(yp_getitem(sq, int_SLICE_DEFAULT), yp_IndexError);
     assert_raises(yp_getitem(sq, int_SLICE_LAST), yp_IndexError);
 
+    // intstore.
+    ead(zero, yp_getitem(sq, intstore_0), assert_obj(zero, eq, items[0]));
+
     obj_array_decref(items);
-    yp_decrefN(N(sq, empty));
+    yp_decrefN(N(sq, empty, int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+            int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
 
 static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_neg_1 = yp_intC(-1);
+    ypObject       *int_neg_2 = yp_intC(-2);
+    ypObject       *int_neg_3 = yp_intC(-3);
+    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
+    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
+    ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[] = obj_array_init(3, type->rand_item());
     ypObject       *sq = type->newN(N(items[0], items[1]));
     ypObject       *empty = type->newN(0);
@@ -513,8 +535,12 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     ead(slice_last, yp_getdefault(sq, int_SLICE_LAST, items[2]),
             assert_obj(slice_last, eq, items[2]));
 
+    // intstore.
+    ead(zero, yp_getdefault(sq, intstore_0, items[2]), assert_obj(zero, eq, items[0]));
+
     obj_array_decref(items);
-    yp_decrefN(N(sq, empty));
+    yp_decrefN(N(sq, empty, int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+            int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
 
@@ -872,6 +898,7 @@ tear_down:
 static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
+    ypObject        *int_1 = yp_intC(1);
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *items[] = obj_array_init(11, type->rand_item());
@@ -951,8 +978,7 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
-            assert_not_raises_exc(
-                    yp_setsliceC6(sq, args.start, args.stop, args.step, empty, &exc));
+            assert_not_raises_exc(yp_setsliceC6(sq, args.start, args.stop, args.step, empty, &exc));
             assert_sequence(sq, items[0], items[1]);
         }
         yp_decrefN(N(sq, empty));
@@ -1139,6 +1165,15 @@ tear_down:
 static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_neg_1 = yp_intC(-1);
+    ypObject       *int_neg_2 = yp_intC(-2);
+    ypObject       *int_neg_3 = yp_intC(-3);
+    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
+    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
+    ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[] = obj_array_init(4, type->rand_item());
 
     // Immutables don't support setitem.
@@ -1197,8 +1232,18 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
+    // intstore
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_setitem(sq, intstore_0, items[2], &exc));
+        assert_sequence(sq, items[2], items[1]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N( int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+            int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
 
@@ -1403,6 +1448,15 @@ tear_down:
 static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_neg_1 = yp_intC(-1);
+    ypObject       *int_neg_2 = yp_intC(-2);
+    ypObject       *int_neg_3 = yp_intC(-3);
+    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
+    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
+    ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[] = obj_array_init(4, type->rand_item());
 
     // Immutables don't support delitem.
@@ -1461,8 +1515,18 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
         yp_decref(sq);
     }
 
+    // intstore.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_delitem(sq, intstore_0, &exc));
+        assert_sequence(sq, items[1], items[2]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+            int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
 
@@ -1517,6 +1581,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
     ypObject        *items[] = obj_array_init(4, type->rand_item());
 
     // Immutables don't support extend.
@@ -1624,6 +1689,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
 
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(int_1));
     return MUNIT_OK;
 }
 
@@ -2034,6 +2100,9 @@ tear_down:
 static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
     ypObject       *items[] = obj_array_init(2, type->rand_item());
 
     // Sort is only implemented for list; it's not currently part of the sequence protocol.
@@ -2057,6 +2126,7 @@ static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
 
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(int_0, int_1, int_2));
     return MUNIT_OK;
 }
 
