@@ -401,25 +401,32 @@ extern "C" {
         _assert_len(_ypmt_LEN_obj, _ypmt_LEN_expected, "%s", "%s", #obj, #expected); \
     } while (0)
 
-// Asserts that obj is a sequence containing exactly the given n items in that order. Items are
+// items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
+// only to obj_fmt.
+#define _assert_sequence(obj, items, obj_fmt, item_strs, ...)                                   \
+    do {                                                                                        \
+        yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(items);                                      \
+        yp_ssize_t _ypmt_SEQ_i;                                                                 \
+        _assert_len(obj, _ypmt_SEQ_n, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_SEQ_n);         \
+        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < _ypmt_SEQ_n; _ypmt_SEQ_i++) {                       \
+            ypObject *_ypmt_SEQ_actual = yp_getindexC(obj, _ypmt_SEQ_i);                        \
+            _assert_not_exception(_ypmt_SEQ_actual, "yp_getindexC(" obj_fmt ", %" PRIssize ")", \
+                    __VA_ARGS__, _ypmt_SEQ_i);                                                  \
+            _assert_obj(_ypmt_SEQ_actual, eq, items[_ypmt_SEQ_i],                               \
+                    "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
+                    item_strs[_ypmt_SEQ_i]);                                                    \
+            yp_decref(_ypmt_SEQ_actual);                                                        \
+        }                                                                                       \
+    } while (0)
+
+// Asserts that obj is a sequence containing exactly the given items in that order. Items are
 // compared by nohtyP equality (i.e. yp_eq). Validates yp_lenC and yp_getindexC.
-#define assert_sequence(obj, ...)                                                            \
-    do {                                                                                     \
-        ypObject  *_ypmt_SEQ_obj = (obj);                                                    \
-        ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                                        \
-        char      *_ypmt_SEQ_item_strs[] = {STRINGIFY(__VA_ARGS__)};                         \
-        yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(_ypmt_SEQ_items);                         \
-        yp_ssize_t _ypmt_SEQ_i;                                                              \
-        _assert_len(_ypmt_SEQ_obj, _ypmt_SEQ_n, "%s", "%" PRIssize, #obj, _ypmt_SEQ_n);      \
-        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < _ypmt_SEQ_n; _ypmt_SEQ_i++) {                    \
-            ypObject *_ypmt_SEQ_actual = yp_getindexC(_ypmt_SEQ_obj, _ypmt_SEQ_i);           \
-            _assert_not_exception(                                                           \
-                    _ypmt_SEQ_actual, "yp_getindexC(%s, %" PRIssize ")", #obj, _ypmt_SEQ_i); \
-            _assert_obj(_ypmt_SEQ_actual, eq, _ypmt_SEQ_items[_ypmt_SEQ_i],                  \
-                    "yp_getindexC(%s, %" PRIssize ")", "%s", #obj, _ypmt_SEQ_i,              \
-                    _ypmt_SEQ_item_strs[_ypmt_SEQ_i]);                                       \
-            yp_decref(_ypmt_SEQ_actual);                                                     \
-        }                                                                                    \
+#define assert_sequence(obj, ...)                                                          \
+    do {                                                                                   \
+        ypObject *_ypmt_SEQ_obj = (obj);                                                   \
+        ypObject *_ypmt_SEQ_items[] = {__VA_ARGS__};                                       \
+        char     *_ypmt_SEQ_item_strs[] = {STRINGIFY(__VA_ARGS__)};                        \
+        _assert_sequence(_ypmt_SEQ_obj, _ypmt_SEQ_items, "%s", _ypmt_SEQ_item_strs, #obj); \
     } while (0)
 
 // Asserts that the first n pointer items in array are exactly the given n items in that order.

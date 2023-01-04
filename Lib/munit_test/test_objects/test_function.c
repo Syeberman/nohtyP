@@ -10,14 +10,23 @@ typedef struct _signature_t {
 // Used as the code for a function. Unconditionally returns None.
 static ypObject *None_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray) { return yp_None; }
 
-// Used as the code for a function. Captures all details about the arguments and returns them.
+
+// Used to represent NULL in the captured argarray. Recall functions are compared by identity, so
+// this will not be confused with a valid value.
+_yp_IMMORTAL_FUNCTION5(static, captured_NULL, None_code, 0, NULL);
+
+// Used as the code for a function. Captures all details about the arguments and returns them. NULL
+// entries in argarray are replaced with the captured_NULL object.
 static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     yp_ssize_t i;
-    ypObject  *argarray_obj = yp_intC((yp_ssize_t)argarray);  // new ref
-    ypObject  *result = yp_listN(N(f, argarray_obj));
-    for (i = 0; i < n; i++) assert_not_raises_exc(yp_append(result, argarray[i], &exc));
-    yp_decref(argarray_obj);
+    ypObject  *argarray_ptr = yp_intC((yp_ssize_t)argarray);  // new ref
+    ypObject  *result = yp_listN(N(f, argarray_ptr));
+    for (i = 0; i < n; i++) {
+        ypObject *arg = argarray[i] == NULL ? captured_NULL : argarray[i];
+        assert_not_raises_exc(yp_append(result, arg, &exc));
+    }
+    yp_decref(argarray_ptr);
     return result;
 }
 
@@ -29,6 +38,43 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
         _assert_obj(_ypmt_CAPT_f, op, _ypmt_CAPT_expected, "<%s f>", "%s", #captured, #expected); \
         yp_decref(_ypmt_CAPT_f);                                                                  \
     } while (0)
+
+#define assert_captured_n(captured, op, expected)                                            \
+    do {                                                                                     \
+        yp_ssize_t _ypmt_CAPT_len;                                                           \
+        yp_ssize_t _ypmt_CAPT_expected = (expected);                                         \
+        _assert_not_raises_exc(                                                              \
+                _ypmt_CAPT_len = yp_lenC((captured), &exc), "yp_lenC(%s, &exc)", #captured); \
+        _assert_typeC(_ypmt_CAPT_len - 2, op, _ypmt_CAPT_expected, PRIssize, "<%s n>", "%s", \
+                #captured, #expected);                                                       \
+    } while (0)
+
+#define assert_captured_argarray_ptr(captured, op, expected)                                   \
+    do {                                                                                       \
+        void     *_ypmt_CAPT_ptr;                                                              \
+        ypObject *_ypmt_CAPT_ptr_obj = yp_getindexC((captured), 1); /* new ref */              \
+        void     *_ypmt_CAPT_expected = (expected);                                            \
+        _assert_not_raises_exc(_ypmt_CAPT_ptr = (void *)yp_asssizeC(_ypmt_CAPT_ptr_obj, &exc), \
+                "yp_asssizeC(yp_getindexC(%s, 1), &exc)", #captured);                          \
+        yp_decref(_ypmt_CAPT_ptr_obj);                                                         \
+        _assert_ptr(_ypmt_CAPT_ptr, op, _ypmt_CAPT_expected, "<%s argarray>", "%s", #captured, \
+                #expected);                                                                    \
+    } while (0)
+
+// Asserts that argarray contained exactly the given items in order. Items are compared by nohtyP
+// equality (i.e. yp_eq). Use captured_NULL for any NULL entries. Also validates n.
+#define assert_captured_args(captured, ...)                                                       \
+    do {                                                                                          \
+        ypObject *_ypmt_CAPT_args = yp_getsliceC4((captured), 2, yp_SLICE_LAST, 1); /* new ref */ \
+        ypObject *_ypmt_CAPT_items[] = {__VA_ARGS__};                                             \
+        char     *_ypmt_CAPT_item_strs[] = {STRINGIFY(__VA_ARGS__)};                              \
+        _assert_not_exception(                                                                    \
+                _ypmt_CAPT_args, "yp_getsliceC4(%s, 2, yp_SLICE_LAST, 1)", #captured);            \
+        _assert_sequence(                                                                         \
+                _ypmt_CAPT_args, _ypmt_CAPT_items, "<%s args>", _ypmt_CAPT_item_strs, #captured); \
+        yp_decref(_ypmt_CAPT_args);                                                               \
+    } while (0)
+
 
 // Declares a variable name of type ypObject * and initializes it with a new reference to a function
 // object. The parameters argument must be surrounded by parentheses.
@@ -267,7 +313,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-// FIXME test_new_immortal: test the yp_IMMORTAL_FUNCTION/etc "constructors"
+// FIXME test_new_immortal: test the yp_IMMORTAL_FUNCTION/etc "constructors".
 
 static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 {
@@ -275,6 +321,11 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         define_function(f, capture_code, ());
         ypObject *captured = any_callN(f, 0);
         assert_captured_f(captured, is, f);
+        assert_captured_n(captured, ==, 0);
+        assert_captured_argarray_ptr(captured, ==, NULL);
+
+        assert_raises(any_callN(f, N(int_0)), yp_TypeError);
+
         yp_decrefN(N(f, captured));
     }
 
