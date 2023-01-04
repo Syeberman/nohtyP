@@ -37,7 +37,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     {
         yp_ssize_t  i;
         signature_t signatures[] = {
-                {0, {}},                                                  // def f()
+                {0},                                                      // def f()
                 {1, {{str_a}}},                                           // def f(a)
                 {2, {{str_a}, {str_b}}},                                  // def f(a, b)
                 {1, {{str_a, int_0}}},                                    // def f(a=0)
