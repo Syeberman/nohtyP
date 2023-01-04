@@ -2113,6 +2113,13 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, yp_ssize_t *
 #define _yp_UNUSED
 #endif
 
+// When a macro argument may contain commas, wrap that argument in parentheses and use this on the
+// parameter, like:
+//
+//      #define MAKE_ARRAY(name, init) ypObject *name[] = {_yp_UNPACK init};
+//      MAKE_ARRAY(objects, (yp_None, yp_None));
+#define _yp_UNPACK(...) __VA_ARGS__
+
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts abuse ob_alloclen to hold a search finger for popitem
 // XXX The dealloc list (i.e., yp_decref) abuses ob_hash to point to the next object to dealloc
@@ -2147,12 +2154,19 @@ struct _ypIntObject {
     // So, this may not be a great way to reduce the size of these simpler types.
     yp_int_t value;
 };
-// bytes and str all share the same underlying structure, because they share some of the same
-// "StringLib" code
 struct _ypStringLibObject {
+    // bytes and str all share the same underlying structure, because they share some of the same
+    // "StringLib" code
     _ypObject_HEAD;
     _yp_INLINE_DATA(yp_uint8_t);
 };
+typedef struct _ypFunctionObject {
+    _ypObject_HEAD;
+    ypObject *(*ob_code)(ypObject *, yp_ssize_t, ypObject *const *);
+    void *ob_state;  // NULL if no extra state
+    // FIXME doc, name/qualname, state, return annotation, module....
+    _yp_INLINE_DATA(yp_parameter_decl_t);
+} ypFunctionObject;
 
 // Set ob_refcnt to this value for immortal objects
 #define _ypObject_REFCNT_IMMORTAL (0x7FFFFFFFu)
@@ -2208,6 +2222,16 @@ struct _ypStringLibObject {
 #define yp_IMMORTAL_INT_static(name, value) _yp_IMMORTAL_INT(static, name, value)
 #define yp_IMMORTAL_BYTES_static(name, value) _yp_IMMORTAL_BYTES(static, name, value)
 #define yp_IMMORTAL_STR_LATIN_1_static(name, value) _yp_IMMORTAL_STR_LATIN_1(static, name, value)
+
+// Immortal functions are not yet part of the external interface: do not use.
+#define _yp_IMMORTAL_FUNCTION5(qual, name, code, parameters_len, parameters)                      \
+    static struct _ypFunctionObject _##name##_struct = {                                          \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters_len, parameters), code, NULL}; \
+    qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
+#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
+    static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
+    _yp_IMMORTAL_FUNCTION5(                                                      \
+            qual, name, code, yp_lengthof_array(_##name##_parameters), _##name##_parameters)
 
 #ifdef yp_FUTURE
 // The implementation of yp_IF is considered "internal"; see above for documentation

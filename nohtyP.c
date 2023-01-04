@@ -686,8 +686,6 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
  *************************************************************************************************/
 #pragma region utilities
 
-#define _yp_UNPACK(...) __VA_ARGS__
-
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -1227,16 +1225,6 @@ typedef struct {
 } ypRangeObject;
 
 
-// FIXME Immortal functions will eventually be moved to nohtyP.h
-typedef struct _ypFunctionObject {
-    ypObject_HEAD;
-    ypObject *(*ob_code)(ypObject *, yp_ssize_t, ypObject *const *);
-    void *ob_state;  // NULL if no extra state
-    // FIXME doc, name/qualname, state, return annotation, module....
-    yp_INLINE_DATA(yp_parameter_decl_t);
-} ypFunctionObject;
-
-
 #pragma endregion object_structs
 
 
@@ -1398,23 +1386,10 @@ static ypRangeObject _yp_range_empty_struct = {
 ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 
 
-#define _yp_IMMORTAL_FUNCTION_OBJECT(qual, name, code, parameters_len, parameters)                \
-    static struct _ypFunctionObject _##name##_struct = {                                          \
-            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters_len, parameters), code, NULL}; \
-    qual ypObject *const yp_UNUSED name = yp_CONST_REF(name) /* force semi-colon */
-#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
-    static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
-    _yp_IMMORTAL_FUNCTION_OBJECT(                                                \
-            qual, name, code, yp_lengthof_array(_##name##_parameters), _##name##_parameters)
-
 #define yp_IMMORTAL_FUNCTION(name, code, parameters) \
     _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, code, parameters)
 #define yp_IMMORTAL_FUNCTION_static(name, code, parameters) \
     _yp_IMMORTAL_FUNCTION(static, name, code, parameters)
-#define yp_IMMORTAL_FUNCTION2(name, code) \
-    _yp_IMMORTAL_FUNCTION_OBJECT(_yp_NOQUAL, name, code, 0, NULL)
-#define yp_IMMORTAL_FUNCTION2_static(name, code) \
-    _yp_IMMORTAL_FUNCTION_OBJECT(static, name, code, 0, NULL)
 // FIXME an *args/**kwargs shortcut?
 
 #pragma endregion common_immortals
