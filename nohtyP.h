@@ -1149,13 +1149,15 @@ ypAPI ypObject *yp_rsplitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 ypAPI ypObject *yp_splitlines2(ypObject *s, ypObject *keepends);
 
 // Returns a new reference to an encoded version of s (a str/chrarray) as a bytes/bytearray object.
-// For yp_encode, encoding is yp_s_utf_8 and errors is yp_s_strict.
 ypAPI ypObject *yp_encode3(ypObject *s, ypObject *encoding, ypObject *errors);
+
+// Equivalent to yp_encode3(s, yp_s_utf_8, yp_s_strict).
 ypAPI ypObject *yp_encode(ypObject *s);
 
 // Returns a new reference to an decoded version of b (a bytes/bytearray) as a str/chrarray object.
-// For yp_decode, encoding is yp_s_utf_8 and errors is yp_s_strict.
 ypAPI ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors);
+
+// Equivalent to yp_decode3(b, yp_s_utf_8, yp_s_strict).
 ypAPI ypObject *yp_decode(ypObject *b);
 
 // Immortal empty bytes and str objects.
