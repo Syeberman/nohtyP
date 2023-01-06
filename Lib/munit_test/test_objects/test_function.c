@@ -15,6 +15,9 @@ static ypObject *None_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 // this will not be confused with a valid value.
 _yp_IMMORTAL_FUNCTION5(static, captured_NULL, None_code, 0, NULL);
 
+// As with captured_NULL, represents yp_NameError/etc in the captured argarray.
+_yp_IMMORTAL_FUNCTION5(static, captured_NameError, None_code, 0, NULL);
+
 // Used as the code for a function. Captures all details about the arguments and returns them. NULL
 // entries in argarray are replaced with the captured_NULL object.
 static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
@@ -23,56 +26,60 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
     ypObject  *argarray_ptr = yp_intC((yp_ssize_t)argarray);  // new ref
     ypObject  *result = yp_listN(N(f, argarray_ptr));
     for (i = 0; i < n; i++) {
-        ypObject *arg = argarray[i] == NULL ? captured_NULL : argarray[i];
+        ypObject *arg = argarray[i];
+        if (arg == NULL) arg = captured_NULL;
+        else if (arg == yp_NameError) arg = captured_NameError;
         assert_not_raises_exc(yp_append(result, arg, &exc));
     }
     yp_decref(argarray_ptr);
     return result;
 }
 
-#define assert_captured_f(captured, op, expected)                                                 \
+// Asserts that f, n, and argarray were exactly the given values (compared by ==).
+#define assert_captured_is(captured, f_expected, n_expected, argarray_expected)                   \
     do {                                                                                          \
-        ypObject *_ypmt_CAPT_f = yp_getindexC((captured), 0); /* new ref */                       \
-        ypObject *_ypmt_CAPT_expected = (expected);                                               \
+        ypObject  *_ypmt_CAPT_captured = (captured);                                              \
+        ypObject  *_ypmt_CAPT_f = yp_getindexC(_ypmt_CAPT_captured, 0); /* new ref */             \
+        yp_ssize_t _ypmt_CAPT_len;                                                                \
+        ypObject  *_ypmt_CAPT_argarray_obj = yp_getindexC(_ypmt_CAPT_captured, 1); /* new ref */  \
+        void      *_ypmt_CAPT_argarray;                                                           \
+        ypObject  *_ypmt_CAPT_f_expected = (f_expected);                                          \
+        yp_ssize_t _ypmt_CAPT_n_expected = (n_expected);                                          \
+        void      *_ypmt_CAPT_argarray_expected = (argarray_expected);                            \
         _assert_not_exception(_ypmt_CAPT_f, "yp_getindexC(%s, 0)", #captured);                    \
-        _assert_obj(_ypmt_CAPT_f, op, _ypmt_CAPT_expected, "<%s f>", "%s", #captured, #expected); \
-        yp_decref(_ypmt_CAPT_f);                                                                  \
+        _assert_not_raises_exc(_ypmt_CAPT_len = yp_lenC(_ypmt_CAPT_captured, &exc),               \
+                "yp_lenC(%s, &exc)", #captured);                                                  \
+        _assert_not_raises_exc(                                                                   \
+                _ypmt_CAPT_argarray = (void *)yp_asssizeC(_ypmt_CAPT_argarray_obj, &exc),         \
+                "yp_asssizeC(yp_getindexC(%s, 1), &exc)", #captured);                             \
+        _assert_obj(                                                                              \
+                _ypmt_CAPT_f, is, _ypmt_CAPT_f_expected, "<%s f>", "%s", #captured, #f_expected); \
+        _assert_typeC(_ypmt_CAPT_len - 2, ==, _ypmt_CAPT_n_expected, PRIssize, "<%s n>", "%s",    \
+                #captured, #n_expected);                                                          \
+        _assert_ptr(_ypmt_CAPT_argarray, ==, _ypmt_CAPT_argarray_expected, "<%s argarray>", "%s", \
+                #captured, #argarray_expected);                                                   \
+        yp_decrefN(N(_ypmt_CAPT_f, _ypmt_CAPT_argarray_obj));                                     \
     } while (0)
 
-#define assert_captured_n(captured, op, expected)                                            \
-    do {                                                                                     \
-        yp_ssize_t _ypmt_CAPT_len;                                                           \
-        yp_ssize_t _ypmt_CAPT_expected = (expected);                                         \
-        _assert_not_raises_exc(                                                              \
-                _ypmt_CAPT_len = yp_lenC((captured), &exc), "yp_lenC(%s, &exc)", #captured); \
-        _assert_typeC(_ypmt_CAPT_len - 2, op, _ypmt_CAPT_expected, PRIssize, "<%s n>", "%s", \
-                #captured, #expected);                                                       \
-    } while (0)
-
-#define assert_captured_argarray_ptr(captured, op, expected)                                   \
-    do {                                                                                       \
-        void     *_ypmt_CAPT_ptr;                                                              \
-        ypObject *_ypmt_CAPT_ptr_obj = yp_getindexC((captured), 1); /* new ref */              \
-        void     *_ypmt_CAPT_expected = (expected);                                            \
-        _assert_not_raises_exc(_ypmt_CAPT_ptr = (void *)yp_asssizeC(_ypmt_CAPT_ptr_obj, &exc), \
-                "yp_asssizeC(yp_getindexC(%s, 1), &exc)", #captured);                          \
-        yp_decref(_ypmt_CAPT_ptr_obj);                                                         \
-        _assert_ptr(_ypmt_CAPT_ptr, op, _ypmt_CAPT_expected, "<%s argarray>", "%s", #captured, \
-                #expected);                                                                    \
-    } while (0)
-
-// Asserts that argarray contained exactly the given items in order. Items are compared by nohtyP
-// equality (i.e. yp_eq). Use captured_NULL for any NULL entries. Also validates n.
-#define assert_captured_args(captured, ...)                                                       \
+// Asserts that f was as expected (compared by identity, aka ==) and that n/argarray contained
+// exactly the given items in order (compared by equality). Use captured_NULL for any NULL entries.
+#define assert_captured(captured, f_expected, ...)                                                \
     do {                                                                                          \
-        ypObject *_ypmt_CAPT_args = yp_getsliceC4((captured), 2, yp_SLICE_LAST, 1); /* new ref */ \
+        ypObject *_ypmt_CAPT_captured = (captured);                                               \
+        ypObject *_ypmt_CAPT_f = yp_getindexC(_ypmt_CAPT_captured, 0); /* new ref */              \
+        ypObject *_ypmt_CAPT_args =                                                               \
+                yp_getsliceC4(_ypmt_CAPT_captured, 2, yp_SLICE_LAST, 1); /* new ref */            \
+        ypObject *_ypmt_CAPT_f_expected = (f_expected);                                           \
         ypObject *_ypmt_CAPT_items[] = {__VA_ARGS__};                                             \
         char     *_ypmt_CAPT_item_strs[] = {STRINGIFY(__VA_ARGS__)};                              \
+        _assert_not_exception(_ypmt_CAPT_f, "yp_getindexC(%s, 0)", #captured);                    \
         _assert_not_exception(                                                                    \
                 _ypmt_CAPT_args, "yp_getsliceC4(%s, 2, yp_SLICE_LAST, 1)", #captured);            \
+        _assert_obj(                                                                              \
+                _ypmt_CAPT_f, is, _ypmt_CAPT_f_expected, "<%s f>", "%s", #captured, #f_expected); \
         _assert_sequence(                                                                         \
                 _ypmt_CAPT_args, _ypmt_CAPT_items, "<%s args>", _ypmt_CAPT_item_strs, #captured); \
-        yp_decref(_ypmt_CAPT_args);                                                               \
+        yp_decrefN(N(_ypmt_CAPT_f, _ypmt_CAPT_args));                                             \
     } while (0)
 
 
@@ -113,11 +120,13 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 {3, {{str_a}, {str_b}, {str_slash}}},                    // def f(a, b, /)
                 {2, {{str_a, int_0}, {str_slash}}},                      // def f(a=0, /)
                 {2, {{str_a, yp_NameError}, {str_slash}}},               // def f(a=<exc>, /)
-                {3, {{str_a, int_0}, {str_b, int_0}, {str_slash}}},      // def f(a=0, b=0, /)
                 {3, {{str_a, int_0}, {str_slash}, {str_b, int_0}}},      // def f(a=0, /, b=0)
+                {3, {{str_a, int_0}, {str_b, int_0}, {str_slash}}},      // def f(a=0, b=0, /)
                 {2, {{str_star}, {str_a}}},                              // def f(*, a)
                 {3, {{str_star}, {str_a}, {str_b}}},                     // def f(*, a, b)
+                {3, {{str_star}, {str_a}, {str_b, int_0}}},              // def f(*, a, b=0)
                 {3, {{str_a}, {str_star}, {str_b}}},                     // def f(a, *, b)
+                {3, {{str_a}, {str_star}, {str_b, int_0}}},              // def f(a, *, b=0)
                 {2, {{str_star}, {str_a, int_0}}},                       // def f(*, a=0)
                 {2, {{str_star}, {str_a, yp_NameError}}},                // def f(*, a=<exc>)
                 {3, {{str_star}, {str_a, int_0}, {str_b}}},              // def f(*, a=0, b)
@@ -334,29 +343,310 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
 // FIXME test_new_immortal: test the yp_IMMORTAL_FUNCTION/etc "constructors".
 
+// Tests common to test_callN, test_call_stars, and callN_to_call_arrayX.
 static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 {
-    ypObject *int_0 = yp_intC(0);
+    ypObject *defs[] = obj_array_init(5, rand_obj_any());
+    ypObject *args[] = obj_array_init(5, rand_obj_any());
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject *str_star = yp_str_frombytesC2(-1, "*");
+    ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
 
+    // def f()
     {
         define_function(f, capture_code, ());
-        ypObject *captured = any_callN(f, 0);
-        assert_captured_f(captured, is, f);
-        assert_captured_n(captured, ==, 0);
-        assert_captured_argarray_ptr(captured, ==, NULL);
 
-        assert_raises(any_callN(f, N(int_0)), yp_TypeError);
+        ead(capt, any_callN(f, 0), assert_captured_is(capt, f, 0, NULL));
 
-        yp_decrefN(N(f, captured));
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+
+        yp_decref(f);
     }
 
-    yp_decrefN(N(int_0));
+    // def f(a)
+    {
+        define_function(f, capture_code, ({str_a}));
+
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0]));
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, b)
+    {
+        define_function(f, capture_code, ({str_a}, {str_b}));
+
+        ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, args[0], args[1]));
+
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}));
+
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0]));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0]));
+
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=yp_NameError)
+    {
+        define_function(f, capture_code, ({str_a, yp_NameError}));
+
+        // It's the responsibility of the function to detect exceptions in argarray.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, captured_NameError));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0]));
+
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, b=1)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_b, defs[1]}));
+
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0], defs[1]));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0], defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, args[0], args[1]));
+
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, /)
+    {
+        define_function(f, capture_code, ({str_a}, {str_slash}));
+
+        // The trailing NULL is trimmed from argarray, so argarray will have one element.
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0]));
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, /, b)
+    {
+        define_function(f, capture_code, ({str_a}, {str_slash}, {str_b}));
+
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, args[0], captured_NULL, args[1]));
+
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, b, /)
+    {
+        define_function(f, capture_code, ({str_a}, {str_b}, {str_slash}));
+
+        // The trailing NULL is trimmed from argarray, so argarray will have two elements.
+        ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, args[0], args[1]));
+
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, /)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_slash}));
+
+        // The trailing NULL is trimmed from argarray, so argarray will have one element.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0]));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0]));
+
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, /, b=1)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_slash}, {str_b, defs[1]}));
+
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0], captured_NULL, defs[1]));
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(capt, f, args[0], captured_NULL, defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, args[0], captured_NULL, args[1]));
+
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, b=1, /)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_b, defs[1]}, {str_slash}));
+
+        // The trailing NULL is trimmed from argarray, so argarray will have two elements.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0], defs[1]));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0], defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, args[0], args[1]));
+
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a}));
+
+        // Being a keyword-only parameter, a cannot be set from a "callN" positional argument.
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *, b)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star}, {str_b}));
+
+        // Being a keyword-only parameter, b cannot be set from a "callN" positional argument.
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *, b=1)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star}, {str_b, defs[1]}));
+
+        // Being a keyword-only parameter, b cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(capt, f, args[0], captured_NULL, defs[1]));
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a=0)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a, defs[0]}));
+
+        // Being a keyword-only parameter, a cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, captured_NULL, defs[0]));
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a=0, b)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a, defs[0]}, {str_b}));
+
+        // Being keyword-only parameters, a and b cannot be set from "callN" positional arguments.
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a=0, b=1)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a, defs[0]}, {str_b, defs[1]}));
+
+        // Being keyword-only parameters, a and b cannot be set from "callN" positional arguments.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, captured_NULL, defs[0], defs[1]));
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, *, b)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star}, {str_b}));
+
+        // Being a keyword-only parameter, b cannot be set from a "callN" positional argument.
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, *, b=1)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star}, {str_b, defs[1]}));
+
+        // Being a keyword-only parameter, b cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0], captured_NULL, defs[1]));
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(capt, f, args[0], captured_NULL, defs[1]));
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    obj_array_decref(defs);
+    obj_array_decref(args);
+    yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
     return MUNIT_OK;
 }
 
 static MunitResult test_callN(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_callN(yp_callN);
+    ypObject   *str_a = yp_str_frombytesC2(-1, "a");
+    MunitResult result;
+
+    result = _test_callN(yp_callN);
+    if (result != MUNIT_OK) goto tear_down;
+
+    // It's the responsibility of the function to detect exceptions in the arguments.
+    {
+        define_function(f, capture_code, ({str_a}));
+
+        ead(capt, yp_callN(f, N(yp_NameError)), assert_captured(capt, f, captured_NameError));
+
+        yp_decref(f);
+    }
+
+tear_down:
+    yp_decrefN(N(str_a));
+    return result;
 }
 
 // Accepts the yp_callN signature and instead calls yp_call_stars. For use in _test_callN. n must be
@@ -378,7 +668,16 @@ static ypObject *callN_to_call_stars(ypObject *c, int n, ...)
 
 static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_callN(callN_to_call_stars);
+    MunitResult result;
+
+    result = _test_callN(callN_to_call_stars);
+    if (result != MUNIT_OK) goto tear_down;
+
+    // It's the responsibility of the function to detect exceptions in the arguments; however, this
+    // is impossible with yp_call_stars, as both tuples and frozendicts reject exceptions.
+
+tear_down:
+    return result;
 }
 
 // Accepts the yp_callN signature and instead calls yp_call_arrayX. For use in _test_callN. n must
@@ -401,7 +700,25 @@ static ypObject *callN_to_call_arrayX(ypObject *c, int n, ...)
 
 static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fixture)
 {
-    return _test_callN(callN_to_call_arrayX);
+    ypObject   *str_a = yp_str_frombytesC2(-1, "a");
+    MunitResult result;
+
+    result = _test_callN(callN_to_call_arrayX);
+    if (result != MUNIT_OK) goto tear_down;
+
+    // It's the responsibility of the function to detect exceptions in the arguments.
+    {
+        define_function(f, capture_code, ({str_a}));
+        ypObject *args[] = {f, yp_NameError};
+
+        ead(capt, yp_call_arrayX(2, args), assert_captured(capt, f, captured_NameError));
+
+        yp_decref(f);
+    }
+
+tear_down:
+    yp_decrefN(N(str_a));
+    return result;
 }
 
 
