@@ -2,6 +2,10 @@
 #include "munit_test/unittest.h"
 
 
+// FIXME Review that signatures match the comments describing what needs to be tested (lots of
+// copy/paste, possible errors).
+
+
 typedef struct _signature_t {
     yp_int32_t          n;
     yp_parameter_decl_t params[8];  // Increase length as necessary.
@@ -27,8 +31,10 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
     ypObject  *result = yp_listN(N(f, argarray_ptr));
     for (i = 0; i < n; i++) {
         ypObject *arg = argarray[i];
-        if (arg == NULL) arg = captured_NULL;
-        else if (arg == yp_NameError) arg = captured_NameError;
+        if (arg == NULL)
+            arg = captured_NULL;
+        else if (arg == yp_NameError)
+            arg = captured_NameError;
         assert_not_raises_exc(yp_append(result, arg, &exc));
     }
     yp_decref(argarray_ptr);
@@ -135,14 +141,19 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 {3, {{str_a, int_0}, {str_star}, {str_b, int_0}}},       // def f(a=0, *, b=0)
                 {1, {{str_star_args}}},                                  // def f(*args)
                 {2, {{str_star_args}, {str_a}}},                         // def f(*args, a)
+                {2, {{str_a}, {str_star_args}}},                         // def f(a, *args)
                 {3, {{str_star_args}, {str_a}, {str_b}}},                // def f(*args, a, b)
+                {3, {{str_star_args}, {str_a}, {str_b, int_0}}},         // def f(*args, a, b=0)
                 {3, {{str_a}, {str_star_args}, {str_b}}},                // def f(a, *args, b)
+                {3, {{str_a}, {str_star_args}, {str_b, int_0}}},         // def f(a, *args, b=0)
                 {2, {{str_star_args}, {str_a, int_0}}},                  // def f(*args, a=0)
                 {2, {{str_star_args}, {str_a, yp_NameError}}},           // def f(*args, a=<exc>)
+                {2, {{str_a, int_0}, {str_star_args}}},                  // def f(a=0, *args)
                 {3, {{str_star_args}, {str_a, int_0}, {str_b}}},         // def f(*args, a=0, b)
                 {3, {{str_star_args}, {str_a, int_0}, {str_b, int_0}}},  // def f(*args, a=0, b=0)
                 {3, {{str_a, int_0}, {str_star_args}, {str_b}}},         // def f(a=0, *args, b)
                 {3, {{str_a, int_0}, {str_star_args}, {str_b, int_0}}},  // def f(a=0, *args, b=0)
+                {3, {{str_a, int_0}, {str_b, int_0}, {str_star_args}}},  // def f(a=0, b=0, *args)
                 {1, {{str_star_star_kwargs}}},                           // def f(**kwargs)
                 {6, {{str_a}, {str_slash}, {str_b}, {str_star}, {str_c},
                             {str_star_star_kwargs}}},  // def f(a, /, b, *, c, **kwargs)
@@ -344,6 +355,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 // FIXME test_new_immortal: test the yp_IMMORTAL_FUNCTION/etc "constructors".
 
 // Tests common to test_callN, test_call_stars, and callN_to_call_arrayX.
+// FIXME Assert that empty *args is always yp_tuple_empty?
 static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 {
     ypObject *defs[] = obj_array_init(5, rand_obj_any());
@@ -621,6 +633,211 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decref(f);
     }
 
+    // def f(*args)
+    {
+        define_function(f, capture_code, ({str_star_args}));
+        ypObject *zero = yp_tupleN(N(args[0]));
+        ypObject *zero_one = yp_tupleN(N(args[0], args[1]));
+
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, yp_tuple_empty));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, zero));
+        ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, zero_one));
+
+        yp_decrefN(N(f, zero, zero_one));
+    }
+
+    // def f(*args, a)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a}));
+
+        // Being a keyword-only parameter, a cannot be set from a "callN" positional argument.
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *args)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}));
+        ypObject *one = yp_tupleN(N(args[1]));
+        ypObject *one_two = yp_tupleN(N(args[1], args[2]));
+
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0], yp_tuple_empty));
+        ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, args[0], one));
+        ead(capt, any_callN(f, N(args[0], args[1], args[2])),
+                assert_captured(capt, f, args[0], one_two));
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+
+        yp_decrefN(N(f, one, one_two));
+    }
+
+    // def f(a, *args, b)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}, {str_b}));
+
+        // Being a keyword-only parameter, b cannot be set from a "callN" positional argument.
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *args, b=1)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}, {str_b, defs[1]}));
+        ypObject *one = yp_tupleN(N(args[1]));
+        ypObject *one_two = yp_tupleN(N(args[1], args[2]));
+
+        // Being a keyword-only parameter, b cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, args[0], one, defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1], args[2])),
+                assert_captured(capt, f, args[0], one_two, defs[1]));
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+
+        yp_decrefN(N(f, one, one_two));
+    }
+
+    // def f(*args, a=0)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a, defs[0]}));
+        ypObject *zero = yp_tupleN(N(args[0]));
+        ypObject *zero_one = yp_tupleN(N(args[0], args[1]));
+
+        // Being a keyword-only parameter, a cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, yp_tuple_empty, defs[0]));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, zero, defs[0]));
+        ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, zero_one, defs[0]));
+
+        yp_decrefN(N(f, zero, zero_one));
+    }
+
+    // def f(a=0, *args)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star_args}));
+        ypObject *one = yp_tupleN(N(args[1]));
+        ypObject *one_two = yp_tupleN(N(args[1], args[2]));
+
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0], yp_tuple_empty));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0], yp_tuple_empty));
+        ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, args[0], one));
+        ead(capt, any_callN(f, N(args[0], args[1], args[2])),
+                assert_captured(capt, f, args[0], one_two));
+
+        yp_decrefN(N(f, one, one_two));
+    }
+
+    // def f(*args, a=0, b)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a, defs[0]}, {str_b}));
+
+        // Being keyword-only parameters, a and b cannot be set from "callN" positional arguments.
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(*args, a=0, b=1)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a, defs[0]}, {str_b, defs[1]}));
+        ypObject *zero = yp_tupleN(N(args[0]));
+        ypObject *zero_one = yp_tupleN(N(args[0], args[1]));
+        ypObject *zero_one_two = yp_tupleN(N(args[0], args[1], args[2]));
+
+        // Being keyword-only parameters, a and b cannot be set from "callN" positional arguments.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, yp_tuple_empty, defs[0], defs[1]));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, zero, defs[0], defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, zero_one, defs[0], defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1], args[2])),
+                assert_captured(capt, f, zero_one_two, defs[0], defs[1]));
+
+        yp_decrefN(N(f, zero, zero_one, zero_one_two));
+    }
+
+    // def f(a=0, *args, b)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star_args}, {str_b}));
+
+        // Being a keyword-only parameter, b cannot be set from a "callN" positional argument.
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, *args, b=1)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star_args}, {str_b, defs[1]}));
+        ypObject *one = yp_tupleN(N(args[1]));
+        ypObject *one_two = yp_tupleN(N(args[1], args[2]));
+
+        // Being a keyword-only parameter, b cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0], yp_tuple_empty, defs[1]));
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, args[0], one, defs[1]));
+        ead(capt, any_callN(f, N(args[0], args[1], args[2])),
+                assert_captured(capt, f, args[0], one_two, defs[1]));
+
+        yp_decrefN(N(f, one, one_two));
+    }
+
+    // def f(a=0, b=1, *args)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_b, defs[1]}, {str_star_args}));
+        ypObject *two = yp_tupleN(N(args[2]));
+
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0], defs[1], yp_tuple_empty));
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(capt, f, args[0], defs[1], yp_tuple_empty));
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, args[0], args[1], yp_tuple_empty));
+        ead(capt, any_callN(f, N(args[0], args[1], args[2])),
+                assert_captured(capt, f, args[0], args[1], two));
+
+        yp_decrefN(N(f, two));
+    }
+
+    // def f(**kwargs)
+    {
+        define_function(f, capture_code, ({str_star_star_kwargs}));
+
+        // **kwargs cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, yp_frozendict_empty));
+        assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, **kwargs)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star_star_kwargs}));
+
+        // **kwargs cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, defs[0], yp_frozendict_empty));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0], yp_frozendict_empty));
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        yp_decref(f);
+    }
+
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
@@ -675,6 +892,7 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
 
     // It's the responsibility of the function to detect exceptions in the arguments; however, this
     // is impossible with yp_call_stars, as both tuples and frozendicts reject exceptions.
+    // FIXME Untrue: yp_call_stars can take any iterable, which can raise.
 
 tear_down:
     return result;

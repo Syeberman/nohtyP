@@ -370,15 +370,35 @@ extern "C" {
         _assert_obj(_ypmt_OBJ_a, op, _ypmt_OBJ_b, "%s", "%s", #a, #b); \
     } while (0)
 
-// yp_type(obj) == expected
-#define assert_type_is(obj, expected)                                                        \
+#define _assert_type_is(obj, expected, obj_fmt, expected_fmt, ...)                           \
     do {                                                                                     \
-        ypObject *_ypmt_TYPE_obj = (obj);                                                    \
-        ypObject *_ypmt_TYPE_expected = (expected);                                          \
-        ypObject *_ypmt_TYPE_type_obj = yp_type(_ypmt_TYPE_obj);                             \
-        _assert_not_exception(_ypmt_TYPE_type_obj, "yp_type(%s)", #obj);                     \
-        _assert_ptr(_ypmt_TYPE_type_obj, ==, _ypmt_TYPE_expected, "yp_type(%s)", "%s", #obj, \
-                #expected);                                                                  \
+        ypObject *_ypmt_TYPE_type_obj = yp_type(obj);                                        \
+        _assert_ptr(_ypmt_TYPE_type_obj, ==, expected, "yp_type(" obj_fmt ")", expected_fmt, \
+                __VA_ARGS__);                                                                \
+    } while (0)
+
+// yp_type(obj) == expected
+#define assert_type_is(obj, expected)                                                      \
+    do {                                                                                   \
+        ypObject *_ypmt_TYPE_obj = (obj);                                                  \
+        ypObject *_ypmt_TYPE_expected = (expected);                                        \
+        _assert_type_is(_ypmt_TYPE_obj, _ypmt_TYPE_expected, "%s", "%s", #obj, #expected); \
+    } while (0)
+
+#define _assert_same_type(a, b, a_fmt, b_fmt, ...)                                  \
+    do {                                                                            \
+        ypObject *_ypmt_TYPE_type_a = yp_type(a);                                   \
+        ypObject *_ypmt_TYPE_type_b = yp_type(b);                                   \
+        _assert_ptr(_ypmt_TYPE_type_a, ==, _ypmt_TYPE_type_b, "yp_type(" a_fmt ")", \
+                "yp_type(" b_fmt ")", __VA_ARGS__);                                 \
+    } while (0)
+
+// yp_type(a) == yp_type(b)
+#define assert_same_type(a, b)                                           \
+    do {                                                                 \
+        ypObject *_ypmt_TYPE_a = (a);                                    \
+        ypObject *_ypmt_TYPE_b = (b);                                    \
+        _assert_type_is(_ypmt_TYPE_a, _ypmt_TYPE_b, "%s", "%s", #a, #b); \
     } while (0)
 
 // XXX expected must be a yp_ssize_t.
@@ -412,6 +432,9 @@ extern "C" {
             ypObject *_ypmt_SEQ_actual = yp_getindexC(obj, _ypmt_SEQ_i);                        \
             _assert_not_exception(_ypmt_SEQ_actual, "yp_getindexC(" obj_fmt ", %" PRIssize ")", \
                     __VA_ARGS__, _ypmt_SEQ_i);                                                  \
+            _assert_same_type(_ypmt_SEQ_actual, items[_ypmt_SEQ_i],                             \
+                    "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
+                    item_strs[_ypmt_SEQ_i]);                                                    \
             _assert_obj(_ypmt_SEQ_actual, eq, items[_ypmt_SEQ_i],                               \
                     "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
                     item_strs[_ypmt_SEQ_i]);                                                    \
@@ -420,7 +443,7 @@ extern "C" {
     } while (0)
 
 // Asserts that obj is a sequence containing exactly the given items in that order. Items are
-// compared by nohtyP equality (i.e. yp_eq). Validates yp_lenC and yp_getindexC.
+// compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getindexC.
 #define assert_sequence(obj, ...)                                                          \
     do {                                                                                   \
         ypObject *_ypmt_SEQ_obj = (obj);                                                   \
