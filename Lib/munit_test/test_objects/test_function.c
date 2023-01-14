@@ -1037,6 +1037,91 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         yp_decref(f);
     }
 
+    // def f(a=0, b=1)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_b, defs[1]}));
+
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0], defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0])), assert_captured(capt, f, args[0], defs[1]));
+        ead(capt, any_callK(f, K(str_b, args[1])), assert_captured(capt, f, defs[0], args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], args[1]));
+
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, /)
+    {
+        define_function(f, capture_code, ({str_a}, {str_slash}));
+
+        // Being a positional-only parameter, a cannot be set from a "callK" keyword argument.
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, /)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_slash}));
+
+        // Being a positional-only parameter, a cannot be set from a "callK" keyword argument. The
+        // trailing NULL is trimmed from argarray, so argarray will have one element.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0]));
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, /, b=1)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_slash}, {str_b, defs[1]}));
+
+        // Being a positional-only parameter, a cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0], captured_NULL, defs[1]));
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, defs[0], captured_NULL, args[1]));
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, b=1, /)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_b, defs[1]}, {str_slash}));
+
+        // Being positional-only parameters, a and b cannot be set from "callK" keyword arguments.
+        // The trailing NULL is trimmed from argarray, so argarray will have two elements.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0], defs[1]));
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
     // FIXME f is an exception
 
     obj_array_decref(defs);
