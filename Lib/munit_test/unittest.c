@@ -2,6 +2,15 @@
 #include "munit_test/unittest.h"
 
 
+extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions) {
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) {
+        if(yp_isexceptionC2(x, exceptions[i])) return TRUE;
+    }
+    return FALSE;
+}
+
+
 // If something should happen 2 in 23 times: RAND_BOOL_FRACTION(2, 23)
 // TODO Better name? Better argument names?
 #define RAND_BOOL_FRACTION(numerator, denominator) \

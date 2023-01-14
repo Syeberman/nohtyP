@@ -361,6 +361,8 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
 // FIXME test_new_immortal: test the yp_IMMORTAL_FUNCTION/etc "constructors".
 
+// FIXME tests where self is an exception.
+
 // Tests common to test_callN, test_call_stars, and callN_to_call_arrayX.
 // FIXME Assert that empty *args is always yp_tuple_empty?
 static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
@@ -381,7 +383,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, 0), assert_captured_is(capt, f, 0, NULL));
 
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
-        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_TypeError, yp_NameError);
 
         yp_decref(f);
     }
@@ -624,7 +626,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
         assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
         assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
-        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_TypeError, yp_NameError);
 
         yp_decref(f);
     }
@@ -641,7 +643,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
         assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
         assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
-        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_TypeError, yp_NameError);
 
         yp_decref(f);
     }
@@ -940,6 +942,8 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decref(f);
     }
 
+    // FIXME f is an exception
+
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
@@ -1032,6 +1036,8 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 
         yp_decref(f);
     }
+
+    // FIXME f is an exception
 
     obj_array_decref(defs);
     obj_array_decref(args);

@@ -127,8 +127,9 @@ extern "C" {
 // clang-format on
 
 // Variadic macro tricks.
-#define N(...) _PP_NARG(, __VA_ARGS__, _PP_RSEQ_N()), __VA_ARGS__
-#define K(...) (_PP_NARG(, __VA_ARGS__, _PP_RSEQ_N())/2), __VA_ARGS__
+#define VA_ARGC(...) (_PP_NARG(, __VA_ARGS__, _PP_RSEQ_N()))
+#define N(...) VA_ARGC(__VA_ARGS__), __VA_ARGS__
+#define K(...) (VA_ARGC(__VA_ARGS__) / 2), __VA_ARGS__
 #define STRINGIFY(...) _ESC(_PP_NARG(_STRINGIFY, __VA_ARGS__, _PP_RSEQ_N())(__VA_ARGS__))
 #define UNPACK(...) __VA_ARGS__
 
@@ -255,53 +256,63 @@ extern "C" {
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
 #define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
 
-#define _assert_isexception(obj, expected, obj_fmt, expected_fmt, ...)                            \
+#define _assert_isexception(obj, n, expected, obj_fmt, expected_fmt, ...)                         \
     do {                                                                                          \
         if (!yp_isexceptionC(obj)) {                                                              \
             munit_errorf("assertion failed: yp_isexceptionC(" obj_fmt ") (expected " expected_fmt \
                          ")",                                                                     \
                     __VA_ARGS__);                                                                 \
         }                                                                                         \
-        if (!yp_isexceptionC2(obj, expected)) {                                                   \
-            munit_errorf("assertion failed: yp_isexceptionC2(" obj_fmt ", " expected_fmt ")",     \
+        if (!yp_isexception_arrayC(obj, n, expected)) {                                           \
+            munit_errorf("assertion failed: yp_isexceptionCN(" obj_fmt ", N(" expected_fmt "))",  \
                     __VA_ARGS__);                                                                 \
         }                                                                                         \
     } while (0)
 
-#define assert_isexception(obj, expected)                                                        \
-    do {                                                                                         \
-        ypObject *_ypmt_ISEXC_obj = (obj);                                                       \
-        ypObject *_ypmt_ISEXC_expected = (expected);                                             \
-        _assert_isexception(_ypmt_ISEXC_obj, _ypmt_ISEXC_expected, "%s", "%s", #obj, #expected); \
+// Asserts that obj is one of the given exceptions.
+#define assert_isexception(obj, ...)                                                           \
+    do {                                                                                       \
+        ypObject *_ypmt_ISEXC_obj = (obj);                                                     \
+        ypObject *_ypmt_ISEXC_expected[] = {__VA_ARGS__};                                      \
+        _assert_isexception(_ypmt_ISEXC_obj, VA_ARGC(__VA_ARGS__), _ypmt_ISEXC_expected, "%s", \
+                "%s", #obj, #__VA_ARGS__);                                                     \
     } while (0)
 
-#define assert_raises(statement, expected) assert_isexception(statement, expected)
+// Asserts that statement evaluates to one of the given exceptions.
+#define assert_raises(statement, ...)                                                            \
+    do {                                                                                         \
+        ypObject *_ypmt_RAISES_statement = (statement);                                          \
+        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                       \
+        _assert_isexception(_ypmt_RAISES_statement, VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, \
+                "%s", "%s", #statement, #__VA_ARGS__);                                           \
+    } while (0)
 
 // statement is only evaluated once.
-#define _assert_raises_exc(statement, expected, statement_fmt, expected_fmt, ...) \
-    do {                                                                          \
-        ypObject *exc = yp_None;                                                  \
-        statement;                                                                \
-        if (!yp_isexceptionC(exc)) {                                              \
-            munit_errorf("assertion failed: " statement_fmt                       \
-                         "; yp_isexceptionC(exc) (expected " expected_fmt ")",    \
-                    __VA_ARGS__);                                                 \
-        }                                                                         \
-        if (!yp_isexceptionC2(exc, expected)) {                                   \
-            munit_errorf("assertion failed: " statement_fmt                       \
-                         "; yp_isexceptionC2(exc, " expected_fmt ")",             \
-                    __VA_ARGS__);                                                 \
-        }                                                                         \
+#define _assert_raises_exc(statement, n, expected, statement_fmt, expected_fmt, ...) \
+    do {                                                                             \
+        ypObject *exc = yp_None;                                                     \
+        statement;                                                                   \
+        if (!yp_isexceptionC(exc)) {                                                 \
+            munit_errorf("assertion failed: " statement_fmt                          \
+                         "; yp_isexceptionC(exc) (expected " expected_fmt ")",       \
+                    __VA_ARGS__);                                                    \
+        }                                                                            \
+        if (!yp_isexception_arrayC(exc, n, expected)) {                              \
+            munit_errorf("assertion failed: " statement_fmt                          \
+                         "; yp_isexceptionCN(exc, N(" expected_fmt "))",             \
+                    __VA_ARGS__);                                                    \
+        }                                                                            \
     } while (0)
 
-// For a function that takes a `ypObject **exc` argument, asserts that it raises the given
-// exception. Statement must include `&exc` for the exception argument. Example:
+// For a function that takes a `ypObject **exc` argument, asserts that it raises one of the given
+// exceptions. Statement must include `&exc` for the exception argument. Example:
 //
 //      assert_raises_exc(yp_lenC(obj, &exc), yp_MethodError);
-#define assert_raises_exc(statement, expected)                                                   \
-    do {                                                                                         \
-        ypObject *_ypmt_RAISES_expected = (expected);                                            \
-        _assert_raises_exc(statement, _ypmt_RAISES_expected, "%s", "%s", #statement, #expected); \
+#define assert_raises_exc(statement, ...)                                                      \
+    do {                                                                                       \
+        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                     \
+        _assert_raises_exc(statement, VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, "%s", "%s", \
+                #statement, #__VA_ARGS__);                                                     \
     } while (0)
 
 // A version of _assert_typeC that ensures a_statement and b_statement do not throw an exception via
@@ -479,6 +490,10 @@ extern "C" {
         assertion;                       \
         yp_decref(name);                 \
     } while (0)
+
+
+// A version of yp_isexceptionCN that accepts an array.
+extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions);
 
 
 typedef ypObject *(*objvoidfunc)(void);
