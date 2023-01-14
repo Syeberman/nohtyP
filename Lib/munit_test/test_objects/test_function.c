@@ -926,6 +926,22 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decref(f);
     }
 
+    // def f(a, **kwargs)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_star_kwargs}));
+
+        // **kwargs cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0], yp_frozendict_empty));
+        assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
     // def f(a=0, **kwargs)
     {
         define_function(f, capture_code, ({str_a, defs[0]}, {str_star_star_kwargs}));
@@ -1122,7 +1138,509 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         yp_decref(f);
     }
 
+    // def f(*, a)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a}));
+
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, captured_NULL, args[0]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a, b)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a}, {str_b}));
+
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, captured_NULL, args[0], args[1]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a, b=1)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a}, {str_b, defs[1]}));
+
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, captured_NULL, args[0], defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, captured_NULL, args[0], args[1]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *, b)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star}, {str_b}));
+
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], captured_NULL, args[1]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *, b=1)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star}, {str_b, defs[1]}));
+
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], captured_NULL, defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], captured_NULL, args[1]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a=0)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a, defs[0]}));
+
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, captured_NULL, defs[0]));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, captured_NULL, args[0]));
+
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a=0, b)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a, defs[0]}, {str_b}));
+
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, captured_NULL, defs[0], args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, captured_NULL, args[0], args[1]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*, a=0, b=1)
+    {
+        define_function(f, capture_code, ({str_star}, {str_a, defs[0]}, {str_b, defs[1]}));
+
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, captured_NULL, defs[0], defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, captured_NULL, args[0], defs[1]));
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, captured_NULL, defs[0], args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, captured_NULL, args[0], args[1]));
+
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, *, b)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star}, {str_b}));
+
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, defs[0], captured_NULL, args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], captured_NULL, args[1]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, *, b=1)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star}, {str_b, defs[1]}));
+
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0], captured_NULL, defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], captured_NULL, defs[1]));
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, defs[0], captured_NULL, args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], captured_NULL, args[1]));
+
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*args)
+    {
+        define_function(f, capture_code, ({str_star_args}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, yp_tuple_empty));
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*args, a)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, yp_tuple_empty, args[0]));
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_a, args[0])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError, str_a, args[0])), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *args)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], yp_tuple_empty));
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_a, args[0])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError, str_a, args[0])), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*args, a, b)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a}, {str_b}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, yp_tuple_empty, args[0], args[1]));
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_c, args[2], str_a, args[0], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*args, a, b=1)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a}, {str_b, defs[1]}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, yp_tuple_empty, args[0], defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, yp_tuple_empty, args[0], args[1]));
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_c, args[2], str_a, args[0], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *args, b)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}, {str_b}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, args[1]));
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_c, args[2], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, *args, b=1)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}, {str_b, defs[1]}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, args[1]));
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_c, args[2], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*args, a=0)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a, defs[0]}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, yp_tuple_empty, defs[0]));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, yp_tuple_empty, args[0]));
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_a, args[0])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError, str_a, args[0])), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, *args)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star_args}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0], yp_tuple_empty));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], yp_tuple_empty));
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_a, args[0])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, args[1], str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_b, yp_NameError, str_a, args[0])), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*args, a=0, b)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a, defs[0]}, {str_b}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, yp_tuple_empty, defs[0], args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, yp_tuple_empty, args[0], args[1]));
+        assert_raises(
+                any_callK(f, K(str_c, args[2], str_a, args[0], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(*args, a=0, b=1)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_a, defs[0]}, {str_b, defs[1]}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, yp_tuple_empty, defs[0], defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, yp_tuple_empty, args[0], defs[1]));
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, yp_tuple_empty, defs[0], args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, yp_tuple_empty, args[0], args[1]));
+        assert_raises(
+                any_callK(f, K(str_c, args[2], str_a, args[0], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, *args, b)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star_args}, {str_b}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, defs[0], yp_tuple_empty, args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, args[1]));
+        assert_raises(
+                any_callK(f, K(str_c, args[2], str_a, args[0], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, *args, b=1)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_star_args}, {str_b, defs[1]}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0], yp_tuple_empty, defs[1]));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, defs[1]));
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, defs[0], yp_tuple_empty, args[1]));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, args[1]));
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_c, args[2], str_b, args[1])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0, b=1, *args)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}, {str_b, defs[1]}, {str_star_args}));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0], defs[1], yp_tuple_empty));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], defs[1], yp_tuple_empty));
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, defs[0], args[1], yp_tuple_empty));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], args[1], yp_tuple_empty));
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(**kwargs)
+    {
+        define_function(f, capture_code, ({str_star_star_kwargs}));
+        ypObject *zero = yp_frozendictK(K(str_a, args[0]));
+        ypObject *one = yp_frozendictK(K(str_b, args[1]));
+        ypObject *zero_one = yp_frozendictK(K(str_a, args[0], str_b, args[1]));
+
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, yp_frozendict_empty));
+        ead(capt, any_callK(f, K(str_a, args[0])), assert_captured(capt, f, zero));
+        ead(capt, any_callK(f, K(str_b, args[1])), assert_captured(capt, f, one));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, zero_one));
+
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(f, zero, one, zero_one));
+    }
+
     // FIXME f is an exception
+
+    // FIXME duplicate args
+
+    // FIXME arg order
 
     obj_array_decref(defs);
     obj_array_decref(args);
