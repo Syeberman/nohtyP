@@ -128,6 +128,7 @@ extern "C" {
 
 // Variadic macro tricks.
 #define N(...) _PP_NARG(, __VA_ARGS__, _PP_RSEQ_N()), __VA_ARGS__
+#define K(...) (_PP_NARG(, __VA_ARGS__, _PP_RSEQ_N())/2), __VA_ARGS__
 #define STRINGIFY(...) _ESC(_PP_NARG(_STRINGIFY, __VA_ARGS__, _PP_RSEQ_N())(__VA_ARGS__))
 #define UNPACK(...) __VA_ARGS__
 

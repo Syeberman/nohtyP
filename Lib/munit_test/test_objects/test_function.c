@@ -23,21 +23,28 @@ _yp_IMMORTAL_FUNCTION5(static, captured_NULL, None_code, 0, NULL);
 _yp_IMMORTAL_FUNCTION5(static, captured_NameError, None_code, 0, NULL);
 
 // Used as the code for a function. Captures all details about the arguments and returns them. NULL
-// entries in argarray are replaced with the captured_NULL object.
+// entries in argarray are replaced with the captured_NULL object, and yp_NameError with
+// captured_NameError.
 static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     yp_ssize_t i;
     ypObject  *argarray_ptr = yp_intC((yp_ssize_t)argarray);  // new ref
     ypObject  *result = yp_listN(N(f, argarray_ptr));
+    assert_not_exception(argarray_ptr);
+    assert_not_exception(result);
+    yp_decref(argarray_ptr);
+
     for (i = 0; i < n; i++) {
         ypObject *arg = argarray[i];
-        if (arg == NULL)
+        if (arg == NULL) {
             arg = captured_NULL;
-        else if (arg == yp_NameError)
+        } else if (arg == yp_NameError) {
             arg = captured_NameError;
+        }
+        assert_not_exception(arg);
         assert_not_raises_exc(yp_append(result, arg, &exc));
     }
-    yp_decref(argarray_ptr);
+
     return result;
 }
 
@@ -374,6 +381,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, 0), assert_captured_is(capt, f, 0, NULL));
 
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -386,6 +394,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
         assert_raises(any_callN(f, 0), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -398,6 +407,8 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -410,6 +421,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0]));
 
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -418,11 +430,13 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
     {
         define_function(f, capture_code, ({str_a, yp_NameError}));
 
-        // It's the responsibility of the function to detect exceptions in argarray.
+        // code is called if a default is an exception.
         ead(capt, any_callN(f, 0), assert_captured(capt, f, captured_NameError));
         ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0]));
 
+        // code is _not_ called if an argument is an exception.
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -436,6 +450,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, args[0], args[1]));
 
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -449,6 +466,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
         assert_raises(any_callN(f, 0), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -462,6 +480,8 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -475,6 +495,8 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -488,6 +510,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0]));
 
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -503,6 +526,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
                 assert_captured(capt, f, args[0], captured_NULL, args[1]));
 
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -517,6 +543,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, args[0], args[1]));
 
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -530,6 +559,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
         assert_raises(any_callN(f, 0), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -544,6 +574,8 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, 0), yp_TypeError);
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -559,6 +591,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
         assert_raises(any_callN(f, 0), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -572,6 +607,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
 
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -586,6 +622,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
 
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -600,6 +639,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
 
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -614,6 +656,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
 
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -629,6 +674,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
 
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -643,6 +691,8 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, zero));
         ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, zero_one));
 
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+
         yp_decrefN(N(f, zero, zero_one));
     }
 
@@ -655,6 +705,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
 
         assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -671,6 +724,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
                 assert_captured(capt, f, args[0], one_two));
 
         assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decrefN(N(f, one, one_two));
     }
@@ -685,6 +741,9 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
         assert_raises(any_callN(f, 0), yp_TypeError);
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], args[1], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -704,6 +763,10 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
                 assert_captured(capt, f, args[0], one_two, defs[1]));
 
         assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], args[1], yp_NameError)), yp_NameError);
 
         yp_decrefN(N(f, one, one_two));
     }
@@ -718,6 +781,10 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, 0), assert_captured(capt, f, yp_tuple_empty, defs[0]));
         ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, zero, defs[0]));
         ead(capt, any_callN(f, N(args[0], args[1])), assert_captured(capt, f, zero_one, defs[0]));
+
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
 
         yp_decrefN(N(f, zero, zero_one));
     }
@@ -734,6 +801,10 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0], args[1], args[2])),
                 assert_captured(capt, f, args[0], one_two));
 
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+
         yp_decrefN(N(f, one, one_two));
     }
 
@@ -746,6 +817,11 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], args[1], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -765,6 +841,11 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0], args[1], args[2])),
                 assert_captured(capt, f, zero_one_two, defs[0], defs[1]));
 
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], args[1], yp_NameError)), yp_NameError);
+
         yp_decrefN(N(f, zero, zero_one, zero_one_two));
     }
 
@@ -777,6 +858,11 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
         assert_raises(any_callN(f, N(args[0], args[1], args[2])), yp_TypeError);
+
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], args[1], yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -796,6 +882,11 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0], args[1], args[2])),
                 assert_captured(capt, f, args[0], one_two, defs[1]));
 
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], args[1], yp_NameError)), yp_NameError);
+
         yp_decrefN(N(f, one, one_two));
     }
 
@@ -812,6 +903,11 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0], args[1], args[2])),
                 assert_captured(capt, f, args[0], args[1], two));
 
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], args[1], yp_NameError)), yp_NameError);
+
         yp_decrefN(N(f, two));
     }
 
@@ -822,6 +918,8 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         // **kwargs cannot be set from a "callN" positional argument.
         ead(capt, any_callN(f, 0), assert_captured(capt, f, yp_frozendict_empty));
         assert_raises(any_callN(f, N(args[0])), yp_TypeError);
+
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
 
         yp_decref(f);
     }
@@ -835,12 +933,109 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, args[0], yp_frozendict_empty));
         assert_raises(any_callN(f, N(args[0], args[1])), yp_TypeError);
 
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(yp_NameError, args[1])), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+
         yp_decref(f);
     }
 
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
+    return MUNIT_OK;
+}
+
+// Tests common to test_callK (not yet implemented) and test_call_stars.
+// FIXME Assert that empty *kwargs is always yp_frozendict_empty?
+static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
+{
+    ypObject *defs[] = obj_array_init(5, rand_obj_any());
+    ypObject *args[] = obj_array_init(5, rand_obj_any());
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject *str_c = yp_str_frombytesC2(-1, "c");
+    ypObject *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject *str_star = yp_str_frombytesC2(-1, "*");
+    ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
+    ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+
+    // def f()
+    {
+        define_function(f, capture_code, ());
+
+        ead(capt, any_callK(f, 0), assert_captured_is(capt, f, 0, NULL));
+
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a)
+    {
+        define_function(f, capture_code, ({str_a}));
+
+        ead(capt, any_callK(f, K(str_a, args[0])), assert_captured(capt, f, args[0]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a, b)
+    {
+        define_function(f, capture_code, ({str_a}, {str_b}));
+
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], args[1]));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_c, args[2])), yp_TypeError);
+        assert_raises(
+                any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError, str_b, args[1])), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=0)
+    {
+        define_function(f, capture_code, ({str_a, defs[0]}));
+
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, defs[0]));
+        ead(capt, any_callK(f, K(str_a, args[0])), assert_captured(capt, f, args[0]));
+
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    // def f(a=yp_NameError)
+    {
+        define_function(f, capture_code, ({str_a, yp_NameError}));
+
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, captured_NameError));
+        ead(capt, any_callK(f, K(str_a, args[0])), assert_captured(capt, f, args[0]));
+
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decref(f);
+    }
+
+    obj_array_decref(defs);
+    obj_array_decref(args);
+    yp_decrefN(N(str_a, str_b, str_c, str_slash, str_star, str_star_args, str_star_star_kwargs));
     return MUNIT_OK;
 }
 
@@ -852,28 +1047,23 @@ static MunitResult test_callN(const MunitParameter params[], fixture_t *fixture)
     result = _test_callN(yp_callN);
     if (result != MUNIT_OK) goto tear_down;
 
-    // It's the responsibility of the function to detect exceptions in the arguments.
-    {
-        define_function(f, capture_code, ({str_a}));
-
-        ead(capt, yp_callN(f, N(yp_NameError)), assert_captured(capt, f, captured_NameError));
-
-        yp_decref(f);
-    }
+    // FIXME Test where the args are not passed exactly (i.e. iter->next(args) returns exception.)
 
 tear_down:
     yp_decrefN(N(str_a));
     return result;
 }
 
-// Accepts the yp_callN signature and instead calls yp_call_stars. For use in _test_callN. n must be
-// >= 0.
-static ypObject *callN_to_call_stars(ypObject *c, int n, ...)
+// Accepts the yp_callN signature and instead calls yp_call_stars with a tuple. For use in
+// _test_callN. n must be >= 0.
+static ypObject *callN_to_call_stars_tuple(ypObject *c, int n, ...)
 {
     va_list   args;
     ypObject *as_tuple;
     ypObject *result;
 
+    // If args contains an exception, as_tuple will be that exception. We could assert_not_raises
+    // here, but this tests that yp_call_stars fails if args is an exception.
     va_start(args, n);
     as_tuple = yp_tupleNV(n, args);  // new ref
     va_end(args);
@@ -883,18 +1073,41 @@ static ypObject *callN_to_call_stars(ypObject *c, int n, ...)
     return result;
 }
 
+// Accepts the "yp_callK" signature (not actually implemented, yet) and instead calls yp_call_stars.
+// For use in _test_callK. n must be >= 0.
+static ypObject *callK_to_call_stars(ypObject *c, int n, ...)
+{
+    va_list   args;
+    ypObject *as_frozendict;
+    ypObject *result;
+
+    // If args contains an exception, as_frozendict will be that exception. We could
+    // assert_not_raises here, but this tests that yp_call_stars fails if kwargs is an exception.
+    va_start(args, n);
+    as_frozendict = yp_frozendictKV(n, args);  // new ref
+    va_end(args);
+
+    result = yp_call_stars(c, yp_tuple_empty, as_frozendict);
+    yp_decref(as_frozendict);
+    return result;
+}
+
 static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fixture)
 {
+    ypObject   *str_a = yp_str_frombytesC2(-1, "a");
     MunitResult result;
 
-    result = _test_callN(callN_to_call_stars);
+    result = _test_callN(callN_to_call_stars_tuple);
     if (result != MUNIT_OK) goto tear_down;
 
-    // It's the responsibility of the function to detect exceptions in the arguments; however, this
-    // is impossible with yp_call_stars, as both tuples and frozendicts reject exceptions.
-    // FIXME Untrue: yp_call_stars can take any iterable, which can raise.
+    // FIXME and again, but with an iterator instead of a tuple (and other types? parameterize?)
 
+    result = _test_callK(callK_to_call_stars);
+    if (result != MUNIT_OK) goto tear_down;
+
+    // FIXME function (a, /, **kwargs) can be called like (1, a=33).
 tear_down:
+    yp_decrefN(N(str_a));
     return result;
 }
 
@@ -924,15 +1137,7 @@ static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fi
     result = _test_callN(callN_to_call_arrayX);
     if (result != MUNIT_OK) goto tear_down;
 
-    // It's the responsibility of the function to detect exceptions in the arguments.
-    {
-        define_function(f, capture_code, ({str_a}));
-        ypObject *args[] = {f, yp_NameError};
-
-        ead(capt, yp_call_arrayX(2, args), assert_captured(capt, f, captured_NameError));
-
-        yp_decref(f);
-    }
+    // FIXME Test where the array is not passed exactly (i.e. iter->next(args) returns exception.)
 
 tear_down:
     yp_decrefN(N(str_a));
