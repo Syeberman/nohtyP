@@ -18961,7 +18961,7 @@ static ypObject *ypFunction_call_stars(ypObject *f, ypObject *args, ypObject *kw
         ypObject                  *result = ypQuickIter_new_fromiterable(&iter, &state, args);
         if (yp_isexceptionC(result)) return result;
         result = _ypFunction_call_QuickIter(f, NULL, iter, &state, kwargs);
-        ypQuickIter_var_close(&state);
+        iter->close(&state);
         return result;
     }
 }
@@ -18996,7 +18996,7 @@ static ypObject *ypFunction_call_stars_withself(
         ypObject                  *result = ypQuickIter_new_fromiterable(&iter, &state, args);
         if (yp_isexceptionC(result)) return result;
         result = _ypFunction_call_QuickIter(f, self, iter, &state, kwargs);
-        ypQuickIter_var_close(&state);
+        iter->close(&state);
         return result;
     }
 }
