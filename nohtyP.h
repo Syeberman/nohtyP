@@ -1254,11 +1254,9 @@ typedef struct _yp_function_decl_t {
     // arguments, where argarray[i] corresponds to parameters[i]; argarray must not be modified. The
     // return value must be a new or immortal reference, or an exception.
     //
-    // In nohtyP, when an exception object is used as input to a function, the function must return
-    // an exception. Additionally, exceptions can be used as parameter defaults. As such, argarray
-    // might contain exceptions. This generally requires no special handling: any functions called
-    // from code must themselves handle exceptions this way, so code need only check the result of
-    // those function calls and return exceptions as appropriate.
+    // If one of the yp_call* arguments is an exception, yp_call* returns an exception without
+    // calling code. As such, argarray will only contain exceptions for parameters that have
+    // exceptions as defaults, and only when the corresponding arguments are omitted from the call.
     //
     // n is deterministic based solely on the parameters: it is either parameters_len, or
     // parameters_len-1 if parameters ends in /.

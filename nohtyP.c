@@ -12170,7 +12170,14 @@ static ypObject *_ypTuple_attach_array(ypObject *sq, ypTuple_detached *detached)
 static ypObject *_ypTuple_new_fromarray(int type, yp_ssize_t n, ypObject *const *array)
 {
     yp_ssize_t i;
-    ypObject  *sq = _ypTuple_new(type, n, /*alloclen_fixed=*/TRUE);
+    ypObject  *sq;
+
+    // Make sure we don't create a tuple containing exceptions.
+    for (i = 0; i < n; i++) {
+        if (yp_isexceptionC(array[i])) return array[i];
+    }
+
+    sq = _ypTuple_new(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(sq)) return sq;
     yp_memcpy(ypTuple_ARRAY(sq), array, n * yp_sizeof(ypObject *));
     for (i = 0; i < n; i++) yp_incref(ypTuple_ARRAY(sq)[i]);
@@ -18832,7 +18839,8 @@ static ypObject *ypFunction_callNV(ypObject *f, int n, va_list args)
         int       i;
         ypObject *argarray[ypFunction_MAX_ARGS_ON_STACK];
         for (i = 0; i < n; i++) {
-            argarray[i] = va_arg(args, ypObject *);  // borrowed
+            ypObject *arg = argarray[i] = va_arg(args, ypObject *);  // borrowed
+            if (yp_isexceptionC(arg)) return arg;
         }
         return ypFunction_CODE_FUNC(f)(f, n, argarray);
 
@@ -18859,6 +18867,7 @@ static ypObject *ypFunction_callNV_withself(ypObject *f, ypObject *self, int n_a
     yp_ssize_t n_actual;
 
     yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
+    yp_ASSERT1(!yp_isexceptionC(self));
     yp_ASSERT1(n_args >= 0);
 
     // Function immortals must be validated at runtime.
@@ -18883,7 +18892,8 @@ static ypObject *ypFunction_callNV_withself(ypObject *f, ypObject *self, int n_a
         ypObject *argarray[ypFunction_MAX_ARGS_ON_STACK];
         argarray[0] = self;  // borrowed
         for (i = 0; i < n_args; i++) {
-            argarray[i + 1] = va_arg(args, ypObject *);  // borrowed
+            ypObject *arg = argarray[i + 1] = va_arg(args, ypObject *);  // borrowed
+            if (yp_isexceptionC(arg)) return arg;
         }
         return ypFunction_CODE_FUNC(f)(f, n_actual, argarray);
 
@@ -18972,6 +18982,7 @@ static ypObject *ypFunction_call_stars_withself(
     yp_uint8_t param_flags;
 
     yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
+    yp_ASSERT1(!yp_isexceptionC(self));
 
     // Function immortals must be validated at runtime.
     if (!(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED)) {
@@ -19050,7 +19061,12 @@ static ypObject *ypFunction_call_array(ypObject *f, yp_ssize_t n, ypObject *cons
         return ypFunction_CODE_FUNC(f)(f, 0, NULL);
 
     } else if (ypFunction_IS_POSITIONAL_MATCH(param_flags, params_len, n)) {
-        // This is why yp_call_arrayX exists: we can just pass the array on through.
+        // This is why yp_call_arrayX exists: we can just pass the array on through (although we
+        // first have to check for exceptions).
+        yp_ssize_t i;
+        for (i = 0; i < n; i++) {
+            if (yp_isexceptionC(args[i])) return args[i];
+        }
         return ypFunction_CODE_FUNC(f)(f, n, args);
 
     } else if (ypFunction_IS_VAR_POS_VAR_KW(param_flags)) {
