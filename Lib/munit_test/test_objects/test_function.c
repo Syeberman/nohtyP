@@ -958,7 +958,31 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decref(f);
     }
 
+    // def f(*args, **kwargs)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_star_star_kwargs}));
+        ypObject *zero = yp_tupleN(N(args[0]));
+        ypObject *zero_one = yp_tupleN(N(args[0], args[1]));
+
+        // **kwargs cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, 0), assert_captured(capt, f, yp_tuple_empty, yp_frozendict_empty));
+        ead(capt, any_callN(f, N(args[0])), assert_captured(capt, f, zero, yp_frozendict_empty));
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, zero_one, yp_frozendict_empty));
+
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(f, zero, zero_one));
+    }
+
+    // FIXME f(a, *args, **kwargs) (a typical flexible method, were a is self)
+    // FIXME f(a, /, *args, **kwargs) (a typical flexible method, were a is self)
+
     // FIXME f is an exception
+
+    // FIXME More than ypFunction_MAX_ARGS_ON_STACK parameters
+
+    // FIXME test callable objects (i.e. withself)
 
     obj_array_decref(defs);
     obj_array_decref(args);
@@ -1636,11 +1660,57 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         yp_decrefN(N(f, zero, one, zero_one));
     }
 
+    // def f(a, **kwargs)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_star_kwargs}));
+        ypObject *one = yp_frozendictK(K(str_b, args[1]));
+
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], yp_frozendict_empty));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], one));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(f, one));
+    }
+
+    // def f(*args, **kwargs)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_star_star_kwargs}));
+        ypObject *zero = yp_frozendictK(K(str_a, args[0]));
+        ypObject *one = yp_frozendictK(K(str_b, args[1]));
+        ypObject *zero_one = yp_frozendictK(K(str_a, args[0], str_b, args[1]));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, 0), assert_captured(capt, f, yp_tuple_empty, yp_frozendict_empty));
+        ead(capt, any_callK(f, K(str_a, args[0])), assert_captured(capt, f, yp_tuple_empty, zero));
+        ead(capt, any_callK(f, K(str_b, args[1])), assert_captured(capt, f, yp_tuple_empty, one));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, yp_tuple_empty, zero_one));
+
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(f, zero, one, zero_one));
+    }
+
+    // FIXME f(a, *args, **kwargs) (a typical flexible method, were a is self)
+    // FIXME f(a, /, *args, **kwargs) (a typical flexible method, were a is self)
+
     // FIXME f is an exception
 
-    // FIXME duplicate args
-
     // FIXME arg order
+
+    // FIXME More than ypFunction_MAX_ARGS_ON_STACK parameters
+
+    // FIXME test callable objects (i.e. withself)
+
+    // TODO PEP 448 talks about the confusion around {'a':0,'a':1} being valid but dict(a=0,a=1)
+    // being invalid. Figure out how we should be handling duplicate keys. Regardless, we can't
+    // currently test for this as the only "yp_callK" we have right now is yp_call_stars, and since
+    // it accepts dicts the deduplication has already occurred.
 
     obj_array_decref(defs);
     obj_array_decref(args);
@@ -1703,7 +1773,10 @@ static ypObject *callK_to_call_stars(ypObject *c, int n, ...)
 
 static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fixture)
 {
+    ypObject   *args[] = obj_array_init(2, rand_obj_any());
     ypObject   *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject   *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject   *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
     MunitResult result;
 
     result = _test_callN(callN_to_call_stars_tuple);
@@ -1714,9 +1787,43 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
     result = _test_callK(callK_to_call_stars);
     if (result != MUNIT_OK) goto tear_down;
 
-    // FIXME function (a, /, **kwargs) can be called like (1, a=33).
+    // FIXME and again, but with an iterator instead of a mapping?
+
+    // FIXME In Python calls, * accepts any iterable, but ** must be a mapping. In nohtyP, we are
+    // accidentally accepting 2-tuple iterables for **. Deny this?
+    // https://docs.python.org/3/reference/expressions.html#calls
+
+    // def f(a) cannot be called like f(0, a=0).
+    {
+        define_function(f, capture_code, ({str_a}));
+        ypObject *f_args = yp_tupleN(N(args[0]));
+        ypObject *f_kwargs = yp_frozendictK(K(str_a, args[0]));
+        assert_raises(yp_call_stars(f, f_args, f_kwargs), yp_TypeError);
+        yp_decrefN(N(f, f_args, f_kwargs));
+    }
+
+    // def f(a, **kwargs) cannot be called like f(0, a=0).
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_star_kwargs}));
+        ypObject *f_args = yp_tupleN(N(args[0]));
+        ypObject *f_kwargs = yp_frozendictK(K(str_a, args[0]));
+        assert_raises(yp_call_stars(f, f_args, f_kwargs), yp_TypeError);
+        yp_decrefN(N(f, f_args, f_kwargs));
+    }
+
+    // def f(a, /, **kwargs) _can_ be called like f(0, a=1) (or f(0, a=0), for that matter).
+    {
+        define_function(f, capture_code, ({str_a}, {str_slash}, {str_star_star_kwargs}));
+        ypObject *f_args = yp_tupleN(N(args[0]));
+        ypObject *f_kwargs = yp_frozendictK(K(str_a, args[1]));
+        ead(capt, yp_call_stars(f, f_args, f_kwargs),
+                assert_captured(capt, f, args[0], captured_NULL, f_kwargs));
+        yp_decrefN(N(f, f_args, f_kwargs));
+    }
+
 tear_down:
-    yp_decrefN(N(str_a));
+    obj_array_decref(args);
+    yp_decrefN(N(str_a, str_slash, str_star_star_kwargs));
     return result;
 }
 

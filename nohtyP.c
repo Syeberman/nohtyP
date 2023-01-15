@@ -18587,6 +18587,7 @@ static ypObject *_ypFunction_call_make_var_kwargs(
 
     // Skip any positional-only parameters: function (a, /, **kwargs) can be called like (1, a=33).
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY) {
+        yp_ASSERT1(ypFunction_PARAMS_LEN(f) > 2);
         while (i < ypFunction_PARAMS_LEN(f)) {
             param = ypFunction_PARAMS(f)[i];
             param_kind = _ypFunction_parameter_kind(param.name);
