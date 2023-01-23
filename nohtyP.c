@@ -18523,6 +18523,7 @@ static void _ypFunction_call_decref_argarray(yp_ssize_t n, ypObject **argarray)
 static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_methods *iter,
         ypQuickIter_state *args, yp_ssize_t *n, ypObject **argarray)
 {
+    int       is_positional_only = ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY;
     ypObject *arg;
 
     while (*n < ypFunction_PARAMS_LEN(f)) {
@@ -18530,6 +18531,8 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_slash) {
+            yp_ASSERT1(is_positional_only);
+            is_positional_only = FALSE;
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the / parameter
         } else if (param_kind == yp_s_star) {
@@ -18548,8 +18551,16 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
         } else if (param_kind == yp_None) {
             arg = iter->next(args);  // new ref
             if (arg == NULL) {
-                // Do *not* consume the parameter: it may be in kwargs.
-                return yp_None;  // end of positional arguments
+                if (!is_positional_only) {
+                    // Do *not* consume the parameter: it may be in kwargs.
+                    return yp_None;  // end of positional arguments
+                } else if (param.default_ != NULL) {
+                    argarray[*n] = yp_incref(param.default_);  // can be an exception
+                    (*n)++;                                    // consume the parameter
+                } else {
+                    // A positional-only parameter without a matching argument or a default.
+                    return yp_TypeError;
+                }
             } else if (yp_isexceptionC(arg)) {
                 return arg;
             } else {
@@ -18586,6 +18597,8 @@ static ypObject *_ypFunction_call_make_var_kwargs(
     yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
 
     // Skip any positional-only parameters: function (a, /, **kwargs) can be called like (1, a=33).
+    // TODO If we tracked the position of the slash the first time through the parameters, we could
+    // skip this loop here.
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY) {
         yp_ASSERT1(ypFunction_PARAMS_LEN(f) > 2);
         while (i < ypFunction_PARAMS_LEN(f)) {
@@ -18638,12 +18651,8 @@ static ypObject *_ypFunction_call_place_kwargs(
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_slash) {
-            if (placed_kwargs > 0) {
-                // A positional-only parameter was filled using a keyword argument.
-                return yp_TypeError;
-            }
-            argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
-            (*n)++;               // consume the / parameter
+            yp_ASSERT(FALSE, "slash should have been consumed by _ypFunction_call_place_args");
+            return yp_SystemError;
         } else if (param_kind == yp_s_star) {
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the * parameter
@@ -19076,10 +19085,12 @@ static ypObject *ypFunction_call_array(ypObject *f, yp_ssize_t n, ypObject *cons
 
     } else if (n > 0 && ypFunction_IS_PARAM_VAR_POS_VAR_KW(param_flags)) {
         ypObject *argarray[3] = {args[0]};  // only self (args[0]) is borrowed in argarray
+        if (yp_isexceptionC(args[0])) return args[0];
         return _ypFunction_call_array_tostars(f, n - 1, args + 1, argarray, 1);
 
     } else if (n > 0 && ypFunction_IS_PARAM_SLASH_VAR_POS_VAR_KW(param_flags)) {
         ypObject *argarray[4] = {args[0], NULL};  // only self (args[0]) is borrowed in argarray
+        if (yp_isexceptionC(args[0])) return args[0];
         return _ypFunction_call_array_tostars(f, n - 1, args + 1, argarray, 2);
 
     } else {
