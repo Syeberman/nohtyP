@@ -2,10 +2,11 @@
 #include "munit_test/unittest.h"
 
 
-extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions) {
+extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
+{
     yp_ssize_t i;
     for (i = 0; i < n; i++) {
-        if(yp_isexceptionC2(x, exceptions[i])) return TRUE;
+        if (yp_isexceptionC2(x, exceptions[i])) return TRUE;
     }
     return FALSE;
 }
@@ -253,7 +254,7 @@ static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
     rand_objs3(n, array, rand_obj_any_hashable);
 }
 
-static void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
+void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
 
 
 typedef struct _new_rand_iter_state {

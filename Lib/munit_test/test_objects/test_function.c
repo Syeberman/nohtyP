@@ -97,6 +97,44 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
     } while (0)
 
 
+// Fills array with n parameters; useful to create functions with many parameters. names start with
+// name_prefix and end with a number incrementing from zero. default_filler generates the default
+// values. array will contain new references that will need to be decremented with
+// parameter_decl_array_decref*.
+static void parameter_decl_array_fill4(
+        yp_ssize_t n, yp_parameter_decl_t *array, char *name_prefix, voidarrayfunc default_filler)
+{
+    yp_ssize_t i;
+    char       name[32];
+    ypObject  *defaults[64];
+
+    assert_ssizeC(n, <=, yp_lengthof_array(defaults));
+    default_filler(n, defaults);  // new refs
+
+    for (i = 0; i < n; i++) {
+        sprintf_array(name, "%s%" PRIssize, name_prefix, i);
+        assert_not_raises(array[i].name = yp_str_frombytesC2(-1, name));  // new ref
+        array[i].default_ = defaults[i];                                  // borrowed ref
+    }
+}
+
+// Discards all references in the ypObject * array of length n. Skips NULL elements.
+static void parameter_decl_array_decref2(yp_ssize_t n, yp_parameter_decl_t *array)
+{
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) {
+        if (array[i].name != NULL) yp_decref(array[i].name);
+        if (array[i].default_ != NULL) yp_decref(array[i].default_);
+    }
+    memset(array, 0, ((size_t)n) * sizeof(yp_parameter_decl_t));
+}
+
+// Discards all references in the ypObject * array. Skips NULL elements. Only call for arrays of
+// fixed size (uses yp_lengthof_array).
+#define parameter_decl_array_decref(array) \
+    parameter_decl_array_decref2(yp_lengthof_array(array), (array))
+
+
 // Declares a variable name of type ypObject * and initializes it with a new reference to a function
 // object. The parameters argument must be surrounded by parentheses.
 // XXX Older compilers reject an empty parameters argument; use define_function2 instead.
@@ -1030,9 +1068,37 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decrefN(N(f, one, one_two));
     }
 
-    // FIXME f is an exception
+    // More than ypFunction_MAX_ARGS_ON_STACK parameters
+    {
+        // params has ypFunction_MAX_ARGS_ON_STACK + 1 elements. Note params contains new refs.
+        yp_parameter_decl_t params[32 + 1] = {{yp_incref(str_a)}};
+        yp_ssize_t          params_len = yp_lengthof_array(params);
+        yp_function_decl_t  decl = {capture_code, 0, (yp_int32_t)params_len, params, NULL, NULL};
+        ypObject           *f;
+        parameter_decl_array_fill4(params_len - 1, params + 1, "b", rand_objs_any);
+        assert_not_raises(f = yp_functionC(&decl));
 
-    // FIXME More than ypFunction_MAX_ARGS_ON_STACK parameters
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(capt, f, args[0], params[1].default_, params[2].default_,
+                        params[3].default_, params[4].default_, params[5].default_,
+                        params[6].default_, params[7].default_, params[8].default_,
+                        params[9].default_, params[10].default_, params[11].default_,
+                        params[12].default_, params[13].default_, params[14].default_,
+                        params[15].default_, params[16].default_, params[17].default_,
+                        params[18].default_, params[19].default_, params[20].default_,
+                        params[21].default_, params[22].default_, params[23].default_,
+                        params[24].default_, params[25].default_, params[26].default_,
+                        params[27].default_, params[28].default_, params[29].default_,
+                        params[30].default_, params[31].default_, params[32].default_));
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+
+        parameter_decl_array_decref(params);
+        yp_decref(f);
+    }
+
+    // FIXME f is an exception
 
     // FIXME test callable objects (i.e. withself)
 
@@ -1796,11 +1862,39 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         yp_decrefN(N(f, zero, one, one_two));
     }
 
+    // More than ypFunction_MAX_ARGS_ON_STACK parameters
+    {
+        // params has ypFunction_MAX_ARGS_ON_STACK + 1 elements. Note params contains new refs.
+        yp_parameter_decl_t params[32 + 1] = {{yp_incref(str_a)}};
+        yp_ssize_t          params_len = yp_lengthof_array(params);
+        yp_function_decl_t  decl = {capture_code, 0, (yp_int32_t)params_len, params, NULL, NULL};
+        ypObject           *f;
+        parameter_decl_array_fill4(params_len - 1, params + 1, "b", rand_objs_any);
+        assert_not_raises(f = yp_functionC(&decl));
+
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], params[1].default_, params[2].default_,
+                        params[3].default_, params[4].default_, params[5].default_,
+                        params[6].default_, params[7].default_, params[8].default_,
+                        params[9].default_, params[10].default_, params[11].default_,
+                        params[12].default_, params[13].default_, params[14].default_,
+                        params[15].default_, params[16].default_, params[17].default_,
+                        params[18].default_, params[19].default_, params[20].default_,
+                        params[21].default_, params[22].default_, params[23].default_,
+                        params[24].default_, params[25].default_, params[26].default_,
+                        params[27].default_, params[28].default_, params[29].default_,
+                        params[30].default_, params[31].default_, params[32].default_));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+
+        parameter_decl_array_decref(params);
+        yp_decref(f);
+    }
+
     // FIXME f is an exception
 
     // FIXME arg order
-
-    // FIXME More than ypFunction_MAX_ARGS_ON_STACK parameters
 
     // FIXME test callable objects (i.e. withself)
 

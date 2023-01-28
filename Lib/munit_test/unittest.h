@@ -9,6 +9,7 @@ extern "C" {
 #include "munit.h"
 
 #include <stddef.h>
+#include <stdio.h>
 
 
 #ifndef TRUE
@@ -97,6 +98,13 @@ extern "C" {
 #define _STRINGIFY24(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x
 #define _STRINGIFY25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y
 #define _STRINGIFY26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z
+#define _STRINGIFY27(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A
+#define _STRINGIFY28(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B
+#define _STRINGIFY29(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C
+#define _STRINGIFY30(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D
+#define _STRINGIFY31(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E
+#define _STRINGIFY32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F
+#define _STRINGIFY33(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F, #G
 
 #define _COMMA_REPEAT1(x) x
 #define _COMMA_REPEAT2(x) x, x
@@ -496,6 +504,18 @@ extern "C" {
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions);
 
 
+// A safe sprintf that asserts on buffer overflow. Only call for arrays of fixed size (uses
+// yp_lengthof_array).
+#define sprintf_array(array, fmt, ...)                                                      \
+    do {                                                                                    \
+        yp_ssize_t _ypmt_SPRINTF_len = yp_lengthof_array(array);                            \
+        yp_ssize_t result =                                                                 \
+                (yp_ssize_t)snprintf((array), (size_t)_ypmt_SPRINTF_len, fmt, __VA_ARGS__); \
+        assert_ssizeC(result, >=, 0);                                                       \
+        assert_ssizeC(result, <, _ypmt_SPRINTF_len);                                        \
+    } while (0)
+
+
 typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef void (*voidarrayfunc)(yp_ssize_t, ypObject **);
@@ -603,6 +623,9 @@ extern ypObject *rand_obj(fixture_type_t *type);
 
 // Returns a random hashable object of the given type. type must be immutable.
 extern ypObject *rand_obj_hashable(fixture_type_t *type);
+
+// Fills array with n random, unique objects of any type.
+extern void rand_objs_any(yp_ssize_t n, ypObject **array);
 
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given
