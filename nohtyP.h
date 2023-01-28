@@ -2224,6 +2224,7 @@ typedef struct _ypFunctionObject {
 #define yp_IMMORTAL_STR_LATIN_1_static(name, value) _yp_IMMORTAL_STR_LATIN_1(static, name, value)
 
 // Immortal functions are not yet part of the external interface: do not use.
+// TODO Older compilers reject an empty parameters argument; create a _yp_IMMORTAL_FUNCTION3?
 #define _yp_IMMORTAL_FUNCTION5(qual, name, code, parameters_len, parameters)                      \
     static struct _ypFunctionObject _##name##_struct = {                                          \
             _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters_len, parameters), code, NULL}; \

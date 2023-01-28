@@ -18519,9 +18519,10 @@ static void _ypFunction_call_decref_argarray(yp_ssize_t n, ypObject **argarray)
 
 // Helper for _ypFunction_call_QuickIter. Places the positional arguments in argarray. Keeps *n
 // up-to-date with the number of references in argarray, so they can be deallocated by
-// _ypFunction_call_QuickIter after the call.
+// _ypFunction_call_QuickIter after the call. Sets *slash_index to the position of /, if present (/
+// is always consumed by this function).
 static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_methods *iter,
-        ypQuickIter_state *args, yp_ssize_t *n, ypObject **argarray)
+        ypQuickIter_state *args, yp_ssize_t *n, ypObject **argarray, yp_ssize_t *slash_index)
 {
     int       is_positional_only = ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY;
     ypObject *arg;
@@ -18531,8 +18532,8 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_slash) {
-            yp_ASSERT1(is_positional_only);
             is_positional_only = FALSE;
+            *slash_index = *n;
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the / parameter
         } else if (param_kind == yp_s_star) {
@@ -18583,9 +18584,11 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
 }
 
 // Helper for _ypFunction_call_QuickIter. Determines **kwargs by modifying kwargs, first dropping
-// keyword arguments we've already placed, freezing it, and returning a new reference.
+// keyword arguments we've already placed, freezing it, and returning a new reference. slash_index
+// is the index of /, or -1 if not present. first_kwarg is the position of the first parameter
+// filled by a keyword argument.
 static ypObject *_ypFunction_call_make_var_kwargs(
-        ypObject *f, yp_ssize_t first_kwarg, ypObject *kwargs)
+        ypObject *f, yp_ssize_t slash_index, yp_ssize_t first_kwarg, ypObject *kwargs)
 {
     yp_parameter_decl_t param;
     ypObject           *param_kind;
@@ -18597,19 +18600,9 @@ static ypObject *_ypFunction_call_make_var_kwargs(
     yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
 
     // Skip any positional-only parameters: function (a, /, **kwargs) can be called like (1, a=33).
-    // TODO If we tracked the position of the slash the first time through the parameters, we could
-    // skip this loop here.
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY) {
-        yp_ASSERT1(ypFunction_PARAMS_LEN(f) > 2);
-        while (i < ypFunction_PARAMS_LEN(f)) {
-            param = ypFunction_PARAMS(f)[i];
-            param_kind = _ypFunction_parameter_kind(param.name);
-            if (yp_isexceptionC(param_kind)) return param_kind;
-
-            i++;  // consume the parameter
-            if (param_kind == yp_s_slash) break;
-        }
-        yp_ASSERT1(i < ypFunction_PARAMS_LEN(f));
+        yp_ASSERT1(slash_index >= 0);
+        i = slash_index + 1;  // start at the param after /, the first kw param
     }
 
     for (/*i already set*/; i < ypFunction_PARAMS_LEN(f); i++) {
@@ -18634,11 +18627,11 @@ static ypObject *_ypFunction_call_make_var_kwargs(
 
 // Helper for _ypFunction_call_QuickIter. Places the keyword arguments in argarray. Keeps *n
 // up-to-date with the number of references in argarray, so they can be deallocated by
-// _ypFunction_call_QuickIter after the call. kwargs must be a dict/frozendict; additonally, if
-// we have a **kwargs parameter, kwargs must be a dict, and it will be modified, frozen, and
-// placed in argarray.
+// _ypFunction_call_QuickIter after the call. slash_index is the index of /, or -1 if not present.
+// kwargs must be a dict/frozendict; additonally, if we have a **kwargs parameter, kwargs must be a
+// dict, and it will be modified, frozen, and placed in argarray.
 static ypObject *_ypFunction_call_place_kwargs(
-        ypObject *f, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
+        ypObject *f, yp_ssize_t slash_index, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
 {
     ypObject  *arg;
     yp_ssize_t first_kwarg = *n;   // remembers the position of the first param filled by us
@@ -18650,10 +18643,8 @@ static ypObject *_ypFunction_call_place_kwargs(
         yp_parameter_decl_t param = ypFunction_PARAMS(f)[*n];
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
 
-        if (param_kind == yp_s_slash) {
-            yp_ASSERT(FALSE, "slash should have been consumed by _ypFunction_call_place_args");
-            return yp_SystemError;
-        } else if (param_kind == yp_s_star) {
+        // / was already consumed by _ypFunction_call_place_args.
+        if (param_kind == yp_s_star) {
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the * parameter
         } else if (param_kind == yp_s_star_args) {
@@ -18662,7 +18653,7 @@ static ypObject *_ypFunction_call_place_kwargs(
         } else if (param_kind == yp_s_star_star_kwargs) {
             yp_ASSERT(*n == ypFunction_PARAMS_LEN(f) - 1,
                     "_ypFunction_validate_parameters didn't ensure that **kwargs came last");
-            arg = _ypFunction_call_make_var_kwargs(f, first_kwarg, kwargs);
+            arg = _ypFunction_call_make_var_kwargs(f, slash_index, first_kwarg, kwargs);
             if (yp_isexceptionC(arg)) return arg;
             argarray[*n] = arg;
             (*n)++;          // consume the parameter
@@ -18682,6 +18673,8 @@ static ypObject *_ypFunction_call_place_kwargs(
                 return yp_TypeError;
             }
         } else {
+            yp_ASSERT(param_kind != yp_s_slash,
+                    "/ should have been consumed by _ypFunction_call_place_args");
             yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
             return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
         }
@@ -18701,22 +18694,25 @@ static ypObject *_ypFunction_call_place_kwargs(
 static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter_methods *iter,
         ypQuickIter_state *args, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
 {
-    ypObject *result;
+    ypObject  *result;
+    yp_ssize_t slash_index = -1;  // index of /, or -1 if not present
 
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED);
 
     // Positional arguments are placed first.
-    result = _ypFunction_call_place_args(f, iter, args, n, argarray);
+    result = _ypFunction_call_place_args(f, iter, args, n, argarray, &slash_index);
     if (yp_isexceptionC(result)) return result;
+    yp_ASSERT1((ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY && slash_index >= 0) ||
+               slash_index == -1);
 
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW) {
         ypObject *kwargs_copy = yp_dict(kwargs);  // modified by _ypFunction_call_place_kwargs
         if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
-        result = _ypFunction_call_place_kwargs(f, kwargs_copy, n, argarray);
+        result = _ypFunction_call_place_kwargs(f, slash_index, kwargs_copy, n, argarray);
         yp_decref(kwargs_copy);
         if (yp_isexceptionC(result)) return result;
     } else if (ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE) {
-        result = _ypFunction_call_place_kwargs(f, kwargs, n, argarray);
+        result = _ypFunction_call_place_kwargs(f, slash_index, kwargs, n, argarray);
         if (yp_isexceptionC(result)) return result;
     } else {
         // We can't trust user-defined mapping types here (and neither does Python). Consider a
@@ -18724,7 +18720,7 @@ static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter
         // contains just one entry, it would match both arguments.
         ypObject *kwargs_asfrozendict = yp_frozendict(kwargs);
         if (yp_isexceptionC(kwargs_asfrozendict)) return kwargs_asfrozendict;
-        result = _ypFunction_call_place_kwargs(f, kwargs_asfrozendict, n, argarray);
+        result = _ypFunction_call_place_kwargs(f, slash_index, kwargs_asfrozendict, n, argarray);
         yp_decref(kwargs_asfrozendict);
         if (yp_isexceptionC(result)) return result;
     }
