@@ -85,6 +85,7 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
         ypObject *_ypmt_CAPT_f_expected = (f_expected);                                           \
         ypObject *_ypmt_CAPT_items[] = {__VA_ARGS__};                                             \
         char     *_ypmt_CAPT_item_strs[] = {STRINGIFY(__VA_ARGS__)};                              \
+        _assert_not_exception(_ypmt_CAPT_captured, "%s", #captured);                              \
         _assert_not_exception(_ypmt_CAPT_f, "yp_getindexC(%s, 0)", #captured);                    \
         _assert_not_exception(                                                                    \
                 _ypmt_CAPT_args, "yp_getsliceC4(%s, 2, yp_SLICE_LAST, 1)", #captured);            \
@@ -98,11 +99,17 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
 
 // Declares a variable name of type ypObject * and initializes it with a new reference to a function
 // object. The parameters argument must be surrounded by parentheses.
+// XXX Older compilers reject an empty parameters argument; use define_function2 instead.
 #define define_function(name, code, parameters)                                                     \
     yp_parameter_decl_t _##name##_parameters[] = {UNPACK parameters};                               \
     yp_function_decl_t  _##name##_declaration = {                                                   \
             (code), 0, yp_lengthof_array(_##name##_parameters), _##name##_parameters, NULL, NULL}; \
     ypObject *name = yp_functionC(&_##name##_declaration)
+
+// Equivalent to define_function(name, code, ()).
+#define define_function2(name, code)                                             \
+    yp_function_decl_t _##name##_declaration = {(code), 0, 0, NULL, NULL, NULL}; \
+    ypObject          *name = yp_functionC(&_##name##_declaration)
 
 
 static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
@@ -166,6 +173,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                             {str_star_star_kwargs}}},  // def f(a, /, b, *, c, **kwargs)
                 {6, {{str_a}, {str_slash}, {str_b}, {str_star_args}, {str_c},
                             {str_star_star_kwargs}}},  // def f(a, /, b, *args, c, **kwargs)
+                                                       // FIXME def f(a, /, *, b): pass
         };
         for (i = 0; i < yp_lengthof_array(signatures); i++) {
             signature_t        signature = signatures[i];
@@ -299,6 +307,9 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 
                 // Non-unique names
                 {2, {{str_a}, {str_a}}},
+                {3, {{str_a}, {str_slash}, {str_a}}},
+                {3, {{str_a}, {str_star}, {str_a}}},
+                {3, {{str_a}, {str_star_args}, {str_a}}},
                 {2, {{str_a}, {str_star_a}}},
                 {2, {{str_a}, {str_star_star_a}}},
                 {2, {{str_star_a}, {str_a}}},
@@ -378,7 +389,7 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 
     // def f()
     {
-        define_function(f, capture_code, ());
+        define_function2(f, capture_code);
 
         ead(capt, any_callN(f, 0), assert_captured_is(capt, f, 0, NULL));
 
@@ -975,8 +986,49 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decrefN(N(f, zero, zero_one));
     }
 
-    // FIXME f(a, *args, **kwargs) (a typical flexible method, were a is self)
-    // FIXME f(a, /, *args, **kwargs) (a typical flexible method, were a is self)
+    // def f(a, *args, **kwargs)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}, {str_star_star_kwargs}));
+        ypObject *one = yp_tupleN(N(args[1]));
+        ypObject *one_two = yp_tupleN(N(args[1], args[2]));
+
+        // **kwargs cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, yp_frozendict_empty));
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, args[0], one, yp_frozendict_empty));
+        ead(capt, any_callN(f, N(args[0], args[1], args[2])),
+                assert_captured(capt, f, args[0], one_two, yp_frozendict_empty));
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(f, one, one_two));
+    }
+
+    // def f(a, /, *args, **kwargs)
+    {
+        define_function(
+                f, capture_code, ({str_a}, {str_slash}, {str_star_args}, {str_star_star_kwargs}));
+        ypObject *one = yp_tupleN(N(args[1]));
+        ypObject *one_two = yp_tupleN(N(args[1], args[2]));
+
+        // **kwargs cannot be set from a "callN" positional argument.
+        ead(capt, any_callN(f, N(args[0])),
+                assert_captured(
+                        capt, f, args[0], captured_NULL, yp_tuple_empty, yp_frozendict_empty));
+        ead(capt, any_callN(f, N(args[0], args[1])),
+                assert_captured(capt, f, args[0], captured_NULL, one, yp_frozendict_empty));
+        ead(capt, any_callN(f, N(args[0], args[1], args[2])),
+                assert_captured(capt, f, args[0], captured_NULL, one_two, yp_frozendict_empty));
+
+        assert_raises(any_callN(f, 0), yp_TypeError);
+        assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
+        assert_raises(any_callN(f, N(args[0], yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(f, one, one_two));
+    }
 
     // FIXME f is an exception
 
@@ -1006,7 +1058,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 
     // def f()
     {
-        define_function(f, capture_code, ());
+        define_function2(f, capture_code);
 
         ead(capt, any_callK(f, 0), assert_captured_is(capt, f, 0, NULL));
 
@@ -1105,7 +1157,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 
         assert_raises(any_callK(f, 0), yp_TypeError);
         assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
-        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError, yp_TypeError);
 
         yp_decref(f);
     }
@@ -1696,8 +1748,53 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         yp_decrefN(N(f, zero, one, zero_one));
     }
 
-    // FIXME f(a, *args, **kwargs) (a typical flexible method, were a is self)
-    // FIXME f(a, /, *args, **kwargs) (a typical flexible method, were a is self)
+    // def f(a, *args, **kwargs)
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}, {str_star_star_kwargs}));
+        ypObject *one = yp_frozendictK(K(str_b, args[1]));
+        ypObject *one_two = yp_frozendictK(K(str_b, args[1], str_c, args[2]));
+
+        // *args cannot be set from a "callK" keyword argument.
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, yp_frozendict_empty));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, one));
+        ead(capt, any_callK(f, K(str_a, args[0], str_b, args[1], str_c, args[2])),
+                assert_captured(capt, f, args[0], yp_tuple_empty, one_two));
+
+        assert_raises(any_callK(f, 0), yp_TypeError);
+        assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(f, one, one_two));
+    }
+
+    // def f(a=0, /, *args, **kwargs)
+    {
+        define_function(f, capture_code,
+                ({str_a, defs[0]}, {str_slash}, {str_star_args}, {str_star_star_kwargs}));
+        ypObject *zero = yp_frozendictK(K(str_a, args[0]));
+        ypObject *one = yp_frozendictK(K(str_b, args[1]));
+        ypObject *one_two = yp_frozendictK(K(str_b, args[1], str_c, args[2]));
+
+        // *args cannot be set from a "callK" keyword argument. Positional-only parameter names
+        // do not conflict with keyword arguments of the same name.
+        ead(capt, any_callK(f, 0),
+                assert_captured(
+                        capt, f, defs[0], captured_NULL, yp_tuple_empty, yp_frozendict_empty));
+        ead(capt, any_callK(f, K(str_a, args[0])),
+                assert_captured(capt, f, defs[0], captured_NULL, yp_tuple_empty, zero));
+        ead(capt, any_callK(f, K(str_b, args[1])),
+                assert_captured(capt, f, defs[0], captured_NULL, yp_tuple_empty, one));
+        ead(capt, any_callK(f, K(str_b, args[1], str_c, args[2])),
+                assert_captured(capt, f, defs[0], captured_NULL, yp_tuple_empty, one_two));
+
+        assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(f, zero, one, one_two));
+    }
 
     // FIXME f is an exception
 
@@ -1832,8 +1929,10 @@ tear_down:
 static ypObject *callN_to_call_arrayX(ypObject *c, int n, ...)
 {
     va_list   args;
-    ypObject *as_array[n + 1];
+    ypObject *as_array[64];
     int       i;
+
+    assert_ssizeC(yp_lengthof_array(as_array), >=, n + 1);
 
     va_start(args, n);
     as_array[0] = c;  // the callable is at args[0]
