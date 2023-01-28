@@ -12166,18 +12166,12 @@ static ypObject *_ypTuple_attach_array(ypObject *sq, ypTuple_detached *detached)
     return yp_None;
 }
 
-// XXX Check for the "yp_tuple_empty" and ypTuple_ALLOCLEN_MAX cases first
+// XXX Check for the "yp_tuple_empty" and ypTuple_ALLOCLEN_MAX cases first.
+// XXX array must not contain exceptions.
 static ypObject *_ypTuple_new_fromarray(int type, yp_ssize_t n, ypObject *const *array)
 {
     yp_ssize_t i;
-    ypObject  *sq;
-
-    // Make sure we don't create a tuple containing exceptions.
-    for (i = 0; i < n; i++) {
-        if (yp_isexceptionC(array[i])) return array[i];
-    }
-
-    sq = _ypTuple_new(type, n, /*alloclen_fixed=*/TRUE);
+    ypObject *sq = _ypTuple_new(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(sq)) return sq;
     yp_memcpy(ypTuple_ARRAY(sq), array, n * yp_sizeof(ypObject *));
     for (i = 0; i < n; i++) yp_incref(ypTuple_ARRAY(sq)[i]);
@@ -12185,7 +12179,7 @@ static ypObject *_ypTuple_new_fromarray(int type, yp_ssize_t n, ypObject *const 
     return sq;
 }
 
-// XXX Check for the "lazy shallow copy" and "yp_tuple_empty" cases first
+// XXX Check for the "lazy shallow copy" and "yp_tuple_empty" cases first.
 static ypObject *_ypTuple_copy(int type, ypObject *x)
 {
     yp_ASSERT(type != ypTuple_CODE || ypObject_TYPE_CODE(x) != ypTuple_CODE,
@@ -13472,7 +13466,15 @@ ypObject *yp_list(ypObject *iterable)
 // of all va_list functions, so keep private for now.
 static ypObject *yp_tuple_fromarray(yp_ssize_t n, ypObject *const *array)
 {
+    yp_ssize_t i;
+
     if (n < 1) return yp_tuple_empty;
+
+    // Make sure we don't create a tuple containing exceptions.
+    for (i = 0; i < n; i++) {
+        if (yp_isexceptionC(array[i])) return array[i];
+    }
+
     return _ypTuple_new_fromarray(ypTuple_CODE, n, array);
 }
 
