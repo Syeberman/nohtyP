@@ -2283,6 +2283,8 @@ static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fi
 
     // FIXME Test where the array is not passed exactly (i.e. iter->next(args) returns exception.)
 
+    assert_raises(yp_call_arrayX(0, NULL), yp_TypeError);
+
 tear_down:
     yp_decrefN(N(str_a));
     return result;

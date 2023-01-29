@@ -19809,11 +19809,12 @@ ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)
 // kwargs in vectorcall, but I don't see the overall benefit.
 ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args)
 {
-    ypObject *c = args[0];  // borrowed
+    ypObject *c;
 
-    if (n < 1) {
-        return yp_TypeError;
-    } else if (ypObject_TYPE_CODE(c) == ypFunction_CODE) {
+    if (n < 1) return yp_TypeError;
+    c = args[0];  // borrowed
+
+    if (ypObject_TYPE_CODE(c) == ypFunction_CODE) {
         return ypFunction_call_array(c, n - 1, args + 1);
     } else {
         ypObject *f;
