@@ -3874,8 +3874,8 @@ static ypObject *invalidated_func_new_code(ypObject *f, yp_ssize_t n, ypObject *
 }
 
 yp_IMMORTAL_FUNCTION_static(invalidated_func_new, invalidated_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+                {yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
 
 static ypTypeObject ypInvalidated_Type = {
         yp_TYPE_HEAD_INIT,
@@ -3966,8 +3966,8 @@ static ypObject *exception_func_new_code(ypObject *f, yp_ssize_t n, ypObject *co
 }
 
 yp_IMMORTAL_FUNCTION_static(exception_func_new, exception_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+                {yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
 
 static ypTypeObject ypException_Type = {
         yp_TYPE_HEAD_INIT,
@@ -10314,16 +10314,16 @@ static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding,
 static ypObject *_ypBytes(int type, ypObject *source);
 static ypObject *_ypBytes_func_new_code(int type, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
+    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
 
-    if (argarray[2] != yp_Arg_Missing) {  // FIXME ...or just use None?
-        ypObject *errors = argarray[3] == yp_Arg_Missing ? yp_s_strict : argarray[3];  // borrowed
-        return _ypBytes_encode(type, argarray[1], argarray[2], errors);
-    } else if (argarray[3] != yp_Arg_Missing) {
+    if (argarray[3] != yp_Arg_Missing) {  // FIXME ...or just use None?
+        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
+        return _ypBytes_encode(type, argarray[2], argarray[3], errors);
+    } else if (argarray[4] != yp_Arg_Missing) {
         // Either "string argument without an encoding" or "errors without a string argument".
         return yp_TypeError;
     } else {
-        return _ypBytes(type, argarray[1]);
+        return _ypBytes(type, argarray[2]);
     }
 }
 
@@ -10339,9 +10339,10 @@ static ypObject *bytearray_func_new_code(ypObject *f, yp_ssize_t n, ypObject *co
     return _ypBytes_func_new_code(ypByteArray_CODE, n, argarray);
 }
 
-#define _ypBytes_FUNC_NEW_PARAMETERS                                                            \
-    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_source), yp_CONST_REF(yp_bytes_empty)}, \
-            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},                        \
+#define _ypBytes_FUNC_NEW_PARAMETERS                                     \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},   \
+            {yp_CONST_REF(yp_s_source), yp_CONST_REF(yp_bytes_empty)},   \
+            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)}, \
             {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)})
 yp_IMMORTAL_FUNCTION_static(bytes_func_new, bytes_func_new_code, _ypBytes_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(
@@ -11322,19 +11323,19 @@ static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, y
 static ypObject *_ypStr(int type, ypObject *object);
 static ypObject *_ypStr_func_new_code(int type, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
+    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
 
     // As object defaults to yp_str_empty, and _ypStr_decode rejects strs, encoding-without-object
     // is an error, just as with bytes (but unlike Python).
-    if (argarray[2] != yp_Arg_Missing) {  // FIXME ...or just use None?
-        ypObject *errors = argarray[3] == yp_Arg_Missing ? yp_s_strict : argarray[3];  // borrowed
-        return _ypStr_decode(type, argarray[1], argarray[2], errors);
-    } else if (argarray[3] != yp_Arg_Missing) {
+    if (argarray[3] != yp_Arg_Missing) {  // FIXME ...or just use None?
+        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
+        return _ypStr_decode(type, argarray[2], argarray[3], errors);
+    } else if (argarray[4] != yp_Arg_Missing) {
         // TODO In Python, sys.getdefaultencoding() is the default. Should we break with Python
         // here? I certainly don't like global variables changing behaviour...
-        return _ypStr_decode(type, argarray[1], yp_s_utf_8, argarray[3]);
+        return _ypStr_decode(type, argarray[2], yp_s_utf_8, argarray[4]);
     } else {
-        return _ypStr(type, argarray[1]);
+        return _ypStr(type, argarray[2]);
     }
 }
 
@@ -11351,9 +11352,10 @@ static ypObject *chrarray_func_new_code(ypObject *f, yp_ssize_t n, ypObject *con
     return _ypStr_func_new_code(ypChrArray_CODE, n, argarray);
 }
 
-#define _ypStr_FUNC_NEW_PARAMETERS                                                            \
-    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_str_empty)}, \
-            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},                      \
+#define _ypStr_FUNC_NEW_PARAMETERS                                       \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},   \
+            {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_str_empty)},     \
+            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)}, \
             {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)})
 yp_IMMORTAL_FUNCTION_static(str_func_new, str_func_new_code, _ypStr_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(chrarray_func_new, chrarray_func_new_code, _ypStr_FUNC_NEW_PARAMETERS);
@@ -12171,7 +12173,7 @@ static ypObject *_ypTuple_attach_array(ypObject *sq, ypTuple_detached *detached)
 static ypObject *_ypTuple_new_fromarray(int type, yp_ssize_t n, ypObject *const *array)
 {
     yp_ssize_t i;
-    ypObject *sq = _ypTuple_new(type, n, /*alloclen_fixed=*/TRUE);
+    ypObject  *sq = _ypTuple_new(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(sq)) return sq;
     yp_memcpy(ypTuple_ARRAY(sq), array, n * yp_sizeof(ypObject *));
     for (i = 0; i < n; i++) yp_incref(ypTuple_ARRAY(sq)[i]);
@@ -19177,8 +19179,8 @@ static ypObject *function_func_new_code(ypObject *f, yp_ssize_t n, ypObject *con
 }
 
 yp_IMMORTAL_FUNCTION_static(function_func_new, function_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+                {yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
 
 static ypCallableMethods ypFunction_as_callable = {
         TRUE,          // tp_iscallable
