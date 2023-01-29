@@ -417,7 +417,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
 static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
 {
     ypObject *defs[] = obj_array_init(5, rand_obj_any());
-    ypObject *args[] = obj_array_init(5, rand_obj_any());
+    ypObject *args[] = obj_array_init(33, rand_obj_any());
     ypObject *str_a = yp_str_frombytesC2(-1, "a");
     ypObject *str_b = yp_str_frombytesC2(-1, "b");
     ypObject *str_slash = yp_str_frombytesC2(-1, "/");
@@ -1090,6 +1090,18 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
                         params[24].default_, params[25].default_, params[26].default_,
                         params[27].default_, params[28].default_, params[29].default_,
                         params[30].default_, params[31].default_, params[32].default_));
+        ead(capt,
+                any_callN(f,
+                        N(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7],
+                                args[8], args[9], args[10], args[11], args[12], args[13], args[14],
+                                args[15], args[16], args[17], args[18], args[19], args[20],
+                                args[21], args[22], args[23], args[24], args[25], args[26],
+                                args[27], args[28], args[29], args[30], args[31], args[32])),
+                assert_captured(capt, f, args[0], args[1], args[2], args[3], args[4], args[5],
+                        args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13],
+                        args[14], args[15], args[16], args[17], args[18], args[19], args[20],
+                        args[21], args[22], args[23], args[24], args[25], args[26], args[27],
+                        args[28], args[29], args[30], args[31], args[32]));
 
         assert_raises(any_callN(f, 0), yp_TypeError);
         assert_raises(any_callN(f, N(yp_NameError)), yp_NameError);
@@ -1098,9 +1110,103 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         yp_decref(f);
     }
 
-    // FIXME f is an exception
+    // FIXME withself in callK tests
 
-    // FIXME test callable objects (i.e. withself)
+    // yp_t_type: pos-only self, pos-only
+    {
+        ead(result, any_callN(yp_t_type, N(str_a)), assert_obj(result, eq, yp_t_str));
+        ead(result, any_callN(yp_t_type, N(yp_t_str)), assert_obj(result, eq, yp_t_type));
+
+        assert_raises(any_callN(yp_t_type, 0), yp_TypeError);
+        assert_raises(any_callN(yp_t_type, N(str_a, str_b)), yp_TypeError);
+        assert_raises(any_callN(yp_t_type, N(yp_NameError)), yp_NameError);
+    }
+
+    // yp_t_bool: pos-only self, pos-only, default
+    {
+        ead(result, any_callN(yp_t_bool, 0), assert_obj(result, eq, yp_False));
+        ead(result, any_callN(yp_t_bool, N(yp_str_empty)), assert_obj(result, eq, yp_False));
+        ead(result, any_callN(yp_t_bool, N(str_a)), assert_obj(result, eq, yp_True));
+
+        assert_raises(any_callN(yp_t_bool, N(str_a, str_b)), yp_TypeError);
+        assert_raises(any_callN(yp_t_bool, N(yp_NameError)), yp_NameError);
+    }
+
+    // yp_t_int: pos-only self, pos-only, pos-or-kw, default
+    {
+        ypObject *str_two_two = yp_str_frombytesC2(-1, "22");
+        ypObject *int_twenty_two = yp_intC(22);
+        ypObject *int_three = yp_intC(3);
+        ypObject *int_eight = yp_intC(8);
+
+        ead(result, any_callN(yp_t_int, 0), assert_obj(result, eq, yp_i_zero));
+        ead(result, any_callN(yp_t_int, N(yp_i_one)), assert_obj(result, eq, yp_i_one));
+        ead(result, any_callN(yp_t_int, N(str_two_two)), assert_obj(result, eq, int_twenty_two));
+        ead(result, any_callN(yp_t_int, N(str_two_two, yp_None)),
+                assert_obj(result, eq, int_twenty_two));
+        ead(result, any_callN(yp_t_int, N(str_two_two, int_three)),
+                assert_obj(result, eq, int_eight));
+
+        assert_raises(any_callN(yp_t_int, N(str_two_two, int_three, int_three)), yp_TypeError);
+        assert_raises(any_callN(yp_t_int, N(yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(str_two_two, int_twenty_two, int_three, int_eight));
+    }
+
+    // yp_t_bytes: pos-only self, pos-or-kw, default
+    {
+        ypObject *bytes_a = yp_bytesC(-1, "a");
+
+        ead(result, any_callN(yp_t_bytes, 0), assert_obj(result, eq, yp_bytes_empty));
+        ead(result, any_callN(yp_t_bytes, N(bytes_a)), assert_obj(result, eq, bytes_a));
+        ead(result, any_callN(yp_t_bytes, N(str_a, yp_s_utf_8)), assert_obj(result, eq, bytes_a));
+        ead(result, any_callN(yp_t_bytes, N(str_a, yp_s_utf_8, yp_s_strict)),
+                assert_obj(result, eq, bytes_a));
+
+        assert_raises(
+                any_callN(yp_t_bytes, N(str_a, yp_s_utf_8, yp_s_strict, bytes_a)), yp_TypeError);
+        assert_raises(any_callN(yp_t_bytes, N(yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(bytes_a));
+    }
+
+    // yp_t_frozendict: pos-only self, pos-only, **kwargs, default
+    {
+        ypObject *tuple_a_b = yp_tupleN(N(str_a, str_b));
+        ypObject *tuple_tuple_a_b = yp_tupleN(N(tuple_a_b));
+        ypObject *frozendict_a_b = yp_frozendictK(K(str_a, str_b));
+
+        // **kwargs cannot be set from a "callN" positional argument.
+        ead(result, any_callN(yp_t_frozendict, 0), assert_obj(result, eq, yp_frozendict_empty));
+        ead(result, any_callN(yp_t_frozendict, N(tuple_tuple_a_b)),
+                assert_obj(result, eq, frozendict_a_b));
+        ead(result, any_callN(yp_t_frozendict, N(frozendict_a_b)),
+                assert_obj(result, eq, frozendict_a_b));
+
+        assert_raises(any_callN(yp_t_frozendict, N(tuple_tuple_a_b, frozendict_a_b)), yp_TypeError);
+        assert_raises(any_callN(yp_t_frozendict, N(yp_NameError)), yp_NameError);
+
+        yp_decrefN(N(tuple_a_b, tuple_tuple_a_b, frozendict_a_b));
+    }
+
+    // yp_t_function: pos-only self, *args, **kwargs (because it's currently not implemented)
+    {
+        // **kwargs cannot be set from a "callN" positional argument.
+        assert_raises(any_callN(yp_t_function, 0), yp_NotImplementedError);
+        assert_raises(any_callN(yp_t_function, N(str_a)), yp_NotImplementedError);
+        assert_raises(any_callN(yp_t_function, N(str_a, str_b)), yp_NotImplementedError);
+
+        assert_raises(any_callN(yp_t_function, N(yp_NameError)), yp_NameError);
+    }
+
+    // yp_NameError: ensure withself doesn't accidentally allow yp_NameError as self
+    {
+        assert_raises(any_callN(yp_NameError, 0), yp_NameError);
+        assert_raises(any_callN(yp_NameError, N(yp_None)), yp_NameError);
+        assert_raises(any_callN(yp_NameError, N(yp_tuple_empty)), yp_NameError);
+    }
+
+    // FIXME f is an exception
 
     obj_array_decref(defs);
     obj_array_decref(args);
@@ -1895,8 +2001,6 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
     // FIXME f is an exception
 
     // FIXME arg order
-
-    // FIXME test callable objects (i.e. withself)
 
     // TODO PEP 448 talks about the confusion around {'a':0,'a':1} being valid but dict(a=0,a=1)
     // being invalid. Figure out how we should be handling duplicate keys. Regardless, we can't

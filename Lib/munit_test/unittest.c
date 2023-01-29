@@ -1437,7 +1437,7 @@ yp_ssize_t yp_lenC_not_raises(ypObject *container)
 }
 
 
-#define MALLOC_TRACKER_MAX_LEN 1000
+#define MALLOC_TRACKER_MAX_LEN 2000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {
