@@ -2352,16 +2352,14 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 static MunitResult test_callN(const MunitParameter params[], fixture_t *fixture)
 {
     ypObject   *str_a = yp_str_frombytesC2(-1, "a");
-    MunitResult result;
+    MunitResult test_result;
 
-    result = _test_callN(yp_callN);
-    if (result != MUNIT_OK) goto tear_down;
-
-    // FIXME Test where the args are not passed exactly (i.e. iter->next(args) returns exception.)
+    test_result = _test_callN(yp_callN);
+    if (test_result != MUNIT_OK) goto tear_down;
 
 tear_down:
     yp_decrefN(N(str_a));
-    return result;
+    return test_result;
 }
 
 // Accepts the yp_callN signature and instead calls yp_call_stars with a tuple. For use in
@@ -2404,19 +2402,23 @@ static ypObject *callK_to_call_stars(ypObject *c, int n, ...)
 
 static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fixture)
 {
+    ypObject   *defs[] = obj_array_init(2, rand_obj_any());
     ypObject   *args[] = obj_array_init(2, rand_obj_any());
     ypObject   *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject   *str_b = yp_str_frombytesC2(-1, "b");
     ypObject   *str_slash = yp_str_frombytesC2(-1, "/");
+    ypObject   *str_star = yp_str_frombytesC2(-1, "*");
+    ypObject   *str_star_args = yp_str_frombytesC2(-1, "*args");
     ypObject   *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
-    MunitResult result;
+    MunitResult test_result;
 
-    result = _test_callN(callN_to_call_stars_tuple);
-    if (result != MUNIT_OK) goto tear_down;
+    test_result = _test_callN(callN_to_call_stars_tuple);
+    if (test_result != MUNIT_OK) goto tear_down;
 
     // FIXME and again, but with an iterator instead of a tuple (and other types? parameterize?)
 
-    result = _test_callK(callK_to_call_stars);
-    if (result != MUNIT_OK) goto tear_down;
+    test_result = _test_callK(callK_to_call_stars);
+    if (test_result != MUNIT_OK) goto tear_down;
 
     // FIXME and again, but with an iterator instead of a mapping?
 
@@ -2427,35 +2429,100 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
     // def f(a) cannot be called like f(0, a=0).
     {
         define_function(f, capture_code, ({str_a}));
-        ypObject *f_args = yp_tupleN(N(args[0]));
-        ypObject *f_kwargs = yp_frozendictK(K(str_a, args[0]));
-        assert_raises(yp_call_stars(f, f_args, f_kwargs), yp_TypeError);
-        yp_decrefN(N(f, f_args, f_kwargs));
+        ypObject *call_args = yp_tupleN(N(args[0]));
+        ypObject *call_kwargs = yp_frozendictK(K(str_a, args[0]));
+        assert_raises(yp_call_stars(f, call_args, call_kwargs), yp_TypeError);
+        yp_decrefN(N(f, call_args, call_kwargs));
     }
 
     // def f(a, **kwargs) cannot be called like f(0, a=0).
     {
         define_function(f, capture_code, ({str_a}, {str_star_star_kwargs}));
-        ypObject *f_args = yp_tupleN(N(args[0]));
-        ypObject *f_kwargs = yp_frozendictK(K(str_a, args[0]));
-        assert_raises(yp_call_stars(f, f_args, f_kwargs), yp_TypeError);
-        yp_decrefN(N(f, f_args, f_kwargs));
+        ypObject *call_args = yp_tupleN(N(args[0]));
+        ypObject *call_kwargs = yp_frozendictK(K(str_a, args[0]));
+        assert_raises(yp_call_stars(f, call_args, call_kwargs), yp_TypeError);
+        yp_decrefN(N(f, call_args, call_kwargs));
     }
 
     // def f(a, /, **kwargs) _can_ be called like f(0, a=1) (or f(0, a=0), for that matter).
     {
         define_function(f, capture_code, ({str_a}, {str_slash}, {str_star_star_kwargs}));
-        ypObject *f_args = yp_tupleN(N(args[0]));
-        ypObject *f_kwargs = yp_frozendictK(K(str_a, args[1]));
-        ead(capt, yp_call_stars(f, f_args, f_kwargs),
-                assert_captured(capt, f, args[0], captured_NULL, f_kwargs));
-        yp_decrefN(N(f, f_args, f_kwargs));
+        ypObject *call_args = yp_tupleN(N(args[0]));
+        ypObject *call_kwargs = yp_frozendictK(K(str_a, args[1]));
+        ead(capt, yp_call_stars(f, call_args, call_kwargs),
+                assert_captured(capt, f, args[0], captured_NULL, call_kwargs));
+        yp_decrefN(N(f, call_args, call_kwargs));
     }
 
+    // Optimization: the args tuple can sometimes be lazy copied.
+    {
+        define_function(f_args, capture_code, ({str_star_args}));
+        define_function(f_args_a, capture_code, ({str_star_args}, {str_a, defs[0]}));
+        define_function(f_args_kwargs, capture_code, ({str_star_args}, {str_star_star_kwargs}));
+        ypObject *call_args = yp_tupleN(N(args[0], args[1]));
+        ypObject *call_kwargs = yp_frozendictK(K(str_a, args[0]));
+
+        ead(capt, yp_call_stars(f_args, call_args, yp_frozendict_empty),
+                assert_captured_arg(capt, 0, is, call_args));
+        ead(capt, yp_call_stars(f_args_a, call_args, yp_frozendict_empty),
+                assert_captured_arg(capt, 0, is, call_args));
+        ead(capt, yp_call_stars(f_args_a, call_args, call_kwargs),
+                assert_captured_arg(capt, 0, is, call_args));
+        ead(capt, yp_call_stars(f_args_kwargs, call_args, yp_frozendict_empty),
+                assert_captured_arg(capt, 0, is, call_args));
+        ead(capt, yp_call_stars(f_args_kwargs, call_args, call_kwargs),
+                assert_captured_arg(capt, 0, is, call_args));
+
+        // TODO There's currently no callable object (withself) with *args.
+
+        yp_decrefN(N(f_args, f_args_a, f_args_kwargs, call_args, call_kwargs));
+    }
+
+    // Optimization: the kwargs frozendict can sometimes be lazy copied.
+    {
+        define_function(f_kwargs, capture_code, ({str_star_star_kwargs}));
+        define_function(f_a_slash_kwargs, capture_code,
+                ({str_a, defs[0]}, {str_slash}, {str_star_star_kwargs}));
+        define_function(f_b_kwargs, capture_code, ({str_b, defs[1]}, {str_star_star_kwargs}));
+        define_function(f_star_b_kwargs, capture_code,
+                ({str_star}, {str_b, defs[1]}, {str_star_star_kwargs}));
+        define_function(f_args_kwargs, capture_code, ({str_star_args}, {str_star_star_kwargs}));
+        ypObject *call_args = yp_tupleN(N(args[0]));
+        ypObject *call_kwargs = yp_frozendictK(K(str_a, args[0]));
+
+        ead(capt, yp_call_stars(f_kwargs, yp_tuple_empty, call_kwargs),
+                assert_captured_arg(capt, 0, is, call_kwargs));
+        ead(capt, yp_call_stars(f_a_slash_kwargs, yp_tuple_empty, call_kwargs),
+                assert_captured_arg(capt, 2, is, call_kwargs));
+        ead(capt, yp_call_stars(f_a_slash_kwargs, call_args, call_kwargs),
+                assert_captured_arg(capt, 2, is, call_kwargs));
+        ead(capt, yp_call_stars(f_b_kwargs, yp_tuple_empty, call_kwargs),
+                assert_captured_arg(capt, 1, is, call_kwargs));
+        ead(capt, yp_call_stars(f_b_kwargs, call_args, call_kwargs),
+                assert_captured_arg(capt, 1, is, call_kwargs));
+        ead(capt, yp_call_stars(f_star_b_kwargs, yp_tuple_empty, call_kwargs),
+                assert_captured_arg(capt, 2, is, call_kwargs));
+        ead(capt, yp_call_stars(f_args_kwargs, yp_tuple_empty, call_kwargs),
+                assert_captured_arg(capt, 1, is, call_kwargs));
+        ead(capt, yp_call_stars(f_args_kwargs, call_args, call_kwargs),
+                assert_captured_arg(capt, 1, is, call_kwargs));
+
+        ead(result, yp_call_stars(yp_t_frozendict, yp_tuple_empty, call_kwargs),
+                assert_obj(result, is, call_kwargs));
+
+        yp_decrefN(N(f_kwargs, f_a_slash_kwargs, f_b_kwargs, f_star_b_kwargs, f_args_kwargs,
+                call_args, call_kwargs));
+    }
+
+    // FIXME Ensure input kwargs is never modified!
+
+    // FIXME argument names that conflict with *name or **name parameter names.
+
 tear_down:
+    obj_array_decref(defs);
     obj_array_decref(args);
-    yp_decrefN(N(str_a, str_slash, str_star_star_kwargs));
-    return result;
+    yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
+    return test_result;
 }
 
 // Accepts the yp_callN signature and instead calls yp_call_arrayX. For use in _test_callN. n must
@@ -2481,18 +2548,18 @@ static ypObject *callN_to_call_arrayX(ypObject *c, int n, ...)
 static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fixture)
 {
     ypObject   *str_a = yp_str_frombytesC2(-1, "a");
-    MunitResult result;
+    MunitResult test_result;
 
-    result = _test_callN(callN_to_call_arrayX);
-    if (result != MUNIT_OK) goto tear_down;
+    test_result = _test_callN(callN_to_call_arrayX);
+    if (test_result != MUNIT_OK) goto tear_down;
 
-    // FIXME Test where the array is not passed exactly (i.e. iter->next(args) returns exception.)
+    // FIXME Test where argarray can be used directly
 
     assert_raises(yp_call_arrayX(0, NULL), yp_TypeError);
 
 tear_down:
     yp_decrefN(N(str_a));
-    return result;
+    return test_result;
 }
 
 
