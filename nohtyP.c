@@ -18421,6 +18421,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             // The previous positional-or-keyword arguments were actually positional-only.
             n_positional_only = n_positional_or_keyword;
             n_positional_or_keyword = 0;
+
         } else if (param_kind == yp_s_star || param_kind == yp_s_star_args) {
             if (remaining_are_keyword_only) {
                 // Invalid: (*, *, a), (*, *args), (*args, *, a), (*args, *args)
@@ -18436,6 +18437,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
                 has_var_positional = TRUE;
                 param_name = str_getslice(param.name, 1, yp_SLICE_LAST, 1);  // new ref
             }
+
         } else if (param_kind == yp_s_star_star_kwargs) {
             if (i != params_len - 1) {
                 // Invalid: (**kwargs, a), (**kwargs, /), (**kwargs, *, a), (**kwargs, *args),
@@ -18448,6 +18450,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             }
             has_var_keyword = TRUE;
             param_name = str_getslice(param.name, 2, yp_SLICE_LAST, 1);  // new ref
+
         } else if (param_kind == yp_None) {
             if (remaining_are_keyword_only) {
                 has_keyword_only = TRUE;
@@ -18461,6 +18464,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
                 n_positional_or_keyword += 1;
             }
             param_name = yp_incref(param.name);  // new ref
+
         } else {
             yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
             result = yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
@@ -18540,19 +18544,23 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
             *slash_index = *n;
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the / parameter
+
         } else if (param_kind == yp_s_star) {
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the * parameter
             break;                // will ensure no remaining positional arguments
+
         } else if (param_kind == yp_s_star_args) {
             arg = iter->remaining_as_tuple(args);  // new ref
             if (yp_isexceptionC(arg)) return arg;
             argarray[*n] = arg;
             (*n)++;          // consume the parameter
             return yp_None;  // end of positional arguments
+
         } else if (param_kind == yp_s_star_star_kwargs) {
             // do *not* consume the **kwargs parameter
             break;  // will ensure no remaining positional arguments
+
         } else if (param_kind == yp_None) {
             arg = iter->next(args);  // new ref
             if (arg == NULL) {
@@ -18572,6 +18580,7 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
                 argarray[*n] = arg;
                 (*n)++;  // consume the parameter
             }
+
         } else {
             yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
             return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
@@ -18591,17 +18600,23 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
 // keyword arguments we've already placed, freezing it, and returning a new reference. slash_index
 // is the index of /, or -1 if not present. first_kwarg is the position of the first parameter
 // filled by a keyword argument.
-static ypObject *_ypFunction_call_make_var_kwargs(
-        ypObject *f, yp_ssize_t slash_index, yp_ssize_t first_kwarg, ypObject *kwargs)
+static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_index,
+        yp_ssize_t first_kwarg, yp_ssize_t placed_kwargs, ypObject *kwargs, int kwargs_is_copy)
 {
     yp_parameter_decl_t param;
     ypObject           *param_kind;
-    ypObject           *arg;
+    ypObject           *result;
     yp_ssize_t          i = 0;
+    ypObject           *kwargs_copy;
 
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED);
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW);
-    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
+
+    // If we consumed all the keyword arguments, then **kwargs will be empty. Recall we can trust
+    // that there are no duplicate names in params, so we know there were no arguments that were
+    // both positional and keyword.
+    if (placed_kwargs >= ypDict_LEN(kwargs)) return yp_frozendict_empty;
 
     // Skip any positional-only parameters: function (a, /, **kwargs) can be called like (1, a=33).
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY) {
@@ -18609,24 +18624,58 @@ static ypObject *_ypFunction_call_make_var_kwargs(
         i = slash_index + 1;  // start at the param after /, the first kw param
     }
 
+    // Ensure that there were no arguments that were both positional and keyword. At this point,
+    // kwargs may still be a frozendict, so use yp_contains. Without a **kwargs,
+    // _ypFunction_call_place_kwargs uses placed_kwargs to detect this case.
+    for (/*i already set*/; i < first_kwarg; i++) {
+        param = ypFunction_PARAMS(f)[i];
+        param_kind = _ypFunction_parameter_kind(param.name);
+        if (yp_isexceptionC(param_kind)) return param_kind;
+        if (param_kind != yp_None) continue;  // skip *, *args, and **kwargs (/ already skipped)
+
+        result = frozendict_contains(kwargs, param.name);
+        if (result == yp_False) continue;
+        if (yp_isexceptionC(result)) return result;
+
+        return yp_TypeError;  // a matching keyword argument that was also positional
+    }
+
+    // If we did not consume any keyword arguments, then **kwargs will be a copy of the keyword
+    // arguments.
+    if (placed_kwargs < 1) {
+        if (kwargs_is_copy) {
+            // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
+            return yp_frozendict(kwargs);
+        } else {
+            return yp_frozendict(kwargs);
+        }
+    }
+
+    // We need to modify then freeze kwargs, so make a copy of it, unless it is *already* a copy.
+    // (We coerce user-defined mapping types to dict, which is already an object we can modify.)
+    if (kwargs_is_copy) {
+        yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
+        kwargs_copy = yp_incref(kwargs);
+    } else {
+        kwargs_copy = yp_dict(kwargs);
+        if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
+    }
+
+    // Remove the keyword arguments we have already placed.
     for (/*i already set*/; i < ypFunction_PARAMS_LEN(f); i++) {
         param = ypFunction_PARAMS(f)[i];
         param_kind = _ypFunction_parameter_kind(param.name);
         if (yp_isexceptionC(param_kind)) return param_kind;
         if (param_kind != yp_None) continue;  // skip *, *args, and **kwargs (/ already skipped)
 
-        arg = dict_popvalue(kwargs, param.name, ypFunction_key_missing);
-        if (arg == ypFunction_key_missing) continue;
-        if (yp_isexceptionC(arg)) return arg;
-        yp_decref(arg);
-
-        // We found a matching keyword argument. Ensure this wasn't also a positional argument.
-        // Without a **kwargs, _ypFunction_call_place_kwargs uses placed_kwargs to detect this case.
-        if (i < first_kwarg) return yp_TypeError;
+        result = dict_delitem(kwargs_copy, param.name);
+        if (result != yp_KeyError && yp_isexceptionC(result)) return result;
     }
 
     // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
-    return yp_frozendict(kwargs);
+    result = yp_frozendict(kwargs_copy);
+    yp_decref(kwargs_copy);
+    return result;
 }
 
 // Helper for _ypFunction_call_QuickIter. Places the keyword arguments in argarray. Keeps *n
@@ -18634,8 +18683,8 @@ static ypObject *_ypFunction_call_make_var_kwargs(
 // _ypFunction_call_QuickIter after the call. slash_index is the index of /, or -1 if not present.
 // kwargs must be a dict/frozendict; additonally, if we have a **kwargs parameter, kwargs must be a
 // dict, and it will be modified, frozen, and placed in argarray.
-static ypObject *_ypFunction_call_place_kwargs(
-        ypObject *f, yp_ssize_t slash_index, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
+static ypObject *_ypFunction_call_place_kwargs(ypObject *f, yp_ssize_t slash_index,
+        ypObject *kwargs, int kwargs_is_copy, yp_ssize_t *n, ypObject **argarray)
 {
     ypObject  *arg;
     yp_ssize_t first_kwarg = *n;   // remembers the position of the first param filled by us
@@ -18651,17 +18700,21 @@ static ypObject *_ypFunction_call_place_kwargs(
         if (param_kind == yp_s_star) {
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the * parameter
+
         } else if (param_kind == yp_s_star_args) {
             argarray[*n] = yp_tuple_empty;  // there must not have been any more positional args
             (*n)++;                         // consume the *args parameter
+
         } else if (param_kind == yp_s_star_star_kwargs) {
             yp_ASSERT(*n == ypFunction_PARAMS_LEN(f) - 1,
                     "_ypFunction_validate_parameters didn't ensure that **kwargs came last");
-            arg = _ypFunction_call_make_var_kwargs(f, slash_index, first_kwarg, kwargs);
+            arg = _ypFunction_call_make_var_kwargs(
+                    f, slash_index, first_kwarg, placed_kwargs, kwargs, kwargs_is_copy);
             if (yp_isexceptionC(arg)) return arg;
             argarray[*n] = arg;
             (*n)++;          // consume the parameter
             return yp_None;  // **kwarg, if present, is always last
+
         } else if (param_kind == yp_None) {
             arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing);  // new ref
             if (yp_isexceptionC(arg)) return arg;
@@ -18676,6 +18729,7 @@ static ypObject *_ypFunction_call_place_kwargs(
                 // A parameter without a matching argument or a default.
                 return yp_TypeError;
             }
+
         } else {
             yp_ASSERT(param_kind != yp_s_slash,
                     "/ should have been consumed by _ypFunction_call_place_args");
@@ -18709,23 +18763,19 @@ static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter
     yp_ASSERT1((ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY && slash_index >= 0) ||
                slash_index == -1);
 
-    if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW) {
-        ypObject *kwargs_copy = yp_dict(kwargs);  // modified by _ypFunction_call_place_kwargs
-        if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
-        result = _ypFunction_call_place_kwargs(f, slash_index, kwargs_copy, n, argarray);
-        yp_decref(kwargs_copy);
-        if (yp_isexceptionC(result)) return result;
-    } else if (ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE) {
-        result = _ypFunction_call_place_kwargs(f, slash_index, kwargs, n, argarray);
+    if (ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE) {
+        result = _ypFunction_call_place_kwargs(
+                f, slash_index, kwargs, /*kwargs_is_copy=*/FALSE, n, argarray);
         if (yp_isexceptionC(result)) return result;
     } else {
         // We can't trust user-defined mapping types here (and neither does Python). Consider a
         // case-insensitive mapping {'a': 1} with a function (a, A). Even though the mapping
         // contains just one entry, it would match both arguments.
-        ypObject *kwargs_asfrozendict = yp_frozendict(kwargs);
-        if (yp_isexceptionC(kwargs_asfrozendict)) return kwargs_asfrozendict;
-        result = _ypFunction_call_place_kwargs(f, slash_index, kwargs_asfrozendict, n, argarray);
-        yp_decref(kwargs_asfrozendict);
+        ypObject *kwargs_copy = yp_dict(kwargs);
+        if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
+        result = _ypFunction_call_place_kwargs(
+                f, slash_index, kwargs_copy, /*kwargs_is_copy=*/TRUE, n, argarray);
+        yp_decref(kwargs_copy);
         if (yp_isexceptionC(result)) return result;
     }
 
