@@ -96,19 +96,19 @@ static ypObject *capture_code(ypObject *f, yp_ssize_t n, ypObject *const *argarr
         yp_decrefN(N(_ypmt_CAPT_f, _ypmt_CAPT_args));                                             \
     } while (0)
 
-#define assert_captured_arg(captured, i, op, expected)                                         \
-    do {                                                                                       \
-        ypObject  *_ypmt_CAPT_captured = (captured);                                           \
-        yp_ssize_t _ypmt_CAPT_i = (i);                                                         \
-        ypObject  *_ypmt_CAPT_expected = (expected);                                           \
-        ypObject  *_ypmt_CAPT_arg =                                                            \
-                yp_getindexC(_ypmt_CAPT_captured, _ypmt_CAPT_i + 2); /* new ref */             \
-        _assert_not_exception(_ypmt_CAPT_captured, "%s", #captured);                           \
-        _assert_not_exception(                                                                 \
-                _ypmt_CAPT_arg, "yp_getindexC(%s, %d)", #captured, _ypmt_CAPT_i + 2);          \
-        _assert_obj(_ypmt_CAPT_arg, op, _ypmt_CAPT_expected, "<%s args[%d]>", "%s", #captured, \
-                _ypmt_CAPT_i, #expected);                                                      \
-        yp_decrefN(N(_ypmt_CAPT_arg));                                                         \
+#define assert_captured_arg(captured, i, op, expected)                                           \
+    do {                                                                                         \
+        ypObject  *_ypmt_CAPT_captured = (captured);                                             \
+        yp_ssize_t _ypmt_CAPT_i = (i);                                                           \
+        ypObject  *_ypmt_CAPT_expected = (expected);                                             \
+        ypObject  *_ypmt_CAPT_arg =                                                              \
+                yp_getindexC(_ypmt_CAPT_captured, _ypmt_CAPT_i + 2); /* new ref */               \
+        _assert_not_exception(_ypmt_CAPT_captured, "%s", #captured);                             \
+        _assert_not_exception(                                                                   \
+                _ypmt_CAPT_arg, "yp_getindexC(%s, %" PRIssize ")", #captured, _ypmt_CAPT_i + 2); \
+        _assert_obj(_ypmt_CAPT_arg, op, _ypmt_CAPT_expected, "<%s args[%" PRIssize "]>", "%s",   \
+                #captured, _ypmt_CAPT_i, #expected);                                             \
+        yp_decrefN(N(_ypmt_CAPT_arg));                                                           \
     } while (0)
 
 // Fills array with n parameters; useful to create functions with many parameters. names start with
