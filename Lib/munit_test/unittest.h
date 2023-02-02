@@ -11,6 +11,13 @@ extern "C" {
 #include <stddef.h>
 #include <stdio.h>
 
+// Older versions of MSVS don't have snprintf, and _snprintf doesn't always write the null
+// terminator. For how we use this function (fail on overflow), this is fine.
+#if defined(_MSC_VER) && _MSC_VER < 1900
+#define unittest_snprintf _snprintf
+#else
+#define unittest_snprintf snprintf
+#endif
 
 #ifndef TRUE
 #define TRUE (1 == 1)
@@ -513,13 +520,13 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
 
 // A safe sprintf that asserts on buffer overflow. Only call for arrays of fixed size (uses
 // yp_lengthof_array).
-#define sprintf_array(array, fmt, ...)                                                      \
-    do {                                                                                    \
-        yp_ssize_t _ypmt_SPRINTF_len = yp_lengthof_array(array);                            \
-        yp_ssize_t result =                                                                 \
-                (yp_ssize_t)snprintf((array), (size_t)_ypmt_SPRINTF_len, fmt, __VA_ARGS__); \
-        assert_ssizeC(result, >=, 0);                                                       \
-        assert_ssizeC(result, <, _ypmt_SPRINTF_len);                                        \
+#define sprintf_array(array, fmt, ...)                                 \
+    do {                                                               \
+        yp_ssize_t _ypmt_SPRINTF_len = yp_lengthof_array(array);       \
+        yp_ssize_t result = (yp_ssize_t)unittest_snprintf(             \
+                (array), (size_t)_ypmt_SPRINTF_len, fmt, __VA_ARGS__); \
+        assert_ssizeC(result, >=, 0);                                  \
+        assert_ssizeC(result, <, _ypmt_SPRINTF_len);                   \
     } while (0)
 
 
