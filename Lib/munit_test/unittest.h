@@ -486,6 +486,40 @@ extern "C" {
         _assert_sequence(_ypmt_SEQ_obj, _ypmt_SEQ_items, "%s", _ypmt_SEQ_item_strs, #obj); \
     } while (0)
 
+// items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
+// only to obj_fmt.
+#define _assert_mapping(obj, items, obj_fmt, item_strs, ...)                                    \
+    do {                                                                                        \
+        yp_ssize_t _ypmt_MAP_k = yp_lengthof_array(items) / 2;                                  \
+        yp_ssize_t _ypmt_MAP_i;                                                                 \
+        _assert_len(obj, _ypmt_MAP_k, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_MAP_k);         \
+        for (_ypmt_MAP_i = 0; _ypmt_MAP_i < _ypmt_MAP_k; _ypmt_MAP_i++) {                       \
+            ypObject *_ypmt_MAP_key = items[_ypmt_MAP_i * 2];                                   \
+            ypObject *_ypmt_MAP_value = items[_ypmt_MAP_i * 2 + 1];                             \
+            char     *_ypmt_MAP_key_str = item_strs[_ypmt_MAP_i * 2];                           \
+            char     *_ypmt_MAP_value_str = item_strs[_ypmt_MAP_i * 2 + 1];                     \
+            ypObject *_ypmt_MAP_actual = yp_getitem(obj, _ypmt_MAP_key);                        \
+            _assert_not_exception(_ypmt_MAP_actual, "yp_getitem(" obj_fmt ", %s)", __VA_ARGS__, \
+                    _ypmt_MAP_key_str);                                                         \
+            _assert_same_type(_ypmt_MAP_actual, _ypmt_MAP_value, "yp_getitem(" obj_fmt ", %s)", \
+                    "%s", __VA_ARGS__, _ypmt_MAP_key_str, _ypmt_MAP_value_str);                 \
+            _assert_obj(_ypmt_MAP_actual, eq, _ypmt_MAP_value, "yp_getitem(" obj_fmt ", %s)",   \
+                    "%s", __VA_ARGS__, _ypmt_MAP_key_str, _ypmt_MAP_value_str);                 \
+            yp_decref(_ypmt_MAP_actual);                                                        \
+        }                                                                                       \
+    } while (0)
+
+// Asserts that obj is a mapping containing exactly the given key/value pairs. Values are
+// compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getitem.
+// FIXME Should we compare keys by type as well? That is tricky to do.
+#define assert_mapping(obj, ...)                                                          \
+    do {                                                                                  \
+        ypObject *_ypmt_MAP_obj = (obj);                                                  \
+        ypObject *_ypmt_MAP_items[] = {__VA_ARGS__};                                      \
+        char     *_ypmt_MAP_item_strs[] = {STRINGIFY(__VA_ARGS__)};                       \
+        _assert_mapping(_ypmt_MAP_obj, _ypmt_MAP_items, "%s", _ypmt_MAP_item_strs, #obj); \
+    } while (0)
+
 // Asserts that the first n pointer items in array are exactly the given n items in that order.
 // Items are compared by C equality (i.e. ==).
 #define assert_ptr_array(array, ...)                                                         \

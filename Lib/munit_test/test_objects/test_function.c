@@ -2454,6 +2454,38 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         yp_decrefN(N(f, call_args, call_kwargs));
     }
 
+    // Ensure the args input to yp_call_stars is not modified.
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_args}));
+        ypObject *call_args = yp_listN(N(args[0], args[1]));
+        ypObject *one = yp_tupleN(N(args[1]));
+
+        ead(capt, yp_call_stars(f, call_args, yp_frozendict_empty),
+                assert_captured(capt, f, args[0], one));
+
+        // This is very unlikely to fail, but we need this test case for kwargs, so for completeness
+        // we'll test args as well.
+        assert_sequence(call_args, args[0], args[1]);
+
+        yp_decrefN(N(f, call_args, one));
+    }
+
+    // Ensure the kwargs input to yp_call_stars is not modified.
+    {
+        define_function(f, capture_code, ({str_a}, {str_star_star_kwargs}));
+        ypObject *call_kwargs = yp_dictK(K(str_a, args[0], str_b, args[1]));
+        ypObject *one = yp_frozendictK(K(str_b, args[1]));
+
+        ead(capt, yp_call_stars(f, yp_tuple_empty, call_kwargs),
+                assert_captured(capt, f, args[0], one));
+
+        // If _ypFunction_call_make_var_kwargs neglects to make a copy of call_kwargs, it may
+        // accidentally modify it.
+        assert_mapping(call_kwargs, str_a, args[0], str_b, args[1]);
+
+        yp_decrefN(N(f, call_kwargs, one));
+    }
+
     // Optimization: the args tuple can sometimes be lazy copied.
     {
         define_function(f_args, capture_code, ({str_star_args}));
@@ -2513,8 +2545,6 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         yp_decrefN(N(f_kwargs, f_a_slash_kwargs, f_b_kwargs, f_star_b_kwargs, f_args_kwargs,
                 call_args, call_kwargs));
     }
-
-    // FIXME Ensure input kwargs is never modified!
 
     // FIXME argument names that conflict with *name or **name parameter names.
 
