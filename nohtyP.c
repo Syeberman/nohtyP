@@ -15660,10 +15660,11 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
         // First, attempt to remove; if nothing was removed, then add it instead
         // TODO _ypSet_pop and _ypSet_push both call yp_currenthashC; consolidate?
         result = _ypSet_pop(so, otherkeys[i].se_key);
-        if (yp_isexceptionC(result)) return result;
         if (result == ypSet_dummy) {
             result = _ypSet_push(so, otherkeys[i].se_key, &spaceleft, keysleft);  // may resize so
             if (yp_isexceptionC(result)) return result;
+        } else if (yp_isexceptionC(result)) {
+            return result;
         } else {
             // XXX spaceleft based on alloclen and fill, so doesn't change on deletions
             // FIXME What if yp_decref modifies so?
@@ -16173,11 +16174,11 @@ static ypObject *frozenset_len(ypObject *so, yp_ssize_t *len)
 static ypObject *set_remove(ypObject *so, ypObject *x, ypObject *onmissing)
 {
     ypObject *result = _ypSet_pop(so, x);
-    if (yp_isexceptionC(result)) return result;
     if (result == ypSet_dummy) {
         if (onmissing == NULL) return yp_KeyError;
         return onmissing;
     }
+    if (yp_isexceptionC(result)) return result;
     yp_decref(result);
     return yp_None;
 }
@@ -17166,8 +17167,8 @@ static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
 static ypObject *dict_delitem(ypObject *mp, ypObject *key)
 {
     ypObject *result = _ypDict_pop(mp, key);
-    if (yp_isexceptionC(result)) return result;
     if (result == ypSet_dummy) return yp_KeyError;
+    if (yp_isexceptionC(result)) return result;
     yp_decref(result);
     return yp_None;
 }
@@ -18661,15 +18662,22 @@ static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_
         if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
     }
 
-    // Remove the keyword arguments we have already placed.
+    // Remove the keyword arguments we have already placed. Remember to decref kwargs_copy on error.
     for (/*i already set*/; i < ypFunction_PARAMS_LEN(f); i++) {
         param = ypFunction_PARAMS(f)[i];
         param_kind = _ypFunction_parameter_kind(param.name);
-        if (yp_isexceptionC(param_kind)) return param_kind;
+        if (yp_isexceptionC(param_kind)) {
+            yp_decref(kwargs_copy);
+            return param_kind;
+        }
         if (param_kind != yp_None) continue;  // skip *, *args, and **kwargs (/ already skipped)
 
-        result = dict_delitem(kwargs_copy, param.name);
-        if (result != yp_KeyError && yp_isexceptionC(result)) return result;
+        result = dict_popvalue(kwargs_copy, param.name, ypFunction_key_missing);
+        if (yp_isexceptionC(result)) {
+            yp_decref(kwargs_copy);
+            return result;
+        }
+        yp_decref(result);
     }
 
     // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
