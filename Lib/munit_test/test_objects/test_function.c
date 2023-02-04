@@ -2124,6 +2124,16 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         ead(capt, any_callK(f, K(str_b, args[1], str_a, args[0])),
                 assert_captured(capt, f, yp_tuple_empty, zero_one));
 
+        // f(args=0, kwargs=1) sets **kwargs to {"args": 0, "kwargs": 1}.
+        {
+            ypObject *str_args = yp_str_frombytesC2(-1, "args");
+            ypObject *str_kwargs = yp_str_frombytesC2(-1, "kwargs");
+            ypObject *expected = yp_frozendictK(K(str_args, args[0], str_kwargs, args[1]));
+            ead(capt, any_callK(f, K(str_args, args[0], str_kwargs, args[1])),
+                    assert_captured(capt, f, yp_tuple_empty, expected));
+            yp_decrefN(N(str_args, str_kwargs, expected));
+        }
+
         // Optimization: empty *args is always yp_tuple_empty.
         ead(capt, any_callK(f, 0), assert_captured_arg(capt, 0, is, yp_tuple_empty));
         ead(capt, any_callK(f, K(str_a, args[0])),
@@ -2496,18 +2506,6 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         ead(capt, yp_call_stars(f, call_args, call_kwargs),
                 assert_captured(capt, f, args[0], captured_NULL, call_kwargs));
         yp_decrefN(N(f, call_args, call_kwargs));
-    }
-
-    // Calling def f(*args, **kwargs) like f(args=0, kwargs=1) sets **kwargs to {"args": 0,
-    // "kwargs": 1}.
-    {
-        define_function(f, capture_code, ({str_star_args}, {str_star_star_kwargs}));
-        ypObject *str_args = yp_str_frombytesC2(-1, "args");
-        ypObject *str_kwargs = yp_str_frombytesC2(-1, "kwargs");
-        ypObject *call_kwargs = yp_frozendictK(K(str_args, args[0], str_kwargs, args[1]));
-        ead(capt, yp_call_stars(f, yp_tuple_empty, call_kwargs),
-                assert_captured(capt, f, yp_tuple_empty, call_kwargs));
-        yp_decrefN(N(f, str_args, str_kwargs, call_kwargs));
     }
 
     // Ensure the args input to yp_call_stars is not modified.
