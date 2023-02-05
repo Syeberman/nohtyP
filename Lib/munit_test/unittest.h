@@ -4,6 +4,11 @@
 extern "C" {
 #endif
 
+#if defined(_MSC_VER) && _MSC_VER < 1900
+// Disables a warning about using _snprintf over _snprintf_s.
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "nohtyP.h"
 
 #include "munit.h"
