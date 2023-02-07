@@ -38,13 +38,13 @@ def _ccEmitter(target, source, env, parent_emitter):
     assert len(source) == 1
     assert os.path.splitext(target[0].path)[1] == ".obj"
     s_base = os.path.splitext(source[0].path)[0]
-    for ext in (".asm", ):
+    for ext in (".asm",):
         env.Clean(target[0], s_base + ext)
     return target, source
 
 
 def _updateCcEmitters(env):
-    builders = (env['BUILDERS']['StaticObject'], env['BUILDERS']['SharedObject'])
+    builders = (env["BUILDERS"]["StaticObject"], env["BUILDERS"]["SharedObject"])
     # TODO Instead, translate the emitter into a ListEmitter
     for builder in builders:
         for source_suffix, parent_emitter in builder.emitter.items():
@@ -57,7 +57,7 @@ def _linkEmitter(target, source, env):
     t_base, t_ext = os.path.splitext(target[0].path)
     # TODO Remove these asserts once we've gotten this right
     assert t_ext in (".dll", ".exe")
-    for ext in (".map", ):
+    for ext in (".map",):
         env.Clean(target[0], t_base + ext)
     return target, source
 
@@ -66,50 +66,58 @@ def _updateLinkEmitters(env, version):
     env.Append(
         PROGEMITTER=[
             _linkEmitter,
-        ], SHLIBEMITTER=[
+        ],
+        SHLIBEMITTER=[
             _linkEmitter,
-        ], LDMODULEEMITTER=[
+        ],
+        LDMODULEEMITTER=[
             _linkEmitter,
-        ]
+        ],
     )
 
 
 # TODO Any new options in VS 14.0 (aka 2015) that we can take advantage of?
 def ApplyMSVSOptions(env, version):
-    """Updates env with MSVS-specific compiler options for nohtyP. version is numeric (ie 12.0).
-    """
+    """Updates env with MSVS-specific compiler options for nohtyP. version is numeric (ie 12.0)."""
+
     def addCcFlags(*args):
         env.AppendUnique(CCFLAGS=list(args))
 
     # TODO /analyze? (enable /Wall, disable /WX, suppress individual warnings)
     addCcFlags(
-        # Warning level 3, warnings-as-errors
+        # Warning level 3
         "/W3",
+        # Warnings-as-errors
         "/WX",
         # Security compile- and runtime-checks (for all builds); /sdl implies /GS
         "/sdl" if version >= 11.0 else "/GS",
-        # Function-level linking, disable minimal rebuild, disable runtime type info
+        # Function-level linking
         "/Gy",
+        # Disable minimal rebuild
         "/Gm-",
+        # Disable runtime type info
         "/GR-",
-        # Source/assembly listing (.asm), exception handling model
+        # Source/assembly listing (.asm)
         "/FAs",
         "/Fa${TARGET.dir}" + os.sep,
+        # Exception handling model
         "/EHsc",
     )
     if env["CONFIGURATION"] == "debug":
         addCcFlags(
-            # Runtime checks, disable optimizations
+            # Runtime checks
             "/RTCsu",
+            # Disable optimizations
             "/Od",
             # Debug multithread and DLL MSVCRT
             "/MDd",
         )
     else:
         addCcFlags(
-            # Optimize: Whole program, full speed; /GL requires /LTCG link flag
-            "/GL",
-            "/Ox",
+            # Optimize: Whole program; /GL requires /LTCG link flag
+            "/GL" if version >= 10.0 else "",
+            # Optimize: Full speed
+            "/Ox" if version >= 10.0 else "/Od",
             # Multithreaded and DLL MSVCRT
             "/MD",
         )
@@ -144,7 +152,7 @@ def ApplyMSVSOptions(env, version):
         "/MAP",
         "/MAPINFO:EXPORTS",
         # Version stamp
-        "/VERSION:${NOHTYP_MAJOR}.${NOHTYP_MINOR}"
+        "/VERSION:${NOHTYP_MAJOR}.${NOHTYP_MINOR}",
     )
     if env["CONFIGURATION"] == "debug":
         addLinkFlags(
@@ -160,7 +168,7 @@ def ApplyMSVSOptions(env, version):
             "/OPT:REF",
             "/OPT:ICF",
             # Link-time code generation; required by /GL cc flag
-            "/LTCG",
+            "/LTCG" if version >= 10.0 else "",
         )
     # If the CRT for this MSVC version needs a manifest, make sure it's embedded
     if _crtRequiresManifest(version):
@@ -185,13 +193,18 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
 
     def generate(env):
         if version is None:
-            raise SCons.Errors.UserError("Visual Studio %r is not installed" % supportedVersions[0])
+            raise SCons.Errors.UserError(
+                "Visual Studio %r is not installed" % supportedVersions[0]
+            )
         if env["TARGET_OS"] != "win32":
-            raise SCons.Errors.StopError("Visual Studio doesn't build for OS %r" % env["TARGET_OS"])
+            raise SCons.Errors.StopError(
+                "Visual Studio doesn't build for OS %r" % env["TARGET_OS"]
+            )
         # TARGET_ARCH is verified by vcvars*.bat
         if env["CONFIGURATION"] not in ("release", "debug"):
             raise SCons.Errors.StopError(
-                "Visual Studio doesn't support the %r configuration (yet)" % env["CONFIGURATION"]
+                "Visual Studio doesn't support the %r configuration (yet)"
+                % env["CONFIGURATION"]
             )
         env["MSVC_VERSION"] = version
 
@@ -200,19 +213,24 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         toolsConfig = env["TOOLS_CONFIG"]
         var_names = ("INCLUDE", "LIB", "LIBPATH", "PATH")
         compilerName = env["COMPILER"].name
-        compilerEnv_name = "%s_%s_ENV" % (compilerName.upper(), env["TARGET_ARCH"].upper())
+        compilerEnv_name = "%s_%s_ENV" % (
+            compilerName.upper(),
+            env["TARGET_ARCH"].upper(),
+        )
         compilerEnv = toolsConfig.get(compilerEnv_name, {})
         if compilerEnv is None:
             raise SCons.Errors.StopError(
-                "Visual Studio %r (%r) disabled in %s" %
-                (supportedVersions[0], env["TARGET_ARCH"], toolsConfig.basename)
+                "Visual Studio %r (%r) disabled in %s"
+                % (supportedVersions[0], env["TARGET_ARCH"], toolsConfig.basename)
             )
 
         # If there was an entry in site_toolsconfig.py, then explicitly use that environment
         if compilerEnv:
             env["MSVC_USE_SCRIPT"] = None  # disable autodetection, vcvars*.bat, etc
             for var_name in var_names:
-                env.PrependENVPath(var_name, compilerEnv[var_name], delete_existing=False)
+                env.PrependENVPath(
+                    var_name, compilerEnv[var_name], delete_existing=False
+                )
 
         # Configures the compiler, including possibly autodetecting the required environment
         _msvsTool.generate(env)
@@ -222,8 +240,8 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         if not env.WhereIs("$CC"):
             toolsConfig.update({compilerEnv_name: None})
             raise SCons.Errors.StopError(
-                "Visual Studio %r (%r) configuration failed" %
-                (supportedVersions[0], env["TARGET_ARCH"])
+                "Visual Studio %r (%r) configuration failed"
+                % (supportedVersions[0], env["TARGET_ARCH"])
             )
 
         # Add an entry for this compiler in site_toolsconfig.py if it doesn't already exist
