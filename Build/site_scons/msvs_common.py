@@ -115,9 +115,9 @@ def ApplyMSVSOptions(env, version):
     else:
         addCcFlags(
             # Optimize: Whole program; /GL requires /LTCG link flag
-            "/GL" if version >= 10.0 else "",
+            "/GL" if version >= 11.0 else "",
             # Optimize: Full speed
-            "/Ox" if version >= 10.0 else "/Od",
+            "/Ox" if version >= 11.0 else "/Od",
             # Multithreaded and DLL MSVCRT
             "/MD",
         )
@@ -168,7 +168,7 @@ def ApplyMSVSOptions(env, version):
             "/OPT:REF",
             "/OPT:ICF",
             # Link-time code generation; required by /GL cc flag
-            "/LTCG" if version >= 10.0 else "",
+            "/LTCG" if version >= 11.0 else "",
         )
     # If the CRT for this MSVC version needs a manifest, make sure it's embedded
     if _crtRequiresManifest(version):
