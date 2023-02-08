@@ -18797,6 +18797,7 @@ static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter
         (*n)--;
     }
 
+    // TODO Protect against misbehaving code that modifies argarray? Anywhere we call code.
     return ypFunction_CODE_FUNC(f)(f, *n, *n > 0 ? argarray : NULL);
 }
 

@@ -2629,18 +2629,55 @@ static ypObject *callN_to_call_arrayX(ypObject *c, int n, ...)
 
 static MunitResult test_call_arrayX(const MunitParameter params[], fixture_t *fixture)
 {
+    ypObject   *args[] = obj_array_init(2, rand_obj_any());
     ypObject   *str_a = yp_str_frombytesC2(-1, "a");
+    ypObject   *str_b = yp_str_frombytesC2(-1, "b");
+    ypObject   *str_slash = yp_str_frombytesC2(-1, "/");
     MunitResult test_result;
 
     test_result = _test_callN(callN_to_call_arrayX);
     if (test_result != MUNIT_OK) goto tear_down;
 
-    // FIXME Test where argarray can be used directly
+    // Optimization: The array can sometimes be used directly as argarray. Based on Python's
+    // vectorcall optimization.
+    {
+        define_function(f_a, capture_code, ({str_a}));
+        define_function(f_a_b, capture_code, ({str_a}, {str_b}));
+        define_function(f_a_slash, capture_code, ({str_a}, {str_slash}));
+        define_function(f_a_b_slash, capture_code, ({str_a}, {str_b}, {str_slash}));
+        ypObject *call_f_a[] = {f_a, args[0]};
+        ypObject *call_f_a_b[] = {f_a_b, args[0], args[1]};
+        ypObject *call_f_a_slash[] = {f_a_slash, args[0]};
+        ypObject *call_f_a_b_slash[] = {f_a_b_slash, args[0], args[1]};
+        ypObject *call_NoneType[] = {yp_t_NoneType};
+        ypObject *call_type[] = {yp_t_type, str_a};
+        ypObject *call_iter[] = {yp_t_iter, yp_t_NoneType, yp_None};
+        ypObject *call_range[] = {yp_t_range, yp_i_zero, yp_i_two, yp_i_one};
 
+        ead(capt, yp_call_arrayX(2, call_f_a), assert_captured_is(capt, f_a, 1, call_f_a + 1));
+        ead(capt, yp_call_arrayX(3, call_f_a_b),
+                assert_captured_is(capt, f_a_b, 2, call_f_a_b + 1));
+        ead(capt, yp_call_arrayX(2, call_f_a_slash),
+                assert_captured_is(capt, f_a_slash, 1, call_f_a_slash + 1));
+        ead(capt, yp_call_arrayX(3, call_f_a_b_slash),
+                assert_captured_is(capt, f_a_b_slash, 2, call_f_a_b_slash + 1));
+
+        // TODO We need a callable object (withself) that allows us to capture argarray, to truly
+        // validate this optimization for such callables.
+        ead(result, yp_call_arrayX(1, call_NoneType), assert_obj(result, is, yp_None));
+        ead(result, yp_call_arrayX(2, call_type), assert_obj(result, is, yp_t_str));
+        ead(result, yp_call_arrayX(3, call_iter), assert_raises(yp_next(result), yp_StopIteration));
+        ead(result, yp_call_arrayX(4, call_range), assert_sequence(result, yp_i_zero, yp_i_one));
+
+        yp_decrefN(N(f_a, f_a_b, f_a_slash, f_a_b_slash));
+    }
+
+    // n must be >0.
     assert_raises(yp_call_arrayX(0, NULL), yp_TypeError);
 
 tear_down:
-    yp_decrefN(N(str_a));
+    obj_array_decref(args);
+    yp_decrefN(N(str_a, str_b, str_slash));
     return test_result;
 }
 
