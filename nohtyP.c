@@ -12366,6 +12366,14 @@ static ypObject *_ypTuple_new_fromminiiter(
         return result;
     }
 
+    // FIXME Make sure the other types normalize to their empty immortal in this case.
+    // TODO We could avoid allocating for an empty miniiter altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypTuple_CODE && ypTuple_LEN(newSq) < 1) {
+        yp_decref(newSq);
+        return yp_tuple_empty;
+    }
+
     return newSq;
 }
 
@@ -18486,7 +18494,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
             result = set_pushunique(param_names, param_name);
             if (result != yp_None) {
                 // Invalid: (a, a), (a, *a), (a, **a), (*a, a), (*a, **a)
-                if (result == yp_KeyError) result = yp_ParameterSyntaxError;
+                if (yp_isexceptionC2(result, yp_KeyError)) result = yp_ParameterSyntaxError;
                 yp_ASSERT(yp_isexceptionC(result), "unexpected return from set_pushunique");
                 yp_decref(param_name);
                 break;
