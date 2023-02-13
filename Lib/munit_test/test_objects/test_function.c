@@ -2435,9 +2435,30 @@ static ypObject *callN_to_call_stars_tuple(ypObject *c, int n, ...)
     return result;
 }
 
-// Accepts the "yp_callK" signature (not actually implemented, yet) and instead calls yp_call_stars.
-// For use in _test_callK. n must be >= 0.
-static ypObject *callK_to_call_stars(ypObject *c, int n, ...)
+// Accepts the yp_callN signature and instead calls yp_call_stars with an iterator. For use in
+// _test_callN. n must be >= 0.
+static ypObject *callN_to_call_stars_iter(ypObject *c, int n, ...)
+{
+    va_list   args;
+    ypObject *as_tuple;
+    ypObject *as_iter;
+    ypObject *result;
+
+    // If args contains an exception, as_iter will be that exception. We could assert_not_raises
+    // here, but this tests that yp_call_stars fails if args is an exception.
+    va_start(args, n);
+    as_tuple = yp_tupleNV(n, args);  // new ref
+    va_end(args);
+
+    as_iter = yp_iter(as_tuple);
+    result = yp_call_stars(c, as_iter, yp_frozendict_empty);
+    yp_decrefN(N(as_tuple, as_iter));
+    return result;
+}
+
+// Accepts the "yp_callK" signature (not actually implemented, yet) and instead calls yp_call_stars
+// with a frozendict. For use in _test_callK. n must be >= 0.
+static ypObject *callK_to_call_stars_frozendict(ypObject *c, int n, ...)
 {
     va_list   args;
     ypObject *as_frozendict;
@@ -2451,6 +2472,43 @@ static ypObject *callK_to_call_stars(ypObject *c, int n, ...)
 
     result = yp_call_stars(c, yp_tuple_empty, as_frozendict);
     yp_decref(as_frozendict);
+    return result;
+}
+
+// Accepts the "yp_callK" signature (not actually implemented, yet) and instead calls yp_call_stars
+// with an iter. For use in _test_callK. n must be >= 0.
+static ypObject *callK_to_call_stars_iter(ypObject *c, int n, ...)
+{
+    va_list   args;
+    ypObject *as_list;
+    int       i;
+    ypObject *item;
+    ypObject *as_iter;
+    ypObject *result;
+
+    // If args contains an exception, as_iter will be that exception. We could assert_not_raises
+    // here, but this tests that yp_call_stars fails if kwargs is an exception.
+    assert_not_raises(as_list = yp_listN(0));  // new ref
+    va_start(args, n);
+    for (i = 0; i < n; i++) {
+        item = yp_tupleN(N(va_arg(args, ypObject *), va_arg(args, ypObject *)));  // new ref
+        if (yp_isexceptionC(item)) {
+            yp_decref(as_list);
+            as_list = item;
+            break;
+        }
+        assert_not_raises_exc(yp_append(as_list, item, &exc));
+        yp_decref(item);
+    }
+    va_end(args);
+
+    //if (!yp_isexceptionC(as_list)) {
+    //    assert_not_raises(yp_frozendict((as_list)));  // FIXME shouldn't fail...
+    //}
+
+    as_iter = yp_iter(as_list);  // new ref
+    result = yp_call_stars(c, yp_tuple_empty, as_iter);
+    yp_decrefN(N(as_list, as_iter));
     return result;
 }
 
@@ -2469,12 +2527,15 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
     test_result = _test_callN(callN_to_call_stars_tuple);
     if (test_result != MUNIT_OK) goto tear_down;
 
-    // FIXME and again, but with an iterator instead of a tuple (and other types? parameterize?)
+    test_result = _test_callN(callN_to_call_stars_iter);
+    if (test_result != MUNIT_OK) goto tear_down;
 
-    test_result = _test_callK(callK_to_call_stars);
+    test_result = _test_callK(callK_to_call_stars_frozendict);
     if (test_result != MUNIT_OK) goto tear_down;
 
     // FIXME and again, but with an iterator instead of a mapping?
+    test_result = _test_callK(callK_to_call_stars_iter);
+    if (test_result != MUNIT_OK) goto tear_down;
 
     // FIXME In Python calls, * accepts any iterable, but ** must be a mapping. In nohtyP, we are
     // accidentally accepting 2-tuple iterables for **. Deny this?
