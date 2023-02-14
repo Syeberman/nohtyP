@@ -17693,6 +17693,14 @@ static ypObject *_ypDict(int type, ypObject *x)
         yp_decref(newMp);
         return result;
     }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypFrozenDict_CODE && ypDict_LEN(newMp) < 1) {
+        yp_decref(newMp);
+        return yp_frozendict_empty;
+    }
+
     return newMp;
 }
 
