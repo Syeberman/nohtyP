@@ -2482,7 +2482,6 @@ static ypObject *callK_to_call_stars_iter(ypObject *c, int n, ...)
     va_list   args;
     ypObject *as_list;
     int       i;
-    ypObject *item;
     ypObject *as_iter;
     ypObject *result;
 
@@ -2491,20 +2490,22 @@ static ypObject *callK_to_call_stars_iter(ypObject *c, int n, ...)
     assert_not_raises(as_list = yp_listN(0));  // new ref
     va_start(args, n);
     for (i = 0; i < n; i++) {
-        item = yp_tupleN(N(va_arg(args, ypObject *), va_arg(args, ypObject *)));  // new ref
-        if (yp_isexceptionC(item)) {
+        // XXX It appears you cannot have two va_arg calls in a single function call (gcc bug?).
+        ypObject *item;
+        ypObject *key = va_arg(args, ypObject *);    // borrowed
+        ypObject *value = va_arg(args, ypObject *);  // borrowed
+        if (yp_isexceptionC(value)) {
             yp_decref(as_list);
-            as_list = item;
+            as_list = value;
             break;
         }
+
+        assert_not_raises(item = yp_tupleN(N(key, value)));  // new ref
         assert_not_raises_exc(yp_append(as_list, item, &exc));
         yp_decref(item);
     }
     va_end(args);
 
-    //if (!yp_isexceptionC(as_list)) {
-    //    assert_not_raises(yp_frozendict((as_list)));  // FIXME shouldn't fail...
-    //}
 
     as_iter = yp_iter(as_list);  // new ref
     result = yp_call_stars(c, yp_tuple_empty, as_iter);
