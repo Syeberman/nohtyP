@@ -76,8 +76,9 @@
 // str.strip/etc. Really the bulk of the issues are in the str/bytes methods, as those tried hard to
 // be non-mutating.
 
-
+#define yp_FUTURE
 #include "nohtyP.h"
+
 #include <float.h>
 #include <math.h>
 #include <stddef.h>
@@ -1385,12 +1386,6 @@ static ypRangeObject _yp_range_empty_struct = {
         {ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0, ypObject_HASH_INVALID, NULL}, 0, 1};
 ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 
-
-#define yp_IMMORTAL_FUNCTION(name, code, parameters) \
-    _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, code, parameters)
-#define yp_IMMORTAL_FUNCTION_static(name, code, parameters) \
-    _yp_IMMORTAL_FUNCTION(static, name, code, parameters)
-// FIXME an *args/**kwargs shortcut?
 
 #pragma endregion common_immortals
 
@@ -20122,8 +20117,8 @@ static ypObject *yp_func_chr_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
     return yp_chrC(i);
 };
 
-yp_IMMORTAL_FUNCTION(yp_func_chr, yp_func_chr_code,
-        ({yp_CONST_REF(yp_s_i), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+yp_IMMORTAL_FUNCTION(
+        yp_func_chr, yp_func_chr_code, ({yp_CONST_REF(yp_s_i), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20139,7 +20134,7 @@ static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *a
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_iscallable_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20148,7 +20143,7 @@ static ypObject *yp_func_iscallable_code(ypObject *c, yp_ssize_t n, ypObject *co
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_iscallable, yp_func_iscallable_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20164,7 +20159,7 @@ static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20173,7 +20168,7 @@ static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *cons
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_reversed, yp_func_reversed_code,
-        ({yp_CONST_REF(yp_s_sequence), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+        ({yp_CONST_REF(yp_s_sequence), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_sorted_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20182,7 +20177,7 @@ static ypObject *yp_func_sorted_code(ypObject *c, yp_ssize_t n, ypObject *const 
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_sorted, yp_func_sorted_code,
-        ({yp_CONST_REF(yp_s_iterable), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+        ({yp_CONST_REF(yp_s_iterable), NULL}, {yp_CONST_REF(yp_s_slash)},
                 {yp_CONST_REF(yp_s_star), NULL}, {yp_CONST_REF(yp_s_key), yp_CONST_REF(yp_None)},
                 {yp_CONST_REF(yp_s_reverse), yp_CONST_REF(yp_False)}));
 

@@ -2189,22 +2189,22 @@ typedef struct _ypFunctionObject {
 #define _ypFunction_CODE (28u)
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                         \
-    {                                                                               \
-        type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, len, _ypObject_LEN_INVALID, \
-                _ypObject_HASH_INVALID, data                                        \
+#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                               \
+    {                                                                                     \
+        (type), 0, (type_flags), _ypObject_REFCNT_IMMORTAL, (len), _ypObject_LEN_INVALID, \
+                _ypObject_HASH_INVALID, (data)                                            \
     }
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, _ypObject_LEN_INVALID, NULL), (value)}; \
     qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_BYTES(qual, name, value)                                                  \
-    static const char                _##name##_data[] = value;                                 \
+    static const char                _##name##_data[] = (value);                               \
     static struct _ypStringLibObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
             _ypStringLib_ENC_CODE_BYTES, sizeof(_##name##_data) - 1, (void *)_##name##_data)}; \
     qual ypObject *const             name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                            \
-    static const char                _##name##_data[] = value;                 \
+    static const char                _##name##_data[] = (value);               \
     static struct _ypStringLibObject _##name##_struct = {                      \
             _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_CODE_LATIN_1, \
                     sizeof(_##name##_data) - 1, (void *)_##name##_data),       \
@@ -2212,12 +2212,9 @@ typedef struct _ypFunctionObject {
     qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
-// TODO Instead of _yp_NOQUAL, should we force extern? We really don't want yp_IMMORTAL_* placed
-// on the stack... And maybe flip around so static is default and _extern is option (as per Python).
-#define _yp_NOQUAL  // Used in place of static or extern for qual
-#define yp_IMMORTAL_INT(name, value) _yp_IMMORTAL_INT(_yp_NOQUAL, name, value)
-#define yp_IMMORTAL_BYTES(name, value) _yp_IMMORTAL_BYTES(_yp_NOQUAL, name, value)
-#define yp_IMMORTAL_STR_LATIN_1(name, value) _yp_IMMORTAL_STR_LATIN_1(_yp_NOQUAL, name, value)
+#define yp_IMMORTAL_INT(name, value) _yp_IMMORTAL_INT(, name, value)
+#define yp_IMMORTAL_BYTES(name, value) _yp_IMMORTAL_BYTES(, name, value)
+#define yp_IMMORTAL_STR_LATIN_1(name, value) _yp_IMMORTAL_STR_LATIN_1(, name, value)
 
 #define yp_IMMORTAL_INT_static(name, value) _yp_IMMORTAL_INT(static, name, value)
 #define yp_IMMORTAL_BYTES_static(name, value) _yp_IMMORTAL_BYTES(static, name, value)
@@ -2225,14 +2222,23 @@ typedef struct _ypFunctionObject {
 
 // Immortal functions are not yet part of the external interface: do not use.
 // TODO Older compilers reject an empty parameters argument; create a _yp_IMMORTAL_FUNCTION3?
-#define _yp_IMMORTAL_FUNCTION5(qual, name, code, parameters_len, parameters)                      \
-    static struct _ypFunctionObject _##name##_struct = {                                          \
-            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters_len, parameters), code, NULL}; \
+// FIXME A convenience version that sets parameters to  (*args, **kwargs)?
+#define _yp_IMMORTAL_FUNCTION5(qual, name, code, parameters_len, parameters)                     \
+    static struct _ypFunctionObject _##name##_struct = {                                         \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, (parameters_len), (parameters)), (code), \
+            NULL};                                                                               \
     qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
 #define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
     static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
     _yp_IMMORTAL_FUNCTION5(                                                      \
             qual, name, code, yp_lengthof_array(_##name##_parameters), _##name##_parameters)
+#ifdef yp_FUTURE
+#define yp_IMMORTAL_FUNCTION(name, code, parameters) _yp_IMMORTAL_FUNCTION(, name, code, parameters)
+#define yp_IMMORTAL_FUNCTION_static(name, code, parameters) \
+    _yp_IMMORTAL_FUNCTION(static, name, code, parameters)
+#define yp_IMMORTAL_FUNCTION2(name, code) _yp_IMMORTAL_FUNCTION5(, name, code, 0, NULL)
+#define yp_IMMORTAL_FUNCTION2_static(name, code) _yp_IMMORTAL_FUNCTION5(static, name, code, 0, NULL)
+#endif
 
 #ifdef yp_FUTURE
 // The implementation of yp_IF is considered "internal"; see above for documentation
