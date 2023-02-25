@@ -1234,10 +1234,7 @@ typedef struct {
  *************************************************************************************************/
 #pragma region common_immortals
 
-// Older compilers don't recognize that `ypObject *const name` is known at compile-time, so use this
-// to initialize when a compiler requires a constant. name must refer to an already-defined
-// immortal.
-#define yp_CONST_REF(name) ((ypObject *)&_##name##_struct)
+#define yp_CONST_REF _yp_CONST_REF
 
 
 #define yp_IMMORTAL_INVALIDATED(name)                                                   \
@@ -3740,7 +3737,6 @@ ypObject *yp_all(ypObject *iterable)
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 // TODO Here and elsewhere, the singleton NotImplemented should be used
 // TODO Comparison functions have the possibility of recursion; trap (also, add tests)
-extern ypObject *const yp_ComparisonNotImplemented;
 #define _ypBool_PUBLIC_CMP_FUNCTION(name, reflection, defval)                         \
     ypObject *yp_##name(ypObject *x, ypObject *y)                                     \
     {                                                                                 \

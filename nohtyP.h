@@ -1727,31 +1727,30 @@ ypAPI void yp_s2i_setitemC5(
  * Immortal "Constructor" Macros
  */
 
-// Defines an immortal int object at compile-time, which can be accessed by the variable name, which
-// is of type "ypObject * const". value is a (constant) yp_int_t. To be used as:
+// The immortal constructors are safe to use as local variables, as the objects they reference are
+// allocated in static memory.
+
+// Defines an immortal int object at compile-time, which can be accessed by the variable name,
+// declared as "ypObject * const". value is a (constant) yp_int_t. To be used as:
 //
 //      yp_IMMORTAL_INT(name, value);
 
 // Defines an immortal bytes object at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const". value is a C string literal that can contain null bytes. The
+// declared as "ypObject * const". value is a C string literal that can contain null bytes. The
 // length is calculated while compiling; the hash will be calculated the first time it is accessed.
 // To be used as:
 //
 //      yp_IMMORTAL_BYTES(name, value);
 
 // Defines an immortal str constant at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const". value is a latin-1 encoded C string literal that can contain
-// null characters. The length is calculated while compiling; the hash will be calculated the first
-// time it is accessed. Note that this also accepts an ascii-encoded C string literal, as ascii is a
+// declared as "ypObject * const". value is a latin-1 encoded C string literal that can contain null
+// characters. The length is calculated while compiling; the hash will be calculated the first time
+// it is accessed. Note that this also accepts an ascii-encoded C string literal, as ascii is a
 // subset of latin-1.
 //
 //      yp_IMMORTAL_STR_LATIN_1(name, value);
 
-// The default immortal "constructor" macros declare variables as "ypObject * const". This means
-// immortals defined outside of a function will be extern. It also means you should *not* use these
-// macros in a function, as the variable will be "deallocated" when the function returns, and
-// immortals should never be deallocated. The following macros work as above, except the variables
-// are declared as "static ypObject * const".
+// As above, except the variables are declared as "static ypObject * const".
 //
 //      yp_IMMORTAL_INT_static(name, value);
 //      yp_IMMORTAL_BYTES_static(name, value);
@@ -2188,6 +2187,16 @@ typedef struct _ypFunctionObject {
 #define _ypStr_CODE (18u)
 #define _ypFunction_CODE (28u)
 
+// Compilers don't recognize that `ypObject *const name` is known at compile-time, so use this
+// to initialize when a compiler requires a constant. name must refer to an immortal defined with
+// yp_IMMORTAL_*.
+// FIXME "Note that DLL-exported immortals like yp_None can never be used as constants."
+// TODO Rename?
+#define _yp_CONST_REF(name) ((ypObject *)&_##name##_struct)
+#ifdef yp_FUTURE
+#define yp_CONST_REF _yp_CONST_REF
+#endif
+
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
 #define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                               \
     {                                                                                     \
@@ -2197,19 +2206,19 @@ typedef struct _ypFunctionObject {
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, _ypObject_LEN_INVALID, NULL), (value)}; \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const name = _yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_BYTES(qual, name, value)                                                  \
     static const char                _##name##_data[] = (value);                               \
     static struct _ypStringLibObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
             _ypStringLib_ENC_CODE_BYTES, sizeof(_##name##_data) - 1, (void *)_##name##_data)}; \
-    qual ypObject *const             name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const             name = _yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                            \
     static const char                _##name##_data[] = (value);               \
     static struct _ypStringLibObject _##name##_struct = {                      \
             _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_CODE_LATIN_1, \
                     sizeof(_##name##_data) - 1, (void *)_##name##_data),       \
     };                                                                         \
-    qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const _yp_UNUSED name = _yp_CONST_REF(name) /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
 #define yp_IMMORTAL_INT(name, value) _yp_IMMORTAL_INT(, name, value)
@@ -2221,13 +2230,16 @@ typedef struct _ypFunctionObject {
 #define yp_IMMORTAL_STR_LATIN_1_static(name, value) _yp_IMMORTAL_STR_LATIN_1(static, name, value)
 
 // Immortal functions are not yet part of the external interface: do not use.
-// TODO Older compilers reject an empty parameters argument; create a _yp_IMMORTAL_FUNCTION3?
-// FIXME A convenience version that sets parameters to  (*args, **kwargs)?
+// XXX Older compilers reject an empty parameters argument, hence yp_IMMORTAL_FUNCTION2.
+// FIXME "Due to limitations of C, you cannot reference nohtyP's built-in immortals; in
+// particular, if you need to use yp_None, yp_True, or yp_False, you will need to create with
+// yp_functionC."
+// FIXME A convenience version that sets parameters to (*args, **kwargs)?
 #define _yp_IMMORTAL_FUNCTION5(qual, name, code, parameters_len, parameters)                     \
     static struct _ypFunctionObject _##name##_struct = {                                         \
             _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, (parameters_len), (parameters)), (code), \
             NULL};                                                                               \
-    qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const _yp_UNUSED name = _yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
     static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
     _yp_IMMORTAL_FUNCTION5(                                                      \
