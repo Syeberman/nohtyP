@@ -9,6 +9,7 @@ extern "C" {
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#define yp_FUTURE
 #include "nohtyP.h"
 
 #include "munit.h"

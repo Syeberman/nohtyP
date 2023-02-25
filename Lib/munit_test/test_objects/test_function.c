@@ -13,10 +13,10 @@ static ypObject *None_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 
 // Used to represent NULL in the captured argarray. Recall functions are compared by identity, so
 // this will not be confused with a valid value.
-_yp_IMMORTAL_FUNCTION5(static, captured_NULL, None_code, 0, NULL);
+yp_IMMORTAL_FUNCTION2_static(captured_NULL, None_code);
 
 // As with captured_NULL, represents yp_NameError/etc in the captured argarray.
-_yp_IMMORTAL_FUNCTION5(static, captured_NameError, None_code, 0, NULL);
+yp_IMMORTAL_FUNCTION2_static(captured_NameError, None_code);
 
 // Used as the code for a function. Captures all details about the arguments and returns them. NULL
 // entries in argarray are replaced with the captured_NULL object, and yp_NameError with
@@ -421,7 +421,61 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-// FIXME test_new_immortal: test the yp_IMMORTAL_FUNCTION/etc "constructors".
+// Tests yp_IMMORTAL_FUNCTION*. As this shares the same parameter-validation code as yp_functionC,
+// these tests focus on yp_IMMORTAL_FUNCTION-specific behaviour.
+static MunitResult test_new_immortal(const MunitParameter params[], fixture_t *fixture)
+{
+    yp_IMMORTAL_STR_LATIN_1(str_a, "a");
+    yp_IMMORTAL_STR_LATIN_1(str_star, "*");
+
+    // Signatures of immortals are validated by yp_call*.
+    {
+        // Once an immortal function is marked validated, it is not validated again. So create
+        // separate objects for each yp_call*.
+        yp_IMMORTAL_FUNCTION2(f_callN, capture_code);
+        yp_IMMORTAL_FUNCTION2(f_call_stars, capture_code);
+        yp_IMMORTAL_FUNCTION2(f_call_arrayX, capture_code);
+        ypObject *f_call_arrayX_args[] = {f_call_arrayX};
+        yp_IMMORTAL_FUNCTION(f_a_callN, capture_code, ({yp_CONST_REF(str_a)}));
+        yp_IMMORTAL_FUNCTION(f_a_call_stars, capture_code, ({yp_CONST_REF(str_a)}));
+        ypObject *f_a_call_stars_args = yp_tupleN(1, yp_i_one);  // new ref
+        ypObject *f_a_call_stars_kwargs =
+                yp_frozendictK(1, yp_CONST_REF(str_a), yp_i_one);  // new ref
+        yp_IMMORTAL_FUNCTION(f_a_call_arrayX, capture_code, ({yp_CONST_REF(str_a)}));
+        ypObject *f_a_call_arrayX_args[] = {f_a_call_arrayX, yp_i_one};
+
+        ead(capt, yp_callN(f_callN, 0), assert_captured_is(capt, f_callN, 0, NULL));
+        ead(capt, yp_call_stars(f_call_stars, yp_tuple_empty, yp_frozendict_empty),
+                assert_captured_is(capt, f_call_stars, 0, NULL));
+        ead(capt, yp_call_arrayX(1, f_call_arrayX_args),
+                assert_captured_is(capt, f_call_arrayX, 0, NULL));
+
+        ead(capt, yp_callN(f_a_callN, 1, yp_i_one), assert_captured(capt, f_a_callN, yp_i_one));
+        ead(capt, yp_call_stars(f_a_call_stars, f_a_call_stars_args, yp_frozendict_empty),
+                assert_captured(capt, f_a_call_stars, yp_i_one));
+        ead(capt, yp_call_stars(f_a_call_stars, yp_tuple_empty, f_a_call_stars_kwargs),
+                assert_captured(capt, f_a_call_stars, yp_i_one));
+        ead(capt, yp_call_arrayX(2, f_a_call_arrayX_args),
+                assert_captured(capt, f_a_call_arrayX, yp_i_one));
+
+        yp_decrefN(N(f_a_call_stars_args, f_a_call_stars_kwargs));
+    }
+
+    // Invalid signatures.
+    {
+        // Invalid immortal functions are validated every time, even though the result will be the
+        // same. Regardless, we don't need separate objects for each call.
+        yp_IMMORTAL_FUNCTION(f_star, capture_code, ({yp_CONST_REF(str_star)}));
+        ypObject *f_star_call_arrayX_args[] = {f_star};
+
+        assert_raises(yp_callN(f_star, 0), yp_ParameterSyntaxError);
+        assert_raises(yp_call_stars(f_star, yp_tuple_empty, yp_frozendict_empty),
+                yp_ParameterSyntaxError);
+        assert_raises(yp_call_arrayX(1, f_star_call_arrayX_args), yp_ParameterSyntaxError);
+    }
+
+    return MUNIT_OK;
+}
 
 // Tests common to test_callN, test_call_stars, and callN_to_call_arrayX.
 static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
@@ -2534,7 +2588,6 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
     test_result = _test_callK(callK_to_call_stars_frozendict);
     if (test_result != MUNIT_OK) goto tear_down;
 
-    // FIXME and again, but with an iterator instead of a mapping?
     test_result = _test_callK(callK_to_call_stars_iter);
     if (test_result != MUNIT_OK) goto tear_down;
 
@@ -2744,8 +2797,11 @@ tear_down:
 }
 
 
-MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_callN, NULL),
-        TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL), {NULL}};
+// FIXME Test: function_frozen_copy, function_bool, function_currenthash, function_func_new_code
+
+
+MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_new_immortal, NULL),
+        TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL), {NULL}};
 
 
 extern void test_function_initialize(void) {}
