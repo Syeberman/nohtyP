@@ -2796,12 +2796,90 @@ tear_down:
     return test_result;
 }
 
+static MunitResult test_copy(const MunitParameter params[], fixture_t *fixture)
+{
+    ypObject *defs[] = obj_array_init(1, rand_obj_any());
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    define_function(f, None_code, ({str_a, defs[0]}));
 
-// FIXME Test: function_frozen_copy, function_bool, function_currenthash, function_func_new_code
+    // All copies are lazy, because all function objects are immutable.
+    ead(copy, yp_unfrozen_copy(f), assert_obj(copy, is, f));
+    ead(copy, yp_frozen_copy(f), assert_obj(copy, is, f));
+    ead(copy, yp_copy(f), assert_obj(copy, is, f));
+
+    obj_array_decref(defs);
+    yp_decrefN(N(str_a, f));
+    return MUNIT_OK;
+}
+
+static MunitResult test_deepcopy(const MunitParameter params[], fixture_t *fixture)
+{
+    ypObject *defs[] = obj_array_init(1, rand_obj_any());
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    define_function(f, None_code, ({str_a, defs[0]}));
+
+    // deepcopy is not yet implemented.
+    assert_raises(yp_unfrozen_deepcopy(f), yp_MethodError);
+    assert_raises(yp_frozen_deepcopy(f), yp_MethodError);
+    assert_raises(yp_deepcopy(f), yp_MethodError);
+
+    obj_array_decref(defs);
+    yp_decrefN(N(str_a, f));
+    return MUNIT_OK;
+}
+
+static MunitResult test_bool(const MunitParameter params[], fixture_t *fixture)
+{
+    ypObject *defs[] = obj_array_init(1, rand_obj_any());
+    ypObject *str_a = yp_str_frombytesC2(-1, "a");
+    define_function2(f, None_code);
+    define_function(f_a, None_code, ({str_a, defs[0]}));
+
+    // Function objects are always truthy.
+    assert_obj(yp_bool(f), is, yp_True);
+    assert_obj(yp_bool(f_a), is, yp_True);
+    assert_obj(yp_bool(yp_func_hash), is, yp_True);
+
+    obj_array_decref(defs);
+    yp_decrefN(N(str_a, f, f_a));
+    return MUNIT_OK;
+}
+
+static MunitResult test_hash(const MunitParameter params[], fixture_t *fixture)
+{
+    define_function2(f1, None_code);
+    define_function2(f2, None_code);
+
+    // All function objects are hashable, but they compare by identity only.
+    assert_hashC_exc(yp_currenthashC(f1, &exc), !=, yp_currenthashC(f2, &exc));
+    assert_hashC_exc(yp_hashC(f1, &exc), !=, yp_hashC(f2, &exc));
+
+    // Function objects can be used as dictionary keys.
+    {
+        ypObject *mp = yp_dictK(K(f1, yp_i_one));
+
+        assert_not_exception(mp);
+        ead(value, yp_getitem(mp, f1), assert_obj(value, is, yp_i_one));
+
+        yp_decrefN(N(mp));
+    }
+
+    yp_decrefN(N(f1, f2));
+    return MUNIT_OK;
+}
+
+static MunitResult test_t_function_call(const MunitParameter params[], fixture_t *fixture)
+{
+    assert_raises(yp_callN(yp_t_function, 0), yp_NotImplementedError);
+
+    return MUNIT_OK;
+}
 
 
 MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_new_immortal, NULL),
-        TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL), {NULL}};
+        TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL),
+        TEST(test_copy, NULL), TEST(test_deepcopy, NULL), TEST(test_bool, NULL),
+        TEST(test_hash, NULL), TEST(test_t_function_call, NULL), {NULL}};
 
 
 extern void test_function_initialize(void) {}

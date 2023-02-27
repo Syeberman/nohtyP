@@ -1,6 +1,8 @@
 
 #include "munit_test/unittest.h"
 
+// TODO Is the behaviour of the comparison methods (yp_lt/etc) part of this interface?
+
 
 // Sequences should accept themselves, their pairs, iterators, and tuple/list as valid types for the
 // "x" (i.e. "other iterable") argument.
@@ -1242,7 +1244,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N( int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+    yp_decrefN(N(int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
             int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
