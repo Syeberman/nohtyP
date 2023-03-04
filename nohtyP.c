@@ -10307,7 +10307,7 @@ static ypObject *_ypBytes_func_new_code(int type, yp_ssize_t n, ypObject *const 
 {
     yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
 
-    if (argarray[3] != yp_Arg_Missing) {  // FIXME ...or just use None?
+    if (argarray[3] != yp_Arg_Missing) {  // TODO ...or just use None?
         ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
         return _ypBytes_encode(type, argarray[2], argarray[3], errors);
     } else if (argarray[4] != yp_Arg_Missing) {
@@ -10643,6 +10643,14 @@ static ypObject *_ypBytes_fromiterable(int type, ypObject *iterable)
         yp_decref(newB);
         return result;
     }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypBytes_CODE && ypBytes_LEN(newB) < 1) {
+        yp_decref(newB);
+        return yp_bytes_empty;
+    }
+
     ypBytes_ASSERT_INVARIANTS(newB);
     return newB;
 }
@@ -11318,7 +11326,7 @@ static ypObject *_ypStr_func_new_code(int type, yp_ssize_t n, ypObject *const *a
 
     // As object defaults to yp_str_empty, and _ypStr_decode rejects strs, encoding-without-object
     // is an error, just as with bytes (but unlike Python).
-    if (argarray[3] != yp_Arg_Missing) {  // FIXME ...or just use None?
+    if (argarray[3] != yp_Arg_Missing) {  // TODO ...or just use None?
         ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
         return _ypStr_decode(type, argarray[2], argarray[3], errors);
     } else if (argarray[4] != yp_Arg_Missing) {
@@ -11676,6 +11684,14 @@ static ypObject *_ypStr_fromiterable(int type, ypObject *iterable)
         yp_decref(newS);
         return result;
     }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypStr_CODE && ypStr_LEN(newS) < 1) {
+        yp_decref(newS);
+        return yp_str_empty;
+    }
+
     ypStr_ASSERT_INVARIANTS(newS);
     return newS;
 }
@@ -12357,8 +12373,7 @@ static ypObject *_ypTuple_new_fromminiiter(
         return result;
     }
 
-    // FIXME Make sure the other types normalize to their empty immortal in this case.
-    // TODO We could avoid allocating for an empty miniiter altogether if we get the first value
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
     // before allocating; is this complication worth the optimization?
     if (type == ypTuple_CODE && ypTuple_LEN(newSq) < 1) {
         yp_decref(newSq);
@@ -16494,6 +16509,14 @@ static ypObject *_ypSet(int type, ypObject *iterable)
         yp_decref(newSo);
         return result;
     }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypFrozenSet_CODE && ypSet_LEN(newSo) < 1) {
+        yp_decref(newSo);
+        return yp_frozenset_empty;
+    }
+
     return newSo;
 }
 
@@ -18480,7 +18503,7 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
         }
 
         if (param_name != NULL) {
-            // FIXME: Implement str_isidentifier, then enable this.
+            // TODO: Implement str_isidentifier, then enable this.
             // result = str_isidentifier(param_name);
             // if (result != yp_True) {
             //     // Invalid: (1), (*1), (**1)
@@ -18652,7 +18675,7 @@ static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_
     // arguments.
     if (placed_kwargs < 1) {
         if (kwargs_is_copy) {
-            // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
+            // TODO Implement frozendict_freeze and freeze kwargs in-place here.
             return yp_frozendict(kwargs);
         } else {
             return yp_frozendict(kwargs);

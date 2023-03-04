@@ -2163,7 +2163,7 @@ typedef struct _ypFunctionObject {
     _ypObject_HEAD;
     ypObject *(*ob_code)(ypObject *, yp_ssize_t, ypObject *const *);
     void *ob_state;  // NULL if no extra state
-    // FIXME doc, name/qualname, state, return annotation, module....
+    // TODO doc, name/qualname, state, return annotation, module....
     _yp_INLINE_DATA(yp_parameter_decl_t);
 } ypFunctionObject;
 
