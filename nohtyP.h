@@ -2187,10 +2187,11 @@ typedef struct _ypFunctionObject {
 #define _ypStr_CODE (18u)
 #define _ypFunction_CODE (28u)
 
-// Compilers don't recognize that `ypObject *const name` is known at compile-time, so use this
-// to initialize when a compiler requires a constant. name must refer to an immortal defined with
-// yp_IMMORTAL_*.
-// FIXME "Note that DLL-exported immortals like yp_None can never be used as constants."
+// Compilers don't recognize that `ypObject *const name` is known at compile-time, so use this to
+// initialize an immortal when a compiler requires a constant. name must refer to an immortal
+// defined with yp_IMMORTAL_* previously in this scope; note that because of this limitation,
+// DLL-exported immortals like yp_None, yp_True, and yp_False can never be used to initialize an
+// immortal.
 // TODO Rename?
 #define _yp_CONST_REF(name) ((ypObject *)&_##name##_struct)
 #ifdef yp_FUTURE
@@ -2231,10 +2232,8 @@ typedef struct _ypFunctionObject {
 
 // Immortal functions are not yet part of the external interface: do not use.
 // XXX Older compilers reject an empty parameters argument, hence yp_IMMORTAL_FUNCTION2.
-// FIXME "Due to limitations of C, you cannot reference nohtyP's built-in immortals; in
-// particular, if you need to use yp_None, yp_True, or yp_False, you will need to create with
-// yp_functionC."
-// FIXME A convenience version that sets parameters to (*args, **kwargs)?
+// TODO A convenience version that sets parameters to (*args, **kwargs)?
+// TODO We _could_ mark yp_IMMORTAL_FUNCTION2 as validated...
 #define _yp_IMMORTAL_FUNCTION5(qual, name, code, parameters_len, parameters)                     \
     static struct _ypFunctionObject _##name##_struct = {                                         \
             _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, (parameters_len), (parameters)), (code), \
