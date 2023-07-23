@@ -2529,44 +2529,6 @@ static ypObject *callK_to_call_stars_frozendict(ypObject *c, int n, ...)
     return result;
 }
 
-// Accepts the "yp_callK" signature (not actually implemented, yet) and instead calls yp_call_stars
-// with an iter. For use in _test_callK. n must be >= 0.
-static ypObject *callK_to_call_stars_iter(ypObject *c, int n, ...)
-{
-    va_list   args;
-    ypObject *as_list;
-    int       i;
-    ypObject *as_iter;
-    ypObject *result;
-
-    // If args contains an exception, as_iter will be that exception. We could assert_not_raises
-    // here, but this tests that yp_call_stars fails if kwargs is an exception.
-    assert_not_raises(as_list = yp_listN(0));  // new ref
-    va_start(args, n);
-    for (i = 0; i < n; i++) {
-        // XXX It appears you cannot have two va_arg calls in a single function call (gcc bug?).
-        ypObject *item;
-        ypObject *key = va_arg(args, ypObject *);    // borrowed
-        ypObject *value = va_arg(args, ypObject *);  // borrowed
-        if (yp_isexceptionC(value)) {
-            yp_decref(as_list);
-            as_list = value;
-            break;
-        }
-
-        assert_not_raises(item = yp_tupleN(N(key, value)));  // new ref
-        assert_not_raises_exc(yp_append(as_list, item, &exc));
-        yp_decref(item);
-    }
-    va_end(args);
-
-
-    as_iter = yp_iter(as_list);  // new ref
-    result = yp_call_stars(c, yp_tuple_empty, as_iter);
-    yp_decrefN(N(as_list, as_iter));
-    return result;
-}
-
 static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fixture)
 {
     ypObject   *defs[] = obj_array_init(2, rand_obj_any());
@@ -2588,12 +2550,8 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
     test_result = _test_callK(callK_to_call_stars_frozendict);
     if (test_result != MUNIT_OK) goto tear_down;
 
-    test_result = _test_callK(callK_to_call_stars_iter);
-    if (test_result != MUNIT_OK) goto tear_down;
-
-    // FIXME In Python calls, * accepts any iterable, but ** must be a mapping. In nohtyP, we are
-    // accidentally accepting 2-tuple iterables for **. Deny this?
-    // https://docs.python.org/3/reference/expressions.html#calls
+    // FIXME When **expression is used, each key in this mapping must be a string. Expression
+    // doesn't need to be an identifier.
 
     // def f(a) cannot be called like f(0, a=0).
     {
@@ -2621,6 +2579,33 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
         ead(capt, yp_call_stars(f, call_args, call_kwargs),
                 assert_captured(capt, f, args[0], captured_NULL, call_kwargs));
         yp_decrefN(N(f, call_args, call_kwargs));
+    }
+
+    // def f(a) cannot be called like f(**((a, 0), )) (** must be a mapping)
+    {
+        define_function(f, capture_code, ({str_a}));
+        ypObject *call_kwargs0 = yp_tupleN(N(str_a, args[0]));
+        ypObject *call_kwargs = yp_tupleN(N(call_kwargs0));
+        assert_raises(yp_call_stars(f, yp_tuple_empty, call_kwargs), yp_TypeError);
+        yp_decrefN(N(f, call_kwargs0, call_kwargs));
+    }
+
+    // def f(**kwargs) cannot be called like f(**((a, 0), )) (** must be a mapping)
+    {
+        define_function(f, capture_code, ({str_star_star_kwargs}));
+        ypObject *call_kwargs0 = yp_tupleN(N(str_a, args[0]));
+        ypObject *call_kwargs = yp_tupleN(N(call_kwargs0));
+        assert_raises(yp_call_stars(f, yp_tuple_empty, call_kwargs), yp_TypeError);
+        yp_decrefN(N(f, call_kwargs0, call_kwargs));
+    }
+
+    // def f(*args, **kwargs) cannot be called like f(**((a, 0), )) (** must be a mapping)
+    {
+        define_function(f, capture_code, ({str_star_args}, {str_star_star_kwargs}));
+        ypObject *call_kwargs0 = yp_tupleN(N(str_a, args[0]));
+        ypObject *call_kwargs = yp_tupleN(N(call_kwargs0));
+        assert_raises(yp_call_stars(f, yp_tuple_empty, call_kwargs), yp_TypeError);
+        yp_decrefN(N(f, call_kwargs0, call_kwargs));
     }
 
     // Ensure the args input to yp_call_stars is not modified.

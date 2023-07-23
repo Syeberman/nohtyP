@@ -349,6 +349,13 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 // Base "constructor" for immortal type objects
 #define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT(ypType_CODE, 0, ypObject_LEN_INVALID, NULL)
 
+// Used in tp_flags
+#define ypType_FLAG_IS_MAPPING (1u << 0)
+#define ypType_FLAG_IS_CALLABLE (1u << 1)
+
+#define ypObject_IS_MAPPING(ob) ((ypObject_TYPE(ob)->tp_flags & ypType_FLAG_IS_MAPPING) != 0)
+#define ypObject_IS_CALLABLE(ob) ((ypObject_TYPE(ob)->tp_flags & ypType_FLAG_IS_CALLABLE) != 0)
+
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)(ypObject *);
 typedef ypObject *(*objobjproc)(ypObject *, ypObject *);
@@ -433,12 +440,12 @@ typedef struct {
 // FIXME Maybe this isn't "as callable", but defines the callable things associated to this object.
 //  - tp_call - returns func obj for when this object is called
 //  - tp_call_method(name) - returns the func implementing the method
-// ...but extra flags stating if this is a static method, class method, instance method
+// ...but extra flags stating if this is a static method, class method, instance method.
+//
+// OR, maybe tp_call should be moved to the top level.
 
 // Callable objects defer to the function object returned by tp_call to parse the arguments.
 typedef struct {
-    // FIXME Move this to a tp_flags, and perhaps move tp_call top-level?
-    int tp_iscallable;
     // FIXME ...doesn't actually call the function, but returns information about how to call
     objpobjpobjproc tp_call;  // on error, return exception, but leave *function/*self
 } ypCallableMethods;
@@ -454,6 +461,7 @@ typedef struct {
 // Type objects hold pointers to each type's methods.
 typedef struct {
     ypObject_HEAD;
+    yp_uint64_t tp_flags;  // flags describing this type (ismapping, iscallable, etc)
     // TODO Fill tp_name and use in DEBUG statements
     // TODO Rename to qualname to follow Python?
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
@@ -650,7 +658,6 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
         *name ## _objproc \
     } }; \
     static ypCallableMethods yp_UNUSED name ## _CallableMethods[1] = { { \
-        FALSE, \
         *name ## _objpobjpobjproc \
     } };
 // clang-format on
@@ -3007,6 +3014,7 @@ yp_IMMORTAL_FUNCTION_static(iter_func_new, iter_func_new_code,
 
 static ypTypeObject ypIter_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -3870,6 +3878,7 @@ yp_IMMORTAL_FUNCTION_static(invalidated_func_new, invalidated_func_new_code,
 
 static ypTypeObject ypInvalidated_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -3962,6 +3971,7 @@ yp_IMMORTAL_FUNCTION_static(exception_func_new, exception_func_new_code,
 
 static ypTypeObject ypException_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -4219,13 +4229,13 @@ yp_IMMORTAL_FUNCTION_static(type_func_new, type_func_new_code,
                 {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypCallableMethods ypType_as_callable = {
-        TRUE,      // tp_iscallable
         type_call  // tp_call
 };
 
 static ypTypeObject ypType_Type = {
         yp_TYPE_HEAD_INIT,
-        NULL,  // tp_name
+        ypType_FLAG_IS_CALLABLE,  // tp_flags
+        NULL,                     // tp_name
 
         // Object fundamentals
         yp_CONST_REF(type_func_new),  // tp_func_new
@@ -4331,6 +4341,7 @@ yp_IMMORTAL_FUNCTION_static(nonetype_func_new, nonetype_func_new_code,
 
 static ypTypeObject ypNoneType_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -4459,6 +4470,7 @@ yp_IMMORTAL_FUNCTION_static(bool_func_new, bool_func_new_code,
 
 static ypTypeObject ypBool_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -4843,6 +4855,7 @@ yp_IMMORTAL_FUNCTION_static(intstore_func_new, intstore_func_new_code, _ypInt_FU
 
 static ypTypeObject ypInt_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -4912,6 +4925,7 @@ static ypTypeObject ypInt_Type = {
 
 static ypTypeObject ypIntStore_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -5594,15 +5608,12 @@ static ypObject *unaryoperation(ypObject *x, unaryLfunc intop, unaryLFfunc float
 }
 
 // Defined here are yp_ineg (et al), and yp_neg (et al)
-#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                     \
-    void yp_i##name(ypObject *x, ypObject **exc)               \
-    {                                                          \
-        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF);  \
-    }                                                          \
-    ypObject *yp_##name(ypObject *x)                           \
-    {                                                          \
-        return unaryoperation(x, yp_##name##L, yp_##name##LF); \
-    }
+#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                    \
+    void yp_i##name(ypObject *x, ypObject **exc)              \
+    {                                                         \
+        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF); \
+    }                                                         \
+    ypObject *yp_##name(ypObject *x) { return unaryoperation(x, yp_##name##L, yp_##name##LF); }
 _ypInt_PUBLIC_UNARY_FUNCTION(neg);
 _ypInt_PUBLIC_UNARY_FUNCTION(pos);
 _ypInt_PUBLIC_UNARY_FUNCTION(abs);
@@ -5964,6 +5975,7 @@ yp_IMMORTAL_FUNCTION_static(
 
 static ypTypeObject ypFloat_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -6033,6 +6045,7 @@ static ypTypeObject ypFloat_Type = {
 
 static ypTypeObject ypFloatStore_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -10361,6 +10374,7 @@ static ypSequenceMethods ypBytes_as_sequence = {
 
 static ypTypeObject ypBytes_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -10450,6 +10464,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
 
 static ypTypeObject ypByteArray_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -11381,6 +11396,7 @@ static ypSequenceMethods ypStr_as_sequence = {
 
 static ypTypeObject ypStr_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -11470,6 +11486,7 @@ static ypSequenceMethods ypChrArray_as_sequence = {
 
 static ypTypeObject ypChrArray_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -13134,6 +13151,7 @@ static ypSequenceMethods ypTuple_as_sequence = {
 
 static ypTypeObject ypTuple_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -13225,6 +13243,7 @@ static ypSequenceMethods ypList_as_sequence = {
 
 static ypTypeObject ypList_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -16253,6 +16272,7 @@ static ypSetMethods ypFrozenSet_as_set = {
 
 static ypTypeObject ypFrozenSet_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -16339,6 +16359,7 @@ static ypSetMethods ypSet_as_set = {
 
 static ypTypeObject ypSet_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -17487,7 +17508,8 @@ static ypMappingMethods ypFrozenDict_as_mapping = {
 
 static ypTypeObject ypFrozenDict_Type = {
         yp_TYPE_HEAD_INIT,
-        NULL,  // tp_name
+        ypType_FLAG_IS_MAPPING,  // tp_flags
+        NULL,                    // tp_name
 
         // Object fundamentals
         yp_CONST_REF(frozendict_func_new),  // tp_func_new
@@ -17569,7 +17591,8 @@ static ypMappingMethods ypDict_as_mapping = {
 
 static ypTypeObject ypDict_Type = {
         yp_TYPE_HEAD_INIT,
-        NULL,  // tp_name
+        ypType_FLAG_IS_MAPPING,  // tp_flags
+        NULL,                    // tp_name
 
         // Object fundamentals
         yp_CONST_REF(dict_func_new),  // tp_func_new
@@ -18148,6 +18171,7 @@ static ypSequenceMethods ypRange_as_sequence = {
 
 static ypTypeObject ypRange_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -18673,6 +18697,7 @@ static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_
 
     // If we did not consume any keyword arguments, then **kwargs will be a copy of the keyword
     // arguments.
+    // FIXME kwargs must be a mapping with string keys
     if (placed_kwargs < 1) {
         if (kwargs_is_copy) {
             // TODO Implement frozendict_freeze and freeze kwargs in-place here.
@@ -18711,6 +18736,7 @@ static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_
     }
 
     // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
+    // FIXME kwargs must be a mapping with string keys
     result = yp_frozendict(kwargs_copy);
     yp_decref(kwargs_copy);
     return result;
@@ -18778,7 +18804,8 @@ static ypObject *_ypFunction_call_place_kwargs(ypObject *f, yp_ssize_t slash_ind
 
     yp_ASSERT1(!(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW));
     if (placed_kwargs != ypDict_LEN(kwargs)) {
-        // Unexpected keyword arguments, or an argument was both positional and keyword.
+        // Unexpected keyword arguments (including non-string keys), or an argument was both
+        // positional and keyword.
         return yp_TypeError;
     }
 
@@ -18805,7 +18832,7 @@ static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter
         result = _ypFunction_call_place_kwargs(
                 f, slash_index, kwargs, /*kwargs_is_copy=*/FALSE, n, argarray);
         if (yp_isexceptionC(result)) return result;
-    } else {
+    } else if (ypObject_IS_MAPPING(kwargs)) {
         // We can't trust user-defined mapping types here (and neither does Python). Consider a
         // case-insensitive mapping {'a': 1} with a function (a, A). Even though the mapping
         // contains just one entry, it would match both arguments.
@@ -18815,6 +18842,10 @@ static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter
                 f, slash_index, kwargs_copy, /*kwargs_is_copy=*/TRUE, n, argarray);
         yp_decref(kwargs_copy);
         if (yp_isexceptionC(result)) return result;
+    } else {
+        // Argument after ** must be a mapping.
+        // XXX Here, Python just requires PyMapping_Keys() (i.e. .keys()) to be supported.
+        return_yp_BAD_TYPE(kwargs);
     }
 
     yp_ASSERT1(*n == ypFunction_PARAMS_LEN(f));
@@ -19025,11 +19056,18 @@ static ypObject *_ypFunction_call_stars_tostars(
 
     yp_ASSERT1(var_pos_i <= yp_SSIZE_T_MAX - 2);  // paranoia, as max value of var_pos_i is 2-ish
 
+    if (!ypObject_IS_MAPPING(kwargs)) {
+        // Argument after ** must be a mapping.
+        // XXX Here, Python just requires PyMapping_Keys() (i.e. .keys()) to be supported.
+        return_yp_BAD_TYPE(kwargs);
+    }
+
     argarray[var_pos_i] = yp_tuple(args);  // new ref
     if (yp_isexceptionC(argarray[var_pos_i])) {
         return argarray[var_pos_i];
     }
 
+    // FIXME kwargs must be a mapping with string keys
     argarray[var_kw_i] = yp_frozendict(kwargs);  // new ref
     if (yp_isexceptionC(argarray[var_kw_i])) {
         yp_decref(argarray[var_pos_i]);
@@ -19272,13 +19310,13 @@ yp_IMMORTAL_FUNCTION_static(function_func_new, function_func_new_code,
                 {yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
 
 static ypCallableMethods ypFunction_as_callable = {
-        TRUE,          // tp_iscallable
         function_call  // tp_call
 };
 
 static ypTypeObject ypFunction_Type = {
         yp_TYPE_HEAD_INIT,
-        NULL,  // tp_name
+        ypType_FLAG_IS_CALLABLE,  // tp_flags
+        NULL,                     // tp_name
 
         // Object fundamentals
         yp_CONST_REF(function_func_new),  // tp_func_new
@@ -19830,7 +19868,7 @@ void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args)
     _yp_REDIRECT_EXC2(mapping, tp_as_mapping, tp_updateK, (mapping, n, args), exc);
 }
 
-int yp_iscallableC(ypObject *x) { return ypObject_TYPE(x)->tp_as_callable->tp_iscallable; }
+int yp_iscallableC(ypObject *x) { return ypObject_IS_CALLABLE(x); }
 
 // TODO A version of yp_callN that also accepts keyword arguments. Could have yp_callK that _only_
 // accepts keyword arguments, but I'd rather it's combined. A yp_callNK would be like
