@@ -18651,10 +18651,54 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
     return yp_None;
 }
 
-// Helper for _ypFunction_call_QuickIter. Determines **kwargs by modifying kwargs, first dropping
-// keyword arguments we've already placed, freezing it, and returning a new reference. slash_index
-// is the index of /, or -1 if not present. first_kwarg is the position of the first parameter
-// filled by a keyword argument.
+// Helper for _ypFunction_call_QuickIter. Returns an exact copy of kwargs as a frozendict, to be
+// assigned to the **kwargs parameter. Raises yp_TypeError if kwargs contains non-string keys.
+// kwargs must be a mapping object. If kwargs_is_copy is true, kwargs is frozen in-place, saving a
+// copy.
+static ypObject *_ypFunction_call_copy_var_kwargs(ypObject *kwargs, int kwargs_is_copy)
+{
+    ypObject   *result;
+    ypObject   *mi;
+    yp_uint64_t mi_state;
+
+    yp_ASSERT1(ypObject_IS_MAPPING(kwargs));
+
+    if (kwargs_is_copy) {
+        yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
+        // TODO Implement frozendict_freeze and freeze kwargs in-place here.
+        result = yp_frozendict(kwargs);
+        if (yp_isexceptionC(result)) return result;
+    } else {
+        result = yp_frozendict(kwargs);
+        if (yp_isexceptionC(result)) return result;
+    }
+
+    // Validate that all the keys are strings.
+    // TODO Make a slightly-more-optimized version of frozendict_miniiter_keys for internal use?
+    mi = frozendict_miniiter_keys(result, &mi_state);
+    while (1) {
+        ypObject *key = frozendict_miniiter_next(mi, &mi_state);
+        // TODO Allow subclasses of str.
+        if (ypObject_TYPE_CODE(key) != ypStr_CODE) {
+            if (yp_isexceptionC2(key, yp_StopIteration)) break;
+
+            // An exception happened or the key is not a str: replace the result with an exception.
+            yp_decref(result);
+            result = yp_BAD_TYPE(key);
+            yp_decref(key);
+            break;
+        }
+        yp_decref(key);
+    }
+    yp_decref(mi);
+
+    return result;
+}
+
+// Helper for _ypFunction_call_QuickIter. Determines **kwargs by copying kwargs, dropping keyword
+// arguments we've already placed, freezing it, and returning a new reference. slash_index is the
+// index of /, or -1 if not present. first_kwarg is the position of the first parameter filled by a
+// keyword argument. If kwargs_is_copy is true, kwargs is modified directly, saving a copy.
 static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_index,
         yp_ssize_t first_kwarg, yp_ssize_t placed_kwargs, ypObject *kwargs, int kwargs_is_copy)
 {
@@ -18695,17 +18739,8 @@ static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_
         return yp_TypeError;  // a matching keyword argument that was also positional
     }
 
-    // If we did not consume any keyword arguments, then **kwargs will be a copy of the keyword
-    // arguments.
-    // FIXME kwargs must be a mapping with string keys
-    if (placed_kwargs < 1) {
-        if (kwargs_is_copy) {
-            // TODO Implement frozendict_freeze and freeze kwargs in-place here.
-            return yp_frozendict(kwargs);
-        } else {
-            return yp_frozendict(kwargs);
-        }
-    }
+    // If we did not consume any keyword arguments, then **kwargs will be an exact copy.
+    if (placed_kwargs < 1) return _ypFunction_call_copy_var_kwargs(kwargs, kwargs_is_copy);
 
     // We need to modify then freeze kwargs, so make a copy of it, unless it is *already* a copy.
     // (We coerce user-defined mapping types to dict, which is already an object we can modify.)
@@ -18735,9 +18770,7 @@ static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_
         yp_decref(result);
     }
 
-    // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
-    // FIXME kwargs must be a mapping with string keys
-    result = yp_frozendict(kwargs_copy);
+    result = _ypFunction_call_copy_var_kwargs(kwargs_copy, /*kwargs_is_copy=*/TRUE);
     yp_decref(kwargs_copy);
     return result;
 }
@@ -19067,8 +19100,8 @@ static ypObject *_ypFunction_call_stars_tostars(
         return argarray[var_pos_i];
     }
 
-    // FIXME kwargs must be a mapping with string keys
-    argarray[var_kw_i] = yp_frozendict(kwargs);  // new ref
+    argarray[var_kw_i] =
+            _ypFunction_call_copy_var_kwargs(kwargs, /*kwargs_is_copy=*/FALSE);  // new ref
     if (yp_isexceptionC(argarray[var_kw_i])) {
         yp_decref(argarray[var_pos_i]);
         return argarray[var_kw_i];

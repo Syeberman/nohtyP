@@ -205,6 +205,17 @@ ypObject *rand_obj(fixture_type_t *type)
     return type->_new_rand(&memo);
 }
 
+ypObject *rand_obj_non_string_hashable(void)
+{
+    static fixture_type_t *non_str_hashable_types[] = {&fixture_type_type_struct,
+            &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
+            &fixture_type_float_struct, &fixture_type_iter_struct, &fixture_type_range_struct,
+            &fixture_type_bytes_struct, &fixture_type_tuple_struct, &fixture_type_frozenset_struct,
+            &fixture_type_frozendict_struct, &fixture_type_function_struct, NULL};
+
+    return rand_obj_hashable(rand_choice_array(non_str_hashable_types));
+}
+
 ypObject *rand_obj_any_hashable(void)
 {
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/TRUE};

@@ -1359,6 +1359,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
     ypObject *str_star = yp_str_frombytesC2(-1, "*");
     ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
     ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
+    ypObject *non_string = rand_obj_non_string_hashable();  // argument names must be strings
 
     // def f()
     {
@@ -2135,6 +2136,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         ead(capt, any_callK(f, 0), assert_captured_arg(capt, 0, is, yp_frozendict_empty));
 
         assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(non_string, args[0])), yp_TypeError);
 
         yp_decrefN(N(f, zero, one, zero_one));
     }
@@ -2158,6 +2160,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         assert_raises(any_callK(f, 0), yp_TypeError);
         assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
         assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], non_string, args[1])), yp_TypeError);
 
         yp_decrefN(N(f, one));
     }
@@ -2201,6 +2204,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         ead(capt, any_callK(f, 0), assert_captured_arg(capt, 1, is, yp_frozendict_empty));
 
         assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(non_string, args[0])), yp_TypeError);
 
         yp_decrefN(N(f, zero, one, zero_one));
     }
@@ -2239,6 +2243,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         assert_raises(any_callK(f, K(str_b, args[1])), yp_TypeError);
         assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
         assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(str_a, args[0], non_string, args[1])), yp_TypeError);
 
         yp_decrefN(N(f, one, one_two));
     }
@@ -2279,6 +2284,8 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 
         assert_raises(any_callK(f, K(str_a, yp_NameError)), yp_NameError);
         assert_raises(any_callK(f, K(str_a, args[0], str_b, yp_NameError)), yp_NameError);
+        assert_raises(any_callK(f, K(non_string, args[0])), yp_TypeError);
+        assert_raises(any_callK(f, K(str_a, args[0], non_string, args[1])), yp_TypeError);
 
         yp_decrefN(N(f, zero, one, one_two));
     }
@@ -2453,7 +2460,8 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
 
     obj_array_decref(defs);
     obj_array_decref(args);
-    yp_decrefN(N(str_a, str_b, str_c, str_slash, str_star, str_star_args, str_star_star_kwargs));
+    yp_decrefN(N(str_a, str_b, str_c, str_slash, str_star, str_star_args, str_star_star_kwargs,
+            non_string));
     return MUNIT_OK;
 }
 
