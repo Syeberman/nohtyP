@@ -2290,6 +2290,29 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         yp_decrefN(N(f, zero, one, one_two));
     }
 
+    // Keyword argument names can be any string, including non-identifiers
+    {
+        define_function(f, capture_code, ({str_star_star_kwargs}));
+        char *strings[] = {
+                "",       // empty string
+                " ",      // whitespace only
+                "0name",  // digit as first character
+                "na:me",  // non-alphanumeric character
+        };
+        int i;
+
+        for (i = 0; i < yp_lengthof_array(strings); i++) {
+            ypObject *name = yp_str_frombytesC2(-1, strings[i]);
+            ypObject *expected = yp_frozendictK(K(name, args[0]));
+
+            ead(capt, any_callK(f, K(name, args[0])), assert_captured(capt, f, expected));
+
+            yp_decrefN(N(name, expected));
+        }
+
+        yp_decrefN(N(f));
+    }
+
     // More than ypFunction_MAX_ARGS_ON_STACK parameters
     {
         // params has ypFunction_MAX_ARGS_ON_STACK + 1 elements. Note params contains new refs.
@@ -2557,9 +2580,6 @@ static MunitResult test_call_stars(const MunitParameter params[], fixture_t *fix
 
     test_result = _test_callK(callK_to_call_stars_frozendict);
     if (test_result != MUNIT_OK) goto tear_down;
-
-    // FIXME When **expression is used, each key in this mapping must be a string. Expression
-    // doesn't need to be an identifier.
 
     // def f(a) cannot be called like f(0, a=0).
     {

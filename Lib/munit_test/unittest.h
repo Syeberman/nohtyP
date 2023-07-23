@@ -517,7 +517,7 @@ extern "C" {
 
 // Asserts that obj is a mapping containing exactly the given key/value pairs. Values are
 // compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getitem.
-// FIXME Should we compare keys by type as well? That is tricky to do.
+// TODO Should we compare keys by type as well? That is tricky to do.
 #define assert_mapping(obj, ...)                                                          \
     do {                                                                                  \
         ypObject *_ypmt_MAP_obj = (obj);                                                  \
