@@ -211,7 +211,7 @@ ypObject *rand_obj_non_string_hashable(void)
             &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
             &fixture_type_float_struct, &fixture_type_iter_struct, &fixture_type_range_struct,
             &fixture_type_bytes_struct, &fixture_type_tuple_struct, &fixture_type_frozenset_struct,
-            &fixture_type_frozendict_struct, &fixture_type_function_struct, NULL};
+            &fixture_type_frozendict_struct, &fixture_type_function_struct};
 
     return rand_obj_hashable(rand_choice_array(non_str_hashable_types));
 }
