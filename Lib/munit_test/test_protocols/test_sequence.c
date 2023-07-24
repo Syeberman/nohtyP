@@ -1,6 +1,8 @@
 
 #include "munit_test/unittest.h"
 
+// TODO Is the behaviour of the comparison methods (yp_lt/etc) part of this interface?
+
 
 // Sequences should accept themselves, their pairs, iterators, and tuple/list as valid types for the
 // "x" (i.e. "other iterable") argument.
@@ -23,145 +25,146 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t  *friend_types[] = {type, type->pair, NULL};
     fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
     ypObject        *items[] = obj_array_init(4, type->rand_item());
 
     // range stores integers following a pattern, so doesn't support concat.
     if (type->is_patterned) {
-        ypObject *self = rand_obj(type);
-        assert_raises(yp_concat(self, self), yp_MethodError);
-        yp_decref(self);
+        ypObject *sq = rand_obj(type);
+        assert_raises(yp_concat(sq, sq), yp_MethodError);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic concatenation.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[2], items[3]));
-        ypObject *result = yp_concat(self, x);
+        ypObject *result = yp_concat(sq, x);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(self, x, result));
+        yp_decrefN(N(sq, x, result));
     }
 
-    // self is empty.
+    // sq is empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(0);
+        ypObject *sq = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
-        ypObject *result = yp_concat(self, x);
+        ypObject *result = yp_concat(sq, x);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1]);
-        yp_decrefN(N(self, x, result));
+        yp_decrefN(N(sq, x, result));
     }
 
     // x is empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_concat(self, x);
+        ypObject *result = yp_concat(sq, x);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1]);
-        yp_decrefN(N(self, x, result));
+        yp_decrefN(N(sq, x, result));
     }
 
     // Both are empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(0);
+        ypObject *sq = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_concat(self, x);
+        ypObject *result = yp_concat(sq, x);
         assert_type_is(result, type->type);
         assert_len(result, 0);
-        yp_decrefN(N(self, x, result));
+        yp_decrefN(N(sq, x, result));
     }
 
-    // x can be self.
+    // x can be sq.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_concat(self, self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_concat(sq, sq);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1], items[0], items[1]);
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
-    // Optimization: lazy shallow copy of an immutable self when friendly x is empty.
+    // Optimization: lazy shallow copy of an immutable sq when friendly x is empty.
     for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_concat(self, x);
+        ypObject *result = yp_concat(sq, x);
         if (type->is_mutable) {
-            assert_obj(self, is_not, result);
+            assert_obj(sq, is_not, result);
         } else {
-            assert_obj(self, is, result);
+            assert_obj(sq, is, result);
         }
-        yp_decrefN(N(self, x, result));
+        yp_decrefN(N(sq, x, result));
     }
 
-    // Optimization: lazy shallow copy of a friendly immutable x when immutable self is empty.
+    // Optimization: lazy shallow copy of a friendly immutable x when immutable sq is empty.
     for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(0);
+        ypObject *sq = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
-        ypObject *result = yp_concat(self, x);
+        ypObject *result = yp_concat(sq, x);
         if (type->is_mutable || (*x_type)->is_mutable) {
             assert_obj(x, is_not, result);
         } else {
             assert_obj(x, is, result);
         }
-        yp_decrefN(N(self, x, result));
+        yp_decrefN(N(sq, x, result));
     }
 
-    // Optimization: empty immortal when immutable self is empty and friendly x is empty.
+    // Optimization: empty immortal when immutable sq is empty and friendly x is empty.
     if (type->falsy != NULL) {
         for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-            ypObject *self = type->newN(0);
+            ypObject *sq = type->newN(0);
             ypObject *x = (*x_type)->newN(0);
-            ypObject *result = yp_concat(self, x);
+            ypObject *result = yp_concat(sq, x);
             assert_obj(result, is, type->falsy);
-            yp_decrefN(N(self, x, result));
+            yp_decrefN(N(sq, x, result));
         }
     }
 
     // x is an iterator that fails at the start.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(yp_concat(self, x), yp_SyntaxError);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_raises(yp_concat(sq, x), yp_SyntaxError);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is an iterator that fails mid-way.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(yp_concat(self, x), yp_SyntaxError);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_raises(yp_concat(sq, x), yp_SyntaxError);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is an iterator with a too-small length_hint.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        ypObject *result = yp_concat(self, x);
+        ypObject *result = yp_concat(sq, x);
         assert_sequence(result, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(self, x_supplier, x, result));
+        yp_decrefN(N(sq, x_supplier, x, result));
     }
 
     // x is an iterator with a too-large length_hint.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        ypObject *result = yp_concat(self, x);
+        ypObject *result = yp_concat(sq, x);
         assert_sequence(result, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(self, x_supplier, x, result));
+        yp_decrefN(N(sq, x_supplier, x, result));
     }
 
     // x is not an iterable.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises(yp_concat(self, int_1), yp_TypeError);
-        yp_decrefN(N(self));
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises(yp_concat(sq, int_1), yp_TypeError);
+        yp_decrefN(N(sq));
     }
 
 tear_down:
@@ -176,86 +179,86 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
 
     // range stores integers following a pattern, so doesn't support repeat.
     if (type->is_patterned) {
-        ypObject *self = rand_obj(type);
-        assert_raises(yp_repeatC(self, 2), yp_MethodError);
-        yp_decref(self);
+        ypObject *sq = rand_obj(type);
+        assert_raises(yp_repeatC(sq, 2), yp_MethodError);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic repeat.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_repeatC(self, 2);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_repeatC(sq, 2);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1], items[0], items[1]);
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
     // Factor of one.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_repeatC(self, 1);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_repeatC(sq, 1);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1]);
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
     // Factor of zero.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_repeatC(self, 0);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_repeatC(sq, 0);
         assert_type_is(result, type->type);
         assert_len(result, 0);
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
     // Negative factor.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_repeatC(self, -1);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_repeatC(sq, -1);
         assert_type_is(result, type->type);
         assert_len(result, 0);
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
     // Large factor. (Exercises _ypSequence_repeat_memcpy optimization.)
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_repeatC(self, 8);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_repeatC(sq, 8);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1], items[0], items[1], items[0], items[1],
                 items[0], items[1], items[0], items[1], items[0], items[1], items[0], items[1],
                 items[0], items[1]);
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
-    // Empty self.
+    // Empty sq.
     {
-        ypObject *self = type->newN(0);
-        ypObject *result = yp_repeatC(self, 2);
+        ypObject *sq = type->newN(0);
+        ypObject *result = yp_repeatC(sq, 2);
         assert_type_is(result, type->type);
         assert_len(result, 0);
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
-    // Optimization: lazy shallow copy of an immutable self when factor is one.
+    // Optimization: lazy shallow copy of an immutable sq when factor is one.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_repeatC(self, 1);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_repeatC(sq, 1);
         if (type->is_mutable) {
-            assert_obj(self, is_not, result);
+            assert_obj(sq, is_not, result);
         } else {
-            assert_obj(self, is, result);
+            assert_obj(sq, is, result);
         }
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
-    // Optimization: empty immortal when immutable self is empty.
+    // Optimization: empty immortal when immutable sq is empty.
     if (type->falsy != NULL) {
-        ypObject *self = type->newN(0);
-        ypObject *result = yp_repeatC(self, 2);
+        ypObject *sq = type->newN(0);
+        ypObject *result = yp_repeatC(sq, 2);
         assert_obj(result, is, type->falsy);
-        yp_decrefN(N(self, result));
+        yp_decrefN(N(sq, result));
     }
 
 tear_down:
@@ -267,31 +270,31 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
 {
     fixture_type_t *type = fixture->type;
     ypObject       *items[] = obj_array_init(2, type->rand_item());
-    ypObject       *self = type->newN(N(items[0], items[1]));
+    ypObject       *sq = type->newN(N(items[0], items[1]));
     ypObject       *empty = type->newN(0);
 
     // Basic index.
-    ead(zero, yp_getindexC(self, 0), assert_obj(zero, eq, items[0]));
-    ead(one, yp_getindexC(self, 1), assert_obj(one, eq, items[1]));
+    ead(zero, yp_getindexC(sq, 0), assert_obj(zero, eq, items[0]));
+    ead(one, yp_getindexC(sq, 1), assert_obj(one, eq, items[1]));
 
     // Negative index.
-    ead(neg_one, yp_getindexC(self, -1), assert_obj(neg_one, eq, items[1]));
-    ead(neg_two, yp_getindexC(self, -2), assert_obj(neg_two, eq, items[0]));
+    ead(neg_one, yp_getindexC(sq, -1), assert_obj(neg_one, eq, items[1]));
+    ead(neg_two, yp_getindexC(sq, -2), assert_obj(neg_two, eq, items[0]));
 
     // Out of bounds.
-    assert_raises(yp_getindexC(self, 2), yp_IndexError);
-    assert_raises(yp_getindexC(self, -3), yp_IndexError);
+    assert_raises(yp_getindexC(sq, 2), yp_IndexError);
+    assert_raises(yp_getindexC(sq, -3), yp_IndexError);
 
-    // Empty self.
+    // Empty sq.
     assert_raises(yp_getindexC(empty, 0), yp_IndexError);
     assert_raises(yp_getindexC(empty, -1), yp_IndexError);
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
-    assert_raises(yp_getindexC(self, yp_SLICE_DEFAULT), yp_IndexError);
-    assert_raises(yp_getindexC(self, yp_SLICE_LAST), yp_IndexError);
+    assert_raises(yp_getindexC(sq, yp_SLICE_DEFAULT), yp_IndexError);
+    assert_raises(yp_getindexC(sq, yp_SLICE_LAST), yp_IndexError);
 
     obj_array_decref(items);
-    yp_decrefN(N(self, empty));
+    yp_decrefN(N(sq, empty));
     return MUNIT_OK;
 }
 
@@ -299,14 +302,14 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
 {
     fixture_type_t *type = fixture->type;
     ypObject       *items[5];
-    ypObject       *self;
+    ypObject       *sq;
     obj_array_fill(items, type->rand_items);
-    self = type->newN(N(items[0], items[1], items[2], items[3], items[4]));
+    sq = type->newN(N(items[0], items[1], items[2], items[3], items[4]));
 
     // Basic slice.
     {
-        ypObject *zero_one = yp_getsliceC4(self, 0, 1, 1);
-        ypObject *one_two = yp_getsliceC4(self, 1, 2, 1);
+        ypObject *zero_one = yp_getsliceC4(sq, 0, 1, 1);
+        ypObject *one_two = yp_getsliceC4(sq, 1, 2, 1);
         assert_type_is(zero_one, type->type);
         assert_sequence(zero_one, items[0]);
         assert_type_is(one_two, type->type);
@@ -316,8 +319,8 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
 
     // Negative step.
     {
-        ypObject *neg_one_neg_two = yp_getsliceC4(self, -1, -2, -1);
-        ypObject *neg_two_neg_three = yp_getsliceC4(self, -2, -3, -1);
+        ypObject *neg_one_neg_two = yp_getsliceC4(sq, -1, -2, -1);
+        ypObject *neg_two_neg_three = yp_getsliceC4(sq, -2, -3, -1);
         assert_type_is(neg_one_neg_two, type->type);
         assert_sequence(neg_one_neg_two, items[4]);
         assert_type_is(neg_two_neg_three, type->type);
@@ -327,8 +330,8 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
 
     // Total slice, forward and backward.
     {
-        ypObject *forward = yp_getsliceC4(self, 0, 5, 1);
-        ypObject *reverse = yp_getsliceC4(self, -1, -6, -1);
+        ypObject *forward = yp_getsliceC4(sq, 0, 5, 1);
+        ypObject *reverse = yp_getsliceC4(sq, -1, -6, -1);
         assert_type_is(forward, type->type);
         assert_sequence(forward, items[0], items[1], items[2], items[3], items[4]);
         assert_type_is(reverse, type->type);
@@ -338,8 +341,8 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
 
     // Step of 2, -2.
     {
-        ypObject *forward = yp_getsliceC4(self, 0, 5, 2);
-        ypObject *reverse = yp_getsliceC4(self, -1, -6, -2);
+        ypObject *forward = yp_getsliceC4(sq, 0, 5, 2);
+        ypObject *reverse = yp_getsliceC4(sq, -1, -6, -2);
         assert_type_is(forward, type->type);
         assert_sequence(forward, items[0], items[2], items[4]);
         assert_type_is(reverse, type->type);
@@ -362,7 +365,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
-            ypObject    *empty = yp_getsliceC4(self, args.start, args.stop, args.step);
+            ypObject    *empty = yp_getsliceC4(sq, args.start, args.stop, args.step);
             assert_type_is(empty, type->type);
             assert_len(empty, 0);
             yp_decref(empty);
@@ -370,84 +373,83 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     }
 
     // yp_SLICE_DEFAULT.
-    ead(i_pos_step, yp_getsliceC4(self, yp_SLICE_DEFAULT, 2, 1),
+    ead(i_pos_step, yp_getsliceC4(sq, yp_SLICE_DEFAULT, 2, 1),
             assert_sequence(i_pos_step, items[0], items[1]));
-    ead(j_pos_step, yp_getsliceC4(self, 2, yp_SLICE_DEFAULT, 1),
+    ead(j_pos_step, yp_getsliceC4(sq, 2, yp_SLICE_DEFAULT, 1),
             assert_sequence(j_pos_step, items[2], items[3], items[4]));
-    ead(both_pos_step, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1),
+    ead(both_pos_step, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1),
             assert_sequence(both_pos_step, items[0], items[1], items[2], items[3], items[4]));
-    ead(i_neg_step, yp_getsliceC4(self, yp_SLICE_DEFAULT, -3, -1),
+    ead(i_neg_step, yp_getsliceC4(sq, yp_SLICE_DEFAULT, -3, -1),
             assert_sequence(i_neg_step, items[4], items[3]));
-    ead(j_neg_step, yp_getsliceC4(self, -3, yp_SLICE_DEFAULT, -1),
+    ead(j_neg_step, yp_getsliceC4(sq, -3, yp_SLICE_DEFAULT, -1),
             assert_sequence(j_neg_step, items[2], items[1], items[0]));
-    ead(both_neg_step, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1),
+    ead(both_neg_step, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1),
             assert_sequence(both_neg_step, items[4], items[3], items[2], items[1], items[0]));
 
     // yp_SLICE_LAST.
-    ead(i_pos_step, yp_getsliceC4(self, yp_SLICE_LAST, 5, 1), assert_len(i_pos_step, 0));
-    ead(j_pos_step, yp_getsliceC4(self, 0, yp_SLICE_LAST, 1),
+    ead(i_pos_step, yp_getsliceC4(sq, yp_SLICE_LAST, 5, 1), assert_len(i_pos_step, 0));
+    ead(j_pos_step, yp_getsliceC4(sq, 0, yp_SLICE_LAST, 1),
             assert_sequence(j_pos_step, items[0], items[1], items[2], items[3], items[4]));
-    ead(both_pos_step, yp_getsliceC4(self, yp_SLICE_LAST, yp_SLICE_LAST, 1),
+    ead(both_pos_step, yp_getsliceC4(sq, yp_SLICE_LAST, yp_SLICE_LAST, 1),
             assert_len(both_pos_step, 0));
-    ead(i_neg_step, yp_getsliceC4(self, yp_SLICE_LAST, -6, -1),
+    ead(i_neg_step, yp_getsliceC4(sq, yp_SLICE_LAST, -6, -1),
             assert_sequence(i_neg_step, items[4], items[3], items[2], items[1], items[0]));
-    ead(j_neg_step, yp_getsliceC4(self, -1, yp_SLICE_LAST, -1), assert_len(j_neg_step, 0));
-    ead(both_neg_step, yp_getsliceC4(self, yp_SLICE_LAST, yp_SLICE_LAST, -1),
+    ead(j_neg_step, yp_getsliceC4(sq, -1, yp_SLICE_LAST, -1), assert_len(j_neg_step, 0));
+    ead(both_neg_step, yp_getsliceC4(sq, yp_SLICE_LAST, yp_SLICE_LAST, -1),
             assert_len(both_neg_step, 0));
 
     // Invalid slices.
-    assert_raises(yp_getsliceC4(self, 0, 1, 0), yp_ValueError);  // step==0
-    assert_raises(yp_getsliceC4(self, 0, 1, -yp_SSIZE_T_MAX - 1),
+    assert_raises(yp_getsliceC4(sq, 0, 1, 0), yp_ValueError);  // step==0
+    assert_raises(yp_getsliceC4(sq, 0, 1, -yp_SSIZE_T_MAX - 1),
             yp_SystemLimitationError);  // too-small step
 
-    // Optimization: lazy shallow copy of an immutable self for total forward slice.
+    // Optimization: lazy shallow copy of an immutable sq for total forward slice.
     if (!type->is_mutable) {
-        ead(forward, yp_getsliceC4(self, 0, 5, 1), assert_obj(forward, is, self));
+        ead(forward, yp_getsliceC4(sq, 0, 5, 1), assert_obj(forward, is, sq));
     }
 
     // Optimization: empty immortal when slice is empty.
     if (type->falsy != NULL) {
-        ead(empty, yp_getsliceC4(self, 0, 0, 1), assert_obj(empty, is, type->falsy));
+        ead(empty, yp_getsliceC4(sq, 0, 0, 1), assert_obj(empty, is, type->falsy));
     }
 
     // Python's test_getslice.
-    ead(slice, yp_getsliceC4(self, 0, 0, 1), assert_len(slice, 0));
-    ead(slice, yp_getsliceC4(self, 1, 2, 1), assert_sequence(slice, items[1]));
-    ead(slice, yp_getsliceC4(self, -2, -1, 1), assert_sequence(slice, items[3]));
-    ead(slice, yp_getsliceC4(self, -1000, 1000, 1), assert_obj(slice, eq, self));
-    ead(slice, yp_getsliceC4(self, 1000, -1000, 1), assert_len(slice, 0));
-    ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1),
-            assert_obj(slice, eq, self));
-    ead(slice, yp_getsliceC4(self, 1, yp_SLICE_DEFAULT, 1),
+    ead(slice, yp_getsliceC4(sq, 0, 0, 1), assert_len(slice, 0));
+    ead(slice, yp_getsliceC4(sq, 1, 2, 1), assert_sequence(slice, items[1]));
+    ead(slice, yp_getsliceC4(sq, -2, -1, 1), assert_sequence(slice, items[3]));
+    ead(slice, yp_getsliceC4(sq, -1000, 1000, 1), assert_obj(slice, eq, sq));
+    ead(slice, yp_getsliceC4(sq, 1000, -1000, 1), assert_len(slice, 0));
+    ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1), assert_obj(slice, eq, sq));
+    ead(slice, yp_getsliceC4(sq, 1, yp_SLICE_DEFAULT, 1),
             assert_sequence(slice, items[1], items[2], items[3], items[4]));
-    ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, 3, 1),
+    ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, 3, 1),
             assert_sequence(slice, items[0], items[1], items[2]));
 
-    ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 2),
+    ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 2),
             assert_sequence(slice, items[0], items[2], items[4]));
-    ead(slice, yp_getsliceC4(self, 1, yp_SLICE_DEFAULT, 2),
+    ead(slice, yp_getsliceC4(sq, 1, yp_SLICE_DEFAULT, 2),
             assert_sequence(slice, items[1], items[3]));
-    ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1),
+    ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1),
             assert_sequence(slice, items[4], items[3], items[2], items[1], items[0]));
-    ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -2),
+    ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -2),
             assert_sequence(slice, items[4], items[2], items[0]));
-    ead(slice, yp_getsliceC4(self, 3, yp_SLICE_DEFAULT, -2),
+    ead(slice, yp_getsliceC4(sq, 3, yp_SLICE_DEFAULT, -2),
             assert_sequence(slice, items[3], items[1]));
-    ead(slice, yp_getsliceC4(self, 3, 3, -2), assert_len(slice, 0));
-    ead(slice, yp_getsliceC4(self, 3, 2, -2), assert_sequence(slice, items[3]));
-    ead(slice, yp_getsliceC4(self, 3, 1, -2), assert_sequence(slice, items[3]));
-    ead(slice, yp_getsliceC4(self, 3, 0, -2), assert_sequence(slice, items[3], items[1]));
-    ead(slice, yp_getsliceC4(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -100),
+    ead(slice, yp_getsliceC4(sq, 3, 3, -2), assert_len(slice, 0));
+    ead(slice, yp_getsliceC4(sq, 3, 2, -2), assert_sequence(slice, items[3]));
+    ead(slice, yp_getsliceC4(sq, 3, 1, -2), assert_sequence(slice, items[3]));
+    ead(slice, yp_getsliceC4(sq, 3, 0, -2), assert_sequence(slice, items[3], items[1]));
+    ead(slice, yp_getsliceC4(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -100),
             assert_sequence(slice, items[4]));
-    ead(slice, yp_getsliceC4(self, 100, -100, 1), assert_len(slice, 0));
-    ead(slice, yp_getsliceC4(self, -100, 100, 1), assert_obj(slice, eq, self));
-    ead(slice, yp_getsliceC4(self, 100, -100, -1),
+    ead(slice, yp_getsliceC4(sq, 100, -100, 1), assert_len(slice, 0));
+    ead(slice, yp_getsliceC4(sq, -100, 100, 1), assert_obj(slice, eq, sq));
+    ead(slice, yp_getsliceC4(sq, 100, -100, -1),
             assert_sequence(slice, items[4], items[3], items[2], items[1], items[0]));
-    ead(slice, yp_getsliceC4(self, -100, 100, -1), assert_len(slice, 0));
-    ead(slice, yp_getsliceC4(self, -100, 100, 2),
+    ead(slice, yp_getsliceC4(sq, -100, 100, -1), assert_len(slice, 0));
+    ead(slice, yp_getsliceC4(sq, -100, 100, 2),
             assert_sequence(slice, items[0], items[2], items[4]));
 
-    yp_decref(self);
+    yp_decref(sq);
     obj_array_decref(items);
     return MUNIT_OK;
 }
@@ -455,66 +457,92 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
 static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_neg_1 = yp_intC(-1);
+    ypObject       *int_neg_2 = yp_intC(-2);
+    ypObject       *int_neg_3 = yp_intC(-3);
+    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
+    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
+    ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[] = obj_array_init(2, type->rand_item());
-    ypObject       *self = type->newN(N(items[0], items[1]));
+    ypObject       *sq = type->newN(N(items[0], items[1]));
     ypObject       *empty = type->newN(0);
 
     // Basic index.
-    ead(zero, yp_getitem(self, int_0), assert_obj(zero, eq, items[0]));
-    ead(one, yp_getitem(self, int_1), assert_obj(one, eq, items[1]));
+    ead(zero, yp_getitem(sq, int_0), assert_obj(zero, eq, items[0]));
+    ead(one, yp_getitem(sq, int_1), assert_obj(one, eq, items[1]));
 
     // Negative index.
-    ead(neg_one, yp_getitem(self, int_neg_1), assert_obj(neg_one, eq, items[1]));
-    ead(neg_two, yp_getitem(self, int_neg_2), assert_obj(neg_two, eq, items[0]));
+    ead(neg_one, yp_getitem(sq, int_neg_1), assert_obj(neg_one, eq, items[1]));
+    ead(neg_two, yp_getitem(sq, int_neg_2), assert_obj(neg_two, eq, items[0]));
 
     // Out of bounds.
-    assert_raises(yp_getitem(self, int_2), yp_IndexError);
-    assert_raises(yp_getitem(self, int_neg_3), yp_IndexError);
+    assert_raises(yp_getitem(sq, int_2), yp_IndexError);
+    assert_raises(yp_getitem(sq, int_neg_3), yp_IndexError);
 
-    // Empty self.
+    // Empty sq.
     assert_raises(yp_getitem(empty, int_0), yp_IndexError);
     assert_raises(yp_getitem(empty, int_neg_1), yp_IndexError);
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
-    assert_raises(yp_getitem(self, int_SLICE_DEFAULT), yp_IndexError);
-    assert_raises(yp_getitem(self, int_SLICE_LAST), yp_IndexError);
+    assert_raises(yp_getitem(sq, int_SLICE_DEFAULT), yp_IndexError);
+    assert_raises(yp_getitem(sq, int_SLICE_LAST), yp_IndexError);
+
+    // intstore.
+    ead(zero, yp_getitem(sq, intstore_0), assert_obj(zero, eq, items[0]));
 
     obj_array_decref(items);
-    yp_decrefN(N(self, empty));
+    yp_decrefN(N(sq, empty, int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+            int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
 
 static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_neg_1 = yp_intC(-1);
+    ypObject       *int_neg_2 = yp_intC(-2);
+    ypObject       *int_neg_3 = yp_intC(-3);
+    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
+    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
+    ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[] = obj_array_init(3, type->rand_item());
-    ypObject       *self = type->newN(N(items[0], items[1]));
+    ypObject       *sq = type->newN(N(items[0], items[1]));
     ypObject       *empty = type->newN(0);
 
     // Basic index.
-    ead(zero, yp_getdefault(self, int_0, items[2]), assert_obj(zero, eq, items[0]));
-    ead(one, yp_getdefault(self, int_1, items[2]), assert_obj(one, eq, items[1]));
+    ead(zero, yp_getdefault(sq, int_0, items[2]), assert_obj(zero, eq, items[0]));
+    ead(one, yp_getdefault(sq, int_1, items[2]), assert_obj(one, eq, items[1]));
 
     // Negative index.
-    ead(neg_one, yp_getdefault(self, int_neg_1, items[2]), assert_obj(neg_one, eq, items[1]));
-    ead(neg_two, yp_getdefault(self, int_neg_2, items[2]), assert_obj(neg_two, eq, items[0]));
+    ead(neg_one, yp_getdefault(sq, int_neg_1, items[2]), assert_obj(neg_one, eq, items[1]));
+    ead(neg_two, yp_getdefault(sq, int_neg_2, items[2]), assert_obj(neg_two, eq, items[0]));
 
     // Out of bounds.
-    ead(two, yp_getdefault(self, int_2, items[2]), assert_obj(two, eq, items[2]));
-    ead(neg_three, yp_getdefault(self, int_neg_3, items[2]), assert_obj(neg_three, eq, items[2]));
+    ead(two, yp_getdefault(sq, int_2, items[2]), assert_obj(two, eq, items[2]));
+    ead(neg_three, yp_getdefault(sq, int_neg_3, items[2]), assert_obj(neg_three, eq, items[2]));
 
-    // Empty self.
+    // Empty sq.
     ead(zero, yp_getdefault(empty, int_0, items[2]), assert_obj(zero, eq, items[2]));
     ead(neg_one, yp_getdefault(empty, int_neg_1, items[2]), assert_obj(neg_one, eq, items[2]));
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
-    ead(slice_default, yp_getdefault(self, int_SLICE_DEFAULT, items[2]),
+    ead(slice_default, yp_getdefault(sq, int_SLICE_DEFAULT, items[2]),
             assert_obj(slice_default, eq, items[2]));
-    ead(slice_last, yp_getdefault(self, int_SLICE_LAST, items[2]),
+    ead(slice_last, yp_getdefault(sq, int_SLICE_LAST, items[2]),
             assert_obj(slice_last, eq, items[2]));
 
+    // intstore.
+    ead(zero, yp_getdefault(sq, intstore_0, items[2]), assert_obj(zero, eq, items[0]));
+
     obj_array_decref(items);
-    yp_decrefN(N(self, empty));
+    yp_decrefN(N(sq, empty, int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+            int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
 
@@ -525,10 +553,10 @@ static MunitResult _test_findC(fixture_type_t *type,
         int forward, int raises)
 {
     ypObject *items[3];
-    ypObject *self;
+    ypObject *sq;
     ypObject *empty = type->newN(0);
     obj_array_fill(items, type->rand_items);
-    self = type->newN(N(items[0], items[1]));
+    sq = type->newN(N(items[0], items[1]));
 
 #define assert_not_found_exc(expression)            \
     do {                                            \
@@ -542,36 +570,36 @@ static MunitResult _test_findC(fixture_type_t *type,
     } while (0)
 
     // Basic find.
-    assert_ssizeC_exc(any_findC(self, items[0], &exc), ==, 0);
-    assert_ssizeC_exc(any_findC(self, items[1], &exc), ==, 1);
+    assert_ssizeC_exc(any_findC(sq, items[0], &exc), ==, 0);
+    assert_ssizeC_exc(any_findC(sq, items[1], &exc), ==, 1);
 
     // Not in sequence.
-    assert_not_found_exc(any_findC(self, items[2], &exc));
+    assert_not_found_exc(any_findC(sq, items[2], &exc));
 
-    // Empty self.
+    // Empty sq.
     assert_not_found_exc(any_findC(empty, items[0], &exc));
 
     // Basic slice.
-    assert_ssizeC_exc(any_findC5(self, items[0], 0, 1, &exc), ==, 0);
-    assert_not_found_exc(any_findC5(self, items[0], 1, 2, &exc));
-    assert_not_found_exc(any_findC5(self, items[1], 0, 1, &exc));
-    assert_ssizeC_exc(any_findC5(self, items[1], 1, 2, &exc), ==, 1);
+    assert_ssizeC_exc(any_findC5(sq, items[0], 0, 1, &exc), ==, 0);
+    assert_not_found_exc(any_findC5(sq, items[0], 1, 2, &exc));
+    assert_not_found_exc(any_findC5(sq, items[1], 0, 1, &exc));
+    assert_ssizeC_exc(any_findC5(sq, items[1], 1, 2, &exc), ==, 1);
 
     // Negative indicies.
-    assert_ssizeC_exc(any_findC5(self, items[0], -2, -1, &exc), ==, 0);
-    assert_not_found_exc(any_findC5(self, items[0], -1, 2, &exc));
-    assert_not_found_exc(any_findC5(self, items[1], -2, -1, &exc));
-    assert_ssizeC_exc(any_findC5(self, items[1], -1, 2, &exc), ==, 1);
+    assert_ssizeC_exc(any_findC5(sq, items[0], -2, -1, &exc), ==, 0);
+    assert_not_found_exc(any_findC5(sq, items[0], -1, 2, &exc));
+    assert_not_found_exc(any_findC5(sq, items[1], -2, -1, &exc));
+    assert_ssizeC_exc(any_findC5(sq, items[1], -1, 2, &exc), ==, 1);
 
     // Total slice.
-    assert_ssizeC_exc(any_findC5(self, items[0], 0, 2, &exc), ==, 0);
-    assert_ssizeC_exc(any_findC5(self, items[1], 0, 2, &exc), ==, 1);
-    assert_not_found_exc(any_findC5(self, items[2], 0, 2, &exc));
+    assert_ssizeC_exc(any_findC5(sq, items[0], 0, 2, &exc), ==, 0);
+    assert_ssizeC_exc(any_findC5(sq, items[1], 0, 2, &exc), ==, 1);
+    assert_not_found_exc(any_findC5(sq, items[2], 0, 2, &exc));
 
     // Total slice, negative indicies.
-    assert_ssizeC_exc(any_findC5(self, items[0], -2, 2, &exc), ==, 0);
-    assert_ssizeC_exc(any_findC5(self, items[1], -2, 2, &exc), ==, 1);
-    assert_not_found_exc(any_findC5(self, items[2], -2, 2, &exc));
+    assert_ssizeC_exc(any_findC5(sq, items[0], -2, 2, &exc), ==, 0);
+    assert_ssizeC_exc(any_findC5(sq, items[1], -2, 2, &exc), ==, 1);
+    assert_not_found_exc(any_findC5(sq, items[2], -2, 2, &exc));
 
     // Empty slices.
     {
@@ -587,33 +615,33 @@ static MunitResult _test_findC(fixture_type_t *type,
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
-            assert_not_found_exc(any_findC5(self, items[0], args.start, args.stop, &exc));
-            assert_not_found_exc(any_findC5(self, items[1], args.start, args.stop, &exc));
-            assert_not_found_exc(any_findC5(self, items[2], args.start, args.stop, &exc));
+            assert_not_found_exc(any_findC5(sq, items[0], args.start, args.stop, &exc));
+            assert_not_found_exc(any_findC5(sq, items[1], args.start, args.stop, &exc));
+            assert_not_found_exc(any_findC5(sq, items[2], args.start, args.stop, &exc));
         }
     }
 
     // yp_SLICE_DEFAULT.
-    assert_ssizeC_exc(any_findC5(self, items[0], yp_SLICE_DEFAULT, 1, &exc), ==, 0);
-    assert_ssizeC_exc(any_findC5(self, items[0], 0, yp_SLICE_DEFAULT, &exc), ==, 0);
-    assert_ssizeC_exc(any_findC5(self, items[0], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 0);
-    assert_ssizeC_exc(any_findC5(self, items[1], yp_SLICE_DEFAULT, 2, &exc), ==, 1);
-    assert_ssizeC_exc(any_findC5(self, items[1], 1, yp_SLICE_DEFAULT, &exc), ==, 1);
-    assert_ssizeC_exc(any_findC5(self, items[1], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
-    assert_not_found_exc(any_findC5(self, items[2], yp_SLICE_DEFAULT, 2, &exc));
-    assert_not_found_exc(any_findC5(self, items[2], 0, yp_SLICE_DEFAULT, &exc));
-    assert_not_found_exc(any_findC5(self, items[2], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc));
+    assert_ssizeC_exc(any_findC5(sq, items[0], yp_SLICE_DEFAULT, 1, &exc), ==, 0);
+    assert_ssizeC_exc(any_findC5(sq, items[0], 0, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(any_findC5(sq, items[0], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(any_findC5(sq, items[1], yp_SLICE_DEFAULT, 2, &exc), ==, 1);
+    assert_ssizeC_exc(any_findC5(sq, items[1], 1, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(any_findC5(sq, items[1], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_not_found_exc(any_findC5(sq, items[2], yp_SLICE_DEFAULT, 2, &exc));
+    assert_not_found_exc(any_findC5(sq, items[2], 0, yp_SLICE_DEFAULT, &exc));
+    assert_not_found_exc(any_findC5(sq, items[2], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc));
 
     // yp_SLICE_LAST.
-    assert_not_found_exc(any_findC5(self, items[0], yp_SLICE_LAST, 2, &exc));
-    assert_ssizeC_exc(any_findC5(self, items[0], 0, yp_SLICE_LAST, &exc), ==, 0);
-    assert_not_found_exc(any_findC5(self, items[0], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
-    assert_not_found_exc(any_findC5(self, items[1], yp_SLICE_LAST, 2, &exc));
-    assert_ssizeC_exc(any_findC5(self, items[1], 1, yp_SLICE_LAST, &exc), ==, 1);
-    assert_not_found_exc(any_findC5(self, items[1], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
-    assert_not_found_exc(any_findC5(self, items[2], yp_SLICE_LAST, 2, &exc));
-    assert_not_found_exc(any_findC5(self, items[2], 0, yp_SLICE_LAST, &exc));
-    assert_not_found_exc(any_findC5(self, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
+    assert_not_found_exc(any_findC5(sq, items[0], yp_SLICE_LAST, 2, &exc));
+    assert_ssizeC_exc(any_findC5(sq, items[0], 0, yp_SLICE_LAST, &exc), ==, 0);
+    assert_not_found_exc(any_findC5(sq, items[0], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
+    assert_not_found_exc(any_findC5(sq, items[1], yp_SLICE_LAST, 2, &exc));
+    assert_ssizeC_exc(any_findC5(sq, items[1], 1, yp_SLICE_LAST, &exc), ==, 1);
+    assert_not_found_exc(any_findC5(sq, items[1], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
+    assert_not_found_exc(any_findC5(sq, items[2], yp_SLICE_LAST, 2, &exc));
+    assert_not_found_exc(any_findC5(sq, items[2], 0, yp_SLICE_LAST, &exc));
+    assert_not_found_exc(any_findC5(sq, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
 
     // If multiples, which one is found depends on the direction. Recall patterned sequences like
     // range don't store duplicates.
@@ -654,7 +682,7 @@ static MunitResult _test_findC(fixture_type_t *type,
 #undef assert_not_found_exc
 
     obj_array_decref(items);
-    yp_decrefN(N(self, empty));
+    yp_decrefN(N(sq, empty));
     return MUNIT_OK;
 }
 
@@ -682,42 +710,42 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
 {
     fixture_type_t *type = fixture->type;
     ypObject       *items[3];
-    ypObject       *self;
+    ypObject       *sq;
     ypObject       *empty = type->newN(0);
     obj_array_fill(items, type->rand_items);
-    self = type->newN(N(items[0], items[1]));
+    sq = type->newN(N(items[0], items[1]));
 
     // Basic count.
-    assert_ssizeC_exc(yp_countC(self, items[0], &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC(self, items[1], &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC(sq, items[0], &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC(sq, items[1], &exc), ==, 1);
 
     // Not in sequence.
-    assert_ssizeC_exc(yp_countC(self, items[2], &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC(sq, items[2], &exc), ==, 0);
 
-    // Empty self.
+    // Empty sq.
     assert_ssizeC_exc(yp_countC(empty, items[0], &exc), ==, 0);
 
     // Basic slice.
-    assert_ssizeC_exc(yp_countC5(self, items[0], 0, 1, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[0], 1, 2, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[1], 0, 1, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[1], 1, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], 0, 1, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], 1, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], 0, 1, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], 1, 2, &exc), ==, 1);
 
     // Negative indicies.
-    assert_ssizeC_exc(yp_countC5(self, items[0], -2, -1, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[0], -1, 2, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[1], -2, -1, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[1], -1, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], -2, -1, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], -1, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], -2, -1, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], -1, 2, &exc), ==, 1);
 
     // Total slice.
-    assert_ssizeC_exc(yp_countC5(self, items[0], 0, 2, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[1], 0, 2, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[2], 0, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], 0, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], 0, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[2], 0, 2, &exc), ==, 0);
 
     // Total slice, negative indicies.
-    assert_ssizeC_exc(yp_countC5(self, items[0], -2, 2, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[1], -2, 2, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[2], -2, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], -2, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], -2, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[2], -2, 2, &exc), ==, 0);
 
     // Empty slices.
     {
@@ -733,33 +761,33 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
-            assert_ssizeC_exc(yp_countC5(self, items[0], args.start, args.stop, &exc), ==, 0);
-            assert_ssizeC_exc(yp_countC5(self, items[1], args.start, args.stop, &exc), ==, 0);
-            assert_ssizeC_exc(yp_countC5(self, items[2], args.start, args.stop, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(sq, items[0], args.start, args.stop, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(sq, items[1], args.start, args.stop, &exc), ==, 0);
+            assert_ssizeC_exc(yp_countC5(sq, items[2], args.start, args.stop, &exc), ==, 0);
         }
     }
 
     // yp_SLICE_DEFAULT.
-    assert_ssizeC_exc(yp_countC5(self, items[0], yp_SLICE_DEFAULT, 1, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[0], 1, yp_SLICE_DEFAULT, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[0], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[1], yp_SLICE_DEFAULT, 2, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[1], 1, yp_SLICE_DEFAULT, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[1], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[2], yp_SLICE_DEFAULT, 2, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[2], 0, yp_SLICE_DEFAULT, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[2], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], yp_SLICE_DEFAULT, 1, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], 1, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], yp_SLICE_DEFAULT, 2, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], 1, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[2], yp_SLICE_DEFAULT, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[2], 0, yp_SLICE_DEFAULT, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[2], yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, &exc), ==, 0);
 
     // yp_SLICE_LAST.
-    assert_ssizeC_exc(yp_countC5(self, items[0], yp_SLICE_LAST, 2, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[0], 0, yp_SLICE_LAST, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[0], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[1], yp_SLICE_LAST, 2, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[1], 1, yp_SLICE_LAST, &exc), ==, 1);
-    assert_ssizeC_exc(yp_countC5(self, items[1], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[2], yp_SLICE_LAST, 2, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[2], 0, yp_SLICE_LAST, &exc), ==, 0);
-    assert_ssizeC_exc(yp_countC5(self, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], yp_SLICE_LAST, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], 0, yp_SLICE_LAST, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[0], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], yp_SLICE_LAST, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], 1, yp_SLICE_LAST, &exc), ==, 1);
+    assert_ssizeC_exc(yp_countC5(sq, items[1], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[2], yp_SLICE_LAST, 2, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[2], 0, yp_SLICE_LAST, &exc), ==, 0);
+    assert_ssizeC_exc(yp_countC5(sq, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc), ==, 0);
 
     // Recall patterned sequences like range don't store duplicates.
     if (!type->is_patterned) {
@@ -799,7 +827,7 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(self, empty));
+    yp_decrefN(N(sq, empty));
     return MUNIT_OK;
 }
 
@@ -810,43 +838,43 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
 
     // Immutables don't support setindex.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(self, 0, items[2], &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setindexC(sq, 0, items[2], &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic index.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setindexC(self, 0, items[2], &exc));
-        assert_sequence(self, items[2], items[1]);
-        assert_not_raises_exc(yp_setindexC(self, 1, items[3], &exc));
-        assert_sequence(self, items[2], items[3]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_setindexC(sq, 0, items[2], &exc));
+        assert_sequence(sq, items[2], items[1]);
+        assert_not_raises_exc(yp_setindexC(sq, 1, items[3], &exc));
+        assert_sequence(sq, items[2], items[3]);
+        yp_decref(sq);
     }
 
     // Negative index.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setindexC(self, -1, items[2], &exc));
-        assert_sequence(self, items[0], items[2]);
-        assert_not_raises_exc(yp_setindexC(self, -2, items[3], &exc));
-        assert_sequence(self, items[3], items[2]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_setindexC(sq, -1, items[2], &exc));
+        assert_sequence(sq, items[0], items[2]);
+        assert_not_raises_exc(yp_setindexC(sq, -2, items[3], &exc));
+        assert_sequence(sq, items[3], items[2]);
+        yp_decref(sq);
     }
 
     // Out of bounds.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(self, 2, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setindexC(self, -3, items[3], &exc), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setindexC(sq, 2, items[2], &exc), yp_IndexError);
+        assert_raises_exc(yp_setindexC(sq, -3, items[3], &exc), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
-    // Empty self.
+    // Empty sq.
     {
         ypObject *empty = type->newN(0);
         assert_raises_exc(yp_setindexC(empty, 0, items[2], &exc), yp_IndexError);
@@ -857,11 +885,11 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(self, yp_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setindexC(self, yp_SLICE_LAST, items[3], &exc), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setindexC(sq, yp_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
+        assert_raises_exc(yp_setindexC(sq, yp_SLICE_LAST, items[3], &exc), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -872,71 +900,72 @@ tear_down:
 static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
+    ypObject        *int_1 = yp_intC(1);
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *items[] = obj_array_init(11, type->rand_item());
 
     // Immutables don't support setslice.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *two = type->newN(N(items[2]));
-        assert_raises_exc(yp_setsliceC6(self, 0, 1, 1, two, &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self, two));
+        assert_raises_exc(yp_setsliceC6(sq, 0, 1, 1, two, &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, two));
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic slice.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *two = (*x_type)->newN(N(items[2]));
         ypObject *three = (*x_type)->newN(N(items[3]));
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 1, 1, two, &exc));
-        assert_sequence(self, items[2], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 1, 2, 1, three, &exc));
-        assert_sequence(self, items[2], items[3]);
-        yp_decrefN(N(self, two, three));
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 1, 1, two, &exc));
+        assert_sequence(sq, items[2], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, 2, 1, three, &exc));
+        assert_sequence(sq, items[2], items[3]);
+        yp_decrefN(N(sq, two, three));
     }
 
     // Negative step.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *two = (*x_type)->newN(N(items[2]));
         ypObject *three = (*x_type)->newN(N(items[3]));
-        assert_not_raises_exc(yp_setsliceC6(self, -1, -2, -1, two, &exc));
-        assert_sequence(self, items[0], items[2]);
-        assert_not_raises_exc(yp_setsliceC6(self, -2, -3, -1, three, &exc));
-        assert_sequence(self, items[3], items[2]);
-        yp_decrefN(N(self, two, three));
+        assert_not_raises_exc(yp_setsliceC6(sq, -1, -2, -1, two, &exc));
+        assert_sequence(sq, items[0], items[2]);
+        assert_not_raises_exc(yp_setsliceC6(sq, -2, -3, -1, three, &exc));
+        assert_sequence(sq, items[3], items[2]);
+        yp_decrefN(N(sq, two, three));
     }
 
     // Total slice, forward and backward.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *four_five = (*x_type)->newN(N(items[4], items[5]));
         ypObject *six_seven = (*x_type)->newN(N(items[6], items[7]));
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 2, 1, four_five, &exc));
-        assert_sequence(self, items[4], items[5]);
-        assert_not_raises_exc(yp_setsliceC6(self, -1, -3, -1, six_seven, &exc));
-        assert_sequence(self, items[7], items[6]);
-        yp_decrefN(N(self, four_five, six_seven));
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 2, 1, four_five, &exc));
+        assert_sequence(sq, items[4], items[5]);
+        assert_not_raises_exc(yp_setsliceC6(sq, -1, -3, -1, six_seven, &exc));
+        assert_sequence(sq, items[7], items[6]);
+        yp_decrefN(N(sq, four_five, six_seven));
     }
 
     // Step of 2, -2.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1], items[2], items[3], items[4]));
+        ypObject *sq = type->newN(N(items[0], items[1], items[2], items[3], items[4]));
         ypObject *five_six_seven = (*x_type)->newN(N(items[5], items[6], items[7]));
         ypObject *eight_nine_ten = (*x_type)->newN(N(items[8], items[9], items[10]));
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 5, 2, five_six_seven, &exc));
-        assert_sequence(self, items[5], items[1], items[6], items[3], items[7]);
-        assert_not_raises_exc(yp_setsliceC6(self, -1, -6, -2, eight_nine_ten, &exc));
-        assert_sequence(self, items[10], items[1], items[9], items[3], items[8]);
-        yp_decrefN(N(self, five_six_seven, eight_nine_ten));
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 5, 2, five_six_seven, &exc));
+        assert_sequence(sq, items[5], items[1], items[6], items[3], items[7]);
+        assert_not_raises_exc(yp_setsliceC6(sq, -1, -6, -2, eight_nine_ten, &exc));
+        assert_sequence(sq, items[10], items[1], items[9], items[3], items[8]);
+        yp_decrefN(N(sq, five_six_seven, eight_nine_ten));
     }
 
     // Empty slices.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject    *self = type->newN(N(items[0], items[1]));
+        ypObject    *sq = type->newN(N(items[0], items[1]));
         ypObject    *empty = (*x_type)->newN(0);
         slice_args_t slices[] = {
                 {0, 0, 1},      // typical empty slice
@@ -951,75 +980,74 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
-            assert_not_raises_exc(
-                    yp_setsliceC6(self, args.start, args.stop, args.step, empty, &exc));
-            assert_sequence(self, items[0], items[1]);
+            assert_not_raises_exc(yp_setsliceC6(sq, args.start, args.stop, args.step, empty, &exc));
+            assert_sequence(sq, items[0], items[1]);
         }
-        yp_decrefN(N(self, empty));
+        yp_decrefN(N(sq, empty));
     }
 
     // yp_SLICE_DEFAULT.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *two = (*x_type)->newN(N(items[2]));
         ypObject *three = (*x_type)->newN(N(items[3]));
         ypObject *four_five = (*x_type)->newN(N(items[4], items[5]));
         ypObject *six = (*x_type)->newN(N(items[6]));
         ypObject *seven = (*x_type)->newN(N(items[7]));
         ypObject *eight_nine = (*x_type)->newN(N(items[8], items[9]));
-        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_DEFAULT, 1, 1, two, &exc));
-        assert_sequence(self, items[2], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 1, yp_SLICE_DEFAULT, 1, three, &exc));
-        assert_sequence(self, items[2], items[3]);
+        assert_not_raises_exc(yp_setsliceC6(sq, yp_SLICE_DEFAULT, 1, 1, two, &exc));
+        assert_sequence(sq, items[2], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, yp_SLICE_DEFAULT, 1, three, &exc));
+        assert_sequence(sq, items[2], items[3]);
         assert_not_raises_exc(
-                yp_setsliceC6(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1, four_five, &exc));
-        assert_sequence(self, items[4], items[5]);
-        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_DEFAULT, -2, -1, six, &exc));
-        assert_sequence(self, items[4], items[6]);
-        assert_not_raises_exc(yp_setsliceC6(self, -2, yp_SLICE_DEFAULT, -1, seven, &exc));
-        assert_sequence(self, items[7], items[6]);
+                yp_setsliceC6(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 1, four_five, &exc));
+        assert_sequence(sq, items[4], items[5]);
+        assert_not_raises_exc(yp_setsliceC6(sq, yp_SLICE_DEFAULT, -2, -1, six, &exc));
+        assert_sequence(sq, items[4], items[6]);
+        assert_not_raises_exc(yp_setsliceC6(sq, -2, yp_SLICE_DEFAULT, -1, seven, &exc));
+        assert_sequence(sq, items[7], items[6]);
         assert_not_raises_exc(
-                yp_setsliceC6(self, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1, eight_nine, &exc));
-        assert_sequence(self, items[9], items[8]);
-        yp_decrefN(N(self, two, three, four_five, six, seven, eight_nine));
+                yp_setsliceC6(sq, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, -1, eight_nine, &exc));
+        assert_sequence(sq, items[9], items[8]);
+        yp_decrefN(N(sq, two, three, four_five, six, seven, eight_nine));
     }
 
     // yp_SLICE_LAST.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *empty = (*x_type)->newN(0);
         ypObject *two = (*x_type)->newN(N(items[2]));
         ypObject *three_four = (*x_type)->newN(N(items[3], items[4]));
-        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_LAST, 2, 1, empty, &exc));
-        assert_sequence(self, items[0], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 1, yp_SLICE_LAST, 1, two, &exc));
-        assert_sequence(self, items[0], items[2]);
-        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_LAST, yp_SLICE_LAST, 1, empty, &exc));
-        assert_sequence(self, items[0], items[2]);
-        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_LAST, -3, -1, three_four, &exc));
-        assert_sequence(self, items[4], items[3]);
-        assert_not_raises_exc(yp_setsliceC6(self, -1, yp_SLICE_LAST, -1, empty, &exc));
-        assert_sequence(self, items[4], items[3]);
-        assert_not_raises_exc(yp_setsliceC6(self, yp_SLICE_LAST, yp_SLICE_LAST, -1, empty, &exc));
-        assert_sequence(self, items[4], items[3]);
-        yp_decrefN(N(self, empty, two, three_four));
+        assert_not_raises_exc(yp_setsliceC6(sq, yp_SLICE_LAST, 2, 1, empty, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, yp_SLICE_LAST, 1, two, &exc));
+        assert_sequence(sq, items[0], items[2]);
+        assert_not_raises_exc(yp_setsliceC6(sq, yp_SLICE_LAST, yp_SLICE_LAST, 1, empty, &exc));
+        assert_sequence(sq, items[0], items[2]);
+        assert_not_raises_exc(yp_setsliceC6(sq, yp_SLICE_LAST, -3, -1, three_four, &exc));
+        assert_sequence(sq, items[4], items[3]);
+        assert_not_raises_exc(yp_setsliceC6(sq, -1, yp_SLICE_LAST, -1, empty, &exc));
+        assert_sequence(sq, items[4], items[3]);
+        assert_not_raises_exc(yp_setsliceC6(sq, yp_SLICE_LAST, yp_SLICE_LAST, -1, empty, &exc));
+        assert_sequence(sq, items[4], items[3]);
+        yp_decrefN(N(sq, empty, two, three_four));
     }
 
     // Invalid slices.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *empty = (*x_type)->newN(0);
-        assert_raises_exc(yp_setsliceC6(self, 0, 1, 0, empty, &exc), yp_ValueError);  // step==0
-        assert_sequence(self, items[0], items[1]);
-        assert_raises_exc(yp_setsliceC6(self, 0, 1, -yp_SSIZE_T_MAX - 1, empty, &exc),
+        assert_raises_exc(yp_setsliceC6(sq, 0, 1, 0, empty, &exc), yp_ValueError);  // step==0
+        assert_sequence(sq, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(sq, 0, 1, -yp_SSIZE_T_MAX - 1, empty, &exc),
                 yp_SystemLimitationError);  // too-small step
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self, empty));
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, empty));
     }
 
     // Regular slices (step==1) can grow and shrink the sequence.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(0);
+        ypObject *sq = type->newN(0);
         ypObject *empty = (*x_type)->newN(0);
         ypObject *zero_one = (*x_type)->newN(N(items[0], items[1]));
         ypObject *two = (*x_type)->newN(N(items[2]));
@@ -1027,108 +1055,108 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         ypObject *four_five = (*x_type)->newN(N(items[4], items[5]));
         ypObject *six_seven_eight = (*x_type)->newN(N(items[6], items[7], items[8]));
         ypObject *nine = (*x_type)->newN(N(items[9]));
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 0, 1, zero_one, &exc));
-        assert_sequence(self, items[0], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 0, 1, empty, &exc));
-        assert_sequence(self, items[0], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 0, 1, two, &exc));
-        assert_sequence(self, items[2], items[0], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 1, 2, 1, empty, &exc));
-        assert_sequence(self, items[2], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 1, 2, 1, three, &exc));
-        assert_sequence(self, items[2], items[3]);
-        assert_not_raises_exc(yp_setsliceC6(self, 1, 2, 1, four_five, &exc));
-        assert_sequence(self, items[2], items[4], items[5]);
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 3, 1, six_seven_eight, &exc));
-        assert_sequence(self, items[6], items[7], items[8]);
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 3, 1, nine, &exc));
-        assert_sequence(self, items[9]);
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 1, 1, empty, &exc));
-        assert_len(self, 0);
-        yp_decrefN(N(self, empty, zero_one, two, three, four_five, six_seven_eight, nine));
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 0, 1, zero_one, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 0, 1, empty, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 0, 1, two, &exc));
+        assert_sequence(sq, items[2], items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, 2, 1, empty, &exc));
+        assert_sequence(sq, items[2], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, 2, 1, three, &exc));
+        assert_sequence(sq, items[2], items[3]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, 2, 1, four_five, &exc));
+        assert_sequence(sq, items[2], items[4], items[5]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 3, 1, six_seven_eight, &exc));
+        assert_sequence(sq, items[6], items[7], items[8]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 3, 1, nine, &exc));
+        assert_sequence(sq, items[9]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 1, 1, empty, &exc));
+        assert_len(sq, 0);
+        yp_decrefN(N(sq, empty, zero_one, two, three, four_five, six_seven_eight, nine));
     }
 
     // Extended slices (step!=1) can neither grow nor shrink the sequence.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *empty = (*x_type)->newN(0);
         ypObject *two = (*x_type)->newN(N(items[2]));
         ypObject *three_four = (*x_type)->newN(N(items[3], items[4]));
-        assert_raises_exc(yp_setsliceC6(self, 0, 0, 2, two, &exc), yp_ValueError);
-        assert_sequence(self, items[0], items[1]);
-        assert_raises_exc(yp_setsliceC6(self, -1, -2, -1, empty, &exc), yp_ValueError);
-        assert_sequence(self, items[0], items[1]);
-        assert_raises_exc(yp_setsliceC6(self, -1, -2, -1, three_four, &exc), yp_ValueError);
-        assert_sequence(self, items[0], items[1]);
-        assert_raises_exc(yp_setsliceC6(self, -1, -3, -1, empty, &exc), yp_ValueError);
-        assert_sequence(self, items[0], items[1]);
-        assert_raises_exc(yp_setsliceC6(self, -1, -3, -1, two, &exc), yp_ValueError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self, empty, two, three_four));
+        assert_raises_exc(yp_setsliceC6(sq, 0, 0, 2, two, &exc), yp_ValueError);
+        assert_sequence(sq, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(sq, -1, -2, -1, empty, &exc), yp_ValueError);
+        assert_sequence(sq, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(sq, -1, -2, -1, three_four, &exc), yp_ValueError);
+        assert_sequence(sq, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(sq, -1, -3, -1, empty, &exc), yp_ValueError);
+        assert_sequence(sq, items[0], items[1]);
+        assert_raises_exc(yp_setsliceC6(sq, -1, -3, -1, two, &exc), yp_ValueError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, empty, two, three_four));
     }
 
-    // x can be self.
+    // x can be sq.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 0, 1, self, &exc));
-        assert_sequence(self, items[0], items[1], items[0], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 1, 4, 1, self, &exc));
-        assert_sequence(self, items[0], items[0], items[1], items[0], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 5, 1, self, &exc));
-        assert_sequence(self, items[0], items[0], items[1], items[0], items[1]);
-        assert_not_raises_exc(yp_setsliceC6(self, -1, -6, -1, self, &exc));
-        assert_sequence(self, items[1], items[0], items[1], items[0], items[0]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 0, 1, sq, &exc));
+        assert_sequence(sq, items[0], items[1], items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, 4, 1, sq, &exc));
+        assert_sequence(sq, items[0], items[0], items[1], items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 5, 1, sq, &exc));
+        assert_sequence(sq, items[0], items[0], items[1], items[0], items[1]);
+        assert_not_raises_exc(yp_setsliceC6(sq, -1, -6, -1, sq, &exc));
+        assert_sequence(sq, items[1], items[0], items[1], items[0], items[0]);
+        yp_decref(sq);
     }
 
     // x is an iterator that fails at the start.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises_exc(yp_setsliceC6(self, 0, 2, 1, x, &exc), yp_SyntaxError);
+        assert_raises_exc(yp_setsliceC6(sq, 0, 2, 1, x, &exc), yp_SyntaxError);
         // In setslice, iterators must be converted to sequences _first_, to validate slicelength.
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is an iterator that fails mid-way.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises_exc(yp_setsliceC6(self, 0, 2, 1, x, &exc), yp_SyntaxError);
+        assert_raises_exc(yp_setsliceC6(sq, 0, 2, 1, x, &exc), yp_SyntaxError);
         // In setslice, iterators must be converted to sequences _first_, to validate slicelength.
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is an iterator with a too-small length_hint.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 2, 1, x, &exc));
-        assert_sequence(self, items[2], items[3]);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 2, 1, x, &exc));
+        assert_sequence(sq, items[2], items[3]);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is an iterator with a too-large length_hint.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_not_raises_exc(yp_setsliceC6(self, 0, 2, 1, x, &exc));
-        assert_sequence(self, items[2], items[3]);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_not_raises_exc(yp_setsliceC6(sq, 0, 2, 1, x, &exc));
+        assert_sequence(sq, items[2], items[3]);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is not an iterable.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setsliceC6(self, 0, 2, 1, int_1, &exc), yp_TypeError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self));
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setsliceC6(sq, 0, 2, 1, int_1, &exc), yp_TypeError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq));
     }
 
 tear_down:
@@ -1139,47 +1167,56 @@ tear_down:
 static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_neg_1 = yp_intC(-1);
+    ypObject       *int_neg_2 = yp_intC(-2);
+    ypObject       *int_neg_3 = yp_intC(-3);
+    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
+    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
+    ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[] = obj_array_init(4, type->rand_item());
 
     // Immutables don't support setitem.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(self, int_0, items[2], &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setitem(sq, int_0, items[2], &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic index.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setitem(self, int_0, items[2], &exc));
-        assert_sequence(self, items[2], items[1]);
-        assert_not_raises_exc(yp_setitem(self, int_1, items[3], &exc));
-        assert_sequence(self, items[2], items[3]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_setitem(sq, int_0, items[2], &exc));
+        assert_sequence(sq, items[2], items[1]);
+        assert_not_raises_exc(yp_setitem(sq, int_1, items[3], &exc));
+        assert_sequence(sq, items[2], items[3]);
+        yp_decref(sq);
     }
 
     // Negative index.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_setitem(self, int_neg_1, items[2], &exc));
-        assert_sequence(self, items[0], items[2]);
-        assert_not_raises_exc(yp_setitem(self, int_neg_2, items[3], &exc));
-        assert_sequence(self, items[3], items[2]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_setitem(sq, int_neg_1, items[2], &exc));
+        assert_sequence(sq, items[0], items[2]);
+        assert_not_raises_exc(yp_setitem(sq, int_neg_2, items[3], &exc));
+        assert_sequence(sq, items[3], items[2]);
+        yp_decref(sq);
     }
 
     // Out of bounds.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(self, int_2, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setitem(self, int_neg_3, items[3], &exc), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setitem(sq, int_2, items[2], &exc), yp_IndexError);
+        assert_raises_exc(yp_setitem(sq, int_neg_3, items[3], &exc), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
-    // Empty self.
+    // Empty sq.
     {
         ypObject *empty = type->newN(0);
         assert_raises_exc(yp_setitem(empty, int_0, items[2], &exc), yp_IndexError);
@@ -1190,15 +1227,25 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(self, int_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
-        assert_raises_exc(yp_setitem(self, int_SLICE_LAST, items[3], &exc), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setitem(sq, int_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
+        assert_raises_exc(yp_setitem(sq, int_SLICE_LAST, items[3], &exc), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
+    }
+
+    // intstore
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_setitem(sq, intstore_0, items[2], &exc));
+        assert_sequence(sq, items[2], items[1]);
+        yp_decref(sq);
     }
 
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+            int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
 
@@ -1209,43 +1256,43 @@ static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixt
 
     // Immutables don't support delindex.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delindexC(self, 0, &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delindexC(sq, 0, &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic index.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_delindexC(self, 0, &exc));
-        assert_sequence(self, items[1], items[2]);
-        assert_not_raises_exc(yp_delindexC(self, 1, &exc));
-        assert_sequence(self, items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_delindexC(sq, 0, &exc));
+        assert_sequence(sq, items[1], items[2]);
+        assert_not_raises_exc(yp_delindexC(sq, 1, &exc));
+        assert_sequence(sq, items[1]);
+        yp_decref(sq);
     }
 
     // Negative index.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_delindexC(self, -1, &exc));
-        assert_sequence(self, items[0], items[1]);
-        assert_not_raises_exc(yp_delindexC(self, -2, &exc));
-        assert_sequence(self, items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_delindexC(sq, -1, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        assert_not_raises_exc(yp_delindexC(sq, -2, &exc));
+        assert_sequence(sq, items[1]);
+        yp_decref(sq);
     }
 
     // Out of bounds.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delindexC(self, 2, &exc), yp_IndexError);
-        assert_raises_exc(yp_delindexC(self, -3, &exc), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delindexC(sq, 2, &exc), yp_IndexError);
+        assert_raises_exc(yp_delindexC(sq, -3, &exc), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
-    // Empty self.
+    // Empty sq.
     {
         ypObject *empty = type->newN(0);
         assert_raises_exc(yp_delindexC(empty, 0, &exc), yp_IndexError);
@@ -1256,11 +1303,11 @@ static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixt
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delindexC(self, yp_SLICE_DEFAULT, &exc), yp_IndexError);
-        assert_raises_exc(yp_delindexC(self, yp_SLICE_LAST, &exc), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delindexC(sq, yp_SLICE_DEFAULT, &exc), yp_IndexError);
+        assert_raises_exc(yp_delindexC(sq, yp_SLICE_LAST, &exc), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -1275,31 +1322,31 @@ static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixt
 
     // Immutables don't support delslice.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delsliceC5(self, 0, 1, 1, &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delsliceC5(sq, 0, 1, 1, &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic slice.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_delsliceC5(self, 0, 1, 1, &exc));
-        assert_sequence(self, items[1], items[2]);
-        assert_not_raises_exc(yp_delsliceC5(self, 1, 2, 1, &exc));
-        assert_sequence(self, items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_delsliceC5(sq, 0, 1, 1, &exc));
+        assert_sequence(sq, items[1], items[2]);
+        assert_not_raises_exc(yp_delsliceC5(sq, 1, 2, 1, &exc));
+        assert_sequence(sq, items[1]);
+        yp_decref(sq);
     }
 
     // Negative step.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_delsliceC5(self, -1, -2, -1, &exc));
-        assert_sequence(self, items[0], items[1]);
-        assert_not_raises_exc(yp_delsliceC5(self, -2, -3, -1, &exc));
-        assert_sequence(self, items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_delsliceC5(sq, -1, -2, -1, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        assert_not_raises_exc(yp_delsliceC5(sq, -2, -3, -1, &exc));
+        assert_sequence(sq, items[1]);
+        yp_decref(sq);
     }
 
     // Total slice, forward and backward.
@@ -1315,18 +1362,18 @@ static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixt
 
     // Step of 2, -2.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
+        ypObject *sq = type->newN(N(items[0], items[1], items[2], items[3], items[4], items[5],
                 items[6], items[7], items[8]));
-        assert_not_raises_exc(yp_delsliceC5(self, 0, 9, 2, &exc));
-        assert_sequence(self, items[1], items[3], items[5], items[7]);
-        assert_not_raises_exc(yp_delsliceC5(self, -1, -5, -2, &exc));
-        assert_sequence(self, items[1], items[5]);
-        yp_decref(self);
+        assert_not_raises_exc(yp_delsliceC5(sq, 0, 9, 2, &exc));
+        assert_sequence(sq, items[1], items[3], items[5], items[7]);
+        assert_not_raises_exc(yp_delsliceC5(sq, -1, -5, -2, &exc));
+        assert_sequence(sq, items[1], items[5]);
+        yp_decref(sq);
     }
 
     // Empty slices.
     {
-        ypObject    *self = type->newN(N(items[0], items[1]));
+        ypObject    *sq = type->newN(N(items[0], items[1]));
         slice_args_t slices[] = {
                 {0, 0, 1},      // typical empty slice
                 {5, 99, 1},     // i>=len(s) and k>0 (regardless of j)
@@ -1340,10 +1387,10 @@ static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixt
         yp_ssize_t i;
         for (i = 0; i < yp_lengthof_array(slices); i++) {
             slice_args_t args = slices[i];
-            assert_not_raises_exc(yp_delsliceC5(self, args.start, args.stop, args.step, &exc));
-            assert_sequence(self, items[0], items[1]);
+            assert_not_raises_exc(yp_delsliceC5(sq, args.start, args.stop, args.step, &exc));
+            assert_sequence(sq, items[0], items[1]);
         }
-        yp_decref(self);
+        yp_decref(sq);
     }
 
     // yp_SLICE_DEFAULT.
@@ -1386,13 +1433,13 @@ static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixt
 
     // Invalid slices.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delsliceC5(self, 0, 1, 0, &exc), yp_ValueError);  // step==0
-        assert_sequence(self, items[0], items[1]);
-        assert_raises_exc(yp_delsliceC5(self, 0, 1, -yp_SSIZE_T_MAX - 1, &exc),
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delsliceC5(sq, 0, 1, 0, &exc), yp_ValueError);  // step==0
+        assert_sequence(sq, items[0], items[1]);
+        assert_raises_exc(yp_delsliceC5(sq, 0, 1, -yp_SSIZE_T_MAX - 1, &exc),
                 yp_SystemLimitationError);  // too-small step
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -1403,47 +1450,56 @@ tear_down:
 static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_neg_1 = yp_intC(-1);
+    ypObject       *int_neg_2 = yp_intC(-2);
+    ypObject       *int_neg_3 = yp_intC(-3);
+    ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
+    ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
+    ypObject       *intstore_0 = yp_intstoreC(0);
     ypObject       *items[] = obj_array_init(4, type->rand_item());
 
     // Immutables don't support delitem.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delitem(self, int_0, &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delitem(sq, int_0, &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic index.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_delitem(self, int_0, &exc));
-        assert_sequence(self, items[1], items[2]);
-        assert_not_raises_exc(yp_delitem(self, int_1, &exc));
-        assert_sequence(self, items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_delitem(sq, int_0, &exc));
+        assert_sequence(sq, items[1], items[2]);
+        assert_not_raises_exc(yp_delitem(sq, int_1, &exc));
+        assert_sequence(sq, items[1]);
+        yp_decref(sq);
     }
 
     // Negative index.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_delitem(self, int_neg_1, &exc));
-        assert_sequence(self, items[0], items[1]);
-        assert_not_raises_exc(yp_delitem(self, int_neg_2, &exc));
-        assert_sequence(self, items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_delitem(sq, int_neg_1, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        assert_not_raises_exc(yp_delitem(sq, int_neg_2, &exc));
+        assert_sequence(sq, items[1]);
+        yp_decref(sq);
     }
 
     // Out of bounds.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delitem(self, int_2, &exc), yp_IndexError);
-        assert_raises_exc(yp_delitem(self, int_neg_3, &exc), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delitem(sq, int_2, &exc), yp_IndexError);
+        assert_raises_exc(yp_delitem(sq, int_neg_3, &exc), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
-    // Empty self.
+    // Empty sq.
     {
         ypObject *empty = type->newN(0);
         assert_raises_exc(yp_delitem(empty, int_0, &exc), yp_IndexError);
@@ -1454,15 +1510,25 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delitem(self, int_SLICE_DEFAULT, &exc), yp_IndexError);
-        assert_raises_exc(yp_delitem(self, int_SLICE_LAST, &exc), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delitem(sq, int_SLICE_DEFAULT, &exc), yp_IndexError);
+        assert_raises_exc(yp_delitem(sq, int_SLICE_LAST, &exc), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
+    }
+
+    // intstore.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_delitem(sq, intstore_0, &exc));
+        assert_sequence(sq, items[1], items[2]);
+        yp_decref(sq);
     }
 
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+            int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
 
@@ -1474,27 +1540,27 @@ static MunitResult _test_appendC(
 
     // Immutables don't support append.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(any_append(self, items[2], &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(any_append(sq, items[2], &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic append.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(any_append(self, items[2], &exc));
-        assert_sequence(self, items[0], items[1], items[2]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(any_append(sq, items[2], &exc));
+        assert_sequence(sq, items[0], items[1], items[2]);
+        yp_decref(sq);
     }
 
     // Self is empty.
     {
-        ypObject *self = type->newN(0);
-        assert_not_raises_exc(any_append(self, items[2], &exc));
-        assert_sequence(self, items[2]);
-        yp_decref(self);
+        ypObject *sq = type->newN(0);
+        assert_not_raises_exc(any_append(sq, items[2], &exc));
+        assert_sequence(sq, items[2]);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -1517,113 +1583,115 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
     ypObject        *items[] = obj_array_init(4, type->rand_item());
 
     // Immutables don't support extend.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *two = type->newN(N(items[2]));
-        assert_raises_exc(yp_extend(self, two, &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self, two));
+        assert_raises_exc(yp_extend(sq, two, &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, two));
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic extend.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[2], items[3]));
-        assert_not_raises_exc(yp_extend(self, x, &exc));
-        assert_sequence(self, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(self, x));
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+        assert_sequence(sq, items[0], items[1], items[2], items[3]);
+        yp_decrefN(N(sq, x));
     }
 
-    // self is empty.
+    // sq is empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(0);
+        ypObject *sq = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[2], items[3]));
-        assert_not_raises_exc(yp_extend(self, x, &exc));
-        assert_sequence(self, items[2], items[3]);
-        yp_decrefN(N(self, x));
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+        assert_sequence(sq, items[2], items[3]);
+        yp_decrefN(N(sq, x));
     }
 
     // x is empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
-        assert_not_raises_exc(yp_extend(self, x, &exc));
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self, x));
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, x));
     }
 
     // Both are empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(0);
+        ypObject *sq = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
-        assert_not_raises_exc(yp_extend(self, x, &exc));
-        assert_len(self, 0);
-        yp_decrefN(N(self, x));
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+        assert_len(sq, 0);
+        yp_decrefN(N(sq, x));
     }
 
-    // x can be self.
+    // x can be sq.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_extend(self, self, &exc));
-        assert_sequence(self, items[0], items[1], items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_extend(sq, sq, &exc));
+        assert_sequence(sq, items[0], items[1], items[0], items[1]);
+        yp_decref(sq);
     }
 
     // x is an iterator that fails at the start.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises_exc(yp_extend(self, x, &exc), yp_SyntaxError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_raises_exc(yp_extend(sq, x, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is an iterator that fails mid-way.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises_exc(yp_extend(self, x, &exc), yp_SyntaxError);
-        // In extend, we avoid converting iterator to a sequence by appending directly to self.
-        assert_sequence(self, items[0], items[1], items[2]);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_raises_exc(yp_extend(sq, x, &exc), yp_SyntaxError);
+        // In extend, we avoid converting iterator to a sequence by appending directly to sq.
+        assert_sequence(sq, items[0], items[1], items[2]);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is an iterator with a too-small length_hint.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_not_raises_exc(yp_extend(self, x, &exc));
-        assert_sequence(self, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+        assert_sequence(sq, items[0], items[1], items[2], items[3]);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is an iterator with a too-large length_hint.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
+        ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_not_raises_exc(yp_extend(self, x, &exc));
-        assert_sequence(self, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(self, x_supplier, x));
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+        assert_sequence(sq, items[0], items[1], items[2], items[3]);
+        yp_decrefN(N(sq, x_supplier, x));
     }
 
     // x is not an iterable.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_extend(self, int_1, &exc), yp_TypeError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decrefN(N(self));
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_extend(sq, int_1, &exc), yp_TypeError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq));
     }
 
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(int_1));
     return MUNIT_OK;
 }
 
@@ -1634,61 +1702,61 @@ static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixtu
 
     // Immutables don't support irepeat.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_irepeatC(self, 2, &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_irepeatC(sq, 2, &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic irepeat.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_irepeatC(self, 2, &exc));
-        assert_sequence(self, items[0], items[1], items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_irepeatC(sq, 2, &exc));
+        assert_sequence(sq, items[0], items[1], items[0], items[1]);
+        yp_decref(sq);
     }
 
     // Factor of one.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_irepeatC(self, 1, &exc));
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_irepeatC(sq, 1, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
     // Factor of zero.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_irepeatC(self, 0, &exc));
-        assert_len(self, 0);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_irepeatC(sq, 0, &exc));
+        assert_len(sq, 0);
+        yp_decref(sq);
     }
 
     // Negative factor.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_irepeatC(self, -1, &exc));
-        assert_len(self, 0);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_irepeatC(sq, -1, &exc));
+        assert_len(sq, 0);
+        yp_decref(sq);
     }
 
     // Large factor. (Exercises _ypSequence_repeat_memcpy optimization.).
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_irepeatC(self, 8, &exc));
-        assert_sequence(self, items[0], items[1], items[0], items[1], items[0], items[1], items[0],
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_irepeatC(sq, 8, &exc));
+        assert_sequence(sq, items[0], items[1], items[0], items[1], items[0], items[1], items[0],
                 items[1], items[0], items[1], items[0], items[1], items[0], items[1], items[0],
                 items[1]);
-        yp_decref(self);
+        yp_decref(sq);
     }
 
-    // Empty self.
+    // Empty sq.
     {
-        ypObject *self = type->newN(0);
-        assert_not_raises_exc(yp_irepeatC(self, 2, &exc));
-        assert_len(self, 0);
-        yp_decref(self);
+        ypObject *sq = type->newN(0);
+        assert_not_raises_exc(yp_irepeatC(sq, 2, &exc));
+        assert_len(sq, 0);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -1703,44 +1771,44 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
 
     // Immutables don't support insert.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_insertC(self, 0, items[2], &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_insertC(sq, 0, items[2], &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic insert.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_insertC(self, 0, items[2], &exc));
-        assert_sequence(self, items[2], items[0], items[1]);
-        assert_not_raises_exc(yp_insertC(self, 1, items[3], &exc));
-        assert_sequence(self, items[2], items[3], items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_insertC(sq, 0, items[2], &exc));
+        assert_sequence(sq, items[2], items[0], items[1]);
+        assert_not_raises_exc(yp_insertC(sq, 1, items[3], &exc));
+        assert_sequence(sq, items[2], items[3], items[0], items[1]);
+        yp_decref(sq);
     }
 
     // Negative index.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_insertC(self, -1, items[2], &exc));
-        assert_sequence(self, items[0], items[2], items[1]);
-        assert_not_raises_exc(yp_insertC(self, -2, items[3], &exc));
-        assert_sequence(self, items[0], items[3], items[2], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_insertC(sq, -1, items[2], &exc));
+        assert_sequence(sq, items[0], items[2], items[1]);
+        assert_not_raises_exc(yp_insertC(sq, -2, items[3], &exc));
+        assert_sequence(sq, items[0], items[3], items[2], items[1]);
+        yp_decref(sq);
     }
 
     // "Out of bounds": recall s.insert(i, x) is the same as s[i:i] = [x].
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_insertC(self, 2, items[2], &exc));
-        assert_sequence(self, items[0], items[1], items[2]);
-        assert_not_raises_exc(yp_insertC(self, -4, items[3], &exc));
-        assert_sequence(self, items[3], items[0], items[1], items[2]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_insertC(sq, 2, items[2], &exc));
+        assert_sequence(sq, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_insertC(sq, -4, items[3], &exc));
+        assert_sequence(sq, items[3], items[0], items[1], items[2]);
+        yp_decref(sq);
     }
 
-    // Empty self.
+    // Empty sq.
     {
         ypObject *self1 = type->newN(0);
         ypObject *self2 = type->newN(0);
@@ -1754,18 +1822,18 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
     // yp_SLICE_DEFAULT. Recall in slices that yp_SLICE_DEFAULT is equivalent to None (or omitting)
     // in Python. Since s.insert(None, '') raises TypeError, that seems correct here too.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_insertC(self, yp_SLICE_DEFAULT, items[2], &exc), yp_TypeError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_insertC(sq, yp_SLICE_DEFAULT, items[2], &exc), yp_TypeError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
     // yp_SLICE_LAST.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_insertC(self, yp_SLICE_LAST, items[2], &exc));
-        assert_sequence(self, items[0], items[1], items[2]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_insertC(sq, yp_SLICE_LAST, items[2], &exc));
+        assert_sequence(sq, items[0], items[1], items[2]);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -1780,43 +1848,43 @@ static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixt
 
     // Immutables don't support popindex.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises(yp_popindexC(self, 0), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises(yp_popindexC(sq, 0), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic popindex.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        ead(popped, yp_popindexC(self, 0), assert_obj(popped, eq, items[0]));
-        assert_sequence(self, items[1], items[2]);
-        ead(popped, yp_popindexC(self, 1), assert_obj(popped, eq, items[2]));
-        assert_sequence(self, items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        ead(popped, yp_popindexC(sq, 0), assert_obj(popped, eq, items[0]));
+        assert_sequence(sq, items[1], items[2]);
+        ead(popped, yp_popindexC(sq, 1), assert_obj(popped, eq, items[2]));
+        assert_sequence(sq, items[1]);
+        yp_decref(sq);
     }
 
     // Negative index.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        ead(popped, yp_popindexC(self, -1), assert_obj(popped, eq, items[2]));
-        assert_sequence(self, items[0], items[1]);
-        ead(popped, yp_popindexC(self, -2), assert_obj(popped, eq, items[0]));
-        assert_sequence(self, items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        ead(popped, yp_popindexC(sq, -1), assert_obj(popped, eq, items[2]));
+        assert_sequence(sq, items[0], items[1]);
+        ead(popped, yp_popindexC(sq, -2), assert_obj(popped, eq, items[0]));
+        assert_sequence(sq, items[1]);
+        yp_decref(sq);
     }
 
     // Out of bounds.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises(yp_popindexC(self, 2), yp_IndexError);
-        assert_raises(yp_popindexC(self, -3), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises(yp_popindexC(sq, 2), yp_IndexError);
+        assert_raises(yp_popindexC(sq, -3), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
-    // Empty self.
+    // Empty sq.
     {
         ypObject *empty = type->newN(0);
         assert_raises(yp_popindexC(empty, 0), yp_IndexError);
@@ -1827,11 +1895,11 @@ static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixt
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises(yp_popindexC(self, yp_SLICE_DEFAULT), yp_IndexError);
-        assert_raises(yp_popindexC(self, yp_SLICE_LAST), yp_IndexError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises(yp_popindexC(sq, yp_SLICE_DEFAULT), yp_IndexError);
+        assert_raises(yp_popindexC(sq, yp_SLICE_LAST), yp_IndexError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -1846,29 +1914,29 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
 
     // Immutables don't support pop.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises(yp_pop(self), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises(yp_pop(sq), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic pop.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        ead(popped, yp_pop(self), assert_obj(popped, eq, items[1]));
-        assert_sequence(self, items[0]);
-        ead(popped, yp_pop(self), assert_obj(popped, eq, items[0]));
-        assert_len(self, 0);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        ead(popped, yp_pop(sq), assert_obj(popped, eq, items[1]));
+        assert_sequence(sq, items[0]);
+        ead(popped, yp_pop(sq), assert_obj(popped, eq, items[0]));
+        assert_len(sq, 0);
+        yp_decref(sq);
     }
 
     // Self is empty.
     {
-        ypObject *self = type->newN(0);
-        assert_raises(yp_pop(self), yp_IndexError);
-        assert_len(self, 0);
-        yp_decref(self);
+        ypObject *sq = type->newN(0);
+        assert_raises(yp_pop(sq), yp_IndexError);
+        assert_len(sq, 0);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -1885,10 +1953,10 @@ static MunitResult _test_remove(
 
     // Immutables don't support remove.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(any_remove(self, items[0], &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(any_remove(sq, items[0], &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
@@ -1905,28 +1973,28 @@ static MunitResult _test_remove(
 
     // Basic remove.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(any_remove(self, items[0], &exc));
-        assert_sequence(self, items[1]);
-        assert_not_raises_exc(any_remove(self, items[1], &exc));
-        assert_len(self, 0);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(any_remove(sq, items[0], &exc));
+        assert_sequence(sq, items[1]);
+        assert_not_raises_exc(any_remove(sq, items[1], &exc));
+        assert_len(sq, 0);
+        yp_decref(sq);
     }
 
     // Not in sequence.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_found_exc(any_remove(self, items[2], &exc));
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_found_exc(any_remove(sq, items[2], &exc));
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
-    // Empty self.
+    // Empty sq.
     {
-        ypObject *self = type->newN(0);
-        assert_not_found_exc(any_remove(self, items[2], &exc));
-        assert_len(self, 0);
-        yp_decref(self);
+        ypObject *sq = type->newN(0);
+        assert_not_found_exc(any_remove(sq, items[2], &exc));
+        assert_len(sq, 0);
+        yp_decref(sq);
     }
 
     // If multiples, the first one is the one that's removed. (There is no yp_rremove, yet.)
@@ -1983,47 +2051,47 @@ static MunitResult test_reverse(const MunitParameter params[], fixture_t *fixtur
 
     // Immutables don't support reverse.
     if (!type->is_mutable) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_reverse(self, &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_reverse(sq, &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic reverse.
     {
-        ypObject *self = type->newN(N(items[0], items[1], items[2]));
-        assert_not_raises_exc(yp_reverse(self, &exc));
-        assert_sequence(self, items[2], items[1], items[0]);
-        assert_not_raises_exc(yp_reverse(self, &exc));
-        assert_sequence(self, items[0], items[1], items[2]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_reverse(sq, &exc));
+        assert_sequence(sq, items[2], items[1], items[0]);
+        assert_not_raises_exc(yp_reverse(sq, &exc));
+        assert_sequence(sq, items[0], items[1], items[2]);
+        yp_decref(sq);
     }
 
     // Reverse sequence of length 2.
     {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_reverse(self, &exc));
-        assert_sequence(self, items[1], items[0]);
-        assert_not_raises_exc(yp_reverse(self, &exc));
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_reverse(sq, &exc));
+        assert_sequence(sq, items[1], items[0]);
+        assert_not_raises_exc(yp_reverse(sq, &exc));
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
     // Reverse sequence of length 1.
     {
-        ypObject *self = type->newN(N(items[0]));
-        assert_not_raises_exc(yp_reverse(self, &exc));
-        assert_sequence(self, items[0]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0]));
+        assert_not_raises_exc(yp_reverse(sq, &exc));
+        assert_sequence(sq, items[0]);
+        yp_decref(sq);
     }
 
     // Self is empty.
     {
-        ypObject *self = type->newN(0);
-        assert_not_raises_exc(yp_reverse(self, &exc));
-        assert_len(self, 0);
-        yp_decref(self);
+        ypObject *sq = type->newN(0);
+        assert_not_raises_exc(yp_reverse(sq, &exc));
+        assert_len(sq, 0);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -2034,29 +2102,33 @@ tear_down:
 static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
+    ypObject       *int_0 = yp_intC(0);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *int_2 = yp_intC(2);
     ypObject       *items[] = obj_array_init(2, type->rand_item());
 
     // Sort is only implemented for list; it's not currently part of the sequence protocol.
     if (type->type != yp_t_list) {
-        ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_sort(self, &exc), yp_MethodError);
-        assert_sequence(self, items[0], items[1]);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_sort(sq, &exc), yp_MethodError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
 
     // Basic sort. This is more thoroughly tested in test_tuple.
     {
-        ypObject *self = type->newN(N(int_2, int_0, int_1));
-        assert_not_raises_exc(yp_sort(self, &exc));
-        assert_sequence(self, int_0, int_1, int_2);
-        assert_not_raises_exc(yp_sort4(self, yp_None, yp_True, &exc));
-        assert_sequence(self, int_2, int_1, int_0);
-        yp_decref(self);
+        ypObject *sq = type->newN(N(int_2, int_0, int_1));
+        assert_not_raises_exc(yp_sort(sq, &exc));
+        assert_sequence(sq, int_0, int_1, int_2);
+        assert_not_raises_exc(yp_sort4(sq, yp_None, yp_True, &exc));
+        assert_sequence(sq, int_2, int_1, int_0);
+        yp_decref(sq);
     }
 
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(int_0, int_1, int_2));
     return MUNIT_OK;
 }
 

@@ -2,6 +2,16 @@
 #include "munit_test/unittest.h"
 
 
+extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions)
+{
+    yp_ssize_t i;
+    for (i = 0; i < n; i++) {
+        if (yp_isexceptionC2(x, exceptions[i])) return TRUE;
+    }
+    return FALSE;
+}
+
+
 // If something should happen 2 in 23 times: RAND_BOOL_FRACTION(2, 23)
 // TODO Better name? Better argument names?
 #define RAND_BOOL_FRACTION(numerator, denominator) \
@@ -195,6 +205,17 @@ ypObject *rand_obj(fixture_type_t *type)
     return type->_new_rand(&memo);
 }
 
+ypObject *rand_obj_non_string_hashable(void)
+{
+    static fixture_type_t *non_str_hashable_types[] = {&fixture_type_type_struct,
+            &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
+            &fixture_type_float_struct, &fixture_type_iter_struct, &fixture_type_range_struct,
+            &fixture_type_bytes_struct, &fixture_type_tuple_struct, &fixture_type_frozenset_struct,
+            &fixture_type_frozendict_struct, &fixture_type_function_struct, NULL};
+
+    return rand_obj_hashable(rand_choice_array(non_str_hashable_types));
+}
+
 ypObject *rand_obj_any_hashable(void)
 {
     rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/TRUE};
@@ -244,7 +265,7 @@ static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
     rand_objs3(n, array, rand_obj_any_hashable);
 }
 
-static void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
+void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
 
 
 typedef struct _new_rand_iter_state {
@@ -1419,22 +1440,6 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array)
 }
 
 
-yp_IMMORTAL_INT(int_neg_5, -5);
-yp_IMMORTAL_INT(int_neg_4, -4);
-yp_IMMORTAL_INT(int_neg_3, -3);
-yp_IMMORTAL_INT(int_neg_2, -2);
-yp_IMMORTAL_INT(int_neg_1, -1);
-yp_IMMORTAL_INT(int_0, 0);
-yp_IMMORTAL_INT(int_1, 1);
-yp_IMMORTAL_INT(int_2, 2);
-yp_IMMORTAL_INT(int_3, 3);
-yp_IMMORTAL_INT(int_4, 4);
-yp_IMMORTAL_INT(int_5, 5);
-
-yp_IMMORTAL_INT(int_SLICE_DEFAULT, yp_SLICE_DEFAULT);
-yp_IMMORTAL_INT(int_SLICE_LAST, yp_SLICE_LAST);
-
-
 yp_ssize_t yp_lenC_not_raises(ypObject *container)
 {
     yp_ssize_t result;
@@ -1443,7 +1448,7 @@ yp_ssize_t yp_lenC_not_raises(ypObject *container)
 }
 
 
-#define MALLOC_TRACKER_MAX_LEN 1000
+#define MALLOC_TRACKER_MAX_LEN 2000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {

@@ -1149,13 +1149,15 @@ ypAPI ypObject *yp_rsplitC3(ypObject *s, ypObject *sep, yp_ssize_t maxsplit);
 ypAPI ypObject *yp_splitlines2(ypObject *s, ypObject *keepends);
 
 // Returns a new reference to an encoded version of s (a str/chrarray) as a bytes/bytearray object.
-// For yp_encode, encoding is yp_s_utf_8 and errors is yp_s_strict.
 ypAPI ypObject *yp_encode3(ypObject *s, ypObject *encoding, ypObject *errors);
+
+// Equivalent to yp_encode3(s, yp_s_utf_8, yp_s_strict).
 ypAPI ypObject *yp_encode(ypObject *s);
 
 // Returns a new reference to an decoded version of b (a bytes/bytearray) as a str/chrarray object.
-// For yp_decode, encoding is yp_s_utf_8 and errors is yp_s_strict.
 ypAPI ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors);
+
+// Equivalent to yp_decode3(b, yp_s_utf_8, yp_s_strict).
 ypAPI ypObject *yp_decode(ypObject *b);
 
 // Immortal empty bytes and str objects.
@@ -1219,20 +1221,22 @@ typedef struct _yp_parameter_decl_t {
     //
     // If name is /, the preceding parameters are positional-only. / cannot be the first parameter.
     // If / is in the middle, the corresponding argarray element will be NULL. If / is last, it is
-    // not included in argarray, and n will be one less than the number of parameters. / cannot come
-    // after *, *args, or **kwargs.
+    // not included in argarray, and n will be one less than the number of parameters. / cannot be
+    // after *, *args, or **kwargs. At most one / may be present.
     //
     // If name is *, the subsequent parameters are keyword-only. If * is first or in the middle, the
     // corresponding argarray element will be NULL. * cannot be last, and cannot be immediately
-    // followed by **kwargs. At most one of * or *args may be present.
+    // before **kwargs. At most one * may be present; * and *args cannot both be present.
     //
     // If name starts with a single *, the corresponding argarray element will be a (possibly empty)
-    // tuple receiving any excess positional arguments. Any subsequent parameters are keyword-only.
-    // The string after * must be a valid Python identifier. Conventionally named *args.
+    // tuple receiving any excess positional arguments. Typically named *args. Any subsequent
+    // parameters are keyword-only. The string after * must be a valid Python identifier. At most
+    // one *args may be present.
     //
     // If name starts with **, the corresponding argarray element will be a (possibly empty)
-    // frozendict receiving any excess keyword arguments. If present, this parameter must be last.
-    // The string after ** must be a valid Python identifier. Conventionally named **kwargs.
+    // frozendict receiving any excess keyword arguments. Typically named **kwargs. If present, this
+    // parameter must be last. The string after ** must be a valid Python identifier. At most one
+    // **kwargs may be present.
     //
     // For convenience using these special forms, nohtyP exports the following immortal strs:
     // yp_s_slash, yp_s_star, yp_s_star_args, yp_s_star_star_kwargs.
@@ -1250,11 +1254,9 @@ typedef struct _yp_function_decl_t {
     // arguments, where argarray[i] corresponds to parameters[i]; argarray must not be modified. The
     // return value must be a new or immortal reference, or an exception.
     //
-    // In nohtyP, when an exception object is used as input to a function, the function must return
-    // an exception. Additionally, exceptions can be used as parameter defaults. As such, argarray
-    // might contain exceptions. This generally requires no special handling: any functions called
-    // from code must themselves handle exceptions this way, so code need only check the result of
-    // those function calls and return exceptions as appropriate.
+    // If one of the yp_call* arguments is an exception, yp_call* returns an exception without
+    // calling code. As such, argarray will only contain exceptions for parameters that have
+    // exceptions as defaults, and only when the corresponding arguments are omitted from the call.
     //
     // n is deterministic based solely on the parameters: it is either parameters_len, or
     // parameters_len-1 if parameters ends in /.
@@ -1725,31 +1727,30 @@ ypAPI void yp_s2i_setitemC5(
  * Immortal "Constructor" Macros
  */
 
-// Defines an immortal int object at compile-time, which can be accessed by the variable name, which
-// is of type "ypObject * const". value is a (constant) yp_int_t. To be used as:
+// The immortal constructors are safe to use as local variables, as the objects they reference are
+// allocated in static memory.
+
+// Defines an immortal int object at compile-time, which can be accessed by the variable name,
+// declared as "ypObject * const". value is a (constant) yp_int_t. To be used as:
 //
 //      yp_IMMORTAL_INT(name, value);
 
 // Defines an immortal bytes object at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const". value is a C string literal that can contain null bytes. The
+// declared as "ypObject * const". value is a C string literal that can contain null bytes. The
 // length is calculated while compiling; the hash will be calculated the first time it is accessed.
 // To be used as:
 //
 //      yp_IMMORTAL_BYTES(name, value);
 
 // Defines an immortal str constant at compile-time, which can be accessed by the variable name,
-// which is of type "ypObject * const". value is a latin-1 encoded C string literal that can contain
-// null characters. The length is calculated while compiling; the hash will be calculated the first
-// time it is accessed. Note that this also accepts an ascii-encoded C string literal, as ascii is a
+// declared as "ypObject * const". value is a latin-1 encoded C string literal that can contain null
+// characters. The length is calculated while compiling; the hash will be calculated the first time
+// it is accessed. Note that this also accepts an ascii-encoded C string literal, as ascii is a
 // subset of latin-1.
 //
 //      yp_IMMORTAL_STR_LATIN_1(name, value);
 
-// The default immortal "constructor" macros declare variables as "ypObject * const". This means
-// immortals defined outside of a function will be extern. It also means you should *not* use these
-// macros in a function, as the variable will be "deallocated" when the function returns, and
-// immortals should never be deallocated. The following macros work as above, except the variables
-// are declared as "static ypObject * const".
+// As above, except the variables are declared as "static ypObject * const".
 //
 //      yp_IMMORTAL_INT_static(name, value);
 //      yp_IMMORTAL_BYTES_static(name, value);
@@ -2111,6 +2112,13 @@ ypAPI ypObject *yp_i2s_getitemCX(ypObject *container, yp_int_t key, yp_ssize_t *
 #define _yp_UNUSED
 #endif
 
+// When a macro argument may contain commas, wrap that argument in parentheses and use this on the
+// parameter, like:
+//
+//      #define MAKE_ARRAY(name, init) ypObject *name[] = {_yp_UNPACK init};
+//      MAKE_ARRAY(objects, (yp_None, yp_None));
+#define _yp_UNPACK(...) __VA_ARGS__
+
 // This structure is likely to change in future versions; it should only exist in-memory
 // XXX dicts abuse ob_alloclen to hold a search finger for popitem
 // XXX The dealloc list (i.e., yp_decref) abuses ob_hash to point to the next object to dealloc
@@ -2145,12 +2153,19 @@ struct _ypIntObject {
     // So, this may not be a great way to reduce the size of these simpler types.
     yp_int_t value;
 };
-// bytes and str all share the same underlying structure, because they share some of the same
-// "StringLib" code
 struct _ypStringLibObject {
+    // bytes and str all share the same underlying structure, because they share some of the same
+    // "StringLib" code
     _ypObject_HEAD;
     _yp_INLINE_DATA(yp_uint8_t);
 };
+typedef struct _ypFunctionObject {
+    _ypObject_HEAD;
+    ypObject *(*ob_code)(ypObject *, yp_ssize_t, ypObject *const *);
+    void *ob_state;  // NULL if no extra state
+    // TODO doc, name/qualname, state, return annotation, module....
+    _yp_INLINE_DATA(yp_parameter_decl_t);
+} ypFunctionObject;
 
 // Set ob_refcnt to this value for immortal objects
 #define _ypObject_REFCNT_IMMORTAL (0x7FFFFFFFu)
@@ -2172,40 +2187,69 @@ struct _ypStringLibObject {
 #define _ypStr_CODE (18u)
 #define _ypFunction_CODE (28u)
 
+// Compilers don't recognize that `ypObject *const name` is known at compile-time, so use this to
+// initialize an immortal when a compiler requires a constant. name must refer to an immortal
+// defined with yp_IMMORTAL_* previously in this scope; note that because of this limitation,
+// DLL-exported immortals like yp_None, yp_True, and yp_False can never be used to initialize an
+// immortal.
+// TODO Rename?
+#define _yp_CONST_REF(name) ((ypObject *)&_##name##_struct)
+#ifdef yp_FUTURE
+#define yp_CONST_REF _yp_CONST_REF
+#endif
+
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                         \
-    {                                                                               \
-        type, 0, type_flags, _ypObject_REFCNT_IMMORTAL, len, _ypObject_LEN_INVALID, \
-                _ypObject_HASH_INVALID, data                                        \
+#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                               \
+    {                                                                                     \
+        (type), 0, (type_flags), _ypObject_REFCNT_IMMORTAL, (len), _ypObject_LEN_INVALID, \
+                _ypObject_HASH_INVALID, (data)                                            \
     }
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, _ypObject_LEN_INVALID, NULL), (value)}; \
-    qual ypObject *const name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const name = _yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_BYTES(qual, name, value)                                                  \
-    static const char                _##name##_data[] = value;                                 \
+    static const char                _##name##_data[] = (value);                               \
     static struct _ypStringLibObject _##name##_struct = {_yp_IMMORTAL_HEAD_INIT(_ypBytes_CODE, \
             _ypStringLib_ENC_CODE_BYTES, sizeof(_##name##_data) - 1, (void *)_##name##_data)}; \
-    qual ypObject *const             name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const             name = _yp_CONST_REF(name) /* force semi-colon */
 #define _yp_IMMORTAL_STR_LATIN_1(qual, name, value)                            \
-    static const char                _##name##_data[] = value;                 \
+    static const char                _##name##_data[] = (value);               \
     static struct _ypStringLibObject _##name##_struct = {                      \
             _yp_IMMORTAL_HEAD_INIT(_ypStr_CODE, _ypStringLib_ENC_CODE_LATIN_1, \
                     sizeof(_##name##_data) - 1, (void *)_##name##_data),       \
     };                                                                         \
-    qual ypObject *const _yp_UNUSED name = (ypObject *)&_##name##_struct /* force semi-colon */
+    qual ypObject *const _yp_UNUSED name = _yp_CONST_REF(name) /* force semi-colon */
 // TODO yp_IMMORTAL_TUPLE
 
-// TODO Instead of _yp_NOQUAL, should we force extern? We really don't want yp_IMMORTAL_* placed
-// on the stack... And maybe flip around so static is default and _extern is option (as per Python).
-#define _yp_NOQUAL  // Used in place of static or extern for qual
-#define yp_IMMORTAL_INT(name, value) _yp_IMMORTAL_INT(_yp_NOQUAL, name, value)
-#define yp_IMMORTAL_BYTES(name, value) _yp_IMMORTAL_BYTES(_yp_NOQUAL, name, value)
-#define yp_IMMORTAL_STR_LATIN_1(name, value) _yp_IMMORTAL_STR_LATIN_1(_yp_NOQUAL, name, value)
+#define yp_IMMORTAL_INT(name, value) _yp_IMMORTAL_INT(, name, value)
+#define yp_IMMORTAL_BYTES(name, value) _yp_IMMORTAL_BYTES(, name, value)
+#define yp_IMMORTAL_STR_LATIN_1(name, value) _yp_IMMORTAL_STR_LATIN_1(, name, value)
 
 #define yp_IMMORTAL_INT_static(name, value) _yp_IMMORTAL_INT(static, name, value)
 #define yp_IMMORTAL_BYTES_static(name, value) _yp_IMMORTAL_BYTES(static, name, value)
 #define yp_IMMORTAL_STR_LATIN_1_static(name, value) _yp_IMMORTAL_STR_LATIN_1(static, name, value)
+
+// Immortal functions are not yet part of the external interface: do not use.
+// XXX Older compilers reject an empty parameters argument, hence yp_IMMORTAL_FUNCTION2.
+// TODO A convenience version that sets parameters to (*args, **kwargs)?
+// TODO We _could_ mark yp_IMMORTAL_FUNCTION2 as validated...
+#define _yp_IMMORTAL_FUNCTION5(qual, name, code, parameters_len, parameters)                     \
+    static struct _ypFunctionObject _##name##_struct = {                                         \
+            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, (parameters_len), (parameters)), (code), \
+            NULL};                                                                               \
+    qual ypObject *const _yp_UNUSED name = _yp_CONST_REF(name) /* force semi-colon */
+#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
+    static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
+    _yp_IMMORTAL_FUNCTION5(                                                      \
+            qual, name, code, yp_lengthof_array(_##name##_parameters), _##name##_parameters)
+#ifdef yp_FUTURE
+#define yp_IMMORTAL_FUNCTION(name, code, parameters) _yp_IMMORTAL_FUNCTION(, name, code, parameters)
+#define yp_IMMORTAL_FUNCTION_static(name, code, parameters) \
+    _yp_IMMORTAL_FUNCTION(static, name, code, parameters)
+#define yp_IMMORTAL_FUNCTION2(name, code) _yp_IMMORTAL_FUNCTION5(, name, code, 0, NULL)
+#define yp_IMMORTAL_FUNCTION2_static(name, code) _yp_IMMORTAL_FUNCTION5(static, name, code, 0, NULL)
+#endif
 
 #ifdef yp_FUTURE
 // The implementation of yp_IF is considered "internal"; see above for documentation

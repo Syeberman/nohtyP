@@ -4,12 +4,26 @@
 extern "C" {
 #endif
 
+#if defined(_MSC_VER) && _MSC_VER < 1900
+// Disables a warning about using _snprintf over _snprintf_s.
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
+#define yp_FUTURE
 #include "nohtyP.h"
 
 #include "munit.h"
 
 #include <stddef.h>
+#include <stdio.h>
 
+// Older versions of MSVS don't have snprintf, and _snprintf doesn't always write the null
+// terminator. For how we use this function (fail on overflow), this is fine.
+#if defined(_MSC_VER) && _MSC_VER < 1900
+#define unittest_snprintf _snprintf
+#else
+#define unittest_snprintf snprintf
+#endif
 
 #ifndef TRUE
 #define TRUE (1 == 1)
@@ -61,9 +75,9 @@ extern "C" {
     _31,_32,_33,_34,_35,_36,_37,_38,_39,_40, \
     _41,_42,_43,_44,_45,_46,_47,_48,_49,_50, \
     _51,_52,_53,_54,_55,_56,_57,_58,_59,_60, \
-    _61,_62,_63,  n, ...) prefix##n
+    _61,_62,_63,_64,_65,_66,  n, ...) prefix##n
 #define _PP_RSEQ_N() \
-                      63,62,61,60, \
+             66,65,64,63,62,61,60, \
     59,58,57,56,55,54,53,52,51,50, \
     49,48,47,46,45,44,43,42,41,40, \
     39,38,37,36,35,34,33,32,31,30, \
@@ -97,6 +111,13 @@ extern "C" {
 #define _STRINGIFY24(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x
 #define _STRINGIFY25(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y
 #define _STRINGIFY26(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z
+#define _STRINGIFY27(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A
+#define _STRINGIFY28(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B
+#define _STRINGIFY29(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C
+#define _STRINGIFY30(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D
+#define _STRINGIFY31(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E
+#define _STRINGIFY32(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F
+#define _STRINGIFY33(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G) #a, #b, #c, #d, #e, #f, #g, #h, #i, #j, #k, #l, #m, #n, #o, #p, #q, #r, #s, #t, #u, #v, #w, #x, #y, #z, #A, #B, #C, #D, #E, #F, #G
 
 #define _COMMA_REPEAT1(x) x
 #define _COMMA_REPEAT2(x) x, x
@@ -124,11 +145,21 @@ extern "C" {
 #define _COMMA_REPEAT24(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 #define _COMMA_REPEAT25(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 #define _COMMA_REPEAT26(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT27(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT28(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT29(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT30(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT31(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT32(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
+#define _COMMA_REPEAT33(x) x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x
 // clang-format on
 
 // Variadic macro tricks.
-#define N(...) _PP_NARG(, __VA_ARGS__, _PP_RSEQ_N()), __VA_ARGS__
+#define VA_ARGC(...) (_PP_NARG(, __VA_ARGS__, _PP_RSEQ_N()))
+#define N(...) VA_ARGC(__VA_ARGS__), __VA_ARGS__
+#define K(...) (VA_ARGC(__VA_ARGS__) / 2), __VA_ARGS__
 #define STRINGIFY(...) _ESC(_PP_NARG(_STRINGIFY, __VA_ARGS__, _PP_RSEQ_N())(__VA_ARGS__))
+#define UNPACK(...) __VA_ARGS__
 
 // sizeof and offsetof as yp_ssize_t, and sizeof a structure member
 #define yp_sizeof(x) ((yp_ssize_t)sizeof(x))
@@ -253,43 +284,63 @@ extern "C" {
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
 #define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
 
-#define _assert_isexception(obj, expected, obj_fmt, expected_fmt, ...)                        \
-    do {                                                                                      \
-        if (!yp_isexceptionC2(obj, expected)) {                                               \
-            munit_errorf("assertion failed: yp_isexceptionC2(" obj_fmt ", " expected_fmt ")", \
-                    __VA_ARGS__);                                                             \
-        }                                                                                     \
+#define _assert_isexception(obj, n, expected, obj_fmt, expected_fmt, ...)                         \
+    do {                                                                                          \
+        if (!yp_isexceptionC(obj)) {                                                              \
+            munit_errorf("assertion failed: yp_isexceptionC(" obj_fmt ") (expected " expected_fmt \
+                         ")",                                                                     \
+                    __VA_ARGS__);                                                                 \
+        }                                                                                         \
+        if (!yp_isexception_arrayC(obj, n, expected)) {                                           \
+            munit_errorf("assertion failed: yp_isexceptionCN(" obj_fmt ", N(" expected_fmt "))",  \
+                    __VA_ARGS__);                                                                 \
+        }                                                                                         \
     } while (0)
 
-#define assert_isexception(obj, expected)                                                        \
+// Asserts that obj is one of the given exceptions.
+#define assert_isexception(obj, ...)                                                           \
+    do {                                                                                       \
+        ypObject *_ypmt_ISEXC_obj = (obj);                                                     \
+        ypObject *_ypmt_ISEXC_expected[] = {__VA_ARGS__};                                      \
+        _assert_isexception(_ypmt_ISEXC_obj, VA_ARGC(__VA_ARGS__), _ypmt_ISEXC_expected, "%s", \
+                "%s", #obj, #__VA_ARGS__);                                                     \
+    } while (0)
+
+// Asserts that statement evaluates to one of the given exceptions.
+#define assert_raises(statement, ...)                                                            \
     do {                                                                                         \
-        ypObject *_ypmt_ISEXC_obj = (obj);                                                       \
-        ypObject *_ypmt_ISEXC_expected = (expected);                                             \
-        _assert_isexception(_ypmt_ISEXC_obj, _ypmt_ISEXC_expected, "%s", "%s", #obj, #expected); \
+        ypObject *_ypmt_RAISES_statement = (statement);                                          \
+        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                       \
+        _assert_isexception(_ypmt_RAISES_statement, VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, \
+                "%s", "%s", #statement, #__VA_ARGS__);                                           \
     } while (0)
-
-#define assert_raises(statement, expected) assert_isexception(statement, expected)
 
 // statement is only evaluated once.
-#define _assert_raises_exc(statement, expected, statement_fmt, expected_fmt, ...) \
-    do {                                                                          \
-        ypObject *exc = yp_None;                                                  \
-        statement;                                                                \
-        if (!yp_isexceptionC2(exc, expected)) {                                   \
-            munit_errorf("assertion failed: " statement_fmt                       \
-                         "; yp_isexceptionC2(exc, " expected_fmt ")",             \
-                    __VA_ARGS__);                                                 \
-        }                                                                         \
+#define _assert_raises_exc(statement, n, expected, statement_fmt, expected_fmt, ...) \
+    do {                                                                             \
+        ypObject *exc = yp_None;                                                     \
+        statement;                                                                   \
+        if (!yp_isexceptionC(exc)) {                                                 \
+            munit_errorf("assertion failed: " statement_fmt                          \
+                         "; yp_isexceptionC(exc) (expected " expected_fmt ")",       \
+                    __VA_ARGS__);                                                    \
+        }                                                                            \
+        if (!yp_isexception_arrayC(exc, n, expected)) {                              \
+            munit_errorf("assertion failed: " statement_fmt                          \
+                         "; yp_isexceptionCN(exc, N(" expected_fmt "))",             \
+                    __VA_ARGS__);                                                    \
+        }                                                                            \
     } while (0)
 
-// For a function that takes a `ypObject **exc` argument, asserts that it raises the given
-// exception. Statement must include `&exc` for the exception argument. Example:
+// For a function that takes a `ypObject **exc` argument, asserts that it raises one of the given
+// exceptions. Statement must include `&exc` for the exception argument. Example:
 //
 //      assert_raises_exc(yp_lenC(obj, &exc), yp_MethodError);
-#define assert_raises_exc(statement, expected)                                                   \
-    do {                                                                                         \
-        ypObject *_ypmt_RAISES_expected = (expected);                                            \
-        _assert_raises_exc(statement, _ypmt_RAISES_expected, "%s", "%s", #statement, #expected); \
+#define assert_raises_exc(statement, ...)                                                      \
+    do {                                                                                       \
+        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                     \
+        _assert_raises_exc(statement, VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, "%s", "%s", \
+                #statement, #__VA_ARGS__);                                                     \
     } while (0)
 
 // A version of _assert_typeC that ensures a_statement and b_statement do not throw an exception via
@@ -359,15 +410,35 @@ extern "C" {
         _assert_obj(_ypmt_OBJ_a, op, _ypmt_OBJ_b, "%s", "%s", #a, #b); \
     } while (0)
 
-// yp_type(obj) == expected
-#define assert_type_is(obj, expected)                                                        \
+#define _assert_type_is(obj, expected, obj_fmt, expected_fmt, ...)                           \
     do {                                                                                     \
-        ypObject *_ypmt_TYPE_obj = (obj);                                                    \
-        ypObject *_ypmt_TYPE_expected = (expected);                                          \
-        ypObject *_ypmt_TYPE_type_obj = yp_type(_ypmt_TYPE_obj);                             \
-        _assert_not_exception(_ypmt_TYPE_type_obj, "yp_type(%s)", #obj);                     \
-        _assert_ptr(_ypmt_TYPE_type_obj, ==, _ypmt_TYPE_expected, "yp_type(%s)", "%s", #obj, \
-                #expected);                                                                  \
+        ypObject *_ypmt_TYPE_type_obj = yp_type(obj);                                        \
+        _assert_ptr(_ypmt_TYPE_type_obj, ==, expected, "yp_type(" obj_fmt ")", expected_fmt, \
+                __VA_ARGS__);                                                                \
+    } while (0)
+
+// yp_type(obj) == expected
+#define assert_type_is(obj, expected)                                                      \
+    do {                                                                                   \
+        ypObject *_ypmt_TYPE_obj = (obj);                                                  \
+        ypObject *_ypmt_TYPE_expected = (expected);                                        \
+        _assert_type_is(_ypmt_TYPE_obj, _ypmt_TYPE_expected, "%s", "%s", #obj, #expected); \
+    } while (0)
+
+#define _assert_same_type(a, b, a_fmt, b_fmt, ...)                                  \
+    do {                                                                            \
+        ypObject *_ypmt_TYPE_type_a = yp_type(a);                                   \
+        ypObject *_ypmt_TYPE_type_b = yp_type(b);                                   \
+        _assert_ptr(_ypmt_TYPE_type_a, ==, _ypmt_TYPE_type_b, "yp_type(" a_fmt ")", \
+                "yp_type(" b_fmt ")", __VA_ARGS__);                                 \
+    } while (0)
+
+// yp_type(a) == yp_type(b)
+#define assert_same_type(a, b)                                           \
+    do {                                                                 \
+        ypObject *_ypmt_TYPE_a = (a);                                    \
+        ypObject *_ypmt_TYPE_b = (b);                                    \
+        _assert_type_is(_ypmt_TYPE_a, _ypmt_TYPE_b, "%s", "%s", #a, #b); \
     } while (0)
 
 // XXX expected must be a yp_ssize_t.
@@ -390,25 +461,69 @@ extern "C" {
         _assert_len(_ypmt_LEN_obj, _ypmt_LEN_expected, "%s", "%s", #obj, #expected); \
     } while (0)
 
-// Asserts that obj is a sequence containing exactly the given n items in that order. Items are
-// compared by nohtyP equality (i.e. yp_eq). Validates yp_lenC and yp_getindexC.
-#define assert_sequence(obj, ...)                                                            \
-    do {                                                                                     \
-        ypObject  *_ypmt_SEQ_obj = (obj);                                                    \
-        ypObject  *_ypmt_SEQ_items[] = {__VA_ARGS__};                                        \
-        char      *_ypmt_SEQ_item_strs[] = {STRINGIFY(__VA_ARGS__)};                         \
-        yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(_ypmt_SEQ_items);                         \
-        yp_ssize_t _ypmt_SEQ_i;                                                              \
-        _assert_len(_ypmt_SEQ_obj, _ypmt_SEQ_n, "%s", "%" PRIssize, #obj, _ypmt_SEQ_n);      \
-        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < _ypmt_SEQ_n; _ypmt_SEQ_i++) {                    \
-            ypObject *_ypmt_SEQ_actual = yp_getindexC(_ypmt_SEQ_obj, _ypmt_SEQ_i);           \
-            _assert_not_exception(                                                           \
-                    _ypmt_SEQ_actual, "yp_getindexC(%s, %" PRIssize ")", #obj, _ypmt_SEQ_i); \
-            _assert_obj(_ypmt_SEQ_actual, eq, _ypmt_SEQ_items[_ypmt_SEQ_i],                  \
-                    "yp_getindexC(%s, %" PRIssize ")", "%s", #obj, _ypmt_SEQ_i,              \
-                    _ypmt_SEQ_item_strs[_ypmt_SEQ_i]);                                       \
-            yp_decref(_ypmt_SEQ_actual);                                                     \
-        }                                                                                    \
+// items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
+// only to obj_fmt.
+#define _assert_sequence(obj, items, obj_fmt, item_strs, ...)                                   \
+    do {                                                                                        \
+        yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(items);                                      \
+        yp_ssize_t _ypmt_SEQ_i;                                                                 \
+        _assert_len(obj, _ypmt_SEQ_n, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_SEQ_n);         \
+        for (_ypmt_SEQ_i = 0; _ypmt_SEQ_i < _ypmt_SEQ_n; _ypmt_SEQ_i++) {                       \
+            ypObject *_ypmt_SEQ_actual = yp_getindexC(obj, _ypmt_SEQ_i);                        \
+            _assert_not_exception(_ypmt_SEQ_actual, "yp_getindexC(" obj_fmt ", %" PRIssize ")", \
+                    __VA_ARGS__, _ypmt_SEQ_i);                                                  \
+            _assert_same_type(_ypmt_SEQ_actual, items[_ypmt_SEQ_i],                             \
+                    "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
+                    item_strs[_ypmt_SEQ_i]);                                                    \
+            _assert_obj(_ypmt_SEQ_actual, eq, items[_ypmt_SEQ_i],                               \
+                    "yp_getindexC(" obj_fmt ", %" PRIssize ")", "%s", __VA_ARGS__, _ypmt_SEQ_i, \
+                    item_strs[_ypmt_SEQ_i]);                                                    \
+            yp_decref(_ypmt_SEQ_actual);                                                        \
+        }                                                                                       \
+    } while (0)
+
+// Asserts that obj is a sequence containing exactly the given items in that order. Items are
+// compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getindexC.
+#define assert_sequence(obj, ...)                                                          \
+    do {                                                                                   \
+        ypObject *_ypmt_SEQ_obj = (obj);                                                   \
+        ypObject *_ypmt_SEQ_items[] = {__VA_ARGS__};                                       \
+        char     *_ypmt_SEQ_item_strs[] = {STRINGIFY(__VA_ARGS__)};                        \
+        _assert_sequence(_ypmt_SEQ_obj, _ypmt_SEQ_items, "%s", _ypmt_SEQ_item_strs, #obj); \
+    } while (0)
+
+// items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
+// only to obj_fmt.
+#define _assert_mapping(obj, items, obj_fmt, item_strs, ...)                                    \
+    do {                                                                                        \
+        yp_ssize_t _ypmt_MAP_k = yp_lengthof_array(items) / 2;                                  \
+        yp_ssize_t _ypmt_MAP_i;                                                                 \
+        _assert_len(obj, _ypmt_MAP_k, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_MAP_k);         \
+        for (_ypmt_MAP_i = 0; _ypmt_MAP_i < _ypmt_MAP_k; _ypmt_MAP_i++) {                       \
+            ypObject *_ypmt_MAP_key = items[_ypmt_MAP_i * 2];                                   \
+            ypObject *_ypmt_MAP_value = items[_ypmt_MAP_i * 2 + 1];                             \
+            char     *_ypmt_MAP_key_str = item_strs[_ypmt_MAP_i * 2];                           \
+            char     *_ypmt_MAP_value_str = item_strs[_ypmt_MAP_i * 2 + 1];                     \
+            ypObject *_ypmt_MAP_actual = yp_getitem(obj, _ypmt_MAP_key);                        \
+            _assert_not_exception(_ypmt_MAP_actual, "yp_getitem(" obj_fmt ", %s)", __VA_ARGS__, \
+                    _ypmt_MAP_key_str);                                                         \
+            _assert_same_type(_ypmt_MAP_actual, _ypmt_MAP_value, "yp_getitem(" obj_fmt ", %s)", \
+                    "%s", __VA_ARGS__, _ypmt_MAP_key_str, _ypmt_MAP_value_str);                 \
+            _assert_obj(_ypmt_MAP_actual, eq, _ypmt_MAP_value, "yp_getitem(" obj_fmt ", %s)",   \
+                    "%s", __VA_ARGS__, _ypmt_MAP_key_str, _ypmt_MAP_value_str);                 \
+            yp_decref(_ypmt_MAP_actual);                                                        \
+        }                                                                                       \
+    } while (0)
+
+// Asserts that obj is a mapping containing exactly the given key/value pairs. Values are
+// compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getitem.
+// TODO Should we compare keys by type as well? That is tricky to do.
+#define assert_mapping(obj, ...)                                                          \
+    do {                                                                                  \
+        ypObject *_ypmt_MAP_obj = (obj);                                                  \
+        ypObject *_ypmt_MAP_items[] = {__VA_ARGS__};                                      \
+        char     *_ypmt_MAP_item_strs[] = {STRINGIFY(__VA_ARGS__)};                       \
+        _assert_mapping(_ypmt_MAP_obj, _ypmt_MAP_items, "%s", _ypmt_MAP_item_strs, #obj); \
     } while (0)
 
 // Asserts that the first n pointer items in array are exactly the given n items in that order.
@@ -436,6 +551,22 @@ extern "C" {
         ypObject *(name) = (expression); \
         assertion;                       \
         yp_decref(name);                 \
+    } while (0)
+
+
+// A version of yp_isexceptionCN that accepts an array.
+extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions);
+
+
+// A safe sprintf that asserts on buffer overflow. Only call for arrays of fixed size (uses
+// yp_lengthof_array).
+#define sprintf_array(array, fmt, ...)                                 \
+    do {                                                               \
+        yp_ssize_t _ypmt_SPRINTF_len = yp_lengthof_array(array);       \
+        yp_ssize_t result = (yp_ssize_t)unittest_snprintf(             \
+                (array), (size_t)_ypmt_SPRINTF_len, fmt, __VA_ARGS__); \
+        assert_ssizeC(result, >=, 0);                                  \
+        assert_ssizeC(result, <, _ypmt_SPRINTF_len);                   \
     } while (0)
 
 
@@ -541,11 +672,17 @@ extern ypObject *rand_obj_any(void);
 // Returns a random hashable object of any type.
 extern ypObject *rand_obj_any_hashable(void);
 
+// Returns a random hashable object of any type except strings.
+extern ypObject *rand_obj_non_string_hashable(void);
+
 // Returns a random object of the given type.
 extern ypObject *rand_obj(fixture_type_t *type);
 
 // Returns a random hashable object of the given type. type must be immutable.
 extern ypObject *rand_obj_hashable(fixture_type_t *type);
+
+// Fills array with n random, unique objects of any type.
+extern void rand_objs_any(yp_ssize_t n, ypObject **array);
 
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given
@@ -575,23 +712,6 @@ extern void obj_array_decref2(yp_ssize_t n, ypObject **array);
 // Discards all references in the ypObject * array. Skips NULL elements. Only call for arrays of
 // fixed size (uses yp_lengthof_array).
 #define obj_array_decref(array) obj_array_decref2(yp_lengthof_array(array), (array))
-
-
-// Handy pre-made objects.
-extern ypObject *const int_neg_5;
-extern ypObject *const int_neg_4;
-extern ypObject *const int_neg_3;
-extern ypObject *const int_neg_2;
-extern ypObject *const int_neg_1;
-extern ypObject *const int_0;
-extern ypObject *const int_1;
-extern ypObject *const int_2;
-extern ypObject *const int_3;
-extern ypObject *const int_4;
-extern ypObject *const int_5;
-
-extern ypObject *const int_SLICE_DEFAULT;
-extern ypObject *const int_SLICE_LAST;
 
 
 // yp_lenC, asserting an exception is not raised.
@@ -628,6 +748,7 @@ SUITE_OF_TESTS_DECLS(test_unittest);
 
 SUITE_OF_SUITES_DECLS(test_objects);
 SUITE_OF_TESTS_DECLS(test_frozenset);
+SUITE_OF_TESTS_DECLS(test_function);
 
 SUITE_OF_SUITES_DECLS(test_protocols);
 SUITE_OF_TESTS_DECLS(test_sequence);

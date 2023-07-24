@@ -76,8 +76,9 @@
 // str.strip/etc. Really the bulk of the issues are in the str/bytes methods, as those tried hard to
 // be non-mutating.
 
-
+#define yp_FUTURE
 #include "nohtyP.h"
+
 #include <float.h>
 #include <math.h>
 #include <stddef.h>
@@ -348,6 +349,13 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 // Base "constructor" for immortal type objects
 #define yp_TYPE_HEAD_INIT yp_IMMORTAL_HEAD_INIT(ypType_CODE, 0, ypObject_LEN_INVALID, NULL)
 
+// Used in tp_flags
+#define ypType_FLAG_IS_MAPPING (1u << 0)
+#define ypType_FLAG_IS_CALLABLE (1u << 1)
+
+#define ypObject_IS_MAPPING(ob) ((ypObject_TYPE(ob)->tp_flags & ypType_FLAG_IS_MAPPING) != 0)
+#define ypObject_IS_CALLABLE(ob) ((ypObject_TYPE(ob)->tp_flags & ypType_FLAG_IS_CALLABLE) != 0)
+
 // Many object methods follow one of these generic function signatures
 typedef ypObject *(*objproc)(ypObject *);
 typedef ypObject *(*objobjproc)(ypObject *, ypObject *);
@@ -432,12 +440,12 @@ typedef struct {
 // FIXME Maybe this isn't "as callable", but defines the callable things associated to this object.
 //  - tp_call - returns func obj for when this object is called
 //  - tp_call_method(name) - returns the func implementing the method
-// ...but extra flags stating if this is a static method, class method, instance method
+// ...but extra flags stating if this is a static method, class method, instance method.
+//
+// OR, maybe tp_call should be moved to the top level.
 
 // Callable objects defer to the function object returned by tp_call to parse the arguments.
 typedef struct {
-    // FIXME Move this to a tp_flags, and perhaps move tp_call top-level?
-    int tp_iscallable;
     // FIXME ...doesn't actually call the function, but returns information about how to call
     objpobjpobjproc tp_call;  // on error, return exception, but leave *function/*self
 } ypCallableMethods;
@@ -453,6 +461,7 @@ typedef struct {
 // Type objects hold pointers to each type's methods.
 typedef struct {
     ypObject_HEAD;
+    yp_uint64_t tp_flags;  // flags describing this type (ismapping, iscallable, etc)
     // TODO Fill tp_name and use in DEBUG statements
     // TODO Rename to qualname to follow Python?
     ypObject *tp_name;  // For printing, in format "<module>.<name>"
@@ -649,7 +658,6 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
         *name ## _objproc \
     } }; \
     static ypCallableMethods yp_UNUSED name ## _CallableMethods[1] = { { \
-        FALSE, \
         *name ## _objpobjpobjproc \
     } };
 // clang-format on
@@ -685,8 +693,6 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
  * Helpful functions and macros
  *************************************************************************************************/
 #pragma region utilities
-
-#define _yp_UNPACK(...) __VA_ARGS__
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -1227,16 +1233,6 @@ typedef struct {
 } ypRangeObject;
 
 
-// FIXME Immortal functions will eventually be moved to nohtyP.h
-typedef struct _ypFunctionObject {
-    ypObject_HEAD;
-    ypObject *(*ob_code)(ypObject *, yp_ssize_t, ypObject *const *);
-    void *ob_state;  // NULL if no extra state
-    // FIXME doc, name/qualname, state, return annotation, module....
-    yp_INLINE_DATA(yp_parameter_decl_t);
-} ypFunctionObject;
-
-
 #pragma endregion object_structs
 
 
@@ -1245,10 +1241,7 @@ typedef struct _ypFunctionObject {
  *************************************************************************************************/
 #pragma region common_immortals
 
-// Older compilers don't recognize that `ypObject *const name` is known at compile-time, so use this
-// to initialize when a compiler requires a constant. name must refer to an already-defined
-// immortal.
-#define yp_CONST_REF(name) ((ypObject *)&_##name##_struct)
+#define yp_CONST_REF _yp_CONST_REF
 
 
 #define yp_IMMORTAL_INVALIDATED(name)                                                   \
@@ -1397,24 +1390,6 @@ static ypRangeObject _yp_range_empty_struct = {
         {ypRange_CODE, 0, 0, ypObject_REFCNT_IMMORTAL, 0, 0, ypObject_HASH_INVALID, NULL}, 0, 1};
 ypObject *const yp_range_empty = yp_CONST_REF(yp_range_empty);
 
-
-#define _yp_IMMORTAL_FUNCTION_OBJECT(qual, name, code, parameters_len, parameters)                \
-    static struct _ypFunctionObject _##name##_struct = {                                          \
-            _yp_IMMORTAL_HEAD_INIT(_ypFunction_CODE, 0, parameters_len, parameters), code, NULL}; \
-    qual ypObject *const yp_UNUSED name = yp_CONST_REF(name) /* force semi-colon */
-#define _yp_IMMORTAL_FUNCTION(qual, name, code, parameters)                      \
-    static yp_parameter_decl_t _##name##_parameters[] = {_yp_UNPACK parameters}; \
-    _yp_IMMORTAL_FUNCTION_OBJECT(                                                \
-            qual, name, code, yp_lengthof_array(_##name##_parameters), _##name##_parameters)
-
-#define yp_IMMORTAL_FUNCTION(name, code, parameters) \
-    _yp_IMMORTAL_FUNCTION(_yp_NOQUAL, name, code, parameters)
-#define yp_IMMORTAL_FUNCTION_static(name, code, parameters) \
-    _yp_IMMORTAL_FUNCTION(static, name, code, parameters)
-#define yp_IMMORTAL_FUNCTION2(name, code) \
-    _yp_IMMORTAL_FUNCTION_OBJECT(_yp_NOQUAL, name, code, 0, NULL)
-#define yp_IMMORTAL_FUNCTION2_static(name, code) \
-    _yp_IMMORTAL_FUNCTION_OBJECT(static, name, code, 0, NULL)
 
 #pragma endregion common_immortals
 
@@ -3039,6 +3014,7 @@ yp_IMMORTAL_FUNCTION_static(iter_func_new, iter_func_new_code,
 
 static ypTypeObject ypIter_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -3769,7 +3745,6 @@ ypObject *yp_all(ypObject *iterable)
 // XXX yp_ComparisonNotImplemented should _never_ be seen outside of comparison functions
 // TODO Here and elsewhere, the singleton NotImplemented should be used
 // TODO Comparison functions have the possibility of recursion; trap (also, add tests)
-extern ypObject *const yp_ComparisonNotImplemented;
 #define _ypBool_PUBLIC_CMP_FUNCTION(name, reflection, defval)                         \
     ypObject *yp_##name(ypObject *x, ypObject *y)                                     \
     {                                                                                 \
@@ -3898,11 +3873,12 @@ static ypObject *invalidated_func_new_code(ypObject *f, yp_ssize_t n, ypObject *
 }
 
 yp_IMMORTAL_FUNCTION_static(invalidated_func_new, invalidated_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+                {yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
 
 static ypTypeObject ypInvalidated_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -3990,11 +3966,12 @@ static ypObject *exception_func_new_code(ypObject *f, yp_ssize_t n, ypObject *co
 }
 
 yp_IMMORTAL_FUNCTION_static(exception_func_new, exception_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+                {yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
 
 static ypTypeObject ypException_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -4252,13 +4229,13 @@ yp_IMMORTAL_FUNCTION_static(type_func_new, type_func_new_code,
                 {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypCallableMethods ypType_as_callable = {
-        TRUE,      // tp_iscallable
         type_call  // tp_call
 };
 
 static ypTypeObject ypType_Type = {
         yp_TYPE_HEAD_INIT,
-        NULL,  // tp_name
+        ypType_FLAG_IS_CALLABLE,  // tp_flags
+        NULL,                     // tp_name
 
         // Object fundamentals
         yp_CONST_REF(type_func_new),  // tp_func_new
@@ -4364,6 +4341,7 @@ yp_IMMORTAL_FUNCTION_static(nonetype_func_new, nonetype_func_new_code,
 
 static ypTypeObject ypNoneType_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -4492,6 +4470,7 @@ yp_IMMORTAL_FUNCTION_static(bool_func_new, bool_func_new_code,
 
 static ypTypeObject ypBool_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -4876,6 +4855,7 @@ yp_IMMORTAL_FUNCTION_static(intstore_func_new, intstore_func_new_code, _ypInt_FU
 
 static ypTypeObject ypInt_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -4945,6 +4925,7 @@ static ypTypeObject ypInt_Type = {
 
 static ypTypeObject ypIntStore_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -5627,15 +5608,12 @@ static ypObject *unaryoperation(ypObject *x, unaryLfunc intop, unaryLFfunc float
 }
 
 // Defined here are yp_ineg (et al), and yp_neg (et al)
-#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                     \
-    void yp_i##name(ypObject *x, ypObject **exc)               \
-    {                                                          \
-        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF);  \
-    }                                                          \
-    ypObject *yp_##name(ypObject *x)                           \
-    {                                                          \
-        return unaryoperation(x, yp_##name##L, yp_##name##LF); \
-    }
+#define _ypInt_PUBLIC_UNARY_FUNCTION(name)                    \
+    void yp_i##name(ypObject *x, ypObject **exc)              \
+    {                                                         \
+        iunaryoperation(x, exc, yp_##name##L, yp_##name##LF); \
+    }                                                         \
+    ypObject *yp_##name(ypObject *x) { return unaryoperation(x, yp_##name##L, yp_##name##LF); }
 _ypInt_PUBLIC_UNARY_FUNCTION(neg);
 _ypInt_PUBLIC_UNARY_FUNCTION(pos);
 _ypInt_PUBLIC_UNARY_FUNCTION(abs);
@@ -5997,6 +5975,7 @@ yp_IMMORTAL_FUNCTION_static(
 
 static ypTypeObject ypFloat_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -6066,6 +6045,7 @@ static ypTypeObject ypFloat_Type = {
 
 static ypTypeObject ypFloatStore_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -10338,16 +10318,16 @@ static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding,
 static ypObject *_ypBytes(int type, ypObject *source);
 static ypObject *_ypBytes_func_new_code(int type, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
+    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
 
-    if (argarray[2] != yp_Arg_Missing) {  // FIXME ...or just use None?
-        ypObject *errors = argarray[3] == yp_Arg_Missing ? yp_s_strict : argarray[3];  // borrowed
-        return _ypBytes_encode(type, argarray[1], argarray[2], errors);
-    } else if (argarray[3] != yp_Arg_Missing) {
+    if (argarray[3] != yp_Arg_Missing) {  // TODO ...or just use None?
+        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
+        return _ypBytes_encode(type, argarray[2], argarray[3], errors);
+    } else if (argarray[4] != yp_Arg_Missing) {
         // Either "string argument without an encoding" or "errors without a string argument".
         return yp_TypeError;
     } else {
-        return _ypBytes(type, argarray[1]);
+        return _ypBytes(type, argarray[2]);
     }
 }
 
@@ -10363,9 +10343,10 @@ static ypObject *bytearray_func_new_code(ypObject *f, yp_ssize_t n, ypObject *co
     return _ypBytes_func_new_code(ypByteArray_CODE, n, argarray);
 }
 
-#define _ypBytes_FUNC_NEW_PARAMETERS                                                            \
-    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_source), yp_CONST_REF(yp_bytes_empty)}, \
-            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},                        \
+#define _ypBytes_FUNC_NEW_PARAMETERS                                     \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},   \
+            {yp_CONST_REF(yp_s_source), yp_CONST_REF(yp_bytes_empty)},   \
+            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)}, \
             {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)})
 yp_IMMORTAL_FUNCTION_static(bytes_func_new, bytes_func_new_code, _ypBytes_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(
@@ -10393,6 +10374,7 @@ static ypSequenceMethods ypBytes_as_sequence = {
 
 static ypTypeObject ypBytes_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -10482,6 +10464,7 @@ static ypSequenceMethods ypByteArray_as_sequence = {
 
 static ypTypeObject ypByteArray_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -10675,6 +10658,14 @@ static ypObject *_ypBytes_fromiterable(int type, ypObject *iterable)
         yp_decref(newB);
         return result;
     }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypBytes_CODE && ypBytes_LEN(newB) < 1) {
+        yp_decref(newB);
+        return yp_bytes_empty;
+    }
+
     ypBytes_ASSERT_INVARIANTS(newB);
     return newB;
 }
@@ -10851,6 +10842,8 @@ static ypObject *str_getindex(ypObject *s, yp_ssize_t i, ypObject *defval)
     }
     return yp_chrC(ypStr_ENC(s)->getindexX(ypStr_DATA(s), i));
 }
+
+#define str_getslice ypStringLib_getslice
 
 static ypObject *chrarray_setindex(ypObject *s, yp_ssize_t i, ypObject *x)
 {
@@ -11344,19 +11337,19 @@ static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, y
 static ypObject *_ypStr(int type, ypObject *object);
 static ypObject *_ypStr_func_new_code(int type, yp_ssize_t n, ypObject *const *argarray)
 {
-    yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
+    yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
 
     // As object defaults to yp_str_empty, and _ypStr_decode rejects strs, encoding-without-object
     // is an error, just as with bytes (but unlike Python).
-    if (argarray[2] != yp_Arg_Missing) {  // FIXME ...or just use None?
-        ypObject *errors = argarray[3] == yp_Arg_Missing ? yp_s_strict : argarray[3];  // borrowed
-        return _ypStr_decode(type, argarray[1], argarray[2], errors);
-    } else if (argarray[3] != yp_Arg_Missing) {
+    if (argarray[3] != yp_Arg_Missing) {  // TODO ...or just use None?
+        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
+        return _ypStr_decode(type, argarray[2], argarray[3], errors);
+    } else if (argarray[4] != yp_Arg_Missing) {
         // TODO In Python, sys.getdefaultencoding() is the default. Should we break with Python
         // here? I certainly don't like global variables changing behaviour...
-        return _ypStr_decode(type, argarray[1], yp_s_utf_8, argarray[3]);
+        return _ypStr_decode(type, argarray[2], yp_s_utf_8, argarray[4]);
     } else {
-        return _ypStr(type, argarray[1]);
+        return _ypStr(type, argarray[2]);
     }
 }
 
@@ -11373,9 +11366,10 @@ static ypObject *chrarray_func_new_code(ypObject *f, yp_ssize_t n, ypObject *con
     return _ypStr_func_new_code(ypChrArray_CODE, n, argarray);
 }
 
-#define _ypStr_FUNC_NEW_PARAMETERS                                                            \
-    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_str_empty)}, \
-            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)},                      \
+#define _ypStr_FUNC_NEW_PARAMETERS                                       \
+    ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},   \
+            {yp_CONST_REF(yp_s_object), yp_CONST_REF(yp_str_empty)},     \
+            {yp_CONST_REF(yp_s_encoding), yp_CONST_REF(yp_Arg_Missing)}, \
             {yp_CONST_REF(yp_s_errors), yp_CONST_REF(yp_Arg_Missing)})
 yp_IMMORTAL_FUNCTION_static(str_func_new, str_func_new_code, _ypStr_FUNC_NEW_PARAMETERS);
 yp_IMMORTAL_FUNCTION_static(chrarray_func_new, chrarray_func_new_code, _ypStr_FUNC_NEW_PARAMETERS);
@@ -11384,7 +11378,7 @@ static ypSequenceMethods ypStr_as_sequence = {
         str_concat,                   // tp_concat
         ypStringLib_repeat,           // tp_repeat
         str_getindex,                 // tp_getindex
-        ypStringLib_getslice,         // tp_getslice
+        str_getslice,                 // tp_getslice
         str_find,                     // tp_find
         str_count,                    // tp_count
         MethodError_objssizeobjproc,  // tp_setindex
@@ -11402,6 +11396,7 @@ static ypSequenceMethods ypStr_as_sequence = {
 
 static ypTypeObject ypStr_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -11491,6 +11486,7 @@ static ypSequenceMethods ypChrArray_as_sequence = {
 
 static ypTypeObject ypChrArray_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -11705,6 +11701,14 @@ static ypObject *_ypStr_fromiterable(int type, ypObject *iterable)
         yp_decref(newS);
         return result;
     }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypStr_CODE && ypStr_LEN(newS) < 1) {
+        yp_decref(newS);
+        return yp_str_empty;
+    }
+
     ypStr_ASSERT_INVARIANTS(newS);
     return newS;
 }
@@ -12188,7 +12192,8 @@ static ypObject *_ypTuple_attach_array(ypObject *sq, ypTuple_detached *detached)
     return yp_None;
 }
 
-// XXX Check for the "yp_tuple_empty" and ypTuple_ALLOCLEN_MAX cases first
+// XXX Check for the "yp_tuple_empty" and ypTuple_ALLOCLEN_MAX cases first.
+// XXX array must not contain exceptions.
 static ypObject *_ypTuple_new_fromarray(int type, yp_ssize_t n, ypObject *const *array)
 {
     yp_ssize_t i;
@@ -12200,7 +12205,7 @@ static ypObject *_ypTuple_new_fromarray(int type, yp_ssize_t n, ypObject *const 
     return sq;
 }
 
-// XXX Check for the "lazy shallow copy" and "yp_tuple_empty" cases first
+// XXX Check for the "lazy shallow copy" and "yp_tuple_empty" cases first.
 static ypObject *_ypTuple_copy(int type, ypObject *x)
 {
     yp_ASSERT(type != ypTuple_CODE || ypObject_TYPE_CODE(x) != ypTuple_CODE,
@@ -12383,6 +12388,13 @@ static ypObject *_ypTuple_new_fromminiiter(
     if (yp_isexceptionC(result)) {
         yp_decref(newSq);
         return result;
+    }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypTuple_CODE && ypTuple_LEN(newSq) < 1) {
+        yp_decref(newSq);
+        return yp_tuple_empty;
     }
 
     return newSq;
@@ -13139,6 +13151,7 @@ static ypSequenceMethods ypTuple_as_sequence = {
 
 static ypTypeObject ypTuple_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -13230,6 +13243,7 @@ static ypSequenceMethods ypList_as_sequence = {
 
 static ypTypeObject ypList_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -13487,7 +13501,15 @@ ypObject *yp_list(ypObject *iterable)
 // of all va_list functions, so keep private for now.
 static ypObject *yp_tuple_fromarray(yp_ssize_t n, ypObject *const *array)
 {
+    yp_ssize_t i;
+
     if (n < 1) return yp_tuple_empty;
+
+    // Make sure we don't create a tuple containing exceptions.
+    for (i = 0; i < n; i++) {
+        if (yp_isexceptionC(array[i])) return array[i];
+    }
+
     return _ypTuple_new_fromarray(ypTuple_CODE, n, array);
 }
 
@@ -15671,10 +15693,11 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
         // First, attempt to remove; if nothing was removed, then add it instead
         // TODO _ypSet_pop and _ypSet_push both call yp_currenthashC; consolidate?
         result = _ypSet_pop(so, otherkeys[i].se_key);
-        if (yp_isexceptionC(result)) return result;
         if (result == ypSet_dummy) {
             result = _ypSet_push(so, otherkeys[i].se_key, &spaceleft, keysleft);  // may resize so
             if (yp_isexceptionC(result)) return result;
+        } else if (yp_isexceptionC(result)) {
+            return result;
         } else {
             // XXX spaceleft based on alloclen and fill, so doesn't change on deletions
             // FIXME What if yp_decref modifies so?
@@ -16184,11 +16207,11 @@ static ypObject *frozenset_len(ypObject *so, yp_ssize_t *len)
 static ypObject *set_remove(ypObject *so, ypObject *x, ypObject *onmissing)
 {
     ypObject *result = _ypSet_pop(so, x);
-    if (yp_isexceptionC(result)) return result;
     if (result == ypSet_dummy) {
         if (onmissing == NULL) return yp_KeyError;
         return onmissing;
     }
+    if (yp_isexceptionC(result)) return result;
     yp_decref(result);
     return yp_None;
 }
@@ -16249,6 +16272,7 @@ static ypSetMethods ypFrozenSet_as_set = {
 
 static ypTypeObject ypFrozenSet_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -16335,6 +16359,7 @@ static ypSetMethods ypSet_as_set = {
 
 static ypTypeObject ypSet_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -16505,6 +16530,14 @@ static ypObject *_ypSet(int type, ypObject *iterable)
         yp_decref(newSo);
         return result;
     }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypFrozenSet_CODE && ypSet_LEN(newSo) < 1) {
+        yp_decref(newSo);
+        return yp_frozenset_empty;
+    }
+
     return newSo;
 }
 
@@ -17177,8 +17210,8 @@ static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
 static ypObject *dict_delitem(ypObject *mp, ypObject *key)
 {
     ypObject *result = _ypDict_pop(mp, key);
-    if (yp_isexceptionC(result)) return result;
     if (result == ypSet_dummy) return yp_KeyError;
+    if (yp_isexceptionC(result)) return result;
     yp_decref(result);
     return yp_None;
 }
@@ -17475,7 +17508,8 @@ static ypMappingMethods ypFrozenDict_as_mapping = {
 
 static ypTypeObject ypFrozenDict_Type = {
         yp_TYPE_HEAD_INIT,
-        NULL,  // tp_name
+        ypType_FLAG_IS_MAPPING,  // tp_flags
+        NULL,                    // tp_name
 
         // Object fundamentals
         yp_CONST_REF(frozendict_func_new),  // tp_func_new
@@ -17557,7 +17591,8 @@ static ypMappingMethods ypDict_as_mapping = {
 
 static ypTypeObject ypDict_Type = {
         yp_TYPE_HEAD_INIT,
-        NULL,  // tp_name
+        ypType_FLAG_IS_MAPPING,  // tp_flags
+        NULL,                    // tp_name
 
         // Object fundamentals
         yp_CONST_REF(dict_func_new),  // tp_func_new
@@ -17695,6 +17730,14 @@ static ypObject *_ypDict(int type, ypObject *x)
         yp_decref(newMp);
         return result;
     }
+
+    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
+    // before allocating; is this complication worth the optimization?
+    if (type == ypFrozenDict_CODE && ypDict_LEN(newMp) < 1) {
+        yp_decref(newMp);
+        return yp_frozendict_empty;
+    }
+
     return newMp;
 }
 
@@ -18128,6 +18171,7 @@ static ypSequenceMethods ypRange_as_sequence = {
 
 static ypTypeObject ypRange_Type = {
         yp_TYPE_HEAD_INIT,
+        0,     // tp_flags
         NULL,  // tp_name
 
         // Object fundamentals
@@ -18351,20 +18395,20 @@ yp_IMMORTAL_INVALIDATED(ypFunction_key_missing);
 // parameter list.
 static ypObject *_ypFunction_parameter_kind(ypObject *name)
 {
-    yp_ssize_t                len;
+    yp_ssize_t                name_len;
     const void               *name_data;
     ypStringLib_getindexXfunc getindexX;
 
     if (ypObject_TYPE_CODE(name) != ypStr_CODE) {
-        return_yp_BAD_TYPE(name);  // FIXME Should also be yp_ParameterSyntaxError
+        return_yp_BAD_TYPE(name);
     }
 
-    len = ypStr_LEN(name);
+    name_len = ypStr_LEN(name);
     name_data = ypStr_DATA(name);
     getindexX = ypStr_ENC(name)->getindexX;
-    if (len < 1) {
+    if (name_len < 1) {
         return yp_ParameterSyntaxError;
-    } else if (len == 1) {
+    } else if (name_len == 1) {
         yp_uint32_t ch = getindexX(name_data, 0);
         if (ch == '/') {
             return yp_s_slash;
@@ -18379,6 +18423,8 @@ static ypObject *_ypFunction_parameter_kind(ypObject *name)
             return yp_None;  // just a regular parameter
         } else if (getindexX(name_data, 1) != '*') {
             return yp_s_star_args;
+        } else if (name_len < 3) {
+            return yp_ParameterSyntaxError;
         } else {
             return yp_s_star_star_kwargs;
         }
@@ -18400,7 +18446,8 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     int remaining_are_keyword_only = FALSE;  // all after * or *args are kw-only
     int must_have_default = FALSE;           // if a parameter has a default, all until * must also
 
-    // ypObject *param_names;  // a yp_set used to detect duplicate names
+    ypObject *param_names;       // a set used to detect duplicate names
+    ypObject *result = yp_None;  // set to exception on error
 
     yp_ASSERT1(!(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED));  // need only be called once
 
@@ -18410,88 +18457,102 @@ static ypObject *_ypFunction_validate_parameters(ypObject *f)
     }
 
     // FIXME We could give yp_set a hint as to how big this will be.
-    // param_names = yp_setN(0);
+    param_names = yp_setN(0);  // new ref
     for (i = 0; i < params_len; i++) {
         yp_parameter_decl_t param = ypFunction_PARAMS(f)[i];
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
-        // ypObject *              param_name = NULL;  // actual name, stripping leading * or **
+        ypObject           *param_name = NULL;  // actual name, stripping leading * or **
 
         if (param_kind == yp_s_slash) {
             if (n_positional_or_keyword < 1 || n_positional_only > 0 ||
                     remaining_are_keyword_only) {
-                // Invalid: (/), (a, /, /), (*, /), (*args, /)
-                return yp_ParameterSyntaxError;
+                // Invalid: (/), (a, /, /), (*, /), (a, *, /), (*, a, /), (*args, /)
+                result = yp_ParameterSyntaxError;
+                break;
             } else if (param.default_ != NULL) {
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             }
             // The previous positional-or-keyword arguments were actually positional-only.
             n_positional_only = n_positional_or_keyword;
             n_positional_or_keyword = 0;
+
         } else if (param_kind == yp_s_star || param_kind == yp_s_star_args) {
             if (remaining_are_keyword_only) {
-                // Invalid: (*, *), (*args, *), (*, *args), (*args, *args)
-                return yp_ParameterSyntaxError;
+                // Invalid: (*, *, a), (*, *args), (*args, *, a), (*args, *args)
+                result = yp_ParameterSyntaxError;
+                break;
             } else if (param.default_ != NULL) {
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             }
             remaining_are_keyword_only = TRUE;
             must_have_default = FALSE;
             if (param_kind == yp_s_star_args) {
                 has_var_positional = TRUE;
-                // param_name = string_getslice(param.name, 1, yp_SLICE_LAST, 1);
+                param_name = str_getslice(param.name, 1, yp_SLICE_LAST, 1);  // new ref
             }
+
         } else if (param_kind == yp_s_star_star_kwargs) {
             if (i != params_len - 1) {
-                // Invalid: (**kwargs, a), (**kwargs, /), (**kwargs, *), (**kwargs, *args),
+                // Invalid: (**kwargs, a), (**kwargs, /), (**kwargs, *, a), (**kwargs, *args),
                 // (**kwargs, **kwargs)
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             } else if (param.default_ != NULL) {
-                return yp_ParameterSyntaxError;
+                result = yp_ParameterSyntaxError;
+                break;
             }
             has_var_keyword = TRUE;
-            // param_name = string_getslice(param.name, 2, yp_SLICE_LAST, 1);
+            param_name = str_getslice(param.name, 2, yp_SLICE_LAST, 1);  // new ref
+
         } else if (param_kind == yp_None) {
-            if (must_have_default) {
-                if (param.default_ == NULL) {
-                    return yp_ParameterSyntaxError;
-                }
-            } else if (param.default_ != NULL) {
-                must_have_default = TRUE;
-            }
             if (remaining_are_keyword_only) {
                 has_keyword_only = TRUE;
             } else {
+                if (param.default_ != NULL) {
+                    must_have_default = TRUE;
+                } else if (must_have_default) {
+                    result = yp_ParameterSyntaxError;
+                    break;
+                }
                 n_positional_or_keyword += 1;
             }
-            // param_name = yp_incref(param.name);
+            param_name = yp_incref(param.name);  // new ref
+
         } else {
             yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
-            return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
+            result = yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
+            break;
         }
 
-        // FIXME: Implement str_isidentifier, string_getslice, then enable this.
-        // FIXME Place this code in a separate helper function.
-        // if (param_name != NULL) {
-        //     ypObject *result = str_isidentifier(param_name);
-        //     if (result != yp_True) {
-        //         // Invalid: (1), (*1), (**1)
-        //         yp_ASSERT(result == yp_False || yp_isexceptionC(result),
-        //                 "unexpected return from str_isidentifier");
-        //         yp_decref(param_name);
-        //         return yp_isexceptionC(result) ? result : yp_ParameterSyntaxError;
-        //     }
+        if (param_name != NULL) {
+            // TODO: Implement str_isidentifier, then enable this.
+            // result = str_isidentifier(param_name);
+            // if (result != yp_True) {
+            //     // Invalid: (1), (*1), (**1)
+            //     if (result == yp_False) result = yp_ParameterSyntaxError;
+            //     yp_ASSERT(yp_isexceptionC(result), "unexpected return from str_isidentifier");
+            //     yp_decref(param_name);
+            //     break;
+            // }
 
-        //     result = set_pushunique(param_names, param_name);
-        //     if (result != yp_None) {
-        //         // Invalid: (a, a), (a, *a), (a, **a)
-        //         yp_ASSERT(yp_isexceptionC(result), "unexpected return from set_pushunique");
-        //         yp_decref(param_name);
-        //         return result == yp_KeyError ? yp_ParameterSyntaxError : result;
-        //     }
-        //     yp_decref(param_name);
-        // }
+            result = set_pushunique(param_names, param_name);
+            if (result != yp_None) {
+                // Invalid: (a, a), (a, *a), (a, **a), (*a, a), (*a, **a)
+                if (yp_isexceptionC2(result, yp_KeyError)) result = yp_ParameterSyntaxError;
+                yp_ASSERT(yp_isexceptionC(result), "unexpected return from set_pushunique");
+                yp_decref(param_name);
+                break;
+            }
+            yp_decref(param_name);
+        }
     }
-    // yp_decref(param_names);
+    yp_decref(param_names);
+    if (result != yp_None) {
+        yp_ASSERT(yp_isexceptionC(result), "result set to non-exception");
+        return yp_isexceptionC(result) ? result : yp_SystemError;
+    }
 
     if (remaining_are_keyword_only && !has_var_positional && !has_keyword_only) {
         // Invalid: (*), (*, **kwargs) (named arguments must follow bare *)
@@ -18521,10 +18582,12 @@ static void _ypFunction_call_decref_argarray(yp_ssize_t n, ypObject **argarray)
 
 // Helper for _ypFunction_call_QuickIter. Places the positional arguments in argarray. Keeps *n
 // up-to-date with the number of references in argarray, so they can be deallocated by
-// _ypFunction_call_QuickIter after the call.
+// _ypFunction_call_QuickIter after the call. Sets *slash_index to the position of /, if present (/
+// is always consumed by this function).
 static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_methods *iter,
-        ypQuickIter_state *args, yp_ssize_t *n, ypObject **argarray)
+        ypQuickIter_state *args, yp_ssize_t *n, ypObject **argarray, yp_ssize_t *slash_index)
 {
+    int       is_positional_only = ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY;
     ypObject *arg;
 
     while (*n < ypFunction_PARAMS_LEN(f)) {
@@ -18532,32 +18595,47 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
 
         if (param_kind == yp_s_slash) {
+            is_positional_only = FALSE;
+            *slash_index = *n;
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the / parameter
+
         } else if (param_kind == yp_s_star) {
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the * parameter
             break;                // will ensure no remaining positional arguments
+
         } else if (param_kind == yp_s_star_args) {
             arg = iter->remaining_as_tuple(args);  // new ref
             if (yp_isexceptionC(arg)) return arg;
             argarray[*n] = arg;
             (*n)++;          // consume the parameter
             return yp_None;  // end of positional arguments
+
         } else if (param_kind == yp_s_star_star_kwargs) {
             // do *not* consume the **kwargs parameter
             break;  // will ensure no remaining positional arguments
+
         } else if (param_kind == yp_None) {
             arg = iter->next(args);  // new ref
             if (arg == NULL) {
-                // Do *not* consume the parameter: it may be in kwargs.
-                return yp_None;  // end of positional arguments
+                if (!is_positional_only) {
+                    // Do *not* consume the parameter: it may be in kwargs.
+                    return yp_None;  // end of positional arguments
+                } else if (param.default_ != NULL) {
+                    argarray[*n] = yp_incref(param.default_);  // can be an exception
+                    (*n)++;                                    // consume the parameter
+                } else {
+                    // A positional-only parameter without a matching argument or a default.
+                    return yp_TypeError;
+                }
             } else if (yp_isexceptionC(arg)) {
                 return arg;
             } else {
                 argarray[*n] = arg;
                 (*n)++;  // consume the parameter
             }
+
         } else {
             yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
             return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
@@ -18573,60 +18651,137 @@ static ypObject *_ypFunction_call_place_args(ypObject *f, const ypQuickIter_meth
     return yp_None;
 }
 
-// Helper for _ypFunction_call_QuickIter. Determines **kwargs by modifying kwargs, first dropping
-// keyword arguments we've already placed, freezing it, and returning a new reference.
-static ypObject *_ypFunction_call_make_var_kwargs(
-        ypObject *f, yp_ssize_t first_kwarg, ypObject *kwargs)
+// Helper for _ypFunction_call_QuickIter. Returns an exact copy of kwargs as a frozendict, to be
+// assigned to the **kwargs parameter. Raises yp_TypeError if kwargs contains non-string keys.
+// kwargs must be a mapping object. If kwargs_is_copy is true, kwargs is frozen in-place, saving a
+// copy.
+static ypObject *_ypFunction_call_copy_var_kwargs(ypObject *kwargs, int kwargs_is_copy)
+{
+    ypObject   *result;
+    ypObject   *mi;
+    yp_uint64_t mi_state;
+
+    yp_ASSERT1(ypObject_IS_MAPPING(kwargs));
+
+    if (kwargs_is_copy) {
+        yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
+        // TODO Implement frozendict_freeze and freeze kwargs in-place here.
+        result = yp_frozendict(kwargs);
+        if (yp_isexceptionC(result)) return result;
+    } else {
+        result = yp_frozendict(kwargs);
+        if (yp_isexceptionC(result)) return result;
+    }
+
+    // Validate that all the keys are strings.
+    // TODO Make a slightly-more-optimized version of frozendict_miniiter_keys for internal use?
+    mi = frozendict_miniiter_keys(result, &mi_state);
+    while (1) {
+        ypObject *key = frozendict_miniiter_next(mi, &mi_state);
+        // TODO Allow subclasses of str.
+        if (ypObject_TYPE_CODE(key) != ypStr_CODE) {
+            if (yp_isexceptionC2(key, yp_StopIteration)) break;
+
+            // An exception happened or the key is not a str: replace the result with an exception.
+            yp_decref(result);
+            result = yp_BAD_TYPE(key);
+            yp_decref(key);
+            break;
+        }
+        yp_decref(key);
+    }
+    yp_decref(mi);
+
+    return result;
+}
+
+// Helper for _ypFunction_call_QuickIter. Determines **kwargs by copying kwargs, dropping keyword
+// arguments we've already placed, freezing it, and returning a new reference. slash_index is the
+// index of /, or -1 if not present. first_kwarg is the position of the first parameter filled by a
+// keyword argument. If kwargs_is_copy is true, kwargs is modified directly, saving a copy.
+static ypObject *_ypFunction_call_make_var_kwargs(ypObject *f, yp_ssize_t slash_index,
+        yp_ssize_t first_kwarg, yp_ssize_t placed_kwargs, ypObject *kwargs, int kwargs_is_copy)
 {
     yp_parameter_decl_t param;
     ypObject           *param_kind;
-    ypObject           *arg;
+    ypObject           *result;
     yp_ssize_t          i = 0;
+    ypObject           *kwargs_copy;
 
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED);
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW);
-    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
+
+    // If we consumed all the keyword arguments, then **kwargs will be empty. Recall we can trust
+    // that there are no duplicate names in params, so we know there were no arguments that were
+    // both positional and keyword.
+    if (placed_kwargs >= ypDict_LEN(kwargs)) return yp_frozendict_empty;
 
     // Skip any positional-only parameters: function (a, /, **kwargs) can be called like (1, a=33).
     if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY) {
-        while (i < ypFunction_PARAMS_LEN(f)) {
-            param = ypFunction_PARAMS(f)[i];
-            param_kind = _ypFunction_parameter_kind(param.name);
-            if (yp_isexceptionC(param_kind)) return param_kind;
-
-            i++;  // consume the parameter
-            if (param_kind == yp_s_slash) break;
-        }
-        yp_ASSERT1(i < ypFunction_PARAMS_LEN(f));
+        yp_ASSERT1(slash_index >= 0);
+        i = slash_index + 1;  // start at the param after /, the first kw param
     }
 
-    for (/*i already set*/; i < ypFunction_PARAMS_LEN(f); i++) {
+    // Ensure that there were no arguments that were both positional and keyword. At this point,
+    // kwargs may still be a frozendict, so use yp_contains. Without a **kwargs,
+    // _ypFunction_call_place_kwargs uses placed_kwargs to detect this case.
+    for (/*i already set*/; i < first_kwarg; i++) {
         param = ypFunction_PARAMS(f)[i];
         param_kind = _ypFunction_parameter_kind(param.name);
         if (yp_isexceptionC(param_kind)) return param_kind;
         if (param_kind != yp_None) continue;  // skip *, *args, and **kwargs (/ already skipped)
 
-        arg = dict_popvalue(kwargs, param.name, ypFunction_key_missing);
-        if (arg == ypFunction_key_missing) continue;
-        if (yp_isexceptionC(arg)) return arg;
-        yp_decref(arg);
+        result = frozendict_contains(kwargs, param.name);
+        if (result == yp_False) continue;
+        if (yp_isexceptionC(result)) return result;
 
-        // We found a matching keyword argument. Ensure this wasn't also a positional argument.
-        // Without a **kwargs, _ypFunction_call_place_kwargs uses placed_kwargs to detect this case.
-        if (i < first_kwarg) return yp_TypeError;
+        return yp_TypeError;  // a matching keyword argument that was also positional
     }
 
-    // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
-    return yp_frozendict(kwargs);
+    // If we did not consume any keyword arguments, then **kwargs will be an exact copy.
+    if (placed_kwargs < 1) return _ypFunction_call_copy_var_kwargs(kwargs, kwargs_is_copy);
+
+    // We need to modify then freeze kwargs, so make a copy of it, unless it is *already* a copy.
+    // (We coerce user-defined mapping types to dict, which is already an object we can modify.)
+    if (kwargs_is_copy) {
+        yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypDict_CODE);
+        kwargs_copy = yp_incref(kwargs);
+    } else {
+        kwargs_copy = yp_dict(kwargs);
+        if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
+    }
+
+    // Remove the keyword arguments we have already placed. Remember to decref kwargs_copy on error.
+    for (/*i already set*/; i < ypFunction_PARAMS_LEN(f); i++) {
+        param = ypFunction_PARAMS(f)[i];
+        param_kind = _ypFunction_parameter_kind(param.name);
+        if (yp_isexceptionC(param_kind)) {
+            yp_decref(kwargs_copy);
+            return param_kind;
+        }
+        if (param_kind != yp_None) continue;  // skip *, *args, and **kwargs (/ already skipped)
+
+        result = dict_popvalue(kwargs_copy, param.name, ypFunction_key_missing);
+        if (yp_isexceptionC(result)) {
+            yp_decref(kwargs_copy);
+            return result;
+        }
+        yp_decref(result);
+    }
+
+    result = _ypFunction_call_copy_var_kwargs(kwargs_copy, /*kwargs_is_copy=*/TRUE);
+    yp_decref(kwargs_copy);
+    return result;
 }
 
 // Helper for _ypFunction_call_QuickIter. Places the keyword arguments in argarray. Keeps *n
 // up-to-date with the number of references in argarray, so they can be deallocated by
-// _ypFunction_call_QuickIter after the call. kwargs must be a dict/frozendict; additonally, if
-// we have a **kwargs parameter, kwargs must be a dict, and it will be modified, frozen, and
-// placed in argarray.
-static ypObject *_ypFunction_call_place_kwargs(
-        ypObject *f, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
+// _ypFunction_call_QuickIter after the call. slash_index is the index of /, or -1 if not present.
+// kwargs must be a dict/frozendict; additonally, if we have a **kwargs parameter, kwargs must be a
+// dict, and it will be modified, frozen, and placed in argarray.
+static ypObject *_ypFunction_call_place_kwargs(ypObject *f, yp_ssize_t slash_index,
+        ypObject *kwargs, int kwargs_is_copy, yp_ssize_t *n, ypObject **argarray)
 {
     ypObject  *arg;
     yp_ssize_t first_kwarg = *n;   // remembers the position of the first param filled by us
@@ -18638,27 +18793,25 @@ static ypObject *_ypFunction_call_place_kwargs(
         yp_parameter_decl_t param = ypFunction_PARAMS(f)[*n];
         ypObject           *param_kind = _ypFunction_parameter_kind(param.name);
 
-        if (param_kind == yp_s_slash) {
-            if (placed_kwargs > 0) {
-                // A positional-only parameter was filled using a keyword argument.
-                return yp_TypeError;
-            }
-            argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
-            (*n)++;               // consume the / parameter
-        } else if (param_kind == yp_s_star) {
+        // / was already consumed by _ypFunction_call_place_args.
+        if (param_kind == yp_s_star) {
             argarray[*n] = NULL;  // a placeholder so argarray[i] corresponds to params[i]
             (*n)++;               // consume the * parameter
+
         } else if (param_kind == yp_s_star_args) {
             argarray[*n] = yp_tuple_empty;  // there must not have been any more positional args
             (*n)++;                         // consume the *args parameter
+
         } else if (param_kind == yp_s_star_star_kwargs) {
             yp_ASSERT(*n == ypFunction_PARAMS_LEN(f) - 1,
                     "_ypFunction_validate_parameters didn't ensure that **kwargs came last");
-            arg = _ypFunction_call_make_var_kwargs(f, first_kwarg, kwargs);
+            arg = _ypFunction_call_make_var_kwargs(
+                    f, slash_index, first_kwarg, placed_kwargs, kwargs, kwargs_is_copy);
             if (yp_isexceptionC(arg)) return arg;
             argarray[*n] = arg;
             (*n)++;          // consume the parameter
             return yp_None;  // **kwarg, if present, is always last
+
         } else if (param_kind == yp_None) {
             arg = frozendict_getdefault(kwargs, param.name, ypFunction_key_missing);  // new ref
             if (yp_isexceptionC(arg)) return arg;
@@ -18673,7 +18826,10 @@ static ypObject *_ypFunction_call_place_kwargs(
                 // A parameter without a matching argument or a default.
                 return yp_TypeError;
             }
+
         } else {
+            yp_ASSERT(param_kind != yp_s_slash,
+                    "/ should have been consumed by _ypFunction_call_place_args");
             yp_ASSERT(yp_isexceptionC(param_kind), "unexpected return from parameter_kind");
             return yp_isexceptionC(param_kind) ? param_kind : yp_SystemError;
         }
@@ -18681,7 +18837,8 @@ static ypObject *_ypFunction_call_place_kwargs(
 
     yp_ASSERT1(!(ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW));
     if (placed_kwargs != ypDict_LEN(kwargs)) {
-        // Unexpected keyword arguments, or an argument was both positional and keyword.
+        // Unexpected keyword arguments (including non-string keys), or an argument was both
+        // positional and keyword.
         return yp_TypeError;
     }
 
@@ -18693,32 +18850,35 @@ static ypObject *_ypFunction_call_place_kwargs(
 static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter_methods *iter,
         ypQuickIter_state *args, ypObject *kwargs, yp_ssize_t *n, ypObject **argarray)
 {
-    ypObject *result;
+    ypObject  *result;
+    yp_ssize_t slash_index = -1;  // index of /, or -1 if not present
 
     yp_ASSERT1(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED);
 
     // Positional arguments are placed first.
-    result = _ypFunction_call_place_args(f, iter, args, n, argarray);
+    result = _ypFunction_call_place_args(f, iter, args, n, argarray, &slash_index);
     if (yp_isexceptionC(result)) return result;
+    yp_ASSERT1((ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_POS_ONLY && slash_index >= 0) ||
+               slash_index == -1);
 
-    if (ypFunction_FLAGS(f) & ypFunction_FLAG_HAS_VAR_KW) {
-        ypObject *kwargs_copy = yp_dict(kwargs);  // modified by _ypFunction_call_place_kwargs
-        if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
-        result = _ypFunction_call_place_kwargs(f, kwargs_copy, n, argarray);
-        yp_decref(kwargs_copy);
+    if (ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE) {
+        result = _ypFunction_call_place_kwargs(
+                f, slash_index, kwargs, /*kwargs_is_copy=*/FALSE, n, argarray);
         if (yp_isexceptionC(result)) return result;
-    } else if (ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE) {
-        result = _ypFunction_call_place_kwargs(f, kwargs, n, argarray);
-        if (yp_isexceptionC(result)) return result;
-    } else {
+    } else if (ypObject_IS_MAPPING(kwargs)) {
         // We can't trust user-defined mapping types here (and neither does Python). Consider a
         // case-insensitive mapping {'a': 1} with a function (a, A). Even though the mapping
         // contains just one entry, it would match both arguments.
-        ypObject *kwargs_asfrozendict = yp_frozendict(kwargs);
-        if (yp_isexceptionC(kwargs_asfrozendict)) return kwargs_asfrozendict;
-        result = _ypFunction_call_place_kwargs(f, kwargs_asfrozendict, n, argarray);
-        yp_decref(kwargs_asfrozendict);
+        ypObject *kwargs_copy = yp_dict(kwargs);
+        if (yp_isexceptionC(kwargs_copy)) return kwargs_copy;
+        result = _ypFunction_call_place_kwargs(
+                f, slash_index, kwargs_copy, /*kwargs_is_copy=*/TRUE, n, argarray);
+        yp_decref(kwargs_copy);
         if (yp_isexceptionC(result)) return result;
+    } else {
+        // Argument after ** must be a mapping.
+        // XXX Here, Python just requires PyMapping_Keys() (i.e. .keys()) to be supported.
+        return_yp_BAD_TYPE(kwargs);
     }
 
     yp_ASSERT1(*n == ypFunction_PARAMS_LEN(f));
@@ -18731,6 +18891,7 @@ static ypObject *_ypFunction_call_QuickIter_inner(ypObject *f, const ypQuickIter
         (*n)--;
     }
 
+    // TODO Protect against misbehaving code that modifies argarray? Anywhere we call code.
     return ypFunction_CODE_FUNC(f)(f, *n, *n > 0 ? argarray : NULL);
 }
 
@@ -18841,7 +19002,8 @@ static ypObject *ypFunction_callNV(ypObject *f, int n, va_list args)
         int       i;
         ypObject *argarray[ypFunction_MAX_ARGS_ON_STACK];
         for (i = 0; i < n; i++) {
-            argarray[i] = va_arg(args, ypObject *);  // borrowed
+            ypObject *arg = argarray[i] = va_arg(args, ypObject *);  // borrowed
+            if (yp_isexceptionC(arg)) return arg;
         }
         return ypFunction_CODE_FUNC(f)(f, n, argarray);
 
@@ -18868,6 +19030,7 @@ static ypObject *ypFunction_callNV_withself(ypObject *f, ypObject *self, int n_a
     yp_ssize_t n_actual;
 
     yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
+    yp_ASSERT1(!yp_isexceptionC(self));
     yp_ASSERT1(n_args >= 0);
 
     // Function immortals must be validated at runtime.
@@ -18892,7 +19055,8 @@ static ypObject *ypFunction_callNV_withself(ypObject *f, ypObject *self, int n_a
         ypObject *argarray[ypFunction_MAX_ARGS_ON_STACK];
         argarray[0] = self;  // borrowed
         for (i = 0; i < n_args; i++) {
-            argarray[i + 1] = va_arg(args, ypObject *);  // borrowed
+            ypObject *arg = argarray[i + 1] = va_arg(args, ypObject *);  // borrowed
+            if (yp_isexceptionC(arg)) return arg;
         }
         return ypFunction_CODE_FUNC(f)(f, n_actual, argarray);
 
@@ -18925,12 +19089,19 @@ static ypObject *_ypFunction_call_stars_tostars(
 
     yp_ASSERT1(var_pos_i <= yp_SSIZE_T_MAX - 2);  // paranoia, as max value of var_pos_i is 2-ish
 
+    if (!ypObject_IS_MAPPING(kwargs)) {
+        // Argument after ** must be a mapping.
+        // XXX Here, Python just requires PyMapping_Keys() (i.e. .keys()) to be supported.
+        return_yp_BAD_TYPE(kwargs);
+    }
+
     argarray[var_pos_i] = yp_tuple(args);  // new ref
     if (yp_isexceptionC(argarray[var_pos_i])) {
         return argarray[var_pos_i];
     }
 
-    argarray[var_kw_i] = yp_frozendict(kwargs);  // new ref
+    argarray[var_kw_i] =
+            _ypFunction_call_copy_var_kwargs(kwargs, /*kwargs_is_copy=*/FALSE);  // new ref
     if (yp_isexceptionC(argarray[var_kw_i])) {
         yp_decref(argarray[var_pos_i]);
         return argarray[var_kw_i];
@@ -18970,7 +19141,7 @@ static ypObject *ypFunction_call_stars(ypObject *f, ypObject *args, ypObject *kw
         ypObject                  *result = ypQuickIter_new_fromiterable(&iter, &state, args);
         if (yp_isexceptionC(result)) return result;
         result = _ypFunction_call_QuickIter(f, NULL, iter, &state, kwargs);
-        ypQuickIter_var_close(&state);
+        iter->close(&state);
         return result;
     }
 }
@@ -18981,6 +19152,7 @@ static ypObject *ypFunction_call_stars_withself(
     yp_uint8_t param_flags;
 
     yp_ASSERT1(ypObject_TYPE_CODE(f) == ypFunction_CODE);
+    yp_ASSERT1(!yp_isexceptionC(self));
 
     // Function immortals must be validated at runtime.
     if (!(ypFunction_FLAGS(f) & ypFunction_FLAG_VALIDATED)) {
@@ -19005,7 +19177,7 @@ static ypObject *ypFunction_call_stars_withself(
         ypObject                  *result = ypQuickIter_new_fromiterable(&iter, &state, args);
         if (yp_isexceptionC(result)) return result;
         result = _ypFunction_call_QuickIter(f, self, iter, &state, kwargs);
-        ypQuickIter_var_close(&state);
+        iter->close(&state);
         return result;
     }
 }
@@ -19059,7 +19231,12 @@ static ypObject *ypFunction_call_array(ypObject *f, yp_ssize_t n, ypObject *cons
         return ypFunction_CODE_FUNC(f)(f, 0, NULL);
 
     } else if (ypFunction_IS_POSITIONAL_MATCH(param_flags, params_len, n)) {
-        // This is why yp_call_arrayX exists: we can just pass the array on through.
+        // This is why yp_call_arrayX exists: we can just pass the array on through (although we
+        // first have to check for exceptions).
+        yp_ssize_t i;
+        for (i = 0; i < n; i++) {
+            if (yp_isexceptionC(args[i])) return args[i];
+        }
         return ypFunction_CODE_FUNC(f)(f, n, args);
 
     } else if (ypFunction_IS_VAR_POS_VAR_KW(param_flags)) {
@@ -19068,10 +19245,12 @@ static ypObject *ypFunction_call_array(ypObject *f, yp_ssize_t n, ypObject *cons
 
     } else if (n > 0 && ypFunction_IS_PARAM_VAR_POS_VAR_KW(param_flags)) {
         ypObject *argarray[3] = {args[0]};  // only self (args[0]) is borrowed in argarray
+        if (yp_isexceptionC(args[0])) return args[0];
         return _ypFunction_call_array_tostars(f, n - 1, args + 1, argarray, 1);
 
     } else if (n > 0 && ypFunction_IS_PARAM_SLASH_VAR_POS_VAR_KW(param_flags)) {
         ypObject *argarray[4] = {args[0], NULL};  // only self (args[0]) is borrowed in argarray
+        if (yp_isexceptionC(args[0])) return args[0];
         return _ypFunction_call_array_tostars(f, n - 1, args + 1, argarray, 2);
 
     } else {
@@ -19160,17 +19339,17 @@ static ypObject *function_func_new_code(ypObject *f, yp_ssize_t n, ypObject *con
 }
 
 yp_IMMORTAL_FUNCTION_static(function_func_new, function_func_new_code,
-        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_star_args), NULL},
-                {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
+        ({yp_CONST_REF(yp_s_cls), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+                {yp_CONST_REF(yp_s_star_args), NULL}, {yp_CONST_REF(yp_s_star_star_kwargs), NULL}));
 
 static ypCallableMethods ypFunction_as_callable = {
-        TRUE,          // tp_iscallable
         function_call  // tp_call
 };
 
 static ypTypeObject ypFunction_Type = {
         yp_TYPE_HEAD_INIT,
-        NULL,  // tp_name
+        ypType_FLAG_IS_CALLABLE,  // tp_flags
+        NULL,                     // tp_name
 
         // Object fundamentals
         yp_CONST_REF(function_func_new),  // tp_func_new
@@ -19722,7 +19901,7 @@ void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args)
     _yp_REDIRECT_EXC2(mapping, tp_as_mapping, tp_updateK, (mapping, n, args), exc);
 }
 
-int yp_iscallableC(ypObject *x) { return ypObject_TYPE(x)->tp_as_callable->tp_iscallable; }
+int yp_iscallableC(ypObject *x) { return ypObject_IS_CALLABLE(x); }
 
 // TODO A version of yp_callN that also accepts keyword arguments. Could have yp_callK that _only_
 // accepts keyword arguments, but I'd rather it's combined. A yp_callNK would be like
@@ -19790,11 +19969,12 @@ ypObject *yp_call_stars(ypObject *c, ypObject *args, ypObject *kwargs)
 // kwargs in vectorcall, but I don't see the overall benefit.
 ypObject *yp_call_arrayX(yp_ssize_t n, ypObject **args)
 {
-    ypObject *c = args[0];  // borrowed
+    ypObject *c;
 
-    if (n < 1) {
-        return yp_TypeError;
-    } else if (ypObject_TYPE_CODE(c) == ypFunction_CODE) {
+    if (n < 1) return yp_TypeError;
+    c = args[0];  // borrowed
+
+    if (ypObject_TYPE_CODE(c) == ypFunction_CODE) {
         return ypFunction_call_array(c, n - 1, args + 1);
     } else {
         ypObject *f;
@@ -20027,8 +20207,8 @@ static ypObject *yp_func_chr_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
     return yp_chrC(i);
 };
 
-yp_IMMORTAL_FUNCTION(yp_func_chr, yp_func_chr_code,
-        ({yp_CONST_REF(yp_s_i), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+yp_IMMORTAL_FUNCTION(
+        yp_func_chr, yp_func_chr_code, ({yp_CONST_REF(yp_s_i), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20044,7 +20224,7 @@ static ypObject *yp_func_hash_code(ypObject *c, yp_ssize_t n, ypObject *const *a
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_hash, yp_func_hash_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_iscallable_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20053,7 +20233,7 @@ static ypObject *yp_func_iscallable_code(ypObject *c, yp_ssize_t n, ypObject *co
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_iscallable, yp_func_iscallable_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20069,7 +20249,7 @@ static ypObject *yp_func_len_code(ypObject *c, yp_ssize_t n, ypObject *const *ar
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_len, yp_func_len_code,
-        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+        ({yp_CONST_REF(yp_s_obj), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20078,7 +20258,7 @@ static ypObject *yp_func_reversed_code(ypObject *c, yp_ssize_t n, ypObject *cons
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_reversed, yp_func_reversed_code,
-        ({yp_CONST_REF(yp_s_sequence), NULL}, {yp_CONST_REF(yp_s_slash), NULL}));
+        ({yp_CONST_REF(yp_s_sequence), NULL}, {yp_CONST_REF(yp_s_slash)}));
 
 static ypObject *yp_func_sorted_code(ypObject *c, yp_ssize_t n, ypObject *const *argarray)
 {
@@ -20087,7 +20267,7 @@ static ypObject *yp_func_sorted_code(ypObject *c, yp_ssize_t n, ypObject *const 
 };
 
 yp_IMMORTAL_FUNCTION(yp_func_sorted, yp_func_sorted_code,
-        ({yp_CONST_REF(yp_s_iterable), NULL}, {yp_CONST_REF(yp_s_slash), NULL},
+        ({yp_CONST_REF(yp_s_iterable), NULL}, {yp_CONST_REF(yp_s_slash)},
                 {yp_CONST_REF(yp_s_star), NULL}, {yp_CONST_REF(yp_s_key), yp_CONST_REF(yp_None)},
                 {yp_CONST_REF(yp_s_reverse), yp_CONST_REF(yp_False)}));
 

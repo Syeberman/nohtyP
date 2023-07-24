@@ -5,6 +5,9 @@
 // TODO This could be a protocol test.
 static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture)
 {
+    ypObject *int_0 = yp_intC(0);
+    ypObject *int_1 = yp_intC(1);
+
     // Remove an item from a set. The hash should equal a "clean" set. This was a bug from the
     // implementation of the yp_HashSet functions.
     {
@@ -23,6 +26,7 @@ static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(expected, set));
     }
 
+    yp_decrefN(N(int_0, int_1));
     return MUNIT_OK;
 }
 
