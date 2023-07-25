@@ -752,6 +752,7 @@ SUITE_OF_TESTS_DECLS(test_function);
 
 SUITE_OF_SUITES_DECLS(test_protocols);
 SUITE_OF_TESTS_DECLS(test_sequence);
+SUITE_OF_TESTS_DECLS(test_setlike);
 SUITE_OF_TESTS_DECLS(test_string);
 
 
