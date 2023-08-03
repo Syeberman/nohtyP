@@ -15842,7 +15842,8 @@ static ypObject *frozenset_isdisjoint(ypObject *so, ypObject *x)
         return _ypSet_isdisjoint(so, x);
     } else {
         // Otherwise, we need to convert x to a set to quickly test if it contains all items
-        // TODO Can we make a version of _ypSet_isdisjoint that doesn't reqire a new set created?
+        // FIXME We can make a version of _ypSet_isdisjoint that doesn't reqire a new set! Just
+        // iterate over x looking for
         x_asset = yp_frozenset(x);
         if (yp_isexceptionC(x_asset)) return x_asset;
         result = _ypSet_isdisjoint(so, x_asset);
