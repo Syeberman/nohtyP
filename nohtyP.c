@@ -373,6 +373,7 @@ typedef ypObject *(*traversefunc)(ypObject *, visitfunc, void *);
 typedef ypObject *(*hashvisitfunc)(ypObject *, void *, yp_hash_t *);
 typedef ypObject *(*hashfunc)(ypObject *, hashvisitfunc, void *, yp_hash_t *);
 typedef ypObject *(*miniiterfunc)(ypObject *, yp_uint64_t *);
+typedef ypObject *(*miniiter_items_nextfunc)(ypObject *, yp_uint64_t *, ypObject **, ypObject **);
 typedef ypObject *(*miniiter_length_hintfunc)(ypObject *, yp_uint64_t *, yp_ssize_t *);
 typedef ypObject *(*lenfunc)(ypObject *, yp_ssize_t *);
 typedef ypObject *(*countfunc)(ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t *);
@@ -425,16 +426,17 @@ typedef struct {
 } ypSetMethods;
 
 typedef struct {
-    miniiterfunc    tp_miniiter_items;
-    objproc         tp_iter_items;
-    miniiterfunc    tp_miniiter_keys;
-    objproc         tp_iter_keys;
-    objobjobjproc   tp_popvalue;
-    objpobjpobjproc tp_popitem;  // on error, return exception, but leave *key/*value
-    objobjobjproc   tp_setdefault;
-    objvalistproc   tp_updateK;
-    miniiterfunc    tp_miniiter_values;
-    objproc         tp_iter_values;
+    miniiterfunc            tp_miniiter_keys;
+    miniiterfunc            tp_miniiter_values;
+    miniiterfunc            tp_miniiter_items;
+    miniiter_items_nextfunc tp_miniiter_items_next;
+    objproc                 tp_iter_keys;
+    objproc                 tp_iter_values;
+    objproc                 tp_iter_items;
+    objobjobjproc           tp_popvalue;
+    objpobjpobjproc         tp_popitem;  // on error, return exception, but leave *key/*value
+    objobjobjproc           tp_setdefault;
+    objvalistproc           tp_updateK;
 } ypMappingMethods;
 
 // FIXME Maybe this isn't "as callable", but defines the callable things associated to this object.
@@ -605,6 +607,7 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
     static ypObject *name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
     static ypObject *name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
     static ypObject *name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
+    static ypObject *name ## _miniiter_items_nextfunc(ypObject *x, yp_uint64_t *state, ypObject **key, ypObject **value) { return retval; } \
     static ypObject *name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *length_hint) { return retval; } \
     static ypObject *name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
     static ypObject *name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
@@ -647,15 +650,16 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
     } }; \
     static ypMappingMethods yp_UNUSED name ## _MappingMethods[1] = { { \
         *name ## _miniiterfunc, \
-        *name ## _objproc, \
         *name ## _miniiterfunc, \
+        *name ## _miniiterfunc, \
+        *name ## _miniiter_items_nextfunc, \
+        *name ## _objproc, \
+        *name ## _objproc, \
         *name ## _objproc, \
         *name ## _objobjobjproc, \
         *name ## _objpobjpobjproc, \
         *name ## _objobjobjproc, \
         *name ## _objvalistproc, \
-        *name ## _miniiterfunc, \
-        *name ## _objproc \
     } }; \
     static ypCallableMethods yp_UNUSED name ## _CallableMethods[1] = { { \
         *name ## _objpobjpobjproc \
@@ -16942,7 +16946,7 @@ static ypObject *_ypDict_update_fromiterable(ypObject *mp, ypObject *x)
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
 
     // Prefer yp_iter_items over yp_iter if supported.
-    // TODO replace with yp_miniiter_items once supported
+    // FIXME replace with yp_miniiter_items now that it's supported
     // TODO help(dict.update) states that it only looks for a .keys() method. This is probably
     // better: while keys() requires an extra lookup, that's likely cheaper than creating all those
     // 2-tuples...although, with yp_miniiter_items, we would get the best of both worlds, so perhaps
@@ -17379,48 +17383,75 @@ static ypObject *frozendict_iter_values(ypObject *x)
     return _ypMiIter_fromminiiter(x, frozendict_miniiter_values);
 }
 
+// Returns the index of the next item to yield, or -1 if exhausted. Updates state.
 // XXX We need to be a little suspicious of _state...just in case the caller has changed it
-static ypObject *frozendict_miniiter_next(ypObject *mp, yp_uint64_t *_state)
+static yp_ssize_t _frozendict_miniiter_next(ypObject *mp, ypDictMiState *state)
 {
-    ypObject      *result;
-    ypDictMiState *state = (ypDictMiState *)_state;
-    yp_ssize_t     index = state->index;  // don't forget to write it back
-    if (state->itemsleft < 1) return yp_StopIteration;
+    yp_ssize_t index = state->index;  // don't forget to write it back
+    if (state->itemsleft < 1) return -1;
 
-    // Find the next entry
+    // Find the next entry.
     while (1) {
         if (index >= ypDict_ALLOCLEN(mp)) {
             ypDictMiState_SET_INDEX(state, ypDict_ALLOCLEN(mp));
             state->itemsleft = 0;
-            return yp_StopIteration;
+            return -1;
         }
         if (ypDict_VALUES(mp)[index] != NULL) break;
         index++;
     }
 
-    // Find the requested data
+    // Update state and return.
+    ypDictMiState_SET_INDEX(state, (index + 1));
+    ypDictMiState_SET_ITEMSLEFT(state, (state->itemsleft - 1));
+    return index;
+}
+
+// XXX We need to be a little suspicious of _state...just in case the caller has changed it
+static ypObject *frozendict_miniiter_next(ypObject *mp, yp_uint64_t *_state)
+{
+    ypDictMiState *state = (ypDictMiState *)_state;
+    yp_ssize_t     index;
+
+    index = _frozendict_miniiter_next(mp, state);
+    if (index < 0) return yp_StopIteration;
+
+    // Find the requested data.
     if (state->keys) {
         if (state->values) {
             // TODO An internal _yp_tuple2, which trusts it won't be passed exceptions, would be
             // quite efficient here
-            result = yp_tupleN(
+            return yp_tupleN(
                     2, ypSet_TABLE(ypDict_KEYSET(mp))[index].se_key, ypDict_VALUES(mp)[index]);
         } else {
-            result = yp_incref(ypSet_TABLE(ypDict_KEYSET(mp))[index].se_key);
+            return yp_incref(ypSet_TABLE(ypDict_KEYSET(mp))[index].se_key);
         }
     } else {
         if (state->values) {
-            result = yp_incref(ypDict_VALUES(mp)[index]);
+            return yp_incref(ypDict_VALUES(mp)[index]);
         } else {
-            result = yp_SystemError;  // should never occur
+            return yp_SystemError;  // should never occur
         }
     }
-    if (yp_isexceptionC(result)) return result;
+}
 
-    // Update state and return
-    ypDictMiState_SET_INDEX(state, (index + 1));
-    ypDictMiState_SET_ITEMSLEFT(state, (state->itemsleft - 1));
-    return result;
+// XXX On error, returns exception, but leaves *key/*value unmodified.
+// XXX We need to be a little suspicious of _state...just in case the caller has changed it
+static ypObject *frozendict_miniiter_items_next(
+        ypObject *mp, yp_uint64_t *_state, ypObject **key, ypObject **value)
+{
+    ypDictMiState *state = (ypDictMiState *)_state;
+    yp_ssize_t     index;
+
+    if (!state->keys || !state->values) return yp_TypeError;  // FIXME ValueError?
+
+    index = _frozendict_miniiter_next(mp, state);
+    if (index < 0) return yp_StopIteration;
+
+    // Find the requested data
+    *key = yp_incref(ypSet_TABLE(ypDict_KEYSET(mp))[index].se_key);
+    *value = yp_incref(ypDict_VALUES(mp)[index]);
+    return yp_None;
 }
 
 static ypObject *frozendict_miniiter_length_hint(
@@ -17495,16 +17526,17 @@ yp_IMMORTAL_FUNCTION_static(
 yp_IMMORTAL_FUNCTION_static(dict_func_new, dict_func_new_code, _ypFrozenDict_FUNC_NEW_PARAMETERS);
 
 static ypMappingMethods ypFrozenDict_as_mapping = {
-        frozendict_miniiter_items,    // tp_miniiter_items
-        frozendict_iter_items,        // tp_iter_items
-        frozendict_miniiter_keys,     // tp_miniiter_keys
-        frozendict_iter_keys,         // tp_iter_keys
-        MethodError_objobjobjproc,    // tp_popvalue
-        MethodError_objpobjpobjproc,  // tp_popitem
-        MethodError_objobjobjproc,    // tp_setdefault
-        MethodError_objvalistproc,    // tp_updateK
-        frozendict_miniiter_values,   // tp_miniiter_values
-        frozendict_iter_values        // tp_iter_values
+        frozendict_miniiter_keys,        // tp_miniiter_keys
+        frozendict_miniiter_values,      // tp_miniiter_values
+        frozendict_miniiter_items,       // tp_miniiter_items
+        frozendict_miniiter_items_next,  // tp_miniiter_items_next
+        frozendict_iter_keys,            // tp_iter_keys
+        frozendict_iter_values,          // tp_iter_values
+        frozendict_iter_items,           // tp_iter_items
+        MethodError_objobjobjproc,       // tp_popvalue
+        MethodError_objpobjpobjproc,     // tp_popitem
+        MethodError_objobjobjproc,       // tp_setdefault
+        MethodError_objvalistproc        // tp_updateK
 };
 
 static ypTypeObject ypFrozenDict_Type = {
@@ -17578,16 +17610,17 @@ static ypTypeObject ypFrozenDict_Type = {
 };
 
 static ypMappingMethods ypDict_as_mapping = {
-        frozendict_miniiter_items,   // tp_miniiter_items
-        frozendict_iter_items,       // tp_iter_items
-        frozendict_miniiter_keys,    // tp_miniiter_keys
-        frozendict_iter_keys,        // tp_iter_keys
-        dict_popvalue,               // tp_popvalue
-        dict_popitem,                // tp_popitem
-        dict_setdefault,             // tp_setdefault
-        dict_updateK,                // tp_updateK
-        frozendict_miniiter_values,  // tp_miniiter_values
-        frozendict_iter_values       // tp_iter_values
+        frozendict_miniiter_keys,        // tp_miniiter_keys
+        frozendict_miniiter_values,      // tp_miniiter_values
+        frozendict_miniiter_items,       // tp_miniiter_items
+        frozendict_miniiter_items_next,  // tp_miniiter_items_next
+        frozendict_iter_keys,            // tp_iter_keys
+        frozendict_iter_values,          // tp_iter_values
+        frozendict_iter_items,           // tp_iter_items
+        dict_popvalue,                   // tp_popvalue
+        dict_popitem,                    // tp_popitem
+        dict_setdefault,                 // tp_setdefault
+        dict_updateK                     // tp_updateK
 };
 
 static ypTypeObject ypDict_Type = {
@@ -20015,9 +20048,7 @@ ypObject *yp_miniiter(ypObject *x, yp_uint64_t *state)
 
 ypObject *yp_miniiter_next(ypObject *mi, yp_uint64_t *state)
 {
-    ypTypeObject *type = ypObject_TYPE(mi);
-    ypObject     *result = type->tp_miniiter_next(mi, state);
-    return result;
+    _yp_REDIRECT1(mi, tp_miniiter_next, (mi, state));
 }
 
 yp_ssize_t yp_miniiter_length_hintC(ypObject *mi, yp_uint64_t *state, ypObject **exc)
@@ -20026,6 +20057,30 @@ yp_ssize_t yp_miniiter_length_hintC(ypObject *mi, yp_uint64_t *state, ypObject *
     ypObject  *result = ypObject_TYPE(mi)->tp_miniiter_length_hint(mi, state, &length_hint);
     if (yp_isexceptionC(result)) return_yp_CEXC_ERR(0, exc, result);
     return length_hint < 0 ? 0 : length_hint;
+}
+
+ypObject *yp_miniiter_keys(ypObject *x, yp_uint64_t *state)
+{
+    _yp_REDIRECT2(x, tp_as_mapping, tp_miniiter_keys, (x, state));
+}
+
+ypObject *yp_miniiter_values(ypObject *x, yp_uint64_t *state)
+{
+    _yp_REDIRECT2(x, tp_as_mapping, tp_miniiter_values, (x, state));
+}
+
+ypObject *yp_miniiter_items(ypObject *x, yp_uint64_t *state)
+{
+    _yp_REDIRECT2(x, tp_as_mapping, tp_miniiter_items, (x, state));
+}
+
+void yp_miniiter_items_next(ypObject *mi, yp_uint64_t *state, ypObject **key, ypObject **value)
+{
+    ypTypeObject *type = ypObject_TYPE(mi);
+    ypObject     *result = type->tp_as_mapping->tp_miniiter_items_next(mi, state, key, value);
+    if (yp_isexceptionC(result)) {
+        *key = *value = result;
+    }
 }
 
 #pragma endregion methods

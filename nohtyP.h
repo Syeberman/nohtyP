@@ -1663,7 +1663,7 @@ ypAPI ypObject *yp_miniiter_items(ypObject *x, yp_uint64_t *state);
 // When the mini iterator is exhausted yp_StopIteration is raised. On error, both *key and *value
 // are set to the same exception.
 ypAPI void yp_miniiter_items_next(
-        ypObject **mi, yp_uint64_t *state, ypObject **key, ypObject **value);
+        ypObject *mi, yp_uint64_t *state, ypObject **key, ypObject **value);
 
 
 /*
