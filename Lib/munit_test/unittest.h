@@ -570,6 +570,10 @@ extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exception
     } while (0)
 
 
+// Pretty-prints the object to f, followed by a newline.
+extern void pprint(FILE *f, ypObject *obj);
+
+
 typedef ypObject *(*objvoidfunc)(void);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef void (*voidarrayfunc)(yp_ssize_t, ypObject **);
