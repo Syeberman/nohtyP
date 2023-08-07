@@ -4,9 +4,14 @@
 extern "C" {
 #endif
 
+// Older versions of MSVS don't have snprintf, and _snprintf doesn't always write the null
+// terminator. For how we use this function (fail on overflow), this is fine.
 #if defined(_MSC_VER) && _MSC_VER < 1900
 // Disables a warning about using _snprintf over _snprintf_s.
 #define _CRT_SECURE_NO_WARNINGS
+#define unittest_snprintf _snprintf
+#else
+#define unittest_snprintf snprintf
 #endif
 
 #define yp_FUTURE
@@ -16,14 +21,6 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdio.h>
-
-// Older versions of MSVS don't have snprintf, and _snprintf doesn't always write the null
-// terminator. For how we use this function (fail on overflow), this is fine.
-#if defined(_MSC_VER) && _MSC_VER < 1900
-#define unittest_snprintf _snprintf
-#else
-#define unittest_snprintf snprintf
-#endif
 
 #ifndef TRUE
 #define TRUE (1 == 1)
@@ -37,7 +34,11 @@ extern "C" {
 #define yp_ARCH_32_BIT 1
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && _MSC_VER < 1800
+// Early versions of the Windows CRT did not support lld.
+#define PRIint "I64d"
+#elif defined(_WIN32) && defined(__GNUC__) && __GNUC__ < 9
+// Early versions of the Windows CRT did not support lld.
 #define PRIint "I64d"
 #else
 #define PRIint "lld"
@@ -45,7 +46,8 @@ extern "C" {
 
 #if defined(yp_ARCH_32_BIT)
 #define PRIssize "d"
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) && _MSC_VER < 1800
+// Early versions of the Windows CRT did not support lld.
 #define PRIssize "I64d"
 #elif defined(__APPLE__)
 // The MacOS X 12.3 SDK defines ssize_t as long (see __darwin_ssize_t in the _types.h files).
@@ -54,12 +56,6 @@ extern "C" {
 #define PRIssize PRId64
 #else
 #define PRIssize "lld"
-#endif
-
-#if defined(GCC_VER) && GCC_VER >= 40600
-#define STATIC_ASSERT(cond, tag) _Static_assert(cond, #tag)
-#else
-#define STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
 #endif
 
 // Work around preprocessing bug in msvs_120 and earlier: https://stackoverflow.com/a/3985071/770500

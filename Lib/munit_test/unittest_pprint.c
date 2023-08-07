@@ -112,24 +112,16 @@ static void pprint_any(FILE *f, int indent, ypObject *obj)
         fprintf(f, obj == yp_True ? "True" : (obj == yp_False ? "False" : "<unexpected bool>"));
 
     } else if (type == yp_t_int) {
-        yp_int_t value;
-        assert_not_raises_exc(value = yp_asintC(obj, &exc));
-        fprintf(f, "%" PRIint, value);
+        assert_not_raises_exc(fprintf(f, "%" PRIint, yp_asintC(obj, &exc)) );
 
     } else if (type == yp_t_intstore) {
-        yp_int_t value;
-        assert_not_raises_exc(value = yp_asintC(obj, &exc));
-        fprintf(f, "intstore(%" PRIint ")", value);
+        assert_not_raises_exc(fprintf(f, "intstore(%" PRIint ")", yp_asintC(obj, &exc)));
 
     } else if (type == yp_t_float) {
-        yp_float_t value;
-        assert_not_raises_exc(value = yp_asfloatC(obj, &exc));
-        fprintf(f, "%f", value);
+        assert_not_raises_exc(fprintf(f, "%f", yp_asfloatC(obj, &exc)));
 
     } else if (type == yp_t_floatstore) {
-        yp_float_t value;
-        assert_not_raises_exc(value = yp_asfloatC(obj, &exc));
-        fprintf(f, "floatstore(%f)", value);
+        assert_not_raises_exc(fprintf(f, "floatstore(%f)", yp_asfloatC(obj, &exc)));
 
     } else if (type == yp_t_iter) {
         fprintf(f, "<iter object at 0x%p>", obj);

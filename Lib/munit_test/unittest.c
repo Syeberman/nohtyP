@@ -1323,9 +1323,6 @@ fixture_type_t *fixture_types_all[] = {&fixture_type_type_struct, &fixture_type_
         &fixture_type_frozendict_struct, &fixture_type_dict_struct, &fixture_type_function_struct,
         NULL};
 
-STATIC_ASSERT(yp_lengthof_array(fixture_types_all) == FIXTURE_TYPES_ALL_LEN + 1,
-        lengthof_fixture_types_all);
-
 // These are subsets of fixture_types_all, so will at most hold that many elements.
 fixture_type_t *fixture_types_immutable[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_numeric[FIXTURE_TYPES_ALL_LEN + 1];
@@ -1397,6 +1394,14 @@ static void initialize_fixture_types(void)
     fixture_type_frozendict->falsy = yp_frozendict_empty;
     fixture_type_dict->type = yp_t_dict;
     fixture_type_function->type = yp_t_function;
+
+    // The fixture_types_* and param_values_types_* arrays above were sized based on
+    // FIXTURE_TYPES_ALL_LEN, so make sure that value is correct.
+    if (yp_lengthof_array(fixture_types_all) != FIXTURE_TYPES_ALL_LEN + 1) {
+        fprintf(stderr, "Update FIXTURE_TYPES_ALL_LEN in unittest.h to %" PRIssize "\n",
+                yp_lengthof_array(fixture_types_all) - 1);
+        abort();
+    }
 
     {
         fixture_type_t **types;

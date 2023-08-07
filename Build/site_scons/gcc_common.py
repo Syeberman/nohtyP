@@ -362,7 +362,7 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
             if not gcc_path:
                 raise SCons.Errors.StopError(f"{gcc_name_arch} detection failed")
 
-        # TODO Update SCons to skip autodetection when requested
+        # FIXME Update SCons to skip autodetection when requested (it's slowing the build down)
         for tool in _tools:
             tool.generate(env)
         cc_preprocessed.generate_PreprocessedBuilder(env)

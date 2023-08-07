@@ -12,6 +12,7 @@ from site_scons.utilities import GetImportLibrary, GetProgram, GetSharedLibrary
 # TODO support scons -h for build options
 
 
+# FIXME Cloning environments is adding seconds to the build.
 RootEnv = MakeRootEnv()
 
 
@@ -44,6 +45,7 @@ def nohtyP_SharedLibrary(env):
 
 
 # Builds the munit_test suite against the shared library.
+# FIXME The more test sources are added, the longer this target takes to initialize.
 def nohtyP_munit_test_Program_shared(env, sharedLib):
     env.PrependUnique(
         CPPPATH=[

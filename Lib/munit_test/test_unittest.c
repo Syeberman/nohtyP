@@ -5,6 +5,37 @@
 #include "munit_test/unittest.h"
 
 
+// Ensure PRIint, PRIssize, and similar are correct. Part of this test is ensuring it passes the
+// compiler's format string checks. Recall that these macros are copied in nohtyP.c and unittest.h.
+static MunitResult test_PRI_formats(const MunitParameter params[], fixture_t *fixture)
+{
+#define assert_PRI_format(fmt, T, _value, _expected)                                           \
+    do {                                                                                       \
+        T          value = _value;                                                             \
+        char       expected[] = _expected;                                                     \
+        yp_ssize_t expected_len = yp_lengthof_array(expected) - 1;                             \
+        char       buffer[64];                                                                 \
+        yp_ssize_t result = (yp_ssize_t)unittest_snprintf(buffer, sizeof(buffer), fmt, value); \
+        assert_ssizeC(result, ==, expected_len);                                               \
+        munit_assert_string_equal(buffer, expected);                                           \
+    } while (0)
+
+    // PRIint
+    assert_PRI_format("%" PRIint, yp_int_t, -1, "-1");
+    assert_PRI_format("%" PRIint, yp_int_t, 0x0102030405060708LL, "72623859790382856");
+
+    // PRIssize
+    assert_PRI_format("%" PRIssize, yp_ssize_t, -1, "-1");
+#ifdef yp_ARCH_32_BIT
+    assert_PRI_format("%" PRIssize, yp_ssize_t, 0x01020304, "16909060");
+#else
+    assert_PRI_format("%" PRIssize, yp_ssize_t, 0x0102030405060708LL, "72623859790382856");
+#endif
+
+#undef assert_PRI_format
+    return MUNIT_OK;
+}
+
 // Ensure the various fixture_types_* arrays were initialzed properly.
 static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *fixture)
 {
@@ -144,9 +175,9 @@ static MunitResult test_rand_obj(const MunitParameter params[], fixture_t *fixtu
 static MunitParameterEnum test_types_all_params[] = {
         {param_key_type, param_values_types_all}, {NULL}};
 
-MunitTest test_unittest_tests[] = {TEST(test_fixture_types, NULL), TEST(test_param_type, NULL),
-        TEST(test_fixture_type, test_types_all_params), TEST(test_rand_obj, test_types_all_params),
-        {NULL}};
+MunitTest test_unittest_tests[] = {TEST(test_PRI_formats, NULL), TEST(test_fixture_types, NULL),
+        TEST(test_param_type, NULL), TEST(test_fixture_type, test_types_all_params),
+        TEST(test_rand_obj, test_types_all_params), {NULL}};
 
 
 extern void test_unittest_initialize(void) {}

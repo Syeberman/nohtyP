@@ -97,7 +97,6 @@
 #endif
 
 #if defined(__GNUC__)  // GCC
-#define GCC_VER (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #include <inttypes.h>
 #include <stdint.h>
 #endif
@@ -241,8 +240,10 @@ static void yp_breakonerr(ypObject *err) {
 #endif
 
 // We always perform static asserts: they don't affect runtime
-#if defined(GCC_VER) && GCC_VER >= 40600
+#if defined(__GNUC__) && __GNUC__ >= 5
 #define yp_STATIC_ASSERT(cond, tag) _Static_assert(cond, #tag)
+#elif defined(_MSC_VER) && _MSC_VER >= 1900
+#define yp_STATIC_ASSERT(cond, tag) static_assert(cond, #tag)
 #else
 #define yp_STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
 #endif
@@ -827,7 +828,7 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 #define yp_IS_NAN _isnan
 #define yp_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
 #define yp_IS_FINITE(X) _finite(X)
-#elif defined(GCC_VER)
+#elif defined(__GNUC__)
 #define yp_IS_NAN isnan
 #define yp_IS_INFINITY(X) (!finite(X) && !isnan(X))
 #define yp_IS_FINITE(X) finite(X)

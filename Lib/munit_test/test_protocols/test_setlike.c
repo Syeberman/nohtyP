@@ -479,3 +479,22 @@ MunitTest test_setlike_tests[] = {TEST(test_isdisjoint, test_setlike_params),
 // test_frozenset is flimsy. Rename?
 
 extern void test_setlike_initialize(void) {}
+
+/*
+FIXME Fix this inconsistently-failing testcase
+
+Build\msvs_120\win32_amd64_release\python_test.log
+
+======================================================================
+FAIL: test_find_periodic_pattern (python_test.test_bytes.ByteArrayAsStringTest) (p='', text='')
+Cover the special path for periodic patterns.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\projects\nohtyp\Lib\python_test\string_tests.py", line 365, in test_find_periodic_pattern
+    self.checkequal(reference_find(p, text),
+  File "C:\projects\nohtyp\Lib\python_test\string_tests.py", line 73, in checkequal
+    self.assertEqual(
+  File "C:\projects\nohtyp\Lib\python_test\yp_unittest\case.py", line 59, in assertEqual
+    _unittest.TestCase.assertEqual(self, first, second, msg)
+AssertionError: -1 != 0
+*/
