@@ -4328,7 +4328,7 @@ static ypObject *nonetype_bool(ypObject *n) { return yp_False; }
 static ypObject *nonetype_currenthash(
         ypObject *n, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    // Since we never contain mutable objects, we can cache our hash
+    // Since None is compared by identity, we can cache our hash.
     *hash = ypObject_CACHED_HASH(yp_None) = yp_HashPointer(yp_None);
     return yp_None;
 }
@@ -15847,7 +15847,7 @@ static ypObject *frozenset_isdisjoint(ypObject *so, ypObject *x)
     } else {
         // Otherwise, we need to convert x to a set to quickly test if it contains all items
         // FIXME We can make a version of _ypSet_isdisjoint that doesn't reqire a new set! Just
-        // iterate over x looking for
+        // iterate over x looking for items.
         x_asset = yp_frozenset(x);
         if (yp_isexceptionC(x_asset)) return x_asset;
         result = _ypSet_isdisjoint(so, x_asset);
@@ -18141,8 +18141,9 @@ static ypObject *range_currenthash(
     yp_HashSequence_next(&state, yp_HashInt(ypRange_LEN(r)));
     yp_HashSequence_next(&state, yp_HashInt(ypRange_START(r)));
     yp_HashSequence_next(&state, yp_HashInt(ypRange_STEP(r)));
-    // Since we never contain mutable objects, we can cache our hash
-    *hash = ypObject_CACHED_HASH(yp_None) = yp_HashSequence_fini(&state);
+
+    // Since we never contain mutable objects, we can cache our hash.
+    *hash = ypObject_CACHED_HASH(r) = yp_HashSequence_fini(&state);
 
     return yp_None;
 }
