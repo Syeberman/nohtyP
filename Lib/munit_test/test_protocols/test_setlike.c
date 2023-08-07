@@ -25,7 +25,6 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         ypObject *so_empty, ypObject *both_empty)
 {
     fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
     ypObject        *so;
     ypObject        *empty = type->newN(0);
@@ -96,11 +95,8 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
 
     // FIXME What if x contains unhashable objects?
 
-    // x is not an iterable.
-    assert_raises(any_cmp(so, int_1), yp_TypeError);
-
     obj_array_decref(items);
-    yp_decrefN(N(int_1, so, empty));
+    yp_decrefN(N(so, empty));
     return MUNIT_OK;
 }
 
@@ -143,6 +139,7 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
 {
     fixture_type_t *type = fixture->type;
     fixture_type_t *x_types[] = x_types_init(type);
+    ypObject       *int_1 = yp_intC(1);
     ypObject       *items[4];
     ypObject       *so;
     MunitResult     test_result;
@@ -162,9 +159,12 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
         if (test_result != MUNIT_OK) goto tear_down;
     }
 
+    // x is not an iterable.
+    assert_raises(yp_isdisjoint(so, int_1), yp_TypeError);
+
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(so));
+    yp_decrefN(N(int_1, so));
     return test_result;
 }
 
@@ -172,6 +172,7 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
 {
     fixture_type_t *type = fixture->type;
     fixture_type_t *x_types[] = x_types_init(type);
+    ypObject       *int_1 = yp_intC(1);
     ypObject       *items[4];
     ypObject       *so;
     MunitResult     test_result;
@@ -191,9 +192,12 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
         if (test_result != MUNIT_OK) goto tear_down;
     }
 
+    // x is not an iterable.
+    assert_raises(yp_issubset(so, int_1), yp_TypeError);
+
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(so));
+    yp_decrefN(N(int_1, so));
     return test_result;
 }
 
@@ -207,6 +211,7 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
     ypObject        *items[4];
     ypObject        *so;
     ypObject        *empty = type->newN(0);
+    MunitResult      test_result;
     obj_array_fill(items, type->rand_items);
     so = type->newN(N(items[0], items[1]));
 
@@ -217,74 +222,21 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
         ead(x, (*x_type)->newN(0), assert_raises(yp_lt(empty, x), yp_TypeError));
     }
 
-    // Basic lt.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        // x has the same items.
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1])),
-                assert_obj(yp_lt(so, x), is, yp_False));
+    test_result = _test_comparisons(type, friend_types, yp_lt, /*x_same=*/yp_False,
+            /*x_empty=*/yp_False, /*x_subset=*/yp_False, /*x_superset=*/yp_True,
+            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_True,
+            /*both_empty=*/yp_False);
+    if (test_result != MUNIT_OK) goto tear_down;
 
-        // x is empty.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_lt(so, x), is, yp_False));
-
-        // x is is a subset.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1])), assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(yp_lt(so, x), is, yp_False));
-
-        // x is a superset.
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2])),
-                assert_obj(yp_lt(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[3])),
-                assert_obj(yp_lt(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1], items[2])),
-                assert_obj(yp_lt(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[2])),
-                assert_obj(yp_lt(so, x), is, yp_True));
-
-        // x overlaps.
-        ead(x, (*x_type)->newN(N(items[0], items[2])), assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[3])),
-                assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1], items[2])), assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1], items[2], items[3])),
-                assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[2])),
-                assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[2])),
-                assert_obj(yp_lt(so, x), is, yp_False));
-
-        // x does not overlap.
-        ead(x, (*x_type)->newN(N(items[2])), assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[2], items[3])), assert_obj(yp_lt(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[2], items[2])), assert_obj(yp_lt(so, x), is, yp_False));
-
-        // x is so.
-        assert_obj(yp_lt(so, so), is, yp_False);
-    }
-
-    // Empty so.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        // Non-empty x.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_lt(empty, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_lt(empty, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(yp_lt(empty, x), is, yp_True));
-
-        // Empty x.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_lt(empty, x), is, yp_False));
-
-        // x is so.
-        assert_obj(yp_lt(empty, empty), is, yp_False);
-    }
-
-    // XXX x cannot contain unhashable objects as lt is only supported on friendly types.
+    // _test_comparisons_faulty_iter not called as lt doesn't support iterators.
 
     // x is not an iterable.
     assert_raises(yp_lt(so, int_1), yp_TypeError);
 
+tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_1, so, empty));
-    return MUNIT_OK;
+    return test_result;
 }
 
 static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
@@ -297,6 +249,7 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
     ypObject        *items[4];
     ypObject        *so;
     ypObject        *empty = type->newN(0);
+    MunitResult      test_result;
     obj_array_fill(items, type->rand_items);
     so = type->newN(N(items[0], items[1]));
 
@@ -307,74 +260,21 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
         ead(x, (*x_type)->newN(0), assert_raises(yp_le(empty, x), yp_TypeError));
     }
 
-    // Basic le.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        // x has the same items.
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_le(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1])),
-                assert_obj(yp_le(so, x), is, yp_True));
+    test_result = _test_comparisons(type, friend_types, yp_le, /*x_same=*/yp_True,
+            /*x_empty=*/yp_False, /*x_subset=*/yp_False, /*x_superset=*/yp_True,
+            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_True,
+            /*both_empty=*/yp_True);
+    if (test_result != MUNIT_OK) goto tear_down;
 
-        // x is empty.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_le(so, x), is, yp_False));
-
-        // x is is a subset.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1])), assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(yp_le(so, x), is, yp_False));
-
-        // x is a superset.
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2])),
-                assert_obj(yp_le(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[3])),
-                assert_obj(yp_le(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1], items[2])),
-                assert_obj(yp_le(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[2])),
-                assert_obj(yp_le(so, x), is, yp_True));
-
-        // x overlaps.
-        ead(x, (*x_type)->newN(N(items[0], items[2])), assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[3])),
-                assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1], items[2])), assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1], items[2], items[3])),
-                assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[2])),
-                assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[2])),
-                assert_obj(yp_le(so, x), is, yp_False));
-
-        // x does not overlap.
-        ead(x, (*x_type)->newN(N(items[2])), assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[2], items[3])), assert_obj(yp_le(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[2], items[2])), assert_obj(yp_le(so, x), is, yp_False));
-
-        // x is so.
-        assert_obj(yp_le(so, so), is, yp_True);
-    }
-
-    // Empty so.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        // Non-empty x.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_le(empty, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_le(empty, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(yp_le(empty, x), is, yp_True));
-
-        // Empty x.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_le(empty, x), is, yp_True));
-
-        // x is so.
-        assert_obj(yp_le(empty, empty), is, yp_True);
-    }
-
-    // XXX x cannot contain unhashable objects as le is only supported on friendly types.
+    // _test_comparisons_faulty_iter not called as le doesn't support iterators.
 
     // x is not an iterable.
     assert_raises(yp_le(so, int_1), yp_TypeError);
 
+tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_1, so, empty));
-    return MUNIT_OK;
+    return test_result;
 }
 
 static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
@@ -387,6 +287,7 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
     ypObject        *items[4];
     ypObject        *so;
     ypObject        *empty = type->newN(0);
+    MunitResult      test_result;
     obj_array_fill(items, type->rand_items);
     so = type->newN(N(items[0], items[1]));
 
@@ -397,74 +298,21 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
         ead(x, (*x_type)->newN(0), assert_obj(yp_eq(empty, x), is, yp_False));
     }
 
-    // Basic eq.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        // x has the same items.
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_eq(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1])),
-                assert_obj(yp_eq(so, x), is, yp_True));
+    test_result = _test_comparisons(type, friend_types, yp_eq, /*x_same=*/yp_True,
+            /*x_empty=*/yp_False, /*x_subset=*/yp_False, /*x_superset=*/yp_False,
+            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
+            /*both_empty=*/yp_True);
+    if (test_result != MUNIT_OK) goto tear_down;
 
-        // x is empty.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_eq(so, x), is, yp_False));
-
-        // x is is a subset.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1])), assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(yp_eq(so, x), is, yp_False));
-
-        // x is a superset.
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2])),
-                assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[3])),
-                assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1], items[2])),
-                assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[2])),
-                assert_obj(yp_eq(so, x), is, yp_False));
-
-        // x overlaps.
-        ead(x, (*x_type)->newN(N(items[0], items[2])), assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[3])),
-                assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1], items[2])), assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1], items[2], items[3])),
-                assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[2])),
-                assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[2])),
-                assert_obj(yp_eq(so, x), is, yp_False));
-
-        // x does not overlap.
-        ead(x, (*x_type)->newN(N(items[2])), assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[2], items[3])), assert_obj(yp_eq(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[2], items[2])), assert_obj(yp_eq(so, x), is, yp_False));
-
-        // x is so.
-        assert_obj(yp_eq(so, so), is, yp_True);
-    }
-
-    // Empty so.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        // Non-empty x.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_eq(empty, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_eq(empty, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(yp_eq(empty, x), is, yp_False));
-
-        // Empty x.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_eq(empty, x), is, yp_True));
-
-        // x is so.
-        assert_obj(yp_eq(empty, empty), is, yp_True);
-    }
-
-    // XXX x cannot contain unhashable objects as eq is only supported on friendly types.
+    // _test_comparisons_faulty_iter not called as eq doesn't support iterators.
 
     // x is not an iterable.
     assert_obj(yp_eq(so, int_1), is, yp_False);
 
+tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_1, so, empty));
-    return MUNIT_OK;
+    return test_result;
 }
 
 static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
@@ -477,6 +325,7 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
     ypObject        *items[4];
     ypObject        *so;
     ypObject        *empty = type->newN(0);
+    MunitResult      test_result;
     obj_array_fill(items, type->rand_items);
     so = type->newN(N(items[0], items[1]));
 
@@ -487,74 +336,21 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
         ead(x, (*x_type)->newN(0), assert_obj(yp_ne(empty, x), is, yp_True));
     }
 
-    // Basic ne.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        // x has the same items.
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_ne(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1])),
-                assert_obj(yp_ne(so, x), is, yp_False));
+    test_result = _test_comparisons(type, friend_types, yp_ne, /*x_same=*/yp_False,
+            /*x_empty=*/yp_True, /*x_subset=*/yp_True, /*x_superset=*/yp_True,
+            /*x_overlap=*/yp_True, /*x_no_overlap=*/yp_True, /*so_empty=*/yp_True,
+            /*both_empty=*/yp_False);
+    if (test_result != MUNIT_OK) goto tear_down;
 
-        // x is empty.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_ne(so, x), is, yp_True));
-
-        // x is is a subset.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[1])), assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(yp_ne(so, x), is, yp_True));
-
-        // x is a superset.
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2])),
-                assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[3])),
-                assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1], items[2])),
-                assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[2])),
-                assert_obj(yp_ne(so, x), is, yp_True));
-
-        // x overlaps.
-        ead(x, (*x_type)->newN(N(items[0], items[2])), assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[3])),
-                assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[1], items[2])), assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[1], items[2], items[3])),
-                assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[2])),
-                assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[2])),
-                assert_obj(yp_ne(so, x), is, yp_True));
-
-        // x does not overlap.
-        ead(x, (*x_type)->newN(N(items[2])), assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[2], items[3])), assert_obj(yp_ne(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[2], items[2])), assert_obj(yp_ne(so, x), is, yp_True));
-
-        // x is so.
-        assert_obj(yp_ne(so, so), is, yp_False);
-    }
-
-    // Empty so.
-    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
-        // Non-empty x.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_ne(empty, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_ne(empty, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(yp_ne(empty, x), is, yp_True));
-
-        // Empty x.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_ne(empty, x), is, yp_False));
-
-        // x is so.
-        assert_obj(yp_ne(empty, empty), is, yp_False);
-    }
-
-    // XXX x cannot contain unhashable objects as ne is only supported on friendly types.
+    // _test_comparisons_faulty_iter not called as ne doesn't support iterators.
 
     // x is not an iterable.
     assert_obj(yp_ne(so, int_1), is, yp_True);
 
+tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_1, so, empty));
-    return MUNIT_OK;
+    return test_result;
 }
 
 // FIXME Move test_remove from test_frozenset here.
