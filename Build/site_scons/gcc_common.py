@@ -211,7 +211,11 @@ def ApplyGCCOptions(env, version):
     if env["CONFIGURATION"] in ("debug", "coverage"):
         addCcFlags(
             # Disable (non-debuggable) optimizations
-            "-Og" if version >= 4.8 else "-O0",
+            # gcc 7.0 (and previous) on Linux, Windows, and Mac all crash with -Og:
+            #   test_function.c: In function 'test_t_function_call':
+            #   test_function.c:2892:1: internal error: in get_insn_template, at final.c:2086
+            #   libbacktrace could not find executable to open
+            "-Og" if version >= 8.0 else "-O0",
             # Runtime check: int overflow
             "-ftrapv",
             # Runtime check: stack overflow
@@ -227,7 +231,11 @@ def ApplyGCCOptions(env, version):
     else:
         addCcFlags(
             # Optimize for speed
-            "-O3",
+            # gcc 7.0 (and previous) on Linux, Windows, and Mac all crash with -O3:
+            #   test_function.c: In function 'test_t_function_call':
+            #   test_function.c:2892:1: internal error: in get_insn_template, at final.c:2086
+            #   libbacktrace could not find executable to open
+            "-O3" if version >= 8.0 else "-O0",
             # Optimize whole program (needs -flto to linker): conflicts with -g
             # https://gcc.gnu.org/onlinedocs/gcc-4.9.0/gcc/Optimize-Options.html
             # "-flto",
