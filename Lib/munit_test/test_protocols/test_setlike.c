@@ -201,6 +201,39 @@ tear_down:
     return test_result;
 }
 
+static MunitResult test_issuperset(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    fixture_type_t *x_types[] = x_types_init(type);
+    ypObject       *int_1 = yp_intC(1);
+    ypObject       *items[4];
+    ypObject       *so;
+    MunitResult     test_result;
+    obj_array_fill(items, type->rand_items);
+    so = type->newN(N(items[0], items[1]));
+
+    test_result = _test_comparisons(type, x_types, yp_issuperset, /*x_same=*/yp_True,
+            /*x_empty=*/yp_True, /*x_subset=*/yp_True, /*x_superset=*/yp_False,
+            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
+            /*both_empty=*/yp_True);
+    if (test_result != MUNIT_OK) goto tear_down;
+
+    {
+        ypObject *x_supplier = type->newN(N(items[0], items[1]));
+        test_result = _test_comparisons_faulty_iter(yp_issuperset, so, x_supplier, yp_True);
+        yp_decrefN(N(x_supplier));
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
+
+    // x is not an iterable.
+    assert_raises(yp_issuperset(so, int_1), yp_TypeError);
+
+tear_down:
+    obj_array_decref(items);
+    yp_decrefN(N(int_1, so));
+    return test_result;
+}
+
 static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
@@ -353,6 +386,82 @@ tear_down:
     return test_result;
 }
 
+static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t  *friend_types[] = {type, type->pair, NULL};
+    fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *items[4];
+    ypObject        *so;
+    ypObject        *empty = type->newN(0);
+    MunitResult      test_result;
+    obj_array_fill(items, type->rand_items);
+    so = type->newN(N(items[0], items[1]));
+
+    // ge is only supported for friendly x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if ((*x_type) == type || (*x_type) == type->pair) continue;
+        ead(x, (*x_type)->newN(0), assert_raises(yp_ge(so, x), yp_TypeError));
+        ead(x, (*x_type)->newN(0), assert_raises(yp_ge(empty, x), yp_TypeError));
+    }
+
+    test_result = _test_comparisons(type, friend_types, yp_ge, /*x_same=*/yp_True,
+            /*x_empty=*/yp_True, /*x_subset=*/yp_True, /*x_superset=*/yp_False,
+            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
+            /*both_empty=*/yp_True);
+    if (test_result != MUNIT_OK) goto tear_down;
+
+    // _test_comparisons_faulty_iter not called as ge doesn't support iterators.
+
+    // x is not an iterable.
+    assert_raises(yp_ge(so, int_1), yp_TypeError);
+
+tear_down:
+    obj_array_decref(items);
+    yp_decrefN(N(int_1, so, empty));
+    return test_result;
+}
+
+static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t  *friend_types[] = {type, type->pair, NULL};
+    fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *items[4];
+    ypObject        *so;
+    ypObject        *empty = type->newN(0);
+    MunitResult      test_result;
+    obj_array_fill(items, type->rand_items);
+    so = type->newN(N(items[0], items[1]));
+
+    // gt is only supported for friendly x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        if ((*x_type) == type || (*x_type) == type->pair) continue;
+        ead(x, (*x_type)->newN(0), assert_raises(yp_gt(so, x), yp_TypeError));
+        ead(x, (*x_type)->newN(0), assert_raises(yp_gt(empty, x), yp_TypeError));
+    }
+
+    test_result = _test_comparisons(type, friend_types, yp_gt, /*x_same=*/yp_False,
+            /*x_empty=*/yp_True, /*x_subset=*/yp_True, /*x_superset=*/yp_False,
+            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
+            /*both_empty=*/yp_False);
+    if (test_result != MUNIT_OK) goto tear_down;
+
+    // _test_comparisons_faulty_iter not called as gt doesn't support iterators.
+
+    // x is not an iterable.
+    assert_raises(yp_gt(so, int_1), yp_TypeError);
+
+tear_down:
+    obj_array_decref(items);
+    yp_decrefN(N(int_1, so, empty));
+    return test_result;
+}
+
 // FIXME Move test_remove from test_frozenset here.
 
 
@@ -361,9 +470,10 @@ static MunitParameterEnum test_setlike_params[] = {
         {param_key_type, param_values_types_set}, {NULL}};
 
 MunitTest test_setlike_tests[] = {TEST(test_isdisjoint, test_setlike_params),
-        TEST(test_issubset, test_setlike_params), TEST(test_lt, test_setlike_params),
-        TEST(test_le, test_setlike_params), TEST(test_eq, test_setlike_params),
-        TEST(test_ne, test_setlike_params), {NULL}};
+        TEST(test_issubset, test_setlike_params), TEST(test_issuperset, test_setlike_params),
+        TEST(test_lt, test_setlike_params), TEST(test_le, test_setlike_params),
+        TEST(test_eq, test_setlike_params), TEST(test_ne, test_setlike_params),
+        TEST(test_ge, test_setlike_params), TEST(test_gt, test_setlike_params), {NULL}};
 
 // FIXME The protocol and the object share the same name. Distinction between test_setlike and
 // test_frozenset is flimsy. Rename?
