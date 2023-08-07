@@ -21,7 +21,8 @@
 
 static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_types[],
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_same, ypObject *x_empty,
-        ypObject *x_subset, ypObject *x_superset, ypObject *x_overlap, ypObject *x_no_overlap)
+        ypObject *x_subset, ypObject *x_superset, ypObject *x_overlap, ypObject *x_no_overlap,
+        ypObject *so_empty, ypObject *both_empty)
 {
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
@@ -31,7 +32,7 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
     obj_array_fill(items, type->rand_items);
     so = type->newN(N(items[0], items[1]));
 
-    // Typical so.
+    // Non-empty so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // x has the same items.
         ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(any_cmp(so, x), is, x_same));
@@ -41,12 +42,12 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         // x is empty.
         ead(x, (*x_type)->newN(0), assert_obj(any_cmp(so, x), is, x_empty));
 
-        // x is is a subset.
+        // x is is a proper subset and is not empty.
         ead(x, (*x_type)->newN(N(items[0])), assert_obj(any_cmp(so, x), is, x_subset));
         ead(x, (*x_type)->newN(N(items[1])), assert_obj(any_cmp(so, x), is, x_subset));
         ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(any_cmp(so, x), is, x_subset));
 
-        // x is a superset.
+        // x is a proper superset.
         ead(x, (*x_type)->newN(N(items[0], items[1], items[2])),
                 assert_obj(any_cmp(so, x), is, x_superset));
         ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[3])),
@@ -56,7 +57,7 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[2])),
                 assert_obj(any_cmp(so, x), is, x_superset));
 
-        // x overlaps.
+        // x overlaps and contains additional items.
         ead(x, (*x_type)->newN(N(items[0], items[2])), assert_obj(any_cmp(so, x), is, x_overlap));
         ead(x, (*x_type)->newN(N(items[0], items[2], items[3])),
                 assert_obj(any_cmp(so, x), is, x_overlap));
@@ -68,7 +69,7 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         ead(x, (*x_type)->newN(N(items[0], items[2], items[2])),
                 assert_obj(any_cmp(so, x), is, x_overlap));
 
-        // x does not overlap.
+        // x does not overlap and contains additional items.
         ead(x, (*x_type)->newN(N(items[2])), assert_obj(any_cmp(so, x), is, x_no_overlap));
         ead(x, (*x_type)->newN(N(items[2], items[3])),
                 assert_obj(any_cmp(so, x), is, x_no_overlap));
@@ -82,18 +83,15 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
     // Empty so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Non-empty x.
-        // FIXME x_superset or x_no_overlap?
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(any_cmp(empty, x), is, x_no_overlap));
-        ead(x, (*x_type)->newN(N(items[0], items[1])),
-                assert_obj(any_cmp(empty, x), is, x_no_overlap));
-        ead(x, (*x_type)->newN(N(items[0], items[0])),
-                assert_obj(any_cmp(empty, x), is, x_no_overlap));
+        ead(x, (*x_type)->newN(N(items[0])), assert_obj(any_cmp(empty, x), is, so_empty));
+        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(any_cmp(empty, x), is, so_empty));
+        ead(x, (*x_type)->newN(N(items[0], items[0])), assert_obj(any_cmp(empty, x), is, so_empty));
 
         // Empty x.
-        ead(x, (*x_type)->newN(0), assert_obj(any_cmp(empty, x), is, x_no_overlap));
+        ead(x, (*x_type)->newN(0), assert_obj(any_cmp(empty, x), is, both_empty));
 
         // x is so.
-        assert_obj(any_cmp(empty, empty), is, x_no_overlap);
+        assert_obj(any_cmp(empty, empty), is, both_empty);
     }
 
     // FIXME What if x contains unhashable objects?
@@ -153,7 +151,8 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
 
     test_result = _test_comparisons(type, x_types, yp_isdisjoint, /*x_same=*/yp_False,
             /*x_empty=*/yp_True, /*x_subset=*/yp_False, /*x_superset=*/yp_False,
-            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_True);
+            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_True, /*so_empty=*/yp_True,
+            /*both_empty=*/yp_True);
     if (test_result != MUNIT_OK) goto tear_down;
 
     {
@@ -171,123 +170,31 @@ tear_down:
 
 static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t  *type = fixture->type;
-    fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
-    ypObject        *items[4];
-    ypObject        *so;
-    ypObject        *empty = type->newN(0);
+    fixture_type_t *type = fixture->type;
+    fixture_type_t *x_types[] = x_types_init(type);
+    ypObject       *items[4];
+    ypObject       *so;
+    MunitResult     test_result;
     obj_array_fill(items, type->rand_items);
     so = type->newN(N(items[0], items[1]));
 
-    // Basic issubset.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        // x has the same items.
-        ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(yp_issubset(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1])),
-                assert_obj(yp_issubset(so, x), is, yp_True));
+    test_result = _test_comparisons(type, x_types, yp_issubset, /*x_same=*/yp_True,
+            /*x_empty=*/yp_False, /*x_subset=*/yp_False, /*x_superset=*/yp_True,
+            /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_True,
+            /*both_empty=*/yp_True);
+    if (test_result != MUNIT_OK) goto tear_down;
 
-        // x is empty.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_issubset(so, x), is, yp_False));
-
-        // x is is a subset.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1])), assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-
-        // x is a superset.
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2])),
-                assert_obj(yp_issubset(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[3])),
-                assert_obj(yp_issubset(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[1], items[2])),
-                assert_obj(yp_issubset(so, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1], items[2], items[2])),
-                assert_obj(yp_issubset(so, x), is, yp_True));
-
-        // x overlaps.
-        ead(x, (*x_type)->newN(N(items[0], items[2])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[3])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1], items[2])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[1], items[2], items[3])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[0], items[2])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[0], items[2], items[2])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-
-        // x does not overlap.
-        ead(x, (*x_type)->newN(N(items[2])), assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[2], items[3])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-        ead(x, (*x_type)->newN(N(items[2], items[2])),
-                assert_obj(yp_issubset(so, x), is, yp_False));
-
-        // x is so.
-        assert_obj(yp_issubset(so, so), is, yp_True);
-    }
-
-    // Empty so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        // Non-empty x.
-        ead(x, (*x_type)->newN(N(items[0])), assert_obj(yp_issubset(empty, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[1])),
-                assert_obj(yp_issubset(empty, x), is, yp_True));
-        ead(x, (*x_type)->newN(N(items[0], items[0])),
-                assert_obj(yp_issubset(empty, x), is, yp_True));
-
-        // Empty x.
-        ead(x, (*x_type)->newN(0), assert_obj(yp_issubset(empty, x), is, yp_True));
-
-        // x is so.
-        assert_obj(yp_issubset(empty, empty), is, yp_True);
-    }
-
-    // FIXME What if x contains unhashable objects?
-
-    // x is an iterator that fails at the start.
     {
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(yp_issubset(so, x), yp_SyntaxError);
-        yp_decrefN(N(x_supplier, x));
+        test_result = _test_comparisons_faulty_iter(yp_issubset, so, x_supplier, yp_False);
+        yp_decrefN(N(x_supplier));
+        if (test_result != MUNIT_OK) goto tear_down;
     }
 
-    // x is an iterator that fails mid-way.
-    {
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(yp_issubset(so, x), yp_SyntaxError);
-        yp_decrefN(N(x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_obj(yp_issubset(so, x), is, yp_False);
-        yp_decrefN(N(x_supplier, x));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_obj(yp_issubset(so, x), is, yp_False);
-        yp_decrefN(N(x_supplier, x));
-    }
-
-    // x is not an iterable.
-    assert_raises(yp_issubset(so, int_1), yp_TypeError);
-
+tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_1, so, empty));
-    return MUNIT_OK;
+    yp_decrefN(N(so));
+    return test_result;
 }
 
 static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
