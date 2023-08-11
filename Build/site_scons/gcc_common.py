@@ -192,7 +192,7 @@ def ApplyGCCOptions(env, version):
         # Disable some warnings
         "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
         "-Wno-pointer-sign",
-        "-Wno-unknown-pragmas",
+        "-Wno-unknown-pragmas", # FIXME remove here, or add to msvs_common?
         # float-conversion warns about passing a double to finite/isnan, unfortunately
         "-Wno-float-conversion",
         # TODO maybe-uninitialized would be good during analyze
