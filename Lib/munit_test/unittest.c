@@ -108,66 +108,27 @@ static void rand_ascii(yp_ssize_t len, yp_uint8_t *source)
 
 
 typedef struct _rand_obj_supplier_memo_t {
-    yp_ssize_t depth;          // The maximum depth of objects: 1 means only "terminal" objects.
+    yp_ssize_t depth;          // The maximum depth of objects.
     int        only_hashable;  // If true, only hashable objects are returned.
 } rand_obj_supplier_memo_t;
 
-// Returns a random object for a type that does not itself require a supplier.
-static ypObject *rand_obj_terminal(void)
-{
-    // TODO Initialize this using a property of the type, perhaps?
-    static fixture_type_t *terminal_types[] = {&fixture_type_type_struct,
-            &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
-            &fixture_type_intstore_struct, &fixture_type_float_struct,
-            &fixture_type_floatstore_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
-            &fixture_type_bytearray_struct, &fixture_type_str_struct, &fixture_type_chrarray_struct,
-            &fixture_type_function_struct};
-
-    static const rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
-
-    fixture_type_t *type = rand_choice_array(terminal_types);
-    return type->_new_rand(&terminal_memo);
-}
-
-// Returns a random object for a hashable type that does not itself require a supplier.
-static ypObject *rand_obj_terminal_hashable(void)
-{
-    // TODO Initialize this using a property of the type, perhaps?
-    static fixture_type_t *terminal_types[] = {&fixture_type_type_struct,
-            &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
-            &fixture_type_float_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
-            &fixture_type_str_struct, &fixture_type_function_struct};
-
-    static const rand_obj_supplier_memo_t terminal_memo = {0};  // depth=0 is an error
-
-    fixture_type_t *type = rand_choice_array(terminal_types);
-    return type->_new_rand(&terminal_memo);
-}
-
-// "Any" may be limited by memo (i.e. we might only return "terminal" types).
+// "Any" may be limited by memo.
 static yp_ssize_t fixture_types_immutable_len;
 static ypObject  *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 {
-    assert_ssizeC(memo->depth, >, 0);
-    if (memo->depth < 2) {
-        return rand_obj_terminal_hashable();
-    } else {
-        rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/TRUE};
-        return rand_choice(fixture_types_immutable_len, fixture_types_immutable)
-                ->_new_rand(&sub_memo);
-    }
+    rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/TRUE};
+    assert_ssizeC(sub_memo.depth, >=, 0);
+    return rand_choice(fixture_types_immutable_len, fixture_types_immutable)->_new_rand(&sub_memo);
 }
 
 // "Any" may be limited by memo (i.e. we might only return hashable types).
 static ypObject *rand_obj_any1(const rand_obj_supplier_memo_t *memo)
 {
-    assert_ssizeC(memo->depth, >, 0);
     if (memo->only_hashable) {
         return rand_obj_any_hashable1(memo);
-    } else if (memo->depth < 2) {
-        return rand_obj_terminal();
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/FALSE};
+        assert_ssizeC(sub_memo.depth, >=, 0);
         return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->_new_rand(&sub_memo);
     }
 }
@@ -586,7 +547,7 @@ static fixture_type_t fixture_type_floatstore_struct = {
 
 static ypObject *new_rand_iter(const rand_obj_supplier_memo_t *memo)
 {
-    yp_ssize_t n = munit_rand_int_range(0, 16);
+    yp_ssize_t n = memo->depth < 1 ? 0 : munit_rand_int_range(0, 16);
     return new_rand_iter3(n, rand_obj_any1, memo);
 }
 
@@ -996,7 +957,7 @@ static fixture_type_t fixture_type_chrarray_struct = {
 
 static ypObject *new_rand_tuple(const rand_obj_supplier_memo_t *memo)
 {
-    if (RAND_OBJ_RETURN_FALSY()) {
+    if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_tuple_empty;
     } else {
         yp_ssize_t len = munit_rand_int_range(1, 16);
@@ -1038,7 +999,7 @@ static fixture_type_t fixture_type_tuple_struct = {
 
 static ypObject *new_rand_list(const rand_obj_supplier_memo_t *memo)
 {
-    if (RAND_OBJ_RETURN_FALSY()) {
+    if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_listN(0);
     } else {
         yp_ssize_t len = munit_rand_int_range(1, 16);
@@ -1080,7 +1041,7 @@ static fixture_type_t fixture_type_list_struct = {
 
 static ypObject *new_rand_frozenset(const rand_obj_supplier_memo_t *memo)
 {
-    if (RAND_OBJ_RETURN_FALSY()) {
+    if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_frozenset_empty;
     } else {
         // n may not be the final length, as duplicates are discarded.
@@ -1123,7 +1084,7 @@ static fixture_type_t fixture_type_frozenset_struct = {
 
 static ypObject *new_rand_set(const rand_obj_supplier_memo_t *memo)
 {
-    if (RAND_OBJ_RETURN_FALSY()) {
+    if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_setN(0);
     } else {
         // n may not be the final length, as duplicates are discarded.
@@ -1166,7 +1127,7 @@ static fixture_type_t fixture_type_set_struct = {
 
 static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
 {
-    if (RAND_OBJ_RETURN_FALSY()) {
+    if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_frozendict_empty;
     } else {
         // n may not be the final length, as duplicate keys are discarded.
@@ -1209,7 +1170,7 @@ static fixture_type_t fixture_type_frozendict_struct = {
 
 static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
 {
-    if (RAND_OBJ_RETURN_FALSY()) {
+    if (memo->depth < 1 || RAND_OBJ_RETURN_FALSY()) {
         return yp_dictK(0);
     } else {
         // n may not be the final length, as duplicate keys are discarded.
