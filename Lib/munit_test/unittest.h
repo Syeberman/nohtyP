@@ -490,6 +490,68 @@ extern "C" {
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
+#define _assert_set(obj, items, obj_fmt, item_strs, ...)                                           \
+    do {                                                                                           \
+        yp_ssize_t  _ypmt_SET_n = yp_lengthof_array(items);                                        \
+        yp_ssize_t  _ypmt_SET_i;                                                                   \
+        int         _ypmt_SET_found[yp_lengthof_array(items)] = {0};                               \
+        yp_uint64_t _ypmt_SET_mi_state;                                                            \
+        ypObject   *_ypmt_SET_mi;                                                                  \
+                                                                                                   \
+        _assert_len(obj, _ypmt_SET_n, obj_fmt, "%" PRIssize, __VA_ARGS__, _ypmt_SET_n);            \
+        _assert_not_raises(_ypmt_SET_mi = yp_miniiter(obj, &_ypmt_SET_mi_state),                   \
+                "yp_miniiter(" obj_fmt ", &mi_state)", __VA_ARGS__);                               \
+                                                                                                   \
+        while (1) {                                                                                \
+            ypObject *_ypmt_SET_actual = yp_miniiter_next(_ypmt_SET_mi, &_ypmt_SET_mi_state);      \
+            if (yp_isexceptionC2(_ypmt_SET_actual, yp_StopIteration)) break;                       \
+            _assert_not_exception(_ypmt_SET_actual,                                                \
+                    "yp_miniiter_next(yp_miniiter(" obj_fmt ", &mi_state), &mi_state)",            \
+                    __VA_ARGS__);                                                                  \
+                                                                                                   \
+            for (_ypmt_SET_i = 0; _ypmt_SET_i < _ypmt_SET_n; _ypmt_SET_i++) {                      \
+                ypObject *_ypmt_SET_eq = yp_eq(_ypmt_SET_actual, items[_ypmt_SET_i]);              \
+                _assert_not_exception(_ypmt_SET_eq, "yp_eq(<item in " obj_fmt ">, %s)",            \
+                        __VA_ARGS__, item_strs[_ypmt_SET_i]);                                      \
+                if (_ypmt_SET_eq == yp_False) continue;                                            \
+                if (_ypmt_SET_found[_ypmt_SET_i]) {                                                \
+                    munit_errorf("%s yielded twice from " obj_fmt, item_strs[_ypmt_SET_i],         \
+                            __VA_ARGS__);                                                          \
+                }                                                                                  \
+                _assert_same_type(_ypmt_SET_actual, items[_ypmt_SET_i], "<item in " obj_fmt ">",   \
+                        "%s", __VA_ARGS__, item_strs[_ypmt_SET_i]);                                \
+                _ypmt_SET_found[_ypmt_SET_i] = TRUE;                                               \
+                break;                                                                             \
+            }                                                                                      \
+            if (_ypmt_SET_i >= _ypmt_SET_n) {                                                      \
+                munit_errorf("unexpected item yielded from " obj_fmt, __VA_ARGS__);                \
+            }                                                                                      \
+                                                                                                   \
+            yp_decref(_ypmt_SET_actual);                                                           \
+        }                                                                                          \
+                                                                                                   \
+        for (_ypmt_SET_i = 0; _ypmt_SET_i < _ypmt_SET_n; _ypmt_SET_i++) {                          \
+            if (!_ypmt_SET_found[_ypmt_SET_i]) {                                                   \
+                munit_errorf("%s not yielded from " obj_fmt, item_strs[_ypmt_SET_i], __VA_ARGS__); \
+            }                                                                                      \
+        }                                                                                          \
+                                                                                                   \
+        yp_decref(_ypmt_SET_mi);                                                                   \
+    } while (0)
+
+// Asserts that obj is a set containing exactly the given items (in any order). Items are compared
+// by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_miniiter.
+// TODO Once the order items are yielded is guaranteed, we can make the order important.
+#define assert_set(obj, ...)                                                          \
+    do {                                                                              \
+        ypObject *_ypmt_SET_obj = (obj);                                              \
+        ypObject *_ypmt_SET_items[] = {__VA_ARGS__};                                  \
+        char     *_ypmt_SET_item_strs[] = {STRINGIFY(__VA_ARGS__)};                   \
+        _assert_set(_ypmt_SET_obj, _ypmt_SET_items, "%s", _ypmt_SET_item_strs, #obj); \
+    } while (0)
+
+// items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
+// only to obj_fmt.
 #define _assert_mapping(obj, items, obj_fmt, item_strs, ...)                                    \
     do {                                                                                        \
         yp_ssize_t _ypmt_MAP_k = yp_lengthof_array(items) / 2;                                  \
@@ -513,7 +575,7 @@ extern "C" {
 
 // Asserts that obj is a mapping containing exactly the given key/value pairs. Values are
 // compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getitem.
-// TODO Should we compare keys by type as well? That is tricky to do.
+// TODO Compare keys by type as well, just like assert_set does.
 #define assert_mapping(obj, ...)                                                          \
     do {                                                                                  \
         ypObject *_ypmt_MAP_obj = (obj);                                                  \
