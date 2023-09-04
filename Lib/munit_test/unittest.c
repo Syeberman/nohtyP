@@ -113,6 +113,15 @@ typedef struct _rand_obj_supplier_memo_t {
 } rand_obj_supplier_memo_t;
 
 // "Any" may be limited by memo.
+static yp_ssize_t fixture_types_mutable_len;
+static ypObject  *rand_obj_any_mutable1(const rand_obj_supplier_memo_t *memo)
+{
+    rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, memo->only_hashable};
+    assert_ssizeC(sub_memo.depth, >=, 0);
+    return rand_choice(fixture_types_mutable_len, fixture_types_mutable)->_new_rand(&sub_memo);
+}
+
+// "Any" may be limited by memo.
 static yp_ssize_t fixture_types_immutable_len;
 static ypObject  *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 {
@@ -168,6 +177,7 @@ ypObject *rand_obj(fixture_type_t *type)
 
 ypObject *rand_obj_non_string_hashable(void)
 {
+    // FIXME Calculate on first use.
     static fixture_type_t *non_str_hashable_types[] = {&fixture_type_type_struct,
             &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
             &fixture_type_float_struct, &fixture_type_iter_struct, &fixture_type_range_struct,
@@ -175,6 +185,12 @@ ypObject *rand_obj_non_string_hashable(void)
             &fixture_type_frozendict_struct, &fixture_type_function_struct};
 
     return rand_obj_hashable(rand_choice_array(non_str_hashable_types));
+}
+
+ypObject *rand_obj_any_mutable(void)
+{
+    rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/FALSE};
+    return rand_obj_any_mutable1(&memo);
 }
 
 ypObject *rand_obj_any_hashable(void)
@@ -1285,6 +1301,7 @@ fixture_type_t *fixture_types_all[] = {&fixture_type_type_struct, &fixture_type_
         NULL};
 
 // These are subsets of fixture_types_all, so will at most hold that many elements.
+fixture_type_t *fixture_types_mutable[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_immutable[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_numeric[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
@@ -1294,6 +1311,7 @@ fixture_type_t *fixture_types_string[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_set[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
 
+static yp_ssize_t fixture_types_mutable_len = 0;    // Incremented later
 static yp_ssize_t fixture_types_immutable_len = 0;  // Incremented later
 
 // Once again, subsets of fixture_types_all.
@@ -1366,19 +1384,25 @@ static void initialize_fixture_types(void)
 
     {
         fixture_type_t **types;
-        fixture_type_t **immutables = fixture_types_immutable;
         char           **param_values = param_values_types_all;
+        fixture_type_t **mutables = fixture_types_mutable;
+        fixture_type_t **immutables = fixture_types_immutable;
         for (types = fixture_types_all; *types != NULL; types++) {
             *param_values = (*types)->name;
             param_values++;
-            if (!(*types)->is_mutable) {
+            if ((*types)->is_mutable) {
+                *mutables = *types;
+                mutables++;
+                fixture_types_mutable_len++;
+            } else {
                 *immutables = *types;
                 immutables++;
                 fixture_types_immutable_len++;
             }
         }
-        *immutables = NULL;
         *param_values = NULL;
+        *mutables = NULL;
+        *immutables = NULL;
     }
 
 #define FILL_TYPE_ARRAYS(protocol)                                            \

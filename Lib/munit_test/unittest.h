@@ -539,8 +539,8 @@ extern "C" {
         yp_decref(_ypmt_SET_mi);                                                                   \
     } while (0)
 
-// Asserts that obj is a set containing exactly the given items (in any order). Items are compared
-// by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_miniiter.
+// Asserts that obj is a set containing exactly the given items, in any order, without duplicates.
+// Items are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_miniiter.
 // TODO Once the order items are yielded is guaranteed, we can make the order important.
 #define assert_set(obj, ...)                                                          \
     do {                                                                              \
@@ -573,8 +573,9 @@ extern "C" {
         }                                                                                       \
     } while (0)
 
-// Asserts that obj is a mapping containing exactly the given key/value pairs. Values are
-// compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getitem.
+// Asserts that obj is a mapping containing exactly the given key/value pairs, in any order, without
+// duplicate keys. Values are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC
+// and yp_getitem.
 // TODO Compare keys by type as well, just like assert_set does.
 #define assert_mapping(obj, ...)                                                          \
     do {                                                                                  \
@@ -705,6 +706,7 @@ typedef struct _fixture_t {
 // "All", except invalidated and exception.
 extern fixture_type_t *fixture_types_all[];
 
+extern fixture_type_t *fixture_types_mutable[];
 extern fixture_type_t *fixture_types_immutable[];
 extern fixture_type_t *fixture_types_numeric[];
 extern fixture_type_t *fixture_types_iterable[];
@@ -730,6 +732,9 @@ extern char param_key_type[];
 
 // Returns a random object of any type.
 extern ypObject *rand_obj_any(void);
+
+// Returns a random mutable object of any type.
+extern ypObject *rand_obj_any_mutable(void);
 
 // Returns a random hashable object of any type.
 extern ypObject *rand_obj_any_hashable(void);

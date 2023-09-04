@@ -16026,6 +16026,10 @@ static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
 // TODO ...except we are creating objects that we destroy then create new ones, which can probably
 // be optimized in certain cases, so rethink these four methods. At the very least, can we avoid
 // the yp_freeze?
+// FIXME Possible optimizations:
+//  - lazy shallow copy of an immutable so when friendly x is empty.
+//  - lazy shallow copy of a friendly immutable x when immutable so is empty.
+//  - empty immortal when immutable so is empty and friendly x is empty.
 static ypObject *frozenset_union(ypObject *so, int n, va_list args)
 {
     ypObject *exc = yp_None;
@@ -16036,6 +16040,7 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
 
     newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
+
     result = set_update(newSo, n, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
@@ -16050,6 +16055,9 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
     return newSo;
 }
 
+// FIXME Possible optimizations:
+//  - lazy shallow copy of an immutable so when x is so.
+//  - empty immortal when immutable so and either so or friendly x is empty.
 static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
 {
     ypObject *exc = yp_None;
@@ -16060,6 +16068,7 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
 
     newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
+
     result = set_intersection_update(newSo, n, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
@@ -16074,6 +16083,9 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
     return newSo;
 }
 
+// FIXME Possible optimizations:
+//  - lazy shallow copy of an immutable so when friendly x is empty.
+//  - empty immortal when immutable so and either so is empty or x is so.
 static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
 {
     ypObject *exc = yp_None;
@@ -16084,6 +16096,7 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
 
     newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
+
     result = set_difference_update(newSo, n, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
@@ -16098,6 +16111,10 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
     return newSo;
 }
 
+// FIXME Possible optimizations:
+//  - lazy shallow copy of an immutable so when friendly x is empty.
+//  - lazy shallow copy of a friendly immutable x when immutable so is empty.
+//  - empty immortal when immutable so is empty and friendly x is empty.
 static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 {
     ypObject *exc = yp_None;
@@ -16106,6 +16123,7 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 
     newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
+
     result = set_symmetric_difference_update(newSo, x);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);

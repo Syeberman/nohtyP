@@ -43,6 +43,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         ypObject *result = yp_concat(sq, x);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1], items[2], items[3]);
+        // FIXME Assert sq is unchanged (here and everywhere)?
         yp_decrefN(N(sq, x, result));
     }
 
