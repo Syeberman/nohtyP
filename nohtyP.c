@@ -16115,6 +16115,7 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
 //  - lazy shallow copy of an immutable so when friendly x is empty.
 //  - lazy shallow copy of a friendly immutable x when immutable so is empty.
 //  - empty immortal when immutable so is empty and friendly x is empty.
+//  - empty immortal when immutable so is x.
 static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 {
     ypObject *exc = yp_None;

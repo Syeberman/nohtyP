@@ -945,6 +945,141 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     return MUNIT_OK;
 }
 
+static MunitResult test_symmetric_difference(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Basic symmetric_difference: items[0] only in so, items[1] in both, items[2] only in x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[2]));
+        ypObject *result = yp_symmetric_difference(so, x);
+        assert_type_is(result, type->type);
+        assert_set(result, items[0], items[2]);
+        yp_decrefN(N(so, x, result));
+    }
+
+    // so is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        ypObject *result = yp_symmetric_difference(so, x);
+        assert_type_is(result, type->type);
+        assert_set(result, items[0], items[1]);
+        yp_decrefN(N(so, x, result));
+    }
+
+    // x is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_symmetric_difference(so, x);
+        assert_type_is(result, type->type);
+        assert_set(result, items[0], items[1]);
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Both are empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_symmetric_difference(so, x);
+        assert_type_is(result, type->type);
+        assert_len(result, 0);
+        yp_decrefN(N(so, x, result));
+    }
+
+    // x can be so.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_symmetric_difference(so, so);
+        assert_type_is(result, type->type);
+        assert_len(result, 0);
+        yp_decrefN(N(so, result));
+    }
+
+    // There is no N version of yp_symmetric_difference, so we always have one x object.
+
+    // x contains an unhashable object.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *so = type->newN(N(items[0], items[1]));
+            ypObject *x = (*x_type)->newN(N(items[1], unhashable));
+            assert_raises(yp_symmetric_difference(so, x), yp_TypeError);
+            yp_decrefN(N(unhashable, so, x));
+        }
+    }
+
+    // Unhashable objects in x should always cause a failure, even if that object is not part of the
+    // result.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(N(int_1));
+            ypObject *x = (*x_type)->newN(N(intstore_1));
+            assert_raises(yp_symmetric_difference(so, x), yp_TypeError);
+            yp_decrefN(N(intstore_1, so, x));
+        }
+    }
+
+    // x is an iterator that fails at the start.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises(yp_symmetric_difference(so, x), yp_SyntaxError);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises(yp_symmetric_difference(so, x), yp_SyntaxError);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        ypObject *result = yp_symmetric_difference(so, x);
+        assert_set(result, items[0], items[2]);
+        yp_decrefN(N(so, x_supplier, x, result));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        ypObject *result = yp_symmetric_difference(so, x);
+        assert_set(result, items[0], items[2]);
+        yp_decrefN(N(so, x_supplier, x, result));
+    }
+
+    // x is not an iterable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises(yp_symmetric_difference(so, int_1), yp_TypeError);
+        yp_decrefN(N(so));
+    }
+
+    obj_array_decref(items);
+    yp_decrefN(N(int_1));
+    return MUNIT_OK;
+}
+
 // FIXME Move test_remove from test_frozenset here.
 
 
@@ -958,7 +1093,8 @@ MunitTest test_setlike_tests[] = {TEST(test_isdisjoint, test_setlike_params),
         TEST(test_eq, test_setlike_params), TEST(test_ne, test_setlike_params),
         TEST(test_ge, test_setlike_params), TEST(test_gt, test_setlike_params),
         TEST(test_union, test_setlike_params), TEST(test_intersection, test_setlike_params),
-        TEST(test_difference, test_setlike_params), {NULL}};
+        TEST(test_difference, test_setlike_params),
+        TEST(test_symmetric_difference, test_setlike_params), {NULL}};
 
 extern void test_setlike_initialize(void) {}
 
