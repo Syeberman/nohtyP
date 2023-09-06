@@ -823,7 +823,6 @@ ypAPI void yp_updateN(ypObject *set, ypObject **exc, int n, ...);
 ypAPI void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
 
 // Equivalent to yp_updateN(set, exc, 1, x).
-// FIXME Remove these non-N update variants (everywhere?)
 ypAPI void yp_update(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes elements from set that are not contained in all n objects. Sets *exc on error. Note that

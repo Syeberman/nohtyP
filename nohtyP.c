@@ -19862,6 +19862,7 @@ void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
 {
     _yp_REDIRECT_EXC1(set, tp_update, (set, n, args), exc);
 }
+void yp_update(ypObject *set, ypObject *x, ypObject **exc) { return yp_updateN(set, exc, 1, x); }
 
 void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...)
 {
@@ -19871,6 +19872,10 @@ void yp_intersection_updateNV(ypObject *set, ypObject **exc, int n, va_list args
 {
     _yp_REDIRECT_EXC2(set, tp_as_set, tp_intersection_update, (set, n, args), exc);
 }
+void yp_intersection_update(ypObject *set, ypObject *x, ypObject **exc)
+{
+    return yp_intersection_updateN(set, exc, 1, x);
+}
 
 void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...)
 {
@@ -19879,6 +19884,10 @@ void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...)
 void yp_difference_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
 {
     _yp_REDIRECT_EXC2(set, tp_as_set, tp_difference_update, (set, n, args), exc);
+}
+void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc)
+{
+    return yp_difference_updateN(set, exc, 1, x);
 }
 
 void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc)

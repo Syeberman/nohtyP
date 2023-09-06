@@ -153,7 +153,7 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
     if (test_result != MUNIT_OK) goto tear_down;
 
     {
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x_supplier = yp_tupleN(N(items[2], items[3]));
         test_result = _test_comparisons_faulty_iter(yp_isdisjoint, so, x_supplier, yp_True);
         yp_decrefN(N(x_supplier));
         if (test_result != MUNIT_OK) goto tear_down;
@@ -186,7 +186,7 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
     if (test_result != MUNIT_OK) goto tear_down;
 
     {
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
+        ypObject *x_supplier = yp_tupleN(N(items[2], items[3]));
         test_result = _test_comparisons_faulty_iter(yp_issubset, so, x_supplier, yp_False);
         yp_decrefN(N(x_supplier));
         if (test_result != MUNIT_OK) goto tear_down;
@@ -219,7 +219,7 @@ static MunitResult test_issuperset(const MunitParameter params[], fixture_t *fix
     if (test_result != MUNIT_OK) goto tear_down;
 
     {
-        ypObject *x_supplier = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
         test_result = _test_comparisons_faulty_iter(yp_issuperset, so, x_supplier, yp_True);
         yp_decrefN(N(x_supplier));
         if (test_result != MUNIT_OK) goto tear_down;
@@ -566,7 +566,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     // x is an iterator that fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
         assert_raises(yp_unionN(so, N(x)), yp_SyntaxError);
         yp_decrefN(N(so, x_supplier, x));
@@ -575,7 +575,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     // x is an iterator that fails mid-way.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises(yp_unionN(so, N(x)), yp_SyntaxError);
         yp_decrefN(N(so, x_supplier, x));
@@ -584,7 +584,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     // x is an iterator with a too-small length_hint.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
         ypObject *result = yp_unionN(so, N(x));
         assert_set(result, items[0], items[1], items[2]);
@@ -594,7 +594,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     // x is an iterator with a too-large length_hint.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
         ypObject *result = yp_unionN(so, N(x));
         assert_set(result, items[0], items[1], items[2]);
@@ -732,7 +732,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     // x is an iterator that fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
         assert_raises(yp_intersectionN(so, N(x)), yp_SyntaxError);
         yp_decrefN(N(so, x_supplier, x));
@@ -741,7 +741,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     // x is an iterator that fails mid-way.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises(yp_intersectionN(so, N(x)), yp_SyntaxError);
         yp_decrefN(N(so, x_supplier, x));
@@ -750,7 +750,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     // x is an iterator with a too-small length_hint.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
         ypObject *result = yp_intersectionN(so, N(x));
         assert_set(result, items[1]);
@@ -760,7 +760,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     // x is an iterator with a too-large length_hint.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
         ypObject *result = yp_intersectionN(so, N(x));
         assert_set(result, items[1]);
@@ -898,7 +898,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     // x is an iterator that fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
         assert_raises(yp_differenceN(so, N(x)), yp_SyntaxError);
         yp_decrefN(N(so, x_supplier, x));
@@ -907,7 +907,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     // x is an iterator that fails mid-way.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises(yp_differenceN(so, N(x)), yp_SyntaxError);
         yp_decrefN(N(so, x_supplier, x));
@@ -916,7 +916,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     // x is an iterator with a too-small length_hint.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
         ypObject *result = yp_differenceN(so, N(x));
         assert_set(result, items[0]);
@@ -926,7 +926,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     // x is an iterator with a too-large length_hint.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
         ypObject *result = yp_differenceN(so, N(x));
         assert_set(result, items[0]);
@@ -1033,7 +1033,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     // x is an iterator that fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
         assert_raises(yp_symmetric_difference(so, x), yp_SyntaxError);
         yp_decrefN(N(so, x_supplier, x));
@@ -1042,7 +1042,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     // x is an iterator that fails mid-way.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises(yp_symmetric_difference(so, x), yp_SyntaxError);
         yp_decrefN(N(so, x_supplier, x));
@@ -1051,7 +1051,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     // x is an iterator with a too-small length_hint.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
         ypObject *result = yp_symmetric_difference(so, x);
         assert_set(result, items[0], items[2]);
@@ -1061,7 +1061,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     // x is an iterator with a too-large length_hint.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
         ypObject *result = yp_symmetric_difference(so, x);
         assert_set(result, items[0], items[2]);
@@ -1075,6 +1075,640 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         yp_decrefN(N(so));
     }
 
+    obj_array_decref(items);
+    yp_decrefN(N(int_1));
+    return MUNIT_OK;
+}
+
+static MunitResult test_update(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support update.
+    if (!type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = type->newN(N(items[1], items[2]));
+        assert_raises_exc(yp_update(so, x, &exc), yp_MethodError);
+        assert_raises_exc(yp_updateN(so, &exc, N(x)), yp_MethodError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic update: items[0] only in so, items[1] in both, items[2] only in x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[2]));
+        assert_not_raises_exc(yp_update(so, x, &exc));
+        assert_set(so, items[0], items[1], items[2]);
+        yp_decrefN(N(so, x));
+    }
+
+    // so is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_update(so, x, &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+    }
+
+    // x is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_update(so, x, &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+    }
+
+    // Both are empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_update(so, x, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so, x));
+    }
+
+    // x can be so.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_update(so, so, &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // Multiple x objects.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x0 = (*x_type)->newN(N(items[2]));
+        ypObject *x1 = (*x_type)->newN(N(items[3]));
+        assert_not_raises_exc(yp_updateN(so, &exc, N(x0, x1)));
+        assert_set(so, items[0], items[1], items[2], items[3]);
+        yp_decrefN(N(so, x0, x1));
+    }
+
+    // Zero x objects.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_updateN(so, &exc, 0));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // x contains an unhashable object.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *so = type->newN(N(items[0], items[1]));
+            ypObject *x = (*x_type)->newN(N(items[1], unhashable));
+            assert_raises_exc(yp_update(so, x, &exc), yp_TypeError);
+            // FIXME Tests for updates that fail mid-way?
+            assert_set(so, items[0], items[1]);
+            yp_decrefN(N(unhashable, so, x));
+        }
+    }
+
+    // x is an iterator that fails at the start.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises_exc(yp_update(so, x, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises_exc(yp_update(so, x, &exc), yp_SyntaxError);
+        // FIXME choose x so we can validate it fails mid-way, here and elsewhere.
+        // so is updated after each item yielded.
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        assert_not_raises_exc(yp_update(so, x, &exc));
+        assert_set(so, items[0], items[1], items[2]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        assert_not_raises_exc(yp_update(so, x, &exc));
+        assert_set(so, items[0], items[1], items[2]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is not an iterable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_update(so, int_1, &exc), yp_TypeError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+tear_down:
+    obj_array_decref(items);
+    yp_decrefN(N(int_1));
+    return MUNIT_OK;
+}
+
+static MunitResult test_intersection_update(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support intersection_update.
+    if (!type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = type->newN(N(items[1], items[2]));
+        assert_raises_exc(yp_intersection_update(so, x, &exc), yp_MethodError);
+        assert_raises_exc(yp_intersection_updateN(so, &exc, N(x)), yp_MethodError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic intersection_update: items[0] only in so, items[1] in both, items[2] only in x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[2]));
+        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+        assert_set(so, items[1]);
+        yp_decrefN(N(so, x));
+    }
+
+    // so is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so, x));
+    }
+
+    // x is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so, x));
+    }
+
+    // Both are empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so, x));
+    }
+
+    // x can be so.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_intersection_update(so, so, &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // Multiple x objects.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x0 = (*x_type)->newN(N(items[0]));
+        ypObject *x1 = (*x_type)->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_intersection_updateN(so, &exc, N(x0, x1)));
+        assert_set(so, items[0]);
+        yp_decrefN(N(so, x0, x1));
+    }
+
+    // Zero x objects.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_intersection_updateN(so, &exc, 0));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // x contains an unhashable object.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *so = type->newN(N(items[0], items[1]));
+            ypObject *x = (*x_type)->newN(N(items[1], unhashable));
+            // FIXME This fails in Python; should it fail for us?
+            assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+            // FIXME Tests for intersection_updates that fail mid-way?
+            assert_set(so, items[1]);
+            yp_decrefN(N(unhashable, so, x));
+        }
+    }
+
+    // An unhashable object in x should match the equal object in so.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(N(int_1));
+            ypObject *x = (*x_type)->newN(N(intstore_1));
+            // FIXME This fails in Python; should it fail for us?
+            assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+            assert_set(so, int_1);
+            yp_decrefN(N(intstore_1, so, x));
+        }
+    }
+
+    // x is an iterator that fails at the start.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises_exc(yp_intersection_update(so, x, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises_exc(yp_intersection_update(so, x, &exc), yp_SyntaxError);
+        // so is updated after each item yielded.
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+        assert_set(so, items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+        assert_set(so, items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is not an iterable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_intersection_update(so, int_1, &exc), yp_TypeError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+tear_down:
+    obj_array_decref(items);
+    yp_decrefN(N(int_1));
+    return MUNIT_OK;
+}
+
+static MunitResult test_difference_update(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support difference_update.
+    if (!type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = type->newN(N(items[1], items[2]));
+        assert_raises_exc(yp_difference_update(so, x, &exc), yp_MethodError);
+        assert_raises_exc(yp_difference_updateN(so, &exc, N(x)), yp_MethodError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic difference_update: items[0] only in so, items[1] in both, items[2] only in x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[2]));
+        assert_not_raises_exc(yp_difference_update(so, x, &exc));
+        assert_set(so, items[0]);
+        yp_decrefN(N(so, x));
+    }
+
+    // so is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_difference_update(so, x, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so, x));
+    }
+
+    // x is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_difference_update(so, x, &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+    }
+
+    // Both are empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_difference_update(so, x, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so, x));
+    }
+
+    // x can be so.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_difference_update(so, so, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so));
+    }
+
+    // Multiple x objects.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x0 = (*x_type)->newN(N(items[0]));
+        ypObject *x1 = (*x_type)->newN(N(items[1]));
+        assert_not_raises_exc(yp_difference_updateN(so, &exc, N(x0, x1)));
+        assert_len(so, 0);
+        yp_decrefN(N(so, x0, x1));
+    }
+
+    // Zero x objects.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_difference_updateN(so, &exc, 0));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // x contains an unhashable object.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *so = type->newN(N(items[0], items[1]));
+            ypObject *x = (*x_type)->newN(N(items[1], unhashable));
+            // FIXME This fails in Python; should it fail for us?
+            assert_not_raises_exc(yp_difference_update(so, x, &exc));
+            // FIXME Tests for difference_updates that fail mid-way?
+            assert_set(so, items[0]);
+            yp_decrefN(N(unhashable, so, x));
+        }
+    }
+
+    // An unhashable object in x should match the equal object in so.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(N(int_1));
+            ypObject *x = (*x_type)->newN(N(intstore_1));
+            // FIXME This fails in Python; should it fail for us?
+            assert_not_raises_exc(yp_difference_update(so, x, &exc));
+            assert_len(so, 0);
+            yp_decrefN(N(intstore_1, so, x));
+        }
+    }
+
+    // x is an iterator that fails at the start.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises_exc(yp_difference_update(so, x, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises_exc(yp_difference_update(so, x, &exc), yp_SyntaxError);
+        // so is updated after each item yielded.
+        assert_set(so, items[0]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        assert_not_raises_exc(yp_difference_update(so, x, &exc));
+        assert_set(so, items[0]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        assert_not_raises_exc(yp_difference_update(so, x, &exc));
+        assert_set(so, items[0]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is not an iterable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_difference_update(so, int_1, &exc), yp_TypeError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+tear_down:
+    obj_array_decref(items);
+    yp_decrefN(N(int_1));
+    return MUNIT_OK;
+}
+
+static MunitResult test_symmetric_difference_update(
+        const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support symmetric_difference_update.
+    if (!type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = type->newN(N(items[1], items[2]));
+        assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_MethodError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic symmetric_difference_update: items[0] only in so, items[1] in both, items[2] only in x.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[2]));
+        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
+        assert_set(so, items[0], items[2]);
+        yp_decrefN(N(so, x));
+    }
+
+    // so is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+    }
+
+    // x is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+    }
+
+    // Both are empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so, x));
+    }
+
+    // x can be so.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_symmetric_difference_update(so, so, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so));
+    }
+
+    // There is no N version of yp_symmetric_difference_update, so we always have one x object.
+
+    // x contains an unhashable object.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *so = type->newN(N(items[0], items[1]));
+            ypObject *x = (*x_type)->newN(N(items[1], unhashable));
+            assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError);
+            // FIXME Tests for symmetric_difference_updates that fail mid-way?
+            assert_set(so, items[0], items[1]);
+            yp_decrefN(N(unhashable, so, x));
+        }
+    }
+
+    // Unhashable objects in x should always cause a failure, even if that object is not part of the
+    // result.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (!(*x_type)->is_set) {
+            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(N(int_1));
+            ypObject *x = (*x_type)->newN(N(intstore_1));
+            assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError);
+            assert_set(so, int_1);
+            yp_decrefN(N(intstore_1, so, x));
+        }
+    }
+
+    // x is an iterator that fails at the start.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_SyntaxError);
+        // FIXME choose x so we can validate it fails mid-way, here and elsewhere.
+        // so is symmetric_difference_updated after each item yielded.  FIXME incorrect!
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
+        assert_set(so, items[0], items[2]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
+        assert_set(so, items[0], items[2]);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
+    // x is not an iterable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_symmetric_difference_update(so, int_1, &exc), yp_TypeError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_1));
     return MUNIT_OK;
@@ -1094,7 +1728,10 @@ MunitTest test_setlike_tests[] = {TEST(test_isdisjoint, test_setlike_params),
         TEST(test_ge, test_setlike_params), TEST(test_gt, test_setlike_params),
         TEST(test_union, test_setlike_params), TEST(test_intersection, test_setlike_params),
         TEST(test_difference, test_setlike_params),
-        TEST(test_symmetric_difference, test_setlike_params), {NULL}};
+        TEST(test_symmetric_difference, test_setlike_params),
+        TEST(test_update, test_setlike_params), TEST(test_intersection_update, test_setlike_params),
+        TEST(test_difference_update, test_setlike_params),
+        TEST(test_symmetric_difference_update, test_setlike_params), {NULL}};
 
 extern void test_setlike_initialize(void) {}
 
