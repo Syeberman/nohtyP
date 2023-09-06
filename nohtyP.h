@@ -845,10 +845,9 @@ ypAPI void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 // Sets *exc on error.
 ypAPI void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Adds element x to set. Sets *exc on error. While Python calls this method add, yp_add is already
-// used for "a+b", so these two equivalent aliases are provided instead.
+// Adds element x to set. Sets *exc on error. Note that Python calls this method add, however yp_add
+// is already used for "a+b".
 ypAPI void yp_push(ypObject *set, ypObject *x, ypObject **exc);
-ypAPI void yp_set_add(ypObject *set, ypObject *x, ypObject **exc);
 
 // If x is already contained in set, raises yp_KeyError; otherwise, adds x to set. Sets *exc on
 // error.
@@ -857,8 +856,8 @@ ypAPI void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc);
 // Removes element x from set. Raises yp_KeyError if x is not contained in set. Sets *exc on error.
 ypAPI void yp_remove(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes element x from set. Does _not_ raise an exception if x is not contained in set. Sets *exc
-// on error.
+// Removes element x from set if it is present. Does _not_ raise yp_KeyError if x is not contained
+// in set. Sets *exc on error.
 ypAPI void yp_discard(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes an arbitrary item from set and returns a new reference to it. You cannot use the order of

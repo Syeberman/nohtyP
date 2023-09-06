@@ -16455,14 +16455,6 @@ static ypTypeObject ypSet_Type = {
 
 // Public functions
 
-void yp_set_add(ypObject *set, ypObject *x, ypObject **exc)
-{
-    ypObject *result;
-    if (ypObject_TYPE_CODE(set) != ypSet_CODE) return_yp_EXC_BAD_TYPE(exc, set);
-    result = set_push(set, x);
-    if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
-}
-
 // TODO Calling it yp_set_* implies it only works for sets, so do we need a yp_frozenset_*?  If we
 // do, we're dooming people to check the type of the object to find out which function they can
 // use...but then what else should we call this?  Do we jump right to yp_getintern?

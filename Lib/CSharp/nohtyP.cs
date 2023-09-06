@@ -258,7 +258,7 @@ namespace nohtyP
             // auto-decref on exception
             var result = _dll.yp_setN( 0 );
             foreach( var item in objects ) {
-                _dll.yp_set_add( ref result, item.self );
+                _dll.yp_push( ref result, item.self );
             }
             return result;  // or exception on error
         }
@@ -822,9 +822,6 @@ namespace nohtyP
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_symmetric_difference_update( ref ypObject_p set, ypObject_p x );
-
-        [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
-        internal static extern void yp_set_add( ref ypObject_p set, ypObject_p x );
 
         [DllImport( DLL_NAME, CallingConvention = CALLCONV )]
         internal static extern void yp_pushunique( ypObject_p set, ypObject_p x, ref ypObject_p exc );

@@ -522,9 +522,6 @@ yp_func(c_void, "yp_difference_updateN", ((c_ypObject_p, "set"), c_ypObject_pp_e
 # void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 yp_func(c_void, "yp_symmetric_difference_update", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
 
-# void yp_set_add(ypObject *set, ypObject *x, ypObject **exc);
-yp_func(c_void, "yp_set_add", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
-
 # void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc);
 yp_func(c_void, "yp_pushunique", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
 
@@ -1905,7 +1902,7 @@ class _ypSet(ypObject):
         _yp_symmetric_difference_update(self, other, yp_None)
         return self
 
-    def add(self, elem): _yp_set_add(self, elem, yp_None)
+    def add(self, elem): _yp_push(self, elem, yp_None)
 
 
 @pytype(yp_t_frozenset, frozenset)

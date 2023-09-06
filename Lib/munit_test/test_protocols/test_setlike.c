@@ -1714,6 +1714,112 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support push.
+    if (!type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_push(so, items[2], &exc), yp_MethodError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic push.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_push(so, items[2], &exc));
+        assert_set(so, items[0], items[1], items[2]);
+        yp_decrefN(N(so));
+    }
+
+    // Item already in so.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_push(so, items[1], &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // so is empty.
+    {
+        ypObject *so = type->newN(0);
+        assert_not_raises_exc(yp_push(so, items[0], &exc));
+        assert_set(so, items[0]);
+        yp_decrefN(N(so));
+    }
+
+    // Item is unhashable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *unhashable = rand_obj_any_mutable();
+        assert_raises_exc(yp_push(so, unhashable, &exc), yp_TypeError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, unhashable));
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support pushunique.
+    if (!type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_pushunique(so, items[2], &exc), yp_MethodError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic pushunique.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_pushunique(so, items[2], &exc));
+        assert_set(so, items[0], items[1], items[2]);
+        yp_decrefN(N(so));
+    }
+
+    // Item already in so.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_pushunique(so, items[1], &exc), yp_KeyError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // so is empty.
+    {
+        ypObject *so = type->newN(0);
+        assert_not_raises_exc(yp_pushunique(so, items[0], &exc));
+        assert_set(so, items[0]);
+        yp_decrefN(N(so));
+    }
+
+    // Item is unhashable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *unhashable = rand_obj_any_mutable();
+        assert_raises_exc(yp_pushunique(so, unhashable, &exc), yp_TypeError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, unhashable));
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 // FIXME Move test_remove from test_frozenset here.
 
 
@@ -1731,7 +1837,8 @@ MunitTest test_setlike_tests[] = {TEST(test_isdisjoint, test_setlike_params),
         TEST(test_symmetric_difference, test_setlike_params),
         TEST(test_update, test_setlike_params), TEST(test_intersection_update, test_setlike_params),
         TEST(test_difference_update, test_setlike_params),
-        TEST(test_symmetric_difference_update, test_setlike_params), {NULL}};
+        TEST(test_symmetric_difference_update, test_setlike_params),
+        TEST(test_push, test_setlike_params), TEST(test_pushunique, test_setlike_params), {NULL}};
 
 extern void test_setlike_initialize(void) {}
 
