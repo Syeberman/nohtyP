@@ -540,6 +540,8 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     }
 
     // x contains an unhashable object.
+    // FIXME Even if the unhashable object equals an item in so, there should be an error (and
+    // elsewhere)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (!(*x_type)->is_set) {
@@ -1820,7 +1822,150 @@ tear_down:
     return MUNIT_OK;
 }
 
-// FIXME Move test_remove from test_frozenset here.
+static MunitResult _test_remove(
+        fixture_type_t *type, void (*any_remove)(ypObject *, ypObject *, ypObject **), int raises)
+{
+    ypObject *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support remove.
+    if (!type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(any_remove(so, items[1], &exc), yp_MethodError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+        goto tear_down;  // Skip remaining tests.
+    }
+
+#define assert_not_found_exc(expression)          \
+    do {                                          \
+        ypObject *exc = yp_None;                  \
+        (expression);                             \
+        if (raises) {                             \
+            assert_isexception(exc, yp_KeyError); \
+        } else {                                  \
+            assert_obj(exc, is, yp_None);         \
+        }                                         \
+    } while (0)
+
+    // Basic remove.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(any_remove(so, items[1], &exc));
+        assert_set(so, items[0]);
+        assert_not_raises_exc(any_remove(so, items[0], &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so));
+    }
+
+    // Item not in so.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_not_found_exc(any_remove(so, items[2], &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // so is empty.
+    {
+        ypObject *so = type->newN(0);
+        assert_not_found_exc(any_remove(so, items[0], &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(so));
+    }
+
+    // Item is unhashable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        // FIXME what if unhashable equals one of the items (here and everywhere)?
+        ypObject *unhashable = rand_obj_any_mutable();
+        assert_not_found_exc(any_remove(so, unhashable, &exc));
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, unhashable));
+    }
+
+    // An unhashable object in x should match the equal object in so.
+    {
+        ypObject *int_1 = yp_intC(1);
+        ypObject *intstore_1 = yp_intstoreC(1);
+        ypObject *so = type->newN(N(int_1));
+        // FIXME This fails in Python; should it fail for us?
+        assert_not_raises_exc(any_remove(so, intstore_1, &exc));
+        assert_len(so, 0);
+        yp_decrefN(N(int_1, intstore_1, so));
+    }
+
+    // Remove an item from a set. The hash should equal a "clean" set. This was a bug from the
+    // implementation of the yp_HashSet functions.
+    {
+        ypObject *expected = type->newN(N(items[0]));
+        yp_hash_t expected_hash;
+        ypObject *so = type->newN(N(items[0], items[1]));
+        yp_hash_t so_hash;
+
+        assert_not_raises_exc(any_remove(so, items[1], &exc));
+
+        // FIXME Make an assert_hashes_equal?
+        assert_not_raises_exc(expected_hash = yp_currenthashC(expected, &exc));
+        assert_not_raises_exc(so_hash = yp_currenthashC(so, &exc));
+        assert_hashC(expected_hash, ==, so_hash);
+
+        yp_decrefN(N(expected, so));
+    }
+
+#undef assert_not_found_exc
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
+static MunitResult test_remove(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_remove(fixture->type, yp_remove, /*raises=*/TRUE);
+}
+
+static MunitResult test_discard(const MunitParameter params[], fixture_t *fixture)
+{
+    return _test_remove(fixture->type, yp_discard, /*raises=*/FALSE);
+}
+
+static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[] = obj_array_init(2, type->rand_item());
+
+    // Immutables don't support pop.
+    if (!type->is_mutable) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises(yp_pop(so), yp_MethodError);
+        assert_set(so, items[0], items[1]);
+        yp_decref(so);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic pop.
+    {
+        ypObject *so = type->newN(N(items[0]));
+        ead(popped, yp_pop(so), assert_obj(popped, eq, items[0]));
+        assert_len(so, 0);
+        yp_decref(so);
+    }
+
+    // FIXME multiple pops (in any order)
+
+    // Self is empty.
+    {
+        ypObject *so = type->newN(0);
+        assert_raises(yp_pop(so), yp_KeyError);
+        assert_len(so, 0);
+        yp_decref(so);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
 
 
 // TODO dict key and item views, when implemented, will also support the set protocol.
@@ -1838,7 +1983,9 @@ MunitTest test_setlike_tests[] = {TEST(test_isdisjoint, test_setlike_params),
         TEST(test_update, test_setlike_params), TEST(test_intersection_update, test_setlike_params),
         TEST(test_difference_update, test_setlike_params),
         TEST(test_symmetric_difference_update, test_setlike_params),
-        TEST(test_push, test_setlike_params), TEST(test_pushunique, test_setlike_params), {NULL}};
+        TEST(test_push, test_setlike_params), TEST(test_pushunique, test_setlike_params),
+        TEST(test_remove, test_setlike_params), TEST(test_discard, test_setlike_params),
+        TEST(test_pop, test_setlike_params), {NULL}};
 
 extern void test_setlike_initialize(void) {}
 
