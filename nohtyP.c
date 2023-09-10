@@ -422,7 +422,7 @@ typedef struct {
     objvalistproc tp_intersection_update;
     objvalistproc tp_difference_update;
     objobjproc    tp_symmetric_difference_update;
-    // tp_push (aka tp_set_add) is elsewhere
+    // tp_push is elsewhere
     objobjproc tp_pushunique;
 } ypSetMethods;
 
@@ -16288,10 +16288,11 @@ static ypSetMethods ypFrozenSet_as_set = {
         frozenset_intersection,          // tp_intersection
         frozenset_difference,            // tp_difference
         frozenset_symmetric_difference,  // tp_symmetric_difference
+        // tp_update is elsewhere
         MethodError_objvalistproc,       // tp_intersection_update
         MethodError_objvalistproc,       // tp_difference_update
         MethodError_objobjproc,          // tp_symmetric_difference_update
-        // tp_push (aka tp_set_ad) is elsewhere
+        // tp_push is elsewhere
         MethodError_objobjproc  // tp_pushunique
 };
 
@@ -16375,10 +16376,11 @@ static ypSetMethods ypSet_as_set = {
         frozenset_intersection,           // tp_intersection
         frozenset_difference,             // tp_difference
         frozenset_symmetric_difference,   // tp_symmetric_difference
+        // tp_update is elsewhere
         set_intersection_update,          // tp_intersection_update
         set_difference_update,            // tp_difference_update
         set_symmetric_difference_update,  // tp_symmetric_difference_update
-        // tp_push (aka tp_set_ad) is elsewhere
+        // tp_push is elsewhere
         set_pushunique,  // tp_pushunique
 };
 

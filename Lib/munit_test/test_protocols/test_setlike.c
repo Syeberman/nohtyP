@@ -19,6 +19,65 @@
     }
 
 
+// TODO Move to test_container? Will need an `if set or dict` around the unhashable test.
+static MunitResult test_contains(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Basic contains (and in and not_in).
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_obj(yp_contains(so, items[1]), is, yp_True);
+        assert_obj(yp_in(items[1], so), is, yp_True);
+        assert_obj(yp_not_in(items[1], so), is, yp_False);
+        yp_decrefN(N(so));
+    }
+
+    // Item not in so.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_obj(yp_contains(so, items[2]), is, yp_False);
+        assert_obj(yp_in(items[2], so), is, yp_False);
+        assert_obj(yp_not_in(items[2], so), is, yp_True);
+        yp_decrefN(N(so));
+    }
+
+    // so is empty.
+    {
+        ypObject *so = type->newN(0);
+        assert_obj(yp_contains(so, items[0]), is, yp_False);
+        assert_obj(yp_in(items[0], so), is, yp_False);
+        assert_obj(yp_not_in(items[0], so), is, yp_True);
+        yp_decrefN(N(so));
+    }
+
+    // Item is unhashable.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *unhashable = rand_obj_any_mutable();
+        assert_obj(yp_contains(so, unhashable), is, yp_False);
+        assert_obj(yp_in(unhashable, so), is, yp_False);
+        assert_obj(yp_not_in(unhashable, so), is, yp_True);
+        yp_decrefN(N(so, unhashable));
+    }
+
+    // An unhashable x should match the equal object in so.
+    {
+        ypObject *int_1 = yp_intC(1);
+        ypObject *intstore_1 = yp_intstoreC(1);
+        ypObject *so = type->newN(N(int_1));
+        assert_obj(yp_contains(so, intstore_1), is, yp_True);
+        assert_obj(yp_in(intstore_1, so), is, yp_True);
+        assert_obj(yp_not_in(intstore_1, so), is, yp_False);
+        yp_decrefN(N(int_1, intstore_1, so));
+    }
+
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
+
 static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_types[],
         ypObject *(*any_cmp)(ypObject *, ypObject *), ypObject *x_same, ypObject *x_empty,
         ypObject *x_subset, ypObject *x_superset, ypObject *x_overlap, ypObject *x_no_overlap,
@@ -1032,6 +1091,10 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         }
     }
 
+    // FIXME if x contains duplicates, those items should only be considered once (i.e.
+    // {1}.symmetric_difference([1, 1]) and {1}.symmetric_difference([2, 2])). And similar tests for
+    // others?
+
     // x is an iterator that fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
@@ -1809,6 +1872,7 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
     }
 
     // Item is unhashable.
+    // FIXME and test if it equals an item already in so: yp_TypeError should win out
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *unhashable = rand_obj_any_mutable();
@@ -1972,13 +2036,13 @@ tear_down:
 static MunitParameterEnum test_setlike_params[] = {
         {param_key_type, param_values_types_set}, {NULL}};
 
-MunitTest test_setlike_tests[] = {TEST(test_isdisjoint, test_setlike_params),
-        TEST(test_issubset, test_setlike_params), TEST(test_issuperset, test_setlike_params),
-        TEST(test_lt, test_setlike_params), TEST(test_le, test_setlike_params),
-        TEST(test_eq, test_setlike_params), TEST(test_ne, test_setlike_params),
-        TEST(test_ge, test_setlike_params), TEST(test_gt, test_setlike_params),
-        TEST(test_union, test_setlike_params), TEST(test_intersection, test_setlike_params),
-        TEST(test_difference, test_setlike_params),
+MunitTest test_setlike_tests[] = {TEST(test_contains, test_setlike_params),
+        TEST(test_isdisjoint, test_setlike_params), TEST(test_issubset, test_setlike_params),
+        TEST(test_issuperset, test_setlike_params), TEST(test_lt, test_setlike_params),
+        TEST(test_le, test_setlike_params), TEST(test_eq, test_setlike_params),
+        TEST(test_ne, test_setlike_params), TEST(test_ge, test_setlike_params),
+        TEST(test_gt, test_setlike_params), TEST(test_union, test_setlike_params),
+        TEST(test_intersection, test_setlike_params), TEST(test_difference, test_setlike_params),
         TEST(test_symmetric_difference, test_setlike_params),
         TEST(test_update, test_setlike_params), TEST(test_intersection_update, test_setlike_params),
         TEST(test_difference_update, test_setlike_params),
