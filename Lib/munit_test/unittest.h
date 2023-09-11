@@ -649,9 +649,9 @@ typedef struct _fixture_type_t {
 
     rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
 
-    // Functions for non-mapping iterables, where rand_item returns an object that can be yielded by
-    // the associated iterator, accepted by newN (if supported), and returned by yp_getitem (if
-    // supported).
+    // Functions for iterables, where rand_item and rand_items returns objects that can be accepted
+    // by newN and subsequently yielded by yp_iter. (For mappings, newN creates an object with the
+    // given keys and random, unique values.)
     objvarargfunc newN;        // Creates a iterable for the given items (i.e. yp_tupleN).
     objvoidfunc   rand_item;   // Creates a random object to store in the iterable.
     voidarrayfunc rand_items;  // Fills an array with n random, unique objects.
@@ -669,7 +669,7 @@ typedef struct _fixture_type_t {
     int is_collection;  // FIXME nohtyP.h calls this "container", but Python abc is collection
     int is_sequence;
     int is_string;
-    int is_set;
+    int is_setlike;
     int is_mapping;
     int is_callable;
     int is_patterned;  // i.e. range doesn't store values, it stores a pattern
@@ -713,7 +713,7 @@ extern fixture_type_t *fixture_types_iterable[];
 extern fixture_type_t *fixture_types_collection[];
 extern fixture_type_t *fixture_types_sequence[];
 extern fixture_type_t *fixture_types_string[];
-extern fixture_type_t *fixture_types_set[];
+extern fixture_type_t *fixture_types_setlike[];
 extern fixture_type_t *fixture_types_mapping[];
 
 // Arrays of MunitParameterEnum values for "type" and similar parameters (i.e. the names of types).
@@ -723,7 +723,7 @@ extern char *param_values_types_iterable[];
 extern char *param_values_types_collection[];
 extern char *param_values_types_sequence[];
 extern char *param_values_types_string[];
-extern char *param_values_types_set[];
+extern char *param_values_types_setlike[];
 extern char *param_values_types_mapping[];
 
 

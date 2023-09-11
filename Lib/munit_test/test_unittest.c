@@ -66,7 +66,7 @@ static MunitResult test_fixture_types(const MunitParameter params[], fixture_t *
     assert_ptr_array(fixture_types_string, fixture_type_bytes, fixture_type_bytearray,
             fixture_type_str, fixture_type_chrarray, NULL);
 
-    assert_ptr_array(fixture_types_set, fixture_type_frozenset, fixture_type_set, NULL);
+    assert_ptr_array(fixture_types_setlike, fixture_type_frozenset, fixture_type_set, NULL);
 
     assert_ptr_array(fixture_types_mapping, fixture_type_frozendict, fixture_type_dict, NULL);
 
@@ -110,7 +110,7 @@ static MunitResult test_param_type(const MunitParameter params[], fixture_t *fix
             NULL);
 
     assert_ptr_array(
-            param_values_types_set, fixture_type_frozenset->name, fixture_type_set->name, NULL);
+            param_values_types_setlike, fixture_type_frozenset->name, fixture_type_set->name, NULL);
 
     assert_ptr_array(param_values_types_mapping, fixture_type_frozendict->name,
             fixture_type_dict->name, NULL);

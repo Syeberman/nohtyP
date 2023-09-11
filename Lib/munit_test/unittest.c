@@ -347,7 +347,7 @@ static fixture_type_t fixture_type_type_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         TRUE,   // is_callable
         FALSE,  // is_patterned
@@ -378,7 +378,7 @@ static fixture_type_t fixture_type_NoneType_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -415,7 +415,7 @@ static fixture_type_t fixture_type_bool_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -450,7 +450,7 @@ static fixture_type_t fixture_type_int_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -485,7 +485,7 @@ static fixture_type_t fixture_type_intstore_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -520,7 +520,7 @@ static fixture_type_t fixture_type_float_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -555,7 +555,7 @@ static fixture_type_t fixture_type_floatstore_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -605,7 +605,7 @@ static fixture_type_t fixture_type_iter_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -720,7 +720,7 @@ static fixture_type_t fixture_type_range_struct = {
         TRUE,   // is_collection
         TRUE,   // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         TRUE,   // is_patterned
@@ -780,7 +780,7 @@ static fixture_type_t fixture_type_bytes_struct = {
         TRUE,   // is_collection
         TRUE,   // is_sequence
         TRUE,   // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -840,7 +840,7 @@ static fixture_type_t fixture_type_bytearray_struct = {
         TRUE,   // is_collection
         TRUE,   // is_sequence
         TRUE,   // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -902,7 +902,7 @@ static fixture_type_t fixture_type_str_struct = {
         TRUE,   // is_collection
         TRUE,   // is_sequence
         TRUE,   // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -965,7 +965,7 @@ static fixture_type_t fixture_type_chrarray_struct = {
         TRUE,   // is_collection
         TRUE,   // is_sequence
         TRUE,   // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -1007,7 +1007,7 @@ static fixture_type_t fixture_type_tuple_struct = {
         TRUE,   // is_collection
         TRUE,   // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -1049,7 +1049,7 @@ static fixture_type_t fixture_type_list_struct = {
         TRUE,   // is_collection
         TRUE,   // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -1092,7 +1092,7 @@ static fixture_type_t fixture_type_frozenset_struct = {
         TRUE,   // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        TRUE,   // is_set
+        TRUE,   // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -1135,7 +1135,7 @@ static fixture_type_t fixture_type_set_struct = {
         TRUE,   // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        TRUE,   // is_set
+        TRUE,   // is_setlike
         FALSE,  // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -1156,6 +1156,46 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+// Used in newN for mapping types (frozendict and dict). Returns an object suitable for
+// yp_frozenset/etc. Values are random and unique from each other (but not necessarily unique from
+// the keys).
+static ypObject *_mapping_new_supplierN(int n, va_list args)
+{
+    int       i;
+    ypObject *values[n];
+    ypObject *supplier;
+
+    obj_array_fill(values, rand_objs_any);
+    assert_not_raises(supplier = yp_listN(0));  // new ref
+
+    for (i = 0; i < n; i++) {
+        ypObject *item;
+        assert_not_raises(item = yp_tupleN(2, va_arg(args, ypObject *), values[i]));  // new ref
+        assert_not_raises_exc(yp_append(supplier, item, &exc));
+        yp_decref(item);
+    }
+
+    obj_array_decref(values);
+    return supplier;
+}
+
+static ypObject *new_frozendictN(int n, ...)
+{
+    va_list   args;
+    ypObject *supplier;
+    ypObject *result;
+
+    if (n < 1) return yp_frozendict_empty;
+
+    va_start(args, n);
+    supplier = _mapping_new_supplierN(n, args);  // new ref
+    va_end(args);
+
+    assert_not_raises(result = yp_frozendict(supplier));  // new ref
+    yp_decref(supplier);
+    return result;
+}
+
 static fixture_type_t fixture_type_frozendict_struct = {
         "frozendict",               // name
         NULL,                       // type (initialized at runtime)
@@ -1164,9 +1204,9 @@ static fixture_type_t fixture_type_frozendict_struct = {
 
         new_rand_frozendict,  // _new_rand
 
-        objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
-        voidarrayfunc_error,  // rand_items
+        new_frozendictN,         // newN
+        rand_obj_any_hashable,   // rand_item
+        rand_objs_any_hashable,  // rand_items
 
         yp_frozendictK,         // newK
         rand_obj_any_hashable,  // rand_key
@@ -1178,7 +1218,7 @@ static fixture_type_t fixture_type_frozendict_struct = {
         TRUE,   // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         TRUE,   // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -1199,6 +1239,21 @@ static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *new_dictN(int n, ...)
+{
+    va_list   args;
+    ypObject *supplier;
+    ypObject *result;
+
+    va_start(args, n);
+    supplier = _mapping_new_supplierN(n, args);  // new ref
+    va_end(args);
+
+    assert_not_raises(result = yp_dict(supplier));  // new ref
+    yp_decref(supplier);
+    return result;
+}
+
 static fixture_type_t fixture_type_dict_struct = {
         "dict",                           // name
         NULL,                             // type (initialized at runtime)
@@ -1207,9 +1262,9 @@ static fixture_type_t fixture_type_dict_struct = {
 
         new_rand_dict,  // _new_rand
 
-        objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
-        voidarrayfunc_error,  // rand_items
+        new_dictN,               // newN
+        rand_obj_any_hashable,   // rand_item
+        rand_objs_any_hashable,  // rand_items
 
         yp_dictK,               // newK
         rand_obj_any_hashable,  // rand_key
@@ -1221,7 +1276,7 @@ static fixture_type_t fixture_type_dict_struct = {
         TRUE,   // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         TRUE,   // is_mapping
         FALSE,  // is_callable
         FALSE,  // is_patterned
@@ -1264,7 +1319,7 @@ static fixture_type_t fixture_type_function_struct = {
         FALSE,  // is_collection
         FALSE,  // is_sequence
         FALSE,  // is_string
-        FALSE,  // is_set
+        FALSE,  // is_setlike
         FALSE,  // is_mapping
         TRUE,   // is_callable
         FALSE,  // is_patterned
@@ -1308,7 +1363,7 @@ fixture_type_t *fixture_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_collection[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_sequence[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_string[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_set[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t *fixture_types_setlike[FIXTURE_TYPES_ALL_LEN + 1];
 fixture_type_t *fixture_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
 
 static yp_ssize_t fixture_types_mutable_len = 0;    // Incremented later
@@ -1321,7 +1376,7 @@ char *param_values_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
 char *param_values_types_collection[FIXTURE_TYPES_ALL_LEN + 1];
 char *param_values_types_sequence[FIXTURE_TYPES_ALL_LEN + 1];
 char *param_values_types_string[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_set[FIXTURE_TYPES_ALL_LEN + 1];
+char *param_values_types_setlike[FIXTURE_TYPES_ALL_LEN + 1];
 char *param_values_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
 
 // The given arrays must be no smaller than fixture_types_all.
@@ -1413,7 +1468,7 @@ static void initialize_fixture_types(void)
     FILL_TYPE_ARRAYS(collection);
     FILL_TYPE_ARRAYS(sequence);
     FILL_TYPE_ARRAYS(string);
-    FILL_TYPE_ARRAYS(set);
+    FILL_TYPE_ARRAYS(setlike);
     FILL_TYPE_ARRAYS(mapping);
 #undef FILL_TYPE_ARRAYS
 }
