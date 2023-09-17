@@ -37,7 +37,7 @@ extern "C" {
 #if defined(_MSC_VER) && _MSC_VER < 1800
 // Early versions of the Windows CRT did not support lld.
 #define PRIint "I64d"
-#elif defined(_WIN32) && defined(__GNUC__) && __GNUC__ < 9
+#elif defined(_WIN32) && defined(__GNUC__) && __GNUC__ < 10
 // Early versions of the Windows CRT did not support lld.
 #define PRIint "I64d"
 #else

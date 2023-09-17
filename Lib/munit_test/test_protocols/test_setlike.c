@@ -4,15 +4,21 @@
 // XXX Because Python calls both the protocol and the object "set", I'm using the term "set-like" to
 // refer to the protocol where there may be confusion.
 
-// Sets should accept themselves, their pairs, iterators, tuple/list, and frozenset/set as valid
-// types for the "x" (i.e. "other iterable") argument.
+// Sets should accept themselves, their pairs, iterators, frozenset/set, and frozendict/dict as
+// valid types for the "x" (i.e. "other iterable") argument.
+// FIXME Should dict really be here?
 // TODO Add dict key and item views here, when implemented.
-#define x_types_init(type)                                                              \
-    {                                                                                   \
-        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, \
-                fixture_type_frozenset, fixture_type_set, fixture_type_frozendict,      \
-                fixture_type_dict, NULL                                                 \
+#define x_types_init(type)                                                                 \
+    {                                                                                      \
+        (type), (type)->pair, fixture_type_iter, fixture_type_frozenset, fixture_type_set, \
+                fixture_type_frozendict, fixture_type_dict, NULL                           \
     }
+
+// Returns true iff type can store unhashable objects.
+static int type_stores_unhashables(fixture_type_t *type)
+{
+    return !type->is_setlike && !type->is_mapping;
+}
 
 
 // TODO Move to test_container? Will need an `if set or dict` around the unhashable test.
@@ -81,13 +87,12 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
 {
     fixture_type_t **x_type;
     ypObject        *items[4];
-    ypObject        *so;
-    ypObject        *empty = type->newN(0);
     obj_array_fill(items, type->rand_items);
-    so = type->newN(N(items[0], items[1]));
 
     // Non-empty so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+
         // x has the same items.
         ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(any_cmp(so, x), is, x_same));
         ead(x, (*x_type)->newN(N(items[0], items[0], items[1])),
@@ -132,10 +137,14 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
 
         // x is so.
         assert_obj(any_cmp(so, so), is, x_same);
+
+        yp_decref(so);
     }
 
     // Empty so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *empty = type->newN(0);
+
         // Non-empty x.
         ead(x, (*x_type)->newN(N(items[0])), assert_obj(any_cmp(empty, x), is, so_empty));
         ead(x, (*x_type)->newN(N(items[0], items[1])), assert_obj(any_cmp(empty, x), is, so_empty));
@@ -146,12 +155,54 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
 
         // x is so.
         assert_obj(any_cmp(empty, empty), is, both_empty);
+
+        yp_decref(empty);
     }
 
-    // FIXME What if x contains unhashable objects?
+    // x contains unhashable objects.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
+            ypObject *int_1 = yp_intC(1);
+            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *so = type->newN(N(items[0], int_1));
+            ypObject *empty = type->newN(0);
+
+            // x has the same items.
+            ead(x, (*x_type)->newN(N(items[0], intstore_1)),
+                    assert_obj(any_cmp(so, x), is, x_same));
+
+            // x is is a proper subset and is not empty.
+            ead(x, (*x_type)->newN(N(intstore_1)), assert_obj(any_cmp(so, x), is, x_subset));
+
+            // x is a proper superset.
+            ead(x, (*x_type)->newN(N(items[0], intstore_1, items[1])),
+                    assert_obj(any_cmp(so, x), is, x_superset));
+            ead(x, (*x_type)->newN(N(items[0], int_1, unhashable)),
+                    assert_obj(any_cmp(so, x), is, x_superset));
+            ead(x, (*x_type)->newN(N(items[0], intstore_1, unhashable)),
+                    assert_obj(any_cmp(so, x), is, x_superset));
+
+            // x overlaps and contains additional items.
+            ead(x, (*x_type)->newN(N(intstore_1, items[1])),
+                    assert_obj(any_cmp(so, x), is, x_overlap));
+            ead(x, (*x_type)->newN(N(int_1, unhashable)),
+                    assert_obj(any_cmp(so, x), is, x_overlap));
+            ead(x, (*x_type)->newN(N(intstore_1, unhashable)),
+                    assert_obj(any_cmp(so, x), is, x_overlap));
+
+            // x does not overlap and contains additional items.
+            ead(x, (*x_type)->newN(N(unhashable)), assert_obj(any_cmp(so, x), is, x_no_overlap));
+
+            // so is empty.
+            ead(x, (*x_type)->newN(N(unhashable)), assert_obj(any_cmp(empty, x), is, so_empty));
+
+            yp_decrefN(N(int_1, intstore_1, unhashable, so, empty));
+        }
+    }
 
     obj_array_decref(items);
-    yp_decrefN(N(so, empty));
     return MUNIT_OK;
 }
 
@@ -599,7 +650,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     // elsewhere)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
@@ -749,7 +800,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
@@ -763,7 +814,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     // An unhashable object in x should match the equal object in so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
@@ -915,7 +966,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
@@ -929,7 +980,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     // An unhashable object in x should match the equal object in so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
@@ -1065,7 +1116,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
@@ -1078,7 +1129,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     // result.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
@@ -1226,7 +1277,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
@@ -1378,7 +1429,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
@@ -1393,7 +1444,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
     // An unhashable object in x should match the equal object in so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
@@ -1544,7 +1595,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
@@ -1559,7 +1610,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
     // An unhashable object in x should match the equal object in so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
@@ -1694,7 +1745,7 @@ static MunitResult test_symmetric_difference_update(
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
@@ -1709,7 +1760,7 @@ static MunitResult test_symmetric_difference_update(
     // result.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
-        if (!(*x_type)->is_setlike && !(*x_type)->is_mapping) {
+        if (type_stores_unhashables(*x_type)) {
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
@@ -1993,7 +2044,8 @@ static MunitResult test_discard(const MunitParameter params[], fixture_t *fixtur
 static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(2, type->rand_item());
+    ypObject       *items[2];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support pop.
     if (!type->is_mutable) {
@@ -2029,6 +2081,7 @@ tear_down:
 
 
 // TODO dict key and item views, when implemented, will also support the set protocol.
+// TODO range could be considered setlike, but is that useful? (Probably not.)
 static MunitParameterEnum test_setlike_params[] = {
         {param_key_type, param_values_types_setlike}, {NULL}};
 
