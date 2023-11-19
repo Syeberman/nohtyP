@@ -308,8 +308,8 @@ typedef size_t yp_uhash_t;
 // The least-significant bit of the type code specifies if the type is immutable (0) or not
 #define ypObject_TYPE_CODE(ob) (((ypObject *)(ob))->ob_type)
 #define ypObject_SET_TYPE_CODE(ob, type) (ypObject_TYPE_CODE(ob) = (_yp_ob_type_t)(type))
-#define ypObject_TYPE_CODE_IS_MUTABLE(type) ((type)&0x1)
-#define ypObject_TYPE_CODE_AS_FROZEN(type) ((type)&0xFE)
+#define ypObject_TYPE_CODE_IS_MUTABLE(type) ((type) & 0x1)
+#define ypObject_TYPE_CODE_AS_FROZEN(type) ((type) & 0xFE)
 #define ypObject_TYPE(ob) (ypTypeTable[ypObject_TYPE_CODE(ob)])
 #define ypObject_IS_MUTABLE(ob) (ypObject_TYPE_CODE_IS_MUTABLE(ypObject_TYPE_CODE(ob)))
 #define ypObject_REFCNT(ob) (((ypObject *)(ob))->ob_refcnt)
@@ -6836,7 +6836,7 @@ static void ypStringLib_inplace_upconvert(
         dest_type      *dest = ((dest_type *)_data);                                    \
         const src_type *src = ((src_type *)_data);                                      \
         for (/*len already set*/; len > 0; len--) {                                     \
-            *dest = (dest_type)*src;                                                    \
+            *dest = (dest_type) * src;                                                  \
             yp_ASSERT(*dest == *src, "ypStringLib_inplace_downconvert truncated data"); \
             dest++;                                                                     \
             src++;                                                                      \
@@ -6928,7 +6928,7 @@ static void ypStringLib_elemcopy_maybeupconvert(int dest_sizeshift, void *dest, 
         dest += dest_i;                                                                         \
         src += src_i;                                                                           \
         for (/*slicelength already set*/; slicelength > 0; slicelength--) {                     \
-            *dest = (dest_type)*src;                                                            \
+            *dest = (dest_type) * src;                                                          \
             yp_ASSERT(*dest == *src, "ypStringLib_elemcopy_maybedownconvert truncated data");   \
             dest++;                                                                             \
             src += src_step;                                                                    \
@@ -12287,7 +12287,7 @@ static ypObject *_ypTuple_deepcopy(int type, ypObject *x, visitfunc copy_visitor
 // factor and n must both be greater than zero. Cannot fail.
 // XXX Handle the "empty" case (factor<1 or n<1) before calling this function
 #define _ypTuple_repeat_memcpy(sq, factor, n) \
-    _ypSequence_repeat_memcpy(ypTuple_ARRAY(sq), (factor), (n)*yp_sizeof(ypObject *))
+    _ypSequence_repeat_memcpy(ypTuple_ARRAY(sq), (factor), (n) * yp_sizeof(ypObject *))
 
 // Called on push/append, extend, or irepeat to increase the allocated size of the tuple. Does not
 // update ypTuple_LEN.
@@ -15021,7 +15021,7 @@ keyfunc_fail:
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
 
-// TODO Many set operations allocate temporary objects on the heap; is there a way to avoid this?
+// FIXME Many set operations allocate temporary objects on the heap; is there a way to avoid this?
 
 #define ypSet_TABLE(so) ((ypSet_KeyEntry *)((ypObject *)so)->ob_data)
 #define ypSet_SET_TABLE(so, value) (((ypObject *)so)->ob_data = (void *)(value))
@@ -15046,8 +15046,7 @@ yp_STATIC_ASSERT((_ypMem_ideal_size_DEFAULT - yp_offsetof(ypSetObject, ob_inline
 #define ypSet_RESIZE_AT_DNM (3)  // denominator
 
 // We don't want the multiplications in _ypSet_space_remaining, _ypSet_calc_alloclen, and
-// _ypSet_resize overflowing, so we impose a separate limit on the maximum len and alloclen for
-// sets
+// _ypSet_resize overflowing, so we impose a separate limit on the max len and alloclen for sets.
 // XXX ypSet_ALLOCLEN_MAX may be larger than the true maximum
 // TODO We could calculate the exact maximum in yp_initialize...
 #define ypSet_ALLOCLEN_MAX                                                                        \
@@ -15144,7 +15143,7 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
 // TODO It's tempting to look into memcpy to copy the tables, although that would mean the copy
 // would be just as dirty as the original. But if the original isn't "too dirty"...
 static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep);
-static ypObject *_ypSet_copy(int type, ypObject *x, int alloclen_fixed)
+static ypObject *_ypSet_copy(int type, ypObject *x)
 {
     yp_ssize_t      keysleft = ypSet_LEN(x);
     ypSet_KeyEntry *otherkeys = ypSet_TABLE(x);
@@ -15152,23 +15151,25 @@ static ypObject *_ypSet_copy(int type, ypObject *x, int alloclen_fixed)
     yp_ssize_t      i;
     ypSet_KeyEntry *loc;
 
-    // FIXME Add assertions for optimizations (i.e. lazy shallow copy) (and elsewhere?)
+    yp_ASSERT(type != ypFrozenSet_CODE || ypObject_TYPE_CODE(x) != ypFrozenSet_CODE,
+            "missed a lazy shallow copy optimization");
+    yp_ASSERT(type != ypFrozenSet_CODE || ypSet_LEN(x) > 0,
+            "missed a yp_frozenset_empty optimization");
 
-    so = _ypSet_new(type, keysleft, alloclen_fixed);
+    so = _ypSet_new(type, keysleft, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(so)) return so;
 
     // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
-        _ypSet_movekey_clean(so, yp_incref(otherkeys[i].se_key), otherkeys[i].se_hash, &loc);
+        _ypSet_movekey_clean(
+                so, yp_incref(otherkeys[i].se_key), otherkeys[i].se_hash, &loc);  // steals key
     }
     return so;
 }
 
 // XXX Check for the yp_frozenset_empty case first
-// FIXME We're trusting that copy_visitor will behave properly and return an object that has the
-// same hash as the original and that is unequal to anything else in the other set...bad assumption!
 static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
     // FIXME This will fail if x is modified during the copy: ypSet_LEN and ypSet_TABLE may change!
@@ -15177,24 +15178,37 @@ static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, 
     ypObject       *so;
     yp_ssize_t      i;
     ypObject       *key;
+    yp_hash_t       hash;
+    ypObject       *exc = yp_None;
     ypSet_KeyEntry *loc;
     ypObject       *result;
 
+    yp_ASSERT(type != ypFrozenSet_CODE || ypSet_LEN(x) > 0,
+            "missed a yp_frozenset_empty optimization");
+
     // XXX Unlike _ypTuple_deepcopy, we don't have to worry about sets that contain themselves,
     // which simplifies this greatly.
-    so = _ypSet_new(type, keysleft, /*alloclen_fixed=*/TRUE);
+    so = _ypSet_new(type, keysleft, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(so)) return so;
 
     // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean.
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
-        key = copy_visitor(otherkeys[i].se_key, copy_memo);
+
+        key = copy_visitor(otherkeys[i].se_key, copy_memo);  // new ref
         if (yp_isexceptionC(key)) {
             yp_decref(so);
             return key;
         }
-        _ypSet_movekey_clean(so, key, otherkeys[i].se_hash, &loc);
+        hash = yp_hashC(key, &exc);
+        if (yp_isexceptionC(exc)) {
+            yp_decref(key);
+            yp_decref(so);
+            return exc;
+        }
+
+        _ypSet_movekey_clean(so, key, hash, &loc);  // steals key
     }
 
     result = _yp_deepcopy_memo_setitem(copy_memo, x, so);
@@ -15208,7 +15222,6 @@ static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, 
 
 // Resizes the set to the smallest size that will hold minused values. If you want to reduce the
 // need for future resizes, call with a larger minused. Returns yp_None, or an exception on error.
-// TODO Do we want to split minused into required and extra, like in other areas?
 yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof(ypSet_KeyEntry),
         ypSet_resize_cant_overflow);
 static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
@@ -15242,7 +15255,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&oldkeys[i])) continue;
         keysleft -= 1;
-        _ypSet_movekey_clean(so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc);
+        _ypSet_movekey_clean(so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc);  // steals key
     }
     ypMem_REALLOC_CONTAINER_FREE_OLDPTR(so, ypSetObject, oldkeys);
     yp_DEBUG("_ypSet_resize: %p table %p  (was %p)", so, ypSet_TABLE(so), oldkeys);
@@ -15329,14 +15342,22 @@ static ypObject *_ypSet_lookkey_bycurrenthash(ypObject *so, ypObject *key, ypSet
     return _ypSet_lookkey(so, key, hash, loc);
 }
 
-// Steals key and adds it to the hash table at the given location. loc must not currently be in
-// use! Ensure the set is large enough (_ypSet_space_remaining) before adding items.
+// Steals key and adds it to the hash table at the given location. loc must not currently be in use!
+// *spaceleft should be initialized from  _ypSet_space_remaining; it will be decremented as
+// appropriate. Ensure the set is large enough (spaceleft > 0) before adding items.
 // XXX Adapted from Python's insertdict in dictobject.c
-static void _ypSet_movekey(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash)
+static void _ypSet_movekey(
+        ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash, yp_ssize_t *spaceleft)
 {
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+    yp_ASSERT1(!ypSet_ENTRY_USED(loc));
+    yp_ASSERT1(loc->se_key != NULL || _ypSet_space_remaining(so) > 0);
+    yp_ASSERT1(*spaceleft == _ypSet_space_remaining(so));
 
-    if (loc->se_key == NULL) ypSet_FILL(so) += 1;
+    if (loc->se_key == NULL) {
+        ypSet_FILL(so) += 1;
+        *spaceleft -= 1;
+    }
     loc->se_key = key;
     loc->se_hash = hash;
     ypSet_SET_LEN(so, ypSet_LEN(so) + 1);
@@ -15355,13 +15376,18 @@ static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, yp
     ypSet_KeyEntry *ep0 = ypSet_TABLE(so);
 
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+    yp_ASSERT1(_ypSet_space_remaining(so) > 0);
+    yp_ASSERT1(ypSet_LEN(so) == ypSet_FILL(so));
 
     i = (size_t)hash & mask;
     (*ep) = &ep0[i];
     for (perturb = (size_t)hash; (*ep)->se_key != NULL; perturb >>= ypSet_PERTURB_SHIFT) {
+        yp_ASSERT1((*ep)->se_key != ypSet_dummy);
+        yp_ASSERT1((*ep)->se_hash != hash || yp_eq((*ep)->se_key, key) == yp_False);
         i = (i << 2) + i + perturb + 1;
         (*ep) = &ep0[i & mask];
     }
+
     ypSet_FILL(so) += 1;
     (*ep)->se_key = key;
     (*ep)->se_hash = hash;
@@ -15374,41 +15400,31 @@ static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
 {
     ypObject *oldkey = loc->se_key;
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+    yp_ASSERT1(ypSet_ENTRY_USED(loc));
     loc->se_key = ypSet_dummy;
     loc->se_hash = ypObject_HASH_INVALID;
     ypSet_SET_LEN(so, ypSet_LEN(so) - 1);
     return oldkey;
 }
 
-// Adds the key to the hash table. *spaceleft should be initialized from  _ypSet_space_remaining;
-// this function then decrements it with each key added, and resets it on every resize. growhint
+// Adds the key to the hash table at the given location if there is enough room, otherwise resizes
+// so and adds the key at the new location. loc must not currently be in use! *spaceleft should be
+// initialized from _ypSet_space_remaining; it will be decremented or reset as appropriate. growhint
 // is the number of additional items, not including key, that are expected to be added to the set.
-// Returns yp_True if so was modified, yp_False if it wasn't due to the key already being in the
-// set, or an exception on error.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypSet_push(
-        ypObject *so, ypObject *key, yp_ssize_t *spaceleft, yp_ssize_t growhint)
+static ypObject *_ypSet_push(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash,
+        yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
-    yp_hash_t       hash;
-    ypObject       *exc = yp_None;
-    ypObject       *result;
-    ypSet_KeyEntry *loc;
-    yp_ssize_t      newlen;
+    ypObject  *result;
+    yp_ssize_t newlen;
 
-    // Look for the appropriate entry in the hash table
-    hash = yp_hashC(key, &exc);
-    if (yp_isexceptionC(exc)) return exc;
-    result = _ypSet_lookkey(so, key, hash, &loc);
-    if (yp_isexceptionC(result)) return result;
+    yp_ASSERT1(!ypSet_ENTRY_USED(loc));
 
-    // If the key is already in the hash table, then there's nothing to do
-    if (ypSet_ENTRY_USED(loc)) return yp_False;
-
-    // Otherwise, we need to add the key, which possibly doesn't involve resizing
-    if (*spaceleft >= 1) {
-        _ypSet_movekey(so, loc, yp_incref(key), hash);
-        *spaceleft -= 1;
-        return yp_True;
+    // We need to add the key; it's possible this doesn't involve resizing.
+    // FIXME if loc is a dummy entry, we could still add without resizing
+    if (*spaceleft > 0) {
+        _ypSet_movekey(so, loc, yp_incref(key), hash, spaceleft);  // steals key
+        return yp_None;
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
@@ -15421,15 +15437,39 @@ static ypObject *_ypSet_push(
     result = _ypSet_resize(so, newlen);                                // invalidates loc
     if (yp_isexceptionC(result)) return result;
 
-    _ypSet_movekey_clean(so, yp_incref(key), hash, &loc);
+    _ypSet_movekey_clean(so, yp_incref(key), hash, &loc);  // steals key
     *spaceleft = _ypSet_space_remaining(so);
+    return yp_None;
+}
+
+// As _ypSet_push, but calculates the hash using yp_hashC. Returns yp_True if so was modified,
+// yp_False if it wasn't due to the key already being in the set, or an exception on error.
+static ypObject *_ypSet_push_byhash(
+        ypObject *so, ypObject *key, yp_ssize_t *spaceleft, yp_ssize_t growhint)
+{
+    yp_hash_t       hash;
+    ypObject       *exc = yp_None;
+    ypSet_KeyEntry *loc;
+    ypObject       *result;
+
+    // Look for the appropriate entry in the hash table.
+    hash = yp_hashC(key, &exc);
+    if (yp_isexceptionC(exc)) return exc;
+    result = _ypSet_lookkey(so, key, hash, &loc);
+    if (yp_isexceptionC(result)) return result;
+
+    // If the key is already in the hash table, then there's nothing to do.
+    if (ypSet_ENTRY_USED(loc)) return yp_False;
+
+    result = _ypSet_push(so, loc, key, hash, spaceleft, growhint);
+    if (yp_isexceptionC(result)) return result;
     return yp_True;
 }
 
 // Removes the key from the hash table. The set is not resized. Returns the reference to the
 // removed key if so was modified, ypSet_dummy if it wasn't due to the key not being in the
 // set, or an exception on error.
-static ypObject *_ypSet_pop(ypObject *so, ypObject *key)
+static ypObject *_ypSet_pop_bycurrenthash(ypObject *so, ypObject *key)
 {
     ypObject       *result;
     ypSet_KeyEntry *loc;
@@ -15527,7 +15567,7 @@ static ypObject *_ypSet_issubset_withiter(ypObject *so, ypObject *mi, yp_uint64_
     // Create a copy of so and remove the items yielded by the iterator. If there are remaining
     // items in the copy, then it's not a subset.
     // FIXME Is there a way to do this without allocating a new set? (I actually think not.)
-    so_remaining = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    so_remaining = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(so_remaining)) return so_remaining;
     result = _ypSet_difference_update_fromiter(so_remaining, mi, mi_state);
     if (!yp_isexceptionC(result)) {
@@ -15575,6 +15615,7 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
     yp_ssize_t      spaceleft = _ypSet_space_remaining(so);
     ypObject       *result;
     yp_ssize_t      i;
+    ypSet_KeyEntry *so_loc;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
     yp_ASSERT1(so != other);
@@ -15582,8 +15623,14 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
-        // TODO _ypSet_push recalculates hash; consolidate?
-        result = _ypSet_push(so, otherkeys[i].se_key, &spaceleft, keysleft);
+
+        // If the key is already in the hash table, then there's nothing to do.
+        result = _ypSet_lookkey(so, otherkeys[i].se_key, otherkeys[i].se_hash, &so_loc);
+        if (yp_isexceptionC(result)) return result;
+        if (ypSet_ENTRY_USED(so_loc)) continue;
+
+        result = _ypSet_push(
+                so, so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft, keysleft);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -15603,8 +15650,8 @@ static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t 
             if (yp_isexceptionC2(key, yp_StopIteration)) break;
             return key;
         }
-        length_hint -= 1;  // check for <0 only when we need it in _ypSet_push
-        result = _ypSet_push(so, key, &spaceleft, length_hint);
+        length_hint -= 1;  // check for <0 only when we need it in _ypSet_push_byhash
+        result = _ypSet_push_byhash(so, key, &spaceleft, length_hint);
         yp_decref(key);
         if (yp_isexceptionC(result)) return result;
     }
@@ -15671,7 +15718,7 @@ static ypObject *_ypSet_intersection_update_fromiter(
     // implement this as ypSet_intersection?
     // Unfortunately, we need to create a short-lived copy of so. It's either that, or convert
     // mi to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
-    so_toremove = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    so_toremove = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(so_toremove)) return so_toremove;
 
     // Remove items from so_toremove that are yielded by mi. so_toremove is then a set
@@ -15740,7 +15787,7 @@ static ypObject *_ypSet_difference_update_fromiter(
             if (yp_isexceptionC2(key, yp_StopIteration)) break;
             return key;
         }
-        result = _ypSet_pop(so, key);  // new ref
+        result = _ypSet_pop_bycurrenthash(so, key);  // new ref
         yp_decref(key);
         if (yp_isexceptionC(result)) return result;
         yp_decref(result);
@@ -15774,6 +15821,7 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
     ypSet_KeyEntry *otherkeys = ypSet_TABLE(other);
     ypObject       *result;
     yp_ssize_t      i;
+    ypSet_KeyEntry *so_loc;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
     yp_ASSERT1(so != other);
@@ -15782,18 +15830,17 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
 
-        // First, attempt to remove; if nothing was removed, then add it instead
-        // TODO _ypSet_pop and _ypSet_push both call yp_currenthashC; consolidate?
-        result = _ypSet_pop(so, otherkeys[i].se_key);
-        if (result == ypSet_dummy) {
-            result = _ypSet_push(so, otherkeys[i].se_key, &spaceleft, keysleft);  // may resize so
-            if (yp_isexceptionC(result)) return result;
-        } else if (yp_isexceptionC(result)) {
-            return result;
+        // Look for the appropriate entry in the hash table.
+        result = _ypSet_lookkey(so, otherkeys[i].se_key, otherkeys[i].se_hash, &so_loc);
+        if (yp_isexceptionC(result)) return result;
+
+        // If the key is in the hash table, remove it, otherwise add it.
+        if (ypSet_ENTRY_USED(so_loc)) {
+            yp_decref(_ypSet_removekey(so, so_loc));
         } else {
-            // XXX spaceleft based on alloclen and fill, so doesn't change on deletions
-            // FIXME What if yp_decref modifies so?
-            yp_decref(result);
+            result = _ypSet_push(so, so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft,
+                    keysleft);  // may resize so
+            if (yp_isexceptionC(result)) return result;
         }
     }
     return yp_None;
@@ -15823,17 +15870,14 @@ static ypObject *frozenset_freeze(ypObject *so)
     return yp_None;  // no-op, currently
 }
 
-static ypObject *frozenset_unfrozen_copy(ypObject *so)
-{
-    return _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);
-}
+static ypObject *frozenset_unfrozen_copy(ypObject *so) { return _ypSet_copy(ypSet_CODE, so); }
 
 static ypObject *frozenset_frozen_copy(ypObject *so)
 {
     if (ypSet_LEN(so) < 1) return yp_frozenset_empty;
     // A shallow copy of a frozenset to a frozenset doesn't require an actual copy
     if (ypObject_TYPE_CODE(so) == ypFrozenSet_CODE) return yp_incref(so);
-    return _ypSet_copy(ypFrozenSet_CODE, so, /*alloclen_fixed=*/TRUE);
+    return _ypSet_copy(ypFrozenSet_CODE, so);
 }
 
 static ypObject *frozenset_unfrozen_deepcopy(ypObject *so, visitfunc copy_visitor, void *copy_memo)
@@ -16105,7 +16149,7 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
 
     if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
 
-    newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = set_update(newSo, n, args);
@@ -16133,7 +16177,7 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
 
     if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
 
-    newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = set_intersection_update(newSo, n, args);
@@ -16161,7 +16205,7 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
 
     if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
 
-    newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = set_difference_update(newSo, n, args);
@@ -16189,7 +16233,7 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
     ypObject *result;
     ypObject *newSo;
 
-    newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = set_symmetric_difference_update(newSo, x);
@@ -16210,7 +16254,7 @@ static ypObject *set_pushunique(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
     // TODO Overallocate
-    ypObject *result = _ypSet_push(so, x, &spaceleft, 0);
+    ypObject *result = _ypSet_push_byhash(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;  // TODO: As usual, what if this is yp_KeyError?
     return result == yp_True ? yp_None : yp_KeyError;
 }
@@ -16219,7 +16263,7 @@ static ypObject *set_push(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
     // TODO Overallocate
-    ypObject *result = _ypSet_push(so, x, &spaceleft, 0);
+    ypObject *result = _ypSet_push_byhash(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;
     return yp_None;
 }
@@ -16255,8 +16299,8 @@ static ypObject *set_clear(ypObject *so)
     return yp_None;
 }
 
-// Note the difference between this, which removes an arbitrary key, and _ypSet_pop, which removes
-// a specific key
+// Note the difference between this, which removes an arbitrary key, and _ypSet_pop_bycurrenthash,
+// which removes a specific key
 // XXX Adapted from Python's set_pop
 static ypObject *set_pop(ypObject *so)
 {
@@ -16298,12 +16342,12 @@ static ypObject *frozenset_len(ypObject *so, yp_ssize_t *len)
 // onmissing must be an immortal, or NULL
 static ypObject *set_remove(ypObject *so, ypObject *x, ypObject *onmissing)
 {
-    ypObject *result = _ypSet_pop(so, x);
+    ypObject *result = _ypSet_pop_bycurrenthash(so, x);
     if (result == ypSet_dummy) {
         if (onmissing == NULL) return yp_KeyError;
         return onmissing;
     }
-    if (yp_isexceptionC(result)) return result;
+    if (yp_isexceptionC(result)) return result;  // FIXME: As usual, what if this is yp_KeyError?
     yp_decref(result);
     return yp_None;
 }
@@ -16553,7 +16597,7 @@ static ypObject *_ypSetNV(int type, int n, va_list args)
             return x;
         }
         n -= 1;
-        result = _ypSet_push(newSo, x, &spaceleft, n);
+        result = _ypSet_push_byhash(newSo, x, &spaceleft, n);
         if (yp_isexceptionC(result)) {
             yp_decref(newSo);
             return result;
@@ -16590,7 +16634,11 @@ static ypObject *_ypSet(int type, ypObject *iterable)
     ypObject  *exc = yp_None;
     ypObject  *newSo;
     ypObject  *result;
-    yp_ssize_t length_hint = yp_lenC(iterable, &exc);
+    yp_ssize_t length_hint;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(iterable) != ypFrozenSet_CODE);
+
+    length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(iterable, &exc);
@@ -16627,7 +16675,7 @@ ypObject *yp_frozenset(ypObject *iterable)
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
         if (ypSet_LEN(iterable) < 1) return yp_frozenset_empty;
         if (ypObject_TYPE_CODE(iterable) == ypFrozenSet_CODE) return yp_incref(iterable);
-        return _ypSet_copy(ypFrozenSet_CODE, iterable, /*alloclen_fixed=*/TRUE);
+        return _ypSet_copy(ypFrozenSet_CODE, iterable);
     }
     return _ypSet(ypFrozenSet_CODE, iterable);
 }
@@ -16635,7 +16683,7 @@ ypObject *yp_frozenset(ypObject *iterable)
 ypObject *yp_set(ypObject *iterable)
 {
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
-        return _ypSet_copy(ypSet_CODE, iterable, /*alloclen_fixed=*/FALSE);
+        return _ypSet_copy(ypSet_CODE, iterable);
     }
     return _ypSet(ypSet_CODE, iterable);
 }
@@ -16808,8 +16856,8 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
         value = oldvalues[i];
         if (value == NULL) continue;
         valuesleft -= 1;
-        _ypSet_movekey_clean(
-                newkeyset, yp_incref(oldkeys[i].se_key), oldkeys[i].se_hash, &newkey_loc);
+        _ypSet_movekey_clean(newkeyset, yp_incref(oldkeys[i].se_key), oldkeys[i].se_hash,
+                &newkey_loc);  // steals key
         ypDict_VALUES(mp)[ypSet_ENTRY_INDEX(newkeyset, newkey_loc)] = oldvalues[i];
     }
 
@@ -16839,11 +16887,11 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // It's possible we can add the key without resizing
+    // FIXME if key_loc is a dummy entry, we could still add without resizing
     if (*spaceleft >= 1) {
-        _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash);
+        _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash, spaceleft);  // steals key
         *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
         ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
-        *spaceleft -= 1;
         return yp_True;
     }
 
@@ -16858,7 +16906,7 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     if (yp_isexceptionC(result)) return result;
 
     keyset = ypDict_KEYSET(mp);
-    _ypSet_movekey_clean(keyset, yp_incref(key), hash, key_loc);
+    _ypSet_movekey_clean(keyset, yp_incref(key), hash, key_loc);  // steals key
     *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
     ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
     *spaceleft = _ypSet_space_remaining(keyset);
@@ -16867,9 +16915,9 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
 
 // Adds the key/value to the dict. If override is false, returns yp_False and does not modify the
 // dict if there is an existing value. *spaceleft should be initialized from
-// _ypSet_space_remaining; this function then decrements it with each key added, and resets it on
-// every resize. Returns yp_True if mp was modified, yp_False if it wasn't due to existing values
-// being preserved (ie override is false), or an exception on error.
+// _ypSet_space_remaining; it will be decremented or reset as appropriate.. Returns yp_True if mp
+// was modified, yp_False if it wasn't due to existing values being preserved (ie override is
+// false), or an exception on error.
 // XXX Adapted from PyDict_SetItem
 static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int override,
         yp_ssize_t *spaceleft, yp_ssize_t growhint)
@@ -17407,8 +17455,8 @@ typedef struct {
 } ypDictMiState;
 yp_STATIC_ASSERT(ypDict_LEN_MAX <= 0x7FFFFFFFu, len_fits_31_bits);
 yp_STATIC_ASSERT(yp_sizeof(yp_uint64_t) >= yp_sizeof(ypDictMiState), ypDictMiState_fits_uint64);
-#define ypDictMiState_SET_ITEMSLEFT(state, v) ((state)->itemsleft = (yp_uint32_t)(v)&0x7FFFFFFFu)
-#define ypDictMiState_SET_INDEX(state, v) ((state)->index = (yp_uint32_t)(v)&0x7FFFFFFFu)
+#define ypDictMiState_SET_ITEMSLEFT(state, v) ((state)->itemsleft = (yp_uint32_t)(v) & 0x7FFFFFFFu)
+#define ypDictMiState_SET_INDEX(state, v) ((state)->index = (yp_uint32_t)(v) & 0x7FFFFFFFu)
 
 static ypObject *frozendict_miniiter_items(ypObject *mp, yp_uint64_t *_state)
 {
