@@ -55,6 +55,9 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
             "yp_ENABLE_SHARED",
             # Assertion failures go to stderr, status updates to MUNIT_OUTPUT_FILE.
             "MUNIT_OUTPUT_FILE=stderr",
+            # Write nohtyP.dll logs directly to stderr, i.e. the output file. Particularly useful
+            # for assertions, as they abort before munit can write the buffer to stderr.
+            "MUNIT_NO_BUFFER",
             "MUNIT_TEST_NAME_LEN=58",
             "MUNIT_DISABLE_TIMING",
         ],
