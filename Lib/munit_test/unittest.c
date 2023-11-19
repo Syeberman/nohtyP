@@ -216,7 +216,28 @@ static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
     return FALSE;
 }
 
-// Fills array with n unique objects as returned by supplier.
+// Returns an object, as returned by supplier, that is unequal among the n objects in array.
+static ypObject *rand_obj_unique3(yp_ssize_t n, ypObject **array, objvoidfunc supplier)
+{
+    yp_ssize_t max_dups = 5;  // Ensure we don't loop indefinitely with a bad supplier.
+    while (TRUE) {
+        ypObject *obj = supplier();  // new ref
+        if (array_contains(n, array, obj)) {
+            max_dups--;
+            if (max_dups < 1) munit_error("too many duplicate objects returned");
+            yp_decref(obj);  // Not unique, so discard it.
+        } else {
+            return obj;  // Unique, so keep it.
+        }
+    }
+}
+
+ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array)
+{
+    return rand_obj_unique3(n, array, rand_obj_any_mutable);
+}
+
+// Fills array with n unequal objects as returned by supplier.
 static void rand_objs3(yp_ssize_t n, ypObject **array, objvoidfunc supplier)
 {
     yp_ssize_t max_dups = n + 10;  // Ensure we don't loop indefinitely with a bad supplier.
@@ -1157,8 +1178,8 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
 }
 
 // Used in newN for mapping types (frozendict and dict). Returns an object suitable for
-// yp_frozenset/etc. Values are random and unique from each other (but not necessarily unique from
-// the keys).
+// yp_frozendict/etc. Values are random and unequal from each other (but not necessarily unequal
+// from the keys).
 static ypObject *_mapping_new_supplierN(int n, va_list args)
 {
     int       i;

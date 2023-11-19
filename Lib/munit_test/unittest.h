@@ -748,6 +748,9 @@ extern ypObject *rand_obj(fixture_type_t *type);
 // Returns a random hashable object of the given type. type must be immutable.
 extern ypObject *rand_obj_hashable(fixture_type_t *type);
 
+// Returns a random mutable object of any type that is unequal to the objects in array.
+extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array);
+
 // Fills array with n random, unique objects of any type.
 extern void rand_objs_any(yp_ssize_t n, ypObject **array);
 

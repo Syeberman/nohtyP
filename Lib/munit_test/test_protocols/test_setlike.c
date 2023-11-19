@@ -58,7 +58,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     // Item is unhashable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *unhashable = rand_obj_any_mutable();
+        ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
         assert_obj(yp_contains(so, unhashable), is, yp_False);
         assert_obj(yp_in(unhashable, so), is, yp_False);
         assert_obj(yp_not_in(unhashable, so), is, yp_True);
@@ -165,7 +165,7 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         if (type_stores_unhashables(*x_type)) {
             ypObject *int_1 = yp_intC(1);
             ypObject *intstore_1 = yp_intstoreC(1);
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(1, &int_1);
             ypObject *so = type->newN(N(items[0], int_1));
             ypObject *empty = type->newN(0);
 
@@ -651,7 +651,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_raises(yp_unionN(so, N(x)), yp_TypeError);
@@ -801,7 +801,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             // FIXME This fails in Python; should it fail for us?
@@ -967,7 +967,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             // FIXME This fails in Python; should it fail for us?
@@ -1117,7 +1117,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_raises(yp_symmetric_difference(so, x), yp_TypeError);
@@ -1278,7 +1278,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_raises_exc(yp_update(so, x, &exc), yp_TypeError);
@@ -1430,7 +1430,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             // FIXME This fails in Python; should it fail for us?
@@ -1596,7 +1596,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             // FIXME This fails in Python; should it fail for us?
@@ -1746,7 +1746,7 @@ static MunitResult test_symmetric_difference_update(
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError);
@@ -1866,9 +1866,10 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Item is unhashable.
+    // FIXME another test: unhashable, but equal to existing, should still fail (elsewhere?)
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *unhashable = rand_obj_any_mutable();
+        ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
         assert_raises_exc(yp_push(so, unhashable, &exc), yp_TypeError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, unhashable));
@@ -1922,7 +1923,7 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
     // FIXME and test if it equals an item already in so: yp_TypeError should win out
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *unhashable = rand_obj_any_mutable();
+        ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
         assert_raises_exc(yp_pushunique(so, unhashable, &exc), yp_TypeError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, unhashable));
@@ -1989,7 +1990,7 @@ static MunitResult _test_remove(
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         // FIXME what if unhashable equals one of the items (here and everywhere)?
-        ypObject *unhashable = rand_obj_any_mutable();
+        ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
         assert_not_found_exc(any_remove(so, unhashable, &exc));
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, unhashable));
