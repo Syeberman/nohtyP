@@ -692,6 +692,8 @@ extern fixture_type_t *fixture_type_tuple;
 extern fixture_type_t *fixture_type_list;
 extern fixture_type_t *fixture_type_frozenset;
 extern fixture_type_t *fixture_type_set;
+extern fixture_type_t *fixture_type_frozenset_dirty;
+extern fixture_type_t *fixture_type_set_dirty;
 extern fixture_type_t *fixture_type_frozendict;
 extern fixture_type_t *fixture_type_dict;
 extern fixture_type_t *fixture_type_function;
@@ -701,7 +703,7 @@ typedef struct _fixture_t {
 } fixture_t;
 
 // The number of elements in fixture_types_all (ignoring the null terminator).
-#define FIXTURE_TYPES_ALL_LEN 20
+#define FIXTURE_TYPES_ALL_LEN 22
 
 // "All", except invalidated and exception.
 extern fixture_type_t *fixture_types_all[];

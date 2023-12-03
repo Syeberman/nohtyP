@@ -20,6 +20,12 @@ static int type_stores_unhashables(fixture_type_t *type)
     return !type->is_setlike && !type->is_mapping;
 }
 
+// Returns true iff type supports comparisons with other.
+static int type_iscomparable(fixture_type_t *type, fixture_type_t *other)
+{
+    return type->type == other->type || type->type == other->pair->type;
+}
+
 
 // TODO Move to test_container? Will need an `if set or dict` around the unhashable test.
 static MunitResult test_contains(const MunitParameter params[], fixture_t *fixture)
@@ -356,7 +362,7 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
 
     // lt is only supported for friendly x.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if ((*x_type) == type || (*x_type) == type->pair) continue;
+        if (type_iscomparable(type, (*x_type))) continue;
         ead(x, (*x_type)->newN(0), assert_raises(yp_lt(so, x), yp_TypeError));
         ead(x, (*x_type)->newN(0), assert_raises(yp_lt(empty, x), yp_TypeError));
     }
@@ -394,7 +400,7 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
 
     // le is only supported for friendly x.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if ((*x_type) == type || (*x_type) == type->pair) continue;
+        if (type_iscomparable(type, (*x_type))) continue;
         ead(x, (*x_type)->newN(0), assert_raises(yp_le(so, x), yp_TypeError));
         ead(x, (*x_type)->newN(0), assert_raises(yp_le(empty, x), yp_TypeError));
     }
@@ -432,7 +438,7 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
 
     // eq is only supported for friendly x. All others compare unequal.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if ((*x_type) == type || (*x_type) == type->pair) continue;
+        if (type_iscomparable(type, (*x_type))) continue;
         ead(x, (*x_type)->newN(0), assert_obj(yp_eq(so, x), is, yp_False));
         ead(x, (*x_type)->newN(0), assert_obj(yp_eq(empty, x), is, yp_False));
     }
@@ -470,7 +476,7 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
 
     // ne is only supported for friendly x. All others compare unequal.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if ((*x_type) == type || (*x_type) == type->pair) continue;
+        if (type_iscomparable(type, (*x_type))) continue;
         ead(x, (*x_type)->newN(0), assert_obj(yp_ne(so, x), is, yp_True));
         ead(x, (*x_type)->newN(0), assert_obj(yp_ne(empty, x), is, yp_True));
     }
@@ -508,7 +514,7 @@ static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
 
     // ge is only supported for friendly x.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if ((*x_type) == type || (*x_type) == type->pair) continue;
+        if (type_iscomparable(type, (*x_type))) continue;
         ead(x, (*x_type)->newN(0), assert_raises(yp_ge(so, x), yp_TypeError));
         ead(x, (*x_type)->newN(0), assert_raises(yp_ge(empty, x), yp_TypeError));
     }
@@ -546,7 +552,7 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
 
     // gt is only supported for friendly x.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        if ((*x_type) == type || (*x_type) == type->pair) continue;
+        if (type_iscomparable(type, (*x_type))) continue;
         ead(x, (*x_type)->newN(0), assert_raises(yp_gt(so, x), yp_TypeError));
         ead(x, (*x_type)->newN(0), assert_raises(yp_gt(empty, x), yp_TypeError));
     }
