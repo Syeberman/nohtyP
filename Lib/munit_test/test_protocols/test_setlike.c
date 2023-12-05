@@ -8,10 +8,11 @@
 // valid types for the "x" (i.e. "other iterable") argument.
 // FIXME Should dict really be here?
 // TODO Add dict key and item views here, when implemented.
-#define x_types_init(type)                                                                 \
-    {                                                                                      \
-        (type), (type)->pair, fixture_type_iter, fixture_type_frozenset, fixture_type_set, \
-                fixture_type_frozendict, fixture_type_dict, NULL                           \
+#define x_types_init(type)                                                                     \
+    {                                                                                          \
+        (type), (type)->pair, fixture_type_iter, fixture_type_frozenset, fixture_type_set,     \
+                fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_frozendict, \
+                fixture_type_dict, NULL                                                        \
     }
 
 // Returns true iff type can store unhashable objects.
@@ -98,13 +99,20 @@ static MunitResult _test_comparisons_not_supported(fixture_type_t *type, fixture
     obj_array_fill(items, type->rand_items);
     so = type->newN(N(items[0], items[1]));
 
-    if (yp_isexceptionC(expected)) {
-        ead(x, rand_obj(x_type), assert_raises(any_cmp(so, x), expected));
-        ead(x, rand_obj(x_type), assert_raises(any_cmp(empty, x), expected));
-    } else {
-        ead(x, rand_obj(x_type), assert_obj(any_cmp(so, x), is, expected));
-        ead(x, rand_obj(x_type), assert_obj(any_cmp(empty, x), is, expected));
-    }
+#define assert_not_supported(expression)      \
+    do {                                      \
+        ypObject *result = (expression);      \
+        if (yp_isexceptionC(expected)) {      \
+            assert_raises(result, expected);  \
+        } else {                              \
+            assert_obj(result, is, expected); \
+        }                                     \
+    } while (0)
+
+    ead(x, rand_obj(x_type), assert_not_supported(any_cmp(so, x)));
+    ead(x, rand_obj(x_type), assert_not_supported(any_cmp(empty, x)));
+
+#undef assert_not_supported
 
     obj_array_decref(items);
     yp_decrefN(N(so, empty));
@@ -221,6 +229,58 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         ead(x, x_type->newN(N(unhashable)), assert_obj(any_cmp(empty, x), is, so_empty));
 
         yp_decrefN(N(int_1, intstore_1, unhashable, so, empty));
+    }
+
+    // Implementations may use the cached hash as a quick inequality test. Recall that only
+    // immutables can cache their hash, which occurs when yp_hashC is called. Because the cached
+    // hash is an internal optimization, it should only be used with friendly types.
+    if (!type->is_mutable && !x_type->is_mutable && type_iscomparable(type, x_type)) {
+        yp_ssize_t i, j;
+        ypObject  *so = type->newN(N(items[0], items[1]));
+        ypObject  *empty = type->newN(0);
+
+        // Run the tests twice: once where so has not cached the hash, and once where it has.
+        for (i = 0; i < 2; i++) {
+            ypObject *x_is_same = x_type->newN(N(items[0], items[1]));
+            ypObject *x_is_empty = x_type->newN(0);
+            ypObject *x_is_subset = x_type->newN(N(items[0]));
+            ypObject *x_is_superset = x_type->newN(N(items[0], items[1], items[2]));
+            ypObject *x_is_overlapped = x_type->newN(N(items[0], items[2]));
+            ypObject *x_is_not_overlapped = x_type->newN(N(items[2]));
+
+            // Run the tests twice: once where x has not cached the hash, and once where it has.
+            for (j = 0; j < 2; j++) {
+                assert_obj(any_cmp(so, x_is_same), is, x_same);
+                assert_obj(any_cmp(so, x_is_empty), is, x_empty);
+                assert_obj(any_cmp(so, x_is_subset), is, x_subset);
+                assert_obj(any_cmp(so, x_is_superset), is, x_superset);
+                assert_obj(any_cmp(so, x_is_overlapped), is, x_overlap);
+                assert_obj(any_cmp(so, x_is_not_overlapped), is, x_no_overlap);
+
+                assert_obj(any_cmp(empty, x_is_same), is, so_empty);
+                assert_obj(any_cmp(empty, x_is_empty), is, both_empty);
+
+                // Trigger the hash to be cached on "x" and try again.
+                assert_not_raises_exc(yp_hashC(x_is_same, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_empty, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_subset, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_superset, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_overlapped, &exc));
+                assert_not_raises_exc(yp_hashC(x_is_not_overlapped, &exc));
+            }
+
+            assert_obj(any_cmp(so, so), is, x_same);
+            assert_obj(any_cmp(empty, empty), is, both_empty);
+
+            // Trigger the hash to be cached on "so" and try again.
+            assert_not_raises_exc(yp_hashC(so, &exc));
+            assert_not_raises_exc(yp_hashC(empty, &exc));
+
+            yp_decrefN(N(x_is_same, x_is_empty, x_is_subset, x_is_superset, x_is_overlapped,
+                    x_is_not_overlapped));
+        }
+
+        yp_decrefN(N(so, empty));
     }
 
     obj_array_decref(items);
@@ -1990,16 +2050,9 @@ static MunitResult _test_remove(
     // implementation of the yp_HashSet functions.
     {
         ypObject *expected = type->newN(N(items[0]));
-        yp_hash_t expected_hash;
         ypObject *so = type->newN(N(items[0], items[1]));
-        yp_hash_t so_hash;
-
         assert_not_raises_exc(any_remove(so, items[1], &exc));
-
-        // FIXME Make an assert_hashes_equal?
-        assert_not_raises_exc(expected_hash = yp_currenthashC(expected, &exc));
-        assert_not_raises_exc(so_hash = yp_currenthashC(so, &exc));
-        assert_hashC(expected_hash, ==, so_hash);
+        assert_hashC_exc(yp_currenthashC(so, &exc), ==, yp_currenthashC(expected, &exc));
 
         yp_decrefN(N(expected, so));
     }

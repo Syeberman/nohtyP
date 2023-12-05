@@ -3034,12 +3034,12 @@ static ypTypeObject ypIter_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,       // tp_freeze
-        MethodError_objproc,       // tp_unfrozen_copy
-        MethodError_objproc,       // tp_frozen_copy
-        MethodError_traversefunc,  // tp_unfrozen_deepcopy
-        MethodError_traversefunc,  // tp_frozen_deepcopy
-        MethodError_objproc,       // tp_invalidate
+        MethodError_objproc,     // tp_freeze
+        TypeError_objproc,       // tp_unfrozen_copy
+        TypeError_objproc,       // tp_frozen_copy
+        TypeError_traversefunc,  // tp_unfrozen_deepcopy
+        TypeError_traversefunc,  // tp_frozen_deepcopy
+        MethodError_objproc,     // tp_invalidate
 
         // Boolean operations and comparisons
         iter_bool,                   // tp_bool
@@ -3414,9 +3414,9 @@ static ypObject *_yp_freeze(ypObject *x)
     // inspect it after to see if it worked. (Or return yp_NotImplemented.) Perhaps return an
     // exception if the top-level freeze doesn't freeze, but in the case of deep freeze allow deeper
     // objects to silently fail to freeze.
-    result = newType->tp_freeze(x);
+    result = newType->tp_freeze(x);  // FIXME shouldn't oldType control freezing?
     if (yp_isexceptionC(result)) return result;
-    ypObject_SET_TYPE_CODE(x, newCode);
+    ypObject_SET_TYPE_CODE(x, newCode);  // FIXME shouldn't tp_freeze control type code?
     return result;
 }
 
@@ -16158,6 +16158,8 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
         return result;
     }
 
+    // FIXME Call frozenset_freeze directly! (here and everywhere)
+    // FIXME If newSo is empty, replace with singleton. (here and everywhere)
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
