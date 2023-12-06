@@ -43,7 +43,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         ypObject *result = yp_concat(sq, x);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1], items[2], items[3]);
-        // FIXME Assert sq is unchanged (here and everywhere)?
+        assert_sequence(sq, items[0], items[1]);  // sq unchanged.
         yp_decrefN(N(sq, x, result));
     }
 
@@ -192,6 +192,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
         ypObject *result = yp_repeatC(sq, 2);
         assert_type_is(result, type->type);
         assert_sequence(result, items[0], items[1], items[0], items[1]);
+        assert_sequence(sq, items[0], items[1]);  // sq unchanged.
         yp_decrefN(N(sq, result));
     }
 
@@ -315,6 +316,7 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
         assert_sequence(zero_one, items[0]);
         assert_type_is(one_two, type->type);
         assert_sequence(one_two, items[1]);
+        assert_sequence(sq, items[0], items[1], items[2], items[3], items[4]);  // sq unchanged.
         yp_decrefN(N(zero_one, one_two));
     }
 

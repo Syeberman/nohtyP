@@ -6,7 +6,7 @@
 
 // Sets should accept themselves, their pairs, iterators, frozenset/set, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
-// FIXME Should dict really be here?
+// TODO Should dict really be here?
 // TODO Add dict key and item views here, when implemented.
 #define x_types_init(type)                                                                     \
     {                                                                                          \
@@ -623,7 +623,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         ypObject *result = yp_unionN(so, N(x));
         assert_type_is(result, type->type);
         assert_set(result, items[0], items[1], items[2]);
-        // FIXME Assert so is unchanged (here and everywhere)?
+        assert_set(so, items[0], items[1]);  // so unchanged.
         yp_decrefN(N(so, x, result));
     }
 
@@ -684,9 +684,16 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(so, result));
     }
 
+    // x contains duplicates
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
+        ypObject *result = yp_unionN(so, N(x));
+        assert_set(result, items[0], items[1], items[2]);
+        yp_decrefN(N(so, x, result));
+    }
+
     // x contains an unhashable object.
-    // FIXME Even if the unhashable object equals an item in so, there should be an error (and
-    // elsewhere)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -695,6 +702,19 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_raises(yp_unionN(so, N(x)), yp_TypeError);
             yp_decrefN(N(unhashable, so, x));
+        }
+    }
+
+    // Unhashable objects in x should always cause a failure, even if that object is not part of the
+    // result.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
+            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(N(int_1));
+            ypObject *x = (*x_type)->newN(N(intstore_1));
+            assert_raises(yp_unionN(so, N(x)), yp_TypeError);
+            yp_decrefN(N(intstore_1, so, x));
         }
     }
 
@@ -776,6 +796,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         ypObject *result = yp_intersectionN(so, N(x));
         assert_type_is(result, type->type);
         assert_set(result, items[1]);
+        assert_set(so, items[0], items[1]);  // so unchanged.
         yp_decrefN(N(so, x, result));
     }
 
@@ -836,6 +857,15 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         yp_decrefN(N(so, result));
     }
 
+    // x contains duplicates
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
+        ypObject *result = yp_intersectionN(so, N(x));
+        assert_set(result, items[1]);
+        yp_decrefN(N(so, x, result));
+    }
+
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
@@ -843,7 +873,6 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
             ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
-            // FIXME This fails in Python; should it fail for us?
             ypObject *result = yp_intersectionN(so, N(x));
             assert_set(result, items[1]);
             yp_decrefN(N(unhashable, so, x, result));
@@ -857,7 +886,6 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
-            // FIXME This fails in Python; should it fail for us?
             ypObject *result = yp_intersectionN(so, N(x));
             assert_set(result, int_1);
             yp_decrefN(N(intstore_1, so, x, result));
@@ -942,6 +970,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         ypObject *result = yp_differenceN(so, N(x));
         assert_type_is(result, type->type);
         assert_set(result, items[0]);
+        assert_set(so, items[0], items[1]);  // so unchanged.
         yp_decrefN(N(so, x, result));
     }
 
@@ -1002,6 +1031,15 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         yp_decrefN(N(so, result));
     }
 
+    // x contains duplicates
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
+        ypObject *result = yp_differenceN(so, N(x));
+        assert_set(result, items[0]);
+        yp_decrefN(N(so, x, result));
+    }
+
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
@@ -1009,7 +1047,6 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
             ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
-            // FIXME This fails in Python; should it fail for us?
             ypObject *result = yp_differenceN(so, N(x));
             assert_set(result, items[0]);
             yp_decrefN(N(unhashable, so, x, result));
@@ -1023,7 +1060,6 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
-            // FIXME This fails in Python; should it fail for us?
             ypObject *result = yp_differenceN(so, N(x));
             assert_len(result, 0);
             yp_decrefN(N(intstore_1, so, x, result));
@@ -1108,6 +1144,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         ypObject *result = yp_symmetric_difference(so, x);
         assert_type_is(result, type->type);
         assert_set(result, items[0], items[2]);
+        assert_set(so, items[0], items[1]);  // so unchanged.
         yp_decrefN(N(so, x, result));
     }
 
@@ -1152,6 +1189,15 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
 
     // There is no N version of yp_symmetric_difference, so we always have one x object.
 
+    // x contains duplicates. (This is a particularly interesting test for symmetric_difference.)
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
+        ypObject *result = yp_symmetric_difference(so, x);
+        assert_set(result, items[0], items[2]);
+        yp_decrefN(N(so, x, result));
+    }
+
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
@@ -1176,10 +1222,6 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
             yp_decrefN(N(intstore_1, so, x));
         }
     }
-
-    // FIXME if x contains duplicates, those items should only be considered once (i.e.
-    // {1}.symmetric_difference([1, 1]) and {1}.symmetric_difference([2, 2])). And similar tests for
-    // others?
 
     // x is an iterator that fails at the start.
     {
@@ -1313,6 +1355,15 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(so));
     }
 
+    // x contains duplicates.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
+        assert_not_raises_exc(yp_update(so, x, &exc));
+        assert_set(so, items[0], items[1], items[2]);
+        yp_decrefN(N(so, x));
+    }
+
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
@@ -1324,6 +1375,20 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
             // FIXME Tests for updates that fail mid-way?
             assert_set(so, items[0], items[1]);
             yp_decrefN(N(unhashable, so, x));
+        }
+    }
+
+    // Unhashable objects in x should always cause a failure, even if that object is not part of the
+    // result.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
+            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(N(int_1));
+            ypObject *x = (*x_type)->newN(N(intstore_1));
+            assert_raises_exc(yp_update(so, x, &exc), yp_TypeError);
+            assert_set(so, int_1);
+            yp_decrefN(N(intstore_1, so, x));
         }
     }
 
@@ -1465,6 +1530,15 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         yp_decrefN(N(so));
     }
 
+    // x contains duplicates.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
+        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
+        assert_set(so, items[1]);
+        yp_decrefN(N(so, x));
+    }
+
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
@@ -1472,7 +1546,6 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
             ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
-            // FIXME This fails in Python; should it fail for us?
             assert_not_raises_exc(yp_intersection_update(so, x, &exc));
             // FIXME Tests for intersection_updates that fail mid-way?
             assert_set(so, items[1]);
@@ -1487,7 +1560,6 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
-            // FIXME This fails in Python; should it fail for us?
             assert_not_raises_exc(yp_intersection_update(so, x, &exc));
             assert_set(so, int_1);
             yp_decrefN(N(intstore_1, so, x));
@@ -1631,6 +1703,15 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         yp_decrefN(N(so));
     }
 
+    // x contains duplicates.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
+        assert_not_raises_exc(yp_difference_update(so, x, &exc));
+        assert_set(so, items[0]);
+        yp_decrefN(N(so, x));
+    }
+
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
@@ -1638,7 +1719,6 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
             ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
-            // FIXME This fails in Python; should it fail for us?
             assert_not_raises_exc(yp_difference_update(so, x, &exc));
             // FIXME Tests for difference_updates that fail mid-way?
             assert_set(so, items[0]);
@@ -1653,7 +1733,6 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
-            // FIXME This fails in Python; should it fail for us?
             assert_not_raises_exc(yp_difference_update(so, x, &exc));
             assert_len(so, 0);
             yp_decrefN(N(intstore_1, so, x));
@@ -1780,6 +1859,15 @@ static MunitResult test_symmetric_difference_update(
     }
 
     // There is no N version of yp_symmetric_difference_update, so we always have one x object.
+
+    // x contains duplicates. (This is a particularly interesting test for symmetric_difference.)
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
+        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
+        assert_set(so, items[0], items[2]);
+        yp_decrefN(N(so, x));
+    }
 
     // x contains an unhashable object.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
