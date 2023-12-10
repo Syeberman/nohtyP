@@ -1364,7 +1364,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
     ypObject *str_star = yp_str_frombytesC2(-1, "*");
     ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
     ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
-    ypObject *non_string = rand_obj_non_string_hashable();  // argument names must be strings
+    ypObject *non_string = rand_obj_hashable_not_str();  // argument names must be strings
 
     // def f()
     {

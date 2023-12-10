@@ -6,8 +6,7 @@
 
 // Sets should accept themselves, their pairs, iterators, frozenset/set, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
-// TODO Should dict really be here?
-// TODO Add dict key and item views here, when implemented.
+// TODO Should dict really be here? What about dict key and item views (when implemented)?
 #define x_types_init(type)                                                                     \
     {                                                                                          \
         (type), (type)->pair, fixture_type_iter, fixture_type_frozenset, fixture_type_set,     \
@@ -29,39 +28,13 @@ static int type_iscomparable(fixture_type_t *type, fixture_type_t *other)
 }
 
 
-// TODO Move to test_container? Will need an `if set or dict` around the unhashable test.
+// The test_contains in test_collection checks for the behaviour shared amongst all collections;
+// this test_contains considers the behaviour unique to set-likes.
 static MunitResult test_contains(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
     ypObject       *items[4];
     obj_array_fill(items, type->rand_items);
-
-    // Basic contains (and in and not_in).
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        assert_obj(yp_contains(so, items[1]), is, yp_True);
-        assert_obj(yp_in(items[1], so), is, yp_True);
-        assert_obj(yp_not_in(items[1], so), is, yp_False);
-        yp_decrefN(N(so));
-    }
-
-    // Item not in so.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        assert_obj(yp_contains(so, items[2]), is, yp_False);
-        assert_obj(yp_in(items[2], so), is, yp_False);
-        assert_obj(yp_not_in(items[2], so), is, yp_True);
-        yp_decrefN(N(so));
-    }
-
-    // so is empty.
-    {
-        ypObject *so = type->newN(0);
-        assert_obj(yp_contains(so, items[0]), is, yp_False);
-        assert_obj(yp_in(items[0], so), is, yp_False);
-        assert_obj(yp_not_in(items[0], so), is, yp_True);
-        yp_decrefN(N(so));
-    }
 
     // Item is unhashable.
     {
@@ -347,6 +320,23 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
         if (test_result != MUNIT_OK) goto tear_down;
     }
 
+    // Optimization: early exit if so is empty, even if the iterator will fail.
+    {
+        ypObject *so = type->newN(0);
+        ypObject *x = new_faulty_iter(yp_frozenset_empty, 0, yp_SyntaxError, 2);
+        assert_obj(yp_isdisjoint(so, x), is, yp_True);
+        yp_decrefN(N(so, x));
+    }
+
+    // Optimization: early exit if x yields an item in so, even if the iterator will fail.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x_supplier = yp_tupleN(N(items[1]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_obj(yp_isdisjoint(so, x), is, yp_False);
+        yp_decrefN(N(so, x_supplier, x));
+    }
+
     // x is not an iterable.
     test_result =
             _test_comparisons_not_supported(type, fixture_type_int, yp_isdisjoint, yp_TypeError);
@@ -380,6 +370,14 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
         test_result = _test_comparisons_faulty_iter(yp_issubset, so, x_supplier, yp_False);
         yp_decrefN(N(so, x_supplier));
         if (test_result != MUNIT_OK) goto tear_down;
+    }
+
+    // Optimization: early exit if so is empty, even if the iterator will fail.
+    {
+        ypObject *so = type->newN(0);
+        ypObject *x = new_faulty_iter(yp_frozenset_empty, 0, yp_SyntaxError, 2);
+        assert_obj(yp_issubset(so, x), is, yp_True);
+        yp_decrefN(N(so, x));
     }
 
     // x is not an iterable.
@@ -1372,7 +1370,6 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_raises_exc(yp_update(so, x, &exc), yp_TypeError);
-            // FIXME Tests for updates that fail mid-way?
             assert_set(so, items[0], items[1]);
             yp_decrefN(N(unhashable, so, x));
         }
@@ -1405,12 +1402,11 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     // x is an iterator that fails mid-way.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
+        ypObject *x_supplier = yp_tupleN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_update(so, x, &exc), yp_SyntaxError);
-        // FIXME choose x so we can validate it fails mid-way, here and elsewhere.
         // so is updated after each item yielded.
-        assert_set(so, items[0], items[1]);
+        assert_set(so, items[0], items[1], items[2]);
         yp_decrefN(N(so, x_supplier, x));
     }
 
@@ -1547,7 +1543,6 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_not_raises_exc(yp_intersection_update(so, x, &exc));
-            // FIXME Tests for intersection_updates that fail mid-way?
             assert_set(so, items[1]);
             yp_decrefN(N(unhashable, so, x));
         }
@@ -1582,7 +1577,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_intersection_update(so, x, &exc), yp_SyntaxError);
-        // so is updated after each item yielded.
+        // intersection_update needs to yield all items before modifying so.
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, x_supplier, x));
     }
@@ -1720,7 +1715,6 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_not_raises_exc(yp_difference_update(so, x, &exc));
-            // FIXME Tests for difference_updates that fail mid-way?
             assert_set(so, items[0]);
             yp_decrefN(N(unhashable, so, x));
         }
@@ -1877,7 +1871,6 @@ static MunitResult test_symmetric_difference_update(
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
             assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError);
-            // FIXME Tests for symmetric_difference_updates that fail mid-way?
             assert_set(so, items[0], items[1]);
             yp_decrefN(N(unhashable, so, x));
         }
@@ -1913,8 +1906,7 @@ static MunitResult test_symmetric_difference_update(
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_SyntaxError);
-        // FIXME choose x so we can validate it fails mid-way, here and elsewhere.
-        // so is symmetric_difference_updated after each item yielded.  FIXME incorrect!
+        // symmetric_difference_update needs to yield all items before modifying so.
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, x_supplier, x));
     }
@@ -1973,6 +1965,8 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_push(so, items[2], &exc));
         assert_set(so, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_push(so, items[3], &exc));
+        assert_set(so, items[0], items[1], items[2], items[3]);
         yp_decrefN(N(so));
     }
 
@@ -1993,13 +1987,22 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Item is unhashable.
-    // FIXME another test: unhashable, but equal to existing, should still fail (elsewhere?)
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
         assert_raises_exc(yp_push(so, unhashable, &exc), yp_TypeError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, unhashable));
+    }
+
+    // Unhashable items should always cause TypeError, even if that item is already in so.
+    {
+        ypObject *int_1 = yp_intC(1);
+        ypObject *intstore_1 = yp_intstoreC(1);
+        ypObject *so = type->newN(N(int_1));
+        assert_raises_exc(yp_push(so, intstore_1, &exc), yp_TypeError);
+        assert_set(so, int_1);
+        yp_decrefN(N(int_1, intstore_1, so));
     }
 
 tear_down:
@@ -2027,6 +2030,8 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_pushunique(so, items[2], &exc));
         assert_set(so, items[0], items[1], items[2]);
+        assert_not_raises_exc(yp_pushunique(so, items[3], &exc));
+        assert_set(so, items[0], items[1], items[2], items[3]);
         yp_decrefN(N(so));
     }
 
@@ -2047,13 +2052,22 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
     }
 
     // Item is unhashable.
-    // FIXME and test if it equals an item already in so: yp_TypeError should win out
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
         assert_raises_exc(yp_pushunique(so, unhashable, &exc), yp_TypeError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, unhashable));
+    }
+
+    // Unhashable items should always cause TypeError, even if that item is already in so.
+    {
+        ypObject *int_1 = yp_intC(1);
+        ypObject *intstore_1 = yp_intstoreC(1);
+        ypObject *so = type->newN(N(int_1));
+        assert_raises_exc(yp_pushunique(so, intstore_1, &exc), yp_TypeError);
+        assert_set(so, int_1);
+        yp_decrefN(N(int_1, intstore_1, so));
     }
 
 tear_down:
@@ -2116,7 +2130,6 @@ static MunitResult _test_remove(
     // Item is unhashable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        // FIXME what if unhashable equals one of the items (here and everywhere)?
         ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
         assert_not_found_exc(any_remove(so, unhashable, &exc));
         assert_set(so, items[0], items[1]);
@@ -2128,7 +2141,6 @@ static MunitResult _test_remove(
         ypObject *int_1 = yp_intC(1);
         ypObject *intstore_1 = yp_intstoreC(1);
         ypObject *so = type->newN(N(int_1));
-        // FIXME This fails in Python; should it fail for us?
         assert_not_raises_exc(any_remove(so, intstore_1, &exc));
         assert_len(so, 0);
         yp_decrefN(N(int_1, intstore_1, so));
@@ -2185,14 +2197,33 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
         yp_decref(so);
     }
 
-    // FIXME multiple pops (in any order)
-
     // Self is empty.
     {
         ypObject *so = type->newN(0);
         assert_raises(yp_pop(so), yp_KeyError);
         assert_len(so, 0);
         yp_decref(so);
+    }
+
+    // Multiple pops. Order is arbitrary.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *first;
+        assert_not_raises(first = yp_pop(so));
+        if (yp_eq(first, items[0]) == yp_True) {
+            assert_set(so, items[1]);
+            ead(popped, yp_pop(so), assert_obj(popped, eq, items[1]));
+        } else {
+            assert_obj(first, eq, items[1]);
+            assert_set(so, items[0]);
+            ead(popped, yp_pop(so), assert_obj(popped, eq, items[0]));
+        }
+        assert_len(so, 0);
+        assert_raises(yp_pop(so), yp_KeyError);
+        assert_len(so, 0);
+        assert_raises(yp_pop(so), yp_KeyError);  // Calling again still raises KeyError.
+        assert_len(so, 0);
+        yp_decrefN(N(so, first));
     }
 
 tear_down:
@@ -2222,22 +2253,3 @@ MunitTest test_setlike_tests[] = {TEST(test_contains, test_setlike_params),
         TEST(test_pop, test_setlike_params), {NULL}};
 
 extern void test_setlike_initialize(void) {}
-
-/*
-FIXME Fix this inconsistently-failing testcase
-
-Build\msvs_120\win32_amd64_release\python_test.log
-
-======================================================================
-FAIL: test_find_periodic_pattern (python_test.test_bytes.ByteArrayAsStringTest) (p='', text='')
-Cover the special path for periodic patterns.
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "C:\projects\nohtyp\Lib\python_test\string_tests.py", line 365, in test_find_periodic_pattern
-    self.checkequal(reference_find(p, text),
-  File "C:\projects\nohtyp\Lib\python_test\string_tests.py", line 73, in checkequal
-    self.assertEqual(
-  File "C:\projects\nohtyp\Lib\python_test\yp_unittest\case.py", line 59, in assertEqual
-    _unittest.TestCase.assertEqual(self, first, second, msg)
-AssertionError: -1 != 0
-*/

@@ -177,16 +177,12 @@ ypObject *rand_obj(fixture_type_t *type)
     return type->_new_rand(&memo);
 }
 
-ypObject *rand_obj_non_string_hashable(void)
+static ssize_t         fixture_types_immutable_not_str_len;
+static fixture_type_t *fixture_types_immutable_not_str[];
+ypObject              *rand_obj_hashable_not_str(void)
 {
-    // FIXME Calculate on first use.
-    static fixture_type_t *non_str_hashable_types[] = {&fixture_type_type_struct,
-            &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
-            &fixture_type_float_struct, &fixture_type_iter_struct, &fixture_type_range_struct,
-            &fixture_type_bytes_struct, &fixture_type_tuple_struct, &fixture_type_frozenset_struct,
-            &fixture_type_frozendict_struct, &fixture_type_function_struct};
-
-    return rand_obj_hashable(rand_choice_array(non_str_hashable_types));
+    return rand_obj_hashable(
+            rand_choice(fixture_types_immutable_not_str_len, fixture_types_immutable_not_str));
 }
 
 ypObject *rand_obj_any_mutable(void)
@@ -1503,18 +1499,20 @@ fixture_type_t *fixture_types_all[] = {&fixture_type_type_struct, &fixture_type_
         NULL};
 
 // These are subsets of fixture_types_all, so will at most hold that many elements.
-fixture_type_t *fixture_types_mutable[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_immutable[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_numeric[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_collection[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_sequence[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_string[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_setlike[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t *fixture_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_mutable[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_immutable[FIXTURE_TYPES_ALL_LEN + 1];
+static fixture_type_t *fixture_types_immutable_not_str[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_numeric[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_collection[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_sequence[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_string[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_setlike[FIXTURE_TYPES_ALL_LEN + 1];
+fixture_type_t        *fixture_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
 
-static yp_ssize_t fixture_types_mutable_len = 0;    // Incremented later
-static yp_ssize_t fixture_types_immutable_len = 0;  // Incremented later
+static yp_ssize_t fixture_types_mutable_len = 0;            // Incremented later
+static yp_ssize_t fixture_types_immutable_len = 0;          // Incremented later
+static yp_ssize_t fixture_types_immutable_not_str_len = 0;  // Incremented later
 
 // Once again, subsets of fixture_types_all.
 char *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
@@ -1592,6 +1590,7 @@ static void initialize_fixture_types(void)
         char           **param_values = param_values_types_all;
         fixture_type_t **mutables = fixture_types_mutable;
         fixture_type_t **immutables = fixture_types_immutable;
+        fixture_type_t **immutables_not_str = fixture_types_immutable_not_str;
         for (types = fixture_types_all; *types != NULL; types++) {
             *param_values = (*types)->name;
             param_values++;
@@ -1603,11 +1602,17 @@ static void initialize_fixture_types(void)
                 *immutables = *types;
                 immutables++;
                 fixture_types_immutable_len++;
+                if ((*types) != fixture_type_str) {
+                    *immutables_not_str = *types;
+                    immutables_not_str++;
+                    fixture_types_immutable_not_str_len++;
+                }
             }
         }
         *param_values = NULL;
         *mutables = NULL;
         *immutables = NULL;
+        *immutables_not_str = NULL;
     }
 
 #define FILL_TYPE_ARRAYS(protocol)                                            \

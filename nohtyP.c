@@ -4334,7 +4334,7 @@ static ypObject *nonetype_currenthash(
         ypObject *n, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
     // Since None is compared by identity, we can cache our hash.
-    *hash = ypObject_CACHED_HASH(yp_None) = yp_HashPointer(yp_None);
+    *hash = ypObject_CACHED_HASH(n) = yp_HashPointer(n);
     return yp_None;
 }
 
@@ -15021,8 +15021,6 @@ keyfunc_fail:
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
 
-// FIXME Many set operations allocate temporary objects on the heap; is there a way to avoid this?
-
 #define ypSet_TABLE(so) ((ypSet_KeyEntry *)((ypObject *)so)->ob_data)
 #define ypSet_SET_TABLE(so, value) (((ypObject *)so)->ob_data = (void *)(value))
 #define ypSet_LEN ypObject_CACHED_LEN
@@ -15352,6 +15350,7 @@ static void _ypSet_movekey(
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
     yp_ASSERT1(!ypSet_ENTRY_USED(loc));
     yp_ASSERT1(loc->se_key != NULL || _ypSet_space_remaining(so) > 0);
+    yp_ASSERT1(!ypObject_IS_MUTABLE(key));
     yp_ASSERT1(*spaceleft == _ypSet_space_remaining(so));
 
     if (loc->se_key == NULL) {
@@ -15378,6 +15377,7 @@ static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, yp
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
     yp_ASSERT1(_ypSet_space_remaining(so) > 0);
     yp_ASSERT1(ypSet_LEN(so) == ypSet_FILL(so));
+    yp_ASSERT1(!ypObject_IS_MUTABLE(key));
 
     i = (size_t)hash & mask;
     (*ep) = &ep0[i];
@@ -15421,8 +15421,7 @@ static ypObject *_ypSet_push(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, y
     yp_ASSERT1(!ypSet_ENTRY_USED(loc));
 
     // We need to add the key; it's possible this doesn't involve resizing.
-    // FIXME if loc is a dummy entry, we could still add without resizing
-    if (*spaceleft > 0) {
+    if (*spaceleft > 0 || loc->se_key == ypSet_dummy) {
         _ypSet_movekey(so, loc, yp_incref(key), hash, spaceleft);  // steals key
         return yp_None;
     }
@@ -15516,7 +15515,8 @@ static ypObject *_ypSet_isdisjoint_withiter(ypObject *so, ypObject *mi, yp_uint6
     ypObject       *result;
     ypSet_KeyEntry *loc;
 
-    // It's tempting to exit early if so is empty, but doing so would mask errors in yielded keys.
+    if (ypSet_LEN(so) < 1) return yp_True;
+
     while (1) {
         key = yp_miniiter_next(mi, mi_state);  // new ref
         if (yp_isexceptionC(key)) {
@@ -15564,9 +15564,11 @@ static ypObject *_ypSet_issubset_withiter(ypObject *so, ypObject *mi, yp_uint64_
     ypObject *so_remaining;
     ypObject *result;
 
+    if (ypSet_LEN(so) < 1) return yp_True;
+
     // Create a copy of so and remove the items yielded by the iterator. If there are remaining
     // items in the copy, then it's not a subset.
-    // FIXME Is there a way to do this without allocating a new set? (I actually think not.)
+    // TODO Is there a way to do this without allocating a new set? (I actually think not.)
     so_remaining = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(so_remaining)) return so_remaining;
     result = _ypSet_difference_update_fromiter(so_remaining, mi, mi_state);
@@ -15591,7 +15593,6 @@ static ypObject *_ypSet_issuperset_withiter(ypObject *so, ypObject *mi, yp_uint6
     ypObject       *result;
     ypSet_KeyEntry *loc;
 
-    // It's tempting to exit early if so is empty, but doing so would mask errors in yielded keys.
     while (1) {
         key = yp_miniiter_next(mi, mi_state);  // new ref
         if (yp_isexceptionC(key)) {
@@ -15714,10 +15715,7 @@ static ypObject *_ypSet_intersection_update_fromiter(
     ypObject *so_toremove;
     ypObject *result;
 
-    // TODO can we do this without creating a copy or, alternatively, would it be better to
-    // implement this as ypSet_intersection?
-    // Unfortunately, we need to create a short-lived copy of so. It's either that, or convert
-    // mi to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
+    // TODO Is there a way to do this without allocating a new set? (I actually think not.)
     so_toremove = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(so_toremove)) return so_toremove;
 
@@ -16122,8 +16120,7 @@ static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
     if (x_pair == ypFrozenSet_CODE) {
         return _ypSet_symmetric_difference_update_fromset(so, x);
     } else {
-        // TODO Can we make a version of _ypSet_symmetric_difference_update_fromset that doesn't
-        // reqire a new set created?
+        // TODO Is there a way to do this without allocating a new set? (I actually think not.)
         ypObject *x_asset = yp_frozenset(x);
         if (yp_isexceptionC(x_asset)) return x_asset;
         result = _ypSet_symmetric_difference_update_fromset(so, x_asset);
@@ -16132,12 +16129,7 @@ static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
     }
 }
 
-// XXX We redirect the new-object set methods to the in-place versions. Among other things, this
-// helps to avoid duplicating code.
-// TODO ...except we are creating objects that we destroy then create new ones, which can probably
-// be optimized in certain cases, so rethink these four methods. At the very least, can we avoid
-// the yp_freeze?
-// FIXME Possible optimizations:
+// TODO Possible optimizations:
 //  - lazy shallow copy of an immutable so when friendly x is empty.
 //  - lazy shallow copy of a friendly immutable x when immutable so is empty.
 //  - empty immortal when immutable so is empty and friendly x is empty.
@@ -16158,8 +16150,9 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
         return result;
     }
 
-    // FIXME Call frozenset_freeze directly! (here and everywhere)
-    // FIXME If newSo is empty, replace with singleton. (here and everywhere)
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start.
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
@@ -16168,7 +16161,7 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
     return newSo;
 }
 
-// FIXME Possible optimizations:
+// TODO Possible optimizations:
 //  - lazy shallow copy of an immutable so when x is so.
 //  - empty immortal when immutable so and either so or friendly x is empty.
 static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
@@ -16188,6 +16181,9 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
         return result;
     }
 
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start.
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
@@ -16196,7 +16192,7 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
     return newSo;
 }
 
-// FIXME Possible optimizations:
+// TODO Possible optimizations:
 //  - lazy shallow copy of an immutable so when friendly x is empty.
 //  - empty immortal when immutable so and either so is empty or x is so.
 static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
@@ -16216,6 +16212,9 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
         return result;
     }
 
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start.
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
@@ -16224,7 +16223,7 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
     return newSo;
 }
 
-// FIXME Possible optimizations:
+// TODO Possible optimizations:
 //  - lazy shallow copy of an immutable so when friendly x is empty.
 //  - lazy shallow copy of a friendly immutable x when immutable so is empty.
 //  - empty immortal when immutable so is empty and friendly x is empty.
@@ -16244,6 +16243,9 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
         return result;
     }
 
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start.
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
@@ -16279,7 +16281,8 @@ static ypObject *set_clear(ypObject *so)
     if (ypSet_FILL(so) < 1) return yp_None;
 
     // Discard the old keys
-    // FIXME What if yp_decref modifies so?
+    // TODO What if yp_decref modifies so? Here and everywhere, we should delay decrefs until we're
+    // done modifying the object.
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&oldkeys[i])) continue;
         keysleft -= 1;
@@ -16349,7 +16352,7 @@ static ypObject *set_remove(ypObject *so, ypObject *x, ypObject *onmissing)
         if (onmissing == NULL) return yp_KeyError;
         return onmissing;
     }
-    if (yp_isexceptionC(result)) return result;  // FIXME: As usual, what if this is yp_KeyError?
+    if (yp_isexceptionC(result)) return result;  // TODO As usual, what if this is yp_KeyError?
     yp_decref(result);
     return yp_None;
 }
@@ -16889,8 +16892,7 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // It's possible we can add the key without resizing
-    // FIXME if key_loc is a dummy entry, we could still add without resizing
-    if (*spaceleft >= 1) {
+    if (*spaceleft > 0 || (*key_loc)->se_key == ypSet_dummy) {
         _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash, spaceleft);  // steals key
         *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
         ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
@@ -17071,7 +17073,7 @@ static ypObject *_ypDict_update_fromiterable(ypObject *mp, ypObject *x)
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
 
     // Prefer yp_iter_items over yp_iter if supported.
-    // FIXME replace with yp_miniiter_items now that it's supported
+    // TODO replace with yp_miniiter_items now that it's supported
     // TODO help(dict.update) states that it only looks for a .keys() method. This is probably
     // better: while keys() requires an extra lookup, that's likely cheaper than creating all those
     // 2-tuples...although, with yp_miniiter_items, we would get the best of both worlds, so perhaps
@@ -17387,10 +17389,8 @@ static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
     ypObject       *result;
     ypObject      **value_loc;
 
-    // Look for the appropriate entry in the hash table; note that key can be a mutable object,
-    // because we are not adding it to the set
-    // FIXME NO! We *do* add the key. We need a test for this bug, and fix!
-    hash = yp_currenthashC(key, &exc);
+    // Look for the appropriate entry in the hash table.
+    hash = yp_hashC(key, &exc);
     if (yp_isexceptionC(exc)) return exc;        // returns if key is an exception
     if (yp_isexceptionC(defval)) return defval;  // returns if defval is an exception
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
@@ -17562,7 +17562,7 @@ static ypObject *frozendict_miniiter_items_next(
     ypDictMiState *state = (ypDictMiState *)_state;
     yp_ssize_t     index;
 
-    if (!state->keys || !state->values) return yp_TypeError;  // FIXME ValueError?
+    if (!state->keys || !state->values) return yp_TypeError;
 
     index = _frozendict_miniiter_next(mp, state);
     if (index < 0) return yp_StopIteration;

@@ -741,8 +741,8 @@ extern ypObject *rand_obj_any_mutable(void);
 // Returns a random hashable object of any type.
 extern ypObject *rand_obj_any_hashable(void);
 
-// Returns a random hashable object of any type except strings.
-extern ypObject *rand_obj_non_string_hashable(void);
+// Returns a random hashable object of any type except str.
+extern ypObject *rand_obj_hashable_not_str(void);
 
 // Returns a random object of the given type.
 extern ypObject *rand_obj(fixture_type_t *type);
