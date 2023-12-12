@@ -177,7 +177,7 @@ ypObject *rand_obj(fixture_type_t *type)
     return type->_new_rand(&memo);
 }
 
-static ssize_t         fixture_types_immutable_not_str_len;
+static yp_ssize_t      fixture_types_immutable_not_str_len;
 static fixture_type_t *fixture_types_immutable_not_str[];
 ypObject              *rand_obj_hashable_not_str(void)
 {
