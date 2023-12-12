@@ -178,7 +178,7 @@ ypObject *rand_obj(fixture_type_t *type)
 }
 
 static yp_ssize_t      fixture_types_immutable_not_str_len;
-static fixture_type_t *fixture_types_immutable_not_str[];
+static fixture_type_t *fixture_types_immutable_not_str[FIXTURE_TYPES_ALL_LEN + 1];
 ypObject              *rand_obj_hashable_not_str(void)
 {
     return rand_obj_hashable(
@@ -1301,11 +1301,15 @@ static ypObject *new_rand_frozendict(const rand_obj_supplier_memo_t *memo)
 // from the keys).
 static ypObject *_mapping_new_supplierN(int n, va_list args)
 {
-    int       i;
-    ypObject *values[n];
-    ypObject *supplier;
+    int        i;
+    ypObject **values;
+    ypObject  *supplier;
 
-    obj_array_fill(values, rand_objs_any);
+    if (n < 1) return yp_listN(0);
+
+    values = malloc(sizeof(ypObject *) * (size_t)n);
+    rand_objs_any(n, values);
+
     assert_not_raises(supplier = yp_listN(0));  // new ref
 
     for (i = 0; i < n; i++) {
@@ -1315,7 +1319,9 @@ static ypObject *_mapping_new_supplierN(int n, va_list args)
         yp_decref(item);
     }
 
-    obj_array_decref(values);
+    obj_array_decref2(n, values);
+    free(values);
+
     return supplier;
 }
 
