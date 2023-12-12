@@ -15927,21 +15927,24 @@ static ypObject *frozenset_miniiter(ypObject *so, yp_uint64_t *_state)
 static ypObject *frozenset_miniiter_next(ypObject *so, yp_uint64_t *_state)
 {
     ypSetMiState   *state = (ypSetMiState *)_state;
+    yp_ssize_t      index = (yp_ssize_t)state->index;  // don't forget to write it back
     ypSet_KeyEntry *loc;
 
-    // Find the next entry
-    if (state->keysleft < 1) return yp_StopIteration;
+    if (state->keysleft < 1 || index < 0) return yp_StopIteration;
+
+    // Find the next entry.
     while (1) {
-        if (((yp_ssize_t)state->index) >= ypSet_ALLOCLEN(so)) {
+        if (index >= ypSet_ALLOCLEN(so)) {
             state->keysleft = 0;
             return yp_StopIteration;
         }
-        loc = &ypSet_TABLE(so)[state->index];
-        state->index += 1;
+        loc = &ypSet_TABLE(so)[index];
         if (ypSet_ENTRY_USED(loc)) break;
+        index += 1;
     }
 
-    // Update state and return the key
+    // Update state and return the key.
+    state->index = (yp_uint32_t)(index + 1);
     state->keysleft -= 1;
     return yp_incref(loc->se_key);
 }
@@ -17506,13 +17509,13 @@ static ypObject *frozendict_iter_values(ypObject *x)
 // XXX We need to be a little suspicious of _state...just in case the caller has changed it
 static yp_ssize_t _frozendict_miniiter_next(ypObject *mp, ypDictMiState *state)
 {
-    yp_ssize_t index = state->index;  // don't forget to write it back
-    if (state->itemsleft < 1) return -1;
+    yp_ssize_t index = (yp_ssize_t)state->index;  // don't forget to write it back
+
+    if (state->itemsleft < 1 || index < 0) return -1;
 
     // Find the next entry.
     while (1) {
         if (index >= ypDict_ALLOCLEN(mp)) {
-            ypDictMiState_SET_INDEX(state, ypDict_ALLOCLEN(mp));
             state->itemsleft = 0;
             return -1;
         }
@@ -17576,7 +17579,7 @@ static ypObject *frozendict_miniiter_items_next(
 static ypObject *frozendict_miniiter_length_hint(
         ypObject *mp, yp_uint64_t *state, yp_ssize_t *length_hint)
 {
-    *length_hint = ((ypDictMiState *)state)->itemsleft;
+    *length_hint = (yp_ssize_t)((ypDictMiState *)state)->itemsleft;
     return yp_None;
 }
 

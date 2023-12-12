@@ -2,6 +2,18 @@
 #include "munit_test/unittest.h"
 
 
+// FIXME Constructor tests.
+
+static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject *), ypObject *(*any_newN)(int, ...)) {
+    // FIXME Tests all the constructors.
+    return MUNIT_OK;
+}
+
+static MunitResult _test_call_type(fixture_type_t *type) {
+    // FIXME Tests yp_call on the type object.
+    return MUNIT_OK;
+}
+
 // frozenset- and set-specific miniiter tests; see test_iterable for more tests.
 static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
 {
@@ -17,6 +29,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
 
         mi_state = (yp_uint64_t)-1;
         ead(next, yp_miniiter_next(mi, &mi_state), assert_raises(next, yp_StopIteration));
+        // FIXME Test this state with the other miniiter functions; recall state may be modified!
 
         yp_decrefN(N(x, mi));
     }
