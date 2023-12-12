@@ -39,7 +39,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
 }
 
 
-char *param_values_test_frozenset[] = {"frozenset", "set"};
+char *param_values_test_frozenset[] = {"frozenset", "set", NULL};
 
 static MunitParameterEnum test_frozenset_params[] = {
         {param_key_type, param_values_test_frozenset}, {NULL}};
