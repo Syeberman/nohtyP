@@ -17762,7 +17762,6 @@ ypObject *yp_dict(ypObject *x)
     return _ypDict(ypDict_CODE, x);
 }
 
-// TOOD ypQuickIter could consolidate this with _ypDict_fromkeys
 static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list args)
 {
     yp_ssize_t spaceleft;
@@ -17771,7 +17770,7 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
     ypObject  *newMp;
 
     if (n > ypDict_LEN_MAX) return yp_MemorySizeOverflowError;
-    newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
+    newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(newMp)) return newMp;
     spaceleft = _ypSet_space_remaining(ypDict_KEYSET(newMp));
 
@@ -17779,11 +17778,10 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
         key = va_arg(args, ypObject *);  // borrowed
         n -= 1;
         result = _ypDict_push(newMp, key, value, 1, &spaceleft, n);
-        if (yp_isexceptionC(result)) break;
-    }
-    if (yp_isexceptionC(result)) {
-        yp_decref(newMp);
-        return result;
+        if (yp_isexceptionC(result)) {
+            yp_decref(newMp);
+            return result;
+        }
     }
     return newMp;
 }
