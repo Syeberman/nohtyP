@@ -86,6 +86,15 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(sq, result));
     }
 
+    // Duplicates: 0 is duplicated in sq, 1 in x, and 2 shared between them.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *sq = type->newN(N(items[0], items[2], items[0]));
+        ypObject *x = (*x_type)->newN(N(items[2], items[1], items[1]));
+        ypObject *result = yp_concat(sq, x);
+        assert_sequence(result, items[0], items[2], items[0], items[2], items[1], items[1]);
+        yp_decrefN(N(sq, x, result));
+    }
+
     // Optimization: lazy shallow copy of an immutable sq when friendly x is empty.
     for (x_type = friend_types; (*x_type) != NULL; x_type++) {
         ypObject *sq = type->newN(N(items[0], items[1]));
@@ -240,6 +249,14 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
         ypObject *result = yp_repeatC(sq, 2);
         assert_type_is(result, type->type);
         assert_len(result, 0);
+        yp_decrefN(N(sq, result));
+    }
+
+    // sq contains duplicates.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1], items[0]));
+        ypObject *result = yp_repeatC(sq, 2);
+        assert_sequence(result, items[0], items[1], items[0], items[0], items[1], items[0]);
         yp_decrefN(N(sq, result));
     }
 
@@ -405,6 +422,14 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     assert_raises(yp_getsliceC4(sq, 0, 1, 0), yp_ValueError);  // step==0
     assert_raises(yp_getsliceC4(sq, 0, 1, -yp_SSIZE_T_MAX - 1),
             yp_SystemLimitationError);  // too-small step
+
+    // Slice contains duplicates.
+    if (!type->is_patterned) {
+        ypObject *dups = type->newN(N(items[0], items[1], items[2], items[2], items[0]));
+        ypObject *slice = yp_getsliceC4(dups, yp_SLICE_DEFAULT, yp_SLICE_DEFAULT, 2);
+        assert_sequence(slice, items[0], items[2], items[0]);
+        yp_decrefN(N(dups, slice));
+    }
 
     // Optimization: lazy shallow copy of an immutable sq for total forward slice.
     if (!type->is_mutable) {
@@ -646,18 +671,18 @@ static MunitResult _test_findC(fixture_type_t *type,
     assert_not_found_exc(any_findC5(sq, items[2], 0, yp_SLICE_LAST, &exc));
     assert_not_found_exc(any_findC5(sq, items[2], yp_SLICE_LAST, yp_SLICE_LAST, &exc));
 
-    // If multiples, which one is found depends on the direction. Recall patterned sequences like
+    // If duplicates, which one is found depends on the direction. Recall patterned sequences like
     // range don't store duplicates.
     if (!type->is_patterned) {
-        ypObject *multi = type->newN(N(items[2], items[2], items[2]));
-        assert_ssizeC_exc(any_findC(multi, items[2], &exc), ==, forward ? 0 : 2);
-        assert_ssizeC_exc(any_findC5(multi, items[2], 0, 2, &exc), ==, forward ? 0 : 1);  // Basic.
-        assert_ssizeC_exc(any_findC5(multi, items[2], 1, 3, &exc), ==, forward ? 1 : 2);  // Basic.
-        assert_ssizeC_exc(any_findC5(multi, items[2], -3, -1, &exc), ==, forward ? 0 : 1);  // Neg.
-        assert_ssizeC_exc(any_findC5(multi, items[2], -2, 3, &exc), ==, forward ? 1 : 2);   // Neg.
-        assert_ssizeC_exc(any_findC5(multi, items[2], 0, 3, &exc), ==, forward ? 0 : 2);   // Total.
-        assert_ssizeC_exc(any_findC5(multi, items[2], -3, 3, &exc), ==, forward ? 0 : 2);  // Total.
-        yp_decref(multi);
+        ypObject *dups = type->newN(N(items[2], items[2], items[2]));
+        assert_ssizeC_exc(any_findC(dups, items[2], &exc), ==, forward ? 0 : 2);
+        assert_ssizeC_exc(any_findC5(dups, items[2], 0, 2, &exc), ==, forward ? 0 : 1);    // Basic.
+        assert_ssizeC_exc(any_findC5(dups, items[2], 1, 3, &exc), ==, forward ? 1 : 2);    // Basic.
+        assert_ssizeC_exc(any_findC5(dups, items[2], -3, -1, &exc), ==, forward ? 0 : 1);  // Neg.
+        assert_ssizeC_exc(any_findC5(dups, items[2], -2, 3, &exc), ==, forward ? 1 : 2);   // Neg.
+        assert_ssizeC_exc(any_findC5(dups, items[2], 0, 3, &exc), ==, forward ? 0 : 2);    // Total.
+        assert_ssizeC_exc(any_findC5(dups, items[2], -3, 3, &exc), ==, forward ? 0 : 2);   // Total.
+        yp_decref(dups);
     }
 
     if (type->is_string) {
@@ -794,17 +819,17 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
 
     // Recall patterned sequences like range don't store duplicates.
     if (!type->is_patterned) {
-        ypObject *multi = type->newN(N(items[2], items[2], items[2]));
-        assert_ssizeC_exc(yp_countC(multi, items[2], &exc), ==, 3);
-        assert_ssizeC_exc(yp_countC5(multi, items[2], 0, 1, &exc), ==, 1);    // Basic.
-        assert_ssizeC_exc(yp_countC5(multi, items[2], 0, 2, &exc), ==, 2);    // Basic.
-        assert_ssizeC_exc(yp_countC5(multi, items[2], 1, 3, &exc), ==, 2);    // Basic.
-        assert_ssizeC_exc(yp_countC5(multi, items[2], -3, -2, &exc), ==, 1);  // Neg.
-        assert_ssizeC_exc(yp_countC5(multi, items[2], -3, -1, &exc), ==, 2);  // Neg.
-        assert_ssizeC_exc(yp_countC5(multi, items[2], -2, 3, &exc), ==, 2);   // Neg.
-        assert_ssizeC_exc(yp_countC5(multi, items[2], 0, 3, &exc), ==, 3);    // Total.
-        assert_ssizeC_exc(yp_countC5(multi, items[2], -3, 3, &exc), ==, 3);   // Total.
-        yp_decref(multi);
+        ypObject *dups = type->newN(N(items[2], items[2], items[2]));
+        assert_ssizeC_exc(yp_countC(dups, items[2], &exc), ==, 3);
+        assert_ssizeC_exc(yp_countC5(dups, items[2], 0, 1, &exc), ==, 1);    // Basic.
+        assert_ssizeC_exc(yp_countC5(dups, items[2], 0, 2, &exc), ==, 2);    // Basic.
+        assert_ssizeC_exc(yp_countC5(dups, items[2], 1, 3, &exc), ==, 2);    // Basic.
+        assert_ssizeC_exc(yp_countC5(dups, items[2], -3, -2, &exc), ==, 1);  // Neg.
+        assert_ssizeC_exc(yp_countC5(dups, items[2], -3, -1, &exc), ==, 2);  // Neg.
+        assert_ssizeC_exc(yp_countC5(dups, items[2], -2, 3, &exc), ==, 2);   // Neg.
+        assert_ssizeC_exc(yp_countC5(dups, items[2], 0, 3, &exc), ==, 3);    // Total.
+        assert_ssizeC_exc(yp_countC5(dups, items[2], -3, 3, &exc), ==, 3);   // Total.
+        yp_decref(dups);
     }
 
     if (type->is_string) {
@@ -892,6 +917,14 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         assert_raises_exc(yp_setindexC(sq, yp_SLICE_DEFAULT, items[2], &exc), yp_IndexError);
         assert_raises_exc(yp_setindexC(sq, yp_SLICE_LAST, items[3], &exc), yp_IndexError);
         assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
+    }
+
+    // Duplicates: 0 is duplicated in sq, 1 shared between them.
+    {
+        ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_setindexC(sq, 3, items[1], &exc));
+        assert_sequence(sq, items[0], items[0], items[1], items[1]);
         yp_decref(sq);
     }
 
@@ -1112,6 +1145,15 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
+    // Duplicates: 0 is duplicated in sq, 1 in x, and 2 shared between them.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *sq = type->newN(N(items[0], items[2], items[0]));
+        ypObject *x = (*x_type)->newN(N(items[2], items[1], items[1]));
+        assert_not_raises_exc(yp_setsliceC6(sq, 1, 1, 1, x, &exc));
+        assert_sequence(sq, items[0], items[2], items[1], items[1], items[2], items[0]);
+        yp_decrefN(N(sq, x));
+    }
+
     // x is an iterator that fails at the start.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
@@ -1173,6 +1215,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     ypObject       *int_0 = yp_intC(0);
     ypObject       *int_1 = yp_intC(1);
     ypObject       *int_2 = yp_intC(2);
+    ypObject       *int_3 = yp_intC(3);
     ypObject       *int_neg_1 = yp_intC(-1);
     ypObject       *int_neg_2 = yp_intC(-2);
     ypObject       *int_neg_3 = yp_intC(-3);
@@ -1237,6 +1280,14 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
+    // Duplicates: 0 is duplicated in sq, 1 shared between them.
+    {
+        ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_setitem(sq, int_3, items[1], &exc));
+        assert_sequence(sq, items[0], items[0], items[1], items[1]);
+        yp_decref(sq);
+    }
+
     // intstore
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
@@ -1247,7 +1298,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
+    yp_decrefN(N(int_0, int_1, int_2, int_3, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
             int_SLICE_LAST, intstore_0));
     return MUNIT_OK;
 }
@@ -1566,6 +1617,14 @@ static MunitResult _test_appendC(
         yp_decref(sq);
     }
 
+    // Duplicates: 0 is duplicated in sq, 1 shared between them.
+    {
+        ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
+        assert_not_raises_exc(any_append(sq, items[1], &exc));
+        assert_sequence(sq, items[0], items[0], items[1], items[2], items[1]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -1641,6 +1700,15 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
         assert_not_raises_exc(yp_extend(sq, sq, &exc));
         assert_sequence(sq, items[0], items[1], items[0], items[1]);
         yp_decref(sq);
+    }
+
+    // Duplicates: 0 is duplicated in sq, 1 in x, and 2 shared between them.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *sq = type->newN(N(items[0], items[2], items[0]));
+        ypObject *x = (*x_type)->newN(N(items[2], items[1], items[1]));
+        assert_not_raises_exc(yp_extend(sq, x, &exc));
+        assert_sequence(sq, items[0], items[2], items[0], items[2], items[1], items[1]);
+        yp_decrefN(N(sq, x));
     }
 
     // x is an iterator that fails at the start.
@@ -1762,6 +1830,14 @@ static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixtu
         yp_decref(sq);
     }
 
+    // sq contains duplicates.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1], items[0]));
+        assert_not_raises_exc(yp_irepeatC(sq, 2, &exc));
+        assert_sequence(sq, items[0], items[1], items[0], items[0], items[1], items[0]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -1839,6 +1915,14 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
+    // Duplicates: 0 is duplicated in sq, 1 shared between them.
+    {
+        ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
+        assert_not_raises_exc(yp_insertC(sq, 0, items[1], &exc));
+        assert_sequence(sq, items[1], items[0], items[0], items[1], items[2]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -1905,6 +1989,18 @@ static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
+    // sq contains duplicates.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1], items[2], items[0], items[0]));
+        ead(popped, yp_popindexC(sq, 0), assert_obj(popped, eq, items[0]));
+        assert_sequence(sq, items[1], items[2], items[0], items[0]);
+        ead(popped, yp_popindexC(sq, 2), assert_obj(popped, eq, items[0]));
+        assert_sequence(sq, items[1], items[2], items[0]);
+        ead(popped, yp_popindexC(sq, 1), assert_obj(popped, eq, items[2]));
+        assert_sequence(sq, items[1], items[0]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -1939,6 +2035,16 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
         ypObject *sq = type->newN(0);
         assert_raises(yp_pop(sq), yp_IndexError);
         assert_len(sq, 0);
+        yp_decref(sq);
+    }
+
+    // sq contains duplicates.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1], items[0], items[0]));
+        ead(popped, yp_pop(sq), assert_obj(popped, eq, items[0]));
+        assert_sequence(sq, items[0], items[1], items[0]);
+        ead(popped, yp_pop(sq), assert_obj(popped, eq, items[0]));
+        assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
 
@@ -2000,12 +2106,12 @@ static MunitResult _test_remove(
         yp_decref(sq);
     }
 
-    // If multiples, the first one is the one that's removed. (There is no yp_rremove, yet.)
-    if (!type->is_patterned) {
-        ypObject *multi = type->newN(N(items[0], items[2], items[1], items[2]));
-        assert_not_raises_exc(any_remove(multi, items[2], &exc));
-        assert_sequence(multi, items[0], items[1], items[2]);
-        yp_decref(multi);
+    // If duplicates, the first one is the one that's removed. (There is no yp_rremove, yet.)
+    {
+        ypObject *dups = type->newN(N(items[0], items[2], items[1], items[2]));
+        assert_not_raises_exc(any_remove(dups, items[2], &exc));
+        assert_sequence(dups, items[0], items[1], items[2]);
+        yp_decref(dups);
     }
 
     if (type->is_string) {
@@ -2097,6 +2203,14 @@ static MunitResult test_reverse(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
+    // sq contains duplicates.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1], items[2], items[1]));
+        assert_not_raises_exc(yp_reverse(sq, &exc));
+        assert_sequence(sq, items[1], items[2], items[1], items[0]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -2120,12 +2234,13 @@ static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
     }
 
     // Basic sort. This is more thoroughly tested in test_tuple.
+    // TODO Write test_tuple.
     {
-        ypObject *sq = type->newN(N(int_2, int_0, int_1));
+        ypObject *sq = type->newN(N(int_2, int_0, int_1, int_0));
         assert_not_raises_exc(yp_sort(sq, &exc));
-        assert_sequence(sq, int_0, int_1, int_2);
+        assert_sequence(sq, int_0, int_0, int_1, int_2);
         assert_not_raises_exc(yp_sort4(sq, yp_None, yp_True, &exc));
-        assert_sequence(sq, int_2, int_1, int_0);
+        assert_sequence(sq, int_2, int_1, int_0, int_0);
         yp_decref(sq);
     }
 
