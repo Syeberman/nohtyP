@@ -6,13 +6,69 @@
 
 static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, ...))
 {
-    // FIXME Tests all the constructors.
+    ypObject *items[2];
+    obj_array_fill(items, type->rand_items);
+
+    // Basic newN.
+    {
+        ypObject *so = any_newN(2, items[0], items[1]);
+        assert_type_is(so, type->type);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // n is zero.
+    {
+        ypObject *so = any_newN(0);
+        assert_type_is(so, type->type);
+        assert_len(so, 0);
+        yp_decrefN(N(so));
+    }
+
+    // n is negative.
+    {
+        ypObject *so = any_newN(-1);
+        assert_type_is(so, type->type);
+        assert_len(so, 0);
+        yp_decrefN(N(so));
+    }
+
+    // Duplicate arguments
+    {
+        ypObject *so = any_newN(3, items[0], items[0], items[1], items[1]);
+        assert_type_is(so, type->type);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // Unhashable argument.
+    {
+        ypObject *unhashable = rand_obj_any_mutable();
+        assert_raises(any_newN(1, unhashable), yp_TypeError);
+        assert_raises(any_newN(3, items[0], items[1], unhashable), yp_TypeError);
+        yp_decrefN(N(unhashable));
+    }
+
+    // Optimization: empty immortal when n is zero.
+    if (type->falsy != NULL) {
+        assert_obj(any_newN(0), is, type->falsy);
+    }
+
+    obj_array_decref(items);
     return MUNIT_OK;
 }
 
 static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject *))
 {
-    // FIXME Tests all the constructors.
+    // fixture_type_t  *x_types[] = x_types_init(type);
+    // fixture_type_t **x_type;
+    // ypObject        *int_1 = yp_intC(1);
+    // ypObject *items[2];
+    // obj_array_fill(items, type->rand_items);
+
+
+    // obj_array_decref(items);
+    // yp_decrefN(N(int_1));
     return MUNIT_OK;
 }
 
