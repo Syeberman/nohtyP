@@ -5,13 +5,14 @@
 static MunitResult test_bool(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *item = type->rand_item();
+    ypObject       *items[1];
+    obj_array_fill(items, type->rand_items);
 
     // Empty collections are falsy, all others are truthy.
-    ead(x, type->newN(1, item), assert_obj(yp_bool(x), is, yp_True));
+    ead(x, type->newN(1, items[0]), assert_obj(yp_bool(x), is, yp_True));
     ead(x, type->newN(0), assert_obj(yp_bool(x), is, yp_False));
 
-    yp_decrefN(N(item));
+    obj_array_decref(items);
     return MUNIT_OK;
 }
 

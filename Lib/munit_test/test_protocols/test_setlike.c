@@ -4,6 +4,9 @@
 // XXX Because Python calls both the protocol and the object "set", I'm using the term "set-like" to
 // refer to the protocol where there may be confusion.
 
+// FIXME Exception passthrough, everywhere.
+// FIXME n is negative.
+
 // Sets should accept themselves, their pairs, iterators, frozenset/set, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
 // TODO Should dict really be here? What about dict key and item views (when implemented)?

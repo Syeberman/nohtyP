@@ -353,7 +353,6 @@ static fixture_type_t fixture_type_type_struct = {
         new_rand_type,  // _new_rand
 
         objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -384,7 +383,6 @@ static fixture_type_t fixture_type_NoneType_struct = {
         new_rand_NoneType,  // _new_rand
 
         objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -421,7 +419,6 @@ static fixture_type_t fixture_type_bool_struct = {
         new_rand_bool,  // _new_rand
 
         objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -456,7 +453,6 @@ static fixture_type_t fixture_type_int_struct = {
         new_rand_int,  // _new_rand
 
         objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -491,7 +487,6 @@ static fixture_type_t fixture_type_intstore_struct = {
         new_rand_intstore,  // _new_rand
 
         objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -526,7 +521,6 @@ static fixture_type_t fixture_type_float_struct = {
         new_rand_float,  // _new_rand
 
         objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -561,7 +555,6 @@ static fixture_type_t fixture_type_floatstore_struct = {
         new_rand_floatstore,  // _new_rand
 
         objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -611,7 +604,6 @@ static fixture_type_t fixture_type_iter_struct = {
         new_rand_iter,  // _new_rand
 
         newN_iter,      // newN
-        rand_obj_any,   // rand_item
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -690,21 +682,6 @@ args_end:
     return result;
 }
 
-static ypObject *rand_item_range(void)
-{
-    // Our current implementation has some limitations. step can't be yp_INT_T_MIN, and the length
-    // can't be >ypObject_LEN_MAX (31 bits). So just play within a narrower area.
-    //
-    // There's also a limitation where we want newN_range to act like a sequence, but range does not
-    // store duplicates. So keep the lowest byte incrementing to decrease the chance of a collision.
-    static yp_int_t low_byte = 0;
-    yp_int_t        value = (munit_rand_int_range(-0x3FFFFF, 0x3FFFFF) << 8) | low_byte;
-    ypObject       *result = yp_intC(value);
-    low_byte = (low_byte + 1) & 0xFF;
-    assert_not_exception(result);
-    return result;
-}
-
 // Fills array with n integers that cover a range with a random start and step. Any slice of these
 // integers is suitable to pass to newN_range to construct a new range.
 static void rand_items_range(yp_ssize_t n, ypObject **array)
@@ -726,7 +703,6 @@ static fixture_type_t fixture_type_range_struct = {
         new_rand_range,  // _new_rand
 
         newN_range,        // newN
-        rand_item_range,   // rand_item
         rand_items_range,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -786,7 +762,6 @@ static fixture_type_t fixture_type_bytes_struct = {
         new_rand_bytes,  // _new_rand
 
         newN_bytes,      // newN
-        rand_obj_byte,   // rand_item
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -846,7 +821,6 @@ static fixture_type_t fixture_type_bytearray_struct = {
         new_rand_bytearray,  // _new_rand
 
         newN_bytearray,  // newN
-        rand_obj_byte,   // rand_item
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -908,7 +882,6 @@ static fixture_type_t fixture_type_str_struct = {
         new_rand_str,  // _new_rand
 
         newN_str,       // newN
-        rand_obj_chr,   // rand_item
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -971,7 +944,6 @@ static fixture_type_t fixture_type_chrarray_struct = {
         new_rand_chrarray,  // _new_rand
 
         newN_chrarray,  // newN
-        rand_obj_chr,   // rand_item
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -1013,7 +985,6 @@ static fixture_type_t fixture_type_tuple_struct = {
         new_rand_tuple,  // _new_rand
 
         yp_tupleN,      // newN
-        rand_obj_any,   // rand_item
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -1055,7 +1026,6 @@ static fixture_type_t fixture_type_list_struct = {
         new_rand_list,  // _new_rand
 
         yp_listN,       // newN
-        rand_obj_any,   // rand_item
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -1098,7 +1068,6 @@ static fixture_type_t fixture_type_frozenset_struct = {
         new_rand_frozenset,  // _new_rand
 
         yp_frozensetN,           // newN
-        rand_obj_any_hashable,   // rand_item
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -1141,7 +1110,6 @@ static fixture_type_t fixture_type_set_struct = {
         new_rand_set,  // _new_rand
 
         yp_setN,                 // newN
-        rand_obj_any_hashable,   // rand_item
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -1213,7 +1181,6 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         new_rand_frozenset_dirty,  // _new_rand
 
         new_frozenset_dirtyN,    // newN
-        rand_obj_any_hashable,   // rand_item
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -1262,7 +1229,6 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         new_rand_set_dirty,  // _new_rand
 
         new_set_dirtyN,          // newN
-        rand_obj_any_hashable,   // rand_item
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
@@ -1351,7 +1317,6 @@ static fixture_type_t fixture_type_frozendict_struct = {
         new_rand_frozendict,  // _new_rand
 
         new_frozendictN,         // newN
-        rand_obj_any_hashable,   // rand_item
         rand_objs_any_hashable,  // rand_items
 
         yp_frozendictK,         // newK
@@ -1409,7 +1374,6 @@ static fixture_type_t fixture_type_dict_struct = {
         new_rand_dict,  // _new_rand
 
         new_dictN,               // newN
-        rand_obj_any_hashable,   // rand_item
         rand_objs_any_hashable,  // rand_items
 
         yp_dictK,               // newK
@@ -1452,7 +1416,6 @@ static fixture_type_t fixture_type_function_struct = {
         new_rand_function,  // _new_rand
 
         objvarargfunc_error,  // newN
-        objvoidfunc_error,    // rand_item
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK

@@ -649,11 +649,10 @@ typedef struct _fixture_type_t {
 
     rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
 
-    // Functions for iterables, where rand_item and rand_items returns objects that can be accepted
-    // by newN and subsequently yielded by yp_iter. (For mappings, newN creates an object with the
-    // given keys and random, unique values.)
+    // Functions for iterables, where rand_items returns objects that can be accepted by newN and
+    // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
+    // and random, unique values.)
     objvarargfunc newN;        // Creates a iterable for the given items (i.e. yp_tupleN).
-    objvoidfunc   rand_item;   // Creates a random object to store in the iterable.
     voidarrayfunc rand_items;  // Fills an array with n random, unique objects.
 
     // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
@@ -765,7 +764,7 @@ extern ypObject *new_faulty_iter(
 // Initializes a ypObject * array of length n with values from expression. Expression is evaluated n
 // times. n must be an integer literal. Example:
 //
-//      ypObject *items[] = obj_array_init(5, type->rand_item());
+//      ypObject *items[] = obj_array_init(5, rand_obj_any());
 #define obj_array_init(n, expression)  \
     {                                  \
         _COMMA_REPEAT##n((expression)) \

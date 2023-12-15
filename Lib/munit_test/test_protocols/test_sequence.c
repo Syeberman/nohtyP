@@ -26,7 +26,8 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *friend_types[] = {type, type->pair, NULL};
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
-    ypObject        *items[] = obj_array_init(4, type->rand_item());
+    ypObject        *items[4];
+    obj_array_fill(items, type->rand_items);
 
     // range stores integers following a pattern, so doesn't support concat.
     if (type->is_patterned) {
@@ -185,7 +186,8 @@ tear_down:
 static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(2, type->rand_item());
+    ypObject       *items[2];
+    obj_array_fill(items, type->rand_items);
 
     // range stores integers following a pattern, so doesn't support repeat.
     if (type->is_patterned) {
@@ -288,9 +290,11 @@ tear_down:
 static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(2, type->rand_item());
-    ypObject       *sq = type->newN(N(items[0], items[1]));
+    ypObject       *items[2];
+    ypObject       *sq;
     ypObject       *empty = type->newN(0);
+    obj_array_fill(items, type->rand_items);
+    sq = type->newN(N(items[0], items[1]));
 
     // Basic index.
     ead(zero, yp_getindexC(sq, 0), assert_obj(zero, eq, items[0]));
@@ -494,9 +498,11 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
     ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
     ypObject       *intstore_0 = yp_intstoreC(0);
-    ypObject       *items[] = obj_array_init(2, type->rand_item());
-    ypObject       *sq = type->newN(N(items[0], items[1]));
+    ypObject       *items[2];
+    ypObject       *sq;
     ypObject       *empty = type->newN(0);
+    obj_array_fill(items, type->rand_items);
+    sq = type->newN(N(items[0], items[1]));
 
     // Basic index.
     ead(zero, yp_getitem(sq, int_0), assert_obj(zero, eq, items[0]));
@@ -539,9 +545,11 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
     ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
     ypObject       *intstore_0 = yp_intstoreC(0);
-    ypObject       *items[] = obj_array_init(3, type->rand_item());
-    ypObject       *sq = type->newN(N(items[0], items[1]));
+    ypObject       *items[3];
+    ypObject       *sq;
     ypObject       *empty = type->newN(0);
+    obj_array_fill(items, type->rand_items);
+    sq = type->newN(N(items[0], items[1]));
 
     // Basic index.
     ead(zero, yp_getdefault(sq, int_0, items[2]), assert_obj(zero, eq, items[0]));
@@ -862,7 +870,8 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
 static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(4, type->rand_item());
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support setindex.
     if (!type->is_mutable) {
@@ -939,7 +948,8 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
     ypObject        *int_1 = yp_intC(1);
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *items[] = obj_array_init(11, type->rand_item());
+    ypObject        *items[11];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support setslice.
     if (!type->is_mutable) {
@@ -1222,7 +1232,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
     ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
     ypObject       *intstore_0 = yp_intstoreC(0);
-    ypObject       *items[] = obj_array_init(4, type->rand_item());
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support setitem.
     if (!type->is_mutable) {
@@ -1306,7 +1317,8 @@ tear_down:
 static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(4, type->rand_item());
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support delindex.
     if (!type->is_mutable) {
@@ -1372,7 +1384,8 @@ tear_down:
 static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(9, type->rand_item());
+    ypObject       *items[9];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support delslice.
     if (!type->is_mutable) {
@@ -1513,7 +1526,8 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
     ypObject       *int_SLICE_DEFAULT = yp_intC(yp_SLICE_DEFAULT);
     ypObject       *int_SLICE_LAST = yp_intC(yp_SLICE_LAST);
     ypObject       *intstore_0 = yp_intstoreC(0);
-    ypObject       *items[] = obj_array_init(4, type->rand_item());
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support delitem.
     if (!type->is_mutable) {
@@ -1590,7 +1604,8 @@ tear_down:
 static MunitResult _test_appendC(
         fixture_type_t *type, void (*any_append)(ypObject *, ypObject *, ypObject **))
 {
-    ypObject *items[] = obj_array_init(3, type->rand_item());
+    ypObject *items[3];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support append.
     if (!type->is_mutable) {
@@ -1646,7 +1661,8 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
-    ypObject        *items[] = obj_array_init(4, type->rand_item());
+    ypObject        *items[4];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support extend.
     if (!type->is_mutable) {
@@ -1769,7 +1785,8 @@ tear_down:
 static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(2, type->rand_item());
+    ypObject       *items[2];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support irepeat.
     if (!type->is_mutable) {
@@ -1846,7 +1863,8 @@ tear_down:
 static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(4, type->rand_item());
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support insert.
     if (!type->is_mutable) {
@@ -1931,7 +1949,8 @@ tear_down:
 static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(4, type->rand_item());
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support popindex.
     if (!type->is_mutable) {
@@ -2009,7 +2028,8 @@ tear_down:
 static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(2, type->rand_item());
+    ypObject       *items[2];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support pop.
     if (!type->is_mutable) {
@@ -2156,7 +2176,8 @@ static MunitResult test_discard(const MunitParameter params[], fixture_t *fixtur
 static MunitResult test_reverse(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[] = obj_array_init(3, type->rand_item());
+    ypObject       *items[3];
+    obj_array_fill(items, type->rand_items);
 
     // Immutables don't support reverse.
     if (!type->is_mutable) {
@@ -2222,7 +2243,8 @@ static MunitResult test_sort(const MunitParameter params[], fixture_t *fixture)
     ypObject       *int_0 = yp_intC(0);
     ypObject       *int_1 = yp_intC(1);
     ypObject       *int_2 = yp_intC(2);
-    ypObject       *items[] = obj_array_init(2, type->rand_item());
+    ypObject       *items[2];
+    obj_array_fill(items, type->rand_items);
 
     // Sort is only implemented for list; it's not currently part of the sequence protocol.
     if (type->type != yp_t_list) {

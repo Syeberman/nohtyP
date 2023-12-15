@@ -2837,9 +2837,9 @@ static MunitResult test_deepcopy(const MunitParameter params[], fixture_t *fixtu
     define_function(f, None_code, ({str_a, defs[0]}));
 
     // deepcopy is not yet implemented.
-    // TOCO In Python, deepcopy on a function is a lazy copy; however, in nohtyP, deepcopy is
+    // TODO In Python, deepcopy on a function is a lazy copy; however, in nohtyP, deepcopy is
     // intended to be a solution for threadsafety by always returning a new object (except, perhaps,
-    // for immortals). How should we handle this?
+    // for immortals).
     assert_raises(yp_unfrozen_deepcopy(f), yp_MethodError);
     assert_raises(yp_frozen_deepcopy(f), yp_MethodError);
     assert_raises(yp_deepcopy(f), yp_MethodError);

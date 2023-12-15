@@ -173,7 +173,7 @@ typedef double             yp_float64_t;
 typedef ssize_t yp_ssize_t;
 #define yp_SSIZE_T_MAX SSIZE_MAX
 #elif SIZE_MAX == 0xFFFFFFFFu
-typedef yp_int32_t    yp_ssize_t;
+typedef yp_int32_t yp_ssize_t;
 #define yp_SSIZE_T_MAX (0x7FFFFFFF)
 #else
 typedef yp_int64_t yp_ssize_t;
@@ -797,6 +797,11 @@ ypAPI ypObject *yp_issuperset(ypObject *set, ypObject *x);
 // Returns the immortal yp_True if every element in x is in set and set has additional elements,
 // else yp_False.
 ypAPI ypObject *yp_gt(ypObject *set, ypObject *x);
+
+// FIXME yp_unionN/etc are the only vararg functions here that don't take "unpacked" arguments.
+// yp_tupleN takes the items to construct the tuple; yp_unionN should do the same. This is all the
+// more obvious when you compare yp_updateK, which takes the items, to yp_updateN, which takes the
+// iterables.
 
 // Returns a new reference to an object of the same type as set containing all the elements from set
 // and all n objects.
