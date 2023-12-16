@@ -12308,10 +12308,12 @@ static ypObject *_ypTuple_extend_grow(ypObject *sq, yp_ssize_t required, yp_ssiz
 }
 
 // growhint is the number of additional items, not including x, that are expected to be added to
-// the tuple
+// the tuple.
+// XXX Check for the "push exception" case first.
 static ypObject *_ypTuple_push(ypObject *sq, ypObject *x, yp_ssize_t growhint)
 {
     ypObject *result;
+    yp_ASSERT1(!yp_isexceptionC(x));
     if (ypTuple_LEN(sq) > ypTuple_LEN_MAX - 1) return yp_MemorySizeOverflowError;
     if (ypTuple_ALLOCLEN(sq) < ypTuple_LEN(sq) + 1) {
         result = _ypTuple_extend_grow(sq, ypTuple_LEN(sq) + 1, MAX(growhint, 0));
@@ -13063,6 +13065,7 @@ static ypObject *tuple_len(ypObject *sq, yp_ssize_t *len)
 
 static ypObject *list_push(ypObject *sq, ypObject *x)
 {
+    if (yp_isexceptionC(x)) return x;
     // TODO Overallocate via growhint
     return _ypTuple_push(sq, x, 0);
 }
