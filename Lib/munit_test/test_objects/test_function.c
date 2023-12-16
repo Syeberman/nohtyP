@@ -1346,6 +1346,13 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(yp_OSError, N(yp_tuple_empty)), yp_OSError);
     }
 
+    // None_code
+    {
+        define_function2(f, None_code);
+        assert_obj(any_callN(f, 0), is, yp_None);
+        yp_decref(f);
+    }
+
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
@@ -2479,6 +2486,13 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         // yp_OSError holds no special meaning in the function implementation or these tests.
         assert_raises(any_callK(yp_OSError, 0), yp_OSError);
         assert_raises(any_callK(yp_OSError, K(str_a, args[0])), yp_OSError);
+    }
+
+    // None_code
+    {
+        define_function2(f, None_code);
+        assert_obj(any_callK(f, 0), is, yp_None);
+        yp_decref(f);
     }
 
     // TODO PEP 448 talks about the confusion around {'a':0,'a':1} being valid but dict(a=0,a=1)

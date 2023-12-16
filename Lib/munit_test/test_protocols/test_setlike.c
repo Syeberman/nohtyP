@@ -2181,7 +2181,8 @@ static MunitResult test_discard(const MunitParameter params[], fixture_t *fixtur
 static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *items[2];
+    yp_ssize_t      i;
+    ypObject       *items[6];
     obj_array_fill(items, type->rand_items);
 
     // Immutables don't support pop.
@@ -2209,18 +2210,20 @@ static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
         yp_decref(so);
     }
 
-    // Multiple pops. Order is arbitrary.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
+    // Multiple pops. Order is arbitrary, so run through a few different items.
+    for (i = 0; i < 5; i++) {
+        ypObject *item_0 = items[0 + i];  // borrowed
+        ypObject *item_1 = items[1 + i];  // borrowed
+        ypObject *so = type->newN(N(item_0, item_1));
         ypObject *first;
         assert_not_raises(first = yp_pop(so));
-        if (yp_eq(first, items[0]) == yp_True) {
-            assert_set(so, items[1]);
-            ead(popped, yp_pop(so), assert_obj(popped, eq, items[1]));
+        if (yp_eq(first, item_0) == yp_True) {
+            assert_set(so, item_1);
+            ead(popped, yp_pop(so), assert_obj(popped, eq, item_1));
         } else {
-            assert_obj(first, eq, items[1]);
-            assert_set(so, items[0]);
-            ead(popped, yp_pop(so), assert_obj(popped, eq, items[0]));
+            assert_obj(first, eq, item_1);
+            assert_set(so, item_0);
+            ead(popped, yp_pop(so), assert_obj(popped, eq, item_0));
         }
         assert_len(so, 0);
         assert_raises(yp_pop(so), yp_KeyError);
