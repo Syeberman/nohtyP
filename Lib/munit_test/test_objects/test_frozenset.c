@@ -2,7 +2,27 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME Constructor tests.
+// FIXME Exception passthrough, everywhere.
+
+#define x_types_init()                                                                   \
+    {                                                                                    \
+        fixture_type_frozenset, fixture_type_set, fixture_type_iter, fixture_type_tuple, \
+                fixture_type_list, fixture_type_frozenset_dirty, fixture_type_set_dirty, \
+                fixture_type_frozendict, fixture_type_dict, NULL                         \
+    }
+
+#define friend_types_init()                                                     \
+    {                                                                           \
+        fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
+                fixture_type_set_dirty, NULL                                    \
+    }
+
+// Returns true iff type can store unhashable objects.
+static int type_stores_unhashables(fixture_type_t *type)
+{
+    return !type->is_setlike && !type->is_mapping;
+}
+
 
 static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, ...))
 {
@@ -33,7 +53,7 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
         yp_decrefN(N(so));
     }
 
-    // Duplicate arguments
+    // Duplicate arguments.
     {
         ypObject *so = any_newN(3, items[0], items[0], items[1], items[1]);
         assert_type_is(so, type->type);
@@ -52,6 +72,7 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
     // Optimization: empty immortal when n is zero.
     if (type->falsy != NULL) {
         assert_obj(any_newN(0), is, type->falsy);
+        assert_obj(any_newN(-1), is, type->falsy);
     }
 
     obj_array_decref(items);
@@ -60,15 +81,74 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
 
 static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject *))
 {
-    // fixture_type_t  *x_types[] = x_types_init(type);
-    // fixture_type_t **x_type;
-    // ypObject        *int_1 = yp_intC(1);
-    // ypObject *items[2];
-    // obj_array_fill(items, type->rand_items);
+    fixture_type_t  *x_types[] = x_types_init();
+    fixture_type_t  *friend_types[] = friend_types_init();
+    fixture_type_t **x_type;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *items[2];
+    obj_array_fill(items, type->rand_items);
 
+    // Basic new.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        ypObject *so = any_new(x);
+        assert_type_is(so, type->type);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+    }
 
-    // obj_array_decref(items);
-    // yp_decrefN(N(int_1));
+    // x is empty.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *so = any_new(x);
+        assert_type_is(so, type->type);
+        assert_len(so, 0);
+        yp_decrefN(N(so, x));
+    }
+
+    // x contains duplicates.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        ypObject *x = (*x_type)->newN(N(items[0], items[0], items[1]));
+        ypObject *so = any_new(x);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so, x));
+    }
+
+    // x contains an unhashable object.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
+            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *x = (*x_type)->newN(N(unhashable));
+            assert_raises(any_new(x), yp_TypeError);
+            yp_decrefN(N(unhashable, x));
+        }
+    }
+
+    // Optimization: lazy shallow copy of an immutable x to immutable so.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        ypObject *so = any_new(x);
+        if (type->is_mutable || (*x_type)->is_mutable) {
+            assert_obj(so, is_not, x);
+        } else {
+            assert_obj(so, is, x);
+        }
+        yp_decrefN(N(so, x));
+    }
+
+    // Optimization: empty immortal when x is empty.
+    if (type->falsy != NULL) {
+        for (x_type = x_types; (*x_type) != NULL; x_type++) {
+            ypObject *x = (*x_type)->newN(0);
+            ypObject *so = any_new(x);
+            assert_obj(so, is, type->falsy);
+            yp_decrefN(N(so, x));
+        }
+    }
+
+    obj_array_decref(items);
+    yp_decrefN(N(int_1));
     return MUNIT_OK;
 }
 
@@ -263,6 +343,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
 }
 
 
+// FIXME test_newN/etc don't need to test "dirty"
 char *param_values_test_frozenset[] = {"frozenset", "set", "frozenset_dirty", "set_dirty", NULL};
 
 static MunitParameterEnum test_frozenset_params[] = {

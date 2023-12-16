@@ -3,6 +3,7 @@
 
 // XXX Because Python calls both the protocol and the object "set", I'm using the term "set-like" to
 // refer to the protocol where there may be confusion.
+// FIXME Do this in nohtyP.h?
 
 // FIXME Exception passthrough, everywhere.
 // FIXME n is negative.

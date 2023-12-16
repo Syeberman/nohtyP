@@ -16639,10 +16639,12 @@ ypObject *yp_setNV(int n, va_list args)
 // XXX Check for the "fellow frozenset/set" case _before_ calling this function
 static ypObject *_ypSet(int type, ypObject *iterable)
 {
-    ypObject  *exc = yp_None;
-    ypObject  *newSo;
-    ypObject  *result;
-    yp_ssize_t length_hint;
+    ypObject   *exc = yp_None;
+    ypObject   *newSo;
+    ypObject   *result;
+    yp_ssize_t  length_hint;
+    yp_uint64_t mi_state;
+    ypObject   *mi;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(iterable) != ypFrozenSet_CODE);
 
@@ -16660,9 +16662,16 @@ static ypObject *_ypSet(int type, ypObject *iterable)
         return yp_MemorySizeOverflowError;
     }
 
-    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);
+    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE); // new ref
     if (yp_isexceptionC(newSo)) return newSo;
-    result = _ypSet_update(newSo, iterable);
+
+    mi = yp_miniiter(iterable, &mi_state);  // new ref
+    if (yp_isexceptionC(mi)) {
+        yp_decref(newSo);
+        return mi;
+    }
+    result = _ypSet_update_fromiter(newSo, mi, &mi_state);
+    yp_decref(mi);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
