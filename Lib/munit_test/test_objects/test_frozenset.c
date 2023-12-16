@@ -75,6 +75,10 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
         assert_obj(any_newN(-1), is, type->falsy);
     }
 
+    // Exception passthrough.
+    assert_isexception(any_newN(N(yp_SyntaxError)), yp_SyntaxError);
+    assert_isexception(any_newN(N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+
     obj_array_decref(items);
     return MUNIT_OK;
 }
@@ -146,6 +150,56 @@ static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject
             yp_decrefN(N(so, x));
         }
     }
+
+    // x is an iterator that fails at the start.
+    {
+        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
+        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
+        assert_raises(any_new(x), yp_SyntaxError);
+        yp_decrefN(N(x_supplier, x));
+    }
+
+    // x is an iterator that fails mid-way.
+    {
+        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
+        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
+        assert_raises(any_new(x), yp_SyntaxError);
+        yp_decrefN(N(x_supplier, x));
+    }
+
+    // x is an iterator with a too-small length_hint.
+    {
+        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
+        ypObject *so = any_new(x);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(x_supplier, x, so));
+    }
+
+    // x is an iterator with a too-large length_hint.
+    {
+        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
+        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
+        ypObject *so = any_new(x);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(x_supplier, x, so));
+    }
+
+    // x is an iterator with the maximum length_hint.
+    // FIXME Similar tests everywhere new_faulty_iter is used. (Consolidate into a single function?)
+    // {
+    //     ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
+    //     ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, yp_SSIZE_T_MAX);
+    //     ypObject *so = any_new(x);
+    //     assert_set(so, items[0], items[1]);
+    //     yp_decrefN(N(x_supplier, x));
+    // }
+
+    // x is not an iterable.
+    assert_raises(any_new(int_1), yp_TypeError);
+
+    // Exception passthrough.
+    assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
 
     obj_array_decref(items);
     yp_decrefN(N(int_1));
@@ -296,6 +350,8 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     fixture_type_t *type = fixture->type;
     ypObject *(*newN_to_call_type)(int, ...);
     ypObject *(*new_to_call_type)(ypObject *);
+    ypObject   *str_iterable = yp_str_frombytesC2(-1, "iterable");
+    ypObject   *str_cls = yp_str_frombytesC2(-1, "cls");
     MunitResult test_result;
 
     if (type->type == yp_t_frozenset) {
@@ -308,13 +364,39 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
     }
 
     test_result = _test_newN(type, newN_to_call_type);
-    if (test_result != MUNIT_OK) return test_result;
+    if (test_result != MUNIT_OK) goto tear_down;
 
     test_result = _test_new(type, new_to_call_type);
-    if (test_result != MUNIT_OK) return test_result;
+    if (test_result != MUNIT_OK) goto tear_down;
 
-    // FIXME additional tests specific to function objects
+    // Zero arguments.
+    {
+        ypObject *so = yp_callN(type->type, 0);
+        assert_type_is(so, type->type);
+        assert_len(so, 0);
+        yp_decrefN(N(so));
+    }
 
+    // Optimization: empty immortal with zero arguments.
+    if (type->falsy != NULL) {
+        assert_obj(yp_callN(type->type, 0), is, type->falsy);
+    }
+
+    // Invalid arguments.
+    {
+        ypObject *kwargs_iterable = yp_frozendictK(K(str_iterable, yp_frozenset_empty));
+        ypObject *kwargs_cls = yp_frozendictK(K(str_cls, type->type));
+
+        assert_raises(
+                yp_callN(type->type, N(yp_frozenset_empty, yp_frozenset_empty)), yp_TypeError);
+        assert_raises(yp_call_stars(type->type, yp_tuple_empty, kwargs_iterable), yp_TypeError);
+        assert_raises(yp_call_stars(type->type, yp_tuple_empty, kwargs_cls), yp_TypeError);
+
+        yp_decrefN(N(kwargs_cls, kwargs_iterable));
+    }
+
+tear_down:
+    yp_decrefN(N(str_iterable, str_cls));
     return MUNIT_OK;
 }
 
