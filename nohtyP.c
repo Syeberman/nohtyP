@@ -16652,6 +16652,7 @@ static ypObject *_ypSet(int type, ypObject *iterable)
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(iterable, &exc);
+        // FIXME A separate, saner maximum for length hints, everywhere?
         if (length_hint > ypSet_LEN_MAX) length_hint = ypSet_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypSet_update
@@ -16659,10 +16660,11 @@ static ypObject *_ypSet(int type, ypObject *iterable)
         return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
     } else if (length_hint > ypSet_LEN_MAX) {
         // yp_lenC reports that we don't have room to add their elements
+        // FIXME _ypSet_new already handles this case
         return yp_MemorySizeOverflowError;
     }
 
-    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE); // new ref
+    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     mi = yp_miniiter(iterable, &mi_state);  // new ref
