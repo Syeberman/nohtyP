@@ -5,7 +5,6 @@
 // refer to the protocol where there may be confusion.
 // FIXME Do this in nohtyP.h?
 
-// FIXME Exception passthrough, everywhere.
 // FIXME n is negative.
 
 // Sets should accept themselves, their pairs, iterators, frozenset/set, and frozendict/dict as
@@ -151,6 +150,10 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         // x is so.
         assert_obj(any_cmp(so, so), is, x_same);
 
+        // Exception passthrough.
+        assert_isexception(any_cmp(so, yp_SyntaxError), yp_SyntaxError);
+
+        assert_set(so, items[0], items[1]);  // so unchanged.
         yp_decref(so);
     }
 
@@ -169,6 +172,10 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
         // x is so.
         assert_obj(any_cmp(empty, empty), is, both_empty);
 
+        // Exception passthrough.
+        assert_isexception(any_cmp(empty, yp_SyntaxError), yp_SyntaxError);
+
+        assert_len(empty, 0);  // empty unchanged.
         yp_decref(empty);
     }
 
@@ -777,6 +784,13 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(so));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises(yp_unionN(so, N(yp_SyntaxError)), yp_SyntaxError);
+        yp_decrefN(N(so));
+    }
+
     obj_array_decref(items);
     yp_decrefN(N(int_1));
     return MUNIT_OK;
@@ -948,6 +962,13 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_raises(yp_intersectionN(so, N(int_1)), yp_TypeError);
+        yp_decrefN(N(so));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises(yp_intersectionN(so, N(yp_SyntaxError)), yp_SyntaxError);
         yp_decrefN(N(so));
     }
 
@@ -1125,6 +1146,13 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         yp_decrefN(N(so));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises(yp_differenceN(so, N(yp_SyntaxError)), yp_SyntaxError);
+        yp_decrefN(N(so));
+    }
+
     obj_array_decref(items);
     yp_decrefN(N(int_1));
     return MUNIT_OK;
@@ -1267,6 +1295,13 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_raises(yp_symmetric_difference(so, int_1), yp_TypeError);
+        yp_decrefN(N(so));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises(yp_symmetric_difference(so, yp_SyntaxError), yp_SyntaxError);
         yp_decrefN(N(so));
     }
 
@@ -1438,6 +1473,14 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_raises_exc(yp_update(so, int_1, &exc), yp_TypeError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1614,6 +1657,14 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         yp_decrefN(N(so));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_intersection_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
 tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_1));
@@ -1786,6 +1837,14 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         yp_decrefN(N(so));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_difference_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
 tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_1));
@@ -1943,6 +2002,14 @@ static MunitResult test_symmetric_difference_update(
         yp_decrefN(N(so));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_symmetric_difference_update(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
 tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_1));
@@ -2009,6 +2076,14 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(int_1, intstore_1, so));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_push(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -2072,6 +2147,14 @@ static MunitResult test_pushunique(const MunitParameter params[], fixture_t *fix
         assert_raises_exc(yp_pushunique(so, intstore_1, &exc), yp_TypeError);
         assert_set(so, int_1);
         yp_decrefN(N(int_1, intstore_1, so));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_pushunique(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
     }
 
 tear_down:
@@ -2159,6 +2242,14 @@ static MunitResult _test_remove(
         assert_hashC_exc(yp_currenthashC(so, &exc), ==, yp_currenthashC(expected, &exc));
 
         yp_decrefN(N(expected, so));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        assert_raises_exc(any_remove(so, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_set(so, items[0], items[1]);
+        yp_decrefN(N(so));
     }
 
 #undef assert_not_found_exc

@@ -2,8 +2,6 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME Exception passthrough, everywhere.
-
 #define x_types_init()                                                                   \
     {                                                                                    \
         fixture_type_frozenset, fixture_type_set, fixture_type_iter, fixture_type_tuple, \

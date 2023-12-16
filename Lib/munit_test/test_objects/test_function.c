@@ -415,7 +415,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 chrarray_star_star_kwargs));
     }
 
-    // Keep the exception if name is an exception.
+    // Exception passthrough.
     {
         define_function(f, None_code, ({yp_OSError}));
         assert_isexception(f, yp_OSError);
@@ -2903,7 +2903,7 @@ static MunitResult test_hash(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-static MunitResult test_t_function_call(const MunitParameter params[], fixture_t *fixture)
+static MunitResult test_call_t_function(const MunitParameter params[], fixture_t *fixture)
 {
     assert_raises(yp_callN(yp_t_function, 0), yp_NotImplementedError);
 
@@ -2914,7 +2914,7 @@ static MunitResult test_t_function_call(const MunitParameter params[], fixture_t
 MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_new_immortal, NULL),
         TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL),
         TEST(test_copy, NULL), TEST(test_deepcopy, NULL), TEST(test_bool, NULL),
-        TEST(test_hash, NULL), TEST(test_t_function_call, NULL), {NULL}};
+        TEST(test_hash, NULL), TEST(test_call_t_function, NULL), {NULL}};
 
 
 extern void test_function_initialize(void) {}

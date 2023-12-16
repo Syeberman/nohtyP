@@ -49,6 +49,15 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
         yp_decrefN(N(self));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        assert_raises(yp_contains(self, yp_SyntaxError), yp_SyntaxError);
+        assert_raises(yp_in(yp_SyntaxError, self), yp_SyntaxError);
+        assert_raises(yp_not_in(yp_SyntaxError, self), yp_SyntaxError);
+        yp_decrefN(N(self));
+    }
+
     obj_array_decref(items);
     return MUNIT_OK;
 }

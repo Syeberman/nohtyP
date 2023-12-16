@@ -3,7 +3,6 @@
 
 // TODO Is the behaviour of the comparison methods (yp_lt/etc) part of this interface?
 
-
 // Sequences should accept themselves, their pairs, iterators, and tuple/list as valid types for the
 // "x" (i.e. "other iterable") argument.
 #define x_types_init(type)                                                                   \
@@ -178,6 +177,14 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(sq));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_isexception(yp_concat(sq, yp_SyntaxError), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decrefN(N(sq));
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -315,6 +322,8 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     assert_raises(yp_getindexC(sq, yp_SLICE_DEFAULT), yp_IndexError);
     assert_raises(yp_getindexC(sq, yp_SLICE_LAST), yp_IndexError);
+
+    assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
     yp_decrefN(N(sq, empty));
@@ -481,6 +490,8 @@ static MunitResult test_getsliceC(const MunitParameter params[], fixture_t *fixt
     ead(slice, yp_getsliceC4(sq, -100, 100, 2),
             assert_sequence(slice, items[0], items[2], items[4]));
 
+    assert_sequence(sq, items[0], items[1], items[2], items[3], items[4]);  // sq unchanged.
+
     yp_decref(sq);
     obj_array_decref(items);
     return MUNIT_OK;
@@ -527,6 +538,11 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     // intstore.
     ead(zero, yp_getitem(sq, intstore_0), assert_obj(zero, eq, items[0]));
 
+    // Exception passthrough.
+    assert_isexception(yp_getitem(sq, yp_SyntaxError), yp_SyntaxError);
+
+    assert_sequence(sq, items[0], items[1]);  // sq unchanged.
+
     obj_array_decref(items);
     yp_decrefN(N(sq, empty, int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
             int_SLICE_LAST, intstore_0));
@@ -563,6 +579,10 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     ead(two, yp_getdefault(sq, int_2, items[2]), assert_obj(two, eq, items[2]));
     ead(neg_three, yp_getdefault(sq, int_neg_3, items[2]), assert_obj(neg_three, eq, items[2]));
 
+    // Exception-as-default.
+    assert_raises(yp_getdefault(sq, int_2, yp_SyntaxError), yp_SyntaxError);
+    assert_raises(yp_getdefault(sq, int_neg_3, yp_SyntaxError), yp_SyntaxError);
+
     // Empty sq.
     ead(zero, yp_getdefault(empty, int_0, items[2]), assert_obj(zero, eq, items[2]));
     ead(neg_one, yp_getdefault(empty, int_neg_1, items[2]), assert_obj(neg_one, eq, items[2]));
@@ -575,6 +595,11 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     // intstore.
     ead(zero, yp_getdefault(sq, intstore_0, items[2]), assert_obj(zero, eq, items[0]));
+
+    // Exception passthrough.
+    assert_isexception(yp_getdefault(sq, yp_SyntaxError, items[2]), yp_SyntaxError);
+
+    assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
     obj_array_decref(items);
     yp_decrefN(N(sq, empty, int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
@@ -714,6 +739,12 @@ static MunitResult _test_findC(fixture_type_t *type,
         assert_not_found_exc(any_findC5(seq, seq, 0, 3, &exc));
         yp_decref(seq);
     }
+
+    // Exception passthrough.
+    assert_raises_exc(any_findC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_raises_exc(any_findC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+
+    assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
 #undef assert_not_found_exc
 
@@ -862,6 +893,12 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
         yp_decref(seq);
     }
 
+    // Exception passthrough.
+    assert_raises_exc(yp_countC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_raises_exc(yp_countC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+
+    assert_sequence(sq, items[0], items[1]);  // sq unchanged.
+
     obj_array_decref(items);
     yp_decrefN(N(sq, empty));
     return MUNIT_OK;
@@ -934,6 +971,14 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
         assert_not_raises_exc(yp_setindexC(sq, 3, items[1], &exc));
         assert_sequence(sq, items[0], items[0], items[1], items[1]);
+        yp_decref(sq);
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
 
@@ -1214,6 +1259,14 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(N(sq));
     }
 
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setsliceC6(sq, 0, 1, 1, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
     return MUNIT_OK;
@@ -1304,6 +1357,15 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         ypObject *sq = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_setitem(sq, intstore_0, items[2], &exc));
         assert_sequence(sq, items[2], items[1]);
+        yp_decref(sq);
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_setitem(sq, yp_SyntaxError, items[2], &exc), yp_SyntaxError);
+        assert_raises_exc(yp_setitem(sq, int_0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
 
@@ -1593,6 +1655,14 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
         yp_decref(sq);
     }
 
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_delitem(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
+    }
+
 tear_down:
     obj_array_decref(items);
     yp_decrefN(N(int_0, int_1, int_2, int_neg_1, int_neg_2, int_neg_3, int_SLICE_DEFAULT,
@@ -1637,6 +1707,14 @@ static MunitResult _test_appendC(
         ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
         assert_not_raises_exc(any_append(sq, items[1], &exc));
         assert_sequence(sq, items[0], items[0], items[1], items[2], items[1]);
+        yp_decref(sq);
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(any_append(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
 
@@ -1774,6 +1852,14 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
         assert_raises_exc(yp_extend(sq, int_1, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decrefN(N(sq));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_extend(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
 tear_down:
@@ -1938,6 +2024,14 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
         ypObject *sq = type->newN(N(items[0], items[0], items[1], items[2]));
         assert_not_raises_exc(yp_insertC(sq, 0, items[1], &exc));
         assert_sequence(sq, items[1], items[0], items[0], items[1], items[2]);
+        yp_decref(sq);
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_insertC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
 
@@ -2154,6 +2248,14 @@ static MunitResult _test_remove(
         assert_not_found_exc(any_remove(seq, seq, &exc));
         assert_sequence(seq, items[0], items[1], items[2]);
         yp_decref(seq);
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *sq = type->newN(N(items[0], items[1]));
+        assert_raises_exc(any_remove(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_sequence(sq, items[0], items[1]);
+        yp_decref(sq);
     }
 
 #undef assert_not_found_exc
