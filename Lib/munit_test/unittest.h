@@ -613,6 +613,71 @@ extern "C" {
     } while (0)
 
 
+#define _faulty_iter_test_raises(                                                \
+        iter_name, iter_expression, expression, test_name, expression_str)       \
+    do {                                                                         \
+        ypObject *iter_name = iter_expression;                                   \
+        ypObject *_ypmt_FLT_ITR_expression = expression;                         \
+        ypObject *_ypmt_FLT_ITR_expected[] = {yp_SyntaxError};                   \
+        _assert_isexception(_ypmt_FLT_ITR_expression, 1, _ypmt_FLT_ITR_expected, \
+                "%s /*" test_name "*/", "yp_SyntaxError", expression_str);       \
+        yp_decref(iter_name);                                                    \
+    } while (0)
+
+// XXX Unfortunately, we don't have a way to inject test_name into the assertion statement.
+#define _faulty_iter_test_succeeds(                                                         \
+        iter_name, iter_expression, name, expression, assertion, test_name, expression_str) \
+    do {                                                                                    \
+        ypObject *iter_name = iter_expression;                                              \
+        ypObject *name;                                                                     \
+        _assert_not_raises(name = expression, "%s /*" test_name "*/", expression_str);      \
+        UNPACK assertion;                                                                   \
+        yp_decrefN(N(iter_name, name));                                                     \
+    } while (0)
+
+// Executes a series of tests using a "faulty iterator" that either throws an exception during
+// iteration or provides a misleading length hint. The faulty iterator is assigned to iter_name and
+// yields values from iter_supplier, which is evaluated once but iterated over multiple times;
+// iter_supplier must contain at least two entries. The result of expression is set to name;
+// expression is evaluated multiple times, and should reference iter_name. Where expression is
+// expected to succeed, the assertion is executed to validate the results; assertion is evaluated
+// multiples times, and should reference name. To be used like:
+//
+//      faulty_iter_tests(x, yp_tupleN(N(items[0], items[1])), so, yp_set(x),
+//              assert_set(so, items[0], items[1]));
+// XXX yp_SyntaxError is chosen as nohtyP.c neither throws nor catches it.
+#define faulty_iter_tests(iter_name, iter_supplier, name, expression, assertion)                   \
+    do {                                                                                           \
+        ypObject  *_ypmt_FLT_ITR_supplier = (iter_supplier);                                       \
+        yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(_ypmt_FLT_ITR_supplier);                 \
+        char       _ypmt_FLT_ITR_expression_str[] = #expression;                                   \
+        assert_ssizeC(_ypmt_FLT_ITR_len, >, 1);                                                    \
+        /* x is an iterator that fails at the start. */                                            \
+        _faulty_iter_test_raises((iter_name),                                                      \
+                new_faulty_iter(_ypmt_FLT_ITR_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len),     \
+                (expression), "fail_start", _ypmt_FLT_ITR_expression_str);                         \
+        /* x is an iterator that fails mid-way. */                                                 \
+        _faulty_iter_test_raises((iter_name),                                                      \
+                new_faulty_iter(_ypmt_FLT_ITR_supplier, 1, yp_SyntaxError, _ypmt_FLT_ITR_len),     \
+                (expression), "fail_mid", _ypmt_FLT_ITR_expression_str);                           \
+        /* x is an iterator with a too-small length_hint. */                                       \
+        _faulty_iter_test_succeeds((iter_name),                                                    \
+                new_faulty_iter(_ypmt_FLT_ITR_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, 1), \
+                (name), (expression), (assertion), "hint_small", _ypmt_FLT_ITR_expression_str);    \
+        /* x is an iterator with a too-large length_hint. */                                       \
+        _faulty_iter_test_succeeds((iter_name),                                                    \
+                new_faulty_iter(_ypmt_FLT_ITR_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,     \
+                        _ypmt_FLT_ITR_len + 100),                                                  \
+                (name), (expression), (assertion), "hint_large", _ypmt_FLT_ITR_expression_str);    \
+        /* x is an iterator with the maximum length_hint. */                                       \
+        /*_faulty_iter_test_succeeds((iter_name),                                                  \
+                new_faulty_iter(_ypmt_FLT_ITR_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,     \
+                        yp_SSIZE_T_MAX),                                                           \
+                (name), (expression), (assertion), "hint_max", _ypmt_FLT_ITR_expression_str);*/    \
+        yp_decref(_ypmt_FLT_ITR_supplier);                                                         \
+    } while (0)
+
+
 // A version of yp_isexceptionCN that accepts an array.
 extern int yp_isexception_arrayC(ypObject *x, yp_ssize_t n, ypObject **exceptions);
 
