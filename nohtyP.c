@@ -15367,7 +15367,7 @@ static void _ypSet_movekey(
 
 // Steals key and adds it to the *clean* hash table. Only use if the key is known to be absent
 // from the table, and the table contains no deleted entries; this is usually known when
-// cleaning/resizing/copying a table. Sets *loc to the location at which the key was inserted.
+// cleaning/resizing/copying a table. Sets *ep to the location at which the key was inserted.
 // Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
 static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep)
@@ -16593,7 +16593,6 @@ static ypObject *yp_set_getintern(ypObject *set, ypObject *x)
 
 // Constructors
 
-// TODO using ypQuickIter here could merge with _ypSet, removing one of its incref/decrefs
 static ypObject *_ypSetNV(int type, int n, va_list args)
 {
     yp_ssize_t spaceleft;
@@ -16640,53 +16639,66 @@ ypObject *yp_setNV(int n, va_list args)
 }
 
 // XXX Check for the "fellow frozenset/set" case _before_ calling this function
-static ypObject *_ypSet(int type, ypObject *iterable)
+static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
 {
-    ypObject   *exc = yp_None;
-    ypObject   *newSo;
-    ypObject   *result;
-    yp_ssize_t  length_hint;
-    yp_uint64_t mi_state;
-    ypObject   *mi;
+    ypObject       *exc = yp_None;
+    yp_uint64_t     mi_state;
+    ypObject       *mi;
+    ypObject       *first;
+    yp_hash_t       first_hash;
+    yp_ssize_t      length_hint;
+    ypObject       *newSo;
+    ypSet_KeyEntry *loc;
+    ypObject       *result;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(iterable) != ypFrozenSet_CODE);
 
-    length_hint = yp_lenC(iterable, &exc);
-    if (yp_isexceptionC(exc)) {
-        // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
-        // FIXME A separate, saner maximum for length hints, everywhere?
-        if (length_hint > ypSet_LEN_MAX) length_hint = ypSet_LEN_MAX;
-    } else if (length_hint < 1) {
-        // yp_lenC reports an empty iterable, so we can shortcut _ypSet_update
-        if (type == ypFrozenSet_CODE) return yp_frozenset_empty;
-        return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
-    } else if (length_hint > ypSet_LEN_MAX) {
-        // yp_lenC reports that we don't have room to add their elements
-        // FIXME _ypSet_new already handles this case
-        return yp_MemorySizeOverflowError;
-    }
-
-    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
-    if (yp_isexceptionC(newSo)) return newSo;
-
     mi = yp_miniiter(iterable, &mi_state);  // new ref
-    if (yp_isexceptionC(mi)) {
-        yp_decref(newSo);
-        return mi;
+    if (yp_isexceptionC(mi)) return mi;
+
+    // FIXME Use a similar "empty iterable" optimization everywhere.
+    first = yp_miniiter_next(mi, &mi_state);  // new ref
+    if (yp_isexceptionC(first)) {
+        yp_decref(mi);
+        if (yp_isexceptionC2(first, yp_StopIteration)) {
+            if (type == ypFrozenSet_CODE) return yp_frozenset_empty;
+            return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
+        }
+        return first;
     }
+
+    first_hash = yp_hashC(first, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(first);
+        yp_decref(mi);
+        return exc;
+    }
+
+    // Ignore errors determining length_hint; it just means we can't pre-allocate
+    length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc) + 1;  // +1 for first.
+    exc = yp_None;
+    // FIXME A separate, saner maximum for length hints, everywhere? Could be a function that also
+    // ignores errors.
+    if (length_hint > ypSet_LEN_MAX) length_hint = ypSet_LEN_MAX;
+
+    // FIXME I'm creating the type directly here, rather than freezing. Do above as well!
+    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
+    if (yp_isexceptionC(newSo)) {
+        yp_decref(first);
+        yp_decref(mi);
+        return newSo;
+    }
+
+    // Add the first element to the set. We can use _ypSet_movekey_clean only because we know that
+    // first is not already in newSo.
+    _ypSet_movekey_clean(newSo, first, first_hash, &loc);  // steals first
+
+    // Add the remaining elements to the set.
     result = _ypSet_update_fromiter(newSo, mi, &mi_state);
     yp_decref(mi);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
-    }
-
-    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
-    // before allocating; is this complication worth the optimization?
-    if (type == ypFrozenSet_CODE && ypSet_LEN(newSo) < 1) {
-        yp_decref(newSo);
-        return yp_frozenset_empty;
     }
 
     return newSo;
@@ -16699,7 +16711,7 @@ ypObject *yp_frozenset(ypObject *iterable)
         if (ypObject_TYPE_CODE(iterable) == ypFrozenSet_CODE) return yp_incref(iterable);
         return _ypSet_copy(ypFrozenSet_CODE, iterable);
     }
-    return _ypSet(ypFrozenSet_CODE, iterable);
+    return _ypSet_fromiterable(ypFrozenSet_CODE, iterable);
 }
 
 ypObject *yp_set(ypObject *iterable)
@@ -16707,7 +16719,7 @@ ypObject *yp_set(ypObject *iterable)
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
         return _ypSet_copy(ypSet_CODE, iterable);
     }
-    return _ypSet(ypSet_CODE, iterable);
+    return _ypSet_fromiterable(ypSet_CODE, iterable);
 }
 
 #pragma endregion set
