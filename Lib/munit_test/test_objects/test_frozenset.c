@@ -29,7 +29,7 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
 
     // Basic newN.
     {
-        ypObject *so = any_newN(2, items[0], items[1]);
+        ypObject *so = any_newN(N(items[0], items[1]));
         assert_type_is(so, type->type);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
@@ -53,7 +53,7 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
 
     // Duplicate arguments.
     {
-        ypObject *so = any_newN(3, items[0], items[0], items[1], items[1]);
+        ypObject *so = any_newN(N(items[0], items[0], items[1], items[1]));
         assert_type_is(so, type->type);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
@@ -62,8 +62,9 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
     // Unhashable argument.
     {
         ypObject *unhashable = rand_obj_any_mutable();
-        assert_raises(any_newN(1, unhashable), yp_TypeError);
-        assert_raises(any_newN(3, items[0], items[1], unhashable), yp_TypeError);
+        assert_raises(any_newN(N(unhashable)), yp_TypeError);
+        assert_raises(any_newN(N(items[0], unhashable)), yp_TypeError);
+        assert_raises(any_newN(N(items[0], items[1], unhashable), yp_TypeError));
         yp_decrefN(N(unhashable));
     }
 
@@ -121,9 +122,12 @@ static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
             ypObject *unhashable = rand_obj_any_mutable();
-            ypObject *x = (*x_type)->newN(N(unhashable));
-            assert_raises(any_new(x), yp_TypeError);
-            yp_decrefN(N(unhashable, x));
+            ead(x, (*x_type)->newN(N(unhashable)), assert_raises(any_new(x), yp_TypeError));
+            ead(x, (*x_type)->newN(N(items[0], unhashable)),
+                    assert_raises(any_new(x), yp_TypeError));
+            ead(x, (*x_type)->newN(N(items[0], items[1], unhashable)),
+                    assert_raises(any_new(x), yp_TypeError));
+            yp_decrefN(N(unhashable));
         }
     }
 
@@ -149,49 +153,9 @@ static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject
         }
     }
 
-    // x is an iterator that fails at the start.
-    {
-        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(any_new(x), yp_SyntaxError);
-        yp_decrefN(N(x_supplier, x));
-    }
-
-    // x is an iterator that fails mid-way.
-    {
-        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(any_new(x), yp_SyntaxError);
-        yp_decrefN(N(x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        ypObject *so = any_new(x);
-        assert_set(so, items[0], items[1]);
-        yp_decrefN(N(x_supplier, x, so));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        ypObject *so = any_new(x);
-        assert_set(so, items[0], items[1]);
-        yp_decrefN(N(x_supplier, x, so));
-    }
-
-    // x is an iterator with the maximum length_hint.
-    // FIXME Similar tests everywhere new_faulty_iter is used. (Consolidate into a single function?)
-    // {
-    //     ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
-    //     ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, yp_SSIZE_T_MAX);
-    //     ypObject *so = any_new(x);
-    //     assert_set(so, items[0], items[1]);
-    //     yp_decrefN(N(x_supplier, x));
-    // }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(x, yp_tupleN(N(items[0], items[1])), so, any_new(x),
+            assert_set(so, items[0], items[1]));
 
     // x is not an iterable.
     assert_raises(any_new(int_1), yp_TypeError);

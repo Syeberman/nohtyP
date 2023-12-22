@@ -669,7 +669,7 @@ extern "C" {
                 new_faulty_iter(_ypmt_FLT_ITR_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,     \
                         _ypmt_FLT_ITR_len + 100),                                                  \
                 (name), (expression), (assertion), "hint_large", _ypmt_FLT_ITR_expression_str);    \
-        /* x is an iterator with the maximum length_hint. */                                       \
+        /* x is an iterator with the maximum length_hint. FIXME Enable. */                         \
         /*_faulty_iter_test_succeeds((iter_name),                                                  \
                 new_faulty_iter(_ypmt_FLT_ITR_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,     \
                         yp_SSIZE_T_MAX),                                                           \
