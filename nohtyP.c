@@ -5636,6 +5636,7 @@ static const yp_uint8_t _BitLengthTable[32] = {
 };
 // clang-format on
 
+// XXX Adapted from Python 2.7's bits_in_ulong
 yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc)
 {
     yp_int_t x_abs;
@@ -15048,13 +15049,21 @@ yp_STATIC_ASSERT((_ypMem_ideal_size_DEFAULT - yp_offsetof(ypSetObject, ob_inline
 
 // We don't want the multiplications in _ypSet_space_remaining, _ypSet_calc_alloclen, and
 // _ypSet_resize overflowing, so we impose a separate limit on the max len and alloclen for sets.
-// XXX ypSet_ALLOCLEN_MAX may be larger than the true maximum
-// TODO We could calculate the exact maximum in yp_initialize...
-#define ypSet_ALLOCLEN_MAX                                                                        \
-    ((yp_ssize_t)MIN4(yp_SSIZE_T_MAX / ypSet_RESIZE_AT_NMR, yp_SSIZE_T_MAX / ypSet_RESIZE_AT_DNM, \
-            (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) / yp_sizeof(ypSet_KeyEntry),                \
-            ypObject_LEN_MAX))
-#define ypSet_LEN_MAX ((yp_ssize_t)(ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
+// alloclen must be a power of two.
+#if defined(yp_ARCH_64_BIT)
+#define ypSet_ALLOCLEN_MAX ((yp_ssize_t)0x40000000)
+#else
+#define ypSet_ALLOCLEN_MAX ((yp_ssize_t)0x01000000)
+#endif
+yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= ypObject_LEN_MAX, ypSet_ALLOCLEN_MAX_fits_in_ob_len);
+yp_STATIC_ASSERT(
+        ypSet_ALLOCLEN_MAX <= (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) / yp_sizeof(ypSet_KeyEntry),
+        ypSet_ALLOCLEN_MAX_size_cant_overflow);
+yp_STATIC_ASSERT((ypSet_ALLOCLEN_MAX << 1) >
+                         MIN(ypObject_LEN_MAX, (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) /
+                                                       yp_sizeof(ypSet_KeyEntry)),
+        ypSet_ALLOCLEN_MAX_is_maximal);
+#define ypSet_LEN_MAX ((ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
 
 // A placeholder to replace deleted entries in the hash table
 yp_IMMORTAL_INVALIDATED(ypSet_dummy);
@@ -15068,7 +15077,6 @@ yp_IMMORTAL_INVALIDATED(ypSet_dummy);
 // Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
 // added before the next resize.
 // XXX Adapted from PyDict_SetItem, although our thresholds are slightly different
-// TODO If we make this threshold configurable, the assert should be in yp_initialize
 yp_STATIC_ASSERT(ypSet_RESIZE_AT_NMR <= yp_SSIZE_T_MAX / ypSet_ALLOCLEN_MAX,
         ypSet_space_remaining_cant_overflow);
 static yp_ssize_t _ypSet_space_remaining(ypObject *so)
@@ -15085,12 +15093,16 @@ static yp_ssize_t _ypSet_space_remaining(ypObject *so)
     return retval;
 }
 
-// Returns the alloclen that will fit minused entries, or <1 on error
+// Returns the alloclen that will fit minused entries. Always succeeds. minused cannot be greater
+// than ypSet_LEN_MAX.
 // XXX Adapted from Python's dictresize
-// TODO Can we improve by using some bit-twiddling to get the highest power of 2?
-// TODO If we make this threshold configurable, the assert should be in yp_initialize
-yp_STATIC_ASSERT(
-        ypSet_RESIZE_AT_DNM <= yp_SSIZE_T_MAX / ypSet_LEN_MAX, ypSet_calc_alloclen_cant_overflow);
+// FIXME Python uses optimized  _Py_bit_length or _BitScanReverse64 to find next log2 value... we
+// could use yp_int_bit_lengthC!
+// FIXME Recent Python comment that seems reasonable:
+//      There are no strict guarantee that returned dict can contain minused items without resize.
+//      So we create medium size dict instead of very large dict or MemoryError.
+yp_STATIC_ASSERT(ypSet_RESIZE_AT_DNM <= (yp_SSIZE_T_MAX - 1) / ypSet_LEN_MAX,
+        ypSet_calc_alloclen_cant_overflow);
 static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
 {
     yp_ssize_t minentries;
@@ -15100,16 +15112,15 @@ static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
     yp_ASSERT(minused <= ypSet_LEN_MAX, "minused cannot be greater than max");
 
     // XXX ypSet_calc_alloclen_cant_overflow ensures this can't overflow
-    minentries = ((minused * ypSet_RESIZE_AT_DNM) / ypSet_RESIZE_AT_NMR) + 1;
+    minentries = ((minused * ypSet_RESIZE_AT_DNM + 1) / ypSet_RESIZE_AT_NMR);
+    yp_ASSERT(minentries <= ypSet_ALLOCLEN_MAX, "calculated minentries greater than max");
+
     alloclen = ypSet_ALLOCLEN_MIN;
-    while (alloclen <= minentries && alloclen > 0) {
+    while (alloclen < minentries) {
         alloclen <<= 1;
     }
+    yp_ASSERT(ypSet_ALLOCLEN_MIN <= alloclen <= minentries, "calculated alloclen out of range");
 
-    // TODO If we could trust that ypSet_ALLOCLEN_MAX was the true maximum (ie, a power of 2), then
-    // we could turn this to an assert, or just remove it: ypSet_LEN_MAX would ensure this is never
-    // reached
-    if (alloclen > ypSet_ALLOCLEN_MAX) return -1;
     return alloclen;
 }
 
@@ -15121,7 +15132,6 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
 {
     ypObject  *so;
     yp_ssize_t alloclen = _ypSet_calc_alloclen(minused);
-    if (alloclen < 1) return yp_MemorySizeOverflowError;
     if (alloclen_fixed && type == ypFrozenSet_CODE) {
         // FIXME Dict intentionally creates empty frozensets that are not frozenset_empty. Perhaps
         // it shouldn't? But then again I'm rethinking this whole keyset business...
@@ -15237,7 +15247,6 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
 
     // Always allocate a separate buffer.
     newalloclen = _ypSet_calc_alloclen(minused);
-    if (newalloclen < 1) return yp_MemorySizeOverflowError;
     // XXX ypSet_resize_cant_overflow ensures this can't overflow
     oldkeys = ypMem_REALLOC_CONTAINER_VARIABLE_NEW(
             so, ypSetObject, newalloclen, 0, ypSet_ALLOCLEN_MAX);
