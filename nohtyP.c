@@ -15065,6 +15065,14 @@ yp_STATIC_ASSERT((ypSet_ALLOCLEN_MAX << 1) >
         ypSet_ALLOCLEN_MAX_is_maximal);
 #define ypSet_LEN_MAX ((ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
 
+// When allocating a set from a generic iterable, limit the length of the initial allocation to this
+// amount. Per Python (dict_new_presized): "There are no strict guarantee that returned dict can
+// contain minused items without resize. So we create medium size dict instead of very large dict or
+// MemoryError."
+#define ypSet_FROMITERABLE_LEN_MAX ((yp_ssize_t)0x555555)
+yp_STATIC_ASSERT(
+        ypSet_FROMITERABLE_LEN_MAX <= ypSet_LEN_MAX, ypSet_FROMITERABLE_LEN_MAX_less_than_LEN_MAX);
+
 // A placeholder to replace deleted entries in the hash table
 yp_IMMORTAL_INVALIDATED(ypSet_dummy);
 
@@ -15143,6 +15151,7 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
     }
     if (yp_isexceptionC(so)) return so;
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
+    // FIXME We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, alloclen);
     ypSet_FILL(so) = 0;
     yp_memset(ypSet_TABLE(so), 0, alloclen * yp_sizeof(ypSet_KeyEntry));
@@ -15253,6 +15262,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
     if (oldkeys == NULL) return yp_MemoryError;
     yp_memset(ypSet_TABLE(so), 0, newalloclen * yp_sizeof(ypSet_KeyEntry));
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
+    // FIXME We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, newalloclen);
 
     // Clear the new table.
@@ -16312,6 +16322,7 @@ static ypObject *set_clear(ypObject *so)
 
     // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
+    // FIXME We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, ypSet_ALLOCLEN_MIN);  // we can't make use of the excess anyway
     ypSet_SET_LEN(so, 0);
     ypSet_FILL(so) = 0;
@@ -16665,6 +16676,12 @@ static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
     mi = yp_miniiter(iterable, &mi_state);  // new ref
     if (yp_isexceptionC(mi)) return mi;
 
+    // Ignore errors determining length_hint; it just means we can't pre-allocate
+    // FIXME Make this a common function.
+    length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc);
+    exc = yp_None;
+    if (length_hint > ypSet_FROMITERABLE_LEN_MAX) length_hint = ypSet_FROMITERABLE_LEN_MAX;
+
     // FIXME Use a similar "empty iterable" optimization everywhere.
     first = yp_miniiter_next(mi, &mi_state);  // new ref
     if (yp_isexceptionC(first)) {
@@ -16682,13 +16699,6 @@ static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
         yp_decref(mi);
         return exc;
     }
-
-    // Ignore errors determining length_hint; it just means we can't pre-allocate
-    length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc) + 1;  // +1 for first.
-    exc = yp_None;
-    // FIXME A separate, saner maximum for length hints, everywhere? Could be a function that also
-    // ignores errors.
-    if (length_hint > ypSet_LEN_MAX) length_hint = ypSet_LEN_MAX;
 
     // FIXME I'm creating the type directly here, rather than freezing. Do above as well!
     newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
