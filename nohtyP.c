@@ -840,6 +840,10 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 #error Need to port Py_IS_NAN et al to nohtyP for this platform
 #endif
 
+// Convenient memory location to use for function calls that require a ypObject **exc, but that
+// otherwise ignore any exceptions raised.
+static ypObject *yp_exc_ignored = NULL;
+
 // Prime multiplier used in string and various other hashes
 // XXX Adapted from Python's _PyHASH_MULTIPLIER
 #define _ypHASH_MULTIPLIER 1000003UL /* 0xf4243 */
@@ -2510,6 +2514,7 @@ static ypObject *ypQuickIter_mi_remaining_as_tuple(ypQuickIter_state *state)
 static yp_ssize_t ypQuickIter_mi_length_hint(ypQuickIter_state *state, int *isexact, ypObject **exc)
 {
     if (state->mi.len >= 0) {
+        // FIXME Audit where and how we trust the length: even a trusted length can change!
         *isexact = TRUE;
         return state->mi.len;
     } else {
@@ -7519,12 +7524,11 @@ static ypObject *_ypStringLib_extend_fromiter(ypObject *s, ypObject *mi, yp_uint
 {
     ypObject                  *x;
     ypStringLib_asitemCfunc    asitem = ypStringLib_ASITEM_FUNC(s);
-    ypObject                  *result = yp_None;
+    ypObject                  *result;
     yp_uint32_t                x_asitem;
     const ypStringLib_encinfo *x_enc;
-    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &result);  // zero on error
-    // FIXME This is awkward. result could be an exception here, which is fine because it's ignored.
-    // But then we reuse it below. And it should really be called exc when getting the hint.
+    // Ignore errors. Recall yp_miniiter_length_hintC returns zero on error.
+    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
 
     while (1) {
         x = yp_miniiter_next(mi, mi_state);  // new ref
@@ -10652,7 +10656,7 @@ static ypObject *_ypBytes_fromiterable(int type, ypObject *iterable)
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint: it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > ypBytes_LEN_MAX) length_hint = ypBytes_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut ypStringLib_extend_fromiterable
@@ -11695,7 +11699,7 @@ static ypObject *_ypStr_fromiterable(int type, ypObject *iterable)
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint: it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > ypStr_LEN_MAX) length_hint = ypStr_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut ypStringLib_extend_fromiterable
@@ -12429,7 +12433,7 @@ static ypObject *_ypTuple_new_fromiterable(int type, ypObject *iterable)
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > ypTuple_ALLOCLEN_MAX) length_hint = ypTuple_ALLOCLEN_MAX;
     } else if (length_hint < 1) {
         // FIXME Should we be trusting len this much?
@@ -12611,7 +12615,7 @@ static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > iterable_maxLen) length_hint = iterable_maxLen;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend_fromiterable
@@ -12866,8 +12870,8 @@ static ypObject *list_extend(ypObject *sq, ypObject *iterable)
         if (ypTuple_LEN(iterable) < 1) return yp_None;  // no change
         return _ypTuple_extend_fromtuple(sq, iterable);
     } else {
-        ypObject  *exc = yp_None;
-        yp_ssize_t length_hint = yp_length_hintC(iterable, &exc);
+        // Ignore errors getting length_hint. Recall yp_length_hintC returns zero on error.
+        yp_ssize_t length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         return _ypTuple_extend_fromiterable(sq, length_hint, iterable);
     }
 }
@@ -13532,8 +13536,8 @@ static ypObject *yp_tuple_fromarray(yp_ssize_t n, ypObject *const *array)
 // TODO Again, we could make this public, but I'd rather not.
 static ypObject *yp_tuple_fromminiiter(ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject  *exc = yp_None;
-    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &exc);  // zero on error
+    // Ignore errors getting length_hint. Recall yp_miniiter_length_hintC returns zero on error.
+    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
     return _ypTuple_new_fromminiiter(ypTuple_CODE, length_hint, mi, mi_state);
 }
 
@@ -15661,11 +15665,11 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
 
 static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject  *exc = yp_None;
     ypObject  *key;
     ypObject  *result;
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
-    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &exc);  // zero on error
+    // Ignore errors getting length_hint. Recall yp_miniiter_length_hintC returns zero on error.
+    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
 
     while (1) {
         key = yp_miniiter_next(mi, mi_state);  // new ref
@@ -16677,9 +16681,8 @@ static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
     if (yp_isexceptionC(mi)) return mi;
 
     // Ignore errors determining length_hint; it just means we can't pre-allocate
-    // FIXME Make this a common function.
-    length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc);
-    exc = yp_None;
+    // FIXME Implement a similar "maximum length hint" everywhere.
+    length_hint = yp_miniiter_length_hintC(mi, &mi_state, &yp_exc_ignored);
     if (length_hint > ypSet_FROMITERABLE_LEN_MAX) length_hint = ypSet_FROMITERABLE_LEN_MAX;
 
     // FIXME Use a similar "empty iterable" optimization everywhere.
@@ -17087,12 +17090,12 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
 
 static ypObject *_ypDict_update_fromiter(ypObject *mp, ypObject *itemiter)
 {
-    ypObject  *exc = yp_None;
     ypObject  *result;
     ypObject  *key;
     ypObject  *value;
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
-    yp_ssize_t length_hint = yp_length_hintC(itemiter, &exc);  // zero on error
+    // Ignore errors getting length_hint. Recall yp_length_hintC returns zero on error.
+    yp_ssize_t length_hint = yp_length_hintC(itemiter, &yp_exc_ignored);
 
     while (1) {
         _ypDict_iter_items_next(itemiter, &key, &value);  // new refs: key, value
@@ -17913,7 +17916,7 @@ static ypObject *_ypDict(int type, ypObject *x)
     // We could just check yp_length_hintC if it returned an "is exact length" flag.
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(x, &exc);
+        length_hint = yp_length_hintC(x, &yp_exc_ignored);
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update_fromiterable
@@ -18025,7 +18028,7 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_push
