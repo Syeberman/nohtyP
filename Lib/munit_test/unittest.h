@@ -257,7 +257,7 @@ extern "C" {
         _assert_not_exception(_ypmt_NOT_RAISES_obj, statement_fmt, __VA_ARGS__); \
     } while (0)
 
-#define assert_not_raises(statement) _assert_not_raises(statement, "%s", #statement)
+#define assert_not_raises(statement) _assert_not_raises((statement), "%s", #statement)
 
 // statement is only evaluated once.
 #define _assert_not_raises_exc(statement, statement_fmt, ...)                              \
@@ -278,7 +278,7 @@ extern "C" {
 // assignment. Example:
 //
 //      assert_not_raises_exc(len = yp_lenC(obj, &exc));
-#define assert_not_raises_exc(statement) _assert_not_raises_exc(statement, "%s", #statement)
+#define assert_not_raises_exc(statement) _assert_not_raises_exc((statement), "%s", #statement)
 
 #define _assert_isexception(obj, n, expected, obj_fmt, expected_fmt, ...)                         \
     do {                                                                                          \
@@ -302,13 +302,20 @@ extern "C" {
                 "%s", #obj, #__VA_ARGS__);                                                     \
     } while (0)
 
+// statement is only evaluated once.
+#define _assert_raises(statement, n, expected, statement_fmt, expected_fmt, ...)                \
+    do {                                                                                        \
+        ypObject *_ypmt_RAISES_statement = statement;                                           \
+        _assert_isexception(                                                                    \
+                _ypmt_RAISES_statement, n, expected, statement_fmt, expected_fmt, __VA_ARGS__); \
+    } while (0)
+
 // Asserts that statement evaluates to one of the given exceptions.
-#define assert_raises(statement, ...)                                                            \
-    do {                                                                                         \
-        ypObject *_ypmt_RAISES_statement = (statement);                                          \
-        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                       \
-        _assert_isexception(_ypmt_RAISES_statement, VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, \
-                "%s", "%s", #statement, #__VA_ARGS__);                                           \
+#define assert_raises(statement, ...)                                                        \
+    do {                                                                                     \
+        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                   \
+        _assert_raises((statement), VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, "%s", "%s", \
+                #statement, #__VA_ARGS__);                                                   \
     } while (0)
 
 // statement is only evaluated once.
@@ -332,11 +339,11 @@ extern "C" {
 // exceptions. Statement must include `&exc` for the exception argument. Example:
 //
 //      assert_raises_exc(yp_lenC(obj, &exc), yp_MethodError);
-#define assert_raises_exc(statement, ...)                                                      \
-    do {                                                                                       \
-        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                     \
-        _assert_raises_exc(statement, VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, "%s", "%s", \
-                #statement, #__VA_ARGS__);                                                     \
+#define assert_raises_exc(statement, ...)                                                        \
+    do {                                                                                         \
+        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                       \
+        _assert_raises_exc((statement), VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, "%s", "%s", \
+                #statement, #__VA_ARGS__);                                                       \
     } while (0)
 
 // A version of _assert_typeC that ensures a_statement and b_statement do not throw an exception via
@@ -613,67 +620,93 @@ extern "C" {
     } while (0)
 
 
-#define _faulty_iter_test_raises(                                                \
-        iter_name, iter_expression, expression, test_name, expression_str)       \
-    do {                                                                         \
-        ypObject *iter_name = iter_expression;                                   \
-        ypObject *_ypmt_FLT_ITR_expression = expression;                         \
-        ypObject *_ypmt_FLT_ITR_expected[] = {yp_SyntaxError};                   \
-        _assert_isexception(_ypmt_FLT_ITR_expression, 1, _ypmt_FLT_ITR_expected, \
-                "%s /*" test_name "*/", "yp_SyntaxError", expression_str);       \
-        yp_decref(iter_name);                                                    \
+#define _faulty_iter_test_raises(setup, iter_name, iter_expression, statement, tear_down,         \
+        test_name, exc_suffix, expected, statement_str)                                           \
+    do {                                                                                          \
+        ypObject *iter_name;                                                                      \
+        UNPACK    setup;                                                                          \
+        iter_name = iter_expression;                                                              \
+        _assert_raises##exc_suffix(                                                               \
+                statement, 1, expected, "%s /*" test_name "*/", "yp_SyntaxError", statement_str); \
+        yp_decref(iter_name);                                                                     \
+        UNPACK tear_down;                                                                         \
     } while (0)
 
 // XXX Unfortunately, we don't have a way to inject test_name into the assertion statement.
-#define _faulty_iter_test_succeeds(                                                         \
-        iter_name, iter_expression, name, expression, assertion, test_name, expression_str) \
+#define _faulty_iter_test_succeeds(setup, iter_name, iter_expression, statement, assertion, \
+        tear_down, test_name, exc_suffix, statement_str)                                    \
     do {                                                                                    \
-        ypObject *iter_name = iter_expression;                                              \
-        ypObject *name;                                                                     \
-        _assert_not_raises(name = expression, "%s /*" test_name "*/", expression_str);      \
+        ypObject *iter_name;                                                                \
+        UNPACK    setup;                                                                    \
+        iter_name = iter_expression;                                                        \
+        _assert_not_raises##exc_suffix(statement, "%s /*" test_name "*/", statement_str);   \
         UNPACK assertion;                                                                   \
-        yp_decrefN(N(iter_name, name));                                                     \
+        yp_decref(iter_name);                                                               \
+        UNPACK tear_down;                                                                   \
+    } while (0)
+
+// XXX yp_SyntaxError is chosen as nohtyP.c neither throws nor catches it.
+#define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,     \
+        exc_suffix, statement_str)                                                               \
+    do {                                                                                         \
+        yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(iter_supplier);                        \
+        ypObject  *_ypmt_FLT_ITR_expected[] = {yp_SyntaxError};                                  \
+        assert_ssizeC(_ypmt_FLT_ITR_len, >, 1);                                                  \
+        /* x is an iterator that fails at the start. */                                          \
+        _faulty_iter_test_raises(setup, iter_name,                                               \
+                new_faulty_iter(iter_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len), statement, \
+                tear_down, "fail_start", exc_suffix, _ypmt_FLT_ITR_expected, statement_str);     \
+        /* x is an iterator that fails mid-way. */                                               \
+        _faulty_iter_test_raises(setup, iter_name,                                               \
+                new_faulty_iter(iter_supplier, 1, yp_SyntaxError, _ypmt_FLT_ITR_len), statement, \
+                tear_down, "fail_mid", exc_suffix, _ypmt_FLT_ITR_expected, statement_str);       \
+        /* x is an iterator with a too-small length_hint. */                                     \
+        _faulty_iter_test_succeeds(setup, iter_name,                                             \
+                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, 1),        \
+                statement, assertion, tear_down, "hint_small", exc_suffix, statement_str);       \
+        /* x is an iterator with a too-large length_hint. */                                     \
+        _faulty_iter_test_succeeds(setup, iter_name,                                             \
+                new_faulty_iter(iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,            \
+                        _ypmt_FLT_ITR_len + 100),                                                \
+                statement, assertion, tear_down, "hint_large", exc_suffix, statement_str);       \
+        /* x is an iterator with the maximum length_hint. */                                     \
+        _faulty_iter_test_succeeds(setup, iter_name,                                             \
+                new_faulty_iter(                                                                 \
+                        iter_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, yp_SSIZE_T_MAX),   \
+                statement, assertion, tear_down, "hint_max", exc_suffix, statement_str);         \
     } while (0)
 
 // Executes a series of tests using a "faulty iterator" that either throws an exception during
 // iteration or provides a misleading length hint. The faulty iterator is assigned to iter_name and
 // yields values from iter_supplier, which is evaluated once but iterated over multiple times;
-// iter_supplier must contain at least two entries. The result of expression is set to name;
-// expression is evaluated multiple times, and should reference iter_name. Where expression is
-// expected to succeed, the assertion is executed to validate the results; assertion is evaluated
-// multiples times, and should reference name. To be used like:
+// iter_supplier must contain at least two entries. statement is executed for each test, and should
+// reference iter_name. In tests where statement is expected to succeed, assertion is executed to
+// validate the results. setup is executed before each test, and tear_down after; setup can contain
+// local variable definitions. To be used like:
 //
-//      faulty_iter_tests(x, yp_tupleN(N(items[0], items[1])), so, yp_set(x),
-//              assert_set(so, items[0], items[1]));
-// XXX yp_SyntaxError is chosen as nohtyP.c neither throws nor catches it.
-#define faulty_iter_tests(iter_name, iter_supplier, name, expression, assertion)                   \
+//     faulty_iter_tests(ypObject * so, x, yp_tupleN(N(items[0], items[1])), so = yp_set(x),
+//             assert_set(so, items[0], items[1]), yp_decref(so));
+#define faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down)        \
     do {                                                                                           \
-        ypObject  *_ypmt_FLT_ITR_supplier = (iter_supplier);                                       \
-        yp_ssize_t _ypmt_FLT_ITR_len = yp_lenC_not_raises(_ypmt_FLT_ITR_supplier);                 \
-        char       _ypmt_FLT_ITR_expression_str[] = #expression;                                   \
-        assert_ssizeC(_ypmt_FLT_ITR_len, >, 1);                                                    \
-        /* x is an iterator that fails at the start. */                                            \
-        _faulty_iter_test_raises((iter_name),                                                      \
-                new_faulty_iter(_ypmt_FLT_ITR_supplier, 0, yp_SyntaxError, _ypmt_FLT_ITR_len),     \
-                (expression), "fail_start", _ypmt_FLT_ITR_expression_str);                         \
-        /* x is an iterator that fails mid-way. */                                                 \
-        _faulty_iter_test_raises((iter_name),                                                      \
-                new_faulty_iter(_ypmt_FLT_ITR_supplier, 1, yp_SyntaxError, _ypmt_FLT_ITR_len),     \
-                (expression), "fail_mid", _ypmt_FLT_ITR_expression_str);                           \
-        /* x is an iterator with a too-small length_hint. */                                       \
-        _faulty_iter_test_succeeds((iter_name),                                                    \
-                new_faulty_iter(_ypmt_FLT_ITR_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError, 1), \
-                (name), (expression), (assertion), "hint_small", _ypmt_FLT_ITR_expression_str);    \
-        /* x is an iterator with a too-large length_hint. */                                       \
-        _faulty_iter_test_succeeds((iter_name),                                                    \
-                new_faulty_iter(_ypmt_FLT_ITR_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,     \
-                        _ypmt_FLT_ITR_len + 100),                                                  \
-                (name), (expression), (assertion), "hint_large", _ypmt_FLT_ITR_expression_str);    \
-        /* x is an iterator with the maximum length_hint. FIXME Enable. */                         \
-        /*_faulty_iter_test_succeeds((iter_name),                                                  \
-                new_faulty_iter(_ypmt_FLT_ITR_supplier, _ypmt_FLT_ITR_len + 1, yp_SyntaxError,     \
-                        yp_SSIZE_T_MAX),                                                           \
-                (name), (expression), (assertion), "hint_max", _ypmt_FLT_ITR_expression_str);*/    \
+        ypObject *_ypmt_FLT_ITR_supplier = (iter_supplier);                                        \
+        char      _ypmt_FLT_ITR_statement_str[] = #statement;                                      \
+        _faulty_iter_tests((setup), (iter_name), _ypmt_FLT_ITR_supplier, (statement), (assertion), \
+                (tear_down), , _ypmt_FLT_ITR_statement_str);                                       \
+        yp_decref(_ypmt_FLT_ITR_supplier);                                                         \
+    } while (0)
+
+// A version of faulty_iter_tests supporting statements that take a `ypObject **exc` argument. To be
+// used like:
+//
+//     faulty_iter_tests_exc(ypObject *sq = type->newN(N(items[0], items[1])), x,
+//             type->newN(N(items[2], items[3])), yp_setsliceC6(sq, 0, 2, 1, x, &exc),
+//             assert_sequence(sq, items[2], items[3]), yp_decref(sq));
+#define faulty_iter_tests_exc(setup, iter_name, iter_supplier, statement, assertion, tear_down)    \
+    do {                                                                                           \
+        ypObject *_ypmt_FLT_ITR_supplier = (iter_supplier);                                        \
+        char      _ypmt_FLT_ITR_statement_str[] = #statement;                                      \
+        _faulty_iter_tests((setup), (iter_name), _ypmt_FLT_ITR_supplier, (statement), (assertion), \
+                (tear_down), _exc, _ypmt_FLT_ITR_statement_str);                                   \
         yp_decref(_ypmt_FLT_ITR_supplier);                                                         \
     } while (0)
 

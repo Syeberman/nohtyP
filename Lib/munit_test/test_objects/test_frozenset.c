@@ -154,8 +154,8 @@ static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject
     }
 
     // Iterator exceptions and bad length hints.
-    faulty_iter_tests(x, yp_tupleN(N(items[0], items[1])), so, any_new(x),
-            assert_set(so, items[0], items[1]));
+    faulty_iter_tests(ypObject * so, x, yp_tupleN(N(items[0], items[1])), so = any_new(x),
+            assert_set(so, items[0], items[1]), yp_decref(so));
 
     // x is not an iterable.
     assert_raises(any_new(int_1), yp_TypeError);
