@@ -132,43 +132,11 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
         }
     }
 
-    // x is an iterator that fails at the start.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(yp_concat(sq, x), yp_SyntaxError);
-        yp_decrefN(N(sq, x_supplier, x));
-    }
-
-    // x is an iterator that fails mid-way.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(yp_concat(sq, x), yp_SyntaxError);
-        yp_decrefN(N(sq, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        ypObject *result = yp_concat(sq, x);
-        assert_sequence(result, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(sq, x_supplier, x, result));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        ypObject *result = yp_concat(sq, x);
-        assert_sequence(result, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(sq, x_supplier, x, result));
-    }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(ypObject *sq = type->newN(N(items[0], items[1])); ypObject * result, x,
+                      type->newN(N(items[2], items[3])), result = yp_concat(sq, x),
+                      assert_sequence(result, items[0], items[1], items[2], items[3]),
+                      yp_decrefN(N(sq, result)));
 
     // x is not an iterable.
     {
@@ -1209,45 +1177,30 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
         yp_decrefN(N(sq, x));
     }
 
-    // x is an iterator that fails at the start.
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests_exc(ypObject *sq = type->newN(N(items[0], items[1])), x,
+            type->newN(N(items[2], items[3])), yp_setsliceC6(sq, 0, 2, 1, x, &exc),
+            assert_sequence(sq, items[2], items[3]), yp_decref(sq));
+
+    // sq is not modified if the iterator fails at the start.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
         assert_raises_exc(yp_setsliceC6(sq, 0, 2, 1, x, &exc), yp_SyntaxError);
-        // In setslice, iterators must be converted to sequences _first_, to validate slicelength.
         assert_sequence(sq, items[0], items[1]);
         yp_decrefN(N(sq, x_supplier, x));
     }
 
-    // x is an iterator that fails mid-way.
+    // sq is not modified if the iterator fails mid-way: iterators must be converted to sequences
+    // _first_, as we need to know how much to shift the data when step==1, or to ensure
+    // len(x)==slicelength when step!=1.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_setsliceC6(sq, 0, 2, 1, x, &exc), yp_SyntaxError);
-        // In setslice, iterators must be converted to sequences _first_, to validate slicelength.
         assert_sequence(sq, items[0], items[1]);
-        yp_decrefN(N(sq, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_not_raises_exc(yp_setsliceC6(sq, 0, 2, 1, x, &exc));
-        assert_sequence(sq, items[2], items[3]);
-        yp_decrefN(N(sq, x_supplier, x));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_not_raises_exc(yp_setsliceC6(sq, 0, 2, 1, x, &exc));
-        assert_sequence(sq, items[2], items[3]);
         yp_decrefN(N(sq, x_supplier, x));
     }
 
@@ -1805,7 +1758,12 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(sq, x));
     }
 
-    // x is an iterator that fails at the start.
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests_exc(ypObject *sq = type->newN(N(items[0], items[1])), x,
+            type->newN(N(items[2], items[3])), yp_extend(sq, x, &exc),
+            assert_sequence(sq, items[0], items[1], items[2], items[3]), yp_decref(sq));
+
+    // sq is not modified if the iterator fails at the start.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
@@ -1815,34 +1773,14 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(sq, x_supplier, x));
     }
 
-    // x is an iterator that fails mid-way.
+    // Optimization: we append directly to sq from the iterator. Unfortunately, if the iterator
+    // fails mid-way sq will have already been modified.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = type->newN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_extend(sq, x, &exc), yp_SyntaxError);
-        // In extend, we avoid converting iterator to a sequence by appending directly to sq.
         assert_sequence(sq, items[0], items[1], items[2]);
-        yp_decrefN(N(sq, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_not_raises_exc(yp_extend(sq, x, &exc));
-        assert_sequence(sq, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(sq, x_supplier, x));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *sq = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = type->newN(N(items[2], items[3]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_not_raises_exc(yp_extend(sq, x, &exc));
-        assert_sequence(sq, items[0], items[1], items[2], items[3]);
         yp_decrefN(N(sq, x_supplier, x));
     }
 

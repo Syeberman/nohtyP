@@ -271,41 +271,6 @@ static MunitResult _test_comparisons(fixture_type_t *type, fixture_type_t *x_typ
     return MUNIT_OK;
 }
 
-// XXX Ensure you pick an so and x_supplier that will exhaust the iterator.
-static MunitResult _test_comparisons_faulty_iter(ypObject *(*any_cmp)(ypObject *, ypObject *),
-        ypObject *so, ypObject *x_supplier, ypObject *expected)
-{
-    // x is an iterator that fails at the start.
-    {
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(any_cmp(so, x), yp_SyntaxError);
-        yp_decrefN(N(x));
-    }
-
-    // x is an iterator that fails mid-way.
-    {
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(any_cmp(so, x), yp_SyntaxError);
-        yp_decrefN(N(x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_obj(any_cmp(so, x), is, expected);
-        yp_decrefN(N(x));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_obj(any_cmp(so, x), is, expected);
-        yp_decrefN(N(x));
-    }
-
-    return MUNIT_OK;
-}
-
 static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
@@ -323,13 +288,10 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
         if (test_result != MUNIT_OK) goto tear_down;
     }
 
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[2], items[3]));
-        test_result = _test_comparisons_faulty_iter(yp_isdisjoint, so, x_supplier, yp_True);
-        yp_decrefN(N(so, x_supplier));
-        if (test_result != MUNIT_OK) goto tear_down;
-    }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
+                      yp_tupleN(N(items[2], items[3])), result = yp_isdisjoint(so, x),
+                      assert_obj(result, is, yp_True), yp_decref(so));
 
     // Optimization: early exit if so is empty, even if the iterator will fail.
     {
@@ -375,13 +337,10 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
         if (test_result != MUNIT_OK) goto tear_down;
     }
 
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[2], items[3]));
-        test_result = _test_comparisons_faulty_iter(yp_issubset, so, x_supplier, yp_False);
-        yp_decrefN(N(so, x_supplier));
-        if (test_result != MUNIT_OK) goto tear_down;
-    }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
+                      yp_tupleN(N(items[2], items[3])), result = yp_issubset(so, x),
+                      assert_obj(result, is, yp_False), yp_decref(so));
 
     // Optimization: early exit if so is empty, even if the iterator will fail.
     {
@@ -418,13 +377,10 @@ static MunitResult test_issuperset(const MunitParameter params[], fixture_t *fix
         if (test_result != MUNIT_OK) goto tear_down;
     }
 
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[0], items[1]));
-        test_result = _test_comparisons_faulty_iter(yp_issuperset, so, x_supplier, yp_True);
-        yp_decrefN(N(so, x_supplier));
-        if (test_result != MUNIT_OK) goto tear_down;
-    }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
+                      yp_tupleN(N(items[0], items[1])), result = yp_issuperset(so, x),
+                      assert_obj(result, is, yp_True), yp_decref(so));
 
     // x is not an iterable.
     test_result =
@@ -739,43 +695,10 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(so, result));
     }
 
-    // x is an iterator that fails at the start.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(yp_unionN(so, N(x)), yp_SyntaxError);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator that fails mid-way.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(yp_unionN(so, N(x)), yp_SyntaxError);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        ypObject *result = yp_unionN(so, N(x));
-        assert_set(result, items[0], items[1], items[2]);
-        yp_decrefN(N(so, x_supplier, x, result));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        ypObject *result = yp_unionN(so, N(x));
-        assert_set(result, items[0], items[1], items[2]);
-        yp_decrefN(N(so, x_supplier, x, result));
-    }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
+                      yp_tupleN(N(items[1], items[2])), result = yp_unionN(so, N(x)),
+                      assert_set(result, items[0], items[1], items[2]), yp_decrefN(N(so, result)));
 
     // x is not an iterable.
     {
@@ -920,43 +843,10 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         yp_decrefN(N(so, result));
     }
 
-    // x is an iterator that fails at the start.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(yp_intersectionN(so, N(x)), yp_SyntaxError);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator that fails mid-way.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(yp_intersectionN(so, N(x)), yp_SyntaxError);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        ypObject *result = yp_intersectionN(so, N(x));
-        assert_set(result, items[1]);
-        yp_decrefN(N(so, x_supplier, x, result));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        ypObject *result = yp_intersectionN(so, N(x));
-        assert_set(result, items[1]);
-        yp_decrefN(N(so, x_supplier, x, result));
-    }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
+                      yp_tupleN(N(items[1], items[2])), result = yp_intersectionN(so, N(x)),
+                      assert_set(result, items[1]), yp_decrefN(N(so, result)));
 
     // x is not an iterable.
     {
@@ -1101,43 +991,10 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         yp_decrefN(N(so, result));
     }
 
-    // x is an iterator that fails at the start.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(yp_differenceN(so, N(x)), yp_SyntaxError);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator that fails mid-way.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(yp_differenceN(so, N(x)), yp_SyntaxError);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        ypObject *result = yp_differenceN(so, N(x));
-        assert_set(result, items[0]);
-        yp_decrefN(N(so, x_supplier, x, result));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        ypObject *result = yp_differenceN(so, N(x));
-        assert_set(result, items[0]);
-        yp_decrefN(N(so, x_supplier, x, result));
-    }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
+                      yp_tupleN(N(items[1], items[2])), result = yp_differenceN(so, N(x)),
+                      assert_set(result, items[0]), yp_decrefN(N(so, result)));
 
     // x is not an iterable.
     {
@@ -1253,43 +1110,10 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         }
     }
 
-    // x is an iterator that fails at the start.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
-        assert_raises(yp_symmetric_difference(so, x), yp_SyntaxError);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator that fails mid-way.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
-        assert_raises(yp_symmetric_difference(so, x), yp_SyntaxError);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        ypObject *result = yp_symmetric_difference(so, x);
-        assert_set(result, items[0], items[2]);
-        yp_decrefN(N(so, x_supplier, x, result));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        ypObject *result = yp_symmetric_difference(so, x);
-        assert_set(result, items[0], items[2]);
-        yp_decrefN(N(so, x_supplier, x, result));
-    }
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
+                      yp_tupleN(N(items[1], items[2])), result = yp_symmetric_difference(so, x),
+                      assert_set(result, items[0], items[2]), yp_decrefN(N(so, result)));
 
     // x is not an iterable.
     {
@@ -1428,7 +1252,12 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         }
     }
 
-    // x is an iterator that fails at the start.
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests_exc(ypObject *so = type->newN(N(items[0], items[1])), x,
+            yp_tupleN(N(items[1], items[2])), yp_update(so, x, &exc),
+            assert_set(so, items[0], items[1], items[2]), yp_decref(so));
+
+    // so is not modified if the iterator fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
@@ -1438,33 +1267,13 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(so, x_supplier, x));
     }
 
-    // x is an iterator that fails mid-way.
+    // Optimization: we add directly to so from the iterator. Unfortunately, if the iterator
+    // fails mid-way so may have already been modified.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = yp_tupleN(N(items[2], items[3]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_update(so, x, &exc), yp_SyntaxError);
-        // so is updated after each item yielded.
-        assert_set(so, items[0], items[1], items[2]);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_not_raises_exc(yp_update(so, x, &exc));
-        assert_set(so, items[0], items[1], items[2]);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_not_raises_exc(yp_update(so, x, &exc));
         assert_set(so, items[0], items[1], items[2]);
         yp_decrefN(N(so, x_supplier, x));
     }
@@ -1608,7 +1417,12 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         }
     }
 
-    // x is an iterator that fails at the start.
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests_exc(ypObject *so = type->newN(N(items[0], items[1])), x,
+            yp_tupleN(N(items[1], items[2])), yp_intersection_update(so, x, &exc),
+            assert_set(so, items[1]), yp_decref(so));
+
+    // so is not modified if the iterator fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
@@ -1618,34 +1432,14 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         yp_decrefN(N(so, x_supplier, x));
     }
 
-    // x is an iterator that fails mid-way.
+    // so is not modified if the iterator fails mid-way: intersection_update needs to yield all
+    // items before modifying so.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_intersection_update(so, x, &exc), yp_SyntaxError);
-        // intersection_update needs to yield all items before modifying so.
         assert_set(so, items[0], items[1]);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
-        assert_set(so, items[1]);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_not_raises_exc(yp_intersection_update(so, x, &exc));
-        assert_set(so, items[1]);
         yp_decrefN(N(so, x_supplier, x));
     }
 
@@ -1788,7 +1582,12 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         }
     }
 
-    // x is an iterator that fails at the start.
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests_exc(ypObject *so = type->newN(N(items[0], items[1])), x,
+            yp_tupleN(N(items[1], items[2])), yp_difference_update(so, x, &exc),
+            assert_set(so, items[0]), yp_decref(so));
+
+    // so is not modified if the iterator fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
@@ -1798,33 +1597,13 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         yp_decrefN(N(so, x_supplier, x));
     }
 
-    // x is an iterator that fails mid-way.
+    // Optimization: we discard from so directly from the iterator. Unfortunately, if the iterator
+    // fails mid-way so may have already been modified.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_difference_update(so, x, &exc), yp_SyntaxError);
-        // so is updated after each item yielded.
-        assert_set(so, items[0]);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_not_raises_exc(yp_difference_update(so, x, &exc));
-        assert_set(so, items[0]);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_not_raises_exc(yp_difference_update(so, x, &exc));
         assert_set(so, items[0]);
         yp_decrefN(N(so, x_supplier, x));
     }
@@ -1953,7 +1732,12 @@ static MunitResult test_symmetric_difference_update(
         }
     }
 
-    // x is an iterator that fails at the start.
+    // Iterator exceptions and bad length hints.
+    faulty_iter_tests_exc(ypObject *so = type->newN(N(items[0], items[1])), x,
+            yp_tupleN(N(items[1], items[2])), yp_symmetric_difference_update(so, x, &exc),
+            assert_set(so, items[0], items[2]), yp_decref(so));
+
+    // so is not modified if the iterator fails at the start.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
@@ -1963,34 +1747,14 @@ static MunitResult test_symmetric_difference_update(
         yp_decrefN(N(so, x_supplier, x));
     }
 
-    // x is an iterator that fails mid-way.
+    // so is not modified if the iterator fails mid-way: symmetric_difference_update needs to yield
+    // all items before modifying so.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_SyntaxError);
-        // symmetric_difference_update needs to yield all items before modifying so.
         assert_set(so, items[0], items[1]);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-small length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 1);
-        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
-        assert_set(so, items[0], items[2]);
-        yp_decrefN(N(so, x_supplier, x));
-    }
-
-    // x is an iterator with a too-large length_hint.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x_supplier = yp_tupleN(N(items[1], items[2]));
-        ypObject *x = new_faulty_iter(x_supplier, 3, yp_SyntaxError, 99);
-        assert_not_raises_exc(yp_symmetric_difference_update(so, x, &exc));
-        assert_set(so, items[0], items[2]);
         yp_decrefN(N(so, x_supplier, x));
     }
 
