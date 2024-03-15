@@ -196,7 +196,8 @@ def ApplyGCCOptions(env, version):
         # Disable some warnings
         "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
         "-Wno-pointer-sign",
-        "-Wno-unknown-pragmas",  # FIXME remove here, or add to msvs_common?
+        # GCC before 13.0 didn't recognize `#pragma region`
+        "" if version >= 13.0 else "-Wno-unknown-pragmas",
         # float-conversion warns about passing a double to finite/isnan, unfortunately
         "-Wno-float-conversion",
         # TODO maybe-uninitialized would be good during analyze
