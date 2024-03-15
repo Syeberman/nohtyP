@@ -2334,7 +2334,6 @@ typedef union {
         yp_uint64_t state;      // Mini iterator state
         ypObject   *iter;       // Mini iterator object (owned)
         ypObject   *to_decref;  // Held on behalf of nextX (owned, discarded by nextX/close)
-        yp_ssize_t  len;        // >=0 if length_hint is exact, or use yp_miniiter_length_hint
     } mi;
 } ypQuickIter_state;
 
@@ -2343,6 +2342,7 @@ typedef union {
 typedef struct {
     // Returns a *borrowed* reference to the next yielded value. If the iterator is exhausted,
     // returns NULL. The reference becomes invalid when a new value is yielded or close is called.
+    // XXX Remember: borrowed references can become invalid if the underlying object is changed!
     ypObject *(*nextX)(ypQuickIter_state *state);
 
     // Similar to nextX, but returns a new reference (that will remain valid until decref'ed).
@@ -2352,13 +2352,9 @@ typedef struct {
     // empty tuple if the iterator is exhausted. Exhausts the iterator, even on error.
     ypObject *(*remaining_as_tuple)(ypQuickIter_state *state);
 
-    // Returns the number of items left to be yielded. Sets *isexact to true if this is an exact
-    // value, or false if this is an estimate. On error, sets *exc, returns zero, and *isexact is
-    // undefined.
-    // TODO Do like Python, and instead of *isexact accept a default hint that is returned?
-    // There's also the idea of a ypObject_MIN_LENHINT...
-    // FIXME Instead, return an error, take a pointer to the hint.
-    yp_ssize_t (*length_hint)(ypQuickIter_state *state, int *isexact, ypObject **exc);
+    // Sets *hint to the approximate number of items left to be yielded and returns yp_None.
+    // On error, an exception is returned and *hint is undefined.
+    ypObject *(*length_hint)(ypQuickIter_state *state, yp_ssize_t *hint);
 
     // Closes the ypQuickIter. Any further operations on state will be undefined.
     // TODO If any of these close methods raise errors, we'll need to return them
@@ -2387,12 +2383,11 @@ static ypObject *ypQuickIter_var_remaining_as_tuple(ypQuickIter_state *state)
     return result;
 }
 
-static yp_ssize_t ypQuickIter_var_length_hint(
-        ypQuickIter_state *state, int *isexact, ypObject **exc)
+static ypObject *ypQuickIter_var_length_hint(ypQuickIter_state *state, yp_ssize_t *hint)
 {
     yp_ASSERT(state->var.n >= 0, "state->var.n should not be negative");
-    *isexact = TRUE;
-    return state->var.n;
+    *hint = state->var.n;
+    return yp_None;
 }
 
 static void ypQuickIter_var_close(ypQuickIter_state *state) { va_end(state->var.args); }
@@ -2443,13 +2438,12 @@ static ypObject *ypQuickIter_array_remaining_as_tuple(ypQuickIter_state *state)
     return result;
 }
 
-static yp_ssize_t ypQuickIter_array_length_hint(
-        ypQuickIter_state *state, int *isexact, ypObject **exc)
+static ypObject *ypQuickIter_array_length_hint(ypQuickIter_state *state, yp_ssize_t *hint)
 {
     yp_ASSERT(state->array.i >= 0 && state->array.i <= state->array.n,
             "state->array.i should be in range(n+1)");
-    *isexact = TRUE;
-    return state->array.n - state->array.i;
+    *hint = state->array.n - state->array.i;
+    return yp_None;
 }
 
 static void ypQuickIter_array_close(ypQuickIter_state *state) {}
@@ -2490,7 +2484,6 @@ static ypObject *ypQuickIter_mi_next(ypQuickIter_state *state)
     // TODO What if we were to store tp_miniiter_next? (What if miniiter did?)
     ypObject *x = yp_miniiter_next(state->mi.iter, &(state->mi.state));  // new ref
     if (yp_isexceptionC2(x, yp_StopIteration)) return NULL;
-    if (state->mi.len >= 0) state->mi.len -= 1;
     return x;
 }
 
@@ -2511,16 +2504,11 @@ static ypObject *ypQuickIter_mi_remaining_as_tuple(ypQuickIter_state *state)
     return yp_tuple_fromminiiter(state->mi.iter, &(state->mi.state));  // new ref
 }
 
-static yp_ssize_t ypQuickIter_mi_length_hint(ypQuickIter_state *state, int *isexact, ypObject **exc)
+static ypObject *ypQuickIter_mi_length_hint(ypQuickIter_state *state, yp_ssize_t *hint)
 {
-    if (state->mi.len >= 0) {
-        // FIXME Audit where and how we trust the length: even a trusted length can change!
-        *isexact = TRUE;
-        return state->mi.len;
-    } else {
-        *isexact = FALSE;
-        return yp_miniiter_length_hintC(state->mi.iter, &(state->mi.state), exc);
-    }
+    ypObject *exc = yp_None;
+    *hint = yp_miniiter_length_hintC(state->mi.iter, &(state->mi.state), &exc);
+    return exc;
 }
 
 static void ypQuickIter_mi_close(ypQuickIter_state *state)
@@ -2552,14 +2540,11 @@ static ypObject *ypQuickIter_new_fromiterable(
 
     } else {
         // We may eventually special-case other types, but for now treat them as generic iterables
-        ypObject *exc = yp_None;
         ypObject *mi = yp_miniiter(iterable, &(state->mi.state));
         if (yp_isexceptionC(mi)) return mi;
         *methods = &ypQuickIter_mi_methods;
         state->mi.iter = mi;
         state->mi.to_decref = yp_None;
-        state->mi.len = yp_lenC(iterable, &exc);
-        if (yp_isexceptionC(exc)) state->mi.len = -1;  // indicates yp_miniiter_length_hintC
         return yp_None;
     }
 }
@@ -7528,6 +7513,8 @@ static ypObject *_ypStringLib_extend_fromiter(ypObject *s, ypObject *mi, yp_uint
     yp_uint32_t                x_asitem;
     const ypStringLib_encinfo *x_enc;
     // Ignore errors. Recall yp_miniiter_length_hintC returns zero on error.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
 
     while (1) {
@@ -10653,6 +10640,8 @@ static ypObject *_ypBytes_fromiterable(int type, ypObject *iterable)
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypBytes_CODE, "call ypStringLib_copy instead");
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypStr_CODE, "raise yp_TypeError earlier");
 
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint: it just means we can't pre-allocate
@@ -11695,7 +11684,8 @@ static ypObject *_ypStr_fromiterable(int type, ypObject *iterable)
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypStr_CODE, "call ypStringLib_copy instead");
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypBytes_CODE, "raise yp_TypeError earlier");
 
-    // TODO Here and everywhere, rethink this bit of code: how much do we trust yp_lenC?
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint: it just means we can't pre-allocate
@@ -12430,6 +12420,8 @@ static ypObject *_ypTuple_new_fromiterable(int type, ypObject *iterable)
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypTuple_CODE,
             "missed a 'fellow tuple/list' optimization");
 
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
@@ -12612,6 +12604,8 @@ static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
         return _ypTuple_new_fromiterable(sq_type, iterable);
     }
 
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
@@ -12871,6 +12865,8 @@ static ypObject *list_extend(ypObject *sq, ypObject *iterable)
         return _ypTuple_extend_fromtuple(sq, iterable);
     } else {
         // Ignore errors getting length_hint. Recall yp_length_hintC returns zero on error.
+        // FIXME How does this handle excessively-large length hints?
+        // FIXME Rewrite similarly to _ypSet_fromiterable?
         yp_ssize_t length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         return _ypTuple_extend_fromiterable(sq, length_hint, iterable);
     }
@@ -13377,13 +13373,12 @@ static ypObject *ypQuickIter_tuple_remaining_as_tuple(ypQuickIter_state *state)
     }
 }
 
-static yp_ssize_t ypQuickIter_tuple_length_hint(
-        ypQuickIter_state *state, int *isexact, ypObject **exc)
+static ypObject *ypQuickIter_tuple_length_hint(ypQuickIter_state *state, yp_ssize_t *hint)
 {
     yp_ASSERT(state->tuple.i >= 0 && state->tuple.i <= ypTuple_LEN(state->tuple.obj),
             "state->tuple.i should be in range(len+1)");
-    *isexact = TRUE;
-    return ypTuple_LEN(state->tuple.obj) - state->tuple.i;
+    *hint = ypTuple_LEN(state->tuple.obj) - state->tuple.i;
+    return yp_None;
 }
 
 static void ypQuickIter_tuple_close(ypQuickIter_state *state)
@@ -13537,6 +13532,8 @@ static ypObject *yp_tuple_fromarray(yp_ssize_t n, ypObject *const *array)
 static ypObject *yp_tuple_fromminiiter(ypObject *mi, yp_uint64_t *mi_state)
 {
     // Ignore errors getting length_hint. Recall yp_miniiter_length_hintC returns zero on error.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
     return _ypTuple_new_fromminiiter(ypTuple_CODE, length_hint, mi, mi_state);
 }
@@ -15129,9 +15126,10 @@ static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
 
     alloclen = ypSet_ALLOCLEN_MIN;
     while (alloclen < minentries) {
-        alloclen <<= 1;
+        alloclen <<= 1u;
     }
-    yp_ASSERT(ypSet_ALLOCLEN_MIN <= alloclen <= minentries, "calculated alloclen out of range");
+    yp_ASSERT(ypSet_ALLOCLEN_MIN <= alloclen && minentries <= alloclen,
+            "calculated alloclen out of range");
 
     return alloclen;
 }
@@ -15669,6 +15667,8 @@ static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t 
     ypObject  *result;
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
     // Ignore errors getting length_hint. Recall yp_miniiter_length_hintC returns zero on error.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
 
     while (1) {
@@ -17095,6 +17095,8 @@ static ypObject *_ypDict_update_fromiter(ypObject *mp, ypObject *itemiter)
     ypObject  *value;
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
     // Ignore errors getting length_hint. Recall yp_length_hintC returns zero on error.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     yp_ssize_t length_hint = yp_length_hintC(itemiter, &yp_exc_ignored);
 
     while (1) {
@@ -17913,7 +17915,8 @@ static ypObject *_ypDict(int type, ypObject *x)
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
 
-    // We could just check yp_length_hintC if it returned an "is exact length" flag.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(x, &yp_exc_ignored);
@@ -18025,6 +18028,8 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     ypObject   *key;
     yp_ssize_t  length_hint;
 
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
