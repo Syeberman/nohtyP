@@ -15052,15 +15052,16 @@ yp_STATIC_ASSERT((_ypMem_ideal_size_DEFAULT - yp_offsetof(ypSetObject, ob_inline
 // _ypSet_resize overflowing, so we impose a separate limit on the max len and alloclen for sets.
 // alloclen must be a power of two.
 #if defined(yp_ARCH_64_BIT)
-#define ypSet_ALLOCLEN_MAX ((yp_ssize_t)0x40000000)
+#define ypSet_ALLOCLEN_MAX ((yp_ssize_t)0x40000000LL)
 #else
-#define ypSet_ALLOCLEN_MAX ((yp_ssize_t)0x01000000)
+#define ypSet_ALLOCLEN_MAX ((yp_ssize_t)0x08000000)
 #endif
 yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= ypObject_LEN_MAX, ypSet_ALLOCLEN_MAX_fits_in_ob_len);
 yp_STATIC_ASSERT(
         ypSet_ALLOCLEN_MAX <= (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) / yp_sizeof(ypSet_KeyEntry),
         ypSet_ALLOCLEN_MAX_size_cant_overflow);
-yp_STATIC_ASSERT((ypSet_ALLOCLEN_MAX << 1) >
+
+yp_STATIC_ASSERT((ypSet_ALLOCLEN_MAX << 1u) >
                          MIN(ypObject_LEN_MAX, (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) /
                                                        yp_sizeof(ypSet_KeyEntry)),
         ypSet_ALLOCLEN_MAX_is_maximal);
@@ -15938,7 +15939,7 @@ typedef struct {
     yp_uint32_t keysleft;
     yp_uint32_t index;
 } ypSetMiState;
-yp_STATIC_ASSERT(ypSet_LEN_MAX <= 0xFFFFFFFFu, len_fits_32_bits);
+yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= 0xFFFFFFFFu, alloclen_fits_32_bits);
 yp_STATIC_ASSERT(yp_sizeof(yp_uint64_t) >= yp_sizeof(ypSetMiState), ypSetMiState_fits_uint64);
 
 static ypObject *frozenset_miniiter(ypObject *so, yp_uint64_t *_state)
