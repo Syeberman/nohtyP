@@ -64,7 +64,7 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
         ypObject *unhashable = rand_obj_any_mutable();
         assert_raises(any_newN(N(unhashable)), yp_TypeError);
         assert_raises(any_newN(N(items[0], unhashable)), yp_TypeError);
-        assert_raises(any_newN(N(items[0], items[1], unhashable), yp_TypeError));
+        assert_raises(any_newN(N(items[0], items[1], unhashable)), yp_TypeError);
         yp_decrefN(N(unhashable));
     }
 

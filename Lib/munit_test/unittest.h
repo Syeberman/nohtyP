@@ -282,6 +282,9 @@ extern "C" {
 
 #define _assert_isexception(obj, n, expected, obj_fmt, expected_fmt, ...)                         \
     do {                                                                                          \
+        if (n < 1) {                                                                              \
+            munit_error("missing expected exception in assertion");                               \
+        }                                                                                         \
         if (!yp_isexceptionC(obj)) {                                                              \
             munit_errorf("assertion failed: yp_isexceptionC(" obj_fmt ") (expected " expected_fmt \
                          ")",                                                                     \
@@ -294,12 +297,13 @@ extern "C" {
     } while (0)
 
 // Asserts that obj is one of the given exceptions.
-#define assert_isexception(obj, ...)                                                           \
-    do {                                                                                       \
-        ypObject *_ypmt_ISEXC_obj = (obj);                                                     \
-        ypObject *_ypmt_ISEXC_expected[] = {__VA_ARGS__};                                      \
-        _assert_isexception(_ypmt_ISEXC_obj, VA_ARGC(__VA_ARGS__), _ypmt_ISEXC_expected, "%s", \
-                "%s", #obj, #__VA_ARGS__);                                                     \
+#define assert_isexception(obj, ...)                                                          \
+    do {                                                                                      \
+        ypObject  *_ypmt_ISEXC_obj = (obj);                                                   \
+        ypObject  *_ypmt_ISEXC_expected[] = {__VA_ARGS__};                                    \
+        yp_ssize_t _ypmt_ISEXC_n = yp_lengthof_array(_ypmt_ISEXC_expected);                   \
+        _assert_isexception(_ypmt_ISEXC_obj, _ypmt_ISEXC_n, _ypmt_ISEXC_expected, "%s", "%s", \
+                #obj, #__VA_ARGS__);                                                          \
     } while (0)
 
 // statement is only evaluated once.
@@ -311,17 +315,21 @@ extern "C" {
     } while (0)
 
 // Asserts that statement evaluates to one of the given exceptions.
-#define assert_raises(statement, ...)                                                        \
-    do {                                                                                     \
-        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                   \
-        _assert_raises((statement), VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, "%s", "%s", \
-                #statement, #__VA_ARGS__);                                                   \
+#define assert_raises(statement, ...)                                                              \
+    do {                                                                                           \
+        ypObject  *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                        \
+        yp_ssize_t _ypmt_RAISES_n = yp_lengthof_array(_ypmt_RAISES_expected);                      \
+        _assert_raises((statement), _ypmt_RAISES_n, _ypmt_RAISES_expected, "%s", "%s", #statement, \
+                #__VA_ARGS__);                                                                     \
     } while (0)
 
 // statement is only evaluated once.
 #define _assert_raises_exc(statement, n, expected, statement_fmt, expected_fmt, ...) \
     do {                                                                             \
         ypObject *exc = yp_None;                                                     \
+        if (n < 1) {                                                                 \
+            munit_error("missing expected exception in assertion");                  \
+        }                                                                            \
         statement;                                                                   \
         if (!yp_isexceptionC(exc)) {                                                 \
             munit_errorf("assertion failed: " statement_fmt                          \
@@ -339,11 +347,12 @@ extern "C" {
 // exceptions. Statement must include `&exc` for the exception argument. Example:
 //
 //      assert_raises_exc(yp_lenC(obj, &exc), yp_MethodError);
-#define assert_raises_exc(statement, ...)                                                        \
-    do {                                                                                         \
-        ypObject *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                       \
-        _assert_raises_exc((statement), VA_ARGC(__VA_ARGS__), _ypmt_RAISES_expected, "%s", "%s", \
-                #statement, #__VA_ARGS__);                                                       \
+#define assert_raises_exc(statement, ...)                                                  \
+    do {                                                                                   \
+        ypObject  *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                \
+        yp_ssize_t _ypmt_RAISES_n = yp_lengthof_array(_ypmt_RAISES_expected);              \
+        _assert_raises_exc((statement), _ypmt_RAISES_n, _ypmt_RAISES_expected, "%s", "%s", \
+                #statement, #__VA_ARGS__);                                                 \
     } while (0)
 
 // A version of _assert_typeC that ensures a_statement and b_statement do not throw an exception via
@@ -601,6 +610,9 @@ extern "C" {
         char      *_ypmt_PTR_ARR_item_strs[] = {STRINGIFY(__VA_ARGS__)};                     \
         yp_ssize_t _ypmt_PTR_ARR_n = yp_lengthof_array(_ypmt_PTR_ARR_items);                 \
         yp_ssize_t _ypmt_PTR_ARR_i;                                                          \
+        if (_ypmt_PTR_ARR_n < 1) {                                                           \
+            munit_error("missing expected items in assertion");                              \
+        }                                                                                    \
         for (_ypmt_PTR_ARR_i = 0; _ypmt_PTR_ARR_i < _ypmt_PTR_ARR_n; _ypmt_PTR_ARR_i++) {    \
             _assert_ptr(_ypmt_PTR_ARR_array[_ypmt_PTR_ARR_i], ==,                            \
                     _ypmt_PTR_ARR_items[_ypmt_PTR_ARR_i], "%s[%" PRIssize "]", "%s", #array, \
