@@ -11,7 +11,7 @@ cache: Build/site_toolsconfig.py
 deploy: off
 
 image:
-  - macOS-Monterey
+  - macOS-Sonoma
   # TODO Support Visual Studio 2022 (msvs_170:win32)
   # - Visual Studio 2022
   - Visual Studio 2019
@@ -31,7 +31,7 @@ configuration:
 matrix:
   exclude:
     # TODO Are there any 32-bit compilers on the macOS images?
-    - image: macOS-Monterey
+    - image: macOS-Sonoma
       platform: x86
     # TODO Are there any 32-bit compilers on the Ubuntu images?
     - image: Ubuntu2004
@@ -39,13 +39,13 @@ matrix:
     - image: Ubuntu1604
       platform: x86
 
-# Ideally, each compiler is listed once, against the most-recent image that includes it.
+# Ideally, each target is listed once, against the most-recent image that includes it.
 for:
   - matrix:
       only:
-        - image: macOS-Monterey
+        - image: macOS-Sonoma
     environment:
-       YP_COMPILER_OSES: gcc_8:darwin gcc_7:darwin gcc_6:darwin
+       YP_COMPILER_OSES: gcc_12:darwin gcc_11:darwin gcc_10:darwin
   - matrix:
       only:
         - image: Visual Studio 2022
