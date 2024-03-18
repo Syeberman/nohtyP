@@ -5,7 +5,7 @@ cloned off this root.
 import os
 import platform
 
-from SCons.Defaults import DefaultEnvironment
+from SCons.Defaults import DefaultEnvironment, __libversionflags
 from SCons.Subst import SetAllowableExceptions
 from SCons.Variables import Variables
 from tools_config import ToolsConfig
@@ -17,6 +17,17 @@ _mscommonLog_path = "Build/.mscommon.log"
 with open(_mscommonLog_path, "w"):
     pass  # clears the file
 os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath(_mscommonLog_path)
+
+
+# FIXME Report this back to SCons
+def adjusted_libversionflags(*args, **kwargs):
+    """__libversionflags sometimes returns None, which is treated as an unknown variable, which then causes a build
+    failure as we disallow unknown variables below. Convert None to '' to bypass this.
+    """
+    result = __libversionflags(*args, **kwargs)
+    if result is None:
+        return ''
+    return result
 
 
 def MakeRootEnv():
@@ -35,6 +46,7 @@ def MakeRootEnv():
     # empty.
     SetAllowableExceptions()
     RootEnv.Replace(
+        __libversionflags=adjusted_libversionflags,
         __RPATH=[],
         _FRAMEWORKPATH="",
         _RPATH=[],
