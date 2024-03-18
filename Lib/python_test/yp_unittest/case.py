@@ -1,4 +1,4 @@
-"""yp_unittest\case.py - Wraps Python's unittest to ensure we're actually testing nohtyP
+"""yp_unittest/case.py - Wraps Python's unittest to ensure we're actually testing nohtyP
 
 Sye van der Veen
 November 5, 2013

@@ -376,7 +376,7 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         if not env.WhereIs("$CC"):
             raise SCons.Errors.StopError(f"{gcc_name_arch} configuration failed")
 
-        def check_version(env, output):
+        def check_version(env, output, unique=True):
             output = output.strip()
             if re_version.fullmatch(output) is None:
                 raise SCons.Errors.StopError(

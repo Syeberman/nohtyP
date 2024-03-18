@@ -109,7 +109,7 @@ class ToolFinder:
 
         win_dirs
             List of Windows path globs to search for executables. Each glob is prepended with
-            'C:\Program Files', 'C:\Program Files (x86)', 'C:\', and similar for detected fixed
+            'C:\\Program Files', 'C:\\Program Files (x86)', 'C:\\', and similar for detected fixed
             drives.
         posix_dirs
             List of Unix/Linux/BSD path globs to search for executables. Each glob should be an
