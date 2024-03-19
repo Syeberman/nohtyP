@@ -26,7 +26,7 @@ def adjusted_libversionflags(*args, **kwargs):
     """
     result = __libversionflags(*args, **kwargs)
     if result is None:
-        return ''
+        return ""
     return result
 
 

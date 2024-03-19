@@ -182,11 +182,14 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
 
     def generate(env):
         if env["TARGET_OS"] != "win32":
-            raise SCons.Errors.StopError("Visual Studio doesn't build for OS %r" % env["TARGET_OS"])
+            raise SCons.Errors.StopError(
+                "Visual Studio doesn't build for OS %r" % env["TARGET_OS"]
+            )
         # TARGET_ARCH is verified by vcvars*.bat
         if env["CONFIGURATION"] not in ("release", "debug"):
             raise SCons.Errors.StopError(
-                "Visual Studio doesn't support the %r configuration (yet)" % env["CONFIGURATION"]
+                "Visual Studio doesn't support the %r configuration (yet)"
+                % env["CONFIGURATION"]
             )
 
         # Caching INCLUDE, LIB, etc in site_toolsconfig.py bypasses the slow vcvars*.bat calls on
@@ -237,6 +240,10 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         _msvsTool.generate(env)
         _msvcTool.generate(env)
         _mslinkTool.generate(env)
+        # mslink sets _MANIFEST_SOURCES to None, which is treated as an unknown variable.
+        # FIXME Report this back to SCons
+        if env["_MANIFEST_SOURCES"] is None:
+            env["_MANIFEST_SOURCES"] = ""
         msvs_preprocessed.generate_PreprocessedBuilder(env)
         if not env.WhereIs("$CC"):
             toolsConfig.update({compilerEnv_name: None})
