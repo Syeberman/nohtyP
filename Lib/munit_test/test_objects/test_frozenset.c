@@ -372,12 +372,30 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     // Corrupted states.
     {
         yp_uint64_t mi_state;
+        yp_ssize_t  length_hint;
         ypObject   *x = type->newN(N(items[0], items[1]));
         ypObject   *mi = yp_miniiter(x, &mi_state);
 
+        mi_state = (yp_uint64_t)0;
+        assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
+
         mi_state = (yp_uint64_t)-1;
-        ead(next, yp_miniiter_next(mi, &mi_state), assert_raises(next, yp_StopIteration));
-        // FIXME Test this state with the other miniiter functions; recall state may be modified!
+        assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
+
+        mi_state = (yp_uint64_t)0xFF0000000FF00000LL;
+        assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
+
+        mi_state = (yp_uint64_t)0;
+        assert_not_raises_exc(length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc));
+        assert_ssizeC(length_hint, ==, 0);
+
+        mi_state = (yp_uint64_t)-1;
+        assert_not_raises_exc(length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc));
+        assert_ssizeC(length_hint, ==, 0);
+
+        mi_state = (yp_uint64_t)0xFF0000000FF00000LL;
+        assert_not_raises_exc(length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc));
+        assert_ssizeC(length_hint, ==, 0);
 
         yp_decrefN(N(x, mi));
     }

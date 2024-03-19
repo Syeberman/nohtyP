@@ -15950,14 +15950,25 @@ static ypObject *frozenset_miniiter(ypObject *so, yp_uint64_t *_state)
     return yp_incref(so);
 }
 
-// XXX We need to be a little suspicious of _state...just in case the caller has changed it
+// XXX We need to be a little suspicious of state, just in case the caller has changed it, so
+// treat everything out of bounds as "iterator exhausted".
+static yp_uint32_t _frozenset_miniiter_adjusted_keysleft(ypObject *so, ypSetMiState *state)
+{
+    yp_ssize_t index = (yp_ssize_t)state->index;
+    if (state->keysleft < 1 || index < 0 || index >= ypSet_ALLOCLEN(so)) {
+        return 0;
+    }
+    return state->keysleft;
+}
+
 static ypObject *frozenset_miniiter_next(ypObject *so, yp_uint64_t *_state)
 {
     ypSetMiState   *state = (ypSetMiState *)_state;
+    yp_uint32_t     keysleft = _frozenset_miniiter_adjusted_keysleft(so, state);
     yp_ssize_t      index = (yp_ssize_t)state->index;  // don't forget to write it back
     ypSet_KeyEntry *loc;
 
-    if (state->keysleft < 1 || index < 0) return yp_StopIteration;
+    if (keysleft < 1) return yp_StopIteration;
 
     // Find the next entry.
     while (1) {
@@ -15972,14 +15983,14 @@ static ypObject *frozenset_miniiter_next(ypObject *so, yp_uint64_t *_state)
 
     // Update state and return the key.
     state->index = (yp_uint32_t)(index + 1);
-    state->keysleft -= 1;
+    state->keysleft = keysleft - 1;
     return yp_incref(loc->se_key);
 }
 
 static ypObject *frozenset_miniiter_length_hint(
-        ypObject *so, yp_uint64_t *state, yp_ssize_t *length_hint)
+        ypObject *so, yp_uint64_t *_state, yp_ssize_t *length_hint)
 {
-    *length_hint = (yp_ssize_t)((ypSetMiState *)state)->keysleft;
+    *length_hint = (yp_ssize_t)_frozenset_miniiter_adjusted_keysleft(so, (ypSetMiState *)_state);
     return yp_None;
 }
 
