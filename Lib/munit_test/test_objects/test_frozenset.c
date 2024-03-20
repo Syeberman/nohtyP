@@ -373,31 +373,38 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     {
         yp_uint64_t mi_state;
         yp_ssize_t  length_hint;
-        ypObject   *x = type->newN(N(items[0], items[1]));
-        ypObject   *mi = yp_miniiter(x, &mi_state);
+        yp_ssize_t  i;
+        yp_uint64_t bad_states[] = {0uLL, (yp_uint64_t)-1, 0x000000FF000000FFuLL};
+        ypObject   *so = type->newN(N(items[0], items[1]));
+        ypObject   *mi = yp_miniiter(so, &mi_state);
 
-        mi_state = (yp_uint64_t)0;
+        for (i = 0; i < yp_lengthof_array(bad_states); i++) {
+            mi_state = bad_states[i];
+            assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
+            munit_assert_uint64(mi_state, ==, bad_states[i]);  // unchanged
+
+            assert_not_raises_exc(length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc));
+            assert_ssizeC(length_hint, ==, 0);
+            munit_assert_uint64(mi_state, ==, bad_states[i]);  // unchanged
+        }
+
+        yp_decrefN(N(so, mi));
+    }
+
+    // Trigger the `index >= ypSet_ALLOCLEN(so)` case in the loop of *_next. keysleft usually
+    // terminates iteration, but if keysleft is corrupted, or if an entry is removed from so, then
+    // we need to ensure we stop at alloclen.
+    {
+        yp_uint64_t mi_state;
+        ypObject   *so = type->newN(0);
+        ypObject   *mi = yp_miniiter(so, &mi_state);
+        munit_assert_uint64(mi_state, ==, 0uLL);
+
+        mi_state = 0x0000000000000001uLL;  // index=0, keysleft=1
         assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
+        munit_assert_uint64(mi_state, ==, 0uLL);  // keysleft set to zero to exhaust the iterator
 
-        mi_state = (yp_uint64_t)-1;
-        assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
-
-        mi_state = (yp_uint64_t)0xFF0000000FF00000LL;
-        assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
-
-        mi_state = (yp_uint64_t)0;
-        assert_not_raises_exc(length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc));
-        assert_ssizeC(length_hint, ==, 0);
-
-        mi_state = (yp_uint64_t)-1;
-        assert_not_raises_exc(length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc));
-        assert_ssizeC(length_hint, ==, 0);
-
-        mi_state = (yp_uint64_t)0xFF0000000FF00000LL;
-        assert_not_raises_exc(length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc));
-        assert_ssizeC(length_hint, ==, 0);
-
-        yp_decrefN(N(x, mi));
+        yp_decrefN(N(so, mi));
     }
 
     obj_array_decref(items);

@@ -15955,9 +15955,7 @@ static ypObject *frozenset_miniiter(ypObject *so, yp_uint64_t *_state)
 static yp_uint32_t _frozenset_miniiter_adjusted_keysleft(ypObject *so, ypSetMiState *state)
 {
     yp_ssize_t index = (yp_ssize_t)state->index;
-    if (state->keysleft < 1 || index < 0 || index >= ypSet_ALLOCLEN(so)) {
-        return 0;
-    }
+    if (index < 0 || index >= ypSet_ALLOCLEN(so)) return 0;
     return state->keysleft;
 }
 
