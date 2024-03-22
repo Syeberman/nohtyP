@@ -17762,6 +17762,7 @@ ypObject *yp_dict(ypObject *x)
     return _ypDict(ypDict_CODE, x);
 }
 
+// TOOD ypQuickIter could consolidate this with _ypDict_fromkeys
 static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list args)
 {
     yp_ssize_t spaceleft;
@@ -17770,7 +17771,7 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
     ypObject  *newMp;
 
     if (n > ypDict_LEN_MAX) return yp_MemorySizeOverflowError;
-    newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);  // new ref
+    newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;
     spaceleft = _ypSet_space_remaining(ypDict_KEYSET(newMp));
 
@@ -17778,10 +17779,11 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
         key = va_arg(args, ypObject *);  // borrowed
         n -= 1;
         result = _ypDict_push(newMp, key, value, 1, &spaceleft, n);
-        if (yp_isexceptionC(result)) {
-            yp_decref(newMp);
-            return result;
-        }
+        if (yp_isexceptionC(result)) break;
+    }
+    if (yp_isexceptionC(result)) {
+        yp_decref(newMp);
+        return result;
     }
     return newMp;
 }
@@ -19805,7 +19807,6 @@ void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
 {
     _yp_REDIRECT_EXC1(set, tp_update, (set, n, args), exc);
 }
-void yp_update(ypObject *set, ypObject *x, ypObject **exc) { yp_updateN(set, exc, 1, x); }
 
 void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...)
 {
@@ -19815,10 +19816,6 @@ void yp_intersection_updateNV(ypObject *set, ypObject **exc, int n, va_list args
 {
     _yp_REDIRECT_EXC2(set, tp_as_set, tp_intersection_update, (set, n, args), exc);
 }
-void yp_intersection_update(ypObject *set, ypObject *x, ypObject **exc)
-{
-    yp_intersection_updateN(set, exc, 1, x);
-}
 
 void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...)
 {
@@ -19827,10 +19824,6 @@ void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...)
 void yp_difference_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
 {
     _yp_REDIRECT_EXC2(set, tp_as_set, tp_difference_update, (set, n, args), exc);
-}
-void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc)
-{
-    yp_difference_updateN(set, exc, 1, x);
 }
 
 void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc)
