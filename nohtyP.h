@@ -173,7 +173,7 @@ typedef double             yp_float64_t;
 typedef ssize_t yp_ssize_t;
 #define yp_SSIZE_T_MAX SSIZE_MAX
 #elif SIZE_MAX == 0xFFFFFFFFu
-typedef yp_int32_t    yp_ssize_t;
+typedef yp_int32_t yp_ssize_t;
 #define yp_SSIZE_T_MAX (0x7FFFFFFF)
 #else
 typedef yp_int64_t yp_ssize_t;
@@ -798,6 +798,11 @@ ypAPI ypObject *yp_issuperset(ypObject *set, ypObject *x);
 // else yp_False.
 ypAPI ypObject *yp_gt(ypObject *set, ypObject *x);
 
+// FIXME yp_unionN/etc are the only vararg functions here that don't take "unpacked" arguments.
+// yp_tupleN takes the items to construct the tuple; yp_unionN should do the same. This is all the
+// more obvious when you compare yp_updateK, which takes the items, to yp_updateN, which takes the
+// iterables.
+
 // Returns a new reference to an object of the same type as set containing all the elements from set
 // and all n objects.
 ypAPI ypObject *yp_unionN(ypObject *set, int n, ...);
@@ -845,10 +850,9 @@ ypAPI void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 // Sets *exc on error.
 ypAPI void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Adds element x to set. Sets *exc on error. While Python calls this method add, yp_add is already
-// used for "a+b", so these two equivalent aliases are provided instead.
+// Adds element x to set. Sets *exc on error. Note that Python calls this method add, however yp_add
+// is already used for "a+b".
 ypAPI void yp_push(ypObject *set, ypObject *x, ypObject **exc);
-ypAPI void yp_set_add(ypObject *set, ypObject *x, ypObject **exc);
 
 // If x is already contained in set, raises yp_KeyError; otherwise, adds x to set. Sets *exc on
 // error.
@@ -857,8 +861,8 @@ ypAPI void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc);
 // Removes element x from set. Raises yp_KeyError if x is not contained in set. Sets *exc on error.
 ypAPI void yp_remove(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes element x from set. Does _not_ raise an exception if x is not contained in set. Sets *exc
-// on error.
+// Removes element x from set if it is present. Does _not_ raise yp_KeyError if x is not contained
+// in set. Sets *exc on error.
 ypAPI void yp_discard(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes an arbitrary item from set and returns a new reference to it. You cannot use the order of
@@ -1663,7 +1667,7 @@ ypAPI ypObject *yp_miniiter_items(ypObject *x, yp_uint64_t *state);
 // When the mini iterator is exhausted yp_StopIteration is raised. On error, both *key and *value
 // are set to the same exception.
 ypAPI void yp_miniiter_items_next(
-        ypObject **mi, yp_uint64_t *state, ypObject **key, ypObject **value);
+        ypObject *mi, yp_uint64_t *state, ypObject **key, ypObject **value);
 
 
 /*

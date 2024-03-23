@@ -97,7 +97,6 @@
 #endif
 
 #if defined(__GNUC__)  // GCC
-#define GCC_VER (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #include <inttypes.h>
 #include <stdint.h>
 #endif
@@ -119,7 +118,11 @@
 //
 // - PRIint: for use with yp_int_t
 // - PRIssize: for use with yp_ssize_t
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && _MSC_VER < 1800
+// Early versions of the Windows CRT did not support lld.
+#define PRIint "I64d"
+#elif defined(_WIN32) && defined(__GNUC__) && __GNUC__ < 10
+// Early versions of the Windows CRT did not support lld.
 #define PRIint "I64d"
 #else
 #define PRIint "lld"
@@ -241,8 +244,10 @@ static void yp_breakonerr(ypObject *err) {
 #endif
 
 // We always perform static asserts: they don't affect runtime
-#if defined(GCC_VER) && GCC_VER >= 40600
+#if defined(__GNUC__) && __GNUC__ >= 5
 #define yp_STATIC_ASSERT(cond, tag) _Static_assert(cond, #tag)
+#elif defined(_MSC_VER) && _MSC_VER >= 1900
+#define yp_STATIC_ASSERT(cond, tag) static_assert(cond, #tag)
 #else
 #define yp_STATIC_ASSERT(cond, tag) typedef char assert_##tag[(cond) ? 1 : -1]
 #endif
@@ -303,8 +308,8 @@ typedef size_t yp_uhash_t;
 // The least-significant bit of the type code specifies if the type is immutable (0) or not
 #define ypObject_TYPE_CODE(ob) (((ypObject *)(ob))->ob_type)
 #define ypObject_SET_TYPE_CODE(ob, type) (ypObject_TYPE_CODE(ob) = (_yp_ob_type_t)(type))
-#define ypObject_TYPE_CODE_IS_MUTABLE(type) ((type)&0x1)
-#define ypObject_TYPE_CODE_AS_FROZEN(type) ((type)&0xFE)
+#define ypObject_TYPE_CODE_IS_MUTABLE(type) ((type) & 0x1)
+#define ypObject_TYPE_CODE_AS_FROZEN(type) ((type) & 0xFE)
 #define ypObject_TYPE(ob) (ypTypeTable[ypObject_TYPE_CODE(ob)])
 #define ypObject_IS_MUTABLE(ob) (ypObject_TYPE_CODE_IS_MUTABLE(ypObject_TYPE_CODE(ob)))
 #define ypObject_REFCNT(ob) (((ypObject *)(ob))->ob_refcnt)
@@ -373,6 +378,7 @@ typedef ypObject *(*traversefunc)(ypObject *, visitfunc, void *);
 typedef ypObject *(*hashvisitfunc)(ypObject *, void *, yp_hash_t *);
 typedef ypObject *(*hashfunc)(ypObject *, hashvisitfunc, void *, yp_hash_t *);
 typedef ypObject *(*miniiterfunc)(ypObject *, yp_uint64_t *);
+typedef ypObject *(*miniiter_items_nextfunc)(ypObject *, yp_uint64_t *, ypObject **, ypObject **);
 typedef ypObject *(*miniiter_length_hintfunc)(ypObject *, yp_uint64_t *, yp_ssize_t *);
 typedef ypObject *(*lenfunc)(ypObject *, yp_ssize_t *);
 typedef ypObject *(*countfunc)(ypObject *, ypObject *, yp_ssize_t, yp_ssize_t, yp_ssize_t *);
@@ -420,21 +426,22 @@ typedef struct {
     objvalistproc tp_intersection_update;
     objvalistproc tp_difference_update;
     objobjproc    tp_symmetric_difference_update;
-    // tp_push (aka tp_set_add) is elsewhere
+    // tp_push is elsewhere
     objobjproc tp_pushunique;
 } ypSetMethods;
 
 typedef struct {
-    miniiterfunc    tp_miniiter_items;
-    objproc         tp_iter_items;
-    miniiterfunc    tp_miniiter_keys;
-    objproc         tp_iter_keys;
-    objobjobjproc   tp_popvalue;
-    objpobjpobjproc tp_popitem;  // on error, return exception, but leave *key/*value
-    objobjobjproc   tp_setdefault;
-    objvalistproc   tp_updateK;
-    miniiterfunc    tp_miniiter_values;
-    objproc         tp_iter_values;
+    miniiterfunc            tp_miniiter_keys;
+    miniiterfunc            tp_miniiter_values;
+    miniiterfunc            tp_miniiter_items;
+    miniiter_items_nextfunc tp_miniiter_items_next;
+    objproc                 tp_iter_keys;
+    objproc                 tp_iter_values;
+    objproc                 tp_iter_items;
+    objobjobjproc           tp_popvalue;
+    objpobjpobjproc         tp_popitem;  // on error, return exception, but leave *key/*value
+    objobjobjproc           tp_setdefault;
+    objvalistproc           tp_updateK;
 } ypMappingMethods;
 
 // FIXME Maybe this isn't "as callable", but defines the callable things associated to this object.
@@ -605,6 +612,7 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
     static ypObject *name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
     static ypObject *name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
     static ypObject *name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
+    static ypObject *name ## _miniiter_items_nextfunc(ypObject *x, yp_uint64_t *state, ypObject **key, ypObject **value) { return retval; } \
     static ypObject *name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *length_hint) { return retval; } \
     static ypObject *name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
     static ypObject *name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
@@ -647,15 +655,16 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
     } }; \
     static ypMappingMethods yp_UNUSED name ## _MappingMethods[1] = { { \
         *name ## _miniiterfunc, \
-        *name ## _objproc, \
         *name ## _miniiterfunc, \
+        *name ## _miniiterfunc, \
+        *name ## _miniiter_items_nextfunc, \
+        *name ## _objproc, \
+        *name ## _objproc, \
         *name ## _objproc, \
         *name ## _objobjobjproc, \
         *name ## _objpobjpobjproc, \
         *name ## _objobjobjproc, \
         *name ## _objvalistproc, \
-        *name ## _miniiterfunc, \
-        *name ## _objproc \
     } }; \
     static ypCallableMethods yp_UNUSED name ## _CallableMethods[1] = { { \
         *name ## _objpobjpobjproc \
@@ -823,13 +832,17 @@ yp_STATIC_ASSERT(yp_sizeof(_yp_uint_t) == yp_sizeof(yp_int_t), sizeof_yp_uint_eq
 #define yp_IS_NAN _isnan
 #define yp_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
 #define yp_IS_FINITE(X) _finite(X)
-#elif defined(GCC_VER)
+#elif defined(__GNUC__)
 #define yp_IS_NAN isnan
 #define yp_IS_INFINITY(X) (!finite(X) && !isnan(X))
 #define yp_IS_FINITE(X) finite(X)
 #else
 #error Need to port Py_IS_NAN et al to nohtyP for this platform
 #endif
+
+// Convenient memory location to use for function calls that require a ypObject **exc, but that
+// otherwise ignore any exceptions raised.
+static ypObject *yp_exc_ignored = NULL;
 
 // Prime multiplier used in string and various other hashes
 // XXX Adapted from Python's _PyHASH_MULTIPLIER
@@ -2321,7 +2334,6 @@ typedef union {
         yp_uint64_t state;      // Mini iterator state
         ypObject   *iter;       // Mini iterator object (owned)
         ypObject   *to_decref;  // Held on behalf of nextX (owned, discarded by nextX/close)
-        yp_ssize_t  len;        // >=0 if length_hint is exact, or use yp_miniiter_length_hint
     } mi;
 } ypQuickIter_state;
 
@@ -2330,6 +2342,7 @@ typedef union {
 typedef struct {
     // Returns a *borrowed* reference to the next yielded value. If the iterator is exhausted,
     // returns NULL. The reference becomes invalid when a new value is yielded or close is called.
+    // XXX Remember: borrowed references can become invalid if the underlying object is changed!
     ypObject *(*nextX)(ypQuickIter_state *state);
 
     // Similar to nextX, but returns a new reference (that will remain valid until decref'ed).
@@ -2339,13 +2352,9 @@ typedef struct {
     // empty tuple if the iterator is exhausted. Exhausts the iterator, even on error.
     ypObject *(*remaining_as_tuple)(ypQuickIter_state *state);
 
-    // Returns the number of items left to be yielded. Sets *isexact to true if this is an exact
-    // value, or false if this is an estimate. On error, sets *exc, returns zero, and *isexact is
-    // undefined.
-    // TODO Do like Python, and instead of *isexact accept a default hint that is returned?
-    // There's also the idea of a ypObject_MIN_LENHINT...
-    // FIXME Instead, return an error, take a pointer to the hint.
-    yp_ssize_t (*length_hint)(ypQuickIter_state *state, int *isexact, ypObject **exc);
+    // Sets *hint to the approximate number of items left to be yielded and returns yp_None.
+    // On error, an exception is returned and *hint is undefined.
+    ypObject *(*length_hint)(ypQuickIter_state *state, yp_ssize_t *hint);
 
     // Closes the ypQuickIter. Any further operations on state will be undefined.
     // TODO If any of these close methods raise errors, we'll need to return them
@@ -2374,12 +2383,11 @@ static ypObject *ypQuickIter_var_remaining_as_tuple(ypQuickIter_state *state)
     return result;
 }
 
-static yp_ssize_t ypQuickIter_var_length_hint(
-        ypQuickIter_state *state, int *isexact, ypObject **exc)
+static ypObject *ypQuickIter_var_length_hint(ypQuickIter_state *state, yp_ssize_t *hint)
 {
     yp_ASSERT(state->var.n >= 0, "state->var.n should not be negative");
-    *isexact = TRUE;
-    return state->var.n;
+    *hint = state->var.n;
+    return yp_None;
 }
 
 static void ypQuickIter_var_close(ypQuickIter_state *state) { va_end(state->var.args); }
@@ -2430,13 +2438,12 @@ static ypObject *ypQuickIter_array_remaining_as_tuple(ypQuickIter_state *state)
     return result;
 }
 
-static yp_ssize_t ypQuickIter_array_length_hint(
-        ypQuickIter_state *state, int *isexact, ypObject **exc)
+static ypObject *ypQuickIter_array_length_hint(ypQuickIter_state *state, yp_ssize_t *hint)
 {
     yp_ASSERT(state->array.i >= 0 && state->array.i <= state->array.n,
             "state->array.i should be in range(n+1)");
-    *isexact = TRUE;
-    return state->array.n - state->array.i;
+    *hint = state->array.n - state->array.i;
+    return yp_None;
 }
 
 static void ypQuickIter_array_close(ypQuickIter_state *state) {}
@@ -2477,7 +2484,6 @@ static ypObject *ypQuickIter_mi_next(ypQuickIter_state *state)
     // TODO What if we were to store tp_miniiter_next? (What if miniiter did?)
     ypObject *x = yp_miniiter_next(state->mi.iter, &(state->mi.state));  // new ref
     if (yp_isexceptionC2(x, yp_StopIteration)) return NULL;
-    if (state->mi.len >= 0) state->mi.len -= 1;
     return x;
 }
 
@@ -2498,15 +2504,11 @@ static ypObject *ypQuickIter_mi_remaining_as_tuple(ypQuickIter_state *state)
     return yp_tuple_fromminiiter(state->mi.iter, &(state->mi.state));  // new ref
 }
 
-static yp_ssize_t ypQuickIter_mi_length_hint(ypQuickIter_state *state, int *isexact, ypObject **exc)
+static ypObject *ypQuickIter_mi_length_hint(ypQuickIter_state *state, yp_ssize_t *hint)
 {
-    if (state->mi.len >= 0) {
-        *isexact = TRUE;
-        return state->mi.len;
-    } else {
-        *isexact = FALSE;
-        return yp_miniiter_length_hintC(state->mi.iter, &(state->mi.state), exc);
-    }
+    ypObject *exc = yp_None;
+    *hint = yp_miniiter_length_hintC(state->mi.iter, &(state->mi.state), &exc);
+    return exc;
 }
 
 static void ypQuickIter_mi_close(ypQuickIter_state *state)
@@ -2538,14 +2540,11 @@ static ypObject *ypQuickIter_new_fromiterable(
 
     } else {
         // We may eventually special-case other types, but for now treat them as generic iterables
-        ypObject *exc = yp_None;
         ypObject *mi = yp_miniiter(iterable, &(state->mi.state));
         if (yp_isexceptionC(mi)) return mi;
         *methods = &ypQuickIter_mi_methods;
         state->mi.iter = mi;
         state->mi.to_decref = yp_None;
-        state->mi.len = yp_lenC(iterable, &exc);
-        if (yp_isexceptionC(exc)) state->mi.len = -1;  // indicates yp_miniiter_length_hintC
         return yp_None;
     }
 }
@@ -3025,12 +3024,12 @@ static ypTypeObject ypIter_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,       // tp_freeze
-        MethodError_objproc,       // tp_unfrozen_copy
-        MethodError_objproc,       // tp_frozen_copy
-        MethodError_traversefunc,  // tp_unfrozen_deepcopy
-        MethodError_traversefunc,  // tp_frozen_deepcopy
-        MethodError_objproc,       // tp_invalidate
+        MethodError_objproc,     // tp_freeze
+        TypeError_objproc,       // tp_unfrozen_copy
+        TypeError_objproc,       // tp_frozen_copy
+        TypeError_traversefunc,  // tp_unfrozen_deepcopy
+        TypeError_traversefunc,  // tp_frozen_deepcopy
+        MethodError_objproc,     // tp_invalidate
 
         // Boolean operations and comparisons
         iter_bool,                   // tp_bool
@@ -3393,7 +3392,7 @@ static ypObject *_yp_freeze(ypObject *x)
     int           oldCode = ypObject_TYPE_CODE(x);
     int           newCode = ypObject_TYPE_CODE_AS_FROZEN(oldCode);
     ypTypeObject *newType;
-    ypObject     *exc = yp_None;
+    ypObject     *result;
 
     // Check if it's already frozen (no-op) or if it can't be frozen (error)
     if (oldCode == newCode) return yp_None;
@@ -3405,10 +3404,10 @@ static ypObject *_yp_freeze(ypObject *x)
     // inspect it after to see if it worked. (Or return yp_NotImplemented.) Perhaps return an
     // exception if the top-level freeze doesn't freeze, but in the case of deep freeze allow deeper
     // objects to silently fail to freeze.
-    exc = newType->tp_freeze(x);
-    if (yp_isexceptionC(exc)) return exc;
-    ypObject_SET_TYPE_CODE(x, newCode);
-    return exc;
+    result = newType->tp_freeze(x);  // FIXME shouldn't oldType control freezing?
+    if (yp_isexceptionC(result)) return result;
+    ypObject_SET_TYPE_CODE(x, newCode);  // FIXME shouldn't tp_freeze control type code?
+    return result;
 }
 
 void yp_freeze(ypObject *x, ypObject **exc)
@@ -4324,8 +4323,8 @@ static ypObject *nonetype_bool(ypObject *n) { return yp_False; }
 static ypObject *nonetype_currenthash(
         ypObject *n, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash)
 {
-    // Since we never contain mutable objects, we can cache our hash
-    *hash = ypObject_CACHED_HASH(yp_None) = yp_HashPointer(yp_None);
+    // Since None is compared by identity, we can cache our hash.
+    *hash = ypObject_CACHED_HASH(n) = yp_HashPointer(n);
     return yp_None;
 }
 
@@ -5627,6 +5626,7 @@ static const yp_uint8_t _BitLengthTable[32] = {
 };
 // clang-format on
 
+// XXX Adapted from Python 2.7's bits_in_ulong
 yp_int_t yp_int_bit_lengthC(ypObject *x, ypObject **exc)
 {
     yp_int_t x_abs;
@@ -6827,7 +6827,7 @@ static void ypStringLib_inplace_upconvert(
         dest_type      *dest = ((dest_type *)_data);                                    \
         const src_type *src = ((src_type *)_data);                                      \
         for (/*len already set*/; len > 0; len--) {                                     \
-            *dest = (dest_type)*src;                                                    \
+            *dest = (dest_type) * src;                                                  \
             yp_ASSERT(*dest == *src, "ypStringLib_inplace_downconvert truncated data"); \
             dest++;                                                                     \
             src++;                                                                      \
@@ -6919,7 +6919,7 @@ static void ypStringLib_elemcopy_maybeupconvert(int dest_sizeshift, void *dest, 
         dest += dest_i;                                                                         \
         src += src_i;                                                                           \
         for (/*slicelength already set*/; slicelength > 0; slicelength--) {                     \
-            *dest = (dest_type)*src;                                                            \
+            *dest = (dest_type) * src;                                                          \
             yp_ASSERT(*dest == *src, "ypStringLib_elemcopy_maybedownconvert truncated data");   \
             dest++;                                                                             \
             src += src_step;                                                                    \
@@ -7509,10 +7509,13 @@ static ypObject *_ypStringLib_extend_fromiter(ypObject *s, ypObject *mi, yp_uint
 {
     ypObject                  *x;
     ypStringLib_asitemCfunc    asitem = ypStringLib_ASITEM_FUNC(s);
-    ypObject                  *result = yp_None;
+    ypObject                  *result;
     yp_uint32_t                x_asitem;
     const ypStringLib_encinfo *x_enc;
-    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &result);  // zero on error
+    // Ignore errors. Recall yp_miniiter_length_hintC returns zero on error.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
+    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
 
     while (1) {
         x = yp_miniiter_next(mi, mi_state);  // new ref
@@ -10637,10 +10640,12 @@ static ypObject *_ypBytes_fromiterable(int type, ypObject *iterable)
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypBytes_CODE, "call ypStringLib_copy instead");
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypStr_CODE, "raise yp_TypeError earlier");
 
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint: it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > ypBytes_LEN_MAX) length_hint = ypBytes_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut ypStringLib_extend_fromiterable
@@ -11679,11 +11684,12 @@ static ypObject *_ypStr_fromiterable(int type, ypObject *iterable)
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypStr_CODE, "call ypStringLib_copy instead");
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypBytes_CODE, "raise yp_TypeError earlier");
 
-    // TODO Here and everywhere, rethink this bit of code: how much do we trust yp_lenC?
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint: it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > ypStr_LEN_MAX) length_hint = ypStr_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut ypStringLib_extend_fromiterable
@@ -12276,7 +12282,7 @@ static ypObject *_ypTuple_deepcopy(int type, ypObject *x, visitfunc copy_visitor
 // factor and n must both be greater than zero. Cannot fail.
 // XXX Handle the "empty" case (factor<1 or n<1) before calling this function
 #define _ypTuple_repeat_memcpy(sq, factor, n) \
-    _ypSequence_repeat_memcpy(ypTuple_ARRAY(sq), (factor), (n)*yp_sizeof(ypObject *))
+    _ypSequence_repeat_memcpy(ypTuple_ARRAY(sq), (factor), (n) * yp_sizeof(ypObject *))
 
 // Called on push/append, extend, or irepeat to increase the allocated size of the tuple. Does not
 // update ypTuple_LEN.
@@ -12297,10 +12303,12 @@ static ypObject *_ypTuple_extend_grow(ypObject *sq, yp_ssize_t required, yp_ssiz
 }
 
 // growhint is the number of additional items, not including x, that are expected to be added to
-// the tuple
+// the tuple.
+// XXX Check for the "push exception" case first.
 static ypObject *_ypTuple_push(ypObject *sq, ypObject *x, yp_ssize_t growhint)
 {
     ypObject *result;
+    yp_ASSERT1(!yp_isexceptionC(x));
     if (ypTuple_LEN(sq) > ypTuple_LEN_MAX - 1) return yp_MemorySizeOverflowError;
     if (ypTuple_ALLOCLEN(sq) < ypTuple_LEN(sq) + 1) {
         result = _ypTuple_extend_grow(sq, ypTuple_LEN(sq) + 1, MAX(growhint, 0));
@@ -12412,10 +12420,12 @@ static ypObject *_ypTuple_new_fromiterable(int type, ypObject *iterable)
     yp_ASSERT(ypObject_TYPE_PAIR_CODE(iterable) != ypTuple_CODE,
             "missed a 'fellow tuple/list' optimization");
 
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > ypTuple_ALLOCLEN_MAX) length_hint = ypTuple_ALLOCLEN_MAX;
     } else if (length_hint < 1) {
         // FIXME Should we be trusting len this much?
@@ -12594,10 +12604,12 @@ static ypObject *tuple_concat(ypObject *sq, ypObject *iterable)
         return _ypTuple_new_fromiterable(sq_type, iterable);
     }
 
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > iterable_maxLen) length_hint = iterable_maxLen;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypTuple_extend_fromiterable
@@ -12852,8 +12864,10 @@ static ypObject *list_extend(ypObject *sq, ypObject *iterable)
         if (ypTuple_LEN(iterable) < 1) return yp_None;  // no change
         return _ypTuple_extend_fromtuple(sq, iterable);
     } else {
-        ypObject  *exc = yp_None;
-        yp_ssize_t length_hint = yp_length_hintC(iterable, &exc);
+        // Ignore errors getting length_hint. Recall yp_length_hintC returns zero on error.
+        // FIXME How does this handle excessively-large length hints?
+        // FIXME Rewrite similarly to _ypSet_fromiterable?
+        yp_ssize_t length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         return _ypTuple_extend_fromiterable(sq, length_hint, iterable);
     }
 }
@@ -13052,6 +13066,7 @@ static ypObject *tuple_len(ypObject *sq, yp_ssize_t *len)
 
 static ypObject *list_push(ypObject *sq, ypObject *x)
 {
+    if (yp_isexceptionC(x)) return x;
     // TODO Overallocate via growhint
     return _ypTuple_push(sq, x, 0);
 }
@@ -13358,13 +13373,12 @@ static ypObject *ypQuickIter_tuple_remaining_as_tuple(ypQuickIter_state *state)
     }
 }
 
-static yp_ssize_t ypQuickIter_tuple_length_hint(
-        ypQuickIter_state *state, int *isexact, ypObject **exc)
+static ypObject *ypQuickIter_tuple_length_hint(ypQuickIter_state *state, yp_ssize_t *hint)
 {
     yp_ASSERT(state->tuple.i >= 0 && state->tuple.i <= ypTuple_LEN(state->tuple.obj),
             "state->tuple.i should be in range(len+1)");
-    *isexact = TRUE;
-    return ypTuple_LEN(state->tuple.obj) - state->tuple.i;
+    *hint = ypTuple_LEN(state->tuple.obj) - state->tuple.i;
+    return yp_None;
 }
 
 static void ypQuickIter_tuple_close(ypQuickIter_state *state)
@@ -13517,8 +13531,10 @@ static ypObject *yp_tuple_fromarray(yp_ssize_t n, ypObject *const *array)
 // TODO Again, we could make this public, but I'd rather not.
 static ypObject *yp_tuple_fromminiiter(ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject  *exc = yp_None;
-    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &exc);  // zero on error
+    // Ignore errors getting length_hint. Recall yp_miniiter_length_hintC returns zero on error.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
+    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
     return _ypTuple_new_fromminiiter(ypTuple_CODE, length_hint, mi, mi_state);
 }
 
@@ -15010,8 +15026,6 @@ keyfunc_fail:
 // XXX Much of this set/dict implementation is pulled right from Python, so best to read the
 // original source for documentation on this implementation
 
-// TODO Many set operations allocate temporary objects on the heap; is there a way to avoid this?
-
 #define ypSet_TABLE(so) ((ypSet_KeyEntry *)((ypObject *)so)->ob_data)
 #define ypSet_SET_TABLE(so, value) (((ypObject *)so)->ob_data = (void *)(value))
 #define ypSet_LEN ypObject_CACHED_LEN
@@ -15035,15 +15049,31 @@ yp_STATIC_ASSERT((_ypMem_ideal_size_DEFAULT - yp_offsetof(ypSetObject, ob_inline
 #define ypSet_RESIZE_AT_DNM (3)  // denominator
 
 // We don't want the multiplications in _ypSet_space_remaining, _ypSet_calc_alloclen, and
-// _ypSet_resize overflowing, so we impose a separate limit on the maximum len and alloclen for
-// sets
-// XXX ypSet_ALLOCLEN_MAX may be larger than the true maximum
-// TODO We could calculate the exact maximum in yp_initialize...
-#define ypSet_ALLOCLEN_MAX                                                                        \
-    ((yp_ssize_t)MIN4(yp_SSIZE_T_MAX / ypSet_RESIZE_AT_NMR, yp_SSIZE_T_MAX / ypSet_RESIZE_AT_DNM, \
-            (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) / yp_sizeof(ypSet_KeyEntry),                \
-            ypObject_LEN_MAX))
-#define ypSet_LEN_MAX ((yp_ssize_t)(ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
+// _ypSet_resize overflowing, so we impose a separate limit on the max len and alloclen for sets.
+// alloclen must be a power of two.
+#if defined(yp_ARCH_64_BIT)
+#define ypSet_ALLOCLEN_MAX ((yp_ssize_t)0x40000000LL)
+#else
+#define ypSet_ALLOCLEN_MAX ((yp_ssize_t)0x08000000)
+#endif
+yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= ypObject_LEN_MAX, ypSet_ALLOCLEN_MAX_fits_in_ob_len);
+yp_STATIC_ASSERT(
+        ypSet_ALLOCLEN_MAX <= (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) / yp_sizeof(ypSet_KeyEntry),
+        ypSet_ALLOCLEN_MAX_size_cant_overflow);
+
+yp_STATIC_ASSERT((ypSet_ALLOCLEN_MAX << 1u) >
+                         MIN(ypObject_LEN_MAX, (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) /
+                                                       yp_sizeof(ypSet_KeyEntry)),
+        ypSet_ALLOCLEN_MAX_is_maximal);
+#define ypSet_LEN_MAX ((ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
+
+// When allocating a set from a generic iterable, limit the length of the initial allocation to this
+// amount. Per Python (dict_new_presized): "There are no strict guarantee that returned dict can
+// contain minused items without resize. So we create medium size dict instead of very large dict or
+// MemoryError."
+#define ypSet_FROMITERABLE_LEN_MAX ((yp_ssize_t)0x555555)
+yp_STATIC_ASSERT(
+        ypSet_FROMITERABLE_LEN_MAX <= ypSet_LEN_MAX, ypSet_FROMITERABLE_LEN_MAX_less_than_LEN_MAX);
 
 // A placeholder to replace deleted entries in the hash table
 yp_IMMORTAL_INVALIDATED(ypSet_dummy);
@@ -15053,15 +15083,10 @@ yp_IMMORTAL_INVALIDATED(ypSet_dummy);
 // Returns the index of the given ypSet_KeyEntry in the hash table
 #define ypSet_ENTRY_INDEX(so, loc) ((yp_ssize_t)((loc)-ypSet_TABLE(so)))
 
-// set code relies on some of the internals from the dict implementation
-#define ypDict_LEN ypObject_CACHED_LEN
-#define ypDict_SET_LEN ypObject_SET_CACHED_LEN
-
 // Before adding keys to the set, call this function to determine if a resize is necessary.
 // Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
 // added before the next resize.
 // XXX Adapted from PyDict_SetItem, although our thresholds are slightly different
-// TODO If we make this threshold configurable, the assert should be in yp_initialize
 yp_STATIC_ASSERT(ypSet_RESIZE_AT_NMR <= yp_SSIZE_T_MAX / ypSet_ALLOCLEN_MAX,
         ypSet_space_remaining_cant_overflow);
 static yp_ssize_t _ypSet_space_remaining(ypObject *so)
@@ -15078,12 +15103,16 @@ static yp_ssize_t _ypSet_space_remaining(ypObject *so)
     return retval;
 }
 
-// Returns the alloclen that will fit minused entries, or <1 on error
+// Returns the alloclen that will fit minused entries. Always succeeds. minused cannot be greater
+// than ypSet_LEN_MAX.
 // XXX Adapted from Python's dictresize
-// TODO Can we improve by using some bit-twiddling to get the highest power of 2?
-// TODO If we make this threshold configurable, the assert should be in yp_initialize
-yp_STATIC_ASSERT(
-        ypSet_RESIZE_AT_DNM <= yp_SSIZE_T_MAX / ypSet_LEN_MAX, ypSet_calc_alloclen_cant_overflow);
+// FIXME Python uses optimized  _Py_bit_length or _BitScanReverse64 to find next log2 value... we
+// could use yp_int_bit_lengthC!
+// FIXME Recent Python comment that seems reasonable:
+//      There are no strict guarantee that returned dict can contain minused items without resize.
+//      So we create medium size dict instead of very large dict or MemoryError.
+yp_STATIC_ASSERT(ypSet_RESIZE_AT_DNM <= (yp_SSIZE_T_MAX - 1) / ypSet_LEN_MAX,
+        ypSet_calc_alloclen_cant_overflow);
 static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
 {
     yp_ssize_t minentries;
@@ -15093,16 +15122,16 @@ static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
     yp_ASSERT(minused <= ypSet_LEN_MAX, "minused cannot be greater than max");
 
     // XXX ypSet_calc_alloclen_cant_overflow ensures this can't overflow
-    minentries = ((minused * ypSet_RESIZE_AT_DNM) / ypSet_RESIZE_AT_NMR) + 1;
-    alloclen = ypSet_ALLOCLEN_MIN;
-    while (alloclen <= minentries && alloclen > 0) {
-        alloclen <<= 1;
-    }
+    minentries = ((minused * ypSet_RESIZE_AT_DNM + 1) / ypSet_RESIZE_AT_NMR);
+    yp_ASSERT(minentries <= ypSet_ALLOCLEN_MAX, "calculated minentries greater than max");
 
-    // TODO If we could trust that ypSet_ALLOCLEN_MAX was the true maximum (ie, a power of 2), then
-    // we could turn this to an assert, or just remove it: ypSet_LEN_MAX would ensure this is never
-    // reached
-    if (alloclen > ypSet_ALLOCLEN_MAX) return -1;
+    alloclen = ypSet_ALLOCLEN_MIN;
+    while (alloclen < minentries) {
+        alloclen <<= 1u;
+    }
+    yp_ASSERT(ypSet_ALLOCLEN_MIN <= alloclen && minentries <= alloclen,
+            "calculated alloclen out of range");
+
     return alloclen;
 }
 
@@ -15114,7 +15143,6 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
 {
     ypObject  *so;
     yp_ssize_t alloclen = _ypSet_calc_alloclen(minused);
-    if (alloclen < 1) return yp_MemorySizeOverflowError;
     if (alloclen_fixed && type == ypFrozenSet_CODE) {
         // FIXME Dict intentionally creates empty frozensets that are not frozenset_empty. Perhaps
         // it shouldn't? But then again I'm rethinking this whole keyset business...
@@ -15126,6 +15154,7 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
     }
     if (yp_isexceptionC(so)) return so;
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
+    // FIXME We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, alloclen);
     ypSet_FILL(so) = 0;
     yp_memset(ypSet_TABLE(so), 0, alloclen * yp_sizeof(ypSet_KeyEntry));
@@ -15137,7 +15166,7 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
 // TODO It's tempting to look into memcpy to copy the tables, although that would mean the copy
 // would be just as dirty as the original. But if the original isn't "too dirty"...
 static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep);
-static ypObject *_ypSet_copy(int type, ypObject *x, int alloclen_fixed)
+static ypObject *_ypSet_copy(int type, ypObject *x)
 {
     yp_ssize_t      keysleft = ypSet_LEN(x);
     ypSet_KeyEntry *otherkeys = ypSet_TABLE(x);
@@ -15145,21 +15174,25 @@ static ypObject *_ypSet_copy(int type, ypObject *x, int alloclen_fixed)
     yp_ssize_t      i;
     ypSet_KeyEntry *loc;
 
-    so = _ypSet_new(type, keysleft, alloclen_fixed);
+    yp_ASSERT(type != ypFrozenSet_CODE || ypObject_TYPE_CODE(x) != ypFrozenSet_CODE,
+            "missed a lazy shallow copy optimization");
+    yp_ASSERT(type != ypFrozenSet_CODE || ypSet_LEN(x) > 0,
+            "missed a yp_frozenset_empty optimization");
+
+    so = _ypSet_new(type, keysleft, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(so)) return so;
 
     // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
-        _ypSet_movekey_clean(so, yp_incref(otherkeys[i].se_key), otherkeys[i].se_hash, &loc);
+        _ypSet_movekey_clean(
+                so, yp_incref(otherkeys[i].se_key), otherkeys[i].se_hash, &loc);  // steals key
     }
     return so;
 }
 
 // XXX Check for the yp_frozenset_empty case first
-// FIXME We're trusting that copy_visitor will behave properly and return an object that has the
-// same hash as the original and that is unequal to anything else in the other set...bad assumption!
 static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, void *copy_memo)
 {
     // FIXME This will fail if x is modified during the copy: ypSet_LEN and ypSet_TABLE may change!
@@ -15168,24 +15201,37 @@ static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, 
     ypObject       *so;
     yp_ssize_t      i;
     ypObject       *key;
+    yp_hash_t       hash;
+    ypObject       *exc = yp_None;
     ypSet_KeyEntry *loc;
     ypObject       *result;
 
+    yp_ASSERT(type != ypFrozenSet_CODE || ypSet_LEN(x) > 0,
+            "missed a yp_frozenset_empty optimization");
+
     // XXX Unlike _ypTuple_deepcopy, we don't have to worry about sets that contain themselves,
     // which simplifies this greatly.
-    so = _ypSet_new(type, keysleft, /*alloclen_fixed=*/TRUE);
+    so = _ypSet_new(type, keysleft, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(so)) return so;
 
     // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean.
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
-        key = copy_visitor(otherkeys[i].se_key, copy_memo);
+
+        key = copy_visitor(otherkeys[i].se_key, copy_memo);  // new ref
         if (yp_isexceptionC(key)) {
             yp_decref(so);
             return key;
         }
-        _ypSet_movekey_clean(so, key, otherkeys[i].se_hash, &loc);
+        hash = yp_hashC(key, &exc);
+        if (yp_isexceptionC(exc)) {
+            yp_decref(key);
+            yp_decref(so);
+            return exc;
+        }
+
+        _ypSet_movekey_clean(so, key, hash, &loc);  // steals key
     }
 
     result = _yp_deepcopy_memo_setitem(copy_memo, x, so);
@@ -15199,7 +15245,6 @@ static ypObject *_ypSet_deepcopy(int type, ypObject *x, visitfunc copy_visitor, 
 
 // Resizes the set to the smallest size that will hold minused values. If you want to reduce the
 // need for future resizes, call with a larger minused. Returns yp_None, or an exception on error.
-// TODO Do we want to split minused into required and extra, like in other areas?
 yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= yp_SSIZE_T_MAX / yp_sizeof(ypSet_KeyEntry),
         ypSet_resize_cant_overflow);
 static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
@@ -15214,13 +15259,13 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
 
     // Always allocate a separate buffer.
     newalloclen = _ypSet_calc_alloclen(minused);
-    if (newalloclen < 1) return yp_MemorySizeOverflowError;
     // XXX ypSet_resize_cant_overflow ensures this can't overflow
     oldkeys = ypMem_REALLOC_CONTAINER_VARIABLE_NEW(
             so, ypSetObject, newalloclen, 0, ypSet_ALLOCLEN_MAX);
     if (oldkeys == NULL) return yp_MemoryError;
     yp_memset(ypSet_TABLE(so), 0, newalloclen * yp_sizeof(ypSet_KeyEntry));
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
+    // FIXME We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, newalloclen);
 
     // Clear the new table.
@@ -15233,7 +15278,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&oldkeys[i])) continue;
         keysleft -= 1;
-        _ypSet_movekey_clean(so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc);
+        _ypSet_movekey_clean(so, oldkeys[i].se_key, oldkeys[i].se_hash, &loc);  // steals key
     }
     ypMem_REALLOC_CONTAINER_FREE_OLDPTR(so, ypSetObject, oldkeys);
     yp_DEBUG("_ypSet_resize: %p table %p  (was %p)", so, ypSet_TABLE(so), oldkeys);
@@ -15268,8 +15313,8 @@ static ypObject *_ypSet_lookkey(
             // Python has protection here against __eq__ changing this set object; hopefully not a
             // problem in nohtyP
             cmp = yp_eq(ep->se_key, key);
-            if (yp_isexceptionC(cmp)) return cmp;
             if (cmp == yp_True) goto success;
+            if (yp_isexceptionC(cmp)) return cmp;
         }
         freeslot = NULL;
     }
@@ -15287,8 +15332,8 @@ static ypObject *_ypSet_lookkey(
         if (ep->se_hash == hash && ep->se_key != ypSet_dummy) {
             // Same __eq__ protection is here as well in Python
             cmp = yp_eq(ep->se_key, key);
-            if (yp_isexceptionC(cmp)) return cmp;
             if (cmp == yp_True) goto success;
+            if (yp_isexceptionC(cmp)) return cmp;
         } else if (ep->se_key == ypSet_dummy && freeslot == NULL) {
             freeslot = ep;
         }
@@ -15302,14 +15347,41 @@ success:
     return yp_None;
 }
 
-// Steals key and adds it to the hash table at the given location. loc must not currently be in
-// use! Ensure the set is large enough (_ypSet_space_remaining) before adding items.
+// As per _ypSet_lookkey, but calls yp_hashC for the hash.
+static ypObject *_ypSet_lookkey_byhash(ypObject *so, ypObject *key, ypSet_KeyEntry **loc)
+{
+    ypObject *exc = yp_None;
+    yp_hash_t hash = yp_hashC(key, &exc);
+    if (yp_isexceptionC(exc)) return exc;
+    return _ypSet_lookkey(so, key, hash, loc);
+}
+
+// As per _ypSet_lookkey, but calls yp_currenthashC for the hash.
+static ypObject *_ypSet_lookkey_bycurrenthash(ypObject *so, ypObject *key, ypSet_KeyEntry **loc)
+{
+    ypObject *exc = yp_None;
+    yp_hash_t hash = yp_currenthashC(key, &exc);
+    if (yp_isexceptionC(exc)) return exc;
+    return _ypSet_lookkey(so, key, hash, loc);
+}
+
+// Steals key and adds it to the hash table at the given location. loc must not currently be in use!
+// *spaceleft should be initialized from  _ypSet_space_remaining; it will be decremented as
+// appropriate. Ensure the set is large enough (spaceleft > 0) before adding items.
 // XXX Adapted from Python's insertdict in dictobject.c
-static void _ypSet_movekey(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash)
+static void _ypSet_movekey(
+        ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash, yp_ssize_t *spaceleft)
 {
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+    yp_ASSERT1(!ypSet_ENTRY_USED(loc));
+    yp_ASSERT1(loc->se_key != NULL || _ypSet_space_remaining(so) > 0);
+    yp_ASSERT1(!ypObject_IS_MUTABLE(key));
+    yp_ASSERT1(*spaceleft == _ypSet_space_remaining(so));
 
-    if (loc->se_key == NULL) ypSet_FILL(so) += 1;
+    if (loc->se_key == NULL) {
+        ypSet_FILL(so) += 1;
+        *spaceleft -= 1;
+    }
     loc->se_key = key;
     loc->se_hash = hash;
     ypSet_SET_LEN(so, ypSet_LEN(so) + 1);
@@ -15317,7 +15389,7 @@ static void _ypSet_movekey(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_
 
 // Steals key and adds it to the *clean* hash table. Only use if the key is known to be absent
 // from the table, and the table contains no deleted entries; this is usually known when
-// cleaning/resizing/copying a table. Sets *loc to the location at which the key was inserted.
+// cleaning/resizing/copying a table. Sets *ep to the location at which the key was inserted.
 // Ensure the set is large enough (_ypSet_space_remaining) before adding items.
 // XXX Adapted from Python's insertdict_clean in dictobject.c
 static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep)
@@ -15328,13 +15400,19 @@ static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, yp
     ypSet_KeyEntry *ep0 = ypSet_TABLE(so);
 
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+    yp_ASSERT1(_ypSet_space_remaining(so) > 0);
+    yp_ASSERT1(ypSet_LEN(so) == ypSet_FILL(so));
+    yp_ASSERT1(!ypObject_IS_MUTABLE(key));
 
     i = (size_t)hash & mask;
     (*ep) = &ep0[i];
     for (perturb = (size_t)hash; (*ep)->se_key != NULL; perturb >>= ypSet_PERTURB_SHIFT) {
+        yp_ASSERT1((*ep)->se_key != ypSet_dummy);
+        yp_ASSERT1((*ep)->se_hash != hash || yp_eq((*ep)->se_key, key) == yp_False);
         i = (i << 2) + i + perturb + 1;
         (*ep) = &ep0[i & mask];
     }
+
     ypSet_FILL(so) += 1;
     (*ep)->se_key = key;
     (*ep)->se_hash = hash;
@@ -15347,40 +15425,30 @@ static ypObject *_ypSet_removekey(ypObject *so, ypSet_KeyEntry *loc)
 {
     ypObject *oldkey = loc->se_key;
     yp_ASSERT1(so != yp_frozenset_empty);  // ensure we don't modify the "empty" frozenset
+    yp_ASSERT1(ypSet_ENTRY_USED(loc));
     loc->se_key = ypSet_dummy;
     loc->se_hash = ypObject_HASH_INVALID;
     ypSet_SET_LEN(so, ypSet_LEN(so) - 1);
     return oldkey;
 }
 
-// Adds the key to the hash table. *spaceleft should be initialized from  _ypSet_space_remaining;
-// this function then decrements it with each key added, and resets it on every resize. growhint
+// Adds the key to the hash table at the given location if there is enough room, otherwise resizes
+// so and adds the key at the new location. loc must not currently be in use! *spaceleft should be
+// initialized from _ypSet_space_remaining; it will be decremented or reset as appropriate. growhint
 // is the number of additional items, not including key, that are expected to be added to the set.
-// Returns yp_True if so was modified, yp_False if it wasn't due to the key already being in the
-// set, or an exception on error.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypSet_push(
-        ypObject *so, ypObject *key, yp_ssize_t *spaceleft, yp_ssize_t growhint)
+static ypObject *_ypSet_push(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, yp_hash_t hash,
+        yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
-    yp_hash_t       hash;
-    ypObject       *result = yp_None;
-    ypSet_KeyEntry *loc;
-    yp_ssize_t      newlen;
+    ypObject  *result;
+    yp_ssize_t newlen;
 
-    // Look for the appropriate entry in the hash table
-    hash = yp_hashC(key, &result);
-    if (yp_isexceptionC(result)) return result;
-    result = _ypSet_lookkey(so, key, hash, &loc);
-    if (yp_isexceptionC(result)) return result;
+    yp_ASSERT1(!ypSet_ENTRY_USED(loc));
 
-    // If the key is already in the hash table, then there's nothing to do
-    if (ypSet_ENTRY_USED(loc)) return yp_False;
-
-    // Otherwise, we need to add the key, which possibly doesn't involve resizing
-    if (*spaceleft >= 1) {
-        _ypSet_movekey(so, loc, yp_incref(key), hash);
-        *spaceleft -= 1;
-        return yp_True;
+    // We need to add the key; it's possible this doesn't involve resizing.
+    if (*spaceleft > 0 || loc->se_key == ypSet_dummy) {
+        _ypSet_movekey(so, loc, yp_incref(key), hash, spaceleft);  // steals key
+        return yp_None;
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
@@ -15393,25 +15461,46 @@ static ypObject *_ypSet_push(
     result = _ypSet_resize(so, newlen);                                // invalidates loc
     if (yp_isexceptionC(result)) return result;
 
-    _ypSet_movekey_clean(so, yp_incref(key), hash, &loc);
+    _ypSet_movekey_clean(so, yp_incref(key), hash, &loc);  // steals key
     *spaceleft = _ypSet_space_remaining(so);
+    return yp_None;
+}
+
+// As _ypSet_push, but calculates the hash using yp_hashC. Returns yp_True if so was modified,
+// yp_False if it wasn't due to the key already being in the set, or an exception on error.
+static ypObject *_ypSet_push_byhash(
+        ypObject *so, ypObject *key, yp_ssize_t *spaceleft, yp_ssize_t growhint)
+{
+    yp_hash_t       hash;
+    ypObject       *exc = yp_None;
+    ypSet_KeyEntry *loc;
+    ypObject       *result;
+
+    // Look for the appropriate entry in the hash table.
+    hash = yp_hashC(key, &exc);
+    if (yp_isexceptionC(exc)) return exc;
+    result = _ypSet_lookkey(so, key, hash, &loc);
+    if (yp_isexceptionC(result)) return result;
+
+    // If the key is already in the hash table, then there's nothing to do.
+    if (ypSet_ENTRY_USED(loc)) return yp_False;
+
+    result = _ypSet_push(so, loc, key, hash, spaceleft, growhint);
+    if (yp_isexceptionC(result)) return result;
     return yp_True;
 }
 
 // Removes the key from the hash table. The set is not resized. Returns the reference to the
 // removed key if so was modified, ypSet_dummy if it wasn't due to the key not being in the
 // set, or an exception on error.
-static ypObject *_ypSet_pop(ypObject *so, ypObject *key)
+static ypObject *_ypSet_pop_bycurrenthash(ypObject *so, ypObject *key)
 {
-    yp_hash_t       hash;
-    ypObject       *result = yp_None;
+    ypObject       *result;
     ypSet_KeyEntry *loc;
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
-    hash = yp_currenthashC(key, &result);
-    if (yp_isexceptionC(result)) return result;
-    result = _ypSet_lookkey(so, key, hash, &loc);
+    result = _ypSet_lookkey_bycurrenthash(so, key, &loc);
     if (yp_isexceptionC(result)) return result;
 
     // If the key is not in the hash table, then there's nothing to do
@@ -15421,15 +15510,19 @@ static ypObject *_ypSet_pop(ypObject *so, ypObject *key)
     return _ypSet_removekey(so, loc);  // new ref
 }
 
-// XXX Check for the so==x case _before_ calling this function
-// TODO This requires that the elements of x are immutable...do we want to support mutables too?
-static ypObject *_ypSet_isdisjoint(ypObject *so, ypObject *x)
+// XXX Check for the so==x case _before_ calling this function.
+static ypObject *_ypSet_isdisjoint_withset(ypObject *so, ypObject *x)
 {
     ypSet_KeyEntry *keys = ypSet_TABLE(so);
     yp_ssize_t      keysleft = ypSet_LEN(so);
     yp_ssize_t      i;
     ypObject       *result;
     ypSet_KeyEntry *loc;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE);
+    yp_ASSERT1(so != x);
+
+    if (ypSet_LEN(so) < 1 || ypSet_LEN(x) < 1) return yp_True;
 
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&keys[i])) continue;
@@ -15441,9 +15534,31 @@ static ypObject *_ypSet_isdisjoint(ypObject *so, ypObject *x)
     return yp_True;
 }
 
-// XXX Check for the so==x case _before_ calling this function
-// TODO This requires that the elements of x are immutable...do we want to support mutables too?
-static ypObject *_ypSet_issubset(ypObject *so, ypObject *x)
+static ypObject *_ypSet_isdisjoint_withiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
+{
+    ypObject       *key;
+    ypObject       *result;
+    ypSet_KeyEntry *loc;
+
+    if (ypSet_LEN(so) < 1) return yp_True;
+
+    while (1) {
+        key = yp_miniiter_next(mi, mi_state);  // new ref
+        if (yp_isexceptionC(key)) {
+            if (yp_isexceptionC2(key, yp_StopIteration)) break;
+            return key;
+        }
+
+        result = _ypSet_lookkey_bycurrenthash(so, key, &loc);
+        yp_decref(key);
+        if (yp_isexceptionC(result)) return result;
+        if (ypSet_ENTRY_USED(loc)) return yp_False;
+    }
+    return yp_True;
+}
+
+// XXX Check for the so==x case _before_ calling this function.
+static ypObject *_ypSet_issubset_withset(ypObject *so, ypObject *x)
 {
     ypSet_KeyEntry *keys = ypSet_TABLE(so);
     yp_ssize_t      keysleft = ypSet_LEN(so);
@@ -15451,11 +15566,67 @@ static ypObject *_ypSet_issubset(ypObject *so, ypObject *x)
     ypObject       *result;
     ypSet_KeyEntry *loc;
 
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE);
+    yp_ASSERT1(so != x);
+
+    if (ypSet_LEN(so) < 1) return yp_True;
     if (ypSet_LEN(so) > ypSet_LEN(x)) return yp_False;
+
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&keys[i])) continue;
         keysleft -= 1;
         result = _ypSet_lookkey(x, keys[i].se_key, keys[i].se_hash, &loc);
+        if (yp_isexceptionC(result)) return result;
+        if (!ypSet_ENTRY_USED(loc)) return yp_False;
+    }
+    return yp_True;
+}
+
+static ypObject *_ypSet_difference_update_fromiter(
+        ypObject *so, ypObject *mi, yp_uint64_t *mi_state);
+static ypObject *_ypSet_issubset_withiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
+{
+    ypObject *so_remaining;
+    ypObject *result;
+
+    if (ypSet_LEN(so) < 1) return yp_True;
+
+    // Create a copy of so and remove the items yielded by the iterator. If there are remaining
+    // items in the copy, then it's not a subset.
+    // TODO Is there a way to do this without allocating a new set? (I actually think not.)
+    so_remaining = _ypSet_copy(ypSet_CODE, so);  // new ref
+    if (yp_isexceptionC(so_remaining)) return so_remaining;
+    result = _ypSet_difference_update_fromiter(so_remaining, mi, mi_state);
+    if (!yp_isexceptionC(result)) {
+        result = ypBool_FROM_C(ypSet_LEN(so_remaining) < 1);
+    }
+    yp_decref(so_remaining);
+    return result;
+}
+
+// XXX Check for the so==x case _before_ calling this function.
+static ypObject *_ypSet_issuperset_withset(ypObject *so, ypObject *x)
+{
+    // Remember that if x.issubset(so), then so.issuperset(x).
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE);
+    return _ypSet_issubset_withset(x, so);
+}
+
+static ypObject *_ypSet_issuperset_withiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
+{
+    ypObject       *key;
+    ypObject       *result;
+    ypSet_KeyEntry *loc;
+
+    while (1) {
+        key = yp_miniiter_next(mi, mi_state);  // new ref
+        if (yp_isexceptionC(key)) {
+            if (yp_isexceptionC2(key, yp_StopIteration)) break;
+            return key;
+        }
+
+        result = _ypSet_lookkey_bycurrenthash(so, key, &loc);
+        yp_decref(key);
         if (yp_isexceptionC(result)) return result;
         if (!ypSet_ENTRY_USED(loc)) return yp_False;
     }
@@ -15470,6 +15641,7 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
     yp_ssize_t      spaceleft = _ypSet_space_remaining(so);
     ypObject       *result;
     yp_ssize_t      i;
+    ypSet_KeyEntry *so_loc;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
     yp_ASSERT1(so != other);
@@ -15477,8 +15649,14 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
-        // TODO _ypSet_push recalculates hash; consolidate?
-        result = _ypSet_push(so, otherkeys[i].se_key, &spaceleft, keysleft);
+
+        // If the key is already in the hash table, then there's nothing to do.
+        result = _ypSet_lookkey(so, otherkeys[i].se_key, otherkeys[i].se_hash, &so_loc);
+        if (yp_isexceptionC(result)) return result;
+        if (ypSet_ENTRY_USED(so_loc)) continue;
+
+        result = _ypSet_push(
+                so, so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft, keysleft);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -15486,11 +15664,13 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
 
 static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject  *exc = yp_None;
     ypObject  *key;
     ypObject  *result;
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
-    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &exc);  // zero on error
+    // Ignore errors getting length_hint. Recall yp_miniiter_length_hintC returns zero on error.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
+    yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
 
     while (1) {
         key = yp_miniiter_next(mi, mi_state);  // new ref
@@ -15498,8 +15678,8 @@ static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t 
             if (yp_isexceptionC2(key, yp_StopIteration)) break;
             return key;
         }
-        length_hint -= 1;  // check for <0 only when we need it in _ypSet_push
-        result = _ypSet_push(so, key, &spaceleft, length_hint);
+        length_hint -= 1;  // check for <0 only when we need it in _ypSet_push_byhash
+        result = _ypSet_push_byhash(so, key, &spaceleft, length_hint);
         yp_decref(key);
         if (yp_isexceptionC(result)) return result;
     }
@@ -15512,16 +15692,13 @@ static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t 
 // XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_update(ypObject *so, ypObject *iterable)
 {
-    int         iterable_pair = ypObject_TYPE_PAIR_CODE(iterable);
-    ypObject   *mi;
-    yp_uint64_t mi_state;
-    ypObject   *result;
-
     // Recall that type pairs are identified by the immutable type code
-    if (iterable_pair == ypFrozenSet_CODE) {
+    if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
         return _ypSet_update_fromset(so, iterable);
     } else {
-        mi = yp_miniiter(iterable, &mi_state);  // new ref
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(iterable, &mi_state);  // new ref
         if (yp_isexceptionC(mi)) return mi;
         result = _ypSet_update_fromiter(so, mi, &mi_state);
         yp_decref(mi);
@@ -15558,9 +15735,6 @@ static ypObject *_ypSet_intersection_update_fromset(ypObject *so, ypObject *othe
     return yp_None;
 }
 
-// TODO This _allows_ mi to yield mutable values, unlike issubset; standardize
-static ypObject *_ypSet_difference_update_fromiter(
-        ypObject *so, ypObject *mi, yp_uint64_t *mi_state);
 static ypObject *_ypSet_difference_update_fromset(ypObject *so, ypObject *other);
 static ypObject *_ypSet_intersection_update_fromiter(
         ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
@@ -15568,11 +15742,8 @@ static ypObject *_ypSet_intersection_update_fromiter(
     ypObject *so_toremove;
     ypObject *result;
 
-    // TODO can we do this without creating a copy or, alternatively, would it be better to
-    // implement this as ypSet_intersection?
-    // Unfortunately, we need to create a short-lived copy of so. It's either that, or convert
-    // mi to a set, or come up with a fancy scheme to "mark" items in so to be deleted.
-    so_toremove = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    // TODO Is there a way to do this without allocating a new set? (I actually think not.)
+    so_toremove = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(so_toremove)) return so_toremove;
 
     // Remove items from so_toremove that are yielded by mi. so_toremove is then a set
@@ -15589,16 +15760,13 @@ static ypObject *_ypSet_intersection_update_fromiter(
 // XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_intersection_update(ypObject *so, ypObject *iterable)
 {
-    int         iterable_pair = ypObject_TYPE_PAIR_CODE(iterable);
-    ypObject   *mi;
-    yp_uint64_t mi_state;
-    ypObject   *result;
-
     // Recall that type pairs are identified by the immutable type code
-    if (iterable_pair == ypFrozenSet_CODE) {
+    if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
         return _ypSet_intersection_update_fromset(so, iterable);
     } else {
-        mi = yp_miniiter(iterable, &mi_state);  // new ref
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(iterable, &mi_state);  // new ref
         if (yp_isexceptionC(mi)) return mi;
         result = _ypSet_intersection_update_fromiter(so, mi, &mi_state);
         yp_decref(mi);
@@ -15631,11 +15799,10 @@ static ypObject *_ypSet_difference_update_fromset(ypObject *so, ypObject *other)
     return yp_None;
 }
 
-// TODO This _allows_ mi to yield mutable values, unlike issubset; standardize
 static ypObject *_ypSet_difference_update_fromiter(
         ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject *result = yp_None;
+    ypObject *result;
     ypObject *key;
 
     // It's tempting to stop once so is empty, but doing so would mask errors in yielded keys
@@ -15645,7 +15812,7 @@ static ypObject *_ypSet_difference_update_fromiter(
             if (yp_isexceptionC2(key, yp_StopIteration)) break;
             return key;
         }
-        result = _ypSet_pop(so, key);  // new ref
+        result = _ypSet_pop_bycurrenthash(so, key);  // new ref
         yp_decref(key);
         if (yp_isexceptionC(result)) return result;
         yp_decref(result);
@@ -15657,16 +15824,13 @@ static ypObject *_ypSet_difference_update_fromiter(
 // XXX Check for the so==iterable case _before_ calling this function
 static ypObject *_ypSet_difference_update(ypObject *so, ypObject *iterable)
 {
-    int         iterable_pair = ypObject_TYPE_PAIR_CODE(iterable);
-    ypObject   *mi;
-    yp_uint64_t mi_state;
-    ypObject   *result;
-
     // Recall that type pairs are identified by the immutable type code
-    if (iterable_pair == ypFrozenSet_CODE) {
+    if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
         return _ypSet_difference_update_fromset(so, iterable);
     } else {
-        mi = yp_miniiter(iterable, &mi_state);  // new ref
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(iterable, &mi_state);  // new ref
         if (yp_isexceptionC(mi)) return mi;
         result = _ypSet_difference_update_fromiter(so, mi, &mi_state);
         yp_decref(mi);
@@ -15682,6 +15846,7 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
     ypSet_KeyEntry *otherkeys = ypSet_TABLE(other);
     ypObject       *result;
     yp_ssize_t      i;
+    ypSet_KeyEntry *so_loc;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
     yp_ASSERT1(so != other);
@@ -15690,18 +15855,17 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
         keysleft -= 1;
 
-        // First, attempt to remove; if nothing was removed, then add it instead
-        // TODO _ypSet_pop and _ypSet_push both call yp_currenthashC; consolidate?
-        result = _ypSet_pop(so, otherkeys[i].se_key);
-        if (result == ypSet_dummy) {
-            result = _ypSet_push(so, otherkeys[i].se_key, &spaceleft, keysleft);  // may resize so
-            if (yp_isexceptionC(result)) return result;
-        } else if (yp_isexceptionC(result)) {
-            return result;
+        // Look for the appropriate entry in the hash table.
+        result = _ypSet_lookkey(so, otherkeys[i].se_key, otherkeys[i].se_hash, &so_loc);
+        if (yp_isexceptionC(result)) return result;
+
+        // If the key is in the hash table, remove it, otherwise add it.
+        if (ypSet_ENTRY_USED(so_loc)) {
+            yp_decref(_ypSet_removekey(so, so_loc));
         } else {
-            // XXX spaceleft based on alloclen and fill, so doesn't change on deletions
-            // FIXME What if yp_decref modifies so?
-            yp_decref(result);
+            result = _ypSet_push(so, so_loc, otherkeys[i].se_key, otherkeys[i].se_hash, &spaceleft,
+                    keysleft);  // may resize so
+            if (yp_isexceptionC(result)) return result;
         }
     }
     return yp_None;
@@ -15731,17 +15895,14 @@ static ypObject *frozenset_freeze(ypObject *so)
     return yp_None;  // no-op, currently
 }
 
-static ypObject *frozenset_unfrozen_copy(ypObject *so)
-{
-    return _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);
-}
+static ypObject *frozenset_unfrozen_copy(ypObject *so) { return _ypSet_copy(ypSet_CODE, so); }
 
 static ypObject *frozenset_frozen_copy(ypObject *so)
 {
     if (ypSet_LEN(so) < 1) return yp_frozenset_empty;
     // A shallow copy of a frozenset to a frozenset doesn't require an actual copy
     if (ypObject_TYPE_CODE(so) == ypFrozenSet_CODE) return yp_incref(so);
-    return _ypSet_copy(ypFrozenSet_CODE, so, /*alloclen_fixed=*/TRUE);
+    return _ypSet_copy(ypFrozenSet_CODE, so);
 }
 
 static ypObject *frozenset_unfrozen_deepcopy(ypObject *so, visitfunc copy_visitor, void *copy_memo)
@@ -15778,7 +15939,7 @@ typedef struct {
     yp_uint32_t keysleft;
     yp_uint32_t index;
 } ypSetMiState;
-yp_STATIC_ASSERT(ypSet_LEN_MAX <= 0xFFFFFFFFu, len_fits_32_bits);
+yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= 0xFFFFFFFFu, alloclen_fits_32_bits);
 yp_STATIC_ASSERT(yp_sizeof(yp_uint64_t) >= yp_sizeof(ypSetMiState), ypSetMiState_fits_uint64);
 
 static ypObject *frozenset_miniiter(ypObject *so, yp_uint64_t *_state)
@@ -15789,113 +15950,105 @@ static ypObject *frozenset_miniiter(ypObject *so, yp_uint64_t *_state)
     return yp_incref(so);
 }
 
-// XXX We need to be a little suspicious of _state...just in case the caller has changed it
+// XXX We need to be a little suspicious of state, just in case the caller has changed it, so
+// treat everything out of bounds as "iterator exhausted".
+static yp_uint32_t _frozenset_miniiter_adjusted_keysleft(ypObject *so, ypSetMiState *state)
+{
+    yp_ssize_t index = (yp_ssize_t)state->index;
+    if (index < 0 || index >= ypSet_ALLOCLEN(so)) return 0;
+    return state->keysleft;
+}
+
 static ypObject *frozenset_miniiter_next(ypObject *so, yp_uint64_t *_state)
 {
     ypSetMiState   *state = (ypSetMiState *)_state;
+    yp_uint32_t     keysleft = _frozenset_miniiter_adjusted_keysleft(so, state);
+    yp_ssize_t      index = (yp_ssize_t)state->index;  // don't forget to write it back
     ypSet_KeyEntry *loc;
 
-    // Find the next entry
-    if (state->keysleft < 1) return yp_StopIteration;
+    if (keysleft < 1) return yp_StopIteration;
+
+    // Find the next entry.
     while (1) {
-        if (((yp_ssize_t)state->index) >= ypSet_ALLOCLEN(so)) {
+        if (index >= ypSet_ALLOCLEN(so)) {
             state->keysleft = 0;
             return yp_StopIteration;
         }
-        loc = &ypSet_TABLE(so)[state->index];
-        state->index += 1;
+        loc = &ypSet_TABLE(so)[index];
         if (ypSet_ENTRY_USED(loc)) break;
+        index += 1;
     }
 
-    // Update state and return the key
-    state->keysleft -= 1;
+    // Update state and return the key.
+    state->index = (yp_uint32_t)(index + 1);
+    state->keysleft = keysleft - 1;
     return yp_incref(loc->se_key);
 }
 
 static ypObject *frozenset_miniiter_length_hint(
-        ypObject *so, yp_uint64_t *state, yp_ssize_t *length_hint)
+        ypObject *so, yp_uint64_t *_state, yp_ssize_t *length_hint)
 {
-    *length_hint = (yp_ssize_t)((ypSetMiState *)state)->keysleft;
+    *length_hint = (yp_ssize_t)_frozenset_miniiter_adjusted_keysleft(so, (ypSetMiState *)_state);
     return yp_None;
 }
 
 static ypObject *frozenset_contains(ypObject *so, ypObject *x)
 {
-    yp_hash_t       hash;
-    ypObject       *result = yp_None;
     ypSet_KeyEntry *loc;
-
-    hash = yp_currenthashC(x, &result);
-    if (yp_isexceptionC(result)) return result;
-    result = _ypSet_lookkey(so, x, hash, &loc);
+    ypObject       *result = _ypSet_lookkey_bycurrenthash(so, x, &loc);
     if (yp_isexceptionC(result)) return result;
     return ypBool_FROM_C(ypSet_ENTRY_USED(loc));
 }
 
 static ypObject *frozenset_isdisjoint(ypObject *so, ypObject *x)
 {
-    ypObject *x_asset;
-    ypObject *result;
-
-    if (so == x) return ypBool_FROM_C(ypSet_LEN(so) < 1);
-    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
-        return _ypSet_isdisjoint(so, x);
+    if (so == x) {
+        return ypBool_FROM_C(ypSet_LEN(so) < 1);
+    } else if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_isdisjoint_withset(so, x);
     } else {
-        // Otherwise, we need to convert x to a set to quickly test if it contains all items
-        // TODO Can we make a version of _ypSet_isdisjoint that doesn't reqire a new set created?
-        x_asset = yp_frozenset(x);
-        if (yp_isexceptionC(x_asset)) return x_asset;
-        result = _ypSet_isdisjoint(so, x_asset);
-        yp_decref(x_asset);
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_isdisjoint_withiter(so, mi, &mi_state);
+        yp_decref(mi);
         return result;
     }
 }
 
 static ypObject *frozenset_issubset(ypObject *so, ypObject *x)
 {
-    int       x_pair = ypObject_TYPE_PAIR_CODE(x);
-    ypObject *x_asset;
-    ypObject *result;
-
-    // We can take some shortcuts if x is a set or a dict
-    if (so == x) return yp_True;
-    if (x_pair == ypFrozenSet_CODE) {
-        return _ypSet_issubset(so, x);
-    } else if (x_pair == ypFrozenDict_CODE) {
-        if (ypSet_LEN(so) > ypDict_LEN(x)) return yp_False;
+    if (so == x) {
+        return yp_True;
+    } else if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_issubset_withset(so, x);
+    } else {
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_issubset_withiter(so, mi, &mi_state);
+        yp_decref(mi);
+        return result;
     }
-
-    // Otherwise, we need to convert x to a set to quickly test if it contains all items
-    // TODO Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
-    x_asset = yp_frozenset(x);
-    if (yp_isexceptionC(x_asset)) return x_asset;
-    result = _ypSet_issubset(so, x_asset);
-    yp_decref(x_asset);
-    return result;
 }
 
-// Remember that if x.issubset(so), then so.issuperset(x)
 static ypObject *frozenset_issuperset(ypObject *so, ypObject *x)
 {
-    int       x_pair = ypObject_TYPE_PAIR_CODE(x);
-    ypObject *x_asset;
-    ypObject *result;
-
-    // We can take some shortcuts if x is a set or a dict
-    if (so == x) return yp_True;
-    if (x_pair == ypFrozenSet_CODE) {
-        return _ypSet_issubset(x, so);
-    } else if (x_pair == ypFrozenDict_CODE) {
-        if (ypDict_LEN(x) > ypSet_LEN(so)) return yp_False;
+    if (so == x) {
+        return yp_True;
+    } else if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_issuperset_withset(so, x);
+    } else {
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_issuperset_withiter(so, mi, &mi_state);
+        yp_decref(mi);
+        return result;
     }
-
-    // Otherwise, we need to convert x to a set to quickly test if it contains all items
-    // TODO Can we make a version of _ypSet_issubset that doesn't reqire a new set created?
-    x_asset = yp_frozenset(x);
-    if (yp_isexceptionC(x_asset)) return x_asset;
-    result = _ypSet_issubset(x_asset, so);
-    yp_decref(x_asset);
-    return result;
 }
 
 static ypObject *frozenset_lt(ypObject *so, ypObject *x)
@@ -15903,14 +16056,14 @@ static ypObject *frozenset_lt(ypObject *so, ypObject *x)
     if (so == x) return yp_False;
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenSet_CODE) return yp_ComparisonNotImplemented;
     if (ypSet_LEN(so) >= ypSet_LEN(x)) return yp_False;
-    return _ypSet_issubset(so, x);
+    return _ypSet_issubset_withset(so, x);
 }
 
 static ypObject *frozenset_le(ypObject *so, ypObject *x)
 {
     if (so == x) return yp_True;
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenSet_CODE) return yp_ComparisonNotImplemented;
-    return _ypSet_issubset(so, x);
+    return _ypSet_issubset_withset(so, x);
 }
 
 // TODO comparison functions can recurse, just like currenthash...fix!
@@ -15919,6 +16072,7 @@ static ypObject *frozenset_eq(ypObject *so, ypObject *x)
     if (so == x) return yp_True;
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenSet_CODE) return yp_ComparisonNotImplemented;
     if (ypSet_LEN(so) != ypSet_LEN(x)) return yp_False;
+    if (ypSet_LEN(so) < 1) return yp_True;
 
     // We need to inspect all our items for equality, which could be time-intensive. It's fairly
     // obvious that the pre-computed hash, if available, can save us some time when so!=x.
@@ -15928,7 +16082,7 @@ static ypObject *frozenset_eq(ypObject *so, ypObject *x)
         return yp_False;
     }
 
-    return _ypSet_issubset(so, x);
+    return _ypSet_issubset_withset(so, x);
 }
 
 static ypObject *frozenset_ne(ypObject *so, ypObject *x)
@@ -15941,7 +16095,7 @@ static ypObject *frozenset_ge(ypObject *so, ypObject *x)
 {
     if (so == x) return yp_True;
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenSet_CODE) return yp_ComparisonNotImplemented;
-    return _ypSet_issubset(x, so);
+    return _ypSet_issuperset_withset(so, x);
 }
 
 static ypObject *frozenset_gt(ypObject *so, ypObject *x)
@@ -15949,7 +16103,7 @@ static ypObject *frozenset_gt(ypObject *so, ypObject *x)
     if (so == x) return yp_False;
     if (ypObject_TYPE_PAIR_CODE(x) != ypFrozenSet_CODE) return yp_ComparisonNotImplemented;
     if (ypSet_LEN(so) <= ypSet_LEN(x)) return yp_False;
-    return _ypSet_issubset(x, so);
+    return _ypSet_issuperset_withset(so, x);
 }
 
 static ypObject *set_update(ypObject *so, int n, va_list args)
@@ -16005,8 +16159,7 @@ static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
     if (x_pair == ypFrozenSet_CODE) {
         return _ypSet_symmetric_difference_update_fromset(so, x);
     } else {
-        // TODO Can we make a version of _ypSet_symmetric_difference_update_fromset that doesn't
-        // reqire a new set created?
+        // TODO Is there a way to do this without allocating a new set? (I actually think not.)
         ypObject *x_asset = yp_frozenset(x);
         if (yp_isexceptionC(x_asset)) return x_asset;
         result = _ypSet_symmetric_difference_update_fromset(so, x_asset);
@@ -16015,11 +16168,10 @@ static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
     }
 }
 
-// XXX We redirect the new-object set methods to the in-place versions. Among other things, this
-// helps to avoid duplicating code.
-// TODO ...except we are creating objects that we destroy then create new ones, which can probably
-// be optimized in certain cases, so rethink these four methods. At the very least, can we avoid
-// the yp_freeze?
+// TODO Possible optimizations:
+//  - lazy shallow copy of an immutable so when friendly x is empty.
+//  - lazy shallow copy of a friendly immutable x when immutable so is empty.
+//  - empty immortal when immutable so is empty and friendly x is empty.
 static ypObject *frozenset_union(ypObject *so, int n, va_list args)
 {
     ypObject *exc = yp_None;
@@ -16028,14 +16180,18 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
 
     if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
 
-    newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
+
     result = set_update(newSo, n, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
     }
 
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start.
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
@@ -16044,6 +16200,9 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
     return newSo;
 }
 
+// TODO Possible optimizations:
+//  - lazy shallow copy of an immutable so when x is so.
+//  - empty immortal when immutable so and either so or friendly x is empty.
 static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
 {
     ypObject *exc = yp_None;
@@ -16052,14 +16211,18 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
 
     if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
 
-    newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
+
     result = set_intersection_update(newSo, n, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
     }
 
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start.
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
@@ -16068,6 +16231,9 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
     return newSo;
 }
 
+// TODO Possible optimizations:
+//  - lazy shallow copy of an immutable so when friendly x is empty.
+//  - empty immortal when immutable so and either so is empty or x is so.
 static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
 {
     ypObject *exc = yp_None;
@@ -16076,14 +16242,18 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
 
     if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
 
-    newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
+
     result = set_difference_update(newSo, n, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
     }
 
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start.
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
@@ -16092,20 +16262,29 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
     return newSo;
 }
 
+// TODO Possible optimizations:
+//  - lazy shallow copy of an immutable so when friendly x is empty.
+//  - lazy shallow copy of a friendly immutable x when immutable so is empty.
+//  - empty immortal when immutable so is empty and friendly x is empty.
+//  - empty immortal when immutable so is x.
 static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 {
     ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
-    newSo = _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
+
     result = set_symmetric_difference_update(newSo, x);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
     }
 
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start.
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
     if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
     if (yp_isexceptionC(exc)) {
         yp_decref(newSo);
@@ -16118,7 +16297,7 @@ static ypObject *set_pushunique(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
     // TODO Overallocate
-    ypObject *result = _ypSet_push(so, x, &spaceleft, 0);
+    ypObject *result = _ypSet_push_byhash(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;  // TODO: As usual, what if this is yp_KeyError?
     return result == yp_True ? yp_None : yp_KeyError;
 }
@@ -16127,7 +16306,7 @@ static ypObject *set_push(ypObject *so, ypObject *x)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
     // TODO Overallocate
-    ypObject *result = _ypSet_push(so, x, &spaceleft, 0);
+    ypObject *result = _ypSet_push_byhash(so, x, &spaceleft, 0);
     if (yp_isexceptionC(result)) return result;
     return yp_None;
 }
@@ -16141,7 +16320,8 @@ static ypObject *set_clear(ypObject *so)
     if (ypSet_FILL(so) < 1) return yp_None;
 
     // Discard the old keys
-    // FIXME What if yp_decref modifies so?
+    // TODO What if yp_decref modifies so? Here and everywhere, we should delay decrefs until we're
+    // done modifying the object.
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&oldkeys[i])) continue;
         keysleft -= 1;
@@ -16156,6 +16336,7 @@ static ypObject *set_clear(ypObject *so)
 
     // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
+    // FIXME We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, ypSet_ALLOCLEN_MIN);  // we can't make use of the excess anyway
     ypSet_SET_LEN(so, 0);
     ypSet_FILL(so) = 0;
@@ -16163,8 +16344,8 @@ static ypObject *set_clear(ypObject *so)
     return yp_None;
 }
 
-// Note the difference between this, which removes an arbitrary key, and _ypSet_pop, which removes
-// a specific key
+// Note the difference between this, which removes an arbitrary key, and _ypSet_pop_bycurrenthash,
+// which removes a specific key
 // XXX Adapted from Python's set_pop
 static ypObject *set_pop(ypObject *so)
 {
@@ -16206,12 +16387,12 @@ static ypObject *frozenset_len(ypObject *so, yp_ssize_t *len)
 // onmissing must be an immortal, or NULL
 static ypObject *set_remove(ypObject *so, ypObject *x, ypObject *onmissing)
 {
-    ypObject *result = _ypSet_pop(so, x);
+    ypObject *result = _ypSet_pop_bycurrenthash(so, x);
     if (result == ypSet_dummy) {
         if (onmissing == NULL) return yp_KeyError;
         return onmissing;
     }
-    if (yp_isexceptionC(result)) return result;
+    if (yp_isexceptionC(result)) return result;  // TODO As usual, what if this is yp_KeyError?
     yp_decref(result);
     return yp_None;
 }
@@ -16263,10 +16444,11 @@ static ypSetMethods ypFrozenSet_as_set = {
         frozenset_intersection,          // tp_intersection
         frozenset_difference,            // tp_difference
         frozenset_symmetric_difference,  // tp_symmetric_difference
-        MethodError_objvalistproc,       // tp_intersection_update
-        MethodError_objvalistproc,       // tp_difference_update
-        MethodError_objobjproc,          // tp_symmetric_difference_update
-        // tp_push (aka tp_set_ad) is elsewhere
+        // tp_update is elsewhere
+        MethodError_objvalistproc,  // tp_intersection_update
+        MethodError_objvalistproc,  // tp_difference_update
+        MethodError_objobjproc,     // tp_symmetric_difference_update
+        // tp_push is elsewhere
         MethodError_objobjproc  // tp_pushunique
 };
 
@@ -16346,14 +16528,15 @@ static ypSetMethods ypSet_as_set = {
         // tp_lt is elsewhere
         frozenset_issuperset,  // tp_issuperset
         // tp_gt is elsewhere
-        frozenset_union,                  // tp_union
-        frozenset_intersection,           // tp_intersection
-        frozenset_difference,             // tp_difference
-        frozenset_symmetric_difference,   // tp_symmetric_difference
+        frozenset_union,                 // tp_union
+        frozenset_intersection,          // tp_intersection
+        frozenset_difference,            // tp_difference
+        frozenset_symmetric_difference,  // tp_symmetric_difference
+        // tp_update is elsewhere
         set_intersection_update,          // tp_intersection_update
         set_difference_update,            // tp_difference_update
         set_symmetric_difference_update,  // tp_symmetric_difference_update
-        // tp_push (aka tp_set_ad) is elsewhere
+        // tp_push is elsewhere
         set_pushunique,  // tp_pushunique
 };
 
@@ -16430,26 +16613,13 @@ static ypTypeObject ypSet_Type = {
 
 // Public functions
 
-void yp_set_add(ypObject *set, ypObject *x, ypObject **exc)
-{
-    ypObject *result;
-    if (ypObject_TYPE_CODE(set) != ypSet_CODE) return_yp_EXC_BAD_TYPE(exc, set);
-    result = set_push(set, x);
-    if (yp_isexceptionC(result)) return_yp_EXC_ERR(exc, result);
-}
-
 // TODO Calling it yp_set_* implies it only works for sets, so do we need a yp_frozenset_*?  If we
 // do, we're dooming people to check the type of the object to find out which function they can
 // use...but then what else should we call this?  Do we jump right to yp_getintern?
 static ypObject *yp_set_getintern(ypObject *set, ypObject *x)
 {
-    yp_hash_t       hash;
-    ypObject       *result = yp_None;
     ypSet_KeyEntry *loc;
-
-    hash = yp_currenthashC(x, &result);
-    if (yp_isexceptionC(result)) return result;
-    result = _ypSet_lookkey(set, x, hash, &loc);
+    ypObject       *result = _ypSet_lookkey_bycurrenthash(set, x, &loc);
     if (yp_isexceptionC(result)) return result;
     if (!ypSet_ENTRY_USED(loc)) return yp_KeyError;
     return yp_incref(loc->se_key);
@@ -16457,7 +16627,6 @@ static ypObject *yp_set_getintern(ypObject *set, ypObject *x)
 
 // Constructors
 
-// TODO using ypQuickIter here could merge with _ypSet, removing one of its incref/decrefs
 static ypObject *_ypSetNV(int type, int n, va_list args)
 {
     yp_ssize_t spaceleft;
@@ -16472,7 +16641,7 @@ static ypObject *_ypSetNV(int type, int n, va_list args)
             return x;
         }
         n -= 1;
-        result = _ypSet_push(newSo, x, &spaceleft, n);
+        result = _ypSet_push_byhash(newSo, x, &spaceleft, n);
         if (yp_isexceptionC(result)) {
             yp_decref(newSo);
             return result;
@@ -16504,38 +16673,64 @@ ypObject *yp_setNV(int n, va_list args)
 }
 
 // XXX Check for the "fellow frozenset/set" case _before_ calling this function
-static ypObject *_ypSet(int type, ypObject *iterable)
+static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
 {
-    ypObject  *exc = yp_None;
-    ypObject  *newSo;
-    ypObject  *result;
-    yp_ssize_t length_hint = yp_lenC(iterable, &exc);
-    if (yp_isexceptionC(exc)) {
-        // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
-        if (length_hint > ypSet_LEN_MAX) length_hint = ypSet_LEN_MAX;
-    } else if (length_hint < 1) {
-        // yp_lenC reports an empty iterable, so we can shortcut _ypSet_update
-        if (type == ypFrozenSet_CODE) return yp_frozenset_empty;
-        return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
-    } else if (length_hint > ypSet_LEN_MAX) {
-        // yp_lenC reports that we don't have room to add their elements
-        return yp_MemorySizeOverflowError;
+    ypObject       *exc = yp_None;
+    yp_uint64_t     mi_state;
+    ypObject       *mi;
+    ypObject       *first;
+    yp_hash_t       first_hash;
+    yp_ssize_t      length_hint;
+    ypObject       *newSo;
+    ypSet_KeyEntry *loc;
+    ypObject       *result;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(iterable) != ypFrozenSet_CODE);
+
+    mi = yp_miniiter(iterable, &mi_state);  // new ref
+    if (yp_isexceptionC(mi)) return mi;
+
+    // Ignore errors determining length_hint; it just means we can't pre-allocate
+    // FIXME Implement a similar "maximum length hint" everywhere.
+    length_hint = yp_miniiter_length_hintC(mi, &mi_state, &yp_exc_ignored);
+    if (length_hint > ypSet_FROMITERABLE_LEN_MAX) length_hint = ypSet_FROMITERABLE_LEN_MAX;
+
+    // FIXME Use a similar "empty iterable" optimization everywhere.
+    first = yp_miniiter_next(mi, &mi_state);  // new ref
+    if (yp_isexceptionC(first)) {
+        yp_decref(mi);
+        if (yp_isexceptionC2(first, yp_StopIteration)) {
+            if (type == ypFrozenSet_CODE) return yp_frozenset_empty;
+            return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
+        }
+        return first;
     }
 
-    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);
-    if (yp_isexceptionC(newSo)) return newSo;
-    result = _ypSet_update(newSo, iterable);
+    first_hash = yp_hashC(first, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(first);
+        yp_decref(mi);
+        return exc;
+    }
+
+    // FIXME I'm creating the type directly here, rather than freezing. Do above as well!
+    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
+    if (yp_isexceptionC(newSo)) {
+        yp_decref(first);
+        yp_decref(mi);
+        return newSo;
+    }
+
+    // Add the first element to the set. We can use _ypSet_movekey_clean only because we know that
+    // first is not already in newSo.
+    _ypSet_movekey_clean(newSo, first, first_hash, &loc);  // steals first
+
+    // Add the remaining elements to the set.
+    result = _ypSet_update_fromiter(newSo, mi, &mi_state);
+    yp_decref(mi);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
-    }
-
-    // TODO We could avoid allocating for an empty iterable altogether if we get the first value
-    // before allocating; is this complication worth the optimization?
-    if (type == ypFrozenSet_CODE && ypSet_LEN(newSo) < 1) {
-        yp_decref(newSo);
-        return yp_frozenset_empty;
     }
 
     return newSo;
@@ -16546,17 +16741,17 @@ ypObject *yp_frozenset(ypObject *iterable)
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
         if (ypSet_LEN(iterable) < 1) return yp_frozenset_empty;
         if (ypObject_TYPE_CODE(iterable) == ypFrozenSet_CODE) return yp_incref(iterable);
-        return _ypSet_copy(ypFrozenSet_CODE, iterable, /*alloclen_fixed=*/TRUE);
+        return _ypSet_copy(ypFrozenSet_CODE, iterable);
     }
-    return _ypSet(ypFrozenSet_CODE, iterable);
+    return _ypSet_fromiterable(ypFrozenSet_CODE, iterable);
 }
 
 ypObject *yp_set(ypObject *iterable)
 {
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
-        return _ypSet_copy(ypSet_CODE, iterable, /*alloclen_fixed=*/FALSE);
+        return _ypSet_copy(ypSet_CODE, iterable);
     }
-    return _ypSet(ypSet_CODE, iterable);
+    return _ypSet_fromiterable(ypSet_CODE, iterable);
 }
 
 #pragma endregion set
@@ -16575,9 +16770,10 @@ ypObject *yp_set(ypObject *iterable)
 // truly immutable. As such, it cannot be exposed outside of the set/dict implementations. On the
 // plus side, we can allocate it's data inline (via alloclen_fixed).
 
-// ypDictObject and ypDict_LEN are defined above, for use by the set code
 #define ypDict_KEYSET(mp) (((ypDictObject *)mp)->keyset)
 #define ypDict_ALLOCLEN(mp) ypSet_ALLOCLEN(ypDict_KEYSET(mp))
+#define ypDict_LEN ypObject_CACHED_LEN
+#define ypDict_SET_LEN ypObject_SET_CACHED_LEN
 #define ypDict_VALUES(mp) ((ypObject **)((ypObject *)mp)->ob_data)
 #define ypDict_SET_VALUES(mp, x) (((ypObject *)mp)->ob_data = x)
 #define ypDict_INLINE_DATA(mp) (((ypDictObject *)mp)->ob_inline_data)
@@ -16726,8 +16922,8 @@ static ypObject *_ypDict_resize(ypObject *mp, yp_ssize_t minused)
         value = oldvalues[i];
         if (value == NULL) continue;
         valuesleft -= 1;
-        _ypSet_movekey_clean(
-                newkeyset, yp_incref(oldkeys[i].se_key), oldkeys[i].se_hash, &newkey_loc);
+        _ypSet_movekey_clean(newkeyset, yp_incref(oldkeys[i].se_key), oldkeys[i].se_hash,
+                &newkey_loc);  // steals key
         ypDict_VALUES(mp)[ypSet_ENTRY_INDEX(newkeyset, newkey_loc)] = oldvalues[i];
     }
 
@@ -16757,11 +16953,10 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // It's possible we can add the key without resizing
-    if (*spaceleft >= 1) {
-        _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash);
+    if (*spaceleft > 0 || (*key_loc)->se_key == ypSet_dummy) {
+        _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash, spaceleft);  // steals key
         *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
         ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
-        *spaceleft -= 1;
         return yp_True;
     }
 
@@ -16776,7 +16971,7 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     if (yp_isexceptionC(result)) return result;
 
     keyset = ypDict_KEYSET(mp);
-    _ypSet_movekey_clean(keyset, yp_incref(key), hash, key_loc);
+    _ypSet_movekey_clean(keyset, yp_incref(key), hash, key_loc);  // steals key
     *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
     ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
     *spaceleft = _ypSet_space_remaining(keyset);
@@ -16785,9 +16980,9 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
 
 // Adds the key/value to the dict. If override is false, returns yp_False and does not modify the
 // dict if there is an existing value. *spaceleft should be initialized from
-// _ypSet_space_remaining; this function then decrements it with each key added, and resets it on
-// every resize. Returns yp_True if mp was modified, yp_False if it wasn't due to existing values
-// being preserved (ie override is false), or an exception on error.
+// _ypSet_space_remaining; it will be decremented or reset as appropriate.. Returns yp_True if mp
+// was modified, yp_False if it wasn't due to existing values being preserved (ie override is
+// false), or an exception on error.
 // XXX Adapted from PyDict_SetItem
 static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int override,
         yp_ssize_t *spaceleft, yp_ssize_t growhint)
@@ -16795,15 +16990,16 @@ static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int 
     yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
     ypSet_KeyEntry *key_loc;
-    ypObject       *result = yp_None;
+    ypObject       *exc = yp_None;
+    ypObject       *result;
     ypObject      **value_loc;
 
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // Look for the appropriate entry in the hash table
-    hash = yp_hashC(key, &result);
-    if (yp_isexceptionC(result)) return result;  // also verifies key is not an exception
-    if (yp_isexceptionC(value)) return value;    // verifies value is not an exception
+    hash = yp_hashC(key, &exc);
+    if (yp_isexceptionC(exc)) return exc;      // also verifies key is not an exception
+    if (yp_isexceptionC(value)) return value;  // verifies value is not an exception
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
@@ -16831,10 +17027,9 @@ static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int 
 // if it wasn't due to the value not being set, or an exception on error.
 static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
 {
-    yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
     ypSet_KeyEntry *key_loc;
-    ypObject       *result = yp_None;
+    ypObject       *result;
     ypObject      **value_loc;
     ypObject       *oldvalue;
 
@@ -16842,9 +17037,7 @@ static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
-    hash = yp_currenthashC(key, &result);
-    if (yp_isexceptionC(result)) return result;
-    result = _ypSet_lookkey(keyset, key, hash, &key_loc);
+    result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
     // If the there's no existing value, then there's nothing to do (if the key is not in the set,
@@ -16907,12 +17100,14 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
 
 static ypObject *_ypDict_update_fromiter(ypObject *mp, ypObject *itemiter)
 {
-    ypObject  *exc = yp_None;
     ypObject  *result;
     ypObject  *key;
     ypObject  *value;
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
-    yp_ssize_t length_hint = yp_length_hintC(itemiter, &exc);  // zero on error
+    // Ignore errors getting length_hint. Recall yp_length_hintC returns zero on error.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
+    yp_ssize_t length_hint = yp_length_hintC(itemiter, &yp_exc_ignored);
 
     while (1) {
         _ypDict_iter_items_next(itemiter, &key, &value);  // new refs: key, value
@@ -16941,7 +17136,7 @@ static ypObject *_ypDict_update_fromiterable(ypObject *mp, ypObject *x)
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
 
     // Prefer yp_iter_items over yp_iter if supported.
-    // TODO replace with yp_miniiter_items once supported
+    // TODO replace with yp_miniiter_items now that it's supported
     // TODO help(dict.update) states that it only looks for a .keys() method. This is probably
     // better: while keys() requires an extra lookup, that's likely cheaper than creating all those
     // 2-tuples...although, with yp_miniiter_items, we would get the best of both worlds, so perhaps
@@ -17107,14 +17302,9 @@ static ypObject *frozendict_currenthash(
 
 static ypObject *frozendict_contains(ypObject *mp, ypObject *key)
 {
-    yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
     ypSet_KeyEntry *key_loc;
-    ypObject       *result = yp_None;
-
-    hash = yp_currenthashC(key, &result);
-    if (yp_isexceptionC(result)) return result;
-    result = _ypSet_lookkey(keyset, key, hash, &key_loc);
+    ypObject       *result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
     return ypBool_FROM_C((*ypDict_VALUE_ENTRY(mp, key_loc)) != NULL);
 }
@@ -17171,10 +17361,9 @@ static ypObject *dict_clear(ypObject *mp)
 // A defval of NULL means to raise an error if key is not in dict
 static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *defval)
 {
-    yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
     ypSet_KeyEntry *key_loc;
-    ypObject       *result = yp_None;
+    ypObject       *result;
     ypObject       *value;
 
     // Because we are called directly (i.e. ypFunction), ensure we're called correctly
@@ -17182,9 +17371,7 @@ static ypObject *frozendict_getdefault(ypObject *mp, ypObject *key, ypObject *de
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
     // because we are not adding it to the set
-    hash = yp_currenthashC(key, &result);
-    if (yp_isexceptionC(result)) return result;
-    result = _ypSet_lookkey(keyset, key, hash, &key_loc);
+    result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
     // If the there's no existing value, return defval, otherwise return the value
@@ -17261,13 +17448,13 @@ static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
     yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
     ypSet_KeyEntry *key_loc;
-    ypObject       *result = yp_None;
+    ypObject       *exc = yp_None;
+    ypObject       *result;
     ypObject      **value_loc;
 
-    // Look for the appropriate entry in the hash table; note that key can be a mutable object,
-    // because we are not adding it to the set
-    hash = yp_currenthashC(key, &result);
-    if (yp_isexceptionC(result)) return result;  // returns if key is an exception
+    // Look for the appropriate entry in the hash table.
+    hash = yp_hashC(key, &exc);
+    if (yp_isexceptionC(exc)) return exc;        // returns if key is an exception
     if (yp_isexceptionC(defval)) return defval;  // returns if defval is an exception
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
     if (yp_isexceptionC(result)) return result;
@@ -17294,7 +17481,7 @@ static ypObject *dict_setdefault(ypObject *mp, ypObject *key, ypObject *defval)
 static ypObject *dict_updateK(ypObject *mp, int n, va_list args)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
-    ypObject  *result = yp_None;
+    ypObject  *result;
     ypObject  *key;
     ypObject  *value;
 
@@ -17333,8 +17520,8 @@ typedef struct {
 } ypDictMiState;
 yp_STATIC_ASSERT(ypDict_LEN_MAX <= 0x7FFFFFFFu, len_fits_31_bits);
 yp_STATIC_ASSERT(yp_sizeof(yp_uint64_t) >= yp_sizeof(ypDictMiState), ypDictMiState_fits_uint64);
-#define ypDictMiState_SET_ITEMSLEFT(state, v) ((state)->itemsleft = (yp_uint32_t)(v)&0x7FFFFFFFu)
-#define ypDictMiState_SET_INDEX(state, v) ((state)->index = (yp_uint32_t)(v)&0x7FFFFFFFu)
+#define ypDictMiState_SET_ITEMSLEFT(state, v) ((state)->itemsleft = (yp_uint32_t)(v) & 0x7FFFFFFFu)
+#define ypDictMiState_SET_INDEX(state, v) ((state)->index = (yp_uint32_t)(v) & 0x7FFFFFFFu)
 
 static ypObject *frozendict_miniiter_items(ypObject *mp, yp_uint64_t *_state)
 {
@@ -17378,54 +17565,81 @@ static ypObject *frozendict_iter_values(ypObject *x)
     return _ypMiIter_fromminiiter(x, frozendict_miniiter_values);
 }
 
+// Returns the index of the next item to yield, or -1 if exhausted. Updates state.
 // XXX We need to be a little suspicious of _state...just in case the caller has changed it
-static ypObject *frozendict_miniiter_next(ypObject *mp, yp_uint64_t *_state)
+static yp_ssize_t _frozendict_miniiter_next(ypObject *mp, ypDictMiState *state)
 {
-    ypObject      *result;
-    ypDictMiState *state = (ypDictMiState *)_state;
-    yp_ssize_t     index = state->index;  // don't forget to write it back
-    if (state->itemsleft < 1) return yp_StopIteration;
+    yp_ssize_t index = (yp_ssize_t)state->index;  // don't forget to write it back
 
-    // Find the next entry
+    if (state->itemsleft < 1 || index < 0) return -1;
+
+    // Find the next entry.
     while (1) {
         if (index >= ypDict_ALLOCLEN(mp)) {
-            ypDictMiState_SET_INDEX(state, ypDict_ALLOCLEN(mp));
             state->itemsleft = 0;
-            return yp_StopIteration;
+            return -1;
         }
         if (ypDict_VALUES(mp)[index] != NULL) break;
         index++;
     }
 
-    // Find the requested data
+    // Update state and return.
+    ypDictMiState_SET_INDEX(state, (index + 1));
+    ypDictMiState_SET_ITEMSLEFT(state, (state->itemsleft - 1));
+    return index;
+}
+
+// XXX We need to be a little suspicious of _state...just in case the caller has changed it
+static ypObject *frozendict_miniiter_next(ypObject *mp, yp_uint64_t *_state)
+{
+    ypDictMiState *state = (ypDictMiState *)_state;
+    yp_ssize_t     index;
+
+    index = _frozendict_miniiter_next(mp, state);
+    if (index < 0) return yp_StopIteration;
+
+    // Find the requested data.
     if (state->keys) {
         if (state->values) {
             // TODO An internal _yp_tuple2, which trusts it won't be passed exceptions, would be
             // quite efficient here
-            result = yp_tupleN(
+            return yp_tupleN(
                     2, ypSet_TABLE(ypDict_KEYSET(mp))[index].se_key, ypDict_VALUES(mp)[index]);
         } else {
-            result = yp_incref(ypSet_TABLE(ypDict_KEYSET(mp))[index].se_key);
+            return yp_incref(ypSet_TABLE(ypDict_KEYSET(mp))[index].se_key);
         }
     } else {
         if (state->values) {
-            result = yp_incref(ypDict_VALUES(mp)[index]);
+            return yp_incref(ypDict_VALUES(mp)[index]);
         } else {
-            result = yp_SystemError;  // should never occur
+            return yp_SystemError;  // should never occur
         }
     }
-    if (yp_isexceptionC(result)) return result;
+}
 
-    // Update state and return
-    ypDictMiState_SET_INDEX(state, (index + 1));
-    ypDictMiState_SET_ITEMSLEFT(state, (state->itemsleft - 1));
-    return result;
+// XXX On error, returns exception, but leaves *key/*value unmodified.
+// XXX We need to be a little suspicious of _state...just in case the caller has changed it
+static ypObject *frozendict_miniiter_items_next(
+        ypObject *mp, yp_uint64_t *_state, ypObject **key, ypObject **value)
+{
+    ypDictMiState *state = (ypDictMiState *)_state;
+    yp_ssize_t     index;
+
+    if (!state->keys || !state->values) return yp_TypeError;
+
+    index = _frozendict_miniiter_next(mp, state);
+    if (index < 0) return yp_StopIteration;
+
+    // Find the requested data
+    *key = yp_incref(ypSet_TABLE(ypDict_KEYSET(mp))[index].se_key);
+    *value = yp_incref(ypDict_VALUES(mp)[index]);
+    return yp_None;
 }
 
 static ypObject *frozendict_miniiter_length_hint(
         ypObject *mp, yp_uint64_t *state, yp_ssize_t *length_hint)
 {
-    *length_hint = ((ypDictMiState *)state)->itemsleft;
+    *length_hint = (yp_ssize_t)((ypDictMiState *)state)->itemsleft;
     return yp_None;
 }
 
@@ -17494,16 +17708,17 @@ yp_IMMORTAL_FUNCTION_static(
 yp_IMMORTAL_FUNCTION_static(dict_func_new, dict_func_new_code, _ypFrozenDict_FUNC_NEW_PARAMETERS);
 
 static ypMappingMethods ypFrozenDict_as_mapping = {
-        frozendict_miniiter_items,    // tp_miniiter_items
-        frozendict_iter_items,        // tp_iter_items
-        frozendict_miniiter_keys,     // tp_miniiter_keys
-        frozendict_iter_keys,         // tp_iter_keys
-        MethodError_objobjobjproc,    // tp_popvalue
-        MethodError_objpobjpobjproc,  // tp_popitem
-        MethodError_objobjobjproc,    // tp_setdefault
-        MethodError_objvalistproc,    // tp_updateK
-        frozendict_miniiter_values,   // tp_miniiter_values
-        frozendict_iter_values        // tp_iter_values
+        frozendict_miniiter_keys,        // tp_miniiter_keys
+        frozendict_miniiter_values,      // tp_miniiter_values
+        frozendict_miniiter_items,       // tp_miniiter_items
+        frozendict_miniiter_items_next,  // tp_miniiter_items_next
+        frozendict_iter_keys,            // tp_iter_keys
+        frozendict_iter_values,          // tp_iter_values
+        frozendict_iter_items,           // tp_iter_items
+        MethodError_objobjobjproc,       // tp_popvalue
+        MethodError_objpobjpobjproc,     // tp_popitem
+        MethodError_objobjobjproc,       // tp_setdefault
+        MethodError_objvalistproc        // tp_updateK
 };
 
 static ypTypeObject ypFrozenDict_Type = {
@@ -17577,16 +17792,17 @@ static ypTypeObject ypFrozenDict_Type = {
 };
 
 static ypMappingMethods ypDict_as_mapping = {
-        frozendict_miniiter_items,   // tp_miniiter_items
-        frozendict_iter_items,       // tp_iter_items
-        frozendict_miniiter_keys,    // tp_miniiter_keys
-        frozendict_iter_keys,        // tp_iter_keys
-        dict_popvalue,               // tp_popvalue
-        dict_popitem,                // tp_popitem
-        dict_setdefault,             // tp_setdefault
-        dict_updateK,                // tp_updateK
-        frozendict_miniiter_values,  // tp_miniiter_values
-        frozendict_iter_values       // tp_iter_values
+        frozendict_miniiter_keys,        // tp_miniiter_keys
+        frozendict_miniiter_values,      // tp_miniiter_values
+        frozendict_miniiter_items,       // tp_miniiter_items
+        frozendict_miniiter_items_next,  // tp_miniiter_items_next
+        frozendict_iter_keys,            // tp_iter_keys
+        frozendict_iter_values,          // tp_iter_values
+        frozendict_iter_items,           // tp_iter_items
+        dict_popvalue,                   // tp_popvalue
+        dict_popitem,                    // tp_popitem
+        dict_setdefault,                 // tp_setdefault
+        dict_updateK                     // tp_updateK
 };
 
 static ypTypeObject ypDict_Type = {
@@ -17709,10 +17925,11 @@ static ypObject *_ypDict(int type, ypObject *x)
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
 
-    // We could just check yp_length_hintC if it returned an "is exact length" flag.
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(x, &exc);
+        length_hint = yp_length_hintC(x, &yp_exc_ignored);
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update_fromiterable
@@ -17766,7 +17983,7 @@ ypObject *yp_dict(ypObject *x)
 static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list args)
 {
     yp_ssize_t spaceleft;
-    ypObject  *result = yp_None;
+    ypObject  *result;
     ypObject  *key;
     ypObject  *newMp;
 
@@ -17819,10 +18036,14 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     ypObject   *newMp;
     yp_ssize_t  spaceleft;
     ypObject   *key;
-    yp_ssize_t  length_hint = yp_lenC(iterable, &exc);
+    yp_ssize_t  length_hint;
+
+    // FIXME How does this handle excessively-large length hints?
+    // FIXME Rewrite similarly to _ypSet_fromiterable?
+    length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
-        length_hint = yp_length_hintC(iterable, &exc);
+        length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_push
@@ -18107,8 +18328,9 @@ static ypObject *range_currenthash(
     yp_HashSequence_next(&state, yp_HashInt(ypRange_LEN(r)));
     yp_HashSequence_next(&state, yp_HashInt(ypRange_START(r)));
     yp_HashSequence_next(&state, yp_HashInt(ypRange_STEP(r)));
-    // Since we never contain mutable objects, we can cache our hash
-    *hash = ypObject_CACHED_HASH(yp_None) = yp_HashSequence_fini(&state);
+
+    // Since we never contain mutable objects, we can cache our hash.
+    *hash = ypObject_CACHED_HASH(r) = yp_HashSequence_fini(&state);
 
     return yp_None;
 }
@@ -19807,6 +20029,7 @@ void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
 {
     _yp_REDIRECT_EXC1(set, tp_update, (set, n, args), exc);
 }
+void yp_update(ypObject *set, ypObject *x, ypObject **exc) { yp_updateN(set, exc, 1, x); }
 
 void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...)
 {
@@ -19816,6 +20039,10 @@ void yp_intersection_updateNV(ypObject *set, ypObject **exc, int n, va_list args
 {
     _yp_REDIRECT_EXC2(set, tp_as_set, tp_intersection_update, (set, n, args), exc);
 }
+void yp_intersection_update(ypObject *set, ypObject *x, ypObject **exc)
+{
+    yp_intersection_updateN(set, exc, 1, x);
+}
 
 void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...)
 {
@@ -19824,6 +20051,10 @@ void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...)
 void yp_difference_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
 {
     _yp_REDIRECT_EXC2(set, tp_as_set, tp_difference_update, (set, n, args), exc);
+}
+void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc)
+{
+    yp_difference_updateN(set, exc, 1, x);
 }
 
 void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc)
@@ -20014,9 +20245,7 @@ ypObject *yp_miniiter(ypObject *x, yp_uint64_t *state)
 
 ypObject *yp_miniiter_next(ypObject *mi, yp_uint64_t *state)
 {
-    ypTypeObject *type = ypObject_TYPE(mi);
-    ypObject     *result = type->tp_miniiter_next(mi, state);
-    return result;
+    _yp_REDIRECT1(mi, tp_miniiter_next, (mi, state));
 }
 
 yp_ssize_t yp_miniiter_length_hintC(ypObject *mi, yp_uint64_t *state, ypObject **exc)
@@ -20025,6 +20254,30 @@ yp_ssize_t yp_miniiter_length_hintC(ypObject *mi, yp_uint64_t *state, ypObject *
     ypObject  *result = ypObject_TYPE(mi)->tp_miniiter_length_hint(mi, state, &length_hint);
     if (yp_isexceptionC(result)) return_yp_CEXC_ERR(0, exc, result);
     return length_hint < 0 ? 0 : length_hint;
+}
+
+ypObject *yp_miniiter_keys(ypObject *x, yp_uint64_t *state)
+{
+    _yp_REDIRECT2(x, tp_as_mapping, tp_miniiter_keys, (x, state));
+}
+
+ypObject *yp_miniiter_values(ypObject *x, yp_uint64_t *state)
+{
+    _yp_REDIRECT2(x, tp_as_mapping, tp_miniiter_values, (x, state));
+}
+
+ypObject *yp_miniiter_items(ypObject *x, yp_uint64_t *state)
+{
+    _yp_REDIRECT2(x, tp_as_mapping, tp_miniiter_items, (x, state));
+}
+
+void yp_miniiter_items_next(ypObject *mi, yp_uint64_t *state, ypObject **key, ypObject **value)
+{
+    ypTypeObject *type = ypObject_TYPE(mi);
+    ypObject     *result = type->tp_as_mapping->tp_miniiter_items_next(mi, state, key, value);
+    if (yp_isexceptionC(result)) {
+        *key = *value = result;
+    }
 }
 
 #pragma endregion methods
