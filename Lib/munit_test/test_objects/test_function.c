@@ -1,6 +1,11 @@
 
 #include "munit_test/unittest.h"
 
+// _test_callK is a bit too complex for GCC.
+#if defined(__GNUC__)
+#pragma GCC optimize("no-var-tracking")
+#endif
+
 
 typedef struct _signature_t {
     yp_int32_t          n;

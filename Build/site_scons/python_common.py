@@ -16,8 +16,7 @@ re_python_stem = re.compile(r"python([0-9.]+)?")
 
 
 def _version_detector(python):
-    """Returns (hexversion, maxsize) for the given Python executable, or (None, None) on error.
-    """
+    """Returns (hexversion, maxsize) for the given Python executable, or (None, None) on error."""
     SconscriptLog.write(f"Detecting version of {python}\n")
 
     # Our exe_globs picks up related tools
@@ -25,9 +24,14 @@ def _version_detector(python):
         return None, None
 
     try:
-        output = subprocess.check_output([
-            str(python), "-c", "import sys; print('(%d, %d)' % (sys.hexversion, sys.maxsize))"
-        ], stderr=subprocess.PIPE).decode()
+        output = subprocess.check_output(
+            [
+                str(python),
+                "-c",
+                "import sys; print('(%d, %d)' % (sys.hexversion, sys.maxsize))",
+            ],
+            stderr=subprocess.PIPE,
+        ).decode()
         hexversion, maxsize = ast.literal_eval(output.strip())
         return hexversion, maxsize
     except subprocess.CalledProcessError:
@@ -35,11 +39,11 @@ def _version_detector(python):
 
 
 python_finder = ToolFinder(
-    win_dirs=('Python*', ),
+    win_dirs=("Python*",),
     posix_dirs=(),  # rely on the environment's path for now
     darwin_dirs=(),  # rely on the environment's path for now
     exe_globs=("python*.*", "python?*", "python"),  # prefer specificity
-    version_detector=_version_detector
+    version_detector=_version_detector,
 )
 
 
@@ -92,7 +96,8 @@ def DefinePythonToolFunctions(hexversions, tool_name):
         python_path = toolsConfig.get(python_siteName, "")
         if python_path is None:
             raise SCons.Errors.StopError(
-                "%s (%r) disabled in %s" % (tool_name, env["TARGET_ARCH"], toolsConfig.basename)
+                "%s (%r) disabled in %s"
+                % (tool_name, env["TARGET_ARCH"], toolsConfig.basename)
             )
 
         # If site_toolsconfig.py came up empty, find a Python that supports our target, then update
@@ -108,6 +113,9 @@ def DefinePythonToolFunctions(hexversions, tool_name):
         path, python = os.path.split(python_path)
         env.PrependENVPath("PATH", path)
         env["PYTHON"] = python
+
+        # FIXME Treat warnings as errors?
+        # env["ENV"]["PYTHONWARNINGS"] = "error"
 
     def exists(env):
         # We rely on generate to tell us if a tool is available

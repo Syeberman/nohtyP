@@ -180,22 +180,7 @@ def ApplyMSVSOptions(env, version):
 def DefineMSVSToolFunctions(numericVersion, supportedVersions):
     """Returns (generate, exists), suitable for use as the SCons tool module functions."""
 
-    # Determine the exact version of tool installed, if any (Express vs "commercial")
-    # XXX get_vs_by_version is internal to SCons and may change in the future
-    for version in supportedVersions:
-        try:
-            if SCons.Tool.MSCommon.vs.get_vs_by_version(version):
-                break
-        except SCons.Errors.UserError:
-            pass  # "not supported by SCons"
-    else:
-        version = None
-
     def generate(env):
-        if version is None:
-            raise SCons.Errors.UserError(
-                "Visual Studio %r is not installed" % supportedVersions[0]
-            )
         if env["TARGET_OS"] != "win32":
             raise SCons.Errors.StopError(
                 "Visual Studio doesn't build for OS %r" % env["TARGET_OS"]
@@ -206,7 +191,6 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
                 "Visual Studio doesn't support the %r configuration (yet)"
                 % env["CONFIGURATION"]
             )
-        env["MSVC_VERSION"] = version
 
         # Caching INCLUDE, LIB, etc in site_toolsconfig.py bypasses the slow vcvars*.bat calls on
         # subsequent builds
@@ -228,14 +212,38 @@ def DefineMSVSToolFunctions(numericVersion, supportedVersions):
         if compilerEnv:
             env["MSVC_USE_SCRIPT"] = None  # disable autodetection, vcvars*.bat, etc
             for var_name in var_names:
-                env.PrependENVPath(
-                    var_name, compilerEnv[var_name], delete_existing=False
-                )
+                try:
+                    env["ENV"][var_name] = compilerEnv[var_name]
+                except KeyError:
+                    # If there are missing variables in compilerEnv, then clear and reset
+                    compilerEnv = {}
+                    break
+
+        # Determine the exact version of tool installed, if any (Express vs "commercial")
+        # XXX get_vs_by_version is internal to SCons and may change in the future
+        # FIXME This slows the build down. Cache MSVC_VERSION like we cache INCLUDE/etc
+        # (except recall that MSVC_VERSION is not in env["ENV"] like the rest).
+        for version in supportedVersions:
+            try:
+                if SCons.Tool.MSCommon.vs.get_vs_by_version(version):
+                    break
+            except SCons.Errors.UserError:
+                pass  # "not supported by SCons"
+        else:
+            toolsConfig.update({compilerEnv_name: None})
+            raise SCons.Errors.UserError(
+                "Visual Studio %r is not installed" % supportedVersions[0]
+            )
+        env["MSVC_VERSION"] = version
 
         # Configures the compiler, including possibly autodetecting the required environment
         _msvsTool.generate(env)
         _msvcTool.generate(env)
         _mslinkTool.generate(env)
+        # mslink sets _MANIFEST_SOURCES to None, which is treated as an unknown variable.
+        # FIXME Report this back to SCons
+        if env["_MANIFEST_SOURCES"] is None:
+            env["_MANIFEST_SOURCES"] = ""
         msvs_preprocessed.generate_PreprocessedBuilder(env)
         if not env.WhereIs("$CC"):
             toolsConfig.update({compilerEnv_name: None})

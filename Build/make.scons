@@ -1,5 +1,4 @@
-import os
-import os.path
+from pathlib import Path
 import traceback
 
 import SCons.Defaults
@@ -8,7 +7,7 @@ import SCons.Tool
 import SCons.Util
 from site_scons.build_environments import AddBuildTargets
 from site_scons.root_environment import MakeRootEnv, SconscriptLog
-from site_scons.utilities import GetImportLibrary, GetProgram, GetSharedLibrary, RGlob
+from site_scons.utilities import GetImportLibrary, GetProgram, GetSharedLibrary
 
 # TODO support scons -h for build options
 
@@ -17,7 +16,7 @@ RootEnv = MakeRootEnv()
 
 
 # Confirm that SCons' top-level directory, the current directory, _is_ the project top
-if not os.path.exists("nohtyP.c"):
+if not Path("nohtyP.c").exists():
     RootEnv.Exit("Run SCons from top project dir (or use Build/make, or scons -C)")
 
 
@@ -56,6 +55,9 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
             "yp_ENABLE_SHARED",
             # Assertion failures go to stderr, status updates to MUNIT_OUTPUT_FILE.
             "MUNIT_OUTPUT_FILE=stderr",
+            # Write nohtyP.dll logs directly to stderr, i.e. the output file. Particularly useful
+            # for assertions, as they abort before munit can write the buffer to stderr.
+            "MUNIT_NO_BUFFER",
             "MUNIT_TEST_NAME_LEN=58",
             "MUNIT_DISABLE_TIMING",
         ],
@@ -71,7 +73,10 @@ def nohtyP_munit_test_Program_shared(env, sharedLib):
     source = [
         "$VTOP/Tools/munit/munit.c",
         # TODO Add ypExample.c to the munit tests.
-        RGlob(env, "$VTOP/Lib/munit_test/", "*.c"),
+        # XXX Update this list when new directories are added. (RGlob adds seconds to the build.)
+        env.Glob("$VTOP/Lib/munit_test/*.c"),
+        env.Glob("$VTOP/Lib/munit_test/test_objects/*.c"),
+        env.Glob("$VTOP/Lib/munit_test/test_protocols/*.c"),
     ]
     return env.Program("$VTOP/munit_test", source=source)
 

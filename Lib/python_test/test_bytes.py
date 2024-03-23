@@ -369,7 +369,7 @@ class BaseBytesTest:
 
     # TODO remove once nohtyP supports utf-16, etc
     def test_decode_utf_8(self):
-        sample = "Hello world\n\u1234\u5678\u9abc\def0\def0"
+        sample = "Hello world\n\u1234\u5678\u9abc"
         for enc in ("utf-8", ):
             b = self.type2test(sample, enc)
             self.assertEqual(b.decode(enc), sample)

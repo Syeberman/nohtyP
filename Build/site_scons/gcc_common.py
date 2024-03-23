@@ -59,13 +59,17 @@ def _version_detector(gcc):
     for arch, archOpts in _arch2opts.items():
         gcc_args = [str(gcc), "test.c"] + list(archOpts)
         SconscriptLog.write("Testing for architecture support: %r\n" % (gcc_args,))
-        SconscriptLog.flush()
-        gcc_result = subprocess.call(
-            gcc_args, cwd=_test_gcc_temp_dir, stdout=SconscriptLog, stderr=SconscriptLog, env=env
+        gcc_result = subprocess.run(
+            gcc_args,
+            cwd=_test_gcc_temp_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=env,
         )
-        SconscriptLog.flush()
-        SconscriptLog.write("gcc %r returned %r\n" % (version, gcc_result))
-        if gcc_result == 0:  # gcc returns zero on success
+        SconscriptLog.write(gcc_result.stdout)
+        SconscriptLog.write("gcc %r returned %r\n" % (version, gcc_result.returncode))
+        if gcc_result.returncode == 0:  # gcc returns zero on success
             supportedArchs.append(arch)
 
     return version, tuple(supportedArchs)
@@ -192,7 +196,8 @@ def ApplyGCCOptions(env, version):
         # Disable some warnings
         "-Wno-unused-function",  # TODO Mark MethodError_lenfunc/etc as unused (portably)?
         "-Wno-pointer-sign",
-        "-Wno-unknown-pragmas",
+        # GCC before 13.0 didn't recognize `#pragma region`
+        "" if version >= 13.0 else "-Wno-unknown-pragmas",
         # float-conversion warns about passing a double to finite/isnan, unfortunately
         "-Wno-float-conversion",
         # TODO maybe-uninitialized would be good during analyze
@@ -211,7 +216,11 @@ def ApplyGCCOptions(env, version):
     if env["CONFIGURATION"] in ("debug", "coverage"):
         addCcFlags(
             # Disable (non-debuggable) optimizations
-            "-Og" if version >= 4.8 else "-O0",
+            # gcc 7.0 (and previous) on Linux, Windows, and Mac all crash with -Og:
+            #   test_function.c: In function 'test_t_function_call':
+            #   test_function.c:2892:1: internal error: in get_insn_template, at final.c:2086
+            #   libbacktrace could not find executable to open
+            "-Og" if version >= 8.0 else "-O0",
             # Runtime check: int overflow
             "-ftrapv",
             # Runtime check: stack overflow
@@ -227,7 +236,11 @@ def ApplyGCCOptions(env, version):
     else:
         addCcFlags(
             # Optimize for speed
-            "-O3",
+            # gcc 7.0 (and previous) on Linux, Windows, and Mac all crash with -O3:
+            #   test_function.c: In function 'test_t_function_call':
+            #   test_function.c:2892:1: internal error: in get_insn_template, at final.c:2086
+            #   libbacktrace could not find executable to open
+            "-O3" if version >= 8.0 else "-O0",
             # Optimize whole program (needs -flto to linker): conflicts with -g
             # https://gcc.gnu.org/onlinedocs/gcc-4.9.0/gcc/Optimize-Options.html
             # "-flto",
@@ -332,10 +345,15 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
 
         # See if site_toolsconfig.py already knows where to find this gcc version
         toolsConfig = env["TOOLS_CONFIG"]
-        gcc_siteName = "%s_%s" % (env["COMPILER"].name.upper(), env["TARGET_ARCH"].upper())
+        gcc_siteName = "%s_%s" % (
+            env["COMPILER"].name.upper(),
+            env["TARGET_ARCH"].upper(),
+        )
         gcc_path = toolsConfig.get(gcc_siteName, "")
         if gcc_path is None:
-            raise SCons.Errors.StopError(f"{gcc_name_arch} disabled in {toolsConfig.basename}")
+            raise SCons.Errors.StopError(
+                f"{gcc_name_arch} disabled in {toolsConfig.basename}"
+            )
 
         # If site_toolsconfig.py came up empty, find a gcc that supports our target, then update
         if not gcc_path:
@@ -358,10 +376,12 @@ def DefineGCCToolFunctions(numericVersion, major, minor=None):
         if not env.WhereIs("$CC"):
             raise SCons.Errors.StopError(f"{gcc_name_arch} configuration failed")
 
-        def check_version(env, output):
+        def check_version(env, output, unique=True):
             output = output.strip()
             if re_version.fullmatch(output) is None:
-                raise SCons.Errors.StopError(f"tried finding {gcc_name}, found {output} instead")
+                raise SCons.Errors.StopError(
+                    f"tried finding {gcc_name}, found {output} instead"
+                )
 
         env.ParseConfig("$CC -dumpfullversion -dumpversion", check_version)
 

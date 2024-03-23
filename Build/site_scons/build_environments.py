@@ -18,6 +18,7 @@ from site_scons.utilities import AliasIfNotEmpty
 # TODO Clang/LLVM support
 # TODO GCC 6 can't be found on AppVeyor's Ubuntu1604
 compiler_names = (
+    "gcc_13",
     "gcc_12",
     "gcc_11",
     "msvs_158",
