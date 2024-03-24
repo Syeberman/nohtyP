@@ -372,7 +372,6 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
     // Corrupted states.
     {
         yp_uint64_t mi_state;
-        yp_ssize_t  length_hint;
         yp_ssize_t  i;
         yp_uint64_t bad_states[] = {0uLL, (yp_uint64_t)-1, 0x000000FF000000FFuLL};
         ypObject   *so = type->newN(N(items[0], items[1]));
@@ -383,8 +382,7 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
             assert_raises(yp_miniiter_next(mi, &mi_state), yp_StopIteration);
             munit_assert_uint64(mi_state, ==, bad_states[i]);  // unchanged
 
-            assert_not_raises_exc(length_hint = yp_miniiter_length_hintC(mi, &mi_state, &exc));
-            assert_ssizeC(length_hint, ==, 0);
+            assert_ssizeC_exc(yp_miniiter_length_hintC(mi, &mi_state, &exc), ==, 0);
             munit_assert_uint64(mi_state, ==, bad_states[i]);  // unchanged
         }
 
@@ -412,7 +410,6 @@ static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixtu
 }
 
 
-// FIXME test_newN/etc don't need to test "dirty"
 char *param_values_test_frozenset[] = {"frozenset", "set", "frozenset_dirty", "set_dirty", NULL};
 
 static MunitParameterEnum test_frozenset_params[] = {

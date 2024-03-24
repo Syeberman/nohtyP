@@ -3,9 +3,7 @@
 
 // XXX Because Python calls both the protocol and the object "set", I'm using the term "set-like" to
 // refer to the protocol where there may be confusion.
-// FIXME Do this in nohtyP.h?
-
-// FIXME n is negative.
+// TODO Do this in nohtyP.h?
 
 // Sets should accept themselves, their pairs, iterators, frozenset/set, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
@@ -585,7 +583,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
-        ypObject *result = yp_unionN(so, N(x));
+        ypObject *result = yp_union(so, x);
         assert_type_is(result, type->type);
         assert_set(result, items[0], items[1], items[2]);
         assert_set(so, items[0], items[1]);  // so unchanged.
@@ -596,7 +594,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
-        ypObject *result = yp_unionN(so, N(x));
+        ypObject *result = yp_union(so, x);
         assert_type_is(result, type->type);
         assert_set(result, items[0], items[1]);
         yp_decrefN(N(so, x, result));
@@ -606,7 +604,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_unionN(so, N(x));
+        ypObject *result = yp_union(so, x);
         assert_type_is(result, type->type);
         assert_set(result, items[0], items[1]);
         yp_decrefN(N(so, x, result));
@@ -616,7 +614,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_unionN(so, N(x));
+        ypObject *result = yp_union(so, x);
         assert_type_is(result, type->type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
@@ -625,26 +623,8 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     // x can be so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_unionN(so, N(so));
+        ypObject *result = yp_union(so, so);
         assert_type_is(result, type->type);
-        assert_set(result, items[0], items[1]);
-        yp_decrefN(N(so, result));
-    }
-
-    // Multiple x objects.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x0 = (*x_type)->newN(N(items[2]));
-        ypObject *x1 = (*x_type)->newN(N(items[3]));
-        ypObject *result = yp_unionN(so, N(x0, x1));
-        assert_set(result, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(so, x0, x1, result));
-    }
-
-    // Zero x objects.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_unionN(so, 0);
         assert_set(result, items[0], items[1]);
         yp_decrefN(N(so, result));
     }
@@ -653,7 +633,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
-        ypObject *result = yp_unionN(so, N(x));
+        ypObject *result = yp_union(so, x);
         assert_set(result, items[0], items[1], items[2]);
         yp_decrefN(N(so, x, result));
     }
@@ -665,7 +645,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
             ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
-            assert_raises(yp_unionN(so, N(x)), yp_TypeError);
+            assert_raises(yp_union(so, x), yp_TypeError);
             yp_decrefN(N(unhashable, so, x));
         }
     }
@@ -678,39 +658,27 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
-            assert_raises(yp_unionN(so, N(x)), yp_TypeError);
+            assert_raises(yp_union(so, x), yp_TypeError);
             yp_decrefN(N(intstore_1, so, x));
         }
     }
 
-    // Optimization: lazy shallow copy of an immutable so when n is zero.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_unionN(so, 0);
-        if (type->is_mutable) {
-            assert_obj(so, is_not, result);
-        } else {
-            assert_obj(so, is, result);
-        }
-        yp_decrefN(N(so, result));
-    }
-
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[1], items[2])), result = yp_unionN(so, N(x)),
+                      yp_tupleN(N(items[1], items[2])), result = yp_union(so, x),
                       assert_set(result, items[0], items[1], items[2]), yp_decrefN(N(so, result)));
 
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_unionN(so, N(int_1)), yp_TypeError);
+        assert_raises(yp_union(so, int_1), yp_TypeError);
         yp_decrefN(N(so));
     }
 
     // Exception passthrough.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_unionN(so, N(yp_SyntaxError)), yp_SyntaxError);
+        assert_raises(yp_union(so, yp_SyntaxError), yp_SyntaxError);
         yp_decrefN(N(so));
     }
 
@@ -732,7 +700,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
-        ypObject *result = yp_intersectionN(so, N(x));
+        ypObject *result = yp_intersection(so, x);
         assert_type_is(result, type->type);
         assert_set(result, items[1]);
         assert_set(so, items[0], items[1]);  // so unchanged.
@@ -743,7 +711,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
-        ypObject *result = yp_intersectionN(so, N(x));
+        ypObject *result = yp_intersection(so, x);
         assert_type_is(result, type->type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
@@ -753,7 +721,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_intersectionN(so, N(x));
+        ypObject *result = yp_intersection(so, x);
         assert_type_is(result, type->type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
@@ -763,7 +731,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_intersectionN(so, N(x));
+        ypObject *result = yp_intersection(so, x);
         assert_type_is(result, type->type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
@@ -772,26 +740,8 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     // x can be so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_intersectionN(so, N(so));
+        ypObject *result = yp_intersection(so, so);
         assert_type_is(result, type->type);
-        assert_set(result, items[0], items[1]);
-        yp_decrefN(N(so, result));
-    }
-
-    // Multiple x objects.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x0 = (*x_type)->newN(N(items[0]));
-        ypObject *x1 = (*x_type)->newN(N(items[0], items[1]));
-        ypObject *result = yp_intersectionN(so, N(x0, x1));
-        assert_set(result, items[0]);
-        yp_decrefN(N(so, x0, x1, result));
-    }
-
-    // Zero x objects.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_intersectionN(so, 0);
         assert_set(result, items[0], items[1]);
         yp_decrefN(N(so, result));
     }
@@ -800,7 +750,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
-        ypObject *result = yp_intersectionN(so, N(x));
+        ypObject *result = yp_intersection(so, x);
         assert_set(result, items[1]);
         yp_decrefN(N(so, x, result));
     }
@@ -812,7 +762,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
             ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
-            ypObject *result = yp_intersectionN(so, N(x));
+            ypObject *result = yp_intersection(so, x);
             assert_set(result, items[1]);
             yp_decrefN(N(unhashable, so, x, result));
         }
@@ -825,40 +775,28 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
-            ypObject *result = yp_intersectionN(so, N(x));
+            ypObject *result = yp_intersection(so, x);
             assert_set(result, int_1);
             yp_decrefN(N(intstore_1, so, x, result));
         }
     }
 
-    // Optimization: lazy shallow copy of an immutable so when n is zero.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_intersectionN(so, 0);
-        if (type->is_mutable) {
-            assert_obj(so, is_not, result);
-        } else {
-            assert_obj(so, is, result);
-        }
-        yp_decrefN(N(so, result));
-    }
-
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[1], items[2])), result = yp_intersectionN(so, N(x)),
+                      yp_tupleN(N(items[1], items[2])), result = yp_intersection(so, x),
                       assert_set(result, items[1]), yp_decrefN(N(so, result)));
 
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_intersectionN(so, N(int_1)), yp_TypeError);
+        assert_raises(yp_intersection(so, int_1), yp_TypeError);
         yp_decrefN(N(so));
     }
 
     // Exception passthrough.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_intersectionN(so, N(yp_SyntaxError)), yp_SyntaxError);
+        assert_raises(yp_intersection(so, yp_SyntaxError), yp_SyntaxError);
         yp_decrefN(N(so));
     }
 
@@ -880,7 +818,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[2]));
-        ypObject *result = yp_differenceN(so, N(x));
+        ypObject *result = yp_difference(so, x);
         assert_type_is(result, type->type);
         assert_set(result, items[0]);
         assert_set(so, items[0], items[1]);  // so unchanged.
@@ -891,7 +829,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
-        ypObject *result = yp_differenceN(so, N(x));
+        ypObject *result = yp_difference(so, x);
         assert_type_is(result, type->type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
@@ -901,7 +839,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_differenceN(so, N(x));
+        ypObject *result = yp_difference(so, x);
         assert_type_is(result, type->type);
         assert_set(result, items[0], items[1]);
         yp_decrefN(N(so, x, result));
@@ -911,7 +849,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(0);
         ypObject *x = (*x_type)->newN(0);
-        ypObject *result = yp_differenceN(so, N(x));
+        ypObject *result = yp_difference(so, x);
         assert_type_is(result, type->type);
         assert_len(result, 0);
         yp_decrefN(N(so, x, result));
@@ -920,27 +858,9 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     // x can be so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_differenceN(so, N(so));
+        ypObject *result = yp_difference(so, so);
         assert_type_is(result, type->type);
         assert_len(result, 0);
-        yp_decrefN(N(so, result));
-    }
-
-    // Multiple x objects.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x0 = (*x_type)->newN(N(items[0]));
-        ypObject *x1 = (*x_type)->newN(N(items[1]));
-        ypObject *result = yp_differenceN(so, N(x0, x1));
-        assert_len(result, 0);
-        yp_decrefN(N(so, x0, x1, result));
-    }
-
-    // Zero x objects.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_differenceN(so, 0);
-        assert_set(result, items[0], items[1]);
         yp_decrefN(N(so, result));
     }
 
@@ -948,7 +868,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = (*x_type)->newN(N(items[1], items[1], items[2], items[2]));
-        ypObject *result = yp_differenceN(so, N(x));
+        ypObject *result = yp_difference(so, x);
         assert_set(result, items[0]);
         yp_decrefN(N(so, x, result));
     }
@@ -960,7 +880,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
             ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ypObject *so = type->newN(N(items[0], items[1]));
             ypObject *x = (*x_type)->newN(N(items[1], unhashable));
-            ypObject *result = yp_differenceN(so, N(x));
+            ypObject *result = yp_difference(so, x);
             assert_set(result, items[0]);
             yp_decrefN(N(unhashable, so, x, result));
         }
@@ -973,40 +893,28 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
             ypObject *intstore_1 = yp_intstoreC(1);
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
-            ypObject *result = yp_differenceN(so, N(x));
+            ypObject *result = yp_difference(so, x);
             assert_len(result, 0);
             yp_decrefN(N(intstore_1, so, x, result));
         }
     }
 
-    // Optimization: lazy shallow copy of an immutable so when n is zero.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *result = yp_differenceN(so, 0);
-        if (type->is_mutable) {
-            assert_obj(so, is_not, result);
-        } else {
-            assert_obj(so, is, result);
-        }
-        yp_decrefN(N(so, result));
-    }
-
     // Iterator exceptions and bad length hints.
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
-                      yp_tupleN(N(items[1], items[2])), result = yp_differenceN(so, N(x)),
+                      yp_tupleN(N(items[1], items[2])), result = yp_difference(so, x),
                       assert_set(result, items[0]), yp_decrefN(N(so, result)));
 
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_differenceN(so, N(int_1)), yp_TypeError);
+        assert_raises(yp_difference(so, int_1), yp_TypeError);
         yp_decrefN(N(so));
     }
 
     // Exception passthrough.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_differenceN(so, N(yp_SyntaxError)), yp_SyntaxError);
+        assert_raises(yp_difference(so, yp_SyntaxError), yp_SyntaxError);
         yp_decrefN(N(so));
     }
 
@@ -1148,7 +1056,6 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = type->newN(N(items[1], items[2]));
         assert_raises_exc(yp_update(so, x, &exc), yp_MethodError);
-        assert_raises_exc(yp_updateN(so, &exc, N(x)), yp_MethodError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, x));
         goto tear_down;  // Skip remaining tests.
@@ -1194,24 +1101,6 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_update(so, so, &exc));
-        assert_set(so, items[0], items[1]);
-        yp_decrefN(N(so));
-    }
-
-    // Multiple x objects.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x0 = (*x_type)->newN(N(items[2]));
-        ypObject *x1 = (*x_type)->newN(N(items[3]));
-        assert_not_raises_exc(yp_updateN(so, &exc, N(x0, x1)));
-        assert_set(so, items[0], items[1], items[2], items[3]);
-        yp_decrefN(N(so, x0, x1));
-    }
-
-    // Zero x objects.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_updateN(so, &exc, 0));
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1314,7 +1203,6 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = type->newN(N(items[1], items[2]));
         assert_raises_exc(yp_intersection_update(so, x, &exc), yp_MethodError);
-        assert_raises_exc(yp_intersection_updateN(so, &exc, N(x)), yp_MethodError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, x));
         goto tear_down;  // Skip remaining tests.
@@ -1360,24 +1248,6 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_intersection_update(so, so, &exc));
-        assert_set(so, items[0], items[1]);
-        yp_decrefN(N(so));
-    }
-
-    // Multiple x objects.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x0 = (*x_type)->newN(N(items[0]));
-        ypObject *x1 = (*x_type)->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_intersection_updateN(so, &exc, N(x0, x1)));
-        assert_set(so, items[0]);
-        yp_decrefN(N(so, x0, x1));
-    }
-
-    // Zero x objects.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_intersection_updateN(so, &exc, 0));
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1479,7 +1349,6 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *x = type->newN(N(items[1], items[2]));
         assert_raises_exc(yp_difference_update(so, x, &exc), yp_MethodError);
-        assert_raises_exc(yp_difference_updateN(so, &exc, N(x)), yp_MethodError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so, x));
         goto tear_down;  // Skip remaining tests.
@@ -1526,24 +1395,6 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_difference_update(so, so, &exc));
         assert_len(so, 0);
-        yp_decrefN(N(so));
-    }
-
-    // Multiple x objects.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        ypObject *x0 = (*x_type)->newN(N(items[0]));
-        ypObject *x1 = (*x_type)->newN(N(items[1]));
-        assert_not_raises_exc(yp_difference_updateN(so, &exc, N(x0, x1)));
-        assert_len(so, 0);
-        yp_decrefN(N(so, x0, x1));
-    }
-
-    // Zero x objects.
-    {
-        ypObject *so = type->newN(N(items[0], items[1]));
-        assert_not_raises_exc(yp_difference_updateN(so, &exc, 0));
-        assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
 

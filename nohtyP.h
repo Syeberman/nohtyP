@@ -798,52 +798,29 @@ ypAPI ypObject *yp_issuperset(ypObject *set, ypObject *x);
 // else yp_False.
 ypAPI ypObject *yp_gt(ypObject *set, ypObject *x);
 
-// FIXME yp_unionN/etc are the only vararg functions here that don't take "unpacked" arguments.
-// yp_tupleN takes the items to construct the tuple; yp_unionN should do the same. This is all the
-// more obvious when you compare yp_updateK, which takes the items, to yp_updateN, which takes the
-// iterables.
-
 // Returns a new reference to an object of the same type as set containing all the elements from set
-// and all n objects.
-ypAPI ypObject *yp_unionN(ypObject *set, int n, ...);
-ypAPI ypObject *yp_unionNV(ypObject *set, int n, va_list args);
+// and x.
+ypAPI ypObject *yp_union(ypObject *set, ypObject *x);
 
 // Returns a new reference to an object of the same type as set containing all the elements common
-// to the set and all n objects.
-ypAPI ypObject *yp_intersectionN(ypObject *set, int n, ...);
-ypAPI ypObject *yp_intersectionNV(ypObject *set, int n, va_list args);
+// to set and x.
+ypAPI ypObject *yp_intersection(ypObject *set, ypObject *x);
 
 // Returns a new reference to an object of the same type as set containing all the elements from set
-// that are not in the n objects.
-ypAPI ypObject *yp_differenceN(ypObject *set, int n, ...);
-ypAPI ypObject *yp_differenceNV(ypObject *set, int n, va_list args);
+// that are not in x.
+ypAPI ypObject *yp_difference(ypObject *set, ypObject *x);
 
 // Returns a new reference to an object of the same type as set containing all the elements in
 // either set or x but not both.
 ypAPI ypObject *yp_symmetric_difference(ypObject *set, ypObject *x);
 
-// Add the elements from the n objects to set. Sets *exc on error. Note that exc is before n as you
-// cannot have arguments after ellipsis.
-ypAPI void yp_updateN(ypObject *set, ypObject **exc, int n, ...);
-ypAPI void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
-
-// Equivalent to yp_updateN(set, exc, 1, x).
+// Add the elements from x to set. Sets *exc on error.
 ypAPI void yp_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes elements from set that are not contained in all n objects. Sets *exc on error. Note that
-// exc is before n as you cannot have arguments after ellipsis.
-ypAPI void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...);
-ypAPI void yp_intersection_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
-
-// Equivalent to yp_intersection_updateN(set, exc, 1, x).
+// Removes elements from set that are not contained in x. Sets *exc on error.
 ypAPI void yp_intersection_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes elements from set that are contained in any of the n objects. Sets *exc on error. Note
-// that exc is before n as you cannot have arguments after ellipsis.
-ypAPI void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...);
-ypAPI void yp_difference_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
-
-// Equivalent to yp_difference_updateN(set, exc, 1, x).
+// Removes elements from set that are contained in x. Sets *exc on error.
 ypAPI void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes elements from set that are contained in x, and adds elements from x not contained in set.
@@ -932,12 +909,7 @@ ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval
 ypAPI void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...);
 ypAPI void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args);
 
-// Add the elements from the n objects to mapping. Each object is handled as per yp_dict. Sets *exc
-// on error. Note that exc is before n as you cannot have arguments after ellipsis.
-ypAPI void yp_updateN(ypObject *mapping, ypObject **exc, int n, ...);
-ypAPI void yp_updateNV(ypObject *mapping, ypObject **exc, int n, va_list args);
-
-// Equivalent to yp_updateN(mapping, exc, 1, x).
+// Add the elements from x to mapping. x is handled as per yp_dict. Sets *exc on error.
 ypAPI void yp_update(ypObject *mapping, ypObject *x, ypObject **exc);
 
 // Immortal empty frozendict object.

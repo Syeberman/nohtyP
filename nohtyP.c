@@ -418,14 +418,14 @@ typedef struct {
     // tp_lt is elsewhere
     objobjproc tp_issuperset;
     // tp_gt is elsewhere
-    objvalistproc tp_union;
-    objvalistproc tp_intersection;
-    objvalistproc tp_difference;
-    objobjproc    tp_symmetric_difference;
+    objobjproc tp_union;
+    objobjproc tp_intersection;
+    objobjproc tp_difference;
+    objobjproc tp_symmetric_difference;
     // tp_update is elsewhere
-    objvalistproc tp_intersection_update;
-    objvalistproc tp_difference_update;
-    objobjproc    tp_symmetric_difference_update;
+    objobjproc tp_intersection_update;
+    objobjproc tp_difference_update;
+    objobjproc tp_symmetric_difference_update;
     // tp_push is elsewhere
     objobjproc tp_pushunique;
 } ypSetMethods;
@@ -528,7 +528,7 @@ typedef struct {
     objobjobjproc tp_getdefault;  // if defval is NULL, raise exception if missing
     objobjobjproc tp_setitem;
     objobjproc    tp_delitem;
-    objvalistproc tp_update;
+    objobjproc    tp_update;
 
     // Sequence operations
     ypSequenceMethods *tp_as_sequence;
@@ -644,12 +644,12 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
         *name ## _objobjproc, \
         *name ## _objobjproc, \
         *name ## _objobjproc, \
-        *name ## _objvalistproc, \
-        *name ## _objvalistproc, \
-        *name ## _objvalistproc, \
         *name ## _objobjproc, \
-        *name ## _objvalistproc, \
-        *name ## _objvalistproc, \
+        *name ## _objobjproc, \
+        *name ## _objobjproc, \
+        *name ## _objobjproc, \
+        *name ## _objobjproc, \
+        *name ## _objobjproc, \
         *name ## _objobjproc, \
         *name ## _objobjproc \
     } }; \
@@ -3066,7 +3066,7 @@ static ypTypeObject ypIter_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -3930,7 +3930,7 @@ static ypTypeObject ypInvalidated_Type = {
         InvalidatedError_objobjobjproc,  // tp_getdefault
         InvalidatedError_objobjobjproc,  // tp_setitem
         InvalidatedError_objobjproc,     // tp_delitem
-        InvalidatedError_objvalistproc,  // tp_update
+        InvalidatedError_objobjproc,     // tp_update
 
         // Sequence operations
         InvalidatedError_SequenceMethods,  // tp_as_sequence
@@ -4023,7 +4023,7 @@ static ypTypeObject ypException_Type = {
         ExceptionMethod_objobjobjproc,  // tp_getdefault
         ExceptionMethod_objobjobjproc,  // tp_setitem
         ExceptionMethod_objobjproc,     // tp_delitem
-        ExceptionMethod_objvalistproc,  // tp_update
+        ExceptionMethod_objobjproc,     // tp_update
 
         // Sequence operations
         ExceptionMethod_SequenceMethods,  // tp_as_sequence
@@ -4286,7 +4286,7 @@ static ypTypeObject ypType_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -4393,7 +4393,7 @@ static ypTypeObject ypNoneType_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -4522,7 +4522,7 @@ static ypTypeObject ypBool_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -4907,7 +4907,7 @@ static ypTypeObject ypInt_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -4977,7 +4977,7 @@ static ypTypeObject ypIntStore_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -6028,7 +6028,7 @@ static ypTypeObject ypFloat_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -6098,7 +6098,7 @@ static ypTypeObject ypFloatStore_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -10430,7 +10430,7 @@ static ypTypeObject ypBytes_Type = {
         _ypSequence_getdefault,     // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypBytes_as_sequence,  // tp_as_sequence
@@ -10511,16 +10511,16 @@ static ypTypeObject ypByteArray_Type = {
         TypeError_objobjproc,       // tp_send
 
         // Container operations
-        bytes_contains,             // tp_contains
-        bytes_len,                  // tp_len
-        bytearray_push,             // tp_push
-        ypStringLib_clear,          // tp_clear
-        bytearray_pop,              // tp_pop
-        bytearray_remove,           // tp_remove
-        _ypSequence_getdefault,     // tp_getdefault
-        _ypSequence_setitem,        // tp_setitem
-        _ypSequence_delitem,        // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        bytes_contains,          // tp_contains
+        bytes_len,               // tp_len
+        bytearray_push,          // tp_push
+        ypStringLib_clear,       // tp_clear
+        bytearray_pop,           // tp_pop
+        bytearray_remove,        // tp_remove
+        _ypSequence_getdefault,  // tp_getdefault
+        _ypSequence_setitem,     // tp_setitem
+        _ypSequence_delitem,     // tp_delitem
+        MethodError_objobjproc,  // tp_update
 
         // Sequence operations
         &ypByteArray_as_sequence,  // tp_as_sequence
@@ -11454,7 +11454,7 @@ static ypTypeObject ypStr_Type = {
         _ypSequence_getdefault,     // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypStr_as_sequence,  // tp_as_sequence
@@ -11535,16 +11535,16 @@ static ypTypeObject ypChrArray_Type = {
         TypeError_objobjproc,       // tp_send
 
         // Container operations
-        str_contains,               // tp_contains
-        str_len,                    // tp_len
-        chrarray_push,              // tp_push
-        ypStringLib_clear,          // tp_clear
-        chrarray_pop,               // tp_pop
-        chrarray_remove,            // tp_remove
-        _ypSequence_getdefault,     // tp_getdefault
-        _ypSequence_setitem,        // tp_setitem
-        _ypSequence_delitem,        // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        str_contains,            // tp_contains
+        str_len,                 // tp_len
+        chrarray_push,           // tp_push
+        ypStringLib_clear,       // tp_clear
+        chrarray_pop,            // tp_pop
+        chrarray_remove,         // tp_remove
+        _ypSequence_getdefault,  // tp_getdefault
+        _ypSequence_setitem,     // tp_setitem
+        _ypSequence_delitem,     // tp_delitem
+        MethodError_objobjproc,  // tp_update
 
         // Sequence operations
         &ypChrArray_as_sequence,  // tp_as_sequence
@@ -13219,7 +13219,7 @@ static ypTypeObject ypTuple_Type = {
         _ypSequence_getdefault,     // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypTuple_as_sequence,  // tp_as_sequence
@@ -13302,16 +13302,16 @@ static ypTypeObject ypList_Type = {
         TypeError_objobjproc,       // tp_send
 
         // Container operations
-        tuple_contains,             // tp_contains
-        tuple_len,                  // tp_len
-        list_push,                  // tp_push
-        list_clear,                 // tp_clear
-        list_pop,                   // tp_pop
-        list_remove,                // tp_remove
-        _ypSequence_getdefault,     // tp_getdefault
-        _ypSequence_setitem,        // tp_setitem
-        _ypSequence_delitem,        // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        tuple_contains,          // tp_contains
+        tuple_len,               // tp_len
+        list_push,               // tp_push
+        list_clear,              // tp_clear
+        list_pop,                // tp_pop
+        list_remove,             // tp_remove
+        _ypSequence_getdefault,  // tp_getdefault
+        _ypSequence_setitem,     // tp_setitem
+        _ypSequence_delitem,     // tp_delitem
+        MethodError_objobjproc,  // tp_update
 
         // Sequence operations
         &ypList_as_sequence,  // tp_as_sequence
@@ -15871,6 +15871,25 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
     return yp_None;
 }
 
+// XXX Check for the so==other case _before_ calling this function
+static ypObject *_ypSet_symmetric_difference_update(ypObject *so, ypObject *iterable)
+{
+    int       x_pair = ypObject_TYPE_PAIR_CODE(iterable);
+    ypObject *result;
+
+    // Recall that type pairs are identified by the immutable type code
+    if (x_pair == ypFrozenSet_CODE) {
+        return _ypSet_symmetric_difference_update_fromset(so, iterable);
+    } else {
+        // TODO Is there a way to do this without allocating a new set? (I actually think not.)
+        ypObject *iterable_asset = yp_frozenset(iterable);
+        if (yp_isexceptionC(iterable_asset)) return iterable_asset;
+        result = _ypSet_symmetric_difference_update_fromset(so, iterable_asset);
+        yp_decref(iterable_asset);
+        return result;
+    }
+}
+
 
 // Public methods
 
@@ -16106,84 +16125,50 @@ static ypObject *frozenset_gt(ypObject *so, ypObject *x)
     return _ypSet_issuperset_withset(so, x);
 }
 
-static ypObject *set_update(ypObject *so, int n, va_list args)
+static ypObject *set_update(ypObject *so, ypObject *x)
 {
-    ypObject *result;
-    for (/*n already set*/; n > 0; n--) {
-        ypObject *x = va_arg(args, ypObject *);  // borrowed
-        if (so == x) continue;
-        result = _ypSet_update(so, x);
-        if (yp_isexceptionC(result)) return result;
-    }
-    return yp_None;
+    if (so == x) return yp_None;
+
+    return _ypSet_update(so, x);
 }
 
-static ypObject *set_intersection_update(ypObject *so, int n, va_list args)
+static ypObject *set_intersection_update(ypObject *so, ypObject *x)
 {
-    ypObject *result;
-    // It's tempting to stop once so is empty, but doing so would mask errors in args
-    for (/*n already set*/; n > 0; n--) {
-        ypObject *x = va_arg(args, ypObject *);  // borrowed
-        if (so == x) continue;
-        result = _ypSet_intersection_update(so, x);
-        if (yp_isexceptionC(result)) return result;
-    }
-    return yp_None;
+    if (so == x) return yp_None;
+
+    return _ypSet_intersection_update(so, x);
 }
 
 static ypObject *set_clear(ypObject *so);
-static ypObject *set_difference_update(ypObject *so, int n, va_list args)
+static ypObject *set_difference_update(ypObject *so, ypObject *x)
 {
-    ypObject *result;
-    // It's tempting to stop once so is empty, but doing so would mask errors in args
-    for (/*n already set*/; n > 0; n--) {
-        ypObject *x = va_arg(args, ypObject *);  // borrowed
-        if (so == x) {
-            result = set_clear(so);
-        } else {
-            result = _ypSet_difference_update(so, x);
-        }
-        if (yp_isexceptionC(result)) return result;
-    }
-    return yp_None;
+    if (so == x) return set_clear(so);
+
+    return _ypSet_difference_update(so, x);
 }
 
 static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
 {
-    int       x_pair = ypObject_TYPE_PAIR_CODE(x);
-    ypObject *result;
-
     if (so == x) return set_clear(so);
 
-    // Recall that type pairs are identified by the immutable type code
-    if (x_pair == ypFrozenSet_CODE) {
-        return _ypSet_symmetric_difference_update_fromset(so, x);
-    } else {
-        // TODO Is there a way to do this without allocating a new set? (I actually think not.)
-        ypObject *x_asset = yp_frozenset(x);
-        if (yp_isexceptionC(x_asset)) return x_asset;
-        result = _ypSet_symmetric_difference_update_fromset(so, x_asset);
-        yp_decref(x_asset);
-        return result;
-    }
+    return _ypSet_symmetric_difference_update(so, x);
 }
 
-// TODO Possible optimizations:
+// FIXME Possible optimizations:
+//  - lazy shallow copy of an immutable so when x is so.
 //  - lazy shallow copy of an immutable so when friendly x is empty.
 //  - lazy shallow copy of a friendly immutable x when immutable so is empty.
 //  - empty immortal when immutable so is empty and friendly x is empty.
-static ypObject *frozenset_union(ypObject *so, int n, va_list args)
+static ypObject *frozenset_union(ypObject *so, ypObject *x)
 {
     ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
-    if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
-
     newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
-    result = set_update(newSo, n, args);
+    result = _ypSet_update(newSo, x);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
@@ -16200,21 +16185,19 @@ static ypObject *frozenset_union(ypObject *so, int n, va_list args)
     return newSo;
 }
 
-// TODO Possible optimizations:
+// FIXME Possible optimizations:
 //  - lazy shallow copy of an immutable so when x is so.
 //  - empty immortal when immutable so and either so or friendly x is empty.
-static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
+static ypObject *frozenset_intersection(ypObject *so, ypObject *x)
 {
     ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
-    if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
-
     newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
-    result = set_intersection_update(newSo, n, args);
+    result = _ypSet_intersection_update(newSo, x);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
@@ -16231,21 +16214,19 @@ static ypObject *frozenset_intersection(ypObject *so, int n, va_list args)
     return newSo;
 }
 
-// TODO Possible optimizations:
+// FIXME Possible optimizations:
 //  - lazy shallow copy of an immutable so when friendly x is empty.
 //  - empty immortal when immutable so and either so is empty or x is so.
-static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
+static ypObject *frozenset_difference(ypObject *so, ypObject *x)
 {
     ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
-    if (!ypObject_IS_MUTABLE(so) && n < 1) return yp_incref(so);
-
     newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
-    result = set_difference_update(newSo, n, args);
+    result = _ypSet_difference_update(newSo, x);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
@@ -16262,7 +16243,7 @@ static ypObject *frozenset_difference(ypObject *so, int n, va_list args)
     return newSo;
 }
 
-// TODO Possible optimizations:
+// FIXME Possible optimizations:
 //  - lazy shallow copy of an immutable so when friendly x is empty.
 //  - lazy shallow copy of a friendly immutable x when immutable so is empty.
 //  - empty immortal when immutable so is empty and friendly x is empty.
@@ -16276,7 +16257,7 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
     newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
-    result = set_symmetric_difference_update(newSo, x);
+    result = _ypSet_symmetric_difference_update(newSo, x);
     if (yp_isexceptionC(result)) {
         yp_decref(newSo);
         return result;
@@ -16445,9 +16426,9 @@ static ypSetMethods ypFrozenSet_as_set = {
         frozenset_difference,            // tp_difference
         frozenset_symmetric_difference,  // tp_symmetric_difference
         // tp_update is elsewhere
-        MethodError_objvalistproc,  // tp_intersection_update
-        MethodError_objvalistproc,  // tp_difference_update
-        MethodError_objobjproc,     // tp_symmetric_difference_update
+        MethodError_objobjproc,  // tp_intersection_update
+        MethodError_objobjproc,  // tp_difference_update
+        MethodError_objobjproc,  // tp_symmetric_difference_update
         // tp_push is elsewhere
         MethodError_objobjproc  // tp_pushunique
 };
@@ -16507,7 +16488,7 @@ static ypTypeObject ypFrozenSet_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -17495,20 +17476,15 @@ static ypObject *dict_updateK(ypObject *mp, int n, va_list args)
     return yp_None;
 }
 
-static ypObject *dict_update(ypObject *mp, int n, va_list args)
+static ypObject *dict_update(ypObject *mp, ypObject *x)
 {
-    ypObject *result;
-    for (/*n already set*/; n > 0; n--) {
-        ypObject *x = va_arg(args, ypObject *);  // borrowed
-        if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenDict_CODE) {
-            if (mp == x) continue;
-            result = _ypDict_update_fromdict(mp, x);
-        } else {
-            result = _ypDict_update_fromiterable(mp, x);
-        }
-        if (yp_isexceptionC(result)) return result;
+    if (mp == x) return yp_None;
+
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenDict_CODE) {
+        return _ypDict_update_fromdict(mp, x);
+    } else {
+        return _ypDict_update_fromiterable(mp, x);
     }
-    return yp_None;
 }
 
 typedef struct {
@@ -17776,7 +17752,7 @@ static ypTypeObject ypFrozenDict_Type = {
         frozendict_getdefault,      // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -18446,7 +18422,7 @@ static ypTypeObject ypRange_Type = {
         _ypSequence_getdefault,     // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypRange_as_sequence,  // tp_as_sequence
@@ -19623,7 +19599,7 @@ static ypTypeObject ypFunction_Type = {
         MethodError_objobjobjproc,  // tp_getdefault
         MethodError_objobjobjproc,  // tp_setitem
         MethodError_objobjproc,     // tp_delitem
-        MethodError_objvalistproc,  // tp_update
+        MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         MethodError_SequenceMethods,  // tp_as_sequence
@@ -19989,31 +19965,19 @@ ypObject *yp_issuperset(ypObject *set, ypObject *x)
     _yp_REDIRECT_BOOL2(set, tp_as_set, tp_issuperset, (set, x));
 }
 
-ypObject *yp_unionN(ypObject *set, int n, ...)
+ypObject *yp_union(ypObject *set, ypObject *x)
 {
-    return_yp_V_FUNC(ypObject *, yp_unionNV, (set, n, args), n);
-}
-ypObject *yp_unionNV(ypObject *set, int n, va_list args)
-{
-    _yp_REDIRECT2(set, tp_as_set, tp_union, (set, n, args));
+    _yp_REDIRECT2(set, tp_as_set, tp_union, (set, x));
 }
 
-ypObject *yp_intersectionN(ypObject *set, int n, ...)
+ypObject *yp_intersection(ypObject *set, ypObject *x)
 {
-    return_yp_V_FUNC(ypObject *, yp_intersectionNV, (set, n, args), n);
-}
-ypObject *yp_intersectionNV(ypObject *set, int n, va_list args)
-{
-    _yp_REDIRECT2(set, tp_as_set, tp_intersection, (set, n, args));
+    _yp_REDIRECT2(set, tp_as_set, tp_intersection, (set, x));
 }
 
-ypObject *yp_differenceN(ypObject *set, int n, ...)
+ypObject *yp_difference(ypObject *set, ypObject *x)
 {
-    return_yp_V_FUNC(ypObject *, yp_differenceNV, (set, n, args), n);
-}
-ypObject *yp_differenceNV(ypObject *set, int n, va_list args)
-{
-    _yp_REDIRECT2(set, tp_as_set, tp_difference, (set, n, args));
+    _yp_REDIRECT2(set, tp_as_set, tp_difference, (set, x));
 }
 
 ypObject *yp_symmetric_difference(ypObject *set, ypObject *x)
@@ -20021,40 +19985,19 @@ ypObject *yp_symmetric_difference(ypObject *set, ypObject *x)
     _yp_REDIRECT2(set, tp_as_set, tp_symmetric_difference, (set, x));
 }
 
-void yp_updateN(ypObject *set, ypObject **exc, int n, ...)
+void yp_update(ypObject *set, ypObject *x, ypObject **exc)
 {
-    return_yp_V_FUNC_void(yp_updateNV, (set, exc, n, args), n);
+    _yp_REDIRECT_EXC1(set, tp_update, (set, x), exc);
 }
-void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
-{
-    _yp_REDIRECT_EXC1(set, tp_update, (set, n, args), exc);
-}
-void yp_update(ypObject *set, ypObject *x, ypObject **exc) { yp_updateN(set, exc, 1, x); }
 
-void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...)
-{
-    return_yp_V_FUNC_void(yp_intersection_updateNV, (set, exc, n, args), n);
-}
-void yp_intersection_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
-{
-    _yp_REDIRECT_EXC2(set, tp_as_set, tp_intersection_update, (set, n, args), exc);
-}
 void yp_intersection_update(ypObject *set, ypObject *x, ypObject **exc)
 {
-    yp_intersection_updateN(set, exc, 1, x);
+    _yp_REDIRECT_EXC2(set, tp_as_set, tp_intersection_update, (set, x), exc);
 }
 
-void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...)
-{
-    return_yp_V_FUNC_void(yp_difference_updateNV, (set, exc, n, args), n);
-}
-void yp_difference_updateNV(ypObject *set, ypObject **exc, int n, va_list args)
-{
-    _yp_REDIRECT_EXC2(set, tp_as_set, tp_difference_update, (set, n, args), exc);
-}
 void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc)
 {
-    yp_difference_updateN(set, exc, 1, x);
+    _yp_REDIRECT_EXC2(set, tp_as_set, tp_difference_update, (set, x), exc);
 }
 
 void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc)

@@ -498,26 +498,26 @@ yp_func(c_ypObject_p, "yp_issubset", ((c_ypObject_p, "set"), (c_ypObject_p, "x")
 # ypObject *yp_issuperset(ypObject *set, ypObject *x);
 yp_func(c_ypObject_p, "yp_issuperset", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
-# ypObject *yp_unionN(ypObject *set, int n, ...);
-yp_func(c_ypObject_p, "yp_unionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p))
+# ypObject *yp_union(ypObject *set, ypObject *x);
+yp_func(c_ypObject_p, "yp_union", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
-# ypObject *yp_intersectionN(ypObject *set, int n, ...);
-yp_func(c_ypObject_p, "yp_intersectionN", ((c_ypObject_p, "set"), c_multiN_ypObject_p))
+# ypObject *yp_intersection(ypObject *set, ypObject *x);
+yp_func(c_ypObject_p, "yp_intersection", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
-# ypObject *yp_differenceN(ypObject *set, int n, ...);
-yp_func(c_ypObject_p, "yp_differenceN", ((c_ypObject_p, "set"), c_multiN_ypObject_p))
+# ypObject *yp_difference(ypObject *set, ypObject *x);
+yp_func(c_ypObject_p, "yp_difference", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
 # ypObject *yp_symmetric_difference(ypObject *set, ypObject *x);
 yp_func(c_ypObject_p, "yp_symmetric_difference", ((c_ypObject_p, "set"), (c_ypObject_p, "x")))
 
-# void yp_updateN(ypObject *set, ypObject **exc, int n, ...);
-yp_func(c_void, "yp_updateN", ((c_ypObject_p, "set"), c_ypObject_pp_exc, c_multiN_ypObject_p))
+# void yp_update(ypObject *set, ypObject *x, ypObject **exc);
+yp_func(c_void, "yp_update", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
 
-# void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...);
-yp_func(c_void, "yp_intersection_updateN", ((c_ypObject_p, "set"), c_ypObject_pp_exc, c_multiN_ypObject_p))
+# void yp_intersection_update(ypObject *set, ypObject *x, ypObject **exc);
+yp_func(c_void, "yp_intersection_update", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
 
-# void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...);
-yp_func(c_void, "yp_difference_updateN", ((c_ypObject_p, "set"), c_ypObject_pp_exc, c_multiN_ypObject_p))
+# void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc);
+yp_func(c_void, "yp_difference_update", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
 
 # void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 yp_func(c_void, "yp_symmetric_difference_update", ((c_ypObject_p, "set"), (c_ypObject_p, "x"), c_ypObject_pp_exc))
@@ -1017,25 +1017,28 @@ class ypObject(c_ypObject_p):
         return _yp_issuperset(self, _yp_iterable(other))
 
     def union(self, *others):
-        return _yp_unionN(self, *(_yp_iterable(x) for x in others))
+        if len(others) < 1: return self.copy()
+        return functools.reduce(_yp_union, others, self)
 
     def intersection(self, *others):
-        return _yp_intersectionN(self, *(_yp_iterable(x) for x in others))
+        if len(others) < 1: return self.copy()
+        return functools.reduce(_yp_intersection, others, self)
 
     def difference(self, *others):
-        return _yp_differenceN(self, *(_yp_iterable(x) for x in others))
+        if len(others) < 1: return self.copy()
+        return functools.reduce(_yp_difference, others, self)
 
     def symmetric_difference(self, other):
         return _yp_symmetric_difference(self, _yp_iterable(other))
 
     def update(self, *others):
-        _yp_updateN(self, yp_None, *(_yp_iterable(x) for x in others))
+        for other in others: _yp_update(self, _yp_iterable(other), yp_None)
 
     def intersection_update(self, *others):
-        _yp_intersection_updateN(self, yp_None, *(_yp_iterable(x) for x in others))
+        for other in others: _yp_intersection_update(self, _yp_iterable(other), yp_None)
 
     def difference_update(self, *others):
-        _yp_difference_updateN(self, yp_None, *(_yp_iterable(x) for x in others))
+        for other in others: _yp_difference_update(self, _yp_iterable(other), yp_None)
 
     def symmetric_difference_update(self, other):
         _yp_symmetric_difference_update(self, _yp_iterable(other), yp_None)
@@ -1841,65 +1844,65 @@ class _ypSet(ypObject):
     def __or__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        return _yp_unionN(self, other)
+        return self.union(other)
 
     def __and__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        return _yp_intersectionN(self, other)
+        return self.intersection(other)
 
     def __sub__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        return _yp_differenceN(self, other)
+        return self.difference(other)
 
     def __xor__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        return _yp_symmetric_difference(self, other)
+        return self.symmetric_difference(other)
 
     def __ror__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        return _yp_unionN(other, self)
+        return other.union(self)
 
     def __rand__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        return _yp_intersectionN(other, self)
+        return other.intersection(self)
 
     def __rsub__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        return _yp_differenceN(other, self)
+        return other.difference(self)
 
     def __rxor__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        return _yp_symmetric_difference(other, self)
+        return other.symmetric_difference(self)
 
     def __ior__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        _yp_updateN(self, yp_None, other)
+        self.update(other)
         return self
 
     def __iand__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        _yp_intersection_updateN(self, yp_None, other)
+        self.intersection_update(other)
         return self
 
     def __isub__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        _yp_difference_updateN(self, yp_None, other)
+        self.difference_update(other)
         return self
 
     def __ixor__(self, other):
         if self._bad_other(other):
             return NotImplemented
-        _yp_symmetric_difference_update(self, other, yp_None)
+        self.symmetric_difference_update(other)
         return self
 
     def add(self, elem): _yp_push(self, elem, yp_None)
@@ -2064,7 +2067,8 @@ class _ypDict(ypObject):
         return (key_p[0], value_p[0])
 
     def update(self, object=yp_tuple_empty, /, **kwargs):
-        _yp_updateN(self, yp_None, _yp_dict_iterable(object), kwargs)
+        _yp_update(self, _yp_dict_iterable(object), yp_None)
+        _yp_update(self, kwargs, yp_None)
 
 
 @pytype(yp_t_frozendict, ())
