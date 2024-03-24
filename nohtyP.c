@@ -17972,11 +17972,10 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
         key = va_arg(args, ypObject *);  // borrowed
         n -= 1;
         result = _ypDict_push(newMp, key, value, 1, &spaceleft, n);
-        if (yp_isexceptionC(result)) break;
-    }
-    if (yp_isexceptionC(result)) {
-        yp_decref(newMp);
-        return result;
+        if (yp_isexceptionC(result)) {
+            yp_decref(newMp);
+            return result;
+        }
     }
     return newMp;
 }
