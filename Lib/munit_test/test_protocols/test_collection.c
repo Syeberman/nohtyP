@@ -62,6 +62,8 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
+// FIXME test_clear, clear an empty collection
+
 // TODO Enable and expand this test. One issue is that rand_items may return items that don't
 // support deepcopy, like iterators.
 // static MunitResult test_deepcopy(const MunitParameter params[], fixture_t *fixture)

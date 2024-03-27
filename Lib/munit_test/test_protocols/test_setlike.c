@@ -15,6 +15,12 @@
                 fixture_type_dict, NULL                                                        \
     }
 
+#define friend_types_init()                                                     \
+    {                                                                           \
+        fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
+                fixture_type_set_dirty, NULL                                    \
+    }
+
 // Returns true iff type can store unhashable objects.
 static int type_stores_unhashables(fixture_type_t *type)
 {
@@ -574,6 +580,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t  *friend_types[] = friend_types_init();
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
@@ -621,7 +628,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     }
 
     // x can be so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *result = yp_union(so, so);
         assert_type_is(result, type->type);
@@ -668,6 +675,62 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
                       yp_tupleN(N(items[1], items[2])), result = yp_union(so, x),
                       assert_set(result, items[0], items[1], items[2]), yp_decrefN(N(so, result)));
 
+    // Optimization: lazy shallow copy of a friendly immutable x when immutable so is empty.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        ypObject *result = yp_union(so, x);
+        if (!type->is_mutable && !(*x_type)->is_mutable) {
+            assert_obj(result, is, x);
+        } else {
+            assert_obj(result, is_not, x);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: lazy shallow copy of an immutable so when friendly x is empty.
+    // TODO This could apply for any iterable x that doesn't yield a value.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_union(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, so);
+        } else {
+            assert_obj(result, is_not, so);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: empty immortal when immutable so is empty and friendly x is empty.
+    // TODO This could apply for any iterable x that doesn't yield a value.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_union(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: lazy shallow copy of an immutable so when x is so.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_union(so, so);
+        if (!type->is_mutable) {
+            assert_obj(result, is, so);
+        } else {
+            assert_obj(result, is_not, so);
+        }
+        yp_decrefN(N(so, result));
+    }
+
+    // TODO There could be similar optimizations for all four of these methods where the result
+    // is equal to so or the result is empty.
+
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
@@ -691,6 +754,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t  *friend_types[] = friend_types_init();
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
@@ -738,7 +802,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     }
 
     // x can be so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *result = yp_intersection(so, so);
         assert_type_is(result, type->type);
@@ -786,6 +850,63 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
                       yp_tupleN(N(items[1], items[2])), result = yp_intersection(so, x),
                       assert_set(result, items[1]), yp_decrefN(N(so, result)));
 
+    // Optimization: empty immortal when immutable so is empty.
+    // TODO This could apply for any iterable x.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        ypObject *result = yp_intersection(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: empty immortal when so is immutable and friendly x is empty.
+    // TODO This could apply for any iterable x that doesn't yield a value.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_intersection(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: empty immortal when immutable so is empty and friendly x is empty.
+    // TODO This could apply for any iterable x that doesn't yield a value.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_intersection(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: lazy shallow copy of an immutable so when x is so.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_intersection(so, so);
+        if (!type->is_mutable) {
+            assert_obj(result, is, so);
+        } else {
+            assert_obj(result, is_not, so);
+        }
+        yp_decrefN(N(so, result));
+    }
+
+    // TODO There could be similar optimizations for all four of these methods where the result
+    // is equal to so or the result is empty.
+
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
@@ -809,6 +930,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t  *friend_types[] = friend_types_init();
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
@@ -856,7 +978,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     }
 
     // x can be so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *result = yp_difference(so, so);
         assert_type_is(result, type->type);
@@ -904,6 +1026,63 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
                       yp_tupleN(N(items[1], items[2])), result = yp_difference(so, x),
                       assert_set(result, items[0]), yp_decrefN(N(so, result)));
 
+    // Optimization: empty immortal when immutable so is empty.
+    // TODO This could apply for any iterable x.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        ypObject *result = yp_difference(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: lazy shallow copy of an immutable so when friendly x is empty.
+    // TODO This could apply for any iterable x that doesn't yield a value.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_difference(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, so);
+        } else {
+            assert_obj(result, is_not, so);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: empty immortal when immutable so is empty and friendly x is empty.
+    // TODO This could apply for any iterable x that doesn't yield a value.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_difference(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: empty immortal when so is immutable and x is so.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_difference(so, so);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, result));
+    }
+
+    // TODO There could be similar optimizations for all four of these methods where the result
+    // is equal to so or the result is empty.
+
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
@@ -927,6 +1106,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t  *friend_types[] = friend_types_init();
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
@@ -974,7 +1154,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     }
 
     // x can be so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    {
         ypObject *so = type->newN(N(items[0], items[1]));
         ypObject *result = yp_symmetric_difference(so, so);
         assert_type_is(result, type->type);
@@ -1022,6 +1202,62 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     faulty_iter_tests(ypObject *so = type->newN(N(items[0], items[1])); ypObject * result, x,
                       yp_tupleN(N(items[1], items[2])), result = yp_symmetric_difference(so, x),
                       assert_set(result, items[0], items[2]), yp_decrefN(N(so, result)));
+
+    // Optimization: lazy shallow copy of a friendly immutable x when immutable so is empty.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(N(items[0], items[1]));
+        ypObject *result = yp_symmetric_difference(so, x);
+        if (!type->is_mutable && !(*x_type)->is_mutable) {
+            assert_obj(result, is, x);
+        } else {
+            assert_obj(result, is_not, x);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: lazy shallow copy of an immutable so when friendly x is empty.
+    // TODO This could apply for any iterable x that doesn't yield a value.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_symmetric_difference(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, so);
+        } else {
+            assert_obj(result, is_not, so);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: empty immortal when immutable so is empty and friendly x is empty.
+    // TODO This could apply for any iterable x that doesn't yield a value.
+    for (x_type = friend_types; (*x_type) != NULL; x_type++) {
+        ypObject *so = type->newN(0);
+        ypObject *x = (*x_type)->newN(0);
+        ypObject *result = yp_symmetric_difference(so, x);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, x, result));
+    }
+
+    // Optimization: empty immortal when so is immutable and x is so.
+    {
+        ypObject *so = type->newN(N(items[0], items[1]));
+        ypObject *result = yp_symmetric_difference(so, so);
+        if (!type->is_mutable) {
+            assert_obj(result, is, yp_frozenset_empty);
+        } else {
+            assert_obj(result, is_not, yp_frozenset_empty);
+        }
+        yp_decrefN(N(so, result));
+    }
+
+    // TODO There could be similar optimizations for all four of these methods where the result
+    // is equal to so or the result is empty.
 
     // x is not an iterable.
     {
@@ -1098,7 +1334,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     }
 
     // x can be so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_update(so, so, &exc));
         assert_set(so, items[0], items[1]);
@@ -1245,7 +1481,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
     }
 
     // x can be so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_intersection_update(so, so, &exc));
         assert_set(so, items[0], items[1]);
@@ -1391,7 +1627,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
     }
 
     // x can be so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_difference_update(so, so, &exc));
         assert_len(so, 0);
@@ -1538,7 +1774,7 @@ static MunitResult test_symmetric_difference_update(
     }
 
     // x can be so.
-    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+    {
         ypObject *so = type->newN(N(items[0], items[1]));
         assert_not_raises_exc(yp_symmetric_difference_update(so, so, &exc));
         assert_len(so, 0);
@@ -1884,6 +2120,7 @@ static MunitResult test_discard(const MunitParameter params[], fixture_t *fixtur
     return _test_remove(fixture->type, yp_discard, /*raises=*/FALSE);
 }
 
+// FIXME Some coverage missing in set_pop
 static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;

@@ -15633,7 +15633,6 @@ static ypObject *_ypSet_issuperset_withiter(ypObject *so, ypObject *mi, yp_uint6
     return yp_True;
 }
 
-// XXX Check for the so==other case _before_ calling this function
 static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
 {
     yp_ssize_t      keysleft = ypSet_LEN(other);
@@ -15644,7 +15643,8 @@ static ypObject *_ypSet_update_fromset(ypObject *so, ypObject *other)
     ypSet_KeyEntry *so_loc;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
-    yp_ASSERT1(so != other);
+
+    if (so == other) return yp_None;
 
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
@@ -15686,27 +15686,6 @@ static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t 
     return yp_None;
 }
 
-// Adds the keys yielded from iterable to the set. If the set has enough space to hold all the
-// keys, the set is not resized (important, as yp_setN et al pre-allocate the necessary space).
-// Requires that iterable's items are immutable; unavoidable as they are to be added to the set.
-// XXX Check for the so==iterable case _before_ calling this function
-static ypObject *_ypSet_update(ypObject *so, ypObject *iterable)
-{
-    // Recall that type pairs are identified by the immutable type code
-    if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
-        return _ypSet_update_fromset(so, iterable);
-    } else {
-        ypObject   *result;
-        yp_uint64_t mi_state;
-        ypObject   *mi = yp_miniiter(iterable, &mi_state);  // new ref
-        if (yp_isexceptionC(mi)) return mi;
-        result = _ypSet_update_fromiter(so, mi, &mi_state);
-        yp_decref(mi);
-        return result;
-    }
-}
-
-// XXX Check the so==other case _before_ calling this function
 static ypObject *_ypSet_intersection_update_fromset(ypObject *so, ypObject *other)
 {
     yp_ssize_t      keysleft = ypSet_LEN(so);
@@ -15716,7 +15695,8 @@ static ypObject *_ypSet_intersection_update_fromset(ypObject *so, ypObject *othe
     ypObject       *result;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
-    yp_ASSERT1(so != other);
+
+    if (so == other) return yp_None;
 
     // Since we're only removing keys from so, it won't be resized, so we can loop over it. We
     // break once so is empty because we aren't expecting any errors from _ypSet_lookkey.
@@ -15756,25 +15736,7 @@ static ypObject *_ypSet_intersection_update_fromiter(
     return result;
 }
 
-// Removes the keys not yielded from iterable from the set
-// XXX Check for the so==iterable case _before_ calling this function
-static ypObject *_ypSet_intersection_update(ypObject *so, ypObject *iterable)
-{
-    // Recall that type pairs are identified by the immutable type code
-    if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
-        return _ypSet_intersection_update_fromset(so, iterable);
-    } else {
-        ypObject   *result;
-        yp_uint64_t mi_state;
-        ypObject   *mi = yp_miniiter(iterable, &mi_state);  // new ref
-        if (yp_isexceptionC(mi)) return mi;
-        result = _ypSet_intersection_update_fromiter(so, mi, &mi_state);
-        yp_decref(mi);
-        return result;
-    }
-}
-
-// XXX Check for the so==other case _before_ calling this function
+static ypObject *set_clear(ypObject *so);
 static ypObject *_ypSet_difference_update_fromset(ypObject *so, ypObject *other)
 {
     yp_ssize_t      keysleft = ypSet_LEN(other);
@@ -15784,7 +15746,8 @@ static ypObject *_ypSet_difference_update_fromset(ypObject *so, ypObject *other)
     ypSet_KeyEntry *loc;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
-    yp_ASSERT1(so != other);
+
+    if (so == other) return set_clear(so);
 
     // We break once so is empty because we aren't expecting any errors from _ypSet_lookkey
     for (i = 0; keysleft > 0; i++) {
@@ -15820,25 +15783,6 @@ static ypObject *_ypSet_difference_update_fromiter(
     return yp_None;
 }
 
-// Removes the keys yielded from iterable from the set
-// XXX Check for the so==iterable case _before_ calling this function
-static ypObject *_ypSet_difference_update(ypObject *so, ypObject *iterable)
-{
-    // Recall that type pairs are identified by the immutable type code
-    if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
-        return _ypSet_difference_update_fromset(so, iterable);
-    } else {
-        ypObject   *result;
-        yp_uint64_t mi_state;
-        ypObject   *mi = yp_miniiter(iterable, &mi_state);  // new ref
-        if (yp_isexceptionC(mi)) return mi;
-        result = _ypSet_difference_update_fromiter(so, mi, &mi_state);
-        yp_decref(mi);
-        return result;
-    }
-}
-
-// XXX Check for the so==other case _before_ calling this function
 static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObject *other)
 {
     yp_ssize_t      spaceleft = _ypSet_space_remaining(so);
@@ -15849,7 +15793,8 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
     ypSet_KeyEntry *so_loc;
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(other) == ypFrozenSet_CODE);
-    yp_ASSERT1(so != other);
+
+    if (so == other) return set_clear(so);
 
     for (i = 0; keysleft > 0; i++) {
         if (!ypSet_ENTRY_USED(&otherkeys[i])) continue;
@@ -15871,23 +15816,238 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
     return yp_None;
 }
 
-// XXX Check for the so==other case _before_ calling this function
-static ypObject *_ypSet_symmetric_difference_update(ypObject *so, ypObject *iterable)
+static ypObject *_ypSet_union_fromset(ypObject *so, ypObject *x)
 {
-    int       x_pair = ypObject_TYPE_PAIR_CODE(iterable);
+    ypObject *exc = yp_None;
     ypObject *result;
+    ypObject *newSo;
 
-    // Recall that type pairs are identified by the immutable type code
-    if (x_pair == ypFrozenSet_CODE) {
-        return _ypSet_symmetric_difference_update_fromset(so, iterable);
-    } else {
-        // TODO Is there a way to do this without allocating a new set? (I actually think not.)
-        ypObject *iterable_asset = yp_frozenset(iterable);
-        if (yp_isexceptionC(iterable_asset)) return iterable_asset;
-        result = _ypSet_symmetric_difference_update_fromset(so, iterable_asset);
-        yp_decref(iterable_asset);
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE);
+
+    if (so == x || ypSet_LEN(x) < 1) {
+        if (!ypObject_IS_MUTABLE(so)) {
+            return ypSet_LEN(so) < 1 ? yp_frozenset_empty : yp_incref(so);
+        }
+        return _ypSet_copy(ypSet_CODE, so);
+    } else if (ypSet_LEN(so) < 1) {
+        if (!ypObject_IS_MUTABLE(so) && !ypObject_IS_MUTABLE(x)) return yp_incref(x);
+        return _ypSet_copy(ypObject_TYPE_CODE(so), x);
+    }
+
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    if (yp_isexceptionC(newSo)) return newSo;
+
+    result = _ypSet_update_fromset(newSo, x);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newSo);
         return result;
     }
+
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
+    return newSo;
+}
+
+// TODO Some optimizations from _ypSet_union_fromset could apply here too.
+static ypObject *_ypSet_union_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
+{
+    ypObject *exc = yp_None;
+    ypObject *result;
+    ypObject *newSo;
+
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    if (yp_isexceptionC(newSo)) return newSo;
+
+    result = _ypSet_update_fromiter(newSo, mi, mi_state);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newSo);
+        return result;
+    }
+
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
+    // TODO ...or, rewrite similarly to _ypSet_fromiterable.
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
+    return newSo;
+}
+
+static ypObject *_ypSet_intersection_fromset(ypObject *so, ypObject *x)
+{
+    ypObject *exc = yp_None;
+    ypObject *result;
+    ypObject *newSo;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE);
+
+    if (ypSet_LEN(so) < 1 || ypSet_LEN(x) < 1) {
+        if (!ypObject_IS_MUTABLE(so)) return yp_frozenset_empty;
+        return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
+    } else if (so == x) {
+        if (!ypObject_IS_MUTABLE(so)) return yp_incref(so);
+        return _ypSet_copy(ypSet_CODE, so);
+    }
+
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    if (yp_isexceptionC(newSo)) return newSo;
+
+    result = _ypSet_intersection_update_fromset(newSo, x);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newSo);
+        return result;
+    }
+
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
+    return newSo;
+}
+
+// TODO Some optimizations from _ypSet_intersection_fromset could apply here too.
+static ypObject *_ypSet_intersection_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
+{
+    ypObject *exc = yp_None;
+    ypObject *result;
+    ypObject *newSo;
+
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    if (yp_isexceptionC(newSo)) return newSo;
+
+    result = _ypSet_intersection_update_fromiter(newSo, mi, mi_state);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newSo);
+        return result;
+    }
+
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
+    // TODO ...or, rewrite similarly to _ypSet_fromiterable.
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
+    return newSo;
+}
+
+static ypObject *_ypSet_difference_fromset(ypObject *so, ypObject *x)
+{
+    ypObject *exc = yp_None;
+    ypObject *result;
+    ypObject *newSo;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE);
+
+    if (so == x || ypSet_LEN(so) < 1) {
+        if (!ypObject_IS_MUTABLE(so)) return yp_frozenset_empty;
+        return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
+    } else if (ypSet_LEN(x) < 1) {
+        if (!ypObject_IS_MUTABLE(so)) return yp_incref(so);
+        return _ypSet_copy(ypSet_CODE, so);
+    }
+
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    if (yp_isexceptionC(newSo)) return newSo;
+
+    result = _ypSet_difference_update_fromset(newSo, x);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newSo);
+        return result;
+    }
+
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
+    return newSo;
+}
+
+// TODO Some optimizations from _ypSet_difference_fromset could apply here too.
+static ypObject *_ypSet_difference_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
+{
+    ypObject *exc = yp_None;
+    ypObject *result;
+    ypObject *newSo;
+
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    if (yp_isexceptionC(newSo)) return newSo;
+
+    result = _ypSet_difference_update_fromiter(newSo, mi, mi_state);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newSo);
+        return result;
+    }
+
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
+    // TODO ...or, rewrite similarly to _ypSet_fromiterable.
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
+    return newSo;
+}
+
+static ypObject *_ypSet_symmetric_difference_fromset(ypObject *so, ypObject *x)
+{
+    ypObject *exc = yp_None;
+    ypObject *result;
+    ypObject *newSo;
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE);
+
+    if (ypSet_LEN(x) < 1) {
+        if (!ypObject_IS_MUTABLE(so)) {
+            return ypSet_LEN(so) < 1 ? yp_frozenset_empty : yp_incref(so);
+        }
+        return _ypSet_copy(ypSet_CODE, so);
+    } else if (so == x) {
+        if (!ypObject_IS_MUTABLE(so)) return yp_frozenset_empty;
+        return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
+    } else if (ypSet_LEN(so) < 1) {
+        if (!ypObject_IS_MUTABLE(so) && !ypObject_IS_MUTABLE(x)) return yp_incref(x);
+        return _ypSet_copy(ypObject_TYPE_CODE(so), x);
+    }
+
+    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    if (yp_isexceptionC(newSo)) return newSo;
+
+    result = _ypSet_symmetric_difference_update_fromset(newSo, x);
+    if (yp_isexceptionC(result)) {
+        yp_decref(newSo);
+        return result;
+    }
+
+    // TODO Call frozenset_freeze directly? It should never fail.
+    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
+    // TODO If newSo is empty, replace with yp_frozenset_empty.
+    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
+    if (yp_isexceptionC(exc)) {
+        yp_decref(newSo);
+        return exc;
+    }
+    return newSo;
 }
 
 
@@ -16127,151 +16287,122 @@ static ypObject *frozenset_gt(ypObject *so, ypObject *x)
 
 static ypObject *set_update(ypObject *so, ypObject *x)
 {
-    if (so == x) return yp_None;
-
-    return _ypSet_update(so, x);
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_update_fromset(so, x);
+    } else {
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_update_fromiter(so, mi, &mi_state);
+        yp_decref(mi);
+        return result;
+    }
 }
 
 static ypObject *set_intersection_update(ypObject *so, ypObject *x)
 {
-    if (so == x) return yp_None;
-
-    return _ypSet_intersection_update(so, x);
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_intersection_update_fromset(so, x);
+    } else {
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_intersection_update_fromiter(so, mi, &mi_state);
+        yp_decref(mi);
+        return result;
+    }
 }
 
-static ypObject *set_clear(ypObject *so);
 static ypObject *set_difference_update(ypObject *so, ypObject *x)
 {
-    if (so == x) return set_clear(so);
-
-    return _ypSet_difference_update(so, x);
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_difference_update_fromset(so, x);
+    } else {
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_difference_update_fromiter(so, mi, &mi_state);
+        yp_decref(mi);
+        return result;
+    }
 }
 
 static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
 {
-    if (so == x) return set_clear(so);
-
-    return _ypSet_symmetric_difference_update(so, x);
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_symmetric_difference_update_fromset(so, x);
+    } else {
+        // TODO Is there a way to do this without allocating a new set? (I actually think not.)
+        ypObject *result;
+        ypObject *x_asset = yp_frozenset(x);  // new ref FIXME _fromiter? elsewhere?
+        if (yp_isexceptionC(x_asset)) return x_asset;
+        result = _ypSet_symmetric_difference_update_fromset(so, x_asset);
+        yp_decref(x_asset);
+        return result;
+    }
 }
 
-// FIXME Possible optimizations:
-//  - lazy shallow copy of an immutable so when x is so.
-//  - lazy shallow copy of an immutable so when friendly x is empty.
-//  - lazy shallow copy of a friendly immutable x when immutable so is empty.
-//  - empty immortal when immutable so is empty and friendly x is empty.
 static ypObject *frozenset_union(ypObject *so, ypObject *x)
 {
-    ypObject *exc = yp_None;
-    ypObject *result;
-    ypObject *newSo;
-
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
-    if (yp_isexceptionC(newSo)) return newSo;
-
-    result = _ypSet_update(newSo, x);
-    if (yp_isexceptionC(result)) {
-        yp_decref(newSo);
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_union_fromset(so, x);
+    } else {
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_union_fromiter(so, mi, &mi_state);
+        yp_decref(mi);
         return result;
     }
-
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start.
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
-    return newSo;
 }
 
-// FIXME Possible optimizations:
-//  - lazy shallow copy of an immutable so when x is so.
-//  - empty immortal when immutable so and either so or friendly x is empty.
 static ypObject *frozenset_intersection(ypObject *so, ypObject *x)
 {
-    ypObject *exc = yp_None;
-    ypObject *result;
-    ypObject *newSo;
-
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
-    if (yp_isexceptionC(newSo)) return newSo;
-
-    result = _ypSet_intersection_update(newSo, x);
-    if (yp_isexceptionC(result)) {
-        yp_decref(newSo);
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_intersection_fromset(so, x);
+    } else {
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_intersection_fromiter(so, mi, &mi_state);
+        yp_decref(mi);
         return result;
     }
-
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start.
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
-    return newSo;
 }
 
-// FIXME Possible optimizations:
-//  - lazy shallow copy of an immutable so when friendly x is empty.
-//  - empty immortal when immutable so and either so is empty or x is so.
 static ypObject *frozenset_difference(ypObject *so, ypObject *x)
 {
-    ypObject *exc = yp_None;
-    ypObject *result;
-    ypObject *newSo;
-
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
-    if (yp_isexceptionC(newSo)) return newSo;
-
-    result = _ypSet_difference_update(newSo, x);
-    if (yp_isexceptionC(result)) {
-        yp_decref(newSo);
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_difference_fromset(so, x);
+    } else {
+        ypObject   *result;
+        yp_uint64_t mi_state;
+        ypObject   *mi = yp_miniiter(x, &mi_state);  // new ref
+        if (yp_isexceptionC(mi)) return mi;
+        result = _ypSet_difference_fromiter(so, mi, &mi_state);
+        yp_decref(mi);
         return result;
     }
-
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start.
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
-    return newSo;
 }
 
-// FIXME Possible optimizations:
-//  - lazy shallow copy of an immutable so when friendly x is empty.
-//  - lazy shallow copy of a friendly immutable x when immutable so is empty.
-//  - empty immortal when immutable so is empty and friendly x is empty.
-//  - empty immortal when immutable so is x.
 static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
 {
-    ypObject *exc = yp_None;
-    ypObject *result;
-    ypObject *newSo;
-
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
-    if (yp_isexceptionC(newSo)) return newSo;
-
-    result = _ypSet_symmetric_difference_update(newSo, x);
-    if (yp_isexceptionC(result)) {
-        yp_decref(newSo);
+    if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
+        return _ypSet_symmetric_difference_fromset(so, x);
+    } else {
+        // TODO Is there a way to do this without allocating a new set? (I actually think not.)
+        ypObject *result;
+        ypObject *x_asset = yp_frozenset(x);  // new ref FIXME _fromiter? elsewhere?
+        if (yp_isexceptionC(x_asset)) return x_asset;
+        result = _ypSet_symmetric_difference_fromset(so, x_asset);
+        yp_decref(x_asset);
         return result;
     }
-
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start.
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
-    return newSo;
 }
 
 static ypObject *set_pushunique(ypObject *so, ypObject *x)
