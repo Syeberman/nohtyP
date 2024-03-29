@@ -62,7 +62,47 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
-// FIXME test_clear, clear an empty collection
+static MunitResult test_clear(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *items[4];
+    obj_array_fill(items, type->rand_items);
+
+    // Immutables don't support clear.
+    if (!type->is_mutable) {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        assert_raises_exc(yp_clear(self, &exc), yp_MethodError);
+        assert_len(self, 2);
+        assert_obj(yp_contains(self, items[0]), is, yp_True);
+        assert_obj(yp_contains(self, items[1]), is, yp_True);
+        yp_decref(self);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic clear.
+    {
+        ypObject *self = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_clear(self, &exc));
+        assert_len(self, 0);
+        assert_obj(yp_contains(self, items[0]), is, yp_False);
+        assert_obj(yp_contains(self, items[1]), is, yp_False);
+        yp_decref(self);
+    }
+
+    // self is empty.
+    {
+        ypObject *self = type->newN(0);
+        assert_not_raises_exc(yp_clear(self, &exc));
+        assert_len(self, 0);
+        assert_obj(yp_contains(self, items[0]), is, yp_False);
+        assert_obj(yp_contains(self, items[1]), is, yp_False);
+        yp_decref(self);
+    }
+
+tear_down:
+    obj_array_decref(items);
+    return MUNIT_OK;
+}
 
 // TODO Enable and expand this test. One issue is that rand_items may return items that don't
 // support deepcopy, like iterators.
@@ -101,6 +141,7 @@ static MunitParameterEnum test_collection_params[] = {
         {param_key_type, param_values_types_collection}, {NULL}};
 
 MunitTest test_collection_tests[] = {TEST(test_bool, test_collection_params),
-        TEST(test_contains, test_collection_params), {NULL}};
+        TEST(test_contains, test_collection_params), TEST(test_clear, test_collection_params),
+        {NULL}};
 
 extern void test_collection_initialize(void) {}
