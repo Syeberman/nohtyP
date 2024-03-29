@@ -2120,7 +2120,6 @@ static MunitResult test_discard(const MunitParameter params[], fixture_t *fixtur
     return _test_remove(fixture->type, yp_discard, /*raises=*/FALSE);
 }
 
-// FIXME Some coverage missing in set_pop
 static MunitResult test_pop(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;

@@ -3383,10 +3383,6 @@ typedef struct _yp_deepcopy_memo_t {
 
 extern ypObject *const yp_RecursionLimitError;
 
-// TODO If len==0, replace it with the immortal "zero-version" of the type
-//  WAIT! I can't do that, because that won't freeze the original and others might be referencing
-//  the original so won't see it as frozen now.
-//  SO! Still freeze the original, but then also replace it with the zero-version
 static ypObject *_yp_freeze(ypObject *x)
 {
     int           oldCode = ypObject_TYPE_CODE(x);
@@ -3400,7 +3396,7 @@ static ypObject *_yp_freeze(ypObject *x)
     yp_ASSERT(newType != NULL, "all types should have an immutable counterpart");
 
     // Freeze the object, possibly reduce memory usage, etc
-    // TODO Support unfreezable objects. Let tp_freeze set the type code as appropriate, then
+    // FIXME Support unfreezable objects. Let tp_freeze set the type code as appropriate, then
     // inspect it after to see if it worked. (Or return yp_NotImplemented.) Perhaps return an
     // exception if the top-level freeze doesn't freeze, but in the case of deep freeze allow deeper
     // objects to silently fail to freeze.
@@ -15106,11 +15102,8 @@ static yp_ssize_t _ypSet_space_remaining(ypObject *so)
 // Returns the alloclen that will fit minused entries. Always succeeds. minused cannot be greater
 // than ypSet_LEN_MAX.
 // XXX Adapted from Python's dictresize
-// FIXME Python uses optimized  _Py_bit_length or _BitScanReverse64 to find next log2 value... we
+// TODO Python uses optimized  _Py_bit_length or _BitScanReverse64 to find next log2 value... we
 // could use yp_int_bit_lengthC!
-// FIXME Recent Python comment that seems reasonable:
-//      There are no strict guarantee that returned dict can contain minused items without resize.
-//      So we create medium size dict instead of very large dict or MemoryError.
 yp_STATIC_ASSERT(ypSet_RESIZE_AT_DNM <= (yp_SSIZE_T_MAX - 1) / ypSet_LEN_MAX,
         ypSet_calc_alloclen_cant_overflow);
 static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
@@ -15154,7 +15147,7 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
     }
     if (yp_isexceptionC(so)) return so;
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // FIXME We could use yp_int_bit_lengthC...
+    // TODO We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, alloclen);
     ypSet_FILL(so) = 0;
     yp_memset(ypSet_TABLE(so), 0, alloclen * yp_sizeof(ypSet_KeyEntry));
@@ -15166,7 +15159,7 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
 // TODO It's tempting to look into memcpy to copy the tables, although that would mean the copy
 // would be just as dirty as the original. But if the original isn't "too dirty"...
 static void _ypSet_movekey_clean(ypObject *so, ypObject *key, yp_hash_t hash, ypSet_KeyEntry **ep);
-static ypObject *_ypSet_copy(int type, ypObject *x)
+static ypObject *_ypSet_copy(int type, ypObject *x, int alloclen_fixed)
 {
     yp_ssize_t      keysleft = ypSet_LEN(x);
     ypSet_KeyEntry *otherkeys = ypSet_TABLE(x);
@@ -15174,12 +15167,9 @@ static ypObject *_ypSet_copy(int type, ypObject *x)
     yp_ssize_t      i;
     ypSet_KeyEntry *loc;
 
-    yp_ASSERT(type != ypFrozenSet_CODE || ypObject_TYPE_CODE(x) != ypFrozenSet_CODE,
-            "missed a lazy shallow copy optimization");
-    yp_ASSERT(type != ypFrozenSet_CODE || ypSet_LEN(x) > 0,
-            "missed a yp_frozenset_empty optimization");
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE);
 
-    so = _ypSet_new(type, keysleft, /*alloclen_fixed=*/TRUE);
+    so = _ypSet_new(type, keysleft, alloclen_fixed);
     if (yp_isexceptionC(so)) return so;
 
     // The set is empty and contains no deleted entries, so we can use _ypSet_movekey_clean
@@ -15265,7 +15255,7 @@ static ypObject *_ypSet_resize(ypObject *so, yp_ssize_t minused)
     if (oldkeys == NULL) return yp_MemoryError;
     yp_memset(ypSet_TABLE(so), 0, newalloclen * yp_sizeof(ypSet_KeyEntry));
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // FIXME We could use yp_int_bit_lengthC...
+    // TODO We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, newalloclen);
 
     // Clear the new table.
@@ -15594,7 +15584,7 @@ static ypObject *_ypSet_issubset_withiter(ypObject *so, ypObject *mi, yp_uint64_
     // Create a copy of so and remove the items yielded by the iterator. If there are remaining
     // items in the copy, then it's not a subset.
     // TODO Is there a way to do this without allocating a new set? (I actually think not.)
-    so_remaining = _ypSet_copy(ypSet_CODE, so);  // new ref
+    so_remaining = _ypSet_copy(ypFrozenSet_CODE, so, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(so_remaining)) return so_remaining;
     result = _ypSet_difference_update_fromiter(so_remaining, mi, mi_state);
     if (!yp_isexceptionC(result)) {
@@ -15723,7 +15713,7 @@ static ypObject *_ypSet_intersection_update_fromiter(
     ypObject *result;
 
     // TODO Is there a way to do this without allocating a new set? (I actually think not.)
-    so_toremove = _ypSet_copy(ypSet_CODE, so);  // new ref
+    so_toremove = _ypSet_copy(ypFrozenSet_CODE, so, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(so_toremove)) return so_toremove;
 
     // Remove items from so_toremove that are yielded by mi. so_toremove is then a set
@@ -15818,7 +15808,6 @@ static ypObject *_ypSet_symmetric_difference_update_fromset(ypObject *so, ypObje
 
 static ypObject *_ypSet_union_fromset(ypObject *so, ypObject *x)
 {
-    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
@@ -15828,13 +15817,13 @@ static ypObject *_ypSet_union_fromset(ypObject *so, ypObject *x)
         if (!ypObject_IS_MUTABLE(so)) {
             return ypSet_LEN(so) < 1 ? yp_frozenset_empty : yp_incref(so);
         }
-        return _ypSet_copy(ypSet_CODE, so);
+        return _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);
     } else if (ypSet_LEN(so) < 1) {
         if (!ypObject_IS_MUTABLE(so) && !ypObject_IS_MUTABLE(x)) return yp_incref(x);
-        return _ypSet_copy(ypObject_TYPE_CODE(so), x);
+        return _ypSet_copy(ypObject_TYPE_CODE(so), x, /*alloclen_fixed=*/TRUE);
     }
 
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    newSo = _ypSet_copy(ypObject_TYPE_CODE(so), so, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = _ypSet_update_fromset(newSo, x);
@@ -15843,24 +15832,16 @@ static ypObject *_ypSet_union_fromset(ypObject *so, ypObject *x)
         return result;
     }
 
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
     return newSo;
 }
 
 // TODO Some optimizations from _ypSet_union_fromset could apply here too.
 static ypObject *_ypSet_union_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    newSo = _ypSet_copy(ypObject_TYPE_CODE(so), so, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = _ypSet_update_fromiter(newSo, mi, mi_state);
@@ -15869,21 +15850,11 @@ static ypObject *_ypSet_union_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *
         return result;
     }
 
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    // TODO ...or, rewrite similarly to _ypSet_fromiterable.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
     return newSo;
 }
 
 static ypObject *_ypSet_intersection_fromset(ypObject *so, ypObject *x)
 {
-    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
@@ -15894,10 +15865,10 @@ static ypObject *_ypSet_intersection_fromset(ypObject *so, ypObject *x)
         return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
     } else if (so == x) {
         if (!ypObject_IS_MUTABLE(so)) return yp_incref(so);
-        return _ypSet_copy(ypSet_CODE, so);
+        return _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);
     }
 
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    newSo = _ypSet_copy(ypObject_TYPE_CODE(so), so, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = _ypSet_intersection_update_fromset(newSo, x);
@@ -15906,25 +15877,16 @@ static ypObject *_ypSet_intersection_fromset(ypObject *so, ypObject *x)
         return result;
     }
 
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
     return newSo;
 }
 
 // TODO Some optimizations from _ypSet_intersection_fromset could apply here too.
 static ypObject *_ypSet_intersection_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    newSo = _ypSet_copy(ypObject_TYPE_CODE(so), so, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = _ypSet_intersection_update_fromiter(newSo, mi, mi_state);
@@ -15933,21 +15895,11 @@ static ypObject *_ypSet_intersection_fromiter(ypObject *so, ypObject *mi, yp_uin
         return result;
     }
 
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    // TODO ...or, rewrite similarly to _ypSet_fromiterable.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
     return newSo;
 }
 
 static ypObject *_ypSet_difference_fromset(ypObject *so, ypObject *x)
 {
-    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
@@ -15958,10 +15910,10 @@ static ypObject *_ypSet_difference_fromset(ypObject *so, ypObject *x)
         return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
     } else if (ypSet_LEN(x) < 1) {
         if (!ypObject_IS_MUTABLE(so)) return yp_incref(so);
-        return _ypSet_copy(ypSet_CODE, so);
+        return _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);
     }
 
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    newSo = _ypSet_copy(ypObject_TYPE_CODE(so), so, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = _ypSet_difference_update_fromset(newSo, x);
@@ -15970,25 +15922,16 @@ static ypObject *_ypSet_difference_fromset(ypObject *so, ypObject *x)
         return result;
     }
 
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
     return newSo;
 }
 
 // TODO Some optimizations from _ypSet_difference_fromset could apply here too.
 static ypObject *_ypSet_difference_fromiter(ypObject *so, ypObject *mi, yp_uint64_t *mi_state)
 {
-    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    newSo = _ypSet_copy(ypObject_TYPE_CODE(so), so, /*alloclen_fixed=*/TRUE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = _ypSet_difference_update_fromiter(newSo, mi, mi_state);
@@ -15997,21 +15940,11 @@ static ypObject *_ypSet_difference_fromiter(ypObject *so, ypObject *mi, yp_uint6
         return result;
     }
 
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    // TODO ...or, rewrite similarly to _ypSet_fromiterable.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
     return newSo;
 }
 
 static ypObject *_ypSet_symmetric_difference_fromset(ypObject *so, ypObject *x)
 {
-    ypObject *exc = yp_None;
     ypObject *result;
     ypObject *newSo;
 
@@ -16021,16 +15954,16 @@ static ypObject *_ypSet_symmetric_difference_fromset(ypObject *so, ypObject *x)
         if (!ypObject_IS_MUTABLE(so)) {
             return ypSet_LEN(so) < 1 ? yp_frozenset_empty : yp_incref(so);
         }
-        return _ypSet_copy(ypSet_CODE, so);
+        return _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);
     } else if (so == x) {
         if (!ypObject_IS_MUTABLE(so)) return yp_frozenset_empty;
         return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
     } else if (ypSet_LEN(so) < 1) {
         if (!ypObject_IS_MUTABLE(so) && !ypObject_IS_MUTABLE(x)) return yp_incref(x);
-        return _ypSet_copy(ypObject_TYPE_CODE(so), x);
+        return _ypSet_copy(ypObject_TYPE_CODE(so), x, /*alloclen_fixed=*/TRUE);
     }
 
-    newSo = _ypSet_copy(ypSet_CODE, so);  // new ref
+    newSo = _ypSet_copy(ypObject_TYPE_CODE(so), so, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) return newSo;
 
     result = _ypSet_symmetric_difference_update_fromset(newSo, x);
@@ -16039,14 +15972,6 @@ static ypObject *_ypSet_symmetric_difference_fromset(ypObject *so, ypObject *x)
         return result;
     }
 
-    // TODO Call frozenset_freeze directly? It should never fail.
-    // TODO ...or, create the set as a frozenset from the start (but _ypSet_copy is alloclen_fixed).
-    // TODO If newSo is empty, replace with yp_frozenset_empty.
-    if (!ypObject_IS_MUTABLE(so)) yp_freeze(newSo, &exc);
-    if (yp_isexceptionC(exc)) {
-        yp_decref(newSo);
-        return exc;
-    }
     return newSo;
 }
 
@@ -16074,14 +15999,17 @@ static ypObject *frozenset_freeze(ypObject *so)
     return yp_None;  // no-op, currently
 }
 
-static ypObject *frozenset_unfrozen_copy(ypObject *so) { return _ypSet_copy(ypSet_CODE, so); }
+static ypObject *frozenset_unfrozen_copy(ypObject *so)
+{
+    return _ypSet_copy(ypSet_CODE, so, /*alloclen_fixed=*/FALSE);
+}
 
 static ypObject *frozenset_frozen_copy(ypObject *so)
 {
     if (ypSet_LEN(so) < 1) return yp_frozenset_empty;
     // A shallow copy of a frozenset to a frozenset doesn't require an actual copy
     if (ypObject_TYPE_CODE(so) == ypFrozenSet_CODE) return yp_incref(so);
-    return _ypSet_copy(ypFrozenSet_CODE, so);
+    return _ypSet_copy(ypFrozenSet_CODE, so, /*alloclen_fixed=*/TRUE);
 }
 
 static ypObject *frozenset_unfrozen_deepcopy(ypObject *so, visitfunc copy_visitor, void *copy_memo)
@@ -16330,6 +16258,7 @@ static ypObject *set_difference_update(ypObject *so, ypObject *x)
     }
 }
 
+static ypObject *_ypSet_fromiterable(int type, ypObject *iterable);
 static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
 {
     if (ypObject_TYPE_PAIR_CODE(x) == ypFrozenSet_CODE) {
@@ -16337,7 +16266,7 @@ static ypObject *set_symmetric_difference_update(ypObject *so, ypObject *x)
     } else {
         // TODO Is there a way to do this without allocating a new set? (I actually think not.)
         ypObject *result;
-        ypObject *x_asset = yp_frozenset(x);  // new ref FIXME _fromiter? elsewhere?
+        ypObject *x_asset = _ypSet_fromiterable(ypFrozenSet_CODE, x);  // new ref
         if (yp_isexceptionC(x_asset)) return x_asset;
         result = _ypSet_symmetric_difference_update_fromset(so, x_asset);
         yp_decref(x_asset);
@@ -16397,7 +16326,7 @@ static ypObject *frozenset_symmetric_difference(ypObject *so, ypObject *x)
     } else {
         // TODO Is there a way to do this without allocating a new set? (I actually think not.)
         ypObject *result;
-        ypObject *x_asset = yp_frozenset(x);  // new ref FIXME _fromiter? elsewhere?
+        ypObject *x_asset = _ypSet_fromiterable(ypFrozenSet_CODE, x);  // new ref
         if (yp_isexceptionC(x_asset)) return x_asset;
         result = _ypSet_symmetric_difference_fromset(so, x_asset);
         yp_decref(x_asset);
@@ -16446,6 +16375,7 @@ static ypObject *set_clear(ypObject *so)
 
     // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
+    // TODO We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, ypSet_ALLOCLEN_MIN);  // we can't make use of the excess anyway
     ypSet_SET_LEN(so, 0);
     ypSet_FILL(so) = 0;
@@ -16822,7 +16752,6 @@ static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
         return exc;
     }
 
-    // FIXME I'm creating the type directly here, rather than freezing. Do above as well!
     newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) {
         yp_decref(first);
@@ -16850,7 +16779,7 @@ ypObject *yp_frozenset(ypObject *iterable)
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
         if (ypSet_LEN(iterable) < 1) return yp_frozenset_empty;
         if (ypObject_TYPE_CODE(iterable) == ypFrozenSet_CODE) return yp_incref(iterable);
-        return _ypSet_copy(ypFrozenSet_CODE, iterable);
+        return _ypSet_copy(ypFrozenSet_CODE, iterable, /*alloclen_fixed=*/TRUE);
     }
     return _ypSet_fromiterable(ypFrozenSet_CODE, iterable);
 }
@@ -16858,7 +16787,7 @@ ypObject *yp_frozenset(ypObject *iterable)
 ypObject *yp_set(ypObject *iterable)
 {
     if (ypObject_TYPE_PAIR_CODE(iterable) == ypFrozenSet_CODE) {
-        return _ypSet_copy(ypSet_CODE, iterable);
+        return _ypSet_copy(ypSet_CODE, iterable, /*alloclen_fixed=*/FALSE);
     }
     return _ypSet_fromiterable(ypSet_CODE, iterable);
 }
