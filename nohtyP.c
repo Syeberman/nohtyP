@@ -16429,8 +16429,6 @@ static ypObject *set_clear(ypObject *so)
     yp_ssize_t      keysleft = ypSet_LEN(so);
     yp_ssize_t      i;
 
-    if (ypSet_FILL(so) < 1) return yp_None;
-
     // Discard the old keys
     // TODO What if yp_decref modifies so? Here and everywhere, we should delay decrefs until we're
     // done modifying the object.
@@ -16448,7 +16446,6 @@ static ypObject *set_clear(ypObject *so)
 
     // Update our attributes and return
     // XXX alloclen must be a power of 2; it's unlikely we'd be given double the requested memory
-    // FIXME We could use yp_int_bit_lengthC...
     ypSet_SET_ALLOCLEN(so, ypSet_ALLOCLEN_MIN);  // we can't make use of the excess anyway
     ypSet_SET_LEN(so, 0);
     ypSet_FILL(so) = 0;
@@ -17434,8 +17431,6 @@ static ypObject *dict_clear(ypObject *mp)
     ypObject **oldvalues = ypDict_VALUES(mp);
     yp_ssize_t valuesleft = ypDict_LEN(mp);
     yp_ssize_t i;
-
-    if (ypDict_LEN(mp) < 1) return yp_None;
 
     // Create a new keyset
     // TODO Rather than creating a new keyset which we may never need, use yp_frozenset_empty,
