@@ -130,7 +130,8 @@
 
 #if defined(yp_ARCH_32_BIT)
 #define PRIssize "d"
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) && _MSC_VER < 1800
+// Early versions of the Windows CRT did not support lld.
 #define PRIssize "I64d"
 #elif defined(__APPLE__)
 // The MacOS X 12.3 SDK defines ssize_t as long (see __darwin_ssize_t in the _types.h files).
@@ -15056,11 +15057,11 @@ yp_STATIC_ASSERT(ypSet_ALLOCLEN_MAX <= ypObject_LEN_MAX, ypSet_ALLOCLEN_MAX_fits
 yp_STATIC_ASSERT(
         ypSet_ALLOCLEN_MAX <= (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) / yp_sizeof(ypSet_KeyEntry),
         ypSet_ALLOCLEN_MAX_size_cant_overflow);
-
 yp_STATIC_ASSERT((ypSet_ALLOCLEN_MAX << 1u) >
                          MIN(ypObject_LEN_MAX, (yp_SSIZE_T_MAX - yp_sizeof(ypSetObject)) /
                                                        yp_sizeof(ypSet_KeyEntry)),
         ypSet_ALLOCLEN_MAX_is_maximal);
+
 #define ypSet_LEN_MAX ((ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
 
 // When allocating a set from a generic iterable, limit the length of the initial allocation to this
