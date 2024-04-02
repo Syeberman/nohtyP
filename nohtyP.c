@@ -17597,18 +17597,27 @@ static ypObject *frozendict_iter_values(ypObject *x)
     return _ypMiIter_fromminiiter(x, frozendict_miniiter_values);
 }
 
+// XXX We need to be a little suspicious of state, just in case the caller has changed it, so
+// treat everything out of bounds as "iterator exhausted".
+static yp_uint32_t _frozendict_miniiter_adjusted_itemsleft(ypObject *mp, ypDictMiState *state)
+{
+    yp_ssize_t index = (yp_ssize_t)state->index;
+    if (index < 0 || index >= ypDict_ALLOCLEN(mp)) return 0;
+    return state->itemsleft;
+}
+
 // Returns the index of the next item to yield, or -1 if exhausted. Updates state.
-// XXX We need to be a little suspicious of _state...just in case the caller has changed it
 static yp_ssize_t _frozendict_miniiter_next(ypObject *mp, ypDictMiState *state)
 {
-    yp_ssize_t index = (yp_ssize_t)state->index;  // don't forget to write it back
+    yp_uint32_t itemsleft = _frozendict_miniiter_adjusted_itemsleft(mp, state);
+    yp_ssize_t  index = (yp_ssize_t)state->index;  // don't forget to write it back
 
-    if (state->itemsleft < 1 || index < 0) return -1;
+    if (itemsleft < 1) return -1;
 
     // Find the next entry.
     while (1) {
         if (index >= ypDict_ALLOCLEN(mp)) {
-            state->itemsleft = 0;
+            ypDictMiState_SET_ITEMSLEFT(state, 0);
             return -1;
         }
         if (ypDict_VALUES(mp)[index] != NULL) break;
@@ -17617,11 +17626,11 @@ static yp_ssize_t _frozendict_miniiter_next(ypObject *mp, ypDictMiState *state)
 
     // Update state and return.
     ypDictMiState_SET_INDEX(state, (index + 1));
-    ypDictMiState_SET_ITEMSLEFT(state, (state->itemsleft - 1));
+    ypDictMiState_SET_ITEMSLEFT(state, (itemsleft - 1));
     return index;
 }
 
-// XXX We need to be a little suspicious of _state...just in case the caller has changed it
+// XXX We need to be a little suspicious of _state...just in case the caller has changed it.
 static ypObject *frozendict_miniiter_next(ypObject *mp, yp_uint64_t *_state)
 {
     ypDictMiState *state = (ypDictMiState *)_state;
@@ -17644,13 +17653,13 @@ static ypObject *frozendict_miniiter_next(ypObject *mp, yp_uint64_t *_state)
         if (state->values) {
             return yp_incref(ypDict_VALUES(mp)[index]);
         } else {
-            return yp_SystemError;  // should never occur
+            // Only occurs if state is corrupted, so treat as "iterator exhausted".
+            return yp_StopIteration;
         }
     }
 }
 
 // XXX On error, returns exception, but leaves *key/*value unmodified.
-// XXX We need to be a little suspicious of _state...just in case the caller has changed it
 static ypObject *frozendict_miniiter_items_next(
         ypObject *mp, yp_uint64_t *_state, ypObject **key, ypObject **value)
 {
@@ -17669,9 +17678,9 @@ static ypObject *frozendict_miniiter_items_next(
 }
 
 static ypObject *frozendict_miniiter_length_hint(
-        ypObject *mp, yp_uint64_t *state, yp_ssize_t *length_hint)
+        ypObject *mp, yp_uint64_t *_state, yp_ssize_t *length_hint)
 {
-    *length_hint = (yp_ssize_t)((ypDictMiState *)state)->itemsleft;
+    *length_hint = (yp_ssize_t)_frozendict_miniiter_adjusted_itemsleft(mp, (ypDictMiState *)_state);
     return yp_None;
 }
 
