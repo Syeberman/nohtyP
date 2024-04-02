@@ -415,7 +415,7 @@ static MunitResult test_newC(const MunitParameter params[], fixture_t *fixture)
                 chrarray_star_star_kwargs));
     }
 
-    // Keep the exception if name is an exception.
+    // Exception passthrough.
     {
         define_function(f, None_code, ({yp_OSError}));
         assert_isexception(f, yp_OSError);
@@ -1346,6 +1346,13 @@ static MunitResult _test_callN(ypObject *(*any_callN)(ypObject *, int, ...))
         assert_raises(any_callN(yp_OSError, N(yp_tuple_empty)), yp_OSError);
     }
 
+    // None_code
+    {
+        define_function2(f, None_code);
+        assert_obj(any_callN(f, 0), is, yp_None);
+        yp_decref(f);
+    }
+
     obj_array_decref(defs);
     obj_array_decref(args);
     yp_decrefN(N(str_a, str_b, str_slash, str_star, str_star_args, str_star_star_kwargs));
@@ -1364,7 +1371,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
     ypObject *str_star = yp_str_frombytesC2(-1, "*");
     ypObject *str_star_args = yp_str_frombytesC2(-1, "*args");
     ypObject *str_star_star_kwargs = yp_str_frombytesC2(-1, "**kwargs");
-    ypObject *non_string = rand_obj_non_string_hashable();  // argument names must be strings
+    ypObject *non_string = rand_obj_hashable_not_str();  // argument names must be strings
 
     // def f()
     {
@@ -2481,6 +2488,13 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         assert_raises(any_callK(yp_OSError, K(str_a, args[0])), yp_OSError);
     }
 
+    // None_code
+    {
+        define_function2(f, None_code);
+        assert_obj(any_callK(f, 0), is, yp_None);
+        yp_decref(f);
+    }
+
     // TODO PEP 448 talks about the confusion around {'a':0,'a':1} being valid but dict(a=0,a=1)
     // being invalid. Figure out how we should be handling duplicate keys. Regardless, we can't
     // currently test for this as the only "yp_callK" we have right now is yp_call_stars, and since
@@ -2837,6 +2851,9 @@ static MunitResult test_deepcopy(const MunitParameter params[], fixture_t *fixtu
     define_function(f, None_code, ({str_a, defs[0]}));
 
     // deepcopy is not yet implemented.
+    // TODO In Python, deepcopy on a function is a lazy copy; however, in nohtyP, deepcopy is
+    // intended to be a solution for threadsafety by always returning a new object (except, perhaps,
+    // for immortals).
     assert_raises(yp_unfrozen_deepcopy(f), yp_MethodError);
     assert_raises(yp_frozen_deepcopy(f), yp_MethodError);
     assert_raises(yp_deepcopy(f), yp_MethodError);
@@ -2886,7 +2903,7 @@ static MunitResult test_hash(const MunitParameter params[], fixture_t *fixture)
     return MUNIT_OK;
 }
 
-static MunitResult test_t_function_call(const MunitParameter params[], fixture_t *fixture)
+static MunitResult test_call_t_function(const MunitParameter params[], fixture_t *fixture)
 {
     assert_raises(yp_callN(yp_t_function, 0), yp_NotImplementedError);
 
@@ -2897,7 +2914,7 @@ static MunitResult test_t_function_call(const MunitParameter params[], fixture_t
 MunitTest test_function_tests[] = {TEST(test_newC, NULL), TEST(test_new_immortal, NULL),
         TEST(test_callN, NULL), TEST(test_call_stars, NULL), TEST(test_call_arrayX, NULL),
         TEST(test_copy, NULL), TEST(test_deepcopy, NULL), TEST(test_bool, NULL),
-        TEST(test_hash, NULL), TEST(test_t_function_call, NULL), {NULL}};
+        TEST(test_hash, NULL), TEST(test_call_t_function, NULL), {NULL}};
 
 
 extern void test_function_initialize(void) {}

@@ -173,7 +173,7 @@ typedef double             yp_float64_t;
 typedef ssize_t yp_ssize_t;
 #define yp_SSIZE_T_MAX SSIZE_MAX
 #elif SIZE_MAX == 0xFFFFFFFFu
-typedef yp_int32_t    yp_ssize_t;
+typedef yp_int32_t yp_ssize_t;
 #define yp_SSIZE_T_MAX (0x7FFFFFFF)
 #else
 typedef yp_int64_t yp_ssize_t;
@@ -799,56 +799,37 @@ ypAPI ypObject *yp_issuperset(ypObject *set, ypObject *x);
 ypAPI ypObject *yp_gt(ypObject *set, ypObject *x);
 
 // Returns a new reference to an object of the same type as set containing all the elements from set
-// and all n objects.
-ypAPI ypObject *yp_unionN(ypObject *set, int n, ...);
-ypAPI ypObject *yp_unionNV(ypObject *set, int n, va_list args);
+// and x.
+ypAPI ypObject *yp_union(ypObject *set, ypObject *x);
 
 // Returns a new reference to an object of the same type as set containing all the elements common
-// to the set and all n objects.
-ypAPI ypObject *yp_intersectionN(ypObject *set, int n, ...);
-ypAPI ypObject *yp_intersectionNV(ypObject *set, int n, va_list args);
+// to set and x.
+ypAPI ypObject *yp_intersection(ypObject *set, ypObject *x);
 
 // Returns a new reference to an object of the same type as set containing all the elements from set
-// that are not in the n objects.
-ypAPI ypObject *yp_differenceN(ypObject *set, int n, ...);
-ypAPI ypObject *yp_differenceNV(ypObject *set, int n, va_list args);
+// that are not in x.
+ypAPI ypObject *yp_difference(ypObject *set, ypObject *x);
 
 // Returns a new reference to an object of the same type as set containing all the elements in
 // either set or x but not both.
 ypAPI ypObject *yp_symmetric_difference(ypObject *set, ypObject *x);
 
-// Add the elements from the n objects to set. Sets *exc on error. Note that exc is before n as you
-// cannot have arguments after ellipsis.
-ypAPI void yp_updateN(ypObject *set, ypObject **exc, int n, ...);
-ypAPI void yp_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
-
-// Equivalent to yp_updateN(set, exc, 1, x).
+// Add the elements from x to set. Sets *exc on error.
 ypAPI void yp_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes elements from set that are not contained in all n objects. Sets *exc on error. Note that
-// exc is before n as you cannot have arguments after ellipsis.
-ypAPI void yp_intersection_updateN(ypObject *set, ypObject **exc, int n, ...);
-ypAPI void yp_intersection_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
-
-// Equivalent to yp_intersection_updateN(set, exc, 1, x).
+// Removes elements from set that are not contained in x. Sets *exc on error.
 ypAPI void yp_intersection_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes elements from set that are contained in any of the n objects. Sets *exc on error. Note
-// that exc is before n as you cannot have arguments after ellipsis.
-ypAPI void yp_difference_updateN(ypObject *set, ypObject **exc, int n, ...);
-ypAPI void yp_difference_updateNV(ypObject *set, ypObject **exc, int n, va_list args);
-
-// Equivalent to yp_difference_updateN(set, exc, 1, x).
+// Removes elements from set that are contained in x. Sets *exc on error.
 ypAPI void yp_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes elements from set that are contained in x, and adds elements from x not contained in set.
 // Sets *exc on error.
 ypAPI void yp_symmetric_difference_update(ypObject *set, ypObject *x, ypObject **exc);
 
-// Adds element x to set. Sets *exc on error. While Python calls this method add, yp_add is already
-// used for "a+b", so these two equivalent aliases are provided instead.
+// Adds element x to set. Sets *exc on error. Note that Python calls this method add, however yp_add
+// is already used for "a+b".
 ypAPI void yp_push(ypObject *set, ypObject *x, ypObject **exc);
-ypAPI void yp_set_add(ypObject *set, ypObject *x, ypObject **exc);
 
 // If x is already contained in set, raises yp_KeyError; otherwise, adds x to set. Sets *exc on
 // error.
@@ -857,8 +838,8 @@ ypAPI void yp_pushunique(ypObject *set, ypObject *x, ypObject **exc);
 // Removes element x from set. Raises yp_KeyError if x is not contained in set. Sets *exc on error.
 ypAPI void yp_remove(ypObject *set, ypObject *x, ypObject **exc);
 
-// Removes element x from set. Does _not_ raise an exception if x is not contained in set. Sets *exc
-// on error.
+// Removes element x from set if it is present. Does _not_ raise yp_KeyError if x is not contained
+// in set. Sets *exc on error.
 ypAPI void yp_discard(ypObject *set, ypObject *x, ypObject **exc);
 
 // Removes an arbitrary item from set and returns a new reference to it. You cannot use the order of
@@ -928,12 +909,7 @@ ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval
 ypAPI void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...);
 ypAPI void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args);
 
-// Add the elements from the n objects to mapping. Each object is handled as per yp_dict. Sets *exc
-// on error. Note that exc is before n as you cannot have arguments after ellipsis.
-ypAPI void yp_updateN(ypObject *mapping, ypObject **exc, int n, ...);
-ypAPI void yp_updateNV(ypObject *mapping, ypObject **exc, int n, va_list args);
-
-// Equivalent to yp_updateN(mapping, exc, 1, x).
+// Add the elements from x to mapping. x is handled as per yp_dict. Sets *exc on error.
 ypAPI void yp_update(ypObject *mapping, ypObject *x, ypObject **exc);
 
 // Immortal empty frozendict object.
@@ -1663,7 +1639,7 @@ ypAPI ypObject *yp_miniiter_items(ypObject *x, yp_uint64_t *state);
 // When the mini iterator is exhausted yp_StopIteration is raised. On error, both *key and *value
 // are set to the same exception.
 ypAPI void yp_miniiter_items_next(
-        ypObject **mi, yp_uint64_t *state, ypObject **key, ypObject **value);
+        ypObject *mi, yp_uint64_t *state, ypObject **key, ypObject **value);
 
 
 /*

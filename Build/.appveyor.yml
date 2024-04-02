@@ -11,13 +11,13 @@ cache: Build/site_toolsconfig.py
 deploy: off
 
 image:
+  - Ubuntu2204
   - macOS-Sonoma
-  # TODO Support Visual Studio 2022 (msvs_170:win32)
-  # - Visual Studio 2022
-  - Visual Studio 2019
+  - Visual Studio 2022
+  # TODO Support Visual Studio 2019 (msvs_160:win32)
+  # - Visual Studio 2019
   - Ubuntu2004
   - Visual Studio 2017
-  - Ubuntu1604
   - Visual Studio 2015
 
 platform:
@@ -34,13 +34,18 @@ matrix:
     - image: macOS-Sonoma
       platform: x86
     # TODO Are there any 32-bit compilers on the Ubuntu images?
-    - image: Ubuntu2004
+    - image: Ubuntu2204
       platform: x86
-    - image: Ubuntu1604
+    - image: Ubuntu2004
       platform: x86
 
 # Ideally, each target is listed once, against the most-recent image that includes it.
 for:
+  - matrix:
+      only:
+        - image: Ubuntu2204
+    environment:
+      YP_COMPILER_OSES: gcc_11:posix gcc_10:posix gcc_9:posix
   - matrix:
       only:
         - image: macOS-Sonoma
@@ -49,22 +54,23 @@ for:
   - matrix:
       only:
         - image: Visual Studio 2022
-    # TODO The docs say gcc_5:win32 is available, but it's not...
     environment:
-       YP_COMPILER_OSES:
+      # TODO Support Visual Studio 2022 (msvs_170:win32)
+      # TODO The docs say gcc_5:win32 is available, but it's not...
+      # TODO Qt contains MinGW builds (MinGW 9.0.0 64 bit: C:\Qt\6.5.3\mingw_64)
+      # TODO Qt contains MinGW builds (MinGW 8.1.0: C:\Qt\Tools\mingw810_32)
+       YP_COMPILER_OSES: gcc_8:win32
   - matrix:
       only:
         - image: Visual Studio 2019
     environment:
       # TODO Support Visual Studio 2019 (msvs_160:win32)
-      YP_COMPILER_OSES: gcc_9:win32 gcc_8:win32
-      # TODO Figure out why gcc_9:win32:amd64 isn't available
-      YP_SKIP_TARGETS: gcc_9:win32:amd64
+      YP_COMPILER_OSES:
   - matrix:
       only:
         - image: Ubuntu2004
     environment:
-      YP_COMPILER_OSES: gcc_9:posix gcc_8:posix gcc_7:posix
+      YP_COMPILER_OSES: gcc_8:posix gcc_7:posix
   - matrix:
       only:
         - image: Visual Studio 2017
@@ -73,12 +79,6 @@ for:
       YP_COMPILER_OSES: gcc_7:win32 msvs_140:win32
       # TODO Figure out why gcc_7:win32:x86 isn't available
       YP_SKIP_TARGETS: gcc_7:win32:x86
-  - matrix:
-      only:
-        - image: Ubuntu1604
-    environment:
-      # TODO Figure out why gcc_6:posix isn't available
-      YP_COMPILER_OSES: gcc_5:posix
   - matrix:
       only:
         - image: Visual Studio 2015
