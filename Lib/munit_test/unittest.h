@@ -496,6 +496,7 @@ extern "C" {
 
 // Asserts that obj is a sequence containing exactly the given items in that order. Items are
 // compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getindexC.
+// FIXME Rewrite to use yp_miniiter like assert_set?
 #define assert_sequence(obj, ...)                                                          \
     do {                                                                                   \
         ypObject *_ypmt_SEQ_obj = (obj);                                                   \
@@ -558,6 +559,7 @@ extern "C" {
 // Asserts that obj is a set containing exactly the given items, in any order, without duplicates.
 // Items are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_miniiter.
 // TODO Once the order items are yielded is guaranteed, we can make the order important.
+// FIXME assert_setlike?
 #define assert_set(obj, ...)                                                          \
     do {                                                                              \
         ypObject *_ypmt_SET_obj = (obj);                                              \
@@ -592,7 +594,7 @@ extern "C" {
 // Asserts that obj is a mapping containing exactly the given key/value pairs, in any order, without
 // duplicate keys. Values are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC
 // and yp_getitem.
-// TODO Compare keys by type as well, just like assert_set does.
+// FIXME Compare keys by type as well, just like assert_set does.
 #define assert_mapping(obj, ...)                                                          \
     do {                                                                                  \
         ypObject *_ypmt_MAP_obj = (obj);                                                  \
@@ -766,10 +768,9 @@ typedef struct _fixture_type_t {
     voidarrayfunc rand_items;  // Fills an array with n random, unique objects.
 
     // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
-    // yp_getitem returns values.
-    objvarargfunc newK;        // Creates an object to hold the given key/values (i.e. yp_dictK).
-    objvoidfunc   rand_key;    // Creates a random key to store in the mapping.
-    objvoidfunc   rand_value;  // Creates a random value to store in the mapping.
+    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys).
+    objvarargfunc newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
+    voidarrayfunc rand_values;  // Fills an array with n random, unique objects for values.
 
     // Flags to describe the properties of the type.
     int is_mutable;

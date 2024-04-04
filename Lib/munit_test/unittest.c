@@ -47,12 +47,6 @@ static fixture_type_t fixture_type_dict_struct;
 static fixture_type_t fixture_type_function_struct;
 
 
-static ypObject *objvoidfunc_error(void)
-{
-    munit_error("unsupported operation");
-    return NULL;
-}
-
 static ypObject *objvarargfunc_error(int n, ...)
 {
     munit_error("unsupported operation");
@@ -356,8 +350,7 @@ static fixture_type_t fixture_type_type_struct = {
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -386,8 +379,7 @@ static fixture_type_t fixture_type_NoneType_struct = {
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -422,8 +414,7 @@ static fixture_type_t fixture_type_bool_struct = {
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -456,8 +447,7 @@ static fixture_type_t fixture_type_int_struct = {
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -490,8 +480,7 @@ static fixture_type_t fixture_type_intstore_struct = {
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -524,8 +513,7 @@ static fixture_type_t fixture_type_float_struct = {
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -558,8 +546,7 @@ static fixture_type_t fixture_type_floatstore_struct = {
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -607,8 +594,7 @@ static fixture_type_t fixture_type_iter_struct = {
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -706,8 +692,7 @@ static fixture_type_t fixture_type_range_struct = {
         rand_items_range,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -765,8 +750,7 @@ static fixture_type_t fixture_type_bytes_struct = {
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -824,8 +808,7 @@ static fixture_type_t fixture_type_bytearray_struct = {
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -885,8 +868,7 @@ static fixture_type_t fixture_type_str_struct = {
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -947,8 +929,7 @@ static fixture_type_t fixture_type_chrarray_struct = {
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -988,8 +969,7 @@ static fixture_type_t fixture_type_tuple_struct = {
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1029,8 +1009,7 @@ static fixture_type_t fixture_type_list_struct = {
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1071,8 +1050,7 @@ static fixture_type_t fixture_type_frozenset_struct = {
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1113,8 +1091,7 @@ static fixture_type_t fixture_type_set_struct = {
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1184,8 +1161,7 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1232,8 +1208,7 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1319,9 +1294,8 @@ static fixture_type_t fixture_type_frozendict_struct = {
         new_frozendictN,         // newN
         rand_objs_any_hashable,  // rand_items
 
-        yp_frozendictK,         // newK
-        rand_obj_any_hashable,  // rand_key
-        rand_obj_any,           // rand_value
+        yp_frozendictK,  // newK
+        rand_objs_any,   // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1376,9 +1350,8 @@ static fixture_type_t fixture_type_dict_struct = {
         new_dictN,               // newN
         rand_objs_any_hashable,  // rand_items
 
-        yp_dictK,               // newK
-        rand_obj_any_hashable,  // rand_key
-        rand_obj_any,           // rand_value
+        yp_dictK,       // newK
+        rand_objs_any,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1419,8 +1392,7 @@ static fixture_type_t fixture_type_function_struct = {
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
