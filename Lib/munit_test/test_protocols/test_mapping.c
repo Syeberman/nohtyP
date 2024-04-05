@@ -16,7 +16,7 @@
 static MunitResult test_contains(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
-    ypObject       *keys[4];
+    ypObject       *keys[2];
     obj_array_fill(keys, type->rand_items);
 
     // Item is unhashable.
@@ -29,7 +29,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
         yp_decrefN(N(mp, unhashable));
     }
 
-    // An unhashable x should match the equal object in mp.
+    // An unhashable x should match the equal key in mp.
     {
         ypObject *int_1 = yp_intC(1);
         ypObject *intstore_1 = yp_intstoreC(1);
@@ -44,15 +44,116 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     return MUNIT_OK;
 }
 
+// FIXME Here and everywhere, an "original object return" flag, with tests to ensure exact object
+// returned.
 static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixture)
 {
-    return MUNIT_FAIL;
+    fixture_type_t *type = fixture->type;
+    ypObject       *keys[3];
+    ypObject       *values[3];
+    ypObject       *unhashable;
+    ypObject       *mp;
+    ypObject       *empty = type->newK(0);
+    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(values, type->rand_values);
+    unhashable = rand_obj_any_mutable_unique(2, keys);
+    mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+
+    // Basic key.
+    ead(value, yp_getitem(mp, keys[0]), assert_obj(value, eq, values[0]));
+    ead(value, yp_getitem(mp, keys[1]), assert_obj(value, eq, values[1]));
+
+    // Unknown key.
+    assert_raises(yp_getitem(mp, keys[2]), yp_KeyError);
+
+    // Empty mp.
+    assert_raises(yp_getitem(empty, keys[0]), yp_KeyError);
+
+    // x is mp.
+    // FIXME Similar tests everywhere.
+    assert_raises(yp_getitem(mp, mp), yp_KeyError);
+
+    // x is unhashable.
+    assert_raises(yp_getitem(mp, unhashable), yp_KeyError);
+
+    // An unhashable x should match the equal key in mp.
+    {
+        ypObject *int_1 = yp_intC(1);
+        ypObject *intstore_1 = yp_intstoreC(1);
+        ypObject *mp_int_1 = type->newK(K(int_1, values[0]));
+        ead(value, yp_getitem(mp_int_1, intstore_1), assert_obj(value, eq, values[0]));
+        yp_decrefN(N(int_1, intstore_1, mp_int_1));
+    }
+
+    // Exception passthrough.
+    assert_isexception(yp_getitem(mp, yp_SyntaxError), yp_SyntaxError);
+
+    assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged
+
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    yp_decrefN(N(unhashable, mp, empty));
+    return MUNIT_OK;
+}
+
+static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *keys[3];
+    ypObject       *values[3];
+    ypObject       *unhashable;
+    ypObject       *mp;
+    ypObject       *empty = type->newK(0);
+    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(values, type->rand_values);
+    unhashable = rand_obj_any_mutable_unique(2, keys);
+    mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+
+    // Basic key.
+    ead(value, yp_getdefault(mp, keys[0], values[2]), assert_obj(value, eq, values[0]));
+    ead(value, yp_getdefault(mp, keys[1], values[2]), assert_obj(value, eq, values[1]));
+
+    // Unknown key.
+    ead(value, yp_getdefault(mp, keys[2], values[2]), assert_obj(value, eq, values[2]));
+
+    // Exception-as-default.
+    assert_raises(yp_getdefault(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
+
+    // Empty mp.
+    ead(value, yp_getdefault(empty, keys[0], values[2]), assert_obj(value, eq, values[2]));
+
+    // x is mp.
+    ead(value, yp_getdefault(mp, mp, values[2]), assert_obj(value, eq, values[2]));
+
+    // x is unhashable.
+    ead(value, yp_getdefault(mp, unhashable, values[2]), assert_obj(value, eq, values[2]));
+
+    // An unhashable x should match the equal key in mp.
+    {
+        ypObject *int_1 = yp_intC(1);
+        ypObject *intstore_1 = yp_intstoreC(1);
+        ypObject *mp_int_1 = type->newK(K(int_1, values[0]));
+        ead(value, yp_getdefault(mp_int_1, intstore_1, values[2]),
+                assert_obj(value, eq, values[0]));
+        yp_decrefN(N(int_1, intstore_1, mp_int_1));
+    }
+
+    // Exception passthrough.
+    assert_isexception(yp_getdefault(mp, yp_SyntaxError, values[2]), yp_SyntaxError);
+
+    assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged
+
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    yp_decrefN(N(unhashable, mp, empty));
+    return MUNIT_OK;
 }
 
 static MunitParameterEnum test_mapping_params[] = {
         {param_key_type, param_values_types_mapping}, {NULL}};
 
-MunitTest test_mapping_tests[] = {
-        TEST(test_contains, test_mapping_params), TEST(test_getitem, test_mapping_params), {NULL}};
+MunitTest test_mapping_tests[] = {TEST(test_contains, test_mapping_params),
+        TEST(test_getitem, test_mapping_params), TEST(test_getdefault, test_mapping_params),
+        {NULL}};
 
 extern void test_mapping_initialize(void) {}

@@ -1162,8 +1162,6 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         yp_decrefN(N(so, result));
     }
 
-    // There is no N version of yp_symmetric_difference, so we always have one x object.
-
     // x contains duplicates. (This is a particularly interesting test for symmetric_difference.)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
@@ -1781,8 +1779,6 @@ static MunitResult test_symmetric_difference_update(
         yp_decrefN(N(so));
     }
 
-    // There is no N version of yp_symmetric_difference_update, so we always have one x object.
-
     // x contains duplicates. (This is a particularly interesting test for symmetric_difference.)
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(N(items[0], items[1]));
@@ -2074,7 +2070,7 @@ static MunitResult _test_remove(
         yp_decrefN(N(so, unhashable));
     }
 
-    // An unhashable object in x should match the equal object in so.
+    // An unhashable x should match the equal object in so.
     {
         ypObject *int_1 = yp_intC(1);
         ypObject *intstore_1 = yp_intstoreC(1);
