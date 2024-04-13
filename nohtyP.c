@@ -16996,7 +16996,7 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
         _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash, spaceleft);  // steals key
         *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
         ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
-        return yp_True;
+        return yp_None;
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
@@ -17014,17 +17014,15 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
     ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
     *spaceleft = _ypSet_space_remaining(keyset);
-    return yp_True;
+    return yp_None;
 }
 
-// Adds the key/value to the dict. If override is false, returns yp_False and does not modify the
-// dict if there is an existing value. *spaceleft should be initialized from
-// _ypSet_space_remaining; it will be decremented or reset as appropriate.. Returns yp_True if mp
-// was modified, yp_False if it wasn't due to existing values being preserved (ie override is
-// false), or an exception on error.
+// Adds the key/value to the dict, overriding existing values, and returning yp_None. *spaceleft
+// should be initialized from _ypSet_space_remaining; it will be decremented or reset as
+// appropriate. Returns an exception on error.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int override,
-        yp_ssize_t *spaceleft, yp_ssize_t growhint)
+static ypObject *_ypDict_push(
+        ypObject *mp, ypObject *key, ypObject *value, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
     yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
@@ -17049,12 +17047,11 @@ static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int 
             *value_loc = yp_incref(value);
             ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
         } else {
-            if (!override) return yp_False;
             // FIXME What if yp_decref modifies mp?
             yp_decref(*value_loc);
             *value_loc = yp_incref(value);
         }
-        return yp_True;
+        return yp_None;
     }
 
     // Otherwise, we need to add both the key _and_ value, which may involve resizing
@@ -17131,7 +17128,7 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
         // TODO _ypDict_push will call yp_hashC again, even though we already know the hash
         // TODO yp_hashC may mutate mp, invalidating valuesleft!
         result = _ypDict_push(
-                mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, 1, &spaceleft, valuesleft);
+                mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, &spaceleft, valuesleft);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -17155,7 +17152,7 @@ static ypObject *_ypDict_update_fromiter(ypObject *mp, ypObject *itemiter)
             return key;
         }
         length_hint -= 1;  // check for <0 only when we need it in _ypDict_push
-        result = _ypDict_push(mp, key, value, 1, &spaceleft, length_hint);
+        result = _ypDict_push(mp, key, value, &spaceleft, length_hint);
         yp_decrefN(2, key, value);
         if (yp_isexceptionC(result)) return result;
     }
@@ -17426,9 +17423,7 @@ static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
     // TODO Overallocate
-    ypObject *result = _ypDict_push(mp, key, value, 1, &spaceleft, 0);
-    if (yp_isexceptionC(result)) return result;
-    return yp_None;
+    return _ypDict_push(mp, key, value, &spaceleft, 0);
 }
 
 static ypObject *dict_delitem(ypObject *mp, ypObject *key)
@@ -17526,7 +17521,7 @@ static ypObject *dict_updateK(ypObject *mp, int n, va_list args)
         key = va_arg(args, ypObject *);    // borrowed
         value = va_arg(args, ypObject *);  // borrowed
         n -= 1;
-        result = _ypDict_push(mp, key, value, 1, &spaceleft, n);
+        result = _ypDict_push(mp, key, value, &spaceleft, n);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -18036,7 +18031,7 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
     while (n > 0) {
         key = va_arg(args, ypObject *);  // borrowed
         n -= 1;
-        result = _ypDict_push(newMp, key, value, 1, &spaceleft, n);
+        result = _ypDict_push(newMp, key, value, &spaceleft, n);
         if (yp_isexceptionC(result)) {
             yp_decref(newMp);
             return result;
@@ -18112,7 +18107,7 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
             break;
         }
         length_hint -= 1;
-        result = _ypDict_push(newMp, key, value, 1, &spaceleft, length_hint);
+        result = _ypDict_push(newMp, key, value, &spaceleft, length_hint);
         yp_decref(key);
         if (yp_isexceptionC(result)) break;
     }

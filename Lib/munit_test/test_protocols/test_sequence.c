@@ -283,6 +283,8 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
     assert_raises(yp_getindexC(sq, 2), yp_IndexError);
     assert_raises(yp_getindexC(sq, -3), yp_IndexError);
 
+    // FIXME deleted index
+
     // Empty sq.
     assert_raises(yp_getindexC(empty, 0), yp_IndexError);
     assert_raises(yp_getindexC(empty, -1), yp_IndexError);
@@ -494,6 +496,8 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     // Out of bounds.
     assert_raises(yp_getitem(sq, int_2), yp_IndexError);
     assert_raises(yp_getitem(sq, int_neg_3), yp_IndexError);
+
+    // FIXME deleted index
 
     // Empty sq.
     assert_raises(yp_getitem(empty, int_0), yp_IndexError);
@@ -916,6 +920,8 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
+    // FIXME deleted index
+
     // Empty sq.
     {
         ypObject *empty = type->newN(0);
@@ -1279,6 +1285,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
+    // FIXME deleted index
+
     // Empty sq.
     {
         ypObject *empty = type->newN(0);
@@ -1287,6 +1295,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         assert_len(empty, 0);
         yp_decref(empty);
     }
+
+    // FIXME value is sq (and elsewhere)
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
@@ -1372,6 +1382,8 @@ static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixt
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
+
+    // FIXME deleted index
 
     // Empty sq.
     {
@@ -1581,6 +1593,8 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
+
+    // FIXME deleted index
 
     // Empty sq.
     {

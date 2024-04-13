@@ -1904,6 +1904,8 @@ static MunitResult test_push(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(so));
     }
 
+    // FIXME x is so (and everywhere)
+
     // Item is unhashable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));

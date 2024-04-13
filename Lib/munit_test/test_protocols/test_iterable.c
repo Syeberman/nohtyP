@@ -2,6 +2,8 @@
 #include "munit_test/unittest.h"
 
 
+// FIXME yp_iter_items, yp_iter_keys, yp_iter_values
+
 // TODO More test cases are needed here.
 static MunitResult test_miniiter(const MunitParameter params[], fixture_t *fixture)
 {
