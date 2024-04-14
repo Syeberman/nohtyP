@@ -266,6 +266,97 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *keys[3];
+    ypObject       *values[3];
+    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(values, type->rand_values);
+
+    // Immutables don't support delitem.
+    if (!type->is_mutable) {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_raises_exc(yp_delitem(mp, keys[2], &exc), yp_MethodError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decref(mp);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic key.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_not_raises_exc(yp_delitem(mp, keys[0], &exc));
+        assert_mapping(mp, keys[1], values[1]);
+        yp_decref(mp);
+    }
+
+    // Unknown key.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_raises_exc(yp_delitem(mp, keys[2], &exc), yp_KeyError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decref(mp);
+    }
+
+    // Previously-deleted key.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_not_raises_exc(yp_delitem(mp, keys[1], &exc));
+        assert_raises_exc(yp_delitem(mp, keys[1], &exc), yp_KeyError);
+        assert_mapping(mp, keys[0], values[0]);
+        yp_decref(mp);
+    }
+
+    // Empty mp.
+    {
+        ypObject *mp = type->newK(0);
+        assert_raises_exc(yp_delitem(mp, keys[2], &exc), yp_KeyError);
+        assert_len(mp, 0);
+        yp_decref(mp);
+    }
+
+    // key is mp.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_raises_exc(yp_delitem(mp, mp, &exc), yp_KeyError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decref(mp);
+    }
+
+    // key is unhashable.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        assert_raises_exc(yp_delitem(mp, unhashable, &exc), yp_KeyError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decrefN(N(mp, unhashable));
+    }
+
+    // An unhashable key should match the equal key in mp.
+    {
+        ypObject *int_1 = yp_intC(1);
+        ypObject *intstore_1 = yp_intstoreC(1);
+        ypObject *mp = type->newK(K(int_1, values[0]));
+        assert_not_raises_exc(yp_delitem(mp, intstore_1, &exc));
+        assert_len(mp, 0);
+        yp_decrefN(N(int_1, intstore_1, mp));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_raises_exc(yp_delitem(mp, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decref(mp);
+    }
+
+tear_down:
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    return MUNIT_OK;
+}
+
 static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -382,7 +473,7 @@ static MunitParameterEnum test_mapping_params[] = {
 
 MunitTest test_mapping_tests[] = {TEST(test_contains, test_mapping_params),
         TEST(test_getitem, test_mapping_params), TEST(test_getdefault, test_mapping_params),
-        TEST(test_setitem, test_mapping_params), TEST(test_setdefault, test_mapping_params),
-        {NULL}};
+        TEST(test_setitem, test_mapping_params), TEST(test_delitem, test_mapping_params),
+        TEST(test_setdefault, test_mapping_params), {NULL}};
 
 extern void test_mapping_initialize(void) {}

@@ -283,7 +283,7 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
     assert_raises(yp_getindexC(sq, 2), yp_IndexError);
     assert_raises(yp_getindexC(sq, -3), yp_IndexError);
 
-    // FIXME deleted index
+    // FIXME Previously-deleted index
 
     // Empty sq.
     assert_raises(yp_getindexC(empty, 0), yp_IndexError);
@@ -497,7 +497,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_raises(yp_getitem(sq, int_2), yp_IndexError);
     assert_raises(yp_getitem(sq, int_neg_3), yp_IndexError);
 
-    // FIXME deleted index
+    // FIXME Previously-deleted index
 
     // Empty sq.
     assert_raises(yp_getitem(empty, int_0), yp_IndexError);
@@ -920,7 +920,7 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
-    // FIXME deleted index
+    // FIXME Previously-deleted index
 
     // Empty sq.
     {
@@ -1285,7 +1285,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
-    // FIXME deleted index
+    // FIXME Previously-deleted index
 
     // Empty sq.
     {
@@ -1383,7 +1383,7 @@ static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
-    // FIXME deleted index
+    // FIXME Previously-deleted index
 
     // Empty sq.
     {
@@ -1541,7 +1541,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixture)
+static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
     ypObject       *int_0 = yp_intC(0);
@@ -1594,7 +1594,7 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
         yp_decref(sq);
     }
 
-    // FIXME deleted index
+    // FIXME Previously-deleted index
 
     // Empty sq.
     {
@@ -1604,6 +1604,8 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
         assert_len(empty, 0);
         yp_decref(empty);
     }
+
+    // FIXME index is sq
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
@@ -2338,7 +2340,7 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_rindexC, test_sequence_params), TEST(test_countC, test_sequence_params),
         TEST(test_setindexC, test_sequence_params), TEST(test_setsliceC, test_sequence_params),
         TEST(test_setitem, test_sequence_params), TEST(test_delindexC, test_sequence_params),
-        TEST(test_delsliceC, test_sequence_params), TEST(test_delitemC, test_sequence_params),
+        TEST(test_delsliceC, test_sequence_params), TEST(test_delitem, test_sequence_params),
         TEST(test_append, test_sequence_params), TEST(test_push, test_sequence_params),
         TEST(test_extend, test_sequence_params), TEST(test_irepeatC, test_sequence_params),
         TEST(test_insertC, test_sequence_params), TEST(test_popindexC, test_sequence_params),

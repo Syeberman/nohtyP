@@ -882,6 +882,7 @@ ypAPI void yp_setitem(ypObject *mapping, ypObject *key, ypObject *x, ypObject **
 
 // Removes the item with the given key from mapping. Raises yp_KeyError if key is not in mapping.
 // Sets *exc on error.
+// FIXME Something like discard that doesn't raise an exception.
 ypAPI void yp_delitem(ypObject *mapping, ypObject *key, ypObject **exc);
 
 // If key is in mapping, remove it and return a new reference to its value, else return a new

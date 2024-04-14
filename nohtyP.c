@@ -17072,16 +17072,16 @@ static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
-    // because we are not adding it to the set
+    // because we are not adding it to the set.
     result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the there's no existing value, then there's nothing to do (if the key is not in the set,
-    // then *value_loc will be NULL)
+    // If there's no existing value, then there's nothing to do (if the key is not in the set, then
+    // *value_loc will be NULL).
     value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
     if (*value_loc == NULL) return ypSet_dummy;
 
-    // Otherwise, we need to remove the value
+    // Otherwise, we need to remove the value.
     oldvalue = *value_loc;
     *value_loc = NULL;
     ypDict_SET_LEN(mp, ypDict_LEN(mp) - 1);
