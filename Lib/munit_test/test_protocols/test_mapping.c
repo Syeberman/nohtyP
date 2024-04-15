@@ -473,6 +473,92 @@ tear_down:
     return MUNIT_OK;
 }
 
+static MunitResult test_popitem(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    yp_ssize_t      i;
+    ypObject       *keys[6];
+    ypObject       *values[6];
+    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(values, type->rand_values);
+
+    // Immutables don't support popitem.
+    if (!type->is_mutable) {
+        ypObject *key, *value;
+        ypObject *mp = type->newK(K(keys[0], values[0]));
+        yp_popitem(mp, &key, &value);
+        assert_raises(key, yp_MethodError);
+        assert_obj(value, is, key);
+        assert_mapping(mp, keys[0], values[0]);
+        yp_decref(mp);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic popitem.
+    {
+        ypObject *key, *value;
+        ypObject *mp = type->newK(K(keys[0], values[0]));
+        yp_popitem(mp, &key, &value);
+        assert_obj(key, eq, keys[0]);
+        assert_obj(value, eq, values[0]);
+        assert_len(mp, 0);
+        yp_decrefN(N(mp, key, value));
+    }
+
+    // Empty mp.
+    {
+        ypObject *key, *value;
+        ypObject *mp = type->newK(0);
+        yp_popitem(mp, &key, &value);
+        assert_raises(key, yp_KeyError);
+        assert_obj(value, is, key);
+        assert_len(mp, 0);
+        yp_decref(mp);
+    }
+
+    // Multiple popitems. Order is arbitrary, so run through a few different items.
+    for (i = 0; i < 5; i++) {
+        ypObject *key_0 = keys[0 + i];      // borrowed
+        ypObject *value_0 = values[0 + i];  // borrowed
+        ypObject *key_1 = keys[1 + i];      // borrowed
+        ypObject *value_1 = values[1 + i];  // borrowed
+        ypObject *mp = type->newK(K(key_0, value_0, key_1, value_1));
+        ypObject *first_key, *first_value;
+        ypObject *second_key, *second_value;
+        ypObject *error_key, *error_value;
+        yp_popitem(mp, &first_key, &first_value);
+        if (yp_eq(first_key, key_0) == yp_True) {
+            assert_obj(first_value, eq, value_0);
+            assert_mapping(mp, key_1, value_1);
+            yp_popitem(mp, &second_key, &second_value);
+            assert_obj(second_key, eq, key_1);
+            assert_obj(second_value, eq, value_1);
+        } else {
+            assert_obj(first_key, eq, key_1);
+            assert_obj(first_value, eq, value_1);
+            assert_mapping(mp, key_0, value_0);
+            yp_popitem(mp, &second_key, &second_value);
+            assert_obj(second_key, eq, key_0);
+            assert_obj(second_value, eq, value_0);
+        }
+        assert_len(mp, 0);
+        yp_popitem(mp, &error_key, &error_value);
+        assert_raises(error_key, yp_KeyError);
+        assert_obj(error_value, is, error_key);
+        assert_len(mp, 0);
+        yp_popitem(mp, &error_key, &error_value);  // Calling again still raises KeyError.
+        assert_raises(error_key, yp_KeyError);
+        assert_obj(error_value, is, error_key);
+        assert_len(mp, 0);
+        yp_decrefN(N(mp, first_key, first_value, second_key, second_value));
+    }
+
+tear_down:
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    return MUNIT_OK;
+}
+
 static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
@@ -592,7 +678,7 @@ static MunitParameterEnum test_mapping_params[] = {
 MunitTest test_mapping_tests[] = {TEST(test_contains, test_mapping_params),
         TEST(test_getitem, test_mapping_params), TEST(test_getdefault, test_mapping_params),
         TEST(test_setitem, test_mapping_params), TEST(test_delitem, test_mapping_params),
-        TEST(test_popvalue, test_mapping_params), TEST(test_setdefault, test_mapping_params),
-        {NULL}};
+        TEST(test_popvalue, test_mapping_params), TEST(test_popitem, test_mapping_params),
+        TEST(test_setdefault, test_mapping_params), {NULL}};
 
 extern void test_mapping_initialize(void) {}
