@@ -235,6 +235,7 @@ extern "C" {
         }                                                                                 \
     } while (0)
 
+// Asserts that obj is not an exception and that no exception has been raised.
 #define assert_not_exception(obj)                             \
     do {                                                      \
         ypObject *_ypmt_NOT_EXC_obj = (obj);                  \
@@ -257,6 +258,7 @@ extern "C" {
         _assert_not_exception(_ypmt_NOT_RAISES_obj, statement_fmt, __VA_ARGS__); \
     } while (0)
 
+// Asserts that statement does not raise an exception.
 #define assert_not_raises(statement) _assert_not_raises((statement), "%s", #statement)
 
 // statement is only evaluated once.
@@ -273,7 +275,7 @@ extern "C" {
         }                                                                                  \
     } while (0)
 
-// For a function that takes a `ypObject **exc` argument, asserts that it does not raise an
+// For a statement that takes a `ypObject **exc` argument, asserts that it does not raise an
 // exception. Statement must include `&exc` for the exception argument, and can include a variable
 // assignment. Example:
 //
@@ -296,7 +298,7 @@ extern "C" {
         }                                                                                         \
     } while (0)
 
-// Asserts that obj is one of the given exceptions.
+// Asserts that obj is one of the given exceptions, but that no exception has been raised.
 #define assert_isexception(obj, ...)                                                          \
     do {                                                                                      \
         ypObject  *_ypmt_ISEXC_obj = (obj);                                                   \
@@ -306,6 +308,15 @@ extern "C" {
                 #obj, #__VA_ARGS__);                                                          \
     } while (0)
 
+// For a statement that takes a `ypObject **exc` argument, asserts that it sets *exc to one of the
+// given exceptions, but that no exception has been raised. statement must include `&exc` for the
+// exception argument. Example:
+//
+//      assert_isexception_exc(yp_lenC(yp_SyntaxError, &exc), yp_SyntaxError);
+// TODO nohtyP does not currently make a distinction between returning and raising an exception, so
+// this is currently an alias to assert_raises_exc.
+#define assert_isexception_exc assert_raises_exc
+
 // statement is only evaluated once.
 #define _assert_raises(statement, n, expected, statement_fmt, expected_fmt, ...)                \
     do {                                                                                        \
@@ -314,7 +325,7 @@ extern "C" {
                 _ypmt_RAISES_statement, n, expected, statement_fmt, expected_fmt, __VA_ARGS__); \
     } while (0)
 
-// Asserts that statement evaluates to one of the given exceptions.
+// Asserts that statement raises one of the given exceptions.
 #define assert_raises(statement, ...)                                                              \
     do {                                                                                           \
         ypObject  *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                        \
@@ -343,8 +354,8 @@ extern "C" {
         }                                                                            \
     } while (0)
 
-// For a function that takes a `ypObject **exc` argument, asserts that it raises one of the given
-// exceptions. Statement must include `&exc` for the exception argument. Example:
+// For a statement that takes a `ypObject **exc` argument, asserts that it raises one of the given
+// exceptions. statement must include `&exc` for the exception argument. Example:
 //
 //      assert_raises_exc(yp_lenC(obj, &exc), yp_MethodError);
 #define assert_raises_exc(statement, ...)                                                  \

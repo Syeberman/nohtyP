@@ -70,7 +70,9 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     if (type->is_mutable) {
         ypObject *mp_delitem = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_not_raises_exc(yp_delitem(mp_delitem, keys[1], &exc));
+        assert_mapping(mp_delitem, keys[0], values[0]);
         assert_raises(yp_getitem(mp_delitem, keys[1]), yp_KeyError);
+        assert_mapping(mp_delitem, keys[0], values[0]);
         yp_decrefN(N(mp_delitem));
     }
 
@@ -128,7 +130,9 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     if (type->is_mutable) {
         ypObject *mp_delitem = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_not_raises_exc(yp_delitem(mp_delitem, keys[1], &exc));
+        assert_mapping(mp_delitem, keys[0], values[0]);
         ead(value, yp_getdefault(mp_delitem, keys[1], values[2]), assert_obj(value, eq, values[2]));
+        assert_mapping(mp_delitem, keys[0], values[0]);
         yp_decrefN(N(mp_delitem));
     }
 
@@ -202,6 +206,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_not_raises_exc(yp_delitem(mp, keys[1], &exc));
+        assert_mapping(mp, keys[0], values[0]);
         assert_not_raises_exc(yp_setitem(mp, keys[1], values[2], &exc));
         assert_mapping(mp, keys[0], values[0], keys[1], values[2]);
         yp_decref(mp);
@@ -254,8 +259,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     // Exception passthrough.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_raises_exc(yp_setitem(mp, yp_SyntaxError, values[2], &exc), yp_SyntaxError);
-        assert_raises_exc(yp_setitem(mp, keys[2], yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(mp, yp_SyntaxError, values[2], &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(mp, keys[2], yp_SyntaxError, &exc), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
     }
@@ -303,6 +308,7 @@ static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_not_raises_exc(yp_delitem(mp, keys[1], &exc));
+        assert_mapping(mp, keys[0], values[0]);
         assert_raises_exc(yp_delitem(mp, keys[1], &exc), yp_KeyError);
         assert_mapping(mp, keys[0], values[0]);
         yp_decref(mp);
@@ -346,8 +352,118 @@ static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixtur
     // Exception passthrough.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_raises_exc(yp_delitem(mp, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_delitem(mp, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decref(mp);
+    }
+
+tear_down:
+    obj_array_decref(values);
+    obj_array_decref(keys);
+    return MUNIT_OK;
+}
+
+static MunitResult test_popvalue(const MunitParameter params[], fixture_t *fixture)
+{
+    fixture_type_t *type = fixture->type;
+    ypObject       *keys[4];
+    ypObject       *values[4];
+    obj_array_fill(keys, type->rand_items);
+    obj_array_fill(values, type->rand_values);
+
+    // Immutables don't support popvalue.
+    if (!type->is_mutable) {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        assert_raises(yp_popvalue3(mp, keys[2], values[3]), yp_MethodError);
+        assert_raises(yp_popvalue2(mp, keys[1]), yp_MethodError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
+        yp_decref(mp);
+        goto tear_down;  // Skip remaining tests.
+    }
+
+    // Basic key.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        ead(value, yp_popvalue3(mp, keys[2], values[3]), assert_obj(value, eq, values[2]));
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        ead(value, yp_popvalue2(mp, keys[1]), assert_obj(value, eq, values[1]));
+        assert_mapping(mp, keys[0], values[0]);
+        yp_decref(mp);
+    }
+
+    // Unknown key.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        ead(value, yp_popvalue3(mp, keys[3], values[3]), assert_obj(value, eq, values[3]));
+        assert_raises(yp_popvalue3(mp, keys[3], yp_SyntaxError), yp_SyntaxError);
+        assert_raises(yp_popvalue2(mp, keys[3]), yp_KeyError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
+        yp_decref(mp);
+    }
+
+    // Previously-deleted key.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        assert_not_raises_exc(yp_delitem(mp, keys[2], &exc));
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        ead(value, yp_popvalue3(mp, keys[2], values[3]), assert_obj(value, eq, values[3]));
+        assert_raises(yp_popvalue3(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
+        assert_raises(yp_popvalue2(mp, keys[2]), yp_KeyError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
+        yp_decref(mp);
+    }
+
+    // Empty mp.
+    {
+        ypObject *mp = type->newK(0);
+        ead(value, yp_popvalue3(mp, keys[3], values[3]), assert_obj(value, eq, values[3]));
+        assert_raises(yp_popvalue3(mp, keys[3], yp_SyntaxError), yp_SyntaxError);
+        assert_raises(yp_popvalue2(mp, keys[3]), yp_KeyError);
+        assert_len(mp, 0);
+        yp_decref(mp);
+    }
+
+    // key is mp.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        ead(value, yp_popvalue3(mp, mp, values[3]), assert_obj(value, eq, values[3]));
+        assert_raises(yp_popvalue3(mp, mp, yp_SyntaxError), yp_SyntaxError);
+        assert_raises(yp_popvalue2(mp, mp), yp_KeyError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
+        yp_decref(mp);
+    }
+
+    // key is unhashable.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        ypObject *unhashable = rand_obj_any_mutable_unique(2, keys);
+        ead(value, yp_popvalue3(mp, unhashable, values[3]), assert_obj(value, eq, values[3]));
+        assert_raises(yp_popvalue3(mp, unhashable, yp_SyntaxError), yp_SyntaxError);
+        assert_raises(yp_popvalue2(mp, unhashable), yp_KeyError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
+        yp_decrefN(N(mp, unhashable));
+    }
+
+    // An unhashable key should match the equal key in mp.
+    {
+        ypObject *int_1 = yp_intC(1);
+        ypObject *intstore_1 = yp_intstoreC(1);
+        ypObject *int_2 = yp_intC(2);
+        ypObject *intstore_2 = yp_intstoreC(2);
+        ypObject *mp = type->newK(K(int_1, values[0], int_2, values[1]));
+        ead(value, yp_popvalue3(mp, intstore_1, values[3]), assert_obj(value, eq, values[0]));
+        assert_mapping(mp, int_2, values[1]);
+        ead(value, yp_popvalue2(mp, intstore_2), assert_obj(value, eq, values[1]));
+        assert_len(mp, 0);
+        yp_decrefN(N(int_1, intstore_1, int_2, intstore_2, mp));
+    }
+
+    // Exception passthrough.
+    {
+        ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1], keys[2], values[2]));
+        assert_isexception(yp_popvalue3(mp, yp_SyntaxError, values[3]), yp_SyntaxError);
+        assert_isexception(yp_popvalue2(mp, yp_SyntaxError), yp_SyntaxError);
+        assert_mapping(mp, keys[0], values[0], keys[1], values[1], keys[2], values[2]);
         yp_decref(mp);
     }
 
@@ -368,6 +484,7 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
     // Immutables don't support setdefault.
     if (!type->is_mutable) {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
+        assert_raises(yp_setdefault(mp, keys[0], values[2]), yp_MethodError);
         assert_raises(yp_setdefault(mp, keys[2], values[2]), yp_MethodError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
@@ -395,6 +512,7 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_not_raises_exc(yp_delitem(mp, keys[1], &exc));
+        assert_mapping(mp, keys[0], values[0]);
         ead(value, yp_setdefault(mp, keys[1], values[2]), assert_obj(value, eq, values[2]));
         assert_mapping(mp, keys[0], values[0], keys[1], values[2]);
         yp_decref(mp);
@@ -455,8 +573,8 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
     // Exception passthrough.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_raises(yp_setdefault(mp, yp_SyntaxError, values[2]), yp_SyntaxError);
-        assert_raises(yp_setdefault(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_setdefault(mp, yp_SyntaxError, values[2]), yp_SyntaxError);
+        assert_isexception(yp_setdefault(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
     }
@@ -474,6 +592,7 @@ static MunitParameterEnum test_mapping_params[] = {
 MunitTest test_mapping_tests[] = {TEST(test_contains, test_mapping_params),
         TEST(test_getitem, test_mapping_params), TEST(test_getdefault, test_mapping_params),
         TEST(test_setitem, test_mapping_params), TEST(test_delitem, test_mapping_params),
-        TEST(test_setdefault, test_mapping_params), {NULL}};
+        TEST(test_popvalue, test_mapping_params), TEST(test_setdefault, test_mapping_params),
+        {NULL}};
 
 extern void test_mapping_initialize(void) {}

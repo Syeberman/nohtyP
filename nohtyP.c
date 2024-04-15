@@ -20109,6 +20109,11 @@ ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *defval)
     _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, defval));
 }
 
+ypObject *yp_popvalue2(ypObject *mapping, ypObject *key)
+{
+    return yp_popvalue3(mapping, key, yp_KeyError);
+}
+
 void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value)
 {
     ypTypeObject *type = ypObject_TYPE(mapping);

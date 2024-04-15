@@ -19,10 +19,11 @@ with open(_mscommonLog_path, "w"):
 os.environ["SCONS_MSCOMMON_DEBUG"] = os.path.abspath(_mscommonLog_path)
 
 
-# FIXME Report this back to SCons
+# XXX Reported to Scons: https://pairlist4.pair.net/pipermail/scons-users/2024-April/009346.html
 def adjusted_libversionflags(*args, **kwargs):
-    """__libversionflags sometimes returns None, which is treated as an unknown variable, which then causes a build
-    failure as we disallow unknown variables below. Convert None to '' to bypass this.
+    """__libversionflags sometimes returns None, which is treated as an unknown variable, which then
+    causes a build failure as we disallow unknown variables below. Convert None to '' to bypass
+    this.
     """
     result = __libversionflags(*args, **kwargs)
     if result is None:

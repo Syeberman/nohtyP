@@ -713,8 +713,8 @@ static MunitResult _test_findC(fixture_type_t *type,
     }
 
     // Exception passthrough.
-    assert_raises_exc(any_findC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_raises_exc(any_findC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+    assert_isexception_exc(any_findC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_isexception_exc(any_findC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -866,8 +866,8 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     }
 
     // Exception passthrough.
-    assert_raises_exc(yp_countC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_raises_exc(yp_countC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+    assert_isexception_exc(yp_countC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_isexception_exc(yp_countC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -951,7 +951,7 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1221,7 +1221,7 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setsliceC6(sq, 0, 1, 1, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setsliceC6(sq, 0, 1, 1, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1326,8 +1326,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(sq, yp_SyntaxError, items[2], &exc), yp_SyntaxError);
-        assert_raises_exc(yp_setitem(sq, int_0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(sq, yp_SyntaxError, items[2], &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(sq, int_0, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1627,7 +1627,7 @@ static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixtur
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delitem(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_delitem(sq, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1682,7 +1682,7 @@ static MunitResult _test_appendC(
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(any_append(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_append(sq, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1811,7 +1811,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_extend(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_extend(sq, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1984,7 +1984,7 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_insertC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_insertC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2207,7 +2207,7 @@ static MunitResult _test_remove(
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(any_remove(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_remove(sq, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
