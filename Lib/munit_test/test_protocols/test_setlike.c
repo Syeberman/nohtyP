@@ -1304,6 +1304,8 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(so, x));
     }
 
+    // FIXME previously-delete (and elsewhere)
+
     // so is empty.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         ypObject *so = type->newN(0);
@@ -1338,6 +1340,8 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
+
+    // FIXME so in x (and elsewhere)
 
     // x contains duplicates.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {

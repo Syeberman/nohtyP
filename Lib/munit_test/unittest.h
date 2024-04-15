@@ -877,6 +877,14 @@ extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array);
 // Fills array with n random, unique objects of any type.
 extern void rand_objs_any(yp_ssize_t n, ypObject **array);
 
+// Returns a list containing n (key, value) pairs as 2-tuples.
+extern ypObject *new_items_listK(yp_ssize_t n, ...);
+extern ypObject *new_items_listKV(yp_ssize_t n, va_list args);
+
+// Returns an iterator yielding n (key, value) pairs as 2-tuples.
+extern ypObject *new_items_iterK(yp_ssize_t n, ...);
+extern ypObject *new_items_iterKV(yp_ssize_t n, va_list args);
+
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given
 // length_hint, which may be different than the number of values actually yielded.

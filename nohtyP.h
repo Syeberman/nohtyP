@@ -326,9 +326,9 @@ ypAPI ypObject *yp_setNV(int n, va_list args);
 ypAPI ypObject *yp_frozenset(ypObject *iterable);
 ypAPI ypObject *yp_set(ypObject *iterable);
 
-// Returns a new reference to a frozendict/dict containing the given n key/value pairs (for a total
-// of 2*n objects); the length will be n, unless there are duplicate keys, in which case the last
-// value will be retained.
+// Returns a new reference to a frozendict/dict containing the given n (key, value) pairs (for a
+// total of 2*n objects); the length will be n, unless there are duplicate keys, in which case the
+// last value will be retained.
 //
 // Ex: yp_dictK(3, key0, value0, key1, value1, key2, value2)
 ypAPI ypObject *yp_frozendictK(int n, ...);
@@ -351,10 +351,9 @@ ypAPI ypObject *yp_dict_fromkeysNV(ypObject *value, int n, va_list args);
 ypAPI ypObject *yp_frozendict_fromkeys(ypObject *iterable, ypObject *value);
 ypAPI ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value);
 
-// Returns a new reference to a frozendict/dict whose key-value pairs come from x. x can be a
+// Returns a new reference to a frozendict/dict whose (key, value) pairs come from x. x can be a
 // mapping object (that supports yp_iter_items), or an iterable that yields exactly two items at a
-// time (ie (key, value)). If a given key is seen more than once, the last value yielded is
-// retained.
+// time. If a given key is seen more than once, the last value yielded is retained.
 ypAPI ypObject *yp_frozendict(ypObject *x);
 ypAPI ypObject *yp_dict(ypObject *x);
 
@@ -904,7 +903,7 @@ ypAPI void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value);
 // yp_None.
 ypAPI ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval);
 
-// Add the given n key/value pairs (for a total of 2*n objects) to mapping, overwriting existing
+// Add the given n (key, value) pairs (for a total of 2*n objects) to mapping, overwriting existing
 // keys. If a given key is seen more than once, the last value is retained. Sets *exc on error. Note
 // that exc is before n as you cannot have arguments after ellipsis.
 ypAPI void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...);
@@ -1156,9 +1155,9 @@ ypAPI ypObject *const yp_str_empty;
 ypAPI ypObject *yp_formatN(ypObject *s, int n, ...);
 ypAPI ypObject *yp_formatNV(ypObject *s, int n, va_list args);
 
-// Similar to yp_formatN, except each replacement field contains the name of one of the n key/value
-// pairs (for a total of 2*n objects). (Implementation note: this function is optimized for in-order
-// replacement field names.)
+// Similar to yp_formatN, except each replacement field contains the name of one of the n (key,
+// value) pairs (for a total of 2*n objects). (Implementation note: this function is optimized for
+// in-order replacement field names.)
 ypAPI ypObject *yp_formatK(ypObject *s, int n, ...);
 ypAPI ypObject *yp_formatKV(ypObject *s, int n, va_list args);
 
@@ -1631,10 +1630,10 @@ ypAPI ypObject *yp_miniiter_values(ypObject *x, yp_uint64_t *state);
 
 // A mini iterator version of yp_iter_items. Otherwise behaves as yp_miniiter. While
 // yp_miniiter_next can be used to retrieve the items from this iterator, yp_miniiter_items_next is
-// preferred as it avoids allocating a new tuple for each key/value pair.
+// preferred as it avoids allocating a new tuple for each (key, value) pair.
 ypAPI ypObject *yp_miniiter_items(ypObject *x, yp_uint64_t *state);
 
-// Returns new references to the next yielded key/value pair from the mini iterator, or an
+// Returns new references to the next yielded (key, value) pair from the mini iterator, or an
 // exception. state must point to the same data returned by the previous yp_miniiter* call. Only
 // applicable for mini iterators returned by yp_miniiter_items, otherwise yp_TypeError is raised.
 // When the mini iterator is exhausted yp_StopIteration is raised. On error, both *key and *value

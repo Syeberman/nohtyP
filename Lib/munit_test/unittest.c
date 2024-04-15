@@ -258,18 +258,63 @@ static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
 void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
 
 
-typedef struct _new_rand_iter_state {
+extern ypObject *new_items_listKV(yp_ssize_t n, va_list args)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_listN(0));  // new ref
+    for (/*n already initialized*/; n > 0; n--) {
+        ypObject *item;
+        // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
+        ypObject *key = va_arg(args, ypObject *);    // borrowed
+        ypObject *value = va_arg(args, ypObject *);  // borrowed
+        assert_not_raises(item = yp_tupleN(2, key, value));  // new ref
+        assert_not_raises_exc(yp_append(result, item, &exc));
+        yp_decref(item);
+    }
+    return result;
+}
+
+extern ypObject *new_items_listK(yp_ssize_t n, ...)
+{
+    ypObject *result;
+    va_list   args;
+    va_start(args, n);
+    result = new_items_listKV(n, args);  // new ref
+    va_end(args);
+    return result;
+}
+
+extern ypObject *new_items_iterKV(yp_ssize_t n, va_list args)
+{
+    ypObject *list = new_items_listKV(n, args);  // new ref
+    ypObject *result = yp_iter(list);
+    yp_decref(list);
+    return result;
+}
+
+extern ypObject *new_items_iterK(yp_ssize_t n, ...)
+{
+    ypObject *result;
+    va_list   args;
+    va_start(args, n);
+    result = new_items_iterKV(n, args);  // new ref
+    va_end(args);
+    return result;
+}
+
+
+typedef struct _rand_iter_state {
     yp_ssize_t               n;
     rand_obj_supplier_t      supplier;
     rand_obj_supplier_memo_t supplier_memo;
-} new_rand_iter_state;
+} rand_iter_state;
 
-static yp_state_decl_t new_rand_iter_state_decl = {yp_sizeof(new_rand_iter_state)};
+static yp_state_decl_t rand_iter_state_decl = {yp_sizeof(rand_iter_state)};
 
-static ypObject *new_rand_iter_func(ypObject *g, ypObject *value)
+static ypObject *rand_iter_func(ypObject *g, ypObject *value)
 {
-    new_rand_iter_state *state;
-    yp_ssize_t           size;
+    rand_iter_state *state;
+    yp_ssize_t       size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
@@ -283,8 +328,8 @@ static ypObject *new_rand_iter3(
         yp_ssize_t n, rand_obj_supplier_t supplier, const rand_obj_supplier_memo_t *supplier_memo)
 {
     ypObject           *result;
-    new_rand_iter_state state = {n, supplier};
-    yp_generator_decl_t decl = {new_rand_iter_func, n, &state, &new_rand_iter_state_decl};
+    rand_iter_state     state = {n, supplier};
+    yp_generator_decl_t decl = {rand_iter_func, n, &state, &rand_iter_state_decl};
     state.supplier_memo = *supplier_memo;
 
     result = yp_generatorC(&decl);
@@ -292,20 +337,19 @@ static ypObject *new_rand_iter3(
     return result;
 }
 
-typedef struct _new_faulty_iter_state {
+typedef struct _faulty_iter_state {
     ypObject  *supplier;   // Sub-iterator supplying values to yield until n reaches zero.
     yp_ssize_t n;          // Raise exception when this reaches zero.
     ypObject  *exception;  // Exception to raise.
-} new_faulty_iter_state;
+} faulty_iter_state;
 
-static yp_state_decl_t new_faulty_iter_state_decl = {yp_sizeof(new_faulty_iter_state), 2,
-        {yp_offsetof(new_faulty_iter_state, supplier),
-                yp_offsetof(new_faulty_iter_state, exception)}};
+static yp_state_decl_t faulty_iter_state_decl = {yp_sizeof(faulty_iter_state), 2,
+        {yp_offsetof(faulty_iter_state, supplier), yp_offsetof(faulty_iter_state, exception)}};
 
-static ypObject *new_faulty_iter_func(ypObject *g, ypObject *value)
+static ypObject *faulty_iter_func(ypObject *g, ypObject *value)
 {
-    new_faulty_iter_state *state;
-    yp_ssize_t             size;
+    faulty_iter_state *state;
+    yp_ssize_t         size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
@@ -318,10 +362,9 @@ static ypObject *new_faulty_iter_func(ypObject *g, ypObject *value)
 extern ypObject *new_faulty_iter(
         ypObject *supplier, yp_ssize_t n, ypObject *exception, yp_ssize_t length_hint)
 {
-    ypObject             *result;
-    new_faulty_iter_state state = {yp_iter(supplier) /*new ref*/, n, exception};
-    yp_generator_decl_t   decl = {
-            new_faulty_iter_func, length_hint, &state, &new_faulty_iter_state_decl};
+    ypObject           *result;
+    faulty_iter_state   state = {yp_iter(supplier) /*new ref*/, n, exception};
+    yp_generator_decl_t decl = {faulty_iter_func, length_hint, &state, &faulty_iter_state_decl};
     assert_not_exception(state.supplier);
     assert_isexception(exception, yp_BaseException);
 

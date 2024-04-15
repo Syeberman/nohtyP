@@ -3343,9 +3343,9 @@ static ypObject *_ypSequence_miniiter_next(ypObject *x, yp_uint64_t *_state)
         return yp_isexceptionC2(result, yp_IndexError) ? yp_StopIteration : result;
     }
 
-    if (*state >= 0) {  // we are counting up from the first element
+    if (*state >= 0) {  // We are counting up from the first element.
         *state += 1;
-    } else {  // we are counting down from the last element
+    } else {  // We are counting down from the last element.
         *state -= 1;
     }
     return result;
@@ -3359,9 +3359,9 @@ static ypObject *_ypSequence_miniiter_lenh(
     ypObject   *exc = yp_None;
     yp_ssize_t  len = yp_lenC(x, &exc);
     if (yp_isexceptionC(exc)) return exc;
-    if (*state >= 0) {
+    if (*state >= 0) {  // We are counting up from the first element.
         *length_hint = len - ((yp_ssize_t)*state);
-    } else {
+    } else {  // We are counting down from the last element.
         *length_hint = len - ((yp_ssize_t)(-1 - *state));
     }
     return yp_None;
@@ -17125,8 +17125,9 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
         if (other_value == NULL) continue;
         valuesleft -= 1;
 
-        // TODO _ypDict_push will call yp_hashC again, even though we already know the hash
-        // TODO yp_hashC may mutate mp, invalidating valuesleft!
+        // FIXME _ypDict_push will call yp_hashC again, even though we already know the hash
+        // FIXME yp_hashC may mutate mp, invalidating valuesleft!
+        // FIXME compare to set_update
         result = _ypDict_push(
                 mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, &spaceleft, valuesleft);
         if (yp_isexceptionC(result)) return result;
@@ -17518,6 +17519,7 @@ static ypObject *dict_updateK(ypObject *mp, int n, va_list args)
     ypObject  *value;
 
     while (n > 0) {
+        // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
         key = va_arg(args, ypObject *);    // borrowed
         value = va_arg(args, ypObject *);  // borrowed
         n -= 1;
