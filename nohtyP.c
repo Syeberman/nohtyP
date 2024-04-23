@@ -17971,7 +17971,7 @@ static ypObject *_ypDict(int type, ypObject *x)
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update_fromiterable
-        if (type == ypFrozenDict_CODE) return yp_frozenset_empty;
+        if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
         return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     } else if (length_hint > ypDict_LEN_MAX) {
         // yp_lenC reports that we don't have room to add their elements
