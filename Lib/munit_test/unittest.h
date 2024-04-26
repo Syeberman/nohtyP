@@ -486,6 +486,7 @@ extern "C" {
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
+// FIXME Assert the type of obj is a known sequence type? (Similar for assert_set, assert_mapping.)
 #define _assert_sequence(obj, items, obj_fmt, item_strs, ...)                                   \
     do {                                                                                        \
         yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(items);                                      \
@@ -757,6 +758,7 @@ extern void pprint(FILE *f, ypObject *obj);
 
 
 typedef ypObject *(*objvoidfunc)(void);
+typedef ypObject *(*objobjfunc)(ypObject *);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef void (*voidarrayfunc)(yp_ssize_t, ypObject **);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
@@ -771,6 +773,8 @@ typedef struct _fixture_type_t {
     fixture_type_t *pair;   // The other type in this object pair, or points back to this type.
 
     rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
+
+    objobjfunc new_;  // The object converter, aka the single-argument constructor.
 
     // Functions for iterables, where rand_items returns objects that can be accepted by newN and
     // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
@@ -849,6 +853,11 @@ extern char *param_values_types_string[];
 extern char *param_values_types_setlike[];
 extern char *param_values_types_mapping[];
 
+// Returns the test fixture type that corresponds with the type of the object. object cannot be
+// invalidated or an exception.
+// TODO Support invalidated and exception types?
+extern fixture_type_t *fixture_type_fromobject(ypObject *object);
+
 
 extern char param_key_type[];
 
@@ -877,13 +886,10 @@ extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array);
 // Fills array with n random, unique objects of any type.
 extern void rand_objs_any(yp_ssize_t n, ypObject **array);
 
-// Returns a list containing n (key, value) pairs as 2-tuples.
-extern ypObject *new_items_listK(yp_ssize_t n, ...);
-extern ypObject *new_items_listKV(yp_ssize_t n, va_list args);
-
-// Returns an iterator yielding n (key, value) pairs as 2-tuples.
-extern ypObject *new_items_iterK(yp_ssize_t n, ...);
-extern ypObject *new_items_iterKV(yp_ssize_t n, va_list args);
+// Returns an object of the given type containing n (key, value) pairs as 2-tuples. The object is
+// constructed by calling type->new_ with a list of the pairs.
+extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...);
+extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args);
 
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given
@@ -948,6 +954,7 @@ SUITE_OF_SUITES_DECLS(munit_test);
 SUITE_OF_TESTS_DECLS(test_unittest);
 
 SUITE_OF_SUITES_DECLS(test_objects);
+SUITE_OF_TESTS_DECLS(test_frozendict);
 SUITE_OF_TESTS_DECLS(test_frozenset);
 SUITE_OF_TESTS_DECLS(test_function);
 

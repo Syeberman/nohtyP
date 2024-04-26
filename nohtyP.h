@@ -1508,6 +1508,8 @@ ypAPI ypObject *yp_type(ypObject *object);
 
 // The immortal type objects. Calling a type object (e.g., with yp_callN) typically constructs an
 // object of that type.
+// FIXME Document the calling signature for these objects, perhaps in a "callable objects" section
+// after the yp_call section?
 ypAPI ypObject *const yp_t_invalidated;
 ypAPI ypObject *const yp_t_exception;
 ypAPI ypObject *const yp_t_type;

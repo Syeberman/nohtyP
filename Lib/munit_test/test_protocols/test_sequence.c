@@ -10,6 +10,11 @@
         (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, NULL \
     }
 
+#define friend_types_init(type)    \
+    {                              \
+        (type), (type)->pair, NULL \
+    }
+
 
 typedef struct _slice_args_t {
     yp_ssize_t start;
@@ -22,7 +27,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = {type, type->pair, NULL};
+    fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];

@@ -18056,6 +18056,8 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
         return _ypDict_new(type, 0, /*alloclen_fixed=*/FALSE);
     }
 
+    // FIXME Is there a better exception we should use? This _could_ be an insane number of
+    // identical keys, which would result in a minimal-sized dict.
     if (n > ypDict_LEN_MAX) return yp_MemorySizeOverflowError;
     newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;

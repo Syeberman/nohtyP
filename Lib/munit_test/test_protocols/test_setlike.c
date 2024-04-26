@@ -7,7 +7,8 @@
 
 // Sets should accept themselves, their pairs, iterators, frozenset/set, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
-// TODO Should dict really be here? What about dict key and item views (when implemented)?
+// FIXME Should dict really be here? What about dict key and item views (when implemented)?
+// FIXME And also dict_dirty/etc, shared key?
 #define x_types_init(type)                                                                     \
     {                                                                                          \
         (type), (type)->pair, fixture_type_iter, fixture_type_frozenset, fixture_type_set,     \
@@ -15,10 +16,9 @@
                 fixture_type_dict, NULL                                                        \
     }
 
-#define friend_types_init()                                                     \
-    {                                                                           \
-        fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
-                fixture_type_set_dirty, NULL                                    \
+#define friend_types_init(type)    \
+    {                              \
+        (type), (type)->pair, NULL \
     }
 
 // Returns true iff type can store unhashable objects.
@@ -280,8 +280,8 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *items[4];
     MunitResult      test_result;
+    ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
@@ -329,8 +329,8 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *items[4];
     MunitResult      test_result;
+    ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
@@ -369,8 +369,8 @@ static MunitResult test_issuperset(const MunitParameter params[], fixture_t *fix
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *items[4];
     MunitResult      test_result;
+    ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
@@ -580,7 +580,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = friend_types_init();
+    fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
@@ -754,7 +754,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = friend_types_init();
+    fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
@@ -930,7 +930,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = friend_types_init();
+    fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
@@ -1106,7 +1106,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = friend_types_init();
+    fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];

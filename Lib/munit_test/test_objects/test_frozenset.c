@@ -2,6 +2,7 @@
 #include "munit_test/unittest.h"
 
 
+// FIXME "frozendict_dirty", "dict_dirty", and shared key?
 #define x_types_init()                                                                   \
     {                                                                                    \
         fixture_type_frozenset, fixture_type_set, fixture_type_iter, fixture_type_tuple, \
@@ -9,10 +10,9 @@
                 fixture_type_frozendict, fixture_type_dict, NULL                         \
     }
 
-#define friend_types_init()                                                     \
-    {                                                                           \
-        fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
-                fixture_type_set_dirty, NULL                                    \
+#define friend_types_init()                            \
+    {                                                  \
+        fixture_type_frozenset, fixture_type_set, NULL \
     }
 
 // Returns true iff type can store unhashable objects.
@@ -22,7 +22,8 @@ static int type_stores_unhashables(fixture_type_t *type)
 }
 
 
-static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, ...))
+static MunitResult _test_newN(
+        fixture_type_t *type, ypObject *(*any_newN)(int, ...), int test_exception_passthrough)
 {
     ypObject *items[2];
     obj_array_fill(items, type->rand_items);
@@ -61,12 +62,14 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
 
     // Unhashable argument.
     {
-        ypObject *unhashable = rand_obj_any_mutable();
+        ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
         assert_raises(any_newN(N(unhashable)), yp_TypeError);
         assert_raises(any_newN(N(items[0], unhashable)), yp_TypeError);
         assert_raises(any_newN(N(items[0], items[1], unhashable)), yp_TypeError);
         yp_decrefN(N(unhashable));
     }
+
+    // FIXME unhashable rejected even if equal to previous item.
 
     // Optimization: empty immortal when n is zero.
     if (type->falsy != NULL) {
@@ -75,14 +78,17 @@ static MunitResult _test_newN(fixture_type_t *type, ypObject *(*any_newN)(int, .
     }
 
     // Exception passthrough.
-    assert_isexception(any_newN(N(yp_SyntaxError)), yp_SyntaxError);
-    assert_isexception(any_newN(N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+    if (test_exception_passthrough) {
+        assert_isexception(any_newN(N(yp_SyntaxError)), yp_SyntaxError);
+        assert_isexception(any_newN(N(yp_None, yp_SyntaxError)), yp_SyntaxError);
+    }
 
     obj_array_decref(items);
     return MUNIT_OK;
 }
 
-static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject *))
+static MunitResult _test_new(
+        fixture_type_t *type, ypObject *(*any_new)(ypObject *), int test_exception_passthrough)
 {
     fixture_type_t  *x_types[] = x_types_init();
     fixture_type_t  *friend_types[] = friend_types_init();
@@ -121,7 +127,7 @@ static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *unhashable = rand_obj_any_mutable();
+            ypObject *unhashable = rand_obj_any_mutable_unique(2, items);
             ead(x, (*x_type)->newN(N(unhashable)), assert_raises(any_new(x), yp_TypeError));
             ead(x, (*x_type)->newN(N(items[0], unhashable)),
                     assert_raises(any_new(x), yp_TypeError));
@@ -131,7 +137,9 @@ static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject
         }
     }
 
-    // Optimization: lazy shallow copy of an immutable x to immutable so.
+    // FIXME unhashable rejected even if equal to previous item.
+
+    // Optimization: lazy shallow copy of a friendly immutable x to immutable so.
     for (x_type = friend_types; (*x_type) != NULL; x_type++) {
         ypObject *x = (*x_type)->newN(N(items[0], items[1]));
         ypObject *so = any_new(x);
@@ -161,7 +169,9 @@ static MunitResult _test_new(fixture_type_t *type, ypObject *(*any_new)(ypObject
     assert_raises(any_new(int_1), yp_TypeError);
 
     // Exception passthrough.
-    assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
+    if (test_exception_passthrough) {
+        assert_isexception(any_new(yp_SyntaxError), yp_SyntaxError);
+    }
 
     obj_array_decref(items);
     yp_decrefN(N(int_1));
@@ -206,10 +216,10 @@ static MunitResult test_newN(const MunitParameter params[], fixture_t *fixture)
         newN_to_newNV = newN_to_setNV;
     }
 
-    test_result = _test_newN(type, newN);
+    test_result = _test_newN(type, newN, /*test_exception_passthrough=*/TRUE);
     if (test_result != MUNIT_OK) return test_result;
 
-    test_result = _test_newN(type, newN_to_newNV);
+    test_result = _test_newN(type, newN_to_newNV, /*test_exception_passthrough=*/TRUE);
     if (test_result != MUNIT_OK) return test_result;
 
     return MUNIT_OK;
@@ -222,7 +232,7 @@ static ypObject *newN_to_frozenset(int n, ...)
     ypObject *result;
 
     va_start(args, n);
-    iterable = yp_tupleNV(n, args);  // new ref
+    assert_not_raises(iterable = yp_tupleNV(n, args));  // new ref
     va_end(args);
 
     result = yp_frozenset(iterable);
@@ -237,7 +247,7 @@ static ypObject *newN_to_set(int n, ...)
     ypObject *result;
 
     va_start(args, n);
-    iterable = yp_tupleNV(n, args);  // new ref
+    assert_not_raises(iterable = yp_tupleNV(n, args));  // new ref
     va_end(args);
 
     result = yp_set(iterable);
@@ -249,30 +259,25 @@ static MunitResult test_new(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
     ypObject *(*newN_to_new)(int, ...);
-    ypObject *(*new)(ypObject *);
+    ypObject *(*new_)(ypObject *);
     MunitResult test_result;
 
     if (type->type == yp_t_frozenset) {
         newN_to_new = newN_to_frozenset;
-        new = yp_frozenset;
+        new_ = yp_frozenset;
     } else {
         assert_ptr(type->type, ==, yp_t_set);
         newN_to_new = newN_to_set;
-        new = yp_set;
+        new_ = yp_set;
     }
 
-    test_result = _test_newN(type, newN_to_new);
+    test_result = _test_newN(type, newN_to_new, /*test_exception_passthrough=*/FALSE);
     if (test_result != MUNIT_OK) return test_result;
 
-    test_result = _test_new(type, new);
+    test_result = _test_new(type, new_, /*test_exception_passthrough=*/TRUE);
     if (test_result != MUNIT_OK) return test_result;
 
     return MUNIT_OK;
-}
-
-static ypObject *new_to_call_t_frozenset(ypObject *iterable)
-{
-    return yp_callN(yp_t_frozenset, 1, iterable);
 }
 
 static ypObject *newN_to_call_t_frozenset(int n, ...)
@@ -282,15 +287,18 @@ static ypObject *newN_to_call_t_frozenset(int n, ...)
     ypObject *result;
 
     va_start(args, n);
-    iterable = yp_tupleNV(n, args);  // new ref
+    assert_not_raises(iterable = yp_tupleNV(n, args));  // new ref
     va_end(args);
 
-    result = new_to_call_t_frozenset(iterable);
+    result = yp_callN(yp_t_frozenset, 1, iterable);
     yp_decref(iterable);
     return result;
 }
 
-static ypObject *new_to_call_t_set(ypObject *iterable) { return yp_callN(yp_t_set, 1, iterable); }
+static ypObject *new_to_call_t_frozenset(ypObject *iterable)
+{
+    return yp_callN(yp_t_frozenset, 1, iterable);
+}
 
 static ypObject *newN_to_call_t_set(int n, ...)
 {
@@ -299,22 +307,24 @@ static ypObject *newN_to_call_t_set(int n, ...)
     ypObject *result;
 
     va_start(args, n);
-    iterable = yp_tupleNV(n, args);  // new ref
+    assert_not_raises(iterable = yp_tupleNV(n, args));  // new ref
     va_end(args);
 
-    result = new_to_call_t_set(iterable);
+    result = yp_callN(yp_t_set, 1, iterable);
     yp_decref(iterable);
     return result;
 }
+static ypObject *new_to_call_t_set(ypObject *iterable) { return yp_callN(yp_t_set, 1, iterable); }
+
 
 static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
     ypObject *(*newN_to_call_type)(int, ...);
     ypObject *(*new_to_call_type)(ypObject *);
+    MunitResult test_result;
     ypObject   *str_iterable = yp_str_frombytesC2(-1, "iterable");
     ypObject   *str_cls = yp_str_frombytesC2(-1, "cls");
-    MunitResult test_result;
 
     if (type->type == yp_t_frozenset) {
         newN_to_call_type = newN_to_call_t_frozenset;
@@ -325,10 +335,10 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
         new_to_call_type = new_to_call_t_set;
     }
 
-    test_result = _test_newN(type, newN_to_call_type);
+    test_result = _test_newN(type, newN_to_call_type, /*test_exception_passthrough=*/FALSE);
     if (test_result != MUNIT_OK) goto tear_down;
 
-    test_result = _test_new(type, new_to_call_type);
+    test_result = _test_new(type, new_to_call_type, /*test_exception_passthrough=*/TRUE);
     if (test_result != MUNIT_OK) goto tear_down;
 
     // Zero arguments.
@@ -346,16 +356,21 @@ static MunitResult test_call_type(const MunitParameter params[], fixture_t *fixt
 
     // Invalid arguments.
     {
+        ypObject *args_two = yp_tupleN(N(yp_frozenset_empty, yp_frozenset_empty));
         ypObject *kwargs_iterable = yp_frozendictK(K(str_iterable, yp_frozenset_empty));
         ypObject *kwargs_cls = yp_frozendictK(K(str_cls, type->type));
 
         assert_raises(
                 yp_callN(type->type, N(yp_frozenset_empty, yp_frozenset_empty)), yp_TypeError);
+        assert_raises(yp_call_stars(type->type, args_two, yp_frozendict_empty), yp_TypeError);
         assert_raises(yp_call_stars(type->type, yp_tuple_empty, kwargs_iterable), yp_TypeError);
         assert_raises(yp_call_stars(type->type, yp_tuple_empty, kwargs_cls), yp_TypeError);
 
-        yp_decrefN(N(kwargs_cls, kwargs_iterable));
+        yp_decrefN(N(kwargs_cls, kwargs_iterable, args_two));
     }
+
+    // Exception passthrough.
+    assert_isexception(yp_callN(type->type, N(yp_SyntaxError)), yp_SyntaxError);
 
 tear_down:
     yp_decrefN(N(str_iterable, str_cls));

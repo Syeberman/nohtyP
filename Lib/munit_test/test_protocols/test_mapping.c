@@ -874,7 +874,7 @@ static void updateK_to_update_fromiter(ypObject *mapping, ypObject **exc, int n,
     va_list   args;
     ypObject *x;
     va_start(args, n);
-    x = new_items_iterKV(n, args);
+    x = new_itemsKV(fixture_type_iter, n, args);
     va_end(args);
     yp_update(mapping, x, exc);
     yp_decref(x);
@@ -913,14 +913,16 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
 
     // Iterator exceptions and bad length hints.
     faulty_iter_tests_exc(ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1])), x,
-            new_items_listK(K(keys[1], values[3], keys[2], values[2])), yp_update(mp, x, &exc),
+            new_itemsK(fixture_type_list, K(keys[1], values[3], keys[2], values[2])),
+            yp_update(mp, x, &exc),
             assert_mapping(mp, keys[0], values[0], keys[1], values[3], keys[2], values[2]),
             yp_decref(mp));
 
     // mp is not modified if the iterator fails at the start.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        ypObject *x_supplier = new_items_listK(K(keys[1], values[3], keys[2], values[2]));
+        ypObject *x_supplier =
+                new_itemsK(fixture_type_list, K(keys[1], values[3], keys[2], values[2]));
         ypObject *x = new_faulty_iter(x_supplier, 0, yp_SyntaxError, 2);
         assert_raises_exc(yp_update(mp, x, &exc), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
@@ -931,7 +933,8 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     // fails mid-way mp may have already been modified.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        ypObject *x_supplier = new_items_listK(K(keys[1], values[3], keys[2], values[2]));
+        ypObject *x_supplier =
+                new_itemsK(fixture_type_list, K(keys[1], values[3], keys[2], values[2]));
         ypObject *x = new_faulty_iter(x_supplier, 1, yp_SyntaxError, 2);
         assert_raises_exc(yp_update(mp, x, &exc), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[3]);

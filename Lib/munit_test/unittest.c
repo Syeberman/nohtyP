@@ -47,10 +47,16 @@ static fixture_type_t fixture_type_dict_struct;
 static fixture_type_t fixture_type_function_struct;
 
 
+static ypObject *objobjfunc_error(ypObject *x)
+{
+    munit_error("unsupported operation");
+    return yp_SystemError;
+}
+
 static ypObject *objvarargfunc_error(int n, ...)
 {
     munit_error("unsupported operation");
-    return NULL;
+    return yp_SystemError;
 }
 
 static void voidarrayfunc_error(yp_ssize_t n, ypObject **array)
@@ -258,15 +264,15 @@ static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
 void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
 
 
-extern ypObject *new_items_listKV(yp_ssize_t n, va_list args)
+static ypObject *_new_items_listKV(yp_ssize_t n, va_list args)
 {
     ypObject *result;
     assert_not_raises(result = yp_listN(0));  // new ref
     for (/*n already initialized*/; n > 0; n--) {
         ypObject *item;
         // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
-        ypObject *key = va_arg(args, ypObject *);    // borrowed
-        ypObject *value = va_arg(args, ypObject *);  // borrowed
+        ypObject *key = va_arg(args, ypObject *);            // borrowed
+        ypObject *value = va_arg(args, ypObject *);          // borrowed
         assert_not_raises(item = yp_tupleN(2, key, value));  // new ref
         assert_not_raises_exc(yp_append(result, item, &exc));
         yp_decref(item);
@@ -274,30 +280,22 @@ extern ypObject *new_items_listKV(yp_ssize_t n, va_list args)
     return result;
 }
 
-extern ypObject *new_items_listK(yp_ssize_t n, ...)
+extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args)
 {
     ypObject *result;
-    va_list   args;
-    va_start(args, n);
-    result = new_items_listKV(n, args);  // new ref
-    va_end(args);
-    return result;
-}
-
-extern ypObject *new_items_iterKV(yp_ssize_t n, va_list args)
-{
-    ypObject *list = new_items_listKV(n, args);  // new ref
-    ypObject *result = yp_iter(list);
+    ypObject *list = _new_items_listKV(n, args);  // new ref
+    if (type == fixture_type_list) return list;
+    result = type->new_(list);
     yp_decref(list);
     return result;
 }
 
-extern ypObject *new_items_iterK(yp_ssize_t n, ...)
+extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...)
 {
     ypObject *result;
     va_list   args;
     va_start(args, n);
-    result = new_items_iterKV(n, args);  // new ref
+    result = new_itemsKV(type, n, args);  // new ref
     va_end(args);
     return result;
 }
@@ -389,6 +387,8 @@ static fixture_type_t fixture_type_type_struct = {
 
         new_rand_type,  // _new_rand
 
+        yp_type,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
@@ -417,6 +417,8 @@ static fixture_type_t fixture_type_NoneType_struct = {
         &fixture_type_NoneType_struct,  // pair
 
         new_rand_NoneType,  // _new_rand
+
+        objobjfunc_error,  // new_
 
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
@@ -453,6 +455,8 @@ static fixture_type_t fixture_type_bool_struct = {
 
         new_rand_bool,  // _new_rand
 
+        yp_bool,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
@@ -485,6 +489,8 @@ static fixture_type_t fixture_type_int_struct = {
         &fixture_type_intstore_struct,  // pair
 
         new_rand_int,  // _new_rand
+
+        yp_int,  // new_
 
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
@@ -519,6 +525,8 @@ static fixture_type_t fixture_type_intstore_struct = {
 
         new_rand_intstore,  // _new_rand
 
+        yp_intstore,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
@@ -552,6 +560,8 @@ static fixture_type_t fixture_type_float_struct = {
 
         new_rand_float,  // _new_rand
 
+        yp_float,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
@@ -584,6 +594,8 @@ static fixture_type_t fixture_type_floatstore_struct = {
         &fixture_type_float_struct,  // pair
 
         new_rand_floatstore,  // _new_rand
+
+        yp_floatstore,  // new_
 
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
@@ -632,6 +644,8 @@ static fixture_type_t fixture_type_iter_struct = {
         &fixture_type_iter_struct,  // pair
 
         new_rand_iter,  // _new_rand
+
+        yp_iter,  // new_
 
         newN_iter,      // newN
         rand_objs_any,  // rand_items
@@ -731,6 +745,8 @@ static fixture_type_t fixture_type_range_struct = {
 
         new_rand_range,  // _new_rand
 
+        objobjfunc_error,  // new_
+
         newN_range,        // newN
         rand_items_range,  // rand_items
 
@@ -789,6 +805,8 @@ static fixture_type_t fixture_type_bytes_struct = {
 
         new_rand_bytes,  // _new_rand
 
+        yp_bytes,  // new_
+
         newN_bytes,      // newN
         rand_objs_byte,  // rand_items
 
@@ -846,6 +864,8 @@ static fixture_type_t fixture_type_bytearray_struct = {
         &fixture_type_bytes_struct,  // pair
 
         new_rand_bytearray,  // _new_rand
+
+        yp_bytearray,  // new_
 
         newN_bytearray,  // newN
         rand_objs_byte,  // rand_items
@@ -906,6 +926,8 @@ static fixture_type_t fixture_type_str_struct = {
         &fixture_type_chrarray_struct,  // pair
 
         new_rand_str,  // _new_rand
+
+        yp_str,  // new_
 
         newN_str,       // newN
         rand_objs_chr,  // rand_items
@@ -968,6 +990,8 @@ static fixture_type_t fixture_type_chrarray_struct = {
 
         new_rand_chrarray,  // _new_rand
 
+        yp_chrarray,  // new_
+
         newN_chrarray,  // newN
         rand_objs_chr,  // rand_items
 
@@ -1008,6 +1032,8 @@ static fixture_type_t fixture_type_tuple_struct = {
 
         new_rand_tuple,  // _new_rand
 
+        yp_tuple,  // new_
+
         yp_tupleN,      // newN
         rand_objs_any,  // rand_items
 
@@ -1047,6 +1073,8 @@ static fixture_type_t fixture_type_list_struct = {
         &fixture_type_tuple_struct,  // pair
 
         new_rand_list,  // _new_rand
+
+        yp_list,  // new_
 
         yp_listN,       // newN
         rand_objs_any,  // rand_items
@@ -1089,6 +1117,8 @@ static fixture_type_t fixture_type_frozenset_struct = {
 
         new_rand_frozenset,  // _new_rand
 
+        yp_frozenset,  // new_
+
         yp_frozensetN,           // newN
         rand_objs_any_hashable,  // rand_items
 
@@ -1130,6 +1160,8 @@ static fixture_type_t fixture_type_set_struct = {
 
         new_rand_set,  // _new_rand
 
+        yp_set,  // new_
+
         yp_setN,                 // newN
         rand_objs_any_hashable,  // rand_items
 
@@ -1169,6 +1201,15 @@ static void make_set_dirty(ypObject *so)
     yp_decref(item);
 }
 
+static ypObject *new_frozenset_dirty(ypObject *x)
+{
+    ypObject *result = yp_set(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_set_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    return result;
+}
+
 static ypObject *new_rand_frozenset_dirty(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = new_rand_set(memo);  // new ref
@@ -1200,6 +1241,8 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
 
         new_rand_frozenset_dirty,  // _new_rand
 
+        new_frozenset_dirty,  // new_
+
         new_frozenset_dirtyN,    // newN
         rand_objs_any_hashable,  // rand_items
 
@@ -1217,6 +1260,14 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         FALSE,  // is_callable
         FALSE,  // is_patterned
 };
+
+static ypObject *new_set_dirty(ypObject *x)
+{
+    ypObject *result = yp_set(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_set_dirty(result);
+    return result;
+}
 
 static ypObject *new_rand_set_dirty(const rand_obj_supplier_memo_t *memo)
 {
@@ -1246,6 +1297,8 @@ static fixture_type_t fixture_type_set_dirty_struct = {
         &fixture_type_frozenset_dirty_struct,  // pair
 
         new_rand_set_dirty,  // _new_rand
+
+        new_set_dirty,  // new_
 
         new_set_dirtyN,          // newN
         rand_objs_any_hashable,  // rand_items
@@ -1334,6 +1387,8 @@ static fixture_type_t fixture_type_frozendict_struct = {
 
         new_rand_frozendict,  // _new_rand
 
+        yp_frozendict,  // new_
+
         new_frozendictN,         // newN
         rand_objs_any_hashable,  // rand_items
 
@@ -1390,6 +1445,8 @@ static fixture_type_t fixture_type_dict_struct = {
 
         new_rand_dict,  // _new_rand
 
+        yp_dict,  // new_
+
         new_dictN,               // newN
         rand_objs_any_hashable,  // rand_items
 
@@ -1430,6 +1487,8 @@ static fixture_type_t fixture_type_function_struct = {
         &fixture_type_function_struct,  // pair
 
         new_rand_function,  // _new_rand
+
+        objobjfunc_error,  // new_
 
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
@@ -1610,6 +1669,19 @@ static void initialize_fixture_types(void)
     FILL_TYPE_ARRAYS(setlike);
     FILL_TYPE_ARRAYS(mapping);
 #undef FILL_TYPE_ARRAYS
+}
+
+// TODO We could speed this up with a frozendict or somesuch.
+extern fixture_type_t *fixture_type_fromobject(ypObject *object)
+{
+    fixture_type_t **fixture_type;
+    ypObject        *type = yp_type(object);
+    for (fixture_type = fixture_types_all; (*fixture_type) != NULL; fixture_type++) {
+        if ((*fixture_type)->type == type) break;
+    }
+    yp_decref(type);
+    assert_not_null(*fixture_type);
+    return *fixture_type;
 }
 
 
