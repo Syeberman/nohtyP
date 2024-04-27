@@ -18025,6 +18025,10 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
     ypObject  *key;
     ypObject  *newMp;
 
+    if (yp_isexceptionC(value)) return value;
+
+    if (type == ypFrozenDict_CODE && n < 1) return yp_frozendict_empty;
+
     if (n > ypDict_LEN_MAX) return yp_MemorySizeOverflowError;
     newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;
@@ -18044,23 +18048,19 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
 
 ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...)
 {
-    if (n < 1) return yp_frozendict_empty;
     return_yp_V_FUNC(ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n);
 }
 ypObject *yp_frozendict_fromkeysNV(ypObject *value, int n, va_list args)
 {
-    if (n < 1) return yp_frozendict_empty;
     return _ypDict_fromkeysNV(ypFrozenDict_CODE, value, n, args);
 }
 
 ypObject *yp_dict_fromkeysN(ypObject *value, int n, ...)
 {
-    if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     return_yp_V_FUNC(ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n);
 }
 ypObject *yp_dict_fromkeysNV(ypObject *value, int n, va_list args)
 {
-    if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     return _ypDict_fromkeysNV(ypDict_CODE, value, n, args);
 }
 
@@ -18074,6 +18074,8 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     yp_ssize_t  spaceleft;
     ypObject   *key;
     yp_ssize_t  length_hint;
+
+    if (yp_isexceptionC(value)) return value;
 
     // FIXME How does this handle excessively-large length hints?
     // FIXME Rewrite similarly to _ypSet_fromiterable?
@@ -18117,6 +18119,11 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     if (yp_isexceptionC(result)) {
         yp_decref(newMp);
         return result;
+    }
+
+    if (type == ypFrozenDict_CODE && ypDict_LEN(newMp) < 1) {
+        yp_decref(newMp);
+        return yp_frozendict_empty;
     }
     return newMp;
 }
