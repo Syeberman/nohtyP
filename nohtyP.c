@@ -17699,36 +17699,60 @@ static ypObject *frozendict_dealloc(ypObject *mp, void *memo)
 
 static ypObject *frozendict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
+    ypObject *object = argarray[1];  // borrowed
+    ypObject *kwargs = argarray[3];  // borrowed
+
     yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_frozendict);
-    yp_ASSERT1(ypObject_TYPE_CODE(argarray[3]) == ypFrozenDict_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
 
-    if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
-        return yp_frozendict(argarray[1]);
-    } else if (argarray[1] == yp_frozendict_empty) {  // the default value
-        return yp_incref(argarray[3]);  // **kwargs is always a frozendict, so just return it
+    if (ypDict_LEN(kwargs) < 1) {  // no keyword args
+        return yp_frozendict(object);
+    } else if (object == yp_frozendict_empty) {  // the default value
+        return yp_incref(kwargs);  // **kwargs is always a frozendict, so just return it
     } else {
-        // FIXME Need a yp_frozendict that merges multiple objects (yp_frozendictN?)
-        return yp_NotImplementedError;
+        // Don't use yp_frozendict: it returns alloclen_fixed objects and yp_frozendict_empty.
+        // TODO Could improve this by pre-allocating.
+        ypObject *result;
+        ypObject *mp = _ypDict_new(ypFrozenDict_CODE, 0, /*alloclen_fixed=*/FALSE);
+        if (yp_isexceptionC(mp)) return mp;
+        if (ypObject_TYPE_PAIR_CODE(object) == ypFrozenDict_CODE) {
+            result = _ypDict_update_fromdict(mp, object);
+        } else {
+            result = _ypDict_update_fromiterable(mp, object);
+        }
+        if (yp_isexceptionC(result)) {
+            yp_decref(mp);
+            return result;
+        }
+        result = _ypDict_update_fromdict(mp, kwargs);
+        if (yp_isexceptionC(result)) {
+            yp_decref(mp);
+            return result;
+        }
+        return mp;
     }
 }
 
 static ypObject *dict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
+    ypObject *object = argarray[1];  // borrowed
+    ypObject *kwargs = argarray[3];  // borrowed
+
     yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_dict);
-    yp_ASSERT1(ypObject_TYPE_CODE(argarray[3]) == ypFrozenDict_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
 
-    if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
-        return yp_dict(argarray[1]);
-    } else if (argarray[1] == yp_frozendict_empty) {  // the default value
-        return _ypDict_copy(ypDict_CODE, argarray[3], /*alloclen_fixed=*/FALSE);
+    if (ypDict_LEN(kwargs) < 1) {  // no keyword args
+        return yp_dict(object);
+    } else if (object == yp_frozendict_empty) {  // the default value
+        return _ypDict_copy(ypDict_CODE, kwargs, /*alloclen_fixed=*/FALSE);
     } else {
         // TODO Could improve this by pre-allocating.
         ypObject *result;
-        ypObject *mp = yp_dict(argarray[1]);
+        ypObject *mp = yp_dict(object);
         if (yp_isexceptionC(mp)) return mp;
-        result = _ypDict_update_fromdict(mp, argarray[3]);
+        result = _ypDict_update_fromdict(mp, kwargs);
         if (yp_isexceptionC(result)) {
             yp_decref(mp);
             return result;
@@ -17954,7 +17978,7 @@ ypObject *yp_dictKV(int n, va_list args)
 
 // XXX Handle the "fellow frozendict" case _before_ calling this function.
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
-static ypObject *_ypDict(int type, ypObject *x)
+static ypObject *_ypDict_new_fromiterable(int type, ypObject *x)
 {
     ypObject  *exc = yp_None;
     ypObject  *newMp;
@@ -18004,7 +18028,7 @@ ypObject *yp_frozendict(ypObject *x)
         if (ypObject_TYPE_CODE(x) == ypFrozenDict_CODE) return yp_incref(x);
         return _ypDict_copy(ypFrozenDict_CODE, x, /*alloclen_fixed=*/TRUE);
     }
-    return _ypDict(ypFrozenDict_CODE, x);
+    return _ypDict_new_fromiterable(ypFrozenDict_CODE, x);
 }
 
 ypObject *yp_dict(ypObject *x)
@@ -18014,7 +18038,7 @@ ypObject *yp_dict(ypObject *x)
         if (ypDict_LEN(x) < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
         return _ypDict_copy(ypDict_CODE, x, /*alloclen_fixed=*/FALSE);
     }
-    return _ypDict(ypDict_CODE, x);
+    return _ypDict_new_fromiterable(ypDict_CODE, x);
 }
 
 // TOOD ypQuickIter could consolidate this with _ypDict_fromkeys
@@ -18027,7 +18051,10 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
 
     if (yp_isexceptionC(value)) return value;
 
-    if (type == ypFrozenDict_CODE && n < 1) return yp_frozendict_empty;
+    if (n < 1) {
+        if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
+        return _ypDict_new(type, 0, /*alloclen_fixed=*/FALSE);
+    }
 
     if (n > ypDict_LEN_MAX) return yp_MemorySizeOverflowError;
     newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
@@ -18931,7 +18958,7 @@ static ypObject *_ypFunction_call_copy_var_kwargs(ypObject *kwargs, int kwargs_i
 
     if (kwargs_is_copy) {
         yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
-        // TODO Implement frozendict_freeze and freeze kwargs in-place here.
+        // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
         result = yp_frozendict(kwargs);
         if (yp_isexceptionC(result)) return result;
     } else {
