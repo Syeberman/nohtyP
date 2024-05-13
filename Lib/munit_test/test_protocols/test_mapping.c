@@ -858,6 +858,39 @@ tear_down:
     return test_result;
 }
 
+static void updateK_to_update_fromiter(ypObject *mapping, ypObject **exc, int n, ...)
+{
+    va_list   args;
+    ypObject *x;
+    va_start(args, n);
+    x = new_itemsKV(fixture_type_iter, n, args);
+    va_end(args);
+    yp_update(mapping, x, exc);
+    yp_decref(x);
+}
+
+static void updateK_to_update_fromtuple(ypObject *mapping, ypObject **exc, int n, ...)
+{
+    va_list   args;
+    ypObject *x;
+    va_start(args, n);
+    x = new_itemsKV(fixture_type_tuple, n, args);
+    va_end(args);
+    yp_update(mapping, x, exc);
+    yp_decref(x);
+}
+
+static void updateK_to_update_fromlist(ypObject *mapping, ypObject **exc, int n, ...)
+{
+    va_list   args;
+    ypObject *x;
+    va_start(args, n);
+    x = new_itemsKV(fixture_type_list, n, args);
+    va_end(args);
+    yp_update(mapping, x, exc);
+    yp_decref(x);
+}
+
 static void updateK_to_update_fromfrozendict(ypObject *mapping, ypObject **exc, int n, ...)
 {
     va_list   args;
@@ -880,36 +913,35 @@ static void updateK_to_update_fromdict(ypObject *mapping, ypObject **exc, int n,
     yp_decref(x);
 }
 
-static void updateK_to_update_fromiter(ypObject *mapping, ypObject **exc, int n, ...)
-{
-    va_list   args;
-    ypObject *x;
-    va_start(args, n);
-    x = new_itemsKV(fixture_type_iter, n, args);
-    va_end(args);
-    yp_update(mapping, x, exc);
-    yp_decref(x);
-}
-
 static MunitResult test_update(const MunitParameter params[], fixture_t *fixture)
 {
-    fixture_type_t *type = fixture->type;
-    MunitResult     test_result;
-    ypObject       *int_1 = yp_intC(1);
-    ypObject       *keys[6];
-    ypObject       *values[6];
+    fixture_type_t  *type = fixture->type;
+    fixture_type_t  *x_types[] = x_types_init(type);
+    fixture_type_t **x_type;
+    MunitResult      test_result;
+    ypObject        *int_1 = yp_intC(1);
+    ypObject        *keys[6];
+    ypObject        *values[6];
     obj_array_fill(keys, type->rand_items);
     obj_array_fill(values, type->rand_values);
 
-    // FIXME integrate with x_types_init?
-    test_result = _test_updateK(type, updateK_to_update_fromfrozendict, /*test_unhashables=*/FALSE);
-    if (test_result != MUNIT_OK) goto tear_down;
-
-    test_result = _test_updateK(type, updateK_to_update_fromdict, /*test_unhashables=*/FALSE);
-    if (test_result != MUNIT_OK) goto tear_down;
-
-    test_result = _test_updateK(type, updateK_to_update_fromiter, /*test_unhashables=*/TRUE);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        void (*updateK)(ypObject *, ypObject **, int, ...);
+        if ((*x_type) == fixture_type_iter) {
+            updateK = updateK_to_update_fromiter;
+        } else if ((*x_type) == fixture_type_tuple) {
+            updateK = updateK_to_update_fromtuple;
+        } else if ((*x_type) == fixture_type_list) {
+            updateK = updateK_to_update_fromlist;
+        } else if ((*x_type) == fixture_type_frozendict) {
+            updateK = updateK_to_update_fromfrozendict;
+        } else {
+            assert_ptr((*x_type), ==, fixture_type_dict);
+            updateK = updateK_to_update_fromdict;
+        }
+        test_result = _test_updateK(type, updateK, /*test_unhashables=*/FALSE);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
     // Remaining tests only apply to mutable objects.
     if (!type->is_mutable) goto tear_down;
