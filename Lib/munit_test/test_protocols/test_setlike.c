@@ -9,11 +9,11 @@
 // valid types for the "x" (i.e. "other iterable") argument.
 // FIXME Should dict really be here? What about dict key and item views (when implemented)?
 // FIXME And also dict_dirty/etc, shared key?
-#define x_types_init(type)                                                                     \
-    {                                                                                          \
-        (type), (type)->pair, fixture_type_iter, fixture_type_frozenset, fixture_type_set,     \
-                fixture_type_frozenset_dirty, fixture_type_set_dirty, fixture_type_frozendict, \
-                fixture_type_dict, NULL                                                        \
+#define x_types_init(type)                                                               \
+    {                                                                                    \
+        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list,  \
+                fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty,  \
+                fixture_type_set_dirty, fixture_type_frozendict, fixture_type_dict, NULL \
     }
 
 #define friend_types_init(type)    \

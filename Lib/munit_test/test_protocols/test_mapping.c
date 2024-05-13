@@ -4,15 +4,14 @@
 // FIXME _ypDict_deepcopy
 // FIXME frozendict_eq where the hash has been cached (introduce _test_comparisons)
 // FIXME The various dict iterators
-// FIXME test_objects/test_frozendict
 
 // Mappings should accept themselves, their pairs, iterators, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
-// FIXME We can't accept just any old iterator...
 // FIXME "Dirty" versions like in test_setlike, and "shared key"?
-#define x_types_init(type)                                                                        \
-    {                                                                                             \
-        (type), (type)->pair, fixture_type_iter, fixture_type_frozendict, fixture_type_dict, NULL \
+#define x_types_init(type)                                                              \
+    {                                                                                   \
+        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, \
+                fixture_type_frozendict, fixture_type_dict, NULL                        \
     }
 
 
