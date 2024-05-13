@@ -52,9 +52,9 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     // Exception passthrough.
     {
         ypObject *self = type->newN(N(items[0], items[1]));
-        assert_raises(yp_contains(self, yp_SyntaxError), yp_SyntaxError);
-        assert_raises(yp_in(yp_SyntaxError, self), yp_SyntaxError);
-        assert_raises(yp_not_in(yp_SyntaxError, self), yp_SyntaxError);
+        assert_isexception(yp_contains(self, yp_SyntaxError), yp_SyntaxError);
+        assert_isexception(yp_in(yp_SyntaxError, self), yp_SyntaxError);
+        assert_isexception(yp_not_in(yp_SyntaxError, self), yp_SyntaxError);
         yp_decrefN(N(self));
     }
 

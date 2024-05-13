@@ -47,16 +47,16 @@ static fixture_type_t fixture_type_dict_struct;
 static fixture_type_t fixture_type_function_struct;
 
 
-static ypObject *objvoidfunc_error(void)
+static ypObject *objobjfunc_error(ypObject *x)
 {
     munit_error("unsupported operation");
-    return NULL;
+    return yp_SystemError;
 }
 
 static ypObject *objvarargfunc_error(int n, ...)
 {
     munit_error("unsupported operation");
-    return NULL;
+    return yp_SystemError;
 }
 
 static void voidarrayfunc_error(yp_ssize_t n, ypObject **array)
@@ -264,18 +264,55 @@ static void rand_objs_any_hashable(yp_ssize_t n, ypObject **array)
 void rand_objs_any(yp_ssize_t n, ypObject **array) { rand_objs3(n, array, rand_obj_any); }
 
 
-typedef struct _new_rand_iter_state {
+static ypObject *_new_items_listKV(yp_ssize_t n, va_list args)
+{
+    ypObject *result;
+    assert_not_raises(result = yp_listN(0));  // new ref
+    for (/*n already initialized*/; n > 0; n--) {
+        ypObject *item;
+        // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
+        ypObject *key = va_arg(args, ypObject *);            // borrowed
+        ypObject *value = va_arg(args, ypObject *);          // borrowed
+        assert_not_raises(item = yp_tupleN(2, key, value));  // new ref
+        assert_not_raises_exc(yp_append(result, item, &exc));
+        yp_decref(item);
+    }
+    return result;
+}
+
+extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args)
+{
+    ypObject *result;
+    ypObject *list = _new_items_listKV(n, args);  // new ref
+    if (type == fixture_type_list) return list;
+    result = type->new_(list);
+    yp_decref(list);
+    return result;
+}
+
+extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...)
+{
+    ypObject *result;
+    va_list   args;
+    va_start(args, n);
+    result = new_itemsKV(type, n, args);  // new ref
+    va_end(args);
+    return result;
+}
+
+
+typedef struct _rand_iter_state {
     yp_ssize_t               n;
     rand_obj_supplier_t      supplier;
     rand_obj_supplier_memo_t supplier_memo;
-} new_rand_iter_state;
+} rand_iter_state;
 
-static yp_state_decl_t new_rand_iter_state_decl = {yp_sizeof(new_rand_iter_state)};
+static yp_state_decl_t rand_iter_state_decl = {yp_sizeof(rand_iter_state)};
 
-static ypObject *new_rand_iter_func(ypObject *g, ypObject *value)
+static ypObject *rand_iter_func(ypObject *g, ypObject *value)
 {
-    new_rand_iter_state *state;
-    yp_ssize_t           size;
+    rand_iter_state *state;
+    yp_ssize_t       size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
@@ -289,8 +326,8 @@ static ypObject *new_rand_iter3(
         yp_ssize_t n, rand_obj_supplier_t supplier, const rand_obj_supplier_memo_t *supplier_memo)
 {
     ypObject           *result;
-    new_rand_iter_state state = {n, supplier};
-    yp_generator_decl_t decl = {new_rand_iter_func, n, &state, &new_rand_iter_state_decl};
+    rand_iter_state     state = {n, supplier};
+    yp_generator_decl_t decl = {rand_iter_func, n, &state, &rand_iter_state_decl};
     state.supplier_memo = *supplier_memo;
 
     result = yp_generatorC(&decl);
@@ -298,20 +335,19 @@ static ypObject *new_rand_iter3(
     return result;
 }
 
-typedef struct _new_faulty_iter_state {
+typedef struct _faulty_iter_state {
     ypObject  *supplier;   // Sub-iterator supplying values to yield until n reaches zero.
     yp_ssize_t n;          // Raise exception when this reaches zero.
     ypObject  *exception;  // Exception to raise.
-} new_faulty_iter_state;
+} faulty_iter_state;
 
-static yp_state_decl_t new_faulty_iter_state_decl = {yp_sizeof(new_faulty_iter_state), 2,
-        {yp_offsetof(new_faulty_iter_state, supplier),
-                yp_offsetof(new_faulty_iter_state, exception)}};
+static yp_state_decl_t faulty_iter_state_decl = {yp_sizeof(faulty_iter_state), 2,
+        {yp_offsetof(faulty_iter_state, supplier), yp_offsetof(faulty_iter_state, exception)}};
 
-static ypObject *new_faulty_iter_func(ypObject *g, ypObject *value)
+static ypObject *faulty_iter_func(ypObject *g, ypObject *value)
 {
-    new_faulty_iter_state *state;
-    yp_ssize_t             size;
+    faulty_iter_state *state;
+    yp_ssize_t         size;
     if (yp_isexceptionC(value)) return value;
     assert_not_exception(yp_iter_stateCX(g, &size, (void **)&state));
     assert_ssizeC(size, ==, yp_sizeof(*state));
@@ -324,10 +360,9 @@ static ypObject *new_faulty_iter_func(ypObject *g, ypObject *value)
 extern ypObject *new_faulty_iter(
         ypObject *supplier, yp_ssize_t n, ypObject *exception, yp_ssize_t length_hint)
 {
-    ypObject             *result;
-    new_faulty_iter_state state = {yp_iter(supplier) /*new ref*/, n, exception};
-    yp_generator_decl_t   decl = {
-            new_faulty_iter_func, length_hint, &state, &new_faulty_iter_state_decl};
+    ypObject           *result;
+    faulty_iter_state   state = {yp_iter(supplier) /*new ref*/, n, exception};
+    yp_generator_decl_t decl = {faulty_iter_func, length_hint, &state, &faulty_iter_state_decl};
     assert_not_exception(state.supplier);
     assert_isexception(exception, yp_BaseException);
 
@@ -352,12 +387,13 @@ static fixture_type_t fixture_type_type_struct = {
 
         new_rand_type,  // _new_rand
 
+        yp_type,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -382,12 +418,13 @@ static fixture_type_t fixture_type_NoneType_struct = {
 
         new_rand_NoneType,  // _new_rand
 
+        objobjfunc_error,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -418,12 +455,13 @@ static fixture_type_t fixture_type_bool_struct = {
 
         new_rand_bool,  // _new_rand
 
+        yp_bool,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -452,12 +490,13 @@ static fixture_type_t fixture_type_int_struct = {
 
         new_rand_int,  // _new_rand
 
+        yp_int,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -486,12 +525,13 @@ static fixture_type_t fixture_type_intstore_struct = {
 
         new_rand_intstore,  // _new_rand
 
+        yp_intstore,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -520,12 +560,13 @@ static fixture_type_t fixture_type_float_struct = {
 
         new_rand_float,  // _new_rand
 
+        yp_float,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         TRUE,   // is_numeric
@@ -554,12 +595,13 @@ static fixture_type_t fixture_type_floatstore_struct = {
 
         new_rand_floatstore,  // _new_rand
 
+        yp_floatstore,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         TRUE,   // is_numeric
@@ -603,12 +645,13 @@ static fixture_type_t fixture_type_iter_struct = {
 
         new_rand_iter,  // _new_rand
 
+        yp_iter,  // new_
+
         newN_iter,      // newN
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -702,12 +745,13 @@ static fixture_type_t fixture_type_range_struct = {
 
         new_rand_range,  // _new_rand
 
+        objobjfunc_error,  // new_
+
         newN_range,        // newN
         rand_items_range,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -761,12 +805,13 @@ static fixture_type_t fixture_type_bytes_struct = {
 
         new_rand_bytes,  // _new_rand
 
+        yp_bytes,  // new_
+
         newN_bytes,      // newN
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -820,12 +865,13 @@ static fixture_type_t fixture_type_bytearray_struct = {
 
         new_rand_bytearray,  // _new_rand
 
+        yp_bytearray,  // new_
+
         newN_bytearray,  // newN
         rand_objs_byte,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -881,12 +927,13 @@ static fixture_type_t fixture_type_str_struct = {
 
         new_rand_str,  // _new_rand
 
+        yp_str,  // new_
+
         newN_str,       // newN
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -943,12 +990,13 @@ static fixture_type_t fixture_type_chrarray_struct = {
 
         new_rand_chrarray,  // _new_rand
 
+        yp_chrarray,  // new_
+
         newN_chrarray,  // newN
         rand_objs_chr,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -984,12 +1032,13 @@ static fixture_type_t fixture_type_tuple_struct = {
 
         new_rand_tuple,  // _new_rand
 
+        yp_tuple,  // new_
+
         yp_tupleN,      // newN
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1025,12 +1074,13 @@ static fixture_type_t fixture_type_list_struct = {
 
         new_rand_list,  // _new_rand
 
+        yp_list,  // new_
+
         yp_listN,       // newN
         rand_objs_any,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1067,12 +1117,13 @@ static fixture_type_t fixture_type_frozenset_struct = {
 
         new_rand_frozenset,  // _new_rand
 
+        yp_frozenset,  // new_
+
         yp_frozensetN,           // newN
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1109,12 +1160,13 @@ static fixture_type_t fixture_type_set_struct = {
 
         new_rand_set,  // _new_rand
 
+        yp_set,  // new_
+
         yp_setN,                 // newN
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1149,6 +1201,15 @@ static void make_set_dirty(ypObject *so)
     yp_decref(item);
 }
 
+static ypObject *new_frozenset_dirty(ypObject *x)
+{
+    ypObject *result = yp_set(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_set_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    return result;
+}
+
 static ypObject *new_rand_frozenset_dirty(const rand_obj_supplier_memo_t *memo)
 {
     ypObject *result = new_rand_set(memo);  // new ref
@@ -1180,12 +1241,13 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
 
         new_rand_frozenset_dirty,  // _new_rand
 
+        new_frozenset_dirty,  // new_
+
         new_frozenset_dirtyN,    // newN
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1198,6 +1260,14 @@ static fixture_type_t fixture_type_frozenset_dirty_struct = {
         FALSE,  // is_callable
         FALSE,  // is_patterned
 };
+
+static ypObject *new_set_dirty(ypObject *x)
+{
+    ypObject *result = yp_set(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_set_dirty(result);
+    return result;
+}
 
 static ypObject *new_rand_set_dirty(const rand_obj_supplier_memo_t *memo)
 {
@@ -1228,12 +1298,13 @@ static fixture_type_t fixture_type_set_dirty_struct = {
 
         new_rand_set_dirty,  // _new_rand
 
+        new_set_dirty,  // new_
+
         new_set_dirtyN,          // newN
         rand_objs_any_hashable,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1316,12 +1387,13 @@ static fixture_type_t fixture_type_frozendict_struct = {
 
         new_rand_frozendict,  // _new_rand
 
+        yp_frozendict,  // new_
+
         new_frozendictN,         // newN
         rand_objs_any_hashable,  // rand_items
 
-        yp_frozendictK,         // newK
-        rand_obj_any_hashable,  // rand_key
-        rand_obj_any,           // rand_value
+        yp_frozendictK,  // newK
+        rand_objs_any,   // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1373,12 +1445,13 @@ static fixture_type_t fixture_type_dict_struct = {
 
         new_rand_dict,  // _new_rand
 
+        yp_dict,  // new_
+
         new_dictN,               // newN
         rand_objs_any_hashable,  // rand_items
 
-        yp_dictK,               // newK
-        rand_obj_any_hashable,  // rand_key
-        rand_obj_any,           // rand_value
+        yp_dictK,       // newK
+        rand_objs_any,  // rand_values
 
         TRUE,   // is_mutable
         FALSE,  // is_numeric
@@ -1415,12 +1488,13 @@ static fixture_type_t fixture_type_function_struct = {
 
         new_rand_function,  // _new_rand
 
+        objobjfunc_error,  // new_
+
         objvarargfunc_error,  // newN
         voidarrayfunc_error,  // rand_items
 
         objvarargfunc_error,  // newK
-        objvoidfunc_error,    // rand_key
-        objvoidfunc_error,    // rand_value
+        voidarrayfunc_error,  // rand_values
 
         FALSE,  // is_mutable
         FALSE,  // is_numeric
@@ -1595,6 +1669,19 @@ static void initialize_fixture_types(void)
     FILL_TYPE_ARRAYS(setlike);
     FILL_TYPE_ARRAYS(mapping);
 #undef FILL_TYPE_ARRAYS
+}
+
+// TODO We could speed this up with a frozendict or somesuch.
+extern fixture_type_t *fixture_type_fromobject(ypObject *object)
+{
+    fixture_type_t **fixture_type;
+    ypObject        *type = yp_type(object);
+    for (fixture_type = fixture_types_all; (*fixture_type) != NULL; fixture_type++) {
+        if ((*fixture_type)->type == type) break;
+    }
+    yp_decref(type);
+    assert_not_null(*fixture_type);
+    return *fixture_type;
 }
 
 

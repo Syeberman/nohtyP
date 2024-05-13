@@ -235,6 +235,7 @@ extern "C" {
         }                                                                                 \
     } while (0)
 
+// Asserts that obj is not an exception and that no exception has been raised.
 #define assert_not_exception(obj)                             \
     do {                                                      \
         ypObject *_ypmt_NOT_EXC_obj = (obj);                  \
@@ -257,6 +258,7 @@ extern "C" {
         _assert_not_exception(_ypmt_NOT_RAISES_obj, statement_fmt, __VA_ARGS__); \
     } while (0)
 
+// Asserts that statement does not raise an exception.
 #define assert_not_raises(statement) _assert_not_raises((statement), "%s", #statement)
 
 // statement is only evaluated once.
@@ -273,7 +275,7 @@ extern "C" {
         }                                                                                  \
     } while (0)
 
-// For a function that takes a `ypObject **exc` argument, asserts that it does not raise an
+// For a statement that takes a `ypObject **exc` argument, asserts that it does not raise an
 // exception. Statement must include `&exc` for the exception argument, and can include a variable
 // assignment. Example:
 //
@@ -296,7 +298,7 @@ extern "C" {
         }                                                                                         \
     } while (0)
 
-// Asserts that obj is one of the given exceptions.
+// Asserts that obj is one of the given exceptions, but that no exception has been raised.
 #define assert_isexception(obj, ...)                                                          \
     do {                                                                                      \
         ypObject  *_ypmt_ISEXC_obj = (obj);                                                   \
@@ -306,6 +308,15 @@ extern "C" {
                 #obj, #__VA_ARGS__);                                                          \
     } while (0)
 
+// For a statement that takes a `ypObject **exc` argument, asserts that it sets *exc to one of the
+// given exceptions, but that no exception has been raised. statement must include `&exc` for the
+// exception argument. Example:
+//
+//      assert_isexception_exc(yp_lenC(yp_SyntaxError, &exc), yp_SyntaxError);
+// TODO nohtyP does not currently make a distinction between returning and raising an exception, so
+// this is currently an alias to assert_raises_exc.
+#define assert_isexception_exc assert_raises_exc
+
 // statement is only evaluated once.
 #define _assert_raises(statement, n, expected, statement_fmt, expected_fmt, ...)                \
     do {                                                                                        \
@@ -314,7 +325,7 @@ extern "C" {
                 _ypmt_RAISES_statement, n, expected, statement_fmt, expected_fmt, __VA_ARGS__); \
     } while (0)
 
-// Asserts that statement evaluates to one of the given exceptions.
+// Asserts that statement raises one of the given exceptions.
 #define assert_raises(statement, ...)                                                              \
     do {                                                                                           \
         ypObject  *_ypmt_RAISES_expected[] = {__VA_ARGS__};                                        \
@@ -343,8 +354,8 @@ extern "C" {
         }                                                                            \
     } while (0)
 
-// For a function that takes a `ypObject **exc` argument, asserts that it raises one of the given
-// exceptions. Statement must include `&exc` for the exception argument. Example:
+// For a statement that takes a `ypObject **exc` argument, asserts that it raises one of the given
+// exceptions. statement must include `&exc` for the exception argument. Example:
 //
 //      assert_raises_exc(yp_lenC(obj, &exc), yp_MethodError);
 #define assert_raises_exc(statement, ...)                                                  \
@@ -475,6 +486,7 @@ extern "C" {
 
 // items and item_strs must be arrays. item_strs are not formatted: the variable arguments apply
 // only to obj_fmt.
+// FIXME Assert the type of obj is a known sequence type? (Similar for assert_set, assert_mapping.)
 #define _assert_sequence(obj, items, obj_fmt, item_strs, ...)                                   \
     do {                                                                                        \
         yp_ssize_t _ypmt_SEQ_n = yp_lengthof_array(items);                                      \
@@ -496,6 +508,7 @@ extern "C" {
 
 // Asserts that obj is a sequence containing exactly the given items in that order. Items are
 // compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_getindexC.
+// FIXME Rewrite to use yp_miniiter like assert_set?
 #define assert_sequence(obj, ...)                                                          \
     do {                                                                                   \
         ypObject *_ypmt_SEQ_obj = (obj);                                                   \
@@ -558,6 +571,7 @@ extern "C" {
 // Asserts that obj is a set containing exactly the given items, in any order, without duplicates.
 // Items are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC and yp_miniiter.
 // TODO Once the order items are yielded is guaranteed, we can make the order important.
+// FIXME assert_setlike?
 #define assert_set(obj, ...)                                                          \
     do {                                                                              \
         ypObject *_ypmt_SET_obj = (obj);                                              \
@@ -592,7 +606,7 @@ extern "C" {
 // Asserts that obj is a mapping containing exactly the given key/value pairs, in any order, without
 // duplicate keys. Values are compared by nohtyP equality (i.e. yp_eq) and type. Validates yp_lenC
 // and yp_getitem.
-// TODO Compare keys by type as well, just like assert_set does.
+// FIXME Compare keys by type as well, just like assert_set does.
 #define assert_mapping(obj, ...)                                                          \
     do {                                                                                  \
         ypObject *_ypmt_MAP_obj = (obj);                                                  \
@@ -744,6 +758,7 @@ extern void pprint(FILE *f, ypObject *obj);
 
 
 typedef ypObject *(*objvoidfunc)(void);
+typedef ypObject *(*objobjfunc)(ypObject *);
 typedef ypObject *(*objvarargfunc)(int, ...);
 typedef void (*voidarrayfunc)(yp_ssize_t, ypObject **);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
@@ -759,6 +774,8 @@ typedef struct _fixture_type_t {
 
     rand_obj_supplier_t _new_rand;  // Call via rand_obj/etc.
 
+    objobjfunc new_;  // The object converter, aka the single-argument constructor.
+
     // Functions for iterables, where rand_items returns objects that can be accepted by newN and
     // subsequently yielded by yp_iter. (For mappings, newN creates an object with the given keys
     // and random, unique values.)
@@ -766,10 +783,9 @@ typedef struct _fixture_type_t {
     voidarrayfunc rand_items;  // Fills an array with n random, unique objects.
 
     // Functions for mappings, where newK takes key/value pairs, yp_contains operates on keys, and
-    // yp_getitem returns values.
-    objvarargfunc newK;        // Creates an object to hold the given key/values (i.e. yp_dictK).
-    objvoidfunc   rand_key;    // Creates a random key to store in the mapping.
-    objvoidfunc   rand_value;  // Creates a random value to store in the mapping.
+    // yp_getitem returns values. Use rand_items to create keys (there is no rand_keys).
+    objvarargfunc newK;         // Creates an object to hold the given key/values (i.e. yp_dictK).
+    voidarrayfunc rand_values;  // Fills an array with n random, unique objects for values.
 
     // Flags to describe the properties of the type.
     int is_mutable;
@@ -837,6 +853,11 @@ extern char *param_values_types_string[];
 extern char *param_values_types_setlike[];
 extern char *param_values_types_mapping[];
 
+// Returns the test fixture type that corresponds with the type of the object. object cannot be
+// invalidated or an exception.
+// TODO Support invalidated and exception types?
+extern fixture_type_t *fixture_type_fromobject(ypObject *object);
+
 
 extern char param_key_type[];
 
@@ -864,6 +885,11 @@ extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array);
 
 // Fills array with n random, unique objects of any type.
 extern void rand_objs_any(yp_ssize_t n, ypObject **array);
+
+// Returns an object of the given type containing n (key, value) pairs as 2-tuples. The object is
+// constructed by calling type->new_ with a list of the pairs.
+extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...);
+extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args);
 
 // Returns an iterator that yields values from supplier (an iterable) until n values have been
 // yielded, after which the given exception is raised. The iterator is initialized with the given
@@ -928,12 +954,14 @@ SUITE_OF_SUITES_DECLS(munit_test);
 SUITE_OF_TESTS_DECLS(test_unittest);
 
 SUITE_OF_SUITES_DECLS(test_objects);
+SUITE_OF_TESTS_DECLS(test_frozendict);
 SUITE_OF_TESTS_DECLS(test_frozenset);
 SUITE_OF_TESTS_DECLS(test_function);
 
 SUITE_OF_SUITES_DECLS(test_protocols);
 SUITE_OF_TESTS_DECLS(test_collection);
 SUITE_OF_TESTS_DECLS(test_iterable);
+SUITE_OF_TESTS_DECLS(test_mapping);
 SUITE_OF_TESTS_DECLS(test_sequence);
 SUITE_OF_TESTS_DECLS(test_setlike);
 SUITE_OF_TESTS_DECLS(test_string);

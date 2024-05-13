@@ -2948,7 +2948,7 @@ static ypObject *iter_close(ypObject *i)
     return yp_RuntimeError;
 }
 
-// iter objects can be returned from yp_miniiter...they simply ignore *state
+// iter objects can be returned from yp_miniiter; such objects ignore *state.
 static ypObject *iter_miniiter(ypObject *i, yp_uint64_t *state)
 {
     *state = 0;  // just in case...
@@ -3343,9 +3343,9 @@ static ypObject *_ypSequence_miniiter_next(ypObject *x, yp_uint64_t *_state)
         return yp_isexceptionC2(result, yp_IndexError) ? yp_StopIteration : result;
     }
 
-    if (*state >= 0) {  // we are counting up from the first element
+    if (*state >= 0) {  // We are counting up from the first element.
         *state += 1;
-    } else {  // we are counting down from the last element
+    } else {  // We are counting down from the last element.
         *state -= 1;
     }
     return result;
@@ -3359,9 +3359,9 @@ static ypObject *_ypSequence_miniiter_lenh(
     ypObject   *exc = yp_None;
     yp_ssize_t  len = yp_lenC(x, &exc);
     if (yp_isexceptionC(exc)) return exc;
-    if (*state >= 0) {
+    if (*state >= 0) {  // We are counting up from the first element.
         *length_hint = len - ((yp_ssize_t)*state);
-    } else {
+    } else {  // We are counting down from the last element.
         *length_hint = len - ((yp_ssize_t)(-1 - *state));
     }
     return yp_None;
@@ -4560,7 +4560,7 @@ typedef void (*iarithCFfunc)(ypObject *, yp_float_t, ypObject **);
 typedef yp_int_t (*unaryLfunc)(yp_int_t, ypObject **);
 typedef yp_float_t (*unaryLFfunc)(yp_float_t, ypObject **);
 
-// Bitwise operations on floats aren't supported, so these functions simply raise yp_TypeError
+// Bitwise operations on floats aren't supported, so these functions raise yp_TypeError.
 static void       yp_ilshiftCF(ypObject *x, yp_float_t y, ypObject **exc);
 static void       yp_irshiftCF(ypObject *x, yp_float_t y, ypObject **exc);
 static void       yp_iampCF(ypObject *x, yp_float_t y, ypObject **exc);
@@ -6378,8 +6378,8 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 // also calculates the length of the slice. Returns yp_ValueError if *step is zero. Recall there are
 // no out-of-bounds errors with slices.
 // XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
-// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
-// as any value that's greater than length.
+// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is a very large number that is handled the same as any
+// value that's greater than length.
 // XXX Adapted from PySlice_GetIndicesEx
 static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
         yp_ssize_t *step, yp_ssize_t *slicelength)
@@ -8232,7 +8232,7 @@ static void _ypStringLib_join_elemcopy(
     yp_ssize_t                 i;
 
     if (s_len < 1) {
-        // The separator is empty, so we just concatenate seq's elements
+        // The separator is empty, so we concatenate seq's elements.
         for (i = 0; /*stop at NULL*/; i++) {
             ypObject *x = seq->getindexX(state, i);  // borrowed
             if (x == NULL) break;
@@ -9095,7 +9095,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8(
         return _ypStringLib_decode_utf_8_onnull(type, len);
     } else if (source[0] < 0x80u) {
         // We optimize for UTF-8 data that is completely, or at least starts with, ASCII: since
-        // ASCII is equivalent to the first 128 ordinals in Unicode, we can just memcpy
+        // ASCII is equivalent to the first 128 ordinals in Unicode, we can memcpy.
         return _ypStringLib_decode_utf_8_ascii_start(type, len, source, errors);
     } else {
         return _ypStringLib_decode_utf_8(type, len, source, errors);
@@ -16996,7 +16996,7 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
         _ypSet_movekey(keyset, *key_loc, yp_incref(key), hash, spaceleft);  // steals key
         *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
         ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
-        return yp_True;
+        return yp_None;
     }
 
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
@@ -17014,17 +17014,15 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     *ypDict_VALUE_ENTRY(mp, *key_loc) = yp_incref(value);
     ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
     *spaceleft = _ypSet_space_remaining(keyset);
-    return yp_True;
+    return yp_None;
 }
 
-// Adds the key/value to the dict. If override is false, returns yp_False and does not modify the
-// dict if there is an existing value. *spaceleft should be initialized from
-// _ypSet_space_remaining; it will be decremented or reset as appropriate.. Returns yp_True if mp
-// was modified, yp_False if it wasn't due to existing values being preserved (ie override is
-// false), or an exception on error.
+// Adds the key/value to the dict, overriding existing values, and returning yp_None. *spaceleft
+// should be initialized from _ypSet_space_remaining; it will be decremented or reset as
+// appropriate. Returns an exception on error.
 // XXX Adapted from PyDict_SetItem
-static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int override,
-        yp_ssize_t *spaceleft, yp_ssize_t growhint)
+static ypObject *_ypDict_push(
+        ypObject *mp, ypObject *key, ypObject *value, yp_ssize_t *spaceleft, yp_ssize_t growhint)
 {
     yp_hash_t       hash;
     ypObject       *keyset = ypDict_KEYSET(mp);
@@ -17042,19 +17040,18 @@ static ypObject *_ypDict_push(ypObject *mp, ypObject *key, ypObject *value, int 
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the key is already in the hash table, then we simply need to update the value
+    // If the key is already in the hash table, then we need to update the value.
     if (ypSet_ENTRY_USED(key_loc)) {
         value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
         if (*value_loc == NULL) {
             *value_loc = yp_incref(value);
             ypDict_SET_LEN(mp, ypDict_LEN(mp) + 1);
         } else {
-            if (!override) return yp_False;
             // FIXME What if yp_decref modifies mp?
             yp_decref(*value_loc);
             *value_loc = yp_incref(value);
         }
-        return yp_True;
+        return yp_None;
     }
 
     // Otherwise, we need to add both the key _and_ value, which may involve resizing
@@ -17075,16 +17072,16 @@ static ypObject *_ypDict_pop(ypObject *mp, ypObject *key)
     yp_ASSERT1(mp != yp_frozendict_empty);  // don't modify the empty frozendict!
 
     // Look for the appropriate entry in the hash table; note that key can be a mutable object,
-    // because we are not adding it to the set
+    // because we are not adding it to the set.
     result = _ypSet_lookkey_bycurrenthash(keyset, key, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the there's no existing value, then there's nothing to do (if the key is not in the set,
-    // then *value_loc will be NULL)
+    // If there's no existing value, then there's nothing to do (if the key is not in the set, then
+    // *value_loc will be NULL).
     value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
     if (*value_loc == NULL) return ypSet_dummy;
 
-    // Otherwise, we need to remove the value
+    // Otherwise, we need to remove the value.
     oldvalue = *value_loc;
     *value_loc = NULL;
     ypDict_SET_LEN(mp, ypDict_LEN(mp) - 1);
@@ -17128,10 +17125,11 @@ static ypObject *_ypDict_update_fromdict(ypObject *mp, ypObject *other)
         if (other_value == NULL) continue;
         valuesleft -= 1;
 
-        // TODO _ypDict_push will call yp_hashC again, even though we already know the hash
-        // TODO yp_hashC may mutate mp, invalidating valuesleft!
+        // FIXME _ypDict_push will call yp_hashC again, even though we already know the hash
+        // FIXME yp_hashC may mutate mp, invalidating valuesleft!
+        // FIXME compare to set_update
         result = _ypDict_push(
-                mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, 1, &spaceleft, valuesleft);
+                mp, ypSet_TABLE(other_keyset)[i].se_key, other_value, &spaceleft, valuesleft);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -17155,7 +17153,7 @@ static ypObject *_ypDict_update_fromiter(ypObject *mp, ypObject *itemiter)
             return key;
         }
         length_hint -= 1;  // check for <0 only when we need it in _ypDict_push
-        result = _ypDict_push(mp, key, value, 1, &spaceleft, length_hint);
+        result = _ypDict_push(mp, key, value, &spaceleft, length_hint);
         yp_decrefN(2, key, value);
         if (yp_isexceptionC(result)) return result;
     }
@@ -17426,9 +17424,7 @@ static ypObject *dict_setitem(ypObject *mp, ypObject *key, ypObject *value)
 {
     yp_ssize_t spaceleft = _ypSet_space_remaining(ypDict_KEYSET(mp));
     // TODO Overallocate
-    ypObject *result = _ypDict_push(mp, key, value, 1, &spaceleft, 0);
-    if (yp_isexceptionC(result)) return result;
-    return yp_None;
+    return _ypDict_push(mp, key, value, &spaceleft, 0);
 }
 
 static ypObject *dict_delitem(ypObject *mp, ypObject *key)
@@ -17523,10 +17519,11 @@ static ypObject *dict_updateK(ypObject *mp, int n, va_list args)
     ypObject  *value;
 
     while (n > 0) {
+        // XXX va_arg calls must be made on separate lines: https://stackoverflow.com/q/1967659
         key = va_arg(args, ypObject *);    // borrowed
         value = va_arg(args, ypObject *);  // borrowed
         n -= 1;
-        result = _ypDict_push(mp, key, value, 1, &spaceleft, n);
+        result = _ypDict_push(mp, key, value, &spaceleft, n);
         if (yp_isexceptionC(result)) return result;
     }
     return yp_None;
@@ -17702,36 +17699,60 @@ static ypObject *frozendict_dealloc(ypObject *mp, void *memo)
 
 static ypObject *frozendict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
+    ypObject *object = argarray[1];  // borrowed
+    ypObject *kwargs = argarray[3];  // borrowed
+
     yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_frozendict);
-    yp_ASSERT1(ypObject_TYPE_CODE(argarray[3]) == ypFrozenDict_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
 
-    if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
-        return yp_frozendict(argarray[1]);
-    } else if (argarray[1] == yp_frozendict_empty) {  // the default value
-        return yp_incref(argarray[3]);  // **kwargs is always a frozendict, so just return it
+    if (ypDict_LEN(kwargs) < 1) {  // no keyword args
+        return yp_frozendict(object);
+    } else if (object == yp_frozendict_empty) {  // the default value
+        return yp_incref(kwargs);  // **kwargs is always a frozendict, so just return it
     } else {
-        // FIXME Need a yp_frozendict that merges multiple objects (yp_frozendictN?)
-        return yp_NotImplementedError;
+        // Don't use yp_frozendict: it returns alloclen_fixed objects and yp_frozendict_empty.
+        // TODO Could improve this by pre-allocating.
+        ypObject *result;
+        ypObject *mp = _ypDict_new(ypFrozenDict_CODE, 0, /*alloclen_fixed=*/FALSE);
+        if (yp_isexceptionC(mp)) return mp;
+        if (ypObject_TYPE_PAIR_CODE(object) == ypFrozenDict_CODE) {
+            result = _ypDict_update_fromdict(mp, object);
+        } else {
+            result = _ypDict_update_fromiterable(mp, object);
+        }
+        if (yp_isexceptionC(result)) {
+            yp_decref(mp);
+            return result;
+        }
+        result = _ypDict_update_fromdict(mp, kwargs);
+        if (yp_isexceptionC(result)) {
+            yp_decref(mp);
+            return result;
+        }
+        return mp;
     }
 }
 
 static ypObject *dict_func_new_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
+    ypObject *object = argarray[1];  // borrowed
+    ypObject *kwargs = argarray[3];  // borrowed
+
     yp_ASSERT(n == 4, "unexpected argarray of length %" PRIssize, n);
     yp_ASSERT1(argarray[0] == yp_t_dict);
-    yp_ASSERT1(ypObject_TYPE_CODE(argarray[3]) == ypFrozenDict_CODE);
+    yp_ASSERT1(ypObject_TYPE_CODE(kwargs) == ypFrozenDict_CODE);
 
-    if (ypDict_LEN(argarray[3]) < 1) {  // no keyword args
-        return yp_dict(argarray[1]);
-    } else if (argarray[1] == yp_frozendict_empty) {  // the default value
-        return _ypDict_copy(ypDict_CODE, argarray[3], /*alloclen_fixed=*/FALSE);
+    if (ypDict_LEN(kwargs) < 1) {  // no keyword args
+        return yp_dict(object);
+    } else if (object == yp_frozendict_empty) {  // the default value
+        return _ypDict_copy(ypDict_CODE, kwargs, /*alloclen_fixed=*/FALSE);
     } else {
         // TODO Could improve this by pre-allocating.
         ypObject *result;
-        ypObject *mp = yp_dict(argarray[1]);
+        ypObject *mp = yp_dict(object);
         if (yp_isexceptionC(mp)) return mp;
-        result = _ypDict_update_fromdict(mp, argarray[3]);
+        result = _ypDict_update_fromdict(mp, kwargs);
         if (yp_isexceptionC(result)) {
             yp_decref(mp);
             return result;
@@ -17957,7 +17978,7 @@ ypObject *yp_dictKV(int n, va_list args)
 
 // XXX Handle the "fellow frozendict" case _before_ calling this function.
 // XXX Always creates a new keyset; if you want to share x's keyset, use _ypDict_copy
-static ypObject *_ypDict(int type, ypObject *x)
+static ypObject *_ypDict_new_fromiterable(int type, ypObject *x)
 {
     ypObject  *exc = yp_None;
     ypObject  *newMp;
@@ -17974,7 +17995,7 @@ static ypObject *_ypDict(int type, ypObject *x)
         if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update_fromiterable
-        if (type == ypFrozenDict_CODE) return yp_frozenset_empty;
+        if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
         return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     } else if (length_hint > ypDict_LEN_MAX) {
         // yp_lenC reports that we don't have room to add their elements
@@ -18007,7 +18028,7 @@ ypObject *yp_frozendict(ypObject *x)
         if (ypObject_TYPE_CODE(x) == ypFrozenDict_CODE) return yp_incref(x);
         return _ypDict_copy(ypFrozenDict_CODE, x, /*alloclen_fixed=*/TRUE);
     }
-    return _ypDict(ypFrozenDict_CODE, x);
+    return _ypDict_new_fromiterable(ypFrozenDict_CODE, x);
 }
 
 ypObject *yp_dict(ypObject *x)
@@ -18017,7 +18038,7 @@ ypObject *yp_dict(ypObject *x)
         if (ypDict_LEN(x) < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
         return _ypDict_copy(ypDict_CODE, x, /*alloclen_fixed=*/FALSE);
     }
-    return _ypDict(ypDict_CODE, x);
+    return _ypDict_new_fromiterable(ypDict_CODE, x);
 }
 
 // TOOD ypQuickIter could consolidate this with _ypDict_fromkeys
@@ -18028,6 +18049,15 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
     ypObject  *key;
     ypObject  *newMp;
 
+    if (yp_isexceptionC(value)) return value;
+
+    if (n < 1) {
+        if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
+        return _ypDict_new(type, 0, /*alloclen_fixed=*/FALSE);
+    }
+
+    // FIXME Is there a better exception we should use? This _could_ be an insane number of
+    // identical keys, which would result in a minimal-sized dict.
     if (n > ypDict_LEN_MAX) return yp_MemorySizeOverflowError;
     newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;
@@ -18036,7 +18066,7 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
     while (n > 0) {
         key = va_arg(args, ypObject *);  // borrowed
         n -= 1;
-        result = _ypDict_push(newMp, key, value, 1, &spaceleft, n);
+        result = _ypDict_push(newMp, key, value, &spaceleft, n);
         if (yp_isexceptionC(result)) {
             yp_decref(newMp);
             return result;
@@ -18047,23 +18077,19 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
 
 ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...)
 {
-    if (n < 1) return yp_frozendict_empty;
     return_yp_V_FUNC(ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n);
 }
 ypObject *yp_frozendict_fromkeysNV(ypObject *value, int n, va_list args)
 {
-    if (n < 1) return yp_frozendict_empty;
     return _ypDict_fromkeysNV(ypFrozenDict_CODE, value, n, args);
 }
 
 ypObject *yp_dict_fromkeysN(ypObject *value, int n, ...)
 {
-    if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     return_yp_V_FUNC(ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n);
 }
 ypObject *yp_dict_fromkeysNV(ypObject *value, int n, va_list args)
 {
-    if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     return _ypDict_fromkeysNV(ypDict_CODE, value, n, args);
 }
 
@@ -18077,6 +18103,8 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     yp_ssize_t  spaceleft;
     ypObject   *key;
     yp_ssize_t  length_hint;
+
+    if (yp_isexceptionC(value)) return value;
 
     // FIXME How does this handle excessively-large length hints?
     // FIXME Rewrite similarly to _ypSet_fromiterable?
@@ -18112,7 +18140,7 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
             break;
         }
         length_hint -= 1;
-        result = _ypDict_push(newMp, key, value, 1, &spaceleft, length_hint);
+        result = _ypDict_push(newMp, key, value, &spaceleft, length_hint);
         yp_decref(key);
         if (yp_isexceptionC(result)) break;
     }
@@ -18120,6 +18148,11 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
     if (yp_isexceptionC(result)) {
         yp_decref(newMp);
         return result;
+    }
+
+    if (type == ypFrozenDict_CODE && ypDict_LEN(newMp) < 1) {
+        yp_decref(newMp);
+        return yp_frozendict_empty;
     }
     return newMp;
 }
@@ -18927,7 +18960,7 @@ static ypObject *_ypFunction_call_copy_var_kwargs(ypObject *kwargs, int kwargs_i
 
     if (kwargs_is_copy) {
         yp_ASSERT1(ypObject_TYPE_PAIR_CODE(kwargs) == ypFrozenDict_CODE);
-        // TODO Implement frozendict_freeze and freeze kwargs in-place here.
+        // FIXME Implement frozendict_freeze and freeze kwargs in-place here.
         result = yp_frozendict(kwargs);
         if (yp_isexceptionC(result)) return result;
     } else {
@@ -19736,8 +19769,8 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
  *************************************************************************************************/
 #pragma region methods
 
-// These are the functions that simply redirect to object methods; more complex public functions
-// are found elsewhere.
+// These are the functions that redirect to object methods; more complex public functions are found
+// elsewhere.
 
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
 #define _yp_REDIRECT1(ob, tp_meth, args)               \
@@ -20112,6 +20145,11 @@ ypObject *yp_iter_keys(ypObject *mapping)
 ypObject *yp_popvalue3(ypObject *mapping, ypObject *key, ypObject *defval)
 {
     _yp_REDIRECT2(mapping, tp_as_mapping, tp_popvalue, (mapping, key, defval));
+}
+
+ypObject *yp_popvalue2(ypObject *mapping, ypObject *key)
+{
+    return yp_popvalue3(mapping, key, yp_KeyError);
 }
 
 void yp_popitem(ypObject *mapping, ypObject **key, ypObject **value)

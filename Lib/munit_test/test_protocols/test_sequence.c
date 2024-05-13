@@ -10,6 +10,11 @@
         (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, NULL \
     }
 
+#define friend_types_init(type)    \
+    {                              \
+        (type), (type)->pair, NULL \
+    }
+
 
 typedef struct _slice_args_t {
     yp_ssize_t start;
@@ -22,7 +27,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
 {
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
-    fixture_type_t  *friend_types[] = {type, type->pair, NULL};
+    fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *items[4];
@@ -283,6 +288,8 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
     assert_raises(yp_getindexC(sq, 2), yp_IndexError);
     assert_raises(yp_getindexC(sq, -3), yp_IndexError);
 
+    // FIXME Previously-deleted index
+
     // Empty sq.
     assert_raises(yp_getindexC(empty, 0), yp_IndexError);
     assert_raises(yp_getindexC(empty, -1), yp_IndexError);
@@ -494,6 +501,8 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     // Out of bounds.
     assert_raises(yp_getitem(sq, int_2), yp_IndexError);
     assert_raises(yp_getitem(sq, int_neg_3), yp_IndexError);
+
+    // FIXME Previously-deleted index
 
     // Empty sq.
     assert_raises(yp_getitem(empty, int_0), yp_IndexError);
@@ -709,8 +718,8 @@ static MunitResult _test_findC(fixture_type_t *type,
     }
 
     // Exception passthrough.
-    assert_raises_exc(any_findC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_raises_exc(any_findC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+    assert_isexception_exc(any_findC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_isexception_exc(any_findC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -862,8 +871,8 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     }
 
     // Exception passthrough.
-    assert_raises_exc(yp_countC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
-    assert_raises_exc(yp_countC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+    assert_isexception_exc(yp_countC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_isexception_exc(yp_countC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -916,6 +925,8 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
+    // FIXME Previously-deleted index
+
     // Empty sq.
     {
         ypObject *empty = type->newN(0);
@@ -945,7 +956,7 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setindexC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1215,7 +1226,7 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setsliceC6(sq, 0, 1, 1, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setsliceC6(sq, 0, 1, 1, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1279,6 +1290,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
+    // FIXME Previously-deleted index
+
     // Empty sq.
     {
         ypObject *empty = type->newN(0);
@@ -1287,6 +1300,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         assert_len(empty, 0);
         yp_decref(empty);
     }
+
+    // FIXME value is sq (and elsewhere)
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
@@ -1316,8 +1331,8 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(sq, yp_SyntaxError, items[2], &exc), yp_SyntaxError);
-        assert_raises_exc(yp_setitem(sq, int_0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(sq, yp_SyntaxError, items[2], &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_setitem(sq, int_0, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1372,6 +1387,8 @@ static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixt
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
+
+    // FIXME Previously-deleted index
 
     // Empty sq.
     {
@@ -1529,7 +1546,7 @@ tear_down:
     return MUNIT_OK;
 }
 
-static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixture)
+static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
     ypObject       *int_0 = yp_intC(0);
@@ -1582,6 +1599,8 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
         yp_decref(sq);
     }
 
+    // FIXME Previously-deleted index
+
     // Empty sq.
     {
         ypObject *empty = type->newN(0);
@@ -1590,6 +1609,8 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
         assert_len(empty, 0);
         yp_decref(empty);
     }
+
+    // FIXME index is sq
 
     // yp_SLICE_DEFAULT, yp_SLICE_LAST.
     {
@@ -1611,7 +1632,7 @@ static MunitResult test_delitemC(const MunitParameter params[], fixture_t *fixtu
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delitem(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_delitem(sq, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1666,7 +1687,7 @@ static MunitResult _test_appendC(
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(any_append(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_append(sq, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1795,7 +1816,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_extend(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_extend(sq, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -1968,7 +1989,7 @@ static MunitResult test_insertC(const MunitParameter params[], fixture_t *fixtur
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_insertC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(yp_insertC(sq, 0, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2191,7 +2212,7 @@ static MunitResult _test_remove(
     // Exception passthrough.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(any_remove(sq, yp_SyntaxError, &exc), yp_SyntaxError);
+        assert_isexception_exc(any_remove(sq, yp_SyntaxError, &exc), yp_SyntaxError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
     }
@@ -2324,7 +2345,7 @@ MunitTest test_sequence_tests[] = {TEST(test_concat, test_sequence_params),
         TEST(test_rindexC, test_sequence_params), TEST(test_countC, test_sequence_params),
         TEST(test_setindexC, test_sequence_params), TEST(test_setsliceC, test_sequence_params),
         TEST(test_setitem, test_sequence_params), TEST(test_delindexC, test_sequence_params),
-        TEST(test_delsliceC, test_sequence_params), TEST(test_delitemC, test_sequence_params),
+        TEST(test_delsliceC, test_sequence_params), TEST(test_delitem, test_sequence_params),
         TEST(test_append, test_sequence_params), TEST(test_push, test_sequence_params),
         TEST(test_extend, test_sequence_params), TEST(test_irepeatC, test_sequence_params),
         TEST(test_insertC, test_sequence_params), TEST(test_popindexC, test_sequence_params),
