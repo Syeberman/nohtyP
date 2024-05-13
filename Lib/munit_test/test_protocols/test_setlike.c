@@ -53,7 +53,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
         yp_decrefN(N(so, unhashable));
     }
 
-    // An unhashable x should match the equal object in so.
+    // An unhashable x should match the equal item in so.
     {
         ypObject *int_1 = yp_intC(1);
         ypObject *intstore_1 = yp_intstoreC(1);
@@ -583,6 +583,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *intstore_1 = yp_intstoreC(1);
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -645,7 +646,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         yp_decrefN(N(so, x, result));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -657,16 +658,28 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
         }
     }
 
-    // Unhashable objects in x should always cause a failure, even if that object is not part of the
-    // result.
+    // Unhashable items rejected even if equal to other hashable items.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(0);
+            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+                    assert_raises(yp_union(so, x), yp_TypeError));
+            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+                    assert_raises(yp_union(so, x), yp_TypeError));
+            assert_len(so, 0);
+            yp_decrefN(N(so));
+        }
+    }
+
+    // Unhashable items in x always cause a failure, even if that item is not part of the result.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
             assert_raises(yp_union(so, x), yp_TypeError);
-            yp_decrefN(N(intstore_1, so, x));
+            yp_decrefN(N(so, x));
         }
     }
 
@@ -746,7 +759,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -819,7 +832,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         yp_decrefN(N(so, x, result));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -832,7 +845,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
         }
     }
 
-    // An unhashable object in x should match the equal object in so.
+    // An unhashable item in x should match the equal item in so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -995,7 +1008,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         yp_decrefN(N(so, x, result));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1008,7 +1021,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
         }
     }
 
-    // An unhashable object in x should match the equal object in so.
+    // An unhashable item in x should match the equal item in so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1109,6 +1122,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *intstore_1 = yp_intstoreC(1);
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1171,7 +1185,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         yp_decrefN(N(so, x, result));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1183,16 +1197,27 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
         }
     }
 
-    // Unhashable objects in x should always cause a failure, even if that object is not part of the
-    // result.
+    // Unhashable items rejected even if equal to other hashable items.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(0);
+            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+                    assert_raises(yp_symmetric_difference(so, x), yp_TypeError));
+            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+                    assert_raises(yp_symmetric_difference(so, x), yp_TypeError));
+            yp_decrefN(N(so));
+        }
+    }
+
+    // Unhashable items in x always cause a failure, even if that item is not part of the result.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
             assert_raises(yp_symmetric_difference(so, x), yp_TypeError);
-            yp_decrefN(N(intstore_1, so, x));
+            yp_decrefN(N(so, x));
         }
     }
 
@@ -1272,7 +1297,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -1282,6 +1307,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *intstore_1 = yp_intstoreC(1);
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1352,7 +1378,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         yp_decrefN(N(so, x));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1365,17 +1391,30 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
         }
     }
 
-    // Unhashable objects in x should always cause a failure, even if that object is not part of the
-    // result.
+    // Unhashable items rejected even if equal to other hashable items.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(0);
+            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+                    assert_raises_exc(yp_update(so, x, &exc), yp_TypeError));
+            assert_len(so, 0);
+            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+                    assert_raises_exc(yp_update(so, x, &exc), yp_TypeError));
+            assert_set(so, int_1);  // Optimization: update adds while it iterates.
+            yp_decrefN(N(so));
+        }
+    }
+
+    // Unhashable items in x always cause a failure, even if that item is not part of the result.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
             assert_raises_exc(yp_update(so, x, &exc), yp_TypeError);
             assert_set(so, int_1);
-            yp_decrefN(N(intstore_1, so, x));
+            yp_decrefN(N(so, x));
         }
     }
 
@@ -1423,7 +1462,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -1499,7 +1538,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         yp_decrefN(N(so, x));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1512,7 +1551,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
         }
     }
 
-    // An unhashable object in x should match the equal object in so.
+    // An unhashable item in x should match the equal item in so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1645,7 +1684,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         yp_decrefN(N(so, x));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1658,7 +1697,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
         }
     }
 
-    // An unhashable object in x should match the equal object in so.
+    // An unhashable item in x should match the equal item in so.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1726,6 +1765,7 @@ static MunitResult test_symmetric_difference_update(
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *intstore_1 = yp_intstoreC(1);
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1792,7 +1832,7 @@ static MunitResult test_symmetric_difference_update(
         yp_decrefN(N(so, x));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -1805,17 +1845,29 @@ static MunitResult test_symmetric_difference_update(
         }
     }
 
-    // Unhashable objects in x should always cause a failure, even if that object is not part of the
-    // result.
+    // Unhashable items rejected even if equal to other hashable items.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
-            ypObject *intstore_1 = yp_intstoreC(1);
+            ypObject *so = type->newN(0);
+            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+                    assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError));
+            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+                    assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError));
+            assert_len(so, 0);
+            yp_decrefN(N(so));
+        }
+    }
+
+    // Unhashable items in x always cause a failure, even if that item is not part of the result.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
             ypObject *so = type->newN(N(int_1));
             ypObject *x = (*x_type)->newN(N(intstore_1));
             assert_raises_exc(yp_symmetric_difference_update(so, x, &exc), yp_TypeError);
             assert_set(so, int_1);
-            yp_decrefN(N(intstore_1, so, x));
+            yp_decrefN(N(so, x));
         }
     }
 
@@ -1864,7 +1916,7 @@ static MunitResult test_symmetric_difference_update(
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -2077,7 +2129,7 @@ static MunitResult _test_remove(
         yp_decrefN(N(so, unhashable));
     }
 
-    // An unhashable x should match the equal object in so.
+    // An unhashable x should match the equal item in so.
     {
         ypObject *int_1 = yp_intC(1);
         ypObject *intstore_1 = yp_intstoreC(1);

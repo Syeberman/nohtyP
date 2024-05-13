@@ -27,6 +27,8 @@ static int type_stores_unhashables(fixture_type_t *type)
 static MunitResult _test_newK(
         fixture_type_t *type, ypObject *(*any_newK)(int, ...), int test_exception_passthrough)
 {
+    ypObject *int_1 = yp_intC(1);
+    ypObject *intstore_1 = yp_intstoreC(1);
     ypObject *keys[4];
     ypObject *values[4];
     obj_array_fill(keys, type->rand_items);
@@ -50,7 +52,6 @@ static MunitResult _test_newK(
 
     // n is negative.
     {
-        // FIXME random negative value (everywhere)
         ypObject *mp = any_newK(-1);
         assert_type_is(mp, type->type);
         assert_len(mp, 0);
@@ -75,7 +76,9 @@ static MunitResult _test_newK(
         yp_decrefN(N(unhashable));
     }
 
-    // FIXME unhashable rejected even if equal to previous item.
+    // Unhashable key rejected even if equal to other hashable key.
+    assert_raises(any_newK(K(int_1, values[0], intstore_1, values[1])), yp_TypeError);
+    assert_raises(any_newK(K(intstore_1, values[0], int_1, values[1])), yp_TypeError);
 
     // Optimization: empty immortal when n is zero.
     if (type->falsy != NULL) {
@@ -95,6 +98,7 @@ static MunitResult _test_newK(
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -105,6 +109,7 @@ static MunitResult _test_new(
     fixture_type_t  *friend_types[] = friend_types_init();
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *intstore_1 = yp_intstoreC(1);
     ypObject        *keys[4];
     ypObject        *values[4];
     obj_array_fill(keys, type->rand_items);
@@ -155,7 +160,16 @@ static MunitResult _test_new(
         }
     }
 
-    // FIXME unhashable rejected even if equal to previous item.
+    // Unhashable key rejected even if equal to other hashable key.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
+            ead(x, new_itemsK(*x_type, K(int_1, values[0], intstore_1, values[1])),
+                    assert_raises(any_new(x), yp_TypeError));
+            ead(x, new_itemsK(*x_type, K(intstore_1, values[0], int_1, values[1])),
+                    assert_raises(any_new(x), yp_TypeError));
+        }
+    }
 
     // Optimization: lazy shallow copy of a friendly immutable x to immutable mp.
     for (x_type = friend_types; (*x_type) != NULL; x_type++) {
@@ -196,6 +210,7 @@ static MunitResult _test_new(
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -482,6 +497,8 @@ tear_down:
 static MunitResult _test_fromkeysN(fixture_type_t *type,
         ypObject *(*any_fromkeysN)(ypObject *, int, ...), int test_exception_passthrough)
 {
+    ypObject *int_1 = yp_intC(1);
+    ypObject *intstore_1 = yp_intstoreC(1);
     ypObject *keys[4];
     ypObject *values[4];
     obj_array_fill(keys, type->rand_items);
@@ -531,7 +548,9 @@ static MunitResult _test_fromkeysN(fixture_type_t *type,
         yp_decrefN(N(unhashable));
     }
 
-    // FIXME unhashable rejected even if equal to previous item.
+    // Unhashable key rejected even if equal to other hashable key.
+    assert_raises(any_fromkeysN(values[0], N(int_1, intstore_1)), yp_TypeError);
+    assert_raises(any_fromkeysN(values[0], N(intstore_1, int_1)), yp_TypeError);
 
     // Optimization: empty immortal when n is zero.
     if (type->falsy != NULL) {
@@ -549,6 +568,7 @@ static MunitResult _test_fromkeysN(fixture_type_t *type,
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -558,6 +578,7 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
     fixture_type_t  *x_types[] = x_types_init();
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *intstore_1 = yp_intstoreC(1);
     ypObject        *keys[4];
     ypObject        *values[4];
     obj_array_fill(keys, type->rand_items);
@@ -590,7 +611,7 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
         yp_decrefN(N(mp, x));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable key.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -605,7 +626,16 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
         }
     }
 
-    // FIXME unhashable rejected even if equal to previous item.
+    // Unhashable key rejected even if equal to other hashable key.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
+            ead(x, (*x_type)->newN(N(int_1, intstore_1)),
+                    assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
+            ead(x, (*x_type)->newN(N(intstore_1, int_1)),
+                    assert_raises(any_fromkeys(x, values[0]), yp_TypeError));
+        }
+    }
 
     // Optimization: empty immortal when x is empty.
     if (type->falsy != NULL) {
@@ -636,6 +666,7 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
 
     obj_array_decref(values);
     obj_array_decref(keys);
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 

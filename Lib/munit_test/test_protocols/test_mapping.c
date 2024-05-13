@@ -680,6 +680,8 @@ tear_down:
 static MunitResult _test_updateK(fixture_type_t *type,
         void (*any_updateK)(ypObject *, ypObject **, int, ...), int test_unhashables)
 {
+    ypObject *int_1 = yp_intC(1);
+    ypObject *intstore_1 = yp_intstoreC(1);
     ypObject *keys[6];
     ypObject *values[6];
     obj_array_fill(keys, type->rand_items);
@@ -772,19 +774,30 @@ static MunitResult _test_updateK(fixture_type_t *type,
         yp_decrefN(N(mp, unhashable));
     }
 
+    // Unhashable key rejected even if equal to other hashable key.
+    if (test_unhashables) {
+        ypObject *mp = type->newK(0);
+        assert_raises_exc(
+                any_updateK(mp, &exc, K(intstore_1, values[1], int_1, values[2])), yp_TypeError);
+        assert_len(mp, 0);
+        assert_raises_exc(
+                any_updateK(mp, &exc, K(int_1, values[1], intstore_1, values[2])), yp_TypeError);
+        assert_mapping(mp, int_1, values[1]);  // Optimization: updateK adds while it iterates.
+        yp_decrefN(N(mp));
+    }
+
     // Unhashable keys should always cause TypeError, even if that key is already in mp.
     if (test_unhashables) {
-        ypObject *int_1 = yp_intC(1);
-        ypObject *intstore_1 = yp_intstoreC(1);
         ypObject *mp = type->newK(K(int_1, values[0]));
         assert_raises_exc(any_updateK(mp, &exc, K(intstore_1, values[2])), yp_TypeError);
         assert_mapping(mp, int_1, values[0]);
-        yp_decrefN(N(int_1, intstore_1, mp));
+        yp_decrefN(N(mp));
     }
 
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
+    yp_decrefN(N(int_1, intstore_1));
     return MUNIT_OK;
 }
 

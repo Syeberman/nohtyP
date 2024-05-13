@@ -25,6 +25,8 @@ static int type_stores_unhashables(fixture_type_t *type)
 static MunitResult _test_newN(
         fixture_type_t *type, ypObject *(*any_newN)(int, ...), int test_exception_passthrough)
 {
+    ypObject *int_1 = yp_intC(1);
+    ypObject *intstore_1 = yp_intstoreC(1);
     ypObject *items[2];
     obj_array_fill(items, type->rand_items);
 
@@ -69,7 +71,9 @@ static MunitResult _test_newN(
         yp_decrefN(N(unhashable));
     }
 
-    // FIXME unhashable rejected even if equal to previous item.
+    // Unhashable argument rejected even if equal to other hashable argument.
+    assert_raises(any_newN(N(int_1, intstore_1)), yp_TypeError);
+    assert_raises(any_newN(N(intstore_1, int_1)), yp_TypeError);
 
     // Optimization: empty immortal when n is zero.
     if (type->falsy != NULL) {
@@ -84,6 +88,7 @@ static MunitResult _test_newN(
     }
 
     obj_array_decref(items);
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -94,6 +99,7 @@ static MunitResult _test_new(
     fixture_type_t  *friend_types[] = friend_types_init();
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *intstore_1 = yp_intstoreC(1);
     ypObject        *items[2];
     obj_array_fill(items, type->rand_items);
 
@@ -123,7 +129,7 @@ static MunitResult _test_new(
         yp_decrefN(N(so, x));
     }
 
-    // x contains an unhashable object.
+    // x contains an unhashable item.
     for (x_type = x_types; (*x_type) != NULL; x_type++) {
         // Skip types that cannot store unhashable objects.
         if (type_stores_unhashables(*x_type)) {
@@ -137,7 +143,14 @@ static MunitResult _test_new(
         }
     }
 
-    // FIXME unhashable rejected even if equal to previous item.
+    // Unhashable item rejected even if equal to other hashable item.
+    for (x_type = x_types; (*x_type) != NULL; x_type++) {
+        // Skip types that cannot store unhashable objects.
+        if (type_stores_unhashables(*x_type)) {
+            ead(x, (*x_type)->newN(N(int_1, intstore_1)), assert_raises(any_new(x), yp_TypeError));
+            ead(x, (*x_type)->newN(N(intstore_1, int_1)), assert_raises(any_new(x), yp_TypeError));
+        }
+    }
 
     // Optimization: lazy shallow copy of a friendly immutable x to immutable so.
     for (x_type = friend_types; (*x_type) != NULL; x_type++) {
@@ -174,7 +187,7 @@ static MunitResult _test_new(
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(intstore_1, int_1));
     return MUNIT_OK;
 }
 
