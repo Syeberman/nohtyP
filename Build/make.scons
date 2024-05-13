@@ -182,7 +182,7 @@ AddBuildTargets(RootEnv, MakeCompilerTargets)
 
 
 # The default for "scons -c" is to clean the entire Build directory; otherwise, the default is to
-# build just the native debug and release targets
+# build the native debug and release targets
 if RootEnv.GetOption("clean"):
     RootEnv.Default("#Build")
 else:

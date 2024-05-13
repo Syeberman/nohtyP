@@ -2,7 +2,6 @@
 #include "munit_test/unittest.h"
 
 // FIXME _ypDict_deepcopy
-// FIXME Remove "simply" from the code comments (and "just")
 // FIXME frozendict_eq where the hash has been cached (introduce _test_comparisons)
 // FIXME The various dict iterators
 // FIXME test_objects/test_frozendict

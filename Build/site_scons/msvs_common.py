@@ -28,7 +28,7 @@ def _crtRequiresManifest(version):
 
 
 # It's a lot of work to add target files to a compilation!
-# TODO Just add native .asm, .map, etc support to SCons
+# TODO Add native .asm, .map, etc support to SCons
 
 
 def _ccEmitter(target, source, env, parent_emitter):

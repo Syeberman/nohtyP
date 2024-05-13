@@ -2948,7 +2948,7 @@ static ypObject *iter_close(ypObject *i)
     return yp_RuntimeError;
 }
 
-// iter objects can be returned from yp_miniiter...they simply ignore *state
+// iter objects can be returned from yp_miniiter; such objects ignore *state.
 static ypObject *iter_miniiter(ypObject *i, yp_uint64_t *state)
 {
     *state = 0;  // just in case...
@@ -4560,7 +4560,7 @@ typedef void (*iarithCFfunc)(ypObject *, yp_float_t, ypObject **);
 typedef yp_int_t (*unaryLfunc)(yp_int_t, ypObject **);
 typedef yp_float_t (*unaryLFfunc)(yp_float_t, ypObject **);
 
-// Bitwise operations on floats aren't supported, so these functions simply raise yp_TypeError
+// Bitwise operations on floats aren't supported, so these functions raise yp_TypeError.
 static void       yp_ilshiftCF(ypObject *x, yp_float_t y, ypObject **exc);
 static void       yp_irshiftCF(ypObject *x, yp_float_t y, ypObject **exc);
 static void       yp_iampCF(ypObject *x, yp_float_t y, ypObject **exc);
@@ -6378,8 +6378,8 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
 // also calculates the length of the slice. Returns yp_ValueError if *step is zero. Recall there are
 // no out-of-bounds errors with slices.
 // XXX yp_SLICE_DEFAULT is yp_SSIZE_T_MIN, which hopefully nobody will try to use as a valid index.
-// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is simply a very large number that is handled the same
-// as any value that's greater than length.
+// yp_SLICE_LAST is yp_SSIZE_T_MAX, which is a very large number that is handled the same as any
+// value that's greater than length.
 // XXX Adapted from PySlice_GetIndicesEx
 static ypObject *ypSlice_AdjustIndicesC(yp_ssize_t length, yp_ssize_t *start, yp_ssize_t *stop,
         yp_ssize_t *step, yp_ssize_t *slicelength)
@@ -8232,7 +8232,7 @@ static void _ypStringLib_join_elemcopy(
     yp_ssize_t                 i;
 
     if (s_len < 1) {
-        // The separator is empty, so we just concatenate seq's elements
+        // The separator is empty, so we concatenate seq's elements.
         for (i = 0; /*stop at NULL*/; i++) {
             ypObject *x = seq->getindexX(state, i);  // borrowed
             if (x == NULL) break;
@@ -9095,7 +9095,7 @@ static ypObject *ypStringLib_decode_frombytesC_utf_8(
         return _ypStringLib_decode_utf_8_onnull(type, len);
     } else if (source[0] < 0x80u) {
         // We optimize for UTF-8 data that is completely, or at least starts with, ASCII: since
-        // ASCII is equivalent to the first 128 ordinals in Unicode, we can just memcpy
+        // ASCII is equivalent to the first 128 ordinals in Unicode, we can memcpy.
         return _ypStringLib_decode_utf_8_ascii_start(type, len, source, errors);
     } else {
         return _ypStringLib_decode_utf_8(type, len, source, errors);
@@ -17040,7 +17040,7 @@ static ypObject *_ypDict_push(
     result = _ypSet_lookkey(keyset, key, hash, &key_loc);
     if (yp_isexceptionC(result)) return result;
 
-    // If the key is already in the hash table, then we simply need to update the value
+    // If the key is already in the hash table, then we need to update the value.
     if (ypSet_ENTRY_USED(key_loc)) {
         value_loc = ypDict_VALUE_ENTRY(mp, key_loc);
         if (*value_loc == NULL) {
@@ -19769,8 +19769,8 @@ ypObject *yp_functionC(yp_function_decl_t *declaration)
  *************************************************************************************************/
 #pragma region methods
 
-// These are the functions that simply redirect to object methods; more complex public functions
-// are found elsewhere.
+// These are the functions that redirect to object methods; more complex public functions are found
+// elsewhere.
 
 // args must be surrounded in brackets, to form the function call; as such, must also include ob
 #define _yp_REDIRECT1(ob, tp_meth, args)               \
