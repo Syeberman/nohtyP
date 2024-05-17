@@ -17,7 +17,7 @@ def CheckEllipsisFunctions(warnings: list[str], header: ypHeader):
 
         if not vararg_postfix:
             warnings.append("vararg function missing N or K postfix: {}".format(name))
-        if function.postfix_input_count is not None:
+        if function.postfix_parameter_count is not None:
             warnings.append(
                 "vararg function contains input count postfix: {}".format(name)
             )
@@ -43,21 +43,21 @@ def CheckEllipsisFunctions(warnings: list[str], header: ypHeader):
                 warnings.append("N (or K) missing NV (or KV) pair: {}".format(name))
 
 
-def CheckInputCounts(warnings: list[str], header: ypHeader):
+def CheckParameterCounts(warnings: list[str], header: ypHeader):
     for function in header.funcs:
         name = function.name
-        postfix_input_count = function.postfix_input_count
+        postfix_parameter_count = function.postfix_parameter_count
 
-        # Skip functions without an input count
-        if postfix_input_count is None:
+        # Skip functions without a parameter count
+        if postfix_parameter_count is None:
             continue
 
-        input_count = sum(1 for param in function.params if param.input)
+        parameter_count = len(function.params)
 
-        if postfix_input_count != input_count:
+        if postfix_parameter_count != parameter_count:
             warnings.append(
-                "input count postfix ({}) isn't correct ({}): {}".format(
-                    postfix_input_count, input_count, name
+                "parameter count postfix ({}) isn't correct ({}): {}".format(
+                    postfix_parameter_count, parameter_count, name
                 )
             )
 

@@ -5,11 +5,15 @@ Date: May 19, 2014
 """
 
 import copy
+from typing import Callable, TypeVar
 from pycparser import c_generator, c_ast, parse_file
 import re
 
+K = TypeVar('K')
+V = TypeVar('V')
 
-def setdefault_call(d: dict, key, default_callable):
+
+def setdefault_call(d: dict[K, V], key: K, default_callable: Callable[[], V]):
     try:
         return d[key]
     except KeyError:
@@ -114,7 +118,7 @@ class ypFunction:
         self.rootname = namematch.group("root")
         self.postfixes = namematch.group("post")
         post_incnt = namematch.group("post_incnt")
-        self.postfix_input_count = int(post_incnt) if post_incnt else None
+        self.postfix_parameter_count = int(post_incnt) if post_incnt else None
 
     def __str__(self):
         return "%s (%s): %r" % (
@@ -128,9 +132,9 @@ class ypHeader:
     """Holds information collected information from nohtyP.h and similar files."""
 
     def __init__(self):
-        self.funcs = []
-        self.name2funcs = {}  # a few functions are listed twice or more
-        self.root2funcs = {}
+        self.funcs = list[ypFunction]()
+        self.name2funcs = dict[str, list[ypFunction]]()  # a few functions are listed twice or more
+        self.root2funcs = dict[str, list[ypFunction]]()
 
     def add_func(self, func: ypFunction):
         self.funcs.append(func)

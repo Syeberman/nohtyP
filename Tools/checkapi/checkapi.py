@@ -6,7 +6,7 @@ Date: May 19, 2014
 
 import sys
 from parse_header import parse_header, ypHeader
-from api_warnings import CheckEllipsisFunctions, CheckInputCounts, CheckSetExcFunctions
+from api_warnings import CheckEllipsisFunctions, CheckParameterCounts, CheckSetExcFunctions
 
 # TODO fake_libc_include doesn't have proper limits or defines for 32- and 64-bit systems
 # (does it matter for our purposes?)
@@ -49,7 +49,7 @@ def CheckApi(filepath: str, *, print=print):
 
     warnings = []
     CheckEllipsisFunctions(warnings, header)
-    CheckInputCounts(warnings, header)
+    CheckParameterCounts(warnings, header)
     CheckSetExcFunctions(warnings, header)
     for warning in warnings:
         print(warning)
