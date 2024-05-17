@@ -5,8 +5,8 @@ Date: May 19, 2014
 """
 
 import sys
-from parse_header import parse_header
-from api_warnings import (CheckEllipsisFunctions, CheckInputCounts, CheckSetExcFunctions)
+from parse_header import parse_header, ypHeader
+from api_warnings import CheckEllipsisFunctions, CheckInputCounts, CheckSetExcFunctions
 
 # TODO fake_libc_include doesn't have proper limits or defines for 32- and 64-bit systems
 # (does it matter for our purposes?)
@@ -29,7 +29,8 @@ from api_warnings import (CheckEllipsisFunctions, CheckInputCounts, CheckSetExcF
 #   - for functions that return yp_None for success or exactly one exception type, convert to a
 #   boolean (on the assumption that it's quicker to test)
 
-def ReportOnVariants(header, *, print=print):
+
+def ReportOnVariants(header: ypHeader, *, print=print):
     """Report the functions that belong to the same group, and which is the unadorned version."""
     for root, funcs in sorted(header.root2funcs.items()):
         if len(funcs) < 2:
@@ -42,7 +43,7 @@ def ReportOnVariants(header, *, print=print):
         print()
 
 
-def CheckApi(filepath, *, print=print):
+def CheckApi(filepath: str, *, print=print):
     """Reports potential problems in nohtyP.h (and related files)."""
     header = parse_header(filepath)
 
