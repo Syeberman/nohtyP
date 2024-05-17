@@ -176,7 +176,9 @@ def ApplyGCCOptions(env, version):
     def addCcFlags(*args):
         env.AppendUnique(CCFLAGS=list(args))
 
-    # TODO analyze? (enable -Wextra, disable -Werror, supress individual warnings)
+    # FIXME -nostdinc for analyze?
+    # FIXME analyze? (enable -Wextra, disable -Werror, supress individual warnings)
+    # FIXME -fcallgraph-info for analyze? or -fanalyzer
     addCcFlags(*archOpts)
     addCcFlags(
         # Warnings-as-errors, all (avoidable) warnings
@@ -279,10 +281,12 @@ def ApplyGCCOptions(env, version):
         addCppDefines("NDEBUG")
 
     # PPCC is the preprocessor-only mode for CC, the C compiler (compare with SHCC et al)
+    # XXX -g3 (debug info) enables -dD, which includes #defines in the output; since we don't need debug info, disable
+    # it with -g0 last in the argument list. (See https://github.com/gcc-mirror/gcc/commit/934a541)
     # TODO -save-temps above also writes the .i file
     # TODO Create PPCC, PPCFLAGS, PPCCFLAGS just like SHCC/etc, and contribute back to SCons?
     # TODO For SCons: be smart and when passed a preprocessed file, compiler skips certain options?
-    env["PPCCCOM"] = "$CC -E -o $TARGET -c $CFLAGS $CCFLAGS $_CCCOMCOM $SOURCES"
+    env["PPCCCOM"] = "$CC -E -o $TARGET -c $CFLAGS $CCFLAGS $_CCCOMCOM -g0 $SOURCES"
 
     def addLinkFlags(*args):
         env.AppendUnique(LINKFLAGS=list(args))

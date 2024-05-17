@@ -164,6 +164,8 @@ def nohtyP_checkapi(env):
     # nohtyP.h contains very few PP conditionals, so not much needs to be set up. Preprocessed
     # only recognizes .c (etc) files so we make a copy with that extension. Use dummy versions
     # of standard headers that work well with pycparser.
+    # FIXME Are the fake includes necessary when we have the real ones available? We always analyze in the context of
+    # a compiler.
     env.PrependUnique(CPPPATH=["#", "#/Include/fake_libc_include"], PDB="", LIBS="")
     headerDotC = env.Command(
         target="$VTOP/checkapi/nohtyP_h.c",
