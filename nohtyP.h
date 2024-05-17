@@ -61,7 +61,7 @@
  *      NV, KV - A version of "N" or "K" that accepts a va_list in place of ...
  *      D - Discard after use (ie yp_IFd)
  *      X - Direct access to internal memory or borrowed objects; tread carefully!
- *      # (number) - A function with # inputs that shares the same name as another function
+ *      # (number) - A function with # parameters that shares the same name as another function
  */
 
 
