@@ -764,7 +764,11 @@ typedef void (*voidarrayfunc)(yp_ssize_t, ypObject **);
 typedef struct _rand_obj_supplier_memo_t rand_obj_supplier_memo_t;
 typedef ypObject *(*rand_obj_supplier_t)(const rand_obj_supplier_memo_t *);
 
-// Any methods or arguments here that don't apply to a given type will fail the test.
+// Describes a single nohtyP type in the context of these tests. Allows for generic tests to be
+// written that apply to an entire classification of types (i.e. test_sequence tests all sequence
+// objects). Any methods or arguments here that don't apply to a given type will fail the test. May
+// also be used to describe special-purpose objects (i.e. fixture_type_set_dirty is a set containing
+// deleted items).
 typedef struct _fixture_type_t fixture_type_t;
 typedef struct _fixture_type_t {
     char           *name;   // The name of the type (i.e. int, bytearray, dict).
@@ -827,24 +831,37 @@ typedef struct _fixture_t {
     fixture_type_t *type;  // The primary type under test.
 } fixture_t;
 
-// The number of elements in fixture_types_all (ignoring the null terminator).
-#define FIXTURE_TYPES_ALL_LEN 22
+// Collects related feature types together (i.e. fixture_types_mutable are all the mutable types).
+typedef struct _fixture_types_t {
+    yp_ssize_t       len;    // The number of types.
+    fixture_type_t **types;  // An array of types. Null-terminated.
+} fixture_types_t;
 
 // "All", except invalidated and exception.
-extern fixture_type_t *fixture_types_all[];
+extern fixture_types_t *fixture_types_all;
 
-extern fixture_type_t *fixture_types_mutable[];
-extern fixture_type_t *fixture_types_immutable[];
-extern fixture_type_t *fixture_types_numeric[];
-extern fixture_type_t *fixture_types_iterable[];
-extern fixture_type_t *fixture_types_collection[];
-extern fixture_type_t *fixture_types_sequence[];
-extern fixture_type_t *fixture_types_string[];
-extern fixture_type_t *fixture_types_setlike[];
-extern fixture_type_t *fixture_types_mapping[];
+extern fixture_types_t *fixture_types_mutable;
+extern fixture_types_t *fixture_types_numeric;
+extern fixture_types_t *fixture_types_iterable;
+extern fixture_types_t *fixture_types_collection;
+extern fixture_types_t *fixture_types_sequence;
+extern fixture_types_t *fixture_types_string;
+extern fixture_types_t *fixture_types_setlike;
+extern fixture_types_t *fixture_types_mapping;
+extern fixture_types_t *fixture_types_immutable;
+extern fixture_types_t *fixture_types_not_numeric;
+extern fixture_types_t *fixture_types_not_iterable;
+extern fixture_types_t *fixture_types_not_collection;
+extern fixture_types_t *fixture_types_not_sequence;
+extern fixture_types_t *fixture_types_not_string;
+extern fixture_types_t *fixture_types_not_setlike;
+extern fixture_types_t *fixture_types_not_mapping;
+extern fixture_types_t *fixture_types_immutable_not_str;
 
 // Arrays of MunitParameterEnum values for "type" and similar parameters (i.e. the names of types).
+// Can't be included in fixture_types_t because the compiler requires this to be a constant.
 extern char *param_values_types_all[];
+extern char *param_values_types_mutable[];
 extern char *param_values_types_numeric[];
 extern char *param_values_types_iterable[];
 extern char *param_values_types_collection[];
@@ -852,6 +869,15 @@ extern char *param_values_types_sequence[];
 extern char *param_values_types_string[];
 extern char *param_values_types_setlike[];
 extern char *param_values_types_mapping[];
+extern char *param_values_types_immutable[];
+extern char *param_values_types_not_numeric[];
+extern char *param_values_types_not_iterable[];
+extern char *param_values_types_not_collection[];
+extern char *param_values_types_not_sequence[];
+extern char *param_values_types_not_string[];
+extern char *param_values_types_not_setlike[];
+extern char *param_values_types_not_mapping[];
+extern char *param_values_types_immutable_not_str[];
 
 // Returns the test fixture type that corresponds with the type of the object. object cannot be
 // invalidated or an exception.

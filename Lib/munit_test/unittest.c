@@ -108,6 +108,11 @@ static void rand_ascii(yp_ssize_t len, yp_uint8_t *source)
 // coerced to pointers.
 #define rand_choice_array(array) rand_choice(yp_lengthof_array(array), (array))
 
+static fixture_type_t *rand_choice_fixture_type(fixture_types_t *types)
+{
+    return rand_choice(types->len, types->types);
+}
+
 
 typedef struct _rand_obj_supplier_memo_t {
     yp_ssize_t depth;          // The maximum depth of objects.
@@ -115,21 +120,19 @@ typedef struct _rand_obj_supplier_memo_t {
 } rand_obj_supplier_memo_t;
 
 // "Any" may be limited by memo.
-static yp_ssize_t fixture_types_mutable_len;
-static ypObject  *rand_obj_any_mutable1(const rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_any_mutable1(const rand_obj_supplier_memo_t *memo)
 {
     rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, memo->only_hashable};
     assert_ssizeC(sub_memo.depth, >=, 0);
-    return rand_choice(fixture_types_mutable_len, fixture_types_mutable)->_new_rand(&sub_memo);
+    return rand_choice_fixture_type(fixture_types_mutable)->_new_rand(&sub_memo);
 }
 
 // "Any" may be limited by memo.
-static yp_ssize_t fixture_types_immutable_len;
-static ypObject  *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
+static ypObject *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 {
     rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/TRUE};
     assert_ssizeC(sub_memo.depth, >=, 0);
-    return rand_choice(fixture_types_immutable_len, fixture_types_immutable)->_new_rand(&sub_memo);
+    return rand_choice_fixture_type(fixture_types_immutable)->_new_rand(&sub_memo);
 }
 
 // "Any" may be limited by memo (i.e. we might only return hashable types).
@@ -140,7 +143,7 @@ static ypObject *rand_obj_any1(const rand_obj_supplier_memo_t *memo)
     } else {
         rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/FALSE};
         assert_ssizeC(sub_memo.depth, >=, 0);
-        return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->_new_rand(&sub_memo);
+        return rand_choice_fixture_type(fixture_types_all)->_new_rand(&sub_memo);
     }
 }
 
@@ -177,12 +180,9 @@ ypObject *rand_obj(fixture_type_t *type)
     return type->_new_rand(&memo);
 }
 
-static yp_ssize_t      fixture_types_immutable_not_str_len;
-static fixture_type_t *fixture_types_immutable_not_str[FIXTURE_TYPES_ALL_LEN + 1];
-ypObject              *rand_obj_hashable_not_str(void)
+ypObject *rand_obj_hashable_not_str(void)
 {
-    return rand_obj_hashable(
-            rand_choice(fixture_types_immutable_not_str_len, fixture_types_immutable_not_str));
+    return rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable_not_str));
 }
 
 ypObject *rand_obj_any_mutable(void)
@@ -376,7 +376,7 @@ extern ypObject *new_faulty_iter(
 // Returns a random type object, except invalidated and exception objects.
 static ypObject *new_rand_type(const rand_obj_supplier_memo_t *memo)
 {
-    return rand_choice(FIXTURE_TYPES_ALL_LEN, fixture_types_all)->type;
+    return rand_choice_fixture_type(fixture_types_all)->type;
 }
 
 static fixture_type_t fixture_type_type_struct = {
@@ -1531,56 +1531,63 @@ fixture_type_t *fixture_type_frozendict = &fixture_type_frozendict_struct;
 fixture_type_t *fixture_type_dict = &fixture_type_dict_struct;
 fixture_type_t *fixture_type_function = &fixture_type_function_struct;
 
-fixture_type_t *fixture_types_all[] = {&fixture_type_type_struct, &fixture_type_NoneType_struct,
-        &fixture_type_bool_struct, &fixture_type_int_struct, &fixture_type_intstore_struct,
-        &fixture_type_float_struct, &fixture_type_floatstore_struct, &fixture_type_iter_struct,
-        &fixture_type_range_struct, &fixture_type_bytes_struct, &fixture_type_bytearray_struct,
-        &fixture_type_str_struct, &fixture_type_chrarray_struct, &fixture_type_tuple_struct,
-        &fixture_type_list_struct, &fixture_type_frozenset_struct, &fixture_type_set_struct,
-        &fixture_type_frozenset_dirty_struct, &fixture_type_set_dirty_struct,
-        &fixture_type_frozendict_struct, &fixture_type_dict_struct, &fixture_type_function_struct,
-        NULL};
+#define FIXTURE_TYPES_ALL_LEN 22  // Verified in initialize_fixture_types.
+static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
+        &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
+        &fixture_type_intstore_struct, &fixture_type_float_struct, &fixture_type_floatstore_struct,
+        &fixture_type_iter_struct, &fixture_type_range_struct, &fixture_type_bytes_struct,
+        &fixture_type_bytearray_struct, &fixture_type_str_struct, &fixture_type_chrarray_struct,
+        &fixture_type_tuple_struct, &fixture_type_list_struct, &fixture_type_frozenset_struct,
+        &fixture_type_set_struct, &fixture_type_frozenset_dirty_struct,
+        &fixture_type_set_dirty_struct, &fixture_type_frozendict_struct, &fixture_type_dict_struct,
+        &fixture_type_function_struct, NULL};
+// param_values_types_all is populated in initialize_fixture_types.
+static fixture_types_t fixture_types_all_struct = {FIXTURE_TYPES_ALL_LEN, fixture_types_all_types};
+fixture_types_t       *fixture_types_all = &fixture_types_all_struct;
+char                  *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
 
-// These are subsets of fixture_types_all, so will at most hold that many elements.
-fixture_type_t        *fixture_types_mutable[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_immutable[FIXTURE_TYPES_ALL_LEN + 1];
-static fixture_type_t *fixture_types_immutable_not_str[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_numeric[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_collection[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_sequence[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_string[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_setlike[FIXTURE_TYPES_ALL_LEN + 1];
-fixture_type_t        *fixture_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
-
-static yp_ssize_t fixture_types_mutable_len = 0;            // Incremented later
-static yp_ssize_t fixture_types_immutable_len = 0;          // Incremented later
-static yp_ssize_t fixture_types_immutable_not_str_len = 0;  // Incremented later
-
-// Once again, subsets of fixture_types_all.
-char *param_values_types_all[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_numeric[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_iterable[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_collection[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_sequence[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_string[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_setlike[FIXTURE_TYPES_ALL_LEN + 1];
-char *param_values_types_mapping[FIXTURE_TYPES_ALL_LEN + 1];
-
-// The given arrays must be no smaller than fixture_types_all.
-static void fill_type_arrays(fixture_type_t **fixture_array, char **param_array, yp_ssize_t offset)
+// Defines the type arrays (i.e. fixture_types_mutable and param_values_types_mutable). Also defines
+// the filter functions used by FILL_FIXTURE_TYPES_ARRAYS to fill these type arrays. These are
+// subsets of fixture_types_all, so will at most hold FIXTURE_TYPES_ALL_LEN elements.
+#define DEFINE_FIXTURE_TYPES_ARRAYS(name)                                                     \
+    static fixture_type_t *fixture_types_##name##_types[FIXTURE_TYPES_ALL_LEN + 1];           \
+    static fixture_types_t fixture_types_##name##_struct = {0, fixture_types_##name##_types}; \
+    fixture_types_t       *fixture_types_##name = &fixture_types_##name##_struct;             \
+    char                  *param_values_types_##name[FIXTURE_TYPES_ALL_LEN + 1];
+#define DEFINE_FIXTURE_TYPES(protocol, not_name)                                                \
+    DEFINE_FIXTURE_TYPES_ARRAYS(protocol)                                                       \
+    static int fixture_type_is_##protocol(fixture_type_t *type) { return type->is_##protocol; } \
+    DEFINE_FIXTURE_TYPES_ARRAYS(not_name)                                                       \
+    static int fixture_type_is_##not_name(fixture_type_t *type) { return !type->is_##protocol; }
+DEFINE_FIXTURE_TYPES(mutable, immutable);
+DEFINE_FIXTURE_TYPES(numeric, not_numeric);
+DEFINE_FIXTURE_TYPES(iterable, not_iterable);
+DEFINE_FIXTURE_TYPES(collection, not_collection);
+DEFINE_FIXTURE_TYPES(sequence, not_sequence);
+DEFINE_FIXTURE_TYPES(string, not_string);
+DEFINE_FIXTURE_TYPES(setlike, not_setlike);
+DEFINE_FIXTURE_TYPES(mapping, not_mapping);
+#undef DEFINE_FIXTURE_TYPES
+DEFINE_FIXTURE_TYPES_ARRAYS(immutable_not_str);
+static int fixture_type_is_immutable_not_str(fixture_type_t *type)
 {
-    fixture_type_t **types;
-    for (types = fixture_types_all; *types != NULL; types++) {
-        if (*((int *)(((yp_uint8_t *)*types) + offset))) {
-            *fixture_array = *types;
-            fixture_array++;
-            *param_array = (*types)->name;
-            param_array++;
+    return !type->is_mutable && type != fixture_type_str;
+}
+#undef DEFINE_FIXTURE_TYPES_ARRAYS
+
+static void fill_fixture_types_arrays(fixture_types_t *fixture_types, char **param_values_types,
+        int (*is_of_type)(fixture_type_t *))
+{
+    fixture_type_t **type;
+    for (type = fixture_types_all->types; *type != NULL; type++) {
+        if (is_of_type(*type)) {
+            fixture_types->types[fixture_types->len] = *type;
+            param_values_types[fixture_types->len] = (*type)->name;
+            fixture_types->len++;
         }
     }
-    *fixture_array = NULL;
-    *param_array = NULL;
+    fixture_types->types[fixture_types->len] = NULL;
+    param_values_types[fixture_types->len] = NULL;
 }
 
 static void initialize_fixture_types(void)
@@ -1622,53 +1629,45 @@ static void initialize_fixture_types(void)
 
     // The fixture_types_* and param_values_types_* arrays above were sized based on
     // FIXTURE_TYPES_ALL_LEN, so make sure that value is correct.
-    if (yp_lengthof_array(fixture_types_all) != FIXTURE_TYPES_ALL_LEN + 1) {
+    if (yp_lengthof_array(fixture_types_all_types) != FIXTURE_TYPES_ALL_LEN + 1) {
         fprintf(stderr, "Update FIXTURE_TYPES_ALL_LEN in unittest.h to %" PRIssize "\n",
-                yp_lengthof_array(fixture_types_all) - 1);
+                yp_lengthof_array(fixture_types_all_types) - 1);
         abort();
     }
 
+    // Fill param_values_types_all. fixture_types_all was initialized statically.
     {
-        fixture_type_t **types;
+        fixture_type_t **type;
         char           **param_values = param_values_types_all;
-        fixture_type_t **mutables = fixture_types_mutable;
-        fixture_type_t **immutables = fixture_types_immutable;
-        fixture_type_t **immutables_not_str = fixture_types_immutable_not_str;
-        for (types = fixture_types_all; *types != NULL; types++) {
-            *param_values = (*types)->name;
+        for (type = fixture_types_all->types; *type != NULL; type++) {
+            *param_values = (*type)->name;
             param_values++;
-            if ((*types)->is_mutable) {
-                *mutables = *types;
-                mutables++;
-                fixture_types_mutable_len++;
-            } else {
-                *immutables = *types;
-                immutables++;
-                fixture_types_immutable_len++;
-                if ((*types) != fixture_type_str) {
-                    *immutables_not_str = *types;
-                    immutables_not_str++;
-                    fixture_types_immutable_not_str_len++;
-                }
-            }
         }
         *param_values = NULL;
-        *mutables = NULL;
-        *immutables = NULL;
-        *immutables_not_str = NULL;
     }
 
-#define FILL_TYPE_ARRAYS(protocol)                                            \
-    fill_type_arrays(fixture_types_##protocol, param_values_types_##protocol, \
-            yp_offsetof(fixture_type_t, is_##protocol));
-    FILL_TYPE_ARRAYS(numeric);
-    FILL_TYPE_ARRAYS(iterable);
-    FILL_TYPE_ARRAYS(collection);
-    FILL_TYPE_ARRAYS(sequence);
-    FILL_TYPE_ARRAYS(string);
-    FILL_TYPE_ARRAYS(setlike);
-    FILL_TYPE_ARRAYS(mapping);
-#undef FILL_TYPE_ARRAYS
+    // Fill the remaining fixture_types_* and param_values_types_* arrays.
+#define FILL_FIXTURE_TYPES_ARRAYS(protocol) \
+    fill_fixture_types_arrays(              \
+            fixture_types_##protocol, param_values_types_##protocol, fixture_type_is_##protocol);
+    FILL_FIXTURE_TYPES_ARRAYS(mutable);
+    FILL_FIXTURE_TYPES_ARRAYS(numeric);
+    FILL_FIXTURE_TYPES_ARRAYS(iterable);
+    FILL_FIXTURE_TYPES_ARRAYS(collection);
+    FILL_FIXTURE_TYPES_ARRAYS(sequence);
+    FILL_FIXTURE_TYPES_ARRAYS(string);
+    FILL_FIXTURE_TYPES_ARRAYS(setlike);
+    FILL_FIXTURE_TYPES_ARRAYS(mapping);
+    FILL_FIXTURE_TYPES_ARRAYS(immutable);
+    FILL_FIXTURE_TYPES_ARRAYS(not_numeric);
+    FILL_FIXTURE_TYPES_ARRAYS(not_iterable);
+    FILL_FIXTURE_TYPES_ARRAYS(not_collection);
+    FILL_FIXTURE_TYPES_ARRAYS(not_sequence);
+    FILL_FIXTURE_TYPES_ARRAYS(not_string);
+    FILL_FIXTURE_TYPES_ARRAYS(not_setlike);
+    FILL_FIXTURE_TYPES_ARRAYS(not_mapping);
+    FILL_FIXTURE_TYPES_ARRAYS(immutable_not_str);
+#undef FILL_FIXTURE_TYPES_ARRAYS
 }
 
 // TODO We could speed this up with a frozendict or somesuch.
@@ -1676,7 +1675,7 @@ extern fixture_type_t *fixture_type_fromobject(ypObject *object)
 {
     fixture_type_t **fixture_type;
     ypObject        *type = yp_type(object);
-    for (fixture_type = fixture_types_all; (*fixture_type) != NULL; fixture_type++) {
+    for (fixture_type = fixture_types_all->types; (*fixture_type) != NULL; fixture_type++) {
         if ((*fixture_type)->type == type) break;
     }
     yp_decref(type);
@@ -1786,7 +1785,7 @@ static fixture_type_t *fixture_get_type(const MunitParameter params[])
     const char      *type_name = munit_parameters_get(params, param_key_type);
     if (type_name == NULL) return NULL;
 
-    for (type = fixture_types_all; *type != NULL; type++) {
+    for (type = fixture_types_all->types; *type != NULL; type++) {
         if (strcmp((*type)->name, type_name) == 0) return *type;
     }
 
