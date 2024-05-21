@@ -110,6 +110,7 @@ static MunitResult _test_new(
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *intstore_1 = yp_intstoreC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *keys[4];
     ypObject        *values[4];
     obj_array_fill(keys, type->rand_items);
@@ -200,8 +201,7 @@ static MunitResult _test_new(
             yp_decref(mp));
 
     // x is not an iterable.
-    // FIXME Function to create a random "not iterable".
-    assert_raises(any_new(int_1), yp_TypeError);
+    assert_raises(any_new(not_iterable), yp_TypeError);
 
     // Exception passthrough.
     if (test_exception_passthrough) {
@@ -210,7 +210,7 @@ static MunitResult _test_new(
 
     obj_array_decref(values);
     obj_array_decref(keys);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(not_iterable, intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -579,6 +579,7 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *intstore_1 = yp_intstoreC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *keys[4];
     ypObject        *values[4];
     obj_array_fill(keys, type->rand_items);
@@ -653,7 +654,7 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
             assert_mapping(mp, keys[0], values[0], keys[1], values[0]), yp_decref(mp));
 
     // x is not an iterable.
-    assert_raises(any_fromkeys(int_1, values[0]), yp_TypeError);
+    assert_raises(any_fromkeys(not_iterable, values[0]), yp_TypeError);
 
     // Exception passthrough.
     if (test_exception_passthrough) {
@@ -666,7 +667,7 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
 
     obj_array_decref(values);
     obj_array_decref(keys);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(not_iterable, intstore_1, int_1));
     return MUNIT_OK;
 }
 

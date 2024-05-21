@@ -120,14 +120,6 @@ typedef struct _rand_obj_supplier_memo_t {
 } rand_obj_supplier_memo_t;
 
 // "Any" may be limited by memo.
-static ypObject *rand_obj_any_mutable1(const rand_obj_supplier_memo_t *memo)
-{
-    rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, memo->only_hashable};
-    assert_ssizeC(sub_memo.depth, >=, 0);
-    return rand_choice_fixture_type(fixture_types_mutable)->_new_rand(&sub_memo);
-}
-
-// "Any" may be limited by memo.
 static ypObject *rand_obj_any_hashable1(const rand_obj_supplier_memo_t *memo)
 {
     rand_obj_supplier_memo_t sub_memo = {memo->depth - 1, /*only_hashable=*/TRUE};
@@ -180,28 +172,27 @@ ypObject *rand_obj(fixture_type_t *type)
     return type->_new_rand(&memo);
 }
 
-ypObject *rand_obj_hashable_not_str(void)
+ypObject *rand_obj_any_not_iterable(void)
+{
+    return rand_obj(rand_choice_fixture_type(fixture_types_not_iterable));
+}
+
+ypObject *rand_obj_any_hashable_not_str(void)
 {
     return rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable_not_str));
 }
 
 ypObject *rand_obj_any_mutable(void)
 {
-    rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/FALSE};
-    return rand_obj_any_mutable1(&memo);
+    return rand_obj(rand_choice_fixture_type(fixture_types_mutable));
 }
 
 ypObject *rand_obj_any_hashable(void)
 {
-    rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/TRUE};
-    return rand_obj_any_hashable1(&memo);
+    return rand_obj_hashable(rand_choice_fixture_type(fixture_types_immutable));
 }
 
-ypObject *rand_obj_any(void)
-{
-    rand_obj_supplier_memo_t memo = {RAND_OBJ_DEFAULT_DEPTH, /*only_hashable=*/FALSE};
-    return rand_obj_any1(&memo);
-}
+ypObject *rand_obj_any(void) { return rand_obj(rand_choice_fixture_type(fixture_types_all)); }
 
 static int array_contains(yp_ssize_t n, ypObject **array, ypObject *x)
 {

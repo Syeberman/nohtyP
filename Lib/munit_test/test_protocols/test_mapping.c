@@ -919,7 +919,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     MunitResult      test_result;
-    ypObject        *int_1 = yp_intC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *keys[6];
     ypObject        *values[6];
     obj_array_fill(keys, type->rand_items);
@@ -987,7 +987,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     // x is not an iterable.
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_raises_exc(yp_update(mp, int_1, &exc), yp_TypeError);
+        assert_raises_exc(yp_update(mp, not_iterable, &exc), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decrefN(N(mp));
     }
@@ -1003,7 +1003,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
 tear_down:
     obj_array_decref(values);
     obj_array_decref(keys);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(not_iterable));
     return test_result;
 }
 

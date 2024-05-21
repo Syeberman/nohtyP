@@ -898,7 +898,10 @@ extern ypObject *rand_obj_any_mutable(void);
 extern ypObject *rand_obj_any_hashable(void);
 
 // Returns a random hashable object of any type except str.
-extern ypObject *rand_obj_hashable_not_str(void);
+extern ypObject *rand_obj_any_hashable_not_str(void);
+
+// Returns a random object of any non-iterable type.
+extern ypObject *rand_obj_any_not_iterable(void);
 
 // Returns a random object of the given type.
 extern ypObject *rand_obj(fixture_type_t *type);
@@ -912,8 +915,8 @@ extern ypObject *rand_obj_any_mutable_unique(yp_ssize_t n, ypObject **array);
 // Fills array with n random, unique objects of any type.
 extern void rand_objs_any(yp_ssize_t n, ypObject **array);
 
-// Returns an object of the given type containing n (key, value) pairs as 2-tuples. The object is
-// constructed by calling type->new_ with a list of the pairs.
+// Returns an object of the given type containing the n (key, value) pairs as 2-tuples. The object
+// is constructed by calling type->new_ with a list of the pairs.
 extern ypObject *new_itemsK(fixture_type_t *type, yp_ssize_t n, ...);
 extern ypObject *new_itemsKV(fixture_type_t *type, yp_ssize_t n, va_list args);
 

@@ -29,7 +29,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -146,7 +146,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     // x is not an iterable.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises(yp_concat(sq, int_1), yp_TypeError);
+        assert_raises(yp_concat(sq, not_iterable), yp_TypeError);
         yp_decrefN(N(sq));
     }
 
@@ -160,6 +160,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
 
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(not_iterable));
     return MUNIT_OK;
 }
 
@@ -969,7 +970,7 @@ tear_down:
 static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t  *type = fixture->type;
-    ypObject        *int_1 = yp_intC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *items[11];
@@ -1218,7 +1219,7 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
     // x is not an iterable.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setsliceC6(sq, 0, 2, 1, int_1, &exc), yp_TypeError);
+        assert_raises_exc(yp_setsliceC6(sq, 0, 2, 1, not_iterable, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decrefN(N(sq));
     }
@@ -1233,6 +1234,7 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
 
 tear_down:
     obj_array_decref(items);
+    yp_decrefN(N(not_iterable));
     return MUNIT_OK;
 }
 
@@ -1712,7 +1714,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     fixture_type_t  *type = fixture->type;
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
-    ypObject        *int_1 = yp_intC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1808,7 +1810,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
     // x is not an iterable.
     {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_extend(sq, int_1, &exc), yp_TypeError);
+        assert_raises_exc(yp_extend(sq, not_iterable, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decrefN(N(sq));
     }
@@ -1823,7 +1825,7 @@ static MunitResult test_extend(const MunitParameter params[], fixture_t *fixture
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(not_iterable));
     return MUNIT_OK;
 }
 

@@ -315,9 +315,10 @@ static MunitResult test_isdisjoint(const MunitParameter params[], fixture_t *fix
     }
 
     // x is not an iterable.
-    test_result =
-            _test_comparisons_not_supported(type, fixture_type_int, yp_isdisjoint, yp_TypeError);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_isdisjoint, yp_TypeError);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     obj_array_decref(items);
@@ -355,9 +356,10 @@ static MunitResult test_issubset(const MunitParameter params[], fixture_t *fixtu
     }
 
     // x is not an iterable.
-    test_result =
-            _test_comparisons_not_supported(type, fixture_type_int, yp_issubset, yp_TypeError);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_issubset, yp_TypeError);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     obj_array_decref(items);
@@ -387,9 +389,10 @@ static MunitResult test_issuperset(const MunitParameter params[], fixture_t *fix
                       assert_obj(result, is, yp_True), yp_decref(so));
 
     // x is not an iterable.
-    test_result =
-            _test_comparisons_not_supported(type, fixture_type_int, yp_issuperset, yp_TypeError);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_issuperset, yp_TypeError);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     obj_array_decref(items);
@@ -411,7 +414,7 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_True,
                     /*both_empty=*/yp_False);
         } else {
-            test_result = _test_comparisons_not_supported(type, (*x_type), yp_lt, yp_TypeError);
+            test_result = _test_comparisons_not_supported(type, *x_type, yp_lt, yp_TypeError);
         }
         if (test_result != MUNIT_OK) goto tear_down;
     }
@@ -419,8 +422,10 @@ static MunitResult test_lt(const MunitParameter params[], fixture_t *fixture)
     // _test_comparisons_faulty_iter not called as lt doesn't support iterators.
 
     // x is not an iterable.
-    test_result = _test_comparisons_not_supported(type, fixture_type_int, yp_lt, yp_TypeError);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_lt, yp_TypeError);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     return test_result;
@@ -441,7 +446,7 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_True,
                     /*both_empty=*/yp_True);
         } else {
-            test_result = _test_comparisons_not_supported(type, (*x_type), yp_le, yp_TypeError);
+            test_result = _test_comparisons_not_supported(type, *x_type, yp_le, yp_TypeError);
         }
         if (test_result != MUNIT_OK) goto tear_down;
     }
@@ -449,8 +454,10 @@ static MunitResult test_le(const MunitParameter params[], fixture_t *fixture)
     // _test_comparisons_faulty_iter not called as le doesn't support iterators.
 
     // x is not an iterable.
-    test_result = _test_comparisons_not_supported(type, fixture_type_int, yp_le, yp_TypeError);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_le, yp_TypeError);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     return test_result;
@@ -471,7 +478,7 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
                     /*both_empty=*/yp_True);
         } else {
-            test_result = _test_comparisons_not_supported(type, (*x_type), yp_eq, yp_False);
+            test_result = _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
         }
         if (test_result != MUNIT_OK) goto tear_down;
     }
@@ -479,8 +486,10 @@ static MunitResult test_eq(const MunitParameter params[], fixture_t *fixture)
     // _test_comparisons_faulty_iter not called as eq doesn't support iterators.
 
     // x is not an iterable.
-    test_result = _test_comparisons_not_supported(type, fixture_type_int, yp_eq, yp_False);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_eq, yp_False);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     return test_result;
@@ -501,7 +510,7 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
                     /*x_overlap=*/yp_True, /*x_no_overlap=*/yp_True, /*so_empty=*/yp_True,
                     /*both_empty=*/yp_False);
         } else {
-            test_result = _test_comparisons_not_supported(type, (*x_type), yp_ne, yp_True);
+            test_result = _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
         }
         if (test_result != MUNIT_OK) goto tear_down;
     }
@@ -509,8 +518,10 @@ static MunitResult test_ne(const MunitParameter params[], fixture_t *fixture)
     // _test_comparisons_faulty_iter not called as ne doesn't support iterators.
 
     // x is not an iterable.
-    test_result = _test_comparisons_not_supported(type, fixture_type_int, yp_ne, yp_True);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_ne, yp_True);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     return test_result;
@@ -531,7 +542,7 @@ static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
                     /*both_empty=*/yp_True);
         } else {
-            test_result = _test_comparisons_not_supported(type, (*x_type), yp_ge, yp_TypeError);
+            test_result = _test_comparisons_not_supported(type, *x_type, yp_ge, yp_TypeError);
         }
         if (test_result != MUNIT_OK) goto tear_down;
     }
@@ -539,8 +550,10 @@ static MunitResult test_ge(const MunitParameter params[], fixture_t *fixture)
     // _test_comparisons_faulty_iter not called as ge doesn't support iterators.
 
     // x is not an iterable.
-    test_result = _test_comparisons_not_supported(type, fixture_type_int, yp_ge, yp_TypeError);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_ge, yp_TypeError);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     return test_result;
@@ -561,7 +574,7 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
                     /*x_overlap=*/yp_False, /*x_no_overlap=*/yp_False, /*so_empty=*/yp_False,
                     /*both_empty=*/yp_False);
         } else {
-            test_result = _test_comparisons_not_supported(type, (*x_type), yp_gt, yp_TypeError);
+            test_result = _test_comparisons_not_supported(type, *x_type, yp_gt, yp_TypeError);
         }
         if (test_result != MUNIT_OK) goto tear_down;
     }
@@ -569,8 +582,10 @@ static MunitResult test_gt(const MunitParameter params[], fixture_t *fixture)
     // _test_comparisons_faulty_iter not called as gt doesn't support iterators.
 
     // x is not an iterable.
-    test_result = _test_comparisons_not_supported(type, fixture_type_int, yp_gt, yp_TypeError);
-    if (test_result != MUNIT_OK) goto tear_down;
+    for (x_type = fixture_types_not_iterable->types; (*x_type) != NULL; x_type++) {
+        test_result = _test_comparisons_not_supported(type, *x_type, yp_gt, yp_TypeError);
+        if (test_result != MUNIT_OK) goto tear_down;
+    }
 
 tear_down:
     return test_result;
@@ -584,6 +599,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *intstore_1 = yp_intstoreC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -747,7 +763,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_union(so, int_1), yp_TypeError);
+        assert_raises(yp_union(so, not_iterable), yp_TypeError);
         yp_decrefN(N(so));
     }
 
@@ -759,7 +775,7 @@ static MunitResult test_union(const MunitParameter params[], fixture_t *fixture)
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(not_iterable, intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -770,6 +786,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -923,7 +940,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_intersection(so, int_1), yp_TypeError);
+        assert_raises(yp_intersection(so, not_iterable), yp_TypeError);
         yp_decrefN(N(so));
     }
 
@@ -935,7 +952,7 @@ static MunitResult test_intersection(const MunitParameter params[], fixture_t *f
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(not_iterable, int_1));
     return MUNIT_OK;
 }
 
@@ -946,6 +963,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     fixture_type_t  *friend_types[] = friend_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1099,7 +1117,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_difference(so, int_1), yp_TypeError);
+        assert_raises(yp_difference(so, not_iterable), yp_TypeError);
         yp_decrefN(N(so));
     }
 
@@ -1111,7 +1129,7 @@ static MunitResult test_difference(const MunitParameter params[], fixture_t *fix
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(not_iterable, int_1));
     return MUNIT_OK;
 }
 
@@ -1123,6 +1141,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *intstore_1 = yp_intstoreC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1285,7 +1304,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises(yp_symmetric_difference(so, int_1), yp_TypeError);
+        assert_raises(yp_symmetric_difference(so, not_iterable), yp_TypeError);
         yp_decrefN(N(so));
     }
 
@@ -1297,7 +1316,7 @@ static MunitResult test_symmetric_difference(const MunitParameter params[], fixt
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(not_iterable, intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -1308,6 +1327,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *intstore_1 = yp_intstoreC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1447,7 +1467,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_update(so, int_1, &exc), yp_TypeError);
+        assert_raises_exc(yp_update(so, not_iterable, &exc), yp_TypeError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1462,7 +1482,7 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(not_iterable, intstore_1, int_1));
     return MUNIT_OK;
 }
 
@@ -1472,6 +1492,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1593,7 +1614,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_intersection_update(so, int_1, &exc), yp_TypeError);
+        assert_raises_exc(yp_intersection_update(so, not_iterable, &exc), yp_TypeError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1608,7 +1629,7 @@ static MunitResult test_intersection_update(const MunitParameter params[], fixtu
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(not_iterable, int_1));
     return MUNIT_OK;
 }
 
@@ -1618,6 +1639,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
     fixture_type_t  *x_types[] = x_types_init(type);
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1739,7 +1761,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_difference_update(so, int_1, &exc), yp_TypeError);
+        assert_raises_exc(yp_difference_update(so, not_iterable, &exc), yp_TypeError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1754,7 +1776,7 @@ static MunitResult test_difference_update(const MunitParameter params[], fixture
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(int_1));
+    yp_decrefN(N(not_iterable, int_1));
     return MUNIT_OK;
 }
 
@@ -1766,6 +1788,7 @@ static MunitResult test_symmetric_difference_update(
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *intstore_1 = yp_intstoreC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[4];
     obj_array_fill(items, type->rand_items);
 
@@ -1900,7 +1923,7 @@ static MunitResult test_symmetric_difference_update(
     // x is not an iterable.
     {
         ypObject *so = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_symmetric_difference_update(so, int_1, &exc), yp_TypeError);
+        assert_raises_exc(yp_symmetric_difference_update(so, not_iterable, &exc), yp_TypeError);
         assert_set(so, items[0], items[1]);
         yp_decrefN(N(so));
     }
@@ -1916,7 +1939,7 @@ static MunitResult test_symmetric_difference_update(
 
 tear_down:
     obj_array_decref(items);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(not_iterable, intstore_1, int_1));
     return MUNIT_OK;
 }
 

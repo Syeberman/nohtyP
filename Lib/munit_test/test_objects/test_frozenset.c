@@ -100,6 +100,7 @@ static MunitResult _test_new(
     fixture_type_t **x_type;
     ypObject        *int_1 = yp_intC(1);
     ypObject        *intstore_1 = yp_intstoreC(1);
+    ypObject        *not_iterable = rand_obj_any_not_iterable();
     ypObject        *items[2];
     obj_array_fill(items, type->rand_items);
 
@@ -179,7 +180,7 @@ static MunitResult _test_new(
             assert_set(so, items[0], items[1]), yp_decref(so));
 
     // x is not an iterable.
-    assert_raises(any_new(int_1), yp_TypeError);
+    assert_raises(any_new(not_iterable), yp_TypeError);
 
     // Exception passthrough.
     if (test_exception_passthrough) {
@@ -187,7 +188,7 @@ static MunitResult _test_new(
     }
 
     obj_array_decref(items);
-    yp_decrefN(N(intstore_1, int_1));
+    yp_decrefN(N(not_iterable, intstore_1, int_1));
     return MUNIT_OK;
 }
 
