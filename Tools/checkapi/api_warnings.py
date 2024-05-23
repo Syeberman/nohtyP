@@ -1,106 +1,89 @@
 from parse_header import ypHeader
 
+# FIXME Test all the warnings.
 
-def CheckEllipsisFunctions(warnings: list[str], header: ypHeader):
-    for function in header.funcs:
-        name = function.name
-        postfixes = function.postfixes
-        vararg_postfix = "N" in postfixes or "K" in postfixes
-        params = function.params
-        vararg_params = params and params[-1].type in ("...", "va_list")
 
-        # Skip non-ellipsis functions
+def CheckVarargFunctions(warnings: list[str], header: ypHeader):
+    for func in header.funcs:
+        vararg_params = func.params and func.params[-1].type in ("...", "va_list")
+
+        if not func.is_vararg:
+            if vararg_params:
+                warnings.append(
+                    "vararg function missing N or K postfix: {}".format(func.name)
+                )
+            continue
         if not vararg_params:
-            if vararg_postfix:
-                warnings.append("N or K used in non-vararg function: {}".format(name))
+            warnings.append(
+                "N, K, or V used in non-vararg function: {}".format(func.name)
+            )
             continue
 
-        if not vararg_postfix:
-            warnings.append("vararg function missing N or K postfix: {}".format(name))
-        if function.postfix_parameter_count is not None:
+        if func.postfix_param_count is not None:
             warnings.append(
-                "vararg function contains input count postfix: {}".format(name)
+                "vararg function contains input count postfix: {}".format(func.name)
             )
 
-        if params[-2].type != "int" or params[-2].name != "n":
+        if func.params[-2].type != "int" or func.params[-2].name != "n":
             warnings.append(
-                "must have 'int n' argument before varargs: {}".format(name)
+                "must have `int n` argument before varargs: {}".format(func.name)
             )
 
-        if "V" in postfixes:
-            if params[-1].type != "va_list":
-                warnings.append("V used in non-va_list function{}".format(name))
-            pair_name = function.rootname + postfixes.replace("V", "")
+        if "V" in func.postfixes:
+            if func.params[-1].type != "va_list":
+                warnings.append("V used in non-va_list function{}".format(func.name))
+            pair_name = func.rootname + func.postfixes.replace("V", "")
             if header.name2funcs.get(pair_name) is None:
-                warnings.append("NV (or KV) missing N (or K) pair: {}".format(name))
+                warnings.append(
+                    "NV (or KV) missing N (or K) pair: {}".format(func.name)
+                )
         else:
-            if params[-1].type != "...":
-                warnings.append("ellipsis not used in non-V function: {}".format(name))
-            pair_name = function.rootname + postfixes.replace("N", "NV").replace(
+            if func.params[-1].type != "...":
+                warnings.append(
+                    "ellipsis not used in non-V function: {}".format(func.name)
+                )
+            pair_name = func.rootname + func.postfixes.replace("N", "NV").replace(
                 "K", "KV"
             )
             if header.name2funcs.get(pair_name) is None:
-                warnings.append("N (or K) missing NV (or KV) pair: {}".format(name))
+                warnings.append(
+                    "N (or K) missing NV (or KV) pair: {}".format(func.name)
+                )
 
 
 def CheckParameterCounts(warnings: list[str], header: ypHeader):
-    for function in header.funcs:
-        name = function.name
-        postfix_parameter_count = function.postfix_parameter_count
-
-        # Skip functions without a parameter count
-        if postfix_parameter_count is None:
+    for func in header.funcs:
+        if func.postfix_param_count is None:
             continue
 
-        parameter_count = len(function.params)
+        param_count = len(func.params)
 
-        if postfix_parameter_count != parameter_count:
+        if func.postfix_param_count != param_count:
             warnings.append(
                 "parameter count postfix ({}) isn't correct ({}): {}".format(
-                    postfix_parameter_count, parameter_count, name
+                    func.postfix_param_count, param_count, func.name
                 )
             )
 
 
-# TODO In reverse, check for ypObject ** functions that are missing E versions
+# FIXME Check that functions that don't return ypObject* have an exc parameter.
 def CheckSetExcFunctions(warnings: list[str], header: ypHeader):
     for func in header.funcs:
-        if "E" not in func.postfixes:
+        if not any(p.name == "exc" for p in func.params):
             continue
 
-        name = func.name
-        pair_name = func.rootname + func.postfixes.replace("E", "")
-
-        pairs = header.name2funcs.get(pair_name)
-        if pairs is None:
-            warnings.append("E function missing non-E version: {}".format(name))
-            continue
-
-        # TODO If the function returns a ypObject *, does it really need exc?
-        first_param = func.params[0]
-        last_param = func.params[-1]
-        if first_param.type != "ypObject *":
+        # FIXME If the function returns a ypObject * it doesn't need exc
+        if "L" not in func.postfixes and func.params[0].type != "ypObject *":
             warnings.append(
-                "first parameter of E function isn't `ypObject *`: {}".format(name)
-            )
-        if last_param.type != "ypObject **" or last_param.name != "exc":
-            warnings.append(
-                "last parameter of E function isn't `ypObject **exc`: {}".format(name)
-            )
-
-        # TODO Check parameter names are the same?  But param names change...
-        for pair in pairs:
-            if pair.params[0].type != "ypObject **":
-                warnings.append(
-                    "first parameter of non-E function isn't `ypObject **`: {}".format(
-                        name
-                    )
+                "first parameter of exc function isn't `ypObject *`: {}".format(
+                    func.name
                 )
+            )
 
-            for i in range(1, len(pair.params)):
-                if pair.params[i].type != func.params[i].type:
-                    warnings.append(
-                        "different types for param `{}` from non-E function: {}".format(
-                            func.params[i].name, name
-                        )
-                    )
+        exc_param = func.params[-3] if func.is_vararg else func.params[-1]
+        if exc_param.type != "ypObject **" or exc_param.name != "exc":
+            warnings.append(
+                "`ypObject **exc` parameter not in expected location: {}".format(
+                    func.name
+                )
+            )

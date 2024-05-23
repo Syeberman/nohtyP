@@ -54,8 +54,8 @@ class ypParameter:
 
     name: str
     type: str
-    input: bool
-    output: bool
+    is_input: bool
+    is_output: bool
 
     @classmethod
     def from_Decl(cls, declnode: c_ast.Decl, param_index):
@@ -70,10 +70,10 @@ class ypParameter:
         # If determining input/output gets too hairy we'll have to annotate the header somehow
         if "**" in self.type:
             # pointers to pointers are outputs
-            self.input, self.output = False, True
+            self.is_input, self.is_output = False, True
         else:
             # all other parameters are inputs
-            self.input, self.output = True, False
+            self.is_input, self.is_output = True, False
 
         return self
 
@@ -84,12 +84,16 @@ class ypParameter:
 class ypFunction:
     _re_name = re.compile(
         r"^(?P<root>yp_([ois]2[ois]_)?([a-z_]+|(asu?int\d+)|(asfloat\d+)))"
-        r"(?P<post>(CF?)?(LF?)?(NV?)?(KV?)?E?D?X?(?P<post_incnt>\d?))$"
+        r"(?P<post>(CF?)?(LF?)?(NV?)?(KV?)?D?X?(?P<post_paramcnt>\d?))$"
     )
 
     name: str
     params: list[ypParameter]
     returntype: str
+    rootname: str
+    postfixes: str
+    postfix_param_count: int | None
+    is_vararg: bool
 
     @classmethod
     def from_Decl(cls, declnode: c_ast.Decl):
@@ -116,9 +120,11 @@ class ypFunction:
         if namematch is None:
             raise ValueError("couldn't parse function name %r" % self.name)
         self.rootname = namematch.group("root")
-        self.postfixes = namematch.group("post")
-        post_incnt = namematch.group("post_incnt")
-        self.postfix_parameter_count = int(post_incnt) if post_incnt else None
+        postfixes = namematch.group("post")
+        self.postfixes = postfixes
+        post_paramcnt = namematch.group("post_paramcnt")
+        self.postfix_param_count = int(post_paramcnt) if post_paramcnt else None
+        self.is_vararg = "N" in postfixes or "K" in postfixes or "V" in postfixes
 
     def __str__(self):
         return "%s (%s): %r" % (
