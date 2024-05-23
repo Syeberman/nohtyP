@@ -55,13 +55,13 @@
  *
  *      C - C native types are accepted and returned where appropriate
  *      L - Library routines that operate strictly on C types
- *      F - A version of "C" or "L" that accepts floats in place of ints
+ *      CF, LF - A version of "C" or "L" that accepts floats in place of ints
  *      N - n variable positional arguments follow
  *      K - n key/value arguments follow (for a total of n*2 arguments)
  *      NV, KV - A version of "N" or "K" that accepts a va_list in place of ...
  *      D - Discard after use (ie yp_IFd)
  *      X - Direct access to internal memory or borrowed objects; tread carefully!
- *      # (number) - A function with # inputs that shares the same name as another function
+ *      # (number) - A function with # parameters that shares the same name as another function
  */
 
 
