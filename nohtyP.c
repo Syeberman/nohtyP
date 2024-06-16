@@ -1280,10 +1280,12 @@ ypObject *const yp_None = yp_CONST_REF(yp_None);
 
 // There are exactly two bool objects
 // TODO Could initialize ypObject_CACHED_HASH here...in fact our value could be in CACHED_HASH.
-static ypBoolObject _yp_True_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, 0, NULL), 1};
+static ypBoolObject _yp_True_struct = {
+        yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, _ypObject_LEN_INVALID, NULL), 1};
 ypObject *const     yp_True = yp_CONST_REF(yp_True);
-static ypBoolObject _yp_False_struct = {yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, 0, NULL), 0};
-ypObject *const     yp_False = yp_CONST_REF(yp_False);
+static ypBoolObject _yp_False_struct = {
+        yp_IMMORTAL_HEAD_INIT(ypBool_CODE, 0, _ypObject_LEN_INVALID, NULL), 0};
+ypObject *const yp_False = yp_CONST_REF(yp_False);
 
 
 #define _ypInt_PREALLOC_START (-5)
