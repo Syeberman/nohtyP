@@ -338,9 +338,9 @@ yp_STATIC_ASSERT(((_yp_ob_len_t)ypObject_LEN_MAX) == ypObject_LEN_MAX, LEN_MAX_f
 
 // The length, and allocated length, of the object
 // XXX Do not set a length >ypObject_LEN_MAX, or a negative length !=ypObject_LEN_INVALID
-#define ypObject_CACHED_LEN(ob) ((yp_ssize_t)((ypObject *)(ob))->ob_len)  // negative if invalid
-#define ypObject_SET_CACHED_LEN(ob, len) (((ypObject *)(ob))->ob_len = (_yp_ob_len_t)(len))
-#define ypObject_ALLOCLEN(ob) ((yp_ssize_t)((ypObject *)(ob))->ob_alloclen)  // negative if invalid
+#define ypObject_LEN(ob) ((yp_ssize_t)((ypObject *)(ob))->ob_len)  // invalid if negative
+#define ypObject_SET_LEN(ob, len) (((ypObject *)(ob))->ob_len = (_yp_ob_len_t)(len))
+#define ypObject_ALLOCLEN(ob) ((yp_ssize_t)((ypObject *)(ob))->ob_alloclen)  // invalid if negative
 #define ypObject_SET_ALLOCLEN(ob, len) (((ypObject *)(ob))->ob_alloclen = (_yp_ob_len_t)(len))
 
 // Hashes can be cached in the object for easy retrieval
@@ -694,7 +694,7 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 
 // list/tuple internals that are shared among other types
 #define ypTuple_ARRAY(sq) ((ypObject **)((ypObject *)sq)->ob_data)
-#define ypTuple_LEN ypObject_CACHED_LEN
+#define ypTuple_LEN ypObject_LEN
 
 #pragma endregion fundamentals
 
@@ -784,16 +784,16 @@ int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
 
 // XXX Adapted from _Py_SIZE_ROUND_DOWN et al
 // Below "a" is a power of 2. Round down size "n" to be a multiple of "a".
-#define yp_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a)-1))
+#define yp_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a) - 1))
 // Round up size "n" to be a multiple of "a".
-#define yp_SIZE_ROUND_UP(n, a) (((size_t)(n) + (size_t)((a)-1)) & ~(size_t)((a)-1))
+#define yp_SIZE_ROUND_UP(n, a) (((size_t)(n) + (size_t)((a) - 1)) & ~(size_t)((a) - 1))
 yp_STATIC_ASSERT(yp_sizeof(size_t) == yp_sizeof(void *), uintptr_unnecessary);
 // Round pointer "p" down to the closest "a"-aligned address <= "p".
-#define yp_ALIGN_DOWN(p, a) ((void *)((size_t)(p) & ~(size_t)((a)-1)))
+#define yp_ALIGN_DOWN(p, a) ((void *)((size_t)(p) & ~(size_t)((a) - 1)))
 // Round pointer "p" up to the closest "a"-aligned address >= "p".
-#define yp_ALIGN_UP(p, a) ((void *)(((size_t)(p) + (size_t)((a)-1)) & ~(size_t)((a)-1)))
+#define yp_ALIGN_UP(p, a) ((void *)(((size_t)(p) + (size_t)((a) - 1)) & ~(size_t)((a) - 1)))
 // Check if pointer "p" is aligned to "a"-bytes boundary.
-#define yp_IS_ALIGNED(p, a) (!((size_t)(p) & (size_t)((a)-1)))
+#define yp_IS_ALIGNED(p, a) (!((size_t)(p) & (size_t)((a) - 1)))
 
 // For N functions (that take variable arguments); to be used as follows:
 //      return_yp_V_FUNC(ypObject *, yp_foobarV, (x, n, args), n)
@@ -1295,7 +1295,7 @@ static ypIntObject _ypInt_pre_allocated[_ypInt_PREALLOC_END - _ypInt_PREALLOC_ST
 #define ypInt_IS_PREALLOC(i) (_ypInt_PREALLOC_START <= i && i < _ypInt_PREALLOC_END)
 
 // XXX Careful! Do not use ypInt_PREALLOC_REF with a value that is not preallocated.
-#define ypInt_PREALLOC_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i)-_ypInt_PREALLOC_START]))
+#define ypInt_PREALLOC_REF(i) ((ypObject *)&(_ypInt_pre_allocated[(i) - _ypInt_PREALLOC_START]))
 
 // TODO Rename to yp_int_*?  I'm OK with yp_s_* because strs are going to be used more often and
 // will likely have long names already (i.e. they'll be named like the string they represent), but
@@ -3784,6 +3784,7 @@ static ypObject *_yp_hash_visitor(ypObject *x, void *_memo, yp_hash_t *hash)
     }
 
     // If the hash has already been calculated, return it immediately
+    // FIXME Rethink these "cached hash" optimizations: should we always call the method?
     if (ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID) {
         *hash = ypObject_CACHED_HASH(x);
         return yp_None;
@@ -3820,6 +3821,7 @@ static ypObject *_yp_cachedhash_visitor(ypObject *x, void *_memo, yp_hash_t *has
     ypObject  *result;
 
     // Check cached hash, and recursion depth first
+    // FIXME Rethink these "cached hash" optimizations: should we always call the method?
     if (!ypObject_IS_MUTABLE(x) && ypObject_CACHED_HASH(x) != ypObject_HASH_INVALID) {
         *hash = ypObject_CACHED_HASH(x);
         return yp_None;
@@ -3846,12 +3848,9 @@ yp_hash_t yp_currenthashC(ypObject *x, ypObject **exc)
 
 yp_ssize_t yp_lenC(ypObject *x, ypObject **exc)
 {
-    // FIXME Rethink these "cached len/hash" optimizations: should we always call the method?
-    yp_ssize_t len = ypObject_CACHED_LEN(x);
-    ypObject  *result;
-
-    if (len >= 0) return len;
-    result = ypObject_TYPE(x)->tp_len(x, &len);
+    // TODO Protect against a tp_len that forgets to set len? Similar for all other methods?
+    yp_ssize_t len;
+    ypObject  *result = ypObject_TYPE(x)->tp_len(x, &len);
     if (yp_isexceptionC(result)) return_yp_CEXC_ERR(0, exc, result);
     yp_ASSERT(len >= 0, "tp_len cannot return negative");
     return len;
@@ -6364,7 +6363,7 @@ static int ypSequence_AdjustIndexC(yp_ssize_t length, yp_ssize_t *i)
                         ((stop) >= (start)) ? 0 : ((stop) - (start) + 1) / (step) + 1;          \
             } else {                                                                            \
                 expected_slicelength =                                                          \
-                        ((start) >= (stop)) ? 0 : ((stop) - (start)-1) / (step) + 1;            \
+                        ((start) >= (stop)) ? 0 : ((stop) - (start) - 1) / (step) + 1;          \
             }                                                                                   \
             yp_ASSERT((slicelength) == expected_slicelength,                                    \
                     "invalid slicelength %" PRIssize " (%" PRIssize ":%" PRIssize ":%" PRIssize \
@@ -6630,8 +6629,8 @@ static yp_codecs_error_handler_func_t yp_codecs_lookup_errorE(ypObject *name, yp
 #define ypStringLib_ENC_CODE(s) (((ypObject *)(s))->ob_type_flags)
 #define ypStringLib_ENC(s) (&(ypStringLib_encs[ypStringLib_ENC_CODE(s)]))
 #define ypStringLib_DATA(s) (((ypObject *)s)->ob_data)
-#define ypStringLib_LEN ypObject_CACHED_LEN
-#define ypStringLib_SET_LEN ypObject_SET_CACHED_LEN
+#define ypStringLib_LEN ypObject_LEN
+#define ypStringLib_SET_LEN ypObject_SET_LEN
 #define ypStringLib_ALLOCLEN ypObject_ALLOCLEN
 #define ypStringLib_SET_ALLOCLEN ypObject_SET_ALLOCLEN
 #define ypStringLib_INLINE_DATA(s) (((ypStringLibObject *)s)->ob_inline_data)
@@ -12025,7 +12024,7 @@ ypObject *yp_splitlines2(ypObject *s, ypObject *keepends)
 // ypTuple_ARRAY is defined above
 #define ypTuple_SET_ARRAY(sq, array) (((ypObject *)sq)->ob_data = array)
 // ypTuple_LEN is defined above
-#define ypTuple_SET_LEN ypObject_SET_CACHED_LEN
+#define ypTuple_SET_LEN ypObject_SET_LEN
 #define ypTuple_ALLOCLEN ypObject_ALLOCLEN
 #define ypTuple_SET_ALLOCLEN ypObject_SET_ALLOCLEN
 #define ypTuple_INLINE_DATA(sq) (((ypTupleObject *)sq)->ob_inline_data)
@@ -15027,8 +15026,8 @@ keyfunc_fail:
 
 #define ypSet_TABLE(so) ((ypSet_KeyEntry *)((ypObject *)so)->ob_data)
 #define ypSet_SET_TABLE(so, value) (((ypObject *)so)->ob_data = (void *)(value))
-#define ypSet_LEN ypObject_CACHED_LEN
-#define ypSet_SET_LEN ypObject_SET_CACHED_LEN
+#define ypSet_LEN ypObject_LEN
+#define ypSet_SET_LEN ypObject_SET_LEN
 #define ypSet_FILL(so) (((ypSetObject *)so)->fill)
 #define ypSet_ALLOCLEN ypObject_ALLOCLEN
 #define ypSet_SET_ALLOCLEN ypObject_SET_ALLOCLEN
@@ -15080,7 +15079,7 @@ yp_IMMORTAL_INVALIDATED(ypSet_dummy);
 // Returns true if the given ypSet_KeyEntry contains a valid key
 #define ypSet_ENTRY_USED(loc) ((loc)->se_key != NULL && (loc)->se_key != ypSet_dummy)
 // Returns the index of the given ypSet_KeyEntry in the hash table
-#define ypSet_ENTRY_INDEX(so, loc) ((yp_ssize_t)((loc)-ypSet_TABLE(so)))
+#define ypSet_ENTRY_INDEX(so, loc) ((yp_ssize_t)((loc) - ypSet_TABLE(so)))
 
 // Before adding keys to the set, call this function to determine if a resize is necessary.
 // Returns 0 if the set should first be resized, otherwise returns the number of keys that can be
@@ -16813,8 +16812,8 @@ ypObject *yp_set(ypObject *iterable)
 
 #define ypDict_KEYSET(mp) (((ypDictObject *)mp)->keyset)
 #define ypDict_ALLOCLEN(mp) ypSet_ALLOCLEN(ypDict_KEYSET(mp))
-#define ypDict_LEN ypObject_CACHED_LEN
-#define ypDict_SET_LEN ypObject_SET_CACHED_LEN
+#define ypDict_LEN ypObject_LEN
+#define ypDict_SET_LEN ypObject_SET_LEN
 #define ypDict_VALUES(mp) ((ypObject **)((ypObject *)mp)->ob_data)
 #define ypDict_SET_VALUES(mp, x) (((ypObject *)mp)->ob_data = x)
 #define ypDict_INLINE_DATA(mp) (((ypDictObject *)mp)->ob_inline_data)
@@ -18180,8 +18179,8 @@ ypObject *yp_dict_fromkeys(ypObject *iterable, ypObject *value)
 
 #define ypRange_START(r) (((ypRangeObject *)r)->start)
 #define ypRange_STEP(r) (((ypRangeObject *)r)->step)
-#define ypRange_LEN ypObject_CACHED_LEN
-#define ypRange_SET_LEN ypObject_SET_CACHED_LEN
+#define ypRange_LEN ypObject_LEN
+#define ypRange_SET_LEN ypObject_SET_LEN
 
 // We normalize start and step for small ranges to make comparisons and hashes easier; use this to
 // ensure we've done it correctly
@@ -18633,7 +18632,7 @@ ypObject *yp_rangeC(yp_int_t stop) { return yp_rangeC3(0, stop, 1); }
 // drop the trailing NULL from argarray, such that n is one less than the number of parameters.
 #define ypFunction_IS_POSITIONAL_MATCH(param_flags, params_len, args_len)          \
     ((ypFunction_HAS_ONLY_POS_OR_KW(param_flags) && (params_len) == (args_len)) || \
-            (ypFunction_HAS_ONLY_POS_ONLY(param_flags) && (params_len)-1 == (args_len)))
+            (ypFunction_HAS_ONLY_POS_ONLY(param_flags) && (params_len) - 1 == (args_len)))
 
 // True if function is exactly (*args, **kwargs).
 #define ypFunction_IS_VAR_POS_VAR_KW(param_flags) \
@@ -18664,8 +18663,8 @@ yp_STATIC_ASSERT(
 #define ypFunction_SET_STATE(f, state) \
     (((ypFunctionObject *)(f))->ob_state = (ypFunctionState *)(state))
 #define ypFunction_PARAMS(f) ((yp_parameter_decl_t *)((ypObject *)(f))->ob_data)
-#define ypFunction_PARAMS_LEN ypObject_CACHED_LEN
-#define ypFunction_SET_PARAMS_LEN ypObject_SET_CACHED_LEN
+#define ypFunction_PARAMS_LEN ypObject_LEN
+#define ypFunction_SET_PARAMS_LEN ypObject_SET_LEN
 #define ypFunction_CODE_FUNC(f) (((ypFunctionObject *)(f))->ob_code)
 
 // The maximum possible size of a function's state
