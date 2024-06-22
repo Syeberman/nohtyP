@@ -7,11 +7,12 @@
 
 // Mappings should accept themselves, their pairs, iterators, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
-// FIXME "Dirty" versions like in test_setlike, and "shared key"?
-#define x_types_init(type)                                                              \
-    {                                                                                   \
-        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, \
-                fixture_type_frozendict, fixture_type_dict, NULL                        \
+// FIXME "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
+#define x_types_init(type)                                                                 \
+    {                                                                                      \
+        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list,    \
+                fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
+                fixture_type_dict_dirty, NULL                                              \
     }
 
 
@@ -34,6 +35,7 @@ static MunitResult test_contains(const MunitParameter params[], fixture_t *fixtu
     }
 
     // An unhashable x should match the equal key in mp.
+    // FIXME A function to return a pair of equal objects, one hashable one not.
     {
         ypObject *int_1 = yp_intC(1);
         ypObject *intstore_1 = yp_intstoreC(1);
@@ -891,6 +893,28 @@ static void updateK_to_update_fromlist(ypObject *mapping, ypObject **exc, int n,
     yp_decref(x);
 }
 
+static void updateK_to_update_fromfrozendict_dirty(ypObject *mapping, ypObject **exc, int n, ...)
+{
+    va_list   args;
+    ypObject *x;
+    va_start(args, n);
+    x = new_itemsKV(fixture_type_frozendict_dirty, n, args);
+    va_end(args);
+    yp_update(mapping, x, exc);
+    yp_decref(x);
+}
+
+static void updateK_to_update_fromdict_dirty(ypObject *mapping, ypObject **exc, int n, ...)
+{
+    va_list   args;
+    ypObject *x;
+    va_start(args, n);
+    x = new_itemsKV(fixture_type_dict_dirty, n, args);
+    va_end(args);
+    yp_update(mapping, x, exc);
+    yp_decref(x);
+}
+
 static void updateK_to_update_fromfrozendict(ypObject *mapping, ypObject **exc, int n, ...)
 {
     va_list   args;
@@ -933,6 +957,10 @@ static MunitResult test_update(const MunitParameter params[], fixture_t *fixture
             updateK = updateK_to_update_fromtuple;
         } else if ((*x_type) == fixture_type_list) {
             updateK = updateK_to_update_fromlist;
+        } else if ((*x_type) == fixture_type_frozendict_dirty) {
+            updateK = updateK_to_update_fromfrozendict_dirty;
+        } else if ((*x_type) == fixture_type_dict_dirty) {
+            updateK = updateK_to_update_fromdict_dirty;
         } else if ((*x_type) == fixture_type_frozendict) {
             updateK = updateK_to_update_fromfrozendict;
         } else {

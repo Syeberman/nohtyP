@@ -3403,9 +3403,9 @@ static ypObject *_yp_freeze(ypObject *x)
     // inspect it after to see if it worked. (Or return yp_NotImplemented.) Perhaps return an
     // exception if the top-level freeze doesn't freeze, but in the case of deep freeze allow deeper
     // objects to silently fail to freeze.
-    result = newType->tp_freeze(x);  // FIXME shouldn't oldType control freezing?
+    result = newType->tp_freeze(x);  // FIXME FIXME shouldn't oldType control freezing?
     if (yp_isexceptionC(result)) return result;
-    ypObject_SET_TYPE_CODE(x, newCode);  // FIXME shouldn't tp_freeze control type code?
+    ypObject_SET_TYPE_CODE(x, newCode);  // FIXME FIXME shouldn't tp_freeze control type code?
     return result;
 }
 
@@ -3423,11 +3423,9 @@ static ypObject *_yp_deepfreeze(ypObject *x, void *_memo)
     ypObject *result;
 
     // Avoid recursion: we only have to visit each object once
-    // TODO An easier way to accomplish the same is to inspect ypObject_IS_MUTABLE, since we freeze
-    // before going deep.
-    // TODO ...and then switch to recursion depth check. In fact, reconsider anywhere we take a
-    // "weak reference" to an object as a means of preventing recursion. (And, also, if we do
-    // this we need a keepalive like deepcopy does.)
+    // TODO Switch to recursion depth check? In fact, reconsider anywhere we take a "weak reference"
+    // to an object as a means of preventing recursion. (And, also, if we do this we need a
+    // keepalive like deepcopy does.)
     id = yp_intC((yp_ssize_t)x);
     yp_pushunique(memo, id, &exc);
     yp_decref(id);
@@ -17214,6 +17212,11 @@ static ypObject *frozendict_traverse(ypObject *mp, visitfunc visitor, void *memo
     return yp_None;
 }
 
+static ypObject *frozendict_freeze(ypObject *mp)
+{
+    return yp_None;  // no-op, currently
+}
+
 static ypObject *frozendict_unfrozen_copy(ypObject *x)
 {
     if (ypDict_LEN(x) < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
@@ -17797,7 +17800,7 @@ static ypTypeObject ypFrozenDict_Type = {
         NULL,                               // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,           // tp_freeze
+        frozendict_freeze,             // tp_freeze
         frozendict_unfrozen_copy,      // tp_unfrozen_copy
         frozendict_frozen_copy,        // tp_frozen_copy
         frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy
@@ -17881,7 +17884,7 @@ static ypTypeObject ypDict_Type = {
         NULL,                         // tp_repr
 
         // Freezing, copying, and invalidating
-        MethodError_objproc,           // tp_freeze
+        frozendict_freeze,             // tp_freeze
         frozendict_unfrozen_copy,      // tp_unfrozen_copy
         frozendict_frozen_copy,        // tp_frozen_copy
         frozendict_unfrozen_deepcopy,  // tp_unfrozen_deepcopy

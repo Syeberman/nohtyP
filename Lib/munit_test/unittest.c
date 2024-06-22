@@ -44,6 +44,8 @@ static fixture_type_t fixture_type_frozenset_dirty_struct;
 static fixture_type_t fixture_type_set_dirty_struct;
 static fixture_type_t fixture_type_frozendict_struct;
 static fixture_type_t fixture_type_dict_struct;
+static fixture_type_t fixture_type_frozendict_dirty_struct;
+static fixture_type_t fixture_type_dict_dirty_struct;
 static fixture_type_t fixture_type_function_struct;
 
 
@@ -1186,6 +1188,7 @@ static void make_set_dirty(ypObject *so)
     munit_rand_memory(16, bytes);
     assert_not_raises(item = yp_bytesC(16, bytes));  // new ref
 
+    assert_obj(item, not_in, so);
     assert_not_raises_exc(yp_pushunique(so, item, &exc));
     assert_not_raises_exc(yp_remove(so, item, &exc));
 
@@ -1198,6 +1201,7 @@ static ypObject *new_frozenset_dirty(ypObject *x)
     if (yp_isexceptionC(result)) return result;
     make_set_dirty(result);
     assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozenset);
     return result;
 }
 
@@ -1206,6 +1210,7 @@ static ypObject *new_rand_frozenset_dirty(const rand_obj_supplier_memo_t *memo)
     ypObject *result = new_rand_set(memo);  // new ref
     make_set_dirty(result);
     assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozenset);
     return result;
 }
 
@@ -1220,6 +1225,7 @@ static ypObject *new_frozenset_dirtyN(int n, ...)
 
     make_set_dirty(result);
     assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozenset);
     return result;
 }
 
@@ -1413,18 +1419,22 @@ static ypObject *new_rand_dict(const rand_obj_supplier_memo_t *memo)
     }
 }
 
+static ypObject *new_dictNV(int n, va_list args)
+{
+    ypObject *result;
+    ypObject *supplier = _mapping_new_supplierN(n, args);  // new ref
+    assert_not_raises(result = yp_dict(supplier));         // new ref
+    yp_decref(supplier);
+    return result;
+}
+
 static ypObject *new_dictN(int n, ...)
 {
     va_list   args;
-    ypObject *supplier;
     ypObject *result;
-
     va_start(args, n);
-    supplier = _mapping_new_supplierN(n, args);  // new ref
+    result = new_dictNV(n, args);  // new ref
     va_end(args);
-
-    assert_not_raises(result = yp_dict(supplier));  // new ref
-    yp_decref(supplier);
     return result;
 }
 
@@ -1456,11 +1466,181 @@ static fixture_type_t fixture_type_dict_struct = {
         FALSE,  // is_patterned
 };
 
+// Adds and discards a unique object from mp such that it will contain a deleted entry.
+static void make_dict_dirty(ypObject *mp)
+{
+    yp_uint8_t bytes[16];
+    ypObject  *item;
+
+    // We could use any object to make the dict dirty: the type and value don't affect the final
+    // result, only the hash of the object remains after removing it. 16 random bytes is unique
+    // enough for UUIDs, so we'll use that. It's unlikely, but possible, that the hash could equal
+    // an existing or future item in this dict, and we don't know what order the entries in the dict
+    // will be visited, so coverage results for the tests could conceivably change run-to-run. Also,
+    // the dict will become clean again if resized, which would affect coverage.
+    munit_rand_memory(16, bytes);
+    assert_not_raises(item = yp_bytesC(16, bytes));  // new ref
+
+    assert_obj(item, not_in, mp);
+    assert_not_raises_exc(yp_setitem(mp, item, item, &exc));
+    assert_not_raises_exc(yp_delitem(mp, item, &exc));
+
+    yp_decref(item);
+}
+
+static ypObject *new_frozendict_dirty(ypObject *x)
+{
+    ypObject *result = yp_dict(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_dict_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozendict);
+    return result;
+}
+
+static ypObject *new_rand_frozendict_dirty(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = new_rand_dict(memo);  // new ref
+    make_dict_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozendict);
+    return result;
+}
+
+static ypObject *new_frozendict_dirtyN(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = new_dictNV(n, args);  // new ref
+    va_end(args);
+
+    make_dict_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozendict);
+    return result;
+}
+
+static ypObject *new_frozendict_dirtyK(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = yp_dictKV(n, args);  // new ref
+    va_end(args);
+
+    make_dict_dirty(result);
+    assert_not_raises_exc(yp_freeze(result, &exc));
+    assert_type_is(result, yp_t_frozendict);
+    return result;
+}
+
+static fixture_type_t fixture_type_frozendict_dirty_struct = {
+        "frozendict_dirty",               // name
+        NULL,                             // type (initialized at runtime)
+        NULL,                             // falsy (initialized at runtime, maybe)
+        &fixture_type_dict_dirty_struct,  // pair
+
+        new_rand_frozendict_dirty,  // _new_rand
+
+        new_frozendict_dirty,  // new_
+
+        new_frozendict_dirtyN,   // newN
+        rand_objs_any_hashable,  // rand_items
+
+        new_frozendict_dirtyK,  // newK
+        rand_objs_any,          // rand_values
+
+        FALSE,  // is_mutable
+        FALSE,  // is_numeric
+        TRUE,   // is_iterable
+        TRUE,   // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_setlike
+        TRUE,   // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_patterned
+};
+
+static ypObject *new_dict_dirty(ypObject *x)
+{
+    ypObject *result = yp_dict(x);  // new ref
+    if (yp_isexceptionC(result)) return result;
+    make_dict_dirty(result);
+    return result;
+}
+
+static ypObject *new_rand_dict_dirty(const rand_obj_supplier_memo_t *memo)
+{
+    ypObject *result = new_rand_dict(memo);  // new ref
+    make_dict_dirty(result);
+    return result;
+}
+
+static ypObject *new_dict_dirtyN(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = new_dictNV(n, args);  // new ref
+    va_end(args);
+
+    make_dict_dirty(result);
+    return result;
+}
+
+static ypObject *new_dict_dirtyK(int n, ...)
+{
+    va_list   args;
+    ypObject *result;
+
+    va_start(args, n);
+    result = yp_dictKV(n, args);  // new ref
+    va_end(args);
+
+    make_dict_dirty(result);
+    return result;
+}
+
+static fixture_type_t fixture_type_dict_dirty_struct = {
+        "dict_dirty",                           // name
+        NULL,                                   // type (initialized at runtime)
+        NULL,                                   // falsy (initialized at runtime, maybe)
+        &fixture_type_frozendict_dirty_struct,  // pair
+
+        new_rand_dict_dirty,  // _new_rand
+
+        new_dict_dirty,  // new_
+
+        new_dict_dirtyN,         // newN
+        rand_objs_any_hashable,  // rand_items
+
+        new_dict_dirtyK,  // newK
+        rand_objs_any,    // rand_values
+
+        TRUE,   // is_mutable
+        FALSE,  // is_numeric
+        TRUE,   // is_iterable
+        TRUE,   // is_collection
+        FALSE,  // is_sequence
+        FALSE,  // is_string
+        FALSE,  // is_setlike
+        TRUE,   // is_mapping
+        FALSE,  // is_callable
+        FALSE,  // is_patterned
+};
+
 static ypObject *new_rand_function_code(ypObject *f, yp_ssize_t n, ypObject *const *argarray)
 {
     return rand_obj_any();
 }
 
+// TODO Randomly return a statically-allocated function.
+// TODO Randomize the parameters, default values, etc.
 static ypObject *new_rand_function(const rand_obj_supplier_memo_t *memo)
 {
     yp_parameter_decl_t parameter_decl[] = {{yp_s_star_args}, {yp_s_star_star_kwargs}};
@@ -1520,9 +1700,11 @@ fixture_type_t *fixture_type_frozenset_dirty = &fixture_type_frozenset_dirty_str
 fixture_type_t *fixture_type_set_dirty = &fixture_type_set_dirty_struct;
 fixture_type_t *fixture_type_frozendict = &fixture_type_frozendict_struct;
 fixture_type_t *fixture_type_dict = &fixture_type_dict_struct;
+fixture_type_t *fixture_type_frozendict_dirty = &fixture_type_frozendict_dirty_struct;
+fixture_type_t *fixture_type_dict_dirty = &fixture_type_dict_dirty_struct;
 fixture_type_t *fixture_type_function = &fixture_type_function_struct;
 
-#define FIXTURE_TYPES_ALL_LEN 22  // Verified in initialize_fixture_types.
+#define FIXTURE_TYPES_ALL_LEN 24  // Verified in initialize_fixture_types.
 static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
         &fixture_type_NoneType_struct, &fixture_type_bool_struct, &fixture_type_int_struct,
         &fixture_type_intstore_struct, &fixture_type_float_struct, &fixture_type_floatstore_struct,
@@ -1531,6 +1713,7 @@ static fixture_type_t *fixture_types_all_types[] = {&fixture_type_type_struct,
         &fixture_type_tuple_struct, &fixture_type_list_struct, &fixture_type_frozenset_struct,
         &fixture_type_set_struct, &fixture_type_frozenset_dirty_struct,
         &fixture_type_set_dirty_struct, &fixture_type_frozendict_struct, &fixture_type_dict_struct,
+        &fixture_type_frozendict_dirty_struct, &fixture_type_dict_dirty_struct,
         &fixture_type_function_struct, NULL};
 // param_values_types_all is populated in initialize_fixture_types.
 static fixture_types_t fixture_types_all_struct = {FIXTURE_TYPES_ALL_LEN, fixture_types_all_types};
@@ -1616,6 +1799,9 @@ static void initialize_fixture_types(void)
     fixture_type_frozendict->type = yp_t_frozendict;
     fixture_type_frozendict->falsy = yp_frozendict_empty;
     fixture_type_dict->type = yp_t_dict;
+    fixture_type_frozendict_dirty->type = yp_t_frozendict;
+    fixture_type_frozendict_dirty->falsy = yp_frozendict_empty;
+    fixture_type_dict_dirty->type = yp_t_dict;
     fixture_type_function->type = yp_t_function;
 
     // The fixture_types_* and param_values_types_* arrays above were sized based on
@@ -1694,7 +1880,7 @@ yp_ssize_t yp_lenC_not_raises(ypObject *container)
 }
 
 
-#define MALLOC_TRACKER_MAX_LEN 2000
+#define MALLOC_TRACKER_MAX_LEN 3000
 
 // TODO Not currently threadsafe
 struct _malloc_tracker_t {

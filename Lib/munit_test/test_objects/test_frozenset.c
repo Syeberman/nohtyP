@@ -10,9 +10,10 @@
                 fixture_type_frozendict, fixture_type_dict, NULL                         \
     }
 
-#define friend_types_init()                            \
-    {                                                  \
-        fixture_type_frozenset, fixture_type_set, NULL \
+#define friend_types_init()                                                     \
+    {                                                                           \
+        fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, \
+                fixture_type_set_dirty, NULL                                    \
     }
 
 // Returns true iff type can store unhashable objects.

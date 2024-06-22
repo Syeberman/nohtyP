@@ -3,6 +3,9 @@
 // of their protocols, but that are instead common among all types that currently implement those
 // protocols. There is room to adjust these tests as new types are created.
 
+// FIXME In test_objects, test that various methods fail if the protocol is not supported; for
+// example, yp_lenC should fail for all non-collections.
+
 #include "munit_test/unittest.h"
 
 

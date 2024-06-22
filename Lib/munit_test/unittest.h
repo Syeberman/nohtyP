@@ -440,11 +440,12 @@ extern "C" {
                 __VA_ARGS__);                                                                \
     } while (0)
 
-// yp_type(obj) == expected
+// yp_type(obj) == expected; obj is not an exception.
 #define assert_type_is(obj, expected)                                                      \
     do {                                                                                   \
         ypObject *_ypmt_TYPE_obj = (obj);                                                  \
         ypObject *_ypmt_TYPE_expected = (expected);                                        \
+        _assert_not_exception(_ypmt_TYPE_obj, "%s", #obj);                                 \
         _assert_type_is(_ypmt_TYPE_obj, _ypmt_TYPE_expected, "%s", "%s", #obj, #expected); \
     } while (0)
 
@@ -456,12 +457,14 @@ extern "C" {
                 "yp_type(" b_fmt ")", __VA_ARGS__);                                 \
     } while (0)
 
-// yp_type(a) == yp_type(b)
+// yp_type(a) == yp_type(b); neither a nor b are exceptions.
 #define assert_same_type(a, b)                                           \
     do {                                                                 \
         ypObject *_ypmt_TYPE_a = (a);                                    \
         ypObject *_ypmt_TYPE_b = (b);                                    \
-        _assert_type_is(_ypmt_TYPE_a, _ypmt_TYPE_b, "%s", "%s", #a, #b); \
+        _assert_not_exception(_ypmt_TYPE_a, "%s", #a);                   \
+        _assert_not_exception(_ypmt_TYPE_b, "%s", #b);                   \
+        _assert_same_type(_ypmt_TYPE_a, _ypmt_TYPE_b, "%s", "%s", #a, #b); \
     } while (0)
 
 // XXX expected must be a yp_ssize_t.
@@ -825,6 +828,8 @@ extern fixture_type_t *fixture_type_frozenset_dirty;
 extern fixture_type_t *fixture_type_set_dirty;
 extern fixture_type_t *fixture_type_frozendict;
 extern fixture_type_t *fixture_type_dict;
+extern fixture_type_t *fixture_type_frozendict_dirty;
+extern fixture_type_t *fixture_type_dict_dirty;
 extern fixture_type_t *fixture_type_function;
 
 typedef struct _fixture_t {

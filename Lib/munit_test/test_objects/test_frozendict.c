@@ -2,19 +2,19 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME "frozendict_dirty", "dict_dirty", shared key?
 // FIXME fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, and
 // fixture_type_set_dirty are tricky because they require hashable types but in (key, value) the
 // value may not be hashable.
-#define x_types_init()                                                                     \
-    {                                                                                      \
-        fixture_type_frozendict, fixture_type_dict, fixture_type_iter, fixture_type_tuple, \
-                fixture_type_list, NULL                                                    \
+#define x_types_init()                                                                          \
+    {                                                                                           \
+        fixture_type_frozendict, fixture_type_dict, fixture_type_iter, fixture_type_tuple,      \
+                fixture_type_list, fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL \
     }
 
-#define friend_types_init()                              \
-    {                                                    \
-        fixture_type_frozendict, fixture_type_dict, NULL \
+#define friend_types_init()                                                        \
+    {                                                                              \
+        fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
+                fixture_type_dict_dirty, NULL                                      \
     }
 
 // Returns true iff type can store unhashable objects.
@@ -775,8 +775,8 @@ static MunitResult test_fromkeys(const MunitParameter params[], fixture_t *fixtu
 }
 
 
-// FIXME "frozendict_dirty", "dict_dirty", shared key?
-char *param_values_test_frozendict[] = {"frozendict", "dict", NULL};
+char *param_values_test_frozendict[] = {
+        "frozendict", "dict", "frozendict_dirty", "dict_dirty", NULL};
 
 static MunitParameterEnum test_frozendict_params[] = {
         {param_key_type, param_values_test_frozendict}, {NULL}};
