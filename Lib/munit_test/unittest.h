@@ -366,7 +366,7 @@ extern "C" {
                 #statement, #__VA_ARGS__);                                                 \
     } while (0)
 
-// A version of _assert_typeC that ensures a_statement and b_statement do not throw an exception via
+// A version of _assert_typeC that ensures a_statement and b_statement do not raise an exception via
 // a `ypObject **exc` argument. a_statement and b_statement are only evaluated once.
 #define _assert_typeC_exc(T, a_statement, op, b_statement, val_pri, a_fmt, b_fmt, ...)       \
     do {                                                                                     \
@@ -387,6 +387,37 @@ extern "C" {
     _assert_typeC_exc(yp_ssize_t, a, op, b, PRIssize, "%s", "%s", #a, #b)
 #define assert_hashC_exc(a, op, b) \
     _assert_typeC_exc(yp_hash_t, a, op, b, PRIssize, "%s", "%s", #a, #b)
+
+// A version of _assert_typeC that ensures a_statement raises one of the given exceptions via a
+// `ypObject **exc` argument. b_statement must not raise an exception. a_statement and b_statement
+// are only evaluated once.
+#define _assert_typeC_raises_exc(T, a_statement, op, b_statement, excs, val_pri, a_fmt, b_fmt,    \
+        excs_fmt, a_str, b_str, excs_str)                                                         \
+    do {                                                                                          \
+        ypObject  *_ypmt_TYPEC_excs[] = {UNPACK excs};                                            \
+        yp_ssize_t _ypmt_TYPEC_n = yp_lengthof_array(_ypmt_TYPEC_excs);                           \
+        T          _ypmt_TYPEC_a;                                                                 \
+        T          _ypmt_TYPEC_b;                                                                 \
+        _assert_raises_exc(_ypmt_TYPEC_a = (a_statement), _ypmt_TYPEC_n, _ypmt_TYPEC_excs, a_fmt, \
+                excs_fmt, a_str, excs_str);                                                       \
+        _assert_not_raises_exc(_ypmt_TYPEC_b = (b_statement), b_fmt, b_str);                      \
+        _assert_typeC(_ypmt_TYPEC_a, op, _ypmt_TYPEC_b, val_pri, a_fmt, b_fmt, a_str, b_str);     \
+    } while (0)
+
+// Asserts that a raises one of the given exceptions via a `ypObject **exc` argument. b must not
+// raise an exception. a and b must evaluate to the appropriate type, and a must be a function call
+// using `&exc` for the exception argument. Example:
+//
+//      assert_ssizeC_raises_exc(yp_findC(obj, item, &exc), ==, -1, yp_TypeError);
+#define assert_intC_raises_exc(a, op, b, ...) \
+    _assert_typeC_raises_exc(                 \
+            yp_int_t, a, op, b, (__VA_ARGS__), PRIint, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
+#define assert_ssizeC_raises_exc(a, op, b, ...) \
+    _assert_typeC_raises_exc(                   \
+            yp_ssize_t, a, op, b, (__VA_ARGS__), PRIssize, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
+#define assert_hashC_raises_exc(a, op, b, ...) \
+    _assert_typeC_raises_exc(                  \
+            yp_hash_t, a, op, b, (__VA_ARGS__), PRIssize, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
 
 // value is the expected value, either yp_True or yp_False; not_value is the negation of value.
 #define _assert_bool(obj, value, not_value, obj_fmt, ...)                                        \
@@ -458,12 +489,12 @@ extern "C" {
     } while (0)
 
 // yp_type(a) == yp_type(b); neither a nor b are exceptions.
-#define assert_same_type(a, b)                                           \
-    do {                                                                 \
-        ypObject *_ypmt_TYPE_a = (a);                                    \
-        ypObject *_ypmt_TYPE_b = (b);                                    \
-        _assert_not_exception(_ypmt_TYPE_a, "%s", #a);                   \
-        _assert_not_exception(_ypmt_TYPE_b, "%s", #b);                   \
+#define assert_same_type(a, b)                                             \
+    do {                                                                   \
+        ypObject *_ypmt_TYPE_a = (a);                                      \
+        ypObject *_ypmt_TYPE_b = (b);                                      \
+        _assert_not_exception(_ypmt_TYPE_a, "%s", #a);                     \
+        _assert_not_exception(_ypmt_TYPE_b, "%s", #b);                     \
         _assert_same_type(_ypmt_TYPE_a, _ypmt_TYPE_b, "%s", "%s", #a, #b); \
     } while (0)
 
@@ -674,7 +705,7 @@ extern "C" {
         UNPACK tear_down;                                                                   \
     } while (0)
 
-// XXX yp_SyntaxError is chosen as nohtyP.c neither throws nor catches it.
+// XXX yp_SyntaxError is chosen as nohtyP.c neither raises nor catches it.
 #define _faulty_iter_tests(setup, iter_name, iter_supplier, statement, assertion, tear_down,      \
         exc_suffix, statement_str)                                                                \
     do {                                                                                          \
@@ -705,7 +736,7 @@ extern "C" {
                 statement, assertion, tear_down, "hint_max", exc_suffix, statement_str);       */ \
     } while (0)
 
-// Executes a series of tests using a "faulty iterator" that either throws an exception during
+// Executes a series of tests using a "faulty iterator" that either raises an exception during
 // iteration or provides a misleading length hint. The faulty iterator is assigned to iter_name and
 // yields values from iter_supplier, which is evaluated once but iterated over multiple times;
 // iter_supplier must contain at least two entries. statement is executed for each test, and should
@@ -798,7 +829,7 @@ typedef struct _fixture_type_t {
     int is_mutable;
     int is_numeric;
     int is_iterable;
-    int is_collection;  // FIXME nohtyP.h calls this "container", but Python abc is collection
+    int is_collection;  // FIXME FIXME nohtyP.h calls this "container", but Python abc is collection
     int is_sequence;
     int is_string;
     int is_setlike;
