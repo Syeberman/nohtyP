@@ -2,7 +2,7 @@
 #include "munit_test/unittest.h"
 
 
-// FIXME fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, and
+// TODO fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, and
 // fixture_type_set_dirty are tricky because they require hashable types but in (key, value) the
 // value may not be hashable.
 #define x_types_init()                                                                          \

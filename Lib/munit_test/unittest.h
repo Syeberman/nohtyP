@@ -412,6 +412,9 @@ extern "C" {
 #define assert_intC_raises_exc(a, op, b, ...) \
     _assert_typeC_raises_exc(                 \
             yp_int_t, a, op, b, (__VA_ARGS__), PRIint, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
+#define assert_floatC_raises_exc(a, op, b, ...) \
+    _assert_typeC_raises_exc(                   \
+            yp_float_t, a, op, b, (__VA_ARGS__), "lf", "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
 #define assert_ssizeC_raises_exc(a, op, b, ...) \
     _assert_typeC_raises_exc(                   \
             yp_ssize_t, a, op, b, (__VA_ARGS__), PRIssize, "%s", "%s", "%s", #a, #b, #__VA_ARGS__)
@@ -1024,6 +1027,7 @@ SUITE_OF_TESTS_DECLS(test_frozenset);
 SUITE_OF_TESTS_DECLS(test_function);
 
 SUITE_OF_SUITES_DECLS(test_protocols);
+SUITE_OF_TESTS_DECLS(test_all);
 SUITE_OF_TESTS_DECLS(test_collection);
 SUITE_OF_TESTS_DECLS(test_iterable);
 SUITE_OF_TESTS_DECLS(test_mapping);

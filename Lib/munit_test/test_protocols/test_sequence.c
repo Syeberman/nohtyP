@@ -36,7 +36,7 @@ static MunitResult test_concat(const MunitParameter params[], fixture_t *fixture
     // range stores integers following a pattern, so doesn't support concat.
     if (type->is_patterned) {
         ypObject *sq = rand_obj(type);
-        assert_raises(yp_concat(sq, sq), yp_MethodError);
+        assert_raises(yp_concat(sq, sq), yp_TypeError);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
@@ -173,7 +173,7 @@ static MunitResult test_repeatC(const MunitParameter params[], fixture_t *fixtur
     // range stores integers following a pattern, so doesn't support repeat.
     if (type->is_patterned) {
         ypObject *sq = rand_obj(type);
-        assert_raises(yp_repeatC(sq, 2), yp_MethodError);
+        assert_raises(yp_repeatC(sq, 2), yp_TypeError);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
     }
@@ -891,7 +891,7 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
     // Immutables don't support setindex.
     if (!type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setindexC(sq, 0, items[2], &exc), yp_MethodError);
+        assert_raises_exc(yp_setindexC(sq, 0, items[2], &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
@@ -980,7 +980,7 @@ static MunitResult test_setsliceC(const MunitParameter params[], fixture_t *fixt
     if (!type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
         ypObject *two = type->newN(N(items[2]));
-        assert_raises_exc(yp_setsliceC6(sq, 0, 1, 1, two, &exc), yp_MethodError);
+        assert_raises_exc(yp_setsliceC6(sq, 0, 1, 1, two, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decrefN(N(sq, two));
         goto tear_down;  // Skip remaining tests.
@@ -1257,7 +1257,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     // Immutables don't support setitem.
     if (!type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_setitem(sq, int_0, items[2], &exc), yp_MethodError);
+        assert_raises_exc(yp_setitem(sq, int_0, items[2], &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
@@ -1355,7 +1355,7 @@ static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixt
     // Immutables don't support delindex.
     if (!type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delindexC(sq, 0, &exc), yp_MethodError);
+        assert_raises_exc(yp_delindexC(sq, 0, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
@@ -1424,7 +1424,7 @@ static MunitResult test_delsliceC(const MunitParameter params[], fixture_t *fixt
     // Immutables don't support delslice.
     if (!type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delsliceC5(sq, 0, 1, 1, &exc), yp_MethodError);
+        assert_raises_exc(yp_delsliceC5(sq, 0, 1, 1, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
@@ -1566,7 +1566,7 @@ static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixtur
     // Immutables don't support delitem.
     if (!type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_delitem(sq, int_0, &exc), yp_MethodError);
+        assert_raises_exc(yp_delitem(sq, int_0, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.
@@ -1838,7 +1838,7 @@ static MunitResult test_irepeatC(const MunitParameter params[], fixture_t *fixtu
     // Immutables don't support irepeat.
     if (!type->is_mutable) {
         ypObject *sq = type->newN(N(items[0], items[1]));
-        assert_raises_exc(yp_irepeatC(sq, 2, &exc), yp_MethodError);
+        assert_raises_exc(yp_irepeatC(sq, 2, &exc), yp_TypeError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
         goto tear_down;  // Skip remaining tests.

@@ -510,7 +510,7 @@ typedef struct {
     // Number operations
     ypNumberMethods *tp_as_number;
 
-    // Iterator operations
+    // Iterable/iterator operations
     miniiterfunc             tp_miniiter;
     miniiterfunc             tp_miniiter_reversed;
     miniiterfunc             tp_miniiter_next;
@@ -599,77 +599,25 @@ yp_STATIC_ASSERT(_ypFunction_CODE == ypFunction_CODE, ypFunction_CODE_matches);
 // needs to point to a valid function (as opposed to constantly checking for NULL)
 // clang-format off
 #define DEFINE_GENERIC_METHODS(name, retval) \
-    static ypObject *name ## _objproc(ypObject *x) { return retval; } \
-    static ypObject *name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
-    static ypObject *name ## _objobjobjproc(ypObject *x, ypObject *y, ypObject *z) { return retval; } \
-    static ypObject *name ## _objssizeproc(ypObject *x, yp_ssize_t i) { return retval; } \
-    static ypObject *name ## _objssizeobjproc(ypObject *x, yp_ssize_t i, ypObject *y) { return retval; } \
-    static ypObject *name ## _objsliceproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k) { return retval; } \
-    static ypObject *name ## _objsliceobjproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y) { return retval; } \
-    static ypObject *name ## _objvalistproc(ypObject *x, int n, va_list args) { return retval; } \
-    static ypObject *name ## _objpobjpobjproc(ypObject *x, ypObject **key, ypObject **value) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objproc(ypObject *x) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objobjproc(ypObject *x, ypObject *y) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objobjobjproc(ypObject *x, ypObject *y, ypObject *z) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objssizeproc(ypObject *x, yp_ssize_t i) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objssizeobjproc(ypObject *x, yp_ssize_t i, ypObject *y) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objsliceproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objsliceobjproc(ypObject *x, yp_ssize_t i, yp_ssize_t j, yp_ssize_t k, ypObject *y) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objvalistproc(ypObject *x, int n, va_list args) { return retval; } \
+    static ypObject *yp_UNUSED name ## _objpobjpobjproc(ypObject *x, ypObject **key, ypObject **value) { return retval; } \
     \
-    static ypObject *name ## _visitfunc(ypObject *x, void *memo) { return retval; } \
-    static ypObject *name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
-    static ypObject *name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
-    static ypObject *name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
-    static ypObject *name ## _miniiter_items_nextfunc(ypObject *x, yp_uint64_t *state, ypObject **key, ypObject **value) { return retval; } \
-    static ypObject *name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *length_hint) { return retval; } \
-    static ypObject *name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
-    static ypObject *name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
-    static ypObject *name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; } \
-    \
-    static ypNumberMethods yp_UNUSED name ## _NumberMethods[1] = { { \
-        *name ## _objproc \
-    } }; \
-    static ypSequenceMethods yp_UNUSED name ## _SequenceMethods[1] = { { \
-        *name ## _objobjproc, \
-        *name ## _objssizeproc, \
-        *name ## _objssizeobjproc, \
-        *name ## _objsliceproc, \
-        *name ## _findfunc, \
-        *name ## _countfunc, \
-        *name ## _objssizeobjproc, \
-        *name ## _objsliceobjproc, \
-        *name ## _objssizeproc, \
-        *name ## _objsliceproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objssizeproc, \
-        *name ## _objssizeobjproc, \
-        *name ## _objssizeproc, \
-        *name ## _objproc, \
-        *name ## _objobjobjproc \
-    } }; \
-    static ypSetMethods yp_UNUSED name ## _SetMethods[1] = { { \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc, \
-        *name ## _objobjproc \
-    } }; \
-    static ypMappingMethods yp_UNUSED name ## _MappingMethods[1] = { { \
-        *name ## _miniiterfunc, \
-        *name ## _miniiterfunc, \
-        *name ## _miniiterfunc, \
-        *name ## _miniiter_items_nextfunc, \
-        *name ## _objproc, \
-        *name ## _objproc, \
-        *name ## _objproc, \
-        *name ## _objobjobjproc, \
-        *name ## _objpobjpobjproc, \
-        *name ## _objobjobjproc, \
-        *name ## _objvalistproc, \
-    } }; \
-    static ypCallableMethods yp_UNUSED name ## _CallableMethods[1] = { { \
-        *name ## _objpobjpobjproc \
-    } };
+    static ypObject *yp_UNUSED name ## _visitfunc(ypObject *x, void *memo) { return retval; } \
+    static ypObject *yp_UNUSED name ## _traversefunc(ypObject *x, visitfunc visitor, void *memo) { return retval; } \
+    static ypObject *yp_UNUSED name ## _hashfunc(ypObject *x, hashvisitfunc hash_visitor, void *hash_memo, yp_hash_t *hash) { return retval; } \
+    static ypObject *yp_UNUSED name ## _miniiterfunc(ypObject *x, yp_uint64_t *state) { return retval; } \
+    static ypObject *yp_UNUSED name ## _miniiter_items_nextfunc(ypObject *x, yp_uint64_t *state, ypObject **key, ypObject **value) { return retval; } \
+    static ypObject *yp_UNUSED name ## _miniiter_lenhfunc(ypObject *x, yp_uint64_t *state, yp_ssize_t *length_hint) { return retval; } \
+    static ypObject *yp_UNUSED name ## _lenfunc(ypObject *x, yp_ssize_t *len) { return retval; } \
+    static ypObject *yp_UNUSED name ## _countfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, yp_ssize_t *count) { return retval; } \
+    static ypObject *yp_UNUSED name ## _findfunc(ypObject *x, ypObject *y, yp_ssize_t i, yp_ssize_t j, findfunc_direction direction, yp_ssize_t *index) { return retval; }
 // clang-format on
 
 DEFINE_GENERIC_METHODS(MethodError, yp_MethodError);  // for methods the type doesn't support
@@ -679,6 +627,66 @@ DEFINE_GENERIC_METHODS(MethodError, yp_MethodError);  // for methods the type do
 DEFINE_GENERIC_METHODS(TypeError, yp_TypeError);
 DEFINE_GENERIC_METHODS(InvalidatedError, yp_InvalidatedError);  // for Invalidated objects
 DEFINE_GENERIC_METHODS(ExceptionMethod, x);  // for exception objects; returns "self"
+#undef DEFINE_GENERIC_METHODS
+
+// FIXME Is this yp_MethodError vs yp_TypeError distinction important to nohtyP? In Python it comes
+// down to the historical choices of if it was implemented as a function, as syntax, or as a method.
+#define DEFINE_GENERIC_PROTOCOL_METHODS(prefix, methodErrorName, typeErrorName)      \
+    static ypNumberMethods yp_UNUSED   prefix##_NumberMethods[1] = {{                \
+            *methodErrorName##_objproc /* _placeholder */                          \
+    }};                                                                            \
+    static ypSequenceMethods yp_UNUSED prefix##_SequenceMethods[1] = {{              \
+            *typeErrorName##_objobjproc,        /* tp_concat */                      \
+            *typeErrorName##_objssizeproc,      /* tp_repeat */                      \
+            *typeErrorName##_objssizeobjproc,   /* tp_getindex */                    \
+            *typeErrorName##_objsliceproc,      /* tp_getslice */                    \
+            *methodErrorName##_findfunc,        /* tp_find */                        \
+            *methodErrorName##_countfunc,       /* tp_count */                       \
+            *typeErrorName##_objssizeobjproc,   /* tp_setindex */                    \
+            *typeErrorName##_objsliceobjproc,   /* tp_setslice */                    \
+            *typeErrorName##_objssizeproc,      /* tp_delindex */                    \
+            *typeErrorName##_objsliceproc,      /* tp_delslice */                    \
+            *methodErrorName##_objobjproc,      /* tp_append */                      \
+            *methodErrorName##_objobjproc,      /* tp_extend */                      \
+            *typeErrorName##_objssizeproc,      /* tp_irepeat */                     \
+            *methodErrorName##_objssizeobjproc, /* tp_insert */                      \
+            *methodErrorName##_objssizeproc,    /* tp_popindex */                    \
+            *methodErrorName##_objproc,         /* tp_reverse */                     \
+            *methodErrorName##_objobjobjproc    /* tp_sort */                        \
+    }};                                                                              \
+    static ypSetMethods yp_UNUSED      prefix##_SetMethods[1] = {{                   \
+            *methodErrorName##_objobjproc /* tp_isdisjoint */,                  \
+            *methodErrorName##_objobjproc /* tp_issubset */,                    \
+            *methodErrorName##_objobjproc /* tp_issuperset */,                  \
+            *methodErrorName##_objobjproc /* tp_union */,                       \
+            *methodErrorName##_objobjproc /* tp_intersection */,                \
+            *methodErrorName##_objobjproc /* tp_difference */,                  \
+            *methodErrorName##_objobjproc /* tp_symmetric_difference */,        \
+            *methodErrorName##_objobjproc /* tp_intersection_update */,         \
+            *methodErrorName##_objobjproc /* tp_difference_update */,           \
+            *methodErrorName##_objobjproc /* tp_symmetric_difference_update */, \
+            *methodErrorName##_objobjproc /* tp_pushunique */                   \
+    }};                                                                         \
+    static ypMappingMethods yp_UNUSED  prefix##_MappingMethods[1] = {{               \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_keys */        \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_values */      \
+            *methodErrorName##_miniiterfunc,          /* tp_miniiter_items */       \
+            *typeErrorName##_miniiter_items_nextfunc, /* tp_miniiter_items_next */  \
+            *methodErrorName##_objproc,               /* tp_iter_keys */            \
+            *methodErrorName##_objproc,               /* tp_iter_values */          \
+            *methodErrorName##_objproc,               /* tp_iter_items */           \
+            *methodErrorName##_objobjobjproc,         /* tp_popvalue */             \
+            *methodErrorName##_objpobjpobjproc,       /* tp_popitem */              \
+            *methodErrorName##_objobjobjproc,         /* tp_setdefault */           \
+            *methodErrorName##_objvalistproc,         /* tp_updateK */              \
+    }};                                                                             \
+    static ypCallableMethods yp_UNUSED prefix##_CallableMethods[1] = {{              \
+            *typeErrorName##_objpobjpobjproc /* tp_call */                           \
+    }}
+DEFINE_GENERIC_PROTOCOL_METHODS(Unsupported, MethodError, TypeError);
+DEFINE_GENERIC_PROTOCOL_METHODS(InvalidatedError, InvalidatedError, InvalidatedError);
+DEFINE_GENERIC_PROTOCOL_METHODS(ExceptionMethod, ExceptionMethod, ExceptionMethod);
+#undef DEFINE_GENERIC_PROTOCOL_METHODS
 
 // For use when an object doesn't support a particular comparison operation
 // FIXME Python has NotImplemented singleton instead
@@ -744,22 +752,29 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 // When an object encounters an unknown type, there are three possible cases:
 //  - it's an invalidated object, so return yp_InvalidatedError
 //  - it's an exception, so return that exception
-//  - it's some other type, so return yp_TypeError
+//  - it's some other type, so return yp_TypeError (or sometimes yp_MethodError)
 // TODO It'd be nice to remove a comparison from this, as a minor efficiency, but not sure how
 // TODO Ensure we are using yp_BAD_TYPE in place of yp_TypeError in all the right places
 // clang-format off
-#define yp_BAD_TYPE(bad_ob) ( \
+#define _yp_BAD_TYPE(bad_ob, exception) ( \
     ypObject_TYPE_PAIR_CODE(bad_ob) == ypInvalidated_CODE ? \
         yp_InvalidatedError : \
     ypObject_TYPE_PAIR_CODE(bad_ob) == ypException_CODE ? \
         (bad_ob) : \
     /* else */ \
-        yp_TypeError)
+        (exception))
 // clang-format on
+#define yp_BAD_TYPE(bad_ob) _yp_BAD_TYPE((bad_ob), yp_TypeError)
 #define return_yp_BAD_TYPE(bad_ob) return_yp_ERR(yp_BAD_TYPE(bad_ob))
 #define return_yp_CEXC_BAD_TYPE(retval, exc, bad_ob) \
     return_yp_CEXC_ERR((retval), (exc), yp_BAD_TYPE(bad_ob))
 #define return_yp_EXC_BAD_TYPE(exc, bad_ob) return_yp_EXC_ERR((exc), yp_BAD_TYPE(bad_ob))
+
+#define yp_METHOD_ERR(bad_ob) _yp_BAD_TYPE((bad_ob), yp_MethodError)
+#define return_yp_METHOD_ERR(bad_ob) return_yp_ERR(yp_METHOD_ERR(bad_ob))
+#define return_yp_CEXC_METHOD_ERR(retval, exc, bad_ob) \
+    return_yp_CEXC_ERR((retval), (exc), yp_METHOD_ERR(bad_ob))
+#define return_yp_EXC_METHOD_ERR(exc, bad_ob) return_yp_EXC_ERR((exc), yp_METHOD_ERR(bad_ob))
 
 #define yp_IS_EXCEPTION_C(x) (ypObject_TYPE_PAIR_CODE(x) == ypException_CODE)
 int yp_isexceptionC(ypObject *x) { return yp_IS_EXCEPTION_C(x); }
@@ -3048,7 +3063,7 @@ static ypTypeObject ypIter_Type = {
         iter_close,        // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         iter_miniiter,              // tp_miniiter
@@ -3066,27 +3081,27 @@ static ypTypeObject ypIter_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // Public functions
 
-// FIXME Compare against Python's __length_hint__ now that it's official.
+// FIXME FIXME Compare against Python's __length_hint__ now that it's official.
 yp_ssize_t yp_length_hintC(ypObject *i, ypObject **exc)
 {
     yp_ssize_t length_hint;
@@ -3302,6 +3317,8 @@ static ypObject *_ypCallableIter_generator(ypObject *i, ypObject *value)
 ypObject *yp_iter2(ypObject *callable, ypObject *sentinel)
 {
     ypObject *i;
+
+    if (!yp_iscallableC(callable)) return yp_TypeError;
 
     // Allocate the iterator
     i = ypMem_MALLOC_FIXED(ypCallableIterObject, ypIter_CODE);
@@ -4261,16 +4278,16 @@ static ypTypeObject ypType_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4279,19 +4296,19 @@ static ypTypeObject ypType_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
         &ypType_as_callable  // tp_as_callable
@@ -4368,16 +4385,16 @@ static ypTypeObject ypNoneType_Type = {
         MethodError_objproc,   // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4386,22 +4403,22 @@ static ypTypeObject ypNoneType_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // No constructors for nonetypes; there is exactly one, immortal object
@@ -4497,16 +4514,16 @@ static ypTypeObject ypBool_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4515,22 +4532,22 @@ static ypTypeObject ypBool_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 
@@ -4882,16 +4899,16 @@ static ypTypeObject ypInt_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4900,22 +4917,22 @@ static ypTypeObject ypInt_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypTypeObject ypIntStore_Type = {
@@ -4952,16 +4969,16 @@ static ypTypeObject ypIntStore_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -4970,22 +4987,22 @@ static ypTypeObject ypIntStore_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // XXX Adapted from Python 2.7's int_add
@@ -6003,16 +6020,16 @@ static ypTypeObject ypFloat_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -6021,22 +6038,22 @@ static ypTypeObject ypFloat_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypTypeObject ypFloatStore_Type = {
@@ -6073,16 +6090,16 @@ static ypTypeObject ypFloatStore_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -6091,22 +6108,22 @@ static ypTypeObject ypFloatStore_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 yp_float_t yp_addLF(yp_float_t x, yp_float_t y, ypObject **exc)
@@ -10321,6 +10338,7 @@ static ypObject *_ypBytes_func_new_code(int type, yp_ssize_t n, ypObject *const 
 
     if (argarray[3] != yp_Arg_Missing) {  // TODO ...or just use None?
         ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
+        if (ypObject_TYPE_PAIR_CODE(argarray[2]) != ypStr_CODE) return_yp_BAD_TYPE(argarray[2]);
         return _ypBytes_encode(type, argarray[2], argarray[3], errors);
     } else if (argarray[4] != yp_Arg_Missing) {
         // Either "string argument without an encoding" or "errors without a string argument".
@@ -10358,13 +10376,13 @@ static ypSequenceMethods ypBytes_as_sequence = {
         ypStringLib_getslice,         // tp_getslice
         bytes_find,                   // tp_find
         bytes_count,                  // tp_count
-        MethodError_objssizeobjproc,  // tp_setindex
-        MethodError_objsliceobjproc,  // tp_setslice
-        MethodError_objssizeproc,     // tp_delindex
-        MethodError_objsliceproc,     // tp_delslice
+        TypeError_objssizeobjproc,    // tp_setindex
+        TypeError_objsliceobjproc,    // tp_setslice
+        TypeError_objssizeproc,       // tp_delindex
+        TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        TypeError_objssizeproc,       // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
@@ -10405,7 +10423,7 @@ static ypTypeObject ypBytes_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -10424,21 +10442,21 @@ static ypTypeObject ypBytes_Type = {
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypBytes_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypSequenceMethods ypByteArray_as_sequence = {
@@ -10495,7 +10513,7 @@ static ypTypeObject ypByteArray_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -10522,13 +10540,13 @@ static ypTypeObject ypByteArray_Type = {
         &ypByteArray_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypObject *_yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **bytes)
@@ -10591,10 +10609,12 @@ ypObject *yp_bytearrayC(yp_ssize_t len, const yp_uint8_t *source)
     return _ypBytesC(ypByteArray_CODE, len, source);
 }
 
+// XXX source must be a str/chrarray object.
 static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
 {
     ypObject *result;
-    if (ypObject_TYPE_PAIR_CODE(source) != ypStr_CODE) return_yp_BAD_TYPE(source);
+
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(source) == ypStr_CODE);
 
     // XXX Not handling errors in yp_eq yet because this is just temporary
     if (yp_eq(encoding, yp_s_utf_8) != yp_True) return yp_NotImplementedError;
@@ -10608,20 +10628,23 @@ static ypObject *_ypBytes_encode(int type, ypObject *source, ypObject *encoding,
 }
 ypObject *yp_bytes3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(source) != ypStr_CODE) return_yp_BAD_TYPE(source);
     return _ypBytes_encode(ypBytes_CODE, source, encoding, errors);
 }
 ypObject *yp_bytearray3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(source) != ypStr_CODE) return_yp_BAD_TYPE(source);
     return _ypBytes_encode(ypByteArray_CODE, source, encoding, errors);
 }
 ypObject *yp_encode3(ypObject *s, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_METHOD_ERR(s);
     return _ypBytes_encode(
             ypObject_IS_MUTABLE(s) ? ypByteArray_CODE : ypBytes_CODE, s, encoding, errors);
 }
 ypObject *yp_encode(ypObject *s)
 {
-    if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_BAD_TYPE(s);
+    if (ypObject_TYPE_PAIR_CODE(s) != ypStr_CODE) return_yp_METHOD_ERR(s);
     return ypStringLib_encode_utf_8(
             ypObject_IS_MUTABLE(s) ? ypByteArray_CODE : ypBytes_CODE, s, yp_s_strict);
 }
@@ -11340,17 +11363,15 @@ static ypObject *_ypStr_func_new_code(int type, yp_ssize_t n, ypObject *const *a
 {
     yp_ASSERT(n == 5, "unexpected argarray of length %" PRIssize, n);
 
-    // As object defaults to yp_str_empty, and _ypStr_decode rejects strs, encoding-without-object
-    // is an error, just as with bytes (but unlike Python).
-    if (argarray[3] != yp_Arg_Missing) {  // TODO ...or just use None?
-        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];  // borrowed
-        return _ypStr_decode(type, argarray[2], argarray[3], errors);
-    } else if (argarray[4] != yp_Arg_Missing) {
-        // TODO In Python, sys.getdefaultencoding() is the default. Should we break with Python
-        // here? I certainly don't like global variables changing behaviour...
-        return _ypStr_decode(type, argarray[2], yp_s_utf_8, argarray[4]);
-    } else {
+    // Unlike Python, setting encoding and/or error without also setting object is an error. (Python
+    // returns the empty string in this case, as if the default for object is b''.)
+    if (argarray[3] == yp_Arg_Missing && argarray[4] == yp_Arg_Missing) {
         return _ypStr(type, argarray[2]);
+    } else {
+        ypObject *encoding = argarray[3] == yp_Arg_Missing ? yp_s_utf_8 : argarray[3];  // borrowed
+        ypObject *errors = argarray[4] == yp_Arg_Missing ? yp_s_strict : argarray[4];   // borrowed
+        if (ypObject_TYPE_PAIR_CODE(argarray[2]) != ypBytes_CODE) return_yp_BAD_TYPE(argarray[2]);
+        return _ypStr_decode(type, argarray[2], encoding, errors);
     }
 }
 
@@ -11382,13 +11403,13 @@ static ypSequenceMethods ypStr_as_sequence = {
         str_getslice,                 // tp_getslice
         str_find,                     // tp_find
         str_count,                    // tp_count
-        MethodError_objssizeobjproc,  // tp_setindex
-        MethodError_objsliceobjproc,  // tp_setslice
-        MethodError_objssizeproc,     // tp_delindex
-        MethodError_objsliceproc,     // tp_delslice
+        TypeError_objssizeobjproc,    // tp_setindex
+        TypeError_objsliceobjproc,    // tp_setslice
+        TypeError_objssizeproc,       // tp_delindex
+        TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        TypeError_objssizeproc,       // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
@@ -11429,7 +11450,7 @@ static ypTypeObject ypStr_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -11448,21 +11469,21 @@ static ypTypeObject ypStr_Type = {
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypStr_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypSequenceMethods ypChrArray_as_sequence = {
@@ -11519,7 +11540,7 @@ static ypTypeObject ypChrArray_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -11546,13 +11567,13 @@ static ypTypeObject ypChrArray_Type = {
         &ypChrArray_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypObject *_yp_asencodedCX(
@@ -11625,13 +11646,14 @@ ypObject *yp_chrarray_frombytesC2(yp_ssize_t len, const yp_uint8_t *source)
     return ypStringLib_decode_frombytesC_utf_8(ypChrArray_CODE, len, source, yp_s_strict);
 }
 
+// XXX source must be a bytes/bytearray object.
 static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, ypObject *errors)
 {
     ypObject *result;
 
     // TODO When we open this up to other types with a buffer interface, make sure we continue
     // to deny str/chrarray as source, as Python does.
-    if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
+    yp_ASSERT1(ypObject_TYPE_PAIR_CODE(source) == ypBytes_CODE);
 
     // XXX Not handling errors in yp_eq yet because this is just temporary
     // TODO Python ignores "unknown encoding/errors" on empty buffer, but I'd rather raise error.
@@ -11647,20 +11669,23 @@ static ypObject *_ypStr_decode(int type, ypObject *source, ypObject *encoding, y
 }
 ypObject *yp_str3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
     return _ypStr_decode(ypStr_CODE, source, encoding, errors);
 }
 ypObject *yp_chrarray3(ypObject *source, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(source) != ypBytes_CODE) return_yp_BAD_TYPE(source);
     return _ypStr_decode(ypChrArray_CODE, source, encoding, errors);
 }
 ypObject *yp_decode3(ypObject *b, ypObject *encoding, ypObject *errors)
 {
+    if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_METHOD_ERR(b);
     return _ypStr_decode(
             ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, b, encoding, errors);
 }
 ypObject *yp_decode(ypObject *b)
 {
-    if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_BAD_TYPE(b);
+    if (ypObject_TYPE_PAIR_CODE(b) != ypBytes_CODE) return_yp_METHOD_ERR(b);
     return ypStringLib_decode_frombytesC_utf_8(
             ypObject_IS_MUTABLE(b) ? ypChrArray_CODE : ypStr_CODE, ypBytes_LEN(b), ypBytes_DATA(b),
             yp_s_strict);
@@ -11830,7 +11855,7 @@ static const ypStringLib_encinfo ypStringLib_encs[4] = {
         if (ob_pair == ypBytes_CODE) {             \
             return bytes_##meth args;              \
         }                                          \
-        return_yp_BAD_TYPE(ob);                    \
+        return_yp_METHOD_ERR(ob);                  \
     } while (0)
 
 
@@ -11977,7 +12002,7 @@ ypObject *yp_joinNV(ypObject *s, int n, va_list args)
     ypQuickSeq_state state;
     ypObject        *result;
 
-    if (!ypStringLib_TYPE_CHECK(s)) return_yp_BAD_TYPE(s);
+    if (!ypStringLib_TYPE_CHECK(s)) return_yp_METHOD_ERR(s);
     ypQuickSeq_new_fromvar(&state, n, args);
     result = ypStringLib_join(s, &ypQuickSeq_var_methods, &state);
     ypQuickSeq_var_close(&state);
@@ -13147,13 +13172,13 @@ static ypSequenceMethods ypTuple_as_sequence = {
         tuple_getslice,               // tp_getslice
         tuple_find,                   // tp_find
         tuple_count,                  // tp_count
-        MethodError_objssizeobjproc,  // tp_setindex
-        MethodError_objsliceobjproc,  // tp_setslice
-        MethodError_objssizeproc,     // tp_delindex
-        MethodError_objsliceproc,     // tp_delslice
+        TypeError_objssizeobjproc,    // tp_setindex
+        TypeError_objsliceobjproc,    // tp_setslice
+        TypeError_objssizeproc,       // tp_delindex
+        TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        TypeError_objssizeproc,       // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
@@ -13194,7 +13219,7 @@ static ypTypeObject ypTuple_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -13213,21 +13238,21 @@ static ypTypeObject ypTuple_Type = {
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypTuple_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypObject *list_sort(ypObject *, ypObject *, ypObject *);
@@ -13286,7 +13311,7 @@ static ypTypeObject ypList_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -13313,13 +13338,13 @@ static ypTypeObject ypList_Type = {
         &ypList_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 ypObject *yp_itemarrayCX(ypObject *seq, yp_ssize_t *len, ypObject *const **array)
@@ -16525,7 +16550,7 @@ static ypTypeObject ypFrozenSet_Type = {
         MethodError_objproc,    // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         frozenset_miniiter,              // tp_miniiter
@@ -16543,22 +16568,22 @@ static ypTypeObject ypFrozenSet_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
         &ypFrozenSet_as_set,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypSetMethods ypSet_as_set = {
@@ -16613,7 +16638,7 @@ static ypTypeObject ypSet_Type = {
         MethodError_objproc,    // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         frozenset_miniiter,              // tp_miniiter
@@ -16625,28 +16650,28 @@ static ypTypeObject ypSet_Type = {
         TypeError_objobjproc,            // tp_send
 
         // Container operations
-        frozenset_contains,         // tp_contains
-        frozenset_len,              // tp_len
-        set_push,                   // tp_push
-        set_clear,                  // tp_clear
-        set_pop,                    // tp_pop
-        set_remove,                 // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
-        set_update,                 // tp_update
+        frozenset_contains,       // tp_contains
+        frozenset_len,            // tp_len
+        set_push,                 // tp_push
+        set_clear,                // tp_clear
+        set_pop,                  // tp_pop
+        set_remove,               // tp_remove
+        TypeError_objobjobjproc,  // tp_getdefault
+        TypeError_objobjobjproc,  // tp_setitem
+        TypeError_objobjproc,     // tp_delitem
+        set_update,               // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
         &ypSet_as_set,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 
@@ -17821,7 +17846,7 @@ static ypTypeObject ypFrozenDict_Type = {
         MethodError_objproc,     // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         frozendict_miniiter_keys,         // tp_miniiter
@@ -17840,21 +17865,21 @@ static ypTypeObject ypFrozenDict_Type = {
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
         frozendict_getdefault,      // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
         &ypFrozenDict_as_mapping,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 static ypMappingMethods ypDict_as_mapping = {
@@ -17905,7 +17930,7 @@ static ypTypeObject ypDict_Type = {
         MethodError_objproc,     // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         frozendict_miniiter_keys,         // tp_miniiter
@@ -17929,16 +17954,16 @@ static ypTypeObject ypDict_Type = {
         dict_update,                // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
         &ypDict_as_mapping,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // Constructors
@@ -18449,19 +18474,19 @@ yp_IMMORTAL_FUNCTION_static(range_func_new, range_func_new_code,
                 {yp_CONST_REF(yp_s_slash), NULL}));
 
 static ypSequenceMethods ypRange_as_sequence = {
-        MethodError_objobjproc,       // tp_concat
-        MethodError_objssizeproc,     // tp_repeat
+        TypeError_objobjproc,         // tp_concat
+        TypeError_objssizeproc,       // tp_repeat
         range_getindex,               // tp_getindex
         range_getslice,               // tp_getslice
         range_find,                   // tp_find
         range_count,                  // tp_count
-        MethodError_objssizeobjproc,  // tp_setindex
-        MethodError_objsliceobjproc,  // tp_setslice
-        MethodError_objssizeproc,     // tp_delindex
-        MethodError_objsliceproc,     // tp_delslice
+        TypeError_objssizeobjproc,    // tp_setindex
+        TypeError_objsliceobjproc,    // tp_setslice
+        TypeError_objssizeproc,       // tp_delindex
+        TypeError_objsliceproc,       // tp_delslice
         MethodError_objobjproc,       // tp_append
         MethodError_objobjproc,       // tp_extend
-        MethodError_objssizeproc,     // tp_irepeat
+        TypeError_objssizeproc,       // tp_irepeat
         MethodError_objssizeobjproc,  // tp_insert
         MethodError_objssizeproc,     // tp_popindex
         MethodError_objproc,          // tp_reverse
@@ -18502,7 +18527,7 @@ static ypTypeObject ypRange_Type = {
         MethodError_objproc,  // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
         _ypSequence_miniiter,       // tp_miniiter
@@ -18521,21 +18546,21 @@ static ypTypeObject ypRange_Type = {
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
         _ypSequence_getdefault,     // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
         &ypRange_as_sequence,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
-        TypeError_CallableMethods  // tp_as_callable
+        Unsupported_CallableMethods  // tp_as_callable
 };
 
 // XXX Adapted from Python's get_len_of_range
@@ -19679,16 +19704,16 @@ static ypTypeObject ypFunction_Type = {
         MethodError_objproc,   // tp_close
 
         // Number operations
-        MethodError_NumberMethods,  // tp_as_number
+        Unsupported_NumberMethods,  // tp_as_number
 
         // Iterator operations
-        TypeError_miniiterfunc,         // tp_miniiter
-        TypeError_miniiterfunc,         // tp_miniiter_reversed
-        MethodError_miniiterfunc,       // tp_miniiter_next  // FIXME Should be type error?
-        MethodError_miniiter_lenhfunc,  // tp_miniiter_length_hint
-        TypeError_objproc,              // tp_iter
-        TypeError_objproc,              // tp_iter_reversed
-        TypeError_objobjproc,           // tp_send
+        TypeError_miniiterfunc,       // tp_miniiter
+        TypeError_miniiterfunc,       // tp_miniiter_reversed
+        TypeError_miniiterfunc,       // tp_miniiter_next
+        TypeError_miniiter_lenhfunc,  // tp_miniiter_length_hint
+        TypeError_objproc,            // tp_iter
+        TypeError_objproc,            // tp_iter_reversed
+        TypeError_objobjproc,         // tp_send
 
         // Container operations
         TypeError_objobjproc,       // tp_contains
@@ -19697,19 +19722,19 @@ static ypTypeObject ypFunction_Type = {
         MethodError_objproc,        // tp_clear
         MethodError_objproc,        // tp_pop
         MethodError_objobjobjproc,  // tp_remove
-        MethodError_objobjobjproc,  // tp_getdefault
-        MethodError_objobjobjproc,  // tp_setitem
-        MethodError_objobjproc,     // tp_delitem
+        TypeError_objobjobjproc,    // tp_getdefault
+        TypeError_objobjobjproc,    // tp_setitem
+        TypeError_objobjproc,       // tp_delitem
         MethodError_objobjproc,     // tp_update
 
         // Sequence operations
-        MethodError_SequenceMethods,  // tp_as_sequence
+        Unsupported_SequenceMethods,  // tp_as_sequence
 
         // Set operations
-        MethodError_SetMethods,  // tp_as_set
+        Unsupported_SetMethods,  // tp_as_set
 
         // Mapping operations
-        MethodError_MappingMethods,  // tp_as_mapping
+        Unsupported_MappingMethods,  // tp_as_mapping
 
         // Callable operations
         &ypFunction_as_callable  // tp_as_callable

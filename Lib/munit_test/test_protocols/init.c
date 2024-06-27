@@ -3,19 +3,17 @@
 // of their protocols, but that are instead common among all types that currently implement those
 // protocols. There is room to adjust these tests as new types are created.
 
-// FIXME In test_objects, test that various methods fail if the protocol is not supported; for
-// example, yp_lenC should fail for all non-collections.
-
 #include "munit_test/unittest.h"
 
 
-MunitSuite test_protocols_suites[] = {SUITE_OF_TESTS(test_collection),
+MunitSuite test_protocols_suites[] = {SUITE_OF_TESTS(test_all), SUITE_OF_TESTS(test_collection),
         SUITE_OF_TESTS(test_iterable), SUITE_OF_TESTS(test_mapping), SUITE_OF_TESTS(test_sequence),
         SUITE_OF_TESTS(test_setlike), SUITE_OF_TESTS(test_string), {NULL}};
 
 
 extern void test_protocols_initialize(void)
 {
+    test_all_initialize();
     test_collection_initialize();
     test_iterable_initialize();
     test_mapping_initialize();

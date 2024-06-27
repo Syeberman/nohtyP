@@ -551,6 +551,8 @@ typedef struct _yp_generator_decl_t {
 // "Sends" a value into iterator and returns a new reference to the next yielded value, or an
 // exception. The iterator may ignore the value. value cannot be an exception. When the iterator is
 // exhausted yp_StopIteration is raised.
+// FIXME Support this? `TypeError: can't send non-None value to a just-started generator` (but you
+// can throw)
 ypAPI ypObject *yp_send(ypObject *iterator, ypObject *value);
 
 // Equivalent to yp_send(iterator, yp_None). Typically used on iterators that ignore the value.
@@ -1914,7 +1916,7 @@ ypAPI ypObject *yp_asbytesCX(ypObject *seq, yp_ssize_t *len, const yp_uint8_t **
 ypAPI ypObject *yp_asencodedCX(
         ypObject *seq, yp_ssize_t *size, const yp_uint8_t **encoded, ypObject **encoding);
 
-// For sequences that store their elements as an array of pointers to ypObjects (list and tuple),
+// For sequences that store their elements as an array of pointers to ypObjects (tuple and list),
 // sets *array to the beginning of that array, *len to the length of the sequence, and returns the
 // immortal yp_None. *array will point into internal object memory, so they are *borrowed*
 // references and MUST NOT be replaced; furthermore, the sequence itself must not be modified while
@@ -2150,9 +2152,9 @@ typedef struct _ypFunctionObject {
 // Set ob_hash to this value for uninitialized hashes (tp_hash will be called and ob_hash updated)
 // TODO Instead, make an ob_flag to state if ob_hash is valid or invalid, then could store -1 as
 // a valid cached hash and int could use ob_hash to store the value
-#define _ypObject_HASH_INVALID ((yp_hash_t)-1)
+#define _ypObject_HASH_INVALID ((yp_hash_t) - 1)
 // Set ob_len or ob_alloclen to this value to signal an invalid length
-#define _ypObject_LEN_INVALID ((yp_ssize_t)-1)
+#define _ypObject_LEN_INVALID ((yp_ssize_t) - 1)
 // Macros on ob_type_flags for string objects (bytes and str)
 #define _ypStringLib_ENC_CODE_BYTES (0u)
 #define _ypStringLib_ENC_CODE_LATIN_1 (1u)

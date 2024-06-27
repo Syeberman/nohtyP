@@ -186,7 +186,7 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
     // Immutables don't support setitem.
     if (!type->is_mutable) {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_raises_exc(yp_setitem(mp, keys[2], values[2], &exc), yp_MethodError);
+        assert_raises_exc(yp_setitem(mp, keys[2], values[2], &exc), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
         goto tear_down;  // Skip remaining tests.
@@ -288,7 +288,7 @@ static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixtur
     // Immutables don't support delitem.
     if (!type->is_mutable) {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
-        assert_raises_exc(yp_delitem(mp, keys[2], &exc), yp_MethodError);
+        assert_raises_exc(yp_delitem(mp, keys[2], &exc), yp_TypeError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
         goto tear_down;  // Skip remaining tests.

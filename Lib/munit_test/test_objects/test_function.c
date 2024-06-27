@@ -2412,7 +2412,7 @@ static MunitResult _test_callK(ypObject *(*any_callK)(ypObject *, int, ...))
         ypObject *int_three = yp_intC(3);
 
         // Positional-only parameters cannot be set from "callK" keyword arguments. Recall that
-        // base requires x to be a bytes/str/etc, which also throws yp_TypeError.
+        // base requires x to be a bytes/str/etc, which also raises yp_TypeError.
         ead(result, any_callK(yp_t_int, 0), assert_obj(result, eq, yp_i_zero));
         ead(result, any_callK(yp_t_int, K(str_base, yp_None)), assert_obj(result, eq, yp_i_zero));
         assert_raises(any_callK(yp_t_int, K(str_base, int_three)), yp_TypeError);
