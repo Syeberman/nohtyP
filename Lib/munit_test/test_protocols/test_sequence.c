@@ -289,7 +289,15 @@ static MunitResult test_getindexC(const MunitParameter params[], fixture_t *fixt
     assert_raises(yp_getindexC(sq, 2), yp_IndexError);
     assert_raises(yp_getindexC(sq, -3), yp_IndexError);
 
-    // FIXME Previously-deleted index
+    // Previously-deleted index.
+    if (type->is_mutable) {
+        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delindexC(sq_delitem, 1, &exc));
+        assert_sequence(sq_delitem, items[0]);
+        assert_raises(yp_getindexC(sq_delitem, 1), yp_IndexError);
+        assert_sequence(sq_delitem, items[0]);
+        yp_decrefN(N(sq_delitem));
+    }
 
     // Empty sq.
     assert_raises(yp_getindexC(empty, 0), yp_IndexError);
@@ -503,7 +511,15 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
     assert_raises(yp_getitem(sq, int_2), yp_IndexError);
     assert_raises(yp_getitem(sq, int_neg_3), yp_IndexError);
 
-    // FIXME Previously-deleted index
+    // Previously-deleted index.
+    if (type->is_mutable) {
+        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delitem(sq_delitem, int_1, &exc));
+        assert_sequence(sq_delitem, items[0]);
+        assert_raises(yp_getitem(sq_delitem, int_1), yp_IndexError);
+        assert_sequence(sq_delitem, items[0]);
+        yp_decrefN(N(sq_delitem));
+    }
 
     // Empty sq.
     assert_raises(yp_getitem(empty, int_0), yp_IndexError);
@@ -560,6 +576,16 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
     // Exception-as-default.
     assert_raises(yp_getdefault(sq, int_2, yp_SyntaxError), yp_SyntaxError);
     assert_raises(yp_getdefault(sq, int_neg_3, yp_SyntaxError), yp_SyntaxError);
+
+    // Previously-deleted index.
+    if (type->is_mutable) {
+        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delitem(sq_delitem, int_1, &exc));
+        assert_sequence(sq_delitem, items[0]);
+        ead(two, yp_getdefault(sq_delitem, int_1, items[2]), assert_obj(two, eq, items[2]));
+        assert_sequence(sq_delitem, items[0]);
+        yp_decrefN(N(sq_delitem));
+    }
 
     // Empty sq.
     ead(zero, yp_getdefault(empty, int_0, items[2]), assert_obj(zero, eq, items[2]));
@@ -926,7 +952,15 @@ static MunitResult test_setindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
-    // FIXME Previously-deleted index
+    // Previously-deleted index.
+    {
+        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delindexC(sq_delitem, 1, &exc));
+        assert_sequence(sq_delitem, items[0]);
+        assert_raises_exc(yp_setindexC(sq_delitem, 1, items[2], &exc), yp_IndexError);
+        assert_sequence(sq_delitem, items[0]);
+        yp_decrefN(N(sq_delitem));
+    }
 
     // Empty sq.
     {
@@ -1292,7 +1326,15 @@ static MunitResult test_setitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
-    // FIXME Previously-deleted index
+    // Previously-deleted index.
+    {
+        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delitem(sq_delitem, int_1, &exc));
+        assert_sequence(sq_delitem, items[0]);
+        assert_raises_exc(yp_setitem(sq_delitem, int_1, items[2], &exc), yp_IndexError);
+        assert_sequence(sq_delitem, items[0]);
+        yp_decrefN(N(sq_delitem));
+    }
 
     // Empty sq.
     {
@@ -1390,7 +1432,15 @@ static MunitResult test_delindexC(const MunitParameter params[], fixture_t *fixt
         yp_decref(sq);
     }
 
-    // FIXME Previously-deleted index
+    // Previously-deleted index.
+    {
+        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delindexC(sq_delitem, 1, &exc));
+        assert_sequence(sq_delitem, items[0]);
+        assert_raises_exc(yp_delindexC(sq_delitem, 1, &exc), yp_IndexError);
+        assert_sequence(sq_delitem, items[0]);
+        yp_decrefN(N(sq_delitem));
+    }
 
     // Empty sq.
     {
@@ -1601,7 +1651,15 @@ static MunitResult test_delitem(const MunitParameter params[], fixture_t *fixtur
         yp_decref(sq);
     }
 
-    // FIXME Previously-deleted index
+    // Previously-deleted index.
+    {
+        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delitem(sq_delitem, int_1, &exc));
+        assert_sequence(sq_delitem, items[0]);
+        assert_raises_exc(yp_delitem(sq_delitem, int_1, &exc), yp_IndexError);
+        assert_sequence(sq_delitem, items[0]);
+        yp_decrefN(N(sq_delitem));
+    }
 
     // Empty sq.
     {
@@ -2043,6 +2101,16 @@ static MunitResult test_popindexC(const MunitParameter params[], fixture_t *fixt
         assert_raises(yp_popindexC(sq, -3), yp_IndexError);
         assert_sequence(sq, items[0], items[1]);
         yp_decref(sq);
+    }
+
+    // Previously-deleted index.
+    {
+        ypObject *sq_delitem = type->newN(N(items[0], items[1]));
+        assert_not_raises_exc(yp_delindexC(sq_delitem, 1, &exc));
+        assert_sequence(sq_delitem, items[0]);
+        assert_raises(yp_popindexC(sq_delitem, 1), yp_IndexError);
+        assert_sequence(sq_delitem, items[0]);
+        yp_decrefN(N(sq_delitem));
     }
 
     // Empty sq.
