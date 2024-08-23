@@ -16,7 +16,7 @@ image:
   - Visual Studio 2022
   # TODO Support Visual Studio 2019 (msvs_160:win32)
   # - Visual Studio 2019
-  - Ubuntu2004
+  - Ubuntu
   - Visual Studio 2017
   - Visual Studio 2015
 
@@ -36,7 +36,7 @@ matrix:
     # TODO Are there any 32-bit compilers on the Ubuntu images?
     - image: Ubuntu2204
       platform: x86
-    - image: Ubuntu2004
+    - image: Ubuntu
       platform: x86
 
 # Ideally, each target is listed once, against the most-recent image that includes it.
@@ -68,7 +68,7 @@ for:
       YP_COMPILER_OSES:
   - matrix:
       only:
-        - image: Ubuntu2004
+        - image: Ubuntu
     environment:
       YP_COMPILER_OSES: gcc_8:posix gcc_7:posix
   - matrix:
