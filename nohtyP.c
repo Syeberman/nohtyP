@@ -18,8 +18,6 @@
 
 // TODO Do like Python and have just type+refcnt for non-containers
 
-// TODO Python now has operator.length_hint that accepts a default=0 value to return
-
 // TODO Move all the in-line overflow checks into macros/functions that use platform-efficient
 // versions as appropriate (like
 // https://gcc.gnu.org/onlinedocs/gcc/Integer-Overflow-Builtins.html).
@@ -27,11 +25,7 @@
 // TODO Use NotImplemented, instead of NotImplementedError, as per Python.
 
 // TODO Look for all the places yp_decref, yp_eq, and others might execute arbitrary code that
-// might modify the object being iterated over. OR  Add some sort of universal flag to objects to
-// prevent modifications.
-
-// TODO Look for places we use a borrowed reference from an object and then call arbitrary code:
-// that code could invalidate and thus discard the reference.
+// might modify the object being iterated over or invalidate a borrowed reference.
 
 // TODO Big, big difference in DLL sizes: 187 KB for MSVS 9.0 64-bit release to 1.6 MB for GCC 8
 // 64-bit release. What's using up so much space? Why are GCC release builds larger than debug?
@@ -720,6 +714,8 @@ static ypObject *NoRefs_traversefunc(ypObject *x, visitfunc visitor, void *memo)
 #define MIN3(a, b, c) MIN(MIN(a, b), c)
 #define MIN4(a, b, c, d) MIN(MIN(a, b), MIN(c, d))
 
+// Returns val, clamped to be no less than min and no more than max.
+#define yp_CLAMP(val, min, max) ((val) < (min) ? (min) : (val) > (max) ? (max) : (val))
 
 // Functions that return nohtyP objects return the error object to "raise" it. Use this as
 // "return_yp_ERR(yp_ValueError);" to return the error properly.
@@ -810,32 +806,32 @@ yp_STATIC_ASSERT(yp_sizeof(size_t) == yp_sizeof(void *), uintptr_unnecessary);
 // Check if pointer "p" is aligned to "a"-bytes boundary.
 #define yp_IS_ALIGNED(p, a) (!((size_t)(p) & (size_t)((a) - 1)))
 
-// For N functions (that take variable arguments); to be used as follows:
-//      return_yp_V_FUNC(ypObject *, yp_foobarV, (x, n, args), n)
-// v_func_args must end in the identifier "args", which is declared internal to the macro.
-#define return_yp_V_FUNC(v_func_rettype, v_func, v_func_args, last_fixed) \
-    do {                                                                  \
-        v_func_rettype retval;                                            \
-        va_list        args;                                              \
-        va_start(args, last_fixed);                                       \
-        retval = v_func v_func_args;                                      \
-        va_end(args);                                                     \
-        return retval;                                                    \
+// For "N" functions (that take variable arguments); to be used as follows:
+//      return_yp_NV_FUNC(ypObject *, yp_foobarNV, (x, n, args), n)
+// nv_func_args must end in the identifier "args", which is declared internal to the macro.
+#define return_yp_NV_FUNC(nv_func_rettype, nv_func, nv_func_args, last_fixed) \
+    do {                                                                      \
+        nv_func_rettype retval;                                               \
+        va_list         args;                                                 \
+        va_start(args, last_fixed);                                           \
+        retval = nv_func nv_func_args;                                        \
+        va_end(args);                                                         \
+        return retval;                                                        \
     } while (0)
 
 // As above, but for functions without a return value
-#define return_yp_V_FUNC_void(v_func, v_func_args, last_fixed) \
-    do {                                                       \
-        va_list args;                                          \
-        va_start(args, last_fixed);                            \
-        v_func v_func_args;                                    \
-        va_end(args);                                          \
-        return;                                                \
+#define return_yp_NV_FUNC_void(nv_func, nv_func_args, last_fixed) \
+    do {                                                          \
+        va_list args;                                             \
+        va_start(args, last_fixed);                               \
+        nv_func nv_func_args;                                     \
+        va_end(args);                                             \
+        return;                                                   \
     } while (0)
 
 // As above, but for "K"-functions
-#define return_yp_K_FUNC return_yp_V_FUNC
-#define return_yp_K_FUNC_void return_yp_V_FUNC_void
+#define return_yp_KV_FUNC return_yp_NV_FUNC
+#define return_yp_KV_FUNC_void return_yp_NV_FUNC_void
 
 // For when we need to work with unsigned yp_int_t's in the math below; casting to unsigned helps
 // avoid undefined behaviour on overflow.
@@ -2193,10 +2189,7 @@ typedef struct {
     ypObject *tail;
 } ypObject_dealloclist;
 
-#define ypObject_DEALLOCLIST_INIT() \
-    {                               \
-        NULL, NULL                  \
-    }
+#define ypObject_DEALLOCLIST_INIT() {NULL, NULL}
 
 static void _ypObject_dealloclist_push(ypObject_dealloclist *list, ypObject *x)
 {
@@ -3132,7 +3125,7 @@ ypObject *yp_iter_stateCX(ypObject *i, yp_ssize_t *size, void **state)
 // code, our yp_sets will be ordered too. So perhaps this is OK again.
 void yp_unpackN(ypObject *iterable, int n, ...)
 {
-    return_yp_V_FUNC_void(yp_unpackNV, (iterable, n, args), n);
+    return_yp_NV_FUNC_void(yp_unpackNV, (iterable, n, args), n);
 }
 
 void yp_unpackNV(ypObject *iterable, int n, va_list args_orig)
@@ -3656,7 +3649,7 @@ ypObject *yp_or(ypObject *x, ypObject *y)
     return yp_incref(x);
 }
 
-ypObject *yp_orN(int n, ...) { return_yp_V_FUNC(ypObject *, yp_orNV, (n, args), n); }
+ypObject *yp_orN(int n, ...) { return_yp_NV_FUNC(ypObject *, yp_orNV, (n, args), n); }
 ypObject *yp_orNV(int n, va_list args)
 {
     ypObject *x;
@@ -3672,7 +3665,7 @@ ypObject *yp_orNV(int n, va_list args)
     return yp_incref(va_arg(args, ypObject *));
 }
 
-ypObject *yp_anyN(int n, ...) { return_yp_V_FUNC(ypObject *, yp_anyNV, (n, args), n); }
+ypObject *yp_anyN(int n, ...) { return_yp_NV_FUNC(ypObject *, yp_anyNV, (n, args), n); }
 ypObject *yp_anyNV(int n, va_list args)
 {
     for (/*n already set*/; n > 0; n--) {
@@ -3709,7 +3702,7 @@ ypObject *yp_and(ypObject *x, ypObject *y)
     return yp_incref(y);
 }
 
-ypObject *yp_andN(int n, ...) { return_yp_V_FUNC(ypObject *, yp_andNV, (n, args), n); }
+ypObject *yp_andN(int n, ...) { return_yp_NV_FUNC(ypObject *, yp_andNV, (n, args), n); }
 ypObject *yp_andNV(int n, va_list args)
 {
     ypObject *x;
@@ -3725,7 +3718,7 @@ ypObject *yp_andNV(int n, va_list args)
     return yp_incref(va_arg(args, ypObject *));
 }
 
-ypObject *yp_allN(int n, ...) { return_yp_V_FUNC(ypObject *, yp_allNV, (n, args), n); }
+ypObject *yp_allN(int n, ...) { return_yp_NV_FUNC(ypObject *, yp_allNV, (n, args), n); }
 ypObject *yp_allNV(int n, va_list args)
 {
     for (/*n already set*/; n > 0; n--) {
@@ -11995,7 +11988,7 @@ ypObject *yp_join(ypObject *s, ypObject *iterable)
 
 ypObject *yp_joinN(ypObject *s, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, yp_joinNV, (s, n, args), n);
+    return_yp_NV_FUNC(ypObject *, yp_joinNV, (s, n, args), n);
 }
 ypObject *yp_joinNV(ypObject *s, int n, va_list args)
 {
@@ -13494,7 +13487,7 @@ static ypObject *_ypTupleNV(int type, int n, va_list args)
 ypObject *yp_tupleN(int n, ...)
 {
     if (n < 1) return yp_tuple_empty;
-    return_yp_V_FUNC(ypObject *, _ypTupleNV, (ypTuple_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypTupleNV, (ypTuple_CODE, n, args), n);
 }
 ypObject *yp_tupleNV(int n, va_list args)
 {
@@ -13505,7 +13498,7 @@ ypObject *yp_tupleNV(int n, va_list args)
 ypObject *yp_listN(int n, ...)
 {
     if (n < 1) return _ypTuple_new(ypList_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return_yp_V_FUNC(ypObject *, _ypTupleNV, (ypList_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypTupleNV, (ypList_CODE, n, args), n);
 }
 ypObject *yp_listNV(int n, va_list args)
 {
@@ -13613,7 +13606,7 @@ static ypObject *_ypTuple_repeatCNV(int type, yp_ssize_t factor, int n, va_list 
 
 ypObject *yp_tuple_repeatCN(yp_ssize_t factor, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, _ypTuple_repeatCNV, (ypTuple_CODE, factor, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypTuple_repeatCNV, (ypTuple_CODE, factor, n, args), n);
 }
 ypObject *yp_tuple_repeatCNV(yp_ssize_t factor, int n, va_list args)
 {
@@ -13622,7 +13615,7 @@ ypObject *yp_tuple_repeatCNV(yp_ssize_t factor, int n, va_list args)
 
 ypObject *yp_list_repeatCN(yp_ssize_t factor, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, _ypTuple_repeatCNV, (ypList_CODE, factor, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypTuple_repeatCNV, (ypList_CODE, factor, n, args), n);
 }
 ypObject *yp_list_repeatCNV(yp_ssize_t factor, int n, va_list args)
 {
@@ -15088,13 +15081,12 @@ yp_STATIC_ASSERT((ypSet_ALLOCLEN_MAX << 1u) >
 
 #define ypSet_LEN_MAX ((ypSet_ALLOCLEN_MAX * ypSet_RESIZE_AT_NMR) / ypSet_RESIZE_AT_DNM)
 
-// When allocating a set from a generic iterable, limit the length of the initial allocation to this
-// amount. Per Python (dict_new_presized): "There are no strict guarantee that returned dict can
-// contain minused items without resize. So we create medium size dict instead of very large dict or
+// When (re)allocating a set, limit the length hint of the item container to this amount. Per
+// Python (dict_new_presized): "There are no strict guarantee that returned dict can contain
+// minused items without resize. So we create medium size dict instead of very large dict or
 // MemoryError."
-#define ypSet_FROMITERABLE_LEN_MAX ((yp_ssize_t)0x555555)
-yp_STATIC_ASSERT(
-        ypSet_FROMITERABLE_LEN_MAX <= ypSet_LEN_MAX, ypSet_FROMITERABLE_LEN_MAX_less_than_LEN_MAX);
+#define ypSet_ALLOC_HINT_MAX ((yp_ssize_t)0x555555)
+yp_STATIC_ASSERT(ypSet_ALLOC_HINT_MAX <= ypSet_LEN_MAX, ypSet_ALLOC_HINT_MAX_less_than_LEN_MAX);
 
 // A placeholder to replace deleted entries in the hash table
 yp_IMMORTAL_INVALIDATED(ypSet_dummy);
@@ -15153,7 +15145,7 @@ static yp_ssize_t _ypSet_calc_alloclen(yp_ssize_t minused)
     return alloclen;
 }
 
-// Returns a new, empty set or frozenset object to hold minused entries
+// Returns a new, empty set or frozenset object to hold at least minused entries.
 // XXX Check for the yp_frozenset_empty case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Overallocate to avoid future resizings
@@ -15178,6 +15170,22 @@ static ypObject *_ypSet_new(int type, yp_ssize_t minused, int alloclen_fixed)
     yp_memset(ypSet_TABLE(so), 0, alloclen * yp_sizeof(ypSet_KeyEntry));
     yp_ASSERT(_ypSet_space_remaining(so) >= minused, "new set doesn't have requested room");
     return so;
+}
+
+// Returns a new, empty set or frozenset object to hold approximately alloc_hint entries. Use this
+// instead of _ypSet_new where alloc_hint may represent duplicate entries (e.g. _ypSetNV), or where
+// alloc_hint may be incorrect (e.g. _ypSet_fromiterable). If alloc_hint is geater than
+// ypSet_ALLOC_HINT_MAX, then alloclen_fixed is ignored and a variable container with at least
+// ypSet_ALLOC_HINT_MAX entries is returned.
+static ypObject *_ypSet_new_fromhint(int type, yp_ssize_t alloc_hint, int alloclen_fixed)
+{
+    if (alloc_hint > ypSet_ALLOC_HINT_MAX) {
+        // We ignore alloclen_fixed and always return a variable container here, because it's
+        // possible that we really do need to add alloc_hint objects to this set.
+        return _ypSet_new(type, ypSet_ALLOC_HINT_MAX, /*alloclen_fixed=*/FALSE);
+    } else {
+        return _ypSet_new(type, alloc_hint, alloclen_fixed);
+    }
 }
 
 // XXX Check for the "lazy shallow copy" and "yp_frozenset_empty" cases first
@@ -15469,8 +15477,8 @@ static ypObject *_ypSet_push(ypObject *so, ypSet_KeyEntry *loc, ypObject *key, y
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
     // fast _ypSet_movekey_clean. Give mutable objects a bit of room to grow. If adding growhint
     // overflows ypSet_LEN_MAX (or yp_SSIZE_T_MAX), clamp to ypSet_LEN_MAX.
-    if (growhint < 0) growhint = 0;
     if (ypSet_LEN(so) > ypSet_LEN_MAX - 1) return yp_MemorySizeOverflowError;
+    growhint = yp_CLAMP(growhint, 0, ypSet_ALLOC_HINT_MAX);
     newlen = yp_USIZE_MATH(ypSet_LEN(so) + 1, +, growhint);
     if (newlen < 0 || newlen > ypSet_LEN_MAX) newlen = ypSet_LEN_MAX;  // addition overflowed
     result = _ypSet_resize(so, newlen);                                // invalidates loc
@@ -15683,7 +15691,6 @@ static ypObject *_ypSet_update_fromiter(ypObject *so, ypObject *mi, yp_uint64_t 
     ypObject  *result;
     yp_ssize_t spaceleft = _ypSet_space_remaining(so);
     // Ignore errors getting length_hint. Recall yp_miniiter_length_hintC returns zero on error.
-    // FIXME How does this handle excessively-large length hints?
     // FIXME Rewrite similarly to _ypSet_fromiterable?
     yp_ssize_t length_hint = yp_miniiter_length_hintC(mi, mi_state, &yp_exc_ignored);
 
@@ -16691,12 +16698,20 @@ static ypObject *yp_set_getintern(ypObject *set, ypObject *x)
 
 // Constructors
 
+// XXX Handle the "no items" case first.
 static ypObject *_ypSetNV(int type, int n, va_list args)
 {
     yp_ssize_t spaceleft;
     ypObject  *result;
-    ypObject  *newSo = _ypSet_new(type, n, /*alloclen_fixed=*/TRUE);
+    ypObject  *newSo;
+
+    yp_ASSERT1(n > 0);
+
+    // We set alloclen_fixed to TRUE here because we know for certain that we will not be adding
+    // more than n entries.
+    newSo = _ypSet_new_fromhint(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newSo)) return newSo;
+
     spaceleft = _ypSet_space_remaining(newSo);
     while (n > 0) {
         ypObject *x = va_arg(args, ypObject *);  // borrowed
@@ -16717,7 +16732,7 @@ static ypObject *_ypSetNV(int type, int n, va_list args)
 ypObject *yp_frozensetN(int n, ...)
 {
     if (n < 1) return yp_frozenset_empty;
-    return_yp_V_FUNC(ypObject *, _ypSetNV, (ypFrozenSet_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypSetNV, (ypFrozenSet_CODE, n, args), n);
 }
 ypObject *yp_frozensetNV(int n, va_list args)
 {
@@ -16728,7 +16743,7 @@ ypObject *yp_frozensetNV(int n, va_list args)
 ypObject *yp_setN(int n, ...)
 {
     if (n < 1) return _ypSet_new(ypSet_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return_yp_V_FUNC(ypObject *, _ypSetNV, (ypSet_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypSetNV, (ypSet_CODE, n, args), n);
 }
 ypObject *yp_setNV(int n, va_list args)
 {
@@ -16755,9 +16770,7 @@ static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
     if (yp_isexceptionC(mi)) return mi;
 
     // Ignore errors determining length_hint; it just means we can't pre-allocate
-    // FIXME Implement a similar "maximum length hint" everywhere.
     length_hint = yp_miniiter_length_hintC(mi, &mi_state, &yp_exc_ignored);
-    if (length_hint > ypSet_FROMITERABLE_LEN_MAX) length_hint = ypSet_FROMITERABLE_LEN_MAX;
 
     // FIXME Use a similar "empty iterable" optimization everywhere.
     first = yp_miniiter_next(mi, &mi_state);  // new ref
@@ -16777,7 +16790,7 @@ static ypObject *_ypSet_fromiterable(int type, ypObject *iterable)
         return exc;
     }
 
-    newSo = _ypSet_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
+    newSo = _ypSet_new_fromhint(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newSo)) {
         yp_decref(first);
         yp_decref(mi);
@@ -16852,6 +16865,12 @@ ypObject *yp_set(ypObject *iterable)
 #define ypDict_ALLOCLEN_MAX ypSet_ALLOCLEN_MAX
 #define ypDict_LEN_MAX ypSet_LEN_MAX
 
+// When (re)allocating a dict, limit the length hint of the item container to this amount. Per
+// Python (dict_new_presized): "There are no strict guarantee that returned dict can contain minused
+// items without resize. So we create medium size dict instead of very large dict or MemoryError."
+#define ypDict_ALLOC_HINT_MAX ypSet_ALLOC_HINT_MAX
+yp_STATIC_ASSERT(ypDict_ALLOC_HINT_MAX <= ypDict_LEN_MAX, ypDict_ALLOC_HINT_MAX_less_than_LEN_MAX);
+
 // Returns a pointer to the value element corresponding to the given key location
 #define ypDict_VALUE_ENTRY(mp, key_loc) \
     (&(ypDict_VALUES(mp)[ypSet_ENTRY_INDEX(ypDict_KEYSET(mp), key_loc)]))
@@ -16864,7 +16883,7 @@ yp_STATIC_ASSERT(
         (yp_SSIZE_T_MAX - yp_sizeof(ypDictObject)) / yp_sizeof(ypObject *) >= ypSet_ALLOCLEN_MAX,
         ypDict_alloclen_max_not_smaller_than_set_alloclen_max);
 
-// Returns a new, empty dict or frozendict object to hold minused entries
+// Returns a new, empty dict or frozendict object to hold at least minused entries.
 // XXX Check for the "yp_frozendict_empty" case first
 // TODO Put protection in place to detect when INLINE objects attempt to be resized
 // TODO Overallocate to avoid future resizings
@@ -16892,6 +16911,22 @@ static ypObject *_ypDict_new(int type, yp_ssize_t minused, int alloclen_fixed)
     ypDict_KEYSET(mp) = keyset;
     yp_memset(ypDict_VALUES(mp), 0, alloclen * yp_sizeof(ypObject *));
     return mp;
+}
+
+// Returns a new, empty dict or frozendict object to hold approximately alloc_hint entries. Use this
+// instead of _ypDict_new where alloc_hint may represent duplicate entries (e.g. _ypDictKV), or
+// where alloc_hint may be incorrect (e.g. _ypDict_new_fromiterable). If alloc_hint is geater than
+// ypDict_ALLOC_HINT_MAX, then alloclen_fixed is ignored and a variable container with at least
+// ypDict_ALLOC_HINT_MAX entries is returned.
+static ypObject *_ypDict_new_fromhint(int type, yp_ssize_t alloc_hint, int alloclen_fixed)
+{
+    if (alloc_hint > ypDict_ALLOC_HINT_MAX) {
+        // We ignore alloclen_fixed and always return a variable container here, because it's
+        // possible that we really do need to add alloc_hint objects to this dict.
+        return _ypDict_new(type, ypDict_ALLOC_HINT_MAX, /*alloclen_fixed=*/FALSE);
+    } else {
+        return _ypDict_new(type, alloc_hint, alloclen_fixed);
+    }
 }
 
 // If we are performing a shallow copy, we can share keysets and quickly memcpy the values
@@ -17026,8 +17061,8 @@ static ypObject *_ypDict_push_newkey(ypObject *mp, ypSet_KeyEntry **key_loc, ypO
     // Otherwise, we need to resize the table to add the key; on the bright side, we can use the
     // fast _ypSet_movekey_clean. Give mutable objects a bit of room to grow. If adding growhint
     // overflows ypSet_LEN_MAX (or yp_SSIZE_T_MAX), clamp to ypSet_LEN_MAX.
-    if (growhint < 0) growhint = 0;
     if (ypDict_LEN(mp) > ypSet_LEN_MAX - 1) return yp_MemorySizeOverflowError;
+    growhint = yp_CLAMP(growhint, 0, ypDict_ALLOC_HINT_MAX);
     newlen = yp_USIZE_MATH(ypDict_LEN(mp) + 1, +, growhint);
     if (newlen < 0 || newlen > ypSet_LEN_MAX) newlen = ypSet_LEN_MAX;  // addition overflowed
     result = _ypDict_resize(mp, newlen);  // invalidates keyset and *key_loc
@@ -17968,13 +18003,19 @@ static ypTypeObject ypDict_Type = {
 
 // Constructors
 
+// XXX Handle the "no items" case first.
 static ypObject *_ypDictKV(int type, int n, va_list args)
 {
     ypObject *newMp;
     ypObject *result;
 
-    newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
+    yp_ASSERT1(n > 0);
+
+    // We set alloclen_fixed to TRUE here because we know for certain that we will not be adding
+    // more than n entries.
+    newMp = _ypDict_new_fromhint(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;
+
     result = dict_updateK(newMp, n, args);
     if (yp_isexceptionC(result)) {
         yp_decref(newMp);
@@ -17986,7 +18027,7 @@ static ypObject *_ypDictKV(int type, int n, va_list args)
 ypObject *yp_frozendictK(int n, ...)
 {
     if (n < 1) return yp_frozendict_empty;
-    return_yp_V_FUNC(ypObject *, _ypDictKV, (ypFrozenDict_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypDictKV, (ypFrozenDict_CODE, n, args), n);
 }
 ypObject *yp_frozendictKV(int n, va_list args)
 {
@@ -17997,7 +18038,7 @@ ypObject *yp_frozendictKV(int n, va_list args)
 ypObject *yp_dictK(int n, ...)
 {
     if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    return_yp_V_FUNC(ypObject *, _ypDictKV, (ypDict_CODE, n, args), n);
+    return_yp_NV_FUNC(ypObject *, _ypDictKV, (ypDict_CODE, n, args), n);
 }
 ypObject *yp_dictKV(int n, va_list args)
 {
@@ -18016,22 +18057,17 @@ static ypObject *_ypDict_new_fromiterable(int type, ypObject *x)
 
     yp_ASSERT1(ypObject_TYPE_PAIR_CODE(x) != ypFrozenDict_CODE);
 
-    // FIXME How does this handle excessively-large length hints?
     // FIXME Rewrite similarly to _ypSet_fromiterable?
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(x, &yp_exc_ignored);
-        if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_update_fromiterable
         if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
         return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    } else if (length_hint > ypDict_LEN_MAX) {
-        // yp_lenC reports that we don't have room to add their elements
-        return yp_MemorySizeOverflowError;
     }
 
-    newMp = _ypDict_new(type, length_hint, /*alloclen_fixed=*/FALSE);
+    newMp = _ypDict_new_fromhint(type, length_hint, /*alloclen_fixed=*/FALSE);
     if (yp_isexceptionC(newMp)) return newMp;
     result = _ypDict_update_fromiterable(newMp, x);
     if (yp_isexceptionC(result)) {
@@ -18070,6 +18106,7 @@ ypObject *yp_dict(ypObject *x)
     return _ypDict_new_fromiterable(ypDict_CODE, x);
 }
 
+// XXX Handle the "no keys" and "value is exception" cases first.
 // TOOD ypQuickIter could consolidate this with _ypDict_fromkeys
 static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list args)
 {
@@ -18078,17 +18115,12 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
     ypObject  *key;
     ypObject  *newMp;
 
-    if (yp_isexceptionC(value)) return value;
+    yp_ASSERT1(n > 0);
+    yp_ASSERT1(!yp_isexceptionC(value));
 
-    if (n < 1) {
-        if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
-        return _ypDict_new(type, 0, /*alloclen_fixed=*/FALSE);
-    }
-
-    // FIXME Is there a better exception we should use? This _could_ be an insane number of
-    // identical keys, which would result in a minimal-sized dict.
-    if (n > ypDict_LEN_MAX) return yp_MemorySizeOverflowError;
-    newMp = _ypDict_new(type, n, /*alloclen_fixed=*/TRUE);
+    // We set alloclen_fixed to TRUE here because we know for certain that we will not be adding
+    // more than n entries.
+    newMp = _ypDict_new_fromhint(type, n, /*alloclen_fixed=*/TRUE);
     if (yp_isexceptionC(newMp)) return newMp;
     spaceleft = _ypSet_space_remaining(ypDict_KEYSET(newMp));
 
@@ -18106,19 +18138,27 @@ static ypObject *_ypDict_fromkeysNV(int type, ypObject *value, int n, va_list ar
 
 ypObject *yp_frozendict_fromkeysN(ypObject *value, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n);
+    if (yp_isexceptionC(value)) return value;
+    if (n < 1) return yp_frozendict_empty;
+    return_yp_NV_FUNC(ypObject *, _ypDict_fromkeysNV, (ypFrozenDict_CODE, value, n, args), n);
 }
 ypObject *yp_frozendict_fromkeysNV(ypObject *value, int n, va_list args)
 {
+    if (yp_isexceptionC(value)) return value;
+    if (n < 1) return yp_frozendict_empty;
     return _ypDict_fromkeysNV(ypFrozenDict_CODE, value, n, args);
 }
 
 ypObject *yp_dict_fromkeysN(ypObject *value, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n);
+    if (yp_isexceptionC(value)) return value;
+    if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
+    return_yp_NV_FUNC(ypObject *, _ypDict_fromkeysNV, (ypDict_CODE, value, n, args), n);
 }
 ypObject *yp_dict_fromkeysNV(ypObject *value, int n, va_list args)
 {
+    if (yp_isexceptionC(value)) return value;
+    if (n < 1) return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
     return _ypDict_fromkeysNV(ypDict_CODE, value, n, args);
 }
 
@@ -18135,26 +18175,21 @@ static ypObject *_ypDict_fromkeys(int type, ypObject *iterable, ypObject *value)
 
     if (yp_isexceptionC(value)) return value;
 
-    // FIXME How does this handle excessively-large length hints?
     // FIXME Rewrite similarly to _ypSet_fromiterable?
     length_hint = yp_lenC(iterable, &exc);
     if (yp_isexceptionC(exc)) {
         // Ignore errors determining length_hint; it just means we can't pre-allocate
         length_hint = yp_length_hintC(iterable, &yp_exc_ignored);
-        if (length_hint > ypDict_LEN_MAX) length_hint = ypDict_LEN_MAX;
     } else if (length_hint < 1) {
         // yp_lenC reports an empty iterable, so we can shortcut _ypDict_push
         if (type == ypFrozenDict_CODE) return yp_frozendict_empty;
         return _ypDict_new(ypDict_CODE, 0, /*alloclen_fixed=*/FALSE);
-    } else if (length_hint > ypDict_LEN_MAX) {
-        // yp_lenC reports that we don't have room to add their elements
-        return yp_MemorySizeOverflowError;
     }
 
     mi = yp_miniiter(iterable, &mi_state);  // new ref
     if (yp_isexceptionC(mi)) return mi;
 
-    newMp = _ypDict_new(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
+    newMp = _ypDict_new_fromhint(type, length_hint, /*alloclen_fixed=*/FALSE);  // new ref
     if (yp_isexceptionC(newMp)) {
         yp_decref(mi);
         return newMp;
@@ -20199,7 +20234,7 @@ ypObject *yp_setdefault(ypObject *mapping, ypObject *key, ypObject *defval)
 
 void yp_updateK(ypObject *mapping, ypObject **exc, int n, ...)
 {
-    return_yp_K_FUNC_void(yp_updateKV, (mapping, exc, n, args), n);
+    return_yp_KV_FUNC_void(yp_updateKV, (mapping, exc, n, args), n);
 }
 void yp_updateKV(ypObject *mapping, ypObject **exc, int n, va_list args)
 {
@@ -20214,7 +20249,7 @@ int yp_iscallableC(ypObject *x) { return ypObject_IS_CALLABLE(x); }
 // miscount would be disastrous).
 ypObject *yp_callN(ypObject *c, int n, ...)
 {
-    return_yp_V_FUNC(ypObject *, yp_callNV, (c, n, args), n);
+    return_yp_NV_FUNC(ypObject *, yp_callNV, (c, n, args), n);
 }
 
 ypObject *yp_callNV(ypObject *c, int n, va_list args)
