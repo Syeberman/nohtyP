@@ -12738,7 +12738,10 @@ static ypObject *tuple_find(ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssiz
 
     result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &sq_rlen);
     if (yp_isexceptionC(result)) return result;
-    if (sq_rlen < 1) goto not_found;
+    if (sq_rlen < 1) {
+        if (yp_isexceptionC(x)) return x;
+        goto not_found;
+    }
 
     if (direction == yp_FIND_REVERSE) {
         ypSlice_InvertIndicesC(&start, &stop, &step, sq_rlen);
@@ -12761,19 +12764,25 @@ static ypObject *tuple_count(
         ypObject *sq, ypObject *x, yp_ssize_t start, yp_ssize_t stop, yp_ssize_t *count)
 {
     ypObject  *result;
-    yp_ssize_t step = 1;  // ignored; assumed unchanged by ypSlice_AdjustIndicesC
-    yp_ssize_t newLen;    // ignored
+    yp_ssize_t step = 1;     // ignored; assumed unchanged by ypSlice_AdjustIndicesC
+    yp_ssize_t slicelength;
     yp_ssize_t i;
     yp_ssize_t n = 0;
 
-    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &newLen);
+    result = ypSlice_AdjustIndicesC(ypTuple_LEN(sq), &start, &stop, &step, &slicelength);
     if (yp_isexceptionC(result)) return result;
+
+    if (slicelength < 1) {
+        if (yp_isexceptionC(x)) return x;
+        goto succeed;
+    }
 
     for (i = start; i < stop; i++) {
         result = yp_eq(x, ypTuple_ARRAY(sq)[i]);
         if (yp_isexceptionC(result)) return result;
         if (ypBool_IS_TRUE_C(result)) n += 1;
     }
+succeed:
     *count = n;
     return yp_None;
 }
@@ -13065,6 +13074,9 @@ static ypObject *tuple_currenthash(
 static ypObject *tuple_contains(ypObject *sq, ypObject *x)
 {
     yp_ssize_t i;
+
+    if (ypTuple_LEN(sq) < 1) return yp_isexceptionC(x) ? x : yp_False;
+
     for (i = 0; i < ypTuple_LEN(sq); i++) {
         ypObject *result = yp_eq(x, ypTuple_ARRAY(sq)[i]);
         if (result != yp_False) return result;  // yp_True, or an exception
