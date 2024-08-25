@@ -2179,11 +2179,9 @@ typedef struct _ypFunctionObject {
 #endif
 
 // "Constructors" for immortal objects; implementation considered "internal", documentation above
-#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                               \
-    {                                                                                     \
-        (type), 0, (type_flags), _ypObject_REFCNT_IMMORTAL, (len), _ypObject_LEN_INVALID, \
-                _ypObject_HASH_INVALID, (data)                                            \
-    }
+#define _yp_IMMORTAL_HEAD_INIT(type, type_flags, len, data)                            \
+    {(type), 0, (type_flags), _ypObject_REFCNT_IMMORTAL, (len), _ypObject_LEN_INVALID, \
+            _ypObject_HASH_INVALID, (data)}
 #define _yp_IMMORTAL_INT(qual, name, value)                                                \
     static struct _ypIntObject _##name##_struct = {                                        \
             _yp_IMMORTAL_HEAD_INIT(_ypInt_CODE, 0, _ypObject_LEN_INVALID, NULL), (value)}; \

@@ -5,15 +5,10 @@
 
 // Sequences should accept themselves, their pairs, iterators, and tuple/list as valid types for the
 // "x" (i.e. "other iterable") argument.
-#define x_types_init(type)                                                                   \
-    {                                                                                        \
-        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, NULL \
-    }
+#define x_types_init(type) \
+    {(type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list, NULL}
 
-#define friend_types_init(type)    \
-    {                              \
-        (type), (type)->pair, NULL \
-    }
+#define friend_types_init(type) {(type), (type)->pair, NULL}
 
 
 typedef struct _slice_args_t {
@@ -534,6 +529,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 
     // Exception passthrough.
     assert_isexception(yp_getitem(sq, yp_SyntaxError), yp_SyntaxError);
+    assert_isexception(yp_getitem(empty, yp_SyntaxError), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -602,6 +598,7 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     // Exception passthrough.
     assert_isexception(yp_getdefault(sq, yp_SyntaxError, items[2]), yp_SyntaxError);
+    assert_isexception(yp_getdefault(empty, yp_SyntaxError, items[2]), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -747,6 +744,10 @@ static MunitResult _test_findC(fixture_type_t *type,
     // Exception passthrough.
     assert_isexception_exc(any_findC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
     assert_isexception_exc(any_findC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+    assert_isexception_exc(any_findC5(sq, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
+    assert_isexception_exc(any_findC(empty, yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_isexception_exc(any_findC5(empty, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+    assert_isexception_exc(any_findC5(empty, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 
@@ -900,6 +901,10 @@ static MunitResult test_countC(const MunitParameter params[], fixture_t *fixture
     // Exception passthrough.
     assert_isexception_exc(yp_countC(sq, yp_SyntaxError, &exc), yp_SyntaxError);
     assert_isexception_exc(yp_countC5(sq, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+    assert_isexception_exc(yp_countC5(sq, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
+    assert_isexception_exc(yp_countC(empty, yp_SyntaxError, &exc), yp_SyntaxError);
+    assert_isexception_exc(yp_countC5(empty, yp_SyntaxError, 0, 1, &exc), yp_SyntaxError);
+    assert_isexception_exc(yp_countC5(empty, yp_SyntaxError, 0, 0, &exc), yp_SyntaxError);
 
     assert_sequence(sq, items[0], items[1]);  // sq unchanged.
 

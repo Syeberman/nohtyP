@@ -8,12 +8,10 @@
 // Mappings should accept themselves, their pairs, iterators, and frozendict/dict as
 // valid types for the "x" (i.e. "other iterable") argument.
 // FIXME "Shared key" versions, somehow? fixture_type_frozendict_shared, fixture_type_dict_shared
-#define x_types_init(type)                                                                 \
-    {                                                                                      \
-        (type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list,    \
-                fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
-                fixture_type_dict_dirty, NULL                                              \
-    }
+#define x_types_init(type)                                                             \
+    {(type), (type)->pair, fixture_type_iter, fixture_type_tuple, fixture_type_list,   \
+            fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
+            fixture_type_dict_dirty, NULL}
 
 
 // The test_contains in test_collection checks for the behaviour shared amongst all collections;
@@ -103,6 +101,7 @@ static MunitResult test_getitem(const MunitParameter params[], fixture_t *fixtur
 
     // Exception passthrough.
     assert_isexception(yp_getitem(mp, yp_SyntaxError), yp_SyntaxError);
+    assert_isexception(yp_getitem(empty, yp_SyntaxError), yp_SyntaxError);
 
     assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged
 
@@ -166,6 +165,7 @@ static MunitResult test_getdefault(const MunitParameter params[], fixture_t *fix
 
     // Exception passthrough.
     assert_isexception(yp_getdefault(mp, yp_SyntaxError, values[2]), yp_SyntaxError);
+    assert_isexception(yp_getdefault(empty, yp_SyntaxError, values[2]), yp_SyntaxError);
 
     assert_mapping(mp, keys[0], values[0], keys[1], values[1]);  // mp unchanged
 
@@ -666,6 +666,7 @@ static MunitResult test_setdefault(const MunitParameter params[], fixture_t *fix
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_isexception(yp_setdefault(mp, yp_SyntaxError, values[2]), yp_SyntaxError);
+        assert_isexception(yp_setdefault(mp, keys[0], yp_SyntaxError), yp_SyntaxError);
         assert_isexception(yp_setdefault(mp, keys[2], yp_SyntaxError), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);
         yp_decref(mp);
@@ -845,9 +846,12 @@ static MunitResult test_updateK(const MunitParameter params[], fixture_t *fixtur
     {
         ypObject *mp = type->newK(K(keys[0], values[0], keys[1], values[1]));
         assert_isexception_exc(yp_updateK(mp, &exc, K(yp_SyntaxError, values[2])), yp_SyntaxError);
+        assert_isexception_exc(yp_updateK(mp, &exc, K(keys[0], yp_SyntaxError)), yp_SyntaxError);
         assert_isexception_exc(yp_updateK(mp, &exc, K(keys[2], yp_SyntaxError)), yp_SyntaxError);
         assert_isexception_exc(
                 updateK_to_updateKV(mp, &exc, K(yp_SyntaxError, values[2])), yp_SyntaxError);
+        assert_isexception_exc(
+                updateK_to_updateKV(mp, &exc, K(keys[0], yp_SyntaxError)), yp_SyntaxError);
         assert_isexception_exc(
                 updateK_to_updateKV(mp, &exc, K(keys[2], yp_SyntaxError)), yp_SyntaxError);
         assert_mapping(mp, keys[0], values[0], keys[1], values[1]);

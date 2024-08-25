@@ -1,6 +1,12 @@
 
 #include "munit_test/unittest.h"
 
+// TODO Ensure yp_startswithC4/yp_endswithC4/yp_replaceC4/yp_lstrip2/yp_splitlines2/yp_encode3/etc
+// properly handles exception passthrough, even in cases where one of the arguments would be ignored
+// (e.g. empty str, empty slice).
+// TODO This (exception passthrough) even includes yp_formatN/etc where the argument is never
+// referenced in the format string.
+
 
 // Shared tests for yp_findC5, yp_indexC5, yp_rfindC5, yp_rindexC5, etc. The _test_findC in
 // test_sequence checks for the behaviour shared amongst all sequences; this _test_findC considers
@@ -38,7 +44,7 @@ static MunitResult _test_findC(fixture_type_t *type,
     assert_not_found_exc(any_findC(string, other_0_2, &exc));                // Out-of-order.
     assert_not_found_exc(any_findC(string, other_1_0, &exc));                // Out-of-order.
     assert_ssizeC_exc(any_findC(string, empty, &exc), ==, forward ? 0 : 3);  // Empty.
-    assert_ssizeC_exc(any_findC(string, string, &exc), ==, 0);                 // Self.
+    assert_ssizeC_exc(any_findC(string, string, &exc), ==, 0);               // Self.
 
     assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 3, &exc), ==, 0);  // Total slice.
     assert_ssizeC_exc(any_findC5(string, other_0_1, 0, 2, &exc), ==, 0);  // Exact slice.
@@ -50,8 +56,9 @@ static MunitResult _test_findC(fixture_type_t *type,
     assert_not_found_exc(any_findC5(string, other_1_2, 1, 1, &exc));      // Empty slice.
 
     assert_ssizeC_exc(any_findC5(string, empty, 0, 3, &exc), ==, forward ? 0 : 3);  // Empty, total.
-    assert_ssizeC_exc(any_findC5(string, empty, 1, 2, &exc), ==, forward ? 1 : 2);  // Empty, partial.
-    assert_ssizeC_exc(any_findC5(string, empty, 2, 2, &exc), ==, 2);                // Empty, empty.
+    assert_ssizeC_exc(
+            any_findC5(string, empty, 1, 2, &exc), ==, forward ? 1 : 2);  // Empty, partial.
+    assert_ssizeC_exc(any_findC5(string, empty, 2, 2, &exc), ==, 2);      // Empty, empty.
 
     // TODO That empty slice bug thing.
     // TODO !forward substrings?

@@ -5,17 +5,13 @@
 // TODO fixture_type_frozenset, fixture_type_set, fixture_type_frozenset_dirty, and
 // fixture_type_set_dirty are tricky because they require hashable types but in (key, value) the
 // value may not be hashable.
-#define x_types_init()                                                                          \
-    {                                                                                           \
-        fixture_type_frozendict, fixture_type_dict, fixture_type_iter, fixture_type_tuple,      \
-                fixture_type_list, fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL \
-    }
+#define x_types_init()                                                                  \
+    {fixture_type_frozendict, fixture_type_dict, fixture_type_iter, fixture_type_tuple, \
+            fixture_type_list, fixture_type_frozendict_dirty, fixture_type_dict_dirty, NULL}
 
-#define friend_types_init()                                                        \
-    {                                                                              \
-        fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
-                fixture_type_dict_dirty, NULL                                      \
-    }
+#define friend_types_init()                                                     \
+    {fixture_type_frozendict, fixture_type_dict, fixture_type_frozendict_dirty, \
+            fixture_type_dict_dirty, NULL}
 
 // Returns true iff type can store unhashable objects.
 static int type_stores_unhashables(fixture_type_t *type)
@@ -528,9 +524,6 @@ static MunitResult _test_fromkeysN(fixture_type_t *type,
         yp_decrefN(N(mp));
     }
 
-    // FIXME large n......Impossible as you'd have to have that many arguments, so change the
-    // code to limit it somehow. (test everywhere)
-
     // Duplicate keys.
     {
         ypObject *mp = any_fromkeysN(values[0], N(keys[0], keys[1], keys[1], keys[0]));
@@ -659,9 +652,6 @@ static MunitResult _test_fromkeys(fixture_type_t *type,
     // Exception passthrough.
     if (test_exception_passthrough) {
         assert_isexception(any_fromkeys(yp_SyntaxError, yp_None), yp_SyntaxError);
-        // FIXME Initially this didn't fail because we only checked value for an exception when
-        // trying to push to the dict. Add more tests everywhere to ensure that all exceptions are
-        // passed through even for paths that may be skipped (i.e. multiple arguments).
         assert_isexception(any_fromkeys(yp_tuple_empty, yp_SyntaxError), yp_SyntaxError);
     }
 

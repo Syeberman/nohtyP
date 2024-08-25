@@ -170,32 +170,32 @@ extern "C" {
 
 
 // parameters can be NULL.
-#define TEST(name, parameters)                                         \
-    {                                                                  \
-        "/" #name,                                    /* name */       \
-                (MunitTestFunc)(name),                /* test */       \
-                (MunitTestSetup)fixture_setup,        /* setup */      \
-                (MunitTestTearDown)fixture_tear_down, /* tear_down */  \
-                MUNIT_TEST_OPTION_NONE,               /* options */    \
-                parameters                            /* parameters */ \
+#define TEST(name, parameters)                                     \
+    {                                                              \
+            "/" #name,                            /* name */       \
+            (MunitTestFunc)(name),                /* test */       \
+            (MunitTestSetup)fixture_setup,        /* setup */      \
+            (MunitTestTearDown)fixture_tear_down, /* tear_down */  \
+            MUNIT_TEST_OPTION_NONE,               /* options */    \
+            parameters                            /* parameters */ \
     }
 
-#define SUITE_OF_TESTS(name)                             \
-    {                                                    \
-        "/" #name,                      /* prefix */     \
-                (name##_tests),         /* tests */      \
-                NULL,                   /* suites */     \
-                1,                      /* iterations */ \
-                MUNIT_SUITE_OPTION_NONE /* options */    \
+#define SUITE_OF_TESTS(name)                         \
+    {                                                \
+            "/" #name,              /* prefix */     \
+            (name##_tests),         /* tests */      \
+            NULL,                   /* suites */     \
+            1,                      /* iterations */ \
+            MUNIT_SUITE_OPTION_NONE /* options */    \
     }
 
-#define SUITE_OF_SUITES(name)                            \
-    {                                                    \
-        "/" #name,                      /* prefix */     \
-                NULL,                   /* tests */      \
-                (name##_suites),        /* suites */     \
-                1,                      /* iterations */ \
-                MUNIT_SUITE_OPTION_NONE /* options */    \
+#define SUITE_OF_SUITES(name)                        \
+    {                                                \
+            "/" #name,              /* prefix */     \
+            NULL,                   /* tests */      \
+            (name##_suites),        /* suites */     \
+            1,                      /* iterations */ \
+            MUNIT_SUITE_OPTION_NONE /* options */    \
     }
 
 
@@ -832,7 +832,7 @@ typedef struct _fixture_type_t {
     int is_mutable;
     int is_numeric;
     int is_iterable;
-    int is_collection;  // FIXME FIXME nohtyP.h calls this "container", but Python abc is collection
+    int is_collection;  // TODO nohtyP.h calls this "container", but Python abc is collection
     int is_sequence;
     int is_string;
     int is_setlike;
@@ -969,10 +969,7 @@ extern ypObject *new_faulty_iter(
 // times. n must be an integer literal. Example:
 //
 //      ypObject *items[] = obj_array_init(5, rand_obj_any());
-#define obj_array_init(n, expression)  \
-    {                                  \
-        _COMMA_REPEAT##n((expression)) \
-    }
+#define obj_array_init(n, expression) {_COMMA_REPEAT##n((expression))}
 
 // Fills the ypObject * array using the given filler. Only call for arrays of fixed size (uses
 // yp_lengthof_array). Example:

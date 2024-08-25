@@ -1,6 +1,10 @@
 #include "munit_test/unittest.h"
 
 
+// TODO Ensure yp_or/yp_orN/yp_anyN and yp_and/yp_andN/yp_allN properly handles exception
+// passthrough, even in cases where one of the arguments would be ignored.
+
+
 // Ensures that yp_TypeError or similar is raised when a type doesn't support a protocol. This
 // doesn't deal with methods only supported on mutable or immutable types: mutability is not a
 // "protocol".
@@ -8,6 +12,9 @@
 // everything below just be yp_TypeError? I'm choosing the equivalent to what Python raises but the
 // distinction is sometimes arbitrary (i.e. in Python next is a function but close is a method).
 // TODO This test could also check exceptions and invalidateds return correct exceptions.
+// TODO Wherever we ensure exceptions and invalidateds return the correct exceptions, we should also
+// ensure that they do so where the arguments would otherwise be "ignored" (i.e. an empty slice
+// might ignore the object, but we need to ensure exception passthrough works).
 static MunitResult test_unsupported_protocols(const MunitParameter params[], fixture_t *fixture)
 {
     fixture_type_t *type = fixture->type;
